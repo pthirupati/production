@@ -11,20 +11,20 @@ max_score: 100
 is_free: false
 infrastructure_type: docker
 jira_priority: Medium
-description: 'Production alert: app works only with SELinux permissive. You are on
-  call for RHEL Linux and must troubleshoot SELinux policy methodically — triage symptoms,
-  find root cause, apply the smallest safe fix, and confirm recovery.'
+description: 'Production alert: a service is denied despite correct Unix permissions.
+  You are on call for RHEL Linux and must troubleshoot SELinux policy methodically
+  — triage symptoms, find root cause, apply the smallest safe fix, and confirm recovery.'
 objectives:
-- 'The incident symptom is clear: app works only with SELinux permissive'
+- 'The incident symptom is clear: a service is denied despite correct Unix permissions'
 - Root cause is isolated with evidence, not guesswork
 - Service behavior returns to normal after the fix
-initial_state: The RHEL practice host is degraded. App works only with selinux permissive.
-  Recent changes may exist around SELinux policy, but do not restart blindly — gather
-  evidence first.
+initial_state: The RHEL practice host is degraded. A service is denied despite correct
+  unix permissions. Recent changes may exist around SELinux policy, but do not restart
+  blindly — gather evidence first.
 hints:
 - order: 1
   cost: 10
-  content: 'Triage: `audit2allow`, `semanage`, and `restorecon`. Capture timestamps,
+  content: 'Triage: `getenforce`, `ausearch -m avc`, and `semanage`. Capture timestamps,
     error messages, and what still works.'
 - order: 2
   cost: 15
@@ -32,6 +32,6 @@ hints:
     the noisy log line.
 - order: 3
   cost: 20
-  content: 'Verify recovery: policy allows required paths/ports while staying enforcing.
-    Document the fix, add `# FIXED-OK` to `/opt/fixitlab/academy/academy-rhel-linux-014-troubleshoot-selinux-policy-2.conf`,
+  content: 'Verify recovery: the service runs with the right context and no new AVC
+    denials. Document the fix, add `# FIXED-OK` to `/opt/fixitlab/academy/academy-rhel-linux-014-troubleshoot-selinux-policy-2.conf`,
     and rerun Check Solution.'

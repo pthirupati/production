@@ -383,19 +383,113 @@ _WRITERS = {
 }
 
 
+# Topic fallback commands so EVERY module shows real syntax/commands even when a
+# topic profile has no curated `commands` map. Keyed by a lowercase substring of
+# the course topic. (lang, {section_key: command}).
+_FALLBACK_CMDS: dict[str, tuple[str, dict[str, str]]] = {
+    "linux": ("bash", {
+        "labs": "id; whoami\nsystemctl status sshd\njournalctl -xe | tail -20",
+        "troubleshooting": "journalctl -p err -b\ndmesg -T | tail\nss -tulpn",
+        "monitoring": "top -b -n1 | head\nfree -h\ndf -h",
+        "security": "sudo -l\ngetent passwd\nss -tulpn",
+    }),
+    "rhel": ("bash", {
+        "labs": "subscription-manager status\ndnf repolist\nsystemctl status firewalld",
+        "troubleshooting": "ausearch -m avc -ts recent\njournalctl -xe\ndnf history",
+        "monitoring": "systemctl --failed\nchronyc tracking",
+        "security": "getenforce\nfirewall-cmd --list-all\nsemanage boolean -l | head",
+    }),
+    "docker": ("bash", {
+        "labs": "docker ps -a\ndocker compose up -d\ndocker logs <container>",
+        "troubleshooting": "docker inspect <container> | jq '.[0].State'\ndocker logs --tail 50 <container>\ndocker stats --no-stream",
+        "monitoring": "docker stats --no-stream\ndocker system df",
+        "security": "docker scout cves <image>\ndocker inspect <container> | jq '.[0].HostConfig.Privileged'",
+    }),
+    "kubernetes": ("bash", {
+        "labs": "kubectl get pods -A\nkubectl describe pod <pod>\nkubectl apply -f manifest.yaml",
+        "troubleshooting": "kubectl get events --sort-by=.lastTimestamp\nkubectl logs <pod> --previous\nkubectl describe pod <pod>",
+        "monitoring": "kubectl top pods\nkubectl get hpa",
+        "security": "kubectl auth can-i --list\nkubectl get netpol",
+    }),
+    "terraform": ("hcl", {
+        "labs": "terraform init\nterraform plan -out=tfplan\nterraform apply tfplan",
+        "troubleshooting": "terraform plan -refresh-only\nterraform state list\nterraform validate",
+        "monitoring": "terraform state list\nterraform show",
+        "security": "terraform plan | grep -i 'sensitive\\|secret'",
+    }),
+    "ansible": ("yaml", {
+        "labs": "ansible -m ping all\nansible-playbook site.yml --check --diff\nansible-playbook site.yml",
+        "troubleshooting": "ansible-playbook site.yml -vvv\nansible -m setup <host>",
+        "monitoring": "ansible all -m command -a 'uptime'",
+        "security": "ansible-vault view secrets.yml",
+    }),
+    "python": ("python", {
+        "labs": "python -m venv .venv && source .venv/bin/activate\npip install -r requirements.txt\npython -m pytest -q",
+        "troubleshooting": "python -X faulthandler app.py\npython -m pdb app.py",
+        "monitoring": "python -m cProfile -s cumtime app.py | head",
+        "security": "pip-audit\nbandit -r .",
+    }),
+    "git": ("bash", {
+        "labs": "git status\ngit checkout -b feature/x\ngit add -p && git commit -m 'msg'",
+        "troubleshooting": "git log --oneline --graph --decorate\ngit reflog\ngit bisect start",
+        "monitoring": "git log --stat -5",
+        "security": "git secret list 2>/dev/null; git log -p | grep -i password | head",
+    }),
+    "sql": ("sql", {
+        "labs": "SELECT version();\nEXPLAIN ANALYZE SELECT * FROM orders WHERE id = 1;",
+        "troubleshooting": "SELECT * FROM pg_stat_activity WHERE state <> 'idle';",
+        "monitoring": "SELECT * FROM pg_stat_user_tables ORDER BY n_dead_tup DESC LIMIT 5;",
+        "security": "SELECT grantee, privilege_type FROM information_schema.role_table_grants LIMIT 10;",
+    }),
+    "prometheus": ("promql", {
+        "labs": "up\nrate(http_requests_total[5m])\nhistogram_quantile(0.95, rate(http_request_duration_seconds_bucket[5m]))",
+        "troubleshooting": "count(up == 0) by (job)",
+        "monitoring": "rate(node_cpu_seconds_total{mode=\"idle\"}[5m])",
+    }),
+    "grafana": ("bash", {
+        "labs": "# Add a Prometheus datasource, then build a panel:\nsum(rate(http_requests_total[5m])) by (status)",
+        "troubleshooting": "curl -s http://localhost:3000/api/health",
+        "monitoring": "curl -s http://localhost:3000/api/datasources",
+    }),
+}
+
+
+def _fallback_for(topic: str) -> tuple[str, dict[str, str]] | None:
+    t = (topic or "").lower()
+    for key, val in _FALLBACK_CMDS.items():
+        if key in t:
+            return val
+    return None
+
+
 def _build_code(section_key: str, topic: str, module: str, profile: dict) -> tuple[str, str, str]:
     cmds = profile.get("commands") or {}
-    if section_key == "labs" and cmds:
-        key = next(iter(cmds))
-        code = cmds[key] if isinstance(cmds[key], str) else str(cmds[key])
-        return f"# {module}\n{code}", "bash", f"{topic} hands-on — run in playground"
-    if section_key == "concepts" and cmds:
-        code = "\n".join(f"# {k}\n{v}" for k, v in list(cmds.items())[:3])
-        return code, "bash", "Reference commands for this module"
+    fb = _fallback_for(topic)
+    fb_lang = fb[0] if fb else "bash"
+    fb_map = fb[1] if fb else {}
+
+    if section_key == "labs":
+        if cmds:
+            key = next(iter(cmds))
+            code = cmds[key] if isinstance(cmds[key], str) else str(cmds[key])
+            return f"# {module}\n{code}", "bash", f"{topic} hands-on — run in playground"
+        if fb_map.get("labs"):
+            return f"# {module}\n{fb_map['labs']}", fb_lang, f"{topic} hands-on — run in playground"
+    if section_key == "concepts":
+        if cmds:
+            code = "\n".join(f"# {k}\n{v}" for k, v in list(cmds.items())[:3])
+            return code, "bash", "Reference commands for this module"
+        if fb_map.get("labs"):
+            return f"# Reference commands\n{fb_map['labs']}", fb_lang, "Reference commands for this module"
     if section_key == "troubleshooting":
-        return f"# Diagnose: {module}\n{list(cmds.values())[0] if cmds else 'echo check logs'}", "bash", "Diagnostic starter"
-    if section_key == "monitoring" and cmds:
-        return list(cmds.values())[-1], "bash", "Health / metrics check"
+        diag = fb_map.get("troubleshooting") or (list(cmds.values())[0] if cmds else "echo 'check logs, metrics, and recent changes'")
+        return f"# Diagnose: {module}\n{diag}", fb_lang if fb_map.get("troubleshooting") else "bash", "Diagnostic starter"
+    if section_key == "monitoring":
+        mon = fb_map.get("monitoring") or (list(cmds.values())[-1] if cmds else "")
+        if mon:
+            return mon, fb_lang if fb_map.get("monitoring") else "bash", "Health / metrics check"
+    if section_key == "security" and fb_map.get("security"):
+        return f"# Security checks: {module}\n{fb_map['security']}", fb_lang, "Security/hardening checks"
     return "", "text", ""
 
 

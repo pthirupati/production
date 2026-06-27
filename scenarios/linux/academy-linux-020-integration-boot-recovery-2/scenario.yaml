@@ -1,4 +1,4 @@
-title: 'Linux Administration: Linux Boot Recovery — Integration Lab'
+title: 'Linux Administration: Boot Recovery — Integration Lab'
 slug: academy-linux-020-integration-boot-recovery-2
 technology: Linux Administration
 category: Cross-Technology
@@ -11,15 +11,15 @@ max_score: 100
 is_free: false
 infrastructure_type: docker
 jira_priority: Medium
-description: 'Integration lab: connect Linux boot recovery with an adjacent platform
-  in the Linux Administration stack. Validate authentication, data handoff, and failure
-  behavior for initramfs, GRUB, fstab, and emergency mode.'
+description: 'Integration lab: connect boot recovery with an adjacent platform in
+  the Linux Administration stack. Validate authentication, data handoff, and failure
+  behavior for GRUB, initramfs, fstab, and rescue targets.'
 objectives:
-- Linux boot recovery is connected to the adjacent system successfully
+- boot recovery is connected to the adjacent system successfully
 - Handoff points are authenticated and observable
 - End-to-end workflow completes without manual intervention
-initial_state: Two systems are deployed but not fully wired together for Linux boot
-  recovery. Downstream consumers are waiting on this integration path.
+initial_state: Two systems are deployed but not fully wired together for boot recovery.
+  Downstream consumers are waiting on this integration path.
 hints:
 - order: 1
   cost: 10

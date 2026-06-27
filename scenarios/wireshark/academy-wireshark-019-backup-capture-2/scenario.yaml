@@ -1,4 +1,4 @@
-title: 'Wireshark Packet Analysis: Packet Capture — Backup and Recovery'
+title: 'Wireshark Packet Analysis: Capturing Traffic — Backup and Recovery'
 slug: academy-wireshark-019-backup-capture-2
 technology: Wireshark Packet Analysis
 category: Backup & Recovery
@@ -11,14 +11,14 @@ max_score: 100
 is_free: false
 infrastructure_type: docker
 jira_priority: Medium
-description: Backup and recovery drill for packet capture. Ensure backups run on schedule,
-  retention is correct, and you can restore snaplen, buffers, filters, and file rotation
-  within the lab RTO.
+description: Backup and recovery drill for capturing traffic. Ensure backups run on
+  schedule, retention is correct, and you can restore interfaces, capture filters,
+  and ring buffers within the lab RTO.
 objectives:
-- Backup coverage for packet capture is complete and restorable
+- Backup coverage for capturing traffic is complete and restorable
 - Retention and encryption meet the stated policy
 - A restore drill proves data integrity
-initial_state: Backup jobs exist but reliability is uncertain for packet capture.
+initial_state: Backup jobs exist but reliability is uncertain for capturing traffic.
   Leadership wants proof that restore works — not just that backup scripts exit zero.
 hints:
 - order: 1

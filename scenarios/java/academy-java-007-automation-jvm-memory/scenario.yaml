@@ -12,7 +12,7 @@ is_free: false
 infrastructure_type: docker
 jira_priority: Medium
 description: 'Automation lab: remove toil around JVM memory. Codify repeatable steps
-  for heap, GC logs, metaspace, and OOM dumps and prove the automation is idempotent.'
+  for heap, GC, and OutOfMemory diagnosis and prove the automation is idempotent.'
 objectives:
 - Day-2 JVM memory work completes safely in this environment
 - Changes are verified with before/after checks

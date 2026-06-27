@@ -1,4 +1,4 @@
-title: 'Bare Metal & IPMI: Serial/Ipmi Console — Integration Lab'
+title: 'Bare Metal & IPMI: Serial/Remote Console — Integration Lab'
 slug: academy-baremetal-060-integration-console-6
 technology: Bare Metal & IPMI
 category: Cross-Technology
@@ -11,14 +11,14 @@ max_score: 100
 is_free: false
 infrastructure_type: docker
 jira_priority: Medium
-description: 'Integration lab: connect serial/IPMI console with an adjacent platform
+description: 'Integration lab: connect serial/remote console with an adjacent platform
   in the Bare Metal & IPMI stack. Validate authentication, data handoff, and failure
-  behavior for SOL, baud, login prompts, and firmware access.'
+  behavior for out-of-band console access.'
 objectives:
-- serial/IPMI console is connected to the adjacent system successfully
+- serial/remote console is connected to the adjacent system successfully
 - Handoff points are authenticated and observable
 - End-to-end workflow completes without manual intervention
-initial_state: Two systems are deployed but not fully wired together for serial/IPMI
+initial_state: Two systems are deployed but not fully wired together for serial/remote
   console. Downstream consumers are waiting on this integration path.
 hints:
 - order: 1

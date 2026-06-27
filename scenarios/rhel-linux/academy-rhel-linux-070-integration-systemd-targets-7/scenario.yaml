@@ -13,7 +13,7 @@ infrastructure_type: docker
 jira_priority: Medium
 description: 'Integration lab: connect systemd targets with an adjacent platform in
   the RHEL Linux stack. Validate authentication, data handoff, and failure behavior
-  for default target, dependencies, and rescue mode.'
+  for boot targets, default target, and isolation.'
 objectives:
 - systemd targets is connected to the adjacent system successfully
 - Handoff points are authenticated and observable

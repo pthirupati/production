@@ -1,4 +1,4 @@
-title: 'HTML & Web Servers: Html Metadata — Integration Lab'
+title: 'HTML & Web Servers: Metadata — Integration Lab'
 slug: academy-html-080-integration-metadata-8
 technology: HTML & Web Servers
 category: Cross-Technology
@@ -11,14 +11,14 @@ max_score: 100
 is_free: false
 infrastructure_type: docker
 jira_priority: Medium
-description: 'Integration lab: connect HTML metadata with an adjacent platform in
-  the HTML & Web Servers stack. Validate authentication, data handoff, and failure
-  behavior for title, meta tags, OpenGraph, and canonical URLs.'
+description: 'Integration lab: connect metadata with an adjacent platform in the HTML
+  & Web Servers stack. Validate authentication, data handoff, and failure behavior
+  for head tags, Open Graph, and favicons.'
 objectives:
-- HTML metadata is connected to the adjacent system successfully
+- metadata is connected to the adjacent system successfully
 - Handoff points are authenticated and observable
 - End-to-end workflow completes without manual intervention
-initial_state: Two systems are deployed but not fully wired together for HTML metadata.
+initial_state: Two systems are deployed but not fully wired together for metadata.
   Downstream consumers are waiting on this integration path.
 hints:
 - order: 1

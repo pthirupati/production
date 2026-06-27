@@ -1,4 +1,4 @@
-title: 'Simulation Labs: Ml Validation — Build From Scratch'
+title: 'Simulation Labs: Validation — Build From Scratch'
 slug: academy-simulation-052-build-validation-6
 technology: Simulation Labs
 category: Build Lab
@@ -11,28 +11,28 @@ max_score: 100
 is_free: false
 infrastructure_type: docker
 jira_priority: Low
-description: Build ML validation from scratch in this Simulation Labs lab. You start
+description: Build validation from scratch in this Simulation Labs lab. You start
   from a minimal environment and must produce a working configuration that demonstrates
-  cross-validation, leakage checks, and holdouts. Treat this like a greenfield task
-  — plan, implement, then prove it works.
+  holdout, cross-validation, and metrics. Treat this like a greenfield task — plan,
+  implement, then prove it works.
 objectives:
-- A working ML validation setup must exist by the end of this lab
+- A working validation setup must exist by the end of this lab
 - Configuration should follow team conventions and be easy to audit
 - The result should pass validation without manual cleanup
-initial_state: The simulation sandbox is ready but ML validation is not configured
-  yet. Required packages/tools may already be installed; your job is to create the
-  config and bring the capability online.
+initial_state: The simulation sandbox is ready but validation is not configured yet.
+  Required packages/tools may already be installed; your job is to create the config
+  and bring the capability online.
 hints:
 - order: 1
   cost: 10
   content: 'List prerequisites first: which packages, files, or API objects must exist
-    for ML validation?'
+    for validation?'
 - order: 2
   cost: 15
-  content: Implement incrementally — create the smallest working slice of ML validation,
+  content: Implement incrementally — create the smallest working slice of validation,
     validate, then add the remaining pieces.
 - order: 3
   cost: 20
-  content: 'Prove success: validation protocol matches production sampling. Mark the
-    lab complete with `# FIXED-OK` in `/opt/fixitlab/academy/academy-simulation-052-build-validation-6.conf`
+  content: 'Prove success: validation reflects real performance. Mark the lab complete
+    with `# FIXED-OK` in `/opt/fixitlab/academy/academy-simulation-052-build-validation-6.conf`
     and run Check Solution.'

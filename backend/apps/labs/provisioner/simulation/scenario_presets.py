@@ -4447,3 +4447,29 @@ try:
     _PRESETS.update(_COMPLETE_TECH_PRESETS)
 except Exception:  # pragma: no cover
     pass
+
+# ── Flagship real-simulation presets (override the marker preset by exact slug) ──
+# These upgrade a curated set of academy labs from `grep FIXED-OK` markers to a
+# genuinely broken OS state (failed service, missing user, closed firewall port,
+# stopped compose stack) validated against the real state. Merged LAST so they
+# win over the generated COMPLETE_TECH_PRESETS marker for the same slug.
+try:
+    from .flagship_presets import FLAGSHIP_PRESETS as _FLAGSHIP_PRESETS
+    _PRESETS.update(_FLAGSHIP_PRESETS)
+except Exception:  # pragma: no cover
+    pass
+
+
+def _mtu_mismatch_marker(state) -> None:
+    """networking-mtu-mismatch: the iptables/MTU fix can't be introspected, so
+    seed a broken marker (no FIXED-OK) and grade on the learner attesting the fix."""
+    state._mkdir("/opt/fixitlab/networking")
+    state._write_file(
+        "/opt/fixitlab/networking/mtu-mismatch.conf",
+        "# broken configuration for networking-mtu-mismatch\n"
+        "# tunnel MTU still 1500 and no TCP MSS clamping — large packets are dropped\n"
+        "# this file needs the documented fix\n",
+    )
+
+
+_PRESETS["networking-mtu-mismatch"] = _mtu_mismatch_marker

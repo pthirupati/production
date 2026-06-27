@@ -1,4 +1,4 @@
-title: 'JavaScript Development: Automated Testing — Automation Practice'
+title: 'JavaScript Development: Testing — Automation Practice'
 slug: academy-javascript-027-automation-testing-3
 technology: JavaScript Development
 category: Automation
@@ -11,15 +11,14 @@ max_score: 100
 is_free: false
 infrastructure_type: docker
 jira_priority: Medium
-description: 'Automation lab: remove toil around automated testing. Codify repeatable
-  steps for unit/integration boundaries, fixtures, and CI gates and prove the automation
-  is idempotent.'
+description: 'Automation lab: remove toil around testing. Codify repeatable steps
+  for unit tests, fixtures, and assertions and prove the automation is idempotent.'
 objectives:
-- Day-2 automated testing work completes safely in this environment
+- Day-2 testing work completes safely in this environment
 - Changes are verified with before/after checks
 - The system remains stable for dependent teams
-initial_state: Operators still perform manual steps for automated testing. Automate
-  the boring parts without hiding important safety checks.
+initial_state: Operators still perform manual steps for testing. Automate the boring
+  parts without hiding important safety checks.
 hints:
 - order: 1
   cost: 10

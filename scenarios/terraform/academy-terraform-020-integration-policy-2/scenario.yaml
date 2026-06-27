@@ -1,4 +1,4 @@
-title: 'Terraform & IaC: Terraform Policy — Integration Lab'
+title: 'Terraform & IaC: Policy As Code — Integration Lab'
 slug: academy-terraform-020-integration-policy-2
 technology: Terraform & IaC
 category: Cross-Technology
@@ -11,15 +11,15 @@ max_score: 100
 is_free: false
 infrastructure_type: docker
 jira_priority: Medium
-description: 'Integration lab: connect Terraform policy with an adjacent platform
-  in the Terraform & IaC stack. Validate authentication, data handoff, and failure
-  behavior for OPA/Sentinel, plan checks, and guardrails.'
+description: 'Integration lab: connect policy as code with an adjacent platform in
+  the Terraform & IaC stack. Validate authentication, data handoff, and failure behavior
+  for guardrails, validation, and sentinel/OPA checks.'
 objectives:
-- Terraform policy is connected to the adjacent system successfully
+- policy as code is connected to the adjacent system successfully
 - Handoff points are authenticated and observable
 - End-to-end workflow completes without manual intervention
-initial_state: Two systems are deployed but not fully wired together for Terraform
-  policy. Downstream consumers are waiting on this integration path.
+initial_state: Two systems are deployed but not fully wired together for policy as
+  code. Downstream consumers are waiting on this integration path.
 hints:
 - order: 1
   cost: 10

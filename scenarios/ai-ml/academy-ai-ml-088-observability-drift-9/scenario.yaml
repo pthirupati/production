@@ -1,4 +1,4 @@
-title: 'AI / ML / LLM & Agents: Infrastructure Drift — Observability Practice'
+title: 'AI / ML / LLM & Agents: Configuration Drift — Observability Practice'
 slug: academy-ai-ml-088-observability-drift-9
 technology: AI / ML / LLM & Agents
 category: Observability
@@ -11,20 +11,20 @@ max_score: 100
 is_free: false
 infrastructure_type: docker
 jira_priority: Medium
-description: 'Observability task: make infrastructure drift visible in logs, metrics,
+description: 'Observability task: make configuration drift visible in logs, metrics,
   or traces. On-call should answer ''what is broken?'' quickly using signals from
-  config vs actual, scheduled detection, and remediation.'
+  detecting and reconciling out-of-band changes.'
 objectives:
-- Day-2 infrastructure drift work completes safely in this environment
+- Day-2 configuration drift work completes safely in this environment
 - Changes are verified with before/after checks
 - The system remains stable for dependent teams
-initial_state: The system runs, but infrastructure drift lacks useful telemetry. Dashboards/alerts
+initial_state: The system runs, but configuration drift lacks useful telemetry. Dashboards/alerts
   are blank or noisy — improve signal quality.
 hints:
 - order: 1
   cost: 10
-  content: 'Find existing signals: `terraform plan`, driftctl, or config audit reports.
-    Identify what is missing for fast triage.'
+  content: 'Find existing signals: `terraform plan -refresh-only` and state. Identify
+    what is missing for fast triage.'
 - order: 2
   cost: 15
   content: Add or fix exporters/dashboards/alerts with clear names, labels, and thresholds.

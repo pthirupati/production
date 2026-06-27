@@ -1,4 +1,4 @@
-title: 'Prompt Engineering & AI Mastery: System Instructions — Fundamentals Lab'
+title: 'Prompt Engineering & AI Mastery: Instruction Design — Fundamentals Lab'
 slug: academy-prompt-engineering-081-learn-instructions-9
 technology: Prompt Engineering & AI Mastery
 category: Core Skills
@@ -12,25 +12,25 @@ is_free: false
 infrastructure_type: docker
 jira_priority: Low
 description: This beginner-friendly Prompt Engineering & AI Mastery lab introduces
-  system instructions. You will explore role prompts, constraints, and tone control
-  on the LLM practice workspace. Read the environment first, then complete the guided
-  steps — no prior production experience required.
+  instruction design. You will explore clear, scoped task instructions on the LLM
+  practice workspace. Read the environment first, then complete the guided steps —
+  no prior production experience required.
 objectives:
-- Understand how system instructions work in this lab environment
-- Identify the main status and configuration signals for system instructions
+- Understand how instruction design work in this lab environment
+- Identify the main status and configuration signals for instruction design
 - Confirm you can read the current state confidently before changing anything
-initial_state: The LLM practice workspace is online with a starter system instructions
+initial_state: The LLM practice workspace is online with a starter instruction design
   setup. Some pieces are intentionally incomplete so you can learn how the pieces
   fit together. Nothing is on fire yet — focus on observation and understanding.
 hints:
 - order: 1
   cost: 10
-  content: 'Orient yourself: prompt versions, eval scores, and refusal logs. Write
-    down what looks normal vs missing.'
+  content: 'Orient yourself: the system/user prompt. Write down what looks normal
+    vs missing.'
 - order: 2
   cost: 15
-  content: Core idea — role prompts, constraints, and tone control. Make one small,
-    reversible change at a time and re-check status.
+  content: Core idea — clear, scoped task instructions. Make one small, reversible
+    change at a time and re-check status.
 - order: 3
   cost: 20
   content: When the lab objective is done, record completion by adding `# FIXED-OK`

@@ -7,7 +7,7 @@ import { useLabStore } from '../store/labStore'
 import { useAuthStore } from '../store/authStore'
 import {
   Clock, CheckCircle2, XCircle, Lightbulb, StopCircle,
-  ChevronRight, Trophy, Target, Eye, FileText,
+  ChevronRight, Trophy, Target, Eye, FileText, AlertTriangle,
   PanelLeftClose, PanelLeftOpen, Sparkles, Timer, Keyboard, ExternalLink, Terminal, Wand2, Ticket as TicketIcon
 } from 'lucide-react'
 import toast from 'react-hot-toast'
@@ -109,7 +109,8 @@ export default function LabRunner() {
   const [interviewMode, setInterviewMode] = useState(false)
   const [sidebarOpen, setSidebarOpen] = useState(false)
   const isMobile = useIsMobile()
-  const [sidebarTab, setSidebarTab] = useState('instructions') // instructions | hints | result
+  const [sidebarTab, setSidebarTab] = useState('instructions') // instructions | guided | hints | result
+  const [guidedStep, setGuidedStep] = useState(0)
   const [showStopConfirm, setShowStopConfirm] = useState(false)
   const [stopping, setStopping] = useState(false)
   const [showShortcuts, setShowShortcuts] = useState(false)
@@ -979,10 +980,16 @@ export default function LabRunner() {
     || scenario?.technology?.slug === 'peoplesoft'
     || (scenario?.slug || '').startsWith('ps-')
   )
+  // AWX/Tower detection — match the sim type, slug, title, or tags so EVERY
+  // AWX-themed lab opens the AWX simulator, not just the ones slugged "awx".
+  // Title/tags are checked (not the long description) to avoid false positives
+  // from generic cross-tech copy that merely mentions AWX in passing.
+  const _awxHay = `${scenario?.slug || ''} ${scenario?.title || ''} ${(scenario?.tags || []).join(' ')}`.toLowerCase()
   const isAwxLab = !isCrossTech && (
     scenario?.simulation_type === 'ansible-awx'
-    || (scenario?.slug || '').includes('awx')
-    || (scenario?.slug || '').includes('tower')
+    || /\bawx\b/.test(_awxHay)
+    || /\btower\b/.test(_awxHay)
+    || _awxHay.includes('automation controller')
   )
   const isTerraformSimLab = !isCrossTech && isTerraformLab(scenario)
   const isBaremetalGuiLab = !isCrossTech && (
@@ -1305,6 +1312,8 @@ export default function LabRunner() {
             <div className="flex border-b border-surface-800">
               {[
                 { key: 'instructions', label: 'Info', icon: FileText },
+                ...(Array.isArray(scenario?.objectives) && scenario.objectives.length > 0
+                  ? [{ key: 'guided', label: 'Guided', icon: Sparkles }] : []),
                 ...(scenario?.itsm_enabled ? [{ key: 'ticket', label: 'Ticket', icon: TicketIcon }] : []),
                 { key: 'hints', label: 'Hints', icon: Lightbulb },
                 { key: 'result', label: 'Result', icon: Target },
@@ -1419,6 +1428,96 @@ export default function LabRunner() {
                   </div>
                 </>
               )}
+
+              {/* Guided tab — walks objectives one step at a time */}
+              {sidebarTab === 'guided' && Array.isArray(scenario.objectives) && scenario.objectives.length > 0 && (() => {
+                const steps = scenario.objectives
+                const total = steps.length
+                const idx = Math.min(guidedStep, total - 1)
+                const stepHint = hints.revealed.find(h => h.order === idx + 1)
+                return (
+                  <div className="space-y-4">
+                    <div>
+                      <div className="flex items-center justify-between mb-2">
+                        <span className="text-xs font-semibold text-surface-400 uppercase tracking-wider">
+                          Guided mode
+                        </span>
+                        <span className="text-[11px] text-surface-500 tabular-nums">Step {idx + 1} of {total}</span>
+                      </div>
+                      <div className="h-1.5 rounded-full bg-surface-800 overflow-hidden">
+                        <div
+                          className="h-full bg-accent-cyan transition-all duration-300"
+                          style={{ width: `${Math.round(((idx + 1) / total) * 100)}%` }}
+                        />
+                      </div>
+                    </div>
+
+                    <div className="rounded-lg bg-surface-800/60 border border-surface-700/60 p-3">
+                      <div className="flex items-center gap-2 mb-1.5">
+                        <Target size={13} className="text-accent-cyan shrink-0" />
+                        <span className="text-xs font-semibold text-accent-cyan">Goal for this step</span>
+                      </div>
+                      <p className="text-sm text-surface-200 leading-relaxed">
+                        {typeof steps[idx] === 'string' ? steps[idx] : JSON.stringify(steps[idx])}
+                      </p>
+                    </div>
+
+                    {!interviewMode && (
+                      stepHint ? (
+                        <div className="rounded-lg bg-surface-800 p-3 border border-accent-amber/10">
+                          <div className="flex items-center gap-2 mb-1.5">
+                            <Lightbulb size={12} className="text-accent-amber" />
+                            <span className="text-xs font-semibold text-accent-amber">How to do it</span>
+                            <span className="text-[10px] text-surface-600">(-{stepHint.penalty} pts)</span>
+                          </div>
+                          <p className="text-sm text-surface-300 leading-relaxed">{stepHint.content}</p>
+                        </div>
+                      ) : (hints.next_available && hints.hints_used < (hints.total_hints || 5)) ? (
+                        <button
+                          onClick={handleRevealHint}
+                          className="w-full py-2.5 rounded-lg text-sm font-medium bg-accent-amber/10 text-accent-amber border border-accent-amber/20 hover:bg-accent-amber/20 transition-all"
+                        >
+                          Show me how (reveal step help)
+                        </button>
+                      ) : (
+                        <p className="text-[11px] text-surface-500 text-center">
+                          No extra help for this step — try it in the terminal, then Check.
+                        </p>
+                      )
+                    )}
+
+                    <div className="flex items-center gap-2">
+                      <button
+                        onClick={() => setGuidedStep(s => Math.max(0, s - 1))}
+                        disabled={idx === 0}
+                        className="flex-1 py-2 rounded-lg text-sm font-medium border border-surface-700 text-surface-300 disabled:opacity-40 hover:bg-surface-800 transition-colors"
+                      >
+                        Back
+                      </button>
+                      {idx < total - 1 ? (
+                        <button
+                          onClick={() => setGuidedStep(s => Math.min(total - 1, s + 1))}
+                          className="flex-1 py-2 rounded-lg text-sm font-semibold bg-accent-cyan/15 text-accent-cyan border border-accent-cyan/25 hover:bg-accent-cyan/25 transition-colors"
+                        >
+                          Next step
+                        </button>
+                      ) : (
+                        <button
+                          onClick={handleValidate}
+                          disabled={validating}
+                          className="flex-1 py-2 rounded-lg text-sm font-semibold bg-accent-green/15 text-accent-green border border-accent-green/25 hover:bg-accent-green/25 transition-colors disabled:opacity-50 flex items-center justify-center gap-1.5"
+                        >
+                          {validating ? <span className="w-3 h-3 border-2 border-accent-green border-t-transparent rounded-full animate-spin" /> : <CheckCircle2 size={14} />}
+                          Check my work
+                        </button>
+                      )}
+                    </div>
+                    <p className="text-[11px] text-surface-600 text-center">
+                      Work through each goal in the terminal. You can switch to free-form anytime via the Info tab.
+                    </p>
+                  </div>
+                )
+              })()}
 
               {/* Hints tab */}
               {sidebarTab === 'hints' && (
@@ -1620,10 +1719,34 @@ export default function LabRunner() {
                             : 'Check the output below and keep trying.'}
                         </p>
                       </div>
-                      {validationResult.output && !validationResult.expired && (
-                        <pre className="text-xs text-accent-red bg-surface-950 rounded p-3 overflow-x-auto whitespace-pre-wrap border border-surface-800">
-                          {validationResult.output}
-                        </pre>
+                      {validationResult.output && !validationResult.expired &&
+                        validationResult.output !== 'NO_VALIDATION_SCRIPT' && (
+                        <div>
+                          <h4 className="text-xs font-semibold text-accent-red uppercase mb-2 flex items-center gap-1">
+                            <AlertTriangle size={12} /> What's still failing
+                          </h4>
+                          <pre className="text-xs text-accent-red bg-surface-950 rounded p-3 overflow-x-auto whitespace-pre-wrap border border-surface-800">
+                            {validationResult.output}
+                          </pre>
+                        </div>
+                      )}
+                      {Array.isArray(scenario.objectives) && scenario.objectives.length > 0 && !validationResult.expired && (
+                        <div className="border-t border-surface-800 pt-4">
+                          <h4 className="text-xs font-semibold text-surface-400 uppercase mb-2 flex items-center gap-1">
+                            <Target size={12} /> Objectives to meet
+                          </h4>
+                          <ul className="space-y-1.5">
+                            {scenario.objectives.map((obj, i) => (
+                              <li key={i} className="flex items-start gap-2 text-sm text-surface-300">
+                                <span className="w-3.5 h-3.5 mt-0.5 shrink-0 rounded-full border border-surface-600" />
+                                <span>{typeof obj === 'string' ? obj : JSON.stringify(obj)}</span>
+                              </li>
+                            ))}
+                          </ul>
+                          <p className="text-[11px] text-surface-500 mt-2">
+                            None of these are confirmed yet — fix the issue above, then run Check again. Stuck? Reveal a hint.
+                          </p>
+                        </div>
                       )}
                       {validationResult.solution && (
                         <div className="border-t border-surface-800 pt-4">

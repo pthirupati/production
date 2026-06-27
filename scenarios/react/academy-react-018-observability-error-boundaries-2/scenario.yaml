@@ -1,4 +1,4 @@
-title: 'React Development: React Error Boundaries — Observability Practice'
+title: 'React Development: Error Boundaries — Observability Practice'
 slug: academy-react-018-observability-error-boundaries-2
 technology: React Development
 category: Observability
@@ -11,20 +11,20 @@ max_score: 100
 is_free: false
 infrastructure_type: docker
 jira_priority: Medium
-description: 'Observability task: make React error boundaries visible in logs, metrics,
+description: 'Observability task: make error boundaries visible in logs, metrics,
   or traces. On-call should answer ''what is broken?'' quickly using signals from
-  fallback UI, logging, and isolating subtree crashes.'
+  catching render errors and fallback UI.'
 objectives:
-- Day-2 React error boundaries work completes safely in this environment
+- Day-2 error boundaries work completes safely in this environment
 - Changes are verified with before/after checks
 - The system remains stable for dependent teams
-initial_state: The system runs, but React error boundaries lacks useful telemetry.
-  Dashboards/alerts are blank or noisy — improve signal quality.
+initial_state: The system runs, but error boundaries lacks useful telemetry. Dashboards/alerts
+  are blank or noisy — improve signal quality.
 hints:
 - order: 1
   cost: 10
-  content: 'Find existing signals: console errors and boundary componentDidCatch logs.
-    Identify what is missing for fast triage.'
+  content: 'Find existing signals: boundary placement and fallback render. Identify
+    what is missing for fast triage.'
 - order: 2
   cost: 15
   content: Add or fix exporters/dashboards/alerts with clear names, labels, and thresholds.

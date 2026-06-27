@@ -12,9 +12,8 @@ is_free: false
 infrastructure_type: docker
 jira_priority: Medium
 description: 'Security review: harden container healthchecks on this Docker & Containers
-  system. Close unsafe defaults, enforce least privilege, and ensure HEALTHCHECK CMD,
-  start periods, and restart policy cannot be abused — without breaking legitimate
-  use.'
+  system. Close unsafe defaults, enforce least privilege, and ensure HEALTHCHECK directives,
+  readiness, and restart policy cannot be abused — without breaking legitimate use.'
 objectives:
 - Unsafe defaults related to container healthchecks are removed or constrained
 - Access follows least privilege and is auditable
@@ -25,8 +24,8 @@ initial_state: The environment is functional but overly permissive around contai
 hints:
 - order: 1
   cost: 10
-  content: 'Baseline current exposure: `docker inspect` Health section and compose
-    healthcheck. Note world-readable files, open ports, or excessive roles.'
+  content: 'Baseline current exposure: `docker ps` health column and `docker inspect`
+    health log. Note world-readable files, open ports, or excessive roles.'
 - order: 2
   cost: 15
   content: Apply least privilege incrementally. Prefer explicit allows over broad

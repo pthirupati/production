@@ -12,9 +12,9 @@ is_free: false
 infrastructure_type: docker
 jira_priority: Low
 description: This beginner-friendly HTML & Web Servers lab introduces semantic HTML.
-  You will explore landmarks, headings hierarchy, and native elements on the web server
-  lab. Read the environment first, then complete the guided steps — no prior production
-  experience required.
+  You will explore landmarks, headings, and structure on the web server lab. Read
+  the environment first, then complete the guided steps — no prior production experience
+  required.
 objectives:
 - Understand how semantic HTML work in this lab environment
 - Identify the main status and configuration signals for semantic HTML
@@ -25,12 +25,12 @@ initial_state: The web server lab is online with a starter semantic HTML setup. 
 hints:
 - order: 1
   cost: 10
-  content: 'Orient yourself: validator, outline view, and screen reader spot check.
-    Write down what looks normal vs missing.'
+  content: 'Orient yourself: the document outline and tags. Write down what looks
+    normal vs missing.'
 - order: 2
   cost: 15
-  content: Core idea — landmarks, headings hierarchy, and native elements. Make one
-    small, reversible change at a time and re-check status.
+  content: Core idea — landmarks, headings, and structure. Make one small, reversible
+    change at a time and re-check status.
 - order: 3
   cost: 20
   content: When the lab objective is done, record completion by adding `# FIXED-OK`

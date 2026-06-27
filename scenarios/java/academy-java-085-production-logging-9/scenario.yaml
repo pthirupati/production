@@ -1,4 +1,4 @@
-title: 'Java Development: Application Logging — Production Readiness'
+title: 'Java Development: Logging — Production Readiness'
 slug: academy-java-085-production-logging-9
 technology: Java Development
 category: Production
@@ -11,15 +11,15 @@ max_score: 100
 is_free: false
 infrastructure_type: docker
 jira_priority: Medium
-description: Production readiness for application logging. Harden, document, and validate
-  structured logs, levels, correlation IDs, and rotation so the change is safe to
-  run during a maintenance window.
+description: Production readiness for logging. Harden, document, and validate loggers,
+  levels, handlers, and formatting so the change is safe to run during a maintenance
+  window.
 objectives:
-- Day-2 application logging work completes safely in this environment
+- Day-2 logging work completes safely in this environment
 - Changes are verified with before/after checks
 - The system remains stable for dependent teams
-initial_state: A feature fix works in dev, but application logging is not production
-  ready — missing guardrails, runbooks, or capacity checks.
+initial_state: A feature fix works in dev, but logging is not production ready — missing
+  guardrails, runbooks, or capacity checks.
 hints:
 - order: 1
   cost: 10
@@ -28,9 +28,9 @@ hints:
 - order: 2
   cost: 15
   content: 'Apply production standards: limits, monitoring, and access controls for
-    application logging.'
+    logging.'
 - order: 3
   cost: 20
-  content: 'Run post-change verification: logs answer who/what/when with traceable
-    request IDs. Record `# FIXED-OK` in `/opt/fixitlab/academy/academy-java-085-production-logging-9.conf`
+  content: 'Run post-change verification: useful logs are emitted at the right levels.
+    Record `# FIXED-OK` in `/opt/fixitlab/academy/academy-java-085-production-logging-9.conf`
     when complete.'

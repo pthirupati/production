@@ -1,4 +1,4 @@
-title: 'Java Development: Python Packaging — Integration Lab'
+title: 'Java Development: Packaging — Integration Lab'
 slug: academy-java-030-integration-packaging-3
 technology: Java Development
 category: Cross-Technology
@@ -11,14 +11,14 @@ max_score: 100
 is_free: false
 infrastructure_type: docker
 jira_priority: Medium
-description: 'Integration lab: connect Python packaging with an adjacent platform
-  in the Java Development stack. Validate authentication, data handoff, and failure
-  behavior for pyproject.toml, wheels, and entry points.'
+description: 'Integration lab: connect packaging with an adjacent platform in the
+  Java Development stack. Validate authentication, data handoff, and failure behavior
+  for pyproject, dependencies, and entry points.'
 objectives:
-- Python packaging is connected to the adjacent system successfully
+- packaging is connected to the adjacent system successfully
 - Handoff points are authenticated and observable
 - End-to-end workflow completes without manual intervention
-initial_state: Two systems are deployed but not fully wired together for Python packaging.
+initial_state: Two systems are deployed but not fully wired together for packaging.
   Downstream consumers are waiting on this integration path.
 hints:
 - order: 1

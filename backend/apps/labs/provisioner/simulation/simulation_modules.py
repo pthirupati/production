@@ -38,14 +38,20 @@ def apply_simulation_context(engine: "UnifiedSimulationEngine") -> None:
         state.hostname = "db-server"
     elif sim_type == "baremetal":
         state.hostname = "bmc-host"
-    elif sim_type == "python":
+    elif sim_type == "python" or slug.startswith("sim-python"):
+        # `sim-python-*` labs ship without a simulation_type (so they seed as
+        # "generic"); trigger the broken-Python persona by slug too, otherwise
+        # /opt/app/main.py is never written and `py_compile` passes fail-open.
         state.hostname = "dev-server"
         state._mkdir("/home/dev")
         state._mkdir("/opt/app")
         if not state.read_file("/home/dev/app.py"):
             state._write_file("/home/dev/app.py", '#!/usr/bin/env python3\nprint("hello"\n')
         if "pip" in slug:
-            state._write_file("/opt/app/main.py", 'import requests\n# missing package\n')
+            # Keep the missing-package narrative but ship a genuinely broken file
+            # (unclosed call) so the `py_compile` check stays fail-closed — a
+            # syntactically-valid import would compile and pass before any fix.
+            state._write_file("/opt/app/main.py", 'import requests\nprint("starting"\n')
         else:
             state._write_file("/opt/app/main.py", 'print("hello"\n')
     elif sim_type == "devops" or "devops" in slug or "ci-pipeline" in slug or "helm" in slug:
@@ -64,6 +70,13 @@ def apply_simulation_context(engine: "UnifiedSimulationEngine") -> None:
             "#!/bin/bash\nset -u\necho ${MISSING_VAR}\n",
         )
 
+    # `sim-rhel-ssh-stop` is graded by `systemctl is-active sshd`; sshd must start
+    # stopped or the check passes before the learner restarts it (fail-open).
+    if "ssh-stop" in slug:
+        state.services["sshd"] = SimService(
+            "sshd", active="inactive", enabled="enabled", description="OpenSSH server daemon",
+        )
+
     if "docker" in slug:
         # A scenario preset may have already put the docker unit (or a related
         # unit like docker-socket-proxy) into a failed state — do NOT clobber
@@ -71,12 +84,32 @@ def apply_simulation_context(engine: "UnifiedSimulationEngine") -> None:
         existing_docker = state.services.get("docker")
         preset_broke_docker = bool(existing_docker and existing_docker.active != "active")
         is_down_slug = "daemon-stopped" in slug or "stopped" in slug or "daemon-down" in slug
+        # Task-style docker sims whose objective is to get a container running
+        # (`docker ps | grep Up`) must start with NO running container, otherwise
+        # the check passes before any work (fail-open).
+        needs_container_up = any(
+            k in slug for k in ("compose-down", "image-pull", "network-connect", "container-exited", "exited")
+        )
+        # Flagship compose labs: the daemon is UP but the compose stack is not
+        # running yet (`docker ps` must be empty until the learner brings it up).
+        try:
+            from .flagship_presets import FLAGSHIP_DOCKER_SLUGS
+        except Exception:  # pragma: no cover
+            FLAGSHIP_DOCKER_SLUGS = set()
+        is_compose_flagship = slug in FLAGSHIP_DOCKER_SLUGS
         if preset_broke_docker or is_down_slug:
             state.services["docker"] = SimService(
                 "docker", active="failed" if preset_broke_docker else "inactive",
                 enabled="enabled", description="Docker Engine",
             )
             engine._container_running = False
+        elif is_compose_flagship or needs_container_up:
+            state.services["docker"] = SimService(
+                "docker", active="active", enabled="enabled", description="Docker Engine",
+            )
+            engine._container_running = False
+            for c in getattr(engine.docker, "containers", []):
+                c["state"] = "exited"
         else:
             state.services["docker"] = SimService(
                 "docker", active="active", enabled="enabled", description="Docker Engine",
@@ -797,6 +830,23 @@ def _register_database(engine: "UnifiedSimulationEngine", shell: RHELShell) -> N
 def _register_docker(engine: "UnifiedSimulationEngine", shell: RHELShell) -> None:
     if not engine.docker:
         engine.docker = DockerState(engine.scenario_slug)
+    # Flagship compose labs: the daemon is up but the stack has not been brought
+    # up yet, so no containers are running until the learner runs
+    # `docker compose up -d` (fail-closed `docker ps` until then).
+    try:
+        from .flagship_presets import FLAGSHIP_DOCKER_SLUGS
+    except Exception:  # pragma: no cover
+        FLAGSHIP_DOCKER_SLUGS = set()
+    # Task-style docker sims whose objective is to get a container running
+    # (`docker ps | grep Up`) must start with NO running container, otherwise the
+    # check passes before any work (fail-open).
+    _slug = (engine.scenario_slug or "").lower()
+    needs_container_up = any(
+        k in _slug for k in ("compose-down", "image-pull", "network-connect", "container-exited", "exited")
+    )
+    if engine.scenario_slug in FLAGSHIP_DOCKER_SLUGS or needs_container_up:
+        for c in getattr(engine.docker, "containers", []):
+            c["state"] = "exited"
     # Keep the validator's flag aligned with the seeded daemon state — a stopped
     # daemon means nothing is reachable as "Up".
     engine._container_running = engine.docker.daemon_running and engine.docker.any_running()

@@ -10,12 +10,16 @@ import { APPS, AppIcon } from './apps/registry'
 
 export default function WindowsServer2022({ autoOpen = 'ServerManager', backendState = null }) {
   const os = useOS()
+  // Select actions individually — these references are stable across store
+  // updates, so effects that depend on them won't re-fire on every render
+  // (depending on the whole `os` object caused a React #185 infinite loop).
+  const hydrateFromBackend = useOS((s) => s.hydrateFromBackend)
   const booted = useRef(false)
   const [altTab, setAltTab] = useState(null) // { index } when held
 
   useEffect(() => {
-    if (backendState) os.hydrateFromBackend(backendState)
-  }, [backendState, os])
+    if (backendState) hydrateFromBackend(backendState)
+  }, [backendState, hydrateFromBackend])
 
   // Auto-open Server Manager on first login (like real Windows Server)
   useEffect(() => {
@@ -26,30 +30,31 @@ export default function WindowsServer2022({ autoOpen = 'ServerManager', backendS
     }
   }, []) // eslint-disable-line
 
-  // Alt+Tab switcher
+  // Alt+Tab switcher — read live state via getState() so the listeners don't
+  // need to be re-bound on every store update.
   useEffect(() => {
     const onKey = (e) => {
       if (e.altKey && e.key === 'Tab') {
         e.preventDefault()
-        const wins = os.windows
+        const wins = useOS.getState().windows
         if (!wins.length) return
         setAltTab((prev) => ({ index: ((prev?.index ?? -1) + 1) % wins.length }))
       } else if (e.key === 'Escape') {
-        os.setStartOpen(false)
+        useOS.getState().setStartOpen(false)
       }
     }
     const onUp = (e) => {
       if (e.key === 'Alt' && altTab) {
-        const wins = os.windows
+        const wins = useOS.getState().windows
         const target = wins[altTab.index]
-        if (target) os.focusWindow(target.id)
+        if (target) useOS.getState().focusWindow(target.id)
         setAltTab(null)
       }
     }
     window.addEventListener('keydown', onKey)
     window.addEventListener('keyup', onUp)
     return () => { window.removeEventListener('keydown', onKey); window.removeEventListener('keyup', onUp) }
-  }, [altTab, os])
+  }, [altTab])
 
   return (
     <ContextMenuProvider>

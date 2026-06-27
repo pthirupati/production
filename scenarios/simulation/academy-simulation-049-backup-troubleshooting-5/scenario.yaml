@@ -1,4 +1,4 @@
-title: 'Simulation Labs: Simulation Troubleshooting — Backup and Recovery'
+title: 'Simulation Labs: Troubleshooting Labs — Backup and Recovery'
 slug: academy-simulation-049-backup-troubleshooting-5
 technology: Simulation Labs
 category: Backup & Recovery
@@ -11,15 +11,16 @@ max_score: 100
 is_free: false
 infrastructure_type: docker
 jira_priority: Medium
-description: Backup and recovery drill for simulation troubleshooting. Ensure backups
-  run on schedule, retention is correct, and you can restore hypothesis-driven debugging
-  in lab environments within the lab RTO.
+description: Backup and recovery drill for troubleshooting labs. Ensure backups run
+  on schedule, retention is correct, and you can restore broken-state design and RCA
+  within the lab RTO.
 objectives:
-- Backup coverage for simulation troubleshooting is complete and restorable
+- Backup coverage for troubleshooting labs is complete and restorable
 - Retention and encryption meet the stated policy
 - A restore drill proves data integrity
-initial_state: Backup jobs exist but reliability is uncertain for simulation troubleshooting.
-  Leadership wants proof that restore works — not just that backup scripts exit zero.
+initial_state: Backup jobs exist but reliability is uncertain for troubleshooting
+  labs. Leadership wants proof that restore works — not just that backup scripts exit
+  zero.
 hints:
 - order: 1
   cost: 10

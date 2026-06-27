@@ -1,4 +1,4 @@
-title: 'GPU & NVIDIA: Cuda Workloads — Build From Scratch'
+title: 'GPU & NVIDIA: Cuda Toolkit — Build From Scratch'
 slug: academy-gpu-062-build-cuda-7
 technology: GPU & NVIDIA
 category: Build Lab
@@ -11,28 +11,28 @@ max_score: 100
 is_free: false
 infrastructure_type: docker
 jira_priority: Low
-description: Build CUDA workloads from scratch in this GPU & NVIDIA lab. You start
-  from a minimal environment and must produce a working configuration that demonstrates
-  kernels, streams, device memory, and occupancy. Treat this like a greenfield task
-  — plan, implement, then prove it works.
+description: Build CUDA toolkit from scratch in this GPU & NVIDIA lab. You start from
+  a minimal environment and must produce a working configuration that demonstrates
+  toolkit/runtime versions and compatibility. Treat this like a greenfield task —
+  plan, implement, then prove it works.
 objectives:
-- A working CUDA workloads setup must exist by the end of this lab
+- A working CUDA toolkit setup must exist by the end of this lab
 - Configuration should follow team conventions and be easy to audit
 - The result should pass validation without manual cleanup
-initial_state: The GPU node is ready but CUDA workloads is not configured yet. Required
+initial_state: The GPU node is ready but CUDA toolkit is not configured yet. Required
   packages/tools may already be installed; your job is to create the config and bring
   the capability online.
 hints:
 - order: 1
   cost: 10
   content: 'List prerequisites first: which packages, files, or API objects must exist
-    for CUDA workloads?'
+    for CUDA toolkit?'
 - order: 2
   cost: 15
-  content: Implement incrementally — create the smallest working slice of CUDA workloads,
+  content: Implement incrementally — create the smallest working slice of CUDA toolkit,
     validate, then add the remaining pieces.
 - order: 3
   cost: 20
-  content: 'Prove success: kernels launch on the selected device with stable results.
-    Mark the lab complete with `# FIXED-OK` in `/opt/fixitlab/academy/academy-gpu-062-build-cuda-7.conf`
-    and run Check Solution.'
+  content: 'Prove success: a sample CUDA workload runs. Mark the lab complete with
+    `# FIXED-OK` in `/opt/fixitlab/academy/academy-gpu-062-build-cuda-7.conf` and
+    run Check Solution.'

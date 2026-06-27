@@ -1,4 +1,4 @@
-title: 'Oracle PeopleSoft: Peoplesoft Reports — Integration Lab'
+title: 'Oracle PeopleSoft: Report Distribution — Integration Lab'
 slug: academy-peoplesoft-070-integration-reports-7
 technology: Oracle PeopleSoft
 category: Cross-Technology
@@ -11,15 +11,15 @@ max_score: 100
 is_free: false
 infrastructure_type: docker
 jira_priority: Medium
-description: 'Integration lab: connect PeopleSoft reports with an adjacent platform
+description: 'Integration lab: connect report distribution with an adjacent platform
   in the Oracle PeopleSoft stack. Validate authentication, data handoff, and failure
-  behavior for PSQuery, nVision, and distribution.'
+  behavior for report nodes and distribution.'
 objectives:
-- PeopleSoft reports is connected to the adjacent system successfully
+- report distribution is connected to the adjacent system successfully
 - Handoff points are authenticated and observable
 - End-to-end workflow completes without manual intervention
-initial_state: Two systems are deployed but not fully wired together for PeopleSoft
-  reports. Downstream consumers are waiting on this integration path.
+initial_state: Two systems are deployed but not fully wired together for report distribution.
+  Downstream consumers are waiting on this integration path.
 hints:
 - order: 1
   cost: 10

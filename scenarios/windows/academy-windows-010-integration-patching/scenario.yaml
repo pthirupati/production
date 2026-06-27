@@ -1,4 +1,4 @@
-title: 'Windows Server: Windows Patching — Integration Lab'
+title: 'Windows Server: Patching — Integration Lab'
 slug: academy-windows-010-integration-patching
 technology: Windows Server
 category: Cross-Technology
@@ -11,14 +11,14 @@ max_score: 100
 is_free: false
 infrastructure_type: docker
 jira_priority: Medium
-description: 'Integration lab: connect Windows patching with an adjacent platform
-  in the Windows Server stack. Validate authentication, data handoff, and failure
-  behavior for WSUS/Intune, rings, and reboot compliance.'
+description: 'Integration lab: connect patching with an adjacent platform in the Windows
+  Server stack. Validate authentication, data handoff, and failure behavior for Windows
+  Update, WSUS, and reboot windows.'
 objectives:
-- Windows patching is connected to the adjacent system successfully
+- patching is connected to the adjacent system successfully
 - Handoff points are authenticated and observable
 - End-to-end workflow completes without manual intervention
-initial_state: Two systems are deployed but not fully wired together for Windows patching.
+initial_state: Two systems are deployed but not fully wired together for patching.
   Downstream consumers are waiting on this integration path.
 hints:
 - order: 1

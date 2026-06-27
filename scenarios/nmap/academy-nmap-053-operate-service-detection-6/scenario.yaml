@@ -1,4 +1,4 @@
-title: 'Nmap Network Scanning: Nmap Service Detection — Daily Operations'
+title: 'Nmap Network Scanning: Service/Version Detection — Daily Operations'
 slug: academy-nmap-053-operate-service-detection-6
 technology: Nmap Network Scanning
 category: Operations
@@ -11,25 +11,23 @@ max_score: 100
 is_free: false
 infrastructure_type: docker
 jira_priority: Medium
-description: 'Day-2 operations: perform a routine Nmap service detection task safely
+description: 'Day-2 operations: perform a routine service/version detection task safely
   in Nmap Network Scanning. Follow change control — inspect, change, verify — while
-  working with -sV versions, probes, and false positives.'
+  working with banner grabbing and version probes.'
 objectives:
-- Day-2 Nmap service detection work completes safely in this environment
+- Day-2 service/version detection work completes safely in this environment
 - Changes are verified with before/after checks
 - The system remains stable for dependent teams
-initial_state: The scanning lab is healthy enough for scheduled work on Nmap service
+initial_state: The scanning lab is healthy enough for scheduled work on service/version
   detection. Complete the maintenance task without unnecessary downtime.
 hints:
 - order: 1
   cost: 10
-  content: 'Pre-check: `nmap -sV --version-intensity`, output review. Confirm backups
-    or snapshots if the change is risky.'
+  content: 'Pre-check: `nmap -sV`. Confirm backups or snapshots if the change is risky.'
 - order: 2
   cost: 15
   content: Execute the maintenance in small steps. Prefer reversible changes.
 - order: 3
   cost: 20
-  content: 'Post-check: detected services match banner evidence. Add `# FIXED-OK`
-    to `/opt/fixitlab/academy/academy-nmap-053-operate-service-detection-6.conf` and
-    run Check Solution.'
+  content: 'Post-check: service versions are detected. Add `# FIXED-OK` to `/opt/fixitlab/academy/academy-nmap-053-operate-service-detection-6.conf`
+    and run Check Solution.'

@@ -1,4 +1,4 @@
-title: 'Database Administration: Database Storage — Observability Practice'
+title: 'Database Administration: Kubernetes Storage — Observability Practice'
 slug: academy-database-018-observability-storage-2
 technology: Database Administration
 category: Observability
@@ -11,19 +11,19 @@ max_score: 100
 is_free: false
 infrastructure_type: docker
 jira_priority: Medium
-description: 'Observability task: make database storage visible in logs, metrics,
+description: 'Observability task: make Kubernetes storage visible in logs, metrics,
   or traces. On-call should answer ''what is broken?'' quickly using signals from
-  tablespaces, files, growth, and autovacuum/optimize.'
+  PV/PVC binding, storage classes, and access modes.'
 objectives:
-- Day-2 database storage work completes safely in this environment
+- Day-2 Kubernetes storage work completes safely in this environment
 - Changes are verified with before/after checks
 - The system remains stable for dependent teams
-initial_state: The system runs, but database storage lacks useful telemetry. Dashboards/alerts
+initial_state: The system runs, but Kubernetes storage lacks useful telemetry. Dashboards/alerts
   are blank or noisy — improve signal quality.
 hints:
 - order: 1
   cost: 10
-  content: 'Find existing signals: disk usage views, IOPS metrics, and file layout.
+  content: 'Find existing signals: `kubectl get pv,pvc,sc` and `kubectl describe pvc`.
     Identify what is missing for fast triage.'
 - order: 2
   cost: 15

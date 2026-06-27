@@ -1,4 +1,4 @@
-title: 'Terraform & IaC: Terraform Workspaces — Automation Practice'
+title: 'Terraform & IaC: Workspaces — Automation Practice'
 slug: academy-terraform-007-automation-workspaces
 technology: Terraform & IaC
 category: Automation
@@ -11,15 +11,14 @@ max_score: 100
 is_free: false
 infrastructure_type: docker
 jira_priority: Medium
-description: 'Automation lab: remove toil around Terraform workspaces. Codify repeatable
-  steps for env isolation, workspace select, and naming and prove the automation is
-  idempotent.'
+description: 'Automation lab: remove toil around workspaces. Codify repeatable steps
+  for per-environment state isolation and prove the automation is idempotent.'
 objectives:
-- Day-2 Terraform workspaces work completes safely in this environment
+- Day-2 workspaces work completes safely in this environment
 - Changes are verified with before/after checks
 - The system remains stable for dependent teams
-initial_state: Operators still perform manual steps for Terraform workspaces. Automate
-  the boring parts without hiding important safety checks.
+initial_state: Operators still perform manual steps for workspaces. Automate the boring
+  parts without hiding important safety checks.
 hints:
 - order: 1
   cost: 10

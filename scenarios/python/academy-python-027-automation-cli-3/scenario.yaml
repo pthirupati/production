@@ -1,4 +1,4 @@
-title: 'Python Development: Python Clis — Automation Practice'
+title: 'Python Development: Command-Line Interfaces — Automation Practice'
 slug: academy-python-027-automation-cli-3
 technology: Python Development
 category: Automation
@@ -11,15 +11,14 @@ max_score: 100
 is_free: false
 infrastructure_type: docker
 jira_priority: Medium
-description: 'Automation lab: remove toil around Python CLIs. Codify repeatable steps
-  for argparse/typer, exit codes, and stdin/stdout contracts and prove the automation
-  is idempotent.'
+description: 'Automation lab: remove toil around command-line interfaces. Codify repeatable
+  steps for argument parsing, help, and exit codes and prove the automation is idempotent.'
 objectives:
-- Day-2 Python CLIs work completes safely in this environment
+- Day-2 command-line interfaces work completes safely in this environment
 - Changes are verified with before/after checks
 - The system remains stable for dependent teams
-initial_state: Operators still perform manual steps for Python CLIs. Automate the
-  boring parts without hiding important safety checks.
+initial_state: Operators still perform manual steps for command-line interfaces. Automate
+  the boring parts without hiding important safety checks.
 hints:
 - order: 1
   cost: 10

@@ -13,8 +13,7 @@ infrastructure_type: docker
 jira_priority: Medium
 description: 'Security review: harden responsive design on this HTML & Web Servers
   system. Close unsafe defaults, enforce least privilege, and ensure breakpoints,
-  fluid layouts, and touch targets cannot be abused — without breaking legitimate
-  use.'
+  fluid layout, and viewport cannot be abused — without breaking legitimate use.'
 objectives:
 - Unsafe defaults related to responsive design are removed or constrained
 - Access follows least privilege and is auditable
@@ -24,8 +23,8 @@ initial_state: The environment is functional but overly permissive around respon
 hints:
 - order: 1
   cost: 10
-  content: 'Baseline current exposure: device mode, CSS grid/flex, and viewport meta.
-    Note world-readable files, open ports, or excessive roles.'
+  content: 'Baseline current exposure: the layout at multiple widths. Note world-readable
+    files, open ports, or excessive roles.'
 - order: 2
   cost: 15
   content: Apply least privilege incrementally. Prefer explicit allows over broad

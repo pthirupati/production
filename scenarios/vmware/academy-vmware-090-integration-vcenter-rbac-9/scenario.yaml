@@ -13,7 +13,7 @@ infrastructure_type: docker
 jira_priority: Medium
 description: 'Integration lab: connect vCenter RBAC with an adjacent platform in the
   VMware vSphere stack. Validate authentication, data handoff, and failure behavior
-  for roles, permissions inheritance, and SSO groups.'
+  for roles, permissions, and inventory scope.'
 objectives:
 - vCenter RBAC is connected to the adjacent system successfully
 - Handoff points are authenticated and observable

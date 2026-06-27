@@ -1,4 +1,4 @@
-title: 'SQLite: Sqlite Pragma — Security Practice'
+title: 'SQLite: Pragma Settings — Security Practice'
 slug: academy-sqlite-066-security-pragma-7
 technology: SQLite
 category: Security
@@ -11,20 +11,20 @@ max_score: 100
 is_free: false
 infrastructure_type: docker
 jira_priority: Medium
-description: 'Security review: harden SQLite PRAGMA on this SQLite system. Close unsafe
-  defaults, enforce least privilege, and ensure journal_mode, synchronous, cache_size,
-  and FKs cannot be abused — without breaking legitimate use.'
+description: 'Security review: harden PRAGMA settings on this SQLite system. Close
+  unsafe defaults, enforce least privilege, and ensure journal mode, sync, and foreign_keys
+  cannot be abused — without breaking legitimate use.'
 objectives:
-- Unsafe defaults related to SQLite PRAGMA are removed or constrained
+- Unsafe defaults related to PRAGMA settings are removed or constrained
 - Access follows least privilege and is auditable
 - Security checks pass without breaking required functionality
-initial_state: The environment is functional but overly permissive around SQLite PRAGMA.
+initial_state: The environment is functional but overly permissive around PRAGMA settings.
   Assume an auditor or pen test is next week — tighten controls with evidence.
 hints:
 - order: 1
   cost: 10
-  content: 'Baseline current exposure: `PRAGMA journal_mode`, `integrity_check`. Note
-    world-readable files, open ports, or excessive roles.'
+  content: 'Baseline current exposure: current PRAGMA values. Note world-readable
+    files, open ports, or excessive roles.'
 - order: 2
   cost: 15
   content: Apply least privilege incrementally. Prefer explicit allows over broad

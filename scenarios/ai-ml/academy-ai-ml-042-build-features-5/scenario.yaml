@@ -1,4 +1,4 @@
-title: 'AI / ML / LLM & Agents: Ml Feature Engineering — Build From Scratch'
+title: 'AI / ML / LLM & Agents: Feature Engineering — Build From Scratch'
 slug: academy-ai-ml-042-build-features-5
 technology: AI / ML / LLM & Agents
 category: Build Lab
@@ -11,28 +11,28 @@ max_score: 100
 is_free: false
 infrastructure_type: docker
 jira_priority: Low
-description: Build ML feature engineering from scratch in this AI / ML / LLM & Agents
+description: Build feature engineering from scratch in this AI / ML / LLM & Agents
   lab. You start from a minimal environment and must produce a working configuration
-  that demonstrates encoding, scaling, leakage, and feature stores. Treat this like
-  a greenfield task — plan, implement, then prove it works.
+  that demonstrates encoding, scaling, and selection. Treat this like a greenfield
+  task — plan, implement, then prove it works.
 objectives:
-- A working ML feature engineering setup must exist by the end of this lab
+- A working feature engineering setup must exist by the end of this lab
 - Configuration should follow team conventions and be easy to audit
 - The result should pass validation without manual cleanup
-initial_state: The ML practice workspace is ready but ML feature engineering is not
-  configured yet. Required packages/tools may already be installed; your job is to
-  create the config and bring the capability online.
+initial_state: The ML practice workspace is ready but feature engineering is not configured
+  yet. Required packages/tools may already be installed; your job is to create the
+  config and bring the capability online.
 hints:
 - order: 1
   cost: 10
   content: 'List prerequisites first: which packages, files, or API objects must exist
-    for ML feature engineering?'
+    for feature engineering?'
 - order: 2
   cost: 15
-  content: Implement incrementally — create the smallest working slice of ML feature
+  content: Implement incrementally — create the smallest working slice of feature
     engineering, validate, then add the remaining pieces.
 - order: 3
   cost: 20
-  content: 'Prove success: feature pipeline version matches served model contract.
-    Mark the lab complete with `# FIXED-OK` in `/opt/fixitlab/academy/academy-ai-ml-042-build-features-5.conf`
+  content: 'Prove success: features improve model signal without leakage. Mark the
+    lab complete with `# FIXED-OK` in `/opt/fixitlab/academy/academy-ai-ml-042-build-features-5.conf`
     and run Check Solution.'

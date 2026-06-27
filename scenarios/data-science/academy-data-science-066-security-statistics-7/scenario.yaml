@@ -1,4 +1,4 @@
-title: 'Data Science & Analytics: Statistics Fundamentals — Security Practice'
+title: 'Data Science & Analytics: Statistics — Security Practice'
 slug: academy-data-science-066-security-statistics-7
 technology: Data Science & Analytics
 category: Security
@@ -11,22 +11,20 @@ max_score: 100
 is_free: false
 infrastructure_type: docker
 jira_priority: Medium
-description: 'Security review: harden statistics fundamentals on this Data Science
-  & Analytics system. Close unsafe defaults, enforce least privilege, and ensure distributions,
-  hypothesis tests, and sampling bias cannot be abused — without breaking legitimate
-  use.'
+description: 'Security review: harden statistics on this Data Science & Analytics
+  system. Close unsafe defaults, enforce least privilege, and ensure distributions,
+  tests, and significance cannot be abused — without breaking legitimate use.'
 objectives:
-- Unsafe defaults related to statistics fundamentals are removed or constrained
+- Unsafe defaults related to statistics are removed or constrained
 - Access follows least privilege and is auditable
 - Security checks pass without breaking required functionality
-initial_state: The environment is functional but overly permissive around statistics
-  fundamentals. Assume an auditor or pen test is next week — tighten controls with
-  evidence.
+initial_state: The environment is functional but overly permissive around statistics.
+  Assume an auditor or pen test is next week — tighten controls with evidence.
 hints:
 - order: 1
   cost: 10
-  content: 'Baseline current exposure: summary stats, CI plots, and sample size checks.
-    Note world-readable files, open ports, or excessive roles.'
+  content: 'Baseline current exposure: summary stats and test results. Note world-readable
+    files, open ports, or excessive roles.'
 - order: 2
   cost: 15
   content: Apply least privilege incrementally. Prefer explicit allows over broad

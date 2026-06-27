@@ -12,7 +12,7 @@ is_free: false
 infrastructure_type: docker
 jira_priority: Medium
 description: Production readiness for NIC bonding. Harden, document, and validate
-  LACP modes, failover, and hash policies so the change is safe to run during a maintenance
+  link aggregation modes and failover so the change is safe to run during a maintenance
   window.
 objectives:
 - Day-2 NIC bonding work completes safely in this environment
@@ -31,6 +31,6 @@ hints:
     NIC bonding.'
 - order: 3
   cost: 20
-  content: 'Run post-change verification: bond fails over cleanly and throughput matches
-    design. Record `# FIXED-OK` in `/opt/fixitlab/academy/academy-networking-005-production-bonding.conf`
+  content: 'Run post-change verification: the bond is up with the correct mode and
+    members. Record `# FIXED-OK` in `/opt/fixitlab/academy/academy-networking-005-production-bonding.conf`
     when complete.'

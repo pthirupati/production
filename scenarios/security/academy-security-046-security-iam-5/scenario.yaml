@@ -12,8 +12,8 @@ is_free: false
 infrastructure_type: docker
 jira_priority: Medium
 description: 'Security review: harden identity and access on this Security system.
-  Close unsafe defaults, enforce least privilege, and ensure users, roles, policies,
-  and federation cannot be abused — without breaking legitimate use.'
+  Close unsafe defaults, enforce least privilege, and ensure users, roles, and least
+  privilege cannot be abused — without breaking legitimate use.'
 objectives:
 - Unsafe defaults related to identity and access are removed or constrained
 - Access follows least privilege and is auditable
@@ -23,8 +23,8 @@ initial_state: The environment is functional but overly permissive around identi
 hints:
 - order: 1
   cost: 10
-  content: 'Baseline current exposure: IAM console/CLI, policy simulator, and CloudTrail.
-    Note world-readable files, open ports, or excessive roles.'
+  content: 'Baseline current exposure: role/policy assignments. Note world-readable
+    files, open ports, or excessive roles.'
 - order: 2
   cost: 15
   content: Apply least privilege incrementally. Prefer explicit allows over broad

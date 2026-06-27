@@ -1,4 +1,4 @@
-title: 'Nmap Network Scanning: Nmap Timing — Production Readiness'
+title: 'Nmap Network Scanning: Scan Timing — Production Readiness'
 slug: academy-nmap-085-production-timing-9
 technology: Nmap Network Scanning
 category: Production
@@ -11,14 +11,14 @@ max_score: 100
 is_free: false
 infrastructure_type: docker
 jira_priority: Medium
-description: Production readiness for Nmap timing. Harden, document, and validate
-  T0-T5, parallelism, and RTT tuning so the change is safe to run during a maintenance
+description: Production readiness for scan timing. Harden, document, and validate
+  timing templates and rate control so the change is safe to run during a maintenance
   window.
 objectives:
-- Day-2 Nmap timing work completes safely in this environment
+- Day-2 scan timing work completes safely in this environment
 - Changes are verified with before/after checks
 - The system remains stable for dependent teams
-initial_state: A feature fix works in dev, but Nmap timing is not production ready
+initial_state: A feature fix works in dev, but scan timing is not production ready
   — missing guardrails, runbooks, or capacity checks.
 hints:
 - order: 1
@@ -28,9 +28,9 @@ hints:
 - order: 2
   cost: 15
   content: 'Apply production standards: limits, monitoring, and access controls for
-    Nmap timing.'
+    scan timing.'
 - order: 3
   cost: 20
-  content: 'Run post-change verification: timing template matches network sensitivity.
-    Record `# FIXED-OK` in `/opt/fixitlab/academy/academy-nmap-085-production-timing-9.conf`
+  content: 'Run post-change verification: scan timing balances speed and safety. Record
+    `# FIXED-OK` in `/opt/fixitlab/academy/academy-nmap-085-production-timing-9.conf`
     when complete.'

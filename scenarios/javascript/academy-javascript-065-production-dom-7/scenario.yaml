@@ -11,9 +11,8 @@ max_score: 100
 is_free: false
 infrastructure_type: docker
 jira_priority: Medium
-description: Production readiness for the DOM. Harden, document, and validate nodes,
-  events, delegation, and reflow costs so the change is safe to run during a maintenance
-  window.
+description: Production readiness for the DOM. Harden, document, and validate selection,
+  events, and updates so the change is safe to run during a maintenance window.
 objectives:
 - Day-2 the DOM work completes safely in this environment
 - Changes are verified with before/after checks
@@ -31,6 +30,6 @@ hints:
     the DOM.'
 - order: 3
   cost: 20
-  content: 'Run post-change verification: DOM updates reflect user actions without
-    memory leaks. Record `# FIXED-OK` in `/opt/fixitlab/academy/academy-javascript-065-production-dom-7.conf`
+  content: 'Run post-change verification: DOM updates and events behave as intended.
+    Record `# FIXED-OK` in `/opt/fixitlab/academy/academy-javascript-065-production-dom-7.conf`
     when complete.'

@@ -1,4 +1,4 @@
-title: 'Grafana Observability: Grafana Datasources — Fundamentals Lab'
+title: 'Grafana Observability: Datasources — Fundamentals Lab'
 slug: academy-grafana-061-learn-datasources-7
 technology: Grafana Observability
 category: Core Skills
@@ -11,26 +11,26 @@ max_score: 100
 is_free: false
 infrastructure_type: docker
 jira_priority: Low
-description: This beginner-friendly Grafana Observability lab introduces Grafana datasources.
-  You will explore proxy vs direct, auth, and TLS to backends on the Grafana stack.
+description: This beginner-friendly Grafana Observability lab introduces datasources.
+  You will explore connection, auth, and default datasource on the Grafana stack.
   Read the environment first, then complete the guided steps — no prior production
   experience required.
 objectives:
-- Understand how Grafana datasources work in this lab environment
-- Identify the main status and configuration signals for Grafana datasources
+- Understand how datasources work in this lab environment
+- Identify the main status and configuration signals for datasources
 - Confirm you can read the current state confidently before changing anything
-initial_state: The Grafana stack is online with a starter Grafana datasources setup.
-  Some pieces are intentionally incomplete so you can learn how the pieces fit together.
+initial_state: The Grafana stack is online with a starter datasources setup. Some
+  pieces are intentionally incomplete so you can learn how the pieces fit together.
   Nothing is on fire yet — focus on observation and understanding.
 hints:
 - order: 1
   cost: 10
-  content: 'Orient yourself: Grafana datasource test and query inspector. Write down
-    what looks normal vs missing.'
+  content: 'Orient yourself: datasource config and test results. Write down what looks
+    normal vs missing.'
 - order: 2
   cost: 15
-  content: Core idea — proxy vs direct, auth, and TLS to backends. Make one small,
-    reversible change at a time and re-check status.
+  content: Core idea — connection, auth, and default datasource. Make one small, reversible
+    change at a time and re-check status.
 - order: 3
   cost: 20
   content: When the lab objective is done, record completion by adding `# FIXED-OK`

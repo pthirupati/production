@@ -1,4 +1,4 @@
-title: 'Windows Server: Windows Dns And Dhcp — Troubleshooting Drill'
+title: 'Windows Server: Dns And Dhcp — Troubleshooting Drill'
 slug: academy-windows-084-troubleshoot-dns-dhcp-9
 technology: Windows Server
 category: Troubleshooting
@@ -11,29 +11,27 @@ max_score: 100
 is_free: false
 infrastructure_type: docker
 jira_priority: Medium
-description: 'Production alert: clients get no IP, wrong gateway/DNS, or stale records
-  break name resolution. You are on call for Windows Server and must troubleshoot
-  Windows DNS and DHCP methodically — triage symptoms, find root cause, apply the
-  smallest safe fix, and confirm recovery.'
+description: 'Production alert: clients get no address or cannot resolve names. You
+  are on call for Windows Server and must troubleshoot DNS and DHCP methodically —
+  triage symptoms, find root cause, apply the smallest safe fix, and confirm recovery.'
 objectives:
-- 'The incident symptom is clear: clients get no IP, wrong gateway/DNS, or stale records
-  break name resolution'
+- 'The incident symptom is clear: clients get no address or cannot resolve names'
 - Root cause is isolated with evidence, not guesswork
 - Service behavior returns to normal after the fix
-initial_state: The Windows Server host is degraded. Clients get no ip, wrong gateway/dns,
-  or stale records break name resolution. Recent changes may exist around Windows
-  DNS and DHCP, but do not restart blindly — gather evidence first.
+initial_state: The Windows Server host is degraded. Clients get no address or cannot
+  resolve names. Recent changes may exist around DNS and DHCP, but do not restart
+  blindly — gather evidence first.
 hints:
 - order: 1
   cost: 10
-  content: 'Triage: DNS Manager, `Get-DhcpServerv4Scope`, and ipconfig /all on clients.
-    Capture timestamps, error messages, and what still works.'
+  content: 'Triage: DNS Manager, DHCP scopes, and `ipconfig /all`. Capture timestamps,
+    error messages, and what still works.'
 - order: 2
   cost: 15
   content: Separate symptom from cause. Fix the underlying misconfiguration, not only
     the noisy log line.
 - order: 3
   cost: 20
-  content: 'Verify recovery: clients receive correct leases and DNS resolves forward
-    and reverse. Document the fix, add `# FIXED-OK` to `/opt/fixitlab/academy/academy-windows-084-troubleshoot-dns-dhcp-9.conf`,
+  content: 'Verify recovery: clients lease an address and resolve names. Document
+    the fix, add `# FIXED-OK` to `/opt/fixitlab/academy/academy-windows-084-troubleshoot-dns-dhcp-9.conf`,
     and rerun Check Solution.'

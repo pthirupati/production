@@ -1,4 +1,4 @@
-title: 'Database Administration: Sql Query Plans — Automation Practice'
+title: 'Database Administration: Query Plans — Automation Practice'
 slug: academy-database-047-automation-query-plan-5
 technology: Database Administration
 category: Automation
@@ -11,15 +11,14 @@ max_score: 100
 is_free: false
 infrastructure_type: docker
 jira_priority: Medium
-description: 'Automation lab: remove toil around SQL query plans. Codify repeatable
-  steps for EXPLAIN/ANALYZE, join order, scans vs index access, and statistics and
-  prove the automation is idempotent.'
+description: 'Automation lab: remove toil around query plans. Codify repeatable steps
+  for EXPLAIN, statistics, and index use and prove the automation is idempotent.'
 objectives:
-- Day-2 SQL query plans work completes safely in this environment
+- Day-2 query plans work completes safely in this environment
 - Changes are verified with before/after checks
 - The system remains stable for dependent teams
-initial_state: Operators still perform manual steps for SQL query plans. Automate
-  the boring parts without hiding important safety checks.
+initial_state: Operators still perform manual steps for query plans. Automate the
+  boring parts without hiding important safety checks.
 hints:
 - order: 1
   cost: 10

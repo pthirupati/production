@@ -1,4 +1,4 @@
-title: 'Node.js Development: Platform Security Hardening — Automation Practice'
+title: 'Node.js Development: Application Security — Automation Practice'
 slug: academy-nodejs-017-automation-security-2
 technology: Node.js Development
 category: Automation
@@ -11,15 +11,14 @@ max_score: 100
 is_free: false
 infrastructure_type: docker
 jira_priority: Medium
-description: 'Automation lab: remove toil around platform security hardening. Codify
-  repeatable steps for least privilege, patching, secrets handling, and exposure reduction
-  and prove the automation is idempotent.'
+description: 'Automation lab: remove toil around application security. Codify repeatable
+  steps for input validation, headers, and authz and prove the automation is idempotent.'
 objectives:
-- Day-2 platform security hardening work completes safely in this environment
+- Day-2 application security work completes safely in this environment
 - Changes are verified with before/after checks
 - The system remains stable for dependent teams
-initial_state: Operators still perform manual steps for platform security hardening.
-  Automate the boring parts without hiding important safety checks.
+initial_state: Operators still perform manual steps for application security. Automate
+  the boring parts without hiding important safety checks.
 hints:
 - order: 1
   cost: 10

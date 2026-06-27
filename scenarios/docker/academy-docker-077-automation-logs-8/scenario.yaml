@@ -12,8 +12,8 @@ is_free: false
 infrastructure_type: docker
 jira_priority: Medium
 description: 'Automation lab: remove toil around container logs. Codify repeatable
-  steps for drivers, rotation, and centralized shipping and prove the automation is
-  idempotent.'
+  steps for log drivers, rotation, and stdout/stderr capture and prove the automation
+  is idempotent.'
 objectives:
 - Day-2 container logs work completes safely in this environment
 - Changes are verified with before/after checks

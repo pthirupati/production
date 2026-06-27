@@ -306,6 +306,14 @@ function speakBrowserUtterance(seg, { voice, locale, rate, pitch }) {
       if (settled) return
       settled = true
       clearTimeout(stuckTimer)
+      clearInterval(speakingPoll)
+      // Some browsers (notably Safari and some Chrome builds) play the audio but
+      // never fire `onstart`. If the engine reports it actually spoke/queued the
+      // utterance, count it as started so we don't show a false
+      // "Voice unavailable" toast for audio the candidate could clearly hear.
+      if (!started && window.speechSynthesis && (window.speechSynthesis.speaking || window.speechSynthesis.pending)) {
+        started = true
+      }
       resolve(started)
     }
     const u = new SpeechSynthesisUtterance(seg)
@@ -317,6 +325,10 @@ function speakBrowserUtterance(seg, { voice, locale, rate, pitch }) {
     u.onstart = () => { started = true }
     u.onend = done
     u.onerror = done
+    // Poll the engine: if it begins speaking without firing onstart, record it.
+    const speakingPoll = setInterval(() => {
+      if (window.speechSynthesis?.speaking) started = true
+    }, 120)
     const stuckTimer = setTimeout(() => {
       if (!started && window.speechSynthesis?.paused) {
         try { window.speechSynthesis.resume() } catch { /* */ }

@@ -11,28 +11,25 @@ max_score: 100
 is_free: false
 infrastructure_type: docker
 jira_priority: Low
-description: This beginner-friendly Ansible Automation lab introduces Ansible inventory.
-  You will explore hosts, groups, variables, and connection settings on the Ansible
-  control node. Read the environment first, then complete the guided steps — no prior
-  production experience required.
+description: Ansible control-node troubleshooting. The managed hosts in the `webservers` group are unreachable
+  over SSH from the control node, so every play fails at the connection stage. Establish key-based SSH
+  access to the inventory hosts so Ansible can reach them. Verify with `ansible webservers -m ping` (every
+  host should return SUCCESS / pong).
 objectives:
-- Understand how Ansible inventory work in this lab environment
-- Identify the main status and configuration signals for Ansible inventory
-- Confirm you can read the current state confidently before changing anything
-initial_state: The Ansible control node is online with a starter Ansible inventory
-  setup. Some pieces are intentionally incomplete so you can learn how the pieces
-  fit together. Nothing is on fire yet — focus on observation and understanding.
+- All hosts in the webservers group are reachable from the control node
+- Key-based SSH authentication works without a password prompt
+- ansible webservers -m ping returns SUCCESS for every host
+initial_state: The Ansible control node cannot authenticate to the managed hosts in the `webservers` group
+  — `ansible webservers -m ping` fails with unreachable/permission-denied errors.
 hints:
 - order: 1
   cost: 10
-  content: 'Orient yourself: `ansible-inventory --graph` and group/host vars files.
-    Write down what looks normal vs missing.'
+  content: 'Confirm the failure: `ansible webservers -m ping` and check `ansible-inventory --list` to
+    see the target hosts.'
 - order: 2
   cost: 15
-  content: Core idea — hosts, groups, variables, and connection settings. Make one
-    small, reversible change at a time and re-check status.
+  content: The inventory is correct — the problem is SSH authentication to the managed nodes.
 - order: 3
   cost: 20
-  content: When the lab objective is done, record completion by adding `# FIXED-OK`
-    to `/opt/fixitlab/academy/academy-ansible-041-learn-inventory-5.conf`, then click
-    Check Solution.
+  content: Distribute your key with `ssh-copy-id` to each managed host (e.g. `ssh-copy-id root@web1`),
+    then re-run `ansible webservers -m ping` and Check Solution.

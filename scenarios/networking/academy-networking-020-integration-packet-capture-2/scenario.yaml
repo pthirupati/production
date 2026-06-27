@@ -1,4 +1,4 @@
-title: 'Networking: Packet Capture Strategy — Integration Lab'
+title: 'Networking: Packet Capture — Integration Lab'
 slug: academy-networking-020-integration-packet-capture-2
 technology: Networking
 category: Cross-Technology
@@ -11,15 +11,15 @@ max_score: 100
 is_free: false
 infrastructure_type: docker
 jira_priority: Medium
-description: 'Integration lab: connect packet capture strategy with an adjacent platform
-  in the Networking stack. Validate authentication, data handoff, and failure behavior
-  for SPAN/TAP placement, filters, and retention.'
+description: 'Integration lab: connect packet capture with an adjacent platform in
+  the Networking stack. Validate authentication, data handoff, and failure behavior
+  for tcpdump filters and reading captures.'
 objectives:
-- packet capture strategy is connected to the adjacent system successfully
+- packet capture is connected to the adjacent system successfully
 - Handoff points are authenticated and observable
 - End-to-end workflow completes without manual intervention
-initial_state: Two systems are deployed but not fully wired together for packet capture
-  strategy. Downstream consumers are waiting on this integration path.
+initial_state: Two systems are deployed but not fully wired together for packet capture.
+  Downstream consumers are waiting on this integration path.
 hints:
 - order: 1
   cost: 10

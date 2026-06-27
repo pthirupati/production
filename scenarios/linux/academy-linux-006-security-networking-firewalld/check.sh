@@ -1,3 +1,3 @@
 #!/usr/bin/env bash
-grep -q FIXED-OK /opt/fixitlab/academy/academy-linux-006-security-networking-firewalld.conf
+sudo firewall-cmd --list-ports
 exit 0

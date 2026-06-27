@@ -1,4 +1,4 @@
-title: 'Oracle PeopleSoft: Peoplesoft Operator Lock — Observability Practice'
+title: 'Oracle PeopleSoft: Operator Account Lock — Observability Practice'
 slug: academy-peoplesoft-018-observability-operator-lock-2
 technology: Oracle PeopleSoft
 category: Observability
@@ -11,20 +11,20 @@ max_score: 100
 is_free: false
 infrastructure_type: docker
 jira_priority: Medium
-description: 'Observability task: make PeopleSoft operator lock visible in logs, metrics,
+description: 'Observability task: make operator account lock visible in logs, metrics,
   or traces. On-call should answer ''what is broken?'' quickly using signals from
-  locked objects, release, and audit.'
+  account lock and password reset.'
 objectives:
-- Day-2 PeopleSoft operator lock work completes safely in this environment
+- Day-2 operator account lock work completes safely in this environment
 - Changes are verified with before/after checks
 - The system remains stable for dependent teams
-initial_state: The system runs, but PeopleSoft operator lock lacks useful telemetry.
+initial_state: The system runs, but operator account lock lacks useful telemetry.
   Dashboards/alerts are blank or noisy — improve signal quality.
 hints:
 - order: 1
   cost: 10
-  content: 'Find existing signals: Operator Security and release actions in PIA. Identify
-    what is missing for fast triage.'
+  content: 'Find existing signals: the user profile lock status. Identify what is
+    missing for fast triage.'
 - order: 2
   cost: 15
   content: Add or fix exporters/dashboards/alerts with clear names, labels, and thresholds.

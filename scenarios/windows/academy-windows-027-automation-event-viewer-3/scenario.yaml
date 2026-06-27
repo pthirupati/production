@@ -1,4 +1,4 @@
-title: 'Windows Server: Windows Event Viewer — Automation Practice'
+title: 'Windows Server: Event Viewer — Automation Practice'
 slug: academy-windows-027-automation-event-viewer-3
 technology: Windows Server
 category: Automation
@@ -11,15 +11,14 @@ max_score: 100
 is_free: false
 infrastructure_type: docker
 jira_priority: Medium
-description: 'Automation lab: remove toil around Windows Event Viewer. Codify repeatable
-  steps for channels, filters, XPath queries, and forwarding and prove the automation
-  is idempotent.'
+description: 'Automation lab: remove toil around Event Viewer. Codify repeatable steps
+  for logs, levels, and event IDs and prove the automation is idempotent.'
 objectives:
-- Day-2 Windows Event Viewer work completes safely in this environment
+- Day-2 Event Viewer work completes safely in this environment
 - Changes are verified with before/after checks
 - The system remains stable for dependent teams
-initial_state: Operators still perform manual steps for Windows Event Viewer. Automate
-  the boring parts without hiding important safety checks.
+initial_state: Operators still perform manual steps for Event Viewer. Automate the
+  boring parts without hiding important safety checks.
 hints:
 - order: 1
   cost: 10

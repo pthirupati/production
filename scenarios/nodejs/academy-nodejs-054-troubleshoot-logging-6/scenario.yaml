@@ -1,4 +1,4 @@
-title: 'Node.js Development: Application Logging — Troubleshooting Drill'
+title: 'Node.js Development: Logging — Troubleshooting Drill'
 slug: academy-nodejs-054-troubleshoot-logging-6
 technology: Node.js Development
 category: Troubleshooting
@@ -11,28 +11,27 @@ max_score: 100
 is_free: false
 infrastructure_type: docker
 jira_priority: Medium
-description: 'Production alert: incidents impossible to debug due to missing fields.
-  You are on call for Node.js Development and must troubleshoot application logging
-  methodically — triage symptoms, find root cause, apply the smallest safe fix, and
-  confirm recovery.'
+description: 'Production alert: failures are silent or logs are unusable. You are
+  on call for Node.js Development and must troubleshoot logging methodically — triage
+  symptoms, find root cause, apply the smallest safe fix, and confirm recovery.'
 objectives:
-- 'The incident symptom is clear: incidents impossible to debug due to missing fields'
+- 'The incident symptom is clear: failures are silent or logs are unusable'
 - Root cause is isolated with evidence, not guesswork
 - Service behavior returns to normal after the fix
-initial_state: The Node.js application is degraded. Incidents impossible to debug
-  due to missing fields. Recent changes may exist around application logging, but
-  do not restart blindly — gather evidence first.
+initial_state: The Node.js application is degraded. Failures are silent or logs are
+  unusable. Recent changes may exist around logging, but do not restart blindly —
+  gather evidence first.
 hints:
 - order: 1
   cost: 10
-  content: 'Triage: log aggregation queries and sample trace IDs. Capture timestamps,
-    error messages, and what still works.'
+  content: 'Triage: logging config and emitted log lines. Capture timestamps, error
+    messages, and what still works.'
 - order: 2
   cost: 15
   content: Separate symptom from cause. Fix the underlying misconfiguration, not only
     the noisy log line.
 - order: 3
   cost: 20
-  content: 'Verify recovery: logs answer who/what/when with traceable request IDs.
-    Document the fix, add `# FIXED-OK` to `/opt/fixitlab/academy/academy-nodejs-054-troubleshoot-logging-6.conf`,
+  content: 'Verify recovery: useful logs are emitted at the right levels. Document
+    the fix, add `# FIXED-OK` to `/opt/fixitlab/academy/academy-nodejs-054-troubleshoot-logging-6.conf`,
     and rerun Check Solution.'

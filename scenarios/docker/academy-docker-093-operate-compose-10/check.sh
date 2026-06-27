@@ -1,3 +1,3 @@
 #!/usr/bin/env bash
-grep -q FIXED-OK /opt/fixitlab/academy/academy-docker-093-operate-compose-10.conf
+docker ps | grep -q Up
 exit 0

@@ -12,8 +12,8 @@ is_free: false
 infrastructure_type: docker
 jira_priority: Medium
 description: Production readiness for tuned profiles. Harden, document, and validate
-  throughput vs latency profiles and overrides so the change is safe to run during
-  a maintenance window.
+  performance profiles and tunables so the change is safe to run during a maintenance
+  window.
 objectives:
 - Day-2 tuned profiles work completes safely in this environment
 - Changes are verified with before/after checks
@@ -31,6 +31,6 @@ hints:
     tuned profiles.'
 - order: 3
   cost: 20
-  content: 'Run post-change verification: tuned profile matches workload with measurable
-    benefit. Record `# FIXED-OK` in `/opt/fixitlab/academy/academy-rhel-linux-055-production-tuned-profile-6.conf`
+  content: 'Run post-change verification: the correct tuned profile is active. Record
+    `# FIXED-OK` in `/opt/fixitlab/academy/academy-rhel-linux-055-production-tuned-profile-6.conf`
     when complete.'

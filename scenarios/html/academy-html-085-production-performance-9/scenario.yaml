@@ -1,4 +1,4 @@
-title: 'HTML & Web Servers: Web Performance — Production Readiness'
+title: 'HTML & Web Servers: Performance — Production Readiness'
 slug: academy-html-085-production-performance-9
 technology: HTML & Web Servers
 category: Production
@@ -11,14 +11,14 @@ max_score: 100
 is_free: false
 infrastructure_type: docker
 jira_priority: Medium
-description: Production readiness for web performance. Harden, document, and validate
-  LCP, bundle size, caching, and profiling so the change is safe to run during a maintenance
+description: Production readiness for performance. Harden, document, and validate
+  render cost, memoization, and profiling so the change is safe to run during a maintenance
   window.
 objectives:
-- Day-2 web performance work completes safely in this environment
+- Day-2 performance work completes safely in this environment
 - Changes are verified with before/after checks
 - The system remains stable for dependent teams
-initial_state: A feature fix works in dev, but web performance is not production ready
+initial_state: A feature fix works in dev, but performance is not production ready
   — missing guardrails, runbooks, or capacity checks.
 hints:
 - order: 1
@@ -28,9 +28,9 @@ hints:
 - order: 2
   cost: 15
   content: 'Apply production standards: limits, monitoring, and access controls for
-    web performance.'
+    performance.'
 - order: 3
   cost: 20
-  content: 'Run post-change verification: core vitals meet budget on target devices.
-    Record `# FIXED-OK` in `/opt/fixitlab/academy/academy-html-085-production-performance-9.conf`
+  content: 'Run post-change verification: unnecessary work is removed and the UI is
+    smooth. Record `# FIXED-OK` in `/opt/fixitlab/academy/academy-html-085-production-performance-9.conf`
     when complete.'

@@ -11,25 +11,26 @@ max_score: 100
 is_free: false
 infrastructure_type: docker
 jira_priority: Medium
-description: 'Day-2 operations: perform a routine systemd services task safely in
-  Linux Administration. Follow change control — inspect, change, verify — while working
-  with unit files, dependencies, restart policies, and journal logging.'
+description: Day-2 systemd service operations. The `nginx` unit on this host has entered a failed state,
+  so the web service it provides is down. Investigate it the way you would in production — `systemctl
+  status nginx` and `journalctl -u nginx` — then bring the unit back to an active (running) state. Verify
+  with `systemctl is-active nginx`.
 objectives:
-- Day-2 systemd services work completes safely in this environment
-- Changes are verified with before/after checks
-- The system remains stable for dependent teams
-initial_state: The Linux practice server is healthy enough for scheduled work on systemd
-  services. Complete the maintenance task without unnecessary downtime.
+- The nginx service is active (running) again
+- The unit is healthy and (ideally) enabled to survive reboot
+- systemctl is-active nginx reports 'active'
+initial_state: The `nginx` service is installed but currently failed/stopped, so the site it serves is
+  unavailable.
 hints:
 - order: 1
   cost: 10
-  content: 'Pre-check: `systemctl status`, `systemctl cat`, and `journalctl -u <service>`.
-    Confirm backups or snapshots if the change is risky.'
+  content: 'Pre-check the unit: `systemctl status nginx` and `journalctl -u nginx` to see why it is not
+    running.'
 - order: 2
   cost: 15
-  content: Execute the maintenance in small steps. Prefer reversible changes.
+  content: Bring it up with the smallest safe action rather than reinstalling — a stopped/failed unit
+    usually just needs to be started.
 - order: 3
   cost: 20
-  content: 'Post-check: the unit is enabled, active, and logging cleanly. Add `# FIXED-OK`
-    to `/opt/fixitlab/academy/academy-linux-003-operate-systemd-services.conf` and
-    run Check Solution.'
+  content: Run `sudo systemctl start nginx` (add `sudo systemctl enable nginx` for persistence), confirm
+    `systemctl is-active nginx`, then Check Solution.

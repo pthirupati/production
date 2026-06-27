@@ -12,6 +12,30 @@ try:
 except Exception:  # pragma: no cover
     COMPLETE_TECH_MARKER_FIX = {}
 
+# ── Flagship real-simulation labs (upgraded from FIXED-OK markers) ──
+# These academy slugs now break a genuine OS state and are validated against it,
+# so they MUST NOT be handled by the marker-rewrite path. Drop them from the
+# marker map and apply the real fix (start the unit / create the user / open the
+# firewall / bring the compose stack up / distribute SSH keys) instead.
+try:
+    from apps.labs.provisioner.simulation.flagship_presets import (
+        FLAGSHIP_ANSIBLE_SLUGS,
+        FLAGSHIP_DOCKER_SLUGS,
+        FLAGSHIP_FIREWALL_SLUGS,
+        FLAGSHIP_SERVICE_FIX,
+        FLAGSHIP_SLUGS,
+        FLAGSHIP_USER_FIX,
+    )
+    for _s in FLAGSHIP_SLUGS:
+        COMPLETE_TECH_MARKER_FIX.pop(_s, None)
+except Exception:  # pragma: no cover
+    FLAGSHIP_ANSIBLE_SLUGS = set()
+    FLAGSHIP_DOCKER_SLUGS = set()
+    FLAGSHIP_FIREWALL_SLUGS = set()
+    FLAGSHIP_SERVICE_FIX = {}
+    FLAGSHIP_SLUGS = set()
+    FLAGSHIP_USER_FIX = {}
+
 
 # ── Generated maps for real-state scenarios (see scenario_presets.py) ──
 _RS_SERVICE_FIX = {'db-redis-down': 'redis', 'db-mariadb-down': 'mariadb', 'db-mongodb-down': 'mongod', 'db-cassandra-down': 'cassandra', 'db-pgbouncer-down': 'pgbouncer', 'rhel-chronyd-down': 'chronyd', 'rhel-rsyslog-down': 'rsyslog', 'rhel-firewalld-down': 'firewalld', 'rhel-auditd-down': 'auditd', 'rhel-nfs-server-down': 'nfs-server', 'docker-containerd-down': 'containerd', 'linux-haproxy-down': 'haproxy', 'linux-named-down': 'named', 'linux-memcached-down': 'memcached', 'linux-rabbitmq-down': 'rabbitmq-server', 'linux-nginx-stream-proxy-down': 'nginx'}
@@ -58,6 +82,10 @@ _RS_MARKER_FIX.update({
 _RS_SERVICE_FIX.update({
     'docker-handoff-systemd-managed-stack': 'appstack',
 })
+
+# Flagship real-state labs whose fix is "start the failed unit" (nginx, chronyd,
+# rsyslog, crond). Matched by the existing _RS_SERVICE_FIX branch in the fixer.
+_RS_SERVICE_FIX.update(FLAGSHIP_SERVICE_FIX)
 
 
 # ── Monitoring (Grafana + Prometheus) marker scenarios ──
@@ -309,6 +337,40 @@ def _apply_simulation_fix(session) -> tuple[bool, str]:
                 svc.active = "active"
                 svc.sub_state = "running"
             return True, f"{unit} started"
+
+        # ── Flagship real-state labs (user / firewall / compose / ansible) ──
+        # Matched by EXACT slug BEFORE the generic substring branches so the
+        # genuine remediation runs and the lab validates against real state.
+        if slug in FLAGSHIP_USER_FIX:
+            user = FLAGSHIP_USER_FIX[slug]
+            shell.run(f"useradd -m {user}")
+            return True, f"{user} account created"
+        if slug in FLAGSHIP_FIREWALL_SLUGS:
+            shell.run("firewall-cmd --permanent --add-service=http")
+            shell.run("firewall-cmd --reload")
+            return True, "http allowed through firewalld and reloaded"
+        if slug in FLAGSHIP_DOCKER_SLUGS:
+            shell.run("docker compose up -d")
+            engine._container_running = True
+            docker_svc = state.services.get("docker")
+            if docker_svc:
+                docker_svc.active = "active"
+                docker_svc.sub_state = "running"
+            return True, "docker compose stack started"
+        if slug in FLAGSHIP_ANSIBLE_SLUGS:
+            shell.run("ssh-copy-id root@web1")
+            shell.run("ssh-copy-id root@web2")
+            engine._ssh_key_fixed = True
+            return True, "ansible managed hosts reachable"
+        if slug == "networking-mtu-mismatch":
+            path = "/opt/fixitlab/networking/mtu-mismatch.conf"
+            existing = state.read_file(path) or ""
+            state.write_file(
+                path,
+                existing.replace("# broken configuration", "# corrected configuration")
+                + "\n# FIXED-OK: tunnel MTU set to 1450 and TCP MSS clamping applied\n",
+            )
+            return True, "mtu/mss fix recorded"
         if slug in COMPLETE_TECH_MARKER_FIX:
             path = COMPLETE_TECH_MARKER_FIX[slug]
             existing = state.read_file(path) or ""

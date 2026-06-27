@@ -12,8 +12,8 @@ is_free: false
 infrastructure_type: docker
 jira_priority: Medium
 description: Backup and recovery drill for prompt debugging. Ensure backups run on
-  schedule, retention is correct, and you can restore trace prompts, compare variants,
-  and regression sets within the lab RTO.
+  schedule, retention is correct, and you can restore tracing, isolating, and iterating
+  within the lab RTO.
 objectives:
 - Backup coverage for prompt debugging is complete and restorable
 - Retention and encryption meet the stated policy

@@ -12,8 +12,8 @@ is_free: false
 infrastructure_type: docker
 jira_priority: Medium
 description: 'Security review: harden NIC teaming on this Bare Metal & IPMI system.
-  Close unsafe defaults, enforce least privilege, and ensure LACP/static teams, failover,
-  and VLAN tagging cannot be abused — without breaking legitimate use.'
+  Close unsafe defaults, enforce least privilege, and ensure bonding/teaming modes
+  and failover cannot be abused — without breaking legitimate use.'
 objectives:
 - Unsafe defaults related to NIC teaming are removed or constrained
 - Access follows least privilege and is auditable
@@ -23,8 +23,8 @@ initial_state: The environment is functional but overly permissive around NIC te
 hints:
 - order: 1
   cost: 10
-  content: 'Baseline current exposure: teamd/Windows teaming UI and switch config.
-    Note world-readable files, open ports, or excessive roles.'
+  content: 'Baseline current exposure: team/bond state and link status. Note world-readable
+    files, open ports, or excessive roles.'
 - order: 2
   cost: 15
   content: Apply least privilege incrementally. Prefer explicit allows over broad

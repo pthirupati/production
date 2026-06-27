@@ -13,7 +13,7 @@ infrastructure_type: docker
 jira_priority: Low
 description: Build TCP analysis from scratch in this Wireshark Packet Analysis lab.
   You start from a minimal environment and must produce a working configuration that
-  demonstrates handshakes, windows, retransmits, and resets. Treat this like a greenfield
+  demonstrates handshakes, retransmits, and window size. Treat this like a greenfield
   task — plan, implement, then prove it works.
 objectives:
 - A working TCP analysis setup must exist by the end of this lab
@@ -33,6 +33,6 @@ hints:
     validate, then add the remaining pieces.
 - order: 3
   cost: 20
-  content: 'Prove success: TCP behavior matches hypothesis for the incident. Mark
-    the lab complete with `# FIXED-OK` in `/opt/fixitlab/academy/academy-wireshark-062-build-tcp-7.conf`
+  content: 'Prove success: the TCP issue is identified from the trace. Mark the lab
+    complete with `# FIXED-OK` in `/opt/fixitlab/academy/academy-wireshark-062-build-tcp-7.conf`
     and run Check Solution.'

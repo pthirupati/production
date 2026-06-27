@@ -1,4 +1,4 @@
-title: 'Shell Scripting: Cron Scheduling — Automation Practice'
+title: 'Shell Scripting: Cron Jobs — Automation Practice'
 slug: academy-shell-script-007-automation-cron
 technology: Shell Scripting
 category: Automation
@@ -11,15 +11,14 @@ max_score: 100
 is_free: false
 infrastructure_type: docker
 jira_priority: Medium
-description: 'Automation lab: remove toil around cron scheduling. Codify repeatable
-  steps for crontab fields, timezones, and environment and prove the automation is
-  idempotent.'
+description: 'Automation lab: remove toil around cron jobs. Codify repeatable steps
+  for schedules, environment, and logging and prove the automation is idempotent.'
 objectives:
-- Day-2 cron scheduling work completes safely in this environment
+- Day-2 cron jobs work completes safely in this environment
 - Changes are verified with before/after checks
 - The system remains stable for dependent teams
-initial_state: Operators still perform manual steps for cron scheduling. Automate
-  the boring parts without hiding important safety checks.
+initial_state: Operators still perform manual steps for cron jobs. Automate the boring
+  parts without hiding important safety checks.
 hints:
 - order: 1
   cost: 10

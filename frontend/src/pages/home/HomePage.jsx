@@ -9,6 +9,7 @@ import { useAuthStore } from '../../store/authStore'
 import MarketingNav from './components/MarketingNav'
 import MarketingFooter from './components/MarketingFooter'
 import HeroSection from './sections/HeroSection'
+import OnboardingSection from './sections/OnboardingSection'
 import TechMarqueeSection from './sections/TechMarqueeSection'
 import ChallengeModesSection from './sections/ChallengeModesSection'
 import TechnologiesSection from './sections/TechnologiesSection'
@@ -54,6 +55,7 @@ export default function HomePage() {
 
       <HeroSection technologies={technologies} stats={stats} />
       <TechMarqueeSection technologies={technologies} />
+      <OnboardingSection isAuthenticated={isAuthenticated} />
       <ChallengeModesSection />
       <TechnologiesSection technologies={technologies} isAuthenticated={isAuthenticated} />
       <CertificationsSection isAuthenticated={isAuthenticated} />

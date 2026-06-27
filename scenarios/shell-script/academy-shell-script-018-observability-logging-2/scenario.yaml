@@ -1,4 +1,4 @@
-title: 'Shell Scripting: Application Logging — Observability Practice'
+title: 'Shell Scripting: Logging — Observability Practice'
 slug: academy-shell-script-018-observability-logging-2
 technology: Shell Scripting
 category: Observability
@@ -11,19 +11,19 @@ max_score: 100
 is_free: false
 infrastructure_type: docker
 jira_priority: Medium
-description: 'Observability task: make application logging visible in logs, metrics,
-  or traces. On-call should answer ''what is broken?'' quickly using signals from
-  structured logs, levels, correlation IDs, and rotation.'
+description: 'Observability task: make logging visible in logs, metrics, or traces.
+  On-call should answer ''what is broken?'' quickly using signals from loggers, levels,
+  handlers, and formatting.'
 objectives:
-- Day-2 application logging work completes safely in this environment
+- Day-2 logging work completes safely in this environment
 - Changes are verified with before/after checks
 - The system remains stable for dependent teams
-initial_state: The system runs, but application logging lacks useful telemetry. Dashboards/alerts
+initial_state: The system runs, but logging lacks useful telemetry. Dashboards/alerts
   are blank or noisy — improve signal quality.
 hints:
 - order: 1
   cost: 10
-  content: 'Find existing signals: log aggregation queries and sample trace IDs. Identify
+  content: 'Find existing signals: logging config and emitted log lines. Identify
     what is missing for fast triage.'
 - order: 2
   cost: 15

@@ -1,4 +1,4 @@
-title: 'SQLite: Sqlite Triggers — Backup and Recovery'
+title: 'SQLite: Triggers — Backup and Recovery'
 slug: academy-sqlite-099-backup-triggers-10
 technology: SQLite
 category: Backup & Recovery
@@ -11,15 +11,15 @@ max_score: 100
 is_free: false
 infrastructure_type: docker
 jira_priority: Medium
-description: Backup and recovery drill for SQLite triggers. Ensure backups run on
-  schedule, retention is correct, and you can restore BEFORE/AFTER, WHEN clauses,
-  and recursion within the lab RTO.
+description: Backup and recovery drill for triggers. Ensure backups run on schedule,
+  retention is correct, and you can restore BEFORE/AFTER triggers and side effects
+  within the lab RTO.
 objectives:
-- Backup coverage for SQLite triggers is complete and restorable
+- Backup coverage for triggers is complete and restorable
 - Retention and encryption meet the stated policy
 - A restore drill proves data integrity
-initial_state: Backup jobs exist but reliability is uncertain for SQLite triggers.
-  Leadership wants proof that restore works — not just that backup scripts exit zero.
+initial_state: Backup jobs exist but reliability is uncertain for triggers. Leadership
+  wants proof that restore works — not just that backup scripts exit zero.
 hints:
 - order: 1
   cost: 10

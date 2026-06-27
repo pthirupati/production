@@ -1,4 +1,4 @@
-title: 'AI / ML / LLM & Agents: Ai Agents — Integration Lab'
+title: 'AI / ML / LLM & Agents: Agents — Integration Lab'
 slug: academy-ai-ml-020-integration-agents-2
 technology: AI / ML / LLM & Agents
 category: Cross-Technology
@@ -11,15 +11,15 @@ max_score: 100
 is_free: false
 infrastructure_type: docker
 jira_priority: Medium
-description: 'Integration lab: connect AI agents with an adjacent platform in the
-  AI / ML / LLM & Agents stack. Validate authentication, data handoff, and failure
-  behavior for tool use, planning loops, memory, and guardrails for autonomous workflows.'
+description: 'Integration lab: connect agents with an adjacent platform in the AI
+  / ML / LLM & Agents stack. Validate authentication, data handoff, and failure behavior
+  for tool use, planning, and loops.'
 objectives:
-- AI agents is connected to the adjacent system successfully
+- agents is connected to the adjacent system successfully
 - Handoff points are authenticated and observable
 - End-to-end workflow completes without manual intervention
-initial_state: Two systems are deployed but not fully wired together for AI agents.
-  Downstream consumers are waiting on this integration path.
+initial_state: Two systems are deployed but not fully wired together for agents. Downstream
+  consumers are waiting on this integration path.
 hints:
 - order: 1
   cost: 10

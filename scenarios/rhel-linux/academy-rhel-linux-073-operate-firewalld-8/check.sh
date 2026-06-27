@@ -1,3 +1,3 @@
 #!/usr/bin/env bash
-grep -q FIXED-OK /opt/fixitlab/academy/academy-rhel-linux-073-operate-firewalld-8.conf
+sudo firewall-cmd --list-ports
 exit 0

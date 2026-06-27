@@ -1,4 +1,4 @@
-title: 'Grafana Observability: Alerting Rules — Production Readiness'
+title: 'Grafana Observability: Alerting — Production Readiness'
 slug: academy-grafana-075-production-alerting-8
 technology: Grafana Observability
 category: Production
@@ -11,15 +11,15 @@ max_score: 100
 is_free: false
 infrastructure_type: docker
 jira_priority: Medium
-description: Production readiness for alerting rules. Harden, document, and validate
-  thresholds, burn rates, inhibition, and on-call routing so the change is safe to
-  run during a maintenance window.
+description: Production readiness for alerting. Harden, document, and validate alert
+  rules, conditions, and routing so the change is safe to run during a maintenance
+  window.
 objectives:
-- Day-2 alerting rules work completes safely in this environment
+- Day-2 alerting work completes safely in this environment
 - Changes are verified with before/after checks
 - The system remains stable for dependent teams
-initial_state: A feature fix works in dev, but alerting rules is not production ready
-  — missing guardrails, runbooks, or capacity checks.
+initial_state: A feature fix works in dev, but alerting is not production ready —
+  missing guardrails, runbooks, or capacity checks.
 hints:
 - order: 1
   cost: 10
@@ -28,9 +28,9 @@ hints:
 - order: 2
   cost: 15
   content: 'Apply production standards: limits, monitoring, and access controls for
-    alerting rules.'
+    alerting.'
 - order: 3
   cost: 20
-  content: 'Run post-change verification: alerts fire for real regressions and stay
-    quiet during expected noise. Record `# FIXED-OK` in `/opt/fixitlab/academy/academy-grafana-075-production-alerting-8.conf`
+  content: 'Run post-change verification: alerts trigger on real conditions. Record
+    `# FIXED-OK` in `/opt/fixitlab/academy/academy-grafana-075-production-alerting-8.conf`
     when complete.'

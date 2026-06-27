@@ -1,4 +1,4 @@
-title: 'PostgreSQL: Postgresql Extensions — Observability Practice'
+title: 'PostgreSQL: Extensions — Observability Practice'
 slug: academy-postgresql-028-observability-extensions-3
 technology: PostgreSQL
 category: Observability
@@ -11,20 +11,20 @@ max_score: 100
 is_free: false
 infrastructure_type: docker
 jira_priority: Medium
-description: 'Observability task: make PostgreSQL extensions visible in logs, metrics,
-  or traces. On-call should answer ''what is broken?'' quickly using signals from
-  CREATE EXTENSION, version pinning, and shared_preload_libraries.'
+description: 'Observability task: make extensions visible in logs, metrics, or traces.
+  On-call should answer ''what is broken?'' quickly using signals from installing
+  and using PostgreSQL extensions.'
 objectives:
-- Day-2 PostgreSQL extensions work completes safely in this environment
+- Day-2 extensions work completes safely in this environment
 - Changes are verified with before/after checks
 - The system remains stable for dependent teams
-initial_state: The system runs, but PostgreSQL extensions lacks useful telemetry.
-  Dashboards/alerts are blank or noisy — improve signal quality.
+initial_state: The system runs, but extensions lacks useful telemetry. Dashboards/alerts
+  are blank or noisy — improve signal quality.
 hints:
 - order: 1
   cost: 10
-  content: 'Find existing signals: `\dx`, `pg_available_extensions`, and postgresql.conf.
-    Identify what is missing for fast triage.'
+  content: 'Find existing signals: `\dx` and extension objects. Identify what is missing
+    for fast triage.'
 - order: 2
   cost: 15
   content: Add or fix exporters/dashboards/alerts with clear names, labels, and thresholds.

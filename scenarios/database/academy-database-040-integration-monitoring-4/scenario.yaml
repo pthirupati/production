@@ -1,4 +1,4 @@
-title: 'Database Administration: Database Monitoring — Integration Lab'
+title: 'Database Administration: Monitoring — Integration Lab'
 slug: academy-database-040-integration-monitoring-4
 technology: Database Administration
 category: Cross-Technology
@@ -11,15 +11,15 @@ max_score: 100
 is_free: false
 infrastructure_type: docker
 jira_priority: Medium
-description: 'Integration lab: connect database monitoring with an adjacent platform
-  in the Database Administration stack. Validate authentication, data handoff, and
-  failure behavior for latency, connections, replication lag, and alarms.'
+description: 'Integration lab: connect Monitoring with an adjacent platform in the
+  Database Administration stack. Validate authentication, data handoff, and failure
+  behavior for how monitoring fits into database administration.'
 objectives:
-- database monitoring is connected to the adjacent system successfully
+- Monitoring is connected to the adjacent system successfully
 - Handoff points are authenticated and observable
 - End-to-end workflow completes without manual intervention
-initial_state: Two systems are deployed but not fully wired together for database
-  monitoring. Downstream consumers are waiting on this integration path.
+initial_state: Two systems are deployed but not fully wired together for Monitoring.
+  Downstream consumers are waiting on this integration path.
 hints:
 - order: 1
   cost: 10

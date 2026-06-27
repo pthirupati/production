@@ -1,4 +1,4 @@
-title: 'VMware vSphere: Vmware Datastores — Build From Scratch'
+title: 'VMware vSphere: Datastores — Build From Scratch'
 slug: academy-vmware-082-build-datastore-9
 technology: VMware vSphere
 category: Build Lab
@@ -11,29 +11,29 @@ max_score: 100
 is_free: false
 infrastructure_type: docker
 jira_priority: Low
-description: Build VMware datastores from scratch in this VMware vSphere lab. You
-  start from a minimal environment and must produce a working configuration that demonstrates
-  VMFS/NFS, capacity, and VM placement. Treat this like a greenfield task — plan,
-  implement, then prove it works.
+description: Build datastores from scratch in this VMware vSphere lab. You start from
+  a minimal environment and must produce a working configuration that demonstrates
+  VMFS/NFS datastores, capacity, and multipathing. Treat this like a greenfield task
+  — plan, implement, then prove it works.
 objectives:
-- A working VMware datastores setup must exist by the end of this lab
+- A working datastores setup must exist by the end of this lab
 - Configuration should follow team conventions and be easy to audit
 - The result should pass validation without manual cleanup
-initial_state: The vSphere lab is ready but VMware datastores is not configured yet.
-  Required packages/tools may already be installed; your job is to create the config
-  and bring the capability online.
+initial_state: The vSphere lab is ready but datastores is not configured yet. Required
+  packages/tools may already be installed; your job is to create the config and bring
+  the capability online.
 hints:
 - order: 1
   cost: 10
   content: 'List prerequisites first: which packages, files, or API objects must exist
-    for VMware datastores?'
+    for datastores?'
 - order: 2
   cost: 15
-  content: Implement incrementally — create the smallest working slice of VMware datastores,
+  content: Implement incrementally — create the smallest working slice of datastores,
     validate, then add the remaining pieces.
 - order: 3
   cost: 20
-  content: 'Prove success: datastores have headroom and correct multipathing. Mark
-    the lab complete with `# FIXED-OK` in `/opt/fixitlab/academy/academy-vmware-082-build-datastore-9.conf`
+  content: 'Prove success: datastores have capacity and redundant paths. Mark the
+    lab complete with `# FIXED-OK` in `/opt/fixitlab/academy/academy-vmware-082-build-datastore-9.conf`
     and run Check Solution.'
 vmware_link: true

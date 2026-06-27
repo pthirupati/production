@@ -13,7 +13,7 @@ infrastructure_type: docker
 jira_priority: Medium
 description: 'Observability task: make change management visible in logs, metrics,
   or traces. On-call should answer ''what is broken?'' quickly using signals from
-  CAB records, risk classification, and backout plans.'
+  approvals, windows, and records.'
 objectives:
 - Day-2 change management work completes safely in this environment
 - Changes are verified with before/after checks
@@ -23,8 +23,8 @@ initial_state: The system runs, but change management lacks useful telemetry. Da
 hints:
 - order: 1
   cost: 10
-  content: 'Find existing signals: change tickets, maintenance windows, and comms
-    templates. Identify what is missing for fast triage.'
+  content: 'Find existing signals: the change record and process. Identify what is
+    missing for fast triage.'
 - order: 2
   cost: 15
   content: Add or fix exporters/dashboards/alerts with clear names, labels, and thresholds.

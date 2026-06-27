@@ -1,4 +1,4 @@
-title: 'Java Development: Platform Security Hardening — Observability Practice'
+title: 'Java Development: Application Security — Observability Practice'
 slug: academy-java-088-observability-security-9
 technology: Java Development
 category: Observability
@@ -11,20 +11,20 @@ max_score: 100
 is_free: false
 infrastructure_type: docker
 jira_priority: Medium
-description: 'Observability task: make platform security hardening visible in logs,
-  metrics, or traces. On-call should answer ''what is broken?'' quickly using signals
-  from least privilege, patching, secrets handling, and exposure reduction.'
+description: 'Observability task: make application security visible in logs, metrics,
+  or traces. On-call should answer ''what is broken?'' quickly using signals from
+  input validation, headers, and authz.'
 objectives:
-- Day-2 platform security hardening work completes safely in this environment
+- Day-2 application security work completes safely in this environment
 - Changes are verified with before/after checks
 - The system remains stable for dependent teams
-initial_state: The system runs, but platform security hardening lacks useful telemetry.
-  Dashboards/alerts are blank or noisy — improve signal quality.
+initial_state: The system runs, but application security lacks useful telemetry. Dashboards/alerts
+  are blank or noisy — improve signal quality.
 hints:
 - order: 1
   cost: 10
-  content: 'Find existing signals: config audits, open-port scans, IAM/role review,
-    and audit logs. Identify what is missing for fast triage.'
+  content: 'Find existing signals: request handling and security headers. Identify
+    what is missing for fast triage.'
 - order: 2
   cost: 15
   content: Add or fix exporters/dashboards/alerts with clear names, labels, and thresholds.

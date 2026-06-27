@@ -12,8 +12,8 @@ is_free: false
 infrastructure_type: docker
 jira_priority: Medium
 description: Backup and recovery drill for data quality. Ensure backups run on schedule,
-  retention is correct, and you can restore constraints, anomalies, and monitoring
-  within the lab RTO.
+  retention is correct, and you can restore validation rules and monitoring within
+  the lab RTO.
 objectives:
 - Backup coverage for data quality is complete and restorable
 - Retention and encryption meet the stated policy

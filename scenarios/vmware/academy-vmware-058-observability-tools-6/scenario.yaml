@@ -1,4 +1,4 @@
-title: 'VMware vSphere: Llm Tool Calling — Observability Practice'
+title: 'VMware vSphere: Tool Use — Observability Practice'
 slug: academy-vmware-058-observability-tools-6
 technology: VMware vSphere
 category: Observability
@@ -11,20 +11,20 @@ max_score: 100
 is_free: false
 infrastructure_type: docker
 jira_priority: Medium
-description: 'Observability task: make LLM tool calling visible in logs, metrics,
-  or traces. On-call should answer ''what is broken?'' quickly using signals from
-  schemas, auth, timeouts, and result parsing.'
+description: 'Observability task: make tool use visible in logs, metrics, or traces.
+  On-call should answer ''what is broken?'' quickly using signals from function calling
+  and schemas.'
 objectives:
-- Day-2 LLM tool calling work completes safely in this environment
+- Day-2 tool use work completes safely in this environment
 - Changes are verified with before/after checks
 - The system remains stable for dependent teams
-initial_state: The system runs, but LLM tool calling lacks useful telemetry. Dashboards/alerts
+initial_state: The system runs, but tool use lacks useful telemetry. Dashboards/alerts
   are blank or noisy — improve signal quality.
 hints:
 - order: 1
   cost: 10
-  content: 'Find existing signals: tool call traces, latency, and error payloads.
-    Identify what is missing for fast triage.'
+  content: 'Find existing signals: tool schemas and call logs. Identify what is missing
+    for fast triage.'
 - order: 2
   cost: 15
   content: Add or fix exporters/dashboards/alerts with clear names, labels, and thresholds.

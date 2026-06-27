@@ -1,4 +1,4 @@
-title: 'VMware vSphere: Vsphere Ha/Drs — Production Readiness'
+title: 'VMware vSphere: Ha And Drs — Production Readiness'
 slug: academy-vmware-015-production-ha-drs-2
 technology: VMware vSphere
 category: Production
@@ -11,14 +11,14 @@ max_score: 100
 is_free: false
 infrastructure_type: docker
 jira_priority: Medium
-description: Production readiness for vSphere HA/DRS. Harden, document, and validate
-  admission control, affinity, and resource pools so the change is safe to run during
-  a maintenance window.
+description: Production readiness for HA and DRS. Harden, document, and validate cluster
+  availability and load balancing so the change is safe to run during a maintenance
+  window.
 objectives:
-- Day-2 vSphere HA/DRS work completes safely in this environment
+- Day-2 HA and DRS work completes safely in this environment
 - Changes are verified with before/after checks
 - The system remains stable for dependent teams
-initial_state: A feature fix works in dev, but vSphere HA/DRS is not production ready
+initial_state: A feature fix works in dev, but HA and DRS is not production ready
   — missing guardrails, runbooks, or capacity checks.
 hints:
 - order: 1
@@ -28,10 +28,10 @@ hints:
 - order: 2
   cost: 15
   content: 'Apply production standards: limits, monitoring, and access controls for
-    vSphere HA/DRS.'
+    HA and DRS.'
 - order: 3
   cost: 20
-  content: 'Run post-change verification: cluster maintains SLA with balanced utilization.
-    Record `# FIXED-OK` in `/opt/fixitlab/academy/academy-vmware-015-production-ha-drs-2.conf`
+  content: 'Run post-change verification: HA restarts VMs and DRS balances load. Record
+    `# FIXED-OK` in `/opt/fixitlab/academy/academy-vmware-015-production-ha-drs-2.conf`
     when complete.'
 vmware_link: true

@@ -117,6 +117,14 @@ function ScenarioCard({ scenario, index, isAuthenticated, onBookmark }) {
             {scenario.subtitle}
           </p>
         )}
+        {scenario.learn?.length > 0 && (
+          <p className="text-[11px] text-surface-400 mt-1 hidden sm:flex items-start gap-1 leading-relaxed">
+            <Target size={11} className="mt-[1px] shrink-0 text-accent-cyan/70" />
+            <span className="truncate">
+              <span className="text-surface-500">You'll learn: </span>{scenario.learn[0]}
+            </span>
+          </p>
+        )}
         {scenario.tags?.length > 0 && (
           <div className="flex gap-1 mt-1.5 flex-wrap">
             {scenario.tags.slice(0, 3).map(tag => (

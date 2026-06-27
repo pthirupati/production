@@ -1,4 +1,4 @@
-title: 'Docker & Containers: Container Registry — Backup and Recovery'
+title: 'Docker & Containers: Image Registry — Backup and Recovery'
 slug: academy-docker-049-backup-registry-5
 technology: Docker & Containers
 category: Backup & Recovery
@@ -11,14 +11,14 @@ max_score: 100
 is_free: false
 infrastructure_type: docker
 jira_priority: Medium
-description: Backup and recovery drill for container registry. Ensure backups run
-  on schedule, retention is correct, and you can restore tags, immutability, scanning,
-  and auth within the lab RTO.
+description: Backup and recovery drill for image registry. Ensure backups run on schedule,
+  retention is correct, and you can restore push/pull auth, tags, and insecure registries
+  within the lab RTO.
 objectives:
-- Backup coverage for container registry is complete and restorable
+- Backup coverage for image registry is complete and restorable
 - Retention and encryption meet the stated policy
 - A restore drill proves data integrity
-initial_state: Backup jobs exist but reliability is uncertain for container registry.
+initial_state: Backup jobs exist but reliability is uncertain for image registry.
   Leadership wants proof that restore works — not just that backup scripts exit zero.
 hints:
 - order: 1

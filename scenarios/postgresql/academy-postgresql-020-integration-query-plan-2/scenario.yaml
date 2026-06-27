@@ -1,4 +1,4 @@
-title: 'PostgreSQL: Sql Query Plans — Integration Lab'
+title: 'PostgreSQL: Query Plans — Integration Lab'
 slug: academy-postgresql-020-integration-query-plan-2
 technology: PostgreSQL
 category: Cross-Technology
@@ -11,15 +11,15 @@ max_score: 100
 is_free: false
 infrastructure_type: docker
 jira_priority: Medium
-description: 'Integration lab: connect SQL query plans with an adjacent platform in
-  the PostgreSQL stack. Validate authentication, data handoff, and failure behavior
-  for EXPLAIN/ANALYZE, join order, scans vs index access, and statistics.'
+description: 'Integration lab: connect query plans with an adjacent platform in the
+  PostgreSQL stack. Validate authentication, data handoff, and failure behavior for
+  EXPLAIN, statistics, and index use.'
 objectives:
-- SQL query plans is connected to the adjacent system successfully
+- query plans is connected to the adjacent system successfully
 - Handoff points are authenticated and observable
 - End-to-end workflow completes without manual intervention
-initial_state: Two systems are deployed but not fully wired together for SQL query
-  plans. Downstream consumers are waiting on this integration path.
+initial_state: Two systems are deployed but not fully wired together for query plans.
+  Downstream consumers are waiting on this integration path.
 hints:
 - order: 1
   cost: 10

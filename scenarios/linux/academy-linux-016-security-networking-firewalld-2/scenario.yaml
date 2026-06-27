@@ -1,4 +1,4 @@
-title: 'Linux Administration: Linux Networking + Firewalld — Security Practice'
+title: 'Linux Administration: Networking And Firewalld — Security Practice'
 slug: academy-linux-016-security-networking-firewalld-2
 technology: Linux Administration
 category: Security
@@ -11,27 +11,25 @@ max_score: 100
 is_free: false
 infrastructure_type: docker
 jira_priority: Medium
-description: 'Security review: harden Linux networking + firewalld on this Linux Administration
-  system. Close unsafe defaults, enforce least privilege, and ensure interfaces, routes,
-  zones, and service ports cannot be abused — without breaking legitimate use.'
+description: Firewall administration with firewalld. Clients cannot reach the HTTP service because the
+  active firewalld zone does not permit web traffic on port 80. Open HTTP persistently and reload firewalld
+  so the rule survives, then confirm the zone allows it. Verify with `firewall-cmd --list-all`.
 objectives:
-- Unsafe defaults related to Linux networking + firewalld are removed or constrained
-- Access follows least privilege and is auditable
-- Security checks pass without breaking required functionality
-initial_state: The environment is functional but overly permissive around Linux networking
-  + firewalld. Assume an auditor or pen test is next week — tighten controls with
-  evidence.
+- HTTP (port 80/tcp) is permitted in the active firewalld zone
+- The rule is persistent across a firewalld reload
+- firewall-cmd shows the HTTP port/service open
+initial_state: Port 80/tcp (HTTP) is not allowed through firewalld in the active zone, so the web service
+  is unreachable from clients.
 hints:
 - order: 1
   cost: 10
-  content: 'Baseline current exposure: `nmcli`, `ip route`, and `firewall-cmd`. Note
-    world-readable files, open ports, or excessive roles.'
+  content: 'Inspect the active zone: `firewall-cmd --list-all` to see which services/ports are currently
+    allowed.'
 - order: 2
   cost: 15
-  content: Apply least privilege incrementally. Prefer explicit allows over broad
-    wildcards.
+  content: Make the change persistent (`--permanent`) and remember runtime rules need a `--reload` to
+    take effect.
 - order: 3
   cost: 20
-  content: Re-test legitimate workflows after hardening. Finish with `# FIXED-OK`
-    in `/opt/fixitlab/academy/academy-linux-016-security-networking-firewalld-2.conf`
-    and Check Solution.
+  content: Run `sudo firewall-cmd --permanent --add-service=http` (or `--add-port=80/tcp`) then `sudo
+    firewall-cmd --reload`; verify with `firewall-cmd --list-all`, then Check Solution.

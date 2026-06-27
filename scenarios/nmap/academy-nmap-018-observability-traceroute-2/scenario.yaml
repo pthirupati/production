@@ -12,8 +12,8 @@ is_free: false
 infrastructure_type: docker
 jira_priority: Medium
 description: 'Observability task: make traceroute visible in logs, metrics, or traces.
-  On-call should answer ''what is broken?'' quickly using signals from hop discovery,
-  ICMP vs UDP, and asymmetric routes.'
+  On-call should answer ''what is broken?'' quickly using signals from path discovery
+  and hops.'
 objectives:
 - Day-2 traceroute work completes safely in this environment
 - Changes are verified with before/after checks
@@ -23,8 +23,8 @@ initial_state: The system runs, but traceroute lacks useful telemetry. Dashboard
 hints:
 - order: 1
   cost: 10
-  content: 'Find existing signals: `traceroute`, `mtr`, and path changes. Identify
-    what is missing for fast triage.'
+  content: 'Find existing signals: `nmap --traceroute`. Identify what is missing for
+    fast triage.'
 - order: 2
   cost: 15
   content: Add or fix exporters/dashboards/alerts with clear names, labels, and thresholds.

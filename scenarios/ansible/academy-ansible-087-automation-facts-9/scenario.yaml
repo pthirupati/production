@@ -1,4 +1,4 @@
-title: 'Ansible Automation: Ansible Facts — Automation Practice'
+title: 'Ansible Automation: Facts — Automation Practice'
 slug: academy-ansible-087-automation-facts-9
 technology: Ansible Automation
 category: Automation
@@ -11,14 +11,14 @@ max_score: 100
 is_free: false
 infrastructure_type: docker
 jira_priority: Medium
-description: 'Automation lab: remove toil around Ansible facts. Codify repeatable
-  steps for setup module, custom facts, and caching and prove the automation is idempotent.'
+description: 'Automation lab: remove toil around facts. Codify repeatable steps for
+  gathered facts, custom facts, and caching and prove the automation is idempotent.'
 objectives:
-- Day-2 Ansible facts work completes safely in this environment
+- Day-2 facts work completes safely in this environment
 - Changes are verified with before/after checks
 - The system remains stable for dependent teams
-initial_state: Operators still perform manual steps for Ansible facts. Automate the
-  boring parts without hiding important safety checks.
+initial_state: Operators still perform manual steps for facts. Automate the boring
+  parts without hiding important safety checks.
 hints:
 - order: 1
   cost: 10

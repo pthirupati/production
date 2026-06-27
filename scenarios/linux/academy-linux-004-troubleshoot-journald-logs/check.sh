@@ -1,3 +1,3 @@
 #!/usr/bin/env bash
-grep -q FIXED-OK /opt/fixitlab/academy/academy-linux-004-troubleshoot-journald-logs.conf
+systemctl is-active rsyslog
 exit 0

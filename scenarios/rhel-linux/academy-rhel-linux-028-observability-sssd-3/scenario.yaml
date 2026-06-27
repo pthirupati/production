@@ -12,8 +12,8 @@ is_free: false
 infrastructure_type: docker
 jira_priority: Medium
 description: 'Observability task: make SSSD identity visible in logs, metrics, or
-  traces. On-call should answer ''what is broken?'' quickly using signals from AD/LDAP
-  providers, caches, and offline logon.'
+  traces. On-call should answer ''what is broken?'' quickly using signals from domain
+  join, providers, and caching.'
 objectives:
 - Day-2 SSSD identity work completes safely in this environment
 - Changes are verified with before/after checks
@@ -23,7 +23,7 @@ initial_state: The system runs, but SSSD identity lacks useful telemetry. Dashbo
 hints:
 - order: 1
   cost: 10
-  content: 'Find existing signals: `sssctl user-check`, `/var/log/sssd`, and `getent`.
+  content: 'Find existing signals: `sssctl domain-status` and `/etc/sssd/sssd.conf`.
     Identify what is missing for fast triage.'
 - order: 2
   cost: 15

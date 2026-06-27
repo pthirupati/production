@@ -1,4 +1,4 @@
-title: 'HTML & Web Servers: Seo Basics — Troubleshooting Drill'
+title: 'HTML & Web Servers: Seo — Troubleshooting Drill'
 slug: academy-html-054-troubleshoot-seo-6
 technology: HTML & Web Servers
 category: Troubleshooting
@@ -11,27 +11,27 @@ max_score: 100
 is_free: false
 infrastructure_type: docker
 jira_priority: Medium
-description: 'Production alert: pages not indexed or duplicate content dilutes rank.
-  You are on call for HTML & Web Servers and must troubleshoot SEO basics methodically
-  — triage symptoms, find root cause, apply the smallest safe fix, and confirm recovery.'
+description: 'Production alert: pages rank poorly or render wrong previews. You are
+  on call for HTML & Web Servers and must troubleshoot SEO methodically — triage symptoms,
+  find root cause, apply the smallest safe fix, and confirm recovery.'
 objectives:
-- 'The incident symptom is clear: pages not indexed or duplicate content dilutes rank'
+- 'The incident symptom is clear: pages rank poorly or render wrong previews'
 - Root cause is isolated with evidence, not guesswork
 - Service behavior returns to normal after the fix
-initial_state: The web server lab is degraded. Pages not indexed or duplicate content
-  dilutes rank. Recent changes may exist around SEO basics, but do not restart blindly
-  — gather evidence first.
+initial_state: The web server lab is degraded. Pages rank poorly or render wrong previews.
+  Recent changes may exist around SEO, but do not restart blindly — gather evidence
+  first.
 hints:
 - order: 1
   cost: 10
-  content: 'Triage: Search Console, robots.txt, and Lighthouse SEO. Capture timestamps,
-    error messages, and what still works.'
+  content: 'Triage: head tags and rendered metadata. Capture timestamps, error messages,
+    and what still works.'
 - order: 2
   cost: 15
   content: Separate symptom from cause. Fix the underlying misconfiguration, not only
     the noisy log line.
 - order: 3
   cost: 20
-  content: 'Verify recovery: SEO checklist passes for template pages. Document the
-    fix, add `# FIXED-OK` to `/opt/fixitlab/academy/academy-html-054-troubleshoot-seo-6.conf`,
+  content: 'Verify recovery: metadata is complete and correct. Document the fix, add
+    `# FIXED-OK` to `/opt/fixitlab/academy/academy-html-054-troubleshoot-seo-6.conf`,
     and rerun Check Solution.'

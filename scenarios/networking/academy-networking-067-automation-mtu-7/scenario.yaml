@@ -12,7 +12,7 @@ is_free: false
 infrastructure_type: docker
 jira_priority: Medium
 description: 'Automation lab: remove toil around MTU and fragmentation. Codify repeatable
-  steps for path MTU, MSS clamping, and jumbo frames and prove the automation is idempotent.'
+  steps for path MTU, jumbo frames, and PMTUD and prove the automation is idempotent.'
 objectives:
 - Day-2 MTU and fragmentation work completes safely in this environment
 - Changes are verified with before/after checks

@@ -1,4 +1,4 @@
-title: 'Terraform & IaC: Infrastructure Drift — Backup and Recovery'
+title: 'Terraform & IaC: Configuration Drift — Backup and Recovery'
 slug: academy-terraform-009-backup-drift
 technology: Terraform & IaC
 category: Backup & Recovery
@@ -11,14 +11,14 @@ max_score: 100
 is_free: false
 infrastructure_type: docker
 jira_priority: Medium
-description: Backup and recovery drill for infrastructure drift. Ensure backups run
-  on schedule, retention is correct, and you can restore config vs actual, scheduled
-  detection, and remediation within the lab RTO.
+description: Backup and recovery drill for configuration drift. Ensure backups run
+  on schedule, retention is correct, and you can restore detecting and reconciling
+  out-of-band changes within the lab RTO.
 objectives:
-- Backup coverage for infrastructure drift is complete and restorable
+- Backup coverage for configuration drift is complete and restorable
 - Retention and encryption meet the stated policy
 - A restore drill proves data integrity
-initial_state: Backup jobs exist but reliability is uncertain for infrastructure drift.
+initial_state: Backup jobs exist but reliability is uncertain for configuration drift.
   Leadership wants proof that restore works — not just that backup scripts exit zero.
 hints:
 - order: 1

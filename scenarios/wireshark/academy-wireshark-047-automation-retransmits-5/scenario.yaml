@@ -1,4 +1,4 @@
-title: 'Wireshark Packet Analysis: Tcp Retransmits — Automation Practice'
+title: 'Wireshark Packet Analysis: Retransmissions — Automation Practice'
 slug: academy-wireshark-047-automation-retransmits-5
 technology: Wireshark Packet Analysis
 category: Automation
@@ -11,13 +11,13 @@ max_score: 100
 is_free: false
 infrastructure_type: docker
 jira_priority: Medium
-description: 'Automation lab: remove toil around TCP retransmits. Codify repeatable
-  steps for loss, congestion, and window sizing and prove the automation is idempotent.'
+description: 'Automation lab: remove toil around retransmissions. Codify repeatable
+  steps for loss, duplicate ACKs, and recovery and prove the automation is idempotent.'
 objectives:
-- Day-2 TCP retransmits work completes safely in this environment
+- Day-2 retransmissions work completes safely in this environment
 - Changes are verified with before/after checks
 - The system remains stable for dependent teams
-initial_state: Operators still perform manual steps for TCP retransmits. Automate
+initial_state: Operators still perform manual steps for retransmissions. Automate
   the boring parts without hiding important safety checks.
 hints:
 - order: 1

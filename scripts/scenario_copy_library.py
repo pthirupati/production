@@ -69,8 +69,6 @@ TECH_PROFILES: dict[str, dict[str, str]] = {
     "simulation": {"domain": "FixitLab simulation", "env": "simulation sandbox", "surface": "terminal state, validation hooks, and lab authoring markers"},
 }
 
-from topic_snippets_extended import EXTENDED_TOPIC_SNIPPETS
-
 TOPIC_SNIPPETS: dict[str, dict[str, str]] = {
     "users-groups": {
         "label": "users and groups",
@@ -396,7 +394,14 @@ TOPIC_SNIPPETS: dict[str, dict[str, str]] = {
     },
 }
 
-TOPIC_SNIPPETS.update({k: v for k, v in EXTENDED_TOPIC_SNIPPETS.items() if k not in TOPIC_SNIPPETS})
+# Merge curated extended snippets (covers the long tail of per-tech topics so
+# generated copy names real commands/symptoms instead of using the fallback).
+try:
+    from topic_snippets_extended import EXTENDED_TOPIC_SNIPPETS
+    for _k, _v in EXTENDED_TOPIC_SNIPPETS.items():
+        TOPIC_SNIPPETS.setdefault(_k, _v)
+except ImportError:
+    pass
 
 ACADEMY_SLUG_RE = re.compile(r"^academy-(?P<tech>[\w-]+)-(?P<seq>\d+)-(?P<rest>.+)$")
 

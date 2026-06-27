@@ -1,4 +1,4 @@
-title: 'MySQL: Database Restore — Security Practice'
+title: 'MySQL: State Restore — Security Practice'
 slug: academy-mysql-046-security-restore-5
 technology: MySQL
 category: Security
@@ -11,20 +11,20 @@ max_score: 100
 is_free: false
 infrastructure_type: docker
 jira_priority: Medium
-description: 'Security review: harden database restore on this MySQL system. Close
-  unsafe defaults, enforce least privilege, and ensure RPO/RTO, PITR, and verification
-  queries cannot be abused — without breaking legitimate use.'
+description: 'Security review: harden state restore on this MySQL system. Close unsafe
+  defaults, enforce least privilege, and ensure reset and restore lab state cannot
+  be abused — without breaking legitimate use.'
 objectives:
-- Unsafe defaults related to database restore are removed or constrained
+- Unsafe defaults related to state restore are removed or constrained
 - Access follows least privilege and is auditable
 - Security checks pass without breaking required functionality
-initial_state: The environment is functional but overly permissive around database
-  restore. Assume an auditor or pen test is next week — tighten controls with evidence.
+initial_state: The environment is functional but overly permissive around state restore.
+  Assume an auditor or pen test is next week — tighten controls with evidence.
 hints:
 - order: 1
   cost: 10
-  content: 'Baseline current exposure: restore logs, backup catalogs, and checksum
-    queries. Note world-readable files, open ports, or excessive roles.'
+  content: 'Baseline current exposure: reset/restore behavior. Note world-readable
+    files, open ports, or excessive roles.'
 - order: 2
   cost: 15
   content: Apply least privilege incrementally. Prefer explicit allows over broad

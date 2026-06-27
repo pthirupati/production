@@ -1,4 +1,4 @@
-title: 'Prometheus Monitoring: Prometheus Remote Write — Security Practice'
+title: 'Prometheus Monitoring: Remote Write — Security Practice'
 slug: academy-prometheus-096-security-remote-write-10
 technology: Prometheus Monitoring
 category: Security
@@ -11,21 +11,20 @@ max_score: 100
 is_free: false
 infrastructure_type: docker
 jira_priority: Medium
-description: 'Security review: harden Prometheus remote write on this Prometheus Monitoring
-  system. Close unsafe defaults, enforce least privilege, and ensure replication,
-  shards, and lag cannot be abused — without breaking legitimate use.'
+description: 'Security review: harden remote write on this Prometheus Monitoring system.
+  Close unsafe defaults, enforce least privilege, and ensure long-term storage and
+  queue tuning cannot be abused — without breaking legitimate use.'
 objectives:
-- Unsafe defaults related to Prometheus remote write are removed or constrained
+- Unsafe defaults related to remote write are removed or constrained
 - Access follows least privilege and is auditable
 - Security checks pass without breaking required functionality
-initial_state: The environment is functional but overly permissive around Prometheus
-  remote write. Assume an auditor or pen test is next week — tighten controls with
-  evidence.
+initial_state: The environment is functional but overly permissive around remote write.
+  Assume an auditor or pen test is next week — tighten controls with evidence.
 hints:
 - order: 1
   cost: 10
-  content: 'Baseline current exposure: remote_write queue metrics and receiver health.
-    Note world-readable files, open ports, or excessive roles.'
+  content: 'Baseline current exposure: remote_write config and queue metrics. Note
+    world-readable files, open ports, or excessive roles.'
 - order: 2
   cost: 15
   content: Apply least privilege incrementally. Prefer explicit allows over broad

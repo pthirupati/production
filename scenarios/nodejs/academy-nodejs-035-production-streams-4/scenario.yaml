@@ -1,4 +1,4 @@
-title: 'Node.js Development: Node.Js Streams — Production Readiness'
+title: 'Node.js Development: Streams — Production Readiness'
 slug: academy-nodejs-035-production-streams-4
 technology: Node.js Development
 category: Production
@@ -11,15 +11,14 @@ max_score: 100
 is_free: false
 infrastructure_type: docker
 jira_priority: Medium
-description: Production readiness for Node.js streams. Harden, document, and validate
-  backpressure, piping, and error propagation so the change is safe to run during
-  a maintenance window.
+description: Production readiness for streams. Harden, document, and validate readable/writable
+  streams and backpressure so the change is safe to run during a maintenance window.
 objectives:
-- Day-2 Node.js streams work completes safely in this environment
+- Day-2 streams work completes safely in this environment
 - Changes are verified with before/after checks
 - The system remains stable for dependent teams
-initial_state: A feature fix works in dev, but Node.js streams is not production ready
-  — missing guardrails, runbooks, or capacity checks.
+initial_state: A feature fix works in dev, but streams is not production ready — missing
+  guardrails, runbooks, or capacity checks.
 hints:
 - order: 1
   cost: 10
@@ -28,9 +27,9 @@ hints:
 - order: 2
   cost: 15
   content: 'Apply production standards: limits, monitoring, and access controls for
-    Node.js streams.'
+    streams.'
 - order: 3
   cost: 20
-  content: 'Run post-change verification: stream pipeline handles backpressure without
-    data loss. Record `# FIXED-OK` in `/opt/fixitlab/academy/academy-nodejs-035-production-streams-4.conf`
+  content: 'Run post-change verification: data streams without buffering everything.
+    Record `# FIXED-OK` in `/opt/fixitlab/academy/academy-nodejs-035-production-streams-4.conf`
     when complete.'

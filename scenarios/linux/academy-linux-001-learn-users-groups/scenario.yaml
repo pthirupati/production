@@ -11,29 +11,26 @@ max_score: 100
 is_free: true
 infrastructure_type: docker
 jira_priority: Low
-description: This beginner-friendly Linux Administration lab introduces users and
-  groups. You will explore how accounts, UIDs/GIDs, primary groups, and supplementary
-  membership are defined on the Linux practice server. Read the environment first,
-  then complete the guided steps — no prior production experience required.
+description: Hands-on user administration. An application is meant to run under a dedicated, non-login
+  service account named `appuser`, but that account does not exist on this host yet — so the service cannot
+  own its files or run with least privilege. Create the `appuser` account (with a home directory) and
+  verify it resolves with `getent passwd appuser`.
 objectives:
-- Understand how users and groups work in this lab environment
-- Identify the main status and configuration signals for users and groups
-- Confirm you can read the current state confidently before changing anything
-initial_state: The Linux practice server is online with a starter users and groups
-  setup. Some pieces are intentionally incomplete so you can learn how the pieces
-  fit together. Nothing is on fire yet — focus on observation and understanding.
+- The dedicated 'appuser' service account exists on the host
+- The account is created cleanly (with a home directory)
+- getent passwd appuser returns the account
+initial_state: The application service account `appuser` is missing on this host. The service that depends
+  on it cannot start until the account exists.
 hints:
 - order: 1
   cost: 10
-  content: 'Orient yourself: `id`, `getent passwd`, and `getent group` (or equivalent
-    directory tools on Windows). Write down what looks normal vs missing.'
+  content: 'Inspect first: `getent passwd appuser` (will be empty) and `cat /etc/passwd` to see existing
+    accounts.'
 - order: 2
   cost: 15
-  content: Core idea — how accounts, UIDs/GIDs, primary groups, and supplementary
-    membership are defined. Make one small, reversible change at a time and re-check
-    status.
+  content: Decide whether the account needs a login shell and home directory. A service account usually
+    wants a home dir but no interactive login.
 - order: 3
   cost: 20
-  content: When the lab objective is done, record completion by adding `# FIXED-OK`
-    to `/opt/fixitlab/academy/academy-linux-001-learn-users-groups.conf`, then click
-    Check Solution.
+  content: 'Create it: `sudo useradd -m appuser`, confirm with `getent passwd appuser`, then run Check
+    Solution.'

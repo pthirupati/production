@@ -1,4 +1,4 @@
-title: 'Grafana Observability: Grafana Contact Points — Security Practice'
+title: 'Grafana Observability: Contact Points — Security Practice'
 slug: academy-grafana-066-security-contact-points-7
 technology: Grafana Observability
 category: Security
@@ -11,21 +11,20 @@ max_score: 100
 is_free: false
 infrastructure_type: docker
 jira_priority: Medium
-description: 'Security review: harden Grafana contact points on this Grafana Observability
-  system. Close unsafe defaults, enforce least privilege, and ensure receivers, templates,
-  and on-call integrations cannot be abused — without breaking legitimate use.'
+description: 'Security review: harden contact points on this Grafana Observability
+  system. Close unsafe defaults, enforce least privilege, and ensure notification
+  channels and templates cannot be abused — without breaking legitimate use.'
 objectives:
-- Unsafe defaults related to Grafana contact points are removed or constrained
+- Unsafe defaults related to contact points are removed or constrained
 - Access follows least privilege and is auditable
 - Security checks pass without breaking required functionality
-initial_state: The environment is functional but overly permissive around Grafana
-  contact points. Assume an auditor or pen test is next week — tighten controls with
-  evidence.
+initial_state: The environment is functional but overly permissive around contact
+  points. Assume an auditor or pen test is next week — tighten controls with evidence.
 hints:
 - order: 1
   cost: 10
-  content: 'Baseline current exposure: Grafana alerting UI and test notification button.
-    Note world-readable files, open ports, or excessive roles.'
+  content: 'Baseline current exposure: contact point config and test send. Note world-readable
+    files, open ports, or excessive roles.'
 - order: 2
   cost: 15
   content: Apply least privilege incrementally. Prefer explicit allows over broad

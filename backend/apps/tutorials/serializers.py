@@ -24,17 +24,12 @@ class TutorialSectionSerializer(serializers.ModelSerializer):
         heading = (obj.heading or "").lower()
         if not any(k in heading for k in ("assessment", "quiz", "checkpoint", "practice question")):
             return None
-        return {
-            "question": f"After studying “{obj.heading}”, what is the safest first step in a production lab?",
-            "options": [
-                "Gather logs and verify symptoms before changing config",
-                "Reboot the server immediately",
-                "Delete data to free space without backup",
-                "Skip validation and mark the lab complete",
-            ],
-            "answer": 0,
-            "explanation": "Always confirm the failure mode with logs, metrics, or health checks before invasive changes.",
-        }
+        # Generate a real, scored end-of-module quiz (5 questions) keyed to the
+        # tutorial's topic + module. Deterministic so it is stable per module.
+        from .quiz_bank import build_module_quiz
+
+        tutorial = obj.tutorial
+        return build_module_quiz(tutorial.topic, tutorial.title)
 
 
 class TutorialProgressSerializer(serializers.ModelSerializer):

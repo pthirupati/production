@@ -1,4 +1,4 @@
-title: 'Database Administration: Database Restore — Build From Scratch'
+title: 'Database Administration: State Restore — Build From Scratch'
 slug: academy-database-002-build-restore
 technology: Database Administration
 category: Build Lab
@@ -11,28 +11,28 @@ max_score: 100
 is_free: true
 infrastructure_type: docker
 jira_priority: Low
-description: Build database restore from scratch in this Database Administration lab.
+description: Build state restore from scratch in this Database Administration lab.
   You start from a minimal environment and must produce a working configuration that
-  demonstrates RPO/RTO, PITR, and verification queries. Treat this like a greenfield
-  task — plan, implement, then prove it works.
+  demonstrates reset and restore lab state. Treat this like a greenfield task — plan,
+  implement, then prove it works.
 objectives:
-- A working database restore setup must exist by the end of this lab
+- A working state restore setup must exist by the end of this lab
 - Configuration should follow team conventions and be easy to audit
 - The result should pass validation without manual cleanup
-initial_state: The database server is ready but database restore is not configured
-  yet. Required packages/tools may already be installed; your job is to create the
-  config and bring the capability online.
+initial_state: The database server is ready but state restore is not configured yet.
+  Required packages/tools may already be installed; your job is to create the config
+  and bring the capability online.
 hints:
 - order: 1
   cost: 10
   content: 'List prerequisites first: which packages, files, or API objects must exist
-    for database restore?'
+    for state restore?'
 - order: 2
   cost: 15
-  content: Implement incrementally — create the smallest working slice of database
-    restore, validate, then add the remaining pieces.
+  content: Implement incrementally — create the smallest working slice of state restore,
+    validate, then add the remaining pieces.
 - order: 3
   cost: 20
-  content: 'Prove success: restored DB passes row counts and app smoke tests. Mark
-    the lab complete with `# FIXED-OK` in `/opt/fixitlab/academy/academy-database-002-build-restore.conf`
+  content: 'Prove success: restore returns a clean starting state. Mark the lab complete
+    with `# FIXED-OK` in `/opt/fixitlab/academy/academy-database-002-build-restore.conf`
     and run Check Solution.'

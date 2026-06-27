@@ -1,4 +1,4 @@
-title: 'Prompt Engineering & AI Mastery: Ai Safety Guardrails — Automation Practice'
+title: 'Prompt Engineering & AI Mastery: Safety Guardrails — Automation Practice'
 slug: academy-prompt-engineering-097-automation-safety-10
 technology: Prompt Engineering & AI Mastery
 category: Automation
@@ -11,14 +11,13 @@ max_score: 100
 is_free: false
 infrastructure_type: docker
 jira_priority: Medium
-description: 'Automation lab: remove toil around AI safety guardrails. Codify repeatable
-  steps for refusals, PII filters, and jailbreak tests and prove the automation is
-  idempotent.'
+description: 'Automation lab: remove toil around safety guardrails. Codify repeatable
+  steps for refusals, filters, and limits and prove the automation is idempotent.'
 objectives:
-- Day-2 AI safety guardrails work completes safely in this environment
+- Day-2 safety guardrails work completes safely in this environment
 - Changes are verified with before/after checks
 - The system remains stable for dependent teams
-initial_state: Operators still perform manual steps for AI safety guardrails. Automate
+initial_state: Operators still perform manual steps for safety guardrails. Automate
   the boring parts without hiding important safety checks.
 hints:
 - order: 1

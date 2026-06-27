@@ -1,4 +1,4 @@
-title: 'SQLite: Sqlite Constraints — Automation Practice'
+title: 'SQLite: Constraints — Automation Practice'
 slug: academy-sqlite-097-automation-constraints-10
 technology: SQLite
 category: Automation
@@ -11,15 +11,14 @@ max_score: 100
 is_free: false
 infrastructure_type: docker
 jira_priority: Medium
-description: 'Automation lab: remove toil around SQLite constraints. Codify repeatable
-  steps for PRIMARY KEY, UNIQUE, FOREIGN KEY, and CHECK and prove the automation is
-  idempotent.'
+description: 'Automation lab: remove toil around constraints. Codify repeatable steps
+  for NOT NULL, UNIQUE, FK, and CHECK and prove the automation is idempotent.'
 objectives:
-- Day-2 SQLite constraints work completes safely in this environment
+- Day-2 constraints work completes safely in this environment
 - Changes are verified with before/after checks
 - The system remains stable for dependent teams
-initial_state: Operators still perform manual steps for SQLite constraints. Automate
-  the boring parts without hiding important safety checks.
+initial_state: Operators still perform manual steps for constraints. Automate the
+  boring parts without hiding important safety checks.
 hints:
 - order: 1
   cost: 10

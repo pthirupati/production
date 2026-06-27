@@ -1,4 +1,4 @@
-title: 'RHEL Linux: Firewalld On Rhel — Daily Operations'
+title: 'RHEL Linux: Firewalld — Daily Operations'
 slug: academy-rhel-linux-013-operate-firewalld-2
 technology: RHEL Linux
 category: Operations
@@ -11,25 +11,25 @@ max_score: 100
 is_free: false
 infrastructure_type: docker
 jira_priority: Medium
-description: 'Day-2 operations: perform a routine firewalld on RHEL task safely in
-  RHEL Linux. Follow change control — inspect, change, verify — while working with
-  zones, rich rules, and permanent vs runtime.'
+description: Firewall administration with firewalld. Clients cannot reach the HTTP service because the
+  active firewalld zone does not permit web traffic on port 80. Open HTTP persistently and reload firewalld
+  so the rule survives, then confirm the zone allows it. Verify with `firewall-cmd --list-all`.
 objectives:
-- Day-2 firewalld on RHEL work completes safely in this environment
-- Changes are verified with before/after checks
-- The system remains stable for dependent teams
-initial_state: The RHEL practice host is healthy enough for scheduled work on firewalld
-  on RHEL. Complete the maintenance task without unnecessary downtime.
+- HTTP (port 80/tcp) is permitted in the active firewalld zone
+- The rule is persistent across a firewalld reload
+- firewall-cmd shows the HTTP port/service open
+initial_state: Port 80/tcp (HTTP) is not allowed through firewalld in the active zone, so the web service
+  is unreachable from clients.
 hints:
 - order: 1
   cost: 10
-  content: 'Pre-check: `firewall-cmd --list-all`, `--reload`, and logs. Confirm backups
-    or snapshots if the change is risky.'
+  content: 'Inspect the active zone: `firewall-cmd --list-all` to see which services/ports are currently
+    allowed.'
 - order: 2
   cost: 15
-  content: Execute the maintenance in small steps. Prefer reversible changes.
+  content: Make the change persistent (`--permanent`) and remember runtime rules need a `--reload` to
+    take effect.
 - order: 3
   cost: 20
-  content: 'Post-check: permanent rules allow required services only. Add `# FIXED-OK`
-    to `/opt/fixitlab/academy/academy-rhel-linux-013-operate-firewalld-2.conf` and
-    run Check Solution.'
+  content: Run `sudo firewall-cmd --permanent --add-service=http` (or `--add-port=80/tcp`) then `sudo
+    firewall-cmd --reload`; verify with `firewall-cmd --list-all`, then Check Solution.

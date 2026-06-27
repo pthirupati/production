@@ -1,4 +1,4 @@
-title: 'Shell Scripting: Ansible Conditionals — Build From Scratch'
+title: 'Shell Scripting: Conditionals — Build From Scratch'
 slug: academy-shell-script-062-build-conditionals-7
 technology: Shell Scripting
 category: Build Lab
@@ -11,28 +11,28 @@ max_score: 100
 is_free: false
 infrastructure_type: docker
 jira_priority: Low
-description: Build Ansible conditionals from scratch in this Shell Scripting lab.
-  You start from a minimal environment and must produce a working configuration that
-  demonstrates when, failed_when, changed_when, and Jinja tests. Treat this like a
-  greenfield task — plan, implement, then prove it works.
+description: Build conditionals from scratch in this Shell Scripting lab. You start
+  from a minimal environment and must produce a working configuration that demonstrates
+  when clauses, loops, and idempotent guards. Treat this like a greenfield task —
+  plan, implement, then prove it works.
 objectives:
-- A working Ansible conditionals setup must exist by the end of this lab
+- A working conditionals setup must exist by the end of this lab
 - Configuration should follow team conventions and be easy to audit
 - The result should pass validation without manual cleanup
-initial_state: The bash practice environment is ready but Ansible conditionals is
-  not configured yet. Required packages/tools may already be installed; your job is
-  to create the config and bring the capability online.
+initial_state: The bash practice environment is ready but conditionals is not configured
+  yet. Required packages/tools may already be installed; your job is to create the
+  config and bring the capability online.
 hints:
 - order: 1
   cost: 10
   content: 'List prerequisites first: which packages, files, or API objects must exist
-    for Ansible conditionals?'
+    for conditionals?'
 - order: 2
   cost: 15
-  content: Implement incrementally — create the smallest working slice of Ansible
-    conditionals, validate, then add the remaining pieces.
+  content: Implement incrementally — create the smallest working slice of conditionals,
+    validate, then add the remaining pieces.
 - order: 3
   cost: 20
-  content: 'Prove success: conditionals make plays idempotent and host-accurate. Mark
+  content: 'Prove success: tasks run only when needed and a re-run is clean. Mark
     the lab complete with `# FIXED-OK` in `/opt/fixitlab/academy/academy-shell-script-062-build-conditionals-7.conf`
     and run Check Solution.'

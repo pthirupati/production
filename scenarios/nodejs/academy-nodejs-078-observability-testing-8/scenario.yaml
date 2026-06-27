@@ -1,4 +1,4 @@
-title: 'Node.js Development: Automated Testing — Observability Practice'
+title: 'Node.js Development: Testing — Observability Practice'
 slug: academy-nodejs-078-observability-testing-8
 technology: Node.js Development
 category: Observability
@@ -11,20 +11,20 @@ max_score: 100
 is_free: false
 infrastructure_type: docker
 jira_priority: Medium
-description: 'Observability task: make automated testing visible in logs, metrics,
-  or traces. On-call should answer ''what is broken?'' quickly using signals from
-  unit/integration boundaries, fixtures, and CI gates.'
+description: 'Observability task: make testing visible in logs, metrics, or traces.
+  On-call should answer ''what is broken?'' quickly using signals from unit tests,
+  fixtures, and assertions.'
 objectives:
-- Day-2 automated testing work completes safely in this environment
+- Day-2 testing work completes safely in this environment
 - Changes are verified with before/after checks
 - The system remains stable for dependent teams
-initial_state: The system runs, but automated testing lacks useful telemetry. Dashboards/alerts
+initial_state: The system runs, but testing lacks useful telemetry. Dashboards/alerts
   are blank or noisy — improve signal quality.
 hints:
 - order: 1
   cost: 10
-  content: 'Find existing signals: test reports, coverage, and flaky test trackers.
-    Identify what is missing for fast triage.'
+  content: 'Find existing signals: test files and `pytest -q` output. Identify what
+    is missing for fast triage.'
 - order: 2
   cost: 15
   content: Add or fix exporters/dashboards/alerts with clear names, labels, and thresholds.

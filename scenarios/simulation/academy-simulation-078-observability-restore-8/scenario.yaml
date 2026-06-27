@@ -1,4 +1,4 @@
-title: 'Simulation Labs: Database Restore — Observability Practice'
+title: 'Simulation Labs: State Restore — Observability Practice'
 slug: academy-simulation-078-observability-restore-8
 technology: Simulation Labs
 category: Observability
@@ -11,20 +11,20 @@ max_score: 100
 is_free: false
 infrastructure_type: docker
 jira_priority: Medium
-description: 'Observability task: make database restore visible in logs, metrics,
-  or traces. On-call should answer ''what is broken?'' quickly using signals from
-  RPO/RTO, PITR, and verification queries.'
+description: 'Observability task: make state restore visible in logs, metrics, or
+  traces. On-call should answer ''what is broken?'' quickly using signals from reset
+  and restore lab state.'
 objectives:
-- Day-2 database restore work completes safely in this environment
+- Day-2 state restore work completes safely in this environment
 - Changes are verified with before/after checks
 - The system remains stable for dependent teams
-initial_state: The system runs, but database restore lacks useful telemetry. Dashboards/alerts
+initial_state: The system runs, but state restore lacks useful telemetry. Dashboards/alerts
   are blank or noisy — improve signal quality.
 hints:
 - order: 1
   cost: 10
-  content: 'Find existing signals: restore logs, backup catalogs, and checksum queries.
-    Identify what is missing for fast triage.'
+  content: 'Find existing signals: reset/restore behavior. Identify what is missing
+    for fast triage.'
 - order: 2
   cost: 15
   content: Add or fix exporters/dashboards/alerts with clear names, labels, and thresholds.

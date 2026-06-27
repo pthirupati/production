@@ -12,9 +12,9 @@ is_free: true
 infrastructure_type: docker
 jira_priority: Low
 description: This beginner-friendly Simulation Labs lab introduces terminal simulation.
-  You will explore shell state, command history, and validation on the simulation
-  sandbox. Read the environment first, then complete the guided steps — no prior production
-  experience required.
+  You will explore command parsing and state changes on the simulation sandbox. Read
+  the environment first, then complete the guided steps — no prior production experience
+  required.
 objectives:
 - Understand how terminal simulation work in this lab environment
 - Identify the main status and configuration signals for terminal simulation
@@ -25,12 +25,12 @@ initial_state: The simulation sandbox is online with a starter terminal simulati
 hints:
 - order: 1
   cost: 10
-  content: 'Orient yourself: simulated FS, last commands, and check scripts. Write
-    down what looks normal vs missing.'
+  content: 'Orient yourself: the simulated terminal and state. Write down what looks
+    normal vs missing.'
 - order: 2
   cost: 15
-  content: Core idea — shell state, command history, and validation. Make one small,
-    reversible change at a time and re-check status.
+  content: Core idea — command parsing and state changes. Make one small, reversible
+    change at a time and re-check status.
 - order: 3
   cost: 20
   content: When the lab objective is done, record completion by adding `# FIXED-OK`

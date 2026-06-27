@@ -1,4 +1,4 @@
-title: 'Data Science & Analytics: Data/Ml Pipelines — Integration Lab'
+title: 'Data Science & Analytics: Data Pipelines — Integration Lab'
 slug: academy-data-science-100-integration-pipelines-10
 technology: Data Science & Analytics
 category: Cross-Technology
@@ -11,14 +11,14 @@ max_score: 100
 is_free: false
 infrastructure_type: docker
 jira_priority: Medium
-description: 'Integration lab: connect data/ML pipelines with an adjacent platform
-  in the Data Science & Analytics stack. Validate authentication, data handoff, and
-  failure behavior for DAG steps, idempotency, and artifact lineage.'
+description: 'Integration lab: connect data pipelines with an adjacent platform in
+  the Data Science & Analytics stack. Validate authentication, data handoff, and failure
+  behavior for stages, dependencies, and reruns.'
 objectives:
-- data/ML pipelines is connected to the adjacent system successfully
+- data pipelines is connected to the adjacent system successfully
 - Handoff points are authenticated and observable
 - End-to-end workflow completes without manual intervention
-initial_state: Two systems are deployed but not fully wired together for data/ML pipelines.
+initial_state: Two systems are deployed but not fully wired together for data pipelines.
   Downstream consumers are waiting on this integration path.
 hints:
 - order: 1

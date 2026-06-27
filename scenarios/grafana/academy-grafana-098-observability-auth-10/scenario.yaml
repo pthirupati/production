@@ -12,8 +12,8 @@ is_free: false
 infrastructure_type: docker
 jira_priority: Medium
 description: 'Observability task: make authentication visible in logs, metrics, or
-  traces. On-call should answer ''what is broken?'' quickly using signals from sessions,
-  OAuth/OIDC, MFA, and token lifetimes.'
+  traces. On-call should answer ''what is broken?'' quickly using signals from users,
+  orgs, and SSO.'
 objectives:
 - Day-2 authentication work completes safely in this environment
 - Changes are verified with before/after checks
@@ -23,8 +23,8 @@ initial_state: The system runs, but authentication lacks useful telemetry. Dashb
 hints:
 - order: 1
   cost: 10
-  content: 'Find existing signals: auth middleware logs, cookie flags, and IdP metadata.
-    Identify what is missing for fast triage.'
+  content: 'Find existing signals: auth config and login flow. Identify what is missing
+    for fast triage.'
 - order: 2
   cost: 15
   content: Add or fix exporters/dashboards/alerts with clear names, labels, and thresholds.

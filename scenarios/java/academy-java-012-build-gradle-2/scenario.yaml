@@ -13,7 +13,7 @@ infrastructure_type: docker
 jira_priority: Low
 description: Build Gradle builds from scratch in this Java Development lab. You start
   from a minimal environment and must produce a working configuration that demonstrates
-  tasks, dependencies, wrappers, and build scans. Treat this like a greenfield task
+  tasks, dependencies, and the build lifecycle. Treat this like a greenfield task
   — plan, implement, then prove it works.
 objectives:
 - A working Gradle builds setup must exist by the end of this lab
@@ -33,6 +33,6 @@ hints:
     validate, then add the remaining pieces.
 - order: 3
   cost: 20
-  content: 'Prove success: `gradlew build` succeeds with locked dependency versions.
-    Mark the lab complete with `# FIXED-OK` in `/opt/fixitlab/academy/academy-java-012-build-gradle-2.conf`
+  content: 'Prove success: `gradle build` succeeds and produces artifacts. Mark the
+    lab complete with `# FIXED-OK` in `/opt/fixitlab/academy/academy-java-012-build-gradle-2.conf`
     and run Check Solution.'

@@ -1,4 +1,4 @@
-title: 'Data Science & Analytics: Data Visualization — Production Readiness'
+title: 'Data Science & Analytics: Visualization — Production Readiness'
 slug: academy-data-science-085-production-visualization-9
 technology: Data Science & Analytics
 category: Production
@@ -11,15 +11,15 @@ max_score: 100
 is_free: false
 infrastructure_type: docker
 jira_priority: Medium
-description: Production readiness for data visualization. Harden, document, and validate
-  chart choice, scales, and honest axes so the change is safe to run during a maintenance
+description: Production readiness for visualization. Harden, document, and validate
+  chart choice, scales, and labels so the change is safe to run during a maintenance
   window.
 objectives:
-- Day-2 data visualization work completes safely in this environment
+- Day-2 visualization work completes safely in this environment
 - Changes are verified with before/after checks
 - The system remains stable for dependent teams
-initial_state: A feature fix works in dev, but data visualization is not production
-  ready — missing guardrails, runbooks, or capacity checks.
+initial_state: A feature fix works in dev, but visualization is not production ready
+  — missing guardrails, runbooks, or capacity checks.
 hints:
 - order: 1
   cost: 10
@@ -28,9 +28,9 @@ hints:
 - order: 2
   cost: 15
   content: 'Apply production standards: limits, monitoring, and access controls for
-    data visualization.'
+    visualization.'
 - order: 3
   cost: 20
-  content: 'Run post-change verification: visualizations match data table and label
-    uncertainty. Record `# FIXED-OK` in `/opt/fixitlab/academy/academy-data-science-085-production-visualization-9.conf`
+  content: 'Run post-change verification: the chart conveys the data accurately. Record
+    `# FIXED-OK` in `/opt/fixitlab/academy/academy-data-science-085-production-visualization-9.conf`
     when complete.'

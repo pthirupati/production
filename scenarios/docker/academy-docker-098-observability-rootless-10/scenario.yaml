@@ -13,7 +13,7 @@ infrastructure_type: docker
 jira_priority: Medium
 description: 'Observability task: make rootless Docker visible in logs, metrics, or
   traces. On-call should answer ''what is broken?'' quickly using signals from user
-  namespaces, subuid, and cgroup delegation.'
+  namespaces, subuid/subgid, and rootless daemon.'
 objectives:
 - Day-2 rootless Docker work completes safely in this environment
 - Changes are verified with before/after checks
@@ -23,8 +23,8 @@ initial_state: The system runs, but rootless Docker lacks useful telemetry. Dash
 hints:
 - order: 1
   cost: 10
-  content: 'Find existing signals: `docker info`, `/etc/subuid`, and systemd user
-    session. Identify what is missing for fast triage.'
+  content: 'Find existing signals: `docker info` security options and `id`. Identify
+    what is missing for fast triage.'
 - order: 2
   cost: 15
   content: Add or fix exporters/dashboards/alerts with clear names, labels, and thresholds.

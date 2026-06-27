@@ -1,4 +1,4 @@
-title: 'Nmap Network Scanning: Scan Output Formats — Security Practice'
+title: 'Nmap Network Scanning: Scan Output — Security Practice'
 slug: academy-nmap-086-security-output-9
 technology: Nmap Network Scanning
 category: Security
@@ -11,20 +11,20 @@ max_score: 100
 is_free: false
 infrastructure_type: docker
 jira_priority: Medium
-description: 'Security review: harden scan output formats on this Nmap Network Scanning
-  system. Close unsafe defaults, enforce least privilege, and ensure grepable XML,
-  JSON, and diffing scans cannot be abused — without breaking legitimate use.'
+description: 'Security review: harden scan output on this Nmap Network Scanning system.
+  Close unsafe defaults, enforce least privilege, and ensure output formats and reporting
+  cannot be abused — without breaking legitimate use.'
 objectives:
-- Unsafe defaults related to scan output formats are removed or constrained
+- Unsafe defaults related to scan output are removed or constrained
 - Access follows least privilege and is auditable
 - Security checks pass without breaking required functionality
-initial_state: The environment is functional but overly permissive around scan output
-  formats. Assume an auditor or pen test is next week — tighten controls with evidence.
+initial_state: The environment is functional but overly permissive around scan output.
+  Assume an auditor or pen test is next week — tighten controls with evidence.
 hints:
 - order: 1
   cost: 10
-  content: 'Baseline current exposure: nmap -oA files and parsing scripts. Note world-readable
-    files, open ports, or excessive roles.'
+  content: 'Baseline current exposure: `-oN/-oX/-oG` files. Note world-readable files,
+    open ports, or excessive roles.'
 - order: 2
   cost: 15
   content: Apply least privilege incrementally. Prefer explicit allows over broad

@@ -1,4 +1,4 @@
-title: 'MySQL: Innodb Engine — Automation Practice'
+title: 'MySQL: Innodb — Automation Practice'
 slug: academy-mysql-097-automation-innodb-10
 technology: MySQL
 category: Automation
@@ -11,15 +11,14 @@ max_score: 100
 is_free: false
 infrastructure_type: docker
 jira_priority: Medium
-description: 'Automation lab: remove toil around InnoDB engine. Codify repeatable
-  steps for buffer pool, redo log, transactions, and locks and prove the automation
-  is idempotent.'
+description: 'Automation lab: remove toil around InnoDB. Codify repeatable steps for
+  buffer pool, redo log, and row locking and prove the automation is idempotent.'
 objectives:
-- Day-2 InnoDB engine work completes safely in this environment
+- Day-2 InnoDB work completes safely in this environment
 - Changes are verified with before/after checks
 - The system remains stable for dependent teams
-initial_state: Operators still perform manual steps for InnoDB engine. Automate the
-  boring parts without hiding important safety checks.
+initial_state: Operators still perform manual steps for InnoDB. Automate the boring
+  parts without hiding important safety checks.
 hints:
 - order: 1
   cost: 10

@@ -1,4 +1,4 @@
-title: 'SQLite: Sqlite Integrity — Integration Lab'
+title: 'SQLite: Integrity Checks — Integration Lab'
 slug: academy-sqlite-050-integration-integrity-5
 technology: SQLite
 category: Cross-Technology
@@ -11,15 +11,15 @@ max_score: 100
 is_free: false
 infrastructure_type: docker
 jira_priority: Medium
-description: 'Integration lab: connect SQLite integrity with an adjacent platform
+description: 'Integration lab: connect integrity checks with an adjacent platform
   in the SQLite stack. Validate authentication, data handoff, and failure behavior
-  for PRAGMA integrity_check and foreign keys.'
+  for PRAGMA integrity_check and corruption recovery.'
 objectives:
-- SQLite integrity is connected to the adjacent system successfully
+- integrity checks is connected to the adjacent system successfully
 - Handoff points are authenticated and observable
 - End-to-end workflow completes without manual intervention
-initial_state: Two systems are deployed but not fully wired together for SQLite integrity.
-  Downstream consumers are waiting on this integration path.
+initial_state: Two systems are deployed but not fully wired together for integrity
+  checks. Downstream consumers are waiting on this integration path.
 hints:
 - order: 1
   cost: 10

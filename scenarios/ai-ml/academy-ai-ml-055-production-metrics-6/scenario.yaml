@@ -1,4 +1,4 @@
-title: 'AI / ML / LLM & Agents: Ml Metrics — Production Readiness'
+title: 'AI / ML / LLM & Agents: Evaluation Metrics — Production Readiness'
 slug: academy-ai-ml-055-production-metrics-6
 technology: AI / ML / LLM & Agents
 category: Production
@@ -11,15 +11,15 @@ max_score: 100
 is_free: false
 infrastructure_type: docker
 jira_priority: Medium
-description: Production readiness for ML metrics. Harden, document, and validate precision/recall,
-  calibration, and business KPIs so the change is safe to run during a maintenance
+description: Production readiness for evaluation metrics. Harden, document, and validate
+  accuracy, precision/recall, and AUC so the change is safe to run during a maintenance
   window.
 objectives:
-- Day-2 ML metrics work completes safely in this environment
+- Day-2 evaluation metrics work completes safely in this environment
 - Changes are verified with before/after checks
 - The system remains stable for dependent teams
-initial_state: A feature fix works in dev, but ML metrics is not production ready
-  — missing guardrails, runbooks, or capacity checks.
+initial_state: A feature fix works in dev, but evaluation metrics is not production
+  ready — missing guardrails, runbooks, or capacity checks.
 hints:
 - order: 1
   cost: 10
@@ -28,9 +28,9 @@ hints:
 - order: 2
   cost: 15
   content: 'Apply production standards: limits, monitoring, and access controls for
-    ML metrics.'
+    evaluation metrics.'
 - order: 3
   cost: 20
-  content: 'Run post-change verification: metrics align with product goal and baseline.
-    Record `# FIXED-OK` in `/opt/fixitlab/academy/academy-ai-ml-055-production-metrics-6.conf`
+  content: 'Run post-change verification: the chosen metrics reflect the goal. Record
+    `# FIXED-OK` in `/opt/fixitlab/academy/academy-ai-ml-055-production-metrics-6.conf`
     when complete.'

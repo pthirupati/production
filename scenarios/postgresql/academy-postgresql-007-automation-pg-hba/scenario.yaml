@@ -1,4 +1,4 @@
-title: 'PostgreSQL: Postgresql Pg_Hba.Conf — Automation Practice'
+title: 'PostgreSQL: Pg_Hba Authentication — Automation Practice'
 slug: academy-postgresql-007-automation-pg-hba
 technology: PostgreSQL
 category: Automation
@@ -11,13 +11,13 @@ max_score: 100
 is_free: false
 infrastructure_type: docker
 jira_priority: Medium
-description: 'Automation lab: remove toil around PostgreSQL pg_hba.conf. Codify repeatable
-  steps for auth methods, CIDR rules, and reload and prove the automation is idempotent.'
+description: 'Automation lab: remove toil around pg_hba authentication. Codify repeatable
+  steps for host-based auth rules and methods and prove the automation is idempotent.'
 objectives:
-- Day-2 PostgreSQL pg_hba.conf work completes safely in this environment
+- Day-2 pg_hba authentication work completes safely in this environment
 - Changes are verified with before/after checks
 - The system remains stable for dependent teams
-initial_state: Operators still perform manual steps for PostgreSQL pg_hba.conf. Automate
+initial_state: Operators still perform manual steps for pg_hba authentication. Automate
   the boring parts without hiding important safety checks.
 hints:
 - order: 1

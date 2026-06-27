@@ -1,4 +1,4 @@
-title: 'JavaScript Development: Html/React Forms — Backup and Recovery'
+title: 'JavaScript Development: Forms — Backup and Recovery'
 slug: academy-javascript-009-backup-forms
 technology: JavaScript Development
 category: Backup & Recovery
@@ -11,15 +11,15 @@ max_score: 100
 is_free: false
 infrastructure_type: docker
 jira_priority: Medium
-description: Backup and recovery drill for HTML/React forms. Ensure backups run on
-  schedule, retention is correct, and you can restore controlled inputs, validation,
-  and submit states within the lab RTO.
+description: Backup and recovery drill for forms. Ensure backups run on schedule,
+  retention is correct, and you can restore controlled inputs, validation, and submission
+  within the lab RTO.
 objectives:
-- Backup coverage for HTML/React forms is complete and restorable
+- Backup coverage for forms is complete and restorable
 - Retention and encryption meet the stated policy
 - A restore drill proves data integrity
-initial_state: Backup jobs exist but reliability is uncertain for HTML/React forms.
-  Leadership wants proof that restore works — not just that backup scripts exit zero.
+initial_state: Backup jobs exist but reliability is uncertain for forms. Leadership
+  wants proof that restore works — not just that backup scripts exit zero.
 hints:
 - order: 1
   cost: 10

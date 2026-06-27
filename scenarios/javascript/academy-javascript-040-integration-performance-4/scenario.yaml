@@ -1,4 +1,4 @@
-title: 'JavaScript Development: Web Performance — Integration Lab'
+title: 'JavaScript Development: Performance — Integration Lab'
 slug: academy-javascript-040-integration-performance-4
 technology: JavaScript Development
 category: Cross-Technology
@@ -11,14 +11,14 @@ max_score: 100
 is_free: false
 infrastructure_type: docker
 jira_priority: Medium
-description: 'Integration lab: connect web performance with an adjacent platform in
-  the JavaScript Development stack. Validate authentication, data handoff, and failure
-  behavior for LCP, bundle size, caching, and profiling.'
+description: 'Integration lab: connect performance with an adjacent platform in the
+  JavaScript Development stack. Validate authentication, data handoff, and failure
+  behavior for render cost, memoization, and profiling.'
 objectives:
-- web performance is connected to the adjacent system successfully
+- performance is connected to the adjacent system successfully
 - Handoff points are authenticated and observable
 - End-to-end workflow completes without manual intervention
-initial_state: Two systems are deployed but not fully wired together for web performance.
+initial_state: Two systems are deployed but not fully wired together for performance.
   Downstream consumers are waiting on this integration path.
 hints:
 - order: 1

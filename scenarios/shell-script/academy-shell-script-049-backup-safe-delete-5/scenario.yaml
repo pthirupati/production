@@ -1,4 +1,4 @@
-title: 'Shell Scripting: Safe Deletion In Scripts — Backup and Recovery'
+title: 'Shell Scripting: Safe Deletion — Backup and Recovery'
 slug: academy-shell-script-049-backup-safe-delete-5
 technology: Shell Scripting
 category: Backup & Recovery
@@ -11,16 +11,15 @@ max_score: 100
 is_free: false
 infrastructure_type: docker
 jira_priority: Medium
-description: Backup and recovery drill for safe deletion in scripts. Ensure backups
-  run on schedule, retention is correct, and you can restore guards, trash staging,
-  and confirmation flags within the lab RTO.
+description: Backup and recovery drill for safe deletion. Ensure backups run on schedule,
+  retention is correct, and you can restore guarded rm, dry-run, and confirmation
+  within the lab RTO.
 objectives:
-- Backup coverage for safe deletion in scripts is complete and restorable
+- Backup coverage for safe deletion is complete and restorable
 - Retention and encryption meet the stated policy
 - A restore drill proves data integrity
-initial_state: Backup jobs exist but reliability is uncertain for safe deletion in
-  scripts. Leadership wants proof that restore works — not just that backup scripts
-  exit zero.
+initial_state: Backup jobs exist but reliability is uncertain for safe deletion. Leadership
+  wants proof that restore works — not just that backup scripts exit zero.
 hints:
 - order: 1
   cost: 10

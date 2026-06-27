@@ -1,4 +1,4 @@
-title: 'Prometheus Monitoring: Prometheus Tsdb — Observability Practice'
+title: 'Prometheus Monitoring: Tsdb — Observability Practice'
 slug: academy-prometheus-008-observability-tsdb
 technology: Prometheus Monitoring
 category: Observability
@@ -11,20 +11,20 @@ max_score: 100
 is_free: false
 infrastructure_type: docker
 jira_priority: Medium
-description: 'Observability task: make Prometheus TSDB visible in logs, metrics, or
-  traces. On-call should answer ''what is broken?'' quickly using signals from blocks,
-  compaction, retention, and WAL.'
+description: 'Observability task: make TSDB visible in logs, metrics, or traces. On-call
+  should answer ''what is broken?'' quickly using signals from retention, blocks,
+  and disk usage.'
 objectives:
-- Day-2 Prometheus TSDB work completes safely in this environment
+- Day-2 TSDB work completes safely in this environment
 - Changes are verified with before/after checks
 - The system remains stable for dependent teams
-initial_state: The system runs, but Prometheus TSDB lacks useful telemetry. Dashboards/alerts
+initial_state: The system runs, but TSDB lacks useful telemetry. Dashboards/alerts
   are blank or noisy — improve signal quality.
 hints:
 - order: 1
   cost: 10
-  content: 'Find existing signals: prometheus tsdb stats, disk usage, and queries.
-    Identify what is missing for fast triage.'
+  content: 'Find existing signals: storage flags and TSDB stats. Identify what is
+    missing for fast triage.'
 - order: 2
   cost: 15
   content: Add or fix exporters/dashboards/alerts with clear names, labels, and thresholds.

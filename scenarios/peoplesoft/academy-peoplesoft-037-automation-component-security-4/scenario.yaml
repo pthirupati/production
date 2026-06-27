@@ -1,4 +1,4 @@
-title: 'Oracle PeopleSoft: Peoplesoft Component Security — Automation Practice'
+title: 'Oracle PeopleSoft: Component Security — Automation Practice'
 slug: academy-peoplesoft-037-automation-component-security-4
 technology: Oracle PeopleSoft
 category: Automation
@@ -11,15 +11,14 @@ max_score: 100
 is_free: false
 infrastructure_type: docker
 jira_priority: Medium
-description: 'Automation lab: remove toil around PeopleSoft component security. Codify
-  repeatable steps for menu/component permissions and row-level security and prove
-  the automation is idempotent.'
+description: 'Automation lab: remove toil around component security. Codify repeatable
+  steps for component/menu access by permission and prove the automation is idempotent.'
 objectives:
-- Day-2 PeopleSoft component security work completes safely in this environment
+- Day-2 component security work completes safely in this environment
 - Changes are verified with before/after checks
 - The system remains stable for dependent teams
-initial_state: Operators still perform manual steps for PeopleSoft component security.
-  Automate the boring parts without hiding important safety checks.
+initial_state: Operators still perform manual steps for component security. Automate
+  the boring parts without hiding important safety checks.
 hints:
 - order: 1
   cost: 10

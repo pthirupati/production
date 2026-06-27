@@ -1,4 +1,4 @@
-title: 'Node.js Development: Application Deployment — Integration Lab'
+title: 'Node.js Development: Deployment — Integration Lab'
 slug: academy-nodejs-050-integration-deployment-5
 technology: Node.js Development
 category: Cross-Technology
@@ -11,15 +11,15 @@ max_score: 100
 is_free: false
 infrastructure_type: docker
 jira_priority: Medium
-description: 'Integration lab: connect application deployment with an adjacent platform
-  in the Node.js Development stack. Validate authentication, data handoff, and failure
-  behavior for rollouts, health checks, and config separation.'
+description: 'Integration lab: connect deployment with an adjacent platform in the
+  Node.js Development stack. Validate authentication, data handoff, and failure behavior
+  for process managers, env, and zero-downtime.'
 objectives:
-- application deployment is connected to the adjacent system successfully
+- deployment is connected to the adjacent system successfully
 - Handoff points are authenticated and observable
 - End-to-end workflow completes without manual intervention
-initial_state: Two systems are deployed but not fully wired together for application
-  deployment. Downstream consumers are waiting on this integration path.
+initial_state: Two systems are deployed but not fully wired together for deployment.
+  Downstream consumers are waiting on this integration path.
 hints:
 - order: 1
   cost: 10

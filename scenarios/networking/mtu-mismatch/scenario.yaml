@@ -33,7 +33,8 @@ hints:
 - order: 3
   cost: 20
   content: 'Re-test: `ping -s 1400 -M do <remote_ip>` now succeeds and large transfers complete. Persist
-    the MTU/MSS settings (interface config + saved iptables) so they survive reboot.'
+    the MTU/MSS settings (interface config + saved iptables) so they survive reboot, then record completion
+    by adding `# FIXED-OK` to `/opt/fixitlab/networking/mtu-mismatch.conf` and click Check Solution.'
 requires_companion_hosts: false
 dual_terminal: false
 jira_priority: High

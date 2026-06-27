@@ -1,4 +1,4 @@
-title: 'Grafana Observability: Grafana Panels — Troubleshooting Drill'
+title: 'Grafana Observability: Panels — Troubleshooting Drill'
 slug: academy-grafana-064-troubleshoot-panels-7
 technology: Grafana Observability
 category: Troubleshooting
@@ -11,27 +11,26 @@ max_score: 100
 is_free: false
 infrastructure_type: docker
 jira_priority: Medium
-description: 'Production alert: panel shows misleading units or dual Y axes. You are
-  on call for Grafana Observability and must troubleshoot Grafana panels methodically
-  — triage symptoms, find root cause, apply the smallest safe fix, and confirm recovery.'
+description: 'Production alert: a panel shows wrong or empty data. You are on call
+  for Grafana Observability and must troubleshoot panels methodically — triage symptoms,
+  find root cause, apply the smallest safe fix, and confirm recovery.'
 objectives:
-- 'The incident symptom is clear: panel shows misleading units or dual Y axes'
+- 'The incident symptom is clear: a panel shows wrong or empty data'
 - Root cause is isolated with evidence, not guesswork
 - Service behavior returns to normal after the fix
-initial_state: The Grafana stack is degraded. Panel shows misleading units or dual
-  y axes. Recent changes may exist around Grafana panels, but do not restart blindly
-  — gather evidence first.
+initial_state: The Grafana stack is degraded. A panel shows wrong or empty data. Recent
+  changes may exist around panels, but do not restart blindly — gather evidence first.
 hints:
 - order: 1
   cost: 10
-  content: 'Triage: panel editor, query inspector, and repeat rows. Capture timestamps,
-    error messages, and what still works.'
+  content: 'Triage: panel query and transform pipeline. Capture timestamps, error
+    messages, and what still works.'
 - order: 2
   cost: 15
   content: Separate symptom from cause. Fix the underlying misconfiguration, not only
     the noisy log line.
 - order: 3
   cost: 20
-  content: 'Verify recovery: panels answer one operational question clearly. Document
-    the fix, add `# FIXED-OK` to `/opt/fixitlab/academy/academy-grafana-064-troubleshoot-panels-7.conf`,
+  content: 'Verify recovery: the panel renders the intended metric. Document the fix,
+    add `# FIXED-OK` to `/opt/fixitlab/academy/academy-grafana-064-troubleshoot-panels-7.conf`,
     and rerun Check Solution.'

@@ -12,8 +12,8 @@ is_free: false
 infrastructure_type: docker
 jira_priority: Medium
 description: Production readiness for Alertmanager. Harden, document, and validate
-  grouping, inhibition, silences, and receiver routes so the change is safe to run
-  during a maintenance window.
+  routing, grouping, and silences so the change is safe to run during a maintenance
+  window.
 objectives:
 - Day-2 Alertmanager work completes safely in this environment
 - Changes are verified with before/after checks
@@ -31,6 +31,6 @@ hints:
     Alertmanager.'
 - order: 3
   cost: 20
-  content: 'Run post-change verification: routes deliver one clear notification per
-    incident with correct severity. Record `# FIXED-OK` in `/opt/fixitlab/academy/academy-prometheus-015-production-alertmanager-2.conf`
+  content: 'Run post-change verification: alerts route to the correct receiver. Record
+    `# FIXED-OK` in `/opt/fixitlab/academy/academy-prometheus-015-production-alertmanager-2.conf`
     when complete.'

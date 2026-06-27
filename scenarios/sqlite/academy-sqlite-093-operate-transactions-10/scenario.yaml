@@ -1,4 +1,4 @@
-title: 'SQLite: Database Transactions — Daily Operations'
+title: 'SQLite: Transactions — Daily Operations'
 slug: academy-sqlite-093-operate-transactions-10
 technology: SQLite
 category: Operations
@@ -11,25 +11,25 @@ max_score: 100
 is_free: false
 infrastructure_type: docker
 jira_priority: Medium
-description: 'Day-2 operations: perform a routine database transactions task safely
-  in SQLite. Follow change control — inspect, change, verify — while working with
-  ACID, isolation levels, and deadlocks.'
+description: 'Day-2 operations: perform a routine transactions task safely in SQLite.
+  Follow change control — inspect, change, verify — while working with BEGIN/COMMIT,
+  atomicity, and isolation.'
 objectives:
-- Day-2 database transactions work completes safely in this environment
+- Day-2 transactions work completes safely in this environment
 - Changes are verified with before/after checks
 - The system remains stable for dependent teams
-initial_state: The SQLite database file is healthy enough for scheduled work on database
-  transactions. Complete the maintenance task without unnecessary downtime.
+initial_state: The SQLite database file is healthy enough for scheduled work on transactions.
+  Complete the maintenance task without unnecessary downtime.
 hints:
 - order: 1
   cost: 10
-  content: 'Pre-check: BEGIN/COMMIT traces, locks, and rollback tests. Confirm backups
-    or snapshots if the change is risky.'
+  content: 'Pre-check: transaction boundaries in the code. Confirm backups or snapshots
+    if the change is risky.'
 - order: 2
   cost: 15
   content: Execute the maintenance in small steps. Prefer reversible changes.
 - order: 3
   cost: 20
-  content: 'Post-check: transactions commit or roll back atomically. Add `# FIXED-OK`
-    to `/opt/fixitlab/academy/academy-sqlite-093-operate-transactions-10.conf` and
-    run Check Solution.'
+  content: 'Post-check: operations are atomic and consistent. Add `# FIXED-OK` to
+    `/opt/fixitlab/academy/academy-sqlite-093-operate-transactions-10.conf` and run
+    Check Solution.'

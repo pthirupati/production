@@ -1,4 +1,4 @@
-title: 'SQLite: Write-Ahead Logging — Troubleshooting Drill'
+title: 'SQLite: Write-Ahead Log — Troubleshooting Drill'
 slug: academy-sqlite-004-troubleshoot-wal
 technology: SQLite
 category: Troubleshooting
@@ -11,27 +11,27 @@ max_score: 100
 is_free: false
 infrastructure_type: docker
 jira_priority: Medium
-description: 'Production alert: replication breaks when WAL disks fill. You are on
-  call for SQLite and must troubleshoot write-ahead logging methodically — triage
-  symptoms, find root cause, apply the smallest safe fix, and confirm recovery.'
+description: 'Production alert: crash recovery or replication lags. You are on call
+  for SQLite and must troubleshoot write-ahead log methodically — triage symptoms,
+  find root cause, apply the smallest safe fix, and confirm recovery.'
 objectives:
-- 'The incident symptom is clear: replication breaks when WAL disks fill'
+- 'The incident symptom is clear: crash recovery or replication lags'
 - Root cause is isolated with evidence, not guesswork
 - Service behavior returns to normal after the fix
-initial_state: The SQLite database file is degraded. Replication breaks when wal disks
-  fill. Recent changes may exist around write-ahead logging, but do not restart blindly
+initial_state: The SQLite database file is degraded. Crash recovery or replication
+  lags. Recent changes may exist around write-ahead log, but do not restart blindly
   — gather evidence first.
 hints:
 - order: 1
   cost: 10
-  content: 'Triage: pg_wal directory, `pg_stat_wal`, or SQLite WAL mode. Capture timestamps,
-    error messages, and what still works.'
+  content: 'Triage: WAL settings and checkpoint activity. Capture timestamps, error
+    messages, and what still works.'
 - order: 2
   cost: 15
   content: Separate symptom from cause. Fix the underlying misconfiguration, not only
     the noisy log line.
 - order: 3
   cost: 20
-  content: 'Verify recovery: WAL retained per policy and replay succeeds. Document
+  content: 'Verify recovery: WAL is configured for durability and performance. Document
     the fix, add `# FIXED-OK` to `/opt/fixitlab/academy/academy-sqlite-004-troubleshoot-wal.conf`,
     and rerun Check Solution.'

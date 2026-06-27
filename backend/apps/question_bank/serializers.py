@@ -29,6 +29,9 @@ class ScenarioListSerializer(serializers.ModelSerializer):
     tags = TagSerializer(many=True, read_only=True)
     completion_rate = serializers.IntegerField(read_only=True, required=False)
     is_bookmarked = serializers.BooleanField(read_only=True, required=False, default=False)
+    # "What you'll learn" — the first couple of spoiler-free outcome bullets so
+    # cards can preview the skills a learner walks away with (KodeKloud parity).
+    learn = serializers.SerializerMethodField()
 
     class Meta:
         model = Scenario
@@ -36,10 +39,14 @@ class ScenarioListSerializer(serializers.ModelSerializer):
             "id", "slug", "title", "subtitle", "category", "difficulty",
             "scenario_type", "technology", "tags", "time_limit", "max_score",
             "is_free", "attempts_count", "completions_count", "completion_rate",
-            "is_bookmarked", "blocked_commands",
+            "is_bookmarked", "blocked_commands", "learn",
             "lab_mode", "simulation_type", "dual_terminal", "requires_companion_hosts",
             "interview_mode", "coding_mode", "cross_technology", "vmware_link", "created_at",
         ]
+
+    def get_learn(self, scenario):
+        # Cap at 2 bullets to keep the list payload light.
+        return public_objectives(scenario.objectives)[:2]
 
 
 class ScenarioDetailSerializer(serializers.ModelSerializer):

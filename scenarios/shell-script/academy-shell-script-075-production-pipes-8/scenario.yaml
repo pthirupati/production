@@ -1,4 +1,4 @@
-title: 'Shell Scripting: Shell Pipes — Production Readiness'
+title: 'Shell Scripting: Pipes And Redirection — Production Readiness'
 slug: academy-shell-script-075-production-pipes-8
 technology: Shell Scripting
 category: Production
@@ -11,15 +11,15 @@ max_score: 100
 is_free: false
 infrastructure_type: docker
 jira_priority: Medium
-description: Production readiness for shell pipes. Harden, document, and validate
-  stdout/stderr, pipefail, and exit codes so the change is safe to run during a maintenance
-  window.
+description: Production readiness for pipes and redirection. Harden, document, and
+  validate stdout/stderr, pipefail, and process substitution so the change is safe
+  to run during a maintenance window.
 objectives:
-- Day-2 shell pipes work completes safely in this environment
+- Day-2 pipes and redirection work completes safely in this environment
 - Changes are verified with before/after checks
 - The system remains stable for dependent teams
-initial_state: A feature fix works in dev, but shell pipes is not production ready
-  — missing guardrails, runbooks, or capacity checks.
+initial_state: A feature fix works in dev, but pipes and redirection is not production
+  ready — missing guardrails, runbooks, or capacity checks.
 hints:
 - order: 1
   cost: 10
@@ -28,9 +28,9 @@ hints:
 - order: 2
   cost: 15
   content: 'Apply production standards: limits, monitoring, and access controls for
-    shell pipes.'
+    pipes and redirection.'
 - order: 3
   cost: 20
-  content: 'Run post-change verification: pipe exit status reflects first failure
-    correctly. Record `# FIXED-OK` in `/opt/fixitlab/academy/academy-shell-script-075-production-pipes-8.conf`
+  content: 'Run post-change verification: pipeline errors propagate correctly. Record
+    `# FIXED-OK` in `/opt/fixitlab/academy/academy-shell-script-075-production-pipes-8.conf`
     when complete.'

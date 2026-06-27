@@ -13,7 +13,7 @@ infrastructure_type: docker
 jira_priority: Medium
 description: 'Day-2 operations: perform a routine Group Policy task safely in Windows
   Server. Follow change control — inspect, change, verify — while working with GPO
-  scope, inheritance, and rsop.'
+  links, precedence, and processing.'
 objectives:
 - Day-2 Group Policy work completes safely in this environment
 - Changes are verified with before/after checks
@@ -23,13 +23,13 @@ initial_state: The Windows Server host is healthy enough for scheduled work on G
 hints:
 - order: 1
   cost: 10
-  content: 'Pre-check: GPMC, `gpresult`, and SYSVOL replication. Confirm backups or
-    snapshots if the change is risky.'
+  content: 'Pre-check: `gpresult /r`, GPMC, and event logs. Confirm backups or snapshots
+    if the change is risky.'
 - order: 2
   cost: 15
   content: Execute the maintenance in small steps. Prefer reversible changes.
 - order: 3
   cost: 20
-  content: 'Post-check: rsop shows intended policy on test machines. Add `# FIXED-OK`
+  content: 'Post-check: the GPO applies with correct precedence. Add `# FIXED-OK`
     to `/opt/fixitlab/academy/academy-windows-043-operate-gpo-5.conf` and run Check
     Solution.'

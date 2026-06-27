@@ -1,4 +1,4 @@
-title: 'VMware vSphere: Ansible Templates — Automation Practice'
+title: 'VMware vSphere: Jinja2 Templates — Automation Practice'
 slug: academy-vmware-027-automation-templates-3
 technology: VMware vSphere
 category: Automation
@@ -11,13 +11,14 @@ max_score: 100
 is_free: false
 infrastructure_type: docker
 jira_priority: Medium
-description: 'Automation lab: remove toil around Ansible templates. Codify repeatable
-  steps for Jinja, variables, and whitespace control and prove the automation is idempotent.'
+description: 'Automation lab: remove toil around Jinja2 templates. Codify repeatable
+  steps for variables, filters, and conditionals in templates and prove the automation
+  is idempotent.'
 objectives:
-- Day-2 Ansible templates work completes safely in this environment
+- Day-2 Jinja2 templates work completes safely in this environment
 - Changes are verified with before/after checks
 - The system remains stable for dependent teams
-initial_state: Operators still perform manual steps for Ansible templates. Automate
+initial_state: Operators still perform manual steps for Jinja2 templates. Automate
   the boring parts without hiding important safety checks.
 hints:
 - order: 1

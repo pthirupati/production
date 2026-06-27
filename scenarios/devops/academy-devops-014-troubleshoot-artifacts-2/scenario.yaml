@@ -1,4 +1,4 @@
-title: 'DevOps: Build Artifacts — Troubleshooting Drill'
+title: 'DevOps: Artifacts — Troubleshooting Drill'
 slug: academy-devops-014-troubleshoot-artifacts-2
 technology: DevOps
 category: Troubleshooting
@@ -11,28 +11,27 @@ max_score: 100
 is_free: false
 infrastructure_type: docker
 jira_priority: Medium
-description: 'Production alert: deploys pull the wrong build or artifacts expire mid-release.
-  You are on call for DevOps and must troubleshoot build artifacts methodically —
-  triage symptoms, find root cause, apply the smallest safe fix, and confirm recovery.'
+description: 'Production alert: artifacts are missing or unversioned. You are on call
+  for DevOps and must troubleshoot artifacts methodically — triage symptoms, find
+  root cause, apply the smallest safe fix, and confirm recovery.'
 objectives:
-- 'The incident symptom is clear: deploys pull the wrong build or artifacts expire
-  mid-release'
+- 'The incident symptom is clear: artifacts are missing or unversioned'
 - Root cause is isolated with evidence, not guesswork
 - Service behavior returns to normal after the fix
-initial_state: The CI/CD lab is degraded. Deploys pull the wrong build or artifacts
-  expire mid-release. Recent changes may exist around build artifacts, but do not
-  restart blindly — gather evidence first.
+initial_state: The CI/CD lab is degraded. Artifacts are missing or unversioned. Recent
+  changes may exist around artifacts, but do not restart blindly — gather evidence
+  first.
 hints:
 - order: 1
   cost: 10
-  content: 'Triage: artifact repository UI, checksums, and CI publish logs. Capture
-    timestamps, error messages, and what still works.'
+  content: 'Triage: artifact storage and versions. Capture timestamps, error messages,
+    and what still works.'
 - order: 2
   cost: 15
   content: Separate symptom from cause. Fix the underlying misconfiguration, not only
     the noisy log line.
 - order: 3
   cost: 20
-  content: 'Verify recovery: the intended version is promoted with verifiable checksums.
-    Document the fix, add `# FIXED-OK` to `/opt/fixitlab/academy/academy-devops-014-troubleshoot-artifacts-2.conf`,
+  content: 'Verify recovery: artifacts are published and traceable. Document the fix,
+    add `# FIXED-OK` to `/opt/fixitlab/academy/academy-devops-014-troubleshoot-artifacts-2.conf`,
     and rerun Check Solution.'

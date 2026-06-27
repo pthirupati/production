@@ -1,4 +1,4 @@
-title: 'Ansible Automation: Ansible Conditionals — Observability Practice'
+title: 'Ansible Automation: Conditionals — Observability Practice'
 slug: academy-ansible-058-observability-conditionals-6
 technology: Ansible Automation
 category: Observability
@@ -11,20 +11,20 @@ max_score: 100
 is_free: false
 infrastructure_type: docker
 jira_priority: Medium
-description: 'Observability task: make Ansible conditionals visible in logs, metrics,
-  or traces. On-call should answer ''what is broken?'' quickly using signals from
-  when, failed_when, changed_when, and Jinja tests.'
+description: 'Observability task: make conditionals visible in logs, metrics, or traces.
+  On-call should answer ''what is broken?'' quickly using signals from when clauses,
+  loops, and idempotent guards.'
 objectives:
-- Day-2 Ansible conditionals work completes safely in this environment
+- Day-2 conditionals work completes safely in this environment
 - Changes are verified with before/after checks
 - The system remains stable for dependent teams
-initial_state: The system runs, but Ansible conditionals lacks useful telemetry. Dashboards/alerts
+initial_state: The system runs, but conditionals lacks useful telemetry. Dashboards/alerts
   are blank or noisy — improve signal quality.
 hints:
 - order: 1
   cost: 10
-  content: 'Find existing signals: ansible-playbook -vvv task skips and facts. Identify
-    what is missing for fast triage.'
+  content: 'Find existing signals: task `when:` lines and run output. Identify what
+    is missing for fast triage.'
 - order: 2
   cost: 15
   content: Add or fix exporters/dashboards/alerts with clear names, labels, and thresholds.

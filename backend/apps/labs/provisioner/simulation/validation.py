@@ -235,7 +235,16 @@ def validate_simulation_state(
             continue
         if stripped.startswith("echo "):
             continue
-        if stripped.startswith("if ") or stripped.startswith("fi") or stripped.startswith("then"):
+        # Skip shell block keywords. Match the `fi` keyword exactly — NOT a prefix
+        # — so real check commands like `firewall-cmd ...` or `find ...` are not
+        # silently dropped (which would make the lab pass fail-open).
+        if (
+            stripped.startswith("if ")
+            or stripped.startswith("then")
+            or stripped == "fi"
+            or stripped.startswith("fi ")
+            or stripped.startswith("fi;")
+        ):
             continue
         if stripped.startswith("exit "):
             code = stripped.split()[1].rstrip(";")
@@ -274,6 +283,19 @@ def _run_line_check(
     failures: list[str],
 ) -> bool:
     """Return True if this line was recognized as a validation check."""
+    # ── Config-repair marker (grep -q FIXED-OK <file>) runs FIRST ──
+    # The marker file path can contain tech keywords (e.g. an academy GPU lab's
+    # path holds "nvidia-smi", a docker lab's holds "docker"), which would
+    # otherwise be grabbed by a substring matcher below (gpu_healthy, etc.) and
+    # auto-pass. Handle the unambiguous marker line up front so it stays
+    # fail-closed until the file genuinely carries the FIXED-OK sentinel.
+    if "grep" in stripped and "FIXED-OK" in stripped:
+        path = next((p for p in stripped.split() if p.startswith("/")), "")
+        content = state.read_file(path) if path else None
+        if content is None or "FIXED-OK" not in content:
+            failures.append(f"{path or 'target file'} not corrected — apply the documented fix")
+        return True
+
     # ── Cross-technology (VMware ⇄ terminal) checks run FIRST ──
     # These scenarios reuse common probes (systemctl is-active nginx, ip addr)
     # whose generic handlers appear later in this function; running the cross-tech
@@ -508,8 +530,13 @@ def _run_line_check(
         content = state.read_file(path)
         if content is None:
             failures.append(f"{path} does not exist — create a valid Python program first")
-        elif "SyntaxError" in content or "IndentationError" in content:
-            failures.append(f"syntax error in {path}")
+        else:
+            # Actually compile the file (don't just look for the literal text
+            # "SyntaxError") so a genuinely broken program stays fail-closed.
+            try:
+                compile(content, path, "exec")
+            except (SyntaxError, ValueError):
+                failures.append(f"syntax error in {path}")
         return True
 
     if "bash -n" in stripped:
@@ -875,16 +902,8 @@ def _run_line_check(
                 failures.append(f"{unit} is not active")
             return True
 
-    # ── Generic config-repair marker (grep -q FIXED-OK <file>) — reads real
-    # file content. A scenario's preset writes a broken config; the fix rewrites
-    # it to contain the FIXED-OK sentinel, proving the file was genuinely edited.
-    if "grep" in stripped and "FIXED-OK" in stripped:
-        path = next((p for p in stripped.split() if p.startswith("/")), "")
-        content = state.read_file(path) if path else None
-        if content is None or "FIXED-OK" not in content:
-            failures.append(f"{path or 'target file'} not corrected — apply the documented fix")
-        return True
-
+    # (The grep -q FIXED-OK marker check is handled at the top of this function
+    # so tech keywords in the marker path can't shadow it.)
     return False
 
 

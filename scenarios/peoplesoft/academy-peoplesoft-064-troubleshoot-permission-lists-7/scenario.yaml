@@ -1,4 +1,4 @@
-title: 'Oracle PeopleSoft: Peoplesoft Permission Lists — Troubleshooting Drill'
+title: 'Oracle PeopleSoft: Permission Lists — Troubleshooting Drill'
 slug: academy-peoplesoft-064-troubleshoot-permission-lists-7
 technology: Oracle PeopleSoft
 category: Troubleshooting
@@ -11,28 +11,27 @@ max_score: 100
 is_free: false
 infrastructure_type: docker
 jira_priority: Medium
-description: 'Production alert: role shows menu but component access denied. You are
-  on call for Oracle PeopleSoft and must troubleshoot PeopleSoft permission lists
-  methodically — triage symptoms, find root cause, apply the smallest safe fix, and
-  confirm recovery.'
+description: 'Production alert: users cannot access required pages. You are on call
+  for Oracle PeopleSoft and must troubleshoot permission lists methodically — triage
+  symptoms, find root cause, apply the smallest safe fix, and confirm recovery.'
 objectives:
-- 'The incident symptom is clear: role shows menu but component access denied'
+- 'The incident symptom is clear: users cannot access required pages'
 - Root cause is isolated with evidence, not guesswork
 - Service behavior returns to normal after the fix
-initial_state: The PeopleSoft app server lab is degraded. Role shows menu but component
-  access denied. Recent changes may exist around PeopleSoft permission lists, but
-  do not restart blindly — gather evidence first.
+initial_state: The PeopleSoft app server lab is degraded. Users cannot access required
+  pages. Recent changes may exist around permission lists, but do not restart blindly
+  — gather evidence first.
 hints:
 - order: 1
   cost: 10
-  content: 'Triage: Security Administrator and PL compare tool. Capture timestamps,
-    error messages, and what still works.'
+  content: 'Triage: permission list and role security. Capture timestamps, error messages,
+    and what still works.'
 - order: 2
   cost: 15
   content: Separate symptom from cause. Fix the underlying misconfiguration, not only
     the noisy log line.
 - order: 3
   cost: 20
-  content: 'Verify recovery: permission lists align with designed security matrix.
-    Document the fix, add `# FIXED-OK` to `/opt/fixitlab/academy/academy-peoplesoft-064-troubleshoot-permission-lists-7.conf`,
+  content: 'Verify recovery: access matches the security design. Document the fix,
+    add `# FIXED-OK` to `/opt/fixitlab/academy/academy-peoplesoft-064-troubleshoot-permission-lists-7.conf`,
     and rerun Check Solution.'

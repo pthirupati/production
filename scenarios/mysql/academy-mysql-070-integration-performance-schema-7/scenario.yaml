@@ -1,4 +1,4 @@
-title: 'MySQL: Mysql Performance_Schema — Integration Lab'
+title: 'MySQL: Performance Schema — Integration Lab'
 slug: academy-mysql-070-integration-performance-schema-7
 technology: MySQL
 category: Cross-Technology
@@ -11,15 +11,15 @@ max_score: 100
 is_free: false
 infrastructure_type: docker
 jira_priority: Medium
-description: 'Integration lab: connect MySQL performance_schema with an adjacent platform
+description: 'Integration lab: connect performance schema with an adjacent platform
   in the MySQL stack. Validate authentication, data handoff, and failure behavior
-  for waits, statements, and consumers.'
+  for instruments, consumers, and digests.'
 objectives:
-- MySQL performance_schema is connected to the adjacent system successfully
+- performance schema is connected to the adjacent system successfully
 - Handoff points are authenticated and observable
 - End-to-end workflow completes without manual intervention
-initial_state: Two systems are deployed but not fully wired together for MySQL performance_schema.
-  Downstream consumers are waiting on this integration path.
+initial_state: Two systems are deployed but not fully wired together for performance
+  schema. Downstream consumers are waiting on this integration path.
 hints:
 - order: 1
   cost: 10

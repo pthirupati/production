@@ -13,7 +13,7 @@ infrastructure_type: docker
 jira_priority: Medium
 description: 'Integration lab: connect least privilege with an adjacent platform in
   the Security stack. Validate authentication, data handoff, and failure behavior
-  for role minimization, JIT access, and periodic review.'
+  for minimal grants and scoped access.'
 objectives:
 - least privilege is connected to the adjacent system successfully
 - Handoff points are authenticated and observable

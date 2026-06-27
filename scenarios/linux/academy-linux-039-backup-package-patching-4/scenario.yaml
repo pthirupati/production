@@ -1,4 +1,4 @@
-title: 'Linux Administration: Linux Patching — Backup and Recovery'
+title: 'Linux Administration: Package Patching — Backup and Recovery'
 slug: academy-linux-039-backup-package-patching-4
 technology: Linux Administration
 category: Backup & Recovery
@@ -11,14 +11,14 @@ max_score: 100
 is_free: false
 infrastructure_type: docker
 jira_priority: Medium
-description: Backup and recovery drill for Linux patching. Ensure backups run on schedule,
-  retention is correct, and you can restore repos, kernels, reboot strategy, and compliance
-  within the lab RTO.
+description: Backup and recovery drill for package patching. Ensure backups run on
+  schedule, retention is correct, and you can restore repos, updates, version pinning,
+  and rollback within the lab RTO.
 objectives:
-- Backup coverage for Linux patching is complete and restorable
+- Backup coverage for package patching is complete and restorable
 - Retention and encryption meet the stated policy
 - A restore drill proves data integrity
-initial_state: Backup jobs exist but reliability is uncertain for Linux patching.
+initial_state: Backup jobs exist but reliability is uncertain for package patching.
   Leadership wants proof that restore works — not just that backup scripts exit zero.
 hints:
 - order: 1

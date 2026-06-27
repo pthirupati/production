@@ -1,4 +1,4 @@
-title: 'Bare Metal & IPMI: Server Bios — Daily Operations'
+title: 'Bare Metal & IPMI: Bios/Uefi — Daily Operations'
 slug: academy-baremetal-023-operate-bios-3
 technology: Bare Metal & IPMI
 category: Operations
@@ -11,25 +11,25 @@ max_score: 100
 is_free: false
 infrastructure_type: docker
 jira_priority: Medium
-description: 'Day-2 operations: perform a routine server BIOS task safely in Bare
-  Metal & IPMI. Follow change control — inspect, change, verify — while working with
-  boot order, virtualization, power profiles, and security features.'
+description: 'Day-2 operations: perform a routine BIOS/UEFI task safely in Bare Metal
+  & IPMI. Follow change control — inspect, change, verify — while working with boot
+  order, virtualization, and settings.'
 objectives:
-- Day-2 server BIOS work completes safely in this environment
+- Day-2 BIOS/UEFI work completes safely in this environment
 - Changes are verified with before/after checks
 - The system remains stable for dependent teams
-initial_state: The physical server lab is healthy enough for scheduled work on server
-  BIOS. Complete the maintenance task without unnecessary downtime.
+initial_state: The physical server lab is healthy enough for scheduled work on BIOS/UEFI.
+  Complete the maintenance task without unnecessary downtime.
 hints:
 - order: 1
   cost: 10
-  content: 'Pre-check: out-of-band console, BIOS screens, and firmware inventory.
-    Confirm backups or snapshots if the change is risky.'
+  content: 'Pre-check: BIOS/UEFI settings and boot order. Confirm backups or snapshots
+    if the change is risky.'
 - order: 2
   cost: 15
   content: Execute the maintenance in small steps. Prefer reversible changes.
 - order: 3
   cost: 20
-  content: 'Post-check: firmware settings match hardware profile and boot reliably.
-    Add `# FIXED-OK` to `/opt/fixitlab/academy/academy-baremetal-023-operate-bios-3.conf`
-    and run Check Solution.'
+  content: 'Post-check: BIOS settings match the build standard. Add `# FIXED-OK` to
+    `/opt/fixitlab/academy/academy-baremetal-023-operate-bios-3.conf` and run Check
+    Solution.'

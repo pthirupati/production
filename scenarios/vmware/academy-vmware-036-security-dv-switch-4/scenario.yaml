@@ -1,4 +1,4 @@
-title: 'VMware vSphere: Distributed Virtual Switch — Security Practice'
+title: 'VMware vSphere: Distributed Switch — Security Practice'
 slug: academy-vmware-036-security-dv-switch-4
 technology: VMware vSphere
 category: Security
@@ -11,20 +11,19 @@ max_score: 100
 is_free: false
 infrastructure_type: docker
 jira_priority: Medium
-description: 'Security review: harden distributed virtual switch on this VMware vSphere
-  system. Close unsafe defaults, enforce least privilege, and ensure port groups,
-  uplinks, and private VLANs cannot be abused — without breaking legitimate use.'
+description: 'Security review: harden distributed switch on this VMware vSphere system.
+  Close unsafe defaults, enforce least privilege, and ensure port groups, uplinks,
+  and VLAN trunks cannot be abused — without breaking legitimate use.'
 objectives:
-- Unsafe defaults related to distributed virtual switch are removed or constrained
+- Unsafe defaults related to distributed switch are removed or constrained
 - Access follows least privilege and is auditable
 - Security checks pass without breaking required functionality
 initial_state: The environment is functional but overly permissive around distributed
-  virtual switch. Assume an auditor or pen test is next week — tighten controls with
-  evidence.
+  switch. Assume an auditor or pen test is next week — tighten controls with evidence.
 hints:
 - order: 1
   cost: 10
-  content: 'Baseline current exposure: vSphere networking view and vmkernel adapters.
+  content: 'Baseline current exposure: dvSwitch config, uplinks, and port group VLANs.
     Note world-readable files, open ports, or excessive roles.'
 - order: 2
   cost: 15

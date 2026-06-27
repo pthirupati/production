@@ -1,4 +1,4 @@
-title: 'Simulation Labs: Lab Hints — Security Practice'
+title: 'Simulation Labs: Hint Authoring — Security Practice'
 slug: academy-simulation-026-security-hints-3
 technology: Simulation Labs
 category: Security
@@ -11,20 +11,20 @@ max_score: 100
 is_free: false
 infrastructure_type: docker
 jira_priority: Medium
-description: 'Security review: harden lab hints on this Simulation Labs system. Close
-  unsafe defaults, enforce least privilege, and ensure progressive disclosure, costs,
-  and anti-spoilers cannot be abused — without breaking legitimate use.'
+description: 'Security review: harden hint authoring on this Simulation Labs system.
+  Close unsafe defaults, enforce least privilege, and ensure progressive, non-spoiler
+  hints cannot be abused — without breaking legitimate use.'
 objectives:
-- Unsafe defaults related to lab hints are removed or constrained
+- Unsafe defaults related to hint authoring are removed or constrained
 - Access follows least privilege and is auditable
 - Security checks pass without breaking required functionality
-initial_state: The environment is functional but overly permissive around lab hints.
+initial_state: The environment is functional but overly permissive around hint authoring.
   Assume an auditor or pen test is next week — tighten controls with evidence.
 hints:
 - order: 1
   cost: 10
-  content: 'Baseline current exposure: hint usage analytics and learner feedback.
-    Note world-readable files, open ports, or excessive roles.'
+  content: 'Baseline current exposure: the hint tiers and costs. Note world-readable
+    files, open ports, or excessive roles.'
 - order: 2
   cost: 15
   content: Apply least privilege incrementally. Prefer explicit allows over broad

@@ -15,7 +15,7 @@ from typing import Optional
 from django.conf import settings
 from django.utils import timezone
 
-from apps.question_bank.scenario_copy import incident_summary, public_objectives
+from apps.question_bank.scenario_copy import public_objectives
 
 from .client import JiraClient, JiraClientError
 from .models import JiraTicketLog, UserScenarioJiraTicket
@@ -60,7 +60,6 @@ def _build_issue_body(session=None, user=None, scenario=None) -> str:
     site = settings.SITE_URL.rstrip("/")
     scenario_url = f"{site}/scenarios/{scenario.slug}"
     lab_url = f"{site}/lab/{session.id}" if session else scenario_url
-    vmware_url = f"{site}/vmware/{session.id}" if session and _is_vmware_scenario(scenario) else ""
 
     from string import Template
     custom = (getattr(scenario, "jira_issue_template", "") or "").strip()
@@ -87,27 +86,38 @@ def _build_issue_body(session=None, user=None, scenario=None) -> str:
         if outcomes
         else "• Restore normal service for the affected system."
     )
-    incident = incident_summary(scenario)
+    # Lead with a complete, self-contained incident narrative built from the
+    # scenario's (now detailed) description + environment so the ticket reads
+    # end-to-end like a real support/ops ticket — no FixitLab plumbing clutter.
+    description = (scenario.description or "").strip()
+    initial = (scenario.initial_state or "").strip()
+    summary_line = (scenario.subtitle or "").strip() or (description.split(". ")[0] if description else scenario.title)
 
-    return (
-        f"h2. Production Incident — {scenario.title}\n\n"
-        f"*Technology:* {scenario.technology.name}\n"
-        f"*Difficulty:* {scenario.difficulty}\n"
-        f"*Reporter:* {user.get_full_name() or user.username} ({user.email})\n"
-        f"*Time limit:* {scenario.time_limit // 60} minutes\n\n"
-        f"h3. Summary\n"
-        f"{scenario.subtitle or scenario.title}\n\n"
-        f"h3. Incident description\n"
-        f"{incident}\n\n"
-        f"h3. Expected outcome\n"
-        f"{outcome_text}\n\n"
-        f"h3. FixitLab Links\n"
-        f"* [Open lab|{lab_url}]\n"
-        + (f"* [Open VMware vCenter Simulator|{vmware_url}]\n" if vmware_url else "")
-        + f"* [Scenario details|{scenario_url}]\n\n"
-        f"*Session ID:* {session.id if session else 'pending'}\n"
-        f"*Site:* {site}"
-    )
+    parts = [
+        f"h2. {scenario.title}",
+        "",
+        f"*Priority:* {getattr(scenario, 'jira_priority', '') or 'Medium'}    "
+        f"*Technology:* {scenario.technology.name}    "
+        f"*Reported by:* {user.get_full_name() or user.username}",
+        "",
+        "h3. Summary",
+        summary_line,
+        "",
+        "h3. What is happening",
+        description or "The affected system is not behaving as expected.",
+    ]
+    if initial and initial != description:
+        parts += ["", "h3. Environment & current state", initial]
+    parts += [
+        "",
+        "h3. What 'resolved' looks like",
+        outcome_text,
+        "",
+        "h3. Notes",
+        "Investigate from first principles, apply the smallest safe fix, and add a "
+        "resolution comment describing the root cause before you close this ticket.",
+    ]
+    return "\n".join(parts)
 
 
 def _ticket_response(mapping, enabled=True, **extra):

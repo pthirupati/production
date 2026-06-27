@@ -12,9 +12,8 @@ is_free: true
 infrastructure_type: docker
 jira_priority: Low
 description: This beginner-friendly Data Science & Analytics lab introduces data cleaning.
-  You will explore nulls, dtypes, outliers, and reproducible transforms on the notebook
-  lab. Read the environment first, then complete the guided steps — no prior production
-  experience required.
+  You will explore nulls, types, and dedup on the notebook lab. Read the environment
+  first, then complete the guided steps — no prior production experience required.
 objectives:
 - Understand how data cleaning work in this lab environment
 - Identify the main status and configuration signals for data cleaning
@@ -25,12 +24,12 @@ initial_state: The notebook lab is online with a starter data cleaning setup. So
 hints:
 - order: 1
   cost: 10
-  content: 'Orient yourself: profiling reports, pandas info(), and sample rows. Write
-    down what looks normal vs missing.'
+  content: 'Orient yourself: data profile and null counts. Write down what looks normal
+    vs missing.'
 - order: 2
   cost: 15
-  content: Core idea — nulls, dtypes, outliers, and reproducible transforms. Make
-    one small, reversible change at a time and re-check status.
+  content: Core idea — nulls, types, and dedup. Make one small, reversible change
+    at a time and re-check status.
 - order: 3
   cost: 20
   content: When the lab objective is done, record completion by adding `# FIXED-OK`

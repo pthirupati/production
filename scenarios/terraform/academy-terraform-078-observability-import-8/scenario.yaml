@@ -1,4 +1,4 @@
-title: 'Terraform & IaC: Terraform Import — Observability Practice'
+title: 'Terraform & IaC: Resource Import — Observability Practice'
 slug: academy-terraform-078-observability-import-8
 technology: Terraform & IaC
 category: Observability
@@ -11,20 +11,20 @@ max_score: 100
 is_free: false
 infrastructure_type: docker
 jira_priority: Medium
-description: 'Observability task: make Terraform import visible in logs, metrics,
-  or traces. On-call should answer ''what is broken?'' quickly using signals from
-  addressing, state adoption, and drift reconciliation.'
+description: 'Observability task: make resource import visible in logs, metrics, or
+  traces. On-call should answer ''what is broken?'' quickly using signals from adopting
+  existing resources into state.'
 objectives:
-- Day-2 Terraform import work completes safely in this environment
+- Day-2 resource import work completes safely in this environment
 - Changes are verified with before/after checks
 - The system remains stable for dependent teams
-initial_state: The system runs, but Terraform import lacks useful telemetry. Dashboards/alerts
+initial_state: The system runs, but resource import lacks useful telemetry. Dashboards/alerts
   are blank or noisy — improve signal quality.
 hints:
 - order: 1
   cost: 10
-  content: 'Find existing signals: `terraform import`, generated config, and plan.
-    Identify what is missing for fast triage.'
+  content: 'Find existing signals: `terraform import`, `terraform state show`, and
+    plan diff. Identify what is missing for fast triage.'
 - order: 2
   cost: 15
   content: Add or fix exporters/dashboards/alerts with clear names, labels, and thresholds.

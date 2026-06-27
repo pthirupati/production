@@ -1,4 +1,4 @@
-title: 'RHEL Linux: Rhel Subscriptions — Fundamentals Lab'
+title: 'RHEL Linux: Subscriptions And Repos — Fundamentals Lab'
 slug: academy-rhel-linux-071-learn-subscription-repos-8
 technology: RHEL Linux
 category: Core Skills
@@ -11,26 +11,26 @@ max_score: 100
 is_free: false
 infrastructure_type: docker
 jira_priority: Low
-description: This beginner-friendly RHEL Linux lab introduces RHEL subscriptions.
-  You will explore entitlements, repos, and candle status on the RHEL practice host.
-  Read the environment first, then complete the guided steps — no prior production
-  experience required.
+description: This beginner-friendly RHEL Linux lab introduces subscriptions and repos.
+  You will explore subscription-manager, entitlements, and repo enablement on the
+  RHEL practice host. Read the environment first, then complete the guided steps —
+  no prior production experience required.
 objectives:
-- Understand how RHEL subscriptions work in this lab environment
-- Identify the main status and configuration signals for RHEL subscriptions
+- Understand how subscriptions and repos work in this lab environment
+- Identify the main status and configuration signals for subscriptions and repos
 - Confirm you can read the current state confidently before changing anything
-initial_state: The RHEL practice host is online with a starter RHEL subscriptions
+initial_state: The RHEL practice host is online with a starter subscriptions and repos
   setup. Some pieces are intentionally incomplete so you can learn how the pieces
   fit together. Nothing is on fire yet — focus on observation and understanding.
 hints:
 - order: 1
   cost: 10
-  content: 'Orient yourself: `subscription-manager`, `dnf repolist`, and compliance.
-    Write down what looks normal vs missing.'
+  content: 'Orient yourself: `subscription-manager status` and `dnf repolist`. Write
+    down what looks normal vs missing.'
 - order: 2
   cost: 15
-  content: Core idea — entitlements, repos, and candle status. Make one small, reversible
-    change at a time and re-check status.
+  content: Core idea — subscription-manager, entitlements, and repo enablement. Make
+    one small, reversible change at a time and re-check status.
 - order: 3
   cost: 20
   content: When the lab objective is done, record completion by adding `# FIXED-OK`

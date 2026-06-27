@@ -1,4 +1,4 @@
-title: 'Java Development: Java Rest Apis — Backup and Recovery'
+title: 'Java Development: Rest Apis — Backup and Recovery'
 slug: academy-java-029-backup-rest-api-3
 technology: Java Development
 category: Backup & Recovery
@@ -11,15 +11,15 @@ max_score: 100
 is_free: false
 infrastructure_type: docker
 jira_priority: Medium
-description: Backup and recovery drill for Java REST APIs. Ensure backups run on schedule,
-  retention is correct, and you can restore controllers, validation, status codes,
-  and DTOs within the lab RTO.
+description: Backup and recovery drill for REST APIs. Ensure backups run on schedule,
+  retention is correct, and you can restore controllers, status codes, and validation
+  within the lab RTO.
 objectives:
-- Backup coverage for Java REST APIs is complete and restorable
+- Backup coverage for REST APIs is complete and restorable
 - Retention and encryption meet the stated policy
 - A restore drill proves data integrity
-initial_state: Backup jobs exist but reliability is uncertain for Java REST APIs.
-  Leadership wants proof that restore works — not just that backup scripts exit zero.
+initial_state: Backup jobs exist but reliability is uncertain for REST APIs. Leadership
+  wants proof that restore works — not just that backup scripts exit zero.
 hints:
 - order: 1
   cost: 10

@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { Link, useNavigate } from 'react-router-dom'
+import { Link, useNavigate, useSearchParams } from 'react-router-dom'
 import { interviewsApi } from '../../api/interviews'
 import api from '../../api/client'
 import { Upload, ChevronRight, ChevronLeft, User, Briefcase, Plus, X, Sparkles } from 'lucide-react'
@@ -17,6 +17,8 @@ const LEVELS = [
 
 export default function InterviewSetup() {
   const navigate = useNavigate()
+  const [searchParams] = useSearchParams()
+  const techParam = searchParams.get('tech') || ''
   const [step, setStep] = useState(0)
   const [technologies, setTechnologies] = useState([])
   const [resumeFile, setResumeFile] = useState(null)
@@ -38,6 +40,18 @@ export default function InterviewSetup() {
   const [customTechInput, setCustomTechInput] = useState('')
   const [resumeScore, setResumeScore] = useState(null)
   const [scoringResume, setScoringResume] = useState(false)
+
+  // Deep-link from a technology page (e.g. /interviews/setup?tech=linux) —
+  // preselect the primary technology so "Practice interview questions for Linux"
+  // lands the candidate ready to start.
+  useEffect(() => {
+    if (!techParam || !technologies.length) return
+    const want = techParam.toLowerCase()
+    const match = technologies.find(
+      t => (t.slug || '').toLowerCase() === want || (t.name || '').toLowerCase() === want,
+    )
+    if (match) setForm(f => ({ ...f, primary_technology: match.name }))
+  }, [techParam, technologies])
 
   useEffect(() => {
     api.get('/technologies/').then(r => setTechnologies(r.data || [])).catch(() => {})

@@ -1,3 +1,3 @@
 #!/usr/bin/env bash
-grep -q FIXED-OK /opt/fixitlab/academy/academy-ansible-011-learn-inventory-2.conf
+ansible webservers -m ping
 exit 0

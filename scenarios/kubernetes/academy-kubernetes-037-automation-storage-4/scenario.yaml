@@ -1,4 +1,4 @@
-title: 'Kubernetes: Database Storage — Automation Practice'
+title: 'Kubernetes: Kubernetes Storage — Automation Practice'
 slug: academy-kubernetes-037-automation-storage-4
 technology: Kubernetes
 category: Automation
@@ -11,14 +11,14 @@ max_score: 100
 is_free: false
 infrastructure_type: docker
 jira_priority: Medium
-description: 'Automation lab: remove toil around database storage. Codify repeatable
-  steps for tablespaces, files, growth, and autovacuum/optimize and prove the automation
+description: 'Automation lab: remove toil around Kubernetes storage. Codify repeatable
+  steps for PV/PVC binding, storage classes, and access modes and prove the automation
   is idempotent.'
 objectives:
-- Day-2 database storage work completes safely in this environment
+- Day-2 Kubernetes storage work completes safely in this environment
 - Changes are verified with before/after checks
 - The system remains stable for dependent teams
-initial_state: Operators still perform manual steps for database storage. Automate
+initial_state: Operators still perform manual steps for Kubernetes storage. Automate
   the boring parts without hiding important safety checks.
 hints:
 - order: 1

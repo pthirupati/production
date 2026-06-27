@@ -1,4 +1,4 @@
-title: 'Wireshark Packet Analysis: Dhcp — Security Practice'
+title: 'Wireshark Packet Analysis: Dhcp Analysis — Security Practice'
 slug: academy-wireshark-096-security-dhcp-10
 technology: Wireshark Packet Analysis
 category: Security
@@ -11,19 +11,19 @@ max_score: 100
 is_free: false
 infrastructure_type: docker
 jira_priority: Medium
-description: 'Security review: harden DHCP on this Wireshark Packet Analysis system.
-  Close unsafe defaults, enforce least privilege, and ensure scopes, reservations,
-  leases, and options cannot be abused — without breaking legitimate use.'
+description: 'Security review: harden DHCP analysis on this Wireshark Packet Analysis
+  system. Close unsafe defaults, enforce least privilege, and ensure DORA exchange
+  and lease issues cannot be abused — without breaking legitimate use.'
 objectives:
-- Unsafe defaults related to DHCP are removed or constrained
+- Unsafe defaults related to DHCP analysis are removed or constrained
 - Access follows least privilege and is auditable
 - Security checks pass without breaking required functionality
-initial_state: The environment is functional but overly permissive around DHCP. Assume
-  an auditor or pen test is next week — tighten controls with evidence.
+initial_state: The environment is functional but overly permissive around DHCP analysis.
+  Assume an auditor or pen test is next week — tighten controls with evidence.
 hints:
 - order: 1
   cost: 10
-  content: 'Baseline current exposure: dhcp server logs, `dhclient`, and lease databases.
+  content: 'Baseline current exposure: DHCP packets (Discover/Offer/Request/Ack).
     Note world-readable files, open ports, or excessive roles.'
 - order: 2
   cost: 15

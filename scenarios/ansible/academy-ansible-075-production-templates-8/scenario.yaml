@@ -1,4 +1,4 @@
-title: 'Ansible Automation: Ansible Templates — Production Readiness'
+title: 'Ansible Automation: Jinja2 Templates — Production Readiness'
 slug: academy-ansible-075-production-templates-8
 technology: Ansible Automation
 category: Production
@@ -11,14 +11,14 @@ max_score: 100
 is_free: false
 infrastructure_type: docker
 jira_priority: Medium
-description: Production readiness for Ansible templates. Harden, document, and validate
-  Jinja, variables, and whitespace control so the change is safe to run during a maintenance
-  window.
+description: Production readiness for Jinja2 templates. Harden, document, and validate
+  variables, filters, and conditionals in templates so the change is safe to run during
+  a maintenance window.
 objectives:
-- Day-2 Ansible templates work completes safely in this environment
+- Day-2 Jinja2 templates work completes safely in this environment
 - Changes are verified with before/after checks
 - The system remains stable for dependent teams
-initial_state: A feature fix works in dev, but Ansible templates is not production
+initial_state: A feature fix works in dev, but Jinja2 templates is not production
   ready — missing guardrails, runbooks, or capacity checks.
 hints:
 - order: 1
@@ -28,9 +28,9 @@ hints:
 - order: 2
   cost: 15
   content: 'Apply production standards: limits, monitoring, and access controls for
-    Ansible templates.'
+    Jinja2 templates.'
 - order: 3
   cost: 20
-  content: 'Run post-change verification: templates idempotent and produce correct
-    config files. Record `# FIXED-OK` in `/opt/fixitlab/academy/academy-ansible-075-production-templates-8.conf`
+  content: 'Run post-change verification: the rendered file matches the intended config.
+    Record `# FIXED-OK` in `/opt/fixitlab/academy/academy-ansible-075-production-templates-8.conf`
     when complete.'

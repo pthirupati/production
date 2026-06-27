@@ -13,7 +13,7 @@ infrastructure_type: docker
 jira_priority: Medium
 description: 'Day-2 operations: perform a routine model training task safely in AI
   / ML / LLM & Agents. Follow change control — inspect, change, verify — while working
-  with train/val split, checkpoints, and early stopping.'
+  with loss curves, epochs, and overfitting.'
 objectives:
 - Day-2 model training work completes safely in this environment
 - Changes are verified with before/after checks
@@ -23,13 +23,13 @@ initial_state: The ML practice workspace is healthy enough for scheduled work on
 hints:
 - order: 1
   cost: 10
-  content: 'Pre-check: loss curves, GPU util, and experiment tracking. Confirm backups
-    or snapshots if the change is risky.'
+  content: 'Pre-check: training/validation curves. Confirm backups or snapshots if
+    the change is risky.'
 - order: 2
   cost: 15
   content: Execute the maintenance in small steps. Prefer reversible changes.
 - order: 3
   cost: 20
-  content: 'Post-check: training reproducible with tracked hyperparameters. Add `#
-    FIXED-OK` to `/opt/fixitlab/academy/academy-ai-ml-013-operate-training-2.conf`
-    and run Check Solution.'
+  content: 'Post-check: training converges with good validation metrics. Add `# FIXED-OK`
+    to `/opt/fixitlab/academy/academy-ai-ml-013-operate-training-2.conf` and run Check
+    Solution.'

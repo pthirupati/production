@@ -1,4 +1,4 @@
-title: 'Simulation Labs: Cross-Technology Integration — Production Readiness'
+title: 'Simulation Labs: Cross-Technology Labs — Production Readiness'
 slug: academy-simulation-085-production-cross-tech-9
 technology: Simulation Labs
 category: Production
@@ -11,15 +11,15 @@ max_score: 100
 is_free: false
 infrastructure_type: docker
 jira_priority: Medium
-description: Production readiness for cross-technology integration. Harden, document,
-  and validate handoffs between platforms, contracts, and failure domains so the change
-  is safe to run during a maintenance window.
+description: Production readiness for cross-technology labs. Harden, document, and
+  validate linking tools (e.g. VMware ↔ AWX) so the change is safe to run during a
+  maintenance window.
 objectives:
-- Day-2 cross-technology integration work completes safely in this environment
+- Day-2 cross-technology labs work completes safely in this environment
 - Changes are verified with before/after checks
 - The system remains stable for dependent teams
-initial_state: A feature fix works in dev, but cross-technology integration is not
-  production ready — missing guardrails, runbooks, or capacity checks.
+initial_state: A feature fix works in dev, but cross-technology labs is not production
+  ready — missing guardrails, runbooks, or capacity checks.
 hints:
 - order: 1
   cost: 10
@@ -28,9 +28,9 @@ hints:
 - order: 2
   cost: 15
   content: 'Apply production standards: limits, monitoring, and access controls for
-    cross-technology integration.'
+    cross-technology labs.'
 - order: 3
   cost: 20
-  content: 'Run post-change verification: integrated workflow succeeds with correlated
-    IDs across systems. Record `# FIXED-OK` in `/opt/fixitlab/academy/academy-simulation-085-production-cross-tech-9.conf`
+  content: 'Run post-change verification: the cross-tool workflow completes. Record
+    `# FIXED-OK` in `/opt/fixitlab/academy/academy-simulation-085-production-cross-tech-9.conf`
     when complete.'

@@ -13,7 +13,7 @@ infrastructure_type: docker
 jira_priority: Medium
 description: 'Security review: harden connection pooling on this Database Administration
   system. Close unsafe defaults, enforce least privilege, and ensure pool size, timeouts,
-  and prepared statements cannot be abused — without breaking legitimate use.'
+  and leaks cannot be abused — without breaking legitimate use.'
 objectives:
 - Unsafe defaults related to connection pooling are removed or constrained
 - Access follows least privilege and is auditable
@@ -23,8 +23,8 @@ initial_state: The environment is functional but overly permissive around connec
 hints:
 - order: 1
   cost: 10
-  content: 'Baseline current exposure: pool metrics, wait times, and server conn count.
-    Note world-readable files, open ports, or excessive roles.'
+  content: 'Baseline current exposure: pool config and active connections. Note world-readable
+    files, open ports, or excessive roles.'
 - order: 2
   cost: 15
   content: Apply least privilege incrementally. Prefer explicit allows over broad

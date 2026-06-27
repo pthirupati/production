@@ -13,7 +13,7 @@ infrastructure_type: docker
 jira_priority: Medium
 description: 'Day-2 operations: perform a routine few-shot examples task safely in
   Prompt Engineering & AI Mastery. Follow change control — inspect, change, verify
-  — while working with example ordering, diversity, and label leakage.'
+  — while working with exemplars and formatting.'
 objectives:
 - Day-2 few-shot examples work completes safely in this environment
 - Changes are verified with before/after checks
@@ -23,13 +23,12 @@ initial_state: The LLM practice workspace is healthy enough for scheduled work o
 hints:
 - order: 1
   cost: 10
-  content: 'Pre-check: prompt transcripts and held-out eval cases. Confirm backups
-    or snapshots if the change is risky.'
+  content: 'Pre-check: the example block. Confirm backups or snapshots if the change
+    is risky.'
 - order: 2
   cost: 15
   content: Execute the maintenance in small steps. Prefer reversible changes.
 - order: 3
   cost: 20
-  content: 'Post-check: examples improve accuracy without overfitting phrasing. Add
-    `# FIXED-OK` to `/opt/fixitlab/academy/academy-prompt-engineering-073-operate-examples-8.conf`
+  content: 'Post-check: examples improve output quality. Add `# FIXED-OK` to `/opt/fixitlab/academy/academy-prompt-engineering-073-operate-examples-8.conf`
     and run Check Solution.'

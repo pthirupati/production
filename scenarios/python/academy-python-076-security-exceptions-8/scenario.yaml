@@ -1,4 +1,4 @@
-title: 'Python Development: Python Exceptions — Security Practice'
+title: 'Python Development: Exception Handling — Security Practice'
 slug: academy-python-076-security-exceptions-8
 technology: Python Development
 category: Security
@@ -11,20 +11,20 @@ max_score: 100
 is_free: false
 infrastructure_type: docker
 jira_priority: Medium
-description: 'Security review: harden Python exceptions on this Python Development
-  system. Close unsafe defaults, enforce least privilege, and ensure try/except granularity,
-  chaining, and custom types cannot be abused — without breaking legitimate use.'
+description: 'Security review: harden exception handling on this Python Development
+  system. Close unsafe defaults, enforce least privilege, and ensure try/except, custom
+  errors, and clean failure cannot be abused — without breaking legitimate use.'
 objectives:
-- Unsafe defaults related to Python exceptions are removed or constrained
+- Unsafe defaults related to exception handling are removed or constrained
 - Access follows least privilege and is auditable
 - Security checks pass without breaking required functionality
-initial_state: The environment is functional but overly permissive around Python exceptions.
-  Assume an auditor or pen test is next week — tighten controls with evidence.
+initial_state: The environment is functional but overly permissive around exception
+  handling. Assume an auditor or pen test is next week — tighten controls with evidence.
 hints:
 - order: 1
   cost: 10
-  content: 'Baseline current exposure: tracebacks, `logging.exception`, and pytest
-    failures. Note world-readable files, open ports, or excessive roles.'
+  content: 'Baseline current exposure: stack traces and except blocks. Note world-readable
+    files, open ports, or excessive roles.'
 - order: 2
   cost: 15
   content: Apply least privilege incrementally. Prefer explicit allows over broad

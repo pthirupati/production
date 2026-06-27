@@ -1,4 +1,4 @@
-title: 'HTML & Web Servers: Web Accessibility — Daily Operations'
+title: 'HTML & Web Servers: Accessibility — Daily Operations'
 slug: academy-html-083-operate-accessibility-9
 technology: HTML & Web Servers
 category: Operations
@@ -11,25 +11,25 @@ max_score: 100
 is_free: false
 infrastructure_type: docker
 jira_priority: Medium
-description: 'Day-2 operations: perform a routine web accessibility task safely in
-  HTML & Web Servers. Follow change control — inspect, change, verify — while working
-  with ARIA roles, keyboard navigation, contrast, and screen-reader semantics.'
+description: 'Day-2 operations: perform a routine accessibility task safely in HTML
+  & Web Servers. Follow change control — inspect, change, verify — while working with
+  semantic markup, ARIA, and keyboard nav.'
 objectives:
-- Day-2 web accessibility work completes safely in this environment
+- Day-2 accessibility work completes safely in this environment
 - Changes are verified with before/after checks
 - The system remains stable for dependent teams
-initial_state: The web server lab is healthy enough for scheduled work on web accessibility.
+initial_state: The web server lab is healthy enough for scheduled work on accessibility.
   Complete the maintenance task without unnecessary downtime.
 hints:
 - order: 1
   cost: 10
-  content: 'Pre-check: axe/Lighthouse audits, tab order, and semantic landmarks. Confirm
-    backups or snapshots if the change is risky.'
+  content: 'Pre-check: the a11y tree and keyboard focus. Confirm backups or snapshots
+    if the change is risky.'
 - order: 2
   cost: 15
   content: Execute the maintenance in small steps. Prefer reversible changes.
 - order: 3
   cost: 20
-  content: 'Post-check: critical paths pass WCAG-oriented checks without breaking
-    visuals. Add `# FIXED-OK` to `/opt/fixitlab/academy/academy-html-083-operate-accessibility-9.conf`
-    and run Check Solution.'
+  content: 'Post-check: the UI is operable with assistive tech. Add `# FIXED-OK` to
+    `/opt/fixitlab/academy/academy-html-083-operate-accessibility-9.conf` and run
+    Check Solution.'

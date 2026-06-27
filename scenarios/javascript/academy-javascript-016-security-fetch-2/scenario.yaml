@@ -1,4 +1,4 @@
-title: 'JavaScript Development: Fetch Api — Security Practice'
+title: 'JavaScript Development: Fetch — Security Practice'
 slug: academy-javascript-016-security-fetch-2
 technology: JavaScript Development
 category: Security
@@ -11,20 +11,20 @@ max_score: 100
 is_free: false
 infrastructure_type: docker
 jira_priority: Medium
-description: 'Security review: harden fetch API on this JavaScript Development system.
-  Close unsafe defaults, enforce least privilege, and ensure HTTP methods, credentials,
-  CORS, and error handling cannot be abused — without breaking legitimate use.'
+description: 'Security review: harden fetch on this JavaScript Development system.
+  Close unsafe defaults, enforce least privilege, and ensure HTTP requests, JSON,
+  and error states cannot be abused — without breaking legitimate use.'
 objectives:
-- Unsafe defaults related to fetch API are removed or constrained
+- Unsafe defaults related to fetch are removed or constrained
 - Access follows least privilege and is auditable
 - Security checks pass without breaking required functionality
-initial_state: The environment is functional but overly permissive around fetch API.
-  Assume an auditor or pen test is next week — tighten controls with evidence.
+initial_state: The environment is functional but overly permissive around fetch. Assume
+  an auditor or pen test is next week — tighten controls with evidence.
 hints:
 - order: 1
   cost: 10
-  content: 'Baseline current exposure: Network tab, response.status, and CORS console
-    errors. Note world-readable files, open ports, or excessive roles.'
+  content: 'Baseline current exposure: Network tab and response handling. Note world-readable
+    files, open ports, or excessive roles.'
 - order: 2
   cost: 15
   content: Apply least privilege incrementally. Prefer explicit allows over broad

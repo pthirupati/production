@@ -1,4 +1,4 @@
-title: 'Ansible Automation: Rolling Ansible Deploys — Integration Lab'
+title: 'Ansible Automation: Rolling Deploys — Integration Lab'
 slug: academy-ansible-030-integration-rolling-deploy-3
 technology: Ansible Automation
 category: Cross-Technology
@@ -11,15 +11,15 @@ max_score: 100
 is_free: false
 infrastructure_type: docker
 jira_priority: Medium
-description: 'Integration lab: connect rolling Ansible deploys with an adjacent platform
-  in the Ansible Automation stack. Validate authentication, data handoff, and failure
-  behavior for serial, max_fail_percentage, and health checks.'
+description: 'Integration lab: connect rolling deploys with an adjacent platform in
+  the Ansible Automation stack. Validate authentication, data handoff, and failure
+  behavior for serial, max-fail, and health gating.'
 objectives:
-- rolling Ansible deploys is connected to the adjacent system successfully
+- rolling deploys is connected to the adjacent system successfully
 - Handoff points are authenticated and observable
 - End-to-end workflow completes without manual intervention
-initial_state: Two systems are deployed but not fully wired together for rolling Ansible
-  deploys. Downstream consumers are waiting on this integration path.
+initial_state: Two systems are deployed but not fully wired together for rolling deploys.
+  Downstream consumers are waiting on this integration path.
 hints:
 - order: 1
   cost: 10

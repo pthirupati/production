@@ -1,4 +1,4 @@
-title: 'Shell Scripting: Shell Loops — Daily Operations'
+title: 'Shell Scripting: Loops — Daily Operations'
 slug: academy-shell-script-093-operate-loops-10
 technology: Shell Scripting
 category: Operations
@@ -11,25 +11,25 @@ max_score: 100
 is_free: false
 infrastructure_type: docker
 jira_priority: Medium
-description: 'Day-2 operations: perform a routine shell loops task safely in Shell
-  Scripting. Follow change control — inspect, change, verify — while working with
-  for/while, word splitting, and exit codes.'
+description: 'Day-2 operations: perform a routine loops task safely in Shell Scripting.
+  Follow change control — inspect, change, verify — while working with for/while,
+  IFS, and safe iteration.'
 objectives:
-- Day-2 shell loops work completes safely in this environment
+- Day-2 loops work completes safely in this environment
 - Changes are verified with before/after checks
 - The system remains stable for dependent teams
 initial_state: The bash practice environment is healthy enough for scheduled work
-  on shell loops. Complete the maintenance task without unnecessary downtime.
+  on loops. Complete the maintenance task without unnecessary downtime.
 hints:
 - order: 1
   cost: 10
-  content: 'Pre-check: `set -e` with loops, `break/continue`, and shellcheck. Confirm
-    backups or snapshots if the change is risky.'
+  content: 'Pre-check: loop bodies and traced iterations. Confirm backups or snapshots
+    if the change is risky.'
 - order: 2
   cost: 15
   content: Execute the maintenance in small steps. Prefer reversible changes.
 - order: 3
   cost: 20
-  content: 'Post-check: loops iterate expected items and propagate failures. Add `#
-    FIXED-OK` to `/opt/fixitlab/academy/academy-shell-script-093-operate-loops-10.conf`
-    and run Check Solution.'
+  content: 'Post-check: the loop processes every item correctly. Add `# FIXED-OK`
+    to `/opt/fixitlab/academy/academy-shell-script-093-operate-loops-10.conf` and
+    run Check Solution.'

@@ -13,8 +13,8 @@ infrastructure_type: docker
 jira_priority: Low
 description: Build UDP scanning from scratch in this Nmap Network Scanning lab. You
   start from a minimal environment and must produce a working configuration that demonstrates
-  open|filtered states, probes, and slow paths. Treat this like a greenfield task
-  — plan, implement, then prove it works.
+  UDP probes and open|filtered states. Treat this like a greenfield task — plan, implement,
+  then prove it works.
 objectives:
 - A working UDP scanning setup must exist by the end of this lab
 - Configuration should follow team conventions and be easy to audit
@@ -33,6 +33,6 @@ hints:
     validate, then add the remaining pieces.
 - order: 3
   cost: 20
-  content: 'Prove success: UDP scan results interpreted with correct caution. Mark
-    the lab complete with `# FIXED-OK` in `/opt/fixitlab/academy/academy-nmap-032-build-udp-scan-4.conf`
+  content: 'Prove success: open UDP services are identified. Mark the lab complete
+    with `# FIXED-OK` in `/opt/fixitlab/academy/academy-nmap-032-build-udp-scan-4.conf`
     and run Check Solution.'

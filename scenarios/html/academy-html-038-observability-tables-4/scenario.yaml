@@ -1,4 +1,4 @@
-title: 'HTML & Web Servers: Html Tables — Observability Practice'
+title: 'HTML & Web Servers: Tables — Observability Practice'
 slug: academy-html-038-observability-tables-4
 technology: HTML & Web Servers
 category: Observability
@@ -11,20 +11,20 @@ max_score: 100
 is_free: false
 infrastructure_type: docker
 jira_priority: Medium
-description: 'Observability task: make HTML tables visible in logs, metrics, or traces.
-  On-call should answer ''what is broken?'' quickly using signals from thead/tbody,
-  scope, and responsive patterns.'
+description: 'Observability task: make tables visible in logs, metrics, or traces.
+  On-call should answer ''what is broken?'' quickly using signals from semantic tables,
+  headers, and accessibility.'
 objectives:
-- Day-2 HTML tables work completes safely in this environment
+- Day-2 tables work completes safely in this environment
 - Changes are verified with before/after checks
 - The system remains stable for dependent teams
-initial_state: The system runs, but HTML tables lacks useful telemetry. Dashboards/alerts
+initial_state: The system runs, but tables lacks useful telemetry. Dashboards/alerts
   are blank or noisy — improve signal quality.
 hints:
 - order: 1
   cost: 10
-  content: 'Find existing signals: accessibility tree and horizontal scroll behavior.
-    Identify what is missing for fast triage.'
+  content: 'Find existing signals: table markup and header scope. Identify what is
+    missing for fast triage.'
 - order: 2
   cost: 15
   content: Add or fix exporters/dashboards/alerts with clear names, labels, and thresholds.

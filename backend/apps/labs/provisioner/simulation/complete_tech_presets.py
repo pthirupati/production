@@ -10,8 +10,9 @@ def _complete_marker(state, path: str, slug: str) -> None:
         state._mkdir(d)
     state._write_file(
         path,
-        f"# practice lab state for {slug}\n"
-        "# complete the objective and add # FIXED-OK when done\n",
+        f"# broken configuration for {slug}\n"
+        "# complete the lab objective, then apply the documented remediation\n"
+        "# this file needs the documented fix\n",
     )
 
 

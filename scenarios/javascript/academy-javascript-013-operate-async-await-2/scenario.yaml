@@ -1,4 +1,4 @@
-title: 'JavaScript Development: Async/Await In Javascript — Daily Operations'
+title: 'JavaScript Development: Async/Await — Daily Operations'
 slug: academy-javascript-013-operate-async-await-2
 technology: JavaScript Development
 category: Operations
@@ -11,26 +11,25 @@ max_score: 100
 is_free: false
 infrastructure_type: docker
 jira_priority: Medium
-description: 'Day-2 operations: perform a routine async/await in JavaScript task safely
-  in JavaScript Development. Follow change control — inspect, change, verify — while
-  working with Promises, microtasks, error propagation, and parallel awaits.'
+description: 'Day-2 operations: perform a routine async/await task safely in JavaScript
+  Development. Follow change control — inspect, change, verify — while working with
+  promises, await, and error handling.'
 objectives:
-- Day-2 async/await in JavaScript work completes safely in this environment
+- Day-2 async/await work completes safely in this environment
 - Changes are verified with before/after checks
 - The system remains stable for dependent teams
 initial_state: The JavaScript practice project is healthy enough for scheduled work
-  on async/await in JavaScript. Complete the maintenance task without unnecessary
-  downtime.
+  on async/await. Complete the maintenance task without unnecessary downtime.
 hints:
 - order: 1
   cost: 10
-  content: 'Pre-check: browser devtools async stacks and test harnesses. Confirm backups
-    or snapshots if the change is risky.'
+  content: 'Pre-check: promise chains and try/catch. Confirm backups or snapshots
+    if the change is risky.'
 - order: 2
   cost: 15
   content: Execute the maintenance in small steps. Prefer reversible changes.
 - order: 3
   cost: 20
-  content: 'Post-check: async flows resolve in order with errors surfaced to callers.
-    Add `# FIXED-OK` to `/opt/fixitlab/academy/academy-javascript-013-operate-async-await-2.conf`
-    and run Check Solution.'
+  content: 'Post-check: async flows resolve and errors are caught. Add `# FIXED-OK`
+    to `/opt/fixitlab/academy/academy-javascript-013-operate-async-await-2.conf` and
+    run Check Solution.'

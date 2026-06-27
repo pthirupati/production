@@ -13,7 +13,7 @@ infrastructure_type: docker
 jira_priority: Medium
 description: 'Day-2 operations: perform a routine nvidia-smi monitoring task safely
   in GPU & NVIDIA. Follow change control — inspect, change, verify — while working
-  with utilization, memory, processes, and clocks.'
+  with utilization, memory, and processes.'
 objectives:
 - Day-2 nvidia-smi monitoring work completes safely in this environment
 - Changes are verified with before/after checks
@@ -23,13 +23,13 @@ initial_state: The GPU node is healthy enough for scheduled work on nvidia-smi m
 hints:
 - order: 1
   cost: 10
-  content: 'Pre-check: `nvidia-smi`, dmon, and persistence mode. Confirm backups or
-    snapshots if the change is risky.'
+  content: 'Pre-check: `nvidia-smi` and `nvidia-smi dmon`. Confirm backups or snapshots
+    if the change is risky.'
 - order: 2
   cost: 15
   content: Execute the maintenance in small steps. Prefer reversible changes.
 - order: 3
   cost: 20
-  content: 'Post-check: smi reflects active processes and thermals. Add `# FIXED-OK`
+  content: 'Post-check: GPU metrics reflect the running workload. Add `# FIXED-OK`
     to `/opt/fixitlab/academy/academy-gpu-083-operate-nvidia-smi-9.conf` and run Check
     Solution.'

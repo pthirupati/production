@@ -1,4 +1,4 @@
-title: 'Linux Administration: Systemd Timers — Observability Practice'
+title: 'Linux Administration: Cron And Systemd Timers — Observability Practice'
 slug: academy-linux-018-observability-cron-timers-2
 technology: Linux Administration
 category: Observability
@@ -11,24 +11,22 @@ max_score: 100
 is_free: false
 infrastructure_type: docker
 jira_priority: Medium
-description: 'Observability task: make systemd timers visible in logs, metrics, or
-  traces. On-call should answer ''what is broken?'' quickly using signals from OnCalendar,
-  monotonic timers, and Persistent.'
+description: Scheduled-jobs operations. The `crond` scheduler is not running, so no cron jobs (backups,
+  rotations, batch tasks) will fire. Restore the scheduler so scheduled work resumes. Verify with `systemctl
+  is-active crond`.
 objectives:
-- Day-2 systemd timers work completes safely in this environment
-- Changes are verified with before/after checks
-- The system remains stable for dependent teams
-initial_state: The system runs, but systemd timers lacks useful telemetry. Dashboards/alerts
-  are blank or noisy — improve signal quality.
+- The crond scheduler service is active (running)
+- Scheduled jobs can fire again
+- systemctl is-active crond reports 'active'
+initial_state: The cron scheduler (`crond`) is stopped, so no scheduled jobs will run until it is started.
 hints:
 - order: 1
   cost: 10
-  content: 'Find existing signals: `systemctl list-timers`, unit files, and journals.
-    Identify what is missing for fast triage.'
+  content: 'Check the scheduler: `systemctl status crond` and `systemctl list-timers` for context.'
 - order: 2
   cost: 15
-  content: Add or fix exporters/dashboards/alerts with clear names, labels, and thresholds.
+  content: No crontab edits are required — the scheduler daemon itself is down.
 - order: 3
   cost: 20
-  content: Trigger a test event and confirm it appears where on-call looks. Complete
-    via `/opt/fixitlab/academy/academy-linux-018-observability-cron-timers-2.conf`.
+  content: Run `sudo systemctl enable --now crond`, confirm with `systemctl is-active crond`, then Check
+    Solution.

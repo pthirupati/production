@@ -12,8 +12,8 @@ is_free: false
 infrastructure_type: docker
 jira_priority: Medium
 description: 'Security review: harden PowerShell administration on this Windows Server
-  system. Close unsafe defaults, enforce least privilege, and ensure cmdlets, remoting,
-  execution policy, and modules cannot be abused — without breaking legitimate use.'
+  system. Close unsafe defaults, enforce least privilege, and ensure cmdlets, pipelines,
+  and remoting cannot be abused — without breaking legitimate use.'
 objectives:
 - Unsafe defaults related to PowerShell administration are removed or constrained
 - Access follows least privilege and is auditable
@@ -24,8 +24,8 @@ initial_state: The environment is functional but overly permissive around PowerS
 hints:
 - order: 1
   cost: 10
-  content: 'Baseline current exposure: `Get-WinEvent`, `Invoke-Command`, and transcripts.
-    Note world-readable files, open ports, or excessive roles.'
+  content: 'Baseline current exposure: `Get-*` cmdlets and `$Error`. Note world-readable
+    files, open ports, or excessive roles.'
 - order: 2
   cost: 15
   content: Apply least privilege incrementally. Prefer explicit allows over broad

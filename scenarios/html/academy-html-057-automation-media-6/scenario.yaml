@@ -1,4 +1,4 @@
-title: 'HTML & Web Servers: Html Media — Automation Practice'
+title: 'HTML & Web Servers: Media — Automation Practice'
 slug: academy-html-057-automation-media-6
 technology: HTML & Web Servers
 category: Automation
@@ -11,14 +11,13 @@ max_score: 100
 is_free: false
 infrastructure_type: docker
 jira_priority: Medium
-description: 'Automation lab: remove toil around HTML media. Codify repeatable steps
-  for video/audio tags, formats, and responsive images and prove the automation is
-  idempotent.'
+description: 'Automation lab: remove toil around media. Codify repeatable steps for
+  images, video, formats, and lazy loading and prove the automation is idempotent.'
 objectives:
-- Day-2 HTML media work completes safely in this environment
+- Day-2 media work completes safely in this environment
 - Changes are verified with before/after checks
 - The system remains stable for dependent teams
-initial_state: Operators still perform manual steps for HTML media. Automate the boring
+initial_state: Operators still perform manual steps for media. Automate the boring
   parts without hiding important safety checks.
 hints:
 - order: 1

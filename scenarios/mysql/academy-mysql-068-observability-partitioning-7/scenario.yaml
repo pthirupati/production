@@ -1,4 +1,4 @@
-title: 'MySQL: Table Partitioning — Observability Practice'
+title: 'MySQL: Partitioning — Observability Practice'
 slug: academy-mysql-068-observability-partitioning-7
 technology: MySQL
 category: Observability
@@ -11,20 +11,20 @@ max_score: 100
 is_free: false
 infrastructure_type: docker
 jira_priority: Medium
-description: 'Observability task: make table partitioning visible in logs, metrics,
-  or traces. On-call should answer ''what is broken?'' quickly using signals from
-  range/list/hash, pruning, and maintenance.'
+description: 'Observability task: make partitioning visible in logs, metrics, or traces.
+  On-call should answer ''what is broken?'' quickly using signals from range/list/hash
+  partitions and pruning.'
 objectives:
-- Day-2 table partitioning work completes safely in this environment
+- Day-2 partitioning work completes safely in this environment
 - Changes are verified with before/after checks
 - The system remains stable for dependent teams
-initial_state: The system runs, but table partitioning lacks useful telemetry. Dashboards/alerts
+initial_state: The system runs, but partitioning lacks useful telemetry. Dashboards/alerts
   are blank or noisy — improve signal quality.
 hints:
 - order: 1
   cost: 10
-  content: 'Find existing signals: EXPLAIN partition pruning and partition DDL. Identify
-    what is missing for fast triage.'
+  content: 'Find existing signals: partition definitions and EXPLAIN. Identify what
+    is missing for fast triage.'
 - order: 2
   cost: 15
   content: Add or fix exporters/dashboards/alerts with clear names, labels, and thresholds.

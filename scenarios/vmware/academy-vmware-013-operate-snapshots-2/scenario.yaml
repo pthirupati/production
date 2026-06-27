@@ -1,4 +1,4 @@
-title: 'VMware vSphere: Vm Snapshots — Daily Operations'
+title: 'VMware vSphere: Snapshots — Daily Operations'
 slug: academy-vmware-013-operate-snapshots-2
 technology: VMware vSphere
 category: Operations
@@ -11,26 +11,26 @@ max_score: 100
 is_free: false
 infrastructure_type: docker
 jira_priority: Medium
-description: 'Day-2 operations: perform a routine VM snapshots task safely in VMware
-  vSphere. Follow change control — inspect, change, verify — while working with quiescing,
-  chains, and consolidation.'
+description: 'Day-2 operations: perform a routine snapshots task safely in VMware
+  vSphere. Follow change control — inspect, change, verify — while working with snapshot
+  trees, consolidation, and disk growth.'
 objectives:
-- Day-2 VM snapshots work completes safely in this environment
+- Day-2 snapshots work completes safely in this environment
 - Changes are verified with before/after checks
 - The system remains stable for dependent teams
-initial_state: The vSphere lab is healthy enough for scheduled work on VM snapshots.
+initial_state: The vSphere lab is healthy enough for scheduled work on snapshots.
   Complete the maintenance task without unnecessary downtime.
 hints:
 - order: 1
   cost: 10
-  content: 'Pre-check: vSphere snapshot manager and datastore usage. Confirm backups
-    or snapshots if the change is risky.'
+  content: 'Pre-check: snapshot manager and VM disk usage. Confirm backups or snapshots
+    if the change is risky.'
 - order: 2
   cost: 15
   content: Execute the maintenance in small steps. Prefer reversible changes.
 - order: 3
   cost: 20
-  content: 'Post-check: snapshot tree healthy with consolidation schedule. Add `#
+  content: 'Post-check: snapshots are consolidated and storage is reclaimed. Add `#
     FIXED-OK` to `/opt/fixitlab/academy/academy-vmware-013-operate-snapshots-2.conf`
     and run Check Solution.'
 vmware_link: true

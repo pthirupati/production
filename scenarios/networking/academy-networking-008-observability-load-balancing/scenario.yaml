@@ -12,8 +12,8 @@ is_free: false
 infrastructure_type: docker
 jira_priority: Medium
 description: 'Observability task: make load balancing visible in logs, metrics, or
-  traces. On-call should answer ''what is broken?'' quickly using signals from L4/L7
-  algorithms, health checks, and stickiness.'
+  traces. On-call should answer ''what is broken?'' quickly using signals from backends,
+  health checks, and algorithms.'
 objectives:
 - Day-2 load balancing work completes safely in this environment
 - Changes are verified with before/after checks
@@ -23,7 +23,7 @@ initial_state: The system runs, but load balancing lacks useful telemetry. Dashb
 hints:
 - order: 1
   cost: 10
-  content: 'Find existing signals: LB config, backend pool status, and access logs.
+  content: 'Find existing signals: LB config, backend health, and connection distribution.
     Identify what is missing for fast triage.'
 - order: 2
   cost: 15

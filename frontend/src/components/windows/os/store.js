@@ -227,8 +227,8 @@ export const useOS = create((set, get) => ({
   scheduledTasks: clone(SEED_TASKS),
   startupItems: clone(SEED_STARTUP),
   roles: clone(SEED_ROLES),
-  hydrateFromBackend: (snapshot) => set((s) => {
-    if (!snapshot) return {}
+  hydrateFromBackend: (snapshot) => {
+    if (!snapshot) return
     const snapshotKey = JSON.stringify({
       computer_name: snapshot.computer_name,
       domain: snapshot.domain,
@@ -238,8 +238,12 @@ export const useOS = create((set, get) => ({
       storage: snapshot.storage,
       ad: snapshot.ad,
     })
-    if (s.backendSnapshotKey === snapshotKey) return {}
+    // Short-circuit WITHOUT calling set() — calling set (even returning {})
+    // produces a fresh state object every time, which would re-fire any effect
+    // that depends on the store object and loop infinitely (React #185).
+    if (get().backendSnapshotKey === snapshotKey) return
 
+    set((s) => {
     const serviceStatus = (v) => String(v || '').toLowerCase() === 'running' ? 'Running' : 'Stopped'
     const startup = (v) => {
       const raw = String(v || '').toLowerCase()
@@ -384,7 +388,8 @@ export const useOS = create((set, get) => ({
       vfs,
       adUsers,
     }
-  }),
+    })
+  },
   setDevice: (cls, name, patch) => set((s) => ({
     devices: s.devices.map((c) => c.cls !== cls ? c : { ...c, items: c.items.map((it) => it.name === name ? { ...it, ...patch } : it) }),
   })),

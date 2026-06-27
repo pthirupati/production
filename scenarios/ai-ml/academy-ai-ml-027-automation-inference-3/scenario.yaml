@@ -1,4 +1,4 @@
-title: 'AI / ML / LLM & Agents: Model Inference — Automation Practice'
+title: 'AI / ML / LLM & Agents: Inference — Automation Practice'
 slug: academy-ai-ml-027-automation-inference-3
 technology: AI / ML / LLM & Agents
 category: Automation
@@ -11,15 +11,14 @@ max_score: 100
 is_free: false
 infrastructure_type: docker
 jira_priority: Medium
-description: 'Automation lab: remove toil around model inference. Codify repeatable
-  steps for batching, latency, GPU/CPU paths, and versioning and prove the automation
-  is idempotent.'
+description: 'Automation lab: remove toil around inference. Codify repeatable steps
+  for serving, batching, and latency and prove the automation is idempotent.'
 objectives:
-- Day-2 model inference work completes safely in this environment
+- Day-2 inference work completes safely in this environment
 - Changes are verified with before/after checks
 - The system remains stable for dependent teams
-initial_state: Operators still perform manual steps for model inference. Automate
-  the boring parts without hiding important safety checks.
+initial_state: Operators still perform manual steps for inference. Automate the boring
+  parts without hiding important safety checks.
 hints:
 - order: 1
   cost: 10

@@ -1,4 +1,4 @@
-title: 'Terraform & IaC: Terraform Data Sources — Production Readiness'
+title: 'Terraform & IaC: Data Sources — Production Readiness'
 slug: academy-terraform-075-production-data-sources-8
 technology: Terraform & IaC
 category: Production
@@ -11,15 +11,15 @@ max_score: 100
 is_free: false
 infrastructure_type: docker
 jira_priority: Medium
-description: Production readiness for Terraform data sources. Harden, document, and
-  validate read-only queries, dependencies, and refresh behavior so the change is
-  safe to run during a maintenance window.
+description: Production readiness for data sources. Harden, document, and validate
+  reading existing infra, filters, and dependencies so the change is safe to run during
+  a maintenance window.
 objectives:
-- Day-2 Terraform data sources work completes safely in this environment
+- Day-2 data sources work completes safely in this environment
 - Changes are verified with before/after checks
 - The system remains stable for dependent teams
-initial_state: A feature fix works in dev, but Terraform data sources is not production
-  ready — missing guardrails, runbooks, or capacity checks.
+initial_state: A feature fix works in dev, but data sources is not production ready
+  — missing guardrails, runbooks, or capacity checks.
 hints:
 - order: 1
   cost: 10
@@ -28,9 +28,9 @@ hints:
 - order: 2
   cost: 15
   content: 'Apply production standards: limits, monitoring, and access controls for
-    Terraform data sources.'
+    data sources.'
 - order: 3
   cost: 20
-  content: 'Run post-change verification: data sources populate resources with live
-    values. Record `# FIXED-OK` in `/opt/fixitlab/academy/academy-terraform-075-production-data-sources-8.conf`
+  content: 'Run post-change verification: data lookups resolve to the intended resource.
+    Record `# FIXED-OK` in `/opt/fixitlab/academy/academy-terraform-075-production-data-sources-8.conf`
     when complete.'

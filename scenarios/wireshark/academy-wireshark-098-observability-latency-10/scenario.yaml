@@ -1,4 +1,4 @@
-title: 'Wireshark Packet Analysis: Network Latency — Observability Practice'
+title: 'Wireshark Packet Analysis: Latency Analysis — Observability Practice'
 slug: academy-wireshark-098-observability-latency-10
 technology: Wireshark Packet Analysis
 category: Observability
@@ -11,20 +11,20 @@ max_score: 100
 is_free: false
 infrastructure_type: docker
 jira_priority: Medium
-description: 'Observability task: make network latency visible in logs, metrics, or
-  traces. On-call should answer ''what is broken?'' quickly using signals from RTT,
-  jitter, buffering, and slow paths.'
+description: 'Observability task: make latency analysis visible in logs, metrics,
+  or traces. On-call should answer ''what is broken?'' quickly using signals from
+  delta times and round-trip delays.'
 objectives:
-- Day-2 network latency work completes safely in this environment
+- Day-2 latency analysis work completes safely in this environment
 - Changes are verified with before/after checks
 - The system remains stable for dependent teams
-initial_state: The system runs, but network latency lacks useful telemetry. Dashboards/alerts
+initial_state: The system runs, but latency analysis lacks useful telemetry. Dashboards/alerts
   are blank or noisy — improve signal quality.
 hints:
 - order: 1
   cost: 10
-  content: 'Find existing signals: ping, mtr, IO graphs, and service traces. Identify
-    what is missing for fast triage.'
+  content: 'Find existing signals: time columns and IO graphs. Identify what is missing
+    for fast triage.'
 - order: 2
   cost: 15
   content: Add or fix exporters/dashboards/alerts with clear names, labels, and thresholds.

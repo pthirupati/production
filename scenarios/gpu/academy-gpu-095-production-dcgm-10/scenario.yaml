@@ -1,4 +1,4 @@
-title: 'GPU & NVIDIA: Nvidia Dcgm — Production Readiness'
+title: 'GPU & NVIDIA: Dcgm — Production Readiness'
 slug: academy-gpu-095-production-dcgm-10
 technology: GPU & NVIDIA
 category: Production
@@ -11,15 +11,14 @@ max_score: 100
 is_free: false
 infrastructure_type: docker
 jira_priority: Medium
-description: Production readiness for NVIDIA DCGM. Harden, document, and validate
-  GPU telemetry, health watches, and field groups so the change is safe to run during
-  a maintenance window.
+description: Production readiness for DCGM. Harden, document, and validate GPU health
+  and telemetry so the change is safe to run during a maintenance window.
 objectives:
-- Day-2 NVIDIA DCGM work completes safely in this environment
+- Day-2 DCGM work completes safely in this environment
 - Changes are verified with before/after checks
 - The system remains stable for dependent teams
-initial_state: A feature fix works in dev, but NVIDIA DCGM is not production ready
-  — missing guardrails, runbooks, or capacity checks.
+initial_state: A feature fix works in dev, but DCGM is not production ready — missing
+  guardrails, runbooks, or capacity checks.
 hints:
 - order: 1
   cost: 10
@@ -28,9 +27,8 @@ hints:
 - order: 2
   cost: 15
   content: 'Apply production standards: limits, monitoring, and access controls for
-    NVIDIA DCGM.'
+    DCGM.'
 - order: 3
   cost: 20
-  content: 'Run post-change verification: DCGM exports health metrics and triggers
-    on XID errors. Record `# FIXED-OK` in `/opt/fixitlab/academy/academy-gpu-095-production-dcgm-10.conf`
-    when complete.'
+  content: 'Run post-change verification: DCGM reports healthy GPUs. Record `# FIXED-OK`
+    in `/opt/fixitlab/academy/academy-gpu-095-production-dcgm-10.conf` when complete.'

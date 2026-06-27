@@ -13,7 +13,7 @@ infrastructure_type: docker
 jira_priority: Medium
 description: 'Integration lab: connect dashboard sharing with an adjacent platform
   in the Grafana Observability stack. Validate authentication, data handoff, and failure
-  behavior for RBAC, snapshots, and external links.'
+  behavior for snapshots, links, and permissions.'
 objectives:
 - dashboard sharing is connected to the adjacent system successfully
 - Handoff points are authenticated and observable

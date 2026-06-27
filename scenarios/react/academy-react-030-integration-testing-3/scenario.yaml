@@ -1,4 +1,4 @@
-title: 'React Development: Automated Testing — Integration Lab'
+title: 'React Development: Testing — Integration Lab'
 slug: academy-react-030-integration-testing-3
 technology: React Development
 category: Cross-Technology
@@ -11,15 +11,15 @@ max_score: 100
 is_free: false
 infrastructure_type: docker
 jira_priority: Medium
-description: 'Integration lab: connect automated testing with an adjacent platform
-  in the React Development stack. Validate authentication, data handoff, and failure
-  behavior for unit/integration boundaries, fixtures, and CI gates.'
+description: 'Integration lab: connect testing with an adjacent platform in the React
+  Development stack. Validate authentication, data handoff, and failure behavior for
+  unit tests, fixtures, and assertions.'
 objectives:
-- automated testing is connected to the adjacent system successfully
+- testing is connected to the adjacent system successfully
 - Handoff points are authenticated and observable
 - End-to-end workflow completes without manual intervention
-initial_state: Two systems are deployed but not fully wired together for automated
-  testing. Downstream consumers are waiting on this integration path.
+initial_state: Two systems are deployed but not fully wired together for testing.
+  Downstream consumers are waiting on this integration path.
 hints:
 - order: 1
   cost: 10

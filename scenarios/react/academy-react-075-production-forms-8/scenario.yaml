@@ -1,4 +1,4 @@
-title: 'React Development: Html/React Forms — Production Readiness'
+title: 'React Development: Forms — Production Readiness'
 slug: academy-react-075-production-forms-8
 technology: React Development
 category: Production
@@ -11,15 +11,15 @@ max_score: 100
 is_free: false
 infrastructure_type: docker
 jira_priority: Medium
-description: Production readiness for HTML/React forms. Harden, document, and validate
-  controlled inputs, validation, and submit states so the change is safe to run during
-  a maintenance window.
+description: Production readiness for forms. Harden, document, and validate controlled
+  inputs, validation, and submission so the change is safe to run during a maintenance
+  window.
 objectives:
-- Day-2 HTML/React forms work completes safely in this environment
+- Day-2 forms work completes safely in this environment
 - Changes are verified with before/after checks
 - The system remains stable for dependent teams
-initial_state: A feature fix works in dev, but HTML/React forms is not production
-  ready — missing guardrails, runbooks, or capacity checks.
+initial_state: A feature fix works in dev, but forms is not production ready — missing
+  guardrails, runbooks, or capacity checks.
 hints:
 - order: 1
   cost: 10
@@ -28,9 +28,9 @@ hints:
 - order: 2
   cost: 15
   content: 'Apply production standards: limits, monitoring, and access controls for
-    HTML/React forms.'
+    forms.'
 - order: 3
   cost: 20
-  content: 'Run post-change verification: forms validate client-side and show accessible
-    errors. Record `# FIXED-OK` in `/opt/fixitlab/academy/academy-react-075-production-forms-8.conf`
+  content: 'Run post-change verification: the form validates and submits correctly.
+    Record `# FIXED-OK` in `/opt/fixitlab/academy/academy-react-075-production-forms-8.conf`
     when complete.'

@@ -1,4 +1,4 @@
-title: 'Prometheus Monitoring: Prometheus Labels — Backup and Recovery'
+title: 'Prometheus Monitoring: Labels And Cardinality — Backup and Recovery'
 slug: academy-prometheus-049-backup-labels-5
 technology: Prometheus Monitoring
 category: Backup & Recovery
@@ -11,14 +11,14 @@ max_score: 100
 is_free: false
 infrastructure_type: docker
 jira_priority: Medium
-description: Backup and recovery drill for Prometheus labels. Ensure backups run on
-  schedule, retention is correct, and you can restore cardinality, naming, and relabeling
-  within the lab RTO.
+description: Backup and recovery drill for labels and cardinality. Ensure backups
+  run on schedule, retention is correct, and you can restore label design and cardinality
+  control within the lab RTO.
 objectives:
-- Backup coverage for Prometheus labels is complete and restorable
+- Backup coverage for labels and cardinality is complete and restorable
 - Retention and encryption meet the stated policy
 - A restore drill proves data integrity
-initial_state: Backup jobs exist but reliability is uncertain for Prometheus labels.
+initial_state: Backup jobs exist but reliability is uncertain for labels and cardinality.
   Leadership wants proof that restore works — not just that backup scripts exit zero.
 hints:
 - order: 1

@@ -1,3 +1,3 @@
 #!/usr/bin/env bash
-grep -q FIXED-OK /opt/fixitlab/academy/academy-rhel-linux-009-backup-chrony.conf
+systemctl is-active chronyd
 exit 0

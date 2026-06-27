@@ -12,9 +12,9 @@ is_free: false
 infrastructure_type: docker
 jira_priority: Low
 description: Build CI pipelines from scratch in this DevOps lab. You start from a
-  minimal environment and must produce a working configuration that demonstrates stages,
-  caching, secrets, and flaky test control. Treat this like a greenfield task — plan,
-  implement, then prove it works.
+  minimal environment and must produce a working configuration that demonstrates build/test
+  stages and caching. Treat this like a greenfield task — plan, implement, then prove
+  it works.
 objectives:
 - A working CI pipelines setup must exist by the end of this lab
 - Configuration should follow team conventions and be easy to audit
@@ -33,6 +33,6 @@ hints:
     validate, then add the remaining pieces.
 - order: 3
   cost: 20
-  content: 'Prove success: pipelines finish fast with deterministic test results.
-    Mark the lab complete with `# FIXED-OK` in `/opt/fixitlab/academy/academy-devops-052-build-ci-pipeline-6.conf`
+  content: 'Prove success: the pipeline runs green and fast. Mark the lab complete
+    with `# FIXED-OK` in `/opt/fixitlab/academy/academy-devops-052-build-ci-pipeline-6.conf`
     and run Check Solution.'

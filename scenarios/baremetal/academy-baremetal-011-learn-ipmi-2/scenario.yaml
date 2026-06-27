@@ -1,4 +1,4 @@
-title: 'Bare Metal & IPMI: Ipmi / Bmc Management — Fundamentals Lab'
+title: 'Bare Metal & IPMI: Ipmi/Bmc — Fundamentals Lab'
 slug: academy-baremetal-011-learn-ipmi-2
 technology: Bare Metal & IPMI
 category: Core Skills
@@ -11,26 +11,26 @@ max_score: 100
 is_free: false
 infrastructure_type: docker
 jira_priority: Low
-description: This beginner-friendly Bare Metal & IPMI lab introduces IPMI / BMC management.
-  You will explore out-of-band power, sensors, SOL console, and user accounts on the
-  physical server lab. Read the environment first, then complete the guided steps
-  — no prior production experience required.
+description: This beginner-friendly Bare Metal & IPMI lab introduces IPMI/BMC. You
+  will explore out-of-band management and power control on the physical server lab.
+  Read the environment first, then complete the guided steps — no prior production
+  experience required.
 objectives:
-- Understand how IPMI / BMC management work in this lab environment
-- Identify the main status and configuration signals for IPMI / BMC management
+- Understand how IPMI/BMC work in this lab environment
+- Identify the main status and configuration signals for IPMI/BMC
 - Confirm you can read the current state confidently before changing anything
-initial_state: The physical server lab is online with a starter IPMI / BMC management
-  setup. Some pieces are intentionally incomplete so you can learn how the pieces
-  fit together. Nothing is on fire yet — focus on observation and understanding.
+initial_state: The physical server lab is online with a starter IPMI/BMC setup. Some
+  pieces are intentionally incomplete so you can learn how the pieces fit together.
+  Nothing is on fire yet — focus on observation and understanding.
 hints:
 - order: 1
   cost: 10
-  content: 'Orient yourself: `ipmitool sensor`, `ipmitool sol activate`, and BMC web
-    UI. Write down what looks normal vs missing.'
+  content: 'Orient yourself: `ipmitool` sensor/power and BMC console. Write down what
+    looks normal vs missing.'
 - order: 2
   cost: 15
-  content: Core idea — out-of-band power, sensors, SOL console, and user accounts.
-    Make one small, reversible change at a time and re-check status.
+  content: Core idea — out-of-band management and power control. Make one small, reversible
+    change at a time and re-check status.
 - order: 3
   cost: 20
   content: When the lab objective is done, record completion by adding `# FIXED-OK`

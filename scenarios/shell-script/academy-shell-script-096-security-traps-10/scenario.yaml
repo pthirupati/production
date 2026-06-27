@@ -1,4 +1,4 @@
-title: 'Shell Scripting: Shell Signal Traps — Security Practice'
+title: 'Shell Scripting: Traps — Security Practice'
 slug: academy-shell-script-096-security-traps-10
 technology: Shell Scripting
 category: Security
@@ -11,20 +11,20 @@ max_score: 100
 is_free: false
 infrastructure_type: docker
 jira_priority: Medium
-description: 'Security review: harden shell signal traps on this Shell Scripting system.
-  Close unsafe defaults, enforce least privilege, and ensure EXIT, ERR, INT handlers,
-  and cleanup cannot be abused — without breaking legitimate use.'
+description: 'Security review: harden traps on this Shell Scripting system. Close
+  unsafe defaults, enforce least privilege, and ensure signal handling and cleanup
+  on exit cannot be abused — without breaking legitimate use.'
 objectives:
-- Unsafe defaults related to shell signal traps are removed or constrained
+- Unsafe defaults related to traps are removed or constrained
 - Access follows least privilege and is auditable
 - Security checks pass without breaking required functionality
-initial_state: The environment is functional but overly permissive around shell signal
-  traps. Assume an auditor or pen test is next week — tighten controls with evidence.
+initial_state: The environment is functional but overly permissive around traps. Assume
+  an auditor or pen test is next week — tighten controls with evidence.
 hints:
 - order: 1
   cost: 10
-  content: 'Baseline current exposure: `trap -p`, manual signals, and temp file cleanup.
-    Note world-readable files, open ports, or excessive roles.'
+  content: 'Baseline current exposure: trap statements and cleanup logic. Note world-readable
+    files, open ports, or excessive roles.'
 - order: 2
   cost: 15
   content: Apply least privilege incrementally. Prefer explicit allows over broad

@@ -1,4 +1,4 @@
-title: 'GPU & NVIDIA: Server Power — Automation Practice'
+title: 'GPU & NVIDIA: Power Management — Automation Practice'
 slug: academy-gpu-017-automation-power-2
 technology: GPU & NVIDIA
 category: Automation
@@ -11,14 +11,14 @@ max_score: 100
 is_free: false
 infrastructure_type: docker
 jira_priority: Medium
-description: 'Automation lab: remove toil around server power. Codify repeatable steps
-  for PSU redundancy, caps, and IPMI power policy and prove the automation is idempotent.'
+description: 'Automation lab: remove toil around power management. Codify repeatable
+  steps for power limits and persistence mode and prove the automation is idempotent.'
 objectives:
-- Day-2 server power work completes safely in this environment
+- Day-2 power management work completes safely in this environment
 - Changes are verified with before/after checks
 - The system remains stable for dependent teams
-initial_state: Operators still perform manual steps for server power. Automate the
-  boring parts without hiding important safety checks.
+initial_state: Operators still perform manual steps for power management. Automate
+  the boring parts without hiding important safety checks.
 hints:
 - order: 1
   cost: 10

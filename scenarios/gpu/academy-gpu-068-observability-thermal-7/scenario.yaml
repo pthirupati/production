@@ -13,7 +13,7 @@ infrastructure_type: docker
 jira_priority: Medium
 description: 'Observability task: make thermal management visible in logs, metrics,
   or traces. On-call should answer ''what is broken?'' quickly using signals from
-  sensors, throttling, and airflow.'
+  temperature, throttling, and cooling.'
 objectives:
 - Day-2 thermal management work completes safely in this environment
 - Changes are verified with before/after checks
@@ -23,7 +23,7 @@ initial_state: The system runs, but thermal management lacks useful telemetry. D
 hints:
 - order: 1
   cost: 10
-  content: 'Find existing signals: IPMI sensors, GPU temps, and fan curves. Identify
+  content: 'Find existing signals: `nvidia-smi -q -d TEMPERATURE` / sensors. Identify
     what is missing for fast triage.'
 - order: 2
   cost: 15

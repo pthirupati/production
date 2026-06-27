@@ -1,4 +1,4 @@
-title: 'Grafana Observability: Grafana Provisioning — Automation Practice'
+title: 'Grafana Observability: Provisioning — Automation Practice'
 slug: academy-grafana-017-automation-provisioning-2
 technology: Grafana Observability
 category: Automation
@@ -11,15 +11,14 @@ max_score: 100
 is_free: false
 infrastructure_type: docker
 jira_priority: Medium
-description: 'Automation lab: remove toil around Grafana provisioning. Codify repeatable
-  steps for dashboards/datasources as code and reload and prove the automation is
-  idempotent.'
+description: 'Automation lab: remove toil around provisioning. Codify repeatable steps
+  for as-code dashboards and datasources and prove the automation is idempotent.'
 objectives:
-- Day-2 Grafana provisioning work completes safely in this environment
+- Day-2 provisioning work completes safely in this environment
 - Changes are verified with before/after checks
 - The system remains stable for dependent teams
-initial_state: Operators still perform manual steps for Grafana provisioning. Automate
-  the boring parts without hiding important safety checks.
+initial_state: Operators still perform manual steps for provisioning. Automate the
+  boring parts without hiding important safety checks.
 hints:
 - order: 1
   cost: 10

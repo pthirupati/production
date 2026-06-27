@@ -1,4 +1,4 @@
-title: 'Docker & Containers: Container Resource Limits — Integration Lab'
+title: 'Docker & Containers: Resource Limits — Integration Lab'
 slug: academy-docker-050-integration-resource-limits-5
 technology: Docker & Containers
 category: Cross-Technology
@@ -11,15 +11,15 @@ max_score: 100
 is_free: false
 infrastructure_type: docker
 jira_priority: Medium
-description: 'Integration lab: connect container resource limits with an adjacent
-  platform in the Docker & Containers stack. Validate authentication, data handoff,
-  and failure behavior for CPU/memory requests/limits and OOM behavior.'
+description: 'Integration lab: connect resource limits with an adjacent platform in
+  the Docker & Containers stack. Validate authentication, data handoff, and failure
+  behavior for CPU/memory limits, OOM, and reservations.'
 objectives:
-- container resource limits is connected to the adjacent system successfully
+- resource limits is connected to the adjacent system successfully
 - Handoff points are authenticated and observable
 - End-to-end workflow completes without manual intervention
-initial_state: Two systems are deployed but not fully wired together for container
-  resource limits. Downstream consumers are waiting on this integration path.
+initial_state: Two systems are deployed but not fully wired together for resource
+  limits. Downstream consumers are waiting on this integration path.
 hints:
 - order: 1
   cost: 10

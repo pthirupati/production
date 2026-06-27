@@ -6,7 +6,7 @@ import { tutorialApi } from '../api/tutorials'
 import {
   ChevronLeft, Target, CheckCircle2, Lock, ChevronRight,
   Wrench, Play, Skull, FolderKanban, Clock, Layers, ChevronDown, ChevronUp,
-  BookOpen, AlertCircle, Circle, Award, PlayCircle, Sparkles,
+  BookOpen, AlertCircle, Circle, Award, PlayCircle, Sparkles, MessageSquare,
 } from 'lucide-react'
 import toast from 'react-hot-toast'
 import TechIcon from '../components/marketing/TechIcon'
@@ -126,6 +126,11 @@ function ScenarioListRow({ scenario, className = '' }) {
           {scenario.is_free && <FreeLabBadge />}
         </div>
         <p className="text-[11.5px] text-white/40 mt-0.5">{diff.label} · {scenario.max_score || 100} XP</p>
+        {scenario.learn?.length > 0 && (
+          <p className="text-[11px] text-white/45 mt-0.5 truncate hidden sm:block">
+            <span className="text-white/30">You'll learn:</span> {scenario.learn[0]}
+          </p>
+        )}
       </div>
       <span className="text-[11px] font-semibold shrink-0" style={{ color: isCompleted ? '#56e0b0' : inProgress ? '#feb155' : scenario.is_free ? '#56e0b0' : 'rgba(255,255,255,.35)' }}>
         {isCompleted ? 'Done' : inProgress ? 'In progress' : locked ? 'Locked' : scenario.is_free ? 'Start free' : 'Start'}
@@ -475,6 +480,12 @@ export default function TechnologyDetail() {
                 className="inline-flex items-center justify-center gap-2 px-[18px] py-3 rounded-[11px] text-[13.5px] font-bold text-white bg-gradient-to-br from-accent-cyan to-accent-purple shadow-[0_8px_22px_-8px_rgb(var(--a-cyan))] hover:opacity-95 transition-opacity"
               >
                 <PlayCircle size={14} /> Continue learning
+              </Link>
+              <Link
+                to={`/interviews/setup?tech=${tech.slug}`}
+                className="inline-flex items-center justify-center gap-2 px-[18px] py-2.5 rounded-[11px] text-[13px] font-bold text-white/90 bg-white/[0.06] border border-white/12 hover:bg-white/[0.1] hover:border-accent-cyan/40 transition-colors"
+              >
+                <MessageSquare size={14} /> Practice interview questions
               </Link>
               {!isSubscribed && isAuthenticated && (
                 <Link to="/pricing" className="text-center text-[11.5px] text-white/45 hover:text-accent-cyan">Subscribe to unlock all labs</Link>

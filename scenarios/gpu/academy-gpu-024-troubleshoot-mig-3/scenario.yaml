@@ -1,4 +1,4 @@
-title: 'GPU & NVIDIA: Nvidia Mig — Troubleshooting Drill'
+title: 'GPU & NVIDIA: Mig Partitioning — Troubleshooting Drill'
 slug: academy-gpu-024-troubleshoot-mig-3
 technology: GPU & NVIDIA
 category: Troubleshooting
@@ -11,27 +11,27 @@ max_score: 100
 is_free: false
 infrastructure_type: docker
 jira_priority: Medium
-description: 'Production alert: workloads cannot see allocated MIG slice. You are
-  on call for GPU & NVIDIA and must troubleshoot NVIDIA MIG methodically — triage
+description: 'Production alert: GPU is not partitioned for multi-tenant use. You are
+  on call for GPU & NVIDIA and must troubleshoot MIG partitioning methodically — triage
   symptoms, find root cause, apply the smallest safe fix, and confirm recovery.'
 objectives:
-- 'The incident symptom is clear: workloads cannot see allocated MIG slice'
+- 'The incident symptom is clear: GPU is not partitioned for multi-tenant use'
 - Root cause is isolated with evidence, not guesswork
 - Service behavior returns to normal after the fix
-initial_state: The GPU node is degraded. Workloads cannot see allocated mig slice.
-  Recent changes may exist around NVIDIA MIG, but do not restart blindly — gather
+initial_state: The GPU node is degraded. Gpu is not partitioned for multi-tenant use.
+  Recent changes may exist around MIG partitioning, but do not restart blindly — gather
   evidence first.
 hints:
 - order: 1
   cost: 10
-  content: 'Triage: `nvidia-smi mig -lgi`, kube device plugin logs. Capture timestamps,
-    error messages, and what still works.'
+  content: 'Triage: `nvidia-smi mig -lgip` and instances. Capture timestamps, error
+    messages, and what still works.'
 - order: 2
   cost: 15
   content: Separate symptom from cause. Fix the underlying misconfiguration, not only
     the noisy log line.
 - order: 3
   cost: 20
-  content: 'Verify recovery: MIG instances match requested profile and persist. Document
-    the fix, add `# FIXED-OK` to `/opt/fixitlab/academy/academy-gpu-024-troubleshoot-mig-3.conf`,
+  content: 'Verify recovery: MIG instances are created and schedulable. Document the
+    fix, add `# FIXED-OK` to `/opt/fixitlab/academy/academy-gpu-024-troubleshoot-mig-3.conf`,
     and rerun Check Solution.'

@@ -1,4 +1,4 @@
-title: 'Shell Scripting: Shell Script Arguments — Integration Lab'
+title: 'Shell Scripting: Argument Handling — Integration Lab'
 slug: academy-shell-script-040-integration-args-4
 technology: Shell Scripting
 category: Cross-Technology
@@ -11,15 +11,15 @@ max_score: 100
 is_free: false
 infrastructure_type: docker
 jira_priority: Medium
-description: 'Integration lab: connect shell script arguments with an adjacent platform
+description: 'Integration lab: connect argument handling with an adjacent platform
   in the Shell Scripting stack. Validate authentication, data handoff, and failure
-  behavior for $1/$@, getopts, defaults, and input validation.'
+  behavior for positional args, getopts, and validation.'
 objectives:
-- shell script arguments is connected to the adjacent system successfully
+- argument handling is connected to the adjacent system successfully
 - Handoff points are authenticated and observable
 - End-to-end workflow completes without manual intervention
-initial_state: Two systems are deployed but not fully wired together for shell script
-  arguments. Downstream consumers are waiting on this integration path.
+initial_state: Two systems are deployed but not fully wired together for argument
+  handling. Downstream consumers are waiting on this integration path.
 hints:
 - order: 1
   cost: 10

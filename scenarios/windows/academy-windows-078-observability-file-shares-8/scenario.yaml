@@ -1,4 +1,4 @@
-title: 'Windows Server: Windows File Shares — Observability Practice'
+title: 'Windows Server: File Shares — Observability Practice'
 slug: academy-windows-078-observability-file-shares-8
 technology: Windows Server
 category: Observability
@@ -11,19 +11,19 @@ max_score: 100
 is_free: false
 infrastructure_type: docker
 jira_priority: Medium
-description: 'Observability task: make Windows file shares visible in logs, metrics,
-  or traces. On-call should answer ''what is broken?'' quickly using signals from
-  SMB permissions, DFS, and offline caching.'
+description: 'Observability task: make file shares visible in logs, metrics, or traces.
+  On-call should answer ''what is broken?'' quickly using signals from SMB shares,
+  share vs NTFS permissions.'
 objectives:
-- Day-2 Windows file shares work completes safely in this environment
+- Day-2 file shares work completes safely in this environment
 - Changes are verified with before/after checks
 - The system remains stable for dependent teams
-initial_state: The system runs, but Windows file shares lacks useful telemetry. Dashboards/alerts
+initial_state: The system runs, but file shares lacks useful telemetry. Dashboards/alerts
   are blank or noisy — improve signal quality.
 hints:
 - order: 1
   cost: 10
-  content: 'Find existing signals: `Get-SmbShare`, ACLs, and connectivity tests. Identify
+  content: 'Find existing signals: `Get-SmbShare`, share ACLs, and NTFS ACLs. Identify
     what is missing for fast triage.'
 - order: 2
   cost: 15

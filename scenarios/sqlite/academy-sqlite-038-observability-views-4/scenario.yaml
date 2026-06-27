@@ -1,4 +1,4 @@
-title: 'SQLite: Sqlite Views — Observability Practice'
+title: 'SQLite: Views — Observability Practice'
 slug: academy-sqlite-038-observability-views-4
 technology: SQLite
 category: Observability
@@ -11,20 +11,20 @@ max_score: 100
 is_free: false
 infrastructure_type: docker
 jira_priority: Medium
-description: 'Observability task: make SQLite views visible in logs, metrics, or traces.
-  On-call should answer ''what is broken?'' quickly using signals from view definitions,
-  updatability, and security.'
+description: 'Observability task: make views visible in logs, metrics, or traces.
+  On-call should answer ''what is broken?'' quickly using signals from view definitions
+  and dependencies.'
 objectives:
-- Day-2 SQLite views work completes safely in this environment
+- Day-2 views work completes safely in this environment
 - Changes are verified with before/after checks
 - The system remains stable for dependent teams
-initial_state: The system runs, but SQLite views lacks useful telemetry. Dashboards/alerts
+initial_state: The system runs, but views lacks useful telemetry. Dashboards/alerts
   are blank or noisy — improve signal quality.
 hints:
 - order: 1
   cost: 10
-  content: 'Find existing signals: `.schema` views and EXPLAIN on view queries. Identify
-    what is missing for fast triage.'
+  content: 'Find existing signals: view SQL and dependent objects. Identify what is
+    missing for fast triage.'
 - order: 2
   cost: 15
   content: Add or fix exporters/dashboards/alerts with clear names, labels, and thresholds.

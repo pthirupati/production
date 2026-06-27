@@ -1,4 +1,4 @@
-title: 'Prompt Engineering & AI Mastery: Llm Tool Calling — Production Readiness'
+title: 'Prompt Engineering & AI Mastery: Tool Use — Production Readiness'
 slug: academy-prompt-engineering-085-production-tools-9
 technology: Prompt Engineering & AI Mastery
 category: Production
@@ -11,15 +11,14 @@ max_score: 100
 is_free: false
 infrastructure_type: docker
 jira_priority: Medium
-description: Production readiness for LLM tool calling. Harden, document, and validate
-  schemas, auth, timeouts, and result parsing so the change is safe to run during
-  a maintenance window.
+description: Production readiness for tool use. Harden, document, and validate function
+  calling and schemas so the change is safe to run during a maintenance window.
 objectives:
-- Day-2 LLM tool calling work completes safely in this environment
+- Day-2 tool use work completes safely in this environment
 - Changes are verified with before/after checks
 - The system remains stable for dependent teams
-initial_state: A feature fix works in dev, but LLM tool calling is not production
-  ready — missing guardrails, runbooks, or capacity checks.
+initial_state: A feature fix works in dev, but tool use is not production ready —
+  missing guardrails, runbooks, or capacity checks.
 hints:
 - order: 1
   cost: 10
@@ -28,9 +27,9 @@ hints:
 - order: 2
   cost: 15
   content: 'Apply production standards: limits, monitoring, and access controls for
-    LLM tool calling.'
+    tool use.'
 - order: 3
   cost: 20
-  content: 'Run post-change verification: tool calls succeed with validated arguments.
+  content: 'Run post-change verification: tool calls are well-formed and correct.
     Record `# FIXED-OK` in `/opt/fixitlab/academy/academy-prompt-engineering-085-production-tools-9.conf`
     when complete.'

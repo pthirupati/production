@@ -1,4 +1,4 @@
-title: 'Windows Server: Iis Web Server — Production Readiness'
+title: 'Windows Server: Iis — Production Readiness'
 slug: academy-windows-055-production-iis-6
 technology: Windows Server
 category: Production
@@ -11,15 +11,14 @@ max_score: 100
 is_free: false
 infrastructure_type: docker
 jira_priority: Medium
-description: Production readiness for IIS web server. Harden, document, and validate
-  sites, app pools, bindings, and modules so the change is safe to run during a maintenance
-  window.
+description: Production readiness for IIS. Harden, document, and validate sites, bindings,
+  app pools, and TLS so the change is safe to run during a maintenance window.
 objectives:
-- Day-2 IIS web server work completes safely in this environment
+- Day-2 IIS work completes safely in this environment
 - Changes are verified with before/after checks
 - The system remains stable for dependent teams
-initial_state: A feature fix works in dev, but IIS web server is not production ready
-  — missing guardrails, runbooks, or capacity checks.
+initial_state: A feature fix works in dev, but IIS is not production ready — missing
+  guardrails, runbooks, or capacity checks.
 hints:
 - order: 1
   cost: 10
@@ -28,9 +27,9 @@ hints:
 - order: 2
   cost: 15
   content: 'Apply production standards: limits, monitoring, and access controls for
-    IIS web server.'
+    IIS.'
 - order: 3
   cost: 20
-  content: 'Run post-change verification: app pool identity and bindings serve the
-    correct app. Record `# FIXED-OK` in `/opt/fixitlab/academy/academy-windows-055-production-iis-6.conf`
+  content: 'Run post-change verification: the site serves over the correct binding
+    and certificate. Record `# FIXED-OK` in `/opt/fixitlab/academy/academy-windows-055-production-iis-6.conf`
     when complete.'
