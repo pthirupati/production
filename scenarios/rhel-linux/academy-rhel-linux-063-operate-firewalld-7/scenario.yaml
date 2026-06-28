@@ -11,47 +11,25 @@ max_score: 100
 is_free: false
 infrastructure_type: docker
 jira_priority: Medium
-description: 'Day-2 operations: perform a routine firewalld task safely in RHEL Linux.
-  Follow change control — inspect, change, verify — while working with zones, services,
-  ports, and rich rules.'
+description: Firewall administration with firewalld. Clients cannot reach the HTTP service because the
+  active firewalld zone does not permit web traffic on port 80. Open HTTP persistently and reload firewalld
+  so the rule survives, then confirm the zone allows it. Verify with `firewall-cmd --list-all`.
 objectives:
-- Day-2 firewalld work completes safely in this environment
-- Changes are verified with before/after checks
-- The system remains stable for dependent teams
-initial_state: The RHEL practice host is healthy enough for scheduled work on firewalld.
-  Complete the maintenance task without unnecessary downtime.
+- HTTP (port 80/tcp) is permitted in the active firewalld zone
+- The rule is persistent across a firewalld reload
+- firewall-cmd shows the HTTP port/service open
+initial_state: Port 80/tcp (HTTP) is not allowed through firewalld in the active zone, so the web service
+  is unreachable from clients.
 hints:
 - order: 1
   cost: 10
-  content: 'Orient yourself before changing anything:
-
-    1. Inspect the current state — `firewall-cmd --list-all` and `--get-active-zones`.
-
-    2. Write down what looks normal versus wrong or missing for firewalld.
-
-    3. Recall the core idea: zones, services, ports, and rich rules. Form one hypothesis
-    before you act.'
+  content: 'Inspect the active zone: `firewall-cmd --list-all` to see which services/ports are currently
+    allowed.'
 - order: 2
   cost: 15
-  content: 'Plan your approach (still no spoilers):
-
-    1. Confirm the exact gap between current and desired state for firewalld.
-
-    2. Decide the single smallest change that moves you toward the objective.
-
-    3. Capture evidence (command output / status) before the change so you can prove
-    it worked afterward.'
+  content: Make the change persistent (`--permanent`) and remember runtime rules need a `--reload` to
+    take effect.
 - order: 3
-  cost: 25
-  content: 'Guided walkthrough:
-
-    1. Re-check the current state — `firewall-cmd --list-all` and `--get-active-zones`.
-
-    2. Execute the maintenance in small, reversible steps, taking a snapshot or backup
-    first if the change is risky.
-
-    3. Verify the result — only intended ports are permitted and rules persist after
-    reload.
-
-    4. Record completion: add `# FIXED-OK` to `/opt/fixitlab/academy/academy-rhel-linux-063-operate-firewalld-7.conf`,
-    then click Check Solution.'
+  cost: 20
+  content: Run `sudo firewall-cmd --permanent --add-service=http` (or `--add-port=80/tcp`) then `sudo
+    firewall-cmd --reload`; verify with `firewall-cmd --list-all`, then Check Solution.

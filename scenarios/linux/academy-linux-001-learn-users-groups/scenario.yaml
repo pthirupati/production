@@ -11,51 +11,26 @@ max_score: 100
 is_free: true
 infrastructure_type: docker
 jira_priority: Low
-description: This beginner-friendly Linux Administration lab introduces users and
-  groups. You will explore how accounts, UIDs/GIDs, primary groups, and supplementary
-  membership are defined on the Linux practice server. Read the environment first,
-  then follow the guided steps — no prior production experience required.
+description: Hands-on user administration. An application is meant to run under a dedicated, non-login
+  service account named `appuser`, but that account does not exist on this host yet — so the service cannot
+  own its files or run with least privilege. Create the `appuser` account (with a home directory) and
+  verify it resolves with `getent passwd appuser`.
 objectives:
-- Understand how users and groups work in this lab environment
-- Identify the main status and configuration signals for users and groups
-- Confirm you can read the current state confidently before changing anything
-initial_state: The Linux practice server is online with a starter users and groups
-  setup. Some pieces are intentionally incomplete so you can learn how they fit together.
-  Nothing is on fire — focus on observation.
+- The dedicated 'appuser' service account exists on the host
+- The account is created cleanly (with a home directory)
+- getent passwd appuser returns the account
+initial_state: The application service account `appuser` is missing on this host. The service that depends
+  on it cannot start until the account exists.
 hints:
 - order: 1
   cost: 10
-  content: 'Orient yourself before changing anything:
-
-    1. Inspect the current state — `id`, `getent passwd`, and `getent group` (or equivalent
-    directory tools on Windows).
-
-    2. Write down what looks normal versus wrong or missing for users and groups.
-
-    3. Recall the core idea: how accounts, UIDs/GIDs, primary groups, and supplementary
-    membership are defined. Form one hypothesis before you act.'
+  content: 'Inspect first: `getent passwd appuser` (will be empty) and `cat /etc/passwd` to see existing
+    accounts.'
 - order: 2
   cost: 15
-  content: 'Plan your approach (still no spoilers):
-
-    1. Confirm the exact gap between current and desired state for users and groups.
-
-    2. Decide the single smallest change that moves you toward the objective.
-
-    3. Capture evidence (command output / status) before the change so you can prove
-    it worked afterward.'
+  content: Decide whether the account needs a login shell and home directory. A service account usually
+    wants a home dir but no interactive login.
 - order: 3
-  cost: 25
-  content: 'Guided walkthrough:
-
-    1. Re-check the current state — `id`, `getent passwd`, and `getent group` (or
-    equivalent directory tools on Windows).
-
-    2. Make one small, reversible change toward the objective, re-reading status after
-    each step so you understand cause and effect.
-
-    3. Verify the result — account and group entries match the expected owner and
-    membership.
-
-    4. Record completion: add `# FIXED-OK` to `/opt/fixitlab/academy/academy-linux-001-learn-users-groups.conf`,
-    then click Check Solution.'
+  cost: 20
+  content: 'Create it: `sudo useradd -m appuser`, confirm with `getent passwd appuser`, then run Check
+    Solution.'

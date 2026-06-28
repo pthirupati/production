@@ -4112,6 +4112,30 @@ body::after {
   background: rgb(241 245 249);
 }
 
+.tutorial-page .tutorial-diagram {
+  margin: 1.25rem 0;
+  padding: 1rem;
+  border-radius: 0.75rem;
+  border: 1px solid var(--tutorial-card-border);
+  background: rgb(var(--s-950) / 0.5);
+}
+.tutorial-page .tutorial-mermaid-host svg {
+  max-width: 100%;
+  height: auto;
+}
+.tutorial-page .tutorial-callout-label {
+  display: block;
+  font-size: 0.65rem;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: rgb(var(--a-cyan));
+  margin-bottom: 0.35rem;
+}
+.tutorial-page .tutorial-callout-warning { border-left-color: rgb(245 158 11 / 0.6); background: rgb(245 158 11 / 0.08); }
+.tutorial-page .tutorial-callout-gotcha { border-left-color: rgb(248 113 113 / 0.6); background: rgb(248 113 113 / 0.08); }
+.tutorial-page .tutorial-callout-tip { border-left-color: rgb(52 211 153 / 0.5); background: rgb(52 211 153 / 0.08); }
+
 .tutorial-page .tutorial-hero {
   background: linear-gradient(
     135deg,

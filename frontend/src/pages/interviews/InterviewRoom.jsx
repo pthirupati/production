@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import { interviewsApi } from '../../api/interviews'
 import { adminApi } from '../../api/admin'
-import { useInterviewVoice, unlockSpeech } from '../../hooks/useInterviewVoice'
+import { useInterviewVoice, unlockSpeech, detectSpeechCapabilities } from '../../hooks/useInterviewVoice'
 import {
   getMediaErrorMessage,
   isMediaDevicesSupported,
@@ -126,6 +126,11 @@ export default function InterviewRoom() {
     isSpeaking, isListening, interimTranscript,
     browserVoices, naturalVoices, selectedVoiceURI, selectVoice,
   } = useInterviewVoice()
+  const speakRef = useRef(speak)
+  const cancelSpeechRef = useRef(cancelSpeech)
+  const speakThenListenRef = useRef(null)
+  speakRef.current = speak
+  cancelSpeechRef.current = cancelSpeech
 
   const [round, setRound] = useState(null)
   const [messages, setMessages] = useState([])
@@ -162,15 +167,18 @@ export default function InterviewRoom() {
   const [coaching, setCoaching] = useState(null)
   const [typingAnswer, setTypingAnswer] = useState(false)
   const [speechSupported, setSpeechSupported] = useState(true)
+  const [ttsSupported, setTtsSupported] = useState(true)
+  const voiceUnavailableToastRef = useRef(false)
+  const audioCutoutToastAtRef = useRef(0)
   const [audioDevices, setAudioDevices] = useState([])
   const [videoDevices, setVideoDevices] = useState([])
   const [selectedAudioId, setSelectedAudioId] = useState('')
   const [selectedVideoId, setSelectedVideoId] = useState('')
   useEffect(() => {
-    const SR = typeof window !== 'undefined' && (window.SpeechRecognition || window.webkitSpeechRecognition)
-    const supported = !!SR
-    setSpeechSupported(supported)
-    if (!supported) setTypingAnswer(true)
+    const caps = detectSpeechCapabilities()
+    setSpeechSupported(caps.stt)
+    setTtsSupported(caps.tts)
+    if (!caps.stt) setTypingAnswer(true)
   }, [])
 
   useEffect(() => {
@@ -471,7 +479,12 @@ export default function InterviewRoom() {
     const poll = () => {
       adminApi.getInterviewObserverSession(token).then(data => {
         setMessages(data.messages || [])
-        setHostState(data.host_state || null)
+        setHostState((prev) => {
+          const hs = data.host_state || null
+          const a = JSON.stringify(prev ?? null)
+          const b = JSON.stringify(hs ?? null)
+          return a === b ? prev : hs
+        })
         setObserverJoined(!!data.host_state?.joined)
         setRateTarget(data.rate_target || null)
       }).catch(() => {})
@@ -873,8 +886,13 @@ export default function InterviewRoom() {
         // Same question stands. Speak the clarification/reply, then re-open the
         // mic so the candidate can now answer the (unchanged) question — but
         // only when we're not in a practical question (they work in the lab).
-        if (audioUnclear && unclearAudioCountRef.current >= 2 && !typingAnswer) {
-          toast('Audio keeps cutting out — try Type mode below if that\'s easier.', { icon: '⌨️', duration: 6000 })
+        if (audioUnclear && unclearAudioCountRef.current >= 4 && !typingAnswer) {
+          const now = Date.now()
+          if (now - audioCutoutToastAtRef.current > 90_000) {
+            audioCutoutToastAtRef.current = now
+            toast('Audio keeps cutting out — try Type mode below if that\'s easier.', { icon: '⌨️', duration: 6000 })
+          }
+          if (unclearAudioCountRef.current >= 6) setTypingAnswer(true)
         }
         await speakThenListen(
           res.reply || res.interviewer_reply?.content,
@@ -1019,26 +1037,15 @@ export default function InterviewRoom() {
       pausePeriodMs: sp.pause_period_ms,
     } : {}
     const { spoken } = await speak(text, voiceId ?? round?.persona_voice_id, speechOpts) || {}
-    if (spoken === false) {
+    if (spoken === false && !voiceUnavailableToastRef.current) {
+      voiceUnavailableToastRef.current = true
       toast('Voice unavailable — read the caption, then tap the mic when ready.', { icon: '🔊' })
     }
     if (autoListen && !observerMode && !isListeningRef.current && !bargedInRef.current) {
       voiceAnswer()
     }
   }
-
-  // Toggle interviewer TTS. When muting mid-sentence, cut the current utterance.
-  const toggleInterviewerMute = () => {
-    setInterviewerMuted((prev) => {
-      const next = !prev
-      interviewerMutedRef.current = next
-      if (next) cancelSpeech()
-      toast(next ? 'Interviewer muted — captions still show' : 'Interviewer voice on', {
-        icon: next ? '🔇' : '🔊',
-      })
-      return next
-    })
-  }
+  speakThenListenRef.current = speakThenListen
 
   // Candidate: sync admin/host messages (founder join, manual questions, AI resume).
   useEffect(() => {
@@ -1047,7 +1054,11 @@ export default function InterviewRoom() {
       try {
         const data = await interviewsApi.getRound(roundId)
         const hs = data.host_state || null
-        setHostState(hs)
+        setHostState((prev) => {
+          const a = JSON.stringify(prev ?? null)
+          const b = JSON.stringify(hs ?? null)
+          return a === b ? prev : hs
+        })
         const incoming = data.messages || []
         setMessages(prev => {
           const ids = new Set(prev.map(m => m.id))
@@ -1064,20 +1075,21 @@ export default function InterviewRoom() {
           if (!isWelcome && !isHandoff && !(isNewQuestion && m.content)) continue
           processedHostMsgRef.current.add(m.id)
           if (isWelcome && m.content) {
-            cancelSpeech()
-            setAiCaption(m.content)
-            await speak(m.content, round?.persona_voice_id)
+            cancelSpeechRef.current()
+            setAiCaption((prev) => (prev === m.content ? prev : m.content))
+            await speakRef.current(m.content, round?.persona_voice_id)
           } else if (isHandoff && m.content) {
-            cancelSpeech()
-            setAiCaption(m.content)
-            await speakThenListen(m.content, { autoListen: false, voiceId: round?.persona_voice_id })
+            cancelSpeechRef.current()
+            setAiCaption((prev) => (prev === m.content ? prev : m.content))
+            await speakThenListenRef.current?.(m.content, { autoListen: false, voiceId: round?.persona_voice_id })
           } else if (isNewQuestion && m.content) {
-            cancelSpeech()
+            cancelSpeechRef.current()
             const hostLabel = hs?.display_name || meta.asked_by || 'Guest interviewer'
             if (isAdminLine) setPersonaTitle(hostLabel)
-            setAiCaption(isAdminLine ? `${hostLabel}: ${m.content}` : m.content)
+            const caption = isAdminLine ? `${hostLabel}: ${m.content}` : m.content
+            setAiCaption((prev) => (prev === caption ? prev : caption))
             awaitingAnswerRef.current = true
-            await speakThenListen(m.content, {
+            await speakThenListenRef.current?.(m.content, {
               autoListen: !practicalMode,
               voiceId: round?.persona_voice_id,
             })
@@ -1090,7 +1102,20 @@ export default function InterviewRoom() {
     syncHost()
     const iv = setInterval(syncHost, 3000)
     return () => clearInterval(iv)
-  }, [started, observerMode, roundId, round?.persona_voice_id, practicalMode, speak, cancelSpeech]) // eslint-disable-line react-hooks/exhaustive-deps
+  }, [started, observerMode, roundId, round?.persona_voice_id, practicalMode])
+
+  // Toggle interviewer TTS. When muting mid-sentence, cut the current utterance.
+  const toggleInterviewerMute = () => {
+    setInterviewerMuted((prev) => {
+      const next = !prev
+      interviewerMutedRef.current = next
+      if (next) cancelSpeechRef.current()
+      toast(next ? 'Interviewer muted — captions still show' : 'Interviewer voice on', {
+        icon: next ? '🔇' : '🔊',
+      })
+      return next
+    })
+  }
 
   // ---- skip-on-silence -------------------------------------------------
   const clearSilenceTimer = () => {
@@ -1605,7 +1630,13 @@ export default function InterviewRoom() {
         {!speechSupported && (
           <div className="rounded-lg border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-xs text-amber-100" role="status">
             <strong>Voice input unavailable</strong> — Firefox, Safari, and some mobile browsers do not support
-            live speech recognition. Type mode is enabled automatically; you can still hear the interviewer.
+            live speech recognition. Type mode is enabled automatically; you can still read the interviewer captions.
+          </div>
+        )}
+        {speechSupported && !ttsSupported && (
+          <div className="rounded-lg border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-xs text-amber-100" role="status">
+            <strong>Interviewer audio unavailable</strong> — your browser cannot play synthesized speech.
+            Questions appear as on-screen captions; answer with the mic or Type mode.
           </div>
         )}
         <ul className="text-xs text-surface-400 space-y-2 list-disc pl-4">

@@ -132,11 +132,18 @@ def _write_architecture(topic: str, module: str, level: str, profile: dict) -> s
     eng = ""
     if engines:
         eng = f"\n\n**Major components:** {', '.join(engines) if isinstance(engines, list) else engines}."
+    diagram = (
+        f"\n\n```mermaid\nflowchart LR\n"
+        f"  user[User / Client] --> edge[Edge / LB]\n"
+        f"  edge --> app[{module}]\n"
+        f"  app --> data[(Data / State)]\n"
+        f"  app --> obs[Logs & Metrics]\n```"
+    )
     return (
         f"## Architecture\n\n"
         f"For **{module}**, draw a one-page diagram before implementing. Label north-south traffic (users → edge → app) "
         f"and east-west traffic (service-to-service). Mark trust boundaries where credentials rotate and where data is encrypted.\n\n"
-        f"{arch}{eng}\n\n"
+        f"{arch}{eng}{diagram}\n\n"
         f"**Failure domains:** identify single points of failure. If one node dies, does the system degrade gracefully "
         f"or halt entirely? Document RTO (how fast you recover) and RPO (how much data you can lose) for stateful parts.\n\n"
         f"**Dependency checklist:** DNS, TLS certificates, identity (SSO/IAM), secrets store, backup target, and "

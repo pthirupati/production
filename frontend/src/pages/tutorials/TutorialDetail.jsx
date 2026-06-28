@@ -10,6 +10,7 @@ import { usePageTitle } from '../../hooks/usePageTitle'
 import { tutorialApi } from '../../api/tutorials'
 import { useAuthStore } from '../../store/authStore'
 import TutorialQuiz from '../../components/tutorials/TutorialQuiz'
+import TutorialMermaid from '../../components/tutorials/TutorialMermaid'
 import { tutorialPlaygroundHref } from '../../utils/playgroundLinks'
 import { getLocalTutorialProgress, markLocalSection, progressPct, setLocalTutorialProgress } from '../../utils/tutorialProgress'
 
@@ -97,8 +98,12 @@ function parseBlocks(text) {
       const buf = []
       i++
       while (i < lines.length && !/^```+\s*$/.test(lines[i].trim())) { buf.push(lines[i]); i++ }
-      i++ // skip closing fence
-      blocks.push({ type: 'code', code: buf.join('\n'), lang })
+      i++
+      if (lang.toLowerCase() === 'mermaid') {
+        blocks.push({ type: 'mermaid', chart: buf.join('\n') })
+      } else {
+        blocks.push({ type: 'code', code: buf.join('\n'), lang })
+      }
       continue
     }
 
@@ -109,11 +114,17 @@ function parseBlocks(text) {
     const h = trimmed.match(/^(#{2,4})\s+(.*)$/)
     if (h) { blocks.push({ type: 'heading', level: h[1].length, text: h[2].trim() }); i++; continue }
 
-    // Blockquote / callout
+    // Callout / blockquote (supports > [!NOTE] style admonitions)
     if (trimmed.startsWith('> ')) {
       const buf = []
       while (i < lines.length && lines[i].trim().startsWith('> ')) { buf.push(lines[i].trim().slice(2)); i++ }
-      blocks.push({ type: 'quote', text: buf.join(' ') })
+      const raw = buf.join(' ')
+      const adm = raw.match(/^\[!(NOTE|TIP|WARNING|GOTCHA)\]\s*(.*)$/i)
+      if (adm) {
+        blocks.push({ type: 'callout', variant: adm[1].toLowerCase(), text: adm[2] || '' })
+      } else {
+        blocks.push({ type: 'quote', text: raw })
+      }
       continue
     }
 
@@ -203,6 +214,15 @@ function Body({ text }) {
                 : 'text-sm font-semibold text-surface-200 uppercase tracking-wide'
             return <h3 key={i} className={cls}>{formatInline(b.text)}</h3>
           }
+          case 'mermaid':
+            return <TutorialMermaid key={i} chart={b.chart} />
+          case 'callout':
+            return (
+              <blockquote key={i} className={`tutorial-callout tutorial-callout-${b.variant}`}>
+                <span className="tutorial-callout-label">{b.variant}</span>
+                {formatInline(b.text)}
+              </blockquote>
+            )
           case 'quote':
             return (
               <blockquote key={i} className="tutorial-callout">

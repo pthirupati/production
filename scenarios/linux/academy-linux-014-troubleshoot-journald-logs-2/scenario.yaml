@@ -11,51 +11,24 @@ max_score: 100
 is_free: false
 infrastructure_type: docker
 jira_priority: Medium
-description: 'Production alert: errors are hard to find or logs rotate away before
-  investigation. You are on call for Linux Administration and must troubleshoot journald
-  logging methodically — triage symptoms, isolate root cause, apply the smallest safe
-  fix, and confirm recovery.'
+description: Logging-pipeline troubleshooting. The `rsyslog` service that journald forwards system logs
+  to is not running, so centralised/persistent logging has stopped and you are flying blind during incidents.
+  Investigate and restore the service. Verify with `systemctl is-active rsyslog`.
 objectives:
-- 'The incident symptom is clear: errors are hard to find or logs rotate away before
-  investigation'
-- Root cause is isolated with evidence, not guesswork
-- Service behavior returns to normal after the fix
-initial_state: The Linux practice server is degraded. Errors are hard to find or logs
-  rotate away before investigation. Recent changes may exist around journald logging,
-  but do not restart blindly — gather evidence first.
+- The rsyslog service is active (running) again
+- The logging pipeline is restored
+- systemctl is-active rsyslog reports 'active'
+initial_state: The `rsyslog` logging service is stopped, so log forwarding and persistence have halted
+  on this host.
 hints:
 - order: 1
   cost: 10
-  content: 'Orient yourself before changing anything:
-
-    1. Inspect the current state — `journalctl -p err..alert`, `journalctl -b`, and
-    `/etc/systemd/journald.conf`.
-
-    2. Write down what looks normal versus wrong or missing for journald logging.
-
-    3. Recall the core idea: structured logs, priorities, boots, and persistent journal
-    storage. Form one hypothesis before you act.'
+  content: 'Check the service: `systemctl status rsyslog` and look for recent log entries with `journalctl
+    -u rsyslog`.'
 - order: 2
   cost: 15
-  content: 'Plan your approach (still no spoilers):
-
-    1. Confirm the exact gap between current and desired state for journald logging.
-
-    2. Decide the single smallest change that moves you toward the objective.
-
-    3. Capture evidence (command output / status) before the change so you can prove
-    it worked afterward.'
+  content: The configuration is intact — the daemon just needs to be running and enabled.
 - order: 3
-  cost: 25
-  content: 'Guided walkthrough:
-
-    1. Re-check the current state — `journalctl -p err..alert`, `journalctl -b`, and
-    `/etc/systemd/journald.conf`.
-
-    2. Fix the underlying misconfiguration you identified (not just the noisy log
-    line), changing one thing at a time.
-
-    3. Verify the result — the relevant error window is visible with useful metadata.
-
-    4. Record completion: add `# FIXED-OK` to `/opt/fixitlab/academy/academy-linux-014-troubleshoot-journald-logs-2.conf`,
-    then click Check Solution.'
+  cost: 20
+  content: Run `sudo systemctl enable --now rsyslog`, confirm with `systemctl is-active rsyslog`, then
+    Check Solution.

@@ -11,49 +11,22 @@ max_score: 100
 is_free: false
 infrastructure_type: docker
 jira_priority: Medium
-description: 'Observability task: make cron and systemd timers visible in logs, metrics,
-  or traces. On-call should answer ''what is broken?'' quickly using signals from
-  scheduled jobs, crontab syntax, and timer units.'
+description: Scheduled-jobs operations. The `crond` scheduler is not running, so no cron jobs (backups,
+  rotations, batch tasks) will fire. Restore the scheduler so scheduled work resumes. Verify with `systemctl
+  is-active crond`.
 objectives:
-- Day-2 cron and systemd timers work completes safely in this environment
-- Changes are verified with before/after checks
-- The system remains stable for dependent teams
-initial_state: The system runs, but cron and systemd timers lacks useful telemetry.
-  Dashboards/alerts are blank or noisy — improve signal quality.
+- The crond scheduler service is active (running)
+- Scheduled jobs can fire again
+- systemctl is-active crond reports 'active'
+initial_state: The cron scheduler (`crond`) is stopped, so no scheduled jobs will run until it is started.
 hints:
 - order: 1
   cost: 10
-  content: 'Orient yourself before changing anything:
-
-    1. Inspect the current state — `crontab -l`, `systemctl list-timers`, and job
-    logs.
-
-    2. Write down what looks normal versus wrong or missing for cron and systemd timers.
-
-    3. Recall the core idea: scheduled jobs, crontab syntax, and timer units. Form
-    one hypothesis before you act.'
+  content: 'Check the scheduler: `systemctl status crond` and `systemctl list-timers` for context.'
 - order: 2
   cost: 15
-  content: 'Plan your approach (still no spoilers):
-
-    1. Confirm the exact gap between current and desired state for cron and systemd
-    timers.
-
-    2. Decide the single smallest change that moves you toward the objective.
-
-    3. Capture evidence (command output / status) before the change so you can prove
-    it worked afterward.'
+  content: No crontab edits are required — the scheduler daemon itself is down.
 - order: 3
-  cost: 25
-  content: 'Guided walkthrough:
-
-    1. Re-check the current state — `crontab -l`, `systemctl list-timers`, and job
-    logs.
-
-    2. Add or fix the exporter / dashboard / alert with clear names, labels, and a
-    sensible threshold.
-
-    3. Verify the result — the job fires on schedule and logs success.
-
-    4. Record completion: add `# FIXED-OK` to `/opt/fixitlab/academy/academy-linux-038-observability-cron-timers-4.conf`,
-    then click Check Solution.'
+  cost: 20
+  content: Run `sudo systemctl enable --now crond`, confirm with `systemctl is-active crond`, then Check
+    Solution.

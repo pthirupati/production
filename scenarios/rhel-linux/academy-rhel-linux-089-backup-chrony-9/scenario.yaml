@@ -11,46 +11,23 @@ max_score: 100
 is_free: false
 infrastructure_type: docker
 jira_priority: Medium
-description: Backup and recovery drill for chrony time sync. Ensure backups run on
-  schedule, retention is correct, and you can restore NTP sources, drift, and step
-  thresholds within the lab RTO.
+description: RHEL time-service operations. `chronyd` (the NTP client) is not running on this host, so
+  the system clock will drift — which breaks TLS validation, log correlation, and Kerberos. Restore the
+  time service to an active state and confirm synchronisation. Verify with `systemctl is-active chronyd`.
 objectives:
-- Backup coverage for chrony time sync is complete and restorable
-- Retention and encryption meet the stated policy
-- A restore drill proves data integrity
-initial_state: Backup jobs exist but reliability is uncertain for chrony time sync.
-  Leadership wants proof that restore works — not just that scripts exit zero.
+- The chronyd service is active (running)
+- Time synchronisation is restored on the host
+- systemctl is-active chronyd reports 'active'
+initial_state: 'Time synchronisation is broken: the `chronyd` service is stopped, so the clock is free-running
+  and will drift out of tolerance.'
 hints:
 - order: 1
   cost: 10
-  content: 'Orient yourself before changing anything:
-
-    1. Inspect the current state — `chronyc sources` and `chronyc tracking`.
-
-    2. Write down what looks normal versus wrong or missing for chrony time sync.
-
-    3. Recall the core idea: NTP sources, drift, and step thresholds. Form one hypothesis
-    before you act.'
+  content: 'Check the service and sync state: `systemctl status chronyd` and `chronyc tracking`.'
 - order: 2
   cost: 15
-  content: 'Plan your approach (still no spoilers):
-
-    1. Confirm the exact gap between current and desired state for chrony time sync.
-
-    2. Decide the single smallest change that moves you toward the objective.
-
-    3. Capture evidence (command output / status) before the change so you can prove
-    it worked afterward.'
+  content: The configuration is fine — the daemon simply is not running and enabled.
 - order: 3
-  cost: 25
-  content: 'Guided walkthrough:
-
-    1. Re-check the current state — `chronyc sources` and `chronyc tracking`.
-
-    2. Repair or run the backup job, then perform a controlled restore into a scratch
-    location to prove it works.
-
-    3. Verify the result — time is synchronized within tolerance.
-
-    4. Record completion: add `# FIXED-OK` to `/opt/fixitlab/academy/academy-rhel-linux-089-backup-chrony-9.conf`,
-    then click Check Solution.'
+  cost: 20
+  content: Run `sudo systemctl enable --now chronyd`, confirm with `systemctl is-active chronyd`, then
+    Check Solution.

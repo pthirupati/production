@@ -212,6 +212,16 @@ function endsOnConnector(text) {
 
 const VOICE_STORAGE_KEY = 'fixitlab.interview.voiceURI'
 
+/** Offline capability probe for preflight (no paid APIs). */
+export function detectSpeechCapabilities() {
+  if (typeof window === 'undefined') {
+    return { stt: false, tts: false, any: false }
+  }
+  const stt = !!(window.SpeechRecognition || window.webkitSpeechRecognition)
+  const tts = !!window.speechSynthesis
+  return { stt, tts, any: stt || tts }
+}
+
 function loadPersistedVoiceURI() {
   try {
     return window.localStorage.getItem(VOICE_STORAGE_KEY) || ''
@@ -449,6 +459,8 @@ export function useInterviewVoice() {
     uses_server_stt: false,
     uses_server_tts: false,
   })
+  const configRef = useRef(config)
+  configRef.current = config
   const [isSpeaking, setIsSpeaking] = useState(false)
   const [isListening, setIsListening] = useState(false)
   const [interimTranscript, setInterimTranscript] = useState('')
@@ -505,10 +517,11 @@ export function useInterviewVoice() {
   }, [])
 
   const resolveVoiceProfile = useCallback((voiceCode) => {
-    const code = voiceCode || config.default_voice_code
+    const cfg = configRef.current
+    const code = voiceCode || cfg.default_voice_code
     return (
-      config.voices?.find(v => v.code === code) ||
-      config.voices?.[0] || {
+      cfg.voices?.find(v => v.code === code) ||
+      cfg.voices?.[0] || {
         code: 'US_F_ZIRA',
         locale: 'en-US',
         browser_voice_hint: '',
@@ -516,7 +529,7 @@ export function useInterviewVoice() {
         rate: 0.95,
       }
     )
-  }, [config])
+  }, [])
 
   // ------------------------------------------------------------------
   // speak() — server TTS with browser fallback
@@ -533,7 +546,7 @@ export function useInterviewVoice() {
       // must NEVER throw out of speak() or the hands-free loop stalls silently.
       // FixitLab runs free by default (no keys → uses_server_tts is false), so
       // this branch is skipped and we always use free browser SpeechSynthesis.
-      if (config.uses_server_tts) {
+      if (configRef.current.uses_server_tts) {
         try {
           const profile = resolveVoiceProfile(voiceCode)
           const result = await serverSpeak(text, profile.code).catch(() => null)
@@ -613,7 +626,7 @@ export function useInterviewVoice() {
     } finally {
       setIsSpeaking(false)
     }
-  }, [config.uses_server_tts, resolveVoiceProfile])
+  }, [resolveVoiceProfile])
 
   const cancelSpeech = useCallback(() => {
     // Invalidate any in-flight segmented queue so it stops between sentences.
@@ -643,7 +656,7 @@ export function useInterviewVoice() {
 
     try {
       // --- Server-side Whisper path ---
-      if (config.uses_server_stt && mediaStream) {
+      if (configRef.current.uses_server_stt && mediaStream) {
         await audioRecorder.current.start(mediaStream)
 
         // Show browser interim results while recording (best effort)
@@ -752,7 +765,7 @@ export function useInterviewVoice() {
       setIsListening(false)
       setInterimTranscript('')
     }
-  }, [config.uses_server_stt])
+  }, [])
 
   // ------------------------------------------------------------------
   // listenLive() — TRUE hands-free turn (FIX 1 / WS1)
