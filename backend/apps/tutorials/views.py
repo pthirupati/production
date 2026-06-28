@@ -50,6 +50,64 @@ def _scenario_brief(scenario_slug: str) -> dict | None:
         return None
 
 
+def _quiz_section_orders(tutorial: Tutorial) -> set[int]:
+    """Sections that require an explicit quiz pass, not just reading/scrolling."""
+    orders: set[int] = set()
+    for section in tutorial.sections.all():
+        heading = (section.heading or "").lower()
+        if section.quiz_json or any(k in heading for k in ("assessment", "quiz", "checkpoint", "practice question")):
+            orders.add(int(section.order))
+    return orders
+
+
+def _linked_lab_completed(user, tutorial: Tutorial) -> bool:
+    """Return whether the tutorial's primary scenario has been solved by the user."""
+    if not tutorial.scenario_slug:
+        return True
+    if not getattr(user, "is_authenticated", False):
+        return False
+    try:
+        from apps.progress.models import UserScenarioProgress
+        from apps.question_bank.models import Scenario
+
+        scenario = Scenario.objects.filter(slug=tutorial.scenario_slug).only("id").first()
+        if not scenario:
+            return False
+        return UserScenarioProgress.objects.filter(
+            user=user,
+            scenario=scenario,
+            completed=True,
+        ).exists()
+    except Exception:
+        logger.exception("Could not evaluate linked lab completion for tutorial=%s", tutorial.slug)
+        return False
+
+
+def _completion_requirements(tutorial: Tutorial, user, completed_sections=None) -> dict:
+    completed = {int(x) for x in (completed_sections or []) if str(x).isdigit()}
+    quiz_orders = sorted(_quiz_section_orders(tutorial))
+    lab_required = bool(tutorial.scenario_slug)
+    lab_completed = _linked_lab_completed(user, tutorial) if lab_required else True
+    section_orders = {int(o) for o in tutorial.sections.values_list("order", flat=True)}
+    return {
+        "all_sections_read": bool(section_orders) and section_orders.issubset(completed),
+        "quiz_required": bool(quiz_orders),
+        "quiz_orders": quiz_orders,
+        "quiz_passed": all(o in completed for o in quiz_orders),
+        "linked_lab_required": lab_required,
+        "linked_lab_slug": tutorial.scenario_slug or "",
+        "linked_lab_completed": lab_completed,
+    }
+
+
+def _requirements_met(requirements: dict) -> bool:
+    return (
+        requirements.get("all_sections_read")
+        and (not requirements.get("quiz_required") or requirements.get("quiz_passed"))
+        and (not requirements.get("linked_lab_required") or requirements.get("linked_lab_completed"))
+    )
+
+
 class TutorialListView(APIView):
     """GET /api/tutorials/ — published tutorials, optionally filtered by topic."""
 
@@ -218,6 +276,11 @@ class TutorialDetailView(APIView):
             except Exception:
                 pass
 
+        completed_sections = []
+        if data.get("user_progress"):
+            completed_sections = data["user_progress"].get("completed_sections") or []
+        data["completion_requirements"] = _completion_requirements(tutorial, request.user, completed_sections)
+
         return Response(data)
 
 
@@ -275,24 +338,42 @@ class TutorialProgressUpdateView(APIView):
             return Response({"error": "Tutorial not found"}, status=404)
 
         section_order = int(request.data.get("section_order") or 0)
+        quiz_passed = bool(request.data.get("quiz_passed"))
         mark_complete = bool(request.data.get("mark_complete"))
         completed_sections = request.data.get("completed_sections")
 
         prog, _ = TutorialProgress.objects.get_or_create(user=request.user, tutorial=tutorial)
+        quiz_orders = _quiz_section_orders(tutorial)
         if isinstance(completed_sections, list):
-            prog.completed_sections = sorted({int(x) for x in completed_sections if str(x).isdigit()})
+            requested = {int(x) for x in completed_sections if str(x).isdigit()}
+            already_passed_quizzes = set(prog.completed_sections or []) & quiz_orders
+            newly_passed_quiz = {section_order} if quiz_passed and section_order in quiz_orders else set()
+            allowed_quizzes = already_passed_quizzes | newly_passed_quiz
+            prog.completed_sections = sorted(
+                o for o in requested if o not in quiz_orders or o in allowed_quizzes
+            )
         elif section_order and section_order not in prog.completed_sections:
-            prog.completed_sections = sorted(set(prog.completed_sections or []) | {section_order})
+            if section_order not in quiz_orders or quiz_passed:
+                prog.completed_sections = sorted(set(prog.completed_sections or []) | {section_order})
 
         if section_order:
             prog.last_section_order = max(prog.last_section_order or 0, section_order)
 
         total = tutorial.sections.count()
-        if mark_complete or (total and len(prog.completed_sections) >= total):
+        requirements = _completion_requirements(tutorial, request.user, prog.completed_sections)
+        if mark_complete and not requirements["quiz_passed"]:
+            # Do not let the legacy "Mark complete" button bypass the quiz.
+            prog.completed_sections = sorted(set(prog.completed_sections or []) - quiz_orders)
+            requirements = _completion_requirements(tutorial, request.user, prog.completed_sections)
+
+        if total and _requirements_met(requirements):
             prog.completed = True
-            prog.completed_sections = sorted(
-                tutorial.sections.values_list("order", flat=True)
-            )
+        else:
+            prog.completed = False
 
         prog.save()
-        return Response({"ok": True, "progress": TutorialProgressSerializer(prog).data})
+        return Response({
+            "ok": True,
+            "progress": TutorialProgressSerializer(prog).data,
+            "completion_requirements": _completion_requirements(tutorial, request.user, prog.completed_sections),
+        })

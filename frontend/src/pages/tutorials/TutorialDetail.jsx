@@ -275,6 +275,7 @@ export default function TutorialDetail() {
   const [activeSection, setActiveSection] = useState(null)
   const [completedSections, setCompletedSections] = useState([])
   const [readProgressPct, setReadProgressPct] = useState(0)
+  const [completionRequirements, setCompletionRequirements] = useState(null)
 
   usePageTitle(tutorial?.meta_title || 'Tutorial', tutorial?.meta_description || '')
 
@@ -287,6 +288,7 @@ export default function TutorialDetail() {
         if (cancelled) return
         if (!data || data.error) { setNotFound(true); return }
         setTutorial(data)
+        setCompletionRequirements(data.completion_requirements || null)
         const prog = data.user_progress
         if (prog?.completed_sections) {
           setCompletedSections(prog.completed_sections)
@@ -302,15 +304,35 @@ export default function TutorialDetail() {
     return () => { cancelled = true }
   }, [slug])
 
-  const persistSectionProgress = (sectionOrder) => {
+  const sectionRequiresQuiz = (sectionOrder) => {
+    const section = tutorial?.sections?.find((s) => Number(s.order) === Number(sectionOrder))
+    return Boolean(section?.quiz)
+  }
+
+  const applyProgressPayload = (payload, fallbackSections = null) => {
+    const progress = payload?.progress
+    const nextSections = progress?.completed_sections || fallbackSections
+    if (nextSections) {
+      setCompletedSections(nextSections)
+      setReadProgressPct(progress?.progress_pct || progressPct(nextSections, tutorial?.sections?.length))
+    }
+    if (payload?.completion_requirements) setCompletionRequirements(payload.completion_requirements)
+  }
+
+  const persistSectionProgress = (sectionOrder, opts = {}) => {
     if (!tutorial || !sectionOrder) return
+    if (sectionRequiresQuiz(sectionOrder) && !opts.quizPassed) return
     const total = tutorial.sections?.length || 0
     setCompletedSections((prev) => {
       if (prev.includes(sectionOrder)) return prev
       const next = [...prev, sectionOrder].sort((a, b) => a - b)
       setReadProgressPct(progressPct(next, total))
       if (isAuthenticated) {
-        tutorialApi.updateProgress(slug, { section_order: sectionOrder, completed_sections: next }).catch(() => {})
+        tutorialApi.updateProgress(slug, {
+          section_order: sectionOrder,
+          completed_sections: next,
+          quiz_passed: Boolean(opts.quizPassed),
+        }).then((payload) => applyProgressPayload(payload, next)).catch(() => {})
       } else {
         markLocalSection(slug, sectionOrder, total)
       }
@@ -321,12 +343,17 @@ export default function TutorialDetail() {
   const markTutorialComplete = () => {
     const total = tutorial.sections?.length || 0
     const allOrders = (tutorial.sections || []).map((s) => s.order)
-    setCompletedSections(allOrders)
-    setReadProgressPct(100)
     if (isAuthenticated) {
-      tutorialApi.updateProgress(slug, { mark_complete: true, completed_sections: allOrders }).catch(() => {})
+      tutorialApi.updateProgress(slug, { mark_complete: true, completed_sections: allOrders })
+        .then((payload) => applyProgressPayload(payload, payload?.progress?.completed_sections || completedSections))
+        .catch(() => {})
     } else {
-      setLocalTutorialProgress(slug, { completed_sections: allOrders, completed: true, last_section_order: total })
+      const quizOrders = (tutorial.sections || []).filter((s) => s.quiz).map((s) => s.order)
+      const next = allOrders.filter((o) => !quizOrders.includes(o) || completedSections.includes(o))
+      const completed = quizOrders.every((o) => next.includes(o))
+      setCompletedSections(next)
+      setReadProgressPct(progressPct(next, total))
+      setLocalTutorialProgress(slug, { completed_sections: next, completed, last_section_order: total })
     }
   }
 
@@ -350,7 +377,7 @@ export default function TutorialDetail() {
           const order = Number(visible[0].target.id.replace('section-', ''))
           if (!Number.isNaN(order)) {
             setActiveSection(order)
-            persistSectionProgress(order)
+            if (!sectionRequiresQuiz(order)) persistSectionProgress(order)
           }
         }
       },
@@ -397,6 +424,15 @@ export default function TutorialDetail() {
   const hasScenario = Boolean(tutorial.scenario_slug || tutorial.linked_scenario)
   const linkedScenario = tutorial.linked_scenario
   const readingPct = readProgressPct || progressPct(completedSections, sections.length)
+  const req = completionRequirements || {}
+  const lessonComplete = req.all_sections_read
+    && (!req.quiz_required || req.quiz_passed)
+    && (!req.linked_lab_required || req.linked_lab_completed)
+  const completionItems = [
+    { label: 'Read every lesson section', done: req.all_sections_read || readingPct >= 100 },
+    req.quiz_required ? { label: 'Pass the end-of-module quiz', done: req.quiz_passed } : null,
+    req.linked_lab_required ? { label: 'Pass the matching hands-on lab', done: req.linked_lab_completed, href: `/scenarios/${req.linked_lab_slug || tutorial.scenario_slug}` } : null,
+  ].filter(Boolean)
   const progressPctTrack = curriculum.total_in_topic
     ? Math.round((curriculum.position / curriculum.total_in_topic) * 100)
     : 0
@@ -533,6 +569,28 @@ export default function TutorialDetail() {
                   <span className="flex items-center gap-1"><Clock size={13} /> {tutorial.estimated_minutes} min read</span>
                   <span className="flex items-center gap-1"><Layers size={13} /> {sections.length} sections</span>
                 </div>
+                {completionItems.length > 0 && (
+                  <div className="mt-5 p-4 rounded-xl border border-surface-800/80 bg-surface-950/30">
+                    <p className="text-[10px] font-bold uppercase tracking-wider text-accent-cyan mb-2">To complete this module</p>
+                    <div className="grid sm:grid-cols-3 gap-2">
+                      {completionItems.map((item) => {
+                        const content = (
+                          <span className={`text-xs flex items-center gap-2 rounded-lg border px-3 py-2 ${
+                            item.done
+                              ? 'border-accent-green/25 bg-accent-green/10 text-accent-green'
+                              : 'border-surface-700 bg-surface-900/60 text-surface-400'
+                          }`}>
+                            <span className="font-mono">{item.done ? '✓' : '○'}</span>
+                            {item.label}
+                          </span>
+                        )
+                        return item.href && !item.done
+                          ? <Link key={item.label} to={item.href}>{content}</Link>
+                          : <span key={item.label}>{content}</span>
+                      })}
+                    </div>
+                  </div>
+                )}
                 <div className="mt-5 flex flex-wrap gap-2">
                   {hasScenario && (
                     <Link to={`/scenarios/${tutorial.scenario_slug || linkedScenario?.slug}`} className="btn-primary text-sm inline-flex items-center gap-1.5">
@@ -547,12 +605,12 @@ export default function TutorialDetail() {
                       <Terminal size={14} /> Try in playground
                     </Link>
                   )}
-                  {readingPct < 100 && (
+                  {!lessonComplete && (
                     <button type="button" onClick={markTutorialComplete} className="text-sm px-3 py-2 rounded-lg border border-surface-700 text-surface-300 hover:text-white hover:border-surface-500">
-                      Mark lesson complete
+                      Check completion
                     </button>
                   )}
-                  {readingPct >= 100 && (
+                  {lessonComplete && (
                     <span className="text-xs text-accent-green flex items-center gap-1 px-2 py-2">
                       <GraduationCap size={14} /> Lesson completed
                     </span>
@@ -584,7 +642,7 @@ export default function TutorialDetail() {
                       {s.quiz && (
                         <TutorialQuiz
                           quiz={s.quiz}
-                          onPassed={() => persistSectionProgress(s.order)}
+                          onPassed={() => persistSectionProgress(s.order, { quizPassed: true })}
                         />
                       )}
                     </section>
