@@ -24,12 +24,33 @@ initial_state: The Ansible control node cannot authenticate to the managed hosts
 hints:
 - order: 1
   cost: 10
-  content: 'Confirm the failure: `ansible webservers -m ping` and check `ansible-inventory --list` to
-    see the target hosts.'
+  content: 'Orient yourself before changing anything:
+
+    1. Inspect the current state — `ansible webservers -m ping` and check `ansible-inventory --list` to
+    see the target hosts.
+
+    2. Write down what looks normal versus wrong or missing.
+
+    3. Form one hypothesis about the root cause before you change anything.'
 - order: 2
   cost: 15
-  content: The inventory is correct — the problem is SSH authentication to the managed nodes.
+  content: 'Plan your approach (still no spoilers):
+
+    1. Confirm the exact gap between current and desired state.
+
+    2. Decide the single smallest change that moves you toward the objective.
+
+    3. Capture command output before the change so you can prove it worked afterward.'
 - order: 3
   cost: 20
-  content: Distribute your key with `ssh-copy-id` to each managed host (e.g. `ssh-copy-id root@web1`),
-    then re-run `ansible webservers -m ping` and Check Solution.
+  content: 'Guided walkthrough:
+
+    1. Re-check the current state — Confirm the failure: `ansible webservers -m ping` and check `ansible-inventory
+    --list` to see the target hosts.
+
+    2. The inventory is correct — the problem is SSH authentication to the managed nodes.
+
+    3. Verify the result — Distribute your key with `ssh-copy-id` to each managed host (e.g. `ssh-copy-id
+    root@web1`), then re-run `ansible webservers -m ping` and Check Solution.
+
+    4. Click Check Solution once every objective is met.'

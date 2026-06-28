@@ -23,10 +23,32 @@ initial_state: The Docker Compose stack is defined but not running — `docker p
 hints:
 - order: 1
   cost: 10
-  content: 'Check what is running: `docker ps` (likely empty) and review the compose file in the app directory.'
+  content: 'Orient yourself before changing anything:
+
+    1. Inspect the current state — `docker ps` (likely empty) and review the compose file in the app directory.
+
+    2. Write down what looks normal versus wrong or missing.
+
+    3. Form one hypothesis about the root cause before you change anything.'
 - order: 2
   cost: 15
-  content: You do not need to rebuild images — the stack simply needs to be started in the background.
+  content: 'Plan your approach (still no spoilers):
+
+    1. Confirm the exact gap between current and desired state.
+
+    2. Decide the single smallest change that moves you toward the objective.
+
+    3. Capture command output before the change so you can prove it worked afterward.'
 - order: 3
   cost: 20
-  content: Run `docker compose up -d` from the app directory, confirm with `docker ps`, then Check Solution.
+  content: 'Guided walkthrough:
+
+    1. Re-check the current state — Check what is running: `docker ps` (likely empty) and review the compose
+    file in the app directory.
+
+    2. You do not need to rebuild images — the stack simply needs to be started in the background.
+
+    3. Verify the result — Run `docker compose up -d` from the app directory, confirm with `docker ps`,
+    then Check Solution.
+
+    4. Click Check Solution once every objective is met.'

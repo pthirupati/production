@@ -23,13 +23,34 @@ initial_state: Port 80/tcp (HTTP) is not allowed through firewalld in the active
 hints:
 - order: 1
   cost: 10
-  content: 'Inspect the active zone: `firewall-cmd --list-all` to see which services/ports are currently
-    allowed.'
+  content: 'Orient yourself before changing anything:
+
+    1. Inspect the current state — `firewall-cmd --list-all` to see which services/ports are currently
+    allowed.
+
+    2. Write down what looks normal versus wrong or missing.
+
+    3. Form one hypothesis about the root cause before you change anything.'
 - order: 2
   cost: 15
-  content: Make the change persistent (`--permanent`) and remember runtime rules need a `--reload` to
-    take effect.
+  content: 'Plan your approach (still no spoilers):
+
+    1. Confirm the exact gap between current and desired state.
+
+    2. Decide the single smallest change that moves you toward the objective.
+
+    3. Capture command output before the change so you can prove it worked afterward.'
 - order: 3
   cost: 20
-  content: Run `sudo firewall-cmd --permanent --add-service=http` (or `--add-port=80/tcp`) then `sudo
-    firewall-cmd --reload`; verify with `firewall-cmd --list-all`, then Check Solution.
+  content: 'Guided walkthrough:
+
+    1. Re-check the current state — Inspect the active zone: `firewall-cmd --list-all` to see which services/ports
+    are currently allowed.
+
+    2. Make the change persistent (`--permanent`) and remember runtime rules need a `--reload` to take
+    effect.
+
+    3. Verify the result — Run `sudo firewall-cmd --permanent --add-service=http` (or `--add-port=80/tcp`)
+    then `sudo firewall-cmd --reload`; verify with `firewall-cmd --list-all`, then Check Solution.
+
+    4. Click Check Solution once every objective is met.'

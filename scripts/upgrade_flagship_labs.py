@@ -261,6 +261,37 @@ def _kind_for(tech: str, slug: str) -> str | None:
     return None
 
 
+def _flagship_guided_hints(spec: dict) -> list[dict]:
+    """Three-tier step-by-step hints (B2) — matches validate_scenario_catalog format."""
+    bullets = list(spec["hints"])
+    inspect = bullets[0].split(":", 1)[-1].strip() if bullets else "run the diagnostic commands"
+    verify = bullets[-1] if bullets else "the objective commands succeed"
+    tier1 = (
+        "Orient yourself before changing anything:\n"
+        f"1. Inspect the current state — {inspect}\n"
+        "2. Write down what looks normal versus wrong or missing.\n"
+        "3. Form one hypothesis about the root cause before you change anything."
+    )
+    tier2 = (
+        "Plan your approach (still no spoilers):\n"
+        "1. Confirm the exact gap between current and desired state.\n"
+        "2. Decide the single smallest change that moves you toward the objective.\n"
+        "3. Capture command output before the change so you can prove it worked afterward."
+    )
+    tier3 = (
+        "Guided walkthrough:\n"
+        f"1. Re-check the current state — {bullets[0]}\n"
+        f"2. {bullets[1]}\n"
+        f"3. Verify the result — {verify}\n"
+        "4. Click Check Solution once every objective is met."
+    )
+    return [
+        {"order": 1, "cost": 10, "content": tier1},
+        {"order": 2, "cost": 15, "content": tier2},
+        {"order": 3, "cost": 20, "content": tier3},
+    ]
+
+
 def _write_check(folder: Path, kind: str) -> None:
     body = KINDS[kind]["check"]
     (folder / "check.sh").write_text(
@@ -274,12 +305,7 @@ def _update_yaml(path: Path, kind: str) -> None:
     data["description"] = spec["description"]
     data["initial_state"] = spec["initial_state"]
     data["objectives"] = list(spec["objectives"])
-    data["hints"] = [
-        {"order": i + 1, "cost": cost, "content": content}
-        for i, (cost, content) in enumerate(
-            zip((10, 15, 20), spec["hints"])
-        )
-    ]
+    data["hints"] = _flagship_guided_hints(spec)
     path.write_text(
         yaml.safe_dump(data, sort_keys=False, allow_unicode=True, width=100),
         encoding="utf-8",

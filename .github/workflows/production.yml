@@ -415,6 +415,11 @@ jobs:
           python manage.py migrate --run-syncdb
           SKIP_EMAIL_TESTS="${{ inputs.skip_email && 'true' || 'false' }}" \
           python manage.py test tests --verbosity=2
+      - name: Validate flagship scenario catalog (real checks, guided hints)
+        working-directory: backend
+        env:
+          DJANGO_SETTINGS_MODULE: config.test_settings
+        run: python manage.py validate_scenario_catalog --flagship-only --fail-on-gaps
 
   # ─────────────────────────────────────────────────────────────
   # DEPLOY — git pull + start platform + build scenario images

@@ -74,11 +74,22 @@ class Command(BaseCommand):
 
     def add_arguments(self, parser):
         parser.add_argument("--technology", default="", help="Comma-separated tech folder slugs")
+        parser.add_argument(
+            "--flagship-only",
+            action="store_true",
+            help="Only validate labs in flagship_presets.FLAGSHIP_SLUG_KIND (real-sim upgraded set)",
+        )
         parser.add_argument("--fail-on-gaps", action="store_true", help="Exit 1 if any gaps found")
         parser.add_argument("--limit", type=int, default=0, help="Stop after N scenarios (smoke)")
 
     def handle(self, *args, **options):
         tech_filter = {t.strip() for t in options["technology"].split(",") if t.strip()}
+        flagship_only = bool(options["flagship_only"])
+        flagship_slugs: set[str] = set()
+        if flagship_only:
+            from apps.labs.provisioner.simulation.flagship_presets import FLAGSHIP_SLUG_KIND
+
+            flagship_slugs = set(FLAGSHIP_SLUG_KIND)
         limit = int(options["limit"] or 0)
         total = 0
         gap_count = 0
@@ -90,6 +101,10 @@ class Command(BaseCommand):
             if tech_filter and tech_path.name not in tech_filter:
                 continue
             for yaml_path in sorted(tech_path.glob("*/scenario.yaml")):
+                if flagship_only:
+                    slug = yaml_path.parent.name
+                    if slug not in flagship_slugs:
+                        continue
                 total += 1
                 gaps = validate_scenario_file(yaml_path)
                 if gaps:

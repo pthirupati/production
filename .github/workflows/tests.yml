@@ -89,6 +89,7 @@ jobs:
         run: |
           python manage.py migrate --run-syncdb
           python manage.py test tests --verbosity=2
+          python manage.py validate_scenario_catalog --flagship-only --fail-on-gaps
       - uses: actions/setup-node@v4
         with:
           node-version: "24"

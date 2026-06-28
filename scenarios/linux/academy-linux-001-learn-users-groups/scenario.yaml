@@ -24,13 +24,34 @@ initial_state: The application service account `appuser` is missing on this host
 hints:
 - order: 1
   cost: 10
-  content: 'Inspect first: `getent passwd appuser` (will be empty) and `cat /etc/passwd` to see existing
-    accounts.'
+  content: 'Orient yourself before changing anything:
+
+    1. Inspect the current state — `getent passwd appuser` (will be empty) and `cat /etc/passwd` to see
+    existing accounts.
+
+    2. Write down what looks normal versus wrong or missing.
+
+    3. Form one hypothesis about the root cause before you change anything.'
 - order: 2
   cost: 15
-  content: Decide whether the account needs a login shell and home directory. A service account usually
-    wants a home dir but no interactive login.
+  content: 'Plan your approach (still no spoilers):
+
+    1. Confirm the exact gap between current and desired state.
+
+    2. Decide the single smallest change that moves you toward the objective.
+
+    3. Capture command output before the change so you can prove it worked afterward.'
 - order: 3
   cost: 20
-  content: 'Create it: `sudo useradd -m appuser`, confirm with `getent passwd appuser`, then run Check
-    Solution.'
+  content: 'Guided walkthrough:
+
+    1. Re-check the current state — Inspect first: `getent passwd appuser` (will be empty) and `cat /etc/passwd`
+    to see existing accounts.
+
+    2. Decide whether the account needs a login shell and home directory. A service account usually wants
+    a home dir but no interactive login.
+
+    3. Verify the result — Create it: `sudo useradd -m appuser`, confirm with `getent passwd appuser`,
+    then run Check Solution.
+
+    4. Click Check Solution once every objective is met.'

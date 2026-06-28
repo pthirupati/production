@@ -24,13 +24,34 @@ initial_state: The `nginx` service is installed but currently failed/stopped, so
 hints:
 - order: 1
   cost: 10
-  content: 'Pre-check the unit: `systemctl status nginx` and `journalctl -u nginx` to see why it is not
-    running.'
+  content: 'Orient yourself before changing anything:
+
+    1. Inspect the current state — `systemctl status nginx` and `journalctl -u nginx` to see why it is
+    not running.
+
+    2. Write down what looks normal versus wrong or missing.
+
+    3. Form one hypothesis about the root cause before you change anything.'
 - order: 2
   cost: 15
-  content: Bring it up with the smallest safe action rather than reinstalling — a stopped/failed unit
-    usually just needs to be started.
+  content: 'Plan your approach (still no spoilers):
+
+    1. Confirm the exact gap between current and desired state.
+
+    2. Decide the single smallest change that moves you toward the objective.
+
+    3. Capture command output before the change so you can prove it worked afterward.'
 - order: 3
   cost: 20
-  content: Run `sudo systemctl start nginx` (add `sudo systemctl enable nginx` for persistence), confirm
-    `systemctl is-active nginx`, then Check Solution.
+  content: 'Guided walkthrough:
+
+    1. Re-check the current state — Pre-check the unit: `systemctl status nginx` and `journalctl -u nginx`
+    to see why it is not running.
+
+    2. Bring it up with the smallest safe action rather than reinstalling — a stopped/failed unit usually
+    just needs to be started.
+
+    3. Verify the result — Run `sudo systemctl start nginx` (add `sudo systemctl enable nginx` for persistence),
+    confirm `systemctl is-active nginx`, then Check Solution.
+
+    4. Click Check Solution once every objective is met.'

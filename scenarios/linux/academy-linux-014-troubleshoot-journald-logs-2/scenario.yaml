@@ -23,12 +23,33 @@ initial_state: The `rsyslog` logging service is stopped, so log forwarding and p
 hints:
 - order: 1
   cost: 10
-  content: 'Check the service: `systemctl status rsyslog` and look for recent log entries with `journalctl
-    -u rsyslog`.'
+  content: 'Orient yourself before changing anything:
+
+    1. Inspect the current state — `systemctl status rsyslog` and look for recent log entries with `journalctl
+    -u rsyslog`.
+
+    2. Write down what looks normal versus wrong or missing.
+
+    3. Form one hypothesis about the root cause before you change anything.'
 - order: 2
   cost: 15
-  content: The configuration is intact — the daemon just needs to be running and enabled.
+  content: 'Plan your approach (still no spoilers):
+
+    1. Confirm the exact gap between current and desired state.
+
+    2. Decide the single smallest change that moves you toward the objective.
+
+    3. Capture command output before the change so you can prove it worked afterward.'
 - order: 3
   cost: 20
-  content: Run `sudo systemctl enable --now rsyslog`, confirm with `systemctl is-active rsyslog`, then
-    Check Solution.
+  content: 'Guided walkthrough:
+
+    1. Re-check the current state — Check the service: `systemctl status rsyslog` and look for recent
+    log entries with `journalctl -u rsyslog`.
+
+    2. The configuration is intact — the daemon just needs to be running and enabled.
+
+    3. Verify the result — Run `sudo systemctl enable --now rsyslog`, confirm with `systemctl is-active
+    rsyslog`, then Check Solution.
+
+    4. Click Check Solution once every objective is met.'
