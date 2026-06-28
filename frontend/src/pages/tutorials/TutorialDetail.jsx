@@ -45,13 +45,119 @@ const LEVEL_CLASS = {
 }
 
 function formatInline(text) {
-  const parts = (text || '').split(/(\*\*[^*]+\*\*)/g)
-  return parts.map((part, i) => {
-    if (part.startsWith('**') && part.endsWith('**')) {
-      return <strong key={i}>{part.slice(2, -2)}</strong>
+  // Tokenize **bold**, `inline code`, and [label](url) so commands/syntax in
+  // prose render as real code chips and links instead of raw markdown.
+  const tokens = []
+  const regex = /(\*\*[^*]+\*\*|`[^`]+`|\[[^\]]+\]\([^)]+\))/g
+  let lastIndex = 0
+  let key = 0
+  let m
+  while ((m = regex.exec(text || '')) !== null) {
+    if (m.index > lastIndex) tokens.push(text.slice(lastIndex, m.index))
+    const tok = m[0]
+    if (tok.startsWith('**')) {
+      tokens.push(<strong key={key++}>{tok.slice(2, -2)}</strong>)
+    } else if (tok.startsWith('`')) {
+      tokens.push(<code key={key++} className="tutorial-inline-code">{tok.slice(1, -1)}</code>)
+    } else {
+      const lm = /\[([^\]]+)\]\(([^)]+)\)/.exec(tok)
+      if (lm) {
+        tokens.push(
+          <a key={key++} href={lm[2]} target="_blank" rel="noopener noreferrer" className="tutorial-inline-link">
+            {lm[1]}
+          </a>,
+        )
+      }
     }
-    return part
-  })
+    lastIndex = regex.lastIndex
+  }
+  if (lastIndex < (text || '').length) tokens.push(text.slice(lastIndex))
+  return tokens
+}
+
+/* Parse markdown-ish body into structured blocks so commands, numbered
+   playbooks, fenced code, tables and callouts all render (not just bold +
+   bullets). The backend already authors all of these — they were previously
+   shown as raw text. */
+function parseBlocks(text) {
+  const lines = (text || '').split('\n')
+  const blocks = []
+  let i = 0
+  const isTableRow = (l) => /^\s*\|.*\|\s*$/.test(l)
+  const isTableSep = (l) => /^\s*\|?[\s:|-]+\|?\s*$/.test(l) && l.includes('-')
+  while (i < lines.length) {
+    const line = lines[i]
+    const trimmed = line.trim()
+    if (!trimmed) { i++; continue }
+
+    // Fenced code block
+    const fence = trimmed.match(/^```+\s*([a-zA-Z0-9_+-]*)\s*$/)
+    if (fence) {
+      const lang = fence[1] || 'text'
+      const buf = []
+      i++
+      while (i < lines.length && !/^```+\s*$/.test(lines[i].trim())) { buf.push(lines[i]); i++ }
+      i++ // skip closing fence
+      blocks.push({ type: 'code', code: buf.join('\n'), lang })
+      continue
+    }
+
+    // Horizontal rule
+    if (/^(-{3,}|\*{3,}|_{3,})$/.test(trimmed)) { blocks.push({ type: 'hr' }); i++; continue }
+
+    // Headings (##, ###, ####)
+    const h = trimmed.match(/^(#{2,4})\s+(.*)$/)
+    if (h) { blocks.push({ type: 'heading', level: h[1].length, text: h[2].trim() }); i++; continue }
+
+    // Blockquote / callout
+    if (trimmed.startsWith('> ')) {
+      const buf = []
+      while (i < lines.length && lines[i].trim().startsWith('> ')) { buf.push(lines[i].trim().slice(2)); i++ }
+      blocks.push({ type: 'quote', text: buf.join(' ') })
+      continue
+    }
+
+    // Table
+    if (isTableRow(line) && i + 1 < lines.length && isTableSep(lines[i + 1])) {
+      const parseRow = (l) => l.trim().replace(/^\||\|$/g, '').split('|').map((c) => c.trim())
+      const header = parseRow(line)
+      i += 2
+      const rows = []
+      while (i < lines.length && isTableRow(lines[i])) { rows.push(parseRow(lines[i])); i++ }
+      blocks.push({ type: 'table', header, rows })
+      continue
+    }
+
+    // Ordered list
+    if (/^\s*\d+\.\s+/.test(line)) {
+      const items = []
+      while (i < lines.length && /^\s*\d+\.\s+/.test(lines[i])) { items.push(lines[i].replace(/^\s*\d+\.\s+/, '')); i++ }
+      blocks.push({ type: 'ol', items })
+      continue
+    }
+
+    // Unordered list
+    if (/^\s*[-*]\s+/.test(line)) {
+      const items = []
+      while (i < lines.length && /^\s*[-*]\s+/.test(lines[i])) { items.push(lines[i].replace(/^\s*[-*]\s+/, '')); i++ }
+      blocks.push({ type: 'ul', items })
+      continue
+    }
+
+    // Paragraph (gather consecutive plain lines until a blank/structural line)
+    const buf = [line]
+    i++
+    while (i < lines.length) {
+      const nxt = lines[i]
+      const nt = nxt.trim()
+      if (!nt) break
+      if (/^```+/.test(nt) || /^(#{2,4})\s+/.test(nt) || /^\s*\d+\.\s+/.test(nxt) || /^\s*[-*]\s+/.test(nxt) || nt.startsWith('> ') || isTableRow(nxt) || /^(-{3,}|\*{3,}|_{3,})$/.test(nt)) break
+      buf.push(nxt)
+      i++
+    }
+    blocks.push({ type: 'p', text: buf.join('\n') })
+  }
+  return blocks
 }
 
 function CodeBlock({ code, language, caption }) {
@@ -80,29 +186,59 @@ function CodeBlock({ code, language, caption }) {
 
 function Body({ text }) {
   if (!text) return null
+  const blocks = parseBlocks(text)
   return (
     <div className="tutorial-prose space-y-4">
-      {text.split('\n\n').map((para, i) => {
-        if (para.startsWith('## ')) {
-          return (
-            <h3 key={i} className="text-lg font-semibold text-white tracking-tight">
-              {para.slice(3).trim()}
-            </h3>
-          )
+      {blocks.map((b, i) => {
+        switch (b.type) {
+          case 'code':
+            return <CodeBlock key={i} code={b.code} language={b.lang} />
+          case 'hr':
+            return <hr key={i} className="border-surface-800 my-2" />
+          case 'heading': {
+            const cls = b.level === 2
+              ? 'text-lg font-semibold text-white tracking-tight'
+              : b.level === 3
+                ? 'text-base font-semibold text-surface-100 tracking-tight'
+                : 'text-sm font-semibold text-surface-200 uppercase tracking-wide'
+            return <h3 key={i} className={cls}>{formatInline(b.text)}</h3>
+          }
+          case 'quote':
+            return (
+              <blockquote key={i} className="tutorial-callout">
+                {formatInline(b.text)}
+              </blockquote>
+            )
+          case 'table':
+            return (
+              <div key={i} className="tutorial-table-wrap">
+                <table className="tutorial-table">
+                  <thead>
+                    <tr>{b.header.map((c, j) => <th key={j}>{formatInline(c)}</th>)}</tr>
+                  </thead>
+                  <tbody>
+                    {b.rows.map((row, r) => (
+                      <tr key={r}>{row.map((c, j) => <td key={j}>{formatInline(c)}</td>)}</tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )
+          case 'ol':
+            return (
+              <ol key={i} className="list-decimal pl-5 space-y-2 text-surface-300">
+                {b.items.map((it, j) => <li key={j} className="leading-relaxed">{formatInline(it)}</li>)}
+              </ol>
+            )
+          case 'ul':
+            return (
+              <ul key={i} className="list-disc pl-5 space-y-2 text-surface-300">
+                {b.items.map((it, j) => <li key={j} className="leading-relaxed">{formatInline(it)}</li>)}
+              </ul>
+            )
+          default:
+            return <p key={i} className="whitespace-pre-line leading-relaxed">{formatInline(b.text)}</p>
         }
-        if (para.includes('\n- ') || para.startsWith('- ')) {
-          const lines = para.split('\n').filter(Boolean)
-          return (
-            <ul key={i} className="list-disc pl-5 space-y-2 text-surface-300">
-              {lines.map((line, j) => (
-                <li key={j} className="leading-relaxed">{formatInline(line.replace(/^-\s*/, ''))}</li>
-              ))}
-            </ul>
-          )
-        }
-        return (
-          <p key={i} className="whitespace-pre-line leading-relaxed">{formatInline(para)}</p>
-        )
       })}
     </div>
   )

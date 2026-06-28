@@ -4046,6 +4046,72 @@ body::after {
   padding-left: 0.25rem;
 }
 
+/* Inline code chips inside prose (commands, flags, file paths) */
+.tutorial-page .tutorial-inline-code {
+  font-family: "JetBrains Mono", "Fira Code", ui-monospace, monospace;
+  font-size: 0.85em;
+  padding: 0.1em 0.4em;
+  border-radius: 0.35rem;
+  background: rgb(var(--a-cyan) / 0.1);
+  border: 1px solid rgb(var(--a-cyan) / 0.18);
+  color: rgb(var(--a-cyan));
+  white-space: nowrap;
+}
+
+.tutorial-page .tutorial-inline-link {
+  color: rgb(var(--a-cyan));
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+.tutorial-page .tutorial-inline-link:hover { opacity: 0.85; }
+
+/* Callout / blockquote */
+.tutorial-page .tutorial-callout {
+  border-left: 3px solid rgb(var(--a-cyan) / 0.5);
+  background: rgb(var(--a-cyan) / 0.06);
+  padding: 0.75rem 1rem;
+  border-radius: 0 0.5rem 0.5rem 0;
+  color: var(--tutorial-prose);
+  font-size: 0.95rem;
+  line-height: 1.7;
+}
+
+/* Tables (comparison grids, mappings, signal lists) */
+.tutorial-page .tutorial-table-wrap {
+  overflow-x: auto;
+  border: 1px solid var(--tutorial-card-border);
+  border-radius: 0.625rem;
+}
+.tutorial-page .tutorial-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.85rem;
+}
+.tutorial-page .tutorial-table th,
+.tutorial-page .tutorial-table td {
+  text-align: left;
+  padding: 0.55rem 0.75rem;
+  border-bottom: 1px solid var(--tutorial-card-border);
+  color: var(--tutorial-prose);
+  vertical-align: top;
+}
+.tutorial-page .tutorial-table th {
+  background: rgb(var(--s-800) / 0.5);
+  color: var(--tutorial-heading);
+  font-weight: 650;
+  white-space: nowrap;
+}
+.tutorial-page .tutorial-table tr:last-child td { border-bottom: none; }
+
+[data-theme="light"] .tutorial-page .tutorial-inline-code {
+  background: rgb(8 145 178 / 0.08);
+  border-color: rgb(8 145 178 / 0.2);
+  color: rgb(14 116 144);
+}
+[data-theme="light"] .tutorial-page .tutorial-table th {
+  background: rgb(241 245 249);
+}
+
 .tutorial-page .tutorial-hero {
   background: linear-gradient(
     135deg,
