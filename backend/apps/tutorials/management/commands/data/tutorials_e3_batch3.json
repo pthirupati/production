@@ -842,7 +842,7 @@
       ],
       [
         "Validation",
-        "check.sh greps FIXED-OK markers — fixes must match scenario recipe.",
+        "Check Solution validates real simulator state — fixes must match the scenario recipe.",
         "",
         "text",
         ""

@@ -278,7 +278,7 @@ TOPIC_PROFILES: dict[str, dict] = {
     "Simulation": {
         "tagline": "FixitLab hands-on training without production risk",
         "concepts": {
-            "grading": "Terminal markers FIXED-OK; GUI simulators for VMware, Grafana, Terraform, Windows.",
+            "grading": "Terminal labs use real state checks; GUI simulators validate VMware, Grafana, Terraform, Windows, and other tool state.",
             "cross tech": "Shared session links terminal fixes to GUI state.",
         },
     },

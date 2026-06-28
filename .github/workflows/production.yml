@@ -420,6 +420,13 @@ jobs:
         env:
           DJANGO_SETTINGS_MODULE: config.test_settings
         run: python manage.py validate_scenario_catalog --flagship-only --fail-on-gaps
+      - name: Validate tutorial completeness (rich lessons, quizzes, linked labs)
+        working-directory: backend
+        env:
+          DJANGO_SETTINGS_MODULE: config.test_settings
+        run: |
+          python manage.py seed_tutorials
+          python manage.py check_tutorial_completeness --all
 
   # ─────────────────────────────────────────────────────────────
   # DEPLOY — git pull + start platform + build scenario images

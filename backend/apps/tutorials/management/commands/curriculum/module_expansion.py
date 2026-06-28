@@ -55,7 +55,7 @@ SECTION_SUBTOPIC_TEMPLATES: dict[str, list[tuple[str, str]]] = {
     "simulations": [
         ("Simulator access", "Open {topic} simulator from FixitLab lab toolbar (Terraform, Grafana, VMware, Windows, AWX, etc.)."),
         ("What to compare", "Match simulated logs, metrics, and UI labels to production expectations."),
-        ("Grading model", "FIXED-OK markers and API checks — treat sim like staging."),
+        ("Grading model", "Real simulator state checks and API checks — treat sim like staging."),
         ("Cross-tech labs", "Some scenarios link terminal fixes to GUI simulator state."),
         ("Repeatability", "Run break/fix cycle three times until steps are automatic."),
     ],

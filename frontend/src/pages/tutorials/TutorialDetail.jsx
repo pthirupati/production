@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import {
   Clock, Layers, ChevronLeft, ChevronRight, FlaskConical,
-  Copy, Check, BookOpen, ListTree, GraduationCap, Terminal,
+  Copy, Check, BookOpen, ListTree, GraduationCap, Terminal, Download,
 } from 'lucide-react'
 import PublicLayout from '../../components/layout/PublicLayout'
 import { FixitPanel } from '../../components/design'
@@ -101,6 +101,10 @@ function parseBlocks(text) {
       i++
       if (lang.toLowerCase() === 'mermaid') {
         blocks.push({ type: 'mermaid', chart: buf.join('\n') })
+      } else if (['bash', 'shell', 'sh', 'powershell'].includes(lang.toLowerCase()) && buf.some((l) => /^(\$|#|>)\s+/.test(l.trim()))) {
+        const firstCommand = buf.find((l) => /^(\$|#|>)\s+/.test(l.trim())) || ''
+        const output = buf.filter((l) => !/^(\$|#|>)\s+/.test(l.trim())).join('\n')
+        blocks.push({ type: 'shell', code: buf.join('\n'), command: firstCommand.replace(/^(\$|#|>)\s+/, ''), output, lang })
       } else {
         blocks.push({ type: 'code', code: buf.join('\n'), lang })
       }
@@ -119,7 +123,7 @@ function parseBlocks(text) {
       const buf = []
       while (i < lines.length && lines[i].trim().startsWith('> ')) { buf.push(lines[i].trim().slice(2)); i++ }
       const raw = buf.join(' ')
-      const adm = raw.match(/^\[!(NOTE|TIP|WARNING|GOTCHA)\]\s*(.*)$/i)
+      const adm = raw.match(/^\[!(NOTE|TIP|WARNING|DANGER|GOTCHA)\]\s*(.*)$/i)
       if (adm) {
         blocks.push({ type: 'callout', variant: adm[1].toLowerCase(), text: adm[2] || '' })
       } else {
@@ -136,6 +140,18 @@ function parseBlocks(text) {
       const rows = []
       while (i < lines.length && isTableRow(lines[i])) { rows.push(parseRow(lines[i])); i++ }
       blocks.push({ type: 'table', header, rows })
+      continue
+    }
+
+    // Collapsible deep-dive: :::details Title ... :::
+    const details = trimmed.match(/^:::\s*(details|collapse)\s*(.*)$/i)
+    if (details) {
+      const title = details[2] || 'More detail'
+      const buf = []
+      i++
+      while (i < lines.length && !/^:::\s*$/.test(lines[i].trim())) { buf.push(lines[i]); i++ }
+      i++
+      blocks.push({ type: 'details', title, text: buf.join('\n') })
       continue
     }
 
@@ -171,8 +187,12 @@ function parseBlocks(text) {
   return blocks
 }
 
-function CodeBlock({ code, language, caption }) {
+function CodeBlock({ code, language, caption, labSlug }) {
   const [copied, setCopied] = useState(false)
+  const [expanded, setExpanded] = useState(false)
+  const lines = (code || '').split('\n')
+  const isLong = lines.length > 25
+  const shownLines = isLong && !expanded ? lines.slice(0, 15) : lines
   const copy = async () => {
     try {
       await navigator.clipboard.writeText(code)
@@ -184,18 +204,89 @@ function CodeBlock({ code, language, caption }) {
     <figure className="tutorial-code-block">
       <div className="tutorial-code-bar">
         <span className="tutorial-code-lang">{language || 'code'}</span>
-        <button type="button" onClick={copy} className="tutorial-code-copy">
-          {copied ? <Check size={12} className="text-accent-green" /> : <Copy size={12} />}
-          {copied ? 'Copied' : 'Copy'}
-        </button>
+        <div className="flex items-center gap-2">
+          {labSlug && ['bash', 'shell', 'sh'].includes((language || '').toLowerCase()) && (
+            <Link to={`/scenarios/${labSlug}`} className="tutorial-code-copy">
+              <Terminal size={12} /> Run in lab
+            </Link>
+          )}
+          <button type="button" onClick={copy} className="tutorial-code-copy">
+            {copied ? <Check size={12} className="text-accent-green" /> : <Copy size={12} />}
+            {copied ? 'Copied' : 'Copy'}
+          </button>
+        </div>
       </div>
-      <pre className="tutorial-code-pre"><code>{code}</code></pre>
+      <pre className="tutorial-code-pre">
+        <code>
+          {shownLines.map((line, idx) => (
+            <span key={idx} className="tutorial-code-line">
+              <span className="tutorial-code-line-num">{idx + 1}</span>
+              <span>{line || ' '}</span>
+            </span>
+          ))}
+        </code>
+      </pre>
+      {isLong && (
+        <button type="button" className="tutorial-code-expand" onClick={() => setExpanded((v) => !v)}>
+          {expanded ? 'Show less' : `Show ${lines.length - shownLines.length} more lines`}
+        </button>
+      )}
       {caption && <figcaption className="tutorial-code-caption">{caption}</figcaption>}
     </figure>
   )
 }
 
-function Body({ text }) {
+function ShellBlock({ code, command, output, labSlug }) {
+  return (
+    <figure className="tutorial-shell-block">
+      <div className="tutorial-shell-command">
+        <span className="tutorial-shell-prompt">$</span>
+        <code>{command || code}</code>
+        {labSlug && (
+          <Link to={`/scenarios/${labSlug}`} className="tutorial-shell-run">
+            Run in lab
+          </Link>
+        )}
+      </div>
+      {output && (
+        <pre className="tutorial-shell-output">{output}</pre>
+      )}
+    </figure>
+  )
+}
+
+function TutorialTable({ header, rows }) {
+  const download = () => {
+    const esc = (v) => `"${String(v || '').replace(/"/g, '""')}"`
+    const csv = [header, ...rows].map((row) => row.map(esc).join(',')).join('\n')
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = 'tutorial-table.csv'
+    a.click()
+    URL.revokeObjectURL(url)
+  }
+  return (
+    <div className="tutorial-table-wrap">
+      <button type="button" className="tutorial-table-export" onClick={download}>
+        <Download size={12} /> CSV
+      </button>
+      <table className="tutorial-table">
+        <thead>
+          <tr>{header.map((c, j) => <th key={j}>{formatInline(c)}</th>)}</tr>
+        </thead>
+        <tbody>
+          {rows.map((row, r) => (
+            <tr key={r}>{row.map((c, j) => <td key={j}>{formatInline(c)}</td>)}</tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  )
+}
+
+function Body({ text, labSlug }) {
   if (!text) return null
   const blocks = parseBlocks(text)
   return (
@@ -203,7 +294,9 @@ function Body({ text }) {
       {blocks.map((b, i) => {
         switch (b.type) {
           case 'code':
-            return <CodeBlock key={i} code={b.code} language={b.lang} />
+            return <CodeBlock key={i} code={b.code} language={b.lang} labSlug={labSlug} />
+          case 'shell':
+            return <ShellBlock key={i} code={b.code} command={b.command} output={b.output} labSlug={labSlug} />
           case 'hr':
             return <hr key={i} className="border-surface-800 my-2" />
           case 'heading': {
@@ -230,19 +323,13 @@ function Body({ text }) {
               </blockquote>
             )
           case 'table':
+            return <TutorialTable key={i} header={b.header} rows={b.rows} />
+          case 'details':
             return (
-              <div key={i} className="tutorial-table-wrap">
-                <table className="tutorial-table">
-                  <thead>
-                    <tr>{b.header.map((c, j) => <th key={j}>{formatInline(c)}</th>)}</tr>
-                  </thead>
-                  <tbody>
-                    {b.rows.map((row, r) => (
-                      <tr key={r}>{row.map((c, j) => <td key={j}>{formatInline(c)}</td>)}</tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
+              <details key={i} className="tutorial-details">
+                <summary>{formatInline(b.title)}</summary>
+                <Body text={b.text} labSlug={labSlug} />
+              </details>
             )
           case 'ol':
             return (
@@ -296,6 +383,7 @@ export default function TutorialDetail() {
   const [completedSections, setCompletedSections] = useState([])
   const [readProgressPct, setReadProgressPct] = useState(0)
   const [completionRequirements, setCompletionRequirements] = useState(null)
+  const [scrollProgress, setScrollProgress] = useState(0)
 
   usePageTitle(tutorial?.meta_title || 'Tutorial', tutorial?.meta_description || '')
 
@@ -389,6 +477,17 @@ export default function TutorialDetail() {
   }, [tutorial])
 
   useEffect(() => {
+    const onScroll = () => {
+      const doc = document.documentElement
+      const max = Math.max(1, doc.scrollHeight - doc.clientHeight)
+      setScrollProgress(Math.min(100, Math.max(0, Math.round((doc.scrollTop / max) * 100))))
+    }
+    onScroll()
+    window.addEventListener('scroll', onScroll, { passive: true })
+    return () => window.removeEventListener('scroll', onScroll)
+  }, [])
+
+  useEffect(() => {
     if (!tutorial?.sections?.length) return
     const obs = new IntersectionObserver(
       (entries) => {
@@ -460,6 +559,7 @@ export default function TutorialDetail() {
   return (
     <PublicLayout>
       <div className="tutorial-page relative overflow-hidden min-h-screen">
+        <div className="tutorial-reading-progress" style={{ width: `${scrollProgress}%` }} />
         <div className="absolute inset-0 aurora-bg opacity-25 pointer-events-none" aria-hidden="true" />
         <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[800px] h-[300px] bg-accent-cyan/[0.04] blur-[100px] pointer-events-none" />
 
@@ -657,8 +757,8 @@ export default function TutorialDetail() {
                           <span className="tutorial-section-badge">{s.heading}</span>
                         </div>
                       </div>
-                      <Body text={s.body} />
-                      {s.code && <CodeBlock code={s.code} language={s.code_language} caption={s.code_caption} />}
+                      <Body text={s.body} labSlug={tutorial.scenario_slug || linkedScenario?.slug} />
+                      {s.code && <CodeBlock code={s.code} language={s.code_language} caption={s.code_caption} labSlug={tutorial.scenario_slug || linkedScenario?.slug} />}
                       {s.quiz && (
                         <TutorialQuiz
                           quiz={s.quiz}

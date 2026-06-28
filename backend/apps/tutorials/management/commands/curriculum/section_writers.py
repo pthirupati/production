@@ -206,7 +206,7 @@ def _write_simulations(topic: str, module: str, level: str, profile: dict) -> st
         f"FixitLab simulators let you practice **{module}** without production risk. "
         f"Open the **{topic}** simulator from the lab toolbar (Terraform Cloud, Grafana, VMware, Windows Server, AWX, etc.).\n\n"
         f"Compare simulated output to real environments: error strings, metric names, UI labels, and timing. "
-        f"Simulations grade via FIXED-OK markers or API validation — treat them like a staging environment.\n\n"
+        f"Simulations grade via real state checks (service status, pods, files, command output, or API validation) — treat them like a staging environment.\n\n"
         f"**Exercise:** break → fix → verify cycle three times until muscle memory forms."
     )
 

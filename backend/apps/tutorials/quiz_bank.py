@@ -160,6 +160,6 @@ def build_module_quiz(topic: str, module: str, *, count: int = 5) -> dict:
 
     return {
         "title": f"{module} — module quiz",
-        "pass_score": 0.6,
+        "pass_score": 0.8,
         "questions": questions,
     }

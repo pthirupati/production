@@ -13,6 +13,7 @@ Usage:
 from django.core.management.base import BaseCommand
 from django.db import transaction
 
+from apps.tutorials.completeness import default_linked_lab_slug, enrich_body
 from apps.tutorials.models import Tutorial, TutorialSection
 
 
@@ -739,6 +740,24 @@ def _filter_specs(specs: list) -> list:
     return [s for s in specs if s.get("slug") not in SHALLOW_E3_SLUGS]
 
 
+def _ensure_assessment_section(sections: list) -> list:
+    """Ensure every tutorial has a section that triggers the 5-question quiz."""
+    if any(
+        any(k in str(row[0]).lower() for k in ("assessment", "quiz", "checkpoint"))
+        for row in sections
+    ):
+        return sections
+    return list(sections) + [
+        (
+            "Assessment",
+            "Answer the five-question module quiz. You pass this lesson when your quiz score is 80% or higher and the linked hands-on lab is complete.",
+            "",
+            "text",
+            "",
+        )
+    ]
+
+
 class Command(BaseCommand):
     help = "Seed the public Tutorials section with original written content (idempotent)."
 
@@ -826,7 +845,9 @@ class Command(BaseCommand):
             Tutorial.objects.filter(slug__in=SHALLOW_E3_SLUGS).delete()
             self.stdout.write(self.style.WARNING(f"  - removed {stale} superseded shallow tutorials"))
         for spec in specs:
-            sections = spec.pop("sections", [])
+            sections = _ensure_assessment_section(spec.pop("sections", []))
+            if not spec.get("scenario_slug"):
+                spec["scenario_slug"] = default_linked_lab_slug(spec.get("topic", ""))
             obj, was_created = Tutorial.objects.update_or_create(
                 slug=spec["slug"],
                 defaults=spec,
@@ -844,7 +865,18 @@ class Command(BaseCommand):
                         code_language=code_language or "bash",
                         code_caption=code_caption,
                     )
-                    for i, (heading, body, code, code_language, code_caption) in enumerate(sections)
+                    for i, (heading, body, code, code_language, code_caption) in enumerate(
+                        (
+                            (
+                                heading,
+                                enrich_body(spec.get("topic", ""), spec.get("title", ""), body),
+                                code,
+                                code_language,
+                                code_caption,
+                            )
+                            for heading, body, code, code_language, code_caption in sections
+                        )
+                    )
                 ]
             )
             # Restore sections key for idempotent re-runs within one process.
