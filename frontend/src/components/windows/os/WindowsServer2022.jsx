@@ -14,6 +14,10 @@ export default function WindowsServer2022({ autoOpen = 'ServerManager', backendS
   // updates, so effects that depend on them won't re-fire on every render
   // (depending on the whole `os` object caused a React #185 infinite loop).
   const hydrateFromBackend = useOS((s) => s.hydrateFromBackend)
+  const taskViewOpen = useOS((s) => s.taskViewOpen)
+  const setTaskViewOpen = useOS((s) => s.setTaskViewOpen)
+  const powerState = useOS((s) => s.powerState)
+  const setPowerState = useOS((s) => s.setPowerState)
   const booted = useRef(false)
   const [altTab, setAltTab] = useState(null) // { index } when held
 
@@ -41,6 +45,8 @@ export default function WindowsServer2022({ autoOpen = 'ServerManager', backendS
         setAltTab((prev) => ({ index: ((prev?.index ?? -1) + 1) % wins.length }))
       } else if (e.key === 'Escape') {
         useOS.getState().setStartOpen(false)
+        useOS.getState().setTaskViewOpen(false)
+        setAltTab(null)
       }
     }
     const onUp = (e) => {
@@ -74,15 +80,47 @@ export default function WindowsServer2022({ autoOpen = 'ServerManager', backendS
         <Taskbar />
         {os.startOpen && <StartMenu />}
 
-        {altTab && (
-          <div className="winos-alttab">
-            <div className="winos-alttab-grid">
+        {(altTab || taskViewOpen) && os.windows.length > 0 && (
+          <div className="winos-alttab" onMouseDown={() => { setAltTab(null); setTaskViewOpen(false) }}>
+            <div className="winos-alttab-grid" onMouseDown={(e) => e.stopPropagation()}>
               {os.windows.map((w, i) => (
-                <div key={w.id} className={`winos-alttab-card ${i === altTab.index ? 'sel' : ''}`}>
+                <div
+                  key={w.id}
+                  className={`winos-alttab-card ${altTab ? (i === altTab.index ? 'sel' : '') : ''}`}
+                  onClick={() => { os.focusWindow(w.id); setAltTab(null); setTaskViewOpen(false) }}
+                >
                   <AppIcon app={w.app} size={36} />
                   <div style={{ fontSize: 12, padding: '0 8px', textAlign: 'center' }}>{w.title}</div>
                 </div>
               ))}
+            </div>
+          </div>
+        )}
+
+        {powerState && (
+          <div className="winos-power-overlay">
+            <div className="winos-power-card">
+              {powerState === 'sleep' && (
+                <>
+                  <div className="winos-power-title">Sleeping</div>
+                  <p className="winos-power-text">Press any key or move the mouse to wake this lab VM.</p>
+                  <button type="button" className="winos-power-btn" onClick={() => setPowerState(null)}>Wake</button>
+                </>
+              )}
+              {powerState === 'shutdown' && (
+                <>
+                  <div className="winos-power-title">Shutting down</div>
+                  <p className="winos-power-text">Windows is shutting down. Restart the lab session from FixitLab to sign in again.</p>
+                  <button type="button" className="winos-power-btn" onClick={() => setPowerState(null)}>Cancel shutdown</button>
+                </>
+              )}
+              {powerState === 'restart' && (
+                <>
+                  <div className="winos-power-title">Restarting</div>
+                  <p className="winos-power-text">Applying updates and restarting services…</p>
+                  <button type="button" className="winos-power-btn" onClick={() => setPowerState(null)}>Sign in</button>
+                </>
+              )}
             </div>
           </div>
         )}

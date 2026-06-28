@@ -14,17 +14,40 @@ from .helpers import is_jira_closed, resolve_jira_issue_url
 from .sync import ensure_scenario_ticket
 
 
+def _user_has_free_lab_quota(user) -> bool:
+    """True while a free-plan user still has one of their daily free labs left.
+
+    Mirrors the lab-start gate (`apps.billing.services.can_start_lab`, enforced in
+    `public_api.views`): the Free plan grants `max_labs_per_day` (5) labs/day, and
+    `labs_remaining` is `max_labs_per_day - labs_started_today`. Staff/admins read
+    as unlimited there, so this returns True for them too.
+    """
+    try:
+        from apps.billing.services import get_user_plan_info
+        return get_user_plan_info(user)["usage"]["labs_remaining"] > 0
+    except Exception:
+        return False
+
+
 def _user_can_open_scenario_jira(user, scenario: Scenario) -> bool:
-    """Jira incident details require the same access as starting the lab."""
+    """Open the Jira incident ONLY when the user is *subscribed* (active tech
+    subscription, org grant, or complimentary/staff access) OR is a free-plan
+    user who still has daily free-lab access remaining. Once the free quota is
+    used up and the user is not subscribed, the ticket must NOT open.
+
+    This is the single enforcement point for the Jira-open rule and matches the
+    lab-start quota gate, so a free user who can't start a 6th lab today also
+    can't open a 6th incident ticket.
+    """
     if not user or not user.is_authenticated:
         return False
+    # Subscribed / complimentary / staff → always allowed.
     if user_has_complimentary_access(user):
         return True
-    if scenario.is_free:
+    if scenario.technology_id and user_has_technology_access(user, scenario.technology_id):
         return True
-    if not scenario.technology_id:
-        return True
-    return user_has_technology_access(user, scenario.technology_id)
+    # Free plan: allowed only while the daily free-lab quota remains.
+    return _user_has_free_lab_quota(user)
 
 
 def _sync_ticket_status(ticket, client=None):

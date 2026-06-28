@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { Wifi, Volume2, Bell, ChevronUp, Shield, Search } from 'lucide-react'
+import { Wifi, Volume2, Bell, ChevronUp, Shield, Search, LayoutGrid } from 'lucide-react'
 import { useOS } from './store'
 import { APPS, AppIcon } from './apps/registry'
 import { useCtxMenu } from './ui'
@@ -9,7 +9,10 @@ const PINNED = [
   { app: 'ServerManager' },
   { app: 'Terminal', props: { shell: 'ps' } },
   { app: 'Terminal', props: { shell: 'cmd' }, key: 'cmd', title: 'Command Prompt' },
+  { app: 'Edge' },
   { app: 'TaskManager' },
+  { app: 'EventViewer' },
+  { app: 'DeviceManager' },
 ]
 
 export default function Taskbar() {
@@ -77,6 +80,14 @@ export default function Taskbar() {
       <div className="winos-tray-btn" style={{ width: 200 }} onClick={() => os.setStartOpen(true)}>
         <Search size={15} /><span style={{ fontSize: 11.5, color: '#bbb' }}>Type here to search</span>
       </div>
+      <button
+        type="button"
+        className={`winos-taskbtn ${os.taskViewOpen ? 'active' : ''}`}
+        title="Task View"
+        onClick={() => os.setTaskViewOpen((v) => !v)}
+      >
+        <LayoutGrid size={18} />
+      </button>
       <div className="winos-tasks">
         {PINNED.map((p) => {
           const win = running.find((w) => w.app === p.app && JSON.stringify(w.props || {}) === JSON.stringify(p.props || {}))

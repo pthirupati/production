@@ -1124,6 +1124,19 @@ def apply_action(session_id: str, action: str, payload: dict | None = None) -> d
         _save_session(str(session_id), entry)
         return {"ok": True, "message": f"Reverted to '{snap['name']}'"}
 
+    if action == "consolidate_snapshots":
+        vm = _find_vm(state, payload.get("vm_id"), payload.get("vm_name"))
+        if not vm:
+            return {"ok": False, "error": "VM not found"}
+        count = len(vm.get("snapshots", []))
+        vm["snapshots"] = []
+        vm["snapshot_consolidated"] = True
+        vm.pop("needs_consolidation", None)
+        events.append(_event(f"Consolidated snapshots on {vm['name']}", "info", vm["name"]))
+        tasks.insert(0, _task("Consolidate Snapshots", vm["name"]))
+        _save_session(str(session_id), entry)
+        return {"ok": True, "message": f"Consolidated {count} snapshot{'s' if count != 1 else ''} on {vm['name']}"}
+
     if action == "reconnect_host":
         host = _find_host(state, payload.get("host_id"), payload.get("host_name"))
         if not host:

@@ -1,0 +1,96 @@
+<svg width="1080" height="1350" viewBox="0 0 1080 1350" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="FixitLab features grid">
+  <defs>
+    <style>
+      @import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@500;700;800&amp;family=Inter:wght@400;500;600&amp;display=swap');
+      .disp{font-family:'DM Sans',system-ui,-apple-system,'Segoe UI',Roboto,sans-serif;}
+      .body{font-family:'Inter',system-ui,-apple-system,'Segoe UI',Roboto,sans-serif;}
+      .mono{font-family:'JetBrains Mono',ui-monospace,Menlo,monospace;}
+    </style>
+    <linearGradient id="brand" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#6d78ff"/><stop offset="0.5" stop-color="#b266e0"/><stop offset="1" stop-color="#49b5ff"/>
+    </linearGradient>
+    <radialGradient id="orbCyan" cx="0.5" cy="0.5" r="0.5"><stop offset="0" stop-color="#6d78ff" stop-opacity="0.4"/><stop offset="1" stop-color="#6d78ff" stop-opacity="0"/></radialGradient>
+    <radialGradient id="orbPurple" cx="0.5" cy="0.5" r="0.5"><stop offset="0" stop-color="#b266e0" stop-opacity="0.4"/><stop offset="1" stop-color="#b266e0" stop-opacity="0"/></radialGradient>
+  </defs>
+
+  <rect width="1080" height="1350" fill="#080a16"/>
+  <circle cx="160" cy="200" r="420" fill="url(#orbCyan)"/>
+  <circle cx="940" cy="1180" r="460" fill="url(#orbPurple)"/>
+
+  <!-- Header -->
+  <g transform="translate(64,80)">
+    <rect width="58" height="58" rx="15" fill="url(#brand)"/>
+    <text x="29" y="40" text-anchor="middle" class="mono" font-size="30" font-weight="700" fill="#080a16">&gt;_</text>
+    <text x="76" y="40" class="disp" font-size="34" font-weight="800" fill="#ffffff">FixitLab</text>
+  </g>
+  <text x="64" y="208" class="disp" font-size="54" font-weight="800" fill="#ffffff">Everything in one</text>
+  <text x="64" y="270" class="disp" font-size="54" font-weight="800" fill="url(#brand)">platform.</text>
+
+  <!-- Feature cards 2x3 -->
+  <g class="body">
+    <!-- card 1 -->
+    <g transform="translate(64,320)">
+      <rect width="466" height="200" rx="18" fill="#49b5ff" fill-opacity="0.07" stroke="#49b5ff" stroke-opacity="0.28"/>
+      <rect x="28" y="28" width="56" height="56" rx="14" fill="#49b5ff" fill-opacity="0.18"/>
+      <text x="56" y="66" text-anchor="middle" class="mono" font-size="26" fill="#8fd0ff">&gt;_</text>
+      <text x="28" y="124" class="disp" font-size="26" font-weight="800" fill="#ffffff">Live cloud labs</text>
+      <text x="28" y="158" font-size="18" fill="#aeb6d4">Real bash terminals in your</text>
+      <text x="28" y="182" font-size="18" fill="#aeb6d4">browser — Docker, AWS, DO.</text>
+    </g>
+    <!-- card 2 -->
+    <g transform="translate(550,320)">
+      <rect width="466" height="200" rx="18" fill="#b266e0" fill-opacity="0.07" stroke="#b266e0" stroke-opacity="0.28"/>
+      <rect x="28" y="28" width="56" height="56" rx="14" fill="#b266e0" fill-opacity="0.18"/>
+      <text x="56" y="64" text-anchor="middle" font-size="28" fill="#d6a8ee">🎙</text>
+      <text x="28" y="124" class="disp" font-size="26" font-weight="800" fill="#ffffff">AI mock interviews</text>
+      <text x="28" y="158" font-size="18" fill="#aeb6d4">Multi-round voice interviews,</text>
+      <text x="28" y="182" font-size="18" fill="#aeb6d4">STAR scoring, real certs.</text>
+    </g>
+    <!-- card 3 -->
+    <g transform="translate(64,540)">
+      <rect width="466" height="200" rx="18" fill="#56e0b0" fill-opacity="0.07" stroke="#56e0b0" stroke-opacity="0.28"/>
+      <rect x="28" y="28" width="56" height="56" rx="14" fill="#56e0b0" fill-opacity="0.18"/>
+      <text x="56" y="64" text-anchor="middle" font-size="28" fill="#7fe8c6">⚡</text>
+      <text x="28" y="124" class="disp" font-size="26" font-weight="800" fill="#ffffff">Fix · Build · Hack</text>
+      <text x="28" y="158" font-size="18" fill="#aeb6d4">Three timed challenge modes</text>
+      <text x="28" y="182" font-size="18" fill="#aeb6d4">with instant validation.</text>
+    </g>
+    <!-- card 4 -->
+    <g transform="translate(550,540)">
+      <rect width="466" height="200" rx="18" fill="#feb155" fill-opacity="0.07" stroke="#feb155" stroke-opacity="0.28"/>
+      <rect x="28" y="28" width="56" height="56" rx="14" fill="#feb155" fill-opacity="0.18"/>
+      <text x="56" y="64" text-anchor="middle" font-size="28" fill="#ffcd8a">🏆</text>
+      <text x="28" y="124" class="disp" font-size="26" font-weight="800" fill="#ffffff">Certification prep</text>
+      <text x="28" y="158" font-size="18" fill="#aeb6d4">RHCSA, CKA &amp; more — vendor-</text>
+      <text x="28" y="182" font-size="18" fill="#aeb6d4">aligned hands-on tracks.</text>
+    </g>
+    <!-- card 5 -->
+    <g transform="translate(64,760)">
+      <rect width="466" height="200" rx="18" fill="#f579dd" fill-opacity="0.07" stroke="#f579dd" stroke-opacity="0.28"/>
+      <rect x="28" y="28" width="56" height="56" rx="14" fill="#f579dd" fill-opacity="0.18"/>
+      <text x="56" y="64" text-anchor="middle" font-size="28" fill="#f7a8e6">🖥</text>
+      <text x="28" y="124" class="disp" font-size="26" font-weight="800" fill="#ffffff">VMware vCenter sim</text>
+      <text x="28" y="158" font-size="18" fill="#aeb6d4">vMotion, HA, DRS, snapshots</text>
+      <text x="28" y="182" font-size="18" fill="#aeb6d4">with realistic faults.</text>
+    </g>
+    <!-- card 6 -->
+    <g transform="translate(550,760)">
+      <rect width="466" height="200" rx="18" fill="#6d78ff" fill-opacity="0.07" stroke="#6d78ff" stroke-opacity="0.28"/>
+      <rect x="28" y="28" width="56" height="56" rx="14" fill="#6d78ff" fill-opacity="0.18"/>
+      <text x="56" y="64" text-anchor="middle" font-size="28" fill="#9fa8ff">&lt;/&gt;</text>
+      <text x="28" y="124" class="disp" font-size="26" font-weight="800" fill="#ffffff">Coding playgrounds</text>
+      <text x="28" y="158" font-size="18" fill="#aeb6d4">Python, Java, JS &amp; Shell with</text>
+      <text x="28" y="182" font-size="18" fill="#aeb6d4">auto-graded test cases.</text>
+    </g>
+  </g>
+
+  <!-- Footer CTA -->
+  <g transform="translate(64,1010)">
+    <text x="0" y="120" class="disp" font-size="40" font-weight="800" fill="#ffffff">Start free today.</text>
+    <text x="0" y="170" class="body" font-size="22" fill="#aeb6d4">21+ technologies · 360+ scenarios · 10k+ engineers</text>
+    <g transform="translate(0,210)">
+      <rect width="280" height="62" rx="31" fill="url(#brand)"/>
+      <text x="140" y="40" text-anchor="middle" class="body" font-size="22" font-weight="600" fill="#080a16">Try free → fixitlab.in</text>
+    </g>
+  </g>
+</svg>

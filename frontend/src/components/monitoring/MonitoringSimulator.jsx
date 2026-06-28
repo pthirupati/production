@@ -3,7 +3,7 @@ import {
   Bell, Gauge, Search, Server, GitBranch,
   AlertTriangle, XCircle, RefreshCw, Play, Layers,
   Compass, Settings, Plug, Plus, Trash2, ChevronUp, ChevronDown, Pencil, ChevronRight, Home, GripVertical,
-  ArrowLeft, Terminal,
+  ArrowLeft, Terminal, Clock, Share2, Save, X, Copy, SlidersHorizontal,
 } from 'lucide-react'
 import { monitoringApi } from '../../api/monitoring'
 import MonitoringLoginGate, { isMonitoringAuthenticated } from './MonitoringLoginGate'
@@ -17,6 +17,7 @@ import GrafanaIconSidebar from './GrafanaIconSidebar'
 import PrometheusTopNav from './PrometheusTopNav'
 import {
   PROMETHEUS_ALERT_GROUPS, PROMETHEUS_CONFIG_YAML, PROMETHEUS_SERVICE_DISCOVERY,
+  PROM_TSDB_TOP_METRICS, PROM_TSDB_TOP_LABELS, PROMETHEUS_FLAGS,
 } from '../../mockData/prometheus'
 import {
   GRAFANA_FOLDERS, GRAFANA_DASHBOARD_BROWSE, GRAFANA_PLAYLISTS, GRAFANA_SNAPSHOTS, GRAFANA_LIBRARY_PANELS,
@@ -125,6 +126,12 @@ function DashPanel({ panel, sessionId, scenario, dashboardUid, noData, editLayou
           </span>
         )}
         <div className="flex items-center gap-1 shrink-0">
+          <button type="button" className="mon-btn !p-1" title="Edit panel"
+            onClick={() => onMutate?.('edit-panel')}><Pencil size={12} /></button>
+          <button type="button" className="mon-btn !p-1" title="Inspect panel data"
+            onClick={() => onMutate?.('inspect-panel')}><Search size={12} /></button>
+          <button type="button" className="mon-btn !p-1" title="More panel actions"
+            onClick={() => onMutate?.('duplicate-panel')}><Copy size={12} /></button>
           {editLayout && (
             <>
               <button type="button" className="mon-btn !p-1" title="Move up" disabled={panelIndex === 0}
@@ -203,6 +210,248 @@ function DashPanel({ panel, sessionId, scenario, dashboardUid, noData, editLayou
   )
 }
 
+const GRAFANA_TIME_RANGES = [
+  'Last 5 minutes', 'Last 15 minutes', 'Last 30 minutes', 'Last 1 hour', 'Last 3 hours',
+  'Last 6 hours', 'Last 12 hours', 'Last 24 hours', 'Last 2 days', 'Last 7 days',
+  'Last 30 days', 'Today so far', 'This week so far', 'This month so far', 'Custom absolute range',
+]
+
+const GRAFANA_REFRESH_INTERVALS = ['Off', '5s', '10s', '30s', '1m', '5m', '15m', '30m', '1h', '1d']
+const GRAFANA_PANEL_TYPES = [
+  'timeseries', 'barchart', 'stat', 'gauge', 'bargauge', 'table', 'piechart', 'heatmap',
+  'state-timeline', 'status-history', 'histogram', 'logs', 'node-graph', 'text', 'alert-list',
+]
+const GRAFANA_TRANSFORMS = [
+  'Calculate field', 'Config from query', 'Convert field type', 'Extract fields', 'Filter by name',
+  'Filter data by query', 'Group by', 'Join by field', 'Labels to fields', 'Limit', 'Merge',
+  'Organize fields', 'Prepare time series', 'Reduce', 'Rename by regex', 'Series to rows', 'Sort by',
+]
+const GRAFANA_UNITS = ['none', 'percent', 'percentunit', 'bytes', 's', 'reqps', 'short', 'ops/s', 'bits/sec', 'ms']
+
+function GrafanaTimePicker({ range, refresh, open, onToggle, onRange, onRefresh, onReload }) {
+  return (
+    <div className="relative">
+      <button type="button" className="mon-tab flex items-center gap-1" onClick={onToggle}>
+        <Clock size={13} /> {range}
+      </button>
+      {open && (
+        <div className="absolute right-0 top-full mt-2 z-30 w-[420px] max-w-[90vw] mon-card shadow-2xl !p-0 overflow-hidden">
+          <div className="grid grid-cols-2">
+            <div className="p-3 border-r border-[#262a45]">
+              <div className="mon-panel-title text-sm mb-2">Quick ranges</div>
+              <div className="grid gap-1 max-h-72 overflow-y-auto">
+                {GRAFANA_TIME_RANGES.map((r) => (
+                  <button key={r} type="button"
+                    className={`text-left px-2 py-1.5 rounded text-xs ${range === r ? 'bg-[#f7913b]/20 text-[#f7913b]' : 'text-[#d8def0] hover:bg-white/5'}`}
+                    onClick={() => onRange(r)}>
+                    {r}
+                  </button>
+                ))}
+              </div>
+            </div>
+            <div className="p-3 space-y-3">
+              <div>
+                <div className="mon-panel-title text-sm mb-2">Absolute time range</div>
+                <label className="block text-[10px] text-[#8a93b2] mb-1">From</label>
+                <input className="mon-input w-full !text-xs mb-2" value="2026-06-28 03:00:00" readOnly />
+                <label className="block text-[10px] text-[#8a93b2] mb-1">To</label>
+                <input className="mon-input w-full !text-xs" value="now" readOnly />
+              </div>
+              <div>
+                <div className="mon-panel-title text-sm mb-2">Refresh interval</div>
+                <div className="flex flex-wrap gap-1">
+                  {GRAFANA_REFRESH_INTERVALS.map((r) => (
+                    <button key={r} type="button"
+                      className={`mon-tab !text-[11px] ${refresh === r ? 'mon-tab-active' : ''}`}
+                      onClick={() => onRefresh(r)}>
+                      {r}
+                    </button>
+                  ))}
+                </div>
+              </div>
+              <button type="button" className="mon-btn-primary w-full !justify-center" onClick={onReload}>
+                <RefreshCw size={13} /> Apply time range
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}
+
+function GrafanaPanelEditor({ panel, dashboardUid, sessionId, onClose, onReload }) {
+  const [tab, setTab] = useState('query')
+  const [draft, setDraft] = useState(() => ({
+    title: panel?.title || '',
+    expr: panel?.expr || 'up',
+    type: panel?.type || 'timeseries',
+    unit: panel?.unit || 'none',
+    legend: 'Table',
+    tooltip: 'All series',
+    threshold: '80',
+    transform: 'Reduce',
+    alertName: `${panel?.title || 'Panel'} threshold`,
+  }))
+  const [saving, setSaving] = useState(false)
+
+  if (!panel) return null
+
+  const save = async () => {
+    setSaving(true)
+    try {
+      await monitoringApi.action(sessionId, 'update_panel', {
+        dashboard_uid: dashboardUid,
+        panel_id: panel.id,
+        title: draft.title,
+        expr: draft.expr,
+        type: draft.type,
+        unit: draft.unit,
+      })
+      onReload?.()
+      onClose()
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  return (
+    <div className="fixed inset-0 z-[1000] bg-black/70 flex items-stretch justify-center p-4">
+      <div className="w-full max-w-6xl bg-[#111217] border border-[#30324a] rounded-lg shadow-2xl overflow-hidden flex flex-col">
+        <div className="px-4 py-3 border-b border-[#30324a] flex items-center gap-3">
+          <div>
+            <div className="text-white font-semibold">Edit panel</div>
+            <div className="text-[11px] text-[#8a93b2]">Dashboard panel editor · query, transforms, alerting, field options</div>
+          </div>
+          <span className="flex-1" />
+          <button type="button" className="mon-btn !text-xs flex items-center gap-1" disabled={saving} onClick={save}>
+            <Save size={13} /> Save
+          </button>
+          <button type="button" className="mon-btn !p-1.5" onClick={onClose}><X size={14} /></button>
+        </div>
+        <div className="grid grid-cols-1 lg:grid-cols-[1fr_330px] min-h-0 flex-1">
+          <div className="p-4 overflow-auto">
+            <div className="mon-card mb-4">
+              <div className="flex items-center justify-between mb-2">
+                <div className="mon-panel-title">{draft.title || 'Untitled panel'}</div>
+                <span className="mon-badge mon-badge-up">{draft.type}</span>
+              </div>
+              <Sparkline values={[12, 18, 14, 25, 31, 29, 38, 42, 37, 49, 46, 52]} color="#f7913b" height={130} />
+            </div>
+            <div className="flex gap-2 mb-3 flex-wrap">
+              {[
+                ['query', 'Query'],
+                ['transform', 'Transform data'],
+                ['alert', 'Alert'],
+              ].map(([k, label]) => (
+                <button key={k} type="button" className={`mon-tab ${tab === k ? 'mon-tab-active' : ''}`} onClick={() => setTab(k)}>
+                  {label}
+                </button>
+              ))}
+            </div>
+            {tab === 'query' && (
+              <div className="space-y-3">
+                <div className="mon-card">
+                  <div className="flex items-center justify-between mb-2">
+                    <div className="mon-panel-title text-sm">Query A</div>
+                    <span className="text-[10px] text-[#8a93b2]">Data source: Prometheus</span>
+                  </div>
+                  <label className="block text-[10px] text-[#8a93b2] mb-1">Legend</label>
+                  <input className="mon-input w-full mb-2" value="{{instance}}" readOnly />
+                  <label className="block text-[10px] text-[#8a93b2] mb-1">PromQL</label>
+                  <textarea className="mon-input w-full font-mono min-h-[90px]" value={draft.expr}
+                    onChange={(e) => setDraft((d) => ({ ...d, expr: e.target.value }))} />
+                  <div className="grid sm:grid-cols-4 gap-2 mt-3">
+                    {['rate', 'sum', 'avg', 'by label'].map((op) => <button key={op} type="button" className="mon-tab !text-[11px]">{op}</button>)}
+                  </div>
+                </div>
+                <div className="mon-card grid sm:grid-cols-3 gap-3">
+                  <label className="text-xs text-[#8a93b2]">Max data points<input className="mon-input w-full mt-1" value="1100" readOnly /></label>
+                  <label className="text-xs text-[#8a93b2]">Min interval<input className="mon-input w-full mt-1" value="$__interval" readOnly /></label>
+                  <label className="text-xs text-[#8a93b2]">Relative time<input className="mon-input w-full mt-1" value="" placeholder="1h" readOnly /></label>
+                </div>
+              </div>
+            )}
+            {tab === 'transform' && (
+              <div className="mon-card">
+                <div className="mon-panel-title text-sm mb-3">Transformations</div>
+                <select className="mon-input w-full mb-3" value={draft.transform}
+                  onChange={(e) => setDraft((d) => ({ ...d, transform: e.target.value }))}>
+                  {GRAFANA_TRANSFORMS.map((t) => <option key={t} value={t}>{t}</option>)}
+                </select>
+                <div className="grid sm:grid-cols-2 gap-2">
+                  {GRAFANA_TRANSFORMS.slice(0, 8).map((t) => (
+                    <button key={t} type="button" className="mon-tab !justify-start !text-[11px]">{t}</button>
+                  ))}
+                </div>
+              </div>
+            )}
+            {tab === 'alert' && (
+              <div className="mon-card space-y-3">
+                <div className="mon-panel-title text-sm">Alert rule</div>
+                <input className="mon-input w-full" value={draft.alertName}
+                  onChange={(e) => setDraft((d) => ({ ...d, alertName: e.target.value }))} />
+                <div className="grid sm:grid-cols-3 gap-2">
+                  <select className="mon-input"><option>IS ABOVE</option><option>IS BELOW</option><option>OUTSIDE RANGE</option></select>
+                  <input className="mon-input" value={draft.threshold}
+                    onChange={(e) => setDraft((d) => ({ ...d, threshold: e.target.value }))} />
+                  <select className="mon-input"><option>for 5m</option><option>for 10m</option><option>for 1h</option></select>
+                </div>
+                <textarea className="mon-input w-full min-h-[70px]" value="Summary: panel threshold exceeded\nRunbook URL: https://runbooks.fixitlab.io/monitoring" readOnly />
+              </div>
+            )}
+          </div>
+          <div className="border-l border-[#30324a] p-4 overflow-auto bg-[#181a2f]">
+            <div className="mon-panel-title mb-3 flex items-center gap-2"><SlidersHorizontal size={14} /> Panel options</div>
+            <div className="space-y-3">
+              <label className="block text-xs text-[#8a93b2]">Title<input className="mon-input w-full mt-1" value={draft.title}
+                onChange={(e) => setDraft((d) => ({ ...d, title: e.target.value }))} /></label>
+              <label className="block text-xs text-[#8a93b2]">Visualization
+                <select className="mon-input w-full mt-1" value={draft.type}
+                  onChange={(e) => setDraft((d) => ({ ...d, type: e.target.value }))}>
+                  {GRAFANA_PANEL_TYPES.map((t) => <option key={t} value={t}>{t}</option>)}
+                </select>
+              </label>
+              <label className="block text-xs text-[#8a93b2]">Unit
+                <select className="mon-input w-full mt-1" value={draft.unit}
+                  onChange={(e) => setDraft((d) => ({ ...d, unit: e.target.value }))}>
+                  {GRAFANA_UNITS.map((u) => <option key={u} value={u}>{u}</option>)}
+                </select>
+              </label>
+              {[
+                ['Tooltip mode', draft.tooltip, ['Single', 'All series', 'Hidden']],
+                ['Legend mode', draft.legend, ['List', 'Table', 'Hidden']],
+                ['Color scheme', 'Classic palette', ['Classic palette', 'Green-Yellow-Red', 'Blue-Yellow-Red', 'Fixed color']],
+                ['Graph style', 'Lines', ['Lines', 'Bars', 'Points']],
+              ].map(([label, value, opts]) => (
+                <label key={label} className="block text-xs text-[#8a93b2]">{label}
+                  <select className="mon-input w-full mt-1" defaultValue={value}>
+                    {opts.map((o) => <option key={o}>{o}</option>)}
+                  </select>
+                </label>
+              ))}
+              <div className="mon-card !p-3 bg-[#111217]">
+                <div className="text-xs font-semibold mb-2 text-[#d8def0]">Thresholds</div>
+                <div className="flex items-center gap-2">
+                  <span className="w-4 h-4 rounded bg-green-500" />
+                  <input className="mon-input flex-1 !py-1" value="Base" readOnly />
+                </div>
+                <div className="flex items-center gap-2 mt-2">
+                  <span className="w-4 h-4 rounded bg-red-500" />
+                  <input className="mon-input flex-1 !py-1" value={draft.threshold}
+                    onChange={(e) => setDraft((d) => ({ ...d, threshold: e.target.value }))} />
+                </div>
+              </div>
+              <button type="button" className="mon-tab w-full !justify-start"><Plus size={13} /> Add field override</button>
+              <button type="button" className="mon-tab w-full !justify-start"><Plus size={13} /> Add data link</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  )
+}
+
 const GRAFANA_NAV_MAP = {
   home: 'home',
   dashboards: 'dashboards',
@@ -213,7 +462,7 @@ const GRAFANA_NAV_MAP = {
 }
 
 /* ── Grafana view ── */
-function GrafanaView({ state, sessionId, scenario, onReload, activeNav, grafanaChildNav }) {
+function GrafanaView({ state, sessionId, scenario, onReload, activeNav, grafanaChildNav, setGrafanaChildNav }) {
   const graf = state.grafana || {}
   const [activeDash, setActiveDash] = useState(graf.dashboards?.[0]?.uid || '')
   const [sub, setSub] = useState(GRAFANA_NAV_MAP[activeNav] || 'dashboards')
@@ -221,6 +470,11 @@ function GrafanaView({ state, sessionId, scenario, onReload, activeNav, grafanaC
   const [adding, setAdding] = useState(false)
   const [dragPanelId, setDragPanelId] = useState(null)
   const [dropPanelId, setDropPanelId] = useState(null)
+  const [timeRange, setTimeRange] = useState('Last 6 hours')
+  const [refreshInterval, setRefreshInterval] = useState('30s')
+  const [timePickerOpen, setTimePickerOpen] = useState(false)
+  const [panelEditor, setPanelEditor] = useState(null)
+  const [toast, setToast] = useState('')
   const [newPanel, setNewPanel] = useState({ title: 'New panel', expr: 'up', type: 'timeseries' })
   const noDataPanels = new Set(state.broken?.panels_no_data || [])
   const dash = (graf.dashboards || []).find(d => d.uid === activeDash) || graf.dashboards?.[0]
@@ -245,6 +499,23 @@ function GrafanaView({ state, sessionId, scenario, onReload, activeNav, grafanaC
 
   const mutatePanels = async (kind, panelId, extra = {}) => {
     if (!dash) return
+    const panel = (dash.panels || []).find((p) => p.id === panelId)
+    if (kind === 'edit-panel' || kind === 'inspect-panel') {
+      if (panel) setPanelEditor(panel)
+      return
+    }
+    if (kind === 'duplicate-panel') {
+      if (!panel) return
+      await monitoringApi.action(sessionId, 'add_panel', {
+        dashboard_uid: dash.uid,
+        title: `${panel.title} copy`,
+        expr: panel.expr,
+        type: panel.type,
+      })
+      setToast('Panel duplicated')
+      onReload?.()
+      return
+    }
     if (kind === 'drag-start') {
       setDragPanelId(panelId)
       return
@@ -320,7 +591,7 @@ function GrafanaView({ state, sessionId, scenario, onReload, activeNav, grafanaC
       })
       if (res?.dashboard?.uid) {
         setActiveDash(res.dashboard.uid)
-        setGrafanaChildNav('View')
+        setGrafanaChildNav?.('View')
         onReload?.()
       }
     } catch {
@@ -391,9 +662,9 @@ function GrafanaView({ state, sessionId, scenario, onReload, activeNav, grafanaC
                     <tr key={d.uid} className="border-b border-[#262a45]/50 hover:bg-white/5 cursor-pointer" onClick={() => {
                       if ((graf.dashboards || []).some((gd) => gd.uid === d.uid)) {
                         setActiveDash(d.uid)
-                        setGrafanaChildNav('View')
+                        setGrafanaChildNav?.('View')
                       } else {
-                        setGrafanaChildNav('Browse')
+                        setGrafanaChildNav?.('Browse')
                       }
                     }}>
                       <td className="py-2 px-2 text-[#f7913b]">{d.title}</td>
@@ -453,28 +724,62 @@ function GrafanaView({ state, sessionId, scenario, onReload, activeNav, grafanaC
 
         {sub === 'dashboards' && dash && !['Browse', 'Playlists', 'Snapshots', 'Library panels'].includes(grafanaChildNav) && (
           <>
-            <div className="flex items-center gap-2 mb-3 flex-wrap">
-              <button type="button" className="mon-tab flex items-center gap-1" onClick={() => { setActiveDash(''); setGrafanaChildNav('Browse') }}>
-                <ArrowLeft size={13} /> Back to dashboards
-              </button>
-              {(graf.dashboards || []).map(d => (
-                <button key={d.uid} onClick={() => setActiveDash(d.uid)}
-                        className={`mon-tab ${d.uid === activeDash ? 'mon-tab-active' : ''}`}>{d.title}</button>
-              ))}
-              <span className="flex-1" />
-              <button type="button" className={`mon-tab ${editLayout ? 'mon-tab-active' : ''}`}
-                onClick={() => setEditLayout((e) => !e)}>
-                <Pencil size={13} /> {editLayout ? 'Done editing' : 'Edit dashboard'}
-              </button>
-              {editLayout && (
-                <>
-                  <span className="text-[10px] text-[#8a93b2] hidden sm:inline">Drag panels to reorder</span>
-                  <button type="button" className="mon-btn-primary !text-xs" onClick={() => setAdding(true)}>
-                    <Plus size={13} /> Add panel
-                  </button>
-                </>
-              )}
+            <div className="mon-card !p-3 mb-3">
+              <div className="flex items-center gap-2 flex-wrap">
+                <button type="button" className="mon-tab flex items-center gap-1" onClick={() => { setActiveDash(''); setGrafanaChildNav?.('Browse') }}>
+                  <ArrowLeft size={13} /> Back
+                </button>
+                <div className="min-w-0">
+                  <div className="text-lg font-semibold text-[#d8def0] flex items-center gap-2">
+                    {dash.title}
+                    <button type="button" className="text-[#8a93b2] hover:text-[#f7913b]" title="Star dashboard">★</button>
+                  </div>
+                  <div className="text-[11px] text-[#8a93b2]">Folder: {dash.folder || 'General'} · UID: {dash.uid}</div>
+                </div>
+                <span className="flex-1" />
+                <button type="button" className="mon-tab flex items-center gap-1" onClick={() => setToast('Share link copied')}>
+                  <Share2 size={13} /> Share
+                </button>
+                <button type="button" className="mon-tab flex items-center gap-1" onClick={() => setToast('Dashboard saved')}>
+                  <Save size={13} /> Save
+                </button>
+                <button type="button" className="mon-tab flex items-center gap-1" onClick={() => setToast('Dashboard settings opened')}>
+                  <Settings size={13} /> Settings
+                </button>
+                <button type="button" className="mon-btn-primary !text-xs flex items-center gap-1" onClick={() => setAdding(true)}>
+                  <Plus size={13} /> Add panel
+                </button>
+                <GrafanaTimePicker
+                  range={timeRange}
+                  refresh={refreshInterval}
+                  open={timePickerOpen}
+                  onToggle={() => setTimePickerOpen((o) => !o)}
+                  onRange={(r) => { setTimeRange(r); setTimePickerOpen(false) }}
+                  onRefresh={(r) => setRefreshInterval(r)}
+                  onReload={() => { setTimePickerOpen(false); onReload?.() }}
+                />
+                <button type="button" className="mon-tab !p-2" title="Refresh dashboard" onClick={onReload}>
+                  <RefreshCw size={13} />
+                </button>
+                <button type="button" className={`mon-tab ${editLayout ? 'mon-tab-active' : ''}`}
+                  onClick={() => setEditLayout((e) => !e)}>
+                  <Pencil size={13} /> {editLayout ? 'Done editing' : 'Edit'}
+                </button>
+              </div>
+              <div className="flex items-center gap-2 mt-3 flex-wrap">
+                {(graf.dashboards || []).map(d => (
+                  <button key={d.uid} onClick={() => setActiveDash(d.uid)}
+                          className={`mon-tab ${d.uid === activeDash ? 'mon-tab-active' : ''}`}>{d.title}</button>
+                ))}
+                {editLayout && <span className="text-[10px] text-[#8a93b2]">Drag panels to reorder. Use panel menus for edit, inspect, duplicate, or delete.</span>}
+              </div>
             </div>
+            {toast && (
+              <div className="mb-3 mon-card !p-2 flex items-center justify-between text-xs text-[#d8def0]">
+                <span>{toast}</span>
+                <button type="button" className="text-[#8a93b2] hover:text-white" onClick={() => setToast('')}><X size={13} /></button>
+              </div>
+            )}
             {adding && (
               <div className="mon-card mb-3 space-y-2">
                 <p className="mon-panel-title text-sm">New panel</p>
@@ -518,6 +823,13 @@ function GrafanaView({ state, sessionId, scenario, onReload, activeNav, grafanaC
                            }} />
               ))}
             </div>
+            <GrafanaPanelEditor
+              panel={panelEditor}
+              dashboardUid={dash.uid}
+              sessionId={sessionId}
+              onClose={() => setPanelEditor(null)}
+              onReload={onReload}
+            />
           </>
         )}
 
@@ -550,8 +862,9 @@ function GrafanaView({ state, sessionId, scenario, onReload, activeNav, grafanaC
 }
 
 /* ── Prometheus alerts (classic UI) ── */
-function PrometheusAlertsPanel({ prom }) {
+function PrometheusAlertsPanel({ prom, sessionId, onReload }) {
   const [openGroups, setOpenGroups] = useState(() => new Set(['instance-health']))
+  const [busyRule, setBusyRule] = useState('')
   const groups = PROMETHEUS_ALERT_GROUPS.map((g) => ({
     ...g,
     rules: g.rules.map((r) => {
@@ -566,6 +879,31 @@ function PrometheusAlertsPanel({ prom }) {
     else next.add(name)
     return next
   })
+
+  const silence = async (rule) => {
+    if (!sessionId) return
+    setBusyRule(rule.name)
+    try {
+      await monitoringApi.action(sessionId, 'silence_alert', {
+        matchers: [{ name: 'alertname', value: rule.name, isRegex: false }],
+        comment: `Silenced ${rule.name} from Prometheus Alerts`,
+      })
+      onReload?.()
+    } finally {
+      setBusyRule('')
+    }
+  }
+
+  const toggleRule = async (rule) => {
+    if (!sessionId) return
+    setBusyRule(rule.name)
+    try {
+      await monitoringApi.action(sessionId, 'toggle_alert_rule', { name: rule.name })
+      onReload?.()
+    } finally {
+      setBusyRule('')
+    }
+  }
 
   return (
     <div className="space-y-2">
@@ -587,6 +925,7 @@ function PrometheusAlertsPanel({ prom }) {
                   <th className="px-4 py-2 text-left font-medium">Alert</th>
                   <th className="px-4 py-2 text-left font-medium">Summary</th>
                   <th className="px-4 py-2 text-left font-medium">Active Since</th>
+                  <th className="px-4 py-2 text-left font-medium">Actions</th>
                 </tr></thead>
                 <tbody>
                   {g.rules.map((r) => (
@@ -599,6 +938,18 @@ function PrometheusAlertsPanel({ prom }) {
                       <td className="px-4 py-2 font-mono text-gray-800">{r.name}</td>
                       <td className="px-4 py-2 text-gray-600">{r.annotations?.summary || r.expr}</td>
                       <td className="px-4 py-2 text-gray-400">{r.for || '—'}</td>
+                      <td className="px-4 py-2">
+                        <div className="flex gap-1">
+                          <button type="button" className="px-2 py-1 rounded border border-gray-200 text-[10px] text-gray-700 hover:bg-gray-50"
+                            disabled={busyRule === r.name} onClick={() => toggleRule(r)}>
+                            {r.state === 'firing' ? 'Resolve' : 'Fire'}
+                          </button>
+                          <button type="button" className="px-2 py-1 rounded border border-amber-200 text-[10px] text-amber-700 hover:bg-amber-50"
+                            disabled={busyRule === r.name} onClick={() => silence(r)}>
+                            Silence
+                          </button>
+                        </div>
+                      </td>
                     </tr>
                   ))}
                 </tbody>
@@ -611,11 +962,28 @@ function PrometheusAlertsPanel({ prom }) {
   )
 }
 
+function normalizePromTarget(t) {
+  const labels = t.labels || {}
+  const instance = t.instance || labels.instance || ''
+  const job = t.job || labels.job || 'custom'
+  return {
+    ...t,
+    job,
+    instance,
+    endpoint: t.scrape_url || (instance ? `http://${instance}/metrics` : ''),
+    lastScrape: t.last_scrape || t.lastScrape || '',
+    duration: t.scrape_duration_ms ?? t.scrapeDurationMs ?? '—',
+    error: t.last_error || t.lastError || '',
+  }
+}
+
 /* ── Prometheus status sub-pages ── */
 function PrometheusStatusPanel({ prom, statusSub, sessionId, onReload }) {
   const [newTarget, setNewTarget] = useState({ job: 'node', url: 'http://localhost:9100/metrics' })
   const [newRule, setNewRule] = useState({ group: 'lab', name: '', expr: 'up == 0', for: '5m' })
   const [busy, setBusy] = useState(false)
+  const [flagFilter, setFlagFilter] = useState('')
+  const targets = (prom.targets || []).map(normalizePromTarget)
 
   const addTarget = async () => {
     if (!sessionId || !newTarget.url.trim()) return
@@ -642,10 +1010,41 @@ function PrometheusStatusPanel({ prom, statusSub, sessionId, onReload }) {
     }
   }
 
+  const reloadConfig = async () => {
+    if (!sessionId) return
+    setBusy(true)
+    try {
+      await monitoringApi.action(sessionId, 'reload_config', {})
+      onReload?.()
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  const deleteTarget = async (target) => {
+    if (!sessionId) return
+    setBusy(true)
+    try {
+      await monitoringApi.action(sessionId, 'delete_scrape_target', {
+        scrape_url: target.scrape_url,
+        instance: target.instance,
+      })
+      onReload?.()
+    } finally {
+      setBusy(false)
+    }
+  }
+
   if (statusSub === 'configuration') {
     return (
-      <div className="mon-card bg-white !border-gray-200">
-        <div className="px-3 py-2 text-sm font-semibold text-gray-800 border-b border-gray-100">Configuration</div>
+      <div className="mon-card bg-white !border-gray-200 !p-0">
+        <div className="px-3 py-2 text-sm font-semibold text-gray-800 border-b border-gray-100 flex items-center justify-between gap-2">
+          <span>Configuration</span>
+          <button type="button" className="px-2 py-1 rounded border border-gray-200 text-xs text-gray-700 hover:bg-gray-50 flex items-center gap-1"
+            disabled={busy} onClick={reloadConfig}>
+            <RefreshCw size={12} /> Reload
+          </button>
+        </div>
         <pre className="p-4 text-xs font-mono text-gray-700 overflow-x-auto whitespace-pre">{PROMETHEUS_CONFIG_YAML}</pre>
       </div>
     )
@@ -658,8 +1057,15 @@ function PrometheusStatusPanel({ prom, statusSub, sessionId, onReload }) {
             <th className="px-3 py-2 text-left">Job</th><th className="px-3 py-2 text-left">Discovered targets</th><th className="px-3 py-2 text-left">Labels</th>
           </tr></thead>
           <tbody>
-            {PROMETHEUS_SERVICE_DISCOVERY.map((sd) => (
-              <tr key={sd.job} className="border-t border-gray-100">
+            {[
+              ...PROMETHEUS_SERVICE_DISCOVERY,
+              ...Object.values(targets.reduce((acc, t) => {
+                acc[t.job] = acc[t.job] || { job: t.job, discovered: 0, labels: ['job', 'instance'] }
+                acc[t.job].discovered += 1
+                return acc
+              }, {})),
+            ].map((sd, i) => (
+              <tr key={`${sd.job}-${i}`} className="border-t border-gray-100">
                 <td className="px-3 py-2 font-mono">{sd.job}</td>
                 <td className="px-3 py-2">{sd.discovered}</td>
                 <td className="px-3 py-2 font-mono text-xs text-gray-600">{(sd.labels || []).join(', ')}</td>
@@ -672,20 +1078,107 @@ function PrometheusStatusPanel({ prom, statusSub, sessionId, onReload }) {
   }
   if (statusSub === 'runtime') {
     return (
-      <div className="grid sm:grid-cols-2 gap-3">
-        {[
-          ['Start time', prom.started_at || '2026-06-20 08:00:00 UTC'],
-          ['Version', '2.51.0'],
-          ['Head series', (prom.head_series || 124832).toLocaleString()],
-          ['Retention', prom.retention || '15d'],
-          ['Storage', prom.storage || 'local TSDB'],
-          ['Query engine', 'PromQL'],
-        ].map(([k, v]) => (
-          <div key={k} className="mon-card bg-white !border-gray-200 !p-3">
-            <div className="text-xs text-gray-500">{k}</div>
-            <div className="text-sm font-mono text-gray-800 mt-0.5">{v}</div>
+      <div className="space-y-3">
+        <div className="flex justify-end">
+          <button type="button" className="px-3 py-1.5 rounded border border-gray-200 text-xs text-gray-700 hover:bg-gray-50 flex items-center gap-1"
+            disabled={busy} onClick={reloadConfig}>
+            <RefreshCw size={12} /> Reload configuration
+          </button>
+        </div>
+        <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-3">
+          {[
+            ['Start time', prom.started_at || '2026-06-20 08:00:00 UTC'],
+            ['Version', prom.version || '2.51.0'],
+            ['Head series', (prom.tsdb?.head_series || prom.head_series || 124832).toLocaleString()],
+            ['Retention', prom.tsdb?.retention || prom.retention || '15d'],
+            ['Storage', prom.storage || 'local TSDB'],
+            ['WAL corruptions', prom.tsdb?.wal_corruptions ?? 0],
+            ['Scrape interval', prom.scrape_interval || '15s'],
+            ['Evaluation interval', prom.evaluation_interval || '15s'],
+            ['Query engine', 'PromQL'],
+          ].map(([k, v]) => (
+            <div key={k} className="mon-card bg-white !border-gray-200 !p-3">
+              <div className="text-xs text-gray-500">{k}</div>
+              <div className="text-sm font-mono text-gray-800 mt-0.5">{v}</div>
+            </div>
+          ))}
+        </div>
+      </div>
+    )
+  }
+  if (statusSub === 'tsdb') {
+    const headSeries = prom.tsdb?.head_series || prom.head_series || 124832
+    const cards = [
+      ['Head chunks', (prom.tsdb?.head_chunks ?? Math.round(headSeries * 3.1)).toLocaleString()],
+      ['Chunk count', (prom.tsdb?.chunk_count ?? Math.round(headSeries * 8.4)).toLocaleString()],
+      ['Number of series', headSeries.toLocaleString()],
+      ['Number of label pairs', (prom.tsdb?.label_pairs ?? 9421).toLocaleString()],
+      ['Min time', prom.tsdb?.min_time || '2026-06-13T08:00:00Z'],
+      ['Max time', prom.tsdb?.max_time || '2026-06-28T03:42:11Z'],
+    ]
+    const topByMetric = PROM_TSDB_TOP_METRICS
+    const topLabels = PROM_TSDB_TOP_LABELS
+    return (
+      <div className="space-y-4">
+        <div className="text-sm font-semibold text-gray-800">TSDB Status</div>
+        <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-3">
+          {cards.map(([k, v]) => (
+            <div key={k} className="mon-card bg-white !border-gray-200 !p-3">
+              <div className="text-xs text-gray-500">{k}</div>
+              <div className="text-sm font-mono text-gray-800 mt-0.5">{v}</div>
+            </div>
+          ))}
+        </div>
+        <div className="grid lg:grid-cols-2 gap-3">
+          <div className="mon-card !p-0 overflow-hidden bg-white !border-gray-200">
+            <div className="px-3 py-2 text-xs font-semibold text-gray-600 border-b">Top 10 series count by metric names</div>
+            <table className="w-full text-sm">
+              <thead><tr className="bg-gray-50 text-gray-500 text-xs"><th className="px-3 py-2 text-left">Name</th><th className="px-3 py-2 text-right">Count</th></tr></thead>
+              <tbody>
+                {topByMetric.map(([name, count]) => (
+                  <tr key={name} className="border-t border-gray-100"><td className="px-3 py-2 font-mono text-xs">{name}</td><td className="px-3 py-2 text-right font-mono text-xs">{count.toLocaleString()}</td></tr>
+                ))}
+              </tbody>
+            </table>
           </div>
-        ))}
+          <div className="mon-card !p-0 overflow-hidden bg-white !border-gray-200">
+            <div className="px-3 py-2 text-xs font-semibold text-gray-600 border-b">Top 10 label names with value count</div>
+            <table className="w-full text-sm">
+              <thead><tr className="bg-gray-50 text-gray-500 text-xs"><th className="px-3 py-2 text-left">Label</th><th className="px-3 py-2 text-right">Values</th></tr></thead>
+              <tbody>
+                {topLabels.map(([name, count]) => (
+                  <tr key={name} className="border-t border-gray-100"><td className="px-3 py-2 font-mono text-xs">{name}</td><td className="px-3 py-2 text-right font-mono text-xs">{count.toLocaleString()}</td></tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    )
+  }
+  if (statusSub === 'flags') {
+    const q = flagFilter.trim().toLowerCase()
+    const rows = PROMETHEUS_FLAGS.filter(([k, v]) => !q || k.toLowerCase().includes(q) || String(v).toLowerCase().includes(q))
+    return (
+      <div className="space-y-3">
+        <div className="flex items-center justify-between gap-2 flex-wrap">
+          <div className="text-sm font-semibold text-gray-800">Command-Line Flags</div>
+          <input className="mon-input bg-white !text-gray-800 !w-64" placeholder="Filter by flag name…" value={flagFilter}
+            onChange={(e) => setFlagFilter(e.target.value)} />
+        </div>
+        <div className="mon-card !p-0 overflow-hidden bg-white !border-gray-200">
+          <table className="w-full text-sm">
+            <thead><tr className="bg-gray-50 text-gray-500 text-xs"><th className="px-3 py-2 text-left">Flag</th><th className="px-3 py-2 text-left">Value</th></tr></thead>
+            <tbody>
+              {rows.map(([k, v]) => (
+                <tr key={k} className="border-t border-gray-100 hover:bg-gray-50"><td className="px-3 py-2 font-mono text-xs text-gray-800">{k}</td><td className="px-3 py-2 font-mono text-xs text-gray-600">{String(v)}</td></tr>
+              ))}
+              {rows.length === 0 && (
+                <tr><td colSpan={2} className="px-3 py-6 text-center text-xs text-gray-400">No flags match “{flagFilter}”.</td></tr>
+              )}
+            </tbody>
+          </table>
+        </div>
       </div>
     )
   }
@@ -751,9 +1244,9 @@ function PrometheusStatusPanel({ prom, statusSub, sessionId, onReload }) {
       </div>
       <div className="mon-card !p-0 overflow-hidden bg-white !border-gray-200">
       <table className="w-full text-sm">
-        <thead><tr className="bg-gray-50 text-gray-500 text-xs"><th className="px-3 py-2 text-left">Job</th><th className="px-3 py-2 text-left">Endpoint</th><th className="px-3 py-2 text-left">State</th><th className="px-3 py-2 text-left">Last scrape</th><th className="px-3 py-2 text-left">Error</th></tr></thead>
+        <thead><tr className="bg-gray-50 text-gray-500 text-xs"><th className="px-3 py-2 text-left">Job</th><th className="px-3 py-2 text-left">Instance</th><th className="px-3 py-2 text-left">Endpoint</th><th className="px-3 py-2 text-left">State</th><th className="px-3 py-2 text-left">Last scrape</th><th className="px-3 py-2 text-left">Error</th><th className="px-3 py-2 text-left">Actions</th></tr></thead>
         <tbody>
-          {(prom.targets || []).map((t, i) => (
+          {targets.map((t, i) => (
             <tr key={i} className="border-t border-gray-100 hover:bg-gray-50">
               <td className="px-3 py-2 font-medium">
                 {t.job}
@@ -767,10 +1260,17 @@ function PrometheusStatusPanel({ prom, statusSub, sessionId, onReload }) {
                   </span>
                 )}
               </td>
-              <td className="px-3 py-2 font-mono text-xs">{t.scrape_url}</td>
+              <td className="px-3 py-2 font-mono text-xs">{t.instance || '—'}</td>
+              <td className="px-3 py-2 font-mono text-xs">{t.endpoint || '—'}</td>
               <td className="px-3 py-2"><span className={`text-xs font-bold ${t.health === 'down' ? 'text-red-600' : 'text-green-600'}`}>{t.health === 'down' ? 'DOWN' : 'UP'}</span></td>
-              <td className="px-3 py-2 font-mono text-xs text-gray-500">{t.scrape_duration_ms}ms</td>
-              <td className="px-3 py-2 text-xs text-red-600">{t.last_error || ''}</td>
+              <td className="px-3 py-2 font-mono text-xs text-gray-500">{t.lastScrape || `${t.duration}ms`}</td>
+              <td className="px-3 py-2 text-xs text-red-600">{t.error || ''}</td>
+              <td className="px-3 py-2">
+                <button type="button" className="px-2 py-1 border border-red-200 text-red-600 rounded text-[10px]"
+                  disabled={busy} onClick={() => deleteTarget(t)}>
+                  Delete
+                </button>
+              </td>
             </tr>
           ))}
         </tbody>
@@ -856,7 +1356,7 @@ function PrometheusView({ state, sessionId, scenario, defaultExpr, activeNav, st
         </div>
       )}
 
-      {showAlerts && <PrometheusAlertsPanel prom={prom} />}
+      {showAlerts && <PrometheusAlertsPanel prom={prom} sessionId={sessionId} onReload={onReload} />}
 
       {showStatus && <PrometheusStatusPanel prom={prom} statusSub={statusSub} sessionId={sessionId} onReload={onReload} />}
 
@@ -932,6 +1432,27 @@ function PrometheusView({ state, sessionId, scenario, defaultExpr, activeNav, st
                 <span key={r.name} className={`mon-badge ${r.configured ? 'mon-badge-up' : 'mon-badge-down'}`}>{r.name} · {r.type}</span>
               ))}
             </div>
+          </div>
+          <div className="mon-card">
+            <div className="mon-panel-title mb-2">Silences</div>
+            {(prom.alertmanager.silences || []).length ? (
+              <div className="space-y-2">
+                {prom.alertmanager.silences.map((s) => (
+                  <div key={s.id} className="rounded border border-[#262a45] bg-[#0d1024] p-2 text-xs">
+                    <div className="flex justify-between gap-2">
+                      <span className="font-mono text-[#f5c451]">{s.id}</span>
+                      <span className="text-[#8a93b2]">ends {s.ends_at}</span>
+                    </div>
+                    <div className="font-mono mt-1 text-[#d8def0]">
+                      {(s.matchers || []).map((m) => `${m.name}="${m.value}"`).join(', ') || 'no matchers'}
+                    </div>
+                    <div className="text-[#8a93b2] mt-1">{s.comment} · {s.created_by}</div>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <p className="text-xs text-[#8a93b2]">No active silences. Use Prometheus → Alerts → Silence to mute a firing alert.</p>
+            )}
           </div>
           {(prom.remote_write || []).length > 0 && (
             <div className="mon-card">
@@ -1088,7 +1609,15 @@ export default function MonitoringSimulator({
         {!state ? (
           <div className="text-center text-[#8a93b2] py-16">Loading {product} state…</div>
         ) : view === 'grafana' ? (
-          <GrafanaView state={state} sessionId={sessionId} scenario={slug} onReload={load} activeNav={grafanaNav} grafanaChildNav={grafanaChildNav} />
+          <GrafanaView
+            state={state}
+            sessionId={sessionId}
+            scenario={slug}
+            onReload={load}
+            activeNav={grafanaNav}
+            grafanaChildNav={grafanaChildNav}
+            setGrafanaChildNav={setGrafanaChildNav}
+          />
         ) : (
           <PrometheusView state={state} sessionId={sessionId} scenario={slug}
                           defaultExpr={summary.targets_down ? 'up == 0' : 'up'}

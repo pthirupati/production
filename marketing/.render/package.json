@@ -1,0 +1,14 @@
+{
+  "name": "fixitlab-render",
+  "private": true,
+  "version": "1.0.0",
+  "description": "Render FixitLab HTML promos to MP4",
+  "dependencies": {
+    "@ffmpeg-installer/ffmpeg": "^1.1.0",
+    "puppeteer-core": "^25.2.1",
+    "puppeteer-screen-recorder": "^3.0.6"
+  },
+  "scripts": {
+    "render": "node render.js"
+  }
+}

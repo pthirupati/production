@@ -1,11 +1,12 @@
 import { useMemo, useState } from 'react'
-import { Power, Settings, FileText, User, Search } from 'lucide-react'
+import { Power, Settings, FileText, User, Search, Lock, LogOut } from 'lucide-react'
 import { useOS } from './store'
 import { APPS, AppIcon } from './apps/registry'
 
 const PINNED = [
   { app: 'ServerManager', label: 'Server Manager', large: true },
   { app: 'Terminal', label: 'Windows PowerShell', props: { shell: 'ps' } },
+  { app: 'Edge', label: 'Microsoft Edge' },
   { app: 'TaskManager', label: 'Task Manager' },
   { app: 'EventViewer', label: 'Event Viewer' },
   { app: 'ComputerManagement', label: 'Computer Management' },
@@ -33,6 +34,7 @@ const CATALOG = [
   ['Group Policy Management', 'GPMC'],
   ['Hyper-V Manager', 'HyperV'],
   ['Internet Information Services (IIS) Manager', 'IISManager'],
+  ['Microsoft Edge', 'Edge'],
   ['Network Connections', 'NetworkConnections'],
   ['Notepad', 'Notepad'],
   ['Paint', 'Paint'],
@@ -66,7 +68,7 @@ export default function StartMenu() {
   return (
     <div className="winos-startmenu" onMouseDown={(e) => e.stopPropagation()}>
       <div className="winos-sm-left">
-        <div className="winos-sm-btn" title="Administrator"><User size={20} /></div>
+        <UserMenu launch={launch} />
         <div className="sp" />
         <div className="winos-sm-btn" onClick={() => launch('FileExplorer', { path: 'This PC' }, 'This PC')} title="File Explorer"><FileText size={20} /></div>
         <div className="winos-sm-btn" onClick={() => launch('Settings')} title="Settings"><Settings size={20} /></div>
@@ -109,16 +111,51 @@ export default function StartMenu() {
   )
 }
 
-function PowerBtn() {
+function UserMenu({ launch }) {
+  const os = useOS()
   const [open, setOpen] = useState(false)
+  const user = os.currentUser || 'Administrator'
+
+  return (
+    <div style={{ position: 'relative' }}>
+      <div className="winos-sm-btn" title={user} onClick={() => setOpen((o) => !o)}><User size={20} /></div>
+      {open && (
+        <div className="winos-ctx" style={{ position: 'absolute', bottom: 0, left: 48, width: 180 }} onMouseLeave={() => setOpen(false)}>
+          <div className="winos-ctx-item" style={{ fontWeight: 600, cursor: 'default' }}>{user}</div>
+          <div className="winos-ctx-item" style={{ fontSize: 11, color: '#888', cursor: 'default' }}>{os.computer || 'WIN-SERVER'}</div>
+          <div className="winos-ctx-sep" />
+          <div className="winos-ctx-item" onClick={() => { launch('FileExplorer', { path: 'C:\\Users\\Administrator' }, 'Administrator'); setOpen(false) }}>
+            <User size={14} style={{ marginRight: 6, verticalAlign: -2 }} />Change account settings
+          </div>
+          <div className="winos-ctx-item" onClick={() => { os.windows.forEach((w) => os.minimizeWindow(w.id)); os.setStartOpen(false); setOpen(false) }}>
+            <Lock size={14} style={{ marginRight: 6, verticalAlign: -2 }} />Lock
+          </div>
+          <div className="winos-ctx-item" onClick={() => { os.setPowerState('restart'); setOpen(false) }}>
+            <LogOut size={14} style={{ marginRight: 6, verticalAlign: -2 }} />Sign out
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}
+
+function PowerBtn() {
+  const os = useOS()
+  const [open, setOpen] = useState(false)
+
+  const act = (state) => {
+    os.setPowerState(state)
+    setOpen(false)
+  }
+
   return (
     <div style={{ position: 'relative' }}>
       <div className="winos-sm-btn" title="Power" onClick={() => setOpen((o) => !o)}><Power size={20} /></div>
       {open && (
         <div className="winos-ctx" style={{ position: 'absolute', bottom: 0, left: 48, width: 140 }} onMouseLeave={() => setOpen(false)}>
-          <div className="winos-ctx-item">Sleep</div>
-          <div className="winos-ctx-item">Shut down</div>
-          <div className="winos-ctx-item">Restart</div>
+          <div className="winos-ctx-item" onClick={() => act('sleep')}>Sleep</div>
+          <div className="winos-ctx-item" onClick={() => act('shutdown')}>Shut down</div>
+          <div className="winos-ctx-item" onClick={() => act('restart')}>Restart</div>
         </div>
       )}
     </div>

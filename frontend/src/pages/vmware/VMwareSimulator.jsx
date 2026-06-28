@@ -142,6 +142,109 @@ function SnapshotModal({ vm, onClose, onAction }) {
   )
 }
 
+function SnapshotManagerModal({ vm, onClose, onAction, acting }) {
+  const snapshots = vm?.snapshots || []
+  const [selectedId, setSelectedId] = useState(snapshots[snapshots.length - 1]?.id || '')
+  const [busy, setBusy] = useState(false)
+  const selected = snapshots.find((s) => s.id === selectedId) || snapshots[snapshots.length - 1] || null
+
+  useEffect(() => {
+    if (!selectedId && snapshots.length) setSelectedId(snapshots[snapshots.length - 1].id)
+    if (selectedId && !snapshots.some((s) => s.id === selectedId)) setSelectedId(snapshots[snapshots.length - 1]?.id || '')
+  }, [selectedId, snapshots])
+
+  const fire = async (action, payload = {}) => {
+    setBusy(true)
+    try {
+      await onAction(action, { vm_id: vm.id, ...payload })
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  const disabled = acting || busy
+
+  return (
+    <div className="vm-modal-overlay">
+      <div className="vm-modal w-[760px] max-w-[95vw]">
+        <div className="vm-modal-header">
+          <span>Snapshot Manager — {vm.name}</span>
+          <button type="button" onClick={onClose} className="text-[#8fa5b8] hover:text-white">✕</button>
+        </div>
+        <div className="vm-modal-body">
+          <div className="grid grid-cols-1 md:grid-cols-[1fr_260px] gap-4">
+            <div className="rounded-lg border border-[#2D3A4A] bg-[#101820] p-4 min-h-[300px] overflow-auto">
+              <div className="text-[11px] text-[#8FA5B8] uppercase tracking-wider mb-4">Snapshot tree</div>
+              <div className="relative pl-5">
+                <div className="absolute left-[29px] top-4 bottom-4 w-px bg-[#2D3A4A]" />
+                <button
+                  type="button"
+                  className="relative flex items-center gap-3 w-full text-left rounded-md px-2 py-2 mb-1 bg-[#1B2A3B] border border-[#2D3A4A]"
+                  onClick={() => setSelectedId('')}
+                >
+                  <span className="relative z-10 w-8 h-8 rounded-full bg-[#2D7CFF] text-white flex items-center justify-center text-xs">VM</span>
+                  <div>
+                    <div className="text-sm font-semibold text-[#E8EDF2]">Current state</div>
+                    <div className="text-[11px] text-[#8FA5B8]">{vm.power} · {vm.guest_os_version || 'Guest OS unknown'}</div>
+                  </div>
+                </button>
+                {snapshots.length === 0 ? (
+                  <div className="ml-12 mt-8 text-xs text-[#8FA5B8]">No snapshots exist for this virtual machine.</div>
+                ) : snapshots.map((snap, index) => (
+                  <button
+                    key={snap.id}
+                    type="button"
+                    className={`relative flex items-center gap-3 w-full text-left rounded-md px-2 py-2 ml-8 mb-1 border ${
+                      selected?.id === snap.id ? 'bg-[rgba(45,124,255,.18)] border-[#2D7CFF]' : 'bg-[#131f2b] border-[#22303f] hover:border-[#2D3A4A]'
+                    }`}
+                    onClick={() => setSelectedId(snap.id)}
+                  >
+                    <span className="absolute -left-8 top-1/2 w-8 h-px bg-[#2D3A4A]" />
+                    <span className="relative z-10 w-8 h-8 rounded-full bg-[#243447] text-[#5b9bf5] flex items-center justify-center text-xs">S{index + 1}</span>
+                    <div className="min-w-0">
+                      <div className="text-sm font-semibold text-[#E8EDF2] truncate">{snap.name}</div>
+                      <div className="text-[11px] text-[#8FA5B8] truncate">{snap.description || 'No description'} · {fmtTime(snap.created)}</div>
+                    </div>
+                  </button>
+                ))}
+              </div>
+            </div>
+            <div className="space-y-3">
+              <div className="rounded-lg border border-[#2D3A4A] bg-[#101820] p-3">
+                <div className="text-[11px] text-[#8FA5B8] uppercase tracking-wider mb-2">Selected snapshot</div>
+                {selected ? (
+                  <div className="space-y-1">
+                    <div className="text-sm font-semibold text-[#E8EDF2]">{selected.name}</div>
+                    <div className="text-[11px] text-[#8FA5B8]">{fmtTime(selected.created)}</div>
+                    <div className="text-xs text-[#B8C7D8] pt-1">{selected.description || 'No description provided.'}</div>
+                  </div>
+                ) : (
+                  <div className="text-xs text-[#8FA5B8]">Current state selected.</div>
+                )}
+              </div>
+              <div className="grid gap-2">
+                <button type="button" className="vm-btn vm-btn-blue justify-center" disabled={disabled} onClick={() => fire('take_snapshot', {
+                  snapshot_name: `snapshot-${new Date().toISOString().slice(0, 10)}`,
+                  description: 'Created from Snapshot Manager',
+                })}>Take Snapshot</button>
+                <button type="button" className="vm-btn justify-center" disabled={disabled || !selected} onClick={() => fire('revert_snapshot', { snapshot_id: selected.id })}>Revert to</button>
+                <button type="button" className="vm-btn vm-btn-red justify-center" disabled={disabled || !selected} onClick={() => fire('delete_snapshot', { snapshot_id: selected.id })}>Delete</button>
+                <button type="button" className="vm-btn vm-btn-red justify-center" disabled={disabled || snapshots.length === 0} onClick={() => fire('consolidate_snapshots')}>Delete All / Consolidate</button>
+              </div>
+              <div className="text-[11px] text-[#8FA5B8] leading-relaxed">
+                Consolidation commits snapshot delta disks back into the base virtual disk and clears snapshot validation warnings for this lab.
+              </div>
+            </div>
+          </div>
+        </div>
+        <div className="vm-modal-footer">
+          <button type="button" onClick={onClose} className="vm-btn">Close</button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
 /* ─── Migrate modal ──────────────────────────────────────────────────── */
 function MigrateModal({ vm, hosts, onClose, onAction }) {
   const [targetHost, setTargetHost] = useState('')
@@ -629,6 +732,7 @@ export default function VMwareSimulator() {
   const [activeTab, setActiveTab] = useState('summary')
   const [expandedSections, setExpandedSections] = useState({ hosts: true, vms: true, storage: true, networks: false })
   const [showSnapshotModal, setShowSnapshotModal] = useState(false)
+  const [showSnapshotManager, setShowSnapshotManager] = useState(false)
   const [showMigrateModal, setShowMigrateModal] = useState(false)
   const [showCreateVmModal, setShowCreateVmModal] = useState(false)
   const [showCreateVmWizard, setShowCreateVmWizard] = useState(false)
@@ -729,6 +833,7 @@ export default function VMwareSimulator() {
         setDetailItem(null)
         setActionsMenuOpen(false)
         setShowSnapshotModal(false)
+        setShowSnapshotManager(false)
         setShowMigrateModal(false)
         setShowCreateVmModal(false)
         setShowEditVmModal(false)
@@ -800,13 +905,13 @@ export default function VMwareSimulator() {
     switch (action) {
       // ── VM sentinels ──
       case '__snapshot__': selVm(payload); setShowSnapshotModal(true); break
-      case '__manage_snapshots__': selVm(payload); setActiveTab('snapshots'); break
+      case '__manage_snapshots__': selVm(payload); setActiveTab('snapshots'); setShowSnapshotManager(true); break
       case '__revert_latest__': {
         const snaps = payload.snapshots || []
         if (snaps.length) runAction('revert_snapshot', { vm_id: payload.id, snapshot_id: snaps[snaps.length - 1].id })
         break
       }
-      case '__consolidate__': runAction('take_snapshot', { vm_id: payload.id, snapshot_name: 'consolidate-helper' }); break
+      case '__consolidate__': runAction('consolidate_snapshots', { vm_id: payload.id }); break
       case '__clone__': selVm(payload); setShowCloneVmModal(true); break
       case '__migrate__': selVm(payload); setShowMigrateModal(true); break
       case '__edit__': selVm(payload); setShowEditVmModal(true); break
@@ -1000,6 +1105,7 @@ export default function VMwareSimulator() {
         {isSuspended && <ToolbarBtn onClick={() => runAction('resume', { vm_id: vm.id })} disabled={acting} label="Resume" />}
         <ToolbarSep />
         <ToolbarBtn onClick={() => setShowSnapshotModal(true)} disabled={acting} label="Take Snapshot" />
+        <ToolbarBtn onClick={() => { setActiveTab('snapshots'); setShowSnapshotManager(true) }} disabled={acting} label="Manage Snapshots…" />
         <ToolbarBtn onClick={() => setShowMigrateModal(true)} disabled={acting} label="Migrate…" />
         <ToolbarBtn onClick={() => setShowVmotionWizard(true)} disabled={acting} label="vMotion Wizard…" />
         <ToolbarBtn onClick={() => setShowStorageVmotionWizard(true)} disabled={acting} label="Storage vMotion…" />
@@ -1800,7 +1906,9 @@ export default function VMwareSimulator() {
                       { label: 'Power Off', action: 'power_off', show: selectedVm.power === 'poweredOn', red: true },
                       { label: 'Reset', action: 'reboot', show: selectedVm.power === 'poweredOn' },
                       { label: 'Suspend', action: 'suspend', show: selectedVm.power === 'poweredOn' },
+                      { label: 'Resume', action: 'resume', show: selectedVm.power === 'suspended', green: true },
                       { label: 'Take Snapshot', action: '__snapshot__', show: true },
+                      { label: 'Manage Snapshots', action: '__manage_snapshots__', show: true },
                       { label: 'Upgrade VMware Tools', action: 'upgrade_vmware_tools', show: (selectedVm.vmware_tools_status || (selectedVm.tools === 'ok' ? 'current' : 'notRunning')) !== 'current', amber: true },
                       { label: 'Launch Console', action: '__console__', show: true, blue: true },
                     ].filter(a => a.show).map(a => (
@@ -1810,6 +1918,7 @@ export default function VMwareSimulator() {
                         disabled={acting}
                         onClick={() => {
                           if (a.action === '__snapshot__') setShowSnapshotModal(true)
+                          else if (a.action === '__manage_snapshots__') { setActiveTab('snapshots'); setShowSnapshotManager(true) }
                           else if (a.action === '__console__') setConsoleVm(selectedVm)
                           else runAction(a.action, { vm_id: selectedVm.id })
                         }}
@@ -2106,9 +2215,14 @@ export default function VMwareSimulator() {
                 <div className="vm-panel">
                   <div className="vm-panel-header flex items-center justify-between">
                     <span>Snapshot manager</span>
-                    <button type="button" onClick={() => setShowSnapshotModal(true)} disabled={acting} className="vm-btn vm-btn-blue text-[11px] py-1 px-3">
-                      Take snapshot
-                    </button>
+                    <div className="flex gap-2">
+                      <button type="button" onClick={() => setShowSnapshotModal(true)} disabled={acting} className="vm-btn vm-btn-blue text-[11px] py-1 px-3">
+                        Take snapshot
+                      </button>
+                      <button type="button" onClick={() => setShowSnapshotManager(true)} disabled={acting} className="vm-btn text-[11px] py-1 px-3">
+                        Open manager
+                      </button>
+                    </div>
                   </div>
                   <div className="vm-panel-body px-3.5">
                     {(selectedVm.snapshots?.length === 0 || !selectedVm.snapshots) ? (
@@ -2511,6 +2625,9 @@ export default function VMwareSimulator() {
       {/* Modals */}
       {showSnapshotModal && selectedVm && (
         <SnapshotModal vm={selectedVm} onClose={() => setShowSnapshotModal(false)} onAction={runAction} />
+      )}
+      {showSnapshotManager && selectedVm && (
+        <SnapshotManagerModal vm={selectedVm} onClose={() => setShowSnapshotManager(false)} onAction={runAction} acting={acting} />
       )}
       {showMigrateModal && selectedVm && (
         <MigrateModal vm={selectedVm} hosts={hosts} onClose={() => setShowMigrateModal(false)} onAction={runAction} />

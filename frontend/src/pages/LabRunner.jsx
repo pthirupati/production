@@ -90,6 +90,70 @@ function LabTimerBadge({ variant = 'desktop' }) {
   )
 }
 
+function guidedCommandSet(scenario = {}) {
+  const tech = (scenario.technology?.slug || '').toLowerCase()
+  const sim = (scenario.simulation_type || '').toLowerCase()
+  const slug = (scenario.slug || '').toLowerCase()
+  const hay = `${tech} ${sim} ${slug}`
+  if (/docker/.test(hay)) return ['docker ps -a', 'docker logs <container>', 'docker inspect <container>']
+  if (/kubernetes|k8s/.test(hay)) return ['kubectl get pods -A', 'kubectl describe pod <pod> -n <ns>', 'kubectl logs <pod> -n <ns>']
+  if (/terraform/.test(hay)) return ['terraform validate', 'terraform plan', 'terraform apply']
+  if (/ansible|awx/.test(hay)) return ['ansible-inventory --list', 'ansible-playbook --check site.yml', 'ansible-playbook site.yml']
+  if (/windows|win-/.test(hay)) return ['Get-Service', 'Get-EventLog -LogName System -Newest 20', 'Test-NetConnection <host> -Port <port>']
+  if (/grafana|prometheus|monitoring/.test(hay)) return ['up', 'up == 0', 'sum by(job)(up)']
+  if (/network|dns|mtu/.test(hay)) return ['ip addr', 'ip route', 'ping -c 3 <host>', 'dig <name>']
+  return ['pwd', 'ls -la', 'systemctl status <service>', 'journalctl -xe --no-pager']
+}
+
+function buildGuidedSteps(scenario = {}) {
+  const objectives = Array.isArray(scenario.objectives) ? scenario.objectives : []
+  const commands = guidedCommandSet(scenario)
+  const techName = scenario.technology?.name || 'this technology'
+  const objectiveSteps = objectives.map((objective, i) => ({
+    title: `Work objective ${i + 1}`,
+    icon: Target,
+    accent: 'text-accent-cyan',
+    body: typeof objective === 'string' ? objective : JSON.stringify(objective),
+    actions: [
+      'Read the objective carefully and identify the service, file, host, or UI area involved.',
+      `Use the ${techName} inspection commands/UI first; do not change anything until you have evidence.`,
+      'Make the smallest change that satisfies the objective, then re-run the same inspection command.',
+    ],
+  }))
+  return [
+    {
+      title: 'Orient yourself',
+      icon: Eye,
+      accent: 'text-accent-cyan',
+      body: scenario.initial_state || scenario.description || 'Understand the incident, the affected system, and what success should look like.',
+      actions: [
+        'Read the scenario, symptoms, and objectives from top to bottom.',
+        'Identify whether the work belongs in the terminal, simulator UI, or both.',
+        'Write down the expected healthy state before changing anything.',
+      ],
+    },
+    {
+      title: 'Inspect the environment',
+      icon: Terminal,
+      accent: 'text-accent-amber',
+      body: 'Collect baseline evidence before attempting a fix.',
+      actions: commands.map((cmd) => `Try: ${cmd}`),
+    },
+    ...objectiveSteps,
+    {
+      title: 'Verify and check',
+      icon: CheckCircle2,
+      accent: 'text-accent-green',
+      body: 'Confirm the fix with evidence before using Check Solution.',
+      actions: [
+        'Re-run the same checks from the inspection step and confirm the unhealthy signal changed.',
+        'If this lab has a simulator, refresh it and confirm the UI now reflects the repaired state.',
+        'Click Check Solution. If it fails, use the failed-objective feedback to return to the matching step.',
+      ],
+    },
+  ]
+}
+
 export default function LabRunner() {
   const { sessionId } = useParams()
   const navigate = useNavigate()
@@ -828,8 +892,21 @@ export default function LabRunner() {
       provider: session.provider,
       container_id: session.container_id,
       instance_id: session.instance_id,
+      simulation_type: scenario?.simulation_type,
+      technology_slug: scenario?.technology?.slug,
+      technology_name: scenario?.technology?.name,
+      scenario_slug: scenario?.slug,
     }
-  }, [session?.status, session?.provider, session?.container_id, session?.instance_id])
+  }, [
+    session?.status,
+    session?.provider,
+    session?.container_id,
+    session?.instance_id,
+    scenario?.simulation_type,
+    scenario?.technology?.slug,
+    scenario?.technology?.name,
+    scenario?.slug,
+  ])
 
   const sendSimCommand = useCallback((cmd, host) => {
     const targetHost = host || terminalHost
@@ -1429,12 +1506,14 @@ export default function LabRunner() {
                 </>
               )}
 
-              {/* Guided tab — walks objectives one step at a time */}
-              {sidebarTab === 'guided' && Array.isArray(scenario.objectives) && scenario.objectives.length > 0 && (() => {
-                const steps = scenario.objectives
+              {/* Guided tab — beginner walkthrough, separate from costed hints */}
+              {sidebarTab === 'guided' && (() => {
+                const steps = buildGuidedSteps(scenario)
                 const total = steps.length
                 const idx = Math.min(guidedStep, total - 1)
-                const stepHint = hints.revealed.find(h => h.order === idx + 1)
+                const step = steps[idx]
+                const StepIcon = step.icon || Target
+                const stepHint = hints.revealed.find(h => h.order === Math.max(1, Math.min(idx, hints.total_hints || 1)))
                 return (
                   <div className="space-y-4">
                     <div>
@@ -1454,12 +1533,31 @@ export default function LabRunner() {
 
                     <div className="rounded-lg bg-surface-800/60 border border-surface-700/60 p-3">
                       <div className="flex items-center gap-2 mb-1.5">
-                        <Target size={13} className="text-accent-cyan shrink-0" />
-                        <span className="text-xs font-semibold text-accent-cyan">Goal for this step</span>
+                        <StepIcon size={13} className={`${step.accent || 'text-accent-cyan'} shrink-0`} />
+                        <span className={`text-xs font-semibold ${step.accent || 'text-accent-cyan'}`}>{step.title}</span>
                       </div>
                       <p className="text-sm text-surface-200 leading-relaxed">
-                        {typeof steps[idx] === 'string' ? steps[idx] : JSON.stringify(steps[idx])}
+                        {step.body}
                       </p>
+                    </div>
+
+                    <div className="rounded-lg bg-surface-900/70 border border-surface-800 p-3">
+                      <div className="text-xs font-semibold text-surface-300 mb-2">Do this now</div>
+                      <ol className="space-y-2">
+                        {(step.actions || []).map((action, actionIdx) => (
+                          <li key={`${idx}-${actionIdx}`} className="flex gap-2 text-sm text-surface-300 leading-relaxed">
+                            <span className="mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-surface-800 text-[10px] font-semibold text-surface-400">
+                              {actionIdx + 1}
+                            </span>
+                            <span>{action.startsWith('Try:') ? (
+                              <>
+                                <span className="text-surface-500">Try: </span>
+                                <code className="rounded bg-surface-950 px-1.5 py-0.5 text-[12px] text-accent-cyan">{action.replace(/^Try:\s*/, '')}</code>
+                              </>
+                            ) : action}</span>
+                          </li>
+                        ))}
+                      </ol>
                     </div>
 
                     {!interviewMode && (
@@ -1771,6 +1869,7 @@ export default function LabRunner() {
           <SimWithTerminal
             open={simTerminalOpen}
             onToggle={() => setSimTerminalOpen((v) => !v)}
+            sessionId={sessionId}
             terminalSession={terminalSession}
             terminalHost={terminalHost}
             blockedCommands={blockedCmds}

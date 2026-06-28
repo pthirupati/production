@@ -404,4 +404,8 @@ export const useOS = create((set, get) => ({
   // ── desktop / shell UI state ──
   startOpen: false,
   setStartOpen: (v) => set({ startOpen: typeof v === 'function' ? v(get().startOpen) : v }),
+  taskViewOpen: false,
+  setTaskViewOpen: (v) => set({ taskViewOpen: typeof v === 'function' ? v(get().taskViewOpen) : v }),
+  powerState: null, // null | 'sleep' | 'shutdown' | 'restart'
+  setPowerState: (powerState) => set({ powerState, startOpen: false, taskViewOpen: false }),
 }))

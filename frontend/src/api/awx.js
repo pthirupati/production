@@ -37,6 +37,21 @@ export const awxApi = {
   createSchedule(sessionId, name, template) {
     return awxApi.action(sessionId, 'create_schedule', { name, template })
   },
+  toggleSchedule(sessionId, scheduleId) {
+    return awxApi.action(sessionId, 'toggle_schedule', { schedule_id: scheduleId })
+  },
+  deleteSchedule(sessionId, scheduleId) {
+    return awxApi.action(sessionId, 'delete_schedule', { schedule_id: scheduleId })
+  },
+  relaunchJob(sessionId, jobId) {
+    return awxApi.action(sessionId, 'relaunch_job', { job_id: jobId })
+  },
+  cancelJob(sessionId, jobId) {
+    return awxApi.action(sessionId, 'cancel_job', { job_id: jobId })
+  },
+  toggleHost(sessionId, hostId) {
+    return awxApi.action(sessionId, 'toggle_host', { host_id: hostId })
+  },
   installAwx(sessionId) {
     return awxApi.action(sessionId, 'install_awx', {})
   },

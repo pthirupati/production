@@ -22,6 +22,7 @@ import {
   GPMC, IISManager, DHCPManager, FirewallAdvanced, PerformanceMonitor,
   Calculator, WordPad, Paint,
 } from './RemainingApps'
+import Edge from './Edge'
 
 // app key → { component, icon, default window props, title }
 export const APPS = {
@@ -52,6 +53,7 @@ export const APPS = {
   Calculator: { c: Calculator, title: 'Calculator', icon: (s = 16) => <CalcIcon size={s} color="#5a6b7b" />, w: 330, h: 450 },
   WordPad: { c: WordPad, title: 'Document - WordPad', icon: (s = 16) => <FileText size={s} color="#5b9bd5" />, w: 760, h: 540 },
   Paint: { c: Paint, title: 'Untitled - Paint', icon: (s = 16) => <Palette size={s} color="#c0392b" />, w: 820, h: 560 },
+  Edge: { c: Edge, title: 'Microsoft Edge', icon: (s = 16) => <Globe size={s} color="#0078d4" />, w: 960, h: 620 },
 }
 
 export function AppIcon({ app, size = 16 }) {

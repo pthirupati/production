@@ -1,0 +1,112 @@
+<svg width="1200" height="627" viewBox="0 0 1200 627" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="FixitLab — Break things. Fix them. Get hired.">
+  <defs>
+    <style>
+      @import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@500;700;800&amp;family=Inter:wght@400;500;600&amp;family=JetBrains+Mono:wght@500;700&amp;display=swap');
+      .disp{font-family:'DM Sans',system-ui,-apple-system,'Segoe UI',Roboto,sans-serif;}
+      .body{font-family:'Inter',system-ui,-apple-system,'Segoe UI',Roboto,sans-serif;}
+      .mono{font-family:'JetBrains Mono',ui-monospace,Menlo,monospace;}
+    </style>
+    <linearGradient id="brand" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#6d78ff"/>
+      <stop offset="0.5" stop-color="#b266e0"/>
+      <stop offset="1" stop-color="#49b5ff"/>
+    </linearGradient>
+    <radialGradient id="orbCyan" cx="0.5" cy="0.5" r="0.5">
+      <stop offset="0" stop-color="#6d78ff" stop-opacity="0.45"/>
+      <stop offset="1" stop-color="#6d78ff" stop-opacity="0"/>
+    </radialGradient>
+    <radialGradient id="orbPurple" cx="0.5" cy="0.5" r="0.5">
+      <stop offset="0" stop-color="#b266e0" stop-opacity="0.42"/>
+      <stop offset="1" stop-color="#b266e0" stop-opacity="0"/>
+    </radialGradient>
+    <linearGradient id="cardEdge" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#6d78ff" stop-opacity="0.5"/>
+      <stop offset="1" stop-color="#b266e0" stop-opacity="0.3"/>
+    </linearGradient>
+  </defs>
+
+  <rect width="1200" height="627" fill="#080a16"/>
+  <circle cx="120" cy="80" r="360" fill="url(#orbCyan)"/>
+  <circle cx="1080" cy="600" r="420" fill="url(#orbPurple)"/>
+  <g stroke="#ffffff" stroke-opacity="0.035" stroke-width="1">
+    <path d="M0 157 H1200 M0 314 H1200 M0 471 H1200 M300 0 V627 M600 0 V627 M900 0 V627"/>
+  </g>
+
+  <!-- Logo lockup -->
+  <g transform="translate(64,56)">
+    <rect width="58" height="58" rx="15" fill="url(#brand)"/>
+    <text x="29" y="40" text-anchor="middle" class="mono" font-size="30" font-weight="700" fill="#080a16">&gt;_</text>
+    <text x="76" y="30" class="disp" font-size="30" font-weight="800" fill="#ffffff">Fixit</text>
+    <text x="76" y="30" class="disp" font-size="30" font-weight="800" fill="url(#brand)" dx="78">Lab</text>
+  </g>
+
+  <!-- Eyebrow -->
+  <g transform="translate(64,176)">
+    <rect width="290" height="34" rx="17" fill="#6d78ff" fill-opacity="0.14" stroke="#6d78ff" stroke-opacity="0.35"/>
+    <circle cx="22" cy="17" r="4" fill="#56e0b0"/>
+    <text x="38" y="22" class="body" font-size="14" font-weight="600" fill="#9fa8ff" letter-spacing="1.5">LIVE CLOUD LABS · AI INTERVIEWS</text>
+  </g>
+
+  <!-- Headline -->
+  <text x="62" y="288" class="disp" font-size="64" font-weight="800" fill="#ffffff">Break things.</text>
+  <text x="62" y="356" class="disp" font-size="64" font-weight="800" fill="#ffffff">Fix them. <tspan fill="url(#brand)">Get hired.</tspan></text>
+
+  <text x="64" y="408" class="body" font-size="20" font-weight="400" fill="#aeb6d4">Practice real incident response on live cloud environments —</text>
+  <text x="64" y="436" class="body" font-size="20" font-weight="400" fill="#aeb6d4">timed challenges, instant validation, and AI mock interviews.</text>
+
+  <!-- Feature pills -->
+  <g transform="translate(64,470)" class="body" font-size="15" font-weight="600">
+    <g>
+      <rect width="186" height="40" rx="20" fill="#49b5ff" fill-opacity="0.1" stroke="#49b5ff" stroke-opacity="0.3"/>
+      <text x="93" y="26" text-anchor="middle" fill="#8fd0ff">Fix It · Build It · Hack It</text>
+    </g>
+    <g transform="translate(200,0)">
+      <rect width="168" height="40" rx="20" fill="#b266e0" fill-opacity="0.1" stroke="#b266e0" stroke-opacity="0.3"/>
+      <text x="84" y="26" text-anchor="middle" fill="#d6a8ee">AI Voice Interviews</text>
+    </g>
+    <g transform="translate(382,0)">
+      <rect width="150" height="40" rx="20" fill="#56e0b0" fill-opacity="0.1" stroke="#56e0b0" stroke-opacity="0.3"/>
+      <text x="75" y="26" text-anchor="middle" fill="#7fe8c6">RHCSA · CKA prep</text>
+    </g>
+  </g>
+
+  <!-- CTA -->
+  <g transform="translate(64,538)">
+    <rect width="220" height="50" rx="25" fill="url(#brand)"/>
+    <text x="110" y="32" text-anchor="middle" class="body" font-size="17" font-weight="600" fill="#080a16">Start free → fixitlab.in</text>
+  </g>
+
+  <!-- Terminal mock (right) -->
+  <g transform="translate(720,150)">
+    <rect width="420" height="330" rx="16" fill="#0d1024" stroke="url(#cardEdge)" stroke-width="1.5"/>
+    <rect width="420" height="44" rx="16" fill="#141833"/>
+    <rect y="28" width="420" height="16" fill="#141833"/>
+    <circle cx="26" cy="22" r="6" fill="#ec6a5e"/>
+    <circle cx="48" cy="22" r="6" fill="#feb155"/>
+    <circle cx="70" cy="22" r="6" fill="#56e0b0"/>
+    <text x="210" y="27" text-anchor="middle" class="mono" font-size="13" fill="#7d86ad">root@fixit-lab: ~/incident</text>
+    <g class="mono" font-size="14.5">
+      <text x="24" y="84" fill="#56e0b0">$ <tspan fill="#cdd5f4">systemctl status api</tspan></text>
+      <text x="24" y="112" fill="#ec6a5e">● api.service — failed (exit 1)</text>
+      <text x="24" y="140" fill="#56e0b0">$ <tspan fill="#cdd5f4">journalctl -u api | tail</tspan></text>
+      <text x="24" y="168" fill="#feb155">EADDRINUSE :8080 already bound</text>
+      <text x="24" y="196" fill="#56e0b0">$ <tspan fill="#cdd5f4">fuser -k 8080/tcp &amp;&amp; systemctl restart api</tspan></text>
+      <text x="24" y="224" fill="#49b5ff">→ api.service active (running) ✓</text>
+      <text x="24" y="258" fill="#56e0b0">$ <tspan fill="#cdd5f4">./check-solution</tspan></text>
+    </g>
+    <g transform="translate(24,278)">
+      <rect width="372" height="38" rx="9" fill="#56e0b0" fill-opacity="0.12" stroke="#56e0b0" stroke-opacity="0.4"/>
+      <text x="16" y="25" class="body" font-size="14.5" font-weight="600" fill="#7fe8c6">✓ Solved in 02:41 — +180 pts · streak ×4</text>
+    </g>
+  </g>
+
+  <!-- Stat strip -->
+  <g class="disp" transform="translate(720,508)">
+    <text x="0" y="22" font-size="26" font-weight="800" fill="#ffffff">21+</text>
+    <text x="0" y="44" class="body" font-size="13" fill="#7d86ad">technologies</text>
+    <text x="150" y="22" font-size="26" font-weight="800" fill="#ffffff">360+</text>
+    <text x="150" y="44" class="body" font-size="13" fill="#7d86ad">live scenarios</text>
+    <text x="300" y="22" font-size="26" font-weight="800" fill="#ffffff">10k+</text>
+    <text x="300" y="44" class="body" font-size="13" fill="#7d86ad">engineers</text>
+  </g>
+</svg>

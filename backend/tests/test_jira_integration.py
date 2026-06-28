@@ -219,11 +219,26 @@ class JiraSubscriptionGateTests(TestCase):
         self.client = APIClient()
         self.client.force_authenticate(user=self.user)
 
-    def test_ensure_ticket_blocked_without_subscription(self):
+    def _exhaust_free_labs(self):
+        """Use up the Free plan's daily lab quota so labs_remaining == 0."""
+        from apps.billing.services import get_user_plan_info
+        max_labs = get_user_plan_info(self.user)["plan"]["max_labs_per_day"]
+        for _ in range(max_labs):
+            LabSession.objects.create(user=self.user, scenario=self.scenario, status="RUNNING")
+
+    def test_open_blocked_after_free_labs_exhausted(self):
+        """Not subscribed + no free labs left → ticket must NOT open."""
+        self._exhaust_free_labs()
         resp = self.client.post(f"/api/jira/tickets/scenario/{self.scenario.id}/")
         self.assertEqual(resp.status_code, 403)
         self.assertEqual(resp.json().get("code"), "SUBSCRIPTION_REQUIRED")
 
-    def test_get_ticket_blocked_without_subscription(self):
+    def test_get_blocked_after_free_labs_exhausted(self):
+        self._exhaust_free_labs()
         resp = self.client.get(f"/api/jira/tickets/scenario/{self.scenario.id}/")
         self.assertEqual(resp.status_code, 403)
+
+    def test_open_allowed_with_free_labs_remaining(self):
+        """Free-plan user with daily free labs left → ticket may open."""
+        resp = self.client.post(f"/api/jira/tickets/scenario/{self.scenario.id}/")
+        self.assertNotEqual(resp.status_code, 403)

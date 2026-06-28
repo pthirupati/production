@@ -1,8 +1,10 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
-  Waves, Filter, Search, ArrowLeft, StopCircle, Lightbulb, RefreshCw,
+  Waves, Filter, Search, ArrowLeft, RefreshCw,
   XCircle, AlertTriangle, CheckCircle2, GitBranch, Flag, Eraser, Target,
-  ArrowRight, ArrowLeftRight,
+  ArrowRight, ArrowLeftRight, FolderOpen, Save, Square, PlayCircle, ZoomIn,
+  ZoomOut, SkipBack, SkipForward, Bookmark, History, BarChart3, Network,
+  Settings, Radio, X, Download, Copy, Eye,
 } from 'lucide-react'
 import { wiresharkApi } from '../../api/wireshark'
 import { LabChromeControls } from '../lab/LabChromeBar'
@@ -32,6 +34,35 @@ const SCOPED_CSS = `
   padding: 0.6rem 1rem; background: #0a0e15; border-bottom: 1px solid var(--ws-border);
   position: sticky; top: 0; z-index: 10;
 }
+.ws-sim .ws-menubar {
+  display: flex; align-items: center; gap: 0.1rem; padding: 0.25rem 0.75rem;
+  background: #101522; border-bottom: 1px solid var(--ws-border); position: sticky; top: 45px; z-index: 9;
+}
+.ws-sim .ws-menu-btn {
+  position: relative; border: 1px solid transparent; background: transparent; color: var(--ws-text);
+  font-size: 0.78rem; padding: 0.28rem 0.55rem; border-radius: 4px; cursor: pointer;
+}
+.ws-sim .ws-menu-btn:hover, .ws-sim .ws-menu-btn.ws-on { background: #1a2233; border-color: var(--ws-border); }
+.ws-sim .ws-menu-pop {
+  position: absolute; top: calc(100% + 2px); left: 0; min-width: 230px; max-height: 420px; overflow-y: auto;
+  background: #f8fafc; color: #111827; border: 1px solid #cbd5e1; box-shadow: 0 18px 40px rgba(0,0,0,.35);
+  border-radius: 4px; padding: 0.25rem; z-index: 40;
+}
+.ws-sim .ws-menu-item {
+  display: flex; justify-content: space-between; align-items: center; gap: 1rem;
+  width: 100%; padding: 0.35rem 0.55rem; font-size: 0.74rem; border-radius: 3px; white-space: nowrap;
+}
+.ws-sim .ws-menu-item:hover { background: #e6f0ff; }
+.ws-sim .ws-toolbar {
+  display: flex; align-items: center; gap: 0.25rem; padding: 0.35rem 0.85rem;
+  background: #141b2a; border-bottom: 1px solid var(--ws-border); overflow-x: auto;
+}
+.ws-sim .ws-tool {
+  display: inline-flex; align-items: center; justify-content: center; width: 30px; height: 28px;
+  border-radius: 5px; color: var(--ws-muted); border: 1px solid transparent; background: transparent; cursor: pointer;
+}
+.ws-sim .ws-tool:hover { color: var(--ws-text); background: #202a3f; border-color: var(--ws-border); }
+.ws-sim .ws-tool.ws-live { color: var(--ws-green); background: rgba(74,222,128,.08); }
 .ws-sim .ws-btn {
   display: inline-flex; align-items: center; gap: 0.4rem; border-radius: 6px;
   padding: 0.45rem 0.8rem; font-size: 0.8rem; font-weight: 600; cursor: pointer;
@@ -91,6 +122,30 @@ const SCOPED_CSS = `
   background: #07090f; border: 1px solid var(--ws-border); border-radius: 8px;
   padding: 0.7rem 0.85rem; max-height: 360px; overflow-y: auto; line-height: 1.55;
   white-space: pre-wrap; word-break: break-word;
+}
+.ws-sim .ws-modal-backdrop {
+  position: fixed; inset: 0; z-index: 60; background: rgba(0,0,0,.65);
+  display: flex; align-items: center; justify-content: center; padding: 1rem;
+}
+.ws-sim .ws-modal {
+  width: min(980px, 96vw); max-height: 88vh; overflow: hidden; display: flex; flex-direction: column;
+  background: #f8fafc; color: #111827; border-radius: 8px; border: 1px solid #cbd5e1;
+  box-shadow: 0 28px 80px rgba(0,0,0,.45);
+}
+.ws-sim .ws-modal-head {
+  display: flex; align-items: center; justify-content: space-between; gap: 1rem;
+  padding: 0.65rem 0.85rem; background: #e5edf7; border-bottom: 1px solid #cbd5e1;
+}
+.ws-sim .ws-modal-body { padding: 0.85rem; overflow: auto; }
+.ws-sim .ws-light-table { width: 100%; border-collapse: collapse; font-size: 0.78rem; }
+.ws-sim .ws-light-table th { text-align: left; background: #e2e8f0; color: #475569; padding: 0.42rem 0.55rem; }
+.ws-sim .ws-light-table td { padding: 0.38rem 0.55rem; border-bottom: 1px solid #e2e8f0; }
+.ws-sim .ws-graph-row { display: grid; grid-template-columns: 120px 1fr 80px; align-items: center; gap: 0.65rem; margin: 0.45rem 0; }
+.ws-sim .ws-graph-bar { height: 12px; border-radius: 999px; background: linear-gradient(90deg, #4c8dff, #34d3c2); }
+.ws-sim .ws-statusbar {
+  display: flex; align-items: center; gap: 0.75rem; padding: 0.35rem 0.85rem;
+  border-top: 1px solid var(--ws-border); background: #0f1522; color: var(--ws-muted);
+  font-size: 0.7rem; font-family: 'JetBrains Mono', ui-monospace, monospace;
 }
 `
 
@@ -155,6 +210,66 @@ function hexDump(pkt) {
   return lines
 }
 
+const WS_MENUS = [
+  ['File', ['Open', 'Open Recent', 'Merge', 'Import from hex dump', 'Close', 'Save', 'Save As', 'Export Specified Packets', 'Export Packet Dissections as CSV', 'Export Objects HTTP', 'Print', 'Quit']],
+  ['Edit', ['Copy as Text', 'Copy as Bytes', 'Copy as JSON', 'Find Packet', 'Find Next', 'Find Previous', 'Mark/Unmark Packet', 'Ignore Packet', 'Set Time Reference', 'Preferences']],
+  ['View', ['Main Toolbar', 'Filter Toolbar', 'Statusbar', 'Packet List', 'Packet Details', 'Packet Bytes', 'Time Display Format', 'Name Resolution', 'Colorize Packet List', 'Zoom In', 'Zoom Out', 'Resize Columns']],
+  ['Go', ['Back', 'Forward', 'Go to Packet', 'First Packet', 'Last Packet', 'Previous Packet', 'Next Packet']],
+  ['Capture', ['Options', 'Start', 'Stop', 'Restart', 'Capture Filters', 'Refresh Interfaces']],
+  ['Analyze', ['Display Filters', 'Apply as Column', 'Apply as Filter', 'Prepare as Filter', 'Enable Protocol', 'Decode As', 'Expert Information', 'Follow TCP Stream', 'Follow UDP Stream', 'Follow HTTP Stream']],
+  ['Statistics', ['Capture File Properties', 'Protocol Hierarchy', 'Conversations', 'Endpoints', 'Packet Lengths', 'I/O Graph', 'Service Response Time', 'Flow Graph', 'HTTP', 'TCP Stream Graphs']],
+  ['Telephony', ['VoIP Calls', 'RTP Streams', 'SIP Flows', 'H.225', 'IAX2', 'RTSP', 'SMPP Operations']],
+  ['Wireless', ['WLAN Traffic', 'Bluetooth ATT Server Attributes', 'Bluetooth Devices', 'Bluetooth HCI Summary']],
+  ['Tools', ['Firewall ACL Rules', 'Credentials', 'Lua Console']],
+  ['Help', ['Contents', 'Supported Protocols', 'FAQ', 'Man Pages', 'Website', 'Sample Captures', 'About Wireshark']],
+]
+
+const DISPLAY_AUTOCOMPLETE = [
+  'ip.addr', 'tcp.port', 'udp.port', 'http', 'dns', 'icmp', 'arp', 'eth.addr',
+  'frame.number', 'tcp.flags', 'http.request', 'http.response', 'ssl', 'tls',
+]
+
+function ModalShell({ title, children, onClose }) {
+  return (
+    <div className="ws-modal-backdrop" onMouseDown={onClose}>
+      <div className="ws-modal" onMouseDown={(e) => e.stopPropagation()}>
+        <div className="ws-modal-head">
+          <div className="font-semibold">{title}</div>
+          <button type="button" className="p-1 rounded hover:bg-slate-200" onClick={onClose}><X size={16} /></button>
+        </div>
+        <div className="ws-modal-body">{children}</div>
+      </div>
+    </div>
+  )
+}
+
+function protocolStats(packets) {
+  const total = packets.length || 1
+  const byProto = new Map()
+  packets.forEach((p) => byProto.set(p.protocol || 'DATA', (byProto.get(p.protocol || 'DATA') || 0) + 1))
+  return Array.from(byProto.entries()).sort((a, b) => b[1] - a[1]).map(([proto, count]) => ({
+    proto,
+    count,
+    pct: Math.round((count / total) * 100),
+    bytes: packets.filter((p) => (p.protocol || 'DATA') === proto).reduce((sum, p) => sum + (p.length || 0), 0),
+  }))
+}
+
+function conversationRows(packets) {
+  const rows = new Map()
+  packets.forEach((p) => {
+    const a = `${p.src}${p.src_port ? `:${p.src_port}` : ''}`
+    const b = `${p.dst}${p.dst_port ? `:${p.dst_port}` : ''}`
+    const key = [a, b].sort().join(' <-> ')
+    const cur = rows.get(key) || { a, b, proto: p.protocol || 'DATA', packets: 0, bytes: 0, duration: 0 }
+    cur.packets += 1
+    cur.bytes += p.length || 0
+    cur.duration = Math.max(cur.duration, Number(p.time || 0))
+    rows.set(key, cur)
+  })
+  return Array.from(rows.values()).sort((a, b) => b.bytes - a.bytes).slice(0, 12)
+}
+
 /**
  * Wireshark packet-capture simulator. Rendered INLINE by LabRunner for wireshark
  * labs (simulation_type 'wireshark' / technology.slug 'wireshark') — no new route.
@@ -173,6 +288,10 @@ export default function WiresharkSimulator({
   const [displayInput, setDisplayInput] = useState('')
   const [displayBad, setDisplayBad] = useState(false)
   const [busy, setBusy] = useState(false)
+  const [menuOpen, setMenuOpen] = useState(null)
+  const [modal, setModal] = useState(null)
+  const [capturing, setCapturing] = useState(true)
+  const [zoom, setZoom] = useState(100)
   const pollRef = useRef(null)
   const hydrated = useRef(false)
 
@@ -257,6 +376,7 @@ export default function WiresharkSimulator({
       await wiresharkApi.followStream(sessionId, payload)
       setDisplayInput(pkt.stream_id != null ? `tcp.stream==${pkt.stream_id}` : displayInput)
       await load()
+      setModal('stream')
     } catch { /* ignore */ }
     finally { setBusy(false) }
   }, [sessionId, displayInput, load])
@@ -265,6 +385,23 @@ export default function WiresharkSimulator({
   const CAPTURE_SAMPLES = ['tcp', 'udp', 'port 80', 'tcp port 443', 'host 10.0.0.5']
 
   const selPkt = packets.find(p => p.no === selected) || null
+  const stats = protocolStats(packets)
+  const conversations = conversationRows(packets)
+
+  const handleMenuItem = (menu, item) => {
+    setMenuOpen(null)
+    if (item === 'Options') setModal('capture-options')
+    else if (item === 'Protocol Hierarchy') setModal('protocol-hierarchy')
+    else if (item === 'Conversations') setModal('conversations')
+    else if (item === 'I/O Graph') setModal('io-graph')
+    else if (item.includes('Follow') && streamPayload.length) setModal('stream')
+    else if (item === 'Start') setCapturing(true)
+    else if (item === 'Stop') setCapturing(false)
+    else if (item === 'Restart') { setCapturing(true); load() }
+    else if (item === 'Zoom In') setZoom((z) => Math.min(140, z + 10))
+    else if (item === 'Zoom Out') setZoom((z) => Math.max(80, z - 10))
+    else if (item === 'About Wireshark') setModal('about')
+  }
 
   return (
     <div className={`ws-sim ${embedded ? 'h-full min-h-0 flex flex-col overflow-hidden' : 'min-h-screen'}`}>
@@ -294,7 +431,64 @@ export default function WiresharkSimulator({
         </div>
       </div>
 
-      <div className="p-4 max-w-[1200px] mx-auto">
+      <div className="ws-menubar" onMouseLeave={() => setMenuOpen(null)}>
+        {WS_MENUS.map(([menu, items]) => (
+          <div key={menu} className="relative">
+            <button
+              type="button"
+              className={`ws-menu-btn ${menuOpen === menu ? 'ws-on' : ''}`}
+              onClick={() => setMenuOpen(menuOpen === menu ? null : menu)}
+              onMouseEnter={() => menuOpen && setMenuOpen(menu)}
+            >
+              {menu}
+            </button>
+            {menuOpen === menu && (
+              <div className="ws-menu-pop">
+                {items.map((item, i) => (
+                  <button key={`${item}-${i}`} type="button" className="ws-menu-item" onClick={() => handleMenuItem(menu, item)}>
+                    <span>{item}</span>
+                    {['Open', 'Save', 'Start', 'Stop', 'Options', 'Protocol Hierarchy', 'Conversations', 'I/O Graph'].includes(item) && <span className="text-slate-400">›</span>}
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+        ))}
+      </div>
+
+      <div className="ws-toolbar">
+        {[
+          [FolderOpen, 'Open capture', () => setModal('capture-options')],
+          [Save, 'Save capture', () => setModal('saved')],
+          [capturing ? Square : PlayCircle, capturing ? 'Stop capture' : 'Start capture', () => setCapturing((c) => !c), capturing ? 'ws-live' : ''],
+          [RefreshCw, 'Restart capture', () => { setCapturing(true); load() }],
+          [Search, 'Find packet', () => setModal('find')],
+          [SkipBack, 'First packet', () => packets[0] && selectPacket(packets[0].no)],
+          [ArrowLeft, 'Previous packet', () => {
+            const idx = packets.findIndex((p) => p.no === selected)
+            if (idx > 0) selectPacket(packets[idx - 1].no)
+          }],
+          [ArrowRight, 'Next packet', () => {
+            const idx = packets.findIndex((p) => p.no === selected)
+            if (idx >= 0 && idx < packets.length - 1) selectPacket(packets[idx + 1].no)
+          }],
+          [SkipForward, 'Last packet', () => packets[packets.length - 1] && selectPacket(packets[packets.length - 1].no)],
+          [ZoomIn, 'Zoom in', () => setZoom((z) => Math.min(140, z + 10))],
+          [ZoomOut, 'Zoom out', () => setZoom((z) => Math.max(80, z - 10))],
+          [BarChart3, 'I/O Graph', () => setModal('io-graph')],
+          [Network, 'Conversations', () => setModal('conversations')],
+          [Settings, 'Capture Options', () => setModal('capture-options')],
+        ].map(([Icon, title, action, klass]) => (
+          <button key={title} type="button" className={`ws-tool ${klass || ''}`} title={title} onClick={action}>
+            <Icon size={15} />
+          </button>
+        ))}
+        <span className="ml-auto text-[10px] ws-mono" style={{ color: 'var(--ws-muted)' }}>
+          {capturing ? 'Live capture running' : 'Capture stopped'} · zoom {zoom}%
+        </span>
+      </div>
+
+      <div className="p-4 max-w-[1200px] mx-auto" style={{ fontSize: `${zoom}%` }}>
         {error && <div className="ws-banner ws-banner-err"><XCircle size={15} className="shrink-0 mt-0.5" /> {error}</div>}
 
         {inv.task && (
@@ -377,8 +571,13 @@ export default function WiresharkSimulator({
             </button>
           </div>
           <div className="flex flex-wrap gap-1.5 mt-1.5">
+            <span className="ws-chip" title="Bookmark current filter"><Bookmark size={11} /> save filter</span>
+            <span className="ws-chip" title="Filter history"><History size={11} /> history</span>
             {DISPLAY_SAMPLES.map(s => (
               <button key={s} className="ws-chip" onClick={() => { setDisplayInput(s); setDisplayBad(false) }}>{s}</button>
+            ))}
+            {DISPLAY_AUTOCOMPLETE.map(s => (
+              <button key={s} className="ws-chip" onClick={() => { setDisplayInput((prev) => prev ? `${prev} && ${s}` : s); setDisplayBad(false) }}>{s}</button>
             ))}
           </div>
         </div>
@@ -539,6 +738,136 @@ export default function WiresharkSimulator({
           </div>
         )}
       </div>
+
+      <div className="ws-statusbar">
+        <span>{inv.interface || 'Ethernet0'}</span>
+        <span>Packets: {summary.wire_packets ?? packets.length}</span>
+        <span>Displayed: {packets.length}</span>
+        <span>Marked: {marked.size}</span>
+        <span className="ml-auto">{displayInput ? `Display filter: ${displayInput}` : 'Ready'}</span>
+      </div>
+
+      {modal === 'stream' && (
+        <ModalShell title={`Follow TCP Stream${followedStream != null ? ` #${followedStream}` : ''}`} onClose={() => setModal(null)}>
+          <div className="flex items-center gap-2 mb-3 flex-wrap text-xs">
+            <select className="border border-slate-300 rounded px-2 py-1 bg-white"><option>ASCII</option><option>Hex Dump</option><option>Raw</option><option>UTF-8</option><option>C Arrays</option></select>
+            <input className="border border-slate-300 rounded px-2 py-1 flex-1 min-w-[180px]" placeholder="Find in stream" />
+            <button className="px-2 py-1 rounded border border-slate-300 flex items-center gap-1"><Copy size={13} /> Copy</button>
+            <button className="px-2 py-1 rounded border border-slate-300 flex items-center gap-1"><Download size={13} /> Save As</button>
+          </div>
+          <div className="font-mono text-xs bg-white border border-slate-300 rounded p-3 max-h-[55vh] overflow-auto leading-6">
+            {streamPayload.length === 0 ? (
+              <div className="text-slate-500">No stream selected. Choose a TCP packet and click follow.</div>
+            ) : streamPayload.map((seg, i) => {
+              const toServer = seg.direction === 'c2s' || seg.direction === 'request' || seg.direction === 'out'
+              return (
+                <div key={i} style={{ color: toServer ? '#c2410c' : '#2563eb' }}>
+                  {seg.data}
+                </div>
+              )
+            })}
+          </div>
+        </ModalShell>
+      )}
+
+      {modal === 'protocol-hierarchy' && (
+        <ModalShell title="Protocol Hierarchy Statistics" onClose={() => setModal(null)}>
+          <table className="ws-light-table">
+            <thead><tr><th>Protocol</th><th>% Packets</th><th>Packets</th><th>Bytes</th><th>Mbit/s</th></tr></thead>
+            <tbody>
+              {stats.map((s) => (
+                <tr key={s.proto}><td>{s.proto}</td><td>{s.pct}%</td><td>{s.count}</td><td>{s.bytes.toLocaleString()}</td><td>{((s.bytes * 8) / 1_000_000).toFixed(3)}</td></tr>
+              ))}
+            </tbody>
+          </table>
+        </ModalShell>
+      )}
+
+      {modal === 'conversations' && (
+        <ModalShell title="Conversations" onClose={() => setModal(null)}>
+          <div className="flex gap-1 mb-3 text-xs">
+            {['Ethernet', 'IPv4', 'IPv6', 'TCP', 'UDP'].map((t) => <button key={t} className="px-2 py-1 rounded border border-slate-300 bg-white">{t}</button>)}
+          </div>
+          <table className="ws-light-table">
+            <thead><tr><th>Address A</th><th>Address B</th><th>Protocol</th><th>Packets</th><th>Bytes</th><th>Duration</th><th></th></tr></thead>
+            <tbody>
+              {conversations.map((c) => (
+                <tr key={`${c.a}-${c.b}`}><td>{c.a}</td><td>{c.b}</td><td>{c.proto}</td><td>{c.packets}</td><td>{c.bytes}</td><td>{c.duration.toFixed(3)}s</td><td><button className="text-blue-600">Follow Stream</button></td></tr>
+              ))}
+            </tbody>
+          </table>
+        </ModalShell>
+      )}
+
+      {modal === 'io-graph' && (
+        <ModalShell title="I/O Graphs" onClose={() => setModal(null)}>
+          <div className="grid gap-3">
+            {stats.slice(0, 5).map((s, i) => (
+              <div key={s.proto} className="ws-graph-row">
+                <span className="font-mono text-xs">{s.proto}</span>
+                <div className="bg-slate-200 rounded-full overflow-hidden">
+                  <div className="ws-graph-bar" style={{ width: `${Math.max(8, s.pct)}%`, filter: `hue-rotate(${i * 35}deg)` }} />
+                </div>
+                <span className="text-right text-xs">{s.count} packets</span>
+              </div>
+            ))}
+          </div>
+          <div className="grid sm:grid-cols-5 gap-2 mt-4 text-xs">
+            {['Name', 'Display filter', 'Color', 'Style', 'Y Axis'].map((h) => <div key={h} className="font-semibold text-slate-500">{h}</div>)}
+            <input className="border rounded px-2 py-1" defaultValue="All packets" />
+            <input className="border rounded px-2 py-1" defaultValue={displayInput || 'frame'} />
+            <input className="border rounded px-2 py-1" type="color" defaultValue="#4c8dff" />
+            <select className="border rounded px-2 py-1"><option>Line</option><option>Impulse</option><option>Dot</option><option>FBar</option></select>
+            <select className="border rounded px-2 py-1"><option>Packets</option><option>Bytes</option><option>Bits</option><option>COUNT</option></select>
+          </div>
+        </ModalShell>
+      )}
+
+      {modal === 'capture-options' && (
+        <ModalShell title="Capture Options" onClose={() => setModal(null)}>
+          <div className="grid lg:grid-cols-[1.2fr_.8fr] gap-4">
+            <div>
+              <div className="font-semibold mb-2">Interfaces</div>
+              <table className="ws-light-table">
+                <thead><tr><th></th><th>Interface</th><th>Traffic</th><th>Link-layer header</th><th>Promiscuous</th></tr></thead>
+                <tbody>
+                  {[
+                    ['Ethernet0', '████████░░', 'Ethernet', true],
+                    ['Wi-Fi', '███░░░░░░░', 'Ethernet', false],
+                    ['Loopback', '█░░░░░░░░░', 'Null/Loopback', true],
+                  ].map(([name, spark, ll, prom]) => (
+                    <tr key={name}><td><input type="checkbox" defaultChecked={name === (inv.interface || 'Ethernet0')} /></td><td>{name}</td><td className="font-mono text-blue-600">{spark}</td><td>{ll}</td><td><input type="checkbox" defaultChecked={prom} /></td></tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+            <div className="space-y-3">
+              <label className="block text-xs font-semibold">Capture filter<input className="mt-1 w-full border rounded px-2 py-1 font-mono" value={captureInput} onChange={(e) => setCaptureInput(e.target.value)} /></label>
+              <label className="block text-xs font-semibold">Output file<input className="mt-1 w-full border rounded px-2 py-1" defaultValue="/captures/fixitlab-session.pcapng" /></label>
+              <div className="grid grid-cols-2 gap-2 text-xs">
+                <label><input type="checkbox" defaultChecked /> Update list of packets in real time</label>
+                <label><input type="checkbox" /> Enable monitor mode</label>
+                <label><input type="checkbox" /> Use ring buffer</label>
+                <label><input type="checkbox" /> Auto-stop after 10000 packets</label>
+              </div>
+              <button className="ws-btn ws-btn-primary" onClick={() => { setCapturing(true); setModal(null) }}><Radio size={13} /> Start</button>
+            </div>
+          </div>
+        </ModalShell>
+      )}
+
+      {['about', 'saved', 'find'].includes(modal) && (
+        <ModalShell title={modal === 'about' ? 'About Wireshark' : modal === 'saved' ? 'Save Capture File' : 'Find Packet'} onClose={() => setModal(null)}>
+          {modal === 'about' && <p className="text-sm">Wireshark 4.2.0 simulated for FixitLab packet analysis labs. Menus, filters, streams, statistics, and capture options are interactive mocks backed by lab state.</p>}
+          {modal === 'saved' && <p className="text-sm">Capture saved as <span className="font-mono">fixitlab-session.pcapng</span>.</p>}
+          {modal === 'find' && (
+            <div className="flex gap-2">
+              <input className="border rounded px-2 py-1 flex-1" placeholder="Find by packet text, hex bytes, or display filter" />
+              <button className="px-3 py-1 rounded bg-blue-600 text-white flex items-center gap-1"><Eye size={13} /> Find</button>
+            </div>
+          )}
+        </ModalShell>
+      )}
     </div>
   )
 }

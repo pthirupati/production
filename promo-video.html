@@ -1,0 +1,269 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1"/>
+<title>FixitLab — Promo Video</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@500;700;800;900&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg:#080a16; --bg2:#0d1024; --bg3:#141833;
+    --cyan:#6d78ff; --purple:#b266e0; --blue:#49b5ff;
+    --green:#56e0b0; --amber:#feb155; --red:#ec6a5e; --pink:#f579dd;
+    --txt:#eaecf7; --mut:#aeb6d4; --dim:#7d86ad;
+    --brand:linear-gradient(135deg,#6d78ff,#b266e0 55%,#49b5ff);
+    --disp:'DM Sans',system-ui,sans-serif; --body:'Inter',system-ui,sans-serif; --mono:'JetBrains Mono',monospace;
+  }
+  *{margin:0;padding:0;box-sizing:border-box}
+  html,body{height:100%;background:#000;overflow:hidden;font-family:var(--body);color:var(--txt)}
+  #wrap{position:fixed;inset:0;display:flex;align-items:center;justify-content:center}
+  /* 16:9 stage scaled to fit */
+  #stage{position:relative;width:1920px;height:1080px;background:var(--bg);overflow:hidden;transform-origin:center center}
+  .orb{position:absolute;border-radius:50%;filter:blur(20px);opacity:.5;pointer-events:none}
+  .orb.c{width:900px;height:900px;background:radial-gradient(circle,rgba(109,120,255,.5),transparent 65%);top:-260px;left:-200px;animation:float 14s ease-in-out infinite}
+  .orb.p{width:1000px;height:1000px;background:radial-gradient(circle,rgba(178,102,224,.45),transparent 65%);bottom:-340px;right:-220px;animation:floatx 17s ease-in-out infinite}
+  .grid{position:absolute;inset:0;background-image:linear-gradient(rgba(255,255,255,.03) 1px,transparent 1px),linear-gradient(90deg,rgba(255,255,255,.03) 1px,transparent 1px);background-size:120px 120px;pointer-events:none}
+  @keyframes float{0%,100%{transform:translateY(0)}50%{transform:translateY(40px)}}
+  @keyframes floatx{0%,100%{transform:translate(0,0)}50%{transform:translate(-40px,30px)}}
+
+  .scene{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;
+    opacity:0;visibility:hidden;transition:opacity .6s ease,transform .6s ease;transform:translateY(24px);padding:0 140px;text-align:center}
+  .scene.on{opacity:1;visibility:visible;transform:translateY(0)}
+
+  .eyebrow{display:inline-flex;align-items:center;gap:12px;padding:12px 26px;border-radius:40px;
+    background:rgba(109,120,255,.13);border:1px solid rgba(109,120,255,.35);color:#9fa8ff;
+    font-weight:600;letter-spacing:2px;font-size:18px;text-transform:uppercase}
+  .dot{width:10px;height:10px;border-radius:50%;background:var(--green);box-shadow:0 0 12px var(--green);animation:blink 1.4s infinite}
+  @keyframes blink{0%,100%{opacity:1}50%{opacity:.3}}
+
+  h1{font-family:var(--disp);font-weight:900;line-height:1.02;letter-spacing:-1px}
+  .grad{background:var(--brand);-webkit-background-clip:text;background-clip:text;color:transparent}
+  .sub{color:var(--mut);font-size:30px;font-weight:400;max-width:1100px;line-height:1.5}
+
+  /* logo */
+  .logo{display:flex;align-items:center;gap:22px}
+  .logobox{width:104px;height:104px;border-radius:26px;background:var(--brand);display:flex;align-items:center;justify-content:center;
+    font-family:var(--mono);font-weight:700;font-size:54px;color:var(--bg);box-shadow:0 20px 60px rgba(109,120,255,.5)}
+  .logotxt{font-family:var(--disp);font-weight:800;font-size:78px}
+
+  /* cards row */
+  .row{display:flex;gap:36px;margin-top:54px}
+  .card{width:380px;border-radius:22px;padding:40px 34px;text-align:left;background:rgba(255,255,255,.025);border:1px solid rgba(255,255,255,.08)}
+  .card .ico{width:74px;height:74px;border-radius:18px;display:flex;align-items:center;justify-content:center;font-size:34px;margin-bottom:26px}
+  .card h3{font-family:var(--disp);font-size:32px;font-weight:800;margin-bottom:14px}
+  .card p{color:var(--mut);font-size:21px;line-height:1.5}
+
+  /* terminal */
+  .term{width:1180px;border-radius:20px;background:var(--bg2);border:1px solid rgba(109,120,255,.4);overflow:hidden;box-shadow:0 40px 120px rgba(0,0,0,.6);text-align:left}
+  .tbar{height:60px;background:var(--bg3);display:flex;align-items:center;gap:12px;padding:0 26px}
+  .tdot{width:15px;height:15px;border-radius:50%}
+  .ttitle{margin-left:18px;font-family:var(--mono);color:var(--dim);font-size:19px}
+  .tbody{padding:34px 40px;font-family:var(--mono);font-size:25px;line-height:1.9;min-height:380px}
+  .tbody .l{white-space:pre-wrap;opacity:0}
+  .tbody .l.show{opacity:1}
+  .ok{color:var(--green)} .err{color:var(--red)} .warn{color:var(--amber)} .info{color:var(--blue)} .cmd{color:var(--txt)}
+  .solved{margin-top:18px;padding:18px 24px;border-radius:12px;background:rgba(86,224,176,.13);border:1px solid rgba(86,224,176,.45);
+    color:#7fe8c6;font-family:var(--body);font-weight:600;font-size:24px;opacity:0;transform:scale(.96);transition:.5s}
+  .solved.show{opacity:1;transform:scale(1)}
+
+  /* interview mock */
+  .call{display:flex;gap:30px;align-items:stretch}
+  .tile{width:540px;height:380px;border-radius:20px;border:1px solid rgba(255,255,255,.1);position:relative;overflow:hidden;display:flex;align-items:center;justify-content:center;background:var(--bg2)}
+  .tile.bot{background:radial-gradient(circle at 50% 40%,rgba(178,102,224,.25),var(--bg2))}
+  .avatar{width:150px;height:150px;border-radius:50%;background:var(--brand);display:flex;align-items:center;justify-content:center;font-size:64px;font-family:var(--disp);font-weight:800;color:var(--bg)}
+  .tilelabel{position:absolute;bottom:18px;left:18px;background:rgba(0,0,0,.55);padding:8px 16px;border-radius:10px;font-size:19px;font-weight:500}
+  .rec{position:absolute;top:18px;right:18px;display:flex;align-items:center;gap:8px;font-size:18px;color:var(--red)}
+  .panel{width:560px;border-radius:20px;background:rgba(255,255,255,.025);border:1px solid rgba(255,255,255,.08);padding:30px;text-align:left}
+  .panel h4{font-family:var(--disp);font-size:24px;font-weight:800;margin-bottom:20px;color:#d6a8ee}
+  .score{display:flex;justify-content:space-between;align-items:center;margin-bottom:18px}
+  .score span{font-size:21px;color:var(--mut)}
+  .bar{width:300px;height:12px;border-radius:6px;background:rgba(255,255,255,.08);overflow:hidden}
+  .bar i{display:block;height:100%;border-radius:6px;background:var(--brand);width:0;transition:width 1.1s ease}
+
+  /* stats */
+  .stats{display:flex;gap:90px;margin-top:30px}
+  .stat .n{font-family:var(--disp);font-size:96px;font-weight:900;background:var(--brand);-webkit-background-clip:text;background-clip:text;color:transparent}
+  .stat .lbl{color:var(--mut);font-size:26px;margin-top:6px}
+
+  .pills{display:flex;gap:18px;flex-wrap:wrap;justify-content:center;max-width:1200px;margin-top:44px}
+  .pill{padding:16px 30px;border-radius:40px;font-size:23px;font-weight:600;background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.12)}
+
+  .cta{margin-top:50px;padding:26px 60px;border-radius:50px;background:var(--brand);color:var(--bg);font-size:32px;font-weight:700;font-family:var(--disp);box-shadow:0 24px 70px rgba(178,102,224,.5)}
+
+  /* progress + controls */
+  #prog{position:absolute;top:0;left:0;height:6px;background:var(--brand);width:0;z-index:50;box-shadow:0 0 14px rgba(109,120,255,.6)}
+  #hint{position:absolute;bottom:26px;left:50%;transform:translateX(-50%);color:var(--dim);font-size:18px;z-index:50;
+    background:rgba(0,0,0,.4);padding:10px 22px;border-radius:30px;transition:opacity .5s}
+  .kbd{font-family:var(--mono);background:rgba(255,255,255,.1);padding:2px 9px;border-radius:6px;color:var(--txt)}
+  @media (prefers-reduced-motion: reduce){*{animation:none!important}}
+</style>
+</head>
+<body>
+<div id="wrap">
+  <div id="stage">
+    <div id="prog"></div>
+    <div class="orb c"></div><div class="orb p"></div><div class="grid"></div>
+
+    <!-- SCENE 1: intro -->
+    <section class="scene" data-dur="4200">
+      <div class="logo" style="margin-bottom:46px">
+        <div class="logobox">&gt;_</div>
+        <div class="logotxt">Fixit<span class="grad">Lab</span></div>
+      </div>
+      <h1 style="font-size:104px">Break things.<br>Fix them. <span class="grad">Get hired.</span></h1>
+      <p class="sub" style="margin-top:34px">The hands-on platform for DevOps, SRE &amp; cloud engineers.</p>
+    </section>
+
+    <!-- SCENE 2: problem -->
+    <section class="scene" data-dur="4200">
+      <div class="eyebrow"><span class="dot"></span> THE REAL TEST</div>
+      <h1 style="font-size:88px;margin-top:40px">It's 3am. Production<br>is <span style="color:var(--red)">down.</span></h1>
+      <p class="sub" style="margin-top:34px">Reading docs won't save you. <span class="grad">Practice will.</span><br>FixitLab drops you into real broken systems — and times you.</p>
+    </section>
+
+    <!-- SCENE 3: challenge modes -->
+    <section class="scene" data-dur="5200">
+      <div class="eyebrow"><span class="dot"></span> THREE WAYS TO PROVE YOURSELF</div>
+      <div class="row">
+        <div class="card"><div class="ico" style="background:rgba(73,181,255,.18);color:var(--blue)">🔧</div><h3 style="color:var(--blue)">Fix It</h3><p>Something's broken. Diagnose the root cause and repair it before the timer runs out.</p></div>
+        <div class="card"><div class="ico" style="background:rgba(86,224,176,.18);color:var(--green)">🚀</div><h3 style="color:var(--green)">Build It</h3><p>Ship it from scratch — configure services and prove you can deliver infrastructure.</p></div>
+        <div class="card"><div class="ico" style="background:rgba(236,106,94,.18);color:var(--red)">🛡</div><h3 style="color:var(--red)">Hack It</h3><p>Exploit a vulnerability, capture the flag, break into a misconfigured system.</p></div>
+      </div>
+    </section>
+
+    <!-- SCENE 4: the lab / terminal -->
+    <section class="scene" data-dur="9000">
+      <div class="eyebrow" style="margin-bottom:34px"><span class="dot"></span> LAUNCH A LIVE LAB · REAL TERMINAL</div>
+      <div class="term">
+        <div class="tbar"><span class="tdot" style="background:var(--red)"></span><span class="tdot" style="background:var(--amber)"></span><span class="tdot" style="background:var(--green)"></span><span class="ttitle">root@fixit-lab: ~/incident — connected via WebSocket</span></div>
+        <div class="tbody" id="term1">
+          <div class="l"><span class="ok">$ </span><span class="cmd">systemctl status api</span></div>
+          <div class="l err">● api.service — failed (Result: exit-code, status=1)</div>
+          <div class="l"><span class="ok">$ </span><span class="cmd">journalctl -u api -n 5 --no-pager</span></div>
+          <div class="l warn">Error: listen EADDRINUSE :::8080 — port already in use</div>
+          <div class="l"><span class="ok">$ </span><span class="cmd">fuser -k 8080/tcp &amp;&amp; systemctl restart api</span></div>
+          <div class="l info">→ api.service active (running) ✓  ./check-solution</div>
+          <div class="solved" id="solved1">✓ Solved in 02:41 — +180 pts · speed bonus · streak ×4</div>
+        </div>
+      </div>
+    </section>
+
+    <!-- SCENE 5: AI interviews -->
+    <section class="scene" data-dur="7000">
+      <div class="eyebrow" style="margin-bottom:34px;background:rgba(178,102,224,.14);border-color:rgba(178,102,224,.35);color:#d6a8ee"><span class="dot" style="background:var(--purple);box-shadow:0 0 12px var(--purple)"></span> AI VOICE MOCK INTERVIEWS</div>
+      <div class="call">
+        <div class="tile bot">
+          <div class="avatar">AI</div>
+          <div class="rec"><span class="dot" style="background:var(--red);box-shadow:0 0 10px var(--red)"></span> LIVE</div>
+          <div class="tilelabel">Interviewer · Browser voice (free)</div>
+        </div>
+        <div class="panel">
+          <h4>Live STAR scoring</h4>
+          <div class="score"><span>Technical depth</span><div class="bar"><i data-w="92%"></i></div></div>
+          <div class="score"><span>Communication</span><div class="bar"><i data-w="86%"></i></div></div>
+          <div class="score"><span>Problem solving</span><div class="bar"><i data-w="90%"></i></div></div>
+          <div class="score"><span>Resume alignment</span><div class="bar"><i data-w="83%"></i></div></div>
+          <p style="color:var(--mut);font-size:20px;margin-top:8px">Resume-aware questions · multi-round · verifiable FIXIT-INT certificate</p>
+        </div>
+      </div>
+    </section>
+
+    <!-- SCENE 6: more features -->
+    <section class="scene" data-dur="5400">
+      <div class="eyebrow"><span class="dot"></span> AND SO MUCH MORE</div>
+      <div class="row" style="margin-top:46px">
+        <div class="card"><div class="ico" style="background:rgba(245,121,221,.16);color:var(--pink)">🖥</div><h3>VMware vCenter sim</h3><p>vMotion, HA, DRS, snapshots &amp; realistic faults in a full vSphere UI.</p></div>
+        <div class="card"><div class="ico" style="background:rgba(109,120,255,.16);color:var(--cyan)">&lt;/&gt;</div><h3>Coding playgrounds</h3><p>Python, Java, JS &amp; Shell with auto-graded test cases in-browser.</p></div>
+        <div class="card"><div class="ico" style="background:rgba(254,177,85,.16);color:var(--amber)">🎓</div><h3>Cert prep</h3><p>RHCSA, CKA &amp; more — vendor-aligned, hands-on certification tracks.</p></div>
+      </div>
+    </section>
+
+    <!-- SCENE 7: stats / proof -->
+    <section class="scene" data-dur="4600">
+      <h1 style="font-size:72px">Trusted by engineers<br>who'd rather <span class="grad">do</span> than read.</h1>
+      <div class="stats">
+        <div class="stat"><div class="n">21+</div><div class="lbl">technologies</div></div>
+        <div class="stat"><div class="n">360+</div><div class="lbl">live scenarios</div></div>
+        <div class="stat"><div class="n">10k+</div><div class="lbl">engineers</div></div>
+      </div>
+      <div class="pills"><span class="pill">Leaderboards</span><span class="pill">Achievements</span><span class="pill">Community forum</span><span class="pill">Instant validation</span><span class="pill">Team &amp; enterprise</span></div>
+    </section>
+
+    <!-- SCENE 8: CTA -->
+    <section class="scene" data-dur="5200">
+      <div class="logo" style="margin-bottom:40px"><div class="logobox">&gt;_</div><div class="logotxt">Fixit<span class="grad">Lab</span></div></div>
+      <h1 style="font-size:96px">Break things. Fix them.<br><span class="grad">Get hired.</span></h1>
+      <div class="cta">Start free today →</div>
+      <p class="sub" style="margin-top:34px;font-size:26px">Live cloud labs · AI interviews · cert prep — all in one platform.</p>
+    </section>
+
+    <div id="hint">Auto-playing · <span class="kbd">Space</span> pause · <span class="kbd">R</span> replay · <span class="kbd">←</span> <span class="kbd">→</span> step · <span class="kbd">F</span> fullscreen</div>
+  </div>
+</div>
+
+<script>
+(function(){
+  var stage=document.getElementById('stage');
+  function fit(){var s=Math.min(innerWidth/1920,innerHeight/1080);stage.style.transform='scale('+s+')';}
+  addEventListener('resize',fit);fit();
+
+  var scenes=[].slice.call(document.querySelectorAll('.scene'));
+  var prog=document.getElementById('prog');
+  var hint=document.getElementById('hint');
+  var i=-1,timer=null,paused=false,t0=0,dur=0,raf=null;
+
+  function clearLab(){
+    document.querySelectorAll('#term1 .l').forEach(function(l){l.classList.remove('show')});
+    var s=document.getElementById('solved1');if(s)s.classList.remove('show');
+    document.querySelectorAll('.bar i').forEach(function(b){b.style.width='0'});
+  }
+  function runLab(){
+    var lines=document.querySelectorAll('#term1 .l');var d=0;
+    lines.forEach(function(l,k){setTimeout(function(){l.classList.add('show')},d);d+=850;});
+    setTimeout(function(){var s=document.getElementById('solved1');if(s)s.classList.add('show')},d+200);
+  }
+  function runScores(){
+    setTimeout(function(){document.querySelectorAll('.bar i').forEach(function(b){b.style.width=b.getAttribute('data-w')})},500);
+  }
+
+  function show(n){
+    if(i>=0)scenes[i].classList.remove('on');
+    i=(n+scenes.length)%scenes.length;
+    clearLab();
+    var sc=scenes[i];sc.classList.add('on');
+    dur=parseInt(sc.getAttribute('data-dur'),10)||5000;
+    if(sc.querySelector('#term1'))runLab();
+    if(sc.querySelector('.bar'))runScores();
+    t0=performance.now();
+    if(timer)clearTimeout(timer);
+    if(!paused)timer=setTimeout(function(){show(i+1)},dur);
+    tick();
+  }
+  function tick(){
+    cancelAnimationFrame(raf);
+    function step(){
+      var p=Math.min((performance.now()-t0)/dur,1);
+      prog.style.width=(p*100)+'%';
+      if(p<1&&!paused)raf=requestAnimationFrame(step);
+    }
+    raf=requestAnimationFrame(step);
+  }
+  function pause(){paused=!paused;if(paused){if(timer)clearTimeout(timer);}else{var rem=Math.max(dur-(performance.now()-t0),0);timer=setTimeout(function(){show(i+1)},rem);tick();}}
+
+  addEventListener('keydown',function(e){
+    if(e.code==='Space'){e.preventDefault();pause();}
+    else if(e.key==='r'||e.key==='R'){paused=false;show(0);}
+    else if(e.key==='ArrowRight'){paused=false;show(i+1);}
+    else if(e.key==='ArrowLeft'){paused=false;show(i-1);}
+    else if(e.key==='f'||e.key==='F'){if(!document.fullscreenElement){document.documentElement.requestFullscreen&&document.documentElement.requestFullscreen();}else{document.exitFullscreen&&document.exitFullscreen();}}
+  });
+  setTimeout(function(){hint.style.opacity='0'},6000);
+  stage.addEventListener('mousemove',function(){hint.style.opacity='1';clearTimeout(hint._t);hint._t=setTimeout(function(){hint.style.opacity='0'},2500)});
+
+  show(0);
+})();
+</script>
+</body>
+</html>

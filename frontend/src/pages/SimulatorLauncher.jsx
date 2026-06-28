@@ -1,10 +1,12 @@
 import { Link } from 'react-router-dom'
 import {
-  Cloud, Server, Activity, Gauge, Monitor, Users, Radar, Waves, Bot, BarChart3, Cpu,
+  Cloud, Server, Activity, Gauge, Monitor, Users, Radar, Waves, Bot, BarChart3, Cpu, Terminal,
 } from 'lucide-react'
 import { PageHeader } from '../components/design'
 
 const SIMULATORS = [
+  { id: 'linux', name: 'Linux Server Terminal', desc: 'Shell labs with services, logs, filesystems, users, networking, and process troubleshooting', icon: Terminal, color: '#22c55e', path: '/technologies/linux' },
+  { id: 'vmware', name: 'VMware vCenter', desc: 'vSphere inventory, VM console, hosts, datastores, snapshots, migrations, and networking', icon: Monitor, color: '#4fa7e8', path: '/technologies/vmware' },
   { id: 'terraform', name: 'Terraform Cloud', desc: 'Workspaces, runs, registry, variables, and VS Code–style IDE', icon: Cloud, color: '#5c4ee5', path: '/technologies/terraform' },
   { id: 'awx', name: 'Ansible AWX / Tower', desc: 'Job templates, inventories, credentials, workflow visualizer', icon: Server, color: '#EE0000', path: '/technologies/ansible' },
   { id: 'grafana', name: 'Grafana', desc: 'Dashboards, Explore, alerting, data sources, administration', icon: Gauge, color: '#f7913b', path: '/technologies/grafana' },

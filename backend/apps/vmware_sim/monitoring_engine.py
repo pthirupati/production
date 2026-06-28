@@ -924,6 +924,46 @@ def apply_action(session_id: str, action: str, payload: dict | None = None) -> d
         _save_session(str(session_id), entry)
         return {"ok": True, "message": f"Added scrape target {url}", "target": target}
 
+    if action == "delete_scrape_target":
+        url = (payload.get("url") or payload.get("scrape_url") or "").strip()
+        instance = (payload.get("instance") or "").strip()
+        targets = state["prometheus"].setdefault("targets", [])
+        before = len(targets)
+        state["prometheus"]["targets"] = [
+            t for t in targets
+            if not (
+                (url and t.get("scrape_url") == url)
+                or (instance and (t.get("instance") or t.get("labels", {}).get("instance")) == instance)
+            )
+        ]
+        if len(state["prometheus"]["targets"]) == before:
+            return {"ok": False, "error": "target not found"}
+        _save_session(str(session_id), entry)
+        return {"ok": True, "message": "Scrape target removed"}
+
+    if action == "reload_config":
+        # Cosmetic stand-in for `/-/reload`: clear reloadable config faults and
+        # refresh target timestamps while keeping scenario validation fail-closed.
+        broken["no_data_metrics"] = []
+        for t in state["prometheus"].setdefault("targets", []):
+            t["last_scrape"] = _now_iso()
+            t["scrape_duration_ms"] = max(8, int(t.get("scrape_duration_ms") or 15))
+            if t.get("health") != "down":
+                t["health"] = "up"
+                t["last_error"] = ""
+        _save_session(str(session_id), entry)
+        return {"ok": True, "message": "Prometheus configuration reloaded"}
+
+    if action == "toggle_alert_rule":
+        name = (payload.get("name") or payload.get("alert") or "").strip()
+        rules = state["prometheus"].setdefault("alerting_rules", [])
+        for r in rules:
+            if r.get("name") == name:
+                r["state"] = "inactive" if r.get("state") == "firing" else "firing"
+                _save_session(str(session_id), entry)
+                return {"ok": True, "message": f"Alert rule {name} updated", "rule": r}
+        return {"ok": False, "error": "alert rule not found"}
+
     if action == "add_alert_rule":
         group = (payload.get("group") or "lab").strip()
         name = (payload.get("name") or payload.get("alert") or "").strip()

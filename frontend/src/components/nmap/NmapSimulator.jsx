@@ -1,18 +1,43 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
-  Radar, Terminal, Play, RefreshCw, ArrowLeft, StopCircle, Lightbulb,
+  Radar, Terminal, Play, RefreshCw,
   XCircle, AlertTriangle, Server, ShieldAlert, Target, CheckCircle2,
-  History, Network, Crosshair,
+  History, Network, Crosshair, X, Copy, Download, Search, HelpCircle,
+  GitCompare, FileCode2, Info, Cpu, Monitor, Router, Apple,
 } from 'lucide-react'
 import { nmapApi } from '../../api/nmap'
 import { LabChromeControls } from '../lab/LabChromeBar'
 
 /* ── scoped, self-contained "security tool" chrome (no shared CSS) ── */
 const SCAN_PROFILES = [
-  { id: 'quick', label: 'Quick scan', flags: ['-T4'], ports: '22,80,443', desc: 'Fast top ports' },
-  { id: 'intense', label: 'Intense scan', flags: ['-T4', '-A', '-v'], ports: '', desc: 'OS, version, scripts' },
-  { id: 'ping', label: 'Ping scan', flags: ['-sn'], ports: '', desc: 'Host discovery only' },
-  { id: 'comprehensive', label: 'Comprehensive', flags: ['-sS', '-sV', '-O'], ports: '1-1024', desc: 'SYN + versions + OS' },
+  { id: 'intense', label: 'Intense scan', flags: ['-T4', '-A', '-v'], ports: '', desc: '-T4 -A -v' },
+  { id: 'intense-udp', label: 'Intense scan plus UDP', flags: ['-sS', '-sU', '-T4', '-A', '-v'], ports: '', desc: '-sS -sU -T4 -A -v' },
+  { id: 'intense-all', label: 'Intense scan, all TCP ports', flags: ['-T4', '-A', '-v'], ports: '1-65535', desc: '-p 1-65535 -T4 -A -v' },
+  { id: 'intense-noping', label: 'Intense scan, no ping', flags: ['-T4', '-A', '-v', '-Pn'], ports: '', desc: '-T4 -A -v -Pn' },
+  { id: 'ping', label: 'Ping scan', flags: ['-sn'], ports: '', desc: '-sn' },
+  { id: 'quick', label: 'Quick scan', flags: ['-T4', '-F'], ports: '', desc: '-T4 -F' },
+  { id: 'quick-plus', label: 'Quick scan plus', flags: ['-sV', '-T4', '-O', '-F', '--version-light'], ports: '', desc: '-sV -T4 -O -F --version-light' },
+  { id: 'quick-traceroute', label: 'Quick traceroute', flags: ['-sn', '--traceroute'], ports: '', desc: '-sn --traceroute' },
+  { id: 'regular', label: 'Regular scan', flags: [], ports: '', desc: 'Default Nmap scan' },
+  { id: 'slow-comprehensive', label: 'Slow comprehensive scan', flags: ['-sS', '-sU', '-T4', '-A', '-v', '-PE', '-PP', '-PS80,443', '-PA3389', '-PU40125', '-g', '53', '--script', 'default or (discovery and safe)'], ports: '', desc: 'Comprehensive discovery + safe NSE scripts' },
+  { id: 'custom', label: 'Custom', flags: ['-sV'], ports: '', desc: 'Editable command' },
+]
+
+const NM_MENUS = [
+  ['Scan', ['New Window', 'Open Scan', 'Save Scan', 'Print', 'Close']],
+  ['Tools', ['Compare Results', 'Search Scan Results', 'NSE Scripts Browser', 'Command Wizard']],
+  ['Profile', ['New Profile', 'Edit Selected Profile', 'Delete Selected Profile']],
+  ['Help', ['Nmap Reference Guide', 'Nmap Online Documentation', 'Zenmap User Guide', 'About']],
+]
+
+const NSE_CATEGORIES = ['auth', 'broadcast', 'brute', 'default', 'discovery', 'dos', 'exploit', 'external', 'fuzzer', 'intrusive', 'malware', 'safe', 'version', 'vuln']
+const NSE_SCRIPTS = [
+  ['http-title', 'default,safe', 'Shows the title of the default HTTP page.'],
+  ['ssl-cert', 'default,safe', 'Retrieves SSL certificate information.'],
+  ['ssh2-enum-algos', 'safe,discovery', 'Reports supported SSH algorithms.'],
+  ['smb-os-discovery', 'safe,discovery', 'Attempts to determine OS information over SMB.'],
+  ['vulners', 'vuln,external', 'Maps service versions to known vulnerabilities.'],
+  ['dns-zone-transfer', 'intrusive,discovery', 'Attempts AXFR zone transfer checks.'],
 ]
 
 const SCOPED_CSS = `
@@ -37,6 +62,25 @@ const SCOPED_CSS = `
   padding: 0.6rem 1rem; background: #070b07; border-bottom: 1px solid var(--nm-border);
   position: sticky; top: 0; z-index: 10;
 }
+.nmap-sim .nm-menubar {
+  display: flex; align-items: center; gap: .15rem; padding: .28rem .85rem;
+  background: #0d140d; border-bottom: 1px solid var(--nm-border); position: sticky; top: 45px; z-index: 9;
+}
+.nmap-sim .nm-menu-btn {
+  position: relative; border: 1px solid transparent; background: transparent; color: var(--nm-text);
+  font-size: .78rem; padding: .28rem .55rem; border-radius: 4px; cursor: pointer;
+}
+.nmap-sim .nm-menu-btn:hover, .nmap-sim .nm-menu-btn.nm-on { background: #132013; border-color: var(--nm-border); }
+.nmap-sim .nm-menu-pop {
+  position: absolute; top: calc(100% + 2px); left: 0; min-width: 230px; max-height: 380px; overflow-y: auto;
+  background: #f8fafc; color: #111827; border: 1px solid #cbd5e1; border-radius: 4px;
+  box-shadow: 0 18px 40px rgba(0,0,0,.35); padding: .25rem; z-index: 40;
+}
+.nmap-sim .nm-menu-item {
+  width: 100%; display: flex; align-items: center; justify-content: space-between; gap: 1rem;
+  padding: .35rem .55rem; border-radius: 3px; font-size: .74rem; white-space: nowrap;
+}
+.nmap-sim .nm-menu-item:hover { background: #dcfce7; }
 .nmap-sim .nm-btn {
   display: inline-flex; align-items: center; gap: 0.4rem; border-radius: 6px;
   padding: 0.45rem 0.8rem; font-size: 0.8rem; font-weight: 600; cursor: pointer;
@@ -100,11 +144,102 @@ const SCOPED_CSS = `
 }
 .nmap-sim .nm-banner-goal { background: rgba(56,224,208,.08); border: 1px solid rgba(56,224,208,.28); color: #9beee3; }
 .nmap-sim .nm-banner-err { background: rgba(255,107,107,.1); border: 1px solid rgba(255,107,107,.3); color: #ffb4b4; }
+.nmap-sim .nm-sidebar {
+  background: #081008; border: 1px solid var(--nm-border); border-radius: 8px; overflow: hidden;
+}
+.nmap-sim .nm-sidebar-head {
+  padding: .5rem .7rem; font-size: .68rem; font-weight: 700; text-transform: uppercase;
+  letter-spacing: .08em; color: var(--nm-muted); background: #101a10; border-bottom: 1px solid var(--nm-border);
+}
+.nmap-sim .nm-side-row {
+  width: 100%; display: flex; align-items: center; gap: .5rem; padding: .45rem .65rem;
+  color: var(--nm-muted); font-size: .76rem; border-bottom: 1px solid #122012; cursor: pointer;
+}
+.nmap-sim .nm-side-row:hover, .nmap-sim .nm-side-row.nm-active { background: #132013; color: var(--nm-text); }
+.nmap-sim .nm-topology {
+  position: relative; height: 380px; background:
+    radial-gradient(circle at center, rgba(74,222,128,.08), transparent 55%),
+    repeating-radial-gradient(circle at center, transparent 0 72px, rgba(74,222,128,.12) 73px 74px);
+  border: 1px solid var(--nm-border); border-radius: 8px; overflow: hidden;
+}
+.nmap-sim .nm-node {
+  position: absolute; transform: translate(-50%, -50%); min-width: 76px; text-align: center;
+  color: var(--nm-text); font-size: .7rem; cursor: pointer;
+}
+.nmap-sim .nm-node-icon {
+  margin: 0 auto .25rem; width: 38px; height: 38px; border-radius: 999px;
+  display: flex; align-items: center; justify-content: center; border: 1px solid rgba(74,222,128,.35);
+  background: #102010; box-shadow: 0 0 20px rgba(74,222,128,.15);
+}
+.nmap-sim .nm-modal-backdrop {
+  position: fixed; inset: 0; z-index: 60; background: rgba(0,0,0,.65);
+  display: flex; align-items: center; justify-content: center; padding: 1rem;
+}
+.nmap-sim .nm-modal {
+  width: min(900px, 96vw); max-height: 86vh; overflow: hidden; display: flex; flex-direction: column;
+  background: #f8fafc; color: #111827; border: 1px solid #cbd5e1; border-radius: 8px;
+  box-shadow: 0 28px 80px rgba(0,0,0,.45);
+}
+.nmap-sim .nm-modal-head {
+  display: flex; align-items: center; justify-content: space-between; padding: .65rem .85rem;
+  background: #dcfce7; border-bottom: 1px solid #bbf7d0;
+}
+.nmap-sim .nm-modal-body { padding: .85rem; overflow: auto; }
 `
 
 function StateBadge({ state }) {
   const cls = state === 'open' ? 'nm-b-open' : state === 'filtered' ? 'nm-b-filtered' : 'nm-b-closed'
   return <span className={`nm-badge ${cls}`}>{(state || 'closed').toUpperCase()}</span>
+}
+
+function NmapModal({ title, children, onClose }) {
+  return (
+    <div className="nm-modal-backdrop" onMouseDown={onClose}>
+      <div className="nm-modal" onMouseDown={(e) => e.stopPropagation()}>
+        <div className="nm-modal-head">
+          <div className="font-semibold">{title}</div>
+          <button type="button" className="p-1 rounded hover:bg-green-100" onClick={onClose}><X size={16} /></button>
+        </div>
+        <div className="nm-modal-body">{children}</div>
+      </div>
+    </div>
+  )
+}
+
+function hostIcon(host) {
+  const os = String(host?.os || host?.hostname || '').toLowerCase()
+  if (os.includes('windows')) return Monitor
+  if (os.includes('mac') || os.includes('darwin')) return Apple
+  if (os.includes('router') || os.includes('gateway')) return Router
+  return Server
+}
+
+function nmapOutput(scan, activeHost) {
+  if (!scan) return 'Starting Nmap 7.94SVN at 2026-06-28 12:37 IST\nNo scan has been executed yet.'
+  const hosts = scan.hosts || []
+  const blocks = hosts.map((h) => {
+    const ports = (h.ports || []).map((p) => {
+      const version = [p.product, p.version].filter(Boolean).join(' ')
+      return `${String(p.port).padEnd(8)}/${(p.proto || 'tcp').padEnd(4)} ${String(p.state || 'closed').padEnd(9)} ${String(p.service || 'unknown').padEnd(12)} ${version}`.trimEnd()
+    }).join('\n')
+    const selected = activeHost?.ip === h.ip ? ' [selected]' : ''
+    return [
+      `Nmap scan report for ${h.hostname ? `${h.hostname} (${h.ip})` : h.ip}${selected}`,
+      `Host is ${h.state || 'up'} (${h.latency || '0.0032s'} latency).`,
+      h.mac ? `MAC Address: ${h.mac}${h.vendor ? ` (${h.vendor})` : ''}` : null,
+      ports ? 'PORT      STATE     SERVICE      VERSION' : 'All 1000 scanned ports are closed or filtered',
+      ports || null,
+      h.os ? `OS details: ${h.os}${h.os_accuracy ? ` (${h.os_accuracy}% accuracy)` : ''}` : null,
+      'Network Distance: 1 hop',
+      h.traceroute ? ['TRACEROUTE', 'HOP RTT      ADDRESS', ...(h.traceroute || []).map((r) => `${r.ttl || 1}   ${r.rtt || '0.45ms'}  ${r.address || h.ip}`)].join('\n') : null,
+    ].filter(Boolean).join('\n')
+  }).join('\n\n')
+  return [
+    `Starting Nmap 7.94SVN at 2026-06-28 12:37 IST`,
+    blocks,
+    '',
+    `Nmap done: ${scan.addresses_scanned || hosts.length} IP address${(scan.addresses_scanned || hosts.length) === 1 ? '' : 'es'} (${scan.hosts_up || hosts.filter((h) => h.state === 'up').length} host${(scan.hosts_up || hosts.length) === 1 ? '' : 's'} up) scanned in ${scan.duration || '8.42'} seconds`,
+  ].join('\n')
 }
 
 /**
@@ -127,7 +262,11 @@ export default function NmapSimulator({
   const [sudo, setSudo] = useState(false)
   const [scanning, setScanning] = useState(false)
   const [lastScan, setLastScan] = useState(null)
-  const [tab, setTab] = useState('results') // results | history
+  const [tab, setTab] = useState('output') // output | ports | topology | details | scans
+  const [outputMode, setOutputMode] = useState('normal')
+  const [menuOpen, setMenuOpen] = useState(null)
+  const [modal, setModal] = useState(null)
+  const [scriptCategory, setScriptCategory] = useState('default')
   const [selectedHost, setSelectedHost] = useState(null)
   const pollRef = useRef(null)
 
@@ -192,7 +331,7 @@ export default function NmapSimulator({
         setError(res.error || res.message || 'Scan rejected')
       } else if (res?.scan) {
         setLastScan(res.scan)
-        setTab('results')
+        setTab('output')
         const firstUp = (res.scan.hosts || []).find(h => h.state === 'up') || res.scan.hosts?.[0]
         setSelectedHost(firstUp?.ip || null)
       }
@@ -218,11 +357,24 @@ export default function NmapSimulator({
   const firewall = inventory.firewall
   const scanHosts = lastScan?.hosts || []
   const activeHost = scanHosts.find(h => h.ip === selectedHost) || scanHosts[0] || null
+  const allPorts = scanHosts.flatMap((h) => (h.ports || []).map((p) => ({ ...p, host: h.ip, hostname: h.hostname })))
+  const services = [...new Set(allPorts.map((p) => p.service).filter(Boolean))]
+  const rawOutput = nmapOutput(lastScan, activeHost)
 
   const FLAG_OPTS = [
     ['-sn', 'Ping sweep'], ['-sS', 'SYN (sudo)'], ['-sT', 'Connect'],
-    ['-sV', 'Version'], ['-O', 'OS (sudo)'], ['-A', 'Aggressive'], ['-Pn', 'Skip discovery'],
+    ['-sV', 'Version'], ['-O', 'OS (sudo)'], ['-A', 'Aggressive'], ['-Pn', 'Skip discovery'], ['--traceroute', 'Traceroute'],
   ]
+
+  const handleMenu = (item) => {
+    setMenuOpen(null)
+    if (item === 'NSE Scripts Browser') setModal('nse')
+    else if (item === 'Compare Results') setModal('compare')
+    else if (item === 'Command Wizard') setModal('wizard')
+    else if (item === 'About') setModal('about')
+    else if (item === 'Search Scan Results') setModal('search')
+    else if (item === 'Save Scan') setModal('save')
+  }
 
   return (
     <div className={`nmap-sim ${embedded ? 'h-full min-h-0 flex flex-col overflow-hidden' : 'min-h-screen'}`}>
@@ -250,6 +402,30 @@ export default function NmapSimulator({
             extendDisabled={extendDisabled}
           />
         </div>
+      </div>
+
+      <div className="nm-menubar" onMouseLeave={() => setMenuOpen(null)}>
+        {NM_MENUS.map(([menu, items]) => (
+          <div key={menu} className="relative">
+            <button
+              type="button"
+              className={`nm-menu-btn ${menuOpen === menu ? 'nm-on' : ''}`}
+              onClick={() => setMenuOpen(menuOpen === menu ? null : menu)}
+              onMouseEnter={() => menuOpen && setMenuOpen(menu)}
+            >
+              {menu}
+            </button>
+            {menuOpen === menu && (
+              <div className="nm-menu-pop">
+                {items.map((item) => (
+                  <button key={item} type="button" className="nm-menu-item" onClick={() => handleMenu(item)}>
+                    <span>{item}</span><span className="text-slate-400">›</span>
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+        ))}
       </div>
 
       <div className="p-4 max-w-[1180px] mx-auto">
@@ -296,17 +472,9 @@ export default function NmapSimulator({
 
         {/* scan builder */}
         <div className="nm-card p-4 mb-4">
-          <div className="flex flex-wrap items-center gap-2 mb-3">
-            <span className="text-[11px] font-semibold uppercase tracking-wider" style={{ color: 'var(--nm-muted)' }}>Profile</span>
-            {SCAN_PROFILES.map((p) => (
-              <button key={p.id} type="button" title={p.desc}
-                onClick={() => { setProfile(p.id); setFlags(new Set(p.flags)); setPorts(p.ports) }}
-                className={`nm-chip ${profile === p.id ? 'nm-chip-active' : ''}`}>{p.label}</button>
-            ))}
-          </div>
-          <div className="flex flex-col lg:flex-row gap-3">
-            <div className="flex-1 min-w-0">
-              <label className="text-[11px] font-semibold uppercase tracking-wider" style={{ color: 'var(--nm-muted)' }}>Target(s)</label>
+          <div className="grid grid-cols-1 lg:grid-cols-[1fr_260px_auto_auto] gap-3 items-end mb-3">
+            <label className="text-[11px] font-semibold uppercase tracking-wider" style={{ color: 'var(--nm-muted)' }}>
+              Target
               <input
                 className="nm-input w-full mt-1"
                 value={targets}
@@ -315,7 +483,29 @@ export default function NmapSimulator({
                 onChange={e => setTargets(e.target.value)}
                 onKeyDown={e => { if (e.key === 'Enter') runScan() }}
               />
-            </div>
+            </label>
+            <label className="text-[11px] font-semibold uppercase tracking-wider" style={{ color: 'var(--nm-muted)' }}>
+              Profile
+              <select
+                className="nm-input w-full mt-1"
+                value={profile}
+                onChange={(e) => {
+                  const p = SCAN_PROFILES.find((sp) => sp.id === e.target.value)
+                  setProfile(e.target.value)
+                  if (p) { setFlags(new Set(p.flags)); setPorts(p.ports) }
+                }}
+              >
+                {SCAN_PROFILES.map((p) => <option key={p.id} value={p.id}>{p.label}</option>)}
+              </select>
+            </label>
+            <button className="nm-btn nm-btn-primary justify-center" disabled={scanning} onClick={runScan}>
+              {scanning ? <RefreshCw size={14} className="animate-spin" /> : <Play size={14} />} Scan
+            </button>
+            <button className="nm-btn justify-center" disabled={!scanning} onClick={() => setScanning(false)}>
+              Cancel
+            </button>
+          </div>
+          <div className="flex flex-col lg:flex-row gap-3">
             <div className="w-full lg:w-56">
               <label className="text-[11px] font-semibold uppercase tracking-wider" style={{ color: 'var(--nm-muted)' }}>Ports (-p)</label>
               <input
@@ -355,121 +545,153 @@ export default function NmapSimulator({
             <div className="nm-console flex-1 !py-2 !text-[12px] flex items-center">
               <span style={{ color: 'var(--nm-green)' }}>$</span>&nbsp;{command}
             </div>
-            <button className="nm-btn nm-btn-primary justify-center" disabled={scanning} onClick={runScan}>
-              {scanning ? <RefreshCw size={14} className="animate-spin" /> : <Play size={14} />} Scan
+            <button className="nm-btn justify-center" onClick={() => navigator.clipboard?.writeText(command)}>
+              <Copy size={13} /> Copy
             </button>
           </div>
         </div>
 
         {/* tabs */}
         <div className="flex items-center gap-2 mb-3">
-          {[['results', 'Scan results', Crosshair], ['history', 'History', History]].map(([k, label, Icon]) => (
+          {[
+            ['output', 'Nmap Output', Terminal],
+            ['ports', 'Ports/Hosts', Crosshair],
+            ['topology', 'Topology', Network],
+            ['details', 'Host Details', Info],
+            ['scans', 'Scans', History],
+          ].map(([k, label, Icon]) => (
             <button key={k} onClick={() => setTab(k)} className={`nm-tab flex items-center gap-1.5 ${tab === k ? 'nm-tab-active' : ''}`}>
               <Icon size={13} /> {label}
             </button>
           ))}
         </div>
 
-        {tab === 'results' && (
-          !lastScan ? (
-            <div className="nm-card p-10 text-center text-sm" style={{ color: 'var(--nm-muted)' }}>
-              <Radar size={26} className="mx-auto mb-2 opacity-50" />
-              Build a scan above and press <b>Scan</b> to discover the network.
-            </div>
-          ) : (
-            <div className="space-y-3">
-              {/* scan summary line */}
-              <div className="nm-console">
-                <span style={{ color: 'var(--nm-green)' }}># {lastScan.command}</span>
-                {'\n'}{lastScan.summary || `${lastScan.hosts_up ?? scanHosts.length} host(s) up, ${lastScan.addresses_scanned ?? '?'} address(es) scanned`}
-                {lastScan.warning ? `\n! ${lastScan.warning}` : ''}
-              </div>
+        {!lastScan && tab !== 'scans' ? (
+          <div className="nm-card p-10 text-center text-sm" style={{ color: 'var(--nm-muted)' }}>
+            <Radar size={26} className="mx-auto mb-2 opacity-50" />
+            Build a scan above and press <b>Scan</b> to discover the network.
+          </div>
+        ) : null}
 
-              <div className="grid grid-cols-1 lg:grid-cols-[320px_1fr] gap-3">
-                {/* hosts list */}
-                <div className="nm-card overflow-hidden">
-                  <div className="px-3 py-2 text-[11px] font-semibold uppercase tracking-wider border-b" style={{ color: 'var(--nm-muted)', borderColor: 'var(--nm-border)' }}>
-                    Hosts ({scanHosts.length})
-                  </div>
-                  <div className="max-h-[420px] overflow-y-auto">
-                    {scanHosts.length === 0 ? (
-                      <div className="p-4 text-xs" style={{ color: 'var(--nm-muted)' }}>No hosts responded.</div>
-                    ) : scanHosts.map(h => {
-                      const open = (h.ports || []).filter(p => p.state === 'open').length
-                      return (
-                        <button
-                          key={h.ip}
-                          onClick={() => setSelectedHost(h.ip)}
-                          className="w-full text-left px-3 py-2.5 border-b flex items-center justify-between gap-2"
-                          style={{
-                            borderColor: '#152015',
-                            background: h.ip === selectedHost ? '#132013' : 'transparent',
-                          }}
-                        >
-                          <div className="min-w-0">
-                            <div className="nm-mono text-sm" style={{ color: 'var(--nm-text)' }}>{h.ip}</div>
-                            <div className="text-[11px] truncate" style={{ color: 'var(--nm-muted)' }}>
-                              {h.hostname || (h.os ? h.os : 'unknown host')}
-                            </div>
-                          </div>
-                          <div className="flex flex-col items-end gap-1 shrink-0">
-                            <span className={`nm-badge ${h.state === 'up' ? 'nm-b-up' : 'nm-b-closed'}`}>{(h.state || 'down').toUpperCase()}</span>
-                            {open > 0 && <span className="text-[10px] nm-mono" style={{ color: 'var(--nm-green)' }}>{open} open</span>}
-                          </div>
-                        </button>
-                      )
-                    })}
-                  </div>
-                </div>
-
-                {/* selected host detail / ports table */}
-                <div className="nm-card overflow-hidden">
-                  {!activeHost ? (
-                    <div className="p-6 text-sm text-center" style={{ color: 'var(--nm-muted)' }}>Select a host to view ports.</div>
-                  ) : (
-                    <>
-                      <div className="px-4 py-3 border-b flex flex-wrap items-center gap-x-4 gap-y-1" style={{ borderColor: 'var(--nm-border)' }}>
-                        <span className="nm-mono text-base font-semibold text-white">{activeHost.ip}</span>
-                        {activeHost.hostname && <span className="text-xs" style={{ color: 'var(--nm-muted)' }}>{activeHost.hostname}</span>}
-                        {activeHost.mac && <span className="text-[11px] nm-mono" style={{ color: 'var(--nm-muted)' }}>{activeHost.mac}{activeHost.vendor ? ` (${activeHost.vendor})` : ''}</span>}
-                        {activeHost.os && (
-                          <span className="nm-badge nm-b-up">OS: {activeHost.os}{activeHost.os_accuracy ? ` ${activeHost.os_accuracy}%` : ''}</span>
-                        )}
-                      </div>
-                      {(activeHost.ports || []).length === 0 ? (
-                        <div className="p-6 text-sm text-center" style={{ color: 'var(--nm-muted)' }}>
-                          No ports reported. Add <span className="nm-mono">-p</span> / a service scan (<span className="nm-mono">-sV</span>).
-                        </div>
-                      ) : (
-                        <div className="max-h-[420px] overflow-y-auto">
-                          <table className="nm-table">
-                            <thead>
-                              <tr><th>Port</th><th>State</th><th>Service</th><th>Version</th></tr>
-                            </thead>
-                            <tbody>
-                              {activeHost.ports.map(p => (
-                                <tr key={`${p.port}/${p.proto}`}>
-                                  <td className="nm-mono">{p.port}/{p.proto || 'tcp'}</td>
-                                  <td><StateBadge state={p.state} /></td>
-                                  <td>{p.service || '—'}</td>
-                                  <td className="nm-mono text-[11px]" style={{ color: 'var(--nm-muted)' }}>
-                                    {[p.product, p.version].filter(Boolean).join(' ') || '—'}
-                                  </td>
-                                </tr>
-                              ))}
-                            </tbody>
-                          </table>
-                        </div>
-                      )}
-                    </>
-                  )}
-                </div>
-              </div>
+        {lastScan && tab === 'output' && (
+          <div className="space-y-3">
+            <div className="flex items-center gap-2 flex-wrap">
+              {['normal', 'xml', 'script-kiddie', 'grepable'].map((mode) => (
+                <button key={mode} className={`nm-tab ${outputMode === mode ? 'nm-tab-active' : ''}`} onClick={() => setOutputMode(mode)}>
+                  {mode === 'script-kiddie' ? 'S|<rIpt kIddi3' : mode.toUpperCase()}
+                </button>
+              ))}
+              <span className="flex-1" />
+              <button className="nm-btn" onClick={() => navigator.clipboard?.writeText(rawOutput)}><Copy size={13} /> Copy output</button>
+              <button className="nm-btn" onClick={() => setModal('save')}><Download size={13} /> Save output</button>
             </div>
-          )
+            <div className="nm-console min-h-[360px] overflow-auto">
+              {outputMode === 'xml'
+                ? `<nmaprun scanner="nmap" args="${command}">\n${scanHosts.map((h) => `  <host><status state="${h.state || 'up'}"/><address addr="${h.ip}" addrtype="ipv4"/></host>`).join('\n')}\n</nmaprun>`
+                : outputMode === 'grepable'
+                  ? scanHosts.map((h) => `Host: ${h.ip} (${h.hostname || ''})\tStatus: ${h.state || 'up'}\tPorts: ${(h.ports || []).map((p) => `${p.port}/${p.state}/${p.proto || 'tcp'}/${p.service || ''}/`).join(', ')}`).join('\n')
+                  : outputMode === 'script-kiddie'
+                    ? rawOutput.replace(/[aeios]/gi, (m) => ({ a: '4', e: '3', i: '1', o: '0', s: '5' }[m.toLowerCase()] || m))
+                    : rawOutput}
+            </div>
+          </div>
         )}
 
-        {tab === 'history' && (
+        {lastScan && tab === 'ports' && (
+          <div className="grid grid-cols-1 lg:grid-cols-[260px_1fr] gap-3">
+            <div className="nm-sidebar">
+              <div className="nm-sidebar-head">Hosts</div>
+              {scanHosts.map((h) => {
+                const Icon = hostIcon(h)
+                return (
+                  <button key={h.ip} className={`nm-side-row ${h.ip === selectedHost ? 'nm-active' : ''}`} onClick={() => setSelectedHost(h.ip)}>
+                    <Icon size={14} /><span className="nm-mono">{h.ip}</span><span className="ml-auto text-[10px]">{h.state || 'up'}</span>
+                  </button>
+                )
+              })}
+              <div className="nm-sidebar-head">Services</div>
+              {services.map((s) => <div key={s} className="nm-side-row"><Cpu size={13} /> {s}</div>)}
+            </div>
+            <div className="nm-card overflow-hidden">
+              <table className="nm-table">
+                <thead><tr><th>Host</th><th>Port</th><th>Protocol</th><th>State</th><th>Service</th><th>Version</th></tr></thead>
+                <tbody>
+                  {allPorts.map((p) => (
+                    <tr key={`${p.host}-${p.port}-${p.proto}`} onClick={() => setSelectedHost(p.host)}>
+                      <td className="nm-mono">{p.host}</td><td className="nm-mono">{p.port}</td><td>{p.proto || 'tcp'}</td><td><StateBadge state={p.state} /></td><td>{p.service || '—'}</td>
+                      <td className="nm-mono text-[11px]" style={{ color: 'var(--nm-muted)' }}>{[p.product, p.version].filter(Boolean).join(' ') || '—'}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        )}
+
+        {lastScan && tab === 'topology' && (
+          <div className="nm-card p-3">
+            <div className="flex items-center gap-2 mb-3">
+              <button className="nm-btn !text-xs">Zoom +</button><button className="nm-btn !text-xs">Zoom -</button>
+              <button className="nm-btn !text-xs">Fisheye</button><button className="nm-btn !text-xs">Interpolation</button>
+            </div>
+            <div className="nm-topology">
+              <div className="nm-node" style={{ left: '50%', top: '50%' }}>
+                <div className="nm-node-icon"><Radar size={18} /></div><div>Nmap</div>
+              </div>
+              {scanHosts.map((h, i) => {
+                const Icon = hostIcon(h)
+                const angle = (Math.PI * 2 * i) / Math.max(1, scanHosts.length)
+                const r = i % 3 === 0 ? 105 : 155
+                const x = 50 + Math.cos(angle) * (r / 3.8)
+                const y = 50 + Math.sin(angle) * (r / 3.8)
+                return (
+                  <button key={h.ip} className="nm-node" style={{ left: `${x}%`, top: `${y}%` }} onClick={() => { setSelectedHost(h.ip); setTab('details') }}>
+                    <div className="nm-node-icon" style={{ borderColor: h.state === 'up' ? 'rgba(56,224,208,.5)' : 'rgba(125,163,125,.25)' }}><Icon size={17} /></div>
+                    <div className="nm-mono">{h.ip}</div>
+                  </button>
+                )
+              })}
+            </div>
+          </div>
+        )}
+
+        {lastScan && tab === 'details' && (
+          <div className="nm-card overflow-hidden">
+            {!activeHost ? <div className="p-6 text-sm text-center" style={{ color: 'var(--nm-muted)' }}>Select a host.</div> : (
+              <div className="p-4 space-y-4">
+                <div className="flex flex-wrap items-center gap-3">
+                  <span className="nm-mono text-lg text-white">{activeHost.ip}</span>
+                  {activeHost.hostname && <span>{activeHost.hostname}</span>}
+                  <span className={`nm-badge ${activeHost.state === 'up' ? 'nm-b-up' : 'nm-b-closed'}`}>{activeHost.state || 'up'}</span>
+                </div>
+                <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-3">
+                  {[
+                    ['IPv4', activeHost.ip],
+                    ['MAC', activeHost.mac || '—'],
+                    ['Vendor', activeHost.vendor || '—'],
+                    ['OS', activeHost.os || 'Unknown'],
+                    ['Last boot', activeHost.last_boot || '2026-06-28 08:11'],
+                    ['Distance', '1 hop'],
+                    ['Open ports', (activeHost.ports || []).filter((p) => p.state === 'open').length],
+                    ['OS accuracy', activeHost.os_accuracy ? `${activeHost.os_accuracy}%` : '—'],
+                  ].map(([k, v]) => (
+                    <div key={k} className="nm-card p-3"><div className="text-[10px]" style={{ color: 'var(--nm-muted)' }}>{k}</div><div className="nm-mono text-sm">{v}</div></div>
+                  ))}
+                </div>
+                <div>
+                  <div className="text-xs font-semibold mb-2" style={{ color: 'var(--nm-muted)' }}>OS Matches</div>
+                  <table className="nm-table"><tbody><tr><td>{activeHost.os || 'Linux 5.x / Ubuntu 20.04'}</td><td>{activeHost.os_accuracy || 96}%</td><td className="nm-mono">cpe:/o:linux:linux_kernel</td></tr></tbody></table>
+                </div>
+                <div>
+                  <div className="text-xs font-semibold mb-2" style={{ color: 'var(--nm-muted)' }}>Traceroute</div>
+                  <table className="nm-table"><thead><tr><th>TTL</th><th>RTT</th><th>Address</th><th>Hostname</th></tr></thead><tbody>{(activeHost.traceroute || [{ ttl: 1, rtt: '0.45ms', address: inventory.gateway || '192.168.1.1' }, { ttl: 2, rtt: '1.22ms', address: activeHost.ip }]).map((r, i) => <tr key={i}><td>{r.ttl || i + 1}</td><td>{r.rtt}</td><td>{r.address}</td><td>{r.hostname || '—'}</td></tr>)}</tbody></table>
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+
+        {tab === 'scans' && (
           <div className="nm-card overflow-hidden">
             {(state?.scan_log || []).length === 0 ? (
               <div className="p-8 text-sm text-center" style={{ color: 'var(--nm-muted)' }}>No scans run yet.</div>
@@ -478,10 +700,10 @@ export default function NmapSimulator({
                 {(state.scan_log || []).slice().reverse().map((entry, i) => {
                   const text = typeof entry === 'string' ? entry : (entry.command || entry.summary || JSON.stringify(entry))
                   return (
-                    <div key={i} className="nm-console !py-2 !text-[12px] flex items-start gap-2">
+                    <button key={i} className="nm-console !py-2 !text-[12px] w-full text-left flex items-start gap-2" onClick={() => setTab('output')}>
                       <span style={{ color: 'var(--nm-green)' }}>$</span>
                       <span className="flex-1">{text}</span>
-                    </div>
+                    </button>
                   )
                 })}
               </div>
@@ -506,6 +728,86 @@ export default function NmapSimulator({
           </div>
         )}
       </div>
+
+      {modal === 'nse' && (
+        <NmapModal title="NSE Scripts Browser" onClose={() => setModal(null)}>
+          <div className="grid md:grid-cols-[220px_1fr] gap-4">
+            <div className="border rounded overflow-hidden">
+              {NSE_CATEGORIES.map((cat) => (
+                <button key={cat} className={`block w-full text-left px-3 py-2 text-sm ${scriptCategory === cat ? 'bg-green-100 text-green-800' : 'hover:bg-slate-100'}`} onClick={() => setScriptCategory(cat)}>
+                  {cat}
+                </button>
+              ))}
+            </div>
+            <div>
+              <div className="flex items-center gap-2 mb-3">
+                <FileCode2 size={16} className="text-green-700" />
+                <span className="font-semibold">Category: {scriptCategory}</span>
+              </div>
+              <table className="w-full text-sm border-collapse">
+                <thead><tr className="bg-slate-100 text-slate-500"><th className="text-left p-2">Script</th><th className="text-left p-2">Categories</th><th className="text-left p-2">Description</th></tr></thead>
+                <tbody>
+                  {NSE_SCRIPTS.filter((s) => s[1].includes(scriptCategory) || scriptCategory === 'default').map(([name, cats, desc]) => (
+                    <tr key={name} className="border-t"><td className="p-2 font-mono">{name}.nse</td><td className="p-2">{cats}</td><td className="p-2">{desc}</td></tr>
+                  ))}
+                </tbody>
+              </table>
+              <button className="mt-3 px-3 py-1.5 rounded bg-green-600 text-white text-sm" onClick={() => { setFlags((prev) => new Set([...prev, '--script', scriptCategory])); setModal(null) }}>Add category to command</button>
+            </div>
+          </div>
+        </NmapModal>
+      )}
+
+      {modal === 'wizard' && (
+        <NmapModal title="Command Wizard" onClose={() => setModal(null)}>
+          <div className="grid sm:grid-cols-2 gap-3 text-sm">
+            {SCAN_PROFILES.map((p) => (
+              <button key={p.id} className="text-left border rounded p-3 hover:bg-green-50" onClick={() => { setProfile(p.id); setFlags(new Set(p.flags)); setPorts(p.ports); setModal(null) }}>
+                <div className="font-semibold">{p.label}</div>
+                <div className="font-mono text-xs text-slate-500 mt-1">{p.desc}</div>
+              </button>
+            ))}
+          </div>
+        </NmapModal>
+      )}
+
+      {modal === 'compare' && (
+        <NmapModal title="Compare Scans" onClose={() => setModal(null)}>
+          <div className="flex items-center gap-2 mb-3 text-sm"><GitCompare size={16} /> Compare current scan against previous scan history.</div>
+          <table className="w-full text-sm"><tbody>
+            <tr className="border-t"><td className="p-2">New hosts</td><td className="p-2 font-mono">{scanHosts.length}</td></tr>
+            <tr className="border-t"><td className="p-2">Open ports</td><td className="p-2 font-mono">{allPorts.filter((p) => p.state === 'open').length}</td></tr>
+            <tr className="border-t"><td className="p-2">Changed services</td><td className="p-2 font-mono">{services.length}</td></tr>
+          </tbody></table>
+        </NmapModal>
+      )}
+
+      {modal === 'search' && (
+        <NmapModal title="Search Scan Results" onClose={() => setModal(null)}>
+          <div className="flex gap-2">
+            <input className="border rounded px-2 py-1 flex-1" placeholder="Search hosts, services, versions, or output" />
+            <button className="px-3 py-1 rounded bg-green-600 text-white flex items-center gap-1"><Search size={13} /> Search</button>
+          </div>
+        </NmapModal>
+      )}
+
+      {modal === 'save' && (
+        <NmapModal title="Save Output" onClose={() => setModal(null)}>
+          <p className="text-sm mb-3">Save current scan as normal, XML, script kiddie, or grepable output.</p>
+          <div className="grid sm:grid-cols-4 gap-2">
+            {['Normal', 'XML', 'S|<rIpt kIddi3', 'Grepable'].map((m) => <button key={m} className="border rounded px-3 py-2 hover:bg-green-50"><Download size={13} className="inline mr-1" /> {m}</button>)}
+          </div>
+        </NmapModal>
+      )}
+
+      {modal === 'about' && (
+        <NmapModal title="About Nmap / Zenmap" onClose={() => setModal(null)}>
+          <div className="flex items-start gap-3 text-sm">
+            <HelpCircle size={22} className="text-green-700 shrink-0" />
+            <p>FixitLab Nmap simulation with Zenmap-style profiles, output tabs, topology, host details, scan history, NSE script browser, and command builder.</p>
+          </div>
+        </NmapModal>
+      )}
     </div>
   )
 }

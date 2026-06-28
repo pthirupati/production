@@ -20,9 +20,25 @@
   position: absolute;
   inset: 0 0 40px 0;
   background:
-    radial-gradient(120% 120% at 70% 80%, rgba(0,0,0,0.45), transparent 60%),
-    linear-gradient(135deg, #0b3a66 0%, #0a2a4a 55%, #07203b 100%);
+    radial-gradient(ellipse 80% 60% at 85% 90%, rgba(0, 120, 212, 0.35), transparent 55%),
+    radial-gradient(ellipse 70% 50% at 15% 20%, rgba(0, 90, 158, 0.45), transparent 50%),
+    radial-gradient(120% 120% at 70% 80%, rgba(0,0,0,0.35), transparent 60%),
+    linear-gradient(145deg, #0c4a7a 0%, #0a3d62 35%, #072a4a 70%, #051e36 100%);
   overflow: hidden;
+}
+.winos-desktop::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background:
+    repeating-linear-gradient(
+      -12deg,
+      transparent,
+      transparent 48px,
+      rgba(255,255,255,0.015) 48px,
+      rgba(255,255,255,0.015) 49px
+    );
+  pointer-events: none;
 }
 .winos-desktop::after {
   content: 'Windows Server 2022';
@@ -194,6 +210,24 @@
 .winos-alttab-grid { display: flex; gap: 14px; flex-wrap: wrap; max-width: 80%; justify-content: center; background: rgba(40,40,40,0.85); padding: 22px; border-radius: 10px; }
 .winos-alttab-card { width: 200px; height: 140px; background: #2b2b2b; border: 2px solid transparent; border-radius: 6px; color: #fff; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 8px; }
 .winos-alttab-card.sel { border-color: #4fc3f7; }
+.winos-alttab-card { cursor: pointer; transition: border-color 0.15s, transform 0.15s; }
+.winos-alttab-card:hover { border-color: rgba(79,195,247,0.6); transform: translateY(-2px); }
+
+.winos-power-overlay {
+  position: absolute; inset: 0; z-index: 13000;
+  display: flex; align-items: center; justify-content: center;
+  background: radial-gradient(circle at center, #0a3d62 0%, #020810 100%);
+}
+.winos-power-card {
+  text-align: center; color: #fff; max-width: 420px; padding: 32px;
+}
+.winos-power-title { font-size: 28px; font-weight: 300; margin-bottom: 12px; }
+.winos-power-text { font-size: 13px; color: rgba(255,255,255,0.75); line-height: 1.5; margin-bottom: 20px; }
+.winos-power-btn {
+  background: #0078d4; color: #fff; border: none; border-radius: 4px;
+  padding: 8px 24px; font-size: 13px; cursor: pointer;
+}
+.winos-power-btn:hover { background: #106ebe; }
 
 .winos-scroll { overflow: auto; }
 .winos-grid2 { display: grid; grid-template-columns: 200px 1fr; gap: 6px 16px; align-items: center; font-size: 12.5px; }

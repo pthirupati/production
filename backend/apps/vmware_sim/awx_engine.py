@@ -62,6 +62,10 @@ def _base_state() -> dict:
             {"id": 1, "name": "Machine SSH", "kind": "Machine"},
             {"id": 2, "name": "Vault Password", "kind": "Vault"},
         ],
+        "schedules": [
+            {"id": 1, "name": "Nightly patch", "template": "Patch Linux", "enabled": True, "next_run": _now_iso()},
+            {"id": 2, "name": "Weekly config drift", "template": "Harden SSH", "enabled": False, "next_run": _now_iso()},
+        ],
         "goal": {"title": "Fix AWX", "objective": "Sync the failing project and re-run the failed job template."},
         "broken": {"project_sync_failed": True, "failed_template_id": 11},
         "events": [],
@@ -253,9 +257,57 @@ def apply_action(session_id: str, action: str, payload: dict | None = None) -> d
     if action == "create_schedule":
         name = (payload.get("name") or "Nightly patch").strip()
         template = payload.get("template") or "Patch Linux"
+        sid = max((s.get("id", 0) for s in state.get("schedules", [])), default=0) + 1
+        state.setdefault("schedules", []).append(
+            {"id": sid, "name": name, "template": template, "enabled": True, "next_run": _now_iso()}
+        )
         state["events"].insert(0, {"time": _now_iso(), "message": f"Schedule {name} for {template}", "severity": "info"})
         _save(session_id, entry)
         return {"ok": True, "message": "Schedule created"}
+
+    if action == "toggle_schedule":
+        sid = int(payload.get("schedule_id") or 0)
+        for s in state.get("schedules", []):
+            if s["id"] == sid:
+                s["enabled"] = not s.get("enabled", True)
+                state["events"].insert(0, {"time": _now_iso(), "message": f"Schedule {s['name']} {'enabled' if s['enabled'] else 'disabled'}", "severity": "info"})
+        _save(session_id, entry)
+        return {"ok": True, "message": "Schedule updated"}
+
+    if action == "delete_schedule":
+        sid = int(payload.get("schedule_id") or 0)
+        state["schedules"] = [s for s in state.get("schedules", []) if s["id"] != sid]
+        state["events"].insert(0, {"time": _now_iso(), "message": f"Schedule {sid} deleted", "severity": "info"})
+        _save(session_id, entry)
+        return {"ok": True, "message": "Schedule deleted"}
+
+    if action == "relaunch_job":
+        jid = int(payload.get("job_id") or 0)
+        src = next((j for j in state.get("jobs", []) if j["id"] == jid), None)
+        name = (src or {}).get("name", "Job")
+        new_id = max((j.get("id", 0) for j in state.get("jobs", [])), default=500) + 1
+        state.setdefault("jobs", []).insert(0, {"id": new_id, "name": name, "status": "successful", "started": _now_iso()})
+        state["events"].insert(0, {"time": _now_iso(), "message": f"Job {name} relaunched (#{new_id})", "severity": "success"})
+        _save(session_id, entry)
+        return {"ok": True, "message": "Job relaunched"}
+
+    if action == "cancel_job":
+        jid = int(payload.get("job_id") or 0)
+        for j in state.get("jobs", []):
+            if j["id"] == jid and j.get("status") in ("running", "pending", "waiting"):
+                j["status"] = "canceled"
+                state["events"].insert(0, {"time": _now_iso(), "message": f"Job {j.get('name')} canceled", "severity": "warning"})
+        _save(session_id, entry)
+        return {"ok": True, "message": "Job canceled"}
+
+    if action == "toggle_host":
+        hid = str(payload.get("host_id") or "")
+        for h in state.get("hosts", []):
+            if str(h.get("id")) == hid:
+                h["enabled"] = not h.get("enabled", True)
+                state["events"].insert(0, {"time": _now_iso(), "message": f"Host {h.get('name')} {'enabled' if h['enabled'] else 'disabled'}", "severity": "info"})
+        _save(session_id, entry)
+        return {"ok": True, "message": "Host updated"}
 
     return {"ok": False, "error": f"Unknown action: {action}"}
 

@@ -1,4 +1,7 @@
 import { useEffect, useRef, useState, useCallback, memo, forwardRef, useImperativeHandle } from 'react'
+import {
+  Download, Maximize2, Minimize2, Minus, Plus, Columns2, Terminal as TerminalIcon, X,
+} from 'lucide-react'
 import { useAuthStore } from '../store/authStore'
 
 const WS_NO_RECONNECT = new Set([1000, 4001, 4003, 4004, 4005, 4008, 4500])
@@ -10,6 +13,68 @@ const WS_CLOSE_MESSAGES = {
   4005: '\r\n\x1b[1;31mLab environment not ready — try again in a few seconds.\x1b[0m\r\n',
   4008: '\r\n\x1b[1;31mToo many terminal tabs open — close another tab and refresh.\x1b[0m\r\n',
   4500: '\r\n\x1b[1;31mCould not connect to lab shell.\x1b[0m\r\n',
+}
+
+const TERMINAL_PROFILES = {
+  powershell: {
+    label: 'Windows PowerShell',
+    icon: 'PS',
+    prompt: 'PS C:\\Users\\Administrator>',
+    theme: { background: '#012456', foreground: '#f3f6fb', cursor: '#ffffff', selectionBackground: '#1b5f9e' },
+  },
+  cmd: {
+    label: 'Windows CMD',
+    icon: 'C:\\',
+    prompt: 'C:\\Users\\Administrator>',
+    theme: { background: '#000000', foreground: '#c0c0c0', cursor: '#ffffff', selectionBackground: '#333333' },
+  },
+  linux: {
+    label: 'Linux Bash',
+    icon: '$',
+    prompt: 'root@ubuntu:~$',
+    theme: { background: '#020617', foreground: '#e2e8f0', cursor: '#06b6d4', selectionBackground: '#334155' },
+  },
+  esxi: {
+    label: 'ESXi Shell',
+    icon: 'ESX',
+    prompt: '[root@esxi:~]',
+    theme: { background: '#2b2f36', foreground: '#e8edf2', cursor: '#f59e0b', selectionBackground: '#4b5563' },
+  },
+  ansible: {
+    label: 'Ansible/AWX CLI',
+    icon: 'A',
+    prompt: 'awx@controller:~$',
+    theme: { background: '#0b1020', foreground: '#dbeafe', cursor: '#60a5fa', selectionBackground: '#1e3a8a' },
+  },
+  terraform: {
+    label: 'Terraform CLI',
+    icon: 'TF',
+    prompt: 'terraform@workspace:~/infra$',
+    theme: { background: '#120b2d', foreground: '#ede9fe', cursor: '#a78bfa', selectionBackground: '#4c1d95' },
+  },
+  kubectl: {
+    label: 'Kubernetes/kubectl',
+    icon: 'K8s',
+    prompt: 'admin@cluster:~$',
+    theme: { background: '#061225', foreground: '#dbeafe', cursor: '#38bdf8', selectionBackground: '#1d4ed8' },
+  },
+}
+
+function inferProfiles(session, hostKey, label) {
+  const sim = String(session?.simulation_type || '').toLowerCase()
+  const tech = String(session?.technology_slug || session?.technology_name || '').toLowerCase()
+  const text = `${sim} ${tech} ${hostKey || ''} ${label || ''}`.toLowerCase()
+  if (text.includes('windows')) return ['powershell', 'cmd']
+  if (text.includes('vmware') || text.includes('vsphere') || text.includes('esxi')) return ['esxi', 'linux']
+  if (text.includes('terraform')) return ['terraform', 'linux']
+  if (text.includes('awx') || text.includes('ansible')) return ['ansible', 'linux']
+  if (text.includes('kubernetes') || text.includes('k8s') || text.includes('kubectl')) return ['kubectl', 'linux']
+  return ['linux']
+}
+
+function makeTab(id, profileKey) {
+  const p = TERMINAL_PROFILES[profileKey] || TERMINAL_PROFILES.linux
+  return { id, profileKey, label: p.label }
 }
 
 /**
@@ -47,6 +112,19 @@ function LabTerminal({
   const isMobileRef = useRef(isMobile)
   isMobileRef.current = isMobile
   const maxReconnectAttempts = 10
+  const [fontSize, setFontSize] = useState(isMobile ? 10 : 13)
+  const fontSizeRef = useRef(fontSize)
+  fontSizeRef.current = fontSize
+  const initialProfiles = inferProfiles(session, hostKey, label)
+  const [tabs, setTabs] = useState(() => initialProfiles.map((p, i) => makeTab(`${p}-${i}`, p)))
+  const [activeTabId, setActiveTabId] = useState(() => `${initialProfiles[0]}-0`)
+  const [split, setSplit] = useState(false)
+  const [fullscreen, setFullscreen] = useState(false)
+  const [statusText, setStatusText] = useState('Connecting')
+  const activeTab = tabs.find((t) => t.id === activeTabId) || tabs[0] || makeTab('linux-0', 'linux')
+  const activeProfile = TERMINAL_PROFILES[activeTab.profileKey] || TERMINAL_PROFILES.linux
+  const activeProfileRef = useRef(activeProfile)
+  activeProfileRef.current = activeProfile
 
   useImperativeHandle(ref, () => ({
     sendCommand(text) {
@@ -86,15 +164,12 @@ function LabTerminal({
       const term = new Terminal({
         cursorBlink: true,
         cursorStyle: 'bar',
-        fontSize: isMobileRef.current ? 10 : 13,
+        fontSize: fontSizeRef.current,
         lineHeight: 1.2,
         fontFamily: '"JetBrains Mono", "Fira Code", monospace',
-        theme: {
-          background: '#020617',
-          foreground: '#e2e8f0',
-          cursor: '#06b6d4',
-          selectionBackground: '#334155',
-        },
+        theme: activeProfileRef.current.theme,
+        scrollback: 5000,
+        allowProposedApi: false,
       })
       const fitAddon = new FitAddon()
       term.loadAddon(fitAddon)
@@ -208,6 +283,7 @@ function LabTerminal({
         const ws = new WebSocket(buildWsUrl())
         wsRef.current = ws
         ws.onopen = () => {
+          setStatusText('Connected')
           connectingRef.current = false
           reconnectAttempts.current = 0
           reconnectMsgShown.current = false
@@ -240,6 +316,7 @@ function LabTerminal({
           } catch { term.write(event.data) }
         }
         ws.onclose = (e) => {
+          setStatusText(e.code === 1000 ? 'Closed' : 'Reconnecting')
           connectingRef.current = false
           if (ws._readyFallback) clearTimeout(ws._readyFallback)
           if (disposed || e.code === 1000) return
@@ -369,14 +446,140 @@ function LabTerminal({
     }
   }, [layoutKey])
 
+  useEffect(() => {
+    const term = xtermRef.current
+    if (!term) return
+    term.options.fontSize = fontSize
+    requestAnimationFrame(() => fitAddonRef.current?.fit())
+  }, [fontSize])
+
+  useEffect(() => {
+    const term = xtermRef.current
+    if (!term || !activeProfile) return
+    term.options.theme = activeProfile.theme
+    term.write(`\r\n\x1b[1;36m${activeProfile.label} profile selected — expected prompt: ${activeProfile.prompt}\x1b[0m\r\n`)
+    requestAnimationFrame(() => fitAddonRef.current?.fit())
+  }, [activeProfile])
+
+  const addTab = () => {
+    setTabs((prev) => {
+      const nextProfile = inferProfiles(session, hostKey, label)[prev.length % Math.max(1, inferProfiles(session, hostKey, label).length)] || 'linux'
+      const id = `${nextProfile}-${Date.now()}`
+      setActiveTabId(id)
+      return [...prev, makeTab(id, nextProfile)]
+    })
+  }
+
+  const closeTab = (id) => {
+    setTabs((prev) => {
+      if (prev.length <= 1) return prev
+      const next = prev.filter((t) => t.id !== id)
+      if (activeTabId === id) setActiveTabId(next[0]?.id)
+      return next
+    })
+  }
+
+  const downloadLog = () => {
+    const term = xtermRef.current
+    if (!term) return
+    const lines = []
+    const buffer = term.buffer?.active
+    if (buffer) {
+      for (let i = 0; i < buffer.length; i += 1) {
+        lines.push(buffer.getLine(i)?.translateToString(true) || '')
+      }
+    }
+    const blob = new Blob([lines.join('\n')], { type: 'text/plain;charset=utf-8' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = `fixitlab-terminal-${hostKey || 'primary'}-${Date.now()}.log`
+    a.click()
+    URL.revokeObjectURL(url)
+  }
+
   return (
-    <div className={`flex flex-col min-h-0 min-w-0 ${className}`}>
+    <div className={`flex flex-col min-h-0 min-w-0 ${fullscreen ? 'fixed inset-3 z-[9999] rounded-lg border border-accent-cyan/40 shadow-2xl' : ''} ${className}`}>
       {label && (
         <div className="shrink-0 px-2 py-1 text-[10px] sm:text-xs font-medium text-accent-cyan border-b border-surface-800 bg-surface-900/90">
           {label}
         </div>
       )}
-      <div ref={mountRef} className="flex-1 min-h-0 p-0.5 touch-manipulation" />
+      <div className="shrink-0 flex items-center gap-1 px-2 py-1 bg-surface-900 border-b border-surface-800 overflow-x-auto">
+        {tabs.map((tab) => {
+          const p = TERMINAL_PROFILES[tab.profileKey] || TERMINAL_PROFILES.linux
+          const active = tab.id === activeTabId
+          return (
+            <button
+              key={tab.id}
+              type="button"
+              onClick={() => setActiveTabId(tab.id)}
+              className={`group shrink-0 inline-flex items-center gap-1.5 rounded px-2 py-1 text-[11px] font-medium border ${
+                active ? 'bg-accent-cyan/15 text-accent-cyan border-accent-cyan/30' : 'bg-surface-950 text-surface-400 border-surface-800 hover:text-white'
+              }`}
+              title={`${p.label} · ${p.prompt}`}
+            >
+              <span className="font-mono text-[10px] opacity-80">{p.icon}</span>
+              <span>{tab.label}</span>
+              {tabs.length > 1 && (
+                <span
+                  role="button"
+                  tabIndex={0}
+                  className="opacity-50 group-hover:opacity-100 hover:text-white"
+                  onClick={(e) => { e.stopPropagation(); closeTab(tab.id) }}
+                  onKeyDown={(e) => { if (e.key === 'Enter') closeTab(tab.id) }}
+                >
+                  <X size={10} />
+                </span>
+              )}
+            </button>
+          )
+        })}
+        <button type="button" className="shrink-0 p-1 rounded text-surface-400 hover:text-white hover:bg-surface-800" title="New terminal tab" onClick={addTab}>
+          <Plus size={14} />
+        </button>
+        <span className="flex-1" />
+        <span className="hidden md:inline text-[10px] text-surface-500 font-mono">{statusText}</span>
+        <button type="button" className={`p-1 rounded ${split ? 'text-accent-cyan bg-accent-cyan/10' : 'text-surface-400 hover:text-white hover:bg-surface-800'}`} title="Split terminal" onClick={() => setSplit((s) => !s)}>
+          <Columns2 size={14} />
+        </button>
+        <button type="button" className="p-1 rounded text-surface-400 hover:text-white hover:bg-surface-800" title="Decrease font size" onClick={() => setFontSize((s) => Math.max(9, s - 1))}>
+          <Minus size={14} />
+        </button>
+        <button type="button" className="p-1 rounded text-surface-400 hover:text-white hover:bg-surface-800" title="Increase font size" onClick={() => setFontSize((s) => Math.min(20, s + 1))}>
+          <Plus size={14} />
+        </button>
+        <button type="button" className="p-1 rounded text-surface-400 hover:text-white hover:bg-surface-800" title="Download session log" onClick={downloadLog}>
+          <Download size={14} />
+        </button>
+        <button type="button" className="p-1 rounded text-surface-400 hover:text-white hover:bg-surface-800" title={fullscreen ? 'Exit full screen' : 'Full screen'} onClick={() => setFullscreen((f) => !f)}>
+          {fullscreen ? <Minimize2 size={14} /> : <Maximize2 size={14} />}
+        </button>
+      </div>
+      <div className={`flex-1 min-h-0 grid ${split ? 'grid-cols-1 md:grid-cols-2' : 'grid-cols-1'}`}>
+        <div ref={mountRef} className="min-h-0 p-0.5 touch-manipulation" style={{ background: activeProfile.theme.background }} />
+        {split && (
+          <div className="min-h-0 border-t md:border-t-0 md:border-l border-surface-800 bg-surface-950 p-3 font-mono text-xs text-surface-300 overflow-auto">
+            <div className="flex items-center gap-2 text-accent-cyan mb-2">
+              <TerminalIcon size={14} /> Split terminal reference
+            </div>
+            <div className="text-surface-500 mb-3">Active profile: {activeProfile.label}</div>
+            <pre className="whitespace-pre-wrap leading-5">{[
+              `${activeProfile.prompt} # examples`,
+              activeTab.profileKey === 'powershell' ? 'Get-Service | Where-Object Status -eq Stopped' : null,
+              activeTab.profileKey === 'cmd' ? 'ipconfig /all' : null,
+              activeTab.profileKey === 'esxi' ? 'esxcli network ip interface list' : null,
+              activeTab.profileKey === 'terraform' ? 'terraform plan' : null,
+              activeTab.profileKey === 'ansible' ? 'ansible-inventory --list' : null,
+              activeTab.profileKey === 'kubectl' ? 'kubectl get pods -A' : null,
+              activeTab.profileKey === 'linux' ? 'systemctl status nginx' : null,
+              'clear    # clear screen',
+              'Tab      # backend shell completion',
+              '↑ / ↓    # command history',
+            ].filter(Boolean).join('\n')}</pre>
+          </div>
+        )}
+      </div>
     </div>
   )
 }

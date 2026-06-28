@@ -1,7 +1,8 @@
-import { Routes, Route, Navigate } from 'react-router-dom'
+import { Routes, Route, Navigate, useLocation } from 'react-router-dom'
 import { Suspense, useState, useEffect } from 'react'
 import { useAuthStore } from '../store/authStore'
 import { lazyWithRetry } from '../utils/lazyWithRetry'
+import ErrorBoundary from '../components/ErrorBoundary'
 
 // Layouts (always loaded)
 import MainLayout from '../components/layout/MainLayout'
@@ -130,7 +131,13 @@ function AdminRoute({ children }) {
 }
 
 export default function AppRouter() {
+  // Route-level error boundary keyed by pathname: a crash on one page (e.g. a
+  // future render loop) shows the recovery UI for THAT page, and simply
+  // navigating elsewhere remounts a fresh boundary instead of leaving the whole
+  // app wedged on the global "Something went wrong" screen until a full reload.
+  const location = useLocation()
   return (
+    <ErrorBoundary key={location.pathname}>
     <Suspense fallback={<PageLoader />}>
       <Routes>
         {/* Public routes */}
@@ -226,5 +233,6 @@ export default function AppRouter() {
         <Route path="*" element={<NotFound />} />
       </Routes>
     </Suspense>
+    </ErrorBoundary>
   )
 }

@@ -3,12 +3,14 @@ export default function PrometheusTopNav({ active, onSelect, statusSub, onStatus
   const items = [
     { key: 'alerts', label: 'Alerts' },
     { key: 'graph', label: 'Graph' },
-    { key: 'status', label: 'Status', dropdown: ['Runtime & Build', 'Configuration', 'Rules', 'Targets', 'Service Discovery'] },
+    { key: 'status', label: 'Status', dropdown: ['Runtime & Build', 'TSDB Status', 'Configuration', 'Flags', 'Rules', 'Targets', 'Service Discovery'] },
     { key: 'help', label: 'Help' },
   ]
   const statusKeys = {
     'Runtime & Build': 'runtime',
+    'TSDB Status': 'tsdb',
     Configuration: 'configuration',
+    Flags: 'flags',
     Rules: 'rules',
     Targets: 'targets',
     'Service Discovery': 'service-discovery',

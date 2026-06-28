@@ -56,6 +56,7 @@ export default function AwxSimulator({
   const [templateName, setTemplateName] = useState('Site Deploy')
   const [scheduleModal, setScheduleModal] = useState(false)
   const [scheduleName, setScheduleName] = useState('Nightly patch')
+  const [scheduleTemplate, setScheduleTemplate] = useState('Patch Linux')
   const [loginUser, setLoginUser] = useState('')
   const [loginPass, setLoginPass] = useState('')
   const [loginError, setLoginError] = useState('')
@@ -159,11 +160,23 @@ export default function AwxSimulator({
           ]} rows={inv.jobs || []} searchKeys={['name', 'status']} onRowClick={(j) => setSelectedJob(j)} />
           {selectedJob && (
             <div className="awx-widget space-y-3">
-              <div className="flex justify-between items-center">
-                <h3 className="font-semibold">{selectedJob.name}</h3>
-                <SimStatusBadge status={selectedJob.status} />
+              <div className="flex justify-between items-center flex-wrap gap-2">
+                <h3 className="font-semibold">{selectedJob.name} <span className="text-xs text-slate-400 font-mono">#{selectedJob.id}</span></h3>
+                <div className="flex items-center gap-2">
+                  <SimStatusBadge status={selectedJob.status} />
+                  <button type="button" className="awx-btn-launch text-[11px] py-1 px-2 flex items-center gap-1" disabled={busy}
+                    onClick={() => { run(() => awxApi.relaunchJob(sessionId, selectedJob.id), 'Job relaunched'); }}>
+                    <RefreshCw size={12} /> Relaunch
+                  </button>
+                  {['running', 'pending', 'waiting'].includes(selectedJob.status) && (
+                    <button type="button" className="px-2 py-1 border border-red-300 text-red-600 rounded text-[11px]" disabled={busy}
+                      onClick={() => { run(() => awxApi.cancelJob(sessionId, selectedJob.id), 'Job canceled'); }}>
+                      Cancel
+                    </button>
+                  )}
+                </div>
               </div>
-              <SimTerminalLog lines={AWX_JOB_LOG} title="Job output" />
+              <SimTerminalLog lines={AWX_JOB_LOG} title={`Output — ${selectedJob.name} (${selectedJob.status})`} />
             </div>
           )}
         </div>
@@ -238,6 +251,12 @@ export default function AwxSimulator({
         { key: 'status', label: 'Status', render: (r) => <SimStatusBadge status={r.status} /> },
         { key: 'source', label: 'Source', sortable: true },
         { key: 'ip', label: 'IP' },
+        { key: 'enabled', label: 'Enabled', render: (r) => (
+          <button type="button" className="px-2 py-1 border rounded text-[10px]" disabled={busy}
+            onClick={(e) => { e.stopPropagation(); run(() => awxApi.toggleHost(sessionId, r.id), (r.enabled !== false) ? 'Host disabled' : 'Host enabled') }}>
+            {(r.enabled !== false) ? 'Enabled' : 'Disabled'}
+          </button>
+        ) },
       ]} rows={inv.hosts || AWX_HOSTS} searchKeys={['name', 'inventory', 'source', 'ip']} />
     }
     if (nav === 'credentials') {
@@ -269,8 +288,21 @@ export default function AwxSimulator({
           <SimDataTable columns={[
         { key: 'name', label: 'Schedule', sortable: true },
         { key: 'template', label: 'Template', sortable: true },
-        { key: 'nextRun', label: 'Next Run', sortable: true, render: (r) => new Date(r.nextRun).toLocaleString() },
-          ]} rows={AWX_SCHEDULES} searchKeys={['name']} />
+        { key: 'next_run', label: 'Next Run', sortable: true, render: (r) => new Date(r.next_run || r.nextRun || Date.now()).toLocaleString() },
+        { key: 'enabled', label: 'State', render: (r) => <SimStatusBadge status={r.enabled ? 'success' : 'disabled'} label={r.enabled ? 'Enabled' : 'Disabled'} /> },
+        { key: 'actions', label: 'Actions', render: (r) => (
+          <div className="flex gap-1" onClick={(e) => e.stopPropagation()}>
+            <button type="button" className="px-2 py-1 border rounded text-[10px]" disabled={busy}
+              onClick={() => run(() => awxApi.toggleSchedule(sessionId, r.id), r.enabled ? 'Schedule disabled' : 'Schedule enabled')}>
+              {r.enabled ? 'Disable' : 'Enable'}
+            </button>
+            <button type="button" className="px-2 py-1 border border-red-300 text-red-600 rounded text-[10px]" disabled={busy}
+              onClick={() => run(() => awxApi.deleteSchedule(sessionId, r.id), 'Schedule deleted')}>
+              Delete
+            </button>
+          </div>
+        ) },
+          ]} rows={inv.schedules || AWX_SCHEDULES} searchKeys={['name']} />
         </div>
       )
     }
@@ -507,12 +539,18 @@ export default function AwxSimulator({
         footer={<>
           <button type="button" className="text-sm px-3" onClick={() => setScheduleModal(false)}>Cancel</button>
           <button type="button" className="awx-btn-launch" disabled={busy} onClick={() => {
-            run(() => awxApi.createSchedule(sessionId, scheduleName, 'Patch Linux'), 'Schedule created')
+            run(() => awxApi.createSchedule(sessionId, scheduleName, scheduleTemplate), 'Schedule created')
             setScheduleModal(false)
           }}>Save</button>
         </>}>
         <label className="block text-sm">Schedule name
           <input className="w-full mt-1 border rounded px-2 py-1.5" value={scheduleName} onChange={(e) => setScheduleName(e.target.value)} />
+        </label>
+        <label className="block text-sm mt-3">Job template
+          <select className="w-full mt-1 border rounded px-2 py-1.5" value={scheduleTemplate} onChange={(e) => setScheduleTemplate(e.target.value)}>
+            {(inv.job_templates || []).map((jt) => <option key={jt.id} value={jt.name}>{jt.name}</option>)}
+            {!(inv.job_templates || []).length && <option value="Patch Linux">Patch Linux</option>}
+          </select>
         </label>
       </SimModal>
     </div>

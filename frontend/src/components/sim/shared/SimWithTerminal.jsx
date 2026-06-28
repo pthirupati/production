@@ -8,6 +8,7 @@ import LabTerminal from '../../LabTerminal'
 export default function SimWithTerminal({
   open = false,
   onToggle,
+  sessionId,
   terminalSession,
   terminalHost = 'primary',
   blockedCommands = [],
@@ -37,8 +38,9 @@ export default function SimWithTerminal({
           <div className="flex-1 min-h-0">
             {terminalSession ? (
               <LabTerminal
+                sessionId={sessionId}
                 session={terminalSession}
-                host={terminalHost}
+                hostKey={terminalHost}
                 blockedCommands={blockedCommands}
                 isMobile={isMobile}
               />
