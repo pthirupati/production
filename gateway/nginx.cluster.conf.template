@@ -339,8 +339,14 @@ server {
 
     # ── WEBSOCKETS ──
     location /ws/ {
-        limit_req zone=ws_connect_rate burst=30 nodelay;
-        limit_conn ws_conn_per_ip 10;
+        # Long-lived terminal connections: cap CONCURRENT sockets per IP only.
+        # Do NOT apply limit_req here - a per-request rate limit treats every
+        # (re)connect as a request, so reconnect storms + multi-pane terminals
+        # drain the bucket and nginx returns 503 on the upgrade, which the
+        # browser surfaces as code 1006 -> an endless "Reconnecting (n/10)" loop
+        # across ALL labs. The concurrent cap below is the correct guardrail and
+        # matches the backend per-user limit (TERMINAL_MAX_WS_PER_USER=20).
+        limit_conn ws_conn_per_ip 20;
         proxy_pass http://backend_ws/ws/;
         proxy_http_version 1.1;
         proxy_set_header Upgrade $http_upgrade;
