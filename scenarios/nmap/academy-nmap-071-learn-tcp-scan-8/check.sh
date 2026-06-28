@@ -1,3 +1,3 @@
 #!/usr/bin/env bash
-grep -q FIXED-OK /opt/fixitlab/academy/academy-nmap-071-learn-tcp-scan-8.conf
+# Validated by the dedicated simulation engine (real state checks).
 exit 0

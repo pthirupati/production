@@ -1,3 +1,3 @@
 #!/usr/bin/env bash
-grep -q FIXED-OK /opt/fixitlab/academy/academy-prometheus-006-security-remote-write.conf
+systemctl is-active nginx
 exit 0

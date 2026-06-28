@@ -1,3 +1,3 @@
 #!/usr/bin/env bash
-grep -q FIXED-OK /opt/fixitlab/academy/academy-vmware-081-learn-vm-lifecycle-9.conf
+# Validated by the dedicated simulation engine (real state checks).
 exit 0

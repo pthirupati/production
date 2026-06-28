@@ -1,3 +1,3 @@
 #!/usr/bin/env bash
-grep -q FIXED-OK /opt/fixitlab/academy/academy-mysql-020-integration-performance-schema-2.conf
+systemctl is-active mysqld
 exit 0

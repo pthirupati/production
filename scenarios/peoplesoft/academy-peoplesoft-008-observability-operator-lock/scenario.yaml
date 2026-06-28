@@ -11,15 +11,14 @@ max_score: 100
 is_free: false
 infrastructure_type: docker
 jira_priority: Medium
-description: 'Observability task: make operator account lock visible in logs, metrics,
-  or traces. On-call should answer ''what is broken?'' quickly using signals from
-  account lock and password reset.'
+description: 'Observability task: make operator account lock visible in logs, metrics, or traces. On-call
+  should answer ''what is broken?'' quickly using signals from account lock and password reset.'
 objectives:
 - Day-2 operator account lock work completes safely in this environment
 - Changes are verified with before/after checks
 - The system remains stable for dependent teams
-initial_state: The system runs, but operator account lock lacks useful telemetry.
-  Dashboards/alerts are blank or noisy — improve signal quality.
+initial_state: The system runs, but operator account lock lacks useful telemetry. Dashboards/alerts are
+  blank or noisy — improve signal quality.
 hints:
 - order: 1
   cost: 10
@@ -29,29 +28,24 @@ hints:
 
     2. Write down what looks normal versus wrong or missing for operator account lock.
 
-    3. Recall the core idea: account lock and password reset. Form one hypothesis
-    before you act.'
+    3. Recall the core idea: account lock and password reset. Form one hypothesis before you act.'
 - order: 2
   cost: 15
   content: 'Plan your approach (still no spoilers):
 
-    1. Confirm the exact gap between current and desired state for operator account
-    lock.
+    1. Confirm the exact gap between current and desired state for operator account lock.
 
     2. Decide the single smallest change that moves you toward the objective.
 
-    3. Capture evidence (command output / status) before the change so you can prove
-    it worked afterward.'
+    3. Capture evidence (command output / status) before the change so you can prove it worked afterward.'
 - order: 3
   cost: 25
   content: 'Guided walkthrough:
 
     1. Re-check the current state — the user profile lock status.
 
-    2. Add or fix the exporter / dashboard / alert with clear names, labels, and a
-    sensible threshold.
+    2. Add or fix the exporter / dashboard / alert with clear names, labels, and a sensible threshold.
 
     3. Verify the result — the account is unlocked and usable.
 
-    4. Record completion: add `# FIXED-OK` to `/opt/fixitlab/academy/academy-peoplesoft-008-observability-operator-lock.conf`,
-    then click Check Solution.'
+    4. Click Check Solution once `systemctl is-active nginx` returns active.'

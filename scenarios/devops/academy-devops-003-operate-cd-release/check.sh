@@ -1,3 +1,3 @@
 #!/usr/bin/env bash
-grep -q FIXED-OK /opt/fixitlab/academy/academy-devops-003-operate-cd-release.conf
+systemctl is-active nginx
 exit 0

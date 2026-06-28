@@ -11,17 +11,15 @@ max_score: 100
 is_free: false
 infrastructure_type: docker
 jira_priority: Medium
-description: 'Production alert: a service is denied despite correct Unix permissions.
-  You are on call for RHEL Linux and must troubleshoot SELinux policy methodically
-  — triage symptoms, isolate root cause, apply the smallest safe fix, and confirm
-  recovery.'
+description: Service operations lab. The `sssd` systemd unit is **failed/inactive** on this host — a realistic
+  fault for Troubleshooting Drill workflows that depend on it. Diagnose with `systemctl status sssd` and
+  journal logs, apply the smallest reliable fix, then verify with `systemctl is-active sssd`.
 objectives:
-- 'The incident symptom is clear: a service is denied despite correct Unix permissions'
-- Root cause is isolated with evidence, not guesswork
-- Service behavior returns to normal after the fix
-initial_state: The RHEL practice host is degraded. A service is denied despite correct
-  unix permissions. Recent changes may exist around SELinux policy, but do not restart
-  blindly — gather evidence first.
+- The `sssd` service is active (running)
+- '`systemctl is-active sssd` returns active'
+- The fix survives a status re-check (no marker files)
+initial_state: The `sssd` service is not running (`systemctl is-active sssd` → inactive/failed). Dependent
+  Troubleshooting Drill tasks cannot succeed until the unit is healthy again.
 hints:
 - order: 1
   cost: 10
@@ -31,8 +29,7 @@ hints:
 
     2. Write down what looks normal versus wrong or missing for SELinux policy.
 
-    3. Recall the core idea: contexts, booleans, and audit denials. Form one hypothesis
-    before you act.'
+    3. Recall the core idea: contexts, booleans, and audit denials. Form one hypothesis before you act.'
 - order: 2
   cost: 15
   content: 'Plan your approach (still no spoilers):
@@ -41,19 +38,16 @@ hints:
 
     2. Decide the single smallest change that moves you toward the objective.
 
-    3. Capture evidence (command output / status) before the change so you can prove
-    it worked afterward.'
+    3. Capture evidence (command output / status) before the change so you can prove it worked afterward.'
 - order: 3
   cost: 25
   content: 'Guided walkthrough:
 
     1. Re-check the current state — `getenforce`, `ausearch -m avc`, and `semanage`.
 
-    2. Fix the underlying misconfiguration you identified (not just the noisy log
-    line), changing one thing at a time.
+    2. Fix the underlying misconfiguration you identified (not just the noisy log line), changing one
+    thing at a time.
 
-    3. Verify the result — the service runs with the right context and no new AVC
-    denials.
+    3. Verify the result — the service runs with the right context and no new AVC denials.
 
-    4. Record completion: add `# FIXED-OK` to `/opt/fixitlab/academy/academy-rhel-linux-004-troubleshoot-selinux-policy.conf`,
-    then click Check Solution.'
+    4. Click Check Solution once `systemctl is-active sssd` returns active.'

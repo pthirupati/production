@@ -1,3 +1,3 @@
 #!/usr/bin/env bash
-grep -q FIXED-OK /opt/fixitlab/academy/academy-kubernetes-081-learn-pods-9.conf
+kubectl get pods | grep -q Running
 exit 0

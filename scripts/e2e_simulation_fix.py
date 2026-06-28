@@ -36,6 +36,19 @@ except Exception:  # pragma: no cover
     FLAGSHIP_SLUGS = set()
     FLAGSHIP_USER_FIX = {}
 
+try:
+    from apps.labs.provisioner.simulation.academy_service_e2e_fixes import (
+        ACADEMY_ANSIBLE_SLUGS,
+        ACADEMY_DOCKER_COMPOSE_SLUGS,
+        ACADEMY_SERVICE_FIX,
+    )
+    for _s in ACADEMY_SERVICE_FIX:
+        COMPLETE_TECH_MARKER_FIX.pop(_s, None)
+except Exception:  # pragma: no cover
+    ACADEMY_ANSIBLE_SLUGS = set()
+    ACADEMY_DOCKER_COMPOSE_SLUGS = set()
+    ACADEMY_SERVICE_FIX = {}
+
 
 # ── Generated maps for real-state scenarios (see scenario_presets.py) ──
 _RS_SERVICE_FIX = {'db-redis-down': 'redis', 'db-mariadb-down': 'mariadb', 'db-mongodb-down': 'mongod', 'db-cassandra-down': 'cassandra', 'db-pgbouncer-down': 'pgbouncer', 'rhel-chronyd-down': 'chronyd', 'rhel-rsyslog-down': 'rsyslog', 'rhel-firewalld-down': 'firewalld', 'rhel-auditd-down': 'auditd', 'rhel-nfs-server-down': 'nfs-server', 'docker-containerd-down': 'containerd', 'linux-haproxy-down': 'haproxy', 'linux-named-down': 'named', 'linux-memcached-down': 'memcached', 'linux-rabbitmq-down': 'rabbitmq-server', 'linux-nginx-stream-proxy-down': 'nginx'}
@@ -338,6 +351,15 @@ def _apply_simulation_fix(session) -> tuple[bool, str]:
                 svc.sub_state = "running"
             return True, f"{unit} started"
 
+        if slug in ACADEMY_SERVICE_FIX:
+            unit = ACADEMY_SERVICE_FIX[slug]
+            shell.run(f"systemctl start {unit}")
+            svc = state.services.get(unit)
+            if svc:
+                svc.active = "active"
+                svc.sub_state = "running"
+            return True, f"{unit} started (academy)"
+
         # ── Flagship real-state labs (user / firewall / compose / ansible) ──
         # Matched by EXACT slug BEFORE the generic substring branches so the
         # genuine remediation runs and the lab validates against real state.
@@ -349,7 +371,7 @@ def _apply_simulation_fix(session) -> tuple[bool, str]:
             shell.run("firewall-cmd --permanent --add-service=http")
             shell.run("firewall-cmd --reload")
             return True, "http allowed through firewalld and reloaded"
-        if slug in FLAGSHIP_DOCKER_SLUGS:
+        if slug in FLAGSHIP_DOCKER_SLUGS or slug in ACADEMY_DOCKER_COMPOSE_SLUGS:
             shell.run("docker compose up -d")
             engine._container_running = True
             docker_svc = state.services.get("docker")
@@ -357,7 +379,7 @@ def _apply_simulation_fix(session) -> tuple[bool, str]:
                 docker_svc.active = "active"
                 docker_svc.sub_state = "running"
             return True, "docker compose stack started"
-        if slug in FLAGSHIP_ANSIBLE_SLUGS:
+        if slug in FLAGSHIP_ANSIBLE_SLUGS or slug in ACADEMY_ANSIBLE_SLUGS:
             shell.run("ssh-copy-id root@web1")
             shell.run("ssh-copy-id root@web2")
             engine._ssh_key_fixed = True

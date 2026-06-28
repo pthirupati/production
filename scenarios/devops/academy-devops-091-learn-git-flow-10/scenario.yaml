@@ -11,16 +11,15 @@ max_score: 100
 is_free: false
 infrastructure_type: docker
 jira_priority: Low
-description: This beginner-friendly DevOps lab introduces Git workflow. You will explore
-  branching, merges, and conflict resolution on the CI/CD lab. Read the environment
-  first, then follow the guided steps — no prior production experience required.
+description: Service operations lab. The `crond` systemd unit is **failed/inactive** on this host — a
+  realistic fault for Fundamentals Lab workflows that depend on it. Diagnose with `systemctl status crond`
+  and journal logs, apply the smallest reliable fix, then verify with `systemctl is-active crond`.
 objectives:
-- Understand how Git workflow work in this lab environment
-- Identify the main status and configuration signals for Git workflow
-- Confirm you can read the current state confidently before changing anything
-initial_state: The CI/CD lab is online with a starter Git workflow setup. Some pieces
-  are intentionally incomplete so you can learn how they fit together. Nothing is
-  on fire — focus on observation.
+- The `crond` service is active (running)
+- '`systemctl is-active crond` returns active'
+- The fix survives a status re-check (no marker files)
+initial_state: The `crond` service is not running (`systemctl is-active crond` → inactive/failed). Dependent
+  Fundamentals Lab tasks cannot succeed until the unit is healthy again.
 hints:
 - order: 1
   cost: 10
@@ -30,8 +29,8 @@ hints:
 
     2. Write down what looks normal versus wrong or missing for Git workflow.
 
-    3. Recall the core idea: branching, merges, and conflict resolution. Form one
-    hypothesis before you act.'
+    3. Recall the core idea: branching, merges, and conflict resolution. Form one hypothesis before you
+    act.'
 - order: 2
   cost: 15
   content: 'Plan your approach (still no spoilers):
@@ -40,18 +39,16 @@ hints:
 
     2. Decide the single smallest change that moves you toward the objective.
 
-    3. Capture evidence (command output / status) before the change so you can prove
-    it worked afterward.'
+    3. Capture evidence (command output / status) before the change so you can prove it worked afterward.'
 - order: 3
   cost: 25
   content: 'Guided walkthrough:
 
     1. Re-check the current state — `git status`, `git log --graph`, and branches.
 
-    2. Make one small, reversible change toward the objective, re-reading status after
-    each step so you understand cause and effect.
+    2. Make one small, reversible change toward the objective, re-reading status after each step so you
+    understand cause and effect.
 
     3. Verify the result — the branch is merged cleanly.
 
-    4. Record completion: add `# FIXED-OK` to `/opt/fixitlab/academy/academy-devops-091-learn-git-flow-10.conf`,
-    then click Check Solution.'
+    4. Click Check Solution once `systemctl is-active crond` returns active.'

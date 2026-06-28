@@ -1,3 +1,3 @@
 #!/usr/bin/env bash
-grep -q FIXED-OK /opt/fixitlab/academy/academy-mysql-079-backup-charset-8.conf
+systemctl is-active mysqld
 exit 0

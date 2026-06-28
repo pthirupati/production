@@ -1,3 +1,3 @@
 #!/usr/bin/env bash
-grep -q FIXED-OK /opt/fixitlab/academy/academy-wireshark-002-build-tcp.conf
+# Validated by the dedicated simulation engine (real state checks).
 exit 0

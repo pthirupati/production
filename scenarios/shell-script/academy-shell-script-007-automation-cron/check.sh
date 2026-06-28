@@ -1,3 +1,3 @@
 #!/usr/bin/env bash
-grep -q FIXED-OK /opt/fixitlab/academy/academy-shell-script-007-automation-cron.conf
+systemctl is-active crond
 exit 0

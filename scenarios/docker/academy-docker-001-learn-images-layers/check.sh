@@ -1,3 +1,3 @@
 #!/usr/bin/env bash
-grep -q FIXED-OK /opt/fixitlab/academy/academy-docker-001-learn-images-layers.conf
+systemctl is-active docker
 exit 0

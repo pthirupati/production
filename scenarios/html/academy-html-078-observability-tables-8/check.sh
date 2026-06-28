@@ -1,3 +1,3 @@
 #!/usr/bin/env bash
-grep -q FIXED-OK /opt/fixitlab/academy/academy-html-078-observability-tables-8.conf
+systemctl is-active httpd
 exit 0

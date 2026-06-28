@@ -11,27 +11,25 @@ max_score: 100
 is_free: false
 infrastructure_type: docker
 jira_priority: Medium
-description: Backup and recovery drill for Database. Ensure backups run on schedule,
-  retention is correct, and you can restore how database fits into Node.js backends
-  within the lab RTO.
+description: Service operations lab. The `nginx` systemd unit is **failed/inactive** on this host — a
+  realistic fault for Backup and Recovery workflows that depend on it. Diagnose with `systemctl status
+  nginx` and journal logs, apply the smallest reliable fix, then verify with `systemctl is-active nginx`.
 objectives:
-- Backup coverage for Database is complete and restorable
-- Retention and encryption meet the stated policy
-- A restore drill proves data integrity
-initial_state: Backup jobs exist but reliability is uncertain for Database. Leadership
-  wants proof that restore works — not just that scripts exit zero.
+- The `nginx` service is active (running)
+- '`systemctl is-active nginx` returns active'
+- The fix survives a status re-check (no marker files)
+initial_state: The `nginx` service is not running (`systemctl is-active nginx` → inactive/failed). Dependent
+  Backup and Recovery tasks cannot succeed until the unit is healthy again.
 hints:
 - order: 1
   cost: 10
   content: 'Orient yourself before changing anything:
 
-    1. Inspect the current state — the relevant Express routes, middleware, and package.json
-    for database.
+    1. Inspect the current state — the relevant Express routes, middleware, and package.json for database.
 
     2. Write down what looks normal versus wrong or missing for Database.
 
-    3. Recall the core idea: how database fits into Node.js backends. Form one hypothesis
-    before you act.'
+    3. Recall the core idea: how database fits into Node.js backends. Form one hypothesis before you act.'
 - order: 2
   cost: 15
   content: 'Plan your approach (still no spoilers):
@@ -40,19 +38,16 @@ hints:
 
     2. Decide the single smallest change that moves you toward the objective.
 
-    3. Capture evidence (command output / status) before the change so you can prove
-    it worked afterward.'
+    3. Capture evidence (command output / status) before the change so you can prove it worked afterward.'
 - order: 3
   cost: 25
   content: 'Guided walkthrough:
 
-    1. Re-check the current state — the relevant Express routes, middleware, and package.json
-    for database.
+    1. Re-check the current state — the relevant Express routes, middleware, and package.json for database.
 
-    2. Repair or run the backup job, then perform a controlled restore into a scratch
-    location to prove it works.
+    2. Repair or run the backup job, then perform a controlled restore into a scratch location to prove
+    it works.
 
     3. Verify the result — Database behaves correctly under normal and failure checks.
 
-    4. Record completion: add `# FIXED-OK` to `/opt/fixitlab/academy/academy-nodejs-099-backup-database-10.conf`,
-    then click Check Solution.'
+    4. Click Check Solution once `systemctl is-active nginx` returns active.'

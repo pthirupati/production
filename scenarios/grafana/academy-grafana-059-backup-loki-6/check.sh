@@ -1,3 +1,3 @@
 #!/usr/bin/env bash
-grep -q FIXED-OK /opt/fixitlab/academy/academy-grafana-059-backup-loki-6.conf
+systemctl is-active nginx
 exit 0

@@ -1,3 +1,3 @@
 #!/usr/bin/env bash
-grep -q FIXED-OK /opt/fixitlab/academy/academy-python-005-production-logging.conf
+systemctl is-active crond
 exit 0

@@ -1,3 +1,3 @@
 #!/usr/bin/env bash
-grep -q FIXED-OK /opt/fixitlab/academy/academy-database-002-build-restore.conf
+systemctl is-active postgresql
 exit 0

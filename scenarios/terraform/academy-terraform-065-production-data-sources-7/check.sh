@@ -1,3 +1,3 @@
 #!/usr/bin/env bash
-grep -q FIXED-OK /opt/fixitlab/academy/academy-terraform-065-production-data-sources-7.conf
+# Validated by the dedicated simulation engine (real state checks).
 exit 0

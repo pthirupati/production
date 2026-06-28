@@ -1,3 +1,3 @@
 #!/usr/bin/env bash
-grep -q FIXED-OK /opt/fixitlab/academy/academy-rhel-linux-052-build-dnf-modules-6.conf
+systemctl is-active firewalld
 exit 0

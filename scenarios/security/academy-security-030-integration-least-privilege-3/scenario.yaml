@@ -11,15 +11,16 @@ max_score: 100
 is_free: false
 infrastructure_type: docker
 jira_priority: Medium
-description: 'Integration lab: connect least privilege with an adjacent platform in
-  the Security stack. Validate authentication, data handoff, and failure behavior
-  for minimal grants and scoped access.'
+description: Service operations lab. The `firewalld` systemd unit is **failed/inactive** on this host
+  — a realistic fault for Integration Lab workflows that depend on it. Diagnose with `systemctl status
+  firewalld` and journal logs, apply the smallest reliable fix, then verify with `systemctl is-active
+  firewalld`.
 objectives:
-- least privilege is connected to the adjacent system successfully
-- Handoff points are authenticated and observable
-- End-to-end workflow completes without manual intervention
-initial_state: Two systems are deployed but not fully wired together for least privilege.
-  Downstream consumers are waiting on this integration path.
+- The `firewalld` service is active (running)
+- '`systemctl is-active firewalld` returns active'
+- The fix survives a status re-check (no marker files)
+initial_state: The `firewalld` service is not running (`systemctl is-active firewalld` → inactive/failed).
+  Dependent Integration Lab tasks cannot succeed until the unit is healthy again.
 hints:
 - order: 1
   cost: 10
@@ -29,8 +30,7 @@ hints:
 
     2. Write down what looks normal versus wrong or missing for least privilege.
 
-    3. Recall the core idea: minimal grants and scoped access. Form one hypothesis
-    before you act.'
+    3. Recall the core idea: minimal grants and scoped access. Form one hypothesis before you act.'
 - order: 2
   cost: 15
   content: 'Plan your approach (still no spoilers):
@@ -39,19 +39,17 @@ hints:
 
     2. Decide the single smallest change that moves you toward the objective.
 
-    3. Capture evidence (command output / status) before the change so you can prove
-    it worked afterward.'
+    3. Capture evidence (command output / status) before the change so you can prove it worked afterward.'
 - order: 3
   cost: 25
   content: 'Guided walkthrough:
 
     1. Re-check the current state — current permissions vs need.
 
-    2. Configure credentials and networking, then drive one happy-path transaction
-    end to end across both systems.
+    2. Configure credentials and networking, then drive one happy-path transaction end to end across both
+    systems.
 
     3. Verify the result — permissions are reduced to the minimum needed.
 
-    4. Record completion: add `# FIXED-OK` to `/opt/fixitlab/academy/academy-security-030-integration-least-privilege-3.conf`,
-    then click Check Solution.'
+    4. Click Check Solution once `systemctl is-active firewalld` returns active.'
 cross_technology: true

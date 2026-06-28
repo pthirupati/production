@@ -11,16 +11,15 @@ max_score: 100
 is_free: false
 infrastructure_type: docker
 jira_priority: Medium
-description: 'Production alert: users cannot access required pages. You are on call
-  for Oracle PeopleSoft and must troubleshoot permission lists methodically — triage
-  symptoms, isolate root cause, apply the smallest safe fix, and confirm recovery.'
+description: 'Production alert: users cannot access required pages. You are on call for Oracle PeopleSoft
+  and must troubleshoot permission lists methodically — triage symptoms, isolate root cause, apply the
+  smallest safe fix, and confirm recovery.'
 objectives:
 - 'The incident symptom is clear: users cannot access required pages'
 - Root cause is isolated with evidence, not guesswork
 - Service behavior returns to normal after the fix
-initial_state: The PeopleSoft app server lab is degraded. Users cannot access required
-  pages. Recent changes may exist around permission lists, but do not restart blindly
-  — gather evidence first.
+initial_state: The PeopleSoft app server lab is degraded. Users cannot access required pages. Recent changes
+  may exist around permission lists, but do not restart blindly — gather evidence first.
 hints:
 - order: 1
   cost: 10
@@ -30,8 +29,7 @@ hints:
 
     2. Write down what looks normal versus wrong or missing for permission lists.
 
-    3. Recall the core idea: pages, components, and access. Form one hypothesis before
-    you act.'
+    3. Recall the core idea: pages, components, and access. Form one hypothesis before you act.'
 - order: 2
   cost: 15
   content: 'Plan your approach (still no spoilers):
@@ -40,18 +38,16 @@ hints:
 
     2. Decide the single smallest change that moves you toward the objective.
 
-    3. Capture evidence (command output / status) before the change so you can prove
-    it worked afterward.'
+    3. Capture evidence (command output / status) before the change so you can prove it worked afterward.'
 - order: 3
   cost: 25
   content: 'Guided walkthrough:
 
     1. Re-check the current state — permission list and role security.
 
-    2. Fix the underlying misconfiguration you identified (not just the noisy log
-    line), changing one thing at a time.
+    2. Fix the underlying misconfiguration you identified (not just the noisy log line), changing one
+    thing at a time.
 
     3. Verify the result — access matches the security design.
 
-    4. Record completion: add `# FIXED-OK` to `/opt/fixitlab/academy/academy-peoplesoft-084-troubleshoot-permission-lists-9.conf`,
-    then click Check Solution.'
+    4. Click Check Solution once `systemctl is-active nginx` returns active.'

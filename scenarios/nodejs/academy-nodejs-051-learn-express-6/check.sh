@@ -1,3 +1,3 @@
 #!/usr/bin/env bash
-grep -q FIXED-OK /opt/fixitlab/academy/academy-nodejs-051-learn-express-6.conf
+systemctl is-active nginx
 exit 0

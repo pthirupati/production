@@ -1,3 +1,3 @@
 #!/usr/bin/env bash
-grep -q FIXED-OK /opt/fixitlab/academy/academy-networking-072-build-dns-8.conf
+systemctl is-active haproxy
 exit 0

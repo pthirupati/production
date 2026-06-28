@@ -1,3 +1,3 @@
 #!/usr/bin/env bash
-grep -q FIXED-OK /opt/fixitlab/academy/academy-devops-077-automation-rollback-8.conf
+systemctl is-active crond
 exit 0

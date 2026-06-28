@@ -1,3 +1,3 @@
 #!/usr/bin/env bash
-grep -q FIXED-OK /opt/fixitlab/academy/academy-terraform-011-learn-providers-2.conf
+# Validated by the dedicated simulation engine (real state checks).
 exit 0

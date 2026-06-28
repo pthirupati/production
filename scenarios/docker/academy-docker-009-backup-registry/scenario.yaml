@@ -11,27 +11,26 @@ max_score: 100
 is_free: false
 infrastructure_type: docker
 jira_priority: Medium
-description: Backup and recovery drill for image registry. Ensure backups run on schedule,
-  retention is correct, and you can restore push/pull auth, tags, and insecure registries
-  within the lab RTO.
+description: Service operations lab. The `docker` systemd unit is **failed/inactive** on this host — a
+  realistic fault for Backup and Recovery workflows that depend on it. Diagnose with `systemctl status
+  docker` and journal logs, apply the smallest reliable fix, then verify with `systemctl is-active docker`.
 objectives:
-- Backup coverage for image registry is complete and restorable
-- Retention and encryption meet the stated policy
-- A restore drill proves data integrity
-initial_state: Backup jobs exist but reliability is uncertain for image registry.
-  Leadership wants proof that restore works — not just that scripts exit zero.
+- The `docker` service is active (running)
+- '`systemctl is-active docker` returns active'
+- The fix survives a status re-check (no marker files)
+initial_state: The `docker` service is not running (`systemctl is-active docker` → inactive/failed). Dependent
+  Backup and Recovery tasks cannot succeed until the unit is healthy again.
 hints:
 - order: 1
   cost: 10
   content: 'Orient yourself before changing anything:
 
-    1. Inspect the current state — `docker login`, `docker pull`, and daemon.json
-    registry config.
+    1. Inspect the current state — `docker login`, `docker pull`, and daemon.json registry config.
 
     2. Write down what looks normal versus wrong or missing for image registry.
 
-    3. Recall the core idea: push/pull auth, tags, and insecure registries. Form one
-    hypothesis before you act.'
+    3. Recall the core idea: push/pull auth, tags, and insecure registries. Form one hypothesis before
+    you act.'
 - order: 2
   cost: 15
   content: 'Plan your approach (still no spoilers):
@@ -40,19 +39,16 @@ hints:
 
     2. Decide the single smallest change that moves you toward the objective.
 
-    3. Capture evidence (command output / status) before the change so you can prove
-    it worked afterward.'
+    3. Capture evidence (command output / status) before the change so you can prove it worked afterward.'
 - order: 3
   cost: 25
   content: 'Guided walkthrough:
 
-    1. Re-check the current state — `docker login`, `docker pull`, and daemon.json
-    registry config.
+    1. Re-check the current state — `docker login`, `docker pull`, and daemon.json registry config.
 
-    2. Repair or run the backup job, then perform a controlled restore into a scratch
-    location to prove it works.
+    2. Repair or run the backup job, then perform a controlled restore into a scratch location to prove
+    it works.
 
     3. Verify the result — images push and pull from the intended registry.
 
-    4. Record completion: add `# FIXED-OK` to `/opt/fixitlab/academy/academy-docker-009-backup-registry.conf`,
-    then click Check Solution.'
+    4. Click Check Solution once `systemctl is-active docker` returns active.'

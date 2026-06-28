@@ -1,3 +1,3 @@
 #!/usr/bin/env bash
-grep -q FIXED-OK /opt/fixitlab/academy/academy-nodejs-008-observability-testing.conf
+systemctl is-active nginx
 exit 0

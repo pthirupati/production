@@ -1,3 +1,3 @@
 #!/usr/bin/env bash
-grep -q FIXED-OK /opt/fixitlab/academy/academy-rhel-linux-072-build-dnf-modules-8.conf
+systemctl is-active rsyslog
 exit 0

@@ -11,15 +11,15 @@ max_score: 100
 is_free: false
 infrastructure_type: docker
 jira_priority: Medium
-description: Backup and recovery drill for safe deletion. Ensure backups run on schedule,
-  retention is correct, and you can restore guarded rm, dry-run, and confirmation
-  within the lab RTO.
+description: Service operations lab. The `crond` systemd unit is **failed/inactive** on this host — a
+  realistic fault for Backup and Recovery workflows that depend on it. Diagnose with `systemctl status
+  crond` and journal logs, apply the smallest reliable fix, then verify with `systemctl is-active crond`.
 objectives:
-- Backup coverage for safe deletion is complete and restorable
-- Retention and encryption meet the stated policy
-- A restore drill proves data integrity
-initial_state: Backup jobs exist but reliability is uncertain for safe deletion. Leadership
-  wants proof that restore works — not just that scripts exit zero.
+- The `crond` service is active (running)
+- '`systemctl is-active crond` returns active'
+- The fix survives a status re-check (no marker files)
+initial_state: The `crond` service is not running (`systemctl is-active crond` → inactive/failed). Dependent
+  Backup and Recovery tasks cannot succeed until the unit is healthy again.
 hints:
 - order: 1
   cost: 10
@@ -29,8 +29,7 @@ hints:
 
     2. Write down what looks normal versus wrong or missing for safe deletion.
 
-    3. Recall the core idea: guarded rm, dry-run, and confirmation. Form one hypothesis
-    before you act.'
+    3. Recall the core idea: guarded rm, dry-run, and confirmation. Form one hypothesis before you act.'
 - order: 2
   cost: 15
   content: 'Plan your approach (still no spoilers):
@@ -39,18 +38,16 @@ hints:
 
     2. Decide the single smallest change that moves you toward the objective.
 
-    3. Capture evidence (command output / status) before the change so you can prove
-    it worked afterward.'
+    3. Capture evidence (command output / status) before the change so you can prove it worked afterward.'
 - order: 3
   cost: 25
   content: 'Guided walkthrough:
 
     1. Re-check the current state — the delete logic and target paths.
 
-    2. Repair or run the backup job, then perform a controlled restore into a scratch
-    location to prove it works.
+    2. Repair or run the backup job, then perform a controlled restore into a scratch location to prove
+    it works.
 
     3. Verify the result — deletions are scoped and guarded.
 
-    4. Record completion: add `# FIXED-OK` to `/opt/fixitlab/academy/academy-shell-script-089-backup-safe-delete-9.conf`,
-    then click Check Solution.'
+    4. Click Check Solution once `systemctl is-active crond` returns active.'

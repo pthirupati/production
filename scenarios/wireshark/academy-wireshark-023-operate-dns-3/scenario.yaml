@@ -11,27 +11,26 @@ max_score: 100
 is_free: false
 infrastructure_type: docker
 jira_priority: Medium
-description: 'Day-2 operations: perform a routine DNS task safely in Wireshark Packet
-  Analysis. Follow change control — inspect, change, verify — while working with name
-  resolution, records, forward/reverse lookups, and resolver config.'
+description: 'Day-2 operations: perform a routine DNS task safely in Wireshark Packet Analysis. Follow
+  change control — inspect, change, verify — while working with name resolution, records, forward/reverse
+  lookups, and resolver config.'
 objectives:
 - Day-2 DNS work completes safely in this environment
 - Changes are verified with before/after checks
 - The system remains stable for dependent teams
-initial_state: The capture lab is healthy enough for scheduled work on DNS. Complete
-  the maintenance task without unnecessary downtime.
+initial_state: The capture lab is healthy enough for scheduled work on DNS. Complete the maintenance task
+  without unnecessary downtime.
 hints:
 - order: 1
   cost: 10
   content: 'Orient yourself before changing anything:
 
-    1. Inspect the current state — `dig`, `nslookup`, or `Resolve-DnsName` plus zone/config
-    files.
+    1. Inspect the current state — `dig`, `nslookup`, or `Resolve-DnsName` plus zone/config files.
 
     2. Write down what looks normal versus wrong or missing for DNS.
 
-    3. Recall the core idea: name resolution, records, forward/reverse lookups, and
-    resolver config. Form one hypothesis before you act.'
+    3. Recall the core idea: name resolution, records, forward/reverse lookups, and resolver config. Form
+    one hypothesis before you act.'
 - order: 2
   cost: 15
   content: 'Plan your approach (still no spoilers):
@@ -40,19 +39,16 @@ hints:
 
     2. Decide the single smallest change that moves you toward the objective.
 
-    3. Capture evidence (command output / status) before the change so you can prove
-    it worked afterward.'
+    3. Capture evidence (command output / status) before the change so you can prove it worked afterward.'
 - order: 3
   cost: 25
   content: 'Guided walkthrough:
 
-    1. Re-check the current state — `dig`, `nslookup`, or `Resolve-DnsName` plus zone/config
-    files.
+    1. Re-check the current state — `dig`, `nslookup`, or `Resolve-DnsName` plus zone/config files.
 
-    2. Execute the maintenance in small, reversible steps, taking a snapshot or backup
-    first if the change is risky.
+    2. Execute the maintenance in small, reversible steps, taking a snapshot or backup first if the change
+    is risky.
 
     3. Verify the result — queries return the expected records from the intended resolver.
 
-    4. Record completion: add `# FIXED-OK` to `/opt/fixitlab/academy/academy-wireshark-023-operate-dns-3.conf`,
-    then click Check Solution.'
+    4. Click Check Solution once `systemctl is-active nginx` returns active.'

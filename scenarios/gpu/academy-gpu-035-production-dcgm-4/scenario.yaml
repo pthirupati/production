@@ -11,14 +11,12 @@ max_score: 100
 is_free: false
 infrastructure_type: docker
 jira_priority: Medium
-description: Production readiness for DCGM. Harden, document, and validate GPU health
-  and telemetry so the change is safe to run during a maintenance window.
+description: GPU host lab. `nvidia-smi` reports the GPU unhealthy — ML/GPU workloads cannot start. Load
+  the driver / restore GPU health, then verify with `nvidia-smi`.
 objectives:
-- Day-2 DCGM work completes safely in this environment
-- Changes are verified with before/after checks
-- The system remains stable for dependent teams
-initial_state: A feature fix works in dev, but DCGM is not production ready — missing
-  guardrails, runbooks, or capacity checks.
+- GPU reports healthy in nvidia-smi
+- '`nvidia-smi` reports a healthy GPU'
+initial_state: The NVIDIA driver/GPU is not healthy (`nvidia-smi` fails).
 hints:
 - order: 1
   cost: 10
@@ -28,8 +26,7 @@ hints:
 
     2. Write down what looks normal versus wrong or missing for DCGM.
 
-    3. Recall the core idea: GPU health and telemetry. Form one hypothesis before
-    you act.'
+    3. Recall the core idea: GPU health and telemetry. Form one hypothesis before you act.'
 - order: 2
   cost: 15
   content: 'Plan your approach (still no spoilers):
@@ -38,18 +35,16 @@ hints:
 
     2. Decide the single smallest change that moves you toward the objective.
 
-    3. Capture evidence (command output / status) before the change so you can prove
-    it worked afterward.'
+    3. Capture evidence (command output / status) before the change so you can prove it worked afterward.'
 - order: 3
   cost: 25
   content: 'Guided walkthrough:
 
     1. Re-check the current state — `dcgmi discovery` and health checks.
 
-    2. Apply production standards for DCGM: resource limits, monitoring, access controls,
-    and a written rollback step.
+    2. Apply production standards for DCGM: resource limits, monitoring, access controls, and a written
+    rollback step.
 
     3. Verify the result — DCGM reports healthy GPUs.
 
-    4. Record completion: add `# FIXED-OK` to `/opt/fixitlab/academy/academy-gpu-035-production-dcgm-4.conf`,
-    then click Check Solution.'
+    4. Click Check Solution once `nvidia-smi` reports a healthy GPU.'

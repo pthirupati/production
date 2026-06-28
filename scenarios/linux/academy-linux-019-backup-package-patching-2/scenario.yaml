@@ -11,15 +11,15 @@ max_score: 100
 is_free: false
 infrastructure_type: docker
 jira_priority: Medium
-description: Backup and recovery drill for package patching. Ensure backups run on
-  schedule, retention is correct, and you can restore repos, updates, version pinning,
-  and rollback within the lab RTO.
+description: Service operations lab. The `rsyslog` systemd unit is **failed/inactive** on this host —
+  a realistic fault for Backup and Recovery workflows that depend on it. Diagnose with `systemctl status
+  rsyslog` and journal logs, apply the smallest reliable fix, then verify with `systemctl is-active rsyslog`.
 objectives:
-- Backup coverage for package patching is complete and restorable
-- Retention and encryption meet the stated policy
-- A restore drill proves data integrity
-initial_state: Backup jobs exist but reliability is uncertain for package patching.
-  Leadership wants proof that restore works — not just that scripts exit zero.
+- The `rsyslog` service is active (running)
+- '`systemctl is-active rsyslog` returns active'
+- The fix survives a status re-check (no marker files)
+initial_state: The `rsyslog` service is not running (`systemctl is-active rsyslog` → inactive/failed).
+  Dependent Backup and Recovery tasks cannot succeed until the unit is healthy again.
 hints:
 - order: 1
   cost: 10
@@ -29,8 +29,8 @@ hints:
 
     2. Write down what looks normal versus wrong or missing for package patching.
 
-    3. Recall the core idea: repos, updates, version pinning, and rollback. Form one
-    hypothesis before you act.'
+    3. Recall the core idea: repos, updates, version pinning, and rollback. Form one hypothesis before
+    you act.'
 - order: 2
   cost: 15
   content: 'Plan your approach (still no spoilers):
@@ -39,19 +39,16 @@ hints:
 
     2. Decide the single smallest change that moves you toward the objective.
 
-    3. Capture evidence (command output / status) before the change so you can prove
-    it worked afterward.'
+    3. Capture evidence (command output / status) before the change so you can prove it worked afterward.'
 - order: 3
   cost: 25
   content: 'Guided walkthrough:
 
     1. Re-check the current state — `dnf history`, `dnf check-update`, and repo files.
 
-    2. Repair or run the backup job, then perform a controlled restore into a scratch
-    location to prove it works.
+    2. Repair or run the backup job, then perform a controlled restore into a scratch location to prove
+    it works.
 
-    3. Verify the result — required packages are at the approved versions and services
-    still run.
+    3. Verify the result — required packages are at the approved versions and services still run.
 
-    4. Record completion: add `# FIXED-OK` to `/opt/fixitlab/academy/academy-linux-019-backup-package-patching-2.conf`,
-    then click Check Solution.'
+    4. Click Check Solution once `systemctl is-active rsyslog` returns active.'

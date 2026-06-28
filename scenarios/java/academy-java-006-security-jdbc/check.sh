@@ -1,3 +1,3 @@
 #!/usr/bin/env bash
-grep -q FIXED-OK /opt/fixitlab/academy/academy-java-006-security-jdbc.conf
+systemctl is-active nginx
 exit 0

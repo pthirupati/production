@@ -11,53 +11,44 @@ max_score: 100
 is_free: false
 infrastructure_type: docker
 jira_priority: Low
-description: Build file permissions and ACLs from scratch in this Linux Administration
-  lab. You start from a minimal environment and must produce a working configuration
-  that demonstrates owner/group/other bits, ACL entries, and default ACL inheritance.
-  Plan, implement, then prove it works.
+description: Service operations lab. The `crond` systemd unit is **failed/inactive** on this host — a
+  realistic fault for Build From Scratch workflows that depend on it. Diagnose with `systemctl status
+  crond` and journal logs, apply the smallest reliable fix, then verify with `systemctl is-active crond`.
 objectives:
-- A working file permissions and ACLs setup must exist by the end of this lab
-- Configuration should follow team conventions and be easy to audit
-- The result should pass validation without manual cleanup
-initial_state: The Linux practice server is ready but file permissions and ACLs is
-  not configured yet. Required tools may already be installed; your job is to create
-  the configuration and bring the capability online.
+- The `crond` service is active (running)
+- '`systemctl is-active crond` returns active'
+- The fix survives a status re-check (no marker files)
+initial_state: The `crond` service is not running (`systemctl is-active crond` → inactive/failed). Dependent
+  Build From Scratch tasks cannot succeed until the unit is healthy again.
 hints:
 - order: 1
   cost: 10
   content: 'Orient yourself before changing anything:
 
-    1. Inspect the current state — `ls -la`, `getfacl`, and `namei -l` on the affected
-    path.
+    1. Inspect the current state — `ls -la`, `getfacl`, and `namei -l` on the affected path.
 
-    2. Write down what looks normal versus wrong or missing for file permissions and
-    ACLs.
+    2. Write down what looks normal versus wrong or missing for file permissions and ACLs.
 
-    3. Recall the core idea: owner/group/other bits, ACL entries, and default ACL
-    inheritance. Form one hypothesis before you act.'
+    3. Recall the core idea: owner/group/other bits, ACL entries, and default ACL inheritance. Form one
+    hypothesis before you act.'
 - order: 2
   cost: 15
   content: 'Plan your approach (still no spoilers):
 
-    1. Confirm the exact gap between current and desired state for file permissions
-    and ACLs.
+    1. Confirm the exact gap between current and desired state for file permissions and ACLs.
 
     2. Decide the single smallest change that moves you toward the objective.
 
-    3. Capture evidence (command output / status) before the change so you can prove
-    it worked afterward.'
+    3. Capture evidence (command output / status) before the change so you can prove it worked afterward.'
 - order: 3
   cost: 25
   content: 'Guided walkthrough:
 
-    1. Re-check the current state — `ls -la`, `getfacl`, and `namei -l` on the affected
-    path.
+    1. Re-check the current state — `ls -la`, `getfacl`, and `namei -l` on the affected path.
 
-    2. Create the smallest working slice of file permissions and ACLs first, validate
-    it, then add the remaining pieces one at a time.
+    2. Create the smallest working slice of file permissions and ACLs first, validate it, then add the
+    remaining pieces one at a time.
 
-    3. Verify the result — the process user can read/write/execute exactly what the
-    service needs.
+    3. Verify the result — the process user can read/write/execute exactly what the service needs.
 
-    4. Record completion: add `# FIXED-OK` to `/opt/fixitlab/academy/academy-linux-022-build-permissions-acl-3.conf`,
-    then click Check Solution.'
+    4. Click Check Solution once `systemctl is-active crond` returns active.'

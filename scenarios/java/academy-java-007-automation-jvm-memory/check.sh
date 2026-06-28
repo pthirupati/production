@@ -1,3 +1,3 @@
 #!/usr/bin/env bash
-grep -q FIXED-OK /opt/fixitlab/academy/academy-java-007-automation-jvm-memory.conf
+systemctl is-active nginx
 exit 0

@@ -11,16 +11,15 @@ max_score: 100
 is_free: true
 infrastructure_type: docker
 jira_priority: Low
-description: Build conditionals from scratch in this Shell Scripting lab. You start
-  from a minimal environment and must produce a working configuration that demonstrates
-  when clauses, loops, and idempotent guards. Plan, implement, then prove it works.
+description: Service operations lab. The `rsyslog` systemd unit is **failed/inactive** on this host —
+  a realistic fault for Build From Scratch workflows that depend on it. Diagnose with `systemctl status
+  rsyslog` and journal logs, apply the smallest reliable fix, then verify with `systemctl is-active rsyslog`.
 objectives:
-- A working conditionals setup must exist by the end of this lab
-- Configuration should follow team conventions and be easy to audit
-- The result should pass validation without manual cleanup
-initial_state: The bash practice environment is ready but conditionals is not configured
-  yet. Required tools may already be installed; your job is to create the configuration
-  and bring the capability online.
+- The `rsyslog` service is active (running)
+- '`systemctl is-active rsyslog` returns active'
+- The fix survives a status re-check (no marker files)
+initial_state: The `rsyslog` service is not running (`systemctl is-active rsyslog` → inactive/failed).
+  Dependent Build From Scratch tasks cannot succeed until the unit is healthy again.
 hints:
 - order: 1
   cost: 10
@@ -30,8 +29,8 @@ hints:
 
     2. Write down what looks normal versus wrong or missing for conditionals.
 
-    3. Recall the core idea: when clauses, loops, and idempotent guards. Form one
-    hypothesis before you act.'
+    3. Recall the core idea: when clauses, loops, and idempotent guards. Form one hypothesis before you
+    act.'
 - order: 2
   cost: 15
   content: 'Plan your approach (still no spoilers):
@@ -40,18 +39,16 @@ hints:
 
     2. Decide the single smallest change that moves you toward the objective.
 
-    3. Capture evidence (command output / status) before the change so you can prove
-    it worked afterward.'
+    3. Capture evidence (command output / status) before the change so you can prove it worked afterward.'
 - order: 3
   cost: 25
   content: 'Guided walkthrough:
 
     1. Re-check the current state — task `when:` lines and run output.
 
-    2. Create the smallest working slice of conditionals first, validate it, then
-    add the remaining pieces one at a time.
+    2. Create the smallest working slice of conditionals first, validate it, then add the remaining pieces
+    one at a time.
 
     3. Verify the result — tasks run only when needed and a re-run is clean.
 
-    4. Record completion: add `# FIXED-OK` to `/opt/fixitlab/academy/academy-shell-script-002-build-conditionals.conf`,
-    then click Check Solution.'
+    4. Click Check Solution once `systemctl is-active rsyslog` returns active.'

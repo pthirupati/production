@@ -11,15 +11,16 @@ max_score: 100
 is_free: false
 infrastructure_type: docker
 jira_priority: Medium
-description: 'Integration lab: connect integrity checks with an adjacent platform
-  in the SQLite stack. Validate authentication, data handoff, and failure behavior
-  for PRAGMA integrity_check and corruption recovery.'
+description: Service operations lab. The `postgresql` systemd unit is **failed/inactive** on this host
+  — a realistic fault for Integration Lab workflows that depend on it. Diagnose with `systemctl status
+  postgresql` and journal logs, apply the smallest reliable fix, then verify with `systemctl is-active
+  postgresql`.
 objectives:
-- integrity checks is connected to the adjacent system successfully
-- Handoff points are authenticated and observable
-- End-to-end workflow completes without manual intervention
-initial_state: Two systems are deployed but not fully wired together for integrity
-  checks. Downstream consumers are waiting on this integration path.
+- The `postgresql` service is active (running)
+- '`systemctl is-active postgresql` returns active'
+- The fix survives a status re-check (no marker files)
+initial_state: The `postgresql` service is not running (`systemctl is-active postgresql` → inactive/failed).
+  Dependent Integration Lab tasks cannot succeed until the unit is healthy again.
 hints:
 - order: 1
   cost: 10
@@ -29,8 +30,8 @@ hints:
 
     2. Write down what looks normal versus wrong or missing for integrity checks.
 
-    3. Recall the core idea: PRAGMA integrity_check and corruption recovery. Form
-    one hypothesis before you act.'
+    3. Recall the core idea: PRAGMA integrity_check and corruption recovery. Form one hypothesis before
+    you act.'
 - order: 2
   cost: 15
   content: 'Plan your approach (still no spoilers):
@@ -39,19 +40,17 @@ hints:
 
     2. Decide the single smallest change that moves you toward the objective.
 
-    3. Capture evidence (command output / status) before the change so you can prove
-    it worked afterward.'
+    3. Capture evidence (command output / status) before the change so you can prove it worked afterward.'
 - order: 3
   cost: 25
   content: 'Guided walkthrough:
 
     1. Re-check the current state — `PRAGMA integrity_check` output.
 
-    2. Configure credentials and networking, then drive one happy-path transaction
-    end to end across both systems.
+    2. Configure credentials and networking, then drive one happy-path transaction end to end across both
+    systems.
 
     3. Verify the result — integrity check passes after repair.
 
-    4. Record completion: add `# FIXED-OK` to `/opt/fixitlab/academy/academy-sqlite-060-integration-integrity-6.conf`,
-    then click Check Solution.'
+    4. Click Check Solution once `systemctl is-active postgresql` returns active.'
 cross_technology: true

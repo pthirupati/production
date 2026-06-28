@@ -11,15 +11,14 @@ max_score: 100
 is_free: false
 infrastructure_type: docker
 jira_priority: Medium
-description: 'Day-2 operations: perform a routine BIOS/UEFI task safely in Bare Metal
-  & IPMI. Follow change control — inspect, change, verify — while working with boot
-  order, virtualization, and settings.'
+description: 'Day-2 operations: perform a routine BIOS/UEFI task safely in Bare Metal & IPMI. Follow change
+  control — inspect, change, verify — while working with boot order, virtualization, and settings.'
 objectives:
 - Day-2 BIOS/UEFI work completes safely in this environment
 - Changes are verified with before/after checks
 - The system remains stable for dependent teams
-initial_state: The physical server lab is healthy enough for scheduled work on BIOS/UEFI.
-  Complete the maintenance task without unnecessary downtime.
+initial_state: The physical server lab is healthy enough for scheduled work on BIOS/UEFI. Complete the
+  maintenance task without unnecessary downtime.
 hints:
 - order: 1
   cost: 10
@@ -29,8 +28,8 @@ hints:
 
     2. Write down what looks normal versus wrong or missing for BIOS/UEFI.
 
-    3. Recall the core idea: boot order, virtualization, and settings. Form one hypothesis
-    before you act.'
+    3. Recall the core idea: boot order, virtualization, and settings. Form one hypothesis before you
+    act.'
 - order: 2
   cost: 15
   content: 'Plan your approach (still no spoilers):
@@ -39,18 +38,16 @@ hints:
 
     2. Decide the single smallest change that moves you toward the objective.
 
-    3. Capture evidence (command output / status) before the change so you can prove
-    it worked afterward.'
+    3. Capture evidence (command output / status) before the change so you can prove it worked afterward.'
 - order: 3
   cost: 25
   content: 'Guided walkthrough:
 
     1. Re-check the current state — BIOS/UEFI settings and boot order.
 
-    2. Execute the maintenance in small, reversible steps, taking a snapshot or backup
-    first if the change is risky.
+    2. Execute the maintenance in small, reversible steps, taking a snapshot or backup first if the change
+    is risky.
 
     3. Verify the result — BIOS settings match the build standard.
 
-    4. Record completion: add `# FIXED-OK` to `/opt/fixitlab/academy/academy-baremetal-013-operate-bios-2.conf`,
-    then click Check Solution.'
+    4. Click Check Solution once `systemctl is-active rsyslog` returns active.'

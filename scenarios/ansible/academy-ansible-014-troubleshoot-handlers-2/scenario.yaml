@@ -11,17 +11,14 @@ max_score: 100
 is_free: false
 infrastructure_type: docker
 jira_priority: Medium
-description: 'Production alert: a service is not restarted after a config change.
-  You are on call for Ansible Automation and must troubleshoot handlers methodically
-  — triage symptoms, isolate root cause, apply the smallest safe fix, and confirm
-  recovery.'
+description: Ansible control-node lab. Managed hosts in `webservers` are unreachable over SSH — `ansible
+  webservers -m ping` fails. Establish key-based access and verify SUCCESS/pong.
 objectives:
-- 'The incident symptom is clear: a service is not restarted after a config change'
-- Root cause is isolated with evidence, not guesswork
-- Service behavior returns to normal after the fix
-initial_state: The Ansible control node is degraded. A service is not restarted after
-  a config change. Recent changes may exist around handlers, but do not restart blindly
-  — gather evidence first.
+- All webservers hosts answer ansible ping with SUCCESS
+- Key-based SSH works without a password prompt
+- '`ansible webservers -m ping` returns SUCCESS for every host'
+initial_state: '`ansible webservers -m ping` fails with unreachable/permission errors until SSH keys are
+  distributed.'
 hints:
 - order: 1
   cost: 10
@@ -31,8 +28,8 @@ hints:
 
     2. Write down what looks normal versus wrong or missing for handlers.
 
-    3. Recall the core idea: notify/handler flow and run-once semantics. Form one
-    hypothesis before you act.'
+    3. Recall the core idea: notify/handler flow and run-once semantics. Form one hypothesis before you
+    act.'
 - order: 2
   cost: 15
   content: 'Plan your approach (still no spoilers):
@@ -41,18 +38,16 @@ hints:
 
     2. Decide the single smallest change that moves you toward the objective.
 
-    3. Capture evidence (command output / status) before the change so you can prove
-    it worked afterward.'
+    3. Capture evidence (command output / status) before the change so you can prove it worked afterward.'
 - order: 3
   cost: 25
   content: 'Guided walkthrough:
 
     1. Re-check the current state — playbook notify lines and `--diff` output.
 
-    2. Fix the underlying misconfiguration you identified (not just the noisy log
-    line), changing one thing at a time.
+    2. Fix the underlying misconfiguration you identified (not just the noisy log line), changing one
+    thing at a time.
 
     3. Verify the result — handlers fire exactly when notified.
 
-    4. Record completion: add `# FIXED-OK` to `/opt/fixitlab/academy/academy-ansible-014-troubleshoot-handlers-2.conf`,
-    then click Check Solution.'
+    4. Click Check Solution once `ansible webservers -m ping` returns SUCCESS for every host.'

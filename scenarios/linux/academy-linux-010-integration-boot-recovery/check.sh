@@ -1,3 +1,3 @@
 #!/usr/bin/env bash
-grep -q FIXED-OK /opt/fixitlab/academy/academy-linux-010-integration-boot-recovery.conf
+systemctl is-active crond
 exit 0

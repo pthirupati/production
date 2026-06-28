@@ -11,16 +11,15 @@ max_score: 100
 is_free: false
 infrastructure_type: docker
 jira_priority: Medium
-description: 'Production alert: clients get no address or cannot resolve names. You
-  are on call for Windows Server and must troubleshoot DNS and DHCP methodically —
-  triage symptoms, isolate root cause, apply the smallest safe fix, and confirm recovery.'
+description: 'Production alert: clients get no address or cannot resolve names. You are on call for Windows
+  Server and must troubleshoot DNS and DHCP methodically — triage symptoms, isolate root cause, apply
+  the smallest safe fix, and confirm recovery.'
 objectives:
 - 'The incident symptom is clear: clients get no address or cannot resolve names'
 - Root cause is isolated with evidence, not guesswork
 - Service behavior returns to normal after the fix
-initial_state: The Windows Server host is degraded. Clients get no address or cannot
-  resolve names. Recent changes may exist around DNS and DHCP, but do not restart
-  blindly — gather evidence first.
+initial_state: The Windows Server host is degraded. Clients get no address or cannot resolve names. Recent
+  changes may exist around DNS and DHCP, but do not restart blindly — gather evidence first.
 hints:
 - order: 1
   cost: 10
@@ -30,8 +29,8 @@ hints:
 
     2. Write down what looks normal versus wrong or missing for DNS and DHCP.
 
-    3. Recall the core idea: zones, scopes, reservations, and dynamic updates. Form
-    one hypothesis before you act.'
+    3. Recall the core idea: zones, scopes, reservations, and dynamic updates. Form one hypothesis before
+    you act.'
 - order: 2
   cost: 15
   content: 'Plan your approach (still no spoilers):
@@ -40,18 +39,16 @@ hints:
 
     2. Decide the single smallest change that moves you toward the objective.
 
-    3. Capture evidence (command output / status) before the change so you can prove
-    it worked afterward.'
+    3. Capture evidence (command output / status) before the change so you can prove it worked afterward.'
 - order: 3
   cost: 25
   content: 'Guided walkthrough:
 
     1. Re-check the current state — DNS Manager, DHCP scopes, and `ipconfig /all`.
 
-    2. Fix the underlying misconfiguration you identified (not just the noisy log
-    line), changing one thing at a time.
+    2. Fix the underlying misconfiguration you identified (not just the noisy log line), changing one
+    thing at a time.
 
     3. Verify the result — clients lease an address and resolve names.
 
-    4. Record completion: add `# FIXED-OK` to `/opt/fixitlab/academy/academy-windows-094-troubleshoot-dns-dhcp-10.conf`,
-    then click Check Solution.'
+    4. Click Check Solution once `systemctl is-active nginx` returns active.'

@@ -1,3 +1,3 @@
 #!/usr/bin/env bash
-grep -q FIXED-OK /opt/fixitlab/academy/academy-javascript-055-production-dom-6.conf
+systemctl is-active nginx
 exit 0

@@ -1,3 +1,3 @@
 #!/usr/bin/env bash
-grep -q FIXED-OK /opt/fixitlab/academy/academy-database-065-production-replication-7.conf
+systemctl is-active redis
 exit 0

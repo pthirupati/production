@@ -4459,6 +4459,13 @@ try:
 except Exception:  # pragma: no cover
     pass
 
+# ── Academy real-state service presets (override COMPLETE_TECH markers) ──
+try:
+    from .academy_service_presets import ACADEMY_SERVICE_PRESETS as _ACADEMY_SERVICE_PRESETS
+    _PRESETS.update(_ACADEMY_SERVICE_PRESETS)
+except Exception:  # pragma: no cover
+    pass
+
 
 def _mtu_mismatch_marker(state) -> None:
     """networking-mtu-mismatch: the iptables/MTU fix can't be introspected, so

@@ -1,3 +1,3 @@
 #!/usr/bin/env bash
-grep -q FIXED-OK /opt/fixitlab/academy/academy-rhel-linux-028-observability-sssd-3.conf
+systemctl is-active sssd
 exit 0

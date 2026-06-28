@@ -335,6 +335,17 @@ def _register_k8s(engine: "UnifiedSimulationEngine", shell: RHELShell) -> None:
     sid = getattr(getattr(shell, "state", None), "session_id", "") or ""
     if not engine.cluster:
         engine.cluster = K8sCluster(engine.scenario_slug, session_id=sid)
+        # Academy k8s labs: start with broken pods (real validation, not FIXED-OK).
+        slug = (engine.scenario_slug or "")
+        if slug.startswith("academy-kubernetes"):
+            try:
+                from .flagship_presets import FLAGSHIP_SLUGS as _FS
+            except Exception:
+                _FS = frozenset()
+            if slug not in _FS:
+                for pod in engine.cluster.pods:
+                    pod.status = "CrashLoopBackOff"
+                    pod.ready = "0/1"
     elif sid and not getattr(engine.cluster, "session_id", ""):
         engine.cluster.session_id = sid
 

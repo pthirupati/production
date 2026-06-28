@@ -11,29 +11,26 @@ max_score: 100
 is_free: false
 infrastructure_type: docker
 jira_priority: Low
-description: Build Terraform state from scratch in this React Development lab. You
-  start from a minimal environment and must produce a working configuration that demonstrates
-  local vs remote state, locking, drift, and resource addressing. Plan, implement,
-  then prove it works.
+description: Service operations lab. The `nginx` systemd unit is **failed/inactive** on this host — a
+  realistic fault for Build From Scratch workflows that depend on it. Diagnose with `systemctl status
+  nginx` and journal logs, apply the smallest reliable fix, then verify with `systemctl is-active nginx`.
 objectives:
-- A working Terraform state setup must exist by the end of this lab
-- Configuration should follow team conventions and be easy to audit
-- The result should pass validation without manual cleanup
-initial_state: The React application is ready but Terraform state is not configured
-  yet. Required tools may already be installed; your job is to create the configuration
-  and bring the capability online.
+- The `nginx` service is active (running)
+- '`systemctl is-active nginx` returns active'
+- The fix survives a status re-check (no marker files)
+initial_state: The `nginx` service is not running (`systemctl is-active nginx` → inactive/failed). Dependent
+  Build From Scratch tasks cannot succeed until the unit is healthy again.
 hints:
 - order: 1
   cost: 10
   content: 'Orient yourself before changing anything:
 
-    1. Inspect the current state — `terraform state list`, `terraform show`, and backend
-    config.
+    1. Inspect the current state — `terraform state list`, `terraform show`, and backend config.
 
     2. Write down what looks normal versus wrong or missing for Terraform state.
 
-    3. Recall the core idea: local vs remote state, locking, drift, and resource addressing.
-    Form one hypothesis before you act.'
+    3. Recall the core idea: local vs remote state, locking, drift, and resource addressing. Form one
+    hypothesis before you act.'
 - order: 2
   cost: 15
   content: 'Plan your approach (still no spoilers):
@@ -42,19 +39,16 @@ hints:
 
     2. Decide the single smallest change that moves you toward the objective.
 
-    3. Capture evidence (command output / status) before the change so you can prove
-    it worked afterward.'
+    3. Capture evidence (command output / status) before the change so you can prove it worked afterward.'
 - order: 3
   cost: 25
   content: 'Guided walkthrough:
 
-    1. Re-check the current state — `terraform state list`, `terraform show`, and
-    backend config.
+    1. Re-check the current state — `terraform state list`, `terraform show`, and backend config.
 
-    2. Create the smallest working slice of Terraform state first, validate it, then
-    add the remaining pieces one at a time.
+    2. Create the smallest working slice of Terraform state first, validate it, then add the remaining
+    pieces one at a time.
 
     3. Verify the result — state accurately reflects deployed resources.
 
-    4. Record completion: add `# FIXED-OK` to `/opt/fixitlab/academy/academy-react-032-build-state-4.conf`,
-    then click Check Solution.'
+    4. Click Check Solution once `systemctl is-active nginx` returns active.'

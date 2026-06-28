@@ -1,3 +1,3 @@
 #!/usr/bin/env bash
-grep -q FIXED-OK /opt/fixitlab/academy/academy-kubernetes-010-integration-autoscaling.conf
+kubectl get pods | grep -q Running
 exit 0

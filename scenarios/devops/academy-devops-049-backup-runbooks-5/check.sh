@@ -1,3 +1,3 @@
 #!/usr/bin/env bash
-grep -q FIXED-OK /opt/fixitlab/academy/academy-devops-049-backup-runbooks-5.conf
+systemctl is-active rsyslog
 exit 0

@@ -11,27 +11,26 @@ max_score: 100
 is_free: false
 infrastructure_type: docker
 jira_priority: Medium
-description: 'Automation lab: remove toil around host firewall. Codify repeatable
-  steps for allow/deny rules, zones, services, and rule persistence and prove the
-  automation is idempotent.'
+description: 'Automation lab: remove toil around host firewall. Codify repeatable steps for allow/deny
+  rules, zones, services, and rule persistence and prove the automation is idempotent.'
 objectives:
 - Day-2 host firewall work completes safely in this environment
 - Changes are verified with before/after checks
 - The system remains stable for dependent teams
-initial_state: Operators still perform manual steps for host firewall. Automate the
-  boring parts without hiding important safety checks.
+initial_state: Operators still perform manual steps for host firewall. Automate the boring parts without
+  hiding important safety checks.
 hints:
 - order: 1
   cost: 10
   content: 'Orient yourself before changing anything:
 
-    1. Inspect the current state — `firewall-cmd --list-all`, `iptables -S`, `ufw
-    status`, or Windows firewall cmdlets.
+    1. Inspect the current state — `firewall-cmd --list-all`, `iptables -S`, `ufw status`, or Windows
+    firewall cmdlets.
 
     2. Write down what looks normal versus wrong or missing for host firewall.
 
-    3. Recall the core idea: allow/deny rules, zones, services, and rule persistence.
-    Form one hypothesis before you act.'
+    3. Recall the core idea: allow/deny rules, zones, services, and rule persistence. Form one hypothesis
+    before you act.'
 - order: 2
   cost: 15
   content: 'Plan your approach (still no spoilers):
@@ -40,19 +39,17 @@ hints:
 
     2. Decide the single smallest change that moves you toward the objective.
 
-    3. Capture evidence (command output / status) before the change so you can prove
-    it worked afterward.'
+    3. Capture evidence (command output / status) before the change so you can prove it worked afterward.'
 - order: 3
   cost: 25
   content: 'Guided walkthrough:
 
-    1. Re-check the current state — `firewall-cmd --list-all`, `iptables -S`, `ufw
-    status`, or Windows firewall cmdlets.
+    1. Re-check the current state — `firewall-cmd --list-all`, `iptables -S`, `ufw status`, or Windows
+    firewall cmdlets.
 
-    2. Implement the automation with dry-run / check mode, then run it twice — the
-    second run must report no changes.
+    2. Implement the automation with dry-run / check mode, then run it twice — the second run must report
+    no changes.
 
     3. Verify the result — only the intended ports and sources are permitted.
 
-    4. Record completion: add `# FIXED-OK` to `/opt/fixitlab/academy/academy-nmap-007-automation-firewall.conf`,
-    then click Check Solution.'
+    4. Click Check Solution once `systemctl is-active nginx` returns active.'

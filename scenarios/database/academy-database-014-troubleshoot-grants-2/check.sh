@@ -1,3 +1,3 @@
 #!/usr/bin/env bash
-grep -q FIXED-OK /opt/fixitlab/academy/academy-database-014-troubleshoot-grants-2.conf
+systemctl is-active mysqld
 exit 0

@@ -11,15 +11,14 @@ max_score: 100
 is_free: false
 infrastructure_type: docker
 jira_priority: Medium
-description: 'Security review: harden Ansible Vault on this Ansible Automation system.
-  Close unsafe defaults, enforce least privilege, and ensure encrypting secrets and
-  decrypt at runtime cannot be abused — without breaking legitimate use.'
+description: Ansible control-node lab. Managed hosts in `webservers` are unreachable over SSH — `ansible
+  webservers -m ping` fails. Establish key-based access and verify SUCCESS/pong.
 objectives:
-- Unsafe defaults related to Ansible Vault are removed or constrained
-- Access follows least privilege and is auditable
-- Security checks pass without breaking required functionality
-initial_state: The environment is functional but overly permissive around Ansible
-  Vault. Assume an auditor or pen test is next week — tighten controls with evidence.
+- All webservers hosts answer ansible ping with SUCCESS
+- Key-based SSH works without a password prompt
+- '`ansible webservers -m ping` returns SUCCESS for every host'
+initial_state: '`ansible webservers -m ping` fails with unreachable/permission errors until SSH keys are
+  distributed.'
 hints:
 - order: 1
   cost: 10
@@ -29,8 +28,8 @@ hints:
 
     2. Write down what looks normal versus wrong or missing for Ansible Vault.
 
-    3. Recall the core idea: encrypting secrets and decrypt at runtime. Form one hypothesis
-    before you act.'
+    3. Recall the core idea: encrypting secrets and decrypt at runtime. Form one hypothesis before you
+    act.'
 - order: 2
   cost: 15
   content: 'Plan your approach (still no spoilers):
@@ -39,18 +38,16 @@ hints:
 
     2. Decide the single smallest change that moves you toward the objective.
 
-    3. Capture evidence (command output / status) before the change so you can prove
-    it worked afterward.'
+    3. Capture evidence (command output / status) before the change so you can prove it worked afterward.'
 - order: 3
   cost: 25
   content: 'Guided walkthrough:
 
     1. Re-check the current state — `ansible-vault view` and vault-id config.
 
-    2. Apply least privilege: remove the unsafe default, then grant only the explicit
-    access the workload actually needs.
+    2. Apply least privilege: remove the unsafe default, then grant only the explicit access the workload
+    actually needs.
 
     3. Verify the result — secrets are encrypted and plays decrypt them at runtime.
 
-    4. Record completion: add `# FIXED-OK` to `/opt/fixitlab/academy/academy-ansible-086-security-vault-9.conf`,
-    then click Check Solution.'
+    4. Click Check Solution once `ansible webservers -m ping` returns SUCCESS for every host.'

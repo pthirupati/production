@@ -11,15 +11,14 @@ max_score: 100
 is_free: false
 infrastructure_type: docker
 jira_priority: Medium
-description: Backup and recovery drill for SMART disk health. Ensure backups run on
-  schedule, retention is correct, and you can restore SMART attributes and predictive
-  failure within the lab RTO.
+description: Backup and recovery drill for SMART disk health. Ensure backups run on schedule, retention
+  is correct, and you can restore SMART attributes and predictive failure within the lab RTO.
 objectives:
 - Backup coverage for SMART disk health is complete and restorable
 - Retention and encryption meet the stated policy
 - A restore drill proves data integrity
-initial_state: Backup jobs exist but reliability is uncertain for SMART disk health.
-  Leadership wants proof that restore works — not just that scripts exit zero.
+initial_state: Backup jobs exist but reliability is uncertain for SMART disk health. Leadership wants
+  proof that restore works — not just that scripts exit zero.
 hints:
 - order: 1
   cost: 10
@@ -29,8 +28,7 @@ hints:
 
     2. Write down what looks normal versus wrong or missing for SMART disk health.
 
-    3. Recall the core idea: SMART attributes and predictive failure. Form one hypothesis
-    before you act.'
+    3. Recall the core idea: SMART attributes and predictive failure. Form one hypothesis before you act.'
 - order: 2
   cost: 15
   content: 'Plan your approach (still no spoilers):
@@ -39,18 +37,16 @@ hints:
 
     2. Decide the single smallest change that moves you toward the objective.
 
-    3. Capture evidence (command output / status) before the change so you can prove
-    it worked afterward.'
+    3. Capture evidence (command output / status) before the change so you can prove it worked afterward.'
 - order: 3
   cost: 25
   content: 'Guided walkthrough:
 
     1. Re-check the current state — `smartctl -a` output.
 
-    2. Repair or run the backup job, then perform a controlled restore into a scratch
-    location to prove it works.
+    2. Repair or run the backup job, then perform a controlled restore into a scratch location to prove
+    it works.
 
     3. Verify the result — SMART status is healthy or failing disks are flagged.
 
-    4. Record completion: add `# FIXED-OK` to `/opt/fixitlab/academy/academy-baremetal-019-backup-smart-2.conf`,
-    then click Check Solution.'
+    4. Click Check Solution once `systemctl is-active rsyslog` returns active.'

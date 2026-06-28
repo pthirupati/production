@@ -11,27 +11,27 @@ max_score: 100
 is_free: false
 infrastructure_type: docker
 jira_priority: Medium
-description: Production readiness for database replication. Harden, document, and
-  validate primary/replica topology, lag, failover, and consistency so the change
-  is safe to run during a maintenance window.
+description: Service operations lab. The `postgresql` systemd unit is **failed/inactive** on this host
+  — a realistic fault for Production Readiness workflows that depend on it. Diagnose with `systemctl status
+  postgresql` and journal logs, apply the smallest reliable fix, then verify with `systemctl is-active
+  postgresql`.
 objectives:
-- Day-2 database replication work completes safely in this environment
-- Changes are verified with before/after checks
-- The system remains stable for dependent teams
-initial_state: A feature fix works in dev, but database replication is not production
-  ready — missing guardrails, runbooks, or capacity checks.
+- The `postgresql` service is active (running)
+- '`systemctl is-active postgresql` returns active'
+- The fix survives a status re-check (no marker files)
+initial_state: The `postgresql` service is not running (`systemctl is-active postgresql` → inactive/failed).
+  Dependent Production Readiness tasks cannot succeed until the unit is healthy again.
 hints:
 - order: 1
   cost: 10
   content: 'Orient yourself before changing anything:
 
-    1. Inspect the current state — replication status views, `SHOW REPLICA STATUS`,
-    or `pg_stat_replication`.
+    1. Inspect the current state — replication status views, `SHOW REPLICA STATUS`, or `pg_stat_replication`.
 
     2. Write down what looks normal versus wrong or missing for database replication.
 
-    3. Recall the core idea: primary/replica topology, lag, failover, and consistency.
-    Form one hypothesis before you act.'
+    3. Recall the core idea: primary/replica topology, lag, failover, and consistency. Form one hypothesis
+    before you act.'
 - order: 2
   cost: 15
   content: 'Plan your approach (still no spoilers):
@@ -40,20 +40,16 @@ hints:
 
     2. Decide the single smallest change that moves you toward the objective.
 
-    3. Capture evidence (command output / status) before the change so you can prove
-    it worked afterward.'
+    3. Capture evidence (command output / status) before the change so you can prove it worked afterward.'
 - order: 3
   cost: 25
   content: 'Guided walkthrough:
 
-    1. Re-check the current state — replication status views, `SHOW REPLICA STATUS`,
-    or `pg_stat_replication`.
+    1. Re-check the current state — replication status views, `SHOW REPLICA STATUS`, or `pg_stat_replication`.
 
-    2. Apply production standards for database replication: resource limits, monitoring,
-    access controls, and a written rollback step.
+    2. Apply production standards for database replication: resource limits, monitoring, access controls,
+    and a written rollback step.
 
-    3. Verify the result — replication is streaming, lag is within SLO, and read routing
-    works.
+    3. Verify the result — replication is streaming, lag is within SLO, and read routing works.
 
-    4. Record completion: add `# FIXED-OK` to `/opt/fixitlab/academy/academy-postgresql-095-production-replication-10.conf`,
-    then click Check Solution.'
+    4. Click Check Solution once `systemctl is-active postgresql` returns active.'

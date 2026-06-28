@@ -1,3 +1,3 @@
 #!/usr/bin/env bash
-grep -q FIXED-OK /opt/fixitlab/academy/academy-baremetal-021-learn-ipmi-3.conf
+# Validated by the dedicated simulation engine (real state checks).
 exit 0

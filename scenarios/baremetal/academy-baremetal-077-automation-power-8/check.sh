@@ -1,3 +1,3 @@
 #!/usr/bin/env bash
-grep -q FIXED-OK /opt/fixitlab/academy/academy-baremetal-077-automation-power-8.conf
+# Validated by the dedicated simulation engine (real state checks).
 exit 0

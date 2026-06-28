@@ -11,27 +11,24 @@ max_score: 100
 is_free: false
 infrastructure_type: docker
 jira_priority: Medium
-description: 'Observability task: make resource import visible in logs, metrics, or
-  traces. On-call should answer ''what is broken?'' quickly using signals from adopting
-  existing resources into state.'
+description: 'Observability task: make resource import visible in logs, metrics, or traces. On-call should
+  answer ''what is broken?'' quickly using signals from adopting existing resources into state.'
 objectives:
 - Day-2 resource import work completes safely in this environment
 - Changes are verified with before/after checks
 - The system remains stable for dependent teams
-initial_state: The system runs, but resource import lacks useful telemetry. Dashboards/alerts
-  are blank or noisy — improve signal quality.
+initial_state: The system runs, but resource import lacks useful telemetry. Dashboards/alerts are blank
+  or noisy — improve signal quality.
 hints:
 - order: 1
   cost: 10
   content: 'Orient yourself before changing anything:
 
-    1. Inspect the current state — `terraform import`, `terraform state show`, and
-    plan diff.
+    1. Inspect the current state — `terraform import`, `terraform state show`, and plan diff.
 
     2. Write down what looks normal versus wrong or missing for resource import.
 
-    3. Recall the core idea: adopting existing resources into state. Form one hypothesis
-    before you act.'
+    3. Recall the core idea: adopting existing resources into state. Form one hypothesis before you act.'
 - order: 2
   cost: 15
   content: 'Plan your approach (still no spoilers):
@@ -40,19 +37,15 @@ hints:
 
     2. Decide the single smallest change that moves you toward the objective.
 
-    3. Capture evidence (command output / status) before the change so you can prove
-    it worked afterward.'
+    3. Capture evidence (command output / status) before the change so you can prove it worked afterward.'
 - order: 3
   cost: 25
   content: 'Guided walkthrough:
 
-    1. Re-check the current state — `terraform import`, `terraform state show`, and
-    plan diff.
+    1. Re-check the current state — `terraform import`, `terraform state show`, and plan diff.
 
-    2. Add or fix the exporter / dashboard / alert with clear names, labels, and a
-    sensible threshold.
+    2. Add or fix the exporter / dashboard / alert with clear names, labels, and a sensible threshold.
 
     3. Verify the result — imported resources show no destroy/recreate in plan.
 
-    4. Record completion: add `# FIXED-OK` to `/opt/fixitlab/academy/academy-terraform-008-observability-import.conf`,
-    then click Check Solution.'
+    4. Click Check Solution once `systemctl is-active nginx` returns active.'

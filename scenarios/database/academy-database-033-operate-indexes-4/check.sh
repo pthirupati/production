@@ -1,3 +1,3 @@
 #!/usr/bin/env bash
-grep -q FIXED-OK /opt/fixitlab/academy/academy-database-033-operate-indexes-4.conf
+systemctl is-active redis
 exit 0

@@ -1,3 +1,3 @@
 #!/usr/bin/env bash
-grep -q FIXED-OK /opt/fixitlab/academy/academy-prometheus-065-production-alertmanager-7.conf
+systemctl is-active crond
 exit 0

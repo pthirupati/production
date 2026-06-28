@@ -11,15 +11,14 @@ max_score: 100
 is_free: false
 infrastructure_type: docker
 jira_priority: Medium
-description: 'Integration lab: connect rolling deploys with an adjacent platform in
-  the Ansible Automation stack. Validate authentication, data handoff, and failure
-  behavior for serial, max-fail, and health gating.'
+description: Ansible control-node lab. Managed hosts in `webservers` are unreachable over SSH — `ansible
+  webservers -m ping` fails. Establish key-based access and verify SUCCESS/pong.
 objectives:
-- rolling deploys is connected to the adjacent system successfully
-- Handoff points are authenticated and observable
-- End-to-end workflow completes without manual intervention
-initial_state: Two systems are deployed but not fully wired together for rolling deploys.
-  Downstream consumers are waiting on this integration path.
+- All webservers hosts answer ansible ping with SUCCESS
+- Key-based SSH works without a password prompt
+- '`ansible webservers -m ping` returns SUCCESS for every host'
+initial_state: '`ansible webservers -m ping` fails with unreachable/permission errors until SSH keys are
+  distributed.'
 hints:
 - order: 1
   cost: 10
@@ -29,8 +28,7 @@ hints:
 
     2. Write down what looks normal versus wrong or missing for rolling deploys.
 
-    3. Recall the core idea: serial, max-fail, and health gating. Form one hypothesis
-    before you act.'
+    3. Recall the core idea: serial, max-fail, and health gating. Form one hypothesis before you act.'
 - order: 2
   cost: 15
   content: 'Plan your approach (still no spoilers):
@@ -39,19 +37,17 @@ hints:
 
     2. Decide the single smallest change that moves you toward the objective.
 
-    3. Capture evidence (command output / status) before the change so you can prove
-    it worked afterward.'
+    3. Capture evidence (command output / status) before the change so you can prove it worked afterward.'
 - order: 3
   cost: 25
   content: 'Guided walkthrough:
 
     1. Re-check the current state — `serial:` settings and per-batch results.
 
-    2. Configure credentials and networking, then drive one happy-path transaction
-    end to end across both systems.
+    2. Configure credentials and networking, then drive one happy-path transaction end to end across both
+    systems.
 
     3. Verify the result — the rollout proceeds in batches and halts on failure.
 
-    4. Record completion: add `# FIXED-OK` to `/opt/fixitlab/academy/academy-ansible-040-integration-rolling-deploy-4.conf`,
-    then click Check Solution.'
+    4. Click Check Solution once `ansible webservers -m ping` returns SUCCESS for every host.'
 cross_technology: true

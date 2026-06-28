@@ -11,27 +11,25 @@ max_score: 100
 is_free: false
 infrastructure_type: docker
 jira_priority: Medium
-description: Production readiness for Jinja2 templates. Harden, document, and validate
-  variables, filters, and conditionals in templates so the change is safe to run during
-  a maintenance window.
+description: Ansible control-node lab. Managed hosts in `webservers` are unreachable over SSH — `ansible
+  webservers -m ping` fails. Establish key-based access and verify SUCCESS/pong.
 objectives:
-- Day-2 Jinja2 templates work completes safely in this environment
-- Changes are verified with before/after checks
-- The system remains stable for dependent teams
-initial_state: A feature fix works in dev, but Jinja2 templates is not production
-  ready — missing guardrails, runbooks, or capacity checks.
+- All webservers hosts answer ansible ping with SUCCESS
+- Key-based SSH works without a password prompt
+- '`ansible webservers -m ping` returns SUCCESS for every host'
+initial_state: '`ansible webservers -m ping` fails with unreachable/permission errors until SSH keys are
+  distributed.'
 hints:
 - order: 1
   cost: 10
   content: 'Orient yourself before changing anything:
 
-    1. Inspect the current state — template files, `--check --diff`, and rendered
-    output.
+    1. Inspect the current state — template files, `--check --diff`, and rendered output.
 
     2. Write down what looks normal versus wrong or missing for Jinja2 templates.
 
-    3. Recall the core idea: variables, filters, and conditionals in templates. Form
-    one hypothesis before you act.'
+    3. Recall the core idea: variables, filters, and conditionals in templates. Form one hypothesis before
+    you act.'
 - order: 2
   cost: 15
   content: 'Plan your approach (still no spoilers):
@@ -40,19 +38,16 @@ hints:
 
     2. Decide the single smallest change that moves you toward the objective.
 
-    3. Capture evidence (command output / status) before the change so you can prove
-    it worked afterward.'
+    3. Capture evidence (command output / status) before the change so you can prove it worked afterward.'
 - order: 3
   cost: 25
   content: 'Guided walkthrough:
 
-    1. Re-check the current state — template files, `--check --diff`, and rendered
-    output.
+    1. Re-check the current state — template files, `--check --diff`, and rendered output.
 
-    2. Apply production standards for Jinja2 templates: resource limits, monitoring,
-    access controls, and a written rollback step.
+    2. Apply production standards for Jinja2 templates: resource limits, monitoring, access controls,
+    and a written rollback step.
 
     3. Verify the result — the rendered file matches the intended config.
 
-    4. Record completion: add `# FIXED-OK` to `/opt/fixitlab/academy/academy-ansible-075-production-templates-8.conf`,
-    then click Check Solution.'
+    4. Click Check Solution once `ansible webservers -m ping` returns SUCCESS for every host.'

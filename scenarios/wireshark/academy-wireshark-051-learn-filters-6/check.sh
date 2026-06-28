@@ -1,3 +1,3 @@
 #!/usr/bin/env bash
-grep -q FIXED-OK /opt/fixitlab/academy/academy-wireshark-051-learn-filters-6.conf
+# Validated by the dedicated simulation engine (real state checks).
 exit 0

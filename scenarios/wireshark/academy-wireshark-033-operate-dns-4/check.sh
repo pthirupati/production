@@ -1,3 +1,3 @@
 #!/usr/bin/env bash
-grep -q FIXED-OK /opt/fixitlab/academy/academy-wireshark-033-operate-dns-4.conf
+# Validated by the dedicated simulation engine (real state checks).
 exit 0

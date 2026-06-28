@@ -1,3 +1,3 @@
 #!/usr/bin/env bash
-grep -q FIXED-OK /opt/fixitlab/academy/academy-security-070-integration-least-privilege-7.conf
+systemctl is-active auditd
 exit 0

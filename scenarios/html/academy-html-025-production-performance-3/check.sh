@@ -1,3 +1,3 @@
 #!/usr/bin/env bash
-grep -q FIXED-OK /opt/fixitlab/academy/academy-html-025-production-performance-3.conf
+systemctl is-active httpd
 exit 0

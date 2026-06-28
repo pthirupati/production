@@ -1,3 +1,3 @@
 #!/usr/bin/env bash
-grep -q FIXED-OK /opt/fixitlab/academy/academy-postgresql-025-production-replication-3.conf
+systemctl is-active postgresql
 exit 0

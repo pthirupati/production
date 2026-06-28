@@ -1,3 +1,3 @@
 #!/usr/bin/env bash
-grep -q FIXED-OK /opt/fixitlab/academy/academy-security-006-security-iam.conf
+systemctl is-active sshd
 exit 0

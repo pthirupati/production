@@ -1,3 +1,3 @@
 #!/usr/bin/env bash
-grep -q FIXED-OK /opt/fixitlab/academy/academy-networking-066-security-nat-7.conf
+systemctl is-active haproxy
 exit 0

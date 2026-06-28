@@ -11,17 +11,15 @@ max_score: 100
 is_free: false
 infrastructure_type: docker
 jira_priority: Low
-description: This beginner-friendly Windows Server lab introduces Active Directory.
-  You will explore domains, OUs, replication, and FSMO roles on the Windows Server
-  host. Read the environment first, then follow the guided steps — no prior production
-  experience required.
+description: This beginner-friendly Windows Server lab introduces Active Directory. You will explore domains,
+  OUs, replication, and FSMO roles on the Windows Server host. Read the environment first, then follow
+  the guided steps — no prior production experience required.
 objectives:
 - Understand how Active Directory work in this lab environment
 - Identify the main status and configuration signals for Active Directory
 - Confirm you can read the current state confidently before changing anything
-initial_state: The Windows Server host is online with a starter Active Directory setup.
-  Some pieces are intentionally incomplete so you can learn how they fit together.
-  Nothing is on fire — focus on observation.
+initial_state: The Windows Server host is online with a starter Active Directory setup. Some pieces are
+  intentionally incomplete so you can learn how they fit together. Nothing is on fire — focus on observation.
 hints:
 - order: 1
   cost: 10
@@ -31,8 +29,8 @@ hints:
 
     2. Write down what looks normal versus wrong or missing for Active Directory.
 
-    3. Recall the core idea: domains, OUs, replication, and FSMO roles. Form one hypothesis
-    before you act.'
+    3. Recall the core idea: domains, OUs, replication, and FSMO roles. Form one hypothesis before you
+    act.'
 - order: 2
   cost: 15
   content: 'Plan your approach (still no spoilers):
@@ -41,19 +39,16 @@ hints:
 
     2. Decide the single smallest change that moves you toward the objective.
 
-    3. Capture evidence (command output / status) before the change so you can prove
-    it worked afterward.'
+    3. Capture evidence (command output / status) before the change so you can prove it worked afterward.'
 - order: 3
   cost: 25
   content: 'Guided walkthrough:
 
     1. Re-check the current state — ADUC, `dcdiag`, `repadmin`, and event logs.
 
-    2. Make one small, reversible change toward the objective, re-reading status after
-    each step so you understand cause and effect.
+    2. Make one small, reversible change toward the objective, re-reading status after each step so you
+    understand cause and effect.
 
-    3. Verify the result — AD is healthy, replication partners agree, and test logon
-    succeeds.
+    3. Verify the result — AD is healthy, replication partners agree, and test logon succeeds.
 
-    4. Record completion: add `# FIXED-OK` to `/opt/fixitlab/academy/academy-windows-061-learn-active-directory-7.conf`,
-    then click Check Solution.'
+    4. Click Check Solution once `systemctl is-active nginx` returns active.'

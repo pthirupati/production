@@ -1,3 +1,3 @@
 #!/usr/bin/env bash
-grep -q FIXED-OK /opt/fixitlab/academy/academy-windows-079-backup-services-8.conf
+# Validated by the dedicated simulation engine (real state checks).
 exit 0

@@ -1,3 +1,3 @@
 #!/usr/bin/env bash
-grep -q FIXED-OK /opt/fixitlab/academy/academy-postgresql-062-build-schemas-7.conf
+systemctl is-active postgresql
 exit 0

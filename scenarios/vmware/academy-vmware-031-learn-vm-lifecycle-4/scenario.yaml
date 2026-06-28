@@ -11,29 +11,26 @@ max_score: 100
 is_free: false
 infrastructure_type: docker
 jira_priority: Low
-description: This beginner-friendly VMware vSphere lab introduces VM lifecycle. You
-  will explore create, template deploy, power state, and guest tools on the vSphere
-  lab. Read the environment first, then follow the guided steps — no prior production
-  experience required.
+description: This beginner-friendly VMware vSphere lab introduces VM lifecycle. You will explore create,
+  template deploy, power state, and guest tools on the vSphere lab. Read the environment first, then follow
+  the guided steps — no prior production experience required.
 objectives:
 - Understand how VM lifecycle work in this lab environment
 - Identify the main status and configuration signals for VM lifecycle
 - Confirm you can read the current state confidently before changing anything
-initial_state: The vSphere lab is online with a starter VM lifecycle setup. Some pieces
-  are intentionally incomplete so you can learn how they fit together. Nothing is
-  on fire — focus on observation.
+initial_state: The vSphere lab is online with a starter VM lifecycle setup. Some pieces are intentionally
+  incomplete so you can learn how they fit together. Nothing is on fire — focus on observation.
 hints:
 - order: 1
   cost: 10
   content: 'Orient yourself before changing anything:
 
-    1. Inspect the current state — vCenter/ESXi VM summary, tasks, and VMware Tools
-    status.
+    1. Inspect the current state — vCenter/ESXi VM summary, tasks, and VMware Tools status.
 
     2. Write down what looks normal versus wrong or missing for VM lifecycle.
 
-    3. Recall the core idea: create, template deploy, power state, and guest tools.
-    Form one hypothesis before you act.'
+    3. Recall the core idea: create, template deploy, power state, and guest tools. Form one hypothesis
+    before you act.'
 - order: 2
   cost: 15
   content: 'Plan your approach (still no spoilers):
@@ -42,21 +39,17 @@ hints:
 
     2. Decide the single smallest change that moves you toward the objective.
 
-    3. Capture evidence (command output / status) before the change so you can prove
-    it worked afterward.'
+    3. Capture evidence (command output / status) before the change so you can prove it worked afterward.'
 - order: 3
   cost: 25
   content: 'Guided walkthrough:
 
-    1. Re-check the current state — vCenter/ESXi VM summary, tasks, and VMware Tools
-    status.
+    1. Re-check the current state — vCenter/ESXi VM summary, tasks, and VMware Tools status.
 
-    2. Make one small, reversible change toward the objective, re-reading status after
-    each step so you understand cause and effect.
+    2. Make one small, reversible change toward the objective, re-reading status after each step so you
+    understand cause and effect.
 
-    3. Verify the result — VM reaches the desired power state with Tools running and
-    correct resources.
+    3. Verify the result — VM reaches the desired power state with Tools running and correct resources.
 
-    4. Record completion: add `# FIXED-OK` to `/opt/fixitlab/academy/academy-vmware-031-learn-vm-lifecycle-4.conf`,
-    then click Check Solution.'
+    4. Click Check Solution once `systemctl is-active nginx` returns active.'
 vmware_link: true

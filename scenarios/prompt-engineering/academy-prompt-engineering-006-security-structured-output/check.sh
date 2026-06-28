@@ -1,3 +1,3 @@
 #!/usr/bin/env bash
-grep -q FIXED-OK /opt/fixitlab/academy/academy-prompt-engineering-006-security-structured-output.conf
+systemctl is-active nginx
 exit 0

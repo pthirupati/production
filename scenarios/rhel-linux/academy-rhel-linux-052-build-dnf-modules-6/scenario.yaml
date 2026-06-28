@@ -11,16 +11,16 @@ max_score: 100
 is_free: false
 infrastructure_type: docker
 jira_priority: Low
-description: Build dnf modules from scratch in this RHEL Linux lab. You start from
-  a minimal environment and must produce a working configuration that demonstrates
-  module streams, profiles, and default versions. Plan, implement, then prove it works.
+description: Service operations lab. The `firewalld` systemd unit is **failed/inactive** on this host
+  — a realistic fault for Build From Scratch workflows that depend on it. Diagnose with `systemctl status
+  firewalld` and journal logs, apply the smallest reliable fix, then verify with `systemctl is-active
+  firewalld`.
 objectives:
-- A working dnf modules setup must exist by the end of this lab
-- Configuration should follow team conventions and be easy to audit
-- The result should pass validation without manual cleanup
-initial_state: The RHEL practice host is ready but dnf modules is not configured yet.
-  Required tools may already be installed; your job is to create the configuration
-  and bring the capability online.
+- The `firewalld` service is active (running)
+- '`systemctl is-active firewalld` returns active'
+- The fix survives a status re-check (no marker files)
+initial_state: The `firewalld` service is not running (`systemctl is-active firewalld` → inactive/failed).
+  Dependent Build From Scratch tasks cannot succeed until the unit is healthy again.
 hints:
 - order: 1
   cost: 10
@@ -30,8 +30,8 @@ hints:
 
     2. Write down what looks normal versus wrong or missing for dnf modules.
 
-    3. Recall the core idea: module streams, profiles, and default versions. Form
-    one hypothesis before you act.'
+    3. Recall the core idea: module streams, profiles, and default versions. Form one hypothesis before
+    you act.'
 - order: 2
   cost: 15
   content: 'Plan your approach (still no spoilers):
@@ -40,18 +40,16 @@ hints:
 
     2. Decide the single smallest change that moves you toward the objective.
 
-    3. Capture evidence (command output / status) before the change so you can prove
-    it worked afterward.'
+    3. Capture evidence (command output / status) before the change so you can prove it worked afterward.'
 - order: 3
   cost: 25
   content: 'Guided walkthrough:
 
     1. Re-check the current state — `dnf module list` and `dnf module info`.
 
-    2. Create the smallest working slice of dnf modules first, validate it, then add
-    the remaining pieces one at a time.
+    2. Create the smallest working slice of dnf modules first, validate it, then add the remaining pieces
+    one at a time.
 
     3. Verify the result — the intended module stream/profile is enabled and installed.
 
-    4. Record completion: add `# FIXED-OK` to `/opt/fixitlab/academy/academy-rhel-linux-052-build-dnf-modules-6.conf`,
-    then click Check Solution.'
+    4. Click Check Solution once `systemctl is-active firewalld` returns active.'

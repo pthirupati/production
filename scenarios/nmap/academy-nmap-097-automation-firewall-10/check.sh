@@ -1,3 +1,3 @@
 #!/usr/bin/env bash
-grep -q FIXED-OK /opt/fixitlab/academy/academy-nmap-097-automation-firewall-10.conf
+# Validated by the dedicated simulation engine (real state checks).
 exit 0

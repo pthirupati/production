@@ -11,17 +11,16 @@ max_score: 100
 is_free: false
 infrastructure_type: docker
 jira_priority: Low
-description: This beginner-friendly RHEL Linux lab introduces subscriptions and repos.
-  You will explore subscription-manager, entitlements, and repo enablement on the
-  RHEL practice host. Read the environment first, then follow the guided steps — no
-  prior production experience required.
+description: Service operations lab. The `firewalld` systemd unit is **failed/inactive** on this host
+  — a realistic fault for Fundamentals Lab workflows that depend on it. Diagnose with `systemctl status
+  firewalld` and journal logs, apply the smallest reliable fix, then verify with `systemctl is-active
+  firewalld`.
 objectives:
-- Understand how subscriptions and repos work in this lab environment
-- Identify the main status and configuration signals for subscriptions and repos
-- Confirm you can read the current state confidently before changing anything
-initial_state: The RHEL practice host is online with a starter subscriptions and repos
-  setup. Some pieces are intentionally incomplete so you can learn how they fit together.
-  Nothing is on fire — focus on observation.
+- The `firewalld` service is active (running)
+- '`systemctl is-active firewalld` returns active'
+- The fix survives a status re-check (no marker files)
+initial_state: The `firewalld` service is not running (`systemctl is-active firewalld` → inactive/failed).
+  Dependent Fundamentals Lab tasks cannot succeed until the unit is healthy again.
 hints:
 - order: 1
   cost: 10
@@ -29,32 +28,28 @@ hints:
 
     1. Inspect the current state — `subscription-manager status` and `dnf repolist`.
 
-    2. Write down what looks normal versus wrong or missing for subscriptions and
-    repos.
+    2. Write down what looks normal versus wrong or missing for subscriptions and repos.
 
-    3. Recall the core idea: subscription-manager, entitlements, and repo enablement.
-    Form one hypothesis before you act.'
+    3. Recall the core idea: subscription-manager, entitlements, and repo enablement. Form one hypothesis
+    before you act.'
 - order: 2
   cost: 15
   content: 'Plan your approach (still no spoilers):
 
-    1. Confirm the exact gap between current and desired state for subscriptions and
-    repos.
+    1. Confirm the exact gap between current and desired state for subscriptions and repos.
 
     2. Decide the single smallest change that moves you toward the objective.
 
-    3. Capture evidence (command output / status) before the change so you can prove
-    it worked afterward.'
+    3. Capture evidence (command output / status) before the change so you can prove it worked afterward.'
 - order: 3
   cost: 25
   content: 'Guided walkthrough:
 
     1. Re-check the current state — `subscription-manager status` and `dnf repolist`.
 
-    2. Make one small, reversible change toward the objective, re-reading status after
-    each step so you understand cause and effect.
+    2. Make one small, reversible change toward the objective, re-reading status after each step so you
+    understand cause and effect.
 
     3. Verify the result — the host is registered and required repos are enabled.
 
-    4. Record completion: add `# FIXED-OK` to `/opt/fixitlab/academy/academy-rhel-linux-011-learn-subscription-repos-2.conf`,
-    then click Check Solution.'
+    4. Click Check Solution once `systemctl is-active firewalld` returns active.'

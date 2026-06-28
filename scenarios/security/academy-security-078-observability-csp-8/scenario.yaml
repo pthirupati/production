@@ -11,15 +11,16 @@ max_score: 100
 is_free: false
 infrastructure_type: docker
 jira_priority: Medium
-description: 'Observability task: make content security policy visible in logs, metrics,
-  or traces. On-call should answer ''what is broken?'' quickly using signals from
-  CSP directives and safe sources.'
+description: Service operations lab. The `firewalld` systemd unit is **failed/inactive** on this host
+  — a realistic fault for Observability Practice workflows that depend on it. Diagnose with `systemctl
+  status firewalld` and journal logs, apply the smallest reliable fix, then verify with `systemctl is-active
+  firewalld`.
 objectives:
-- Day-2 content security policy work completes safely in this environment
-- Changes are verified with before/after checks
-- The system remains stable for dependent teams
-initial_state: The system runs, but content security policy lacks useful telemetry.
-  Dashboards/alerts are blank or noisy — improve signal quality.
+- The `firewalld` service is active (running)
+- '`systemctl is-active firewalld` returns active'
+- The fix survives a status re-check (no marker files)
+initial_state: The `firewalld` service is not running (`systemctl is-active firewalld` → inactive/failed).
+  Dependent Observability Practice tasks cannot succeed until the unit is healthy again.
 hints:
 - order: 1
   cost: 10
@@ -29,29 +30,24 @@ hints:
 
     2. Write down what looks normal versus wrong or missing for content security policy.
 
-    3. Recall the core idea: CSP directives and safe sources. Form one hypothesis
-    before you act.'
+    3. Recall the core idea: CSP directives and safe sources. Form one hypothesis before you act.'
 - order: 2
   cost: 15
   content: 'Plan your approach (still no spoilers):
 
-    1. Confirm the exact gap between current and desired state for content security
-    policy.
+    1. Confirm the exact gap between current and desired state for content security policy.
 
     2. Decide the single smallest change that moves you toward the objective.
 
-    3. Capture evidence (command output / status) before the change so you can prove
-    it worked afterward.'
+    3. Capture evidence (command output / status) before the change so you can prove it worked afterward.'
 - order: 3
   cost: 25
   content: 'Guided walkthrough:
 
     1. Re-check the current state — CSP headers and console violations.
 
-    2. Add or fix the exporter / dashboard / alert with clear names, labels, and a
-    sensible threshold.
+    2. Add or fix the exporter / dashboard / alert with clear names, labels, and a sensible threshold.
 
     3. Verify the result — CSP blocks unsafe sources without breaking the app.
 
-    4. Record completion: add `# FIXED-OK` to `/opt/fixitlab/academy/academy-security-078-observability-csp-8.conf`,
-    then click Check Solution.'
+    4. Click Check Solution once `systemctl is-active firewalld` returns active.'

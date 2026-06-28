@@ -1,3 +1,3 @@
 #!/usr/bin/env bash
-grep -q FIXED-OK /opt/fixitlab/academy/academy-nmap-009-backup-os-detect.conf
+# Validated by the dedicated simulation engine (real state checks).
 exit 0

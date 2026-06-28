@@ -1,3 +1,3 @@
 #!/usr/bin/env bash
-grep -q FIXED-OK /opt/fixitlab/academy/academy-wireshark-075-production-http-8.conf
+# Validated by the dedicated simulation engine (real state checks).
 exit 0

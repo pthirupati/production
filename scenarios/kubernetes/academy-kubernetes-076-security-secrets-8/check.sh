@@ -1,3 +1,3 @@
 #!/usr/bin/env bash
-grep -q FIXED-OK /opt/fixitlab/academy/academy-kubernetes-076-security-secrets-8.conf
+kubectl get pods | grep -q Running
 exit 0

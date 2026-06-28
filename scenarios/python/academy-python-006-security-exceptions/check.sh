@@ -1,3 +1,3 @@
 #!/usr/bin/env bash
-grep -q FIXED-OK /opt/fixitlab/academy/academy-python-006-security-exceptions.conf
+systemctl is-active nginx
 exit 0

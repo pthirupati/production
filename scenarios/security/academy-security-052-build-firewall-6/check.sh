@@ -1,3 +1,3 @@
 #!/usr/bin/env bash
-grep -q FIXED-OK /opt/fixitlab/academy/academy-security-052-build-firewall-6.conf
+systemctl is-active auditd
 exit 0

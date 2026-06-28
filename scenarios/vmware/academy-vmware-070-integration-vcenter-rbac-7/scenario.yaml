@@ -11,15 +11,14 @@ max_score: 100
 is_free: false
 infrastructure_type: docker
 jira_priority: Medium
-description: 'Integration lab: connect vCenter RBAC with an adjacent platform in the
-  VMware vSphere stack. Validate authentication, data handoff, and failure behavior
-  for roles, permissions, and inventory scope.'
+description: 'Integration lab: connect vCenter RBAC with an adjacent platform in the VMware vSphere stack.
+  Validate authentication, data handoff, and failure behavior for roles, permissions, and inventory scope.'
 objectives:
 - vCenter RBAC is connected to the adjacent system successfully
 - Handoff points are authenticated and observable
 - End-to-end workflow completes without manual intervention
-initial_state: Two systems are deployed but not fully wired together for vCenter RBAC.
-  Downstream consumers are waiting on this integration path.
+initial_state: Two systems are deployed but not fully wired together for vCenter RBAC. Downstream consumers
+  are waiting on this integration path.
 hints:
 - order: 1
   cost: 10
@@ -29,8 +28,7 @@ hints:
 
     2. Write down what looks normal versus wrong or missing for vCenter RBAC.
 
-    3. Recall the core idea: roles, permissions, and inventory scope. Form one hypothesis
-    before you act.'
+    3. Recall the core idea: roles, permissions, and inventory scope. Form one hypothesis before you act.'
 - order: 2
   cost: 15
   content: 'Plan your approach (still no spoilers):
@@ -39,20 +37,18 @@ hints:
 
     2. Decide the single smallest change that moves you toward the objective.
 
-    3. Capture evidence (command output / status) before the change so you can prove
-    it worked afterward.'
+    3. Capture evidence (command output / status) before the change so you can prove it worked afterward.'
 - order: 3
   cost: 25
   content: 'Guided walkthrough:
 
     1. Re-check the current state — role definitions and permission assignments.
 
-    2. Configure credentials and networking, then drive one happy-path transaction
-    end to end across both systems.
+    2. Configure credentials and networking, then drive one happy-path transaction end to end across both
+    systems.
 
     3. Verify the result — permissions match least-privilege by inventory scope.
 
-    4. Record completion: add `# FIXED-OK` to `/opt/fixitlab/academy/academy-vmware-070-integration-vcenter-rbac-7.conf`,
-    then click Check Solution.'
+    4. Click Check Solution once `systemctl is-active nginx` returns active.'
 cross_technology: true
 vmware_link: true

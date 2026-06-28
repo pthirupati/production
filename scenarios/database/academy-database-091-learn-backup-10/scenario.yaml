@@ -11,29 +11,26 @@ max_score: 100
 is_free: false
 infrastructure_type: docker
 jira_priority: Low
-description: This beginner-friendly Database Administration lab introduces backup
-  workflows. You will explore full/incremental backups, retention, encryption, and
-  restore drills on the database server. Read the environment first, then follow the
-  guided steps — no prior production experience required.
+description: Service operations lab. The `mysqld` systemd unit is **failed/inactive** on this host — a
+  realistic fault for Fundamentals Lab workflows that depend on it. Diagnose with `systemctl status mysqld`
+  and journal logs, apply the smallest reliable fix, then verify with `systemctl is-active mysqld`.
 objectives:
-- Understand how backup workflows work in this lab environment
-- Identify the main status and configuration signals for backup workflows
-- Confirm you can read the current state confidently before changing anything
-initial_state: The database server is online with a starter backup workflows setup.
-  Some pieces are intentionally incomplete so you can learn how they fit together.
-  Nothing is on fire — focus on observation.
+- The `mysqld` service is active (running)
+- '`systemctl is-active mysqld` returns active'
+- The fix survives a status re-check (no marker files)
+initial_state: The `mysqld` service is not running (`systemctl is-active mysqld` → inactive/failed). Dependent
+  Fundamentals Lab tasks cannot succeed until the unit is healthy again.
 hints:
 - order: 1
   cost: 10
   content: 'Orient yourself before changing anything:
 
-    1. Inspect the current state — backup job logs, catalog/metadata, and latest restore
-    test results.
+    1. Inspect the current state — backup job logs, catalog/metadata, and latest restore test results.
 
     2. Write down what looks normal versus wrong or missing for backup workflows.
 
-    3. Recall the core idea: full/incremental backups, retention, encryption, and
-    restore drills. Form one hypothesis before you act.'
+    3. Recall the core idea: full/incremental backups, retention, encryption, and restore drills. Form
+    one hypothesis before you act.'
 - order: 2
   cost: 15
   content: 'Plan your approach (still no spoilers):
@@ -42,19 +39,16 @@ hints:
 
     2. Decide the single smallest change that moves you toward the objective.
 
-    3. Capture evidence (command output / status) before the change so you can prove
-    it worked afterward.'
+    3. Capture evidence (command output / status) before the change so you can prove it worked afterward.'
 - order: 3
   cost: 25
   content: 'Guided walkthrough:
 
-    1. Re-check the current state — backup job logs, catalog/metadata, and latest
-    restore test results.
+    1. Re-check the current state — backup job logs, catalog/metadata, and latest restore test results.
 
-    2. Make one small, reversible change toward the objective, re-reading status after
-    each step so you understand cause and effect.
+    2. Make one small, reversible change toward the objective, re-reading status after each step so you
+    understand cause and effect.
 
     3. Verify the result — a restore completes within policy and data checksums match.
 
-    4. Record completion: add `# FIXED-OK` to `/opt/fixitlab/academy/academy-database-091-learn-backup-10.conf`,
-    then click Check Solution.'
+    4. Click Check Solution once `systemctl is-active mysqld` returns active.'

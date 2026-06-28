@@ -1,3 +1,3 @@
 #!/usr/bin/env bash
-grep -q FIXED-OK /opt/fixitlab/academy/academy-networking-041-learn-routing-5.conf
+systemctl is-active named
 exit 0

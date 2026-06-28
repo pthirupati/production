@@ -1,3 +1,3 @@
 #!/usr/bin/env bash
-grep -q FIXED-OK /opt/fixitlab/academy/academy-ai-ml-014-troubleshoot-validation-2.conf
+systemctl is-active nginx
 exit 0

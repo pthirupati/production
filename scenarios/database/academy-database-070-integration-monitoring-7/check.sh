@@ -1,3 +1,3 @@
 #!/usr/bin/env bash
-grep -q FIXED-OK /opt/fixitlab/academy/academy-database-070-integration-monitoring-7.conf
+systemctl is-active mysqld
 exit 0

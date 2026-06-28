@@ -11,50 +11,42 @@ max_score: 100
 is_free: false
 infrastructure_type: docker
 jira_priority: Medium
-description: 'Observability task: make role-based access control visible in logs,
-  metrics, or traces. On-call should answer ''what is broken?'' quickly using signals
-  from roles, bindings, least privilege, and auditability.'
+description: Kubernetes operations lab. One or more pods are **not Running** — workloads for Observability
+  Practice cannot serve traffic. Inspect with `kubectl get pods`, read `kubectl describe pod` events,
+  fix the root cause, and confirm all pods Running.
 objectives:
-- Day-2 role-based access control work completes safely in this environment
-- Changes are verified with before/after checks
-- The system remains stable for dependent teams
-initial_state: The system runs, but role-based access control lacks useful telemetry.
-  Dashboards/alerts are blank or noisy — improve signal quality.
+- All pods in the default namespace are Running
+- '`kubectl get pods` shows every pod Running'
+- The deployment survives `kubectl get pods` re-check
+initial_state: The cluster is up but at least one pod is CrashLoopBackOff or Pending.
 hints:
 - order: 1
   cost: 10
   content: 'Orient yourself before changing anything:
 
-    1. Inspect the current state — RBAC policy objects, role assignments, and effective
-    permissions.
+    1. Inspect the current state — RBAC policy objects, role assignments, and effective permissions.
 
-    2. Write down what looks normal versus wrong or missing for role-based access
-    control.
+    2. Write down what looks normal versus wrong or missing for role-based access control.
 
-    3. Recall the core idea: roles, bindings, least privilege, and auditability. Form
-    one hypothesis before you act.'
+    3. Recall the core idea: roles, bindings, least privilege, and auditability. Form one hypothesis before
+    you act.'
 - order: 2
   cost: 15
   content: 'Plan your approach (still no spoilers):
 
-    1. Confirm the exact gap between current and desired state for role-based access
-    control.
+    1. Confirm the exact gap between current and desired state for role-based access control.
 
     2. Decide the single smallest change that moves you toward the objective.
 
-    3. Capture evidence (command output / status) before the change so you can prove
-    it worked afterward.'
+    3. Capture evidence (command output / status) before the change so you can prove it worked afterward.'
 - order: 3
   cost: 25
   content: 'Guided walkthrough:
 
-    1. Re-check the current state — RBAC policy objects, role assignments, and effective
-    permissions.
+    1. Re-check the current state — RBAC policy objects, role assignments, and effective permissions.
 
-    2. Add or fix the exporter / dashboard / alert with clear names, labels, and a
-    sensible threshold.
+    2. Add or fix the exporter / dashboard / alert with clear names, labels, and a sensible threshold.
 
     3. Verify the result — effective permissions match the policy of least privilege.
 
-    4. Record completion: add `# FIXED-OK` to `/opt/fixitlab/academy/academy-kubernetes-058-observability-rbac-6.conf`,
-    then click Check Solution.'
+    4. Click Check Solution once `kubectl get pods` shows every pod Running.'

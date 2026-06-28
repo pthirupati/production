@@ -11,15 +11,15 @@ max_score: 100
 is_free: false
 infrastructure_type: docker
 jira_priority: Medium
-description: 'Integration lab: connect dashboard sharing with an adjacent platform
-  in the Grafana Observability stack. Validate authentication, data handoff, and failure
-  behavior for snapshots, links, and permissions.'
+description: Service operations lab. The `rsyslog` systemd unit is **failed/inactive** on this host —
+  a realistic fault for Integration Lab workflows that depend on it. Diagnose with `systemctl status rsyslog`
+  and journal logs, apply the smallest reliable fix, then verify with `systemctl is-active rsyslog`.
 objectives:
-- dashboard sharing is connected to the adjacent system successfully
-- Handoff points are authenticated and observable
-- End-to-end workflow completes without manual intervention
-initial_state: Two systems are deployed but not fully wired together for dashboard
-  sharing. Downstream consumers are waiting on this integration path.
+- The `rsyslog` service is active (running)
+- '`systemctl is-active rsyslog` returns active'
+- The fix survives a status re-check (no marker files)
+initial_state: The `rsyslog` service is not running (`systemctl is-active rsyslog` → inactive/failed).
+  Dependent Integration Lab tasks cannot succeed until the unit is healthy again.
 hints:
 - order: 1
   cost: 10
@@ -29,8 +29,7 @@ hints:
 
     2. Write down what looks normal versus wrong or missing for dashboard sharing.
 
-    3. Recall the core idea: snapshots, links, and permissions. Form one hypothesis
-    before you act.'
+    3. Recall the core idea: snapshots, links, and permissions. Form one hypothesis before you act.'
 - order: 2
   cost: 15
   content: 'Plan your approach (still no spoilers):
@@ -39,19 +38,17 @@ hints:
 
     2. Decide the single smallest change that moves you toward the objective.
 
-    3. Capture evidence (command output / status) before the change so you can prove
-    it worked afterward.'
+    3. Capture evidence (command output / status) before the change so you can prove it worked afterward.'
 - order: 3
   cost: 25
   content: 'Guided walkthrough:
 
     1. Re-check the current state — share settings and permissions.
 
-    2. Configure credentials and networking, then drive one happy-path transaction
-    end to end across both systems.
+    2. Configure credentials and networking, then drive one happy-path transaction end to end across both
+    systems.
 
     3. Verify the result — sharing matches the intended audience.
 
-    4. Record completion: add `# FIXED-OK` to `/opt/fixitlab/academy/academy-grafana-100-integration-sharing-10.conf`,
-    then click Check Solution.'
+    4. Click Check Solution once `systemctl is-active rsyslog` returns active.'
 cross_technology: true

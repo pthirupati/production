@@ -1,3 +1,3 @@
 #!/usr/bin/env bash
-grep -q FIXED-OK /opt/fixitlab/academy/academy-java-070-integration-packaging-7.conf
+systemctl is-active nginx
 exit 0

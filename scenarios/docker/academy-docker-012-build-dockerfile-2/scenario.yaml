@@ -11,29 +11,26 @@ max_score: 100
 is_free: false
 infrastructure_type: docker
 jira_priority: Low
-description: Build Dockerfiles from scratch in this Docker & Containers lab. You start
-  from a minimal environment and must produce a working configuration that demonstrates
-  image layers, build context, ENTRYPOINT/CMD, and caching. Plan, implement, then
-  prove it works.
+description: Service operations lab. The `docker` systemd unit is **failed/inactive** on this host — a
+  realistic fault for Build From Scratch workflows that depend on it. Diagnose with `systemctl status
+  docker` and journal logs, apply the smallest reliable fix, then verify with `systemctl is-active docker`.
 objectives:
-- A working Dockerfiles setup must exist by the end of this lab
-- Configuration should follow team conventions and be easy to audit
-- The result should pass validation without manual cleanup
-initial_state: The Docker host is ready but Dockerfiles is not configured yet. Required
-  tools may already be installed; your job is to create the configuration and bring
-  the capability online.
+- The `docker` service is active (running)
+- '`systemctl is-active docker` returns active'
+- The fix survives a status re-check (no marker files)
+initial_state: The `docker` service is not running (`systemctl is-active docker` → inactive/failed). Dependent
+  Build From Scratch tasks cannot succeed until the unit is healthy again.
 hints:
 - order: 1
   cost: 10
   content: 'Orient yourself before changing anything:
 
-    1. Inspect the current state — `docker build` output, `docker history`, and the
-    Dockerfile stages.
+    1. Inspect the current state — `docker build` output, `docker history`, and the Dockerfile stages.
 
     2. Write down what looks normal versus wrong or missing for Dockerfiles.
 
-    3. Recall the core idea: image layers, build context, ENTRYPOINT/CMD, and caching.
-    Form one hypothesis before you act.'
+    3. Recall the core idea: image layers, build context, ENTRYPOINT/CMD, and caching. Form one hypothesis
+    before you act.'
 - order: 2
   cost: 15
   content: 'Plan your approach (still no spoilers):
@@ -42,20 +39,16 @@ hints:
 
     2. Decide the single smallest change that moves you toward the objective.
 
-    3. Capture evidence (command output / status) before the change so you can prove
-    it worked afterward.'
+    3. Capture evidence (command output / status) before the change so you can prove it worked afterward.'
 - order: 3
   cost: 25
   content: 'Guided walkthrough:
 
-    1. Re-check the current state — `docker build` output, `docker history`, and the
-    Dockerfile stages.
+    1. Re-check the current state — `docker build` output, `docker history`, and the Dockerfile stages.
 
-    2. Create the smallest working slice of Dockerfiles first, validate it, then add
-    the remaining pieces one at a time.
+    2. Create the smallest working slice of Dockerfiles first, validate it, then add the remaining pieces
+    one at a time.
 
-    3. Verify the result — the image builds reproducibly and the container starts
-    as intended.
+    3. Verify the result — the image builds reproducibly and the container starts as intended.
 
-    4. Record completion: add `# FIXED-OK` to `/opt/fixitlab/academy/academy-docker-012-build-dockerfile-2.conf`,
-    then click Check Solution.'
+    4. Click Check Solution once `systemctl is-active docker` returns active.'

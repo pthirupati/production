@@ -1,3 +1,3 @@
 #!/usr/bin/env bash
-grep -q FIXED-OK /opt/fixitlab/academy/academy-mysql-002-build-users-grants.conf
+systemctl is-active mysqld
 exit 0

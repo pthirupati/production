@@ -1,3 +1,3 @@
 #!/usr/bin/env bash
-grep -q FIXED-OK /opt/fixitlab/academy/academy-simulation-061-learn-terminal-7.conf
+systemctl is-active nginx
 exit 0

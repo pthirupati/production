@@ -11,17 +11,16 @@ max_score: 100
 is_free: true
 infrastructure_type: docker
 jira_priority: Low
-description: Build database indexes from scratch in this SQLite lab. You start from
-  a minimal environment and must produce a working configuration that demonstrates
-  B-tree indexes, selectivity, covering indexes, and plan impact. Plan, implement,
-  then prove it works.
+description: Service operations lab. The `postgresql` systemd unit is **failed/inactive** on this host
+  — a realistic fault for Build From Scratch workflows that depend on it. Diagnose with `systemctl status
+  postgresql` and journal logs, apply the smallest reliable fix, then verify with `systemctl is-active
+  postgresql`.
 objectives:
-- A working database indexes setup must exist by the end of this lab
-- Configuration should follow team conventions and be easy to audit
-- The result should pass validation without manual cleanup
-initial_state: The SQLite database file is ready but database indexes is not configured
-  yet. Required tools may already be installed; your job is to create the configuration
-  and bring the capability online.
+- The `postgresql` service is active (running)
+- '`systemctl is-active postgresql` returns active'
+- The fix survives a status re-check (no marker files)
+initial_state: The `postgresql` service is not running (`systemctl is-active postgresql` → inactive/failed).
+  Dependent Build From Scratch tasks cannot succeed until the unit is healthy again.
 hints:
 - order: 1
   cost: 10
@@ -31,8 +30,8 @@ hints:
 
     2. Write down what looks normal versus wrong or missing for database indexes.
 
-    3. Recall the core idea: B-tree indexes, selectivity, covering indexes, and plan
-    impact. Form one hypothesis before you act.'
+    3. Recall the core idea: B-tree indexes, selectivity, covering indexes, and plan impact. Form one
+    hypothesis before you act.'
 - order: 2
   cost: 15
   content: 'Plan your approach (still no spoilers):
@@ -41,18 +40,16 @@ hints:
 
     2. Decide the single smallest change that moves you toward the objective.
 
-    3. Capture evidence (command output / status) before the change so you can prove
-    it worked afterward.'
+    3. Capture evidence (command output / status) before the change so you can prove it worked afterward.'
 - order: 3
   cost: 25
   content: 'Guided walkthrough:
 
     1. Re-check the current state — EXPLAIN/EXPLAIN ANALYZE and index usage views.
 
-    2. Create the smallest working slice of database indexes first, validate it, then
-    add the remaining pieces one at a time.
+    2. Create the smallest working slice of database indexes first, validate it, then add the remaining
+    pieces one at a time.
 
     3. Verify the result — plans use the intended index and latency drops.
 
-    4. Record completion: add `# FIXED-OK` to `/opt/fixitlab/academy/academy-sqlite-002-build-indexes.conf`,
-    then click Check Solution.'
+    4. Click Check Solution once `systemctl is-active postgresql` returns active.'

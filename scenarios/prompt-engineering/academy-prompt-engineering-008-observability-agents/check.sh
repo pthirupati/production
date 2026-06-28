@@ -1,3 +1,3 @@
 #!/usr/bin/env bash
-grep -q FIXED-OK /opt/fixitlab/academy/academy-prompt-engineering-008-observability-agents.conf
+systemctl is-active nginx
 exit 0

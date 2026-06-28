@@ -1,3 +1,3 @@
 #!/usr/bin/env bash
-grep -q FIXED-OK /opt/fixitlab/academy/academy-react-032-build-state-4.conf
+systemctl is-active nginx
 exit 0

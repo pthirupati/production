@@ -1,3 +1,3 @@
 #!/usr/bin/env bash
-grep -q FIXED-OK /opt/fixitlab/academy/academy-grafana-007-automation-provisioning.conf
+systemctl is-active rsyslog
 exit 0

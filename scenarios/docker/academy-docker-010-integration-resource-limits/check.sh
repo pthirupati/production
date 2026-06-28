@@ -1,3 +1,3 @@
 #!/usr/bin/env bash
-grep -q FIXED-OK /opt/fixitlab/academy/academy-docker-010-integration-resource-limits.conf
+systemctl is-active docker
 exit 0

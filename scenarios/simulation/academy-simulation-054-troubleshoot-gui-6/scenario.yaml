@@ -11,16 +11,15 @@ max_score: 100
 is_free: false
 infrastructure_type: docker
 jira_priority: Medium
-description: 'Production alert: a GUI action does not persist. You are on call for
-  Simulation Labs and must troubleshoot GUI simulation methodically — triage symptoms,
-  isolate root cause, apply the smallest safe fix, and confirm recovery.'
+description: Service operations lab. The `nginx` systemd unit is **failed/inactive** on this host — a
+  realistic fault for Troubleshooting Drill workflows that depend on it. Diagnose with `systemctl status
+  nginx` and journal logs, apply the smallest reliable fix, then verify with `systemctl is-active nginx`.
 objectives:
-- 'The incident symptom is clear: a GUI action does not persist'
-- Root cause is isolated with evidence, not guesswork
-- Service behavior returns to normal after the fix
-initial_state: The simulation sandbox is degraded. A gui action does not persist.
-  Recent changes may exist around GUI simulation, but do not restart blindly — gather
-  evidence first.
+- The `nginx` service is active (running)
+- '`systemctl is-active nginx` returns active'
+- The fix survives a status re-check (no marker files)
+initial_state: The `nginx` service is not running (`systemctl is-active nginx` → inactive/failed). Dependent
+  Troubleshooting Drill tasks cannot succeed until the unit is healthy again.
 hints:
 - order: 1
   cost: 10
@@ -30,8 +29,7 @@ hints:
 
     2. Write down what looks normal versus wrong or missing for GUI simulation.
 
-    3. Recall the core idea: interactive panels and state binding. Form one hypothesis
-    before you act.'
+    3. Recall the core idea: interactive panels and state binding. Form one hypothesis before you act.'
 - order: 2
   cost: 15
   content: 'Plan your approach (still no spoilers):
@@ -40,18 +38,16 @@ hints:
 
     2. Decide the single smallest change that moves you toward the objective.
 
-    3. Capture evidence (command output / status) before the change so you can prove
-    it worked afterward.'
+    3. Capture evidence (command output / status) before the change so you can prove it worked afterward.'
 - order: 3
   cost: 25
   content: 'Guided walkthrough:
 
     1. Re-check the current state — the GUI and underlying state.
 
-    2. Fix the underlying misconfiguration you identified (not just the noisy log
-    line), changing one thing at a time.
+    2. Fix the underlying misconfiguration you identified (not just the noisy log line), changing one
+    thing at a time.
 
     3. Verify the result — GUI actions update graded state.
 
-    4. Record completion: add `# FIXED-OK` to `/opt/fixitlab/academy/academy-simulation-054-troubleshoot-gui-6.conf`,
-    then click Check Solution.'
+    4. Click Check Solution once `systemctl is-active nginx` returns active.'

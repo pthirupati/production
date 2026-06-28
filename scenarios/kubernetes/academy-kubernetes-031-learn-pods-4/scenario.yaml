@@ -11,29 +11,25 @@ max_score: 100
 is_free: false
 infrastructure_type: docker
 jira_priority: Low
-description: This beginner-friendly Kubernetes lab introduces Kubernetes pods. You
-  will explore pod spec, containers, probes, resources, and scheduling on the Kubernetes
-  cluster. Read the environment first, then follow the guided steps — no prior production
-  experience required.
+description: Kubernetes operations lab. One or more pods are **not Running** — workloads for Fundamentals
+  Lab cannot serve traffic. Inspect with `kubectl get pods`, read `kubectl describe pod` events, fix the
+  root cause, and confirm all pods Running.
 objectives:
-- Understand how Kubernetes pods work in this lab environment
-- Identify the main status and configuration signals for Kubernetes pods
-- Confirm you can read the current state confidently before changing anything
-initial_state: The Kubernetes cluster is online with a starter Kubernetes pods setup.
-  Some pieces are intentionally incomplete so you can learn how they fit together.
-  Nothing is on fire — focus on observation.
+- All pods in the default namespace are Running
+- '`kubectl get pods` shows every pod Running'
+- The deployment survives `kubectl get pods` re-check
+initial_state: The cluster is up but at least one pod is CrashLoopBackOff or Pending.
 hints:
 - order: 1
   cost: 10
   content: 'Orient yourself before changing anything:
 
-    1. Inspect the current state — `kubectl describe pod`, `kubectl logs`, and the
-    rendered manifest.
+    1. Inspect the current state — `kubectl describe pod`, `kubectl logs`, and the rendered manifest.
 
     2. Write down what looks normal versus wrong or missing for Kubernetes pods.
 
-    3. Recall the core idea: pod spec, containers, probes, resources, and scheduling.
-    Form one hypothesis before you act.'
+    3. Recall the core idea: pod spec, containers, probes, resources, and scheduling. Form one hypothesis
+    before you act.'
 - order: 2
   cost: 15
   content: 'Plan your approach (still no spoilers):
@@ -42,19 +38,16 @@ hints:
 
     2. Decide the single smallest change that moves you toward the objective.
 
-    3. Capture evidence (command output / status) before the change so you can prove
-    it worked afterward.'
+    3. Capture evidence (command output / status) before the change so you can prove it worked afterward.'
 - order: 3
   cost: 25
   content: 'Guided walkthrough:
 
-    1. Re-check the current state — `kubectl describe pod`, `kubectl logs`, and the
-    rendered manifest.
+    1. Re-check the current state — `kubectl describe pod`, `kubectl logs`, and the rendered manifest.
 
-    2. Make one small, reversible change toward the objective, re-reading status after
-    each step so you understand cause and effect.
+    2. Make one small, reversible change toward the objective, re-reading status after each step so you
+    understand cause and effect.
 
     3. Verify the result — pods are Running/Ready with healthy probe results.
 
-    4. Record completion: add `# FIXED-OK` to `/opt/fixitlab/academy/academy-kubernetes-031-learn-pods-4.conf`,
-    then click Check Solution.'
+    4. Click Check Solution once `kubectl get pods` shows every pod Running.'

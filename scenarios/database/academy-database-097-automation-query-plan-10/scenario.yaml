@@ -11,14 +11,15 @@ max_score: 100
 is_free: false
 infrastructure_type: docker
 jira_priority: Medium
-description: 'Automation lab: remove toil around query plans. Codify repeatable steps
-  for EXPLAIN, statistics, and index use and prove the automation is idempotent.'
+description: Service operations lab. The `redis` systemd unit is **failed/inactive** on this host — a
+  realistic fault for Automation Practice workflows that depend on it. Diagnose with `systemctl status
+  redis` and journal logs, apply the smallest reliable fix, then verify with `systemctl is-active redis`.
 objectives:
-- Day-2 query plans work completes safely in this environment
-- Changes are verified with before/after checks
-- The system remains stable for dependent teams
-initial_state: Operators still perform manual steps for query plans. Automate the
-  boring parts without hiding important safety checks.
+- The `redis` service is active (running)
+- '`systemctl is-active redis` returns active'
+- The fix survives a status re-check (no marker files)
+initial_state: The `redis` service is not running (`systemctl is-active redis` → inactive/failed). Dependent
+  Automation Practice tasks cannot succeed until the unit is healthy again.
 hints:
 - order: 1
   cost: 10
@@ -28,8 +29,7 @@ hints:
 
     2. Write down what looks normal versus wrong or missing for query plans.
 
-    3. Recall the core idea: EXPLAIN, statistics, and index use. Form one hypothesis
-    before you act.'
+    3. Recall the core idea: EXPLAIN, statistics, and index use. Form one hypothesis before you act.'
 - order: 2
   cost: 15
   content: 'Plan your approach (still no spoilers):
@@ -38,18 +38,16 @@ hints:
 
     2. Decide the single smallest change that moves you toward the objective.
 
-    3. Capture evidence (command output / status) before the change so you can prove
-    it worked afterward.'
+    3. Capture evidence (command output / status) before the change so you can prove it worked afterward.'
 - order: 3
   cost: 25
   content: 'Guided walkthrough:
 
     1. Re-check the current state — EXPLAIN (ANALYZE) output.
 
-    2. Implement the automation with dry-run / check mode, then run it twice — the
-    second run must report no changes.
+    2. Implement the automation with dry-run / check mode, then run it twice — the second run must report
+    no changes.
 
     3. Verify the result — the plan uses the intended indexes.
 
-    4. Record completion: add `# FIXED-OK` to `/opt/fixitlab/academy/academy-database-097-automation-query-plan-10.conf`,
-    then click Check Solution.'
+    4. Click Check Solution once `systemctl is-active redis` returns active.'

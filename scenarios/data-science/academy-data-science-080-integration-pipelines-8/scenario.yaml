@@ -11,15 +11,15 @@ max_score: 100
 is_free: false
 infrastructure_type: docker
 jira_priority: Medium
-description: 'Integration lab: connect data pipelines with an adjacent platform in
-  the Data Science & Analytics stack. Validate authentication, data handoff, and failure
-  behavior for stages, dependencies, and reruns.'
+description: Service operations lab. The `nginx` systemd unit is **failed/inactive** on this host — a
+  realistic fault for Integration Lab workflows that depend on it. Diagnose with `systemctl status nginx`
+  and journal logs, apply the smallest reliable fix, then verify with `systemctl is-active nginx`.
 objectives:
-- data pipelines is connected to the adjacent system successfully
-- Handoff points are authenticated and observable
-- End-to-end workflow completes without manual intervention
-initial_state: Two systems are deployed but not fully wired together for data pipelines.
-  Downstream consumers are waiting on this integration path.
+- The `nginx` service is active (running)
+- '`systemctl is-active nginx` returns active'
+- The fix survives a status re-check (no marker files)
+initial_state: The `nginx` service is not running (`systemctl is-active nginx` → inactive/failed). Dependent
+  Integration Lab tasks cannot succeed until the unit is healthy again.
 hints:
 - order: 1
   cost: 10
@@ -29,8 +29,7 @@ hints:
 
     2. Write down what looks normal versus wrong or missing for data pipelines.
 
-    3. Recall the core idea: stages, dependencies, and reruns. Form one hypothesis
-    before you act.'
+    3. Recall the core idea: stages, dependencies, and reruns. Form one hypothesis before you act.'
 - order: 2
   cost: 15
   content: 'Plan your approach (still no spoilers):
@@ -39,19 +38,17 @@ hints:
 
     2. Decide the single smallest change that moves you toward the objective.
 
-    3. Capture evidence (command output / status) before the change so you can prove
-    it worked afterward.'
+    3. Capture evidence (command output / status) before the change so you can prove it worked afterward.'
 - order: 3
   cost: 25
   content: 'Guided walkthrough:
 
     1. Re-check the current state — the pipeline DAG and run logs.
 
-    2. Configure credentials and networking, then drive one happy-path transaction
-    end to end across both systems.
+    2. Configure credentials and networking, then drive one happy-path transaction end to end across both
+    systems.
 
     3. Verify the result — the pipeline runs end-to-end reliably.
 
-    4. Record completion: add `# FIXED-OK` to `/opt/fixitlab/academy/academy-data-science-080-integration-pipelines-8.conf`,
-    then click Check Solution.'
+    4. Click Check Solution once `systemctl is-active nginx` returns active.'
 cross_technology: true

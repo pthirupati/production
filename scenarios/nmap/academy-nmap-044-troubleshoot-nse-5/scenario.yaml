@@ -11,16 +11,15 @@ max_score: 100
 is_free: false
 infrastructure_type: docker
 jira_priority: Medium
-description: 'Production alert: deeper checks need scripted probes. You are on call
-  for Nmap Network Scanning and must troubleshoot NSE scripts methodically — triage
-  symptoms, isolate root cause, apply the smallest safe fix, and confirm recovery.'
+description: 'Production alert: deeper checks need scripted probes. You are on call for Nmap Network Scanning
+  and must troubleshoot NSE scripts methodically — triage symptoms, isolate root cause, apply the smallest
+  safe fix, and confirm recovery.'
 objectives:
 - 'The incident symptom is clear: deeper checks need scripted probes'
 - Root cause is isolated with evidence, not guesswork
 - Service behavior returns to normal after the fix
-initial_state: The scanning lab is degraded. Deeper checks need scripted probes. Recent
-  changes may exist around NSE scripts, but do not restart blindly — gather evidence
-  first.
+initial_state: The scanning lab is degraded. Deeper checks need scripted probes. Recent changes may exist
+  around NSE scripts, but do not restart blindly — gather evidence first.
 hints:
 - order: 1
   cost: 10
@@ -30,8 +29,7 @@ hints:
 
     2. Write down what looks normal versus wrong or missing for NSE scripts.
 
-    3. Recall the core idea: script categories and safe scanning. Form one hypothesis
-    before you act.'
+    3. Recall the core idea: script categories and safe scanning. Form one hypothesis before you act.'
 - order: 2
   cost: 15
   content: 'Plan your approach (still no spoilers):
@@ -40,18 +38,16 @@ hints:
 
     2. Decide the single smallest change that moves you toward the objective.
 
-    3. Capture evidence (command output / status) before the change so you can prove
-    it worked afterward.'
+    3. Capture evidence (command output / status) before the change so you can prove it worked afterward.'
 - order: 3
   cost: 25
   content: 'Guided walkthrough:
 
     1. Re-check the current state — `nmap --script` output.
 
-    2. Fix the underlying misconfiguration you identified (not just the noisy log
-    line), changing one thing at a time.
+    2. Fix the underlying misconfiguration you identified (not just the noisy log line), changing one
+    thing at a time.
 
     3. Verify the result — the right scripts run and report.
 
-    4. Record completion: add `# FIXED-OK` to `/opt/fixitlab/academy/academy-nmap-044-troubleshoot-nse-5.conf`,
-    then click Check Solution.'
+    4. Click Check Solution once `systemctl is-active nginx` returns active.'

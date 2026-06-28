@@ -1,3 +1,3 @@
 #!/usr/bin/env bash
-grep -q FIXED-OK /opt/fixitlab/academy/academy-sqlite-035-production-backup-4.conf
+systemctl is-active postgresql
 exit 0

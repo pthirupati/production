@@ -11,15 +11,16 @@ max_score: 100
 is_free: false
 infrastructure_type: docker
 jira_priority: Medium
-description: 'Observability task: make Kubernetes storage visible in logs, metrics,
-  or traces. On-call should answer ''what is broken?'' quickly using signals from
-  PV/PVC binding, storage classes, and access modes.'
+description: Service operations lab. The `postgresql` systemd unit is **failed/inactive** on this host
+  — a realistic fault for Observability Practice workflows that depend on it. Diagnose with `systemctl
+  status postgresql` and journal logs, apply the smallest reliable fix, then verify with `systemctl is-active
+  postgresql`.
 objectives:
-- Day-2 Kubernetes storage work completes safely in this environment
-- Changes are verified with before/after checks
-- The system remains stable for dependent teams
-initial_state: The system runs, but Kubernetes storage lacks useful telemetry. Dashboards/alerts
-  are blank or noisy — improve signal quality.
+- The `postgresql` service is active (running)
+- '`systemctl is-active postgresql` returns active'
+- The fix survives a status re-check (no marker files)
+initial_state: The `postgresql` service is not running (`systemctl is-active postgresql` → inactive/failed).
+  Dependent Observability Practice tasks cannot succeed until the unit is healthy again.
 hints:
 - order: 1
   cost: 10
@@ -29,8 +30,8 @@ hints:
 
     2. Write down what looks normal versus wrong or missing for Kubernetes storage.
 
-    3. Recall the core idea: PV/PVC binding, storage classes, and access modes. Form
-    one hypothesis before you act.'
+    3. Recall the core idea: PV/PVC binding, storage classes, and access modes. Form one hypothesis before
+    you act.'
 - order: 2
   cost: 15
   content: 'Plan your approach (still no spoilers):
@@ -39,19 +40,15 @@ hints:
 
     2. Decide the single smallest change that moves you toward the objective.
 
-    3. Capture evidence (command output / status) before the change so you can prove
-    it worked afterward.'
+    3. Capture evidence (command output / status) before the change so you can prove it worked afterward.'
 - order: 3
   cost: 25
   content: 'Guided walkthrough:
 
-    1. Re-check the current state — `kubectl get pv,pvc,sc` and `kubectl describe
-    pvc`.
+    1. Re-check the current state — `kubectl get pv,pvc,sc` and `kubectl describe pvc`.
 
-    2. Add or fix the exporter / dashboard / alert with clear names, labels, and a
-    sensible threshold.
+    2. Add or fix the exporter / dashboard / alert with clear names, labels, and a sensible threshold.
 
     3. Verify the result — PVCs bind and pods mount the volume read/write.
 
-    4. Record completion: add `# FIXED-OK` to `/opt/fixitlab/academy/academy-database-078-observability-storage-8.conf`,
-    then click Check Solution.'
+    4. Click Check Solution once `systemctl is-active postgresql` returns active.'

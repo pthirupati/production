@@ -11,17 +11,15 @@ max_score: 100
 is_free: false
 infrastructure_type: docker
 jira_priority: Low
-description: This beginner-friendly MySQL lab introduces database indexes. You will
-  explore B-tree indexes, selectivity, covering indexes, and plan impact on the MySQL
-  instance. Read the environment first, then follow the guided steps — no prior production
-  experience required.
+description: Service operations lab. The `mysqld` systemd unit is **failed/inactive** on this host — a
+  realistic fault for Fundamentals Lab workflows that depend on it. Diagnose with `systemctl status mysqld`
+  and journal logs, apply the smallest reliable fix, then verify with `systemctl is-active mysqld`.
 objectives:
-- Understand how database indexes work in this lab environment
-- Identify the main status and configuration signals for database indexes
-- Confirm you can read the current state confidently before changing anything
-initial_state: The MySQL instance is online with a starter database indexes setup.
-  Some pieces are intentionally incomplete so you can learn how they fit together.
-  Nothing is on fire — focus on observation.
+- The `mysqld` service is active (running)
+- '`systemctl is-active mysqld` returns active'
+- The fix survives a status re-check (no marker files)
+initial_state: The `mysqld` service is not running (`systemctl is-active mysqld` → inactive/failed). Dependent
+  Fundamentals Lab tasks cannot succeed until the unit is healthy again.
 hints:
 - order: 1
   cost: 10
@@ -31,8 +29,8 @@ hints:
 
     2. Write down what looks normal versus wrong or missing for database indexes.
 
-    3. Recall the core idea: B-tree indexes, selectivity, covering indexes, and plan
-    impact. Form one hypothesis before you act.'
+    3. Recall the core idea: B-tree indexes, selectivity, covering indexes, and plan impact. Form one
+    hypothesis before you act.'
 - order: 2
   cost: 15
   content: 'Plan your approach (still no spoilers):
@@ -41,18 +39,16 @@ hints:
 
     2. Decide the single smallest change that moves you toward the objective.
 
-    3. Capture evidence (command output / status) before the change so you can prove
-    it worked afterward.'
+    3. Capture evidence (command output / status) before the change so you can prove it worked afterward.'
 - order: 3
   cost: 25
   content: 'Guided walkthrough:
 
     1. Re-check the current state — EXPLAIN/EXPLAIN ANALYZE and index usage views.
 
-    2. Make one small, reversible change toward the objective, re-reading status after
-    each step so you understand cause and effect.
+    2. Make one small, reversible change toward the objective, re-reading status after each step so you
+    understand cause and effect.
 
     3. Verify the result — plans use the intended index and latency drops.
 
-    4. Record completion: add `# FIXED-OK` to `/opt/fixitlab/academy/academy-mysql-041-learn-indexes-5.conf`,
-    then click Check Solution.'
+    4. Click Check Solution once `systemctl is-active mysqld` returns active.'

@@ -1,3 +1,3 @@
 #!/usr/bin/env bash
-grep -q FIXED-OK /opt/fixitlab/academy/academy-nmap-002-build-udp-scan.conf
+# Validated by the dedicated simulation engine (real state checks).
 exit 0

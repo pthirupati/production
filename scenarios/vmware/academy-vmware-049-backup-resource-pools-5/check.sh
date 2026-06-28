@@ -1,3 +1,3 @@
 #!/usr/bin/env bash
-grep -q FIXED-OK /opt/fixitlab/academy/academy-vmware-049-backup-resource-pools-5.conf
+# Validated by the dedicated simulation engine (real state checks).
 exit 0

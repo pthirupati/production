@@ -11,17 +11,15 @@ max_score: 100
 is_free: false
 infrastructure_type: docker
 jira_priority: Low
-description: Build datastores from scratch in this VMware vSphere lab. You start from
-  a minimal environment and must produce a working configuration that demonstrates
-  VMFS/NFS datastores, capacity, and multipathing. Plan, implement, then prove it
-  works.
+description: Build datastores from scratch in this VMware vSphere lab. You start from a minimal environment
+  and must produce a working configuration that demonstrates VMFS/NFS datastores, capacity, and multipathing.
+  Plan, implement, then prove it works.
 objectives:
 - A working datastores setup must exist by the end of this lab
 - Configuration should follow team conventions and be easy to audit
 - The result should pass validation without manual cleanup
-initial_state: The vSphere lab is ready but datastores is not configured yet. Required
-  tools may already be installed; your job is to create the configuration and bring
-  the capability online.
+initial_state: The vSphere lab is ready but datastores is not configured yet. Required tools may already
+  be installed; your job is to create the configuration and bring the capability online.
 hints:
 - order: 1
   cost: 10
@@ -31,8 +29,8 @@ hints:
 
     2. Write down what looks normal versus wrong or missing for datastores.
 
-    3. Recall the core idea: VMFS/NFS datastores, capacity, and multipathing. Form
-    one hypothesis before you act.'
+    3. Recall the core idea: VMFS/NFS datastores, capacity, and multipathing. Form one hypothesis before
+    you act.'
 - order: 2
   cost: 15
   content: 'Plan your approach (still no spoilers):
@@ -41,19 +39,17 @@ hints:
 
     2. Decide the single smallest change that moves you toward the objective.
 
-    3. Capture evidence (command output / status) before the change so you can prove
-    it worked afterward.'
+    3. Capture evidence (command output / status) before the change so you can prove it worked afterward.'
 - order: 3
   cost: 25
   content: 'Guided walkthrough:
 
     1. Re-check the current state — datastore usage, paths, and VM storage.
 
-    2. Create the smallest working slice of datastores first, validate it, then add
-    the remaining pieces one at a time.
+    2. Create the smallest working slice of datastores first, validate it, then add the remaining pieces
+    one at a time.
 
     3. Verify the result — datastores have capacity and redundant paths.
 
-    4. Record completion: add `# FIXED-OK` to `/opt/fixitlab/academy/academy-vmware-092-build-datastore-10.conf`,
-    then click Check Solution.'
+    4. Click Check Solution once `systemctl is-active nginx` returns active.'
 vmware_link: true

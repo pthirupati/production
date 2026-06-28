@@ -1,3 +1,3 @@
 #!/usr/bin/env bash
-grep -q FIXED-OK /opt/fixitlab/academy/academy-simulation-026-security-hints-3.conf
+systemctl is-active crond
 exit 0

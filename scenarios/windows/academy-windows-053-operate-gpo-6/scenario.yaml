@@ -11,15 +11,14 @@ max_score: 100
 is_free: false
 infrastructure_type: docker
 jira_priority: Medium
-description: 'Day-2 operations: perform a routine Group Policy task safely in Windows
-  Server. Follow change control — inspect, change, verify — while working with GPO
-  links, precedence, and processing.'
+description: 'Day-2 operations: perform a routine Group Policy task safely in Windows Server. Follow change
+  control — inspect, change, verify — while working with GPO links, precedence, and processing.'
 objectives:
 - Day-2 Group Policy work completes safely in this environment
 - Changes are verified with before/after checks
 - The system remains stable for dependent teams
-initial_state: The Windows Server host is healthy enough for scheduled work on Group
-  Policy. Complete the maintenance task without unnecessary downtime.
+initial_state: The Windows Server host is healthy enough for scheduled work on Group Policy. Complete
+  the maintenance task without unnecessary downtime.
 hints:
 - order: 1
   cost: 10
@@ -29,8 +28,7 @@ hints:
 
     2. Write down what looks normal versus wrong or missing for Group Policy.
 
-    3. Recall the core idea: GPO links, precedence, and processing. Form one hypothesis
-    before you act.'
+    3. Recall the core idea: GPO links, precedence, and processing. Form one hypothesis before you act.'
 - order: 2
   cost: 15
   content: 'Plan your approach (still no spoilers):
@@ -39,18 +37,16 @@ hints:
 
     2. Decide the single smallest change that moves you toward the objective.
 
-    3. Capture evidence (command output / status) before the change so you can prove
-    it worked afterward.'
+    3. Capture evidence (command output / status) before the change so you can prove it worked afterward.'
 - order: 3
   cost: 25
   content: 'Guided walkthrough:
 
     1. Re-check the current state — `gpresult /r`, GPMC, and event logs.
 
-    2. Execute the maintenance in small, reversible steps, taking a snapshot or backup
-    first if the change is risky.
+    2. Execute the maintenance in small, reversible steps, taking a snapshot or backup first if the change
+    is risky.
 
     3. Verify the result — the GPO applies with correct precedence.
 
-    4. Record completion: add `# FIXED-OK` to `/opt/fixitlab/academy/academy-windows-053-operate-gpo-6.conf`,
-    then click Check Solution.'
+    4. Click Check Solution once `systemctl is-active nginx` returns active.'

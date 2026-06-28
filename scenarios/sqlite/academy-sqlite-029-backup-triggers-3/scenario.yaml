@@ -11,15 +11,16 @@ max_score: 100
 is_free: false
 infrastructure_type: docker
 jira_priority: Medium
-description: Backup and recovery drill for triggers. Ensure backups run on schedule,
-  retention is correct, and you can restore BEFORE/AFTER triggers and side effects
-  within the lab RTO.
+description: Service operations lab. The `postgresql` systemd unit is **failed/inactive** on this host
+  — a realistic fault for Backup and Recovery workflows that depend on it. Diagnose with `systemctl status
+  postgresql` and journal logs, apply the smallest reliable fix, then verify with `systemctl is-active
+  postgresql`.
 objectives:
-- Backup coverage for triggers is complete and restorable
-- Retention and encryption meet the stated policy
-- A restore drill proves data integrity
-initial_state: Backup jobs exist but reliability is uncertain for triggers. Leadership
-  wants proof that restore works — not just that scripts exit zero.
+- The `postgresql` service is active (running)
+- '`systemctl is-active postgresql` returns active'
+- The fix survives a status re-check (no marker files)
+initial_state: The `postgresql` service is not running (`systemctl is-active postgresql` → inactive/failed).
+  Dependent Backup and Recovery tasks cannot succeed until the unit is healthy again.
 hints:
 - order: 1
   cost: 10
@@ -29,8 +30,7 @@ hints:
 
     2. Write down what looks normal versus wrong or missing for triggers.
 
-    3. Recall the core idea: BEFORE/AFTER triggers and side effects. Form one hypothesis
-    before you act.'
+    3. Recall the core idea: BEFORE/AFTER triggers and side effects. Form one hypothesis before you act.'
 - order: 2
   cost: 15
   content: 'Plan your approach (still no spoilers):
@@ -39,18 +39,16 @@ hints:
 
     2. Decide the single smallest change that moves you toward the objective.
 
-    3. Capture evidence (command output / status) before the change so you can prove
-    it worked afterward.'
+    3. Capture evidence (command output / status) before the change so you can prove it worked afterward.'
 - order: 3
   cost: 25
   content: 'Guided walkthrough:
 
     1. Re-check the current state — trigger definitions and firing order.
 
-    2. Repair or run the backup job, then perform a controlled restore into a scratch
-    location to prove it works.
+    2. Repair or run the backup job, then perform a controlled restore into a scratch location to prove
+    it works.
 
     3. Verify the result — triggers fire correctly without loops.
 
-    4. Record completion: add `# FIXED-OK` to `/opt/fixitlab/academy/academy-sqlite-029-backup-triggers-3.conf`,
-    then click Check Solution.'
+    4. Click Check Solution once `systemctl is-active postgresql` returns active.'

@@ -11,15 +11,15 @@ max_score: 100
 is_free: false
 infrastructure_type: docker
 jira_priority: Medium
-description: 'Security review: harden NIC teaming on this Bare Metal & IPMI system.
-  Close unsafe defaults, enforce least privilege, and ensure bonding/teaming modes
-  and failover cannot be abused — without breaking legitimate use.'
+description: 'Security review: harden NIC teaming on this Bare Metal & IPMI system. Close unsafe defaults,
+  enforce least privilege, and ensure bonding/teaming modes and failover cannot be abused — without breaking
+  legitimate use.'
 objectives:
 - Unsafe defaults related to NIC teaming are removed or constrained
 - Access follows least privilege and is auditable
 - Security checks pass without breaking required functionality
-initial_state: The environment is functional but overly permissive around NIC teaming.
-  Assume an auditor or pen test is next week — tighten controls with evidence.
+initial_state: The environment is functional but overly permissive around NIC teaming. Assume an auditor
+  or pen test is next week — tighten controls with evidence.
 hints:
 - order: 1
   cost: 10
@@ -29,8 +29,7 @@ hints:
 
     2. Write down what looks normal versus wrong or missing for NIC teaming.
 
-    3. Recall the core idea: bonding/teaming modes and failover. Form one hypothesis
-    before you act.'
+    3. Recall the core idea: bonding/teaming modes and failover. Form one hypothesis before you act.'
 - order: 2
   cost: 15
   content: 'Plan your approach (still no spoilers):
@@ -39,18 +38,16 @@ hints:
 
     2. Decide the single smallest change that moves you toward the objective.
 
-    3. Capture evidence (command output / status) before the change so you can prove
-    it worked afterward.'
+    3. Capture evidence (command output / status) before the change so you can prove it worked afterward.'
 - order: 3
   cost: 25
   content: 'Guided walkthrough:
 
     1. Re-check the current state — team/bond state and link status.
 
-    2. Apply least privilege: remove the unsafe default, then grant only the explicit
-    access the workload actually needs.
+    2. Apply least privilege: remove the unsafe default, then grant only the explicit access the workload
+    actually needs.
 
     3. Verify the result — the team is up with correct mode.
 
-    4. Record completion: add `# FIXED-OK` to `/opt/fixitlab/academy/academy-baremetal-046-security-nic-teaming-5.conf`,
-    then click Check Solution.'
+    4. Click Check Solution once `systemctl is-active rsyslog` returns active.'

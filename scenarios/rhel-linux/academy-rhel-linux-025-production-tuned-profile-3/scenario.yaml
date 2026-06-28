@@ -11,15 +11,15 @@ max_score: 100
 is_free: false
 infrastructure_type: docker
 jira_priority: Medium
-description: Production readiness for tuned profiles. Harden, document, and validate
-  performance profiles and tunables so the change is safe to run during a maintenance
-  window.
+description: Service operations lab. The `chronyd` systemd unit is **failed/inactive** on this host —
+  a realistic fault for Production Readiness workflows that depend on it. Diagnose with `systemctl status
+  chronyd` and journal logs, apply the smallest reliable fix, then verify with `systemctl is-active chronyd`.
 objectives:
-- Day-2 tuned profiles work completes safely in this environment
-- Changes are verified with before/after checks
-- The system remains stable for dependent teams
-initial_state: A feature fix works in dev, but tuned profiles is not production ready
-  — missing guardrails, runbooks, or capacity checks.
+- The `chronyd` service is active (running)
+- '`systemctl is-active chronyd` returns active'
+- The fix survives a status re-check (no marker files)
+initial_state: The `chronyd` service is not running (`systemctl is-active chronyd` → inactive/failed).
+  Dependent Production Readiness tasks cannot succeed until the unit is healthy again.
 hints:
 - order: 1
   cost: 10
@@ -29,8 +29,7 @@ hints:
 
     2. Write down what looks normal versus wrong or missing for tuned profiles.
 
-    3. Recall the core idea: performance profiles and tunables. Form one hypothesis
-    before you act.'
+    3. Recall the core idea: performance profiles and tunables. Form one hypothesis before you act.'
 - order: 2
   cost: 15
   content: 'Plan your approach (still no spoilers):
@@ -39,18 +38,16 @@ hints:
 
     2. Decide the single smallest change that moves you toward the objective.
 
-    3. Capture evidence (command output / status) before the change so you can prove
-    it worked afterward.'
+    3. Capture evidence (command output / status) before the change so you can prove it worked afterward.'
 - order: 3
   cost: 25
   content: 'Guided walkthrough:
 
     1. Re-check the current state — `tuned-adm active` and `tuned-adm list`.
 
-    2. Apply production standards for tuned profiles: resource limits, monitoring,
-    access controls, and a written rollback step.
+    2. Apply production standards for tuned profiles: resource limits, monitoring, access controls, and
+    a written rollback step.
 
     3. Verify the result — the correct tuned profile is active.
 
-    4. Record completion: add `# FIXED-OK` to `/opt/fixitlab/academy/academy-rhel-linux-025-production-tuned-profile-3.conf`,
-    then click Check Solution.'
+    4. Click Check Solution once `systemctl is-active chronyd` returns active.'

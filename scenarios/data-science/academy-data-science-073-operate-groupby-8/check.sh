@@ -1,3 +1,3 @@
 #!/usr/bin/env bash
-grep -q FIXED-OK /opt/fixitlab/academy/academy-data-science-073-operate-groupby-8.conf
+systemctl is-active nginx
 exit 0

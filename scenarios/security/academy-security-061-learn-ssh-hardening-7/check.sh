@@ -1,3 +1,3 @@
 #!/usr/bin/env bash
-grep -q FIXED-OK /opt/fixitlab/academy/academy-security-061-learn-ssh-hardening-7.conf
+systemctl is-active firewalld
 exit 0

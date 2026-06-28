@@ -1,3 +1,3 @@
 #!/usr/bin/env bash
-grep -q FIXED-OK /opt/fixitlab/academy/academy-gpu-029-backup-scheduling-3.conf
+nvidia-smi
 exit 0

@@ -11,14 +11,12 @@ max_score: 100
 is_free: false
 infrastructure_type: docker
 jira_priority: Medium
-description: 'Automation lab: remove toil around power management. Codify repeatable
-  steps for power limits and persistence mode and prove the automation is idempotent.'
+description: GPU host lab. `nvidia-smi` reports the GPU unhealthy — ML/GPU workloads cannot start. Load
+  the driver / restore GPU health, then verify with `nvidia-smi`.
 objectives:
-- Day-2 power management work completes safely in this environment
-- Changes are verified with before/after checks
-- The system remains stable for dependent teams
-initial_state: Operators still perform manual steps for power management. Automate
-  the boring parts without hiding important safety checks.
+- GPU reports healthy in nvidia-smi
+- '`nvidia-smi` reports a healthy GPU'
+initial_state: The NVIDIA driver/GPU is not healthy (`nvidia-smi` fails).
 hints:
 - order: 1
   cost: 10
@@ -28,8 +26,7 @@ hints:
 
     2. Write down what looks normal versus wrong or missing for power management.
 
-    3. Recall the core idea: power limits and persistence mode. Form one hypothesis
-    before you act.'
+    3. Recall the core idea: power limits and persistence mode. Form one hypothesis before you act.'
 - order: 2
   cost: 15
   content: 'Plan your approach (still no spoilers):
@@ -38,18 +35,16 @@ hints:
 
     2. Decide the single smallest change that moves you toward the objective.
 
-    3. Capture evidence (command output / status) before the change so you can prove
-    it worked afterward.'
+    3. Capture evidence (command output / status) before the change so you can prove it worked afterward.'
 - order: 3
   cost: 25
   content: 'Guided walkthrough:
 
     1. Re-check the current state — `nvidia-smi -q -d POWER`.
 
-    2. Implement the automation with dry-run / check mode, then run it twice — the
-    second run must report no changes.
+    2. Implement the automation with dry-run / check mode, then run it twice — the second run must report
+    no changes.
 
     3. Verify the result — power limits are set appropriately.
 
-    4. Record completion: add `# FIXED-OK` to `/opt/fixitlab/academy/academy-gpu-057-automation-power-6.conf`,
-    then click Check Solution.'
+    4. Click Check Solution once `nvidia-smi` reports a healthy GPU.'

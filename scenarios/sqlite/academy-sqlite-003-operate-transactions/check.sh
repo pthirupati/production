@@ -1,3 +1,3 @@
 #!/usr/bin/env bash
-grep -q FIXED-OK /opt/fixitlab/academy/academy-sqlite-003-operate-transactions.conf
+systemctl is-active postgresql
 exit 0

@@ -11,15 +11,14 @@ max_score: 100
 is_free: false
 infrastructure_type: docker
 jira_priority: Medium
-description: 'Automation lab: remove toil around Kubernetes storage. Codify repeatable
-  steps for PV/PVC binding, storage classes, and access modes and prove the automation
-  is idempotent.'
+description: Kubernetes operations lab. One or more pods are **not Running** — workloads for Automation
+  Practice cannot serve traffic. Inspect with `kubectl get pods`, read `kubectl describe pod` events,
+  fix the root cause, and confirm all pods Running.
 objectives:
-- Day-2 Kubernetes storage work completes safely in this environment
-- Changes are verified with before/after checks
-- The system remains stable for dependent teams
-initial_state: Operators still perform manual steps for Kubernetes storage. Automate
-  the boring parts without hiding important safety checks.
+- All pods in the default namespace are Running
+- '`kubectl get pods` shows every pod Running'
+- The deployment survives `kubectl get pods` re-check
+initial_state: The cluster is up but at least one pod is CrashLoopBackOff or Pending.
 hints:
 - order: 1
   cost: 10
@@ -29,8 +28,8 @@ hints:
 
     2. Write down what looks normal versus wrong or missing for Kubernetes storage.
 
-    3. Recall the core idea: PV/PVC binding, storage classes, and access modes. Form
-    one hypothesis before you act.'
+    3. Recall the core idea: PV/PVC binding, storage classes, and access modes. Form one hypothesis before
+    you act.'
 - order: 2
   cost: 15
   content: 'Plan your approach (still no spoilers):
@@ -39,19 +38,16 @@ hints:
 
     2. Decide the single smallest change that moves you toward the objective.
 
-    3. Capture evidence (command output / status) before the change so you can prove
-    it worked afterward.'
+    3. Capture evidence (command output / status) before the change so you can prove it worked afterward.'
 - order: 3
   cost: 25
   content: 'Guided walkthrough:
 
-    1. Re-check the current state — `kubectl get pv,pvc,sc` and `kubectl describe
-    pvc`.
+    1. Re-check the current state — `kubectl get pv,pvc,sc` and `kubectl describe pvc`.
 
-    2. Implement the automation with dry-run / check mode, then run it twice — the
-    second run must report no changes.
+    2. Implement the automation with dry-run / check mode, then run it twice — the second run must report
+    no changes.
 
     3. Verify the result — PVCs bind and pods mount the volume read/write.
 
-    4. Record completion: add `# FIXED-OK` to `/opt/fixitlab/academy/academy-kubernetes-077-automation-storage-8.conf`,
-    then click Check Solution.'
+    4. Click Check Solution once `kubectl get pods` shows every pod Running.'

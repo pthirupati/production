@@ -1,3 +1,3 @@
 #!/usr/bin/env bash
-grep -q FIXED-OK /opt/fixitlab/academy/academy-grafana-054-troubleshoot-panels-6.conf
+systemctl is-active rsyslog
 exit 0

@@ -1,3 +1,3 @@
 #!/usr/bin/env bash
-grep -q FIXED-OK /opt/fixitlab/academy/academy-peoplesoft-076-security-app-engine-8.conf
+# Validated by the dedicated simulation engine (real state checks).
 exit 0

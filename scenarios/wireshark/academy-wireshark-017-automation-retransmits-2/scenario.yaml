@@ -11,14 +11,14 @@ max_score: 100
 is_free: false
 infrastructure_type: docker
 jira_priority: Medium
-description: 'Automation lab: remove toil around retransmissions. Codify repeatable
-  steps for loss, duplicate ACKs, and recovery and prove the automation is idempotent.'
+description: 'Automation lab: remove toil around retransmissions. Codify repeatable steps for loss, duplicate
+  ACKs, and recovery and prove the automation is idempotent.'
 objectives:
 - Day-2 retransmissions work completes safely in this environment
 - Changes are verified with before/after checks
 - The system remains stable for dependent teams
-initial_state: Operators still perform manual steps for retransmissions. Automate
-  the boring parts without hiding important safety checks.
+initial_state: Operators still perform manual steps for retransmissions. Automate the boring parts without
+  hiding important safety checks.
 hints:
 - order: 1
   cost: 10
@@ -28,8 +28,7 @@ hints:
 
     2. Write down what looks normal versus wrong or missing for retransmissions.
 
-    3. Recall the core idea: loss, duplicate ACKs, and recovery. Form one hypothesis
-    before you act.'
+    3. Recall the core idea: loss, duplicate ACKs, and recovery. Form one hypothesis before you act.'
 - order: 2
   cost: 15
   content: 'Plan your approach (still no spoilers):
@@ -38,18 +37,16 @@ hints:
 
     2. Decide the single smallest change that moves you toward the objective.
 
-    3. Capture evidence (command output / status) before the change so you can prove
-    it worked afterward.'
+    3. Capture evidence (command output / status) before the change so you can prove it worked afterward.'
 - order: 3
   cost: 25
   content: 'Guided walkthrough:
 
     1. Re-check the current state — expert info retransmit markers.
 
-    2. Implement the automation with dry-run / check mode, then run it twice — the
-    second run must report no changes.
+    2. Implement the automation with dry-run / check mode, then run it twice — the second run must report
+    no changes.
 
     3. Verify the result — the loss source is identified.
 
-    4. Record completion: add `# FIXED-OK` to `/opt/fixitlab/academy/academy-wireshark-017-automation-retransmits-2.conf`,
-    then click Check Solution.'
+    4. Click Check Solution once `systemctl is-active nginx` returns active.'

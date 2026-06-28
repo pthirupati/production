@@ -11,28 +11,25 @@ max_score: 100
 is_free: false
 infrastructure_type: docker
 jira_priority: Medium
-description: 'Production alert: HTTP routes return 404/502 or TLS handshake fails.
-  You are on call for Kubernetes and must troubleshoot Ingress methodically — triage
-  symptoms, isolate root cause, apply the smallest safe fix, and confirm recovery.'
+description: Kubernetes operations lab. One or more pods are **not Running** — workloads for Troubleshooting
+  Drill cannot serve traffic. Inspect with `kubectl get pods`, read `kubectl describe pod` events, fix
+  the root cause, and confirm all pods Running.
 objectives:
-- 'The incident symptom is clear: HTTP routes return 404/502 or TLS handshake fails'
-- Root cause is isolated with evidence, not guesswork
-- Service behavior returns to normal after the fix
-initial_state: The Kubernetes cluster is degraded. Http routes return 404/502 or tls
-  handshake fails. Recent changes may exist around Ingress, but do not restart blindly
-  — gather evidence first.
+- All pods in the default namespace are Running
+- '`kubectl get pods` shows every pod Running'
+- The deployment survives `kubectl get pods` re-check
+initial_state: The cluster is up but at least one pod is CrashLoopBackOff or Pending.
 hints:
 - order: 1
   cost: 10
   content: 'Orient yourself before changing anything:
 
-    1. Inspect the current state — `kubectl describe ingress`, controller logs, and
-    backend Service health.
+    1. Inspect the current state — `kubectl describe ingress`, controller logs, and backend Service health.
 
     2. Write down what looks normal versus wrong or missing for Ingress.
 
-    3. Recall the core idea: hosts, paths, TLS secrets, and ingress controller routing.
-    Form one hypothesis before you act.'
+    3. Recall the core idea: hosts, paths, TLS secrets, and ingress controller routing. Form one hypothesis
+    before you act.'
 - order: 2
   cost: 15
   content: 'Plan your approach (still no spoilers):
@@ -41,20 +38,16 @@ hints:
 
     2. Decide the single smallest change that moves you toward the objective.
 
-    3. Capture evidence (command output / status) before the change so you can prove
-    it worked afterward.'
+    3. Capture evidence (command output / status) before the change so you can prove it worked afterward.'
 - order: 3
   cost: 25
   content: 'Guided walkthrough:
 
-    1. Re-check the current state — `kubectl describe ingress`, controller logs, and
-    backend Service health.
+    1. Re-check the current state — `kubectl describe ingress`, controller logs, and backend Service health.
 
-    2. Fix the underlying misconfiguration you identified (not just the noisy log
-    line), changing one thing at a time.
+    2. Fix the underlying misconfiguration you identified (not just the noisy log line), changing one
+    thing at a time.
 
-    3. Verify the result — requests reach the intended backend with a valid certificate
-    chain.
+    3. Verify the result — requests reach the intended backend with a valid certificate chain.
 
-    4. Record completion: add `# FIXED-OK` to `/opt/fixitlab/academy/academy-kubernetes-044-troubleshoot-ingress-5.conf`,
-    then click Check Solution.'
+    4. Click Check Solution once `kubectl get pods` shows every pod Running.'

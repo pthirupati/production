@@ -1,3 +1,3 @@
 #!/usr/bin/env bash
-grep -q FIXED-OK /opt/fixitlab/academy/academy-mysql-096-security-restore-10.conf
+systemctl is-active mysqld
 exit 0

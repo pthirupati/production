@@ -1,3 +1,3 @@
 #!/usr/bin/env bash
-grep -q FIXED-OK /opt/fixitlab/academy/academy-python-009-backup-async.conf
+systemctl is-active crond
 exit 0

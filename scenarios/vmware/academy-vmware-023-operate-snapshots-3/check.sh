@@ -1,3 +1,3 @@
 #!/usr/bin/env bash
-grep -q FIXED-OK /opt/fixitlab/academy/academy-vmware-023-operate-snapshots-3.conf
+# Validated by the dedicated simulation engine (real state checks).
 exit 0

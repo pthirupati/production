@@ -11,29 +11,27 @@ max_score: 100
 is_free: false
 infrastructure_type: docker
 jira_priority: Low
-description: Build users and groups from scratch in this Windows Server lab. You start
-  from a minimal environment and must produce a working configuration that demonstrates
-  how accounts, UIDs/GIDs, primary groups, and supplementary membership are defined.
-  Plan, implement, then prove it works.
+description: Build users and groups from scratch in this Windows Server lab. You start from a minimal
+  environment and must produce a working configuration that demonstrates how accounts, UIDs/GIDs, primary
+  groups, and supplementary membership are defined. Plan, implement, then prove it works.
 objectives:
 - A working users and groups setup must exist by the end of this lab
 - Configuration should follow team conventions and be easy to audit
 - The result should pass validation without manual cleanup
-initial_state: The Windows Server host is ready but users and groups is not configured
-  yet. Required tools may already be installed; your job is to create the configuration
-  and bring the capability online.
+initial_state: The Windows Server host is ready but users and groups is not configured yet. Required tools
+  may already be installed; your job is to create the configuration and bring the capability online.
 hints:
 - order: 1
   cost: 10
   content: 'Orient yourself before changing anything:
 
-    1. Inspect the current state — `id`, `getent passwd`, and `getent group` (or equivalent
-    directory tools on Windows).
+    1. Inspect the current state — `id`, `getent passwd`, and `getent group` (or equivalent directory
+    tools on Windows).
 
     2. Write down what looks normal versus wrong or missing for users and groups.
 
-    3. Recall the core idea: how accounts, UIDs/GIDs, primary groups, and supplementary
-    membership are defined. Form one hypothesis before you act.'
+    3. Recall the core idea: how accounts, UIDs/GIDs, primary groups, and supplementary membership are
+    defined. Form one hypothesis before you act.'
 - order: 2
   cost: 15
   content: 'Plan your approach (still no spoilers):
@@ -42,20 +40,17 @@ hints:
 
     2. Decide the single smallest change that moves you toward the objective.
 
-    3. Capture evidence (command output / status) before the change so you can prove
-    it worked afterward.'
+    3. Capture evidence (command output / status) before the change so you can prove it worked afterward.'
 - order: 3
   cost: 25
   content: 'Guided walkthrough:
 
-    1. Re-check the current state — `id`, `getent passwd`, and `getent group` (or
-    equivalent directory tools on Windows).
+    1. Re-check the current state — `id`, `getent passwd`, and `getent group` (or equivalent directory
+    tools on Windows).
 
-    2. Create the smallest working slice of users and groups first, validate it, then
-    add the remaining pieces one at a time.
+    2. Create the smallest working slice of users and groups first, validate it, then add the remaining
+    pieces one at a time.
 
-    3. Verify the result — account and group entries match the expected owner and
-    membership.
+    3. Verify the result — account and group entries match the expected owner and membership.
 
-    4. Record completion: add `# FIXED-OK` to `/opt/fixitlab/academy/academy-windows-052-build-users-groups-6.conf`,
-    then click Check Solution.'
+    4. Click Check Solution once `systemctl is-active nginx` returns active.'

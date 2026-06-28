@@ -1,3 +1,3 @@
 #!/usr/bin/env bash
-grep -q FIXED-OK /opt/fixitlab/academy/academy-data-science-008-observability-exports.conf
+systemctl is-active nginx
 exit 0

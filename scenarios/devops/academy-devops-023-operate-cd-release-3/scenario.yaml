@@ -11,15 +11,15 @@ max_score: 100
 is_free: false
 infrastructure_type: docker
 jira_priority: Medium
-description: 'Day-2 operations: perform a routine CD releases task safely in DevOps.
-  Follow change control — inspect, change, verify — while working with deploy stages,
-  approvals, and rollback.'
+description: Service operations lab. The `rsyslog` systemd unit is **failed/inactive** on this host —
+  a realistic fault for Daily Operations workflows that depend on it. Diagnose with `systemctl status
+  rsyslog` and journal logs, apply the smallest reliable fix, then verify with `systemctl is-active rsyslog`.
 objectives:
-- Day-2 CD releases work completes safely in this environment
-- Changes are verified with before/after checks
-- The system remains stable for dependent teams
-initial_state: The CI/CD lab is healthy enough for scheduled work on CD releases.
-  Complete the maintenance task without unnecessary downtime.
+- The `rsyslog` service is active (running)
+- '`systemctl is-active rsyslog` returns active'
+- The fix survives a status re-check (no marker files)
+initial_state: The `rsyslog` service is not running (`systemctl is-active rsyslog` → inactive/failed).
+  Dependent Daily Operations tasks cannot succeed until the unit is healthy again.
 hints:
 - order: 1
   cost: 10
@@ -29,8 +29,7 @@ hints:
 
     2. Write down what looks normal versus wrong or missing for CD releases.
 
-    3. Recall the core idea: deploy stages, approvals, and rollback. Form one hypothesis
-    before you act.'
+    3. Recall the core idea: deploy stages, approvals, and rollback. Form one hypothesis before you act.'
 - order: 2
   cost: 15
   content: 'Plan your approach (still no spoilers):
@@ -39,18 +38,16 @@ hints:
 
     2. Decide the single smallest change that moves you toward the objective.
 
-    3. Capture evidence (command output / status) before the change so you can prove
-    it worked afterward.'
+    3. Capture evidence (command output / status) before the change so you can prove it worked afterward.'
 - order: 3
   cost: 25
   content: 'Guided walkthrough:
 
     1. Re-check the current state — the release pipeline and environments.
 
-    2. Execute the maintenance in small, reversible steps, taking a snapshot or backup
-    first if the change is risky.
+    2. Execute the maintenance in small, reversible steps, taking a snapshot or backup first if the change
+    is risky.
 
     3. Verify the result — releases deploy and can roll back.
 
-    4. Record completion: add `# FIXED-OK` to `/opt/fixitlab/academy/academy-devops-023-operate-cd-release-3.conf`,
-    then click Check Solution.'
+    4. Click Check Solution once `systemctl is-active rsyslog` returns active.'

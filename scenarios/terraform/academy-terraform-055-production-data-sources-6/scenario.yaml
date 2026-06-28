@@ -11,15 +11,14 @@ max_score: 100
 is_free: false
 infrastructure_type: docker
 jira_priority: Medium
-description: Production readiness for data sources. Harden, document, and validate
-  reading existing infra, filters, and dependencies so the change is safe to run during
-  a maintenance window.
+description: Production readiness for data sources. Harden, document, and validate reading existing infra,
+  filters, and dependencies so the change is safe to run during a maintenance window.
 objectives:
 - Day-2 data sources work completes safely in this environment
 - Changes are verified with before/after checks
 - The system remains stable for dependent teams
-initial_state: A feature fix works in dev, but data sources is not production ready
-  — missing guardrails, runbooks, or capacity checks.
+initial_state: A feature fix works in dev, but data sources is not production ready — missing guardrails,
+  runbooks, or capacity checks.
 hints:
 - order: 1
   cost: 10
@@ -29,8 +28,8 @@ hints:
 
     2. Write down what looks normal versus wrong or missing for data sources.
 
-    3. Recall the core idea: reading existing infra, filters, and dependencies. Form
-    one hypothesis before you act.'
+    3. Recall the core idea: reading existing infra, filters, and dependencies. Form one hypothesis before
+    you act.'
 - order: 2
   cost: 15
   content: 'Plan your approach (still no spoilers):
@@ -39,19 +38,16 @@ hints:
 
     2. Decide the single smallest change that moves you toward the objective.
 
-    3. Capture evidence (command output / status) before the change so you can prove
-    it worked afterward.'
+    3. Capture evidence (command output / status) before the change so you can prove it worked afterward.'
 - order: 3
   cost: 25
   content: 'Guided walkthrough:
 
-    1. Re-check the current state — data blocks, `terraform plan`, and `terraform
-    console`.
+    1. Re-check the current state — data blocks, `terraform plan`, and `terraform console`.
 
-    2. Apply production standards for data sources: resource limits, monitoring, access
-    controls, and a written rollback step.
+    2. Apply production standards for data sources: resource limits, monitoring, access controls, and
+    a written rollback step.
 
     3. Verify the result — data lookups resolve to the intended resource.
 
-    4. Record completion: add `# FIXED-OK` to `/opt/fixitlab/academy/academy-terraform-055-production-data-sources-6.conf`,
-    then click Check Solution.'
+    4. Click Check Solution once `systemctl is-active nginx` returns active.'

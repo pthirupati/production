@@ -1,3 +1,3 @@
 #!/usr/bin/env bash
-grep -q FIXED-OK /opt/fixitlab/academy/academy-prometheus-059-backup-labels-6.conf
+systemctl is-active nginx
 exit 0

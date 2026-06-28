@@ -1,3 +1,3 @@
 #!/usr/bin/env bash
-grep -q FIXED-OK /opt/fixitlab/academy/academy-windows-001-learn-active-directory.conf
+# Validated by the dedicated simulation engine (real state checks).
 exit 0

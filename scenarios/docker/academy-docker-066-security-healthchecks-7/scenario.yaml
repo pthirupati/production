@@ -11,28 +11,26 @@ max_score: 100
 is_free: false
 infrastructure_type: docker
 jira_priority: Medium
-description: 'Security review: harden container healthchecks on this Docker & Containers
-  system. Close unsafe defaults, enforce least privilege, and ensure HEALTHCHECK directives,
-  readiness, and restart policy cannot be abused — without breaking legitimate use.'
+description: Service operations lab. The `docker` systemd unit is **failed/inactive** on this host — a
+  realistic fault for Security Practice workflows that depend on it. Diagnose with `systemctl status docker`
+  and journal logs, apply the smallest reliable fix, then verify with `systemctl is-active docker`.
 objectives:
-- Unsafe defaults related to container healthchecks are removed or constrained
-- Access follows least privilege and is auditable
-- Security checks pass without breaking required functionality
-initial_state: The environment is functional but overly permissive around container
-  healthchecks. Assume an auditor or pen test is next week — tighten controls with
-  evidence.
+- The `docker` service is active (running)
+- '`systemctl is-active docker` returns active'
+- The fix survives a status re-check (no marker files)
+initial_state: The `docker` service is not running (`systemctl is-active docker` → inactive/failed). Dependent
+  Security Practice tasks cannot succeed until the unit is healthy again.
 hints:
 - order: 1
   cost: 10
   content: 'Orient yourself before changing anything:
 
-    1. Inspect the current state — `docker ps` health column and `docker inspect`
-    health log.
+    1. Inspect the current state — `docker ps` health column and `docker inspect` health log.
 
     2. Write down what looks normal versus wrong or missing for container healthchecks.
 
-    3. Recall the core idea: HEALTHCHECK directives, readiness, and restart policy.
-    Form one hypothesis before you act.'
+    3. Recall the core idea: HEALTHCHECK directives, readiness, and restart policy. Form one hypothesis
+    before you act.'
 - order: 2
   cost: 15
   content: 'Plan your approach (still no spoilers):
@@ -41,19 +39,16 @@ hints:
 
     2. Decide the single smallest change that moves you toward the objective.
 
-    3. Capture evidence (command output / status) before the change so you can prove
-    it worked afterward.'
+    3. Capture evidence (command output / status) before the change so you can prove it worked afterward.'
 - order: 3
   cost: 25
   content: 'Guided walkthrough:
 
-    1. Re-check the current state — `docker ps` health column and `docker inspect`
-    health log.
+    1. Re-check the current state — `docker ps` health column and `docker inspect` health log.
 
-    2. Apply least privilege: remove the unsafe default, then grant only the explicit
-    access the workload actually needs.
+    2. Apply least privilege: remove the unsafe default, then grant only the explicit access the workload
+    actually needs.
 
     3. Verify the result — the container reports healthy and unhealthy ones are restarted.
 
-    4. Record completion: add `# FIXED-OK` to `/opt/fixitlab/academy/academy-docker-066-security-healthchecks-7.conf`,
-    then click Check Solution.'
+    4. Click Check Solution once `systemctl is-active docker` returns active.'

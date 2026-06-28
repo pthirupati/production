@@ -11,15 +11,14 @@ max_score: 100
 is_free: false
 infrastructure_type: docker
 jira_priority: Medium
-description: Backup and recovery drill for network policies. Ensure backups run on
-  schedule, retention is correct, and you can restore ingress/egress rules, selectors,
-  and default deny within the lab RTO.
+description: Kubernetes operations lab. One or more pods are **not Running** — workloads for Backup and
+  Recovery cannot serve traffic. Inspect with `kubectl get pods`, read `kubectl describe pod` events,
+  fix the root cause, and confirm all pods Running.
 objectives:
-- Backup coverage for network policies is complete and restorable
-- Retention and encryption meet the stated policy
-- A restore drill proves data integrity
-initial_state: Backup jobs exist but reliability is uncertain for network policies.
-  Leadership wants proof that restore works — not just that scripts exit zero.
+- All pods in the default namespace are Running
+- '`kubectl get pods` shows every pod Running'
+- The deployment survives `kubectl get pods` re-check
+initial_state: The cluster is up but at least one pod is CrashLoopBackOff or Pending.
 hints:
 - order: 1
   cost: 10
@@ -29,8 +28,8 @@ hints:
 
     2. Write down what looks normal versus wrong or missing for network policies.
 
-    3. Recall the core idea: ingress/egress rules, selectors, and default deny. Form
-    one hypothesis before you act.'
+    3. Recall the core idea: ingress/egress rules, selectors, and default deny. Form one hypothesis before
+    you act.'
 - order: 2
   cost: 15
   content: 'Plan your approach (still no spoilers):
@@ -39,18 +38,16 @@ hints:
 
     2. Decide the single smallest change that moves you toward the objective.
 
-    3. Capture evidence (command output / status) before the change so you can prove
-    it worked afterward.'
+    3. Capture evidence (command output / status) before the change so you can prove it worked afterward.'
 - order: 3
   cost: 25
   content: 'Guided walkthrough:
 
     1. Re-check the current state — `kubectl get netpol` and `kubectl describe netpol`.
 
-    2. Repair or run the backup job, then perform a controlled restore into a scratch
-    location to prove it works.
+    2. Repair or run the backup job, then perform a controlled restore into a scratch location to prove
+    it works.
 
     3. Verify the result — only intended pod-to-pod traffic is permitted.
 
-    4. Record completion: add `# FIXED-OK` to `/opt/fixitlab/academy/academy-kubernetes-049-backup-networkpolicy-5.conf`,
-    then click Check Solution.'
+    4. Click Check Solution once `kubectl get pods` shows every pod Running.'

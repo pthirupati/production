@@ -11,27 +11,25 @@ max_score: 100
 is_free: false
 infrastructure_type: docker
 jira_priority: Medium
-description: 'Day-2 operations: perform a routine Ansible roles task safely in Ansible
-  Automation. Follow change control — inspect, change, verify — while working with
-  role layout, defaults/vars, tasks, handlers, and dependencies.'
+description: Ansible control-node lab. Managed hosts in `webservers` are unreachable over SSH — `ansible
+  webservers -m ping` fails. Establish key-based access and verify SUCCESS/pong.
 objectives:
-- Day-2 Ansible roles work completes safely in this environment
-- Changes are verified with before/after checks
-- The system remains stable for dependent teams
-initial_state: The Ansible control node is healthy enough for scheduled work on Ansible
-  roles. Complete the maintenance task without unnecessary downtime.
+- All webservers hosts answer ansible ping with SUCCESS
+- Key-based SSH works without a password prompt
+- '`ansible webservers -m ping` returns SUCCESS for every host'
+initial_state: '`ansible webservers -m ping` fails with unreachable/permission errors until SSH keys are
+  distributed.'
 hints:
 - order: 1
   cost: 10
   content: 'Orient yourself before changing anything:
 
-    1. Inspect the current state — roles/ tree, `ansible-galaxy list`, and role variable
-    precedence.
+    1. Inspect the current state — roles/ tree, `ansible-galaxy list`, and role variable precedence.
 
     2. Write down what looks normal versus wrong or missing for Ansible roles.
 
-    3. Recall the core idea: role layout, defaults/vars, tasks, handlers, and dependencies.
-    Form one hypothesis before you act.'
+    3. Recall the core idea: role layout, defaults/vars, tasks, handlers, and dependencies. Form one hypothesis
+    before you act.'
 - order: 2
   cost: 15
   content: 'Plan your approach (still no spoilers):
@@ -40,20 +38,16 @@ hints:
 
     2. Decide the single smallest change that moves you toward the objective.
 
-    3. Capture evidence (command output / status) before the change so you can prove
-    it worked afterward.'
+    3. Capture evidence (command output / status) before the change so you can prove it worked afterward.'
 - order: 3
   cost: 25
   content: 'Guided walkthrough:
 
-    1. Re-check the current state — roles/ tree, `ansible-galaxy list`, and role variable
-    precedence.
+    1. Re-check the current state — roles/ tree, `ansible-galaxy list`, and role variable precedence.
 
-    2. Execute the maintenance in small, reversible steps, taking a snapshot or backup
-    first if the change is risky.
+    2. Execute the maintenance in small, reversible steps, taking a snapshot or backup first if the change
+    is risky.
 
-    3. Verify the result — role applies idempotently with the expected variables per
-    group.
+    3. Verify the result — role applies idempotently with the expected variables per group.
 
-    4. Record completion: add `# FIXED-OK` to `/opt/fixitlab/academy/academy-ansible-093-operate-roles-10.conf`,
-    then click Check Solution.'
+    4. Click Check Solution once `ansible webservers -m ping` returns SUCCESS for every host.'

@@ -1,3 +1,3 @@
 #!/usr/bin/env bash
-grep -q FIXED-OK /opt/fixitlab/academy/academy-postgresql-009-backup-partitioning.conf
+systemctl is-active postgresql
 exit 0

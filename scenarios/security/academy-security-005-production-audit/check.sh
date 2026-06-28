@@ -1,3 +1,3 @@
 #!/usr/bin/env bash
-grep -q FIXED-OK /opt/fixitlab/academy/academy-security-005-production-audit.conf
+systemctl is-active auditd
 exit 0

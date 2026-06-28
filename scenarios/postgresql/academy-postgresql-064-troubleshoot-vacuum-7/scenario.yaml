@@ -11,16 +11,16 @@ max_score: 100
 is_free: false
 infrastructure_type: docker
 jira_priority: Medium
-description: 'Production alert: tables bloat and queries slow over time. You are on
-  call for PostgreSQL and must troubleshoot vacuum and bloat methodically — triage
-  symptoms, isolate root cause, apply the smallest safe fix, and confirm recovery.'
+description: Service operations lab. The `postgresql` systemd unit is **failed/inactive** on this host
+  — a realistic fault for Troubleshooting Drill workflows that depend on it. Diagnose with `systemctl
+  status postgresql` and journal logs, apply the smallest reliable fix, then verify with `systemctl is-active
+  postgresql`.
 objectives:
-- 'The incident symptom is clear: tables bloat and queries slow over time'
-- Root cause is isolated with evidence, not guesswork
-- Service behavior returns to normal after the fix
-initial_state: The PostgreSQL cluster is degraded. Tables bloat and queries slow over
-  time. Recent changes may exist around vacuum and bloat, but do not restart blindly
-  — gather evidence first.
+- The `postgresql` service is active (running)
+- '`systemctl is-active postgresql` returns active'
+- The fix survives a status re-check (no marker files)
+initial_state: The `postgresql` service is not running (`systemctl is-active postgresql` → inactive/failed).
+  Dependent Troubleshooting Drill tasks cannot succeed until the unit is healthy again.
 hints:
 - order: 1
   cost: 10
@@ -30,8 +30,7 @@ hints:
 
     2. Write down what looks normal versus wrong or missing for vacuum and bloat.
 
-    3. Recall the core idea: autovacuum, dead tuples, and bloat. Form one hypothesis
-    before you act.'
+    3. Recall the core idea: autovacuum, dead tuples, and bloat. Form one hypothesis before you act.'
 - order: 2
   cost: 15
   content: 'Plan your approach (still no spoilers):
@@ -40,18 +39,16 @@ hints:
 
     2. Decide the single smallest change that moves you toward the objective.
 
-    3. Capture evidence (command output / status) before the change so you can prove
-    it worked afterward.'
+    3. Capture evidence (command output / status) before the change so you can prove it worked afterward.'
 - order: 3
   cost: 25
   content: 'Guided walkthrough:
 
     1. Re-check the current state — `pg_stat_user_tables` and autovacuum settings.
 
-    2. Fix the underlying misconfiguration you identified (not just the noisy log
-    line), changing one thing at a time.
+    2. Fix the underlying misconfiguration you identified (not just the noisy log line), changing one
+    thing at a time.
 
     3. Verify the result — vacuum keeps bloat and stats healthy.
 
-    4. Record completion: add `# FIXED-OK` to `/opt/fixitlab/academy/academy-postgresql-064-troubleshoot-vacuum-7.conf`,
-    then click Check Solution.'
+    4. Click Check Solution once `systemctl is-active postgresql` returns active.'

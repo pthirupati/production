@@ -11,15 +11,12 @@ max_score: 100
 is_free: false
 infrastructure_type: docker
 jira_priority: Medium
-description: Backup and recovery drill for GPU scheduling. Ensure backups run on schedule,
-  retention is correct, and you can restore device plugins and resource requests within
-  the lab RTO.
+description: GPU host lab. `nvidia-smi` reports the GPU unhealthy — ML/GPU workloads cannot start. Load
+  the driver / restore GPU health, then verify with `nvidia-smi`.
 objectives:
-- Backup coverage for GPU scheduling is complete and restorable
-- Retention and encryption meet the stated policy
-- A restore drill proves data integrity
-initial_state: Backup jobs exist but reliability is uncertain for GPU scheduling.
-  Leadership wants proof that restore works — not just that scripts exit zero.
+- GPU reports healthy in nvidia-smi
+- '`nvidia-smi` reports a healthy GPU'
+initial_state: The NVIDIA driver/GPU is not healthy (`nvidia-smi` fails).
 hints:
 - order: 1
   cost: 10
@@ -29,8 +26,7 @@ hints:
 
     2. Write down what looks normal versus wrong or missing for GPU scheduling.
 
-    3. Recall the core idea: device plugins and resource requests. Form one hypothesis
-    before you act.'
+    3. Recall the core idea: device plugins and resource requests. Form one hypothesis before you act.'
 - order: 2
   cost: 15
   content: 'Plan your approach (still no spoilers):
@@ -39,18 +35,16 @@ hints:
 
     2. Decide the single smallest change that moves you toward the objective.
 
-    3. Capture evidence (command output / status) before the change so you can prove
-    it worked afterward.'
+    3. Capture evidence (command output / status) before the change so you can prove it worked afterward.'
 - order: 3
   cost: 25
   content: 'Guided walkthrough:
 
     1. Re-check the current state — node GPU capacity and pod requests.
 
-    2. Repair or run the backup job, then perform a controlled restore into a scratch
-    location to prove it works.
+    2. Repair or run the backup job, then perform a controlled restore into a scratch location to prove
+    it works.
 
     3. Verify the result — GPU workloads schedule onto GPU nodes.
 
-    4. Record completion: add `# FIXED-OK` to `/opt/fixitlab/academy/academy-gpu-079-backup-scheduling-8.conf`,
-    then click Check Solution.'
+    4. Click Check Solution once `nvidia-smi` reports a healthy GPU.'

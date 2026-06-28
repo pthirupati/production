@@ -1,3 +1,3 @@
 #!/usr/bin/env bash
-grep -q FIXED-OK /opt/fixitlab/academy/academy-shell-script-002-build-conditionals.conf
+systemctl is-active rsyslog
 exit 0

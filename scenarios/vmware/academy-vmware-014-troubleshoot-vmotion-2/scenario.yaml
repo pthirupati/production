@@ -11,15 +11,15 @@ max_score: 100
 is_free: false
 infrastructure_type: docker
 jira_priority: Medium
-description: 'Production alert: a VM fails to migrate between hosts. You are on call
-  for VMware vSphere and must troubleshoot vMotion methodically — triage symptoms,
-  isolate root cause, apply the smallest safe fix, and confirm recovery.'
+description: 'Production alert: a VM fails to migrate between hosts. You are on call for VMware vSphere
+  and must troubleshoot vMotion methodically — triage symptoms, isolate root cause, apply the smallest
+  safe fix, and confirm recovery.'
 objectives:
 - 'The incident symptom is clear: a VM fails to migrate between hosts'
 - Root cause is isolated with evidence, not guesswork
 - Service behavior returns to normal after the fix
-initial_state: The vSphere lab is degraded. A vm fails to migrate between hosts. Recent
-  changes may exist around vMotion, but do not restart blindly — gather evidence first.
+initial_state: The vSphere lab is degraded. A vm fails to migrate between hosts. Recent changes may exist
+  around vMotion, but do not restart blindly — gather evidence first.
 hints:
 - order: 1
   cost: 10
@@ -29,8 +29,8 @@ hints:
 
     2. Write down what looks normal versus wrong or missing for vMotion.
 
-    3. Recall the core idea: live migration, EVC, and network requirements. Form one
-    hypothesis before you act.'
+    3. Recall the core idea: live migration, EVC, and network requirements. Form one hypothesis before
+    you act.'
 - order: 2
   cost: 15
   content: 'Plan your approach (still no spoilers):
@@ -39,19 +39,17 @@ hints:
 
     2. Decide the single smallest change that moves you toward the objective.
 
-    3. Capture evidence (command output / status) before the change so you can prove
-    it worked afterward.'
+    3. Capture evidence (command output / status) before the change so you can prove it worked afterward.'
 - order: 3
   cost: 25
   content: 'Guided walkthrough:
 
     1. Re-check the current state — vMotion network, EVC mode, and migration tasks.
 
-    2. Fix the underlying misconfiguration you identified (not just the noisy log
-    line), changing one thing at a time.
+    2. Fix the underlying misconfiguration you identified (not just the noisy log line), changing one
+    thing at a time.
 
     3. Verify the result — vMotion completes with no downtime.
 
-    4. Record completion: add `# FIXED-OK` to `/opt/fixitlab/academy/academy-vmware-014-troubleshoot-vmotion-2.conf`,
-    then click Check Solution.'
+    4. Click Check Solution once `systemctl is-active nginx` returns active.'
 vmware_link: true

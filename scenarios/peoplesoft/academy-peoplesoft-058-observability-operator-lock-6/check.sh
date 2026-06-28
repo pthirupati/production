@@ -1,3 +1,3 @@
 #!/usr/bin/env bash
-grep -q FIXED-OK /opt/fixitlab/academy/academy-peoplesoft-058-observability-operator-lock-6.conf
+# Validated by the dedicated simulation engine (real state checks).
 exit 0

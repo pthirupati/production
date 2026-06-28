@@ -11,17 +11,12 @@ max_score: 100
 is_free: false
 infrastructure_type: docker
 jira_priority: Low
-description: This beginner-friendly GPU & NVIDIA lab introduces GPU drivers. You will
-  explore driver/kernel module versions, persistence mode, and device nodes on the
-  GPU node. Read the environment first, then follow the guided steps — no prior production
-  experience required.
+description: GPU host lab. `nvidia-smi` reports the GPU unhealthy — ML/GPU workloads cannot start. Load
+  the driver / restore GPU health, then verify with `nvidia-smi`.
 objectives:
-- Understand how GPU drivers work in this lab environment
-- Identify the main status and configuration signals for GPU drivers
-- Confirm you can read the current state confidently before changing anything
-initial_state: The GPU node is online with a starter GPU drivers setup. Some pieces
-  are intentionally incomplete so you can learn how they fit together. Nothing is
-  on fire — focus on observation.
+- GPU reports healthy in nvidia-smi
+- '`nvidia-smi` reports a healthy GPU'
+initial_state: The NVIDIA driver/GPU is not healthy (`nvidia-smi` fails).
 hints:
 - order: 1
   cost: 10
@@ -31,8 +26,8 @@ hints:
 
     2. Write down what looks normal versus wrong or missing for GPU drivers.
 
-    3. Recall the core idea: driver/kernel module versions, persistence mode, and
-    device nodes. Form one hypothesis before you act.'
+    3. Recall the core idea: driver/kernel module versions, persistence mode, and device nodes. Form one
+    hypothesis before you act.'
 - order: 2
   cost: 15
   content: 'Plan your approach (still no spoilers):
@@ -41,19 +36,16 @@ hints:
 
     2. Decide the single smallest change that moves you toward the objective.
 
-    3. Capture evidence (command output / status) before the change so you can prove
-    it worked afterward.'
+    3. Capture evidence (command output / status) before the change so you can prove it worked afterward.'
 - order: 3
   cost: 25
   content: 'Guided walkthrough:
 
     1. Re-check the current state — `nvidia-smi`, `dmesg`, and driver package versions.
 
-    2. Make one small, reversible change toward the objective, re-reading status after
-    each step so you understand cause and effect.
+    2. Make one small, reversible change toward the objective, re-reading status after each step so you
+    understand cause and effect.
 
-    3. Verify the result — nvidia-smi reports healthy devices and sample CUDA jobs
-    run.
+    3. Verify the result — nvidia-smi reports healthy devices and sample CUDA jobs run.
 
-    4. Record completion: add `# FIXED-OK` to `/opt/fixitlab/academy/academy-gpu-011-learn-drivers-2.conf`,
-    then click Check Solution.'
+    4. Click Check Solution once `nvidia-smi` reports a healthy GPU.'

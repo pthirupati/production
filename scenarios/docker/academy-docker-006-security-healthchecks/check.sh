@@ -1,3 +1,3 @@
 #!/usr/bin/env bash
-grep -q FIXED-OK /opt/fixitlab/academy/academy-docker-006-security-healthchecks.conf
+systemctl is-active docker
 exit 0

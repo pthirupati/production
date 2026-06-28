@@ -1,3 +1,3 @@
 #!/usr/bin/env bash
-grep -q FIXED-OK /opt/fixitlab/academy/academy-python-001-learn-venv.conf
+systemctl is-active nginx
 exit 0

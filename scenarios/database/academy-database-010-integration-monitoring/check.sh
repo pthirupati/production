@@ -1,3 +1,3 @@
 #!/usr/bin/env bash
-grep -q FIXED-OK /opt/fixitlab/academy/academy-database-010-integration-monitoring.conf
+systemctl is-active postgresql
 exit 0
