@@ -483,7 +483,7 @@ export default function AdminScenarios() {
                     {hints.map(h => (
                       <div key={h.id} className="flex items-start gap-2 p-2 rounded-lg bg-surface-800/40 text-sm">
                         <span className="text-accent-amber text-xs font-mono shrink-0">-{h.penalty}pts</span>
-                        <span className="text-surface-300 flex-1">{h.content}</span>
+                        <span className="text-surface-300 flex-1 whitespace-pre-wrap">{h.content}</span>
                         <button type="button" onClick={() => handleDeleteHint(h.id)} className="text-surface-500 hover:text-red-400"><Trash2 size={14} /></button>
                       </div>
                     ))}

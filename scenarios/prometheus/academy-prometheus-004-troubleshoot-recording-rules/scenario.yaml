@@ -13,7 +13,8 @@ infrastructure_type: docker
 jira_priority: Medium
 description: 'Production alert: dashboards are slow on expensive queries. You are
   on call for Prometheus Monitoring and must troubleshoot recording rules methodically
-  — triage symptoms, find root cause, apply the smallest safe fix, and confirm recovery.'
+  — triage symptoms, isolate root cause, apply the smallest safe fix, and confirm
+  recovery.'
 objectives:
 - 'The incident symptom is clear: dashboards are slow on expensive queries'
 - Root cause is isolated with evidence, not guesswork
@@ -24,14 +25,34 @@ initial_state: The Prometheus stack is degraded. Dashboards are slow on expensiv
 hints:
 - order: 1
   cost: 10
-  content: 'Triage: recording rule files and resulting series. Capture timestamps,
-    error messages, and what still works.'
+  content: 'Orient yourself before changing anything:
+
+    1. Inspect the current state — recording rule files and resulting series.
+
+    2. Write down what looks normal versus wrong or missing for recording rules.
+
+    3. Recall the core idea: precomputed series and naming. Form one hypothesis before
+    you act.'
 - order: 2
   cost: 15
-  content: Separate symptom from cause. Fix the underlying misconfiguration, not only
-    the noisy log line.
+  content: 'Plan your approach (still no spoilers):
+
+    1. Confirm the exact gap between current and desired state for recording rules.
+
+    2. Decide the single smallest change that moves you toward the objective.
+
+    3. Capture evidence (command output / status) before the change so you can prove
+    it worked afterward.'
 - order: 3
-  cost: 20
-  content: 'Verify recovery: recording rules produce the expected series. Document
-    the fix, add `# FIXED-OK` to `/opt/fixitlab/academy/academy-prometheus-004-troubleshoot-recording-rules.conf`,
-    and rerun Check Solution.'
+  cost: 25
+  content: 'Guided walkthrough:
+
+    1. Re-check the current state — recording rule files and resulting series.
+
+    2. Fix the underlying misconfiguration you identified (not just the noisy log
+    line), changing one thing at a time.
+
+    3. Verify the result — recording rules produce the expected series.
+
+    4. Record completion: add `# FIXED-OK` to `/opt/fixitlab/academy/academy-prometheus-004-troubleshoot-recording-rules.conf`,
+    then click Check Solution.'

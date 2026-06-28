@@ -13,26 +13,50 @@ infrastructure_type: docker
 jira_priority: Low
 description: This beginner-friendly Wireshark Packet Analysis lab introduces capture/display
   filters. You will explore BPF/display filters, protocol fields, and follow streams
-  on the capture lab. Read the environment first, then complete the guided steps —
-  no prior production experience required.
+  on the capture lab. Read the environment first, then follow the guided steps — no
+  prior production experience required.
 objectives:
 - Understand how capture/display filters work in this lab environment
 - Identify the main status and configuration signals for capture/display filters
 - Confirm you can read the current state confidently before changing anything
 initial_state: The capture lab is online with a starter capture/display filters setup.
-  Some pieces are intentionally incomplete so you can learn how the pieces fit together.
-  Nothing is on fire yet — focus on observation and understanding.
+  Some pieces are intentionally incomplete so you can learn how they fit together.
+  Nothing is on fire — focus on observation.
 hints:
 - order: 1
   cost: 10
-  content: 'Orient yourself: Wireshark filter bar, protocol decode panes, and IO graphs.
-    Write down what looks normal vs missing.'
+  content: 'Orient yourself before changing anything:
+
+    1. Inspect the current state — Wireshark filter bar, protocol decode panes, and
+    IO graphs.
+
+    2. Write down what looks normal versus wrong or missing for capture/display filters.
+
+    3. Recall the core idea: BPF/display filters, protocol fields, and follow streams.
+    Form one hypothesis before you act.'
 - order: 2
   cost: 15
-  content: Core idea — BPF/display filters, protocol fields, and follow streams. Make
-    one small, reversible change at a time and re-check status.
+  content: 'Plan your approach (still no spoilers):
+
+    1. Confirm the exact gap between current and desired state for capture/display
+    filters.
+
+    2. Decide the single smallest change that moves you toward the objective.
+
+    3. Capture evidence (command output / status) before the change so you can prove
+    it worked afterward.'
 - order: 3
-  cost: 20
-  content: When the lab objective is done, record completion by adding `# FIXED-OK`
-    to `/opt/fixitlab/academy/academy-wireshark-041-learn-filters-5.conf`, then click
-    Check Solution.
+  cost: 25
+  content: 'Guided walkthrough:
+
+    1. Re-check the current state — Wireshark filter bar, protocol decode panes, and
+    IO graphs.
+
+    2. Make one small, reversible change toward the objective, re-reading status after
+    each step so you understand cause and effect.
+
+    3. Verify the result — the target flow is isolated with enough context to explain
+    latency/errors.
+
+    4. Record completion: add `# FIXED-OK` to `/opt/fixitlab/academy/academy-wireshark-041-learn-filters-5.conf`,
+    then click Check Solution.'

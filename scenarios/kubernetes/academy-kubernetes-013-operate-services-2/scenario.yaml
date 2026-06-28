@@ -23,13 +23,37 @@ initial_state: The Kubernetes cluster is healthy enough for scheduled work on Ku
 hints:
 - order: 1
   cost: 10
-  content: 'Pre-check: `kubectl get svc,endpoints`, `kubectl describe svc`, and pod
-    labels. Confirm backups or snapshots if the change is risky.'
+  content: 'Orient yourself before changing anything:
+
+    1. Inspect the current state — `kubectl get svc,endpoints`, `kubectl describe
+    svc`, and pod labels.
+
+    2. Write down what looks normal versus wrong or missing for Kubernetes Services.
+
+    3. Recall the core idea: ClusterIP/NodePort/LoadBalancer, selectors, endpoints,
+    and kube-proxy routing. Form one hypothesis before you act.'
 - order: 2
   cost: 15
-  content: Execute the maintenance in small steps. Prefer reversible changes.
+  content: 'Plan your approach (still no spoilers):
+
+    1. Confirm the exact gap between current and desired state for Kubernetes Services.
+
+    2. Decide the single smallest change that moves you toward the objective.
+
+    3. Capture evidence (command output / status) before the change so you can prove
+    it worked afterward.'
 - order: 3
-  cost: 20
-  content: 'Post-check: Service endpoints match ready pods and probes succeed through
-    the Service IP. Add `# FIXED-OK` to `/opt/fixitlab/academy/academy-kubernetes-013-operate-services-2.conf`
-    and run Check Solution.'
+  cost: 25
+  content: 'Guided walkthrough:
+
+    1. Re-check the current state — `kubectl get svc,endpoints`, `kubectl describe
+    svc`, and pod labels.
+
+    2. Execute the maintenance in small, reversible steps, taking a snapshot or backup
+    first if the change is risky.
+
+    3. Verify the result — Service endpoints match ready pods and probes succeed through
+    the Service IP.
+
+    4. Record completion: add `# FIXED-OK` to `/opt/fixitlab/academy/academy-kubernetes-013-operate-services-2.conf`,
+    then click Check Solution.'

@@ -13,7 +13,7 @@ infrastructure_type: docker
 jira_priority: Medium
 description: 'Production alert: routes 404 or guards do not protect pages. You are
   on call for React Development and must troubleshoot routing methodically — triage
-  symptoms, find root cause, apply the smallest safe fix, and confirm recovery.'
+  symptoms, isolate root cause, apply the smallest safe fix, and confirm recovery.'
 objectives:
 - 'The incident symptom is clear: routes 404 or guards do not protect pages'
 - Root cause is isolated with evidence, not guesswork
@@ -24,14 +24,34 @@ initial_state: The React application is degraded. Routes 404 or guards do not pr
 hints:
 - order: 1
   cost: 10
-  content: 'Triage: route config and URL params. Capture timestamps, error messages,
-    and what still works.'
+  content: 'Orient yourself before changing anything:
+
+    1. Inspect the current state — route config and URL params.
+
+    2. Write down what looks normal versus wrong or missing for routing.
+
+    3. Recall the core idea: routes, params, and navigation guards. Form one hypothesis
+    before you act.'
 - order: 2
   cost: 15
-  content: Separate symptom from cause. Fix the underlying misconfiguration, not only
-    the noisy log line.
+  content: 'Plan your approach (still no spoilers):
+
+    1. Confirm the exact gap between current and desired state for routing.
+
+    2. Decide the single smallest change that moves you toward the objective.
+
+    3. Capture evidence (command output / status) before the change so you can prove
+    it worked afterward.'
 - order: 3
-  cost: 20
-  content: 'Verify recovery: navigation and guards work as intended. Document the
-    fix, add `# FIXED-OK` to `/opt/fixitlab/academy/academy-react-054-troubleshoot-router-6.conf`,
-    and rerun Check Solution.'
+  cost: 25
+  content: 'Guided walkthrough:
+
+    1. Re-check the current state — route config and URL params.
+
+    2. Fix the underlying misconfiguration you identified (not just the noisy log
+    line), changing one thing at a time.
+
+    3. Verify the result — navigation and guards work as intended.
+
+    4. Record completion: add `# FIXED-OK` to `/opt/fixitlab/academy/academy-react-054-troubleshoot-router-6.conf`,
+    then click Check Solution.'

@@ -1639,7 +1639,7 @@ export default function LabRunner() {
                             <span className="text-xs font-semibold text-accent-amber">Hint {hint.order}</span>
                             <span className="text-[10px] text-surface-600">(-{hint.penalty} pts)</span>
                           </div>
-                          <p className="text-sm text-surface-300 leading-relaxed">{hint.content}</p>
+                          <p className="text-sm text-surface-300 leading-relaxed whitespace-pre-wrap">{hint.content}</p>
                         </div>
                       ))}
                     </div>

@@ -23,14 +23,36 @@ initial_state: A feature fix works in dev, but backup workflows is not productio
 hints:
 - order: 1
   cost: 10
-  content: Review SLO impact, rollback plan, and blast radius before changing production
-    settings.
+  content: 'Orient yourself before changing anything:
+
+    1. Inspect the current state — backup job logs, catalog/metadata, and latest restore
+    test results.
+
+    2. Write down what looks normal versus wrong or missing for backup workflows.
+
+    3. Recall the core idea: full/incremental backups, retention, encryption, and
+    restore drills. Form one hypothesis before you act.'
 - order: 2
   cost: 15
-  content: 'Apply production standards: limits, monitoring, and access controls for
-    backup workflows.'
+  content: 'Plan your approach (still no spoilers):
+
+    1. Confirm the exact gap between current and desired state for backup workflows.
+
+    2. Decide the single smallest change that moves you toward the objective.
+
+    3. Capture evidence (command output / status) before the change so you can prove
+    it worked afterward.'
 - order: 3
-  cost: 20
-  content: 'Run post-change verification: a restore completes within policy and data
-    checksums match. Record `# FIXED-OK` in `/opt/fixitlab/academy/academy-sqlite-095-production-backup-10.conf`
-    when complete.'
+  cost: 25
+  content: 'Guided walkthrough:
+
+    1. Re-check the current state — backup job logs, catalog/metadata, and latest
+    restore test results.
+
+    2. Apply production standards for backup workflows: resource limits, monitoring,
+    access controls, and a written rollback step.
+
+    3. Verify the result — a restore completes within policy and data checksums match.
+
+    4. Record completion: add `# FIXED-OK` to `/opt/fixitlab/academy/academy-sqlite-095-production-backup-10.conf`,
+    then click Check Solution.'

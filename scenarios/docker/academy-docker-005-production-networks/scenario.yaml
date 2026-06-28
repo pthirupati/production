@@ -23,14 +23,37 @@ initial_state: A feature fix works in dev, but Docker networks is not production
 hints:
 - order: 1
   cost: 10
-  content: Review SLO impact, rollback plan, and blast radius before changing production
-    settings.
+  content: 'Orient yourself before changing anything:
+
+    1. Inspect the current state — `docker network ls`, `docker network inspect`,
+    and `docker port`.
+
+    2. Write down what looks normal versus wrong or missing for Docker networks.
+
+    3. Recall the core idea: bridge/overlay networks, DNS names, published ports,
+    and container-to-container connectivity. Form one hypothesis before you act.'
 - order: 2
   cost: 15
-  content: 'Apply production standards: limits, monitoring, and access controls for
-    Docker networks.'
+  content: 'Plan your approach (still no spoilers):
+
+    1. Confirm the exact gap between current and desired state for Docker networks.
+
+    2. Decide the single smallest change that moves you toward the objective.
+
+    3. Capture evidence (command output / status) before the change so you can prove
+    it worked afterward.'
 - order: 3
-  cost: 20
-  content: 'Run post-change verification: expected containers share the correct network
-    and connectivity works on the service port. Record `# FIXED-OK` in `/opt/fixitlab/academy/academy-docker-005-production-networks.conf`
-    when complete.'
+  cost: 25
+  content: 'Guided walkthrough:
+
+    1. Re-check the current state — `docker network ls`, `docker network inspect`,
+    and `docker port`.
+
+    2. Apply production standards for Docker networks: resource limits, monitoring,
+    access controls, and a written rollback step.
+
+    3. Verify the result — expected containers share the correct network and connectivity
+    works on the service port.
+
+    4. Record completion: add `# FIXED-OK` to `/opt/fixitlab/academy/academy-docker-005-production-networks.conf`,
+    then click Check Solution.'

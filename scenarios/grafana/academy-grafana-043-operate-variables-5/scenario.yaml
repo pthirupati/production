@@ -23,13 +23,35 @@ initial_state: The Grafana stack is healthy enough for scheduled work on Terrafo
 hints:
 - order: 1
   cost: 10
-  content: 'Pre-check: variables.tf, *.tfvars, and `terraform console`. Confirm backups
-    or snapshots if the change is risky.'
+  content: 'Orient yourself before changing anything:
+
+    1. Inspect the current state — variables.tf, *.tfvars, and `terraform console`.
+
+    2. Write down what looks normal versus wrong or missing for Terraform variables.
+
+    3. Recall the core idea: input variables, defaults, validation, and tfvars layering.
+    Form one hypothesis before you act.'
 - order: 2
   cost: 15
-  content: Execute the maintenance in small steps. Prefer reversible changes.
+  content: 'Plan your approach (still no spoilers):
+
+    1. Confirm the exact gap between current and desired state for Terraform variables.
+
+    2. Decide the single smallest change that moves you toward the objective.
+
+    3. Capture evidence (command output / status) before the change so you can prove
+    it worked afterward.'
 - order: 3
-  cost: 20
-  content: 'Post-check: the correct tfvars set is used and `terraform validate` passes.
-    Add `# FIXED-OK` to `/opt/fixitlab/academy/academy-grafana-043-operate-variables-5.conf`
-    and run Check Solution.'
+  cost: 25
+  content: 'Guided walkthrough:
+
+    1. Re-check the current state — variables.tf, *.tfvars, and `terraform console`.
+
+    2. Execute the maintenance in small, reversible steps, taking a snapshot or backup
+    first if the change is risky.
+
+    3. Verify the result — the correct tfvars set is used and `terraform validate`
+    passes.
+
+    4. Record completion: add `# FIXED-OK` to `/opt/fixitlab/academy/academy-grafana-043-operate-variables-5.conf`,
+    then click Check Solution.'

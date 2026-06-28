@@ -23,14 +23,34 @@ initial_state: The environment is functional but overly permissive around connec
 hints:
 - order: 1
   cost: 10
-  content: 'Baseline current exposure: pool config and active connections. Note world-readable
-    files, open ports, or excessive roles.'
+  content: 'Orient yourself before changing anything:
+
+    1. Inspect the current state — pool config and active connections.
+
+    2. Write down what looks normal versus wrong or missing for connection pooling.
+
+    3. Recall the core idea: pool size, timeouts, and leaks. Form one hypothesis before
+    you act.'
 - order: 2
   cost: 15
-  content: Apply least privilege incrementally. Prefer explicit allows over broad
-    wildcards.
+  content: 'Plan your approach (still no spoilers):
+
+    1. Confirm the exact gap between current and desired state for connection pooling.
+
+    2. Decide the single smallest change that moves you toward the objective.
+
+    3. Capture evidence (command output / status) before the change so you can prove
+    it worked afterward.'
 - order: 3
-  cost: 20
-  content: Re-test legitimate workflows after hardening. Finish with `# FIXED-OK`
-    in `/opt/fixitlab/academy/academy-database-066-security-pooling-7.conf` and Check
-    Solution.
+  cost: 25
+  content: 'Guided walkthrough:
+
+    1. Re-check the current state — pool config and active connections.
+
+    2. Apply least privilege: remove the unsafe default, then grant only the explicit
+    access the workload actually needs.
+
+    3. Verify the result — the pool serves load without exhaustion.
+
+    4. Record completion: add `# FIXED-OK` to `/opt/fixitlab/academy/academy-database-066-security-pooling-7.conf`,
+    then click Check Solution.'

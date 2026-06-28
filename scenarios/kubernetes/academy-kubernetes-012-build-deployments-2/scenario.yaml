@@ -13,26 +13,48 @@ infrastructure_type: docker
 jira_priority: Low
 description: Build Deployments from scratch in this Kubernetes lab. You start from
   a minimal environment and must produce a working configuration that demonstrates
-  replicas, rollout strategy, selectors, and revision history. Treat this like a greenfield
-  task — plan, implement, then prove it works.
+  replicas, rollout strategy, selectors, and revision history. Plan, implement, then
+  prove it works.
 objectives:
 - A working Deployments setup must exist by the end of this lab
 - Configuration should follow team conventions and be easy to audit
 - The result should pass validation without manual cleanup
 initial_state: The Kubernetes cluster is ready but Deployments is not configured yet.
-  Required packages/tools may already be installed; your job is to create the config
+  Required tools may already be installed; your job is to create the configuration
   and bring the capability online.
 hints:
 - order: 1
   cost: 10
-  content: 'List prerequisites first: which packages, files, or API objects must exist
-    for Deployments?'
+  content: 'Orient yourself before changing anything:
+
+    1. Inspect the current state — `kubectl get deploy`, `kubectl rollout status`,
+    and `kubectl describe deploy`.
+
+    2. Write down what looks normal versus wrong or missing for Deployments.
+
+    3. Recall the core idea: replicas, rollout strategy, selectors, and revision history.
+    Form one hypothesis before you act.'
 - order: 2
   cost: 15
-  content: Implement incrementally — create the smallest working slice of Deployments,
-    validate, then add the remaining pieces.
+  content: 'Plan your approach (still no spoilers):
+
+    1. Confirm the exact gap between current and desired state for Deployments.
+
+    2. Decide the single smallest change that moves you toward the objective.
+
+    3. Capture evidence (command output / status) before the change so you can prove
+    it worked afterward.'
 - order: 3
-  cost: 20
-  content: 'Prove success: desired replicas are available and the rollout completed.
-    Mark the lab complete with `# FIXED-OK` in `/opt/fixitlab/academy/academy-kubernetes-012-build-deployments-2.conf`
-    and run Check Solution.'
+  cost: 25
+  content: 'Guided walkthrough:
+
+    1. Re-check the current state — `kubectl get deploy`, `kubectl rollout status`,
+    and `kubectl describe deploy`.
+
+    2. Create the smallest working slice of Deployments first, validate it, then add
+    the remaining pieces one at a time.
+
+    3. Verify the result — desired replicas are available and the rollout completed.
+
+    4. Record completion: add `# FIXED-OK` to `/opt/fixitlab/academy/academy-kubernetes-012-build-deployments-2.conf`,
+    then click Check Solution.'

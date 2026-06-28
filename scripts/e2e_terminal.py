@@ -80,13 +80,20 @@ async def _check_terminal_async(session_id: str, token: str) -> tuple[bool, str]
             ):
                 return False, f"no shell prompt (tail: {output[-120:]!r})"
 
-            await asyncio.sleep(1.5)
+            # Give a freshly-attached PTY time to wire up its line discipline.
+            # Under remote-docker (cluster D4) latency the first keystroke can be
+            # dropped if sent too early, so we settle, send a priming newline, and
+            # then re-send the echo periodically until the marker comes back rather
+            # than relying on a single send.
+            await asyncio.sleep(2.5)
+            await ws.send(json.dumps({"input": "\r\n"}))
+            await asyncio.sleep(0.5)
             await ws.send(json.dumps({"input": f"echo {MARKER}\r\n"}))
 
             echo_out = ""
             saw_marker = False
-            echo_deadline = time.time() + 20
-            retried = False
+            echo_deadline = time.time() + 30
+            last_send = time.time()
             while time.time() < echo_deadline:
                 try:
                     data = await _recv_json(ws, timeout=2.0)
@@ -98,11 +105,12 @@ async def _check_terminal_async(session_id: str, token: str) -> tuple[bool, str]
                         saw_marker = True
                         break
                 except asyncio.TimeoutError:
-                    # Retry echo once at the midpoint if still not found
-                    if not retried and time.time() > echo_deadline - 10:
-                        retried = True
-                        await ws.send(json.dumps({"input": f"echo {MARKER}\r\n"}))
-                    continue
+                    pass
+                # Re-send the echo every ~4s in case an early keystroke was dropped
+                # before the remote PTY finished attaching.
+                if not saw_marker and time.time() - last_send > 4:
+                    last_send = time.time()
+                    await ws.send(json.dumps({"input": f"echo {MARKER}\r\n"}))
             if not saw_marker:
                 return False, f"echo {MARKER} not returned (tail: {echo_out[-120:]!r})"
 

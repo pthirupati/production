@@ -23,12 +23,34 @@ initial_state: The system runs, but TSDB lacks useful telemetry. Dashboards/aler
 hints:
 - order: 1
   cost: 10
-  content: 'Find existing signals: storage flags and TSDB stats. Identify what is
-    missing for fast triage.'
+  content: 'Orient yourself before changing anything:
+
+    1. Inspect the current state — storage flags and TSDB stats.
+
+    2. Write down what looks normal versus wrong or missing for TSDB.
+
+    3. Recall the core idea: retention, blocks, and disk usage. Form one hypothesis
+    before you act.'
 - order: 2
   cost: 15
-  content: Add or fix exporters/dashboards/alerts with clear names, labels, and thresholds.
+  content: 'Plan your approach (still no spoilers):
+
+    1. Confirm the exact gap between current and desired state for TSDB.
+
+    2. Decide the single smallest change that moves you toward the objective.
+
+    3. Capture evidence (command output / status) before the change so you can prove
+    it worked afterward.'
 - order: 3
-  cost: 20
-  content: Trigger a test event and confirm it appears where on-call looks. Complete
-    via `/opt/fixitlab/academy/academy-prometheus-098-observability-tsdb-10.conf`.
+  cost: 25
+  content: 'Guided walkthrough:
+
+    1. Re-check the current state — storage flags and TSDB stats.
+
+    2. Add or fix the exporter / dashboard / alert with clear names, labels, and a
+    sensible threshold.
+
+    3. Verify the result — retention and storage are within budget.
+
+    4. Record completion: add `# FIXED-OK` to `/opt/fixitlab/academy/academy-prometheus-098-observability-tsdb-10.conf`,
+    then click Check Solution.'

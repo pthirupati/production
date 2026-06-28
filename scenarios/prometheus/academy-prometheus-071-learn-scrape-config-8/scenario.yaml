@@ -13,26 +13,46 @@ infrastructure_type: docker
 jira_priority: Low
 description: This beginner-friendly Prometheus Monitoring lab introduces scrape config.
   You will explore jobs, targets, and relabeling on the Prometheus stack. Read the
-  environment first, then complete the guided steps — no prior production experience
+  environment first, then follow the guided steps — no prior production experience
   required.
 objectives:
 - Understand how scrape config work in this lab environment
 - Identify the main status and configuration signals for scrape config
 - Confirm you can read the current state confidently before changing anything
 initial_state: The Prometheus stack is online with a starter scrape config setup.
-  Some pieces are intentionally incomplete so you can learn how the pieces fit together.
-  Nothing is on fire yet — focus on observation and understanding.
+  Some pieces are intentionally incomplete so you can learn how they fit together.
+  Nothing is on fire — focus on observation.
 hints:
 - order: 1
   cost: 10
-  content: 'Orient yourself: prometheus.yml and the Targets page. Write down what
-    looks normal vs missing.'
+  content: 'Orient yourself before changing anything:
+
+    1. Inspect the current state — prometheus.yml and the Targets page.
+
+    2. Write down what looks normal versus wrong or missing for scrape config.
+
+    3. Recall the core idea: jobs, targets, and relabeling. Form one hypothesis before
+    you act.'
 - order: 2
   cost: 15
-  content: Core idea — jobs, targets, and relabeling. Make one small, reversible change
-    at a time and re-check status.
+  content: 'Plan your approach (still no spoilers):
+
+    1. Confirm the exact gap between current and desired state for scrape config.
+
+    2. Decide the single smallest change that moves you toward the objective.
+
+    3. Capture evidence (command output / status) before the change so you can prove
+    it worked afterward.'
 - order: 3
-  cost: 20
-  content: When the lab objective is done, record completion by adding `# FIXED-OK`
-    to `/opt/fixitlab/academy/academy-prometheus-071-learn-scrape-config-8.conf`,
-    then click Check Solution.
+  cost: 25
+  content: 'Guided walkthrough:
+
+    1. Re-check the current state — prometheus.yml and the Targets page.
+
+    2. Make one small, reversible change toward the objective, re-reading status after
+    each step so you understand cause and effect.
+
+    3. Verify the result — targets are UP and metrics flow in.
+
+    4. Record completion: add `# FIXED-OK` to `/opt/fixitlab/academy/academy-prometheus-071-learn-scrape-config-8.conf`,
+    then click Check Solution.'

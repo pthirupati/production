@@ -23,14 +23,34 @@ initial_state: The environment is functional but overly permissive around respon
 hints:
 - order: 1
   cost: 10
-  content: 'Baseline current exposure: the layout at multiple widths. Note world-readable
-    files, open ports, or excessive roles.'
+  content: 'Orient yourself before changing anything:
+
+    1. Inspect the current state — the layout at multiple widths.
+
+    2. Write down what looks normal versus wrong or missing for responsive design.
+
+    3. Recall the core idea: breakpoints, fluid layout, and viewport. Form one hypothesis
+    before you act.'
 - order: 2
   cost: 15
-  content: Apply least privilege incrementally. Prefer explicit allows over broad
-    wildcards.
+  content: 'Plan your approach (still no spoilers):
+
+    1. Confirm the exact gap between current and desired state for responsive design.
+
+    2. Decide the single smallest change that moves you toward the objective.
+
+    3. Capture evidence (command output / status) before the change so you can prove
+    it worked afterward.'
 - order: 3
-  cost: 20
-  content: Re-test legitimate workflows after hardening. Finish with `# FIXED-OK`
-    in `/opt/fixitlab/academy/academy-html-036-security-responsive-4.conf` and Check
-    Solution.
+  cost: 25
+  content: 'Guided walkthrough:
+
+    1. Re-check the current state — the layout at multiple widths.
+
+    2. Apply least privilege: remove the unsafe default, then grant only the explicit
+    access the workload actually needs.
+
+    3. Verify the result — the page adapts cleanly across screen sizes.
+
+    4. Record completion: add `# FIXED-OK` to `/opt/fixitlab/academy/academy-html-036-security-responsive-4.conf`,
+    then click Check Solution.'

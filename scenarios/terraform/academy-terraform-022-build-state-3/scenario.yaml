@@ -13,26 +13,48 @@ infrastructure_type: docker
 jira_priority: Low
 description: Build Terraform state from scratch in this Terraform & IaC lab. You start
   from a minimal environment and must produce a working configuration that demonstrates
-  local vs remote state, locking, drift, and resource addressing. Treat this like
-  a greenfield task — plan, implement, then prove it works.
+  local vs remote state, locking, drift, and resource addressing. Plan, implement,
+  then prove it works.
 objectives:
 - A working Terraform state setup must exist by the end of this lab
 - Configuration should follow team conventions and be easy to audit
 - The result should pass validation without manual cleanup
 initial_state: The Terraform workspace is ready but Terraform state is not configured
-  yet. Required packages/tools may already be installed; your job is to create the
-  config and bring the capability online.
+  yet. Required tools may already be installed; your job is to create the configuration
+  and bring the capability online.
 hints:
 - order: 1
   cost: 10
-  content: 'List prerequisites first: which packages, files, or API objects must exist
-    for Terraform state?'
+  content: 'Orient yourself before changing anything:
+
+    1. Inspect the current state — `terraform state list`, `terraform show`, and backend
+    config.
+
+    2. Write down what looks normal versus wrong or missing for Terraform state.
+
+    3. Recall the core idea: local vs remote state, locking, drift, and resource addressing.
+    Form one hypothesis before you act.'
 - order: 2
   cost: 15
-  content: Implement incrementally — create the smallest working slice of Terraform
-    state, validate, then add the remaining pieces.
+  content: 'Plan your approach (still no spoilers):
+
+    1. Confirm the exact gap between current and desired state for Terraform state.
+
+    2. Decide the single smallest change that moves you toward the objective.
+
+    3. Capture evidence (command output / status) before the change so you can prove
+    it worked afterward.'
 - order: 3
-  cost: 20
-  content: 'Prove success: state accurately reflects deployed resources. Mark the
-    lab complete with `# FIXED-OK` in `/opt/fixitlab/academy/academy-terraform-022-build-state-3.conf`
-    and run Check Solution.'
+  cost: 25
+  content: 'Guided walkthrough:
+
+    1. Re-check the current state — `terraform state list`, `terraform show`, and
+    backend config.
+
+    2. Create the smallest working slice of Terraform state first, validate it, then
+    add the remaining pieces one at a time.
+
+    3. Verify the result — state accurately reflects deployed resources.
+
+    4. Record completion: add `# FIXED-OK` to `/opt/fixitlab/academy/academy-terraform-022-build-state-3.conf`,
+    then click Check Solution.'

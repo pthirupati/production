@@ -13,26 +13,48 @@ infrastructure_type: docker
 jira_priority: Low
 description: This beginner-friendly Kubernetes lab introduces Kubernetes pods. You
   will explore pod spec, containers, probes, resources, and scheduling on the Kubernetes
-  cluster. Read the environment first, then complete the guided steps — no prior production
+  cluster. Read the environment first, then follow the guided steps — no prior production
   experience required.
 objectives:
 - Understand how Kubernetes pods work in this lab environment
 - Identify the main status and configuration signals for Kubernetes pods
 - Confirm you can read the current state confidently before changing anything
 initial_state: The Kubernetes cluster is online with a starter Kubernetes pods setup.
-  Some pieces are intentionally incomplete so you can learn how the pieces fit together.
-  Nothing is on fire yet — focus on observation and understanding.
+  Some pieces are intentionally incomplete so you can learn how they fit together.
+  Nothing is on fire — focus on observation.
 hints:
 - order: 1
   cost: 10
-  content: 'Orient yourself: `kubectl describe pod`, `kubectl logs`, and the rendered
-    manifest. Write down what looks normal vs missing.'
+  content: 'Orient yourself before changing anything:
+
+    1. Inspect the current state — `kubectl describe pod`, `kubectl logs`, and the
+    rendered manifest.
+
+    2. Write down what looks normal versus wrong or missing for Kubernetes pods.
+
+    3. Recall the core idea: pod spec, containers, probes, resources, and scheduling.
+    Form one hypothesis before you act.'
 - order: 2
   cost: 15
-  content: Core idea — pod spec, containers, probes, resources, and scheduling. Make
-    one small, reversible change at a time and re-check status.
+  content: 'Plan your approach (still no spoilers):
+
+    1. Confirm the exact gap between current and desired state for Kubernetes pods.
+
+    2. Decide the single smallest change that moves you toward the objective.
+
+    3. Capture evidence (command output / status) before the change so you can prove
+    it worked afterward.'
 - order: 3
-  cost: 20
-  content: When the lab objective is done, record completion by adding `# FIXED-OK`
-    to `/opt/fixitlab/academy/academy-kubernetes-011-learn-pods-2.conf`, then click
-    Check Solution.
+  cost: 25
+  content: 'Guided walkthrough:
+
+    1. Re-check the current state — `kubectl describe pod`, `kubectl logs`, and the
+    rendered manifest.
+
+    2. Make one small, reversible change toward the objective, re-reading status after
+    each step so you understand cause and effect.
+
+    3. Verify the result — pods are Running/Ready with healthy probe results.
+
+    4. Record completion: add `# FIXED-OK` to `/opt/fixitlab/academy/academy-kubernetes-011-learn-pods-2.conf`,
+    then click Check Solution.'

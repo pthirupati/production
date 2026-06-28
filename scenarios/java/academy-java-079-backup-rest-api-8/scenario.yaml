@@ -19,15 +19,38 @@ objectives:
 - Retention and encryption meet the stated policy
 - A restore drill proves data integrity
 initial_state: Backup jobs exist but reliability is uncertain for REST APIs. Leadership
-  wants proof that restore works — not just that backup scripts exit zero.
+  wants proof that restore works — not just that scripts exit zero.
 hints:
 - order: 1
   cost: 10
-  content: Inspect backup schedules, last success time, and destination free space.
+  content: 'Orient yourself before changing anything:
+
+    1. Inspect the current state — controller mappings and responses.
+
+    2. Write down what looks normal versus wrong or missing for REST APIs.
+
+    3. Recall the core idea: controllers, status codes, and validation. Form one hypothesis
+    before you act.'
 - order: 2
   cost: 15
-  content: Run or repair the backup job, then perform a controlled restore to a scratch
-    location.
+  content: 'Plan your approach (still no spoilers):
+
+    1. Confirm the exact gap between current and desired state for REST APIs.
+
+    2. Decide the single smallest change that moves you toward the objective.
+
+    3. Capture evidence (command output / status) before the change so you can prove
+    it worked afterward.'
 - order: 3
-  cost: 20
-  content: Compare restored data to source. Complete the lab via `# FIXED-OK` in `/opt/fixitlab/academy/academy-java-079-backup-rest-api-8.conf`.
+  cost: 25
+  content: 'Guided walkthrough:
+
+    1. Re-check the current state — controller mappings and responses.
+
+    2. Repair or run the backup job, then perform a controlled restore into a scratch
+    location to prove it works.
+
+    3. Verify the result — endpoints behave per the API contract.
+
+    4. Record completion: add `# FIXED-OK` to `/opt/fixitlab/academy/academy-java-079-backup-rest-api-8.conf`,
+    then click Check Solution.'

@@ -533,6 +533,158 @@ def _objectives(kind: str, label: str, symptom: str) -> list[str]:
     ]
 
 
+# Per-kind narrative templates. {name} {label} {concept} {symptom} {env} fill in.
+_KIND_COPY: dict[str, dict[str, str]] = {
+    "learn": {
+        "description": (
+            "This beginner-friendly {name} lab introduces {label}. "
+            "You will explore {concept} on the {env}. "
+            "Read the environment first, then follow the guided steps — no prior production experience required."
+        ),
+        "initial_state": (
+            "The {env} is online with a starter {label} setup. Some pieces are intentionally "
+            "incomplete so you can learn how they fit together. Nothing is on fire — focus on observation."
+        ),
+    },
+    "build": {
+        "description": (
+            "Build {label} from scratch in this {name} lab. You start from a minimal environment and must "
+            "produce a working configuration that demonstrates {concept}. Plan, implement, then prove it works."
+        ),
+        "initial_state": (
+            "The {env} is ready but {label} is not configured yet. Required tools may already be installed; "
+            "your job is to create the configuration and bring the capability online."
+        ),
+    },
+    "troubleshoot": {
+        "description": (
+            "Production alert: {symptom}. You are on call for {name} and must troubleshoot {label} "
+            "methodically — triage symptoms, isolate root cause, apply the smallest safe fix, and confirm recovery."
+        ),
+        "initial_state": (
+            "The {env} is degraded. {Symptom}. Recent changes may exist around {label}, "
+            "but do not restart blindly — gather evidence first."
+        ),
+    },
+    "security": {
+        "description": (
+            "Security review: harden {label} on this {name} system. Close unsafe defaults, enforce least "
+            "privilege, and ensure {concept} cannot be abused — without breaking legitimate use."
+        ),
+        "initial_state": (
+            "The environment is functional but overly permissive around {label}. "
+            "Assume an auditor or pen test is next week — tighten controls with evidence."
+        ),
+    },
+    "backup": {
+        "description": (
+            "Backup and recovery drill for {label}. Ensure backups run on schedule, retention is correct, "
+            "and you can restore {concept} within the lab RTO."
+        ),
+        "initial_state": (
+            "Backup jobs exist but reliability is uncertain for {label}. "
+            "Leadership wants proof that restore works — not just that scripts exit zero."
+        ),
+    },
+    "integration": {
+        "description": (
+            "Integration lab: connect {label} with an adjacent platform in the {name} stack. "
+            "Validate authentication, data handoff, and failure behavior for {concept}."
+        ),
+        "initial_state": (
+            "Two systems are deployed but not fully wired together for {label}. "
+            "Downstream consumers are waiting on this integration path."
+        ),
+    },
+    "observability": {
+        "description": (
+            "Observability task: make {label} visible in logs, metrics, or traces. On-call should answer "
+            "'what is broken?' quickly using signals from {concept}."
+        ),
+        "initial_state": (
+            "The system runs, but {label} lacks useful telemetry. "
+            "Dashboards/alerts are blank or noisy — improve signal quality."
+        ),
+    },
+    "automation": {
+        "description": (
+            "Automation lab: remove toil around {label}. Codify repeatable steps for {concept} "
+            "and prove the automation is idempotent."
+        ),
+        "initial_state": (
+            "Operators still perform manual steps for {label}. "
+            "Automate the boring parts without hiding important safety checks."
+        ),
+    },
+    "production": {
+        "description": (
+            "Production readiness for {label}. Harden, document, and validate {concept} so the change "
+            "is safe to run during a maintenance window."
+        ),
+        "initial_state": (
+            "A feature fix works in dev, but {label} is not production ready — "
+            "missing guardrails, runbooks, or capacity checks."
+        ),
+    },
+    "operate": {
+        "description": (
+            "Day-2 operations: perform a routine {label} task safely in {name}. "
+            "Follow change control — inspect, change, verify — while working with {concept}."
+        ),
+        "initial_state": (
+            "The {env} is healthy enough for scheduled work on {label}. "
+            "Complete the maintenance task without unnecessary downtime."
+        ),
+    },
+}
+
+# Per-kind "do" step used as the middle action of the guided walkthrough (tier 3).
+_KIND_ACTION: dict[str, str] = {
+    "learn": "Make one small, reversible change toward the objective, re-reading status after each step so you understand cause and effect",
+    "build": "Create the smallest working slice of {label} first, validate it, then add the remaining pieces one at a time",
+    "troubleshoot": "Fix the underlying misconfiguration you identified (not just the noisy log line), changing one thing at a time",
+    "security": "Apply least privilege: remove the unsafe default, then grant only the explicit access the workload actually needs",
+    "backup": "Repair or run the backup job, then perform a controlled restore into a scratch location to prove it works",
+    "integration": "Configure credentials and networking, then drive one happy-path transaction end to end across both systems",
+    "observability": "Add or fix the exporter / dashboard / alert with clear names, labels, and a sensible threshold",
+    "automation": "Implement the automation with dry-run / check mode, then run it twice — the second run must report no changes",
+    "production": "Apply production standards for {label}: resource limits, monitoring, access controls, and a written rollback step",
+    "operate": "Execute the maintenance in small, reversible steps, taking a snapshot or backup first if the change is risky",
+}
+
+
+def _guided_hints(
+    kind: str, label: str, concept: str, inspect: str, symptom: str, verify: str, marker: str
+) -> list[dict[str, Any]]:
+    """Three escalating hints, each a numbered step-by-step guide (not a one-liner)."""
+    action = _KIND_ACTION.get(kind, _KIND_ACTION["operate"]).format(label=label)
+
+    tier1 = (
+        f"Orient yourself before changing anything:\n"
+        f"1. Inspect the current state — {inspect}.\n"
+        f"2. Write down what looks normal versus wrong or missing for {label}.\n"
+        f"3. Recall the core idea: {concept}. Form one hypothesis before you act."
+    )
+    tier2 = (
+        f"Plan your approach (still no spoilers):\n"
+        f"1. Confirm the exact gap between current and desired state for {label}.\n"
+        f"2. Decide the single smallest change that moves you toward the objective.\n"
+        f"3. Capture evidence (command output / status) before the change so you can prove it worked afterward."
+    )
+    tier3 = (
+        f"Guided walkthrough:\n"
+        f"1. Re-check the current state — {inspect}.\n"
+        f"2. {action}.\n"
+        f"3. Verify the result — {verify}.\n"
+        f"4. Record completion: add `# FIXED-OK` to `{marker}`, then click Check Solution."
+    )
+    return [
+        {"order": 1, "cost": 10, "content": tier1},
+        {"order": 2, "cost": 15, "content": tier2},
+        {"order": 3, "cost": 25, "content": tier3},
+    ]
+
+
 def build_academy_copy(
     *,
     tech: str,
@@ -553,268 +705,18 @@ def build_academy_copy(
     marker = marker or _marker_from_slug(slug)
     kind_label = KIND_LABELS[kind]
 
-    if kind == "learn":
-        description = (
-            f"This beginner-friendly {name} lab introduces {label}. "
-            f"You will explore {concept} on the {profile['env']}. "
-            "Read the environment first, then complete the guided steps — no prior production experience required."
-        )
-        initial_state = (
-            f"The {profile['env']} is online with a starter {label} setup. "
-            "Some pieces are intentionally incomplete so you can learn how the pieces fit together. "
-            "Nothing is on fire yet — focus on observation and understanding."
-        )
-        hints = [
-            {
-                "order": 1,
-                "cost": 10,
-                "content": f"Orient yourself: {inspect}. Write down what looks normal vs missing.",
-            },
-            {
-                "order": 2,
-                "cost": 15,
-                "content": f"Core idea — {concept}. Make one small, reversible change at a time and re-check status.",
-            },
-            {
-                "order": 3,
-                "cost": 20,
-                "content": f"When the lab objective is done, record completion by adding `# FIXED-OK` to `{marker}`, then click Check Solution.",
-            },
-        ]
-    elif kind == "build":
-        description = (
-            f"Build {label} from scratch in this {name} lab. "
-            f"You start from a minimal environment and must produce a working configuration that demonstrates {concept}. "
-            "Treat this like a greenfield task — plan, implement, then prove it works."
-        )
-        initial_state = (
-            f"The {profile['env']} is ready but {label} is not configured yet. "
-            "Required packages/tools may already be installed; your job is to create the config and bring the capability online."
-        )
-        hints = [
-            {
-                "order": 1,
-                "cost": 10,
-                "content": f"List prerequisites first: which packages, files, or API objects must exist for {label}?",
-            },
-            {
-                "order": 2,
-                "cost": 15,
-                "content": f"Implement incrementally — create the smallest working slice of {label}, validate, then add the remaining pieces.",
-            },
-            {
-                "order": 3,
-                "cost": 20,
-                "content": f"Prove success: {verify}. Mark the lab complete with `# FIXED-OK` in `{marker}` and run Check Solution.",
-            },
-        ]
-    elif kind == "troubleshoot":
-        description = (
-            f"Production alert: {symptom}. "
-            f"You are on call for {name} and must troubleshoot {label} methodically — triage symptoms, find root cause, apply the smallest safe fix, and confirm recovery."
-        )
-        initial_state = (
-            f"The {profile['env']} is degraded. {symptom.capitalize()}. "
-            f"Recent changes may exist around {label}, but do not restart blindly — gather evidence first."
-        )
-        hints = [
-            {
-                "order": 1,
-                "cost": 10,
-                "content": f"Triage: {inspect}. Capture timestamps, error messages, and what still works.",
-            },
-            {
-                "order": 2,
-                "cost": 15,
-                "content": "Separate symptom from cause. Fix the underlying misconfiguration, not only the noisy log line.",
-            },
-            {
-                "order": 3,
-                "cost": 20,
-                "content": f"Verify recovery: {verify}. Document the fix, add `# FIXED-OK` to `{marker}`, and rerun Check Solution.",
-            },
-        ]
-    elif kind == "security":
-        description = (
-            f"Security review: harden {label} on this {name} system. "
-            f"Close unsafe defaults, enforce least privilege, and ensure {concept} cannot be abused — without breaking legitimate use."
-        )
-        initial_state = (
-            f"The environment is functional but overly permissive around {label}. "
-            "Assume an auditor or pen test is next week — tighten controls with evidence."
-        )
-        hints = [
-            {
-                "order": 1,
-                "cost": 10,
-                "content": f"Baseline current exposure: {inspect}. Note world-readable files, open ports, or excessive roles.",
-            },
-            {
-                "order": 2,
-                "cost": 15,
-                "content": "Apply least privilege incrementally. Prefer explicit allows over broad wildcards.",
-            },
-            {
-                "order": 3,
-                "cost": 20,
-                "content": f"Re-test legitimate workflows after hardening. Finish with `# FIXED-OK` in `{marker}` and Check Solution.",
-            },
-        ]
-    elif kind == "backup":
-        description = (
-            f"Backup and recovery drill for {label}. "
-            f"Ensure backups run on schedule, retention is correct, and you can restore {concept} within the lab RTO."
-        )
-        initial_state = (
-            f"Backup jobs exist but reliability is uncertain for {label}. "
-            "Leadership wants proof that restore works — not just that backup scripts exit zero."
-        )
-        hints = [
-            {
-                "order": 1,
-                "cost": 10,
-                "content": "Inspect backup schedules, last success time, and destination free space.",
-            },
-            {
-                "order": 2,
-                "cost": 15,
-                "content": "Run or repair the backup job, then perform a controlled restore to a scratch location.",
-            },
-            {
-                "order": 3,
-                "cost": 20,
-                "content": f"Compare restored data to source. Complete the lab via `# FIXED-OK` in `{marker}`.",
-            },
-        ]
-    elif kind == "integration":
-        description = (
-            f"Integration lab: connect {label} with an adjacent platform in the {name} stack. "
-            f"Validate authentication, data handoff, and failure behavior for {concept}."
-        )
-        initial_state = (
-            f"Two systems are deployed but not fully wired together for {label}. "
-            "Downstream consumers are waiting on this integration path."
-        )
-        hints = [
-            {
-                "order": 1,
-                "cost": 10,
-                "content": "Map the contract: which endpoints, queues, files, or CRDs connect the systems?",
-            },
-            {
-                "order": 2,
-                "cost": 15,
-                "content": "Configure credentials and networking first, then test a minimal happy-path transaction.",
-            },
-            {
-                "order": 3,
-                "cost": 20,
-                "content": f"Run an end-to-end check plus one failure case. Mark `{marker}` with `# FIXED-OK` when green.",
-            },
-        ]
-    elif kind == "observability":
-        description = (
-            f"Observability task: make {label} visible in logs, metrics, or traces. "
-            f"On-call should answer 'what is broken?' quickly using signals from {concept}."
-        )
-        initial_state = (
-            f"The system runs, but {label} lacks useful telemetry. "
-            "Dashboards/alerts are blank or noisy — improve signal quality."
-        )
-        hints = [
-            {
-                "order": 1,
-                "cost": 10,
-                "content": f"Find existing signals: {inspect}. Identify what is missing for fast triage.",
-            },
-            {
-                "order": 2,
-                "cost": 15,
-                "content": "Add or fix exporters/dashboards/alerts with clear names, labels, and thresholds.",
-            },
-            {
-                "order": 3,
-                "cost": 20,
-                "content": f"Trigger a test event and confirm it appears where on-call looks. Complete via `{marker}`.",
-            },
-        ]
-    elif kind == "automation":
-        description = (
-            f"Automation lab: remove toil around {label}. "
-            f"Codify repeatable steps for {concept} and prove the automation is idempotent."
-        )
-        initial_state = (
-            f"Operators still perform manual steps for {label}. "
-            "Automate the boring parts without hiding important safety checks."
-        )
-        hints = [
-            {
-                "order": 1,
-                "cost": 10,
-                "content": "Write down the manual checklist. Circle steps that are safe to automate first.",
-            },
-            {
-                "order": 2,
-                "cost": 15,
-                "content": "Implement automation with dry-run/check mode when available. Run it twice — second run should be clean.",
-            },
-            {
-                "order": 3,
-                "cost": 20,
-                "content": f"Attach logging and failure notifications. Finish with `# FIXED-OK` in `{marker}`.",
-            },
-        ]
-    elif kind == "production":
-        description = (
-            f"Production readiness for {label}. "
-            f"Harden, document, and validate {concept} so the change is safe to run during a maintenance window."
-        )
-        initial_state = (
-            f"A feature fix works in dev, but {label} is not production ready — missing guardrails, runbooks, or capacity checks."
-        )
-        hints = [
-            {
-                "order": 1,
-                "cost": 10,
-                "content": "Review SLO impact, rollback plan, and blast radius before changing production settings.",
-            },
-            {
-                "order": 2,
-                "cost": 15,
-                "content": f"Apply production standards: limits, monitoring, and access controls for {label}.",
-            },
-            {
-                "order": 3,
-                "cost": 20,
-                "content": f"Run post-change verification: {verify}. Record `# FIXED-OK` in `{marker}` when complete.",
-            },
-        ]
-    else:  # operate
-        description = (
-            f"Day-2 operations: perform a routine {label} task safely in {name}. "
-            f"Follow change control — inspect, change, verify — while working with {concept}."
-        )
-        initial_state = (
-            f"The {profile['env']} is healthy enough for scheduled work on {label}. "
-            "Complete the maintenance task without unnecessary downtime."
-        )
-        hints = [
-            {
-                "order": 1,
-                "cost": 10,
-                "content": f"Pre-check: {inspect}. Confirm backups or snapshots if the change is risky.",
-            },
-            {
-                "order": 2,
-                "cost": 15,
-                "content": "Execute the maintenance in small steps. Prefer reversible changes.",
-            },
-            {
-                "order": 3,
-                "cost": 20,
-                "content": f"Post-check: {verify}. Add `# FIXED-OK` to `{marker}` and run Check Solution.",
-            },
-        ]
+    fmt = {
+        "name": name,
+        "label": label,
+        "concept": concept,
+        "symptom": symptom,
+        "Symptom": symptom.capitalize(),
+        "env": profile["env"],
+    }
+    copy = _KIND_COPY.get(kind, _KIND_COPY["operate"])
+    description = copy["description"].format(**fmt)
+    initial_state = copy["initial_state"].format(**fmt)
+    hints = _guided_hints(kind, label, concept, inspect, symptom, verify, marker)
 
     title = f"{name}: {label.title()} — {kind_label}"
     return {
@@ -880,12 +782,28 @@ def enrich_scenario_data(data: dict, *, folder_name: str, tech_dir: str) -> dict
     hints = list(data.get("hints") or [])
     while len(hints) < 3:
         hints.append({"order": len(hints) + 1, "cost": 10 + (len(hints) * 5), "content": ""})
+    env = profile.get("env", "practice environment")
     if not hints[0].get("content"):
-        hints[0]["content"] = f"Start with read-only discovery on the {profile['env']}: logs, status commands, and config related to {label}."
+        hints[0]["content"] = (
+            f"Orient yourself before changing anything:\n"
+            f"1. Do read-only discovery on the {env}: logs, status commands, and config related to {label}.\n"
+            f"2. Note what looks normal versus wrong or missing.\n"
+            f"3. Form one hypothesis about the failure before you act."
+        )
     if not hints[1].get("content") or "smallest correct change" in hints[1]["content"].lower():
-        hints[1]["content"] = "Change one thing at a time. Prefer reversible fixes and note evidence before/after."
+        hints[1]["content"] = (
+            "Plan your approach:\n"
+            "1. Pin down the exact gap between current and desired state.\n"
+            "2. Choose the single smallest, reversible change that addresses it.\n"
+            "3. Capture command output before the change so you can prove it worked."
+        )
     if not hints[2].get("content"):
-        hints[2]["content"] = "Re-run the failing check or user workflow to confirm the incident is resolved."
+        hints[2]["content"] = (
+            "Guided walkthrough:\n"
+            "1. Apply the change one step at a time.\n"
+            "2. Re-run the failing check or user workflow to confirm recovery.\n"
+            "3. Document the symptom → cause → fix before closing the ticket."
+        )
 
     objectives = data.get("objectives") or []
     if len(objectives) < 2 or any("apply the correct" in str(o).lower() for o in objectives):

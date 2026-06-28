@@ -13,7 +13,7 @@ infrastructure_type: docker
 jira_priority: Medium
 description: 'Production alert: a GUI action does not persist. You are on call for
   Simulation Labs and must troubleshoot GUI simulation methodically — triage symptoms,
-  find root cause, apply the smallest safe fix, and confirm recovery.'
+  isolate root cause, apply the smallest safe fix, and confirm recovery.'
 objectives:
 - 'The incident symptom is clear: a GUI action does not persist'
 - Root cause is isolated with evidence, not guesswork
@@ -24,14 +24,34 @@ initial_state: The simulation sandbox is degraded. A gui action does not persist
 hints:
 - order: 1
   cost: 10
-  content: 'Triage: the GUI and underlying state. Capture timestamps, error messages,
-    and what still works.'
+  content: 'Orient yourself before changing anything:
+
+    1. Inspect the current state — the GUI and underlying state.
+
+    2. Write down what looks normal versus wrong or missing for GUI simulation.
+
+    3. Recall the core idea: interactive panels and state binding. Form one hypothesis
+    before you act.'
 - order: 2
   cost: 15
-  content: Separate symptom from cause. Fix the underlying misconfiguration, not only
-    the noisy log line.
+  content: 'Plan your approach (still no spoilers):
+
+    1. Confirm the exact gap between current and desired state for GUI simulation.
+
+    2. Decide the single smallest change that moves you toward the objective.
+
+    3. Capture evidence (command output / status) before the change so you can prove
+    it worked afterward.'
 - order: 3
-  cost: 20
-  content: 'Verify recovery: GUI actions update graded state. Document the fix, add
-    `# FIXED-OK` to `/opt/fixitlab/academy/academy-simulation-064-troubleshoot-gui-7.conf`,
-    and rerun Check Solution.'
+  cost: 25
+  content: 'Guided walkthrough:
+
+    1. Re-check the current state — the GUI and underlying state.
+
+    2. Fix the underlying misconfiguration you identified (not just the noisy log
+    line), changing one thing at a time.
+
+    3. Verify the result — GUI actions update graded state.
+
+    4. Record completion: add `# FIXED-OK` to `/opt/fixitlab/academy/academy-simulation-064-troubleshoot-gui-7.conf`,
+    then click Check Solution.'

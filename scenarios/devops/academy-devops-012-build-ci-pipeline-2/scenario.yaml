@@ -13,26 +13,45 @@ infrastructure_type: docker
 jira_priority: Low
 description: Build CI pipelines from scratch in this DevOps lab. You start from a
   minimal environment and must produce a working configuration that demonstrates build/test
-  stages and caching. Treat this like a greenfield task — plan, implement, then prove
-  it works.
+  stages and caching. Plan, implement, then prove it works.
 objectives:
 - A working CI pipelines setup must exist by the end of this lab
 - Configuration should follow team conventions and be easy to audit
 - The result should pass validation without manual cleanup
 initial_state: The CI/CD lab is ready but CI pipelines is not configured yet. Required
-  packages/tools may already be installed; your job is to create the config and bring
+  tools may already be installed; your job is to create the configuration and bring
   the capability online.
 hints:
 - order: 1
   cost: 10
-  content: 'List prerequisites first: which packages, files, or API objects must exist
-    for CI pipelines?'
+  content: 'Orient yourself before changing anything:
+
+    1. Inspect the current state — the pipeline definition and run logs.
+
+    2. Write down what looks normal versus wrong or missing for CI pipelines.
+
+    3. Recall the core idea: build/test stages and caching. Form one hypothesis before
+    you act.'
 - order: 2
   cost: 15
-  content: Implement incrementally — create the smallest working slice of CI pipelines,
-    validate, then add the remaining pieces.
+  content: 'Plan your approach (still no spoilers):
+
+    1. Confirm the exact gap between current and desired state for CI pipelines.
+
+    2. Decide the single smallest change that moves you toward the objective.
+
+    3. Capture evidence (command output / status) before the change so you can prove
+    it worked afterward.'
 - order: 3
-  cost: 20
-  content: 'Prove success: the pipeline runs green and fast. Mark the lab complete
-    with `# FIXED-OK` in `/opt/fixitlab/academy/academy-devops-012-build-ci-pipeline-2.conf`
-    and run Check Solution.'
+  cost: 25
+  content: 'Guided walkthrough:
+
+    1. Re-check the current state — the pipeline definition and run logs.
+
+    2. Create the smallest working slice of CI pipelines first, validate it, then
+    add the remaining pieces one at a time.
+
+    3. Verify the result — the pipeline runs green and fast.
+
+    4. Record completion: add `# FIXED-OK` to `/opt/fixitlab/academy/academy-devops-012-build-ci-pipeline-2.conf`,
+    then click Check Solution.'

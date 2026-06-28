@@ -13,25 +13,45 @@ infrastructure_type: docker
 jira_priority: Low
 description: This beginner-friendly Data Science & Analytics lab introduces data cleaning.
   You will explore nulls, types, and dedup on the notebook lab. Read the environment
-  first, then complete the guided steps — no prior production experience required.
+  first, then follow the guided steps — no prior production experience required.
 objectives:
 - Understand how data cleaning work in this lab environment
 - Identify the main status and configuration signals for data cleaning
 - Confirm you can read the current state confidently before changing anything
 initial_state: The notebook lab is online with a starter data cleaning setup. Some
-  pieces are intentionally incomplete so you can learn how the pieces fit together.
-  Nothing is on fire yet — focus on observation and understanding.
+  pieces are intentionally incomplete so you can learn how they fit together. Nothing
+  is on fire — focus on observation.
 hints:
 - order: 1
   cost: 10
-  content: 'Orient yourself: data profile and null counts. Write down what looks normal
-    vs missing.'
+  content: 'Orient yourself before changing anything:
+
+    1. Inspect the current state — data profile and null counts.
+
+    2. Write down what looks normal versus wrong or missing for data cleaning.
+
+    3. Recall the core idea: nulls, types, and dedup. Form one hypothesis before you
+    act.'
 - order: 2
   cost: 15
-  content: Core idea — nulls, types, and dedup. Make one small, reversible change
-    at a time and re-check status.
+  content: 'Plan your approach (still no spoilers):
+
+    1. Confirm the exact gap between current and desired state for data cleaning.
+
+    2. Decide the single smallest change that moves you toward the objective.
+
+    3. Capture evidence (command output / status) before the change so you can prove
+    it worked afterward.'
 - order: 3
-  cost: 20
-  content: When the lab objective is done, record completion by adding `# FIXED-OK`
-    to `/opt/fixitlab/academy/academy-data-science-071-learn-cleaning-8.conf`, then
-    click Check Solution.
+  cost: 25
+  content: 'Guided walkthrough:
+
+    1. Re-check the current state — data profile and null counts.
+
+    2. Make one small, reversible change toward the objective, re-reading status after
+    each step so you understand cause and effect.
+
+    3. Verify the result — the dataset is clean and typed.
+
+    4. Record completion: add `# FIXED-OK` to `/opt/fixitlab/academy/academy-data-science-071-learn-cleaning-8.conf`,
+    then click Check Solution.'

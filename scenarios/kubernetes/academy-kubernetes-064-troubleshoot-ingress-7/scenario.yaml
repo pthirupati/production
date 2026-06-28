@@ -13,7 +13,7 @@ infrastructure_type: docker
 jira_priority: Medium
 description: 'Production alert: HTTP routes return 404/502 or TLS handshake fails.
   You are on call for Kubernetes and must troubleshoot Ingress methodically — triage
-  symptoms, find root cause, apply the smallest safe fix, and confirm recovery.'
+  symptoms, isolate root cause, apply the smallest safe fix, and confirm recovery.'
 objectives:
 - 'The incident symptom is clear: HTTP routes return 404/502 or TLS handshake fails'
 - Root cause is isolated with evidence, not guesswork
@@ -24,14 +24,37 @@ initial_state: The Kubernetes cluster is degraded. Http routes return 404/502 or
 hints:
 - order: 1
   cost: 10
-  content: 'Triage: `kubectl describe ingress`, controller logs, and backend Service
-    health. Capture timestamps, error messages, and what still works.'
+  content: 'Orient yourself before changing anything:
+
+    1. Inspect the current state — `kubectl describe ingress`, controller logs, and
+    backend Service health.
+
+    2. Write down what looks normal versus wrong or missing for Ingress.
+
+    3. Recall the core idea: hosts, paths, TLS secrets, and ingress controller routing.
+    Form one hypothesis before you act.'
 - order: 2
   cost: 15
-  content: Separate symptom from cause. Fix the underlying misconfiguration, not only
-    the noisy log line.
+  content: 'Plan your approach (still no spoilers):
+
+    1. Confirm the exact gap between current and desired state for Ingress.
+
+    2. Decide the single smallest change that moves you toward the objective.
+
+    3. Capture evidence (command output / status) before the change so you can prove
+    it worked afterward.'
 - order: 3
-  cost: 20
-  content: 'Verify recovery: requests reach the intended backend with a valid certificate
-    chain. Document the fix, add `# FIXED-OK` to `/opt/fixitlab/academy/academy-kubernetes-064-troubleshoot-ingress-7.conf`,
-    and rerun Check Solution.'
+  cost: 25
+  content: 'Guided walkthrough:
+
+    1. Re-check the current state — `kubectl describe ingress`, controller logs, and
+    backend Service health.
+
+    2. Fix the underlying misconfiguration you identified (not just the noisy log
+    line), changing one thing at a time.
+
+    3. Verify the result — requests reach the intended backend with a valid certificate
+    chain.
+
+    4. Record completion: add `# FIXED-OK` to `/opt/fixitlab/academy/academy-kubernetes-064-troubleshoot-ingress-7.conf`,
+    then click Check Solution.'

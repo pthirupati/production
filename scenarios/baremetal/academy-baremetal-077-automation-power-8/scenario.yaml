@@ -22,12 +22,34 @@ initial_state: Operators still perform manual steps for power management. Automa
 hints:
 - order: 1
   cost: 10
-  content: Write down the manual checklist. Circle steps that are safe to automate
-    first.
+  content: 'Orient yourself before changing anything:
+
+    1. Inspect the current state — `nvidia-smi -q -d POWER`.
+
+    2. Write down what looks normal versus wrong or missing for power management.
+
+    3. Recall the core idea: power limits and persistence mode. Form one hypothesis
+    before you act.'
 - order: 2
   cost: 15
-  content: Implement automation with dry-run/check mode when available. Run it twice
-    — second run should be clean.
+  content: 'Plan your approach (still no spoilers):
+
+    1. Confirm the exact gap between current and desired state for power management.
+
+    2. Decide the single smallest change that moves you toward the objective.
+
+    3. Capture evidence (command output / status) before the change so you can prove
+    it worked afterward.'
 - order: 3
-  cost: 20
-  content: Attach logging and failure notifications. Finish with `# FIXED-OK` in `/opt/fixitlab/academy/academy-baremetal-077-automation-power-8.conf`.
+  cost: 25
+  content: 'Guided walkthrough:
+
+    1. Re-check the current state — `nvidia-smi -q -d POWER`.
+
+    2. Implement the automation with dry-run / check mode, then run it twice — the
+    second run must report no changes.
+
+    3. Verify the result — power limits are set appropriately.
+
+    4. Record completion: add `# FIXED-OK` to `/opt/fixitlab/academy/academy-baremetal-077-automation-power-8.conf`,
+    then click Check Solution.'

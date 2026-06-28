@@ -13,26 +13,46 @@ infrastructure_type: docker
 jira_priority: Low
 description: This beginner-friendly Prompt Engineering & AI Mastery lab introduces
   instruction design. You will explore clear, scoped task instructions on the LLM
-  practice workspace. Read the environment first, then complete the guided steps —
-  no prior production experience required.
+  practice workspace. Read the environment first, then follow the guided steps — no
+  prior production experience required.
 objectives:
 - Understand how instruction design work in this lab environment
 - Identify the main status and configuration signals for instruction design
 - Confirm you can read the current state confidently before changing anything
 initial_state: The LLM practice workspace is online with a starter instruction design
-  setup. Some pieces are intentionally incomplete so you can learn how the pieces
-  fit together. Nothing is on fire yet — focus on observation and understanding.
+  setup. Some pieces are intentionally incomplete so you can learn how they fit together.
+  Nothing is on fire — focus on observation.
 hints:
 - order: 1
   cost: 10
-  content: 'Orient yourself: the system/user prompt. Write down what looks normal
-    vs missing.'
+  content: 'Orient yourself before changing anything:
+
+    1. Inspect the current state — the system/user prompt.
+
+    2. Write down what looks normal versus wrong or missing for instruction design.
+
+    3. Recall the core idea: clear, scoped task instructions. Form one hypothesis
+    before you act.'
 - order: 2
   cost: 15
-  content: Core idea — clear, scoped task instructions. Make one small, reversible
-    change at a time and re-check status.
+  content: 'Plan your approach (still no spoilers):
+
+    1. Confirm the exact gap between current and desired state for instruction design.
+
+    2. Decide the single smallest change that moves you toward the objective.
+
+    3. Capture evidence (command output / status) before the change so you can prove
+    it worked afterward.'
 - order: 3
-  cost: 20
-  content: When the lab objective is done, record completion by adding `# FIXED-OK`
-    to `/opt/fixitlab/academy/academy-prompt-engineering-071-learn-instructions-8.conf`,
-    then click Check Solution.
+  cost: 25
+  content: 'Guided walkthrough:
+
+    1. Re-check the current state — the system/user prompt.
+
+    2. Make one small, reversible change toward the objective, re-reading status after
+    each step so you understand cause and effect.
+
+    3. Verify the result — instructions yield the intended behavior.
+
+    4. Record completion: add `# FIXED-OK` to `/opt/fixitlab/academy/academy-prompt-engineering-071-learn-instructions-8.conf`,
+    then click Check Solution.'

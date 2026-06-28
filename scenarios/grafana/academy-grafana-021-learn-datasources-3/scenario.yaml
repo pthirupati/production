@@ -13,26 +13,46 @@ infrastructure_type: docker
 jira_priority: Low
 description: This beginner-friendly Grafana Observability lab introduces datasources.
   You will explore connection, auth, and default datasource on the Grafana stack.
-  Read the environment first, then complete the guided steps — no prior production
-  experience required.
+  Read the environment first, then follow the guided steps — no prior production experience
+  required.
 objectives:
 - Understand how datasources work in this lab environment
 - Identify the main status and configuration signals for datasources
 - Confirm you can read the current state confidently before changing anything
 initial_state: The Grafana stack is online with a starter datasources setup. Some
-  pieces are intentionally incomplete so you can learn how the pieces fit together.
-  Nothing is on fire yet — focus on observation and understanding.
+  pieces are intentionally incomplete so you can learn how they fit together. Nothing
+  is on fire — focus on observation.
 hints:
 - order: 1
   cost: 10
-  content: 'Orient yourself: datasource config and test results. Write down what looks
-    normal vs missing.'
+  content: 'Orient yourself before changing anything:
+
+    1. Inspect the current state — datasource config and test results.
+
+    2. Write down what looks normal versus wrong or missing for datasources.
+
+    3. Recall the core idea: connection, auth, and default datasource. Form one hypothesis
+    before you act.'
 - order: 2
   cost: 15
-  content: Core idea — connection, auth, and default datasource. Make one small, reversible
-    change at a time and re-check status.
+  content: 'Plan your approach (still no spoilers):
+
+    1. Confirm the exact gap between current and desired state for datasources.
+
+    2. Decide the single smallest change that moves you toward the objective.
+
+    3. Capture evidence (command output / status) before the change so you can prove
+    it worked afterward.'
 - order: 3
-  cost: 20
-  content: When the lab objective is done, record completion by adding `# FIXED-OK`
-    to `/opt/fixitlab/academy/academy-grafana-021-learn-datasources-3.conf`, then
-    click Check Solution.
+  cost: 25
+  content: 'Guided walkthrough:
+
+    1. Re-check the current state — datasource config and test results.
+
+    2. Make one small, reversible change toward the objective, re-reading status after
+    each step so you understand cause and effect.
+
+    3. Verify the result — the datasource connects and returns data.
+
+    4. Record completion: add `# FIXED-OK` to `/opt/fixitlab/academy/academy-grafana-021-learn-datasources-3.conf`,
+    then click Check Solution.'

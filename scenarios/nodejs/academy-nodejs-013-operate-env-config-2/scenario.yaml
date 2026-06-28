@@ -23,13 +23,34 @@ initial_state: The Node.js application is healthy enough for scheduled work on e
 hints:
 - order: 1
   cost: 10
-  content: 'Pre-check: `.env` files and config loading. Confirm backups or snapshots
-    if the change is risky.'
+  content: 'Orient yourself before changing anything:
+
+    1. Inspect the current state — `.env` files and config loading.
+
+    2. Write down what looks normal versus wrong or missing for environment config.
+
+    3. Recall the core idea: env vars, secrets, and per-env settings. Form one hypothesis
+    before you act.'
 - order: 2
   cost: 15
-  content: Execute the maintenance in small steps. Prefer reversible changes.
+  content: 'Plan your approach (still no spoilers):
+
+    1. Confirm the exact gap between current and desired state for environment config.
+
+    2. Decide the single smallest change that moves you toward the objective.
+
+    3. Capture evidence (command output / status) before the change so you can prove
+    it worked afterward.'
 - order: 3
-  cost: 20
-  content: 'Post-check: config loads correctly per environment. Add `# FIXED-OK` to
-    `/opt/fixitlab/academy/academy-nodejs-013-operate-env-config-2.conf` and run Check
-    Solution.'
+  cost: 25
+  content: 'Guided walkthrough:
+
+    1. Re-check the current state — `.env` files and config loading.
+
+    2. Execute the maintenance in small, reversible steps, taking a snapshot or backup
+    first if the change is risky.
+
+    3. Verify the result — config loads correctly per environment.
+
+    4. Record completion: add `# FIXED-OK` to `/opt/fixitlab/academy/academy-nodejs-013-operate-env-config-2.conf`,
+    then click Check Solution.'

@@ -23,14 +23,34 @@ initial_state: A feature fix works in dev, but HTTP analysis is not production r
 hints:
 - order: 1
   cost: 10
-  content: Review SLO impact, rollback plan, and blast radius before changing production
-    settings.
+  content: 'Orient yourself before changing anything:
+
+    1. Inspect the current state — HTTP streams and status codes.
+
+    2. Write down what looks normal versus wrong or missing for HTTP analysis.
+
+    3. Recall the core idea: requests, responses, and timing. Form one hypothesis
+    before you act.'
 - order: 2
   cost: 15
-  content: 'Apply production standards: limits, monitoring, and access controls for
-    HTTP analysis.'
+  content: 'Plan your approach (still no spoilers):
+
+    1. Confirm the exact gap between current and desired state for HTTP analysis.
+
+    2. Decide the single smallest change that moves you toward the objective.
+
+    3. Capture evidence (command output / status) before the change so you can prove
+    it worked afterward.'
 - order: 3
-  cost: 20
-  content: 'Run post-change verification: the HTTP issue is pinpointed. Record `#
-    FIXED-OK` in `/opt/fixitlab/academy/academy-wireshark-095-production-http-10.conf`
-    when complete.'
+  cost: 25
+  content: 'Guided walkthrough:
+
+    1. Re-check the current state — HTTP streams and status codes.
+
+    2. Apply production standards for HTTP analysis: resource limits, monitoring,
+    access controls, and a written rollback step.
+
+    3. Verify the result — the HTTP issue is pinpointed.
+
+    4. Record completion: add `# FIXED-OK` to `/opt/fixitlab/academy/academy-wireshark-095-production-http-10.conf`,
+    then click Check Solution.'

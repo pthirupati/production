@@ -11,22 +11,49 @@ max_score: 100
 is_free: false
 infrastructure_type: docker
 jira_priority: Medium
-description: Container operations with Docker Compose. The application's services are defined in the compose
-  file, but the stack is not running, so there are no live containers serving traffic. Bring the stack
-  up and confirm the containers are healthy. Verify with `docker ps`.
+description: 'Day-2 operations: perform a routine Docker Compose task safely in Docker
+  & Containers. Follow change control — inspect, change, verify — while working with
+  multi-service stacks, networks, volumes, and dependency order.'
 objectives:
-- The Docker Compose stack is running
-- docker ps shows the application containers in the Up state
-- The containerised service is reachable again
-initial_state: The Docker Compose stack is defined but not running — `docker ps` shows no application
-  containers Up.
+- Day-2 Docker Compose work completes safely in this environment
+- Changes are verified with before/after checks
+- The system remains stable for dependent teams
+initial_state: The Docker host is healthy enough for scheduled work on Docker Compose.
+  Complete the maintenance task without unnecessary downtime.
 hints:
 - order: 1
   cost: 10
-  content: 'Check what is running: `docker ps` (likely empty) and review the compose file in the app directory.'
+  content: 'Orient yourself before changing anything:
+
+    1. Inspect the current state — `docker compose config`, `docker compose ps`, and
+    service logs.
+
+    2. Write down what looks normal versus wrong or missing for Docker Compose.
+
+    3. Recall the core idea: multi-service stacks, networks, volumes, and dependency
+    order. Form one hypothesis before you act.'
 - order: 2
   cost: 15
-  content: You do not need to rebuild images — the stack simply needs to be started in the background.
+  content: 'Plan your approach (still no spoilers):
+
+    1. Confirm the exact gap between current and desired state for Docker Compose.
+
+    2. Decide the single smallest change that moves you toward the objective.
+
+    3. Capture evidence (command output / status) before the change so you can prove
+    it worked afterward.'
 - order: 3
-  cost: 20
-  content: Run `docker compose up -d` from the app directory, confirm with `docker ps`, then Check Solution.
+  cost: 25
+  content: 'Guided walkthrough:
+
+    1. Re-check the current state — `docker compose config`, `docker compose ps`,
+    and service logs.
+
+    2. Execute the maintenance in small, reversible steps, taking a snapshot or backup
+    first if the change is risky.
+
+    3. Verify the result — the stack is healthy end-to-end with persistent data where
+    required.
+
+    4. Record completion: add `# FIXED-OK` to `/opt/fixitlab/academy/academy-docker-023-operate-compose-3.conf`,
+    then click Check Solution.'

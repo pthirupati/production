@@ -23,14 +23,37 @@ initial_state: A feature fix works in dev, but database replication is not produ
 hints:
 - order: 1
   cost: 10
-  content: Review SLO impact, rollback plan, and blast radius before changing production
-    settings.
+  content: 'Orient yourself before changing anything:
+
+    1. Inspect the current state — replication status views, `SHOW REPLICA STATUS`,
+    or `pg_stat_replication`.
+
+    2. Write down what looks normal versus wrong or missing for database replication.
+
+    3. Recall the core idea: primary/replica topology, lag, failover, and consistency.
+    Form one hypothesis before you act.'
 - order: 2
   cost: 15
-  content: 'Apply production standards: limits, monitoring, and access controls for
-    database replication.'
+  content: 'Plan your approach (still no spoilers):
+
+    1. Confirm the exact gap between current and desired state for database replication.
+
+    2. Decide the single smallest change that moves you toward the objective.
+
+    3. Capture evidence (command output / status) before the change so you can prove
+    it worked afterward.'
 - order: 3
-  cost: 20
-  content: 'Run post-change verification: replication is streaming, lag is within
-    SLO, and read routing works. Record `# FIXED-OK` in `/opt/fixitlab/academy/academy-database-035-production-replication-4.conf`
-    when complete.'
+  cost: 25
+  content: 'Guided walkthrough:
+
+    1. Re-check the current state — replication status views, `SHOW REPLICA STATUS`,
+    or `pg_stat_replication`.
+
+    2. Apply production standards for database replication: resource limits, monitoring,
+    access controls, and a written rollback step.
+
+    3. Verify the result — replication is streaming, lag is within SLO, and read routing
+    works.
+
+    4. Record completion: add `# FIXED-OK` to `/opt/fixitlab/academy/academy-database-035-production-replication-4.conf`,
+    then click Check Solution.'

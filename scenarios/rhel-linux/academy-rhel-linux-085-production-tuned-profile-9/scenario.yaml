@@ -23,14 +23,34 @@ initial_state: A feature fix works in dev, but tuned profiles is not production 
 hints:
 - order: 1
   cost: 10
-  content: Review SLO impact, rollback plan, and blast radius before changing production
-    settings.
+  content: 'Orient yourself before changing anything:
+
+    1. Inspect the current state — `tuned-adm active` and `tuned-adm list`.
+
+    2. Write down what looks normal versus wrong or missing for tuned profiles.
+
+    3. Recall the core idea: performance profiles and tunables. Form one hypothesis
+    before you act.'
 - order: 2
   cost: 15
-  content: 'Apply production standards: limits, monitoring, and access controls for
-    tuned profiles.'
+  content: 'Plan your approach (still no spoilers):
+
+    1. Confirm the exact gap between current and desired state for tuned profiles.
+
+    2. Decide the single smallest change that moves you toward the objective.
+
+    3. Capture evidence (command output / status) before the change so you can prove
+    it worked afterward.'
 - order: 3
-  cost: 20
-  content: 'Run post-change verification: the correct tuned profile is active. Record
-    `# FIXED-OK` in `/opt/fixitlab/academy/academy-rhel-linux-085-production-tuned-profile-9.conf`
-    when complete.'
+  cost: 25
+  content: 'Guided walkthrough:
+
+    1. Re-check the current state — `tuned-adm active` and `tuned-adm list`.
+
+    2. Apply production standards for tuned profiles: resource limits, monitoring,
+    access controls, and a written rollback step.
+
+    3. Verify the result — the correct tuned profile is active.
+
+    4. Record completion: add `# FIXED-OK` to `/opt/fixitlab/academy/academy-rhel-linux-085-production-tuned-profile-9.conf`,
+    then click Check Solution.'

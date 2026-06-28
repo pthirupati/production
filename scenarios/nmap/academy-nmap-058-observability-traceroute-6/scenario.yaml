@@ -23,12 +23,34 @@ initial_state: The system runs, but traceroute lacks useful telemetry. Dashboard
 hints:
 - order: 1
   cost: 10
-  content: 'Find existing signals: `nmap --traceroute`. Identify what is missing for
-    fast triage.'
+  content: 'Orient yourself before changing anything:
+
+    1. Inspect the current state — `nmap --traceroute`.
+
+    2. Write down what looks normal versus wrong or missing for traceroute.
+
+    3. Recall the core idea: path discovery and hops. Form one hypothesis before you
+    act.'
 - order: 2
   cost: 15
-  content: Add or fix exporters/dashboards/alerts with clear names, labels, and thresholds.
+  content: 'Plan your approach (still no spoilers):
+
+    1. Confirm the exact gap between current and desired state for traceroute.
+
+    2. Decide the single smallest change that moves you toward the objective.
+
+    3. Capture evidence (command output / status) before the change so you can prove
+    it worked afterward.'
 - order: 3
-  cost: 20
-  content: Trigger a test event and confirm it appears where on-call looks. Complete
-    via `/opt/fixitlab/academy/academy-nmap-058-observability-traceroute-6.conf`.
+  cost: 25
+  content: 'Guided walkthrough:
+
+    1. Re-check the current state — `nmap --traceroute`.
+
+    2. Add or fix the exporter / dashboard / alert with clear names, labels, and a
+    sensible threshold.
+
+    3. Verify the result — the path/hops are mapped.
+
+    4. Record completion: add `# FIXED-OK` to `/opt/fixitlab/academy/academy-nmap-058-observability-traceroute-6.conf`,
+    then click Check Solution.'

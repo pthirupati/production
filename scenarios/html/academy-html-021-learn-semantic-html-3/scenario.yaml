@@ -13,26 +13,46 @@ infrastructure_type: docker
 jira_priority: Low
 description: This beginner-friendly HTML & Web Servers lab introduces semantic HTML.
   You will explore landmarks, headings, and structure on the web server lab. Read
-  the environment first, then complete the guided steps — no prior production experience
+  the environment first, then follow the guided steps — no prior production experience
   required.
 objectives:
 - Understand how semantic HTML work in this lab environment
 - Identify the main status and configuration signals for semantic HTML
 - Confirm you can read the current state confidently before changing anything
 initial_state: The web server lab is online with a starter semantic HTML setup. Some
-  pieces are intentionally incomplete so you can learn how the pieces fit together.
-  Nothing is on fire yet — focus on observation and understanding.
+  pieces are intentionally incomplete so you can learn how they fit together. Nothing
+  is on fire — focus on observation.
 hints:
 - order: 1
   cost: 10
-  content: 'Orient yourself: the document outline and tags. Write down what looks
-    normal vs missing.'
+  content: 'Orient yourself before changing anything:
+
+    1. Inspect the current state — the document outline and tags.
+
+    2. Write down what looks normal versus wrong or missing for semantic HTML.
+
+    3. Recall the core idea: landmarks, headings, and structure. Form one hypothesis
+    before you act.'
 - order: 2
   cost: 15
-  content: Core idea — landmarks, headings, and structure. Make one small, reversible
-    change at a time and re-check status.
+  content: 'Plan your approach (still no spoilers):
+
+    1. Confirm the exact gap between current and desired state for semantic HTML.
+
+    2. Decide the single smallest change that moves you toward the objective.
+
+    3. Capture evidence (command output / status) before the change so you can prove
+    it worked afterward.'
 - order: 3
-  cost: 20
-  content: When the lab objective is done, record completion by adding `# FIXED-OK`
-    to `/opt/fixitlab/academy/academy-html-021-learn-semantic-html-3.conf`, then click
-    Check Solution.
+  cost: 25
+  content: 'Guided walkthrough:
+
+    1. Re-check the current state — the document outline and tags.
+
+    2. Make one small, reversible change toward the objective, re-reading status after
+    each step so you understand cause and effect.
+
+    3. Verify the result — the markup uses correct semantic elements.
+
+    4. Record completion: add `# FIXED-OK` to `/opt/fixitlab/academy/academy-html-021-learn-semantic-html-3.conf`,
+    then click Check Solution.'

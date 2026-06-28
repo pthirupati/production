@@ -23,14 +23,34 @@ initial_state: A feature fix works in dev, but scan timing is not production rea
 hints:
 - order: 1
   cost: 10
-  content: Review SLO impact, rollback plan, and blast radius before changing production
-    settings.
+  content: 'Orient yourself before changing anything:
+
+    1. Inspect the current state — `-T` templates and timing flags.
+
+    2. Write down what looks normal versus wrong or missing for scan timing.
+
+    3. Recall the core idea: timing templates and rate control. Form one hypothesis
+    before you act.'
 - order: 2
   cost: 15
-  content: 'Apply production standards: limits, monitoring, and access controls for
-    scan timing.'
+  content: 'Plan your approach (still no spoilers):
+
+    1. Confirm the exact gap between current and desired state for scan timing.
+
+    2. Decide the single smallest change that moves you toward the objective.
+
+    3. Capture evidence (command output / status) before the change so you can prove
+    it worked afterward.'
 - order: 3
-  cost: 20
-  content: 'Run post-change verification: scan timing balances speed and safety. Record
-    `# FIXED-OK` in `/opt/fixitlab/academy/academy-nmap-025-production-timing-3.conf`
-    when complete.'
+  cost: 25
+  content: 'Guided walkthrough:
+
+    1. Re-check the current state — `-T` templates and timing flags.
+
+    2. Apply production standards for scan timing: resource limits, monitoring, access
+    controls, and a written rollback step.
+
+    3. Verify the result — scan timing balances speed and safety.
+
+    4. Record completion: add `# FIXED-OK` to `/opt/fixitlab/academy/academy-nmap-025-production-timing-3.conf`,
+    then click Check Solution.'

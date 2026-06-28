@@ -13,26 +13,49 @@ infrastructure_type: docker
 jira_priority: Low
 description: Build Dockerfiles from scratch in this Docker & Containers lab. You start
   from a minimal environment and must produce a working configuration that demonstrates
-  image layers, build context, ENTRYPOINT/CMD, and caching. Treat this like a greenfield
-  task — plan, implement, then prove it works.
+  image layers, build context, ENTRYPOINT/CMD, and caching. Plan, implement, then
+  prove it works.
 objectives:
 - A working Dockerfiles setup must exist by the end of this lab
 - Configuration should follow team conventions and be easy to audit
 - The result should pass validation without manual cleanup
 initial_state: The Docker host is ready but Dockerfiles is not configured yet. Required
-  packages/tools may already be installed; your job is to create the config and bring
+  tools may already be installed; your job is to create the configuration and bring
   the capability online.
 hints:
 - order: 1
   cost: 10
-  content: 'List prerequisites first: which packages, files, or API objects must exist
-    for Dockerfiles?'
+  content: 'Orient yourself before changing anything:
+
+    1. Inspect the current state — `docker build` output, `docker history`, and the
+    Dockerfile stages.
+
+    2. Write down what looks normal versus wrong or missing for Dockerfiles.
+
+    3. Recall the core idea: image layers, build context, ENTRYPOINT/CMD, and caching.
+    Form one hypothesis before you act.'
 - order: 2
   cost: 15
-  content: Implement incrementally — create the smallest working slice of Dockerfiles,
-    validate, then add the remaining pieces.
+  content: 'Plan your approach (still no spoilers):
+
+    1. Confirm the exact gap between current and desired state for Dockerfiles.
+
+    2. Decide the single smallest change that moves you toward the objective.
+
+    3. Capture evidence (command output / status) before the change so you can prove
+    it worked afterward.'
 - order: 3
-  cost: 20
-  content: 'Prove success: the image builds reproducibly and the container starts
-    as intended. Mark the lab complete with `# FIXED-OK` in `/opt/fixitlab/academy/academy-docker-042-build-dockerfile-5.conf`
-    and run Check Solution.'
+  cost: 25
+  content: 'Guided walkthrough:
+
+    1. Re-check the current state — `docker build` output, `docker history`, and the
+    Dockerfile stages.
+
+    2. Create the smallest working slice of Dockerfiles first, validate it, then add
+    the remaining pieces one at a time.
+
+    3. Verify the result — the image builds reproducibly and the container starts
+    as intended.
+
+    4. Record completion: add `# FIXED-OK` to `/opt/fixitlab/academy/academy-docker-042-build-dockerfile-5.conf`,
+    then click Check Solution.'

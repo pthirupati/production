@@ -13,7 +13,7 @@ infrastructure_type: docker
 jira_priority: Medium
 description: 'Production alert: crash recovery or replication lags. You are on call
   for SQLite and must troubleshoot write-ahead log methodically — triage symptoms,
-  find root cause, apply the smallest safe fix, and confirm recovery.'
+  isolate root cause, apply the smallest safe fix, and confirm recovery.'
 objectives:
 - 'The incident symptom is clear: crash recovery or replication lags'
 - Root cause is isolated with evidence, not guesswork
@@ -24,14 +24,34 @@ initial_state: The SQLite database file is degraded. Crash recovery or replicati
 hints:
 - order: 1
   cost: 10
-  content: 'Triage: WAL settings and checkpoint activity. Capture timestamps, error
-    messages, and what still works.'
+  content: 'Orient yourself before changing anything:
+
+    1. Inspect the current state — WAL settings and checkpoint activity.
+
+    2. Write down what looks normal versus wrong or missing for write-ahead log.
+
+    3. Recall the core idea: WAL/journal mode, checkpoints, and durability. Form one
+    hypothesis before you act.'
 - order: 2
   cost: 15
-  content: Separate symptom from cause. Fix the underlying misconfiguration, not only
-    the noisy log line.
+  content: 'Plan your approach (still no spoilers):
+
+    1. Confirm the exact gap between current and desired state for write-ahead log.
+
+    2. Decide the single smallest change that moves you toward the objective.
+
+    3. Capture evidence (command output / status) before the change so you can prove
+    it worked afterward.'
 - order: 3
-  cost: 20
-  content: 'Verify recovery: WAL is configured for durability and performance. Document
-    the fix, add `# FIXED-OK` to `/opt/fixitlab/academy/academy-sqlite-064-troubleshoot-wal-7.conf`,
-    and rerun Check Solution.'
+  cost: 25
+  content: 'Guided walkthrough:
+
+    1. Re-check the current state — WAL settings and checkpoint activity.
+
+    2. Fix the underlying misconfiguration you identified (not just the noisy log
+    line), changing one thing at a time.
+
+    3. Verify the result — WAL is configured for durability and performance.
+
+    4. Record completion: add `# FIXED-OK` to `/opt/fixitlab/academy/academy-sqlite-064-troubleshoot-wal-7.conf`,
+    then click Check Solution.'
