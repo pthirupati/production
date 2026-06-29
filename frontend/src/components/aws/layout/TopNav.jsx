@@ -4,6 +4,7 @@ import { Menu, Search, ChevronDown, Bell, Settings, Terminal as TerminalIcon, Gl
 import { useAwsStore } from '../store/awsStore'
 import { AWS_REGIONS, REGION_GEO_ORDER, regionName } from '../lib/regions'
 import { SERVICES, SERVICE_CATEGORIES, BASE } from './serviceNav'
+import AwsLabsMenu from './AwsLabsMenu'
 
 function AwsLogo() {
   return (
@@ -61,6 +62,7 @@ export default function TopNav({ onToggleSidebar, onToggleCloudShell }) {
       <button className="aws-topnav-btn" onClick={() => setOpenMenu(openMenu === 'services' ? null : 'services')}>
         <Grid3x3 size={15} /> Services <ChevronDown size={13} />
       </button>
+      <AwsLabsMenu />
 
       {/* Search */}
       <div style={{ position: 'relative', flex: 1, maxWidth: 460, margin: '0 8px' }}>

@@ -1,5 +1,5 @@
 import { useNavigate } from 'react-router-dom'
-import { Server, Database, Shield, Network, Activity, CheckCircle2 } from 'lucide-react'
+import { Server, Database, Shield, Network, Activity, CheckCircle2, GraduationCap, ArrowRight } from 'lucide-react'
 import { useAwsStore, scoped } from '../store/awsStore'
 import { regionName } from '../lib/regions'
 import { SectionLabel } from '../ui/primitives'
@@ -27,6 +27,31 @@ export default function ConsoleHome() {
     <div className="aws-page">
       <h1 style={{ marginBottom: 4 }}>Console Home</h1>
       <div style={{ color: 'var(--aws-text-secondary)', marginBottom: 20 }}>Region: {regionName(region)}</div>
+
+      {/* Guided-lab CTA — the console is a practice environment, so surface the
+          AWS hands-on labs prominently right on the home page. */}
+      <div
+        className="aws-card"
+        style={{
+          marginBottom: 16, display: 'flex', alignItems: 'center', gap: 16, flexWrap: 'wrap',
+          background: 'linear-gradient(90deg, rgba(255,153,0,0.12), rgba(0,115,187,0.10))',
+          borderLeft: '4px solid var(--aws-orange)',
+        }}
+      >
+        <GraduationCap size={32} style={{ color: 'var(--aws-orange)' }} />
+        <div style={{ flex: 1, minWidth: 220 }}>
+          <div style={{ fontWeight: 700, fontSize: 15 }}>AWS hands-on labs</div>
+          <div style={{ fontSize: 13, color: 'var(--aws-text-secondary)' }}>
+            Practice EC2, S3, IAM, VPC, RDS, EKS, Lambda and 40+ services in guided, validated scenarios.
+          </div>
+        </div>
+        <button
+          onClick={() => navigate('/technologies/aws')}
+          style={{ background: 'var(--aws-orange)', color: '#16191f', border: 'none', borderRadius: 4, padding: '9px 16px', fontWeight: 700, fontSize: 13, cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: 6 }}
+        >
+          Browse AWS labs <ArrowRight size={15} />
+        </button>
+      </div>
 
       <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: 16 }}>
         <div className="aws-card">

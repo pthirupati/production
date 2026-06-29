@@ -229,6 +229,60 @@
 }
 .winos-power-btn:hover { background: #106ebe; }
 
+/* ── Realistic reboot / boot sequence ── */
+.winboot-screen {
+  position: absolute; inset: 0; z-index: 13500;
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  background: #000; color: #fff; user-select: none;
+  font-family: 'Segoe UI', system-ui, sans-serif;
+}
+/* Firmware POST — monochrome text console */
+.winboot-post {
+  align-items: flex-start; justify-content: flex-start;
+  padding: 28px 36px; background: #000; color: #d8d8d8;
+  font-family: 'Consolas', 'Courier New', monospace;
+}
+.winboot-post-head { font-size: 18px; letter-spacing: 2px; color: #f0f0f0; }
+.winboot-post-sub { font-size: 12px; color: #8a8a8a; margin-bottom: 18px; }
+.winboot-post-body { font-size: 12.5px; line-height: 1.45; color: #c9c9c9; margin: 0; white-space: pre-wrap; }
+.winboot-post-foot {
+  position: absolute; bottom: 22px; left: 36px; right: 36px;
+  font-size: 12px; color: #9a9a9a; border-top: 1px solid #2a2a2a; padding-top: 8px;
+}
+/* Windows boot logo — four pane window mark */
+.winboot-logo, .winboot-welcome, .winboot-off { background: #0a0a0a; }
+.winboot-logo-mark {
+  display: grid; grid-template-columns: 1fr 1fr; grid-template-rows: 1fr 1fr;
+  gap: 5px; width: 96px; height: 96px; margin-bottom: 40px; transform: skewX(-9deg);
+}
+.winboot-logo-mark.sm { width: 60px; height: 60px; margin-bottom: 26px; }
+.winboot-logo-mark span { background: #4cc2ff; border-radius: 2px; }
+.winboot-caption { font-size: 22px; font-weight: 300; margin-bottom: 26px; }
+/* Spinner dots — circular chase like the real Windows boot spinner */
+.winboot-dots { display: flex; gap: 9px; height: 14px; align-items: center; }
+.winboot-dots span {
+  width: 9px; height: 9px; border-radius: 50%; background: #fff;
+  animation: winboot-bounce 1s infinite ease-in-out both;
+}
+@keyframes winboot-bounce {
+  0%, 80%, 100% { opacity: 0.25; transform: translateY(0); }
+  40% { opacity: 1; transform: translateY(-7px); }
+}
+.winboot-update-text, .winboot-ready-text {
+  margin-top: 34px; font-size: 15px; font-weight: 300; text-align: center; line-height: 1.6;
+  color: #f0f0f0;
+}
+.winboot-welcome-text { font-size: 30px; font-weight: 300; }
+.winboot-off-title { font-size: 24px; font-weight: 300; margin-bottom: 10px; }
+.winboot-off-text { font-size: 13px; color: rgba(255,255,255,0.7); margin-bottom: 24px; }
+.winboot-power-btn {
+  background: transparent; color: #fff; border: 1px solid rgba(255,255,255,0.5);
+  border-radius: 50%; width: 84px; height: 84px; font-size: 13px; cursor: pointer;
+  display: flex; align-items: center; justify-content: center; flex-direction: column; gap: 2px;
+  transition: border-color 0.15s, background 0.15s;
+}
+.winboot-power-btn:hover { border-color: #4cc2ff; background: rgba(76,194,255,0.12); }
+
 .winos-scroll { overflow: auto; }
 .winos-grid2 { display: grid; grid-template-columns: 200px 1fr; gap: 6px 16px; align-items: center; font-size: 12.5px; }
 .winos-card { border: 1px solid #e2e2e2; border-radius: 6px; background: #fff; }

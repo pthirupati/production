@@ -6,6 +6,7 @@ import Desktop from './Desktop'
 import Taskbar from './Taskbar'
 import StartMenu from './StartMenu'
 import WindowFrame from './WindowFrame'
+import BootSequence from './BootSequence'
 import { APPS, AppIcon } from './apps/registry'
 
 export default function WindowsServer2022({ autoOpen = 'ServerManager', backendState = null }) {
@@ -97,33 +98,19 @@ export default function WindowsServer2022({ autoOpen = 'ServerManager', backendS
           </div>
         )}
 
-        {powerState && (
+        {/* Sleep is an instant wake card; restart/shutdown run the full
+            firmware POST → Windows logo → updates → "Getting Windows ready"
+            boot sequence so a reboot actually shows the boot process. */}
+        {powerState === 'sleep' && (
           <div className="winos-power-overlay">
             <div className="winos-power-card">
-              {powerState === 'sleep' && (
-                <>
-                  <div className="winos-power-title">Sleeping</div>
-                  <p className="winos-power-text">Press any key or move the mouse to wake this lab VM.</p>
-                  <button type="button" className="winos-power-btn" onClick={() => setPowerState(null)}>Wake</button>
-                </>
-              )}
-              {powerState === 'shutdown' && (
-                <>
-                  <div className="winos-power-title">Shutting down</div>
-                  <p className="winos-power-text">Windows is shutting down. Restart the lab session from FixitLab to sign in again.</p>
-                  <button type="button" className="winos-power-btn" onClick={() => setPowerState(null)}>Cancel shutdown</button>
-                </>
-              )}
-              {powerState === 'restart' && (
-                <>
-                  <div className="winos-power-title">Restarting</div>
-                  <p className="winos-power-text">Applying updates and restarting services…</p>
-                  <button type="button" className="winos-power-btn" onClick={() => setPowerState(null)}>Sign in</button>
-                </>
-              )}
+              <div className="winos-power-title">Sleeping</div>
+              <p className="winos-power-text">Press any key or move the mouse to wake this lab VM.</p>
+              <button type="button" className="winos-power-btn" onClick={() => setPowerState(null)}>Wake</button>
             </div>
           </div>
         )}
+        {(powerState === 'restart' || powerState === 'shutdown') && <BootSequence />}
       </div>
     </ContextMenuProvider>
   )

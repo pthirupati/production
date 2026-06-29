@@ -36,19 +36,24 @@ export default function InterviewHub() {
   const [startingSample, setStartingSample] = useState(false)
 
   const load = () => {
-    Promise.all([
+    // Use allSettled so a single transient hiccup (a 429 burst, or a 502 while a
+    // rolling deploy restarts the backend) never blanks the whole hub with
+    // "Could not load interviews". Each section renders whatever resolved; we
+    // only surface the error toast if EVERY call failed (true outage).
+    Promise.allSettled([
       interviewsApi.listCampaigns(),
       interviewsApi.getEntitlement(),
       interviewsApi.getPlans(),
-      interviewsApi.getSampleInfo().catch(() => null),
+      interviewsApi.getSampleInfo(),
     ])
-      .then(([c, e, p, sample]) => {
-        setCampaigns(c.campaigns || [])
-        setEntitlement(e)
-        setPlans((p.plans || []).filter(x => x.code !== 'free'))
-        setSampleInfo(sample)
+      .then(([cRes, eRes, pRes, sampleRes]) => {
+        if (cRes.status === 'fulfilled') setCampaigns(cRes.value?.campaigns || [])
+        if (eRes.status === 'fulfilled') setEntitlement(eRes.value)
+        if (pRes.status === 'fulfilled') setPlans((pRes.value?.plans || []).filter(x => x.code !== 'free'))
+        if (sampleRes.status === 'fulfilled') setSampleInfo(sampleRes.value)
+        const allFailed = [cRes, eRes, pRes].every(r => r.status === 'rejected')
+        if (allFailed) toast.error('Could not load interviews. Please refresh in a moment.')
       })
-      .catch(() => toast.error('Could not load interviews'))
       .finally(() => setLoading(false))
   }
 

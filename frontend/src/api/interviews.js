@@ -50,7 +50,7 @@ export const interviewsApi = {
     return api.post('/interviews/profile/resume-score/', payload, { silentError: true }).then(r => r.data)
   },
   listCampaigns() {
-    return api.get('/interviews/campaigns/').then(r => r.data)
+    return api.get('/interviews/campaigns/', { silentError: true }).then(r => r.data)
   },
   createCampaign(payload) {
     return api.post('/interviews/campaigns/', payload).then(r => r.data)

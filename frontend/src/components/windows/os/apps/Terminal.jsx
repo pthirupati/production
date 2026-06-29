@@ -53,6 +53,18 @@ function runCommand(raw, shell, os, cwdRef) {
     if (lower.startsWith('stop-service')) { const m = line.match(/-name\s+(\S+)|stop-service\s+(\S+)/i); const n = (m?.[1] || m?.[2] || '').replace(/['"]/g, ''); os.stopService(n); return [''] }
     if (lower.startsWith('restart-service')) { const m = line.match(/-name\s+(\S+)|restart-service\s+(\S+)/i); const n = (m?.[1] || m?.[2] || '').replace(/['"]/g, ''); os.stopService(n); os.startService(n); return [''] }
 
+    // Reboot / shutdown — drive the GUI boot sequence so a terminal restart
+    // shows firmware POST → Windows logo → "Getting Windows ready" → desktop.
+    if (lower.startsWith('restart-computer') || /^shutdown(\s|$)/.test(lower)) {
+      const isRestart = lower.startsWith('restart-computer') || /\s\/r(\s|$)/.test(lower) || /-r(\s|$)/.test(lower)
+      const isAbort = /\s\/a(\s|$)/.test(lower)
+      if (isAbort) return ['Cancelled the scheduled shutdown.', '']
+      setTimeout(() => os.setPowerState(isRestart ? 'restart' : 'shutdown'), 350)
+      return [isRestart
+        ? 'Restarting the computer. The session will reboot now…'
+        : 'Shutting down the computer…', '']
+    }
+
     if (lower.startsWith('get-childitem') || lower === 'ls' || lower === 'dir' || lower === 'gci') {
       const names = os.listDir(cwd) || []
       out.push('', `    Directory: ${cwd}`, '', 'Mode                 LastWriteTime         Length Name', '----                 -------------         ------ ----')
