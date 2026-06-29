@@ -6,9 +6,12 @@ import { resolveEc2Workload, workloadHint } from '../../terminal/ec2Workload'
 import { publicDns } from '../../lib/ids'
 
 export default function ConnectModal({ instance, onClose }) {
-  const [tab, setTab] = useState('eic')
-  const [connected, setConnected] = useState(false)
   const workload = resolveEc2Workload(instance)
+  const isWindows = workload === 'windows'
+  // Windows instances default to the RDP tab + Administrator, just like the
+  // real console; Linux/K8s default to EC2 Instance Connect.
+  const [tab, setTab] = useState(isWindows ? 'rdp' : 'eic')
+  const [connected, setConnected] = useState(false)
   const [user, setUser] = useState(defaultUser(instance.os))
   const dns = instance.publicIp ? publicDns(instance.publicIp, instance.region) : `${instance.privateIp} (private)`
   const sshHost = instance.publicIp ? publicDns(instance.publicIp, instance.region) : instance.privateIp
@@ -100,11 +103,29 @@ export default function ConnectModal({ instance, onClose }) {
         )}
         {tab === 'rdp' && (
           <div style={{ color: 'var(--aws-text-secondary)', lineHeight: 1.6 }}>
-            <p>RDP is available for Windows instances. This instance is {instance.os}, so SSH-based connection methods are recommended.</p>
-            <div className="aws-card" style={{ marginTop: 12 }}>
-              <div><strong>RDP file:</strong> Not generated for Linux AMIs</div>
-              <div><strong>Administrator password:</strong> Not applicable</div>
-            </div>
+            {isWindows ? (
+              <>
+                <p>Download the remote desktop file or connect in-browser. The session opens the Windows Server PowerShell/Server Manager engine.</p>
+                <div className="aws-card" style={{ marginTop: 12 }}>
+                  <div><strong>Public DNS:</strong> <span className="aws-mono">{dns}</span></div>
+                  <div style={{ marginTop: 6 }}><strong>User name:</strong> Administrator</div>
+                  <div style={{ marginTop: 6, display: 'flex', alignItems: 'center', gap: 8 }}>
+                    <strong>Password:</strong>
+                    <span className="aws-mono">{`Lab-${instance.id.replace('i-', '').slice(0, 8)}!Aws`}</span>
+                    <span className="aws-hint" style={{ margin: 0 }}>(decrypted with your key pair)</span>
+                  </div>
+                </div>
+                <div className="aws-hint" style={{ marginTop: 10 }}><strong>Lab engine:</strong> {workloadHint(workload)}</div>
+              </>
+            ) : (
+              <>
+                <p>RDP is for Windows instances. This instance is {instance.os}, so use EC2 Instance Connect, Session Manager, or an SSH client instead.</p>
+                <div className="aws-card" style={{ marginTop: 12 }}>
+                  <div><strong>RDP file:</strong> Not generated for Linux AMIs</div>
+                  <div><strong>Administrator password:</strong> Not applicable</div>
+                </div>
+              </>
+            )}
           </div>
         )}
       </div>
