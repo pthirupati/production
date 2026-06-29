@@ -107,6 +107,25 @@ function guidedCommandSet(scenario = {}) {
 }
 
 function buildGuidedSteps(scenario = {}) {
+  const authored = scenario.guided_mode?.enabled && Array.isArray(scenario.guided_mode?.steps)
+    ? scenario.guided_mode.steps
+    : []
+  if (authored.length > 0) {
+    return authored.map((s, i) => ({
+      title: s.title || `Guided step ${i + 1}`,
+      icon: i === 0 ? Eye : i === authored.length - 1 ? CheckCircle2 : Target,
+      accent: i === authored.length - 1 ? 'text-accent-green' : 'text-accent-cyan',
+      body: s.instruction || s.explanation || 'Complete this step before moving on.',
+      commands: s.command && !String(s.command).startsWith('#') ? [String(s.command)] : [],
+      actions: [
+        s.command && !String(s.command).startsWith('#') ? `Run: ${s.command}` : null,
+        s.expected_output ? `Expected evidence: ${s.expected_output}` : null,
+        s.explanation || null,
+      ].filter(Boolean),
+      verifyLabel: s.expected_output ? 'I saw this evidence' : 'Mark step done',
+    }))
+  }
+
   const objectives = Array.isArray(scenario.objectives) ? scenario.objectives : []
   const commands = guidedCommandSet(scenario)
   const techName = scenario.technology?.name || 'this technology'
@@ -115,11 +134,13 @@ function buildGuidedSteps(scenario = {}) {
     icon: Target,
     accent: 'text-accent-cyan',
     body: typeof objective === 'string' ? objective : JSON.stringify(objective),
+    commands: [],
     actions: [
       'Read the objective carefully and identify the service, file, host, or UI area involved.',
       `Use the ${techName} inspection commands/UI first; do not change anything until you have evidence.`,
       'Make the smallest change that satisfies the objective, then re-run the same inspection command.',
     ],
+    verifyLabel: 'I completed this objective',
   }))
   return [
     {
@@ -127,18 +148,22 @@ function buildGuidedSteps(scenario = {}) {
       icon: Eye,
       accent: 'text-accent-cyan',
       body: scenario.initial_state || scenario.description || 'Understand the incident, the affected system, and what success should look like.',
+      commands: [],
       actions: [
         'Read the scenario, symptoms, and objectives from top to bottom.',
         'Identify whether the work belongs in the terminal, simulator UI, or both.',
         'Write down the expected healthy state before changing anything.',
       ],
+      verifyLabel: 'I understand the incident',
     },
     {
       title: 'Inspect the environment',
       icon: Terminal,
       accent: 'text-accent-amber',
       body: 'Collect baseline evidence before attempting a fix.',
+      commands,
       actions: commands.map((cmd) => `Try: ${cmd}`),
+      verifyLabel: 'I collected baseline evidence',
     },
     ...objectiveSteps,
     {
@@ -146,13 +171,21 @@ function buildGuidedSteps(scenario = {}) {
       icon: CheckCircle2,
       accent: 'text-accent-green',
       body: 'Confirm the fix with evidence before using Check Solution.',
+      commands: commands.slice(0, 2),
       actions: [
         'Re-run the same checks from the inspection step and confirm the unhealthy signal changed.',
         'If this lab has a simulator, refresh it and confirm the UI now reflects the repaired state.',
         'Click Check Solution. If it fails, use the failed-objective feedback to return to the matching step.',
       ],
+      verifyLabel: 'Run Check Solution',
     },
   ]
+}
+
+function commandFromAction(action = '') {
+  const raw = String(action)
+  const match = raw.match(/^(Try|Run):\s*(.+)$/i)
+  return match ? match[2].trim() : ''
 }
 
 function hintTitleForOrder(order) {
@@ -298,6 +331,7 @@ export default function LabRunner() {
   const isMobile = useIsMobile()
   const [sidebarTab, setSidebarTab] = useState('instructions') // instructions | guided | hints | result
   const [guidedStep, setGuidedStep] = useState(0)
+  const [guidedDone, setGuidedDone] = useState({})
   const [showStopConfirm, setShowStopConfirm] = useState(false)
   const [stopping, setStopping] = useState(false)
   const [showShortcuts, setShowShortcuts] = useState(false)
@@ -398,6 +432,11 @@ export default function LabRunner() {
     if (closeTimerRef.current) clearTimeout(closeTimerRef.current)
     if (closeCountdownRef.current) clearInterval(closeCountdownRef.current)
   }, [])
+
+  useEffect(() => {
+    setGuidedStep(0)
+    setGuidedDone({})
+  }, [sessionId])
 
   // Keyboard shortcuts
   const toggleHints = useCallback(() => {
@@ -897,6 +936,16 @@ export default function LabRunner() {
     } catch (err) {
       toast.error(err.response?.data?.error || 'Validation error')
     } finally { setValidating(false) }
+  }
+
+  const handleGuidedStepVerify = (idx, total) => {
+    if (idx >= total - 1) {
+      handleValidate()
+      return
+    }
+    setGuidedDone(prev => ({ ...prev, [idx]: true }))
+    setGuidedStep(s => Math.min(total - 1, s + 1))
+    toast.success('Step verified — moving to the next step', { duration: 1800 })
   }
 
   async function handleRevealHint() {
@@ -1672,20 +1721,38 @@ export default function LabRunner() {
                 const step = steps[idx]
                 const StepIcon = step.icon || Target
                 const stepHint = hints.revealed.find(h => h.order === Math.max(1, Math.min(idx, hints.total_hints || 1)))
+                const completedCount = steps.filter((_, stepIdx) => guidedDone[stepIdx] || (validationResult?.passed && stepIdx === total - 1)).length
                 return (
                   <div className="space-y-4">
                     <div>
                       <div className="flex items-center justify-between mb-2">
                         <span className="text-xs font-semibold text-surface-400 uppercase tracking-wider">
-                          Guided mode
+                          Guided step → verify
                         </span>
-                        <span className="text-[11px] text-surface-500 tabular-nums">Step {idx + 1} of {total}</span>
+                        <span className="text-[11px] text-surface-500 tabular-nums">{completedCount}/{total} verified</span>
                       </div>
                       <div className="h-1.5 rounded-full bg-surface-800 overflow-hidden">
                         <div
                           className="h-full bg-accent-cyan transition-all duration-300"
-                          style={{ width: `${Math.round(((idx + 1) / total) * 100)}%` }}
+                          style={{ width: `${Math.round((completedCount / total) * 100)}%` }}
                         />
+                      </div>
+                      <div className="mt-3 grid grid-cols-5 gap-1.5">
+                        {steps.map((s, stepIdx) => (
+                          <button
+                            key={`${s.title}-${stepIdx}`}
+                            type="button"
+                            onClick={() => setGuidedStep(stepIdx)}
+                            title={s.title}
+                            className={`h-2 rounded-full transition-colors ${
+                              stepIdx === idx
+                                ? 'bg-accent-cyan'
+                                : guidedDone[stepIdx] || (validationResult?.passed && stepIdx === total - 1)
+                                  ? 'bg-accent-green'
+                                  : 'bg-surface-700 hover:bg-surface-600'
+                            }`}
+                          />
+                        ))}
                       </div>
                     </div>
 
@@ -1707,15 +1774,36 @@ export default function LabRunner() {
                             <span className="mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-surface-800 text-[10px] font-semibold text-surface-400">
                               {actionIdx + 1}
                             </span>
-                            <span>{action.startsWith('Try:') ? (
+                            <span className="min-w-0 flex-1">{/^(Try|Run):/i.test(action) ? (
                               <>
-                                <span className="text-surface-500">Try: </span>
-                                <code className="rounded bg-surface-950 px-1.5 py-0.5 text-[12px] text-accent-cyan">{action.replace(/^Try:\s*/, '')}</code>
+                                <span className="text-surface-500">{action.split(':')[0]}: </span>
+                                <code className="rounded bg-surface-950 px-1.5 py-0.5 text-[12px] text-accent-cyan break-all">{commandFromAction(action)}</code>
                               </>
                             ) : action}</span>
+                            {commandFromAction(action) && (
+                              <button
+                                type="button"
+                                onClick={() => sendSimCommand(commandFromAction(action))}
+                                className="shrink-0 rounded-md border border-accent-cyan/25 bg-accent-cyan/10 px-2 py-1 text-[10px] font-semibold text-accent-cyan hover:bg-accent-cyan/20"
+                              >
+                                Run
+                              </button>
+                            )}
                           </li>
                         ))}
                       </ol>
+                    </div>
+
+                    <div className="rounded-lg bg-surface-800/50 border border-surface-700/60 p-3">
+                      <div className="flex items-center gap-2 mb-1.5">
+                        <CheckCircle2 size={12} className={guidedDone[idx] || validationResult?.passed ? 'text-accent-green' : 'text-surface-500'} />
+                        <span className="text-xs font-semibold text-surface-300">Step verification</span>
+                      </div>
+                      <p className="text-xs text-surface-500 leading-relaxed">
+                        {idx < total - 1
+                          ? 'Confirm you have evidence for this step before continuing. This is a learning gate, not a score penalty.'
+                          : 'Final verification runs the real lab checker and updates your score.'}
+                      </p>
                     </div>
 
                     {!interviewMode && (
@@ -1752,10 +1840,11 @@ export default function LabRunner() {
                       </button>
                       {idx < total - 1 ? (
                         <button
-                          onClick={() => setGuidedStep(s => Math.min(total - 1, s + 1))}
-                          className="flex-1 py-2 rounded-lg text-sm font-semibold bg-accent-cyan/15 text-accent-cyan border border-accent-cyan/25 hover:bg-accent-cyan/25 transition-colors"
+                          onClick={() => handleGuidedStepVerify(idx, total)}
+                          className="flex-1 py-2 rounded-lg text-sm font-semibold bg-accent-cyan/15 text-accent-cyan border border-accent-cyan/25 hover:bg-accent-cyan/25 transition-colors flex items-center justify-center gap-1.5"
                         >
-                          Next step
+                          <CheckCircle2 size={14} />
+                          {step.verifyLabel || 'Verify step'}
                         </button>
                       ) : (
                         <button
@@ -1764,7 +1853,7 @@ export default function LabRunner() {
                           className="flex-1 py-2 rounded-lg text-sm font-semibold bg-accent-green/15 text-accent-green border border-accent-green/25 hover:bg-accent-green/25 transition-colors disabled:opacity-50 flex items-center justify-center gap-1.5"
                         >
                           {validating ? <span className="w-3 h-3 border-2 border-accent-green border-t-transparent rounded-full animate-spin" /> : <CheckCircle2 size={14} />}
-                          Check my work
+                          {step.verifyLabel || 'Run Check Solution'}
                         </button>
                       )}
                     </div>
