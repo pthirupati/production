@@ -1,0 +1,139 @@
+title: Athena — Operate Lab
+slug: academy-aws-083-operate-athena-2
+technology: aws
+category: Build
+difficulty: medium
+scenario_type: do
+lab_mode: simulation
+simulation_type: generic
+time_limit: 1200
+max_score: 100
+is_free: false
+infrastructure_type: docker
+jira_priority: Medium
+description: 'CONTEXT: A team operating AWS cloud operations needs you to resolve `Athena — Operate Lab`
+  during a realistic incident. The business impact is reduced service reliability until the underlying
+  state is repaired.
+
+
+  ENVIRONMENT: You are working in FixitLab''s offline AWS practice account with AWS CLI, IAM policies,
+  EC2/S3/VPC, security groups, and CloudFormation/Terraform. All tools run locally; no paid APIs or external
+  cloud calls are required.
+
+
+  SYMPTOM / STARTING STATE: The AWS practice account is healthy enough for scheduled work on Athena. Complete
+  the maintenance task without unnecessary downtime. Day-2 operations: perform a routine Athena task safely
+  in AWS Cloud. Follow change control — inspect, change, verify — while working with how athena fits into
+  AWS cloud operations.
+
+
+  OBJECTIVE: Day-2 Athena work completes safely in this environment; Changes are verified with before/after
+  checks; The system remains stable for dependent teams. Success means `check.sh` exits successfully.
+
+
+  WHAT TO AVOID: Do not apply broad destructive changes, skip evidence gathering, or fake completion with
+  marker files — the checker validates real system state.'
+objectives:
+- Day-2 Athena work completes safely in this environment
+- Changes are verified with before/after checks
+- The system remains stable for dependent teams
+initial_state: The AWS practice account is healthy enough for scheduled work on Athena. Complete the maintenance
+  task without unnecessary downtime.
+hints:
+- order: 1
+  cost: 0
+  content: 'Where to look: Start with read-only discovery on the AWS practice account. For Athena, inspect
+    the relevant AWS CLI, IAM policies, EC2/S3/VPC, security groups, and CloudFormation/Terraform for
+    athena before changing anything.'
+- order: 2
+  cost: 25
+  content: 'Diagnostic steps:
+
+    1. Gather evidence with the relevant AWS CLI, IAM policies, EC2/S3/VPC, security groups, and CloudFormation/Terraform
+    for athena.
+
+    2. Compare current output to the scenario objectives.
+
+    3. Form a single hypothesis about the smallest fix that would restore healthy state.'
+- order: 3
+  cost: 50
+  content: 'Exact fix + verification:
+
+    1. The system remains stable for dependent teams.
+
+    2. Re-run the lab checker (`check.sh` or Check Solution).
+
+    3. Confirm every scenario objective is satisfied.
+
+
+    WHY: the grader validates real state — marker files are ignored.'
+summary: Complete the athena — operate lab aws lab and verify success with the checker
+estimated_minutes: 20
+xp_reward: 100
+prerequisites:
+- Basic aws literacy
+tags:
+- aws
+- do
+- hands-on
+linked_tutorial: aws-fundamentals
+what_you_will_learn:
+- Day-2 Athena work completes safely in this environment
+- Changes are verified with before/after checks
+- The system remains stable for dependent teams
+environment:
+  nodes:
+  - role: primary
+    os: FixitLab AWS practice account
+    hostname: lab-primary
+    ip: 127.0.0.1
+    specs: local offline simulation
+  pre_installed:
+  - aws
+  - bash
+  - coreutils
+  - journalctl
+  - systemctl
+  credentials:
+  - user: root
+    password: lab123
+tasks:
+- id: task_1
+  title: Athena — Operate Lab
+  description: Restore healthy behavior for Athena — Operate Lab by investigating the failure, applying
+    the smallest safe fix, and validating the outcome.
+  background: 'This aws lab teaches systematic troubleshooting: observe, hypothesize, change, verify.'
+  validation:
+    type: custom_script
+    script: check.sh
+    error_message: Validation did not pass. Re-read the objectives and Hint 2 diagnostic steps.
+solution:
+  summary: Identify the misconfiguration affecting this aws lab and apply the minimal fix.
+  files_changed: []
+  commands_run:
+  - bash check.sh
+  reference_docs: aws-fundamentals
+guided_mode:
+  enabled: true
+  steps:
+  - step: 1
+    title: Inspect current state
+    instruction: Run a read-only diagnostic before changing anything.
+    command: check.sh
+    expected_output: Output shows the current failure mode
+    explanation: Evidence-first troubleshooting avoids guessing.
+    next_on: command_success
+  - step: 2
+    title: Apply the minimal fix
+    instruction: Make one reversible change aligned with the objectives.
+    command: '# your fix command here'
+    expected_output: State moves toward the objective
+    explanation: Small changes make rollback easy if the hypothesis was wrong.
+    next_on: command_success
+  - step: 3
+    title: Verify with the grader
+    instruction: Run the same verification the checker uses.
+    command: check.sh
+    expected_output: '`check.sh` exits successfully'
+    explanation: The lab passes only when real state is healthy.
+    next_on: command_success

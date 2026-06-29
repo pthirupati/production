@@ -125,7 +125,7 @@ server {
     add_header X-XSS-Protection        "1; mode=block" always;
     add_header Referrer-Policy         "strict-origin-when-cross-origin" always;
     add_header Permissions-Policy      "camera=(self), microphone=(self), geolocation=()" always;
-    add_header Content-Security-Policy "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval' https://checkout.razorpay.com; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https://lh3.googleusercontent.com; connect-src 'self' wss://*.fixitlab.in https://api.github.com https://accounts.google.com https://oauth2.googleapis.com https://api.razorpay.com https://lumberjack.razorpay.com; font-src 'self' data: https://fonts.googleapis.com https://fonts.gstatic.com; frame-src https://api.razorpay.com https://checkout.razorpay.com; frame-ancestors 'none';" always;
+    add_header Content-Security-Policy "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval' https://checkout.razorpay.com; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https://lh3.googleusercontent.com; connect-src 'self' wss://fixitlab.in wss://www.fixitlab.in wss://*.fixitlab.in https://api.github.com https://accounts.google.com https://oauth2.googleapis.com https://api.razorpay.com https://lumberjack.razorpay.com; font-src 'self' data: https://fonts.googleapis.com https://fonts.gstatic.com; frame-src https://api.razorpay.com https://checkout.razorpay.com; frame-ancestors 'none';" always;
 
     client_max_body_size 10m;
     server_tokens off;
@@ -344,9 +344,18 @@ server {
         # (re)connect as a request, so reconnect storms + multi-pane terminals
         # drain the bucket and nginx returns 503 on the upgrade, which the
         # browser surfaces as code 1006 -> an endless "Reconnecting (n/10)" loop
-        # across ALL labs. The concurrent cap below is the correct guardrail and
-        # matches the backend per-user limit (TERMINAL_MAX_WS_PER_USER=20).
-        limit_conn ws_conn_per_ip 20;
+        # across ALL labs. The concurrent cap below is the correct guardrail.
+        #
+        # This cap is keyed on the CLIENT IP ($binary_remote_addr). Many real
+        # users share one egress IP (office NAT, mobile CGNAT, university), and a
+        # single learner opens multiple panes (dual-pane labs + SSH-client tabs)
+        # plus brief reconnect overlap. A cap of 20 was exhausted by those shared
+        # IPs, nginx returned 503 on the upgrade, and every browser behind that IP
+        # fell into the endless "Reconnecting (n/10)" loop on ALL technologies.
+        # Raise the per-IP cap well above the backend PER-USER limit
+        # (TERMINAL_MAX_WS_PER_USER=20), which remains the real per-account
+        # guardrail enforced in the consumer.
+        limit_conn ws_conn_per_ip 100;
         proxy_pass http://backend_ws/ws/;
         proxy_http_version 1.1;
         proxy_set_header Upgrade $http_upgrade;
@@ -356,6 +365,10 @@ server {
         proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
         proxy_set_header X-Forwarded-Proto $scheme;
         proxy_buffering off;
+        # Keep the long-lived upstream socket alive at the TCP layer so idle
+        # terminals are not silently reaped by the kernel/VPC between the 25s
+        # application pings.
+        proxy_socket_keepalive on;
         proxy_read_timeout 3600s;
         proxy_send_timeout 3600s;
     }

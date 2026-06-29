@@ -304,6 +304,7 @@ function LabTerminal({
           prev.onmessage = null
           if (prev._readyFallback) clearTimeout(prev._readyFallback)
           if (prev._stableTimer) clearTimeout(prev._stableTimer)
+          if (prev._clientPing) clearInterval(prev._clientPing)
           if (prev.readyState === WebSocket.OPEN || prev.readyState === WebSocket.CONNECTING) {
             prev.close(1000)
           }
@@ -328,6 +329,18 @@ function LabTerminal({
           }, 10000)
           const fallbackMs = isSimulation ? 800 : isCloud ? 8000 : 1500
           ws._readyFallback = setTimeout(fireReady, fallbackMs)
+          // Client-side keepalive. The backend pings server->client every 25s,
+          // but an idle terminal sends nothing client->server, and some proxies
+          // / NAT gateways reap a tunnel based on CLIENT inactivity only. Send a
+          // tiny no-op every 20s (the consumer ignores any frame without an
+          // "input"/"resize" key) so the connection stays warm in both
+          // directions and idle terminals stop dropping into the reconnect loop.
+          if (ws._clientPing) clearInterval(ws._clientPing)
+          ws._clientPing = setInterval(() => {
+            if (ws.readyState === WebSocket.OPEN) {
+              try { ws.send(JSON.stringify({ keepalive: 1 })) } catch { /* socket closing */ }
+            }
+          }, 20000)
         }
         ws.onmessage = (event) => {
           try {
@@ -358,6 +371,7 @@ function LabTerminal({
           connectingRef.current = false
           if (ws._readyFallback) clearTimeout(ws._readyFallback)
           if (ws._stableTimer) clearTimeout(ws._stableTimer)
+          if (ws._clientPing) clearInterval(ws._clientPing)
           if (disposed || e.code === 1000) return
           // Auth expired: silently refresh the access token once and reconnect
           // instead of dead-ending on "refresh the page".
@@ -481,6 +495,7 @@ function LabTerminal({
         if (ws) {
           if (ws._readyFallback) clearTimeout(ws._readyFallback)
           if (ws._stableTimer) clearTimeout(ws._stableTimer)
+          if (ws._clientPing) clearInterval(ws._clientPing)
           ws.onclose = null
           ws.close(1000)
         }

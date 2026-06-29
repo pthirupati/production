@@ -1269,6 +1269,16 @@ export default function LabRunner() {
     || _awxHay.includes('automation controller')
   )
   const isTerraformSimLab = !isCrossTech && isTerraformLab(scenario)
+  // AWS labs get a one-click link into the full in-app AWS Management Console
+  // simulator (/aws-sim) so learners can drive the same scenario from the
+  // console (EC2/S3/IAM/VPC/...) alongside the CLI terminal. Match the AWS
+  // technology slug or aws-* scenario slugs, but never Terraform labs (which
+  // merely target AWS providers and have their own simulator).
+  const isAwsLab = !isCrossTech && !isTerraformSimLab && (
+    scenario?.technology?.slug === 'aws'
+    || (scenario?.slug || '').startsWith('aws-')
+    || (scenario?.slug || '').startsWith('academy-aws-')
+  )
   const isBaremetalGuiLab = !isCrossTech && (
     scenario?.simulation_type === 'baremetal'
     && /maas|lxd|lxc|kvm|virsh|ipmi|pxe/.test((scenario?.slug || '').toLowerCase())
@@ -2316,6 +2326,17 @@ export default function LabRunner() {
               style={{ borderColor: 'rgba(124,58,237,.45)', color: '#a78bfa', background: 'rgba(124,58,237,.14)' }}
             >
               <ExternalLink size={12} /> Open Terraform
+            </button>
+          )}
+          {isAwsLab && (
+            <button
+              type="button"
+              onClick={() => window.open('/aws-sim', '_blank', 'noopener')}
+              title="Open the AWS Management Console simulator — EC2, S3, IAM, VPC, RDS, Lambda and more"
+              className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-md border text-[10px] font-semibold"
+              style={{ borderColor: 'rgba(255,153,0,.5)', color: '#ff9900', background: 'rgba(255,153,0,.12)' }}
+            >
+              <ExternalLink size={12} /> Open AWS Console
             </button>
           )}
           {isBaremetalGuiLab && (

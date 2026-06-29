@@ -22,6 +22,15 @@ E2E_OUT = ROOT / "backend/apps/labs/provisioner/simulation/complete_tech_e2e_fix
 MIN_TOTAL = 150
 MIN_NEW_PER_TECH = 40
 
+# Per-technology catalogue size override. AWS spans far more first-class services
+# than the default 150-scenario catalogue can cover with breadth, so we give it a
+# larger target. The generator is additive and idempotent (existing slugs are
+# skipped), so raising this only ADDS new service scenarios on top of the
+# existing AWS labs — it never rewrites or orphans the ones already seeded.
+TECH_TARGET = {
+    "aws": 420,
+}
+
 SIM_BY_TECH = {
     "ansible": "ansible",
     "ai-ml": "python",
@@ -74,7 +83,19 @@ GENERIC_TOPICS = [
 KIND_TITLES = {kind: title for kind, title, _summary in GENERIC_TOPICS}
 
 TECH_TOPICS = {
-    "aws": ["ec2", "s3", "iam", "vpc", "security-groups", "rds", "lambda", "cloudwatch", "autoscaling", "route53"],
+    "aws": [
+        # Original 10 — kept first so already-seeded academy slugs stay stable.
+        "ec2", "s3", "iam", "vpc", "security-groups", "rds", "lambda", "cloudwatch", "autoscaling", "route53",
+        # Comprehensive AWS service coverage appended below so the catalogue
+        # spans compute, storage, networking, databases, containers, messaging,
+        # IaC, security, observability, and cost across the whole platform.
+        "ebs", "efs", "elb-alb", "nlb", "nat-gateway", "vpc-peering", "transit-gateway",
+        "cloudfront", "acm", "api-gateway", "cognito", "waf", "guardduty", "config",
+        "cloudtrail", "kms", "secrets-manager", "ssm-parameter-store", "ssm-session-manager",
+        "dynamodb", "aurora", "elasticache", "redshift", "athena", "glue",
+        "eks", "ecs-fargate", "ecr", "sqs", "sns", "eventbridge", "step-functions", "kinesis",
+        "cloudformation", "organizations", "sts-assume-role", "cost-explorer", "aws-backup", "ses",
+    ],
     "linux": ["users-groups", "permissions-acl", "systemd-services", "journald-logs", "storage-lvm", "networking-firewalld", "selinux", "cron-timers", "package-patching", "boot-recovery"],
     "rhel-linux": ["subscription-repos", "dnf-modules", "firewalld", "selinux-policy", "tuned-profile", "kdump", "auditd", "sssd", "chrony", "systemd-targets"],
     "docker": ["images-layers", "dockerfile", "compose", "volumes", "networks", "healthchecks", "logs", "rootless", "registry", "resource-limits"],
@@ -289,7 +310,8 @@ def main() -> None:
         count = existing_count(tech)
         academy_count = existing_academy_count(tech)
         non_academy_count = count - academy_count
-        desired_generated = max(MIN_NEW_PER_TECH, MIN_TOTAL - non_academy_count)
+        tech_total = TECH_TARGET.get(tech, MIN_TOTAL)
+        desired_generated = max(MIN_NEW_PER_TECH, tech_total - non_academy_count)
         to_create = max(0, desired_generated - academy_count)
         plan[tech] = to_create
         topics = TECH_TOPICS.get(tech, ["basics", "build", "operate", "troubleshoot", "security", "scale", "backup", "monitor", "integrate", "recover"])
