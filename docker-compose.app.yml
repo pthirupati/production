@@ -29,6 +29,8 @@ services:
       - .env.production
     environment:
       TERMINAL_MAX_WS_PER_USER: ${TERMINAL_MAX_WS_PER_USER:-20}
+      # Heavy tutorial seed runs in platform-start.sh after health — not at boot.
+      SKIP_STARTUP_TUTORIAL_SEED: "1"
       # Remote lab Docker engine on D4 (set by ci-wire-cluster-env.py)
       DOCKER_HOST: ${DOCKER_SOCKET:-unix:///var/run/docker.sock}
       # Identify this node to the fleet monitor so it attaches its live host

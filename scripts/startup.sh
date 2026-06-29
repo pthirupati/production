@@ -22,8 +22,15 @@ with open(lock_path, "w") as lock_file:
     subprocess.check_call([sys.executable, "manage.py", "migrate", "--noinput"])
 PY
 
-echo "[startup] Seeding tutorials (idempotent)..."
-python manage.py seed_tutorials || echo "[startup] seed_tutorials skipped or failed — continuing"
+# Tutorial seeding is heavy (900+ lessons) and blocks uvicorn from starting. In
+# production, platform-start.sh runs seed_tutorials via exec AFTER the backend
+# is healthy. Set SKIP_STARTUP_TUTORIAL_SEED=1 in compose (default on app role).
+if [ "${SKIP_STARTUP_TUTORIAL_SEED:-0}" != "1" ]; then
+  echo "[startup] Seeding tutorials (idempotent)..."
+  python manage.py seed_tutorials || echo "[startup] seed_tutorials skipped or failed — continuing"
+else
+  echo "[startup] Skipping tutorial seed on boot (platform-start will seed after health)"
+fi
 
 echo "[startup] Collecting static files..."
 python manage.py collectstatic --noinput
