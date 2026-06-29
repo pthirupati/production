@@ -49,6 +49,16 @@ except Exception:  # pragma: no cover
     ACADEMY_DOCKER_COMPOSE_SLUGS = set()
     ACADEMY_SERVICE_FIX = {}
 
+# ── Generic ``simulation`` technology real-state labs (start the failed unit) ──
+try:
+    from apps.labs.provisioner.simulation.simulation_marker_e2e_fixes import (
+        SIMULATION_SERVICE_FIX,
+    )
+    for _s in SIMULATION_SERVICE_FIX:
+        COMPLETE_TECH_MARKER_FIX.pop(_s, None)
+except Exception:  # pragma: no cover
+    SIMULATION_SERVICE_FIX = {}
+
 
 # ── Generated maps for real-state scenarios (see scenario_presets.py) ──
 _RS_SERVICE_FIX = {'db-redis-down': 'redis', 'db-mariadb-down': 'mariadb', 'db-mongodb-down': 'mongod', 'db-cassandra-down': 'cassandra', 'db-pgbouncer-down': 'pgbouncer', 'rhel-chronyd-down': 'chronyd', 'rhel-rsyslog-down': 'rsyslog', 'rhel-firewalld-down': 'firewalld', 'rhel-auditd-down': 'auditd', 'rhel-nfs-server-down': 'nfs-server', 'docker-containerd-down': 'containerd', 'linux-haproxy-down': 'haproxy', 'linux-named-down': 'named', 'linux-memcached-down': 'memcached', 'linux-rabbitmq-down': 'rabbitmq-server', 'linux-nginx-stream-proxy-down': 'nginx'}
@@ -359,6 +369,15 @@ def _apply_simulation_fix(session) -> tuple[bool, str]:
                 svc.active = "active"
                 svc.sub_state = "running"
             return True, f"{unit} started (academy)"
+
+        if slug in SIMULATION_SERVICE_FIX:
+            unit = SIMULATION_SERVICE_FIX[slug]
+            shell.run(f"systemctl start {unit}")
+            svc = state.services.get(unit)
+            if svc:
+                svc.active = "active"
+                svc.sub_state = "running"
+            return True, f"{unit} started (simulation)"
 
         # ── Flagship real-state labs (user / firewall / compose / ansible) ──
         # Matched by EXACT slug BEFORE the generic substring branches so the

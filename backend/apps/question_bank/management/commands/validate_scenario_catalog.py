@@ -22,8 +22,39 @@ ROOT = Path(__file__).resolve().parents[5]
 SCEN = ROOT / "scenarios"
 
 MARKER_ONLY_RE = re.compile(r"grep\s+-q\s+FIXED-OK|FIXED-OK.*grep", re.I)
-GUIDED_HINT_RE = re.compile(r"(Orient yourself|Plan your approach|Guided walkthrough|\n1\.\s)", re.I)
+# Truly fake completion marker: a sentinel file the learner writes by hand
+# (echo FIXED-OK > /tmp/scenario-fixed). This proves nothing about lab state.
+TMP_MARKER_RE = re.compile(r"/tmp/scenario-fixed|FIX_MARKER", re.I)
+GUIDED_HINT_RE = re.compile(
+    r"(Orient yourself|Plan your approach|Guided walkthrough|Where to look|"
+    r"Diagnostic steps|Exact fix|\n\s*1\.\s)",
+    re.I,
+)
 ACADEMY_SLUG_RE = re.compile(r"^academy-")
+
+# Simulation types that are graded by a dedicated engine (apps.vmware_sim.*),
+# NOT by check.sh — see SimulationProvisioner.run_validation routing. For these
+# the on-disk check.sh is vestigial, so a leftover marker there is not a grading
+# gap (the dedicated engine performs the real state check).
+DEDICATED_SIM_TYPES = frozenset({
+    "nmap", "wireshark", "peoplesoft", "windows-server", "ai-agent",
+    "data-dashboard", "ansible-awx", "terraform", "baremetal", "vmware",
+    "datascience",
+})
+
+
+def _is_trivial_script(body: str) -> bool:
+    """True when a check.sh has no substantive validation line (always passes)."""
+    for raw in (body or "").splitlines():
+        line = raw.strip()
+        if not line or line.startswith("#"):
+            continue
+        if line in ("true", ":", "exit 0", "exit 0;"):
+            continue
+        if line.startswith("exit ") and line.split()[1].rstrip(";") == "0":
+            continue
+        return False
+    return True
 
 
 def validate_scenario_file(path: Path) -> list[str]:
@@ -54,17 +85,38 @@ def validate_scenario_file(path: Path) -> list[str]:
             elif not GUIDED_HINT_RE.search(content):
                 gaps.append(f"hint {i} not step-by-step guided format")
 
+    # Determine the real grading channel before judging check.sh, so we report
+    # honest, actionable gaps instead of false "marker" positives:
+    #   • coding_mode labs are graded by HIDDEN TESTS (check.sh is vestigial),
+    #   • dedicated-sim labs are graded by their engine (check.sh is vestigial),
+    #   • everything else is graded by check.sh via the simulation engine.
+    coding_mode = bool(data.get("coding_mode"))
+    sim_type = (data.get("simulation_type") or "").strip().lower()
+
     check_sh = path.parent / "check.sh"
     validation = (data.get("validation_script") or "").strip()
     script_body = validation
     if check_sh.is_file():
         script_body = check_sh.read_text(encoding="utf-8")
-    if not script_body.strip():
+
+    if coding_mode:
+        spec = data.get("coding_spec") or {}
+        hidden = spec.get("hidden_tests") or []
+        if not hidden:
+            gaps.append("coding lab has no hidden tests (grading is trivial)")
+    elif sim_type in DEDICATED_SIM_TYPES:
+        # Graded by a dedicated engine; the on-disk check.sh is not used.
+        pass
+    elif not script_body.strip():
         gaps.append("no validation script / check.sh")
-    elif MARKER_ONLY_RE.search(script_body) and not ACADEMY_SLUG_RE.match(slug):
-        gaps.append("marker-only validation (FIXED-OK grep)")
-    elif MARKER_ONLY_RE.search(script_body) and ACADEMY_SLUG_RE.match(slug):
-        gaps.append("academy lab still uses FIXED-OK marker check")
+    elif _is_trivial_script(script_body):
+        gaps.append("trivial validation (check.sh always passes)")
+    elif TMP_MARKER_RE.search(script_body):
+        # The fake /tmp/scenario-fixed completion sentinel — proves nothing.
+        if ACADEMY_SLUG_RE.match(slug):
+            gaps.append("academy lab still uses FIXED-OK marker check")
+        else:
+            gaps.append("marker-only validation (/tmp completion sentinel)")
 
     return gaps
 

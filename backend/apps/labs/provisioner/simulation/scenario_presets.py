@@ -4466,6 +4466,16 @@ try:
 except Exception:  # pragma: no cover
     pass
 
+# ── Generic ``simulation`` technology real-state presets (override markers) ──
+# These 40 labs were the only non-academy old-marker labs whose grading genuinely
+# depended on the /tmp/scenario-fixed sentinel. They now boot a failed systemd
+# unit and validate via `systemctl is-active <unit>` against real engine state.
+try:
+    from .simulation_marker_presets import SIMULATION_MARKER_PRESETS as _SIMULATION_MARKER_PRESETS
+    _PRESETS.update(_SIMULATION_MARKER_PRESETS)
+except Exception:  # pragma: no cover
+    pass
+
 
 def _mtu_mismatch_marker(state) -> None:
     """networking-mtu-mismatch: the iptables/MTU fix can't be introspected, so

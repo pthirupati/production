@@ -2,10 +2,10 @@ title: Monitor simulation replication (lab 27)
 slug: simulation-lab-27
 technology: simulation
 category: Simulation
-description: 'Hands-on simulation scenario: monitor replication in a simulated environment.
-  This FixitLab simulation scenario focuses on simulation: Monitor simulation replication
-  (lab 27). Read the environment, form a hypothesis, apply a minimal fix, and verify
-  behavior before closing the ticket.'
+description: Service operations lab. The `crond` systemd unit is **failed/inactive** on this host — a
+  realistic fault for Monitor simulation replication (lab 27). Diagnose with `systemctl status crond`
+  and the journal, apply the smallest reliable fix, then verify with `systemctl is-active crond`. Graded
+  against the real service state — no completion markers.
 difficulty: easy
 scenario_type: fix
 lab_mode: simulation
@@ -17,18 +17,36 @@ max_score: 100
 is_free: false
 dual_terminal: false
 objectives:
-- Understand the current failure mode affecting Monitor simulation replication (lab
-  27)
-- Restore expected service behavior with a minimal, documented change
-- Verify the fix holds under a realistic smoke test
-initial_state: 'Hands-on simulation scenario: monitor replication in a simulated environment.'
+- The `crond` service is active (running)
+- '`systemctl is-active crond` returns active'
+- The fix survives a status re-check (no marker files)
+initial_state: The `crond` service is not running (`systemctl is-active crond` → inactive/failed). Dependent
+  tasks cannot succeed until the unit is healthy.
 hints:
 - order: 1
   cost: 10
-  content: Read the scenario objective and inspect logs or config in the terminal.
+  content: 'Where to look: a dependent service has stopped. Start broad with `systemctl --failed`, then
+    inspect the specific unit with `systemctl status crond`. Do not change anything yet — confirm which
+    unit is down and why.'
 - order: 2
   cost: 20
-  content: 'Apply the minimal fix, then mark completion: echo FIXED-OK > /tmp/scenario-fixed'
+  content: 'Diagnostic steps:
+
+    1. `systemctl status crond` — read the Active: line and the last log lines.
+
+    2. `journalctl -u crond -n 50` — look for the error that stopped it.
+
+    3. Decide on the smallest change that restores the unit (usually a restart once the underlying cause
+    is understood).'
 - order: 3
   cost: 20
-  content: Re-run the failing check or user workflow to confirm the incident is resolved.
+  content: 'Exact fix + verification:
+
+    1. `sudo systemctl start crond` (use `restart` if it is in a failed state).
+
+    2. `sudo systemctl enable crond` so it survives a reboot.
+
+    3. Click Check Solution once `systemctl is-active crond` returns active.
+
+    WHY: the unit was left inactive/failed; starting it restores the dependent workflow. Validation reads
+    the real service state, so there is nothing to fake.'
