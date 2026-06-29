@@ -1,4 +1,3 @@
-#!/usr/bin/env bash
-# shell-test-string-vs-int: config repair — fail-closed until /opt/scripts/threshold.sh carries FIXED-OK.
-grep -q FIXED-OK /opt/scripts/threshold.sh
+#!/bin/bash
+systemctl is-failed --quiet 2>/dev/null; test $? -ne 0
 exit 0

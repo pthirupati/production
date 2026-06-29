@@ -1,29 +1,114 @@
 title: Terraform Running in Wrong Workspace
 slug: terraform-workspace-wrong
 difficulty: easy
-category: Terraform
-description: 'A developer runs terraform plan while in the default or production workspace instead of the staging workspace, risking changes to the wrong environment. Switch to the correct workspace before running any infrastructure commands.'
-initial_state: 'Simulated Terraform project with multiple workspaces (default, staging, production). The shell session is currently in the production workspace. Running terraform plan would target production resources instead of the intended staging environment.'
+category: Fix
+description: 'CONTEXT: A team operating Terraform IaC needs you to resolve `Terraform Running in Wrong
+  Workspace` during a realistic incident. The business impact is reduced service reliability until the
+  underlying state is repaired.
+
+
+  ENVIRONMENT: You are working in FixitLab''s offline Terraform workspace with HCL files, state, and plan/apply
+  workflow. All tools run locally; no paid APIs or external cloud calls are required.
+
+
+  SYMPTOM / STARTING STATE: Simulated Terraform project with multiple workspaces (default, staging, production).
+  The shell session is currently in the production workspace. Running terraform plan would target production
+  resources instead of the intended staging environment. A developer runs terraform plan while in the
+  default or production workspace instead of the staging workspace, risking changes to the wrong environment.
+  Switch to the correct workspace before running any infrastructure commands.
+
+
+  OBJECTIVE: Run terraform workspace show to identify the currently active workspace; List available workspaces
+  with terraform workspace list; Switch to the staging workspace using terraform workspace select. Success
+  means `check.sh` exits successfully.
+
+
+  WHAT TO AVOID: Do not apply broad destructive changes, skip evidence gathering, or fake completion with
+  marker files — the checker validates real system state.'
+initial_state: Simulated Terraform project with multiple workspaces (default, staging, production). The
+  shell session is currently in the production workspace. Running terraform plan would target production
+  resources instead of the intended staging environment.
 objectives:
-  - Run terraform workspace show to identify the currently active workspace
-  - List available workspaces with terraform workspace list
-  - Switch to the staging workspace using terraform workspace select
-  - Run terraform plan and verify it targets the staging environment
+- Run terraform workspace show to identify the currently active workspace
+- List available workspaces with terraform workspace list
+- Switch to the staging workspace using terraform workspace select
+- Run terraform plan and verify it targets the staging environment
 lab_mode: simulation
 simulation_type: terraform
 time_limit: 1200
 max_score: 100
 is_free: true
 hints:
-  - content: 'Run: terraform workspace show to see the current workspace. If it says "default" or "production", you are in the wrong one.'
-    cost: 10
-    order: 1
-  - content: 'Run: terraform workspace list to see all available workspaces, then: terraform workspace select staging to switch.'
-    cost: 15
-    order: 2
-  - content: 'If the staging workspace does not exist yet, create it: terraform workspace new staging. Then run terraform plan to confirm the correct state is used.'
-    cost: 20
-    order: 3
+- order: 1
+  cost: 0
+  content: 'Where to look: Run terraform workspace show to identify the currently active workspace'
+- order: 2
+  cost: 25
+  content: 'Diagnostic steps:
+
+    1. List available workspaces with terraform workspace list
+
+    2. Switch to the staging workspace using terraform workspace select
+
+    3. Run terraform plan and verify it targets the staging environment'
+- order: 3
+  cost: 50
+  content: 'Exact fix + verification:
+
+    1. Run terraform plan and verify it targets the staging environment.
+
+    2. Re-run the lab checker (`check.sh` or Check Solution).
+
+    3. Confirm every scenario objective is satisfied.
+
+
+    WHY: the grader validates real state — marker files are ignored.'
 requires_companion_hosts: false
 dual_terminal: false
 jira_priority: Medium
+technology: terraform
+summary: Complete the terraform running in wrong workspace terraform lab and verify success with the checker
+estimated_minutes: 20
+xp_reward: 100
+prerequisites:
+- Basic terraform literacy
+tags:
+- fix
+- hands-on
+- terraform
+linked_tutorial: terraform-fundamentals
+what_you_will_learn:
+- Run terraform workspace show to identify the currently active workspace
+- List available workspaces with terraform workspace list
+- Switch to the staging workspace using terraform workspace select
+- Run terraform plan and verify it targets the staging environment
+environment:
+  nodes:
+  - role: primary
+    os: FixitLab Terraform workspace
+    hostname: lab-primary
+    ip: 127.0.0.1
+    specs: local offline simulation
+  pre_installed:
+  - bash
+  - coreutils
+  - terraform
+  credentials:
+  - user: root
+    password: lab123
+tasks:
+- id: task_1
+  title: Terraform Running in Wrong Workspace
+  description: Restore healthy behavior for Terraform Running in Wrong Workspace by investigating the
+    failure, applying the smallest safe fix, and validating the outcome.
+  background: 'This terraform lab teaches systematic troubleshooting: observe, hypothesize, change, verify.'
+  validation:
+    type: custom_script
+    script: check.sh
+    error_message: Validation did not pass. Re-read the objectives and Hint 2 diagnostic steps.
+solution:
+  summary: Identify the misconfiguration affecting this terraform lab and apply the minimal fix.
+  files_changed: []
+  commands_run:
+  - bash check.sh
+  reference_docs: terraform-fundamentals

@@ -1,9 +1,26 @@
 title: Fix the Word Frequency Counter
 slug: py-fix-word-frequency-counter
-category: Python Development
-description: word_count(text) should return a dict mapping each lowercased word to its frequency, but
-  it never lowercases and splits on the default which leaves trailing punctuation attached, AND it overwrites
-  counts to 1 instead of incrementing. Fix counting, case, and punctuation.
+category: Fix
+description: 'CONTEXT: A team operating Python development needs you to resolve `Fix the Word Frequency
+  Counter` during a realistic incident. The business impact is reduced service reliability until the underlying
+  state is repaired.
+
+
+  ENVIRONMENT: You are working in FixitLab''s offline Python project workspace with source files, venv,
+  tests, and CLI entrypoints. All tools run locally; no paid APIs or external cloud calls are required.
+
+
+  SYMPTOM / STARTING STATE: word_count(text) should return a dict mapping each lowercased word to its
+  frequency, but it never lowercases and splits on the default which leaves trailing punctuation attached,
+  AND it overwrites counts to 1 instead of incrementing. Fix counting, case, and punctuation.
+
+
+  OBJECTIVE: Notice counts cap at 1 and case/punctuation split words; Lowercase and strip punctuation
+  from each token; Increment counts correctly. Success means all hidden tests pass.
+
+
+  WHAT TO AVOID: Do not apply broad destructive changes, skip evidence gathering, or fake completion with
+  marker files — the checker validates real system state.'
 difficulty: medium
 scenario_type: fix
 lab_mode: simulation
@@ -21,55 +38,119 @@ objectives:
 initial_state: word_count(text) should return a dict mapping each lowercased word to its frequency, but
   it never lowercases and splits on the default which leaves trailing punctuation attached, AND it overwrites
   counts to 1 instead of incrementing. Fix counting, case, and punctuation.
-solution_explanation: |
-  Assigning 1 each time discards prior counts; counts.get(word,0)+1 accumulates. Stripping punctuation and lowercasing merges word variants.
+solution_explanation: 'Assigning 1 each time discards prior counts; counts.get(word,0)+1 accumulates.
+  Stripping punctuation and lowercasing merges word variants.
+
+  '
 coding_spec:
   language: python
   entrypoint: solution.py
   kind: fix
-  instructions: |
-    Fix word_count(text): return {word: count}. Words are lowercased and stripped of surrounding punctuation; split on whitespace.
-      word_count('Cat cat, dog.') -> {'cat': 2, 'dog': 1}
-    Click Run to try it, then Check Solution to grade against all tests.
+  instructions: "Fix word_count(text): return {word: count}. Words are lowercased and stripped of surrounding\
+    \ punctuation; split on whitespace.\n  word_count('Cat cat, dog.') -> {'cat': 2, 'dog': 1}\nClick\
+    \ Run to try it, then Check Solution to grade against all tests.\n"
   files:
   - path: solution.py
-    content: |
-      import string
-
-      def word_count(text):
-          counts = {}
-          for word in text.split():
-              counts[word] = 1     # bug: overwrites; no normalization
-          return counts
+    content: "import string\n\ndef word_count(text):\n    counts = {}\n    for word in text.split():\n\
+      \        counts[word] = 1     # bug: overwrites; no normalization\n    return counts\n"
     readonly: false
   visible_tests:
   - name: counts and normalizes
-    code: |
-      assert word_count('Cat cat, dog.') == {'cat': 2, 'dog': 1}, word_count('Cat cat, dog.')
+    code: 'assert word_count(''Cat cat, dog.'') == {''cat'': 2, ''dog'': 1}, word_count(''Cat cat, dog.'')
+
+      '
   - name: single word
-    code: |
-      assert word_count('hello') == {'hello': 1}
+    code: 'assert word_count(''hello'') == {''hello'': 1}
+
+      '
   hidden_tests:
   - name: punctuation stripped
-    code: |
-      assert word_count('hi! hi? hi.') == {'hi': 3}, word_count('hi! hi? hi.')
+    code: 'assert word_count(''hi! hi? hi.'') == {''hi'': 3}, word_count(''hi! hi? hi.'')
+
+      '
   - name: case folded
-    code: |
-      assert word_count('The THE the') == {'the': 3}
+    code: 'assert word_count(''The THE the'') == {''the'': 3}
+
+      '
   - name: empty text
-    code: |
-      assert word_count('') == {}
+    code: 'assert word_count('''') == {}
+
+      '
   - name: mixed
-    code: |
-      assert word_count('a a b A') == {'a': 3, 'b': 1}
+    code: 'assert word_count(''a a b A'') == {''a'': 3, ''b'': 1}
+
+      '
   timeout: 8
 hints:
 - order: 1
-  cost: 10
-  content: 'word_count(''cat cat'') returns {''cat'': 1} — it overwrites instead of adding.'
+  cost: 0
+  content: 'Where to look: Open `solution.py`, read the instructions, and run the visible tests to see
+    which assertion fails first.'
 - order: 2
-  cost: 20
-  content: Use counts.get(word, 0) + 1 to accumulate; also lowercase and strip punctuation.
+  cost: 25
+  content: 'Diagnostic steps:
+
+    1. Click Run and read the traceback — note line number and actual vs expected values.
+
+    2. Reproduce the failure with the smallest input from a visible test.
+
+    3. Compare your implementation to the bug described in the lab prompt.'
 - order: 3
-  cost: 30
-  content: raw.strip(string.punctuation).lower() normalizes each token before counting.
+  cost: 50
+  content: 'Exact fix + verification:
+
+    1. Increment counts correctly.
+
+    2. Re-run the lab checker (`check.sh` or Check Solution).
+
+    3. Confirm every scenario objective is satisfied.
+
+
+    WHY: the grader validates real state — marker files are ignored.'
+technology: python
+summary: Complete the fix the word frequency counter python lab and verify success with the checker
+estimated_minutes: 25
+xp_reward: 100
+prerequisites:
+- Basic python literacy
+tags:
+- fix
+- hands-on
+- python
+linked_tutorial: python-fundamentals
+what_you_will_learn:
+- Notice counts cap at 1 and case/punctuation split words
+- Lowercase and strip punctuation from each token
+- Increment counts correctly
+environment:
+  nodes:
+  - role: primary
+    os: FixitLab Python project workspace
+    hostname: lab-primary
+    ip: 127.0.0.1
+    specs: local offline simulation
+  pre_installed:
+  - bash
+  - coreutils
+  - pip
+  - python
+  - python3
+  credentials:
+  - user: root
+    password: lab123
+tasks:
+- id: task_1
+  title: Fix the Word Frequency Counter
+  description: Restore healthy behavior for Fix the Word Frequency Counter by investigating the failure,
+    applying the smallest safe fix, and validating the outcome.
+  background: 'This python lab teaches systematic troubleshooting: observe, hypothesize, change, verify.'
+  validation:
+    type: custom_script
+    script: hidden_tests
+    error_message: One or more hidden tests failed. Read the public test output, fix your solution, and
+      submit again.
+solution:
+  summary: The solution passes all hidden tests by implementing the required behavior in code.
+  files_changed: []
+  commands_run: []
+  reference_docs: python-fundamentals

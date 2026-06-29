@@ -1,4 +1,3 @@
 #!/bin/bash
-# Simulation validation
-true
+firewall-cmd --state | grep -q 'running'
 exit 0

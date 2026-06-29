@@ -1,7 +1,7 @@
-title: 'Kubernetes: Kubernetes Pods — Fundamentals Lab'
+title: Kubernetes Pods — Learn Lab
 slug: academy-kubernetes-011-learn-pods-2
-technology: Kubernetes
-category: Core Skills
+technology: kubernetes
+category: Learn
 difficulty: easy
 scenario_type: do
 lab_mode: simulation
@@ -11,17 +11,38 @@ max_score: 100
 is_free: false
 infrastructure_type: docker
 jira_priority: Low
-description: Kubernetes operations lab. One or more pods are **not Running** — workloads for Fundamentals
-  Lab cannot serve traffic. Inspect with `kubectl get pods`, read `kubectl describe pod` events, fix the
-  root cause, and confirm all pods Running.
+description: 'CONTEXT: A team operating Kubernetes needs you to resolve `kubernetes: Kubernetes Pods —
+  Fundamentals Lab` during a realistic incident. The business impact is reduced service reliability until
+  the underlying state is repaired.
+
+
+  ENVIRONMENT: You are working in FixitLab''s offline Kubernetes cluster with kubectl, manifests, and
+  cluster resources. All tools run locally; no paid APIs or external cloud calls are required.
+
+
+  SYMPTOM / STARTING STATE: The Kubernetes cluster is online with a starter Kubernetes pods setup. Some
+  pieces are intentionally incomplete so you can learn how they fit together. Nothing is on fire — focus
+  on observation. This beginner-friendly kubernetes lab introduces Kubernetes pods. You will explore pod
+  spec, containers, probes, resources, and scheduling on the Kubernetes cluster. Read the environment
+  first, then follow the guided steps — no prior production experience required.
+
+
+  OBJECTIVE: Understand how Kubernetes pods work in this lab environment; Identify the main status and
+  configuration signals for Kubernetes pods; Confirm you can read the current state confidently before
+  changing anything. Success means `kubectl get pods` shows every pod Running.
+
+
+  WHAT TO AVOID: Do not apply broad destructive changes, skip evidence gathering, or fake completion with
+  marker files — the checker validates real system state.'
 objectives:
-- All pods in the default namespace are Running
-- '`kubectl get pods` shows every pod Running'
-- The deployment survives `kubectl get pods` re-check
-initial_state: The cluster is up but at least one pod is CrashLoopBackOff or Pending.
+- Understand how Kubernetes pods work in this lab environment
+- Identify the main status and configuration signals for Kubernetes pods
+- Confirm you can read the current state confidently before changing anything
+initial_state: The Kubernetes cluster is online with a starter Kubernetes pods setup. Some pieces are
+  intentionally incomplete so you can learn how they fit together. Nothing is on fire — focus on observation.
 hints:
 - order: 1
-  cost: 10
+  cost: 0
   content: 'Orient yourself before changing anything:
 
     1. Inspect the current state — `kubectl describe pod`, `kubectl logs`, and the rendered manifest.
@@ -31,17 +52,17 @@ hints:
     3. Recall the core idea: pod spec, containers, probes, resources, and scheduling. Form one hypothesis
     before you act.'
 - order: 2
-  cost: 15
-  content: 'Plan your approach (still no spoilers):
-
-    1. Confirm the exact gap between current and desired state for Kubernetes pods.
-
-    2. Decide the single smallest change that moves you toward the objective.
-
-    3. Capture evidence (command output / status) before the change so you can prove it worked afterward.'
-- order: 3
   cost: 25
-  content: 'Guided walkthrough:
+  content: 'Diagnostic steps:
+
+    1. `kubectl get pods` — note CrashLoopBackOff, ImagePullBackOff, or Pending.
+
+    2. `kubectl describe pod <name>` — read Events at the bottom.
+
+    3. `kubectl logs <name> [--previous]` if the container restarted.'
+- order: 3
+  cost: 50
+  content: 'Exact fix + verification:
 
     1. Re-check the current state — `kubectl describe pod`, `kubectl logs`, and the rendered manifest.
 
@@ -50,4 +71,76 @@ hints:
 
     3. Verify the result — pods are Running/Ready with healthy probe results.
 
-    4. Click Check Solution once `kubectl get pods` shows every pod Running.'
+    4. Click Check Solution once the objective is met (graded on real state, not a marker file).'
+summary: Complete the kubernetes pods — learn lab kubernetes lab and verify success with the checker
+estimated_minutes: 15
+xp_reward: 100
+prerequisites:
+- Basic kubernetes literacy
+tags:
+- do
+- hands-on
+- kubernetes
+linked_tutorial: kubernetes-fundamentals
+what_you_will_learn:
+- Understand how Kubernetes pods work in this lab environment
+- Identify the main status and configuration signals for Kubernetes pods
+- Confirm you can read the current state confidently before changing anything
+environment:
+  nodes:
+  - role: primary
+    os: FixitLab Kubernetes cluster
+    hostname: lab-primary
+    ip: 127.0.0.1
+    specs: local offline simulation
+  pre_installed:
+  - bash
+  - coreutils
+  - helm
+  - kubectl
+  - kubernetes
+  credentials:
+  - user: root
+    password: lab123
+tasks:
+- id: task_1
+  title: Kubernetes Pods — Learn Lab
+  description: Restore healthy behavior for Kubernetes Pods — Learn Lab by investigating the failure,
+    applying the smallest safe fix, and validating the outcome.
+  background: 'This kubernetes lab teaches systematic troubleshooting: observe, hypothesize, change, verify.'
+  validation:
+    type: k8s_resource_state
+    resource_kind: Pod
+    resource_name: all
+    namespace: default
+    expected_state: Running
+    error_message: One or more pods are not Running. Use kubectl describe pod and kubectl logs.
+solution:
+  summary: Identify the misconfiguration affecting this kubernetes lab and apply the minimal fix.
+  files_changed: []
+  commands_run: []
+  reference_docs: kubernetes-fundamentals
+guided_mode:
+  enabled: true
+  steps:
+  - step: 1
+    title: Inspect current state
+    instruction: Run a read-only diagnostic before changing anything.
+    command: check.sh
+    expected_output: Output shows the current failure mode
+    explanation: Evidence-first troubleshooting avoids guessing.
+    next_on: command_success
+  - step: 2
+    title: Apply the minimal fix
+    instruction: Make one reversible change aligned with the objectives.
+    command: '# your fix command here'
+    expected_output: State moves toward the objective
+    explanation: Small changes make rollback easy if the hypothesis was wrong.
+    next_on: command_success
+  - step: 3
+    title: Verify with the grader
+    instruction: Run the same verification the checker uses.
+    command: check.sh
+    expected_output: '`kubectl get pods` shows every pod Running'
+    explanation: The lab passes only when real state is healthy.
+    next_on: command_success

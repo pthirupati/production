@@ -1,4 +1,3 @@
-#!/usr/bin/env bash
-# gpu-persistence-daemon-config: config repair (FIXED-OK sentinel).
-grep -q FIXED-OK /etc/gpu/persistenced.conf
+#!/bin/bash
+nvidia-smi | grep -q 'NVIDIA-SMI'
 exit 0

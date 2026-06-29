@@ -1,37 +1,150 @@
-title: "Docker Escape Attempt — Detect and Harden Container Configuration"
+title: Docker Escape Attempt - Detect and Harden Container
 slug: docker-escape-attempt
-technology: Security
-category: Container Security
+technology: security
+category: Build
 difficulty: hard
 time_limit: 1200
 max_score: 100
 infrastructure_type: docker
 jira_priority: Critical
 is_free: false
-description: |
-  Security monitoring has detected suspicious activity from a running container
-  that appears to be attempting a privileged escape. The container was launched
-  with --privileged and has /host mounted from the host filesystem. Identify the
-  dangerous container configuration, stop the offending container, and redeploy
-  it with a hardened security profile using --cap-drop and a read-only root.
-objectives:
-  - Identify the privileged container and its dangerous mounts using docker inspect
-  - Stop the offending container and document the security misconfigurations found
-  - Redeploy the container without --privileged, with --cap-drop=ALL --cap-add=NET_BIND_SERVICE, and --read-only
-initial_state: |
-  Docker host with a running container named `webapp` launched with --privileged
+description: 'CONTEXT: A team operating security hardening needs you to resolve `Docker Escape Attempt
+  - Detect and Harden Container` during a realistic incident. The business impact is reduced service reliability
+  until the underlying state is repaired.
+
+
+  ENVIRONMENT: You are working in FixitLab''s offline hardening lab with SSH, firewall, TLS, audit logs,
+  and IAM settings. All tools run locally; no paid APIs or external cloud calls are required.
+
+
+  SYMPTOM / STARTING STATE: Docker host with a running container named `webapp` launched with --privileged
+
   and -v /:/host. The container image is nginx:alpine. Docker daemon is running
+
+  with default configuration. Audit logs show unexpected host filesystem access. Security monitoring has
+  detected suspicious activity from a running container
+
+  that appears to be attempting a privileged escape. The container was launched
+
+  with --privileged and has /host mounted from the host filesystem. Identify the
+
+  dangerous container configuration, stop the offending container, and redeploy
+
+  it with a hardened security profile using --cap-drop and a read-only root.
+
+
+  OBJECTIVE: Identify the privileged container and its dangerous mounts using docker inspect; Stop the
+  offending container and document the security misconfigurations found; Redeploy the container without
+  --privileged, with --cap-drop=ALL --cap-add=NET_BIND_SERVICE, and --read-only. Success means `check.sh`
+  exits successfully.
+
+
+  WHAT TO AVOID: Do not apply broad destructive changes, skip evidence gathering, or fake completion with
+  marker files — the checker validates real system state.'
+objectives:
+- Identify the privileged container and its dangerous mounts using docker inspect
+- Stop the offending container and document the security misconfigurations found
+- Redeploy the container without --privileged, with --cap-drop=ALL --cap-add=NET_BIND_SERVICE, and --read-only
+initial_state: 'Docker host with a running container named `webapp` launched with --privileged
+
+  and -v /:/host. The container image is nginx:alpine. Docker daemon is running
+
   with default configuration. Audit logs show unexpected host filesystem access.
+
+  '
 hints:
-  - order: 1
-    cost: 10
-    content: 'Run `docker inspect webapp | grep -A5 ''Privileged\|Binds\|CapAdd''` to see the dangerous configuration.'
-  - order: 2
-    cost: 15
-    content: "Stop the container: `docker stop webapp && docker rm webapp` before redeploying with restricted settings."
-  - order: 3
-    cost: 20
-    content: "Redeploy safely: `docker run -d --name webapp --cap-drop=ALL --cap-add=NET_BIND_SERVICE --read-only --security-opt no-new-privileges nginx:alpine`"
-  - order: 4
-    cost: 25
-    content: "Verify: `docker inspect webapp | grep -E 'Privileged|CapDrop|ReadonlyRootfs'` — Privileged should be false and CapDrop should list ALL."
+- order: 1
+  cost: 0
+  content: 'Where to look: Run `docker ps -a` and `docker logs <container>` for the failing container.'
+- order: 2
+  cost: 25
+  content: 'Diagnostic steps:
+
+    1. `docker ps -a` — note Exited status and exit code.
+
+    2. `docker logs <name>` for the startup error.
+
+    3. Inspect the Dockerfile or `docker run` flags if the image is wrong.'
+- order: 3
+  cost: 50
+  content: 'Exact fix + verification:
+
+    1. Fix image, port mapping, volume, or env configuration.
+
+    2. `docker start <name>` or re-run with corrected flags.
+
+    3. Confirm `bash check.sh` shows the container Up.
+
+
+    WHY: the checker validates the container is actually running.'
+summary: Complete the docker escape attempt - detect and harden container security lab and verify success
+  with the checker
+estimated_minutes: 20
+xp_reward: 100
+prerequisites:
+- Basic security literacy
+tags:
+- fix
+- hands-on
+- security
+linked_tutorial: security-fundamentals
+what_you_will_learn:
+- Identify the privileged container and its dangerous mounts using docker inspect
+- Stop the offending container and document the security misconfigurations found
+- Redeploy the container without --privileged, with --cap-drop=ALL --cap-add=NET_BIND_SERVICE, and --read-only
+environment:
+  nodes:
+  - role: primary
+    os: FixitLab hardening lab
+    hostname: lab-primary
+    ip: 127.0.0.1
+    specs: local offline simulation
+  pre_installed:
+  - bash
+  - coreutils
+  - journalctl
+  - security
+  - systemctl
+  credentials:
+  - user: root
+    password: lab123
+tasks:
+- id: task_1
+  title: Docker Escape Attempt - Detect and Harden Container
+  description: Restore healthy behavior for Docker Escape Attempt - Detect and Harden Container by investigating
+    the failure, applying the smallest safe fix, and validating the outcome.
+  background: 'This security lab teaches systematic troubleshooting: observe, hypothesize, change, verify.'
+  validation:
+    type: custom_script
+    script: check.sh
+    error_message: Validation did not pass. Re-read the objectives and Hint 2 diagnostic steps.
+solution:
+  summary: Identify the misconfiguration affecting this security lab and apply the minimal fix.
+  files_changed: []
+  commands_run:
+  - bash check.sh
+  reference_docs: security-fundamentals
+guided_mode:
+  enabled: true
+  steps:
+  - step: 1
+    title: Inspect current state
+    instruction: Run a read-only diagnostic before changing anything.
+    command: check.sh
+    expected_output: Output shows the current failure mode
+    explanation: Evidence-first troubleshooting avoids guessing.
+    next_on: command_success
+  - step: 2
+    title: Apply the minimal fix
+    instruction: Make one reversible change aligned with the objectives.
+    command: '# your fix command here'
+    expected_output: State moves toward the objective
+    explanation: Small changes make rollback easy if the hypothesis was wrong.
+    next_on: command_success
+  - step: 3
+    title: Verify with the grader
+    instruction: Run the same verification the checker uses.
+    command: check.sh
+    expected_output: '`check.sh` exits successfully'
+    explanation: The lab passes only when real state is healthy.
+    next_on: command_success

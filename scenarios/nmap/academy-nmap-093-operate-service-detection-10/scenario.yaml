@@ -1,7 +1,7 @@
-title: 'Nmap Network Scanning: Service/Version Detection — Daily Operations'
+title: Service/Version Detection — Operate Lab
 slug: academy-nmap-093-operate-service-detection-10
-technology: Nmap Network Scanning
-category: Operations
+technology: nmap
+category: Build
 difficulty: medium
 scenario_type: do
 lab_mode: simulation
@@ -11,9 +11,28 @@ max_score: 100
 is_free: false
 infrastructure_type: docker
 jira_priority: Medium
-description: 'Day-2 operations: perform a routine service/version detection task safely in Nmap Network
-  Scanning. Follow change control — inspect, change, verify — while working with banner grabbing and version
-  probes.'
+description: 'CONTEXT: A team operating network scanning needs you to resolve `nmap: Service/Version Detection
+  — Daily Operations` during a realistic incident. The business impact is reduced service reliability
+  until the underlying state is repaired.
+
+
+  ENVIRONMENT: You are working in FixitLab''s offline scanning lab with nmap CLI, targets, and scan output.
+  All tools run locally; no paid APIs or external cloud calls are required.
+
+
+  SYMPTOM / STARTING STATE: The scanning lab is healthy enough for scheduled work on service/version detection.
+  Complete the maintenance task without unnecessary downtime. Day-2 operations: perform a routine service/version
+  detection task safely in nmap. Follow change control — inspect, change, verify — while working with
+  banner grabbing and version probes.
+
+
+  OBJECTIVE: Day-2 service/version detection work completes safely in this environment; Changes are verified
+  with before/after checks; The system remains stable for dependent teams. Success means `check.sh` exits
+  successfully.
+
+
+  WHAT TO AVOID: Do not apply broad destructive changes, skip evidence gathering, or fake completion with
+  marker files — the checker validates real system state.'
 objectives:
 - Day-2 service/version detection work completes safely in this environment
 - Changes are verified with before/after checks
@@ -22,7 +41,7 @@ initial_state: The scanning lab is healthy enough for scheduled work on service/
   the maintenance task without unnecessary downtime.
 hints:
 - order: 1
-  cost: 10
+  cost: 0
   content: 'Orient yourself before changing anything:
 
     1. Inspect the current state — `nmap -sV`.
@@ -31,17 +50,15 @@ hints:
 
     3. Recall the core idea: banner grabbing and version probes. Form one hypothesis before you act.'
 - order: 2
-  cost: 15
-  content: 'Plan your approach (still no spoilers):
-
-    1. Confirm the exact gap between current and desired state for service/version detection.
-
-    2. Decide the single smallest change that moves you toward the objective.
-
-    3. Capture evidence (command output / status) before the change so you can prove it worked afterward.'
-- order: 3
   cost: 25
-  content: 'Guided walkthrough:
+  content: 'Diagnostic steps:
+
+    1. Changes are verified with before/after checks
+
+    2. The system remains stable for dependent teams'
+- order: 3
+  cost: 50
+  content: 'Exact fix + verification:
 
     1. Re-check the current state — `nmap -sV`.
 
@@ -50,4 +67,74 @@ hints:
 
     3. Verify the result — service versions are detected.
 
-    4. Click Check Solution once `systemctl is-active nginx` returns active.'
+    4. Click Check Solution once the objective is met (graded on real state, not a marker file).'
+summary: Complete the service/version detection — operate lab nmap lab and verify success with the checker
+estimated_minutes: 20
+xp_reward: 100
+prerequisites:
+- Basic nmap literacy
+tags:
+- do
+- hands-on
+- nmap
+linked_tutorial: nmap-fundamentals
+what_you_will_learn:
+- Day-2 service/version detection work completes safely in this environment
+- Changes are verified with before/after checks
+- The system remains stable for dependent teams
+environment:
+  nodes:
+  - role: primary
+    os: FixitLab scanning lab
+    hostname: lab-primary
+    ip: 127.0.0.1
+    specs: local offline simulation
+  pre_installed:
+  - bash
+  - coreutils
+  - journalctl
+  - nmap
+  - systemctl
+  credentials:
+  - user: root
+    password: lab123
+tasks:
+- id: task_1
+  title: Service/Version Detection — Operate Lab
+  description: Restore healthy behavior for Service/Version Detection — Operate Lab by investigating the
+    failure, applying the smallest safe fix, and validating the outcome.
+  background: 'This nmap lab teaches systematic troubleshooting: observe, hypothesize, change, verify.'
+  validation:
+    type: custom_script
+    script: check.sh
+    error_message: Validation did not pass. Re-read the objectives and Hint 2 diagnostic steps.
+solution:
+  summary: Identify the misconfiguration affecting this nmap lab and apply the minimal fix.
+  files_changed: []
+  commands_run:
+  - bash check.sh
+  reference_docs: nmap-fundamentals
+guided_mode:
+  enabled: true
+  steps:
+  - step: 1
+    title: Inspect current state
+    instruction: Run a read-only diagnostic before changing anything.
+    command: check.sh
+    expected_output: Output shows the current failure mode
+    explanation: Evidence-first troubleshooting avoids guessing.
+    next_on: command_success
+  - step: 2
+    title: Apply the minimal fix
+    instruction: Make one reversible change aligned with the objectives.
+    command: '# your fix command here'
+    expected_output: State moves toward the objective
+    explanation: Small changes make rollback easy if the hypothesis was wrong.
+    next_on: command_success
+  - step: 3
+    title: Verify with the grader
+    instruction: Run the same verification the checker uses.
+    command: check.sh
+    expected_output: '`check.sh` exits successfully'
+    explanation: The lab passes only when real state is healthy.
+    next_on: command_success

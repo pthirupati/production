@@ -1,7 +1,7 @@
 slug: ansible-awx-install
 title: Install Ansible AWX Operator
-technology: Ansible
-category: AWX / Tower
+technology: ansible
+category: Build
 difficulty: medium
 scenario_type: do
 time_limit: 1200
@@ -10,21 +10,123 @@ lab_mode: simulation
 simulation_type: ansible-awx
 infrastructure_type: simulation
 is_free: false
-description: >-
-  Build lab: install the Ansible AWX operator on the training cluster and verify the web UI is reachable.
-  Use the AWX simulator to complete the operator install, then confirm the dashboard loads.
+description: 'CONTEXT: A team operating Ansible automation needs you to resolve `Install Ansible AWX Operator`
+  during a realistic incident. The business impact is reduced service reliability until the underlying
+  state is repaired.
+
+
+  ENVIRONMENT: You are working in FixitLab''s offline Ansible control node with inventory, playbooks,
+  roles, and ansible-playbook. All tools run locally; no paid APIs or external cloud calls are required.
+
+
+  SYMPTOM / STARTING STATE: Kubernetes cluster with AWX operator manifest staged but not applied. AWX
+  web UI is not yet available. Build lab: install the Ansible AWX operator on the training cluster and
+  verify the web UI is reachable. Use the AWX simulator to complete the operator install, then confirm
+  the dashboard loads.
+
+
+  OBJECTIVE: Open the AWX simulator from the lab toolbar and sign in; Run the AWX operator install action;
+  Verify the dashboard shows AWX as installed with no blocking errors. Success means `check.sh` exits
+  successfully.
+
+
+  WHAT TO AVOID: Do not apply broad destructive changes, skip evidence gathering, or fake completion with
+  marker files — the checker validates real system state.'
 objectives:
-  - Open the AWX simulator from the lab toolbar and sign in
-  - Run the AWX operator install action
-  - Verify the dashboard shows AWX as installed with no blocking errors
-initial_state: Kubernetes cluster with AWX operator manifest staged but not applied. AWX web UI is not yet available.
+- Open the AWX simulator from the lab toolbar and sign in
+- Run the AWX operator install action
+- Verify the dashboard shows AWX as installed with no blocking errors
+initial_state: Kubernetes cluster with AWX operator manifest staged but not applied. AWX web UI is not
+  yet available.
 hints:
-  - order: 1
-    cost: 10
-    content: Click **Open AWX** in the lab toolbar, then **Sign In** with the training admin account.
-  - order: 2
-    cost: 15
-    content: On the Dashboard, click **Install AWX** to apply the operator and wait for success.
-  - order: 3
-    cost: 20
-    content: Click **Check** in the lab toolbar to validate the install completed.
+- order: 1
+  cost: 0
+  content: 'Where to look: Open the AWX simulator from the lab toolbar and sign in'
+- order: 2
+  cost: 25
+  content: 'Diagnostic steps:
+
+    1. Run the AWX operator install action
+
+    2. Verify the dashboard shows AWX as installed with no blocking errors'
+- order: 3
+  cost: 50
+  content: 'Exact fix + verification:
+
+    1. Verify the dashboard shows AWX as installed with no blocking errors.
+
+    2. Re-run the lab checker (`check.sh` or Check Solution).
+
+    3. Confirm every scenario objective is satisfied.
+
+
+    WHY: the grader validates real state — marker files are ignored.'
+summary: Complete the install ansible awx operator ansible lab and verify success with the checker
+estimated_minutes: 20
+xp_reward: 100
+prerequisites:
+- Basic ansible literacy
+tags:
+- ansible
+- do
+- hands-on
+linked_tutorial: ansible-fundamentals
+what_you_will_learn:
+- Open the AWX simulator from the lab toolbar and sign in
+- Run the AWX operator install action
+- Verify the dashboard shows AWX as installed with no blocking errors
+environment:
+  nodes:
+  - role: primary
+    os: FixitLab Ansible control node
+    hostname: lab-primary
+    ip: 127.0.0.1
+    specs: local offline simulation
+  pre_installed:
+  - ansible
+  - ansible-playbook
+  - bash
+  - coreutils
+  credentials:
+  - user: root
+    password: lab123
+tasks:
+- id: task_1
+  title: Install Ansible AWX Operator
+  description: Restore healthy behavior for Install Ansible AWX Operator by investigating the failure,
+    applying the smallest safe fix, and validating the outcome.
+  background: 'This ansible lab teaches systematic troubleshooting: observe, hypothesize, change, verify.'
+  validation:
+    type: custom_script
+    script: check.sh
+    error_message: Validation did not pass. Re-read the objectives and Hint 2 diagnostic steps.
+solution:
+  summary: Identify the misconfiguration affecting this ansible lab and apply the minimal fix.
+  files_changed: []
+  commands_run:
+  - bash check.sh
+  reference_docs: ansible-fundamentals
+guided_mode:
+  enabled: true
+  steps:
+  - step: 1
+    title: Inspect current state
+    instruction: Run a read-only diagnostic before changing anything.
+    command: check.sh
+    expected_output: Output shows the current failure mode
+    explanation: Evidence-first troubleshooting avoids guessing.
+    next_on: command_success
+  - step: 2
+    title: Apply the minimal fix
+    instruction: Make one reversible change aligned with the objectives.
+    command: '# your fix command here'
+    expected_output: State moves toward the objective
+    explanation: Small changes make rollback easy if the hypothesis was wrong.
+    next_on: command_success
+  - step: 3
+    title: Verify with the grader
+    instruction: Run the same verification the checker uses.
+    command: check.sh
+    expected_output: '`check.sh` exits successfully'
+    explanation: The lab passes only when real state is healthy.
+    next_on: command_success

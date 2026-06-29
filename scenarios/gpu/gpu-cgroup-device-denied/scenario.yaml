@@ -1,7 +1,7 @@
 title: Container Denied GPU by cgroup Rule
 slug: gpu-cgroup-device-denied
-technology: Gpu
-category: Containers
+technology: gpu
+category: Fix
 difficulty: hard
 lab_mode: simulation
 simulation_type: gpu
@@ -10,8 +10,26 @@ max_score: 100
 is_free: true
 jira_priority: High
 dual_terminal: false
-description: Containers can't see the GPU because the NVIDIA container runtime/cgroup device rules are
-  misconfigured. Fix the runtime config and confirm it is corrected.
+description: 'CONTEXT: A team operating GPU operations needs you to resolve `Container Denied GPU by cgroup
+  Rule` during a realistic incident. The business impact is reduced service reliability until the underlying
+  state is repaired.
+
+
+  ENVIRONMENT: You are working in FixitLab''s offline GPU node with nvidia-smi, drivers, CUDA, and container
+  toolkit. All tools run locally; no paid APIs or external cloud calls are required.
+
+
+  SYMPTOM / STARTING STATE: A GPU host whose container runtime config blocks GPU device access for containers.
+  Containers can''t see the GPU because the NVIDIA container runtime/cgroup device rules are misconfigured.
+  Fix the runtime config and confirm it is corrected.
+
+
+  OBJECTIVE: Confirm containers can''t access the GPU; Fix the container runtime/cgroup config; Verify
+  the runtime config is corrected. Success means `check.sh` exits successfully.
+
+
+  WHAT TO AVOID: Do not apply broad destructive changes, skip evidence gathering, or fake completion with
+  marker files — the checker validates real system state.'
 initial_state: A GPU host whose container runtime config blocks GPU device access for containers.
 objectives:
 - Confirm containers can't access the GPU
@@ -19,11 +37,73 @@ objectives:
 - Verify the runtime config is corrected
 hints:
 - order: 1
-  cost: 10
-  content: 'CUDA error: no device in containers.'
+  cost: 0
+  content: 'Where to look: Run `docker ps -a` and `docker logs <container>` for the failing container.'
 - order: 2
-  cost: 15
-  content: Correct config.toml device/cgroup settings.
+  cost: 25
+  content: 'Diagnostic steps:
+
+    1. `docker ps -a` — note Exited status and exit code.
+
+    2. `docker logs <name>` for the startup error.
+
+    3. Inspect the Dockerfile or `docker run` flags if the image is wrong.'
 - order: 3
-  cost: 20
-  content: config.toml carries the corrected settings.
+  cost: 50
+  content: 'Exact fix + verification:
+
+    1. Fix image, port mapping, volume, or env configuration.
+
+    2. `docker start <name>` or re-run with corrected flags.
+
+    3. Confirm `nvidia-smi` shows the container Up.
+
+
+    WHY: the checker validates the container is actually running.'
+summary: Complete the container denied gpu by cgroup rule gpu lab and verify success with the checker
+estimated_minutes: 20
+xp_reward: 100
+prerequisites:
+- Basic gpu literacy
+tags:
+- fix
+- gpu
+- hands-on
+linked_tutorial: gpu-fundamentals
+what_you_will_learn:
+- Confirm containers can't access the GPU
+- Fix the container runtime/cgroup config
+- Verify the runtime config is corrected
+environment:
+  nodes:
+  - role: primary
+    os: FixitLab GPU node
+    hostname: lab-primary
+    ip: 127.0.0.1
+    specs: local offline simulation
+  pre_installed:
+  - bash
+  - coreutils
+  - gpu
+  - journalctl
+  - systemctl
+  credentials:
+  - user: root
+    password: lab123
+tasks:
+- id: task_1
+  title: Container Denied GPU by cgroup Rule
+  description: Restore healthy behavior for Container Denied GPU by cgroup Rule by investigating the failure,
+    applying the smallest safe fix, and validating the outcome.
+  background: 'This gpu lab teaches systematic troubleshooting: observe, hypothesize, change, verify.'
+  validation:
+    type: command_output
+    command: nvidia-smi
+    expected_output: NVIDIA-SMI
+    error_message: GPU health check still fails. Verify driver and device visibility.
+solution:
+  summary: Identify the misconfiguration affecting this gpu lab and apply the minimal fix.
+  files_changed: []
+  commands_run:
+  - nvidia-smi
+  reference_docs: gpu-fundamentals

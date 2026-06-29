@@ -1,7 +1,7 @@
 title: CI Deploy Blocked by Environment Protection
 slug: devops-ci-pipeline-env-protection
-technology: DevOps
-category: CI/CD
+technology: devops
+category: Fix
 difficulty: medium
 lab_mode: simulation
 simulation_type: generic
@@ -10,8 +10,26 @@ max_score: 100
 is_free: true
 jira_priority: High
 dual_terminal: false
-description: Deploys fail because a protected-environment rule isn't satisfied by the pipeline. Fix the
-  pipeline config and confirm it passes.
+description: 'CONTEXT: A team operating DevOps delivery needs you to resolve `CI Deploy Blocked by Environment
+  Protection` during a realistic incident. The business impact is reduced service reliability until the
+  underlying state is repaired.
+
+
+  ENVIRONMENT: You are working in FixitLab''s offline CI/CD lab with git repos, pipelines, artifacts,
+  and runbooks. All tools run locally; no paid APIs or external cloud calls are required.
+
+
+  SYMPTOM / STARTING STATE: A CI/CD or Helm environment with the documented ci-pipeline fault. Deploys
+  fail because a protected-environment rule isn''t satisfied by the pipeline. Fix the pipeline config
+  and confirm it passes.
+
+
+  OBJECTIVE: Confirm the pipeline is failing; Fix the pipeline configuration; Verify the pipeline passes.
+  Success means `check.sh` exits successfully.
+
+
+  WHAT TO AVOID: Do not apply broad destructive changes, skip evidence gathering, or fake completion with
+  marker files — the checker validates real system state.'
 initial_state: A CI/CD or Helm environment with the documented ci-pipeline fault.
 objectives:
 - Confirm the pipeline is failing
@@ -19,11 +37,71 @@ objectives:
 - Verify the pipeline passes
 hints:
 - order: 1
-  cost: 10
-  content: The pipeline deploy stage is failing.
+  cost: 0
+  content: 'Where to look: Confirm the pipeline is failing'
 - order: 2
-  cost: 15
-  content: Fix the pipeline configuration and redeploy.
+  cost: 25
+  content: 'Diagnostic steps:
+
+    1. Fix the pipeline configuration
+
+    2. Verify the pipeline passes'
 - order: 3
-  cost: 20
-  content: The pipeline/release is healthy.
+  cost: 50
+  content: 'Exact fix + verification:
+
+    1. Verify the pipeline passes.
+
+    2. Re-run the lab checker (`check.sh` or Check Solution).
+
+    3. Confirm every scenario objective is satisfied.
+
+
+    WHY: the grader validates real state — marker files are ignored.'
+summary: Complete the ci deploy blocked by environment protection devops lab and verify success with the
+  checker
+estimated_minutes: 25
+xp_reward: 100
+prerequisites:
+- Basic devops literacy
+tags:
+- devops
+- fix
+- hands-on
+linked_tutorial: devops-fundamentals
+what_you_will_learn:
+- Confirm the pipeline is failing
+- Fix the pipeline configuration
+- Verify the pipeline passes
+environment:
+  nodes:
+  - role: primary
+    os: FixitLab CI/CD lab
+    hostname: lab-primary
+    ip: 127.0.0.1
+    specs: local offline simulation
+  pre_installed:
+  - bash
+  - coreutils
+  - devops
+  - journalctl
+  - systemctl
+  credentials:
+  - user: root
+    password: lab123
+tasks:
+- id: task_1
+  title: CI Deploy Blocked by Environment Protection
+  description: Restore healthy behavior for CI Deploy Blocked by Environment Protection by investigating
+    the failure, applying the smallest safe fix, and validating the outcome.
+  background: 'This devops lab teaches systematic troubleshooting: observe, hypothesize, change, verify.'
+  validation:
+    type: custom_script
+    script: check.sh
+    error_message: Validation did not pass. Re-read the objectives and Hint 2 diagnostic steps.
+solution:
+  summary: Identify the misconfiguration affecting this devops lab and apply the minimal fix.
+  files_changed: []
+  commands_run:
+  - bash check.sh
+  reference_docs: devops-fundamentals

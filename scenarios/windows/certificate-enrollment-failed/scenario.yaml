@@ -1,36 +1,115 @@
 title: Certificate Enrollment Failed
 slug: win-cert-enrollment-fail
 difficulty: medium
-category: Windows Server
-description: 'Users are unable to enroll certificates from the internal Certificate
-  Authority. Enrollment requests are failing with access denied or template not found
-  errors. The CA permissions and certificate template configuration need to be diagnosed
-  and repaired.'
-initial_state: 'Windows Server 2022 with Active Directory Certificate Services (AD
-  CS) installed. The CA is online but certificate enrollment is failing for domain
-  users. Certificate templates may have incorrect permissions or enrollment settings.'
+category: Fix
+description: 'CONTEXT: A team operating Windows Server needs you to resolve `Certificate Enrollment Failed`
+  during a realistic incident. The business impact is reduced service reliability until the underlying
+  state is repaired.
+
+
+  ENVIRONMENT: You are working in FixitLab''s offline Windows Server host with PowerShell, Server Manager,
+  and AD tools. All tools run locally; no paid APIs or external cloud calls are required.
+
+
+  SYMPTOM / STARTING STATE: Windows Server 2022 with Active Directory Certificate Services (AD CS) installed.
+  The CA is online but certificate enrollment is failing for domain users. Certificate templates may have
+  incorrect permissions or enrollment settings. Users are unable to enroll certificates from the internal
+  Certificate Authority. Enrollment requests are failing with access denied or template not found errors.
+  The CA permissions and certificate template configuration need to be diagnosed and repaired.
+
+
+  OBJECTIVE: Identify why certificate enrollment is failing from the CA; Fix certificate template permissions
+  and enrollment rights; Verify successful certificate enrollment for affected users. Success means `check.sh`
+  exits successfully.
+
+
+  WHAT TO AVOID: Do not apply broad destructive changes, skip evidence gathering, or fake completion with
+  marker files — the checker validates real system state.'
+initial_state: Windows Server 2022 with Active Directory Certificate Services (AD CS) installed. The CA
+  is online but certificate enrollment is failing for domain users. Certificate templates may have incorrect
+  permissions or enrollment settings.
 objectives:
-  - Identify why certificate enrollment is failing from the CA
-  - Fix certificate template permissions and enrollment rights
-  - Verify successful certificate enrollment for affected users
+- Identify why certificate enrollment is failing from the CA
+- Fix certificate template permissions and enrollment rights
+- Verify successful certificate enrollment for affected users
 lab_mode: simulation
 simulation_type: windows
 time_limit: 1800
 max_score: 100
 is_free: false
 hints:
-  - content: 'Check CA status and templates: certutil -CAInfo and Get-CATemplate |
-      Select Name, Oid to list available templates'
-    cost: 10
-    order: 1
-  - content: 'Review template permissions in Certificate Templates console (certtmpl.msc).
-      Ensure Domain Users or target group has Enroll and Autoenroll permissions.'
-    cost: 15
-    order: 2
-  - content: 'Force autoenrollment update: certutil -pulse or via GPO: gpupdate /force
-      then check Application event log for enrollment errors (Event ID 13, 64).'
-    cost: 20
-    order: 3
+- order: 1
+  cost: 0
+  content: 'Where to look: Open Event Viewer (System/Application) and the relevant Services mmc or Server
+    Manager role status.'
+- order: 2
+  cost: 25
+  content: 'Diagnostic steps:
+
+    1. Note the service state and dependency chain in services.msc.
+
+    2. Read the most recent error in Event Viewer for the failing component.
+
+    3. Use PowerShell (`Get-Service`, `Get-WinEvent`) for scripted evidence.'
+- order: 3
+  cost: 50
+  content: 'Exact fix + verification:
+
+    1. Apply the minimal fix (service start, GPO, binding, or permission).
+
+    2. Re-test the failing operation.
+
+    3. Confirm Check Solution passes.
+
+
+    WHY: Windows labs grade real role/service state.'
 requires_companion_hosts: false
 dual_terminal: false
 jira_priority: Medium
+technology: windows
+summary: Complete the certificate enrollment failed windows lab and verify success with the checker
+estimated_minutes: 30
+xp_reward: 100
+prerequisites:
+- Basic windows literacy
+tags:
+- fix
+- hands-on
+- windows
+linked_tutorial: windows-fundamentals
+what_you_will_learn:
+- Identify why certificate enrollment is failing from the CA
+- Fix certificate template permissions and enrollment rights
+- Verify successful certificate enrollment for affected users
+environment:
+  nodes:
+  - role: primary
+    os: FixitLab Windows Server host
+    hostname: lab-primary
+    ip: 127.0.0.1
+    specs: local offline simulation
+  pre_installed:
+  - bash
+  - coreutils
+  - journalctl
+  - systemctl
+  - windows
+  credentials:
+  - user: root
+    password: lab123
+tasks:
+- id: task_1
+  title: Certificate Enrollment Failed
+  description: Restore healthy behavior for Certificate Enrollment Failed by investigating the failure,
+    applying the smallest safe fix, and validating the outcome.
+  background: 'This windows lab teaches systematic troubleshooting: observe, hypothesize, change, verify.'
+  validation:
+    type: custom_script
+    script: check.sh
+    error_message: Validation did not pass. Re-read the objectives and Hint 2 diagnostic steps.
+solution:
+  summary: Identify the misconfiguration affecting this windows lab and apply the minimal fix.
+  files_changed: []
+  commands_run:
+  - bash check.sh
+  reference_docs: windows-fundamentals

@@ -1,9 +1,26 @@
 title: Fix the Number Parsing Crash
 slug: py-fix-parse-int-base-error
-category: Python Development
-description: safe_int(s, default) should parse a string to an int, returning `default` when the string
-  is not a valid integer, but it lets ValueError propagate and crash. Wrap the parse so invalid input
-  falls back to default.
+category: Fix
+description: 'CONTEXT: A team operating Python development needs you to resolve `Fix the Number Parsing
+  Crash` during a realistic incident. The business impact is reduced service reliability until the underlying
+  state is repaired.
+
+
+  ENVIRONMENT: You are working in FixitLab''s offline Python project workspace with source files, venv,
+  tests, and CLI entrypoints. All tools run locally; no paid APIs or external cloud calls are required.
+
+
+  SYMPTOM / STARTING STATE: safe_int(s, default) should parse a string to an int, returning `default`
+  when the string is not a valid integer, but it lets ValueError propagate and crash. Wrap the parse so
+  invalid input falls back to default.
+
+
+  OBJECTIVE: Trigger the ValueError on bad input; Catch the conversion error; Return the provided default
+  on failure. Success means all hidden tests pass.
+
+
+  WHAT TO AVOID: Do not apply broad destructive changes, skip evidence gathering, or fake completion with
+  marker files — the checker validates real system state.'
 difficulty: easy
 scenario_type: fix
 lab_mode: simulation
@@ -21,50 +38,118 @@ objectives:
 initial_state: safe_int(s, default) should parse a string to an int, returning `default` when the string
   is not a valid integer, but it lets ValueError propagate and crash. Wrap the parse so invalid input
   falls back to default.
-solution_explanation: |
-  int() raises on non-numeric input. Catching ValueError/TypeError and returning the default makes parsing safe.
+solution_explanation: 'int() raises on non-numeric input. Catching ValueError/TypeError and returning
+  the default makes parsing safe.
+
+  '
 coding_spec:
   language: python
   entrypoint: solution.py
   kind: fix
-  instructions: |
-    Fix safe_int(s, default): return int(s) when s parses, otherwise return default. Never raise.
-      safe_int('42', 0) -> 42, safe_int('abc', -1) -> -1
-    Click Run to try it, then Check Solution to grade against all tests.
+  instructions: "Fix safe_int(s, default): return int(s) when s parses, otherwise return default. Never\
+    \ raise.\n  safe_int('42', 0) -> 42, safe_int('abc', -1) -> -1\nClick Run to try it, then Check Solution\
+    \ to grade against all tests.\n"
   files:
   - path: solution.py
-    content: |
-      def safe_int(s, default):
-          return int(s)        # raises ValueError on bad input
+    content: "def safe_int(s, default):\n    return int(s)        # raises ValueError on bad input\n"
     readonly: false
   visible_tests:
   - name: valid number
-    code: |
-      assert safe_int('42', 0) == 42
+    code: 'assert safe_int(''42'', 0) == 42
+
+      '
   - name: invalid falls back
-    code: |
-      assert safe_int('abc', -1) == -1
+    code: 'assert safe_int(''abc'', -1) == -1
+
+      '
   hidden_tests:
   - name: empty string
-    code: |
-      assert safe_int('', 99) == 99
+    code: 'assert safe_int('''', 99) == 99
+
+      '
   - name: float string falls back
-    code: |
-      assert safe_int('3.14', 0) == 0
+    code: 'assert safe_int(''3.14'', 0) == 0
+
+      '
   - name: negative number
-    code: |
-      assert safe_int('-7', 0) == -7
+    code: 'assert safe_int(''-7'', 0) == -7
+
+      '
   - name: None falls back
-    code: |
-      assert safe_int(None, 5) == 5
+    code: 'assert safe_int(None, 5) == 5
+
+      '
   timeout: 8
 hints:
 - order: 1
-  cost: 10
-  content: safe_int('abc', -1) raises ValueError instead of returning -1.
+  cost: 0
+  content: 'Where to look: Open `solution.py`, read the instructions, and run the visible tests to see
+    which assertion fails first.'
 - order: 2
-  cost: 20
-  content: Wrap int(s) in try/except.
+  cost: 25
+  content: 'Diagnostic steps:
+
+    1. Click Run and read the traceback — note line number and actual vs expected values.
+
+    2. Reproduce the failure with the smallest input from a visible test.
+
+    3. Compare your implementation to the bug described in the lab prompt.'
 - order: 3
-  cost: 30
-  content: Catch ValueError (and TypeError for None) and return default.
+  cost: 50
+  content: 'Exact fix + verification:
+
+    1. Return the provided default on failure.
+
+    2. Re-run the lab checker (`check.sh` or Check Solution).
+
+    3. Confirm every scenario objective is satisfied.
+
+
+    WHY: the grader validates real state — marker files are ignored.'
+technology: python
+summary: Complete the fix the number parsing crash python lab and verify success with the checker
+estimated_minutes: 25
+xp_reward: 100
+prerequisites:
+- Basic python literacy
+tags:
+- fix
+- hands-on
+- python
+linked_tutorial: python-fundamentals
+what_you_will_learn:
+- Trigger the ValueError on bad input
+- Catch the conversion error
+- Return the provided default on failure
+environment:
+  nodes:
+  - role: primary
+    os: FixitLab Python project workspace
+    hostname: lab-primary
+    ip: 127.0.0.1
+    specs: local offline simulation
+  pre_installed:
+  - bash
+  - coreutils
+  - pip
+  - python
+  - python3
+  credentials:
+  - user: root
+    password: lab123
+tasks:
+- id: task_1
+  title: Fix the Number Parsing Crash
+  description: Restore healthy behavior for Fix the Number Parsing Crash by investigating the failure,
+    applying the smallest safe fix, and validating the outcome.
+  background: 'This python lab teaches systematic troubleshooting: observe, hypothesize, change, verify.'
+  validation:
+    type: custom_script
+    script: hidden_tests
+    error_message: One or more hidden tests failed. Read the public test output, fix your solution, and
+      submit again.
+solution:
+  summary: The solution passes all hidden tests by implementing the required behavior in code.
+  files_changed: []
+  commands_run: []
+  reference_docs: python-fundamentals

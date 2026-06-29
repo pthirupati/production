@@ -1,7 +1,7 @@
-title: 'DevOps: Incident Response — Integration Lab'
+title: Incident Response — Integration Lab
 slug: academy-devops-010-integration-incident-response
-technology: DevOps
-category: Cross-Technology
+technology: devops
+category: Project
 difficulty: hard
 scenario_type: do
 lab_mode: simulation
@@ -11,44 +11,130 @@ max_score: 100
 is_free: false
 infrastructure_type: docker
 jira_priority: Medium
-description: Service operations lab. The `rsyslog` systemd unit is **failed/inactive** on this host —
-  a realistic fault for Integration Lab workflows that depend on it. Diagnose with `systemctl status rsyslog`
-  and journal logs, apply the smallest reliable fix, then verify with `systemctl is-active rsyslog`.
+description: 'CONTEXT: A team operating DevOps delivery needs you to resolve `devops: Incident Response
+  — Integration Lab` during a realistic incident. The business impact is reduced service reliability until
+  the underlying state is repaired.
+
+
+  ENVIRONMENT: You are working in FixitLab''s offline CI/CD lab with git repos, pipelines, artifacts,
+  and runbooks. All tools run locally; no paid APIs or external cloud calls are required.
+
+
+  SYMPTOM / STARTING STATE: Two systems are deployed but not fully wired together for incident response.
+  Downstream consumers are waiting on this integration path. Integration lab: connect incident response
+  with an adjacent platform in the devops stack. Validate authentication, data handoff, and failure behavior
+  for triage, comms, and postmortem.
+
+
+  OBJECTIVE: incident response is connected to the adjacent system successfully; Handoff points are authenticated
+  and observable; End-to-end workflow completes without manual intervention. Success means `systemctl
+  is-active rsyslog` returns active.
+
+
+  WHAT TO AVOID: Do not apply broad destructive changes, skip evidence gathering, or fake completion with
+  marker files — the checker validates real system state.'
 objectives:
-- The `rsyslog` service is active (running)
-- '`systemctl is-active rsyslog` returns active'
-- The fix survives a status re-check (no marker files)
-initial_state: The `rsyslog` service is not running (`systemctl is-active rsyslog` → inactive/failed).
-  Dependent Integration Lab tasks cannot succeed until the unit is healthy again.
+- incident response is connected to the adjacent system successfully
+- Handoff points are authenticated and observable
+- End-to-end workflow completes without manual intervention
+initial_state: Two systems are deployed but not fully wired together for incident response. Downstream
+  consumers are waiting on this integration path.
 hints:
 - order: 1
-  cost: 10
-  content: 'Orient yourself before changing anything:
-
-    1. Inspect the current state — the incident timeline and actions.
-
-    2. Write down what looks normal versus wrong or missing for incident response.
-
-    3. Recall the core idea: triage, comms, and postmortem. Form one hypothesis before you act.'
+  cost: 0
+  content: 'Where to look: Start with `systemctl status rsyslog` and `journalctl -u rsyslog -n 50 --no-pager`
+    before changing anything.'
 - order: 2
-  cost: 15
-  content: 'Plan your approach (still no spoilers):
-
-    1. Confirm the exact gap between current and desired state for incident response.
-
-    2. Decide the single smallest change that moves you toward the objective.
-
-    3. Capture evidence (command output / status) before the change so you can prove it worked afterward.'
-- order: 3
   cost: 25
-  content: 'Guided walkthrough:
+  content: 'Diagnostic steps:
 
-    1. Re-check the current state — the incident timeline and actions.
+    1. Run `systemctl status rsyslog` — note Active/Failed and the last log lines.
 
-    2. Configure credentials and networking, then drive one happy-path transaction end to end across both
-    systems.
+    2. Read `journalctl -u rsyslog -n 50` for the root error.
 
-    3. Verify the result — the incident is resolved and documented.
+    3. Form a hypothesis about the smallest config or permission fix.'
+- order: 3
+  cost: 50
+  content: 'Exact fix + verification:
 
-    4. Click Check Solution once `systemctl is-active rsyslog` returns active.'
+    1. Apply the minimal fix (config, unit override, or missing directory).
+
+    2. Run `systemctl daemon-reload` if you edited a unit file.
+
+    3. Run `systemctl restart rsyslog` and confirm `systemctl is-active rsyslog` succeeds.
+
+
+    WHY: the grader checks real service state, not marker files.'
 cross_technology: true
+summary: Complete the incident response — integration lab devops lab and verify success with the checker
+estimated_minutes: 20
+xp_reward: 100
+prerequisites:
+- Basic devops literacy
+tags:
+- devops
+- do
+- hands-on
+linked_tutorial: devops-fundamentals
+what_you_will_learn:
+- incident response is connected to the adjacent system successfully
+- Handoff points are authenticated and observable
+- End-to-end workflow completes without manual intervention
+environment:
+  nodes:
+  - role: primary
+    os: FixitLab CI/CD lab
+    hostname: lab-primary
+    ip: 127.0.0.1
+    specs: local offline simulation
+  pre_installed:
+  - bash
+  - coreutils
+  - devops
+  - journalctl
+  - systemctl
+  credentials:
+  - user: root
+    password: lab123
+tasks:
+- id: task_1
+  title: Incident Response — Integration Lab
+  description: Restore healthy behavior for Incident Response — Integration Lab by investigating the failure,
+    applying the smallest safe fix, and validating the outcome.
+  background: 'This devops lab teaches systematic troubleshooting: observe, hypothesize, change, verify.'
+  validation:
+    type: service_active
+    command: systemctl is-active rsyslog
+    expected_status: active
+    error_message: The rsyslog service is not active yet. Check `systemctl status rsyslog` and `journalctl
+      -u rsyslog -n 50`.
+solution:
+  summary: The root cause is an unhealthy `rsyslog` service; repair it and verify active state.
+  files_changed: []
+  commands_run:
+  - systemctl is-active rsyslog
+  reference_docs: devops-fundamentals
+guided_mode:
+  enabled: true
+  steps:
+  - step: 1
+    title: Inspect current state
+    instruction: Run a read-only diagnostic before changing anything.
+    command: systemctl is-active rsyslog
+    expected_output: Output shows the current failure mode
+    explanation: Evidence-first troubleshooting avoids guessing.
+    next_on: command_success
+  - step: 2
+    title: Apply the minimal fix
+    instruction: Make one reversible change aligned with the objectives.
+    command: '# your fix command here'
+    expected_output: State moves toward the objective
+    explanation: Small changes make rollback easy if the hypothesis was wrong.
+    next_on: command_success
+  - step: 3
+    title: Verify with the grader
+    instruction: Run the same verification the checker uses.
+    command: systemctl is-active rsyslog
+    expected_output: '`systemctl is-active rsyslog` returns active'
+    explanation: The lab passes only when real state is healthy.
+    next_on: command_success

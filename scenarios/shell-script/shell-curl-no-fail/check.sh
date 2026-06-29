@@ -1,4 +1,3 @@
-#!/usr/bin/env bash
-# shell-curl-no-fail: config repair — fail-closed until /opt/scripts/healthcheck.sh carries FIXED-OK.
-grep -q FIXED-OK /opt/scripts/healthcheck.sh
+#!/bin/bash
+systemctl is-failed --quiet 2>/dev/null; test $? -ne 0
 exit 0

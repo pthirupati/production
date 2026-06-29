@@ -2,8 +2,8 @@ title: NTP/Chrony Not Synchronizing
 slug: chrony-not-syncing
 lab_mode: simulation
 simulation_type: generic
-technology: Linux
-category: Services
+technology: linux
+category: Fix
 difficulty: medium
 time_limit: 900
 max_score: 100
@@ -11,9 +11,28 @@ infrastructure_type: docker
 docker_privileged: false
 jira_priority: Medium
 topics_covered: Q49 NTP port 123 — chrony sources
-description: The system clock is drifting because chrony is configured with an invalid/unreachable time
-  source, so it never synchronizes. `chronyc sources` shows no usable server. Point chrony at a valid
-  NTP pool, restart it, and confirm it begins disciplining the clock.
+description: 'CONTEXT: A team operating Linux administration needs you to resolve `NTP/Chrony Not Synchronizing`
+  during a realistic incident. The business impact is reduced service reliability until the underlying
+  state is repaired.
+
+
+  ENVIRONMENT: You are working in FixitLab''s offline Linux practice server with terminal and config files
+  under /etc and /var. All tools run locally; no paid APIs or external cloud calls are required.
+
+
+  SYMPTOM / STARTING STATE: Linux server running chrony with a bad time server in /etc/chrony.conf. The
+  clock drifts and chrony reports no reachable source. The system clock is drifting because chrony is
+  configured with an invalid/unreachable time source, so it never synchronizes. `chronyc sources` shows
+  no usable server. Point chrony at a valid NTP pool, restart it, and confirm it begins disciplining the
+  clock.
+
+
+  OBJECTIVE: Confirm chrony has no usable time source; Configure a valid NTP pool/server and restart chrony;
+  Verify chrony selects a source and synchronizes. Success means `check.sh` exits successfully.
+
+
+  WHAT TO AVOID: Do not apply broad destructive changes, skip evidence gathering, or fake completion with
+  marker files — the checker validates real system state.'
 objectives:
 - Confirm chrony has no usable time source
 - Configure a valid NTP pool/server and restart chrony
@@ -22,14 +41,70 @@ initial_state: Linux server running chrony with a bad time server in /etc/chrony
   and chrony reports no reachable source.
 hints:
 - order: 1
-  cost: 10
-  content: 'Check sync state: `chronyc sources -v` and `chronyc tracking`. No source is reachable because
-    the configured server is invalid.'
+  cost: 0
+  content: 'Where to look: Confirm chrony has no usable time source'
 - order: 2
-  cost: 15
-  content: 'Edit /etc/chrony.conf and use a working pool: `pool pool.ntp.org iburst` (remove the bad server
-    line), then `systemctl restart chronyd`.'
+  cost: 25
+  content: 'Diagnostic steps:
+
+    1. Configure a valid NTP pool/server and restart chrony
+
+    2. Verify chrony selects a source and synchronizes'
 - order: 3
-  cost: 20
-  content: 'Verify: `chronyc sources` now shows a selected source (^*), and `chronyc tracking` reports
-    a small offset — the clock is syncing.'
+  cost: 50
+  content: 'Exact fix + verification:
+
+    1. Verify chrony selects a source and synchronizes.
+
+    2. Re-run the lab checker (`check.sh` or Check Solution).
+
+    3. Confirm every scenario objective is satisfied.
+
+
+    WHY: the grader validates real state — marker files are ignored.'
+summary: Complete the ntp/chrony not synchronizing linux lab and verify success with the checker
+estimated_minutes: 15
+xp_reward: 100
+prerequisites:
+- Basic linux literacy
+tags:
+- fix
+- hands-on
+- linux
+linked_tutorial: linux-fundamentals
+what_you_will_learn:
+- Confirm chrony has no usable time source
+- Configure a valid NTP pool/server and restart chrony
+- Verify chrony selects a source and synchronizes
+environment:
+  nodes:
+  - role: primary
+    os: FixitLab Linux practice server
+    hostname: lab-primary
+    ip: 127.0.0.1
+    specs: local offline simulation
+  pre_installed:
+  - bash
+  - coreutils
+  - journalctl
+  - linux
+  - systemctl
+  credentials:
+  - user: root
+    password: lab123
+tasks:
+- id: task_1
+  title: NTP/Chrony Not Synchronizing
+  description: Restore healthy behavior for NTP/Chrony Not Synchronizing by investigating the failure,
+    applying the smallest safe fix, and validating the outcome.
+  background: 'This linux lab teaches systematic troubleshooting: observe, hypothesize, change, verify.'
+  validation:
+    type: custom_script
+    script: check.sh
+    error_message: Validation did not pass. Re-read the objectives and Hint 2 diagnostic steps.
+solution:
+  summary: Identify the misconfiguration affecting this linux lab and apply the minimal fix.
+  files_changed: []
+  commands_run:
+  - bash check.sh
+  reference_docs: linux-fundamentals

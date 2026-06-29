@@ -1,9 +1,26 @@
 title: 'Refactor: Make sortedCopy Pure'
 slug: js-review-pure-no-mutate-sort
-category: JavaScript Development
-description: sortedCopy(arr) is supposed to return a sorted COPY, leaving the input untouched, but it
-  sorts arr in place and returns it, so callers see their array reordered. Refactor it to sort a copy.
-  The hidden test pins the no-mutation contract.
+category: Fix
+description: 'CONTEXT: A team operating JavaScript needs you to resolve `Refactor: Make sortedCopy Pure`
+  during a realistic incident. The business impact is reduced service reliability until the underlying
+  state is repaired.
+
+
+  ENVIRONMENT: You are working in FixitLab''s offline JavaScript practice project with modules, browser
+  console, and Node tooling. All tools run locally; no paid APIs or external cloud calls are required.
+
+
+  SYMPTOM / STARTING STATE: sortedCopy(arr) is supposed to return a sorted COPY, leaving the input untouched,
+  but it sorts arr in place and returns it, so callers see their array reordered. Refactor it to sort
+  a copy. The hidden test pins the no-mutation contract.
+
+
+  OBJECTIVE: Recognize the in-place sort side effect; Sort a copy instead of the original; Return ascending-sorted
+  values without mutating input. Success means all hidden tests pass.
+
+
+  WHAT TO AVOID: Do not apply broad destructive changes, skip evidence gathering, or fake completion with
+  marker files — the checker validates real system state.'
 difficulty: medium
 scenario_type: fix
 lab_mode: simulation
@@ -21,52 +38,124 @@ objectives:
 initial_state: sortedCopy(arr) is supposed to return a sorted COPY, leaving the input untouched, but it
   sorts arr in place and returns it, so callers see their array reordered. Refactor it to sort a copy.
   The hidden test pins the no-mutation contract.
-solution_explanation: |
-  Array.sort mutates its receiver. Spreading into a new array first sorts a copy and leaves the caller's array intact.
+solution_explanation: 'Array.sort mutates its receiver. Spreading into a new array first sorts a copy
+  and leaves the caller''s array intact.
+
+  '
 coding_spec:
   language: javascript
   entrypoint: solution.js
   kind: review
-  instructions: |
-    Refactor sortedCopy(arr): return a new ascending-sorted array; do NOT mutate the input.
-      sortedCopy([3,1,2]) -> [1,2,3], original stays [3,1,2]
-    Click Run to try it, then Check Solution to grade against all tests.
+  instructions: "Refactor sortedCopy(arr): return a new ascending-sorted array; do NOT mutate the input.\n\
+    \  sortedCopy([3,1,2]) -> [1,2,3], original stays [3,1,2]\nClick Run to try it, then Check Solution\
+    \ to grade against all tests.\n"
   files:
   - path: solution.js
-    content: |
-      function sortedCopy(arr) {
-        return arr.sort((a, b) => a - b); // sorts in place, mutates input
-      }
+    content: "function sortedCopy(arr) {\n  return arr.sort((a, b) => a - b); // sorts in place, mutates\
+      \ input\n}\n"
     readonly: false
   visible_tests:
   - name: sorts ascending
-    code: |
-      assert(JSON.stringify(sortedCopy([3,1,2])) === JSON.stringify([1,2,3]), JSON.stringify(sortedCopy([3,1,2])));
+    code: 'assert(JSON.stringify(sortedCopy([3,1,2])) === JSON.stringify([1,2,3]), JSON.stringify(sortedCopy([3,1,2])));
+
+      '
   - name: already sorted
-    code: |
-      assert(JSON.stringify(sortedCopy([1,2,3])) === JSON.stringify([1,2,3]), JSON.stringify(sortedCopy([1,2,3])));
+    code: 'assert(JSON.stringify(sortedCopy([1,2,3])) === JSON.stringify([1,2,3]), JSON.stringify(sortedCopy([1,2,3])));
+
+      '
   hidden_tests:
   - name: does not mutate input
-    code: |
-      const src = [3, 1, 2];
+    code: 'const src = [3, 1, 2];
+
       sortedCopy(src);
-      assert(JSON.stringify(src) === JSON.stringify([3, 1, 2]), 'input mutated');
+
+      assert(JSON.stringify(src) === JSON.stringify([3, 1, 2]), ''input mutated'');
+
+      '
   - name: returns a new array
-    code: |
-      const src = [2, 1];
+    code: 'const src = [2, 1];
+
       const out = sortedCopy(src);
+
       assert(out !== src);
+
+      '
   - name: negatives
-    code: |
-      assert(JSON.stringify(sortedCopy([0, -5, 3, -1])) === JSON.stringify([-5, -1, 0, 3]), JSON.stringify(sortedCopy([0, -5, 3, -1])));
+    code: 'assert(JSON.stringify(sortedCopy([0, -5, 3, -1])) === JSON.stringify([-5, -1, 0, 3]), JSON.stringify(sortedCopy([0,
+      -5, 3, -1])));
+
+      '
   timeout: 8
 hints:
 - order: 1
-  cost: 10
-  content: After sortedCopy(src), src is itself sorted — Array.sort mutates in place.
+  cost: 0
+  content: 'Where to look: Open `solution.js`, read the instructions, and run the visible tests to see
+    which assertion fails first.'
 - order: 2
-  cost: 20
-  content: Copy the array first, then sort the copy.
+  cost: 25
+  content: 'Diagnostic steps:
+
+    1. Click Run and read the traceback — note line number and actual vs expected values.
+
+    2. Reproduce the failure with the smallest input from a visible test.
+
+    3. Compare your implementation to the bug described in the lab prompt.'
 - order: 3
-  cost: 30
-  content: Return [...arr].sort((a, b) => a - b).
+  cost: 50
+  content: 'Exact fix + verification:
+
+    1. Return ascending-sorted values without mutating input.
+
+    2. Re-run the lab checker (`check.sh` or Check Solution).
+
+    3. Confirm every scenario objective is satisfied.
+
+
+    WHY: the grader validates real state — marker files are ignored.'
+technology: javascript
+summary: 'Complete the refactor: make sortedcopy pure javascript lab and verify success with the checker'
+estimated_minutes: 25
+xp_reward: 100
+prerequisites:
+- Basic javascript literacy
+tags:
+- fix
+- hands-on
+- javascript
+linked_tutorial: javascript-fundamentals
+what_you_will_learn:
+- Recognize the in-place sort side effect
+- Sort a copy instead of the original
+- Return ascending-sorted values without mutating input
+environment:
+  nodes:
+  - role: primary
+    os: FixitLab JavaScript practice project
+    hostname: lab-primary
+    ip: 127.0.0.1
+    specs: local offline simulation
+  pre_installed:
+  - bash
+  - coreutils
+  - javascript
+  - journalctl
+  - systemctl
+  credentials:
+  - user: root
+    password: lab123
+tasks:
+- id: task_1
+  title: 'Refactor: Make sortedCopy Pure'
+  description: 'Restore healthy behavior for Refactor: Make sortedCopy Pure by investigating the failure,
+    applying the smallest safe fix, and validating the outcome.'
+  background: 'This javascript lab teaches systematic troubleshooting: observe, hypothesize, change, verify.'
+  validation:
+    type: custom_script
+    script: hidden_tests
+    error_message: One or more hidden tests failed. Read the public test output, fix your solution, and
+      submit again.
+solution:
+  summary: The solution passes all hidden tests by implementing the required behavior in code.
+  files_changed: []
+  commands_run: []
+  reference_docs: javascript-fundamentals

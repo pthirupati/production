@@ -1,41 +1,139 @@
 title: SELinux Blocks nginx on a Custom Port
 slug: linux-selinux-httpd-port-denied
 difficulty: medium
-category: Linux Administration
-description: |
-  nginx is configured to listen on the non-standard port 8080, but SELinux is in
+category: Fix
+description: 'CONTEXT: A team operating Linux administration needs you to resolve `SELinux Blocks nginx
+  on a Custom Port` during a realistic incident. The business impact is reduced service reliability until
+  the underlying state is repaired.
+
+
+  ENVIRONMENT: You are working in FixitLab''s offline Linux practice server with terminal and config files
+  under /etc and /var. All tools run locally; no paid APIs or external cloud calls are required.
+
+
+  SYMPTOM / STARTING STATE: Simulated RHEL 9 server. getenforce returns Enforcing. nginx.conf listens
+  on 8080.
+
+  systemctl start nginx fails and the audit log shows:
+
+  type=AVC msg=audit(...): avc:  denied  { name_bind } for  pid=... comm="nginx"
+
+  src=8080 scontext=system_u:system_r:httpd_t:s0 tcontext=system_u:object_r:unreserved_port_t:s0 nginx
+  is configured to listen on the non-standard port 8080, but SELinux is in
+
   Enforcing mode and only labels the standard HTTP ports (80, 443, 8008, ...) with
+
   the http_port_t type. When nginx tries to bind to 8080 the kernel denies the
+
   name_bind and the service fails to start. The correct production fix is to add the
+
   port to the http_port_t SELinux type with semanage — NOT to disable SELinux.
 
-initial_state: |
-  Simulated RHEL 9 server. getenforce returns Enforcing. nginx.conf listens on 8080.
+
+  OBJECTIVE: Confirm SELinux is in Enforcing mode with getenforce / sestatus; Identify port 8080 is not
+  labelled http_port_t (semanage port -l | grep http_port_t); Add the port label with semanage port -a
+  -t http_port_t -p tcp 8080. Success means `systemctl is-active nginx` returns active.
+
+
+  WHAT TO AVOID: Do not apply broad destructive changes, skip evidence gathering, or fake completion with
+  marker files — the checker validates real system state.'
+initial_state: 'Simulated RHEL 9 server. getenforce returns Enforcing. nginx.conf listens on 8080.
+
   systemctl start nginx fails and the audit log shows:
+
   type=AVC msg=audit(...): avc:  denied  { name_bind } for  pid=... comm="nginx"
+
   src=8080 scontext=system_u:system_r:httpd_t:s0 tcontext=system_u:object_r:unreserved_port_t:s0
 
+  '
 objectives:
-  - Confirm SELinux is in Enforcing mode with getenforce / sestatus
-  - Identify port 8080 is not labelled http_port_t (semanage port -l | grep http_port_t)
-  - Add the port label with semanage port -a -t http_port_t -p tcp 8080
-  - Start nginx with systemctl start nginx and confirm it is running
-  - Leave SELinux in Enforcing mode — do not disable it
+- Confirm SELinux is in Enforcing mode with getenforce / sestatus
+- Identify port 8080 is not labelled http_port_t (semanage port -l | grep http_port_t)
+- Add the port label with semanage port -a -t http_port_t -p tcp 8080
+- Start nginx with systemctl start nginx and confirm it is running
+- Leave SELinux in Enforcing mode — do not disable it
 lab_mode: simulation
 simulation_type: generic
 time_limit: 900
 max_score: 100
 is_free: false
 hints:
-  - content: 'Check enforcement with getenforce. The audit denial is a name_bind on port 8080 because that port is not in the http_port_t type. Do not run setenforce 0.'
-    cost: 10
-    order: 1
-  - content: 'Add the port to SELinux policy: semanage port -a -t http_port_t -p tcp 8080. Confirm with semanage port -l | grep http_port_t before starting nginx.'
-    cost: 20
-    order: 2
-  - content: 'After labelling the port, start the service: systemctl start nginx. getenforce must still report Enforcing.'
-    cost: 15
-    order: 3
+- order: 1
+  cost: 0
+  content: 'Where to look: Test the config to get the exact file and line: `nginx -t`. It prints the offending
+    directive (e.g. unknown directive "listn").'
+- order: 2
+  cost: 25
+  content: 'Diagnostic steps:
+
+    1. Run `nginx -t` and note the file path and line number in the error.
+
+    2. Open that file (often `/etc/nginx/nginx.conf` or under `/etc/nginx/conf.d/`).
+
+    3. Compare the bad directive to the nginx docs — typos like `listn` should be `listen`.'
+- order: 3
+  cost: 50
+  content: 'Exact fix + verification:
+
+    1. Correct the typo on the reported line and save the file.
+
+    2. Re-run `nginx -t` until it reports syntax is ok.
+
+    3. Run `systemctl enable --now nginx`, then `curl -I http://localhost` (expect HTTP 200).
+
+
+    WHY: systemd will not start nginx until `nginx -t` passes.'
 requires_companion_hosts: false
 dual_terminal: false
 jira_priority: High
+technology: linux
+summary: Complete the selinux blocks nginx on a custom port linux lab and verify success with the checker
+estimated_minutes: 15
+xp_reward: 100
+prerequisites:
+- Basic linux literacy
+tags:
+- fix
+- hands-on
+- linux
+linked_tutorial: linux-fundamentals
+what_you_will_learn:
+- Confirm SELinux is in Enforcing mode with getenforce / sestatus
+- Identify port 8080 is not labelled http_port_t (semanage port -l | grep http_port_t)
+- Add the port label with semanage port -a -t http_port_t -p tcp 8080
+- Start nginx with systemctl start nginx and confirm it is running
+- Leave SELinux in Enforcing mode — do not disable it
+environment:
+  nodes:
+  - role: primary
+    os: FixitLab Linux practice server
+    hostname: lab-primary
+    ip: 127.0.0.1
+    specs: local offline simulation
+  pre_installed:
+  - bash
+  - coreutils
+  - journalctl
+  - linux
+  - systemctl
+  credentials:
+  - user: root
+    password: lab123
+tasks:
+- id: task_1
+  title: SELinux Blocks nginx on a Custom Port
+  description: Restore healthy behavior for SELinux Blocks nginx on a Custom Port by investigating the
+    failure, applying the smallest safe fix, and validating the outcome.
+  background: 'This linux lab teaches systematic troubleshooting: observe, hypothesize, change, verify.'
+  validation:
+    type: service_active
+    command: systemctl is-active nginx
+    expected_status: active
+    error_message: The nginx service is not active yet. Check `systemctl status nginx` and `journalctl
+      -u nginx -n 50`.
+solution:
+  summary: The root cause is an unhealthy `nginx` service; repair it and verify active state.
+  files_changed: []
+  commands_run:
+  - systemctl is-active nginx
+  reference_docs: linux-fundamentals

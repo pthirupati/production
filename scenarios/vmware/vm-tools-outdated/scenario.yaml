@@ -1,8 +1,7 @@
----
 slug: vm-tools-outdated
-title: "VMware Tools Outdated — VM Performance and Management Degraded"
-technology: VMware
-category: VM Management
+title: VMware Tools Outdated - VM Performance and Management
+technology: vmware
+category: Fix
 difficulty: easy
 time_limit: 900
 max_score: 100
@@ -11,36 +10,120 @@ simulation_type: vmware
 infrastructure_type: simulation
 jira_priority: Medium
 is_free: true
-description: |
-  Multiple Windows and Linux VMs in the production cluster are running VMware Tools
-  versions that are more than 3 major versions behind the current ESXi 8.0 host.
-  Outdated Tools causes degraded VMXNET3 driver performance, missing balloon driver
-  for memory management, and inability to perform graceful guest OS quiesces for
-  snapshot consistency. vCenter shows "VMware Tools: Outdated" warnings on 8 VMs.
-objectives:
-  - Identify all VMs with outdated VMware Tools using vCenter inventory
-  - Update VMware Tools on a Windows VM using the automatic upgrade mechanism
-  - Update VMware Tools on a Linux VM using open-vm-tools package manager
-  - Verify all target VMs show "VMware Tools: OK (Current)" status
-initial_state: |
-  VMware vCenter simulation. 8 VMs showing "VMware Tools: Outdated" status.
+description: 'CONTEXT: A team operating VMware vSphere needs you to resolve `VMware Tools Outdated - VM
+  Performance and Management` during a realistic incident. The business impact is reduced service reliability
+  until the underlying state is repaired.
+
+
+  ENVIRONMENT: You are working in FixitLab''s offline vSphere lab with VMs, datastores, vCenter, and ESXi
+  tasks. All tools run locally; no paid APIs or external cloud calls are required.
+
+
+  SYMPTOM / STARTING STATE: VMware vCenter simulation. 8 VMs showing "VMware Tools: Outdated" status.
+
   Mix of Windows Server 2019 and Ubuntu 22.04 VMs.
+
+  VMware Tools current version for ESXi 8.0: 12.3.0. Multiple Windows and Linux VMs in the production
+  cluster are running VMware Tools
+
+  versions that are more than 3 major versions behind the current ESXi 8.0 host.
+
+  Outdated Tools causes degraded VMXNET3 driver performance, missing balloon driver
+
+  for memory management, and inability to perform graceful guest OS quiesces for
+
+  snapshot consistency. vCenter shows "VMware Tools: Outdated" warnings on 8 VMs.
+
+
+  OBJECTIVE: Identify all VMs with outdated VMware Tools using vCenter inventory; Update VMware Tools
+  on a Windows VM using the automatic upgrade mechanism; Update VMware Tools on a Linux VM using open-vm-tools
+  package manager. Success means `check.sh` exits successfully.
+
+
+  WHAT TO AVOID: Do not apply broad destructive changes, skip evidence gathering, or fake completion with
+  marker files — the checker validates real system state.'
+objectives:
+- Identify all VMs with outdated VMware Tools using vCenter inventory
+- Update VMware Tools on a Windows VM using the automatic upgrade mechanism
+- Update VMware Tools on a Linux VM using open-vm-tools package manager
+- Verify all target VMs show "VMware Tools: OK (Current)" status
+initial_state: 'VMware vCenter simulation. 8 VMs showing "VMware Tools: Outdated" status.
+
+  Mix of Windows Server 2019 and Ubuntu 22.04 VMs.
+
   VMware Tools current version for ESXi 8.0: 12.3.0.
+
+  '
 hints:
-  - order: 1
-    cost: 10
-    content: "In vCenter, use the VM inventory list view. Add the 'VMware Tools Status'
-      column. Filter by 'Outdated' to see all affected VMs.
-      Alternatively: Hosts & Clusters → cluster → VMs tab → filter."
-  - order: 2
-    cost: 15
-    content: "For Windows VMs: right-click VM → Guest OS → Upgrade VMware Tools.
-      Select 'Automatic upgrade' to perform a silent install.
-      The VM will not need to be powered off for a minor update."
-  - order: 3
-    cost: 20
-    content: "For Linux VMs using open-vm-tools:
-      SSH into the VM and run:
-      sudo apt update && sudo apt install --only-upgrade open-vm-tools open-vm-tools-desktop
-      OR for RHEL/CentOS: sudo yum update open-vm-tools
-      After upgrade, verify: vmware-toolsd --version"
+- order: 1
+  cost: 0
+  content: 'Where to look: Identify all VMs with outdated VMware Tools using vCenter inventory'
+- order: 2
+  cost: 25
+  content: 'Diagnostic steps:
+
+    1. Update VMware Tools on a Windows VM using the automatic upgrade mechanism
+
+    2. Update VMware Tools on a Linux VM using open-vm-tools package manager
+
+    3. {''Verify all target VMs show "VMware Tools'': ''OK (Current)" status''}'
+- order: 3
+  cost: 50
+  content: 'Exact fix + verification:
+
+    1. {''Verify all target VMs show "VMware Tools'': ''OK (Current)" status''}.
+
+    2. Re-run the lab checker (`check.sh` or Check Solution).
+
+    3. Confirm every scenario objective is satisfied.
+
+
+    WHY: the grader validates real state — marker files are ignored.'
+summary: Complete the vmware tools outdated - vm performance and management vmware lab and verify success
+  with the checker
+estimated_minutes: 15
+xp_reward: 100
+prerequisites:
+- Basic vmware literacy
+tags:
+- fix
+- hands-on
+- vmware
+linked_tutorial: vmware-fundamentals
+what_you_will_learn:
+- Identify all VMs with outdated VMware Tools using vCenter inventory
+- Update VMware Tools on a Windows VM using the automatic upgrade mechanism
+- Update VMware Tools on a Linux VM using open-vm-tools package manager
+- '{''Verify all target VMs show "VMware Tools'': ''OK (Current)" status''}'
+environment:
+  nodes:
+  - role: primary
+    os: FixitLab vSphere lab
+    hostname: lab-primary
+    ip: 127.0.0.1
+    specs: local offline simulation
+  pre_installed:
+  - bash
+  - coreutils
+  - journalctl
+  - systemctl
+  - vmware
+  credentials:
+  - user: root
+    password: lab123
+tasks:
+- id: task_1
+  title: VMware Tools Outdated - VM Performance and Management
+  description: Restore healthy behavior for VMware Tools Outdated - VM Performance and Management by investigating
+    the failure, applying the smallest safe fix, and validating the outcome.
+  background: 'This vmware lab teaches systematic troubleshooting: observe, hypothesize, change, verify.'
+  validation:
+    type: custom_script
+    script: check.sh
+    error_message: Validation did not pass. Re-read the objectives and Hint 2 diagnostic steps.
+solution:
+  summary: Identify the misconfiguration affecting this vmware lab and apply the minimal fix.
+  files_changed: []
+  commands_run:
+  - bash check.sh
+  reference_docs: vmware-fundamentals

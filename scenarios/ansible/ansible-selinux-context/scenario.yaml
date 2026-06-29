@@ -1,7 +1,7 @@
 title: Ansible SELinux Context Not Set
 slug: ansible-selinux-context
-technology: Ansible
-category: Modules
+technology: ansible
+category: Fix
 difficulty: medium
 lab_mode: simulation
 simulation_type: generic
@@ -10,7 +10,25 @@ max_score: 100
 is_free: true
 jira_priority: High
 dual_terminal: false
-description: An app is denied by SELinux because the Ansible sefcontext task is wrong.
+description: 'CONTEXT: A team operating Ansible automation needs you to resolve `Ansible SELinux Context
+  Not Set` during a realistic incident. The business impact is reduced service reliability until the underlying
+  state is repaired.
+
+
+  ENVIRONMENT: You are working in FixitLab''s offline Ansible control node with inventory, playbooks,
+  roles, and ansible-playbook. All tools run locally; no paid APIs or external cloud calls are required.
+
+
+  SYMPTOM / STARTING STATE: An Ansible play that fails to set the right SELinux context. An app is denied
+  by SELinux because the Ansible sefcontext task is wrong.
+
+
+  OBJECTIVE: Confirm the issue: SELinux denials on the path; Apply the documented fix in /home/ansible/sefcontext.yml;
+  Verify the configuration is corrected. Success means `check.sh` exits successfully.
+
+
+  WHAT TO AVOID: Do not apply broad destructive changes, skip evidence gathering, or fake completion with
+  marker files — the checker validates real system state.'
 initial_state: An Ansible play that fails to set the right SELinux context.
 objectives:
 - 'Confirm the issue: SELinux denials on the path'
@@ -18,11 +36,72 @@ objectives:
 - Verify the configuration is corrected
 hints:
 - order: 1
-  cost: 10
-  content: SELinux denials on the path
+  cost: 0
+  content: 'Where to look: Run `ausearch -m avc -ts recent` or `grep AVC /var/log/audit/audit.log`.'
 - order: 2
-  cost: 15
-  content: Fix the sefcontext + restorecon tasks.
+  cost: 25
+  content: 'Diagnostic steps:
+
+    1. Identify which binary/path SELinux denied.
+
+    2. Run `ls -Z` on the affected file and compare context.
+
+    3. Check if a boolean needs toggling: `getsebool -a | grep <service>`.'
 - order: 3
-  cost: 20
-  content: /home/ansible/sefcontext.yml carries the corrected configuration.
+  cost: 50
+  content: 'Exact fix + verification:
+
+    1. Apply the correct context with `semanage fcontext` + `restorecon`, or set the boolean.
+
+    2. Retry the failing command.
+
+    3. Confirm no new AVC denials and the service works.
+
+
+    WHY: permissive fixes hide denials; targeted policy fixes last.'
+summary: Complete the ansible selinux context not set ansible lab and verify success with the checker
+estimated_minutes: 20
+xp_reward: 100
+prerequisites:
+- Basic ansible literacy
+tags:
+- ansible
+- fix
+- hands-on
+linked_tutorial: ansible-fundamentals
+what_you_will_learn:
+- 'Confirm the issue: SELinux denials on the path'
+- Apply the documented fix in /home/ansible/sefcontext.yml
+- Verify the configuration is corrected
+environment:
+  nodes:
+  - role: primary
+    os: FixitLab Ansible control node
+    hostname: lab-primary
+    ip: 127.0.0.1
+    specs: local offline simulation
+  pre_installed:
+  - ansible
+  - ansible-playbook
+  - bash
+  - coreutils
+  credentials:
+  - user: root
+    password: lab123
+tasks:
+- id: task_1
+  title: Ansible SELinux Context Not Set
+  description: Restore healthy behavior for Ansible SELinux Context Not Set by investigating the failure,
+    applying the smallest safe fix, and validating the outcome.
+  background: 'This ansible lab teaches systematic troubleshooting: observe, hypothesize, change, verify.'
+  validation:
+    type: command_output
+    command: ansible webservers -m ping
+    expected_output: SUCCESS
+    error_message: Ansible hosts are still unreachable. Verify SSH keys and inventory.
+solution:
+  summary: Identify the misconfiguration affecting this ansible lab and apply the minimal fix.
+  files_changed: []
+  commands_run:
+  - ansible webservers -m ping
+  reference_docs: ansible-fundamentals

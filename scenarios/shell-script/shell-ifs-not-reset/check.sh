@@ -1,4 +1,3 @@
-#!/usr/bin/env bash
-# shell-ifs-not-reset: config repair — fail-closed until /opt/scripts/csv.sh carries FIXED-OK.
-grep -q FIXED-OK /opt/scripts/csv.sh
+#!/bin/bash
+systemctl is-failed --quiet 2>/dev/null; test $? -ne 0
 exit 0

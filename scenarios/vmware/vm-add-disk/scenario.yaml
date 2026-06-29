@@ -1,10 +1,28 @@
 title: Expand VM Disk Capacity
 slug: vmware-add-disk
-category: VMware vSphere
-description: The application VM web-prod-01 needs at least 100 GB of disk but currently has only 40 GB,
-  so it's running out of space. Additional disk capacity should be added from vCenter without taking the
-  VM down (hot-add). Add at least 60 GB more so the VM meets the 100 GB requirement, then confirm the
-  new capacity.
+category: Fix
+description: 'CONTEXT: A team operating VMware vSphere needs you to resolve `Expand VM Disk Capacity`
+  during a realistic incident. The business impact is reduced service reliability until the underlying
+  state is repaired.
+
+
+  ENVIRONMENT: You are working in FixitLab''s offline vSphere lab with VMs, datastores, vCenter, and ESXi
+  tasks. All tools run locally; no paid APIs or external cloud calls are required.
+
+
+  SYMPTOM / STARTING STATE: vCenter VM web-prod-01 with a single 40 GB disk; the application requires
+  at least 100 GB, so more capacity must be added (online). The application VM web-prod-01 needs at least
+  100 GB of disk but currently has only 40 GB, so it''s running out of space. Additional disk capacity
+  should be added from vCenter without taking the VM down (hot-add). Add at least 60 GB more so the VM
+  meets the 100 GB requirement, then confirm the new capacity.
+
+
+  OBJECTIVE: Locate web-prod-01 in the vCenter inventory; Add at least 60 GB of additional disk capacity
+  (hot-add); Verify the VM now meets the 100 GB requirement. Success means `check.sh` exits successfully.
+
+
+  WHAT TO AVOID: Do not apply broad destructive changes, skip evidence gathering, or fake completion with
+  marker files — the checker validates real system state.'
 difficulty: medium
 lab_mode: simulation
 simulation_type: vmware
@@ -20,13 +38,73 @@ initial_state: vCenter VM web-prod-01 with a single 40 GB disk; the application 
   GB, so more capacity must be added (online).
 hints:
 - order: 1
-  cost: 10
-  content: Select web-prod-01 in inventory and open Edit Settings (or Actions -> Edit Settings).
+  cost: 0
+  content: 'Where to look: Run `df -h` and `du -xh /var /tmp /home | sort -h | tail -20` for large paths.'
 - order: 2
-  cost: 15
-  content: Either grow the existing virtual disk or use "Add New Device" -> Hard Disk to add ≥60 GB (modern
-    hardware allows this while powered on).
+  cost: 25
+  content: 'Diagnostic steps:
+
+    1. Find which mount is 100% — often `/` or `/var`.
+
+    2. `journalctl --disk-usage` and old logs under `/var/log`.
+
+    3. Look for core dumps, temp files, or oversized application data.'
 - order: 3
-  cost: 20
-  content: Apply the change and confirm the VM's total disk capacity is now ≥100 GB. (Inside the guest
-    you'd then rescan/grow the filesystem to use it.)
+  cost: 50
+  content: 'Exact fix + verification:
+
+    1. Remove or rotate the largest safe files (logs, caches, old packages).
+
+    2. `df -h` should show free space on the affected mount.
+
+    3. Retry the command that failed with ''No space left on device''.
+
+
+    WHY: many services fail cryptically when disk is full.'
+technology: vmware
+summary: Complete the expand vm disk capacity vmware lab and verify success with the checker
+estimated_minutes: 15
+xp_reward: 100
+prerequisites:
+- Basic vmware literacy
+tags:
+- fix
+- hands-on
+- vmware
+linked_tutorial: vmware-fundamentals
+what_you_will_learn:
+- Locate web-prod-01 in the vCenter inventory
+- Add at least 60 GB of additional disk capacity (hot-add)
+- Verify the VM now meets the 100 GB requirement
+environment:
+  nodes:
+  - role: primary
+    os: FixitLab vSphere lab
+    hostname: lab-primary
+    ip: 127.0.0.1
+    specs: local offline simulation
+  pre_installed:
+  - bash
+  - coreutils
+  - journalctl
+  - systemctl
+  - vmware
+  credentials:
+  - user: root
+    password: lab123
+tasks:
+- id: task_1
+  title: Expand VM Disk Capacity
+  description: Restore healthy behavior for Expand VM Disk Capacity by investigating the failure, applying
+    the smallest safe fix, and validating the outcome.
+  background: 'This vmware lab teaches systematic troubleshooting: observe, hypothesize, change, verify.'
+  validation:
+    type: custom_script
+    script: check.sh
+    error_message: Validation did not pass. Re-read the objectives and Hint 2 diagnostic steps.
+solution:
+  summary: Identify the misconfiguration affecting this vmware lab and apply the minimal fix.
+  files_changed: []
+  commands_run:
+  - bash check.sh
+  reference_docs: vmware-fundamentals

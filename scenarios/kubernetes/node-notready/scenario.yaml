@@ -1,12 +1,30 @@
 title: Node in NotReady State
 slug: k8s-node-notready
 difficulty: hard
-category: Kubernetes
-description: 'A worker node has transitioned to NotReady and all pods scheduled on it are evicted. The
-  kubelet service on the node has stopped, preventing it from sending heartbeats to the control plane.
-  You must SSH to the node, diagnose the kubelet failure, and restore the node to Ready state.
+category: Fix
+description: 'CONTEXT: A team operating Kubernetes needs you to resolve `Node in NotReady State` during
+  a realistic incident. The business impact is reduced service reliability until the underlying state
+  is repaired.
 
-  '
+
+  ENVIRONMENT: You are working in FixitLab''s offline Kubernetes cluster with kubectl, manifests, and
+  cluster resources. All tools run locally; no paid APIs or external cloud calls are required.
+
+
+  SYMPTOM / STARTING STATE: Simulated Kubernetes cluster. Node "worker-1" is in NotReady state. Multiple
+  pods have been evicted and workloads are degraded. A worker node has transitioned to NotReady and all
+  pods scheduled on it are evicted. The kubelet service on the node has stopped, preventing it from sending
+  heartbeats to the control plane. You must SSH to the node, diagnose the kubelet failure, and restore
+  the node to Ready state.
+
+
+  OBJECTIVE: Identify which node is NotReady and investigate why the kubelet stopped; Restart the kubelet
+  service and resolve any configuration errors; Confirm the node returns to Ready state and pods are rescheduled.
+  Success means `kubectl get pods` shows every pod Running.
+
+
+  WHAT TO AVOID: Do not apply broad destructive changes, skip evidence gathering, or fake completion with
+  marker files — the checker validates real system state.'
 initial_state: 'Simulated Kubernetes cluster. Node "worker-1" is in NotReady state. Multiple pods have
   been evicted and workloads are degraded.
 
@@ -22,18 +40,79 @@ max_score: 100
 is_free: false
 hints:
 - order: 1
-  cost: 10
-  content: 'Find the bad node and why: `kubectl get nodes` then `kubectl describe node worker-1` — read
-    the Conditions section (e.g. KubeletNotReady / "PLEG is not healthy").'
+  cost: 0
+  content: 'Where to look: Run `kubectl get pods -A` and `kubectl describe pod <name>` for any pod not
+    in Running state.'
 - order: 2
-  cost: 20
-  content: 'On the node, inspect the kubelet: `sudo systemctl status kubelet` and `sudo journalctl -u
-    kubelet -n 50 --no-pager`. A stopped service or a config/cert error is the usual cause.'
+  cost: 25
+  content: 'Diagnostic steps:
+
+    1. `kubectl get pods` — note CrashLoopBackOff, ImagePullBackOff, or Pending.
+
+    2. `kubectl describe pod <name>` — read Events at the bottom.
+
+    3. `kubectl logs <name> [--previous]` if the container restarted.'
 - order: 3
-  cost: 30
-  content: 'Restart it once the config is valid: `sudo systemctl restart kubelet` (run `sudo systemctl
-    enable kubelet` if it was disabled). Within ~40s `kubectl get nodes` shows worker-1 as Ready and pods
-    reschedule.'
+  cost: 50
+  content: 'Exact fix + verification:
+
+    1. Fix the root cause (image name, env var, volume mount, or probe).
+
+    2. `kubectl apply -f` the corrected manifest or delete the pod to recreate.
+
+    3. Confirm `kubectl get pods` shows every pod Running.
+
+
+    WHY: Kubernetes only reports healthy when the workload actually runs.'
 requires_companion_hosts: true
 dual_terminal: true
 jira_priority: High
+technology: kubernetes
+summary: Complete the node in notready state kubernetes lab and verify success with the checker
+estimated_minutes: 30
+xp_reward: 100
+prerequisites:
+- Basic kubernetes literacy
+tags:
+- fix
+- hands-on
+- kubernetes
+linked_tutorial: kubernetes-fundamentals
+what_you_will_learn:
+- Identify which node is NotReady and investigate why the kubelet stopped
+- Restart the kubelet service and resolve any configuration errors
+- Confirm the node returns to Ready state and pods are rescheduled
+environment:
+  nodes:
+  - role: primary
+    os: FixitLab Kubernetes cluster
+    hostname: lab-primary
+    ip: 127.0.0.1
+    specs: local offline simulation
+  pre_installed:
+  - bash
+  - coreutils
+  - helm
+  - kubectl
+  - kubernetes
+  credentials:
+  - user: root
+    password: lab123
+tasks:
+- id: task_1
+  title: Node in NotReady State
+  description: Restore healthy behavior for Node in NotReady State by investigating the failure, applying
+    the smallest safe fix, and validating the outcome.
+  background: 'This kubernetes lab teaches systematic troubleshooting: observe, hypothesize, change, verify.'
+  validation:
+    type: k8s_resource_state
+    resource_kind: Pod
+    resource_name: all
+    namespace: default
+    expected_state: Running
+    error_message: One or more pods are not Running. Use kubectl describe pod and kubectl logs.
+solution:
+  summary: Identify the misconfiguration affecting this kubernetes lab and apply the minimal fix.
+  files_changed: []
+  commands_run: []
+  reference_docs: kubernetes-fundamentals

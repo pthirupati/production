@@ -1,38 +1,127 @@
-title: "PAM Authentication Broken — Fix Misconfigured Login Stack"
+title: PAM Authentication Broken — Fix Misconfigured Login Stack
 slug: pam-auth-broken
-technology: Security
-category: Hardening
+technology: security
+category: Fix
 difficulty: hard
 time_limit: 1200
 max_score: 100
 infrastructure_type: docker
 jira_priority: Critical
 is_free: false
-description: |
-  After a failed attempt to configure two-factor authentication, the PAM
+description: 'CONTEXT: A team operating security hardening needs you to resolve `PAM Authentication Broken
+  — Fix Misconfigured Login Stack` during a realistic incident. The business impact is reduced service
+  reliability until the underlying state is repaired.
+
+
+  ENVIRONMENT: You are working in FixitLab''s offline hardening lab with SSH, firewall, TLS, audit logs,
+  and IAM settings. All tools run locally; no paid APIs or external cloud calls are required.
+
+
+  SYMPTOM / STARTING STATE: Ubuntu server where a previous admin added a broken pam_google_authenticator
+
+  line as ''required'' in /etc/pam.d/sshd without the module being installed.
+
+  Console access via the lab terminal is available. sshd is running on port 22. After a failed attempt
+  to configure two-factor authentication, the PAM
+
   configuration for SSH logins has been left in a broken state. All SSH
-  password authentication attempts now fail with 'Permission denied' even with
+
+  password authentication attempts now fail with ''Permission denied'' even with
+
   the correct credentials. Console access still works. You must diagnose the
+
   PAM stack misconfiguration in /etc/pam.d/sshd and restore working SSH
+
   authentication without disabling security controls.
+
+
+  OBJECTIVE: Identify the misconfiguration in /etc/pam.d/sshd causing authentication failures; Fix the
+  PAM stack so that SSH password authentication works correctly; Verify that SSH login succeeds with valid
+  credentials and fails with invalid ones. Success means `check.sh` exits successfully.
+
+
+  WHAT TO AVOID: Do not apply broad destructive changes, skip evidence gathering, or fake completion with
+  marker files — the checker validates real system state.'
 objectives:
-  - Identify the misconfiguration in /etc/pam.d/sshd causing authentication failures
-  - Fix the PAM stack so that SSH password authentication works correctly
-  - Verify that SSH login succeeds with valid credentials and fails with invalid ones
-initial_state: |
-  Ubuntu server where a previous admin added a broken pam_google_authenticator
-  line as 'required' in /etc/pam.d/sshd without the module being installed.
+- Identify the misconfiguration in /etc/pam.d/sshd causing authentication failures
+- Fix the PAM stack so that SSH password authentication works correctly
+- Verify that SSH login succeeds with valid credentials and fails with invalid ones
+initial_state: 'Ubuntu server where a previous admin added a broken pam_google_authenticator
+
+  line as ''required'' in /etc/pam.d/sshd without the module being installed.
+
   Console access via the lab terminal is available. sshd is running on port 22.
+
+  '
 hints:
-  - order: 1
-    cost: 10
-    content: "Check the PAM config: `cat /etc/pam.d/sshd` and look for modules that reference missing .so files or have incorrect control flags."
-  - order: 2
-    cost: 15
-    content: "Test auth: `pamtester sshd testuser authenticate` to see the exact PAM error. Look for 'module is unknown' indicating a missing PAM module."
-  - order: 3
-    cost: 20
-    content: "Find the bad line: the `auth required pam_google_authenticator.so` entry is broken. Either remove it or change 'required' to 'optional' if the module is not installed."
-  - order: 4
-    cost: 25
-    content: "After editing /etc/pam.d/sshd, test with `pamtester sshd validuser authenticate` — it should succeed. No sshd restart needed; PAM is read per-auth."
+- order: 1
+  cost: 0
+  content: 'Where to look: Run `systemctl status sshd` and `ss -tlnp | grep :22` on the target host.'
+- order: 2
+  cost: 25
+  content: 'Diagnostic steps:
+
+    1. Confirm sshd is active and listening on port 22.
+
+    2. Check `firewall-cmd` or iptables for blocked port 22.
+
+    3. Read `/var/log/secure` for auth or config errors.'
+- order: 3
+  cost: 50
+  content: 'Exact fix + verification:
+
+    1. Fix sshd_config, firewall, or socket unit as needed.
+
+    2. `systemctl restart sshd`.
+
+    3. `ssh -o BatchMode=yes user@localhost echo ok` succeeds.
+
+
+    WHY: SSH failures are usually service, firewall, or config — not credentials alone.'
+summary: Complete the pam authentication broken — fix misconfigured login stack security lab and verify
+  success with the checker
+estimated_minutes: 20
+xp_reward: 100
+prerequisites:
+- Basic security literacy
+tags:
+- fix
+- hands-on
+- security
+linked_tutorial: security-fundamentals
+what_you_will_learn:
+- Identify the misconfiguration in /etc/pam.d/sshd causing authentication failures
+- Fix the PAM stack so that SSH password authentication works correctly
+- Verify that SSH login succeeds with valid credentials and fails with invalid ones
+environment:
+  nodes:
+  - role: primary
+    os: FixitLab hardening lab
+    hostname: lab-primary
+    ip: 127.0.0.1
+    specs: local offline simulation
+  pre_installed:
+  - bash
+  - coreutils
+  - journalctl
+  - security
+  - systemctl
+  credentials:
+  - user: root
+    password: lab123
+tasks:
+- id: task_1
+  title: PAM Authentication Broken — Fix Misconfigured Login Stack
+  description: Restore healthy behavior for PAM Authentication Broken — Fix Misconfigured Login Stack
+    by investigating the failure, applying the smallest safe fix, and validating the outcome.
+  background: 'This security lab teaches systematic troubleshooting: observe, hypothesize, change, verify.'
+  validation:
+    type: custom_script
+    script: check.sh
+    error_message: Validation did not pass. Re-read the objectives and Hint 2 diagnostic steps.
+solution:
+  summary: Identify the misconfiguration affecting this security lab and apply the minimal fix.
+  files_changed: []
+  commands_run:
+  - bash check.sh
+  reference_docs: security-fundamentals

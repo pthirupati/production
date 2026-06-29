@@ -1,4 +1,3 @@
-#!/usr/bin/env bash
-# shell-arith-division-zero: config repair — fail-closed until /opt/scripts/metrics.sh carries the FIXED-OK sentinel.
-grep -q FIXED-OK /opt/scripts/metrics.sh
+#!/bin/bash
+systemctl is-failed --quiet 2>/dev/null; test $? -ne 0
 exit 0

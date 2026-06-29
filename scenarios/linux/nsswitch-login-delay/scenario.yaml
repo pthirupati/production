@@ -2,8 +2,8 @@ title: Slow SSH Login — NSS/DNS Delay
 slug: nsswitch-login-delay
 lab_mode: simulation
 simulation_type: generic
-technology: Linux
-category: Authentication
+technology: linux
+category: Fix
 difficulty: medium
 time_limit: 900
 max_score: 100
@@ -11,10 +11,28 @@ infrastructure_type: docker
 docker_privileged: false
 jira_priority: Medium
 topics_covered: Q169 login delay — nsswitch, UseDNS no
-description: SSH logins take 30+ seconds at the password prompt because name-service lookups are timing
-  out — /etc/nsswitch.conf lists an unreachable/slow source before the local files/DNS, so each lookup
-  waits for a timeout. Fix the nsswitch hosts ordering (and optionally disable sshd's reverse-DNS) to
-  make logins fast again.
+description: 'CONTEXT: A team operating Linux administration needs you to resolve `Slow SSH Login — NSS/DNS
+  Delay` during a realistic incident. The business impact is reduced service reliability until the underlying
+  state is repaired.
+
+
+  ENVIRONMENT: You are working in FixitLab''s offline Linux practice server with terminal and config files
+  under /etc and /var. All tools run locally; no paid APIs or external cloud calls are required.
+
+
+  SYMPTOM / STARTING STATE: Linux server where a misconfigured /etc/nsswitch.conf hosts line causes lookups
+  to hang on a slow source, adding a 30s+ delay to SSH password prompts. SSH logins take 30+ seconds at
+  the password prompt because name-service lookups are timing out — /etc/nsswitch.conf lists an unreachable/slow
+  source before the local files/DNS, so each lookup waits for a timeout. Fix the nsswitch hosts ordering
+  (and optionally disable sshd''s reverse-DNS) to make logins fast again.
+
+
+  OBJECTIVE: Trace the login delay to nsswitch lookup timeouts; Correct the hosts line ordering in /etc/nsswitch.conf;
+  Verify logins are fast (optionally set UseDNS no in sshd_config). Success means `check.sh` exits successfully.
+
+
+  WHAT TO AVOID: Do not apply broad destructive changes, skip evidence gathering, or fake completion with
+  marker files — the checker validates real system state.'
 objectives:
 - Trace the login delay to nsswitch lookup timeouts
 - Correct the hosts line ordering in /etc/nsswitch.conf
@@ -23,13 +41,73 @@ initial_state: Linux server where a misconfigured /etc/nsswitch.conf hosts line 
   on a slow source, adding a 30s+ delay to SSH password prompts.
 hints:
 - order: 1
-  cost: 10
-  content: 'Time it: the delay hits before the password prompt, pointing at name lookups. Inspect `/etc/nsswitch.conf`
-    — the `hosts:` line lists a slow/unreachable source first.'
+  cost: 0
+  content: 'Where to look: Run `cat /etc/resolv.conf` and test with `dig example.com` or `getent hosts
+    example.com`.'
 - order: 2
-  cost: 15
-  content: 'Set a sane order: `hosts: files dns` in /etc/nsswitch.conf (remove the offending source).'
+  cost: 25
+  content: 'Diagnostic steps:
+
+    1. Note the configured nameserver IP in resolv.conf.
+
+    2. `ping` or `nc -zv` the nameserver — is it reachable?
+
+    3. Check if NetworkManager or systemd-resolved overwrites the file.'
 - order: 3
-  cost: 20
-  content: Optionally add `UseDNS no` to /etc/ssh/sshd_config and `systemctl reload sshd` to skip reverse
-    lookups. Re-test SSH — the prompt is immediate.
+  cost: 50
+  content: 'Exact fix + verification:
+
+    1. Verify logins are fast (optionally set UseDNS no in sshd_config).
+
+    2. Re-run the lab checker (`check.sh` or Check Solution).
+
+    3. Confirm every scenario objective is satisfied.
+
+
+    WHY: the grader validates real state — marker files are ignored.'
+summary: Complete the slow ssh login — nss/dns delay linux lab and verify success with the checker
+estimated_minutes: 15
+xp_reward: 100
+prerequisites:
+- Basic linux literacy
+tags:
+- fix
+- hands-on
+- linux
+linked_tutorial: linux-fundamentals
+what_you_will_learn:
+- Trace the login delay to nsswitch lookup timeouts
+- Correct the hosts line ordering in /etc/nsswitch.conf
+- Verify logins are fast (optionally set UseDNS no in sshd_config)
+environment:
+  nodes:
+  - role: primary
+    os: FixitLab Linux practice server
+    hostname: lab-primary
+    ip: 127.0.0.1
+    specs: local offline simulation
+  pre_installed:
+  - bash
+  - coreutils
+  - journalctl
+  - linux
+  - systemctl
+  credentials:
+  - user: root
+    password: lab123
+tasks:
+- id: task_1
+  title: Slow SSH Login — NSS/DNS Delay
+  description: Restore healthy behavior for Slow SSH Login — NSS/DNS Delay by investigating the failure,
+    applying the smallest safe fix, and validating the outcome.
+  background: 'This linux lab teaches systematic troubleshooting: observe, hypothesize, change, verify.'
+  validation:
+    type: custom_script
+    script: check.sh
+    error_message: Validation did not pass. Re-read the objectives and Hint 2 diagnostic steps.
+solution:
+  summary: Identify the misconfiguration affecting this linux lab and apply the minimal fix.
+  files_changed: []
+  commands_run:
+  - bash check.sh
+  reference_docs: linux-fundamentals

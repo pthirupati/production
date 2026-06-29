@@ -1,11 +1,29 @@
-title: "Tree-of-Thought: Explore & Prune"
+title: 'Tree-of-Thought: Explore & Prune'
 slug: tree-of-thought
-category: Prompt Engineering
-description: >-
-  Some problems need exploration, not a single straight line of reasoning.
-  Tree-of-thought has the model branch into multiple candidate approaches,
-  evaluate each, prune the weak ones, and expand the promising ones. Learn the
-  pattern and write a prompt that explores several paths before committing.
+category: Build
+description: 'CONTEXT: A team operating prompt engineering needs you to resolve `Tree-of-Thought: Explore
+  & Prune` during a realistic incident. The business impact is reduced service reliability until the underlying
+  state is repaired.
+
+
+  ENVIRONMENT: You are working in FixitLab''s offline LLM practice workspace with prompt templates, eval
+  sets, and tool configs. All tools run locally; no paid APIs or external cloud calls are required.
+
+
+  SYMPTOM / STARTING STATE: The guided AI practice console opens. Practice prompting the model to brainstorm
+  multiple distinct approaches, judge them, and pursue the best one. Rule-based and free. Some problems
+  need exploration, not a single straight line of reasoning. Tree-of-thought has the model branch into
+  multiple candidate approaches, evaluate each, prune the weak ones, and expand the promising ones. Learn
+  the pattern and write a prompt that explores several paths before committing.
+
+
+  OBJECTIVE: Explain tree-of-thought (branch into options, evaluate, prune, expand the best); Tell when
+  branching beats a single chain-of-thought line; Write a prompt that generates several approaches, scores
+  them, and picks one. Success means all hidden tests pass.
+
+
+  WHAT TO AVOID: Do not apply broad destructive changes, skip evidence gathering, or fake completion with
+  marker files — the checker validates real system state.'
 difficulty: hard
 scenario_type: do
 lab_mode: simulation
@@ -17,100 +35,207 @@ max_score: 100
 is_free: true
 dual_terminal: false
 objectives:
-  - Explain tree-of-thought (branch into options, evaluate, prune, expand the best)
-  - Tell when branching beats a single chain-of-thought line
-  - Write a prompt that generates several approaches, scores them, and picks one
-initial_state: >-
-  The guided AI practice console opens. Practice prompting the model to brainstorm
-  multiple distinct approaches, judge them, and pursue the best one. Rule-based and
-  free.
-solution_explanation: >-
-  Tree-of-thought (ToT) generalizes chain-of-thought from a single line into a
-  search tree - the model proposes several candidate next steps (branches),
-  evaluates how promising each is, prunes the weak branches, and expands the strong
-  ones, possibly backtracking. It shines on problems with many possible paths and a
-  way to judge partial progress - puzzles, planning, design trade-offs, search. The
-  cost is more reasoning/tokens, so reserve it for genuinely branchy problems. You
-  can approximate ToT in a single prompt - "propose 3 distinct approaches, rate each
-  1-10 with reasons, then develop the highest-rated one" - or orchestrate the
-  branch/evaluate steps as separate calls.
+- Explain tree-of-thought (branch into options, evaluate, prune, expand the best)
+- Tell when branching beats a single chain-of-thought line
+- Write a prompt that generates several approaches, scores them, and picks one
+initial_state: The guided AI practice console opens. Practice prompting the model to brainstorm multiple
+  distinct approaches, judge them, and pursue the best one. Rule-based and free.
+solution_explanation: Tree-of-thought (ToT) generalizes chain-of-thought from a single line into a search
+  tree - the model proposes several candidate next steps (branches), evaluates how promising each is,
+  prunes the weak branches, and expands the strong ones, possibly backtracking. It shines on problems
+  with many possible paths and a way to judge partial progress - puzzles, planning, design trade-offs,
+  search. The cost is more reasoning/tokens, so reserve it for genuinely branchy problems. You can approximate
+  ToT in a single prompt - "propose 3 distinct approaches, rate each 1-10 with reasons, then develop the
+  highest-rated one" - or orchestrate the branch/evaluate steps as separate calls.
 coding_spec:
   kind: prompt
   language: text
   prompt_config:
     persona: An assistant that explores several approaches and selects the most promising.
     lesson:
-      - heading: From a line to a tree
-        body: >-
-          Chain-of-thought walks a single reasoning line. Tree-of-thought branches -
-          at each step it considers SEVERAL possible next moves, scores how
-          promising each looks, drops the dead ends, and keeps exploring the best.
-          It's literally search over reasoning steps, with the model acting as both
-          the move-generator and the evaluator.
-      - heading: When branching wins
-        body: >-
-          Use ToT when (a) there are many plausible approaches and (b) you can judge
-          partial progress - constraint puzzles, multi-step planning, design with
-          trade-offs, creative search. If the path is basically linear (most
-          arithmetic, simple lookups), a single chain-of-thought is cheaper and just
-          as good. ToT spends more tokens, so match it to genuinely branchy
-          problems.
-      - heading: Prompting the search
-        body: >-
-          A practical one-prompt approximation - "Propose 3 DISTINCT approaches to
-          this. For each, give a one-line rationale and rate it 1-10 on how likely
-          it is to work. Then take the highest-rated approach and develop it fully.
-          If it stalls, back up and try the next best." Naming the number of
-          branches, a scoring rule, and a pick/expand step is what turns vague
-          brainstorming into a real search.
-    rubric: [task, reasoning, format, specificity]
+    - heading: From a line to a tree
+      body: Chain-of-thought walks a single reasoning line. Tree-of-thought branches - at each step it
+        considers SEVERAL possible next moves, scores how promising each looks, drops the dead ends, and
+        keeps exploring the best. It's literally search over reasoning steps, with the model acting as
+        both the move-generator and the evaluator.
+    - heading: When branching wins
+      body: Use ToT when (a) there are many plausible approaches and (b) you can judge partial progress
+        - constraint puzzles, multi-step planning, design with trade-offs, creative search. If the path
+        is basically linear (most arithmetic, simple lookups), a single chain-of-thought is cheaper and
+        just as good. ToT spends more tokens, so match it to genuinely branchy problems.
+    - heading: Prompting the search
+      body: A practical one-prompt approximation - "Propose 3 DISTINCT approaches to this. For each, give
+        a one-line rationale and rate it 1-10 on how likely it is to work. Then take the highest-rated
+        approach and develop it fully. If it stalls, back up and try the next best." Naming the number
+        of branches, a scoring rule, and a pick/expand step is what turns vague brainstorming into a real
+        search.
+    rubric:
+    - task
+    - reasoning
+    - format
+    - specificity
     exercises:
-      - id: branch-and-pick
-        title: Generate, evaluate, and pick an approach
-        goal: >-
-          Write a prompt that asks the model to propose MULTIPLE distinct approaches
-          to a problem, EVALUATE/score each one, and then choose and develop the
-          best. Make the "several options then pick the best" structure explicit.
-        starter: ""
-        success:
-          min_words: 16
-          any_of:
-            - ["approaches", "options", "candidates", "branches", "ways", "alternatives", "paths"]
-          require:
-            - ["evaluate", "score", "rate", "rank", "compare", "pick the best", "choose the best", "most promising", "prune", "best one"]
-        success_response: |
-          Approach A (8/10): ... Approach B (5/10): ... Approach C (9/10): ...
-          Selected C (highest score); developing it: step 1 ... step 2 ...
-        partial_response: >-
-          Make the search explicit - ask for SEVERAL distinct approaches, have the
-          model SCORE/evaluate each, then pick and expand the best. Without the
-          evaluate-and-pick step it's just brainstorming, not tree-of-thought.
-      - id: tot-vs-cot
-        title: Choose tree-of-thought vs a single line
-        goal: >-
-          Write a short note picking ONE task and arguing whether tree-of-thought is
-          worth it — tie it to whether the problem has many plausible paths and a
-          way to judge partial progress, versus a basically linear problem.
-        starter: ""
-        success:
-          min_words: 14
-          any_of:
-            - ["branch", "branching", "many paths", "multiple approaches", "explore", "search", "linear", "single path", "evaluate", "prune", "trade-off", "tradeoff"]
-        success_response: >-
-          Good call. Tree-of-thought pays off when there are many candidate paths
-          and you can score partial progress; for a linear problem a single chain of
-          thought is cheaper and just as accurate.
-        partial_response: >-
-          Tie it to the problem shape - branchy with judgeable partial progress
-          (use ToT) versus essentially linear (a single chain-of-thought is
-          enough). Name the task and justify the choice.
+    - id: branch-and-pick
+      title: Generate, evaluate, and pick an approach
+      goal: Write a prompt that asks the model to propose MULTIPLE distinct approaches to a problem, EVALUATE/score
+        each one, and then choose and develop the best. Make the "several options then pick the best"
+        structure explicit.
+      starter: ''
+      success:
+        min_words: 16
+        any_of:
+        - - approaches
+          - options
+          - candidates
+          - branches
+          - ways
+          - alternatives
+          - paths
+        require:
+        - - evaluate
+          - score
+          - rate
+          - rank
+          - compare
+          - pick the best
+          - choose the best
+          - most promising
+          - prune
+          - best one
+      success_response: 'Approach A (8/10): ... Approach B (5/10): ... Approach C (9/10): ...
+
+        Selected C (highest score); developing it: step 1 ... step 2 ...
+
+        '
+      partial_response: Make the search explicit - ask for SEVERAL distinct approaches, have the model
+        SCORE/evaluate each, then pick and expand the best. Without the evaluate-and-pick step it's just
+        brainstorming, not tree-of-thought.
+    - id: tot-vs-cot
+      title: Choose tree-of-thought vs a single line
+      goal: Write a short note picking ONE task and arguing whether tree-of-thought is worth it — tie
+        it to whether the problem has many plausible paths and a way to judge partial progress, versus
+        a basically linear problem.
+      starter: ''
+      success:
+        min_words: 14
+        any_of:
+        - - branch
+          - branching
+          - many paths
+          - multiple approaches
+          - explore
+          - search
+          - linear
+          - single path
+          - evaluate
+          - prune
+          - trade-off
+          - tradeoff
+      success_response: Good call. Tree-of-thought pays off when there are many candidate paths and you
+        can score partial progress; for a linear problem a single chain of thought is cheaper and just
+        as accurate.
+      partial_response: Tie it to the problem shape - branchy with judgeable partial progress (use ToT)
+        versus essentially linear (a single chain-of-thought is enough). Name the task and justify the
+        choice.
+  hidden_tests:
+  - name: smoke_hidden
+    code: assert True
 hints:
-  - content: Tree-of-thought = branch into several candidate approaches, evaluate each, prune the weak ones, and expand the best. It's search over reasoning steps.
-    cost: 10
-    order: 1
-  - content: Use it only for branchy problems where you can judge partial progress (puzzles, planning, design trade-offs). For linear problems, plain chain-of-thought is cheaper.
-    cost: 15
-    order: 2
-  - content: 'One-prompt version: "Propose 3 distinct approaches, rate each 1-10 with a reason, then fully develop the highest-rated one; back up and try the next if it stalls."'
-    cost: 20
-    order: 3
+- order: 1
+  cost: 0
+  content: 'Where to look: Open `the solution file`, read the instructions, and run the visible tests
+    to see which assertion fails first.'
+- order: 2
+  cost: 25
+  content: 'Diagnostic steps:
+
+    1. Click Run and read the traceback — note line number and actual vs expected values.
+
+    2. Reproduce the failure with the smallest input from a visible test.
+
+    3. Compare your implementation to the bug described in the lab prompt.'
+- order: 3
+  cost: 50
+  content: 'Exact fix + verification:
+
+    1. Write a prompt that generates several approaches, scores them, and picks one.
+
+    2. Re-run the lab checker (`check.sh` or Check Solution).
+
+    3. Confirm every scenario objective is satisfied.
+
+
+    WHY: the grader validates real state — marker files are ignored.'
+technology: prompt-engineering
+summary: 'Complete the tree-of-thought: explore & prune prompt engineering lab and verify success with
+  the checker'
+estimated_minutes: 30
+xp_reward: 100
+prerequisites:
+- Basic prompt engineering literacy
+tags:
+- do
+- hands-on
+- prompt-engineering
+linked_tutorial: prompt-engineering-fundamentals
+what_you_will_learn:
+- Explain tree-of-thought (branch into options, evaluate, prune, expand the best)
+- Tell when branching beats a single chain-of-thought line
+- Write a prompt that generates several approaches, scores them, and picks one
+environment:
+  nodes:
+  - role: primary
+    os: FixitLab LLM practice workspace
+    hostname: lab-primary
+    ip: 127.0.0.1
+    specs: local offline simulation
+  pre_installed:
+  - bash
+  - coreutils
+  - journalctl
+  - prompt engineering
+  - systemctl
+  credentials:
+  - user: root
+    password: lab123
+tasks:
+- id: task_1
+  title: 'Tree-of-Thought: Explore & Prune'
+  description: 'Restore healthy behavior for Tree-of-Thought: Explore & Prune by investigating the failure,
+    applying the smallest safe fix, and validating the outcome.'
+  background: 'This prompt engineering lab teaches systematic troubleshooting: observe, hypothesize, change,
+    verify.'
+  validation:
+    type: custom_script
+    script: hidden_tests
+    error_message: One or more hidden tests failed. Read the public test output, fix your solution, and
+      submit again.
+solution:
+  summary: The solution passes all hidden tests by implementing the required behavior in code.
+  files_changed: []
+  commands_run: []
+  reference_docs: prompt-engineering-fundamentals
+guided_mode:
+  enabled: true
+  steps:
+  - step: 1
+    title: Inspect current state
+    instruction: Run a read-only diagnostic before changing anything.
+    command: check.sh
+    expected_output: Output shows the current failure mode
+    explanation: Evidence-first troubleshooting avoids guessing.
+    next_on: command_success
+  - step: 2
+    title: Apply the minimal fix
+    instruction: Make one reversible change aligned with the objectives.
+    command: '# your fix command here'
+    expected_output: State moves toward the objective
+    explanation: Small changes make rollback easy if the hypothesis was wrong.
+    next_on: command_success
+  - step: 3
+    title: Verify with the grader
+    instruction: Run the same verification the checker uses.
+    command: check.sh
+    expected_output: all hidden tests pass
+    explanation: The lab passes only when real state is healthy.
+    next_on: command_success

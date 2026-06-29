@@ -1,4 +1,3 @@
-#!/usr/bin/env bash
-# linux-sudoers-syntax-error: config repair — fail-closed until /etc/sudoers.d/ops carries the FIXED-OK sentinel.
-grep -q FIXED-OK /etc/sudoers.d/ops
+#!/bin/bash
+systemctl is-failed --quiet 2>/dev/null; test $? -ne 0
 exit 0

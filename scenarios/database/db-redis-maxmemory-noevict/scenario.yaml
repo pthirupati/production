@@ -1,7 +1,7 @@
 title: Redis OOM From No Eviction Policy
 slug: db-redis-maxmemory-noevict
-technology: Database
-category: Redis
+technology: database
+category: Fix
 difficulty: medium
 lab_mode: simulation
 simulation_type: generic
@@ -10,8 +10,26 @@ max_score: 100
 is_free: true
 jira_priority: High
 dual_terminal: false
-description: Redis is returning OOM errors on writes because maxmemory is set with a 'noeviction' policy
-  and the dataset filled memory. Set an appropriate eviction policy and confirm the config is corrected.
+description: 'CONTEXT: A team operating database administration needs you to resolve `Redis OOM From No
+  Eviction Policy` during a realistic incident. The business impact is reduced service reliability until
+  the underlying state is repaired.
+
+
+  ENVIRONMENT: You are working in FixitLab''s offline database server with SQL client, schemas, backups,
+  and performance views. All tools run locally; no paid APIs or external cloud calls are required.
+
+
+  SYMPTOM / STARTING STATE: A Redis host whose redis.conf uses maxmemory-policy noeviction, so it rejects
+  writes once full. Redis is returning OOM errors on writes because maxmemory is set with a ''noeviction''
+  policy and the dataset filled memory. Set an appropriate eviction policy and confirm the config is corrected.
+
+
+  OBJECTIVE: Confirm writes fail with OOM under noeviction; Set an appropriate maxmemory-policy; Verify
+  the config is corrected. Success means `check.sh` exits successfully.
+
+
+  WHAT TO AVOID: Do not apply broad destructive changes, skip evidence gathering, or fake completion with
+  marker files — the checker validates real system state.'
 initial_state: A Redis host whose redis.conf uses maxmemory-policy noeviction, so it rejects writes once
   full.
 objectives:
@@ -20,11 +38,70 @@ objectives:
 - Verify the config is corrected
 hints:
 - order: 1
-  cost: 10
-  content: Redis returns 'OOM command not allowed'.
+  cost: 0
+  content: 'Where to look: Confirm writes fail with OOM under noeviction'
 - order: 2
-  cost: 15
-  content: Set maxmemory-policy (e.g. allkeys-lru) in redis.conf.
+  cost: 25
+  content: 'Diagnostic steps:
+
+    1. Set an appropriate maxmemory-policy
+
+    2. Verify the config is corrected'
 - order: 3
-  cost: 20
-  content: redis.conf carries the corrected policy.
+  cost: 50
+  content: 'Exact fix + verification:
+
+    1. Verify the config is corrected.
+
+    2. Re-run the lab checker (`check.sh` or Check Solution).
+
+    3. Confirm every scenario objective is satisfied.
+
+
+    WHY: the grader validates real state — marker files are ignored.'
+summary: Complete the redis oom from no eviction policy database lab and verify success with the checker
+estimated_minutes: 20
+xp_reward: 100
+prerequisites:
+- Basic database literacy
+tags:
+- database
+- fix
+- hands-on
+linked_tutorial: database-fundamentals
+what_you_will_learn:
+- Confirm writes fail with OOM under noeviction
+- Set an appropriate maxmemory-policy
+- Verify the config is corrected
+environment:
+  nodes:
+  - role: primary
+    os: FixitLab database server
+    hostname: lab-primary
+    ip: 127.0.0.1
+    specs: local offline simulation
+  pre_installed:
+  - bash
+  - coreutils
+  - database
+  - journalctl
+  - systemctl
+  credentials:
+  - user: root
+    password: lab123
+tasks:
+- id: task_1
+  title: Redis OOM From No Eviction Policy
+  description: Restore healthy behavior for Redis OOM From No Eviction Policy by investigating the failure,
+    applying the smallest safe fix, and validating the outcome.
+  background: 'This database lab teaches systematic troubleshooting: observe, hypothesize, change, verify.'
+  validation:
+    type: custom_script
+    script: check.sh
+    error_message: Validation did not pass. Re-read the objectives and Hint 2 diagnostic steps.
+solution:
+  summary: Identify the misconfiguration affecting this database lab and apply the minimal fix.
+  files_changed: []
+  commands_run:
+  - bash check.sh
+  reference_docs: database-fundamentals

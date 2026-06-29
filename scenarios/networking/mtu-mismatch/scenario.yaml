@@ -1,13 +1,31 @@
 title: MTU Mismatch Causing Packet Loss
 slug: networking-mtu-mismatch
 difficulty: hard
-category: Networking
-description: 'Large TCP transfers and file uploads intermittently fail while small requests succeed. The
-  symptom is an MTU mismatch between the host NIC (1500 bytes) and a VPN tunnel (1450 bytes). Large packets
-  that cannot be fragmented are silently dropped. The fix involves setting the correct MTU on the tunnel
-  interface and enabling TCP MSS clamping via iptables.
+category: Fix
+description: 'CONTEXT: A team operating network operations needs you to resolve `MTU Mismatch Causing
+  Packet Loss` during a realistic incident. The business impact is reduced service reliability until the
+  underlying state is repaired.
 
-  '
+
+  ENVIRONMENT: You are working in FixitLab''s offline network lab with interfaces, routing tables, DNS,
+  and firewall rules. All tools run locally; no paid APIs or external cloud calls are required.
+
+
+  SYMPTOM / STARTING STATE: Simulated RHEL 9 server with a VPN tunnel. ping with small packets succeeds
+  but ping -s 1400 -M do to the remote end times out. Large file transfers hang indefinitely. Large TCP
+  transfers and file uploads intermittently fail while small requests succeed. The symptom is an MTU mismatch
+  between the host NIC (1500 bytes) and a VPN tunnel (1450 bytes). Large packets that cannot be fragmented
+  are silently dropped. The fix involves setting the correct MTU on the tunnel interface and enabling
+  TCP MSS clamping via iptables.
+
+
+  OBJECTIVE: Use ping with the DF bit set to discover the effective path MTU; Set the correct MTU on the
+  tunnel interface to match the path MTU; Apply TCP MSS clamping and confirm large transfers complete
+  successfully. Success means `check.sh` exits successfully.
+
+
+  WHAT TO AVOID: Do not apply broad destructive changes, skip evidence gathering, or fake completion with
+  marker files — the checker validates real system state.'
 initial_state: 'Simulated RHEL 9 server with a VPN tunnel. ping with small packets succeeds but ping -s
   1400 -M do to the remote end times out. Large file transfers hang indefinitely.
 
@@ -23,18 +41,74 @@ max_score: 100
 is_free: false
 hints:
 - order: 1
-  cost: 10
-  content: 'Reproduce the MTU problem: small requests work, large ones stall. Test with the DF bit: `ping
-    -c3 -s 1400 -M do <remote_ip>` fails while `-s 100` succeeds.'
+  cost: 0
+  content: 'Where to look: Use ping with the DF bit set to discover the effective path MTU'
 - order: 2
-  cost: 15
-  content: 'Lower the tunnel MTU to fit the path: `ip link set tun0 mtu 1450`, and clamp TCP MSS so sessions
-    negotiate a safe size: `iptables -t mangle -A FORWARD -p tcp --tcp-flags SYN,RST SYN -j TCPMSS --clamp-mss-to-pmtu`.'
+  cost: 25
+  content: 'Diagnostic steps:
+
+    1. Set the correct MTU on the tunnel interface to match the path MTU
+
+    2. Apply TCP MSS clamping and confirm large transfers complete successfully'
 - order: 3
-  cost: 20
-  content: 'Re-test: `ping -s 1400 -M do <remote_ip>` now succeeds and large transfers complete. Persist
-    the MTU/MSS settings (interface config + saved iptables) so they survive reboot, then record completion
-    by adding `# FIXED-OK` to `/opt/fixitlab/networking/mtu-mismatch.conf` and click Check Solution.'
+  cost: 50
+  content: 'Exact fix + verification:
+
+    1. Apply TCP MSS clamping and confirm large transfers complete successfully.
+
+    2. Re-run the lab checker (`check.sh` or Check Solution).
+
+    3. Confirm every scenario objective is satisfied.
+
+
+    WHY: the grader validates real state — marker files are ignored.'
 requires_companion_hosts: false
 dual_terminal: false
 jira_priority: High
+technology: networking
+summary: Complete the mtu mismatch causing packet loss networking lab and verify success with the checker
+estimated_minutes: 20
+xp_reward: 100
+prerequisites:
+- Basic networking literacy
+tags:
+- fix
+- hands-on
+- networking
+linked_tutorial: networking-fundamentals
+what_you_will_learn:
+- Use ping with the DF bit set to discover the effective path MTU
+- Set the correct MTU on the tunnel interface to match the path MTU
+- Apply TCP MSS clamping and confirm large transfers complete successfully
+environment:
+  nodes:
+  - role: primary
+    os: FixitLab network lab
+    hostname: lab-primary
+    ip: 127.0.0.1
+    specs: local offline simulation
+  pre_installed:
+  - bash
+  - coreutils
+  - journalctl
+  - networking
+  - systemctl
+  credentials:
+  - user: root
+    password: lab123
+tasks:
+- id: task_1
+  title: MTU Mismatch Causing Packet Loss
+  description: Restore healthy behavior for MTU Mismatch Causing Packet Loss by investigating the failure,
+    applying the smallest safe fix, and validating the outcome.
+  background: 'This networking lab teaches systematic troubleshooting: observe, hypothesize, change, verify.'
+  validation:
+    type: custom_script
+    script: check.sh
+    error_message: Validation did not pass. Re-read the objectives and Hint 2 diagnostic steps.
+solution:
+  summary: Identify the misconfiguration affecting this networking lab and apply the minimal fix.
+  files_changed: []
+  commands_run:
+  - bash check.sh
+  reference_docs: networking-fundamentals

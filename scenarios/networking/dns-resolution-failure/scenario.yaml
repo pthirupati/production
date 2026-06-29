@@ -1,37 +1,121 @@
 slug: dns-resolution-failure
-title: "DNS Resolution Failure — Fix /etc/resolv.conf"
-technology: Networking
-category: DNS
+title: DNS Resolution Failure — Fix /etc/resolv.conf
+technology: networking
+category: Fix
 difficulty: easy
 time_limit: 600
 max_score: 100
 infrastructure_type: docker
 jira_priority: High
 is_free: true
-description: |
-  After a VM migration, all outbound DNS lookups are failing. Applications that
-  depend on hostname resolution (package managers, monitoring agents, mail delivery)
-  are timing out. Investigation shows /etc/resolv.conf was overwritten with incorrect
-  nameserver entries pointing to a decommissioned internal resolver.
-  Restore the correct configuration so DNS lookups succeed.
-objectives:
-  - Diagnose the DNS resolution failure
-  - Correct /etc/resolv.conf with valid nameserver entries
-  - Verify hostname lookups succeed
-initial_state: |
-  Ubuntu 22.04 with /etc/resolv.conf containing a single nameserver line pointing
+description: 'CONTEXT: A team operating network operations needs you to resolve `DNS Resolution Failure
+  — Fix /etc/resolv.conf` during a realistic incident. The business impact is reduced service reliability
+  until the underlying state is repaired.
+
+
+  ENVIRONMENT: You are working in FixitLab''s offline network lab with interfaces, routing tables, DNS,
+  and firewall rules. All tools run locally; no paid APIs or external cloud calls are required.
+
+
+  SYMPTOM / STARTING STATE: Ubuntu 22.04 with /etc/resolv.conf containing a single nameserver line pointing
+
   to 10.0.0.253 (a decommissioned host). `host google.com` and `dig` both fail
+
+  with SERVFAIL or timeout. After a VM migration, all outbound DNS lookups are failing. Applications that
+
+  depend on hostname resolution (package managers, monitoring agents, mail delivery)
+
+  are timing out. Investigation shows /etc/resolv.conf was overwritten with incorrect
+
+  nameserver entries pointing to a decommissioned internal resolver.
+
+  Restore the correct configuration so DNS lookups succeed.
+
+
+  OBJECTIVE: Diagnose the DNS resolution failure; Correct /etc/resolv.conf with valid nameserver entries;
+  Verify hostname lookups succeed. Success means `check.sh` exits successfully.
+
+
+  WHAT TO AVOID: Do not apply broad destructive changes, skip evidence gathering, or fake completion with
+  marker files — the checker validates real system state.'
+objectives:
+- Diagnose the DNS resolution failure
+- Correct /etc/resolv.conf with valid nameserver entries
+- Verify hostname lookups succeed
+initial_state: 'Ubuntu 22.04 with /etc/resolv.conf containing a single nameserver line pointing
+
+  to 10.0.0.253 (a decommissioned host). `host google.com` and `dig` both fail
+
   with SERVFAIL or timeout.
+
+  '
 hints:
-  - order: 1
-    cost: 10
-    content: "Run `cat /etc/resolv.conf` and `dig @8.8.8.8 google.com` to confirm the issue is the configured resolver."
-  - order: 2
-    cost: 15
-    content: "Edit /etc/resolv.conf. Add `nameserver 8.8.8.8` and `nameserver 1.1.1.1` as fallback."
-  - order: 3
-    cost: 10
-    content: "Test with `host google.com` or `nslookup google.com` after saving."
-  - order: 4
-    cost: 20
-    content: "If systemd-resolved is active, use `resolvectl status` and update the DNS via `/etc/systemd/resolved.conf`."
+- order: 1
+  cost: 0
+  content: 'Where to look: Diagnose the DNS resolution failure'
+- order: 2
+  cost: 25
+  content: 'Diagnostic steps:
+
+    1. Correct /etc/resolv.conf with valid nameserver entries
+
+    2. Verify hostname lookups succeed'
+- order: 3
+  cost: 50
+  content: 'Exact fix + verification:
+
+    1. Verify hostname lookups succeed.
+
+    2. Re-run the lab checker (`check.sh` or Check Solution).
+
+    3. Confirm every scenario objective is satisfied.
+
+
+    WHY: the grader validates real state — marker files are ignored.'
+summary: Complete the dns resolution failure — fix /etc/resolv conf networking lab and verify success
+  with the checker
+estimated_minutes: 10
+xp_reward: 100
+prerequisites:
+- Basic networking literacy
+tags:
+- fix
+- hands-on
+- networking
+linked_tutorial: networking-fundamentals
+what_you_will_learn:
+- Diagnose the DNS resolution failure
+- Correct /etc/resolv.conf with valid nameserver entries
+- Verify hostname lookups succeed
+environment:
+  nodes:
+  - role: primary
+    os: FixitLab network lab
+    hostname: lab-primary
+    ip: 127.0.0.1
+    specs: local offline simulation
+  pre_installed:
+  - bash
+  - coreutils
+  - journalctl
+  - networking
+  - systemctl
+  credentials:
+  - user: root
+    password: lab123
+tasks:
+- id: task_1
+  title: DNS Resolution Failure — Fix /etc/resolv.conf
+  description: Restore healthy behavior for DNS Resolution Failure — Fix /etc/resolv.conf by investigating
+    the failure, applying the smallest safe fix, and validating the outcome.
+  background: 'This networking lab teaches systematic troubleshooting: observe, hypothesize, change, verify.'
+  validation:
+    type: custom_script
+    script: check.sh
+    error_message: Validation did not pass. Re-read the objectives and Hint 2 diagnostic steps.
+solution:
+  summary: Identify the misconfiguration affecting this networking lab and apply the minimal fix.
+  files_changed: []
+  commands_run:
+  - bash check.sh
+  reference_docs: networking-fundamentals

@@ -2,8 +2,8 @@ title: Disk Full — Deleted File Still Open
 slug: disk-full-open-deleted-file
 lab_mode: simulation
 simulation_type: generic
-technology: Linux
-category: Storage
+technology: linux
+category: Fix
 difficulty: hard
 time_limit: 1200
 max_score: 100
@@ -11,10 +11,29 @@ infrastructure_type: docker
 docker_privileged: false
 jira_priority: Medium
 topics_covered: Q6 df vs du — lsof /proc/fd, restart process
-description: '`df` reports /var/log at 100% full, but `du` of the directory sums to far less. A running
-  process still holds a large log file open after it was deleted, so the space isn''t released until the
-  file descriptor is closed. Find the process holding the deleted file and reclaim the space without a
-  reboot.'
+description: 'CONTEXT: A team operating Linux administration needs you to resolve `Disk Full — Deleted
+  File Still Open` during a realistic incident. The business impact is reduced service reliability until
+  the underlying state is repaired.
+
+
+  ENVIRONMENT: You are working in FixitLab''s offline Linux practice server with terminal and config files
+  under /etc and /var. All tools run locally; no paid APIs or external cloud calls are required.
+
+
+  SYMPTOM / STARTING STATE: Linux server where /var/log shows full in df but not in du. A process keeps
+  a deleted log file open, pinning its blocks. `df` reports /var/log at 100% full, but `du` of the directory
+  sums to far less. A running process still holds a large log file open after it was deleted, so the space
+  isn''t released until the file descriptor is closed. Find the process holding the deleted file and reclaim
+  the space without a reboot.
+
+
+  OBJECTIVE: Recognize the df-vs-du discrepancy points to a deleted-but-open file; Find the process and
+  descriptor holding the deleted file; Reclaim the space (close/truncate the fd or restart the holder).
+  Success means `check.sh` exits successfully.
+
+
+  WHAT TO AVOID: Do not apply broad destructive changes, skip evidence gathering, or fake completion with
+  marker files — the checker validates real system state.'
 objectives:
 - Recognize the df-vs-du discrepancy points to a deleted-but-open file
 - Find the process and descriptor holding the deleted file
@@ -23,14 +42,72 @@ initial_state: Linux server where /var/log shows full in df but not in du. A pro
   file open, pinning its blocks.
 hints:
 - order: 1
-  cost: 10
-  content: Compare `df -h /var/log` (100%) with `du -sh /var/log` (much less). The gap means space is
-    held by deleted-but-open files.
+  cost: 0
+  content: 'Where to look: Run `df -h` and `du -xh /var /tmp /home | sort -h | tail -20` for large paths.'
 - order: 2
-  cost: 15
-  content: 'Find the holder: `lsof +L1 /var/log` (or `lsof | grep deleted`) lists the PID and the open
-    fd pointing at the deleted file.'
+  cost: 25
+  content: 'Diagnostic steps:
+
+    1. Find which mount is 100% — often `/` or `/var`.
+
+    2. `journalctl --disk-usage` and old logs under `/var/log`.
+
+    3. Look for core dumps, temp files, or oversized application data.'
 - order: 3
-  cost: 20
-  content: 'Release the space without rebooting: truncate the descriptor with `: > /proc/<PID>/fd/<N>`
-    or restart/HUP the process. `df -h /var/log` immediately shows the space back.'
+  cost: 50
+  content: 'Exact fix + verification:
+
+    1. Remove or rotate the largest safe files (logs, caches, old packages).
+
+    2. `df -h` should show free space on the affected mount.
+
+    3. Retry the command that failed with ''No space left on device''.
+
+
+    WHY: many services fail cryptically when disk is full.'
+summary: Complete the disk full — deleted file still open linux lab and verify success with the checker
+estimated_minutes: 20
+xp_reward: 100
+prerequisites:
+- Basic linux literacy
+tags:
+- fix
+- hands-on
+- linux
+linked_tutorial: linux-fundamentals
+what_you_will_learn:
+- Recognize the df-vs-du discrepancy points to a deleted-but-open file
+- Find the process and descriptor holding the deleted file
+- Reclaim the space (close/truncate the fd or restart the holder)
+environment:
+  nodes:
+  - role: primary
+    os: FixitLab Linux practice server
+    hostname: lab-primary
+    ip: 127.0.0.1
+    specs: local offline simulation
+  pre_installed:
+  - bash
+  - coreutils
+  - journalctl
+  - linux
+  - systemctl
+  credentials:
+  - user: root
+    password: lab123
+tasks:
+- id: task_1
+  title: Disk Full — Deleted File Still Open
+  description: Restore healthy behavior for Disk Full — Deleted File Still Open by investigating the failure,
+    applying the smallest safe fix, and validating the outcome.
+  background: 'This linux lab teaches systematic troubleshooting: observe, hypothesize, change, verify.'
+  validation:
+    type: custom_script
+    script: check.sh
+    error_message: Validation did not pass. Re-read the objectives and Hint 2 diagnostic steps.
+solution:
+  summary: Identify the misconfiguration affecting this linux lab and apply the minimal fix.
+  files_changed: []
+  commands_run:
+  - bash check.sh
+  reference_docs: linux-fundamentals

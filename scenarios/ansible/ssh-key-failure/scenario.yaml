@@ -1,21 +1,53 @@
-category: Ansible Automation
-description: Managed host web2 is UNREACHABLE to Ansible because SSH key-based authentication isn't set
-  up for it — the control node's public key is missing from web2's authorized_keys, so the ping module
-  fails with a publickey error. Distribute the key to web2 and confirm Ansible can reach all webservers.
+category: Fix
+description: 'CONTEXT: A team operating Ansible automation needs you to resolve `Ansible SSH Key Failure`
+  during a realistic incident. The business impact is reduced service reliability until the underlying
+  state is repaired.
+
+
+  ENVIRONMENT: You are working in FixitLab''s offline Ansible control node with inventory, playbooks,
+  roles, and ansible-playbook. All tools run locally; no paid APIs or external cloud calls are required.
+
+
+  SYMPTOM / STARTING STATE: Simulated Ansible control node. web2 is unreachable over SSH (publickey auth
+  fails) while the other webservers respond. The control node''s key has not been copied to web2. Managed
+  host web2 is UNREACHABLE to Ansible because SSH key-based authentication isn''t set up for it — the
+  control node''s public key is missing from web2''s authorized_keys, so the ping module fails with a
+  publickey error. Distribute the key to web2 and confirm Ansible can reach all webservers.
+
+
+  OBJECTIVE: Identify that web2 fails Ansible''s ping on publickey authentication; Copy the control node''s
+  SSH key to web2; Verify all webservers respond to ansible -m ping. Success means `check.sh` exits successfully.
+
+
+  WHAT TO AVOID: Do not apply broad destructive changes, skip evidence gathering, or fake completion with
+  marker files — the checker validates real system state.'
 difficulty: medium
 dual_terminal: true
 hints:
 - order: 1
-  cost: 10
-  content: 'Pinpoint the bad host: `ansible webservers -m ping` shows web2 UNREACHABLE with a publickey/permission-denied
-    message.'
+  cost: 0
+  content: 'Where to look: Run `ansible webservers -m ping -vvv` to see SSH and inventory errors.'
 - order: 2
-  cost: 20
-  content: 'Install your key on web2: `ssh-copy-id root@web2` (or append your ~/.ssh/id_rsa.pub to its
-    ~/.ssh/authorized_keys), then test plain SSH: `ssh root@web2 hostname`.'
+  cost: 25
+  content: 'Diagnostic steps:
+
+    1. Verify `inventory` hostnames resolve and SSH keys work.
+
+    2. Check `ansible.cfg` for remote_user and privilege escalation.
+
+    3. Test manual `ssh user@host` from the control node.'
 - order: 3
-  cost: 30
-  content: Re-run `ansible webservers -m ping` — web2 now returns "pong" along with the rest of the group.
+  cost: 50
+  content: 'Exact fix + verification:
+
+    1. Fix inventory, SSH key, or `ansible_user` in group_vars.
+
+    2. Re-run `ansible webservers -m ping`.
+
+    3. Confirm every host returns SUCCESS.
+
+
+    WHY: Ansible cannot manage hosts it cannot reach.'
 initial_state: Simulated Ansible control node. web2 is unreachable over SSH (publickey auth fails) while
   the other webservers respond. The control node's key has not been copied to web2.
 is_free: false
@@ -31,3 +63,50 @@ simulation_type: ansible
 slug: sim-ansible-ssh-key
 time_limit: 900
 title: Ansible SSH Key Failure
+technology: ansible
+summary: Complete the ansible ssh key failure ansible lab and verify success with the checker
+estimated_minutes: 15
+xp_reward: 100
+prerequisites:
+- Basic ansible literacy
+tags:
+- ansible
+- fix
+- hands-on
+linked_tutorial: ansible-fundamentals
+what_you_will_learn:
+- Identify that web2 fails Ansible's ping on publickey authentication
+- Copy the control node's SSH key to web2
+- Verify all webservers respond to ansible -m ping
+environment:
+  nodes:
+  - role: primary
+    os: FixitLab Ansible control node
+    hostname: lab-primary
+    ip: 127.0.0.1
+    specs: local offline simulation
+  pre_installed:
+  - ansible
+  - ansible-playbook
+  - bash
+  - coreutils
+  credentials:
+  - user: root
+    password: lab123
+tasks:
+- id: task_1
+  title: Ansible SSH Key Failure
+  description: Restore healthy behavior for Ansible SSH Key Failure by investigating the failure, applying
+    the smallest safe fix, and validating the outcome.
+  background: 'This ansible lab teaches systematic troubleshooting: observe, hypothesize, change, verify.'
+  validation:
+    type: command_output
+    command: ansible webservers -m ping
+    expected_output: SUCCESS
+    error_message: Ansible hosts are still unreachable. Verify SSH keys and inventory.
+solution:
+  summary: Identify the misconfiguration affecting this ansible lab and apply the minimal fix.
+  files_changed: []
+  commands_run:
+  - ansible webservers -m ping
+  reference_docs: ansible-fundamentals

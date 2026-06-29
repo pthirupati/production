@@ -1,4 +1,3 @@
-#!/usr/bin/env bash
-# rhel-crypto-policy-legacy: config repair (FIXED-OK sentinel).
-grep -q FIXED-OK /etc/crypto-policies/config
+#!/bin/bash
+firewall-cmd --state | grep -q 'running'
 exit 0

@@ -1,8 +1,7 @@
----
 slug: java-direct-buffer-oom
-title: "OutOfMemoryError: Direct Buffer Memory (Off-Heap Leak)"
-technology: Java
-category: "JVM Performance"
+title: 'OutOfMemoryError: Direct Buffer Memory (Off-Heap Leak)'
+technology: java
+category: Fix
 difficulty: hard
 time_limit: 1200
 max_score: 100
@@ -11,22 +10,108 @@ simulation_type: java
 infrastructure_type: simulation
 jira_priority: High
 is_free: false
-description: |
-  A high-throughput NIO/Netty service crashes with 'OutOfMemoryError: Direct buffer memory'. Direct (off-heap) ByteBuffers are allocated but not released promptly and MaxDirectMemorySize is unbounded, so native memory grows until allocation fails. Bound direct memory and fix the buffer lifecycle.
+description: 'CONTEXT: A team operating Java applications needs you to resolve `OutOfMemoryError: Direct
+  Buffer Memory (Off-Heap Leak)` during a realistic incident. The business impact is reduced service reliability
+  until the underlying state is repaired.
+
+
+  ENVIRONMENT: You are working in FixitLab''s offline Java project with Maven/Gradle, JVM logs, and Spring
+  configuration. All tools run locally; no paid APIs or external cloud calls are required.
+
+
+  SYMPTOM / STARTING STATE: JVM flags at /app/jvm.options leave direct memory unbounded; an NIO path leaks
+  direct buffers until ''OutOfMemoryError: Direct buffer memory''. A high-throughput NIO/Netty service
+  crashes with ''OutOfMemoryError: Direct buffer memory''. Direct (off-heap) ByteBuffers are allocated
+  but not released promptly and MaxDirectMemorySize is unbounded, so native memory grows until allocation
+  fails. Bound direct memory and fix the buffer lifecycle.
+
+
+  OBJECTIVE: Confirm the OOM is ''Direct buffer memory'', not heap; Set -XX:MaxDirectMemorySize so off-heap
+  usage is bounded; Ensure direct buffers are released/pooled correctly. Success means `check.sh` exits
+  successfully.
+
+
+  WHAT TO AVOID: Do not apply broad destructive changes, skip evidence gathering, or fake completion with
+  marker files — the checker validates real system state.'
 objectives:
-  - "Confirm the OOM is 'Direct buffer memory', not heap"
-  - "Set -XX:MaxDirectMemorySize so off-heap usage is bounded"
-  - "Ensure direct buffers are released/pooled correctly"
-  - "Verify off-heap memory stabilizes under load"
-initial_state: |
-  JVM flags at /app/jvm.options leave direct memory unbounded; an NIO path leaks direct buffers until 'OutOfMemoryError: Direct buffer memory'.
+- Confirm the OOM is 'Direct buffer memory', not heap
+- Set -XX:MaxDirectMemorySize so off-heap usage is bounded
+- Ensure direct buffers are released/pooled correctly
+- Verify off-heap memory stabilizes under load
+initial_state: 'JVM flags at /app/jvm.options leave direct memory unbounded; an NIO path leaks direct
+  buffers until ''OutOfMemoryError: Direct buffer memory''.
+
+  '
 hints:
-  - order: 1
-    cost: 10
-    content: "The OOM names 'Direct buffer memory' — this is native/off-heap, not the Java heap."
-  - order: 2
-    cost: 15
-    content: "Set -XX:MaxDirectMemorySize=256m so the leak fails fast and is visible."
-  - order: 3
-    cost: 20
-    content: "Release buffers (ReferenceCountUtil.release / pooled allocator) instead of relying on GC."
+- order: 1
+  cost: 0
+  content: 'Where to look: Confirm the OOM is ''Direct buffer memory'', not heap'
+- order: 2
+  cost: 25
+  content: 'Diagnostic steps:
+
+    1. Set -XX:MaxDirectMemorySize so off-heap usage is bounded
+
+    2. Ensure direct buffers are released/pooled correctly
+
+    3. Verify off-heap memory stabilizes under load'
+- order: 3
+  cost: 50
+  content: 'Exact fix + verification:
+
+    1. Verify off-heap memory stabilizes under load.
+
+    2. Re-run the lab checker (`check.sh` or Check Solution).
+
+    3. Confirm every scenario objective is satisfied.
+
+
+    WHY: the grader validates real state — marker files are ignored.'
+summary: 'Complete the outofmemoryerror: direct buffer memory (off-heap leak) java lab and verify success
+  with the checker'
+estimated_minutes: 20
+xp_reward: 100
+prerequisites:
+- Basic java literacy
+tags:
+- fix
+- hands-on
+- java
+linked_tutorial: java-fundamentals
+what_you_will_learn:
+- Confirm the OOM is 'Direct buffer memory', not heap
+- Set -XX:MaxDirectMemorySize so off-heap usage is bounded
+- Ensure direct buffers are released/pooled correctly
+- Verify off-heap memory stabilizes under load
+environment:
+  nodes:
+  - role: primary
+    os: FixitLab Java project
+    hostname: lab-primary
+    ip: 127.0.0.1
+    specs: local offline simulation
+  pre_installed:
+  - bash
+  - coreutils
+  - java
+  - journalctl
+  - systemctl
+  credentials:
+  - user: root
+    password: lab123
+tasks:
+- id: task_1
+  title: 'OutOfMemoryError: Direct Buffer Memory (Off-Heap Leak)'
+  description: 'Restore healthy behavior for OutOfMemoryError: Direct Buffer Memory (Off-Heap Leak) by
+    investigating the failure, applying the smallest safe fix, and validating the outcome.'
+  background: 'This java lab teaches systematic troubleshooting: observe, hypothesize, change, verify.'
+  validation:
+    type: custom_script
+    script: check.sh
+    error_message: Validation did not pass. Re-read the objectives and Hint 2 diagnostic steps.
+solution:
+  summary: Identify the misconfiguration affecting this java lab and apply the minimal fix.
+  files_changed: []
+  commands_run:
+  - bash check.sh
+  reference_docs: java-fundamentals

@@ -1,7 +1,7 @@
 slug: srm-disaster-recovery
 title: SRM Site Recovery Not Configured
-technology: VMware
-category: vCenter Administration
+technology: vmware
+category: Fix
 difficulty: medium
 scenario_type: fix
 time_limit: 1200
@@ -11,26 +11,101 @@ simulation_type: vmware
 infrastructure_type: simulation
 jira_priority: Medium
 is_free: false
-description: Site Recovery Manager (SRM) protection between the production site (DC-Prod) and the recovery
-  site (DC-DR) isn't configured, so there is no orchestrated disaster-recovery plan and protected VMs
-  can't be failed over. Configure SRM protection groups and a recovery plan, then run a non-disruptive
-  test to validate recovery.
+description: 'CONTEXT: A team operating VMware vSphere needs you to resolve `SRM Site Recovery Not Configured`
+  during a realistic incident. The business impact is reduced service reliability until the underlying
+  state is repaired.
+
+
+  ENVIRONMENT: You are working in FixitLab''s offline vSphere lab with VMs, datastores, vCenter, and ESXi
+  tasks. All tools run locally; no paid APIs or external cloud calls are required.
+
+
+  SYMPTOM / STARTING STATE: vCenter spanning DC-Prod and DC-DR where SRM replication/protection is not
+  configured; no protection groups or recovery plans exist. Site Recovery Manager (SRM) protection between
+  the production site (DC-Prod) and the recovery site (DC-DR) isn''t configured, so there is no orchestrated
+  disaster-recovery plan and protected VMs can''t be failed over. Configure SRM protection groups and
+  a recovery plan, then run a non-disruptive test to validate recovery.
+
+
+  OBJECTIVE: Ensure the sites are linked, then configure SRM protection groups; Create a recovery plan
+  covering the protected VMs; Run a recovery plan test and confirm it succeeds. Success means `check.sh`
+  exits successfully.
+
+
+  WHAT TO AVOID: Do not apply broad destructive changes, skip evidence gathering, or fake completion with
+  marker files — the checker validates real system state.'
 objectives:
 - Ensure the sites are linked, then configure SRM protection groups
 - Create a recovery plan covering the protected VMs
 - Run a recovery plan test and confirm it succeeds
 hints:
 - order: 1
-  cost: 10
-  content: If the sites aren't linked yet, enable linked mode / pair the sites first so SRM can see both
-    DC-Prod and DC-DR.
+  cost: 0
+  content: 'Where to look: Ensure the sites are linked, then configure SRM protection groups'
 - order: 2
-  cost: 15
-  content: In Site Recovery, create a protection group for the production VMs (backed by replication),
-    then build a recovery plan that includes that group.
+  cost: 25
+  content: 'Diagnostic steps:
+
+    1. Create a recovery plan covering the protected VMs
+
+    2. Run a recovery plan test and confirm it succeeds'
 - order: 3
-  cost: 20
-  content: Run the recovery plan in Test mode (non-disruptive) and confirm the test completes successfully,
-    validating failover to DC-DR.
+  cost: 50
+  content: 'Exact fix + verification:
+
+    1. Run a recovery plan test and confirm it succeeds.
+
+    2. Re-run the lab checker (`check.sh` or Check Solution).
+
+    3. Confirm every scenario objective is satisfied.
+
+
+    WHY: the grader validates real state — marker files are ignored.'
 initial_state: vCenter spanning DC-Prod and DC-DR where SRM replication/protection is not configured;
   no protection groups or recovery plans exist.
+summary: Complete the srm site recovery not configured vmware lab and verify success with the checker
+estimated_minutes: 20
+xp_reward: 100
+prerequisites:
+- Basic vmware literacy
+tags:
+- fix
+- hands-on
+- vmware
+linked_tutorial: vmware-fundamentals
+what_you_will_learn:
+- Ensure the sites are linked, then configure SRM protection groups
+- Create a recovery plan covering the protected VMs
+- Run a recovery plan test and confirm it succeeds
+environment:
+  nodes:
+  - role: primary
+    os: FixitLab vSphere lab
+    hostname: lab-primary
+    ip: 127.0.0.1
+    specs: local offline simulation
+  pre_installed:
+  - bash
+  - coreutils
+  - journalctl
+  - systemctl
+  - vmware
+  credentials:
+  - user: root
+    password: lab123
+tasks:
+- id: task_1
+  title: SRM Site Recovery Not Configured
+  description: Restore healthy behavior for SRM Site Recovery Not Configured by investigating the failure,
+    applying the smallest safe fix, and validating the outcome.
+  background: 'This vmware lab teaches systematic troubleshooting: observe, hypothesize, change, verify.'
+  validation:
+    type: custom_script
+    script: check.sh
+    error_message: Validation did not pass. Re-read the objectives and Hint 2 diagnostic steps.
+solution:
+  summary: Identify the misconfiguration affecting this vmware lab and apply the minimal fix.
+  files_changed: []
+  commands_run:
+  - bash check.sh
+  reference_docs: vmware-fundamentals

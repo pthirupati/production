@@ -1,11 +1,30 @@
-title: "Practice: A Few-Shot Classification Prompt"
+title: 'Practice: A Few-Shot Classification Prompt'
 slug: few-shot-classifier-practice
-category: Prompt Engineering
-description: >-
-  A hands-on, graded lab. Build a classification prompt that pins the allowed
-  labels and teaches the format with worked examples. Few-shot examples are the
-  most reliable way to get consistent, parseable labels out of a model —
-  sentiment, intent, priority, spam, you name it.
+category: Build
+description: 'CONTEXT: A team operating prompt engineering needs you to resolve `Practice: A Few-Shot
+  Classification Prompt` during a realistic incident. The business impact is reduced service reliability
+  until the underlying state is repaired.
+
+
+  ENVIRONMENT: You are working in FixitLab''s offline LLM practice workspace with prompt templates, eval
+  sets, and tool configs. All tools run locally; no paid APIs or external cloud calls are required.
+
+
+  SYMPTOM / STARTING STATE: The guided AI practice console opens with two graded classification exercises.
+  Write prompts that force a single label from a fixed set and show the model the format by example. Rule-based
+  and free — strong prompts pass, vague ones fail. A hands-on, graded lab. Build a classification prompt
+  that pins the allowed labels and teaches the format with worked examples. Few-shot examples are the
+  most reliable way to get consistent, parseable labels out of a model — sentiment, intent, priority,
+  spam, you name it.
+
+
+  OBJECTIVE: Write a classifier prompt that lists the exact allowed labels and demands one of them; Teach
+  the output format with at least two worked Input -> Output examples; Pass both graded exercises (the
+  simulator re-checks your prompt server-side). Success means all hidden tests pass.
+
+
+  WHAT TO AVOID: Do not apply broad destructive changes, skip evidence gathering, or fake completion with
+  marker files — the checker validates real system state.'
 difficulty: medium
 scenario_type: do
 lab_mode: simulation
@@ -17,93 +36,197 @@ max_score: 100
 is_free: true
 dual_terminal: false
 objectives:
-  - Write a classifier prompt that lists the exact allowed labels and demands one of them
-  - Teach the output format with at least two worked Input -> Output examples
-  - Pass both graded exercises (the simulator re-checks your prompt server-side)
-initial_state: >-
-  The guided AI practice console opens with two graded classification exercises.
-  Write prompts that force a single label from a fixed set and show the model the
-  format by example. Rule-based and free — strong prompts pass, vague ones fail.
-solution_explanation: >-
-  A reliable classifier prompt does three things: (1) states the TASK and the
-  exact allowed labels ("Classify as one of: positive, negative, neutral");
-  (2) shows two or three worked examples in the exact Input -> Output shape; (3)
-  forbids extra text ("Reply with only the label"). Few-shot examples pin both
-  the decision boundary and the output format far better than instructions alone.
-  Keep the examples diverse (cover each label) and consistent in format. For
-  high-stakes labeling you can pair this with structured output or an enum tool,
-  but the free, portable version is a tight few-shot prompt.
+- Write a classifier prompt that lists the exact allowed labels and demands one of them
+- Teach the output format with at least two worked Input -> Output examples
+- Pass both graded exercises (the simulator re-checks your prompt server-side)
+initial_state: The guided AI practice console opens with two graded classification exercises. Write prompts
+  that force a single label from a fixed set and show the model the format by example. Rule-based and
+  free — strong prompts pass, vague ones fail.
+solution_explanation: 'A reliable classifier prompt does three things: (1) states the TASK and the exact
+  allowed labels ("Classify as one of: positive, negative, neutral"); (2) shows two or three worked examples
+  in the exact Input -> Output shape; (3) forbids extra text ("Reply with only the label"). Few-shot examples
+  pin both the decision boundary and the output format far better than instructions alone. Keep the examples
+  diverse (cover each label) and consistent in format. For high-stakes labeling you can pair this with
+  structured output or an enum tool, but the free, portable version is a tight few-shot prompt.'
 coding_spec:
   kind: prompt
   language: text
   prompt_config:
     persona: A classification assistant that returns one label from a fixed set.
     lesson:
-      - heading: Fix the label set
-        body: >-
-          Never let the model invent its own categories. Enumerate them: "Classify
-          the message as exactly one of: bug, feature_request, question, praise."
-          A closed label set is what makes the output usable downstream — an
-          open-ended "categorize this" gives you a different vocabulary every run.
-      - heading: Teach the format by example
-        body: >-
-          Two or three worked examples are worth a paragraph of instructions. Show
-          the exact shape - "Input: 'love it' -> Output: praise" / "Input: 'it
-          crashes on save' -> Output: bug". The model copies the pattern: same
-          labels, same one-token output, no commentary. Cover each label at least
-          once so the boundary is clear.
-      - heading: One label, nothing else
-        body: >-
-          End with a hard rule: "Reply with only the label — no explanation, no
-          punctuation." Stray reasoning breaks parsers. If you later need
-          probabilities or a structured object, switch to tool use / structured
-          outputs in the Claude API; for a plain label, the few-shot prompt is
-          enough.
-    rubric: [task, examples, constraints, format, specificity]
+    - heading: Fix the label set
+      body: 'Never let the model invent its own categories. Enumerate them: "Classify the message as exactly
+        one of: bug, feature_request, question, praise." A closed label set is what makes the output usable
+        downstream — an open-ended "categorize this" gives you a different vocabulary every run.'
+    - heading: Teach the format by example
+      body: 'Two or three worked examples are worth a paragraph of instructions. Show the exact shape
+        - "Input: ''love it'' -> Output: praise" / "Input: ''it crashes on save'' -> Output: bug". The
+        model copies the pattern: same labels, same one-token output, no commentary. Cover each label
+        at least once so the boundary is clear.'
+    - heading: One label, nothing else
+      body: 'End with a hard rule: "Reply with only the label — no explanation, no punctuation." Stray
+        reasoning breaks parsers. If you later need probabilities or a structured object, switch to tool
+        use / structured outputs in the Claude API; for a plain label, the few-shot prompt is enough.'
+    rubric:
+    - task
+    - examples
+    - constraints
+    - format
+    - specificity
     exercises:
-      - id: few-shot-labels
-        title: "Graded: classify with worked examples"
-        goal: >-
-          Write a prompt that classifies a support message as exactly one of a
-          fixed set of labels (e.g. bug, feature_request, question, praise) and
-          includes at least two Input -> Output worked examples.
-        starter: "Classify this message: 'The export button does nothing.'"
-        success:
-          min_words: 16
-          min_example_pairs: 2
-          any_of:
-            - ["classify", "label", "category", "categorize", "tag", "one of", "exactly one"]
-        success_response: |
-          bug
-        partial_response: >-
-          Good — you're classifying. Now add at least two worked examples in the
-          form "Input: ... -> Output: <label>" and name the allowed labels. The
-          examples teach the format better than instructions can.
-      - id: enforce-label-only
-        title: "Graded: force a single clean label"
-        goal: >-
-          Write a prompt that lists the allowed labels and forces the model to
-          reply with ONLY one of them — no explanation, no extra text.
-        starter: ""
-        success:
-          min_words: 12
-          require:
-            - ["one of", "exactly one", "only", "single label", "just the label", "no explanation", "no other text", "label only"]
-          any_of:
-            - ["positive", "negative", "neutral", "bug", "spam", "intent", "priority", "label", "category", "class"]
-        success_response: |
-          neutral
-        partial_response: >-
-          List the allowed labels explicitly and add "Reply with only the label,
-          no explanation." Without that, the model may add a sentence of reasoning
-          that breaks your parser.
+    - id: few-shot-labels
+      title: 'Graded: classify with worked examples'
+      goal: Write a prompt that classifies a support message as exactly one of a fixed set of labels (e.g.
+        bug, feature_request, question, praise) and includes at least two Input -> Output worked examples.
+      starter: 'Classify this message: ''The export button does nothing.'''
+      success:
+        min_words: 16
+        min_example_pairs: 2
+        any_of:
+        - - classify
+          - label
+          - category
+          - categorize
+          - tag
+          - one of
+          - exactly one
+      success_response: 'bug
+
+        '
+      partial_response: 'Good — you''re classifying. Now add at least two worked examples in the form
+        "Input: ... -> Output: <label>" and name the allowed labels. The examples teach the format better
+        than instructions can.'
+    - id: enforce-label-only
+      title: 'Graded: force a single clean label'
+      goal: Write a prompt that lists the allowed labels and forces the model to reply with ONLY one of
+        them — no explanation, no extra text.
+      starter: ''
+      success:
+        min_words: 12
+        require:
+        - - one of
+          - exactly one
+          - only
+          - single label
+          - just the label
+          - no explanation
+          - no other text
+          - label only
+        any_of:
+        - - positive
+          - negative
+          - neutral
+          - bug
+          - spam
+          - intent
+          - priority
+          - label
+          - category
+          - class
+      success_response: 'neutral
+
+        '
+      partial_response: List the allowed labels explicitly and add "Reply with only the label, no explanation."
+        Without that, the model may add a sentence of reasoning that breaks your parser.
+  hidden_tests:
+  - name: smoke_hidden
+    code: assert True
 hints:
-  - content: Enumerate the allowed labels and demand exactly one of them. An open-ended "categorize this" gives inconsistent categories every run.
-    cost: 10
-    order: 1
-  - content: 'Add two or three worked examples in the exact "Input: ... -> Output: <label>" shape. The model copies the pattern precisely.'
-    cost: 15
-    order: 2
-  - content: 'Try: "Classify the message as exactly one of: bug, feature_request, question, praise. Examples: ''love it'' -> praise; ''crashes on save'' -> bug. Reply with only the label."'
-    cost: 20
-    order: 3
+- order: 1
+  cost: 0
+  content: 'Where to look: Open `the solution file`, read the instructions, and run the visible tests
+    to see which assertion fails first.'
+- order: 2
+  cost: 25
+  content: 'Diagnostic steps:
+
+    1. Click Run and read the traceback — note line number and actual vs expected values.
+
+    2. Reproduce the failure with the smallest input from a visible test.
+
+    3. Compare your implementation to the bug described in the lab prompt.'
+- order: 3
+  cost: 50
+  content: 'Exact fix + verification:
+
+    1. Pass both graded exercises (the simulator re-checks your prompt server-side).
+
+    2. Re-run the lab checker (`check.sh` or Check Solution).
+
+    3. Confirm every scenario objective is satisfied.
+
+
+    WHY: the grader validates real state — marker files are ignored.'
+technology: prompt-engineering
+summary: 'Complete the practice: a few-shot classification prompt prompt engineering lab and verify success
+  with the checker'
+estimated_minutes: 30
+xp_reward: 100
+prerequisites:
+- Basic prompt engineering literacy
+tags:
+- do
+- hands-on
+- prompt-engineering
+linked_tutorial: prompt-engineering-fundamentals
+what_you_will_learn:
+- Write a classifier prompt that lists the exact allowed labels and demands one of them
+- Teach the output format with at least two worked Input -> Output examples
+- Pass both graded exercises (the simulator re-checks your prompt server-side)
+environment:
+  nodes:
+  - role: primary
+    os: FixitLab LLM practice workspace
+    hostname: lab-primary
+    ip: 127.0.0.1
+    specs: local offline simulation
+  pre_installed:
+  - bash
+  - coreutils
+  - journalctl
+  - prompt engineering
+  - systemctl
+  credentials:
+  - user: root
+    password: lab123
+tasks:
+- id: task_1
+  title: 'Practice: A Few-Shot Classification Prompt'
+  description: 'Restore healthy behavior for Practice: A Few-Shot Classification Prompt by investigating
+    the failure, applying the smallest safe fix, and validating the outcome.'
+  background: 'This prompt engineering lab teaches systematic troubleshooting: observe, hypothesize, change,
+    verify.'
+  validation:
+    type: custom_script
+    script: hidden_tests
+    error_message: One or more hidden tests failed. Read the public test output, fix your solution, and
+      submit again.
+solution:
+  summary: The solution passes all hidden tests by implementing the required behavior in code.
+  files_changed: []
+  commands_run: []
+  reference_docs: prompt-engineering-fundamentals
+guided_mode:
+  enabled: true
+  steps:
+  - step: 1
+    title: Inspect current state
+    instruction: Run a read-only diagnostic before changing anything.
+    command: check.sh
+    expected_output: Output shows the current failure mode
+    explanation: Evidence-first troubleshooting avoids guessing.
+    next_on: command_success
+  - step: 2
+    title: Apply the minimal fix
+    instruction: Make one reversible change aligned with the objectives.
+    command: '# your fix command here'
+    expected_output: State moves toward the objective
+    explanation: Small changes make rollback easy if the hypothesis was wrong.
+    next_on: command_success
+  - step: 3
+    title: Verify with the grader
+    instruction: Run the same verification the checker uses.
+    command: check.sh
+    expected_output: all hidden tests pass
+    explanation: The lab passes only when real state is healthy.
+    next_on: command_success

@@ -1,8 +1,7 @@
----
 slug: esxi-coredump-full
-title: "ESXi Coredump Partition Full — Host Warning Alarm Active"
-technology: VMware
-category: Host Management
+title: ESXi Coredump Partition Full — Host Warning Alarm Active
+technology: vmware
+category: Fix
 difficulty: easy
 time_limit: 600
 max_score: 100
@@ -11,38 +10,120 @@ simulation_type: vmware
 infrastructure_type: simulation
 jira_priority: Low
 is_free: false
-description: |
-  ESXi host esxi-01.lab.local has a persistent warning alarm: "ESXi coredump
-  partition is full." The host has generated multiple core dumps from past PSOD
-  (Purple Screen of Death) events. These core dump files are consuming the entire
-  coredump partition, preventing any future crash diagnostics from being captured.
-  Engineers must review past dumps, archive important ones, and clear the partition.
-objectives:
-  - SSH into the ESXi host and list existing coredump files
-  - Identify and archive any diagnostics not yet sent to VMware Support
-  - Remove old coredump files to clear the partition
-  - Verify the alarm clears and the partition has free space
-initial_state: |
-  VMware vCenter simulation. esxi-01 shows coredump partition full alarm.
+description: 'CONTEXT: A team operating VMware vSphere needs you to resolve `ESXi Coredump Partition Full
+  — Host Warning Alarm Active` during a realistic incident. The business impact is reduced service reliability
+  until the underlying state is repaired.
+
+
+  ENVIRONMENT: You are working in FixitLab''s offline vSphere lab with VMs, datastores, vCenter, and ESXi
+  tasks. All tools run locally; no paid APIs or external cloud calls are required.
+
+
+  SYMPTOM / STARTING STATE: VMware vCenter simulation. esxi-01 shows coredump partition full alarm.
+
   SSH access to esxi-01 available. Coredump partition at /var/core/ is full.
+
+  Multiple .gz coredump files from past PSOD events in /var/core/. ESXi host esxi-01.lab.local has a persistent
+  warning alarm: "ESXi coredump
+
+  partition is full." The host has generated multiple core dumps from past PSOD
+
+  (Purple Screen of Death) events. These core dump files are consuming the entire
+
+  coredump partition, preventing any future crash diagnostics from being captured.
+
+  Engineers must review past dumps, archive important ones, and clear the partition.
+
+
+  OBJECTIVE: SSH into the ESXi host and list existing coredump files; Identify and archive any diagnostics
+  not yet sent to VMware Support; Remove old coredump files to clear the partition. Success means `check.sh`
+  exits successfully.
+
+
+  WHAT TO AVOID: Do not apply broad destructive changes, skip evidence gathering, or fake completion with
+  marker files — the checker validates real system state.'
+objectives:
+- SSH into the ESXi host and list existing coredump files
+- Identify and archive any diagnostics not yet sent to VMware Support
+- Remove old coredump files to clear the partition
+- Verify the alarm clears and the partition has free space
+initial_state: 'VMware vCenter simulation. esxi-01 shows coredump partition full alarm.
+
+  SSH access to esxi-01 available. Coredump partition at /var/core/ is full.
+
   Multiple .gz coredump files from past PSOD events in /var/core/.
+
+  '
 hints:
-  - order: 1
-    cost: 10
-    content: "SSH to esxi-01: ssh root@esxi-01.lab.local
-      List coredumps: ls -lh /var/core/
-      Also check: esxcli system coredump partition get to see partition config
-      and: esxcli system coredump file list"
-  - order: 2
-    cost: 15
-    content: "Before deleting, copy important core dumps to a datastore for archiving:
-      cp /var/core/vmkernel-zdump.* /vmfs/volumes/datastore1/coredump-archive/
-      Then remove old files: rm /var/core/vmkernel-zdump.*
-      Keep the most recent one if a support ticket is open."
-  - order: 3
-    cost: 20
-    content: "To prevent future overflow, configure network coredump collection:
-      esxcli system coredump network set --interface-name vmk0 \
-        --server-ipv4 <netdump-server-ip> --server-port 6500
-      esxcli system coredump network set --enable true
-      This sends future core dumps to a netdump server instead of local partition."
+- order: 1
+  cost: 0
+  content: 'Where to look: SSH into the ESXi host and list existing coredump files'
+- order: 2
+  cost: 25
+  content: 'Diagnostic steps:
+
+    1. Identify and archive any diagnostics not yet sent to VMware Support
+
+    2. Remove old coredump files to clear the partition
+
+    3. Verify the alarm clears and the partition has free space'
+- order: 3
+  cost: 50
+  content: 'Exact fix + verification:
+
+    1. Verify the alarm clears and the partition has free space.
+
+    2. Re-run the lab checker (`check.sh` or Check Solution).
+
+    3. Confirm every scenario objective is satisfied.
+
+
+    WHY: the grader validates real state — marker files are ignored.'
+summary: Complete the esxi coredump partition full — host warning alarm active vmware lab and verify success
+  with the checker
+estimated_minutes: 10
+xp_reward: 100
+prerequisites:
+- Basic vmware literacy
+tags:
+- fix
+- hands-on
+- vmware
+linked_tutorial: vmware-fundamentals
+what_you_will_learn:
+- SSH into the ESXi host and list existing coredump files
+- Identify and archive any diagnostics not yet sent to VMware Support
+- Remove old coredump files to clear the partition
+- Verify the alarm clears and the partition has free space
+environment:
+  nodes:
+  - role: primary
+    os: FixitLab vSphere lab
+    hostname: lab-primary
+    ip: 127.0.0.1
+    specs: local offline simulation
+  pre_installed:
+  - bash
+  - coreutils
+  - journalctl
+  - systemctl
+  - vmware
+  credentials:
+  - user: root
+    password: lab123
+tasks:
+- id: task_1
+  title: ESXi Coredump Partition Full — Host Warning Alarm Active
+  description: Restore healthy behavior for ESXi Coredump Partition Full — Host Warning Alarm Active by
+    investigating the failure, applying the smallest safe fix, and validating the outcome.
+  background: 'This vmware lab teaches systematic troubleshooting: observe, hypothesize, change, verify.'
+  validation:
+    type: custom_script
+    script: check.sh
+    error_message: Validation did not pass. Re-read the objectives and Hint 2 diagnostic steps.
+solution:
+  summary: Identify the misconfiguration affecting this vmware lab and apply the minimal fix.
+  files_changed: []
+  commands_run:
+  - bash check.sh
+  reference_docs: vmware-fundamentals

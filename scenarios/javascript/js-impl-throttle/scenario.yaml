@@ -1,9 +1,26 @@
 title: Implement throttle (Leading Edge)
 slug: js-impl-throttle
-category: JavaScript Development
-description: 'Implement throttle(fn, interval): return a function that calls fn immediately on the first
-  invocation, then ignores further calls until `interval` ms have elapsed (leading-edge throttling). Use
-  setTimeout to re-open the gate. The stub is empty so tests fail.'
+category: Build
+description: 'CONTEXT: A team operating JavaScript needs you to resolve `Implement throttle (Leading Edge)`
+  during a realistic incident. The business impact is reduced service reliability until the underlying
+  state is repaired.
+
+
+  ENVIRONMENT: You are working in FixitLab''s offline JavaScript practice project with modules, browser
+  console, and Node tooling. All tools run locally; no paid APIs or external cloud calls are required.
+
+
+  SYMPTOM / STARTING STATE: Implement throttle(fn, interval): return a function that calls fn immediately
+  on the first invocation, then ignores further calls until `interval` ms have elapsed (leading-edge throttling).
+  Use setTimeout to re-open the gate. The stub is empty so tests fail.
+
+
+  OBJECTIVE: Call fn immediately on the leading edge; Block calls during the cooldown window; Re-open
+  after `interval` ms via setTimeout. Success means all hidden tests pass.
+
+
+  WHAT TO AVOID: Do not apply broad destructive changes, skip evidence gathering, or fake completion with
+  marker files — the checker validates real system state.'
 difficulty: hard
 scenario_type: do
 lab_mode: simulation
@@ -21,86 +38,150 @@ objectives:
 initial_state: 'Implement throttle(fn, interval): return a function that calls fn immediately on the first
   invocation, then ignores further calls until `interval` ms have elapsed (leading-edge throttling). Use
   setTimeout to re-open the gate. The stub is empty so tests fail.'
-solution_explanation: |
-  A closure flag gates calls: the first call runs fn and sets the flag; subsequent calls return until a setTimeout clears the flag after `interval` ms, implementing leading-edge throttling.
+solution_explanation: 'A closure flag gates calls: the first call runs fn and sets the flag; subsequent
+  calls return until a setTimeout clears the flag after `interval` ms, implementing leading-edge throttling.
+
+  '
 coding_spec:
   language: javascript
   entrypoint: solution.js
   kind: impl
-  instructions: |
-    Implement throttle(fn, interval) -> throttled function. The first call runs fn right away; calls during the next `interval` ms are dropped; after the window the next call runs again.
+  instructions: 'Implement throttle(fn, interval) -> throttled function. The first call runs fn right
+    away; calls during the next `interval` ms are dropped; after the window the next call runs again.
+
     Use the global setTimeout.
+
     Click Run to try it, then Check Solution to grade against all tests.
+
+    '
   files:
   - path: solution.js
-    content: |
-      function throttle(fn, interval) {
-        // TODO: run fn on the leading edge, then ignore calls for `interval` ms
-      }
+    content: "function throttle(fn, interval) {\n  // TODO: run fn on the leading edge, then ignore calls\
+      \ for `interval` ms\n}\n"
     readonly: false
   visible_tests:
   - name: fires immediately, then blocks
-    code: |
-      const _oST=globalThis.setTimeout;let _q=[];
-      globalThis.setTimeout=(cb)=>{_q.push(cb);return {};};
-      const flush=()=>{const live=_q.slice();_q=[];live.forEach(cb=>cb());};
-      try {
-        let calls=0; const t=throttle(()=>{calls++;},100);
-        t(); t(); t();
-        assert(calls===1,'leading call only, got '+calls);
-        flush();
-        t();
-        assert(calls===2,'fires again after window, got '+calls);
-      } finally { globalThis.setTimeout=_oST; }
+    code: "const _oST=globalThis.setTimeout;let _q=[];\nglobalThis.setTimeout=(cb)=>{_q.push(cb);return\
+      \ {};};\nconst flush=()=>{const live=_q.slice();_q=[];live.forEach(cb=>cb());};\ntry {\n  let calls=0;\
+      \ const t=throttle(()=>{calls++;},100);\n  t(); t(); t();\n  assert(calls===1,'leading call only,\
+      \ got '+calls);\n  flush();\n  t();\n  assert(calls===2,'fires again after window, got '+calls);\n\
+      } finally { globalThis.setTimeout=_oST; }\n"
   - name: returns a function
-    code: |
-      assert(typeof throttle(()=>{},10)==='function');
+    code: 'assert(typeof throttle(()=>{},10)===''function'');
+
+      '
   hidden_tests:
   - name: first arg used on leading call
-    code: |
-      const _oST=globalThis.setTimeout;let _q=[];
-      globalThis.setTimeout=(cb)=>{_q.push(cb);return {};};
-      try {
-        let seen=null; const t=throttle((x)=>{seen=x;},50);
-        t('a'); t('b');
-        assert(seen==='a','leading arg should be a, got '+seen);
-      } finally { globalThis.setTimeout=_oST; }
+    code: "const _oST=globalThis.setTimeout;let _q=[];\nglobalThis.setTimeout=(cb)=>{_q.push(cb);return\
+      \ {};};\ntry {\n  let seen=null; const t=throttle((x)=>{seen=x;},50);\n  t('a'); t('b');\n  assert(seen==='a','leading\
+      \ arg should be a, got '+seen);\n} finally { globalThis.setTimeout=_oST; }\n"
   - name: blocks every call within the window
-    code: |
-      const _oST=globalThis.setTimeout;let _q=[];
-      globalThis.setTimeout=(cb)=>{_q.push(cb);return {};};
-      try {
-        let calls=0; const t=throttle(()=>{calls++;},100);
-        for (let i=0;i<10;i++) t();
-        assert(calls===1,'only one call in window, got '+calls);
-      } finally { globalThis.setTimeout=_oST; }
+    code: "const _oST=globalThis.setTimeout;let _q=[];\nglobalThis.setTimeout=(cb)=>{_q.push(cb);return\
+      \ {};};\ntry {\n  let calls=0; const t=throttle(()=>{calls++;},100);\n  for (let i=0;i<10;i++) t();\n\
+      \  assert(calls===1,'only one call in window, got '+calls);\n} finally { globalThis.setTimeout=_oST;\
+      \ }\n"
   - name: multiple windows
-    code: |
-      const _oST=globalThis.setTimeout;let _q=[];
-      globalThis.setTimeout=(cb)=>{_q.push(cb);return {};};
-      const flush=()=>{const live=_q.slice();_q=[];live.forEach(cb=>cb());};
-      try {
-        let calls=0; const t=throttle(()=>{calls++;},10);
-        t(); flush(); t(); flush(); t();
-        assert(calls===3,'expected 3 across windows, got '+calls);
-      } finally { globalThis.setTimeout=_oST; }
+    code: "const _oST=globalThis.setTimeout;let _q=[];\nglobalThis.setTimeout=(cb)=>{_q.push(cb);return\
+      \ {};};\nconst flush=()=>{const live=_q.slice();_q=[];live.forEach(cb=>cb());};\ntry {\n  let calls=0;\
+      \ const t=throttle(()=>{calls++;},10);\n  t(); flush(); t(); flush(); t();\n  assert(calls===3,'expected\
+      \ 3 across windows, got '+calls);\n} finally { globalThis.setTimeout=_oST; }\n"
   - name: forwards multiple args on leading call
-    code: |
-      const _oST=globalThis.setTimeout;let _q=[];
-      globalThis.setTimeout=(cb)=>{_q.push(cb);return {};};
-      try {
-        let sum=0; const t=throttle((a,b)=>{sum=a+b;},10);
-        t(4,5); t(1,1);
-        assert(sum===9,'expected 9 from leading call, got '+sum);
-      } finally { globalThis.setTimeout=_oST; }
+    code: "const _oST=globalThis.setTimeout;let _q=[];\nglobalThis.setTimeout=(cb)=>{_q.push(cb);return\
+      \ {};};\ntry {\n  let sum=0; const t=throttle((a,b)=>{sum=a+b;},10);\n  t(4,5); t(1,1);\n  assert(sum===9,'expected\
+      \ 9 from leading call, got '+sum);\n} finally { globalThis.setTimeout=_oST; }\n"
   timeout: 8
 hints:
 - order: 1
-  cost: 10
-  content: Track a `blocked` flag in a closure.
+  cost: 0
+  content: 'Where to look: Open `solution.js`, read the instructions, and run the visible tests to see
+    which assertion fails first.'
 - order: 2
-  cost: 20
-  content: If blocked, return early; otherwise set blocked, call fn, and schedule clearing the flag.
+  cost: 25
+  content: 'Diagnostic steps:
+
+    1. Block calls during the cooldown window
+
+    2. Re-open after `interval` ms via setTimeout'
 - order: 3
-  cost: 30
-  content: Use setTimeout(() => { blocked = false; }, interval) to re-open the gate.
+  cost: 50
+  content: 'Exact fix + verification:
+
+    1. Re-open after `interval` ms via setTimeout.
+
+    2. Re-run the lab checker (`check.sh` or Check Solution).
+
+    3. Confirm every scenario objective is satisfied.
+
+
+    WHY: the grader validates real state — marker files are ignored.'
+technology: javascript
+summary: Complete the implement throttle (leading edge) javascript lab and verify success with the checker
+estimated_minutes: 25
+xp_reward: 100
+prerequisites:
+- Basic javascript literacy
+tags:
+- do
+- hands-on
+- javascript
+linked_tutorial: javascript-fundamentals
+what_you_will_learn:
+- Call fn immediately on the leading edge
+- Block calls during the cooldown window
+- Re-open after `interval` ms via setTimeout
+environment:
+  nodes:
+  - role: primary
+    os: FixitLab JavaScript practice project
+    hostname: lab-primary
+    ip: 127.0.0.1
+    specs: local offline simulation
+  pre_installed:
+  - bash
+  - coreutils
+  - javascript
+  - journalctl
+  - systemctl
+  credentials:
+  - user: root
+    password: lab123
+tasks:
+- id: task_1
+  title: Implement throttle (Leading Edge)
+  description: Restore healthy behavior for Implement throttle (Leading Edge) by investigating the failure,
+    applying the smallest safe fix, and validating the outcome.
+  background: 'This javascript lab teaches systematic troubleshooting: observe, hypothesize, change, verify.'
+  validation:
+    type: custom_script
+    script: hidden_tests
+    error_message: One or more hidden tests failed. Read the public test output, fix your solution, and
+      submit again.
+solution:
+  summary: The solution passes all hidden tests by implementing the required behavior in code.
+  files_changed: []
+  commands_run: []
+  reference_docs: javascript-fundamentals
+guided_mode:
+  enabled: true
+  steps:
+  - step: 1
+    title: Inspect current state
+    instruction: Run a read-only diagnostic before changing anything.
+    command: check.sh
+    expected_output: Output shows the current failure mode
+    explanation: Evidence-first troubleshooting avoids guessing.
+    next_on: command_success
+  - step: 2
+    title: Apply the minimal fix
+    instruction: Make one reversible change aligned with the objectives.
+    command: '# your fix command here'
+    expected_output: State moves toward the objective
+    explanation: Small changes make rollback easy if the hypothesis was wrong.
+    next_on: command_success
+  - step: 3
+    title: Verify with the grader
+    instruction: Run the same verification the checker uses.
+    command: check.sh
+    expected_output: all hidden tests pass
+    explanation: The lab passes only when real state is healthy.
+    next_on: command_success

@@ -1,11 +1,29 @@
 title: TF-IDF Term Scoring
 slug: aiml-tfidf-scoring
 technology: ai-ml
-category: AI / ML / LLM & Agents
-description: Bag-of-words counts treat every word equally, so common words like "the" drown out the
-  ones that actually distinguish a document. TF-IDF fixes that by weighting each term's frequency in
-  a document against how rare it is across the whole corpus. Implement it from scratch with stdlib
+category: Build
+description: 'CONTEXT: A team operating AI/ML workflows needs you to resolve `TF-IDF Term Scoring` during
+  a realistic incident. The business impact is reduced service reliability until the underlying state
+  is repaired.
+
+
+  ENVIRONMENT: You are working in FixitLab''s offline ML practice workspace with datasets, training scripts,
+  metrics, and model artifacts. All tools run locally; no paid APIs or external cloud calls are required.
+
+
+  SYMPTOM / STARTING STATE: Bag-of-words counts treat every word equally, so common words like "the" drown
+  out the ones that actually distinguish a document. TF-IDF fixes that by weighting each term''s frequency
+  in a document against how rare it is across the whole corpus. Implement it from scratch with stdlib
   math so common terms get pushed toward zero and distinctive terms float to the top.
+
+
+  OBJECTIVE: Compute term frequency (TF) within a single document; Compute inverse document frequency
+  (IDF) across the corpus with smoothing; Combine them into a per-term TF-IDF score for one document.
+  Success means all hidden tests pass.
+
+
+  WHAT TO AVOID: Do not apply broad destructive changes, skip evidence gathering, or fake completion with
+  marker files — the checker validates real system state.'
 difficulty: medium
 scenario_type: do
 lab_mode: simulation
@@ -21,106 +39,221 @@ objectives:
 - Compute inverse document frequency (IDF) across the corpus with smoothing
 - Combine them into a per-term TF-IDF score for one document
 initial_state: Bag-of-words counts treat every word equally, so common words like "the" drown out the
-  ones that actually distinguish a document. TF-IDF fixes that by weighting each term's frequency in
-  a document against how rare it is across the whole corpus. Implement it from scratch with stdlib
-  math so common terms get pushed toward zero and distinctive terms float to the top.
-solution_explanation: |
-  TF is the count of a term in the document divided by the document's total token count. IDF uses the
+  ones that actually distinguish a document. TF-IDF fixes that by weighting each term's frequency in a
+  document against how rare it is across the whole corpus. Implement it from scratch with stdlib math
+  so common terms get pushed toward zero and distinctive terms float to the top.
+solution_explanation: 'TF is the count of a term in the document divided by the document''s total token
+  count. IDF uses the
+
   smoothed form log((1 + N) / (1 + df)) + 1, where N is the number of documents and df is how many
+
   documents contain the term — the +1 smoothing avoids division by zero and a log of zero, and the
+
   trailing +1 keeps even ubiquitous terms slightly positive. tfidf multiplies TF by IDF for each term
+
   in the chosen document. A term that appears in every document gets the smallest IDF, so common
+
   words are down-weighted while rare, distinctive words score highest.
+
+  '
 coding_spec:
   language: python
   entrypoint: solution.py
   kind: impl
-  instructions: |
-    Each document is a list of tokens. Implement three functions (import math allowed):
-      term_frequency(doc) -> dict[str, float]: count(term) / len(doc) for each term. Empty doc -> {}.
-      inverse_document_frequency(corpus) -> dict[str, float]: for every term anywhere in the corpus,
-        idf = log((1 + N) / (1 + df)) + 1, where N = number of documents and df = number of documents
-        containing the term. Use math.log (natural log).
-      tfidf(doc, corpus) -> dict[str, float]: tf(term) * idf(term) for each term in doc, where idf is
-        taken from inverse_document_frequency(corpus).
-    Click Run to try it, then Check Solution to grade against all tests.
+  instructions: "Each document is a list of tokens. Implement three functions (import math allowed):\n\
+    \  term_frequency(doc) -> dict[str, float]: count(term) / len(doc) for each term. Empty doc -> {}.\n\
+    \  inverse_document_frequency(corpus) -> dict[str, float]: for every term anywhere in the corpus,\n\
+    \    idf = log((1 + N) / (1 + df)) + 1, where N = number of documents and df = number of documents\n\
+    \    containing the term. Use math.log (natural log).\n  tfidf(doc, corpus) -> dict[str, float]: tf(term)\
+    \ * idf(term) for each term in doc, where idf is\n    taken from inverse_document_frequency(corpus).\n\
+    Click Run to try it, then Check Solution to grade against all tests.\n"
   files:
   - path: solution.py
-    content: |
-      import math
-
-      def term_frequency(doc):
-          # TODO: count(term) / len(doc) for each distinct term.
-          pass
-
-      def inverse_document_frequency(corpus):
-          # TODO: log((1 + N) / (1 + df)) + 1 for each term seen in the corpus.
-          pass
-
-      def tfidf(doc, corpus):
-          # TODO: tf(term) * idf(term) for each term in doc.
-          pass
+    content: "import math\n\ndef term_frequency(doc):\n    # TODO: count(term) / len(doc) for each distinct\
+      \ term.\n    pass\n\ndef inverse_document_frequency(corpus):\n    # TODO: log((1 + N) / (1 + df))\
+      \ + 1 for each term seen in the corpus.\n    pass\n\ndef tfidf(doc, corpus):\n    # TODO: tf(term)\
+      \ * idf(term) for each term in doc.\n    pass\n"
     readonly: false
   visible_tests:
   - name: term frequency normalizes by length
-    code: |
-      import math
+    code: 'import math
+
       tf = term_frequency(["a", "a", "b", "c"])
+
       assert math.isclose(tf["a"], 0.5, rel_tol=1e-9), tf
+
       assert math.isclose(tf["b"], 0.25, rel_tol=1e-9), tf
+
       assert math.isclose(tf["c"], 0.25, rel_tol=1e-9), tf
+
+      '
   - name: common term has lower idf than rare term
-    code: |
-      corpus = [["a", "b"], ["a", "c"], ["a", "d"]]
+    code: 'corpus = [["a", "b"], ["a", "c"], ["a", "d"]]
+
       idf = inverse_document_frequency(corpus)
-      # 'a' is in every doc, 'b' in only one -> idf(a) < idf(b)
+
+      # ''a'' is in every doc, ''b'' in only one -> idf(a) < idf(b)
+
       assert idf["a"] < idf["b"], idf
+
+      '
   hidden_tests:
   - name: empty document has no term frequencies
-    code: |
-      assert term_frequency([]) == {}, term_frequency([])
+    code: 'assert term_frequency([]) == {}, term_frequency([])
+
+      '
   - name: idf exact smoothed value
-    code: |
-      import math
+    code: 'import math
+
       corpus = [["a", "b"], ["a", "c"], ["a", "d"]]
+
       idf = inverse_document_frequency(corpus)
-      # N=3. 'a' df=3 -> log(4/4)+1 = 1.0 ; 'b' df=1 -> log(4/2)+1
+
+      # N=3. ''a'' df=3 -> log(4/4)+1 = 1.0 ; ''b'' df=1 -> log(4/2)+1
+
       assert math.isclose(idf["a"], 1.0, rel_tol=1e-9), idf
+
       assert math.isclose(idf["b"], math.log(4 / 2) + 1, rel_tol=1e-9), idf
+
+      '
   - name: tfidf combines tf and idf
-    code: |
-      import math
+    code: 'import math
+
       corpus = [["a", "b"], ["a", "c"], ["a", "d"]]
+
       doc = ["a", "b"]
+
       scores = tfidf(doc, corpus)
+
       idf = inverse_document_frequency(corpus)
+
       assert math.isclose(scores["a"], 0.5 * idf["a"], rel_tol=1e-9), scores
+
       assert math.isclose(scores["b"], 0.5 * idf["b"], rel_tol=1e-9), scores
+
+      '
   - name: distinctive term outranks common term in same doc
-    code: |
-      corpus = [["the", "cat"], ["the", "dog"], ["the", "fish"]]
+    code: 'corpus = [["the", "cat"], ["the", "dog"], ["the", "fish"]]
+
       scores = tfidf(["the", "cat"], corpus)
+
       assert scores["cat"] > scores["the"], scores
+
+      '
   - name: idf covers every corpus term
-    code: |
-      corpus = [["x"], ["y"], ["z"]]
+    code: 'corpus = [["x"], ["y"], ["z"]]
+
       idf = inverse_document_frequency(corpus)
+
       assert set(idf.keys()) == {"x", "y", "z"}, idf
+
+      '
   - name: repeated term in doc counts once per document for df
-    code: |
-      import math
-      # 'a' appears twice in doc 0 but df should still be 1 (one document)
+    code: 'import math
+
+      # ''a'' appears twice in doc 0 but df should still be 1 (one document)
+
       corpus = [["a", "a"], ["b"]]
+
       idf = inverse_document_frequency(corpus)
+
       assert math.isclose(idf["a"], math.log((1 + 2) / (1 + 1)) + 1, rel_tol=1e-9), idf
+
+      '
   timeout: 8
 hints:
 - order: 1
-  cost: 10
-  content: term_frequency just divides each term's count by len(doc). collections.Counter makes the counting easy; guard against an empty doc so you do not divide by zero.
+  cost: 0
+  content: 'Where to look: Open `solution.py`, read the instructions, and run the visible tests to see
+    which assertion fails first.'
 - order: 2
-  cost: 20
-  content: For df, count how many DOCUMENTS contain the term (use set(doc) per document so a repeat in one doc only counts once). N is len(corpus).
+  cost: 25
+  content: 'Diagnostic steps:
+
+    1. Click Run and read the traceback — note line number and actual vs expected values.
+
+    2. Reproduce the failure with the smallest input from a visible test.
+
+    3. Compare your implementation to the bug described in the lab prompt.'
 - order: 3
-  cost: 30
-  content: 'idf = math.log((1 + N) / (1 + df)) + 1. Then tfidf(doc, corpus) multiplies term_frequency(doc)[t] by idf[t] for each term t in the doc.'
+  cost: 50
+  content: 'Exact fix + verification:
+
+    1. Combine them into a per-term TF-IDF score for one document.
+
+    2. Re-run the lab checker (`check.sh` or Check Solution).
+
+    3. Confirm every scenario objective is satisfied.
+
+
+    WHY: the grader validates real state — marker files are ignored.'
+summary: Complete the tf-idf term scoring ai ml lab and verify success with the checker
+estimated_minutes: 25
+xp_reward: 100
+prerequisites:
+- Basic ai ml literacy
+tags:
+- ai-ml
+- do
+- hands-on
+linked_tutorial: ai-ml-fundamentals
+what_you_will_learn:
+- Compute term frequency (TF) within a single document
+- Compute inverse document frequency (IDF) across the corpus with smoothing
+- Combine them into a per-term TF-IDF score for one document
+environment:
+  nodes:
+  - role: primary
+    os: FixitLab ML practice workspace
+    hostname: lab-primary
+    ip: 127.0.0.1
+    specs: local offline simulation
+  pre_installed:
+  - ai ml
+  - bash
+  - coreutils
+  - pip
+  - python3
+  credentials:
+  - user: root
+    password: lab123
+tasks:
+- id: task_1
+  title: TF-IDF Term Scoring
+  description: Restore healthy behavior for TF-IDF Term Scoring by investigating the failure, applying
+    the smallest safe fix, and validating the outcome.
+  background: 'This ai ml lab teaches systematic troubleshooting: observe, hypothesize, change, verify.'
+  validation:
+    type: custom_script
+    script: hidden_tests
+    error_message: One or more hidden tests failed. Read the public test output, fix your solution, and
+      submit again.
+solution:
+  summary: The solution passes all hidden tests by implementing the required behavior in code.
+  files_changed: []
+  commands_run: []
+  reference_docs: ai-ml-fundamentals
+guided_mode:
+  enabled: true
+  steps:
+  - step: 1
+    title: Inspect current state
+    instruction: Run a read-only diagnostic before changing anything.
+    command: check.sh
+    expected_output: Output shows the current failure mode
+    explanation: Evidence-first troubleshooting avoids guessing.
+    next_on: command_success
+  - step: 2
+    title: Apply the minimal fix
+    instruction: Make one reversible change aligned with the objectives.
+    command: '# your fix command here'
+    expected_output: State moves toward the objective
+    explanation: Small changes make rollback easy if the hypothesis was wrong.
+    next_on: command_success
+  - step: 3
+    title: Verify with the grader
+    instruction: Run the same verification the checker uses.
+    command: check.sh
+    expected_output: all hidden tests pass
+    explanation: The lab passes only when real state is healthy.
+    next_on: command_success

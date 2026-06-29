@@ -1,8 +1,25 @@
 title: 'Log Analysis: Fix the TypeError on len(None)'
 slug: py-logfix-typeerror-none-len
-category: Python Development
-description: 'The log shows `TypeError: object of type ''NoneType'' has no len()` from count_items() because
-  the argument can be None. Treat None as an empty collection (count 0) without crashing.'
+category: Fix
+description: 'CONTEXT: A team operating Python development needs you to resolve `Log Analysis: Fix the
+  TypeError on len(None)` during a realistic incident. The business impact is reduced service reliability
+  until the underlying state is repaired.
+
+
+  ENVIRONMENT: You are working in FixitLab''s offline Python project workspace with source files, venv,
+  tests, and CLI entrypoints. All tools run locally; no paid APIs or external cloud calls are required.
+
+
+  SYMPTOM / STARTING STATE: The log shows `TypeError: object of type ''NoneType'' has no len()` from count_items()
+  because the argument can be None. Treat None as an empty collection (count 0) without crashing.
+
+
+  OBJECTIVE: Identify the None-length crash from the log; Guard the None case; Return 0 for None, the
+  length otherwise. Success means all hidden tests pass.
+
+
+  WHAT TO AVOID: Do not apply broad destructive changes, skip evidence gathering, or fake completion with
+  marker files — the checker validates real system state.'
 difficulty: easy
 scenario_type: fix
 lab_mode: simulation
@@ -19,53 +36,124 @@ objectives:
 - Return 0 for None, the length otherwise
 initial_state: 'The log shows `TypeError: object of type ''NoneType'' has no len()` from count_items()
   because the argument can be None. Treat None as an empty collection (count 0) without crashing.'
-solution_explanation: |
-  len() requires a sized object. Guarding None and returning 0 prevents the TypeError while preserving normal length behavior.
+solution_explanation: 'len() requires a sized object. Guarding None and returning 0 prevents the TypeError
+  while preserving normal length behavior.
+
+  '
 coding_spec:
   language: python
   entrypoint: solution.py
   kind: logfix
-  instructions: |
-    Fix count_items(items) so it returns len(items), but returns 0 when items is None. The log shows it crashes on None.
+  instructions: 'Fix count_items(items) so it returns len(items), but returns 0 when items is None. The
+    log shows it crashes on None.
+
     Click Run to try it, then Check Solution to grade against all tests.
+
+    '
   files:
   - path: solution.py
-    content: |
-      # Production log:
-      #   TypeError: object of type 'NoneType' has no len()
-      #     at count_items(items) -> return len(items)
-
-      def count_items(items):
-          return len(items)   # crashes when items is None
+    content: "# Production log:\n#   TypeError: object of type 'NoneType' has no len()\n#     at count_items(items)\
+      \ -> return len(items)\n\ndef count_items(items):\n    return len(items)   # crashes when items\
+      \ is None\n"
     readonly: false
   visible_tests:
   - name: list length
-    code: |
-      assert count_items([1, 2, 3]) == 3
+    code: 'assert count_items([1, 2, 3]) == 3
+
+      '
   - name: none is zero
-    code: |
-      assert count_items(None) == 0
+    code: 'assert count_items(None) == 0
+
+      '
   hidden_tests:
   - name: empty list
-    code: |
-      assert count_items([]) == 0
+    code: 'assert count_items([]) == 0
+
+      '
   - name: string length
-    code: |
-      assert count_items('abc') == 3
+    code: 'assert count_items(''abc'') == 3
+
+      '
   - name: dict length
-    code: |
-      assert count_items({'a': 1}) == 1
+    code: 'assert count_items({''a'': 1}) == 1
+
+      '
   - name: none does not raise
-    code: |
-      assert count_items(None) == 0
+    code: 'assert count_items(None) == 0
+
+      '
   timeout: 8
 hints:
 - order: 1
-  cost: 10
-  content: The log says len(None) is the problem.
+  cost: 0
+  content: 'Where to look: Open `solution.py`, read the instructions, and run the visible tests to see
+    which assertion fails first.'
 - order: 2
-  cost: 20
-  content: Check `if items is None` before calling len.
+  cost: 25
+  content: 'Diagnostic steps:
+
+    1. Click Run and read the traceback — note line number and actual vs expected values.
+
+    2. Reproduce the failure with the smallest input from a visible test.
+
+    3. Compare your implementation to the bug described in the lab prompt.'
 - order: 3
-  cost: 30
-  content: Return 0 for None, otherwise len(items).
+  cost: 50
+  content: 'Exact fix + verification:
+
+    1. Return 0 for None, the length otherwise.
+
+    2. Re-run the lab checker (`check.sh` or Check Solution).
+
+    3. Confirm every scenario objective is satisfied.
+
+
+    WHY: the grader validates real state — marker files are ignored.'
+technology: python
+summary: 'Complete the log analysis: fix the typeerror on len(none) python lab and verify success with
+  the checker'
+estimated_minutes: 25
+xp_reward: 100
+prerequisites:
+- Basic python literacy
+tags:
+- fix
+- hands-on
+- python
+linked_tutorial: python-fundamentals
+what_you_will_learn:
+- Identify the None-length crash from the log
+- Guard the None case
+- Return 0 for None, the length otherwise
+environment:
+  nodes:
+  - role: primary
+    os: FixitLab Python project workspace
+    hostname: lab-primary
+    ip: 127.0.0.1
+    specs: local offline simulation
+  pre_installed:
+  - bash
+  - coreutils
+  - pip
+  - python
+  - python3
+  credentials:
+  - user: root
+    password: lab123
+tasks:
+- id: task_1
+  title: 'Log Analysis: Fix the TypeError on len(None)'
+  description: 'Restore healthy behavior for Log Analysis: Fix the TypeError on len(None) by investigating
+    the failure, applying the smallest safe fix, and validating the outcome.'
+  background: 'This python lab teaches systematic troubleshooting: observe, hypothesize, change, verify.'
+  validation:
+    type: custom_script
+    script: hidden_tests
+    error_message: One or more hidden tests failed. Read the public test output, fix your solution, and
+      submit again.
+solution:
+  summary: The solution passes all hidden tests by implementing the required behavior in code.
+  files_changed: []
+  commands_run: []
+  reference_docs: python-fundamentals

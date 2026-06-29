@@ -1,7 +1,7 @@
-title: 'Grafana Observability: Authentication — Observability Practice'
+title: Authentication — Observability Lab
 slug: academy-grafana-048-observability-auth-5
-technology: Grafana Observability
-category: Observability
+technology: grafana
+category: Optimize
 difficulty: medium
 scenario_type: do
 lab_mode: simulation
@@ -11,42 +11,129 @@ max_score: 100
 is_free: false
 infrastructure_type: docker
 jira_priority: Medium
-description: Service operations lab. The `rsyslog` systemd unit is **failed/inactive** on this host —
-  a realistic fault for Observability Practice workflows that depend on it. Diagnose with `systemctl status
-  rsyslog` and journal logs, apply the smallest reliable fix, then verify with `systemctl is-active rsyslog`.
+description: 'CONTEXT: A team operating Grafana observability needs you to resolve `grafana: Authentication
+  — Observability Practice` during a realistic incident. The business impact is reduced service reliability
+  until the underlying state is repaired.
+
+
+  ENVIRONMENT: You are working in FixitLab''s offline Grafana stack with dashboards, datasources, alerts,
+  and provisioning YAML. All tools run locally; no paid APIs or external cloud calls are required.
+
+
+  SYMPTOM / STARTING STATE: The system runs, but authentication lacks useful telemetry. Dashboards/alerts
+  are blank or noisy — improve signal quality. Observability task: make authentication visible in logs,
+  metrics, or traces. On-call should answer ''what is broken?'' quickly using signals from users, orgs,
+  and SSO.
+
+
+  OBJECTIVE: Day-2 authentication work completes safely in this environment; Changes are verified with
+  before/after checks; The system remains stable for dependent teams. Success means `systemctl is-active
+  rsyslog` returns active.
+
+
+  WHAT TO AVOID: Do not apply broad destructive changes, skip evidence gathering, or fake completion with
+  marker files — the checker validates real system state.'
 objectives:
-- The `rsyslog` service is active (running)
-- '`systemctl is-active rsyslog` returns active'
-- The fix survives a status re-check (no marker files)
-initial_state: The `rsyslog` service is not running (`systemctl is-active rsyslog` → inactive/failed).
-  Dependent Observability Practice tasks cannot succeed until the unit is healthy again.
+- Day-2 authentication work completes safely in this environment
+- Changes are verified with before/after checks
+- The system remains stable for dependent teams
+initial_state: The system runs, but authentication lacks useful telemetry. Dashboards/alerts are blank
+  or noisy — improve signal quality.
 hints:
 - order: 1
-  cost: 10
-  content: 'Orient yourself before changing anything:
-
-    1. Inspect the current state — auth config and login flow.
-
-    2. Write down what looks normal versus wrong or missing for authentication.
-
-    3. Recall the core idea: users, orgs, and SSO. Form one hypothesis before you act.'
+  cost: 0
+  content: 'Where to look: Start with `systemctl status rsyslog` and `journalctl -u rsyslog -n 50 --no-pager`
+    before changing anything.'
 - order: 2
-  cost: 15
-  content: 'Plan your approach (still no spoilers):
-
-    1. Confirm the exact gap between current and desired state for authentication.
-
-    2. Decide the single smallest change that moves you toward the objective.
-
-    3. Capture evidence (command output / status) before the change so you can prove it worked afterward.'
-- order: 3
   cost: 25
-  content: 'Guided walkthrough:
+  content: 'Diagnostic steps:
 
-    1. Re-check the current state — auth config and login flow.
+    1. Run `systemctl status rsyslog` — note Active/Failed and the last log lines.
 
-    2. Add or fix the exporter / dashboard / alert with clear names, labels, and a sensible threshold.
+    2. Read `journalctl -u rsyslog -n 50` for the root error.
 
-    3. Verify the result — auth works with correct permissions.
+    3. Form a hypothesis about the smallest config or permission fix.'
+- order: 3
+  cost: 50
+  content: 'Exact fix + verification:
 
-    4. Click Check Solution once `systemctl is-active rsyslog` returns active.'
+    1. Apply the minimal fix (config, unit override, or missing directory).
+
+    2. Run `systemctl daemon-reload` if you edited a unit file.
+
+    3. Run `systemctl restart rsyslog` and confirm `systemctl is-active rsyslog` succeeds.
+
+
+    WHY: the grader checks real service state, not marker files.'
+summary: Complete the authentication — observability lab grafana lab and verify success with the checker
+estimated_minutes: 20
+xp_reward: 100
+prerequisites:
+- Basic grafana literacy
+tags:
+- do
+- grafana
+- hands-on
+linked_tutorial: grafana-fundamentals
+what_you_will_learn:
+- Day-2 authentication work completes safely in this environment
+- Changes are verified with before/after checks
+- The system remains stable for dependent teams
+environment:
+  nodes:
+  - role: primary
+    os: FixitLab Grafana stack
+    hostname: lab-primary
+    ip: 127.0.0.1
+    specs: local offline simulation
+  pre_installed:
+  - bash
+  - coreutils
+  - grafana
+  - journalctl
+  - systemctl
+  credentials:
+  - user: root
+    password: lab123
+tasks:
+- id: task_1
+  title: Authentication — Observability Lab
+  description: Restore healthy behavior for Authentication — Observability Lab by investigating the failure,
+    applying the smallest safe fix, and validating the outcome.
+  background: 'This grafana lab teaches systematic troubleshooting: observe, hypothesize, change, verify.'
+  validation:
+    type: service_active
+    command: systemctl is-active rsyslog
+    expected_status: active
+    error_message: The rsyslog service is not active yet. Check `systemctl status rsyslog` and `journalctl
+      -u rsyslog -n 50`.
+solution:
+  summary: The root cause is an unhealthy `rsyslog` service; repair it and verify active state.
+  files_changed: []
+  commands_run:
+  - systemctl is-active rsyslog
+  reference_docs: grafana-fundamentals
+guided_mode:
+  enabled: true
+  steps:
+  - step: 1
+    title: Inspect current state
+    instruction: Run a read-only diagnostic before changing anything.
+    command: systemctl is-active rsyslog
+    expected_output: Output shows the current failure mode
+    explanation: Evidence-first troubleshooting avoids guessing.
+    next_on: command_success
+  - step: 2
+    title: Apply the minimal fix
+    instruction: Make one reversible change aligned with the objectives.
+    command: '# your fix command here'
+    expected_output: State moves toward the objective
+    explanation: Small changes make rollback easy if the hypothesis was wrong.
+    next_on: command_success
+  - step: 3
+    title: Verify with the grader
+    instruction: Run the same verification the checker uses.
+    command: systemctl is-active rsyslog
+    expected_output: '`systemctl is-active rsyslog` returns active'
+    explanation: The lab passes only when real state is healthy.
+    next_on: command_success

@@ -2,8 +2,8 @@ title: SSH Rejects Writable Home Directory
 slug: home-directory-ssh-denied
 lab_mode: simulation
 simulation_type: generic
-technology: Linux
-category: SSH / Security
+technology: linux
+category: Fix
 difficulty: easy
 time_limit: 600
 max_score: 100
@@ -11,9 +11,29 @@ infrastructure_type: docker
 docker_privileged: false
 jira_priority: Medium
 topics_covered: Q38 home dir perms — must not be group/world writable
-description: User 'ops' can no longer log in via SSH with key auth because their home directory is world-writable.
-  OpenSSH's StrictModes refuses to use ~/.ssh when the home directory or key files are writable by group/other,
-  as a security precaution. Tighten the home directory permissions so sshd accepts the keys again.
+description: 'CONTEXT: A team operating Linux administration needs you to resolve `SSH Rejects Writable
+  Home Directory` during a realistic incident. The business impact is reduced service reliability until
+  the underlying state is repaired.
+
+
+  ENVIRONMENT: You are working in FixitLab''s offline Linux practice server with terminal and config files
+  under /etc and /var. All tools run locally; no paid APIs or external cloud calls are required.
+
+
+  SYMPTOM / STARTING STATE: Linux server where /home/ops is world-writable, so sshd (StrictModes) rejects
+  key-based login for ops. User ''ops'' can no longer log in via SSH with key auth because their home
+  directory is world-writable. OpenSSH''s StrictModes refuses to use ~/.ssh when the home directory or
+  key files are writable by group/other, as a security precaution. Tighten the home directory permissions
+  so sshd accepts the keys again.
+
+
+  OBJECTIVE: Confirm the login failure traces to permissive home-directory permissions; Set safe permissions
+  on the home directory; Verify ops can SSH in with key authentication. Success means `check.sh` exits
+  successfully.
+
+
+  WHAT TO AVOID: Do not apply broad destructive changes, skip evidence gathering, or fake completion with
+  marker files — the checker validates real system state.'
 objectives:
 - Confirm the login failure traces to permissive home-directory permissions
 - Set safe permissions on the home directory
@@ -22,14 +42,70 @@ initial_state: Linux server where /home/ops is world-writable, so sshd (StrictMo
   login for ops.
 hints:
 - order: 1
-  cost: 10
-  content: 'sshd logs the reason: `journalctl -u sshd | tail` shows "bad ownership or modes for directory
-    /home/ops". Check it: `ls -ld /home/ops` (group/other-writable).'
+  cost: 0
+  content: 'Where to look: Confirm the login failure traces to permissive home-directory permissions'
 - order: 2
-  cost: 15
-  content: 'Remove the unsafe write bits: `chmod 755 /home/ops` (750 is fine too). Also ensure `~/.ssh`
-    is 700 and `authorized_keys` is 600.'
+  cost: 25
+  content: 'Diagnostic steps:
+
+    1. Set safe permissions on the home directory
+
+    2. Verify ops can SSH in with key authentication'
 - order: 3
-  cost: 20
-  content: 'Verify: `ssh ops@localhost` (or from the client) now authenticates with the key — no more
-    StrictModes rejection.'
+  cost: 50
+  content: 'Exact fix + verification:
+
+    1. Verify ops can SSH in with key authentication.
+
+    2. Re-run the lab checker (`check.sh` or Check Solution).
+
+    3. Confirm every scenario objective is satisfied.
+
+
+    WHY: the grader validates real state — marker files are ignored.'
+summary: Complete the ssh rejects writable home directory linux lab and verify success with the checker
+estimated_minutes: 10
+xp_reward: 100
+prerequisites:
+- Basic linux literacy
+tags:
+- fix
+- hands-on
+- linux
+linked_tutorial: linux-fundamentals
+what_you_will_learn:
+- Confirm the login failure traces to permissive home-directory permissions
+- Set safe permissions on the home directory
+- Verify ops can SSH in with key authentication
+environment:
+  nodes:
+  - role: primary
+    os: FixitLab Linux practice server
+    hostname: lab-primary
+    ip: 127.0.0.1
+    specs: local offline simulation
+  pre_installed:
+  - bash
+  - coreutils
+  - journalctl
+  - linux
+  - systemctl
+  credentials:
+  - user: root
+    password: lab123
+tasks:
+- id: task_1
+  title: SSH Rejects Writable Home Directory
+  description: Restore healthy behavior for SSH Rejects Writable Home Directory by investigating the failure,
+    applying the smallest safe fix, and validating the outcome.
+  background: 'This linux lab teaches systematic troubleshooting: observe, hypothesize, change, verify.'
+  validation:
+    type: custom_script
+    script: check.sh
+    error_message: Validation did not pass. Re-read the objectives and Hint 2 diagnostic steps.
+solution:
+  summary: Identify the misconfiguration affecting this linux lab and apply the minimal fix.
+  files_changed: []
+  commands_run:
+  - bash check.sh
+  reference_docs: linux-fundamentals

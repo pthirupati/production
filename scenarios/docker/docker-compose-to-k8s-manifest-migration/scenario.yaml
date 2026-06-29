@@ -1,24 +1,58 @@
-title: "Docker → Kubernetes Migration: Compose Service Won't Translate"
+title: 'Docker → Kubernetes Migration: Compose Service Won''t'
 slug: docker-compose-to-k8s-manifest-migration
-technology: Docker & Containers
-category: Container Migration
+technology: docker
+category: Build
 difficulty: medium
-description: |
-  CROSS-TECHNOLOGY task (Docker -> Kubernetes). The team is lifting the `api`
-  service out of docker-compose and onto Kubernetes. A converted manifest was
-  generated at /opt/app/k8s/deployment.yaml, but it is wrong: it still references
-  the compose-only `container_name`, uses a host bind-mount path that does not
-  exist in-cluster, and sets no resource requests — so `kubectl apply` is rejected
-  and the Deployment never schedules. Fix the manifest so the compose service
-  becomes a valid Kubernetes Deployment.
-initial_state: |
-  A host with the original /opt/app/docker-compose.yml (the api service) and a
+description: 'CONTEXT: A team operating Docker containers needs you to resolve `Docker → Kubernetes Migration:
+  Compose Service Won''t` during a realistic incident. The business impact is reduced service reliability
+  until the underlying state is repaired.
+
+
+  ENVIRONMENT: You are working in FixitLab''s offline Docker host with docker CLI, images, containers,
+  and compose files. All tools run locally; no paid APIs or external cloud calls are required.
+
+
+  SYMPTOM / STARTING STATE: A host with the original /opt/app/docker-compose.yml (the api service) and
+  a
+
   half-converted /opt/app/k8s/deployment.yaml that is invalid Kubernetes
+
+  (compose-only keys, a bind mount, no probes/limits). kubectl apply fails. CROSS-TECHNOLOGY task (Docker
+  -> Kubernetes). The team is lifting the `api`
+
+  service out of docker-compose and onto Kubernetes. A converted manifest was
+
+  generated at /opt/app/k8s/deployment.yaml, but it is wrong: it still references
+
+  the compose-only `container_name`, uses a host bind-mount path that does not
+
+  exist in-cluster, and sets no resource requests — so `kubectl apply` is rejected
+
+  and the Deployment never schedules. Fix the manifest so the compose service
+
+  becomes a valid Kubernetes Deployment.
+
+
+  OBJECTIVE: Diff the compose service against the generated Deployment to find the invalid/compose-only
+  fields; Rewrite /opt/app/k8s/deployment.yaml as a valid Deployment (proper image, container port, a
+  volume the cluster can satisfy, resource requests); Confirm the manifest is corrected so `kubectl apply
+  -f deployment.yaml` would be accepted. Success means `check.sh` exits successfully.
+
+
+  WHAT TO AVOID: Do not apply broad destructive changes, skip evidence gathering, or fake completion with
+  marker files — the checker validates real system state.'
+initial_state: 'A host with the original /opt/app/docker-compose.yml (the api service) and a
+
+  half-converted /opt/app/k8s/deployment.yaml that is invalid Kubernetes
+
   (compose-only keys, a bind mount, no probes/limits). kubectl apply fails.
+
+  '
 objectives:
-  - Diff the compose service against the generated Deployment to find the invalid/compose-only fields
-  - Rewrite /opt/app/k8s/deployment.yaml as a valid Deployment (proper image, container port, a volume the cluster can satisfy, resource requests)
-  - Confirm the manifest is corrected so `kubectl apply -f deployment.yaml` would be accepted
+- Diff the compose service against the generated Deployment to find the invalid/compose-only fields
+- Rewrite /opt/app/k8s/deployment.yaml as a valid Deployment (proper image, container port, a volume the
+  cluster can satisfy, resource requests)
+- Confirm the manifest is corrected so `kubectl apply -f deployment.yaml` would be accepted
 lab_mode: simulation
 simulation_type: generic
 cross_technology: true
@@ -28,12 +62,99 @@ is_free: false
 jira_priority: High
 dual_terminal: false
 hints:
-  - order: 1
-    cost: 10
-    content: "Compose-only keys (`container_name`, host bind mounts) are not valid in a Pod spec. Compare /opt/app/docker-compose.yml to /opt/app/k8s/deployment.yaml."
-  - order: 2
-    cost: 15
-    content: "Replace the bind mount with an emptyDir/configMap volume, add a containerPort, and add resources.requests so the scheduler can place the pod."
-  - order: 3
-    cost: 20
-    content: "Validate with `kubectl apply --dry-run=client -f /opt/app/k8s/deployment.yaml`. Once valid, the manifest is corrected."
+- order: 1
+  cost: 0
+  content: 'Where to look: Run `kubectl get pods -A` and `kubectl describe pod <name>` for any pod not
+    in Running state.'
+- order: 2
+  cost: 25
+  content: 'Diagnostic steps:
+
+    1. `kubectl get pods` — note CrashLoopBackOff, ImagePullBackOff, or Pending.
+
+    2. `kubectl describe pod <name>` — read Events at the bottom.
+
+    3. `kubectl logs <name> [--previous]` if the container restarted.'
+- order: 3
+  cost: 50
+  content: 'Exact fix + verification:
+
+    1. Fix the root cause (image name, env var, volume mount, or probe).
+
+    2. `kubectl apply -f` the corrected manifest or delete the pod to recreate.
+
+    3. Confirm `kubectl get pods` shows every pod Running.
+
+
+    WHY: Kubernetes only reports healthy when the workload actually runs.'
+summary: 'Complete the docker → kubernetes migration: compose service won''t docker lab and verify success
+  with the checker'
+estimated_minutes: 25
+xp_reward: 100
+prerequisites:
+- Basic docker literacy
+tags:
+- docker
+- fix
+- hands-on
+linked_tutorial: docker-fundamentals
+what_you_will_learn:
+- Diff the compose service against the generated Deployment to find the invalid/compose-only fields
+- Rewrite /opt/app/k8s/deployment.yaml as a valid Deployment (proper image, container port, a volume the
+  cluster can satisfy, resource requests)
+- Confirm the manifest is corrected so `kubectl apply -f deployment.yaml` would be accepted
+environment:
+  nodes:
+  - role: primary
+    os: FixitLab Docker host
+    hostname: lab-primary
+    ip: 127.0.0.1
+    specs: local offline simulation
+  pre_installed:
+  - bash
+  - coreutils
+  - docker
+  - docker-compose
+  credentials:
+  - user: root
+    password: lab123
+tasks:
+- id: task_1
+  title: 'Docker → Kubernetes Migration: Compose Service Won''t'
+  description: 'Restore healthy behavior for Docker → Kubernetes Migration: Compose Service Won''t by
+    investigating the failure, applying the smallest safe fix, and validating the outcome.'
+  background: 'This docker lab teaches systematic troubleshooting: observe, hypothesize, change, verify.'
+  validation:
+    type: custom_script
+    script: check.sh
+    error_message: Validation did not pass. Re-read the objectives and Hint 2 diagnostic steps.
+solution:
+  summary: Identify the misconfiguration affecting this docker lab and apply the minimal fix.
+  files_changed: []
+  commands_run:
+  - bash check.sh
+  reference_docs: docker-fundamentals
+guided_mode:
+  enabled: true
+  steps:
+  - step: 1
+    title: Inspect current state
+    instruction: Run a read-only diagnostic before changing anything.
+    command: check.sh
+    expected_output: Output shows the current failure mode
+    explanation: Evidence-first troubleshooting avoids guessing.
+    next_on: command_success
+  - step: 2
+    title: Apply the minimal fix
+    instruction: Make one reversible change aligned with the objectives.
+    command: '# your fix command here'
+    expected_output: State moves toward the objective
+    explanation: Small changes make rollback easy if the hypothesis was wrong.
+    next_on: command_success
+  - step: 3
+    title: Verify with the grader
+    instruction: Run the same verification the checker uses.
+    command: check.sh
+    expected_output: '`check.sh` exits successfully'
+    explanation: The lab passes only when real state is healthy.
+    next_on: command_success

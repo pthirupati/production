@@ -1,7 +1,7 @@
-title: 'Linux Administration: Users And Groups — Fundamentals Lab'
+title: Users And Groups — Learn Lab
 slug: academy-linux-011-learn-users-groups-2
-technology: Linux Administration
-category: Core Skills
+technology: linux
+category: Learn
 difficulty: easy
 scenario_type: do
 lab_mode: simulation
@@ -11,47 +11,134 @@ max_score: 100
 is_free: false
 infrastructure_type: docker
 jira_priority: Low
-description: Hands-on user administration. An application is meant to run under a dedicated, non-login
-  service account named `appuser`, but that account does not exist on this host yet — so the service cannot
-  own its files or run with least privilege. Create the `appuser` account (with a home directory) and
-  verify it resolves with `getent passwd appuser`.
+description: 'CONTEXT: A team operating Linux administration needs you to resolve `linux: Users And Groups
+  — Fundamentals Lab` during a realistic incident. The business impact is reduced service reliability
+  until the underlying state is repaired.
+
+
+  ENVIRONMENT: You are working in FixitLab''s offline Linux practice server with terminal and config files
+  under /etc and /var. All tools run locally; no paid APIs or external cloud calls are required.
+
+
+  SYMPTOM / STARTING STATE: The Linux practice server is online with a starter users and groups setup.
+  Some pieces are intentionally incomplete so you can learn how they fit together. Nothing is on fire
+  — focus on observation. This beginner-friendly linux lab introduces users and groups. You will explore
+  how accounts, UIDs/GIDs, primary groups, and supplementary membership are defined on the Linux practice
+  server. Read the environment first, then follow the guided steps — no prior production experience required.
+
+
+  OBJECTIVE: Understand how users and groups work in this lab environment; Identify the main status and
+  configuration signals for users and groups; Confirm you can read the current state confidently before
+  changing anything. Success means `check.sh` exits successfully.
+
+
+  WHAT TO AVOID: Do not apply broad destructive changes, skip evidence gathering, or fake completion with
+  marker files — the checker validates real system state.'
 objectives:
-- The dedicated 'appuser' service account exists on the host
-- The account is created cleanly (with a home directory)
-- getent passwd appuser returns the account
-initial_state: The application service account `appuser` is missing on this host. The service that depends
-  on it cannot start until the account exists.
+- Understand how users and groups work in this lab environment
+- Identify the main status and configuration signals for users and groups
+- Confirm you can read the current state confidently before changing anything
+initial_state: The Linux practice server is online with a starter users and groups setup. Some pieces
+  are intentionally incomplete so you can learn how they fit together. Nothing is on fire — focus on observation.
 hints:
 - order: 1
-  cost: 10
+  cost: 0
   content: 'Orient yourself before changing anything:
 
-    1. Inspect the current state — `getent passwd appuser` (will be empty) and `cat /etc/passwd` to see
-    existing accounts.
+    1. Inspect the current state — `id`, `getent passwd`, and `getent group` (or equivalent directory
+    tools on Windows).
 
-    2. Write down what looks normal versus wrong or missing.
+    2. Write down what looks normal versus wrong or missing for users and groups.
 
-    3. Form one hypothesis about the root cause before you change anything.'
+    3. Recall the core idea: how accounts, UIDs/GIDs, primary groups, and supplementary membership are
+    defined. Form one hypothesis before you act.'
 - order: 2
-  cost: 15
-  content: 'Plan your approach (still no spoilers):
+  cost: 25
+  content: 'Diagnostic steps:
 
-    1. Confirm the exact gap between current and desired state.
+    1. Identify the main status and configuration signals for users and groups
 
-    2. Decide the single smallest change that moves you toward the objective.
-
-    3. Capture command output before the change so you can prove it worked afterward.'
+    2. Confirm you can read the current state confidently before changing anything'
 - order: 3
-  cost: 20
-  content: 'Guided walkthrough:
+  cost: 50
+  content: 'Exact fix + verification:
 
-    1. Re-check the current state — Inspect first: `getent passwd appuser` (will be empty) and `cat /etc/passwd`
-    to see existing accounts.
+    1. Re-check the current state — `id`, `getent passwd`, and `getent group` (or equivalent directory
+    tools on Windows).
 
-    2. Decide whether the account needs a login shell and home directory. A service account usually wants
-    a home dir but no interactive login.
+    2. Make one small, reversible change toward the objective, re-reading status after each step so you
+    understand cause and effect.
 
-    3. Verify the result — Create it: `sudo useradd -m appuser`, confirm with `getent passwd appuser`,
-    then run Check Solution.
+    3. Verify the result — account and group entries match the expected owner and membership.
 
-    4. Click Check Solution once every objective is met.'
+    4. Click Check Solution once the objective is met (graded on real state, not a marker file).'
+summary: Complete the users and groups — learn lab linux lab and verify success with the checker
+estimated_minutes: 15
+xp_reward: 100
+prerequisites:
+- Basic linux literacy
+tags:
+- do
+- hands-on
+- linux
+linked_tutorial: linux-fundamentals
+what_you_will_learn:
+- Understand how users and groups work in this lab environment
+- Identify the main status and configuration signals for users and groups
+- Confirm you can read the current state confidently before changing anything
+environment:
+  nodes:
+  - role: primary
+    os: FixitLab Linux practice server
+    hostname: lab-primary
+    ip: 127.0.0.1
+    specs: local offline simulation
+  pre_installed:
+  - bash
+  - coreutils
+  - journalctl
+  - linux
+  - systemctl
+  credentials:
+  - user: root
+    password: lab123
+tasks:
+- id: task_1
+  title: Users And Groups — Learn Lab
+  description: Restore healthy behavior for Users And Groups — Learn Lab by investigating the failure,
+    applying the smallest safe fix, and validating the outcome.
+  background: 'This linux lab teaches systematic troubleshooting: observe, hypothesize, change, verify.'
+  validation:
+    type: custom_script
+    script: check.sh
+    error_message: Validation did not pass. Re-read the objectives and Hint 2 diagnostic steps.
+solution:
+  summary: Identify the misconfiguration affecting this linux lab and apply the minimal fix.
+  files_changed: []
+  commands_run:
+  - bash check.sh
+  reference_docs: linux-fundamentals
+guided_mode:
+  enabled: true
+  steps:
+  - step: 1
+    title: Inspect current state
+    instruction: Run a read-only diagnostic before changing anything.
+    command: check.sh
+    expected_output: Output shows the current failure mode
+    explanation: Evidence-first troubleshooting avoids guessing.
+    next_on: command_success
+  - step: 2
+    title: Apply the minimal fix
+    instruction: Make one reversible change aligned with the objectives.
+    command: '# your fix command here'
+    expected_output: State moves toward the objective
+    explanation: Small changes make rollback easy if the hypothesis was wrong.
+    next_on: command_success
+  - step: 3
+    title: Verify with the grader
+    instruction: Run the same verification the checker uses.
+    command: check.sh
+    expected_output: '`check.sh` exits successfully'
+    explanation: The lab passes only when real state is healthy.
+    next_on: command_success

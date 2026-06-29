@@ -1,7 +1,7 @@
 title: CTF — Find the Hidden Flag
 slug: ctf-find-the-flag
-technology: Security
-category: CTF
+technology: security
+category: Hack
 difficulty: medium
 scenario_type: hack
 time_limit: 900
@@ -10,9 +10,29 @@ infrastructure_type: docker
 lab_mode: docker
 jira_priority: Medium
 is_free: true
-description: 'Capture-the-flag challenge: a flag of the form FIXITLAB{...} is hidden somewhere on the
-  filesystem. Use practical Linux forensics — searching by name and content, inspecting hidden directories
-  and dotfiles, and checking common stash locations — to locate the flag and submit it for validation.'
+description: 'CONTEXT: A team operating security hardening needs you to resolve `CTF — Find the Hidden
+  Flag` during a realistic incident. The business impact is reduced service reliability until the underlying
+  state is repaired.
+
+
+  ENVIRONMENT: You are working in FixitLab''s offline hardening lab with SSH, firewall, TLS, audit logs,
+  and IAM settings. All tools run locally; no paid APIs or external cloud calls are required.
+
+
+  SYMPTOM / STARTING STATE: Linux system with a hidden flag string FIXITLAB{...} placed somewhere on disk
+  (often in a hidden directory or dotfile). Find it using standard search/forensics tools. Capture-the-flag
+  challenge: a flag of the form FIXITLAB{...} is hidden somewhere on the filesystem. Use practical Linux
+  forensics — searching by name and content, inspecting hidden directories and dotfiles, and checking
+  common stash locations — to locate the flag and submit it for validation.
+
+
+  OBJECTIVE: Search the filesystem by filename and by content for the flag; Inspect hidden directories/dotfiles
+  and common stash locations; Locate the FIXITLAB{...} flag and submit it. Success means `check.sh` exits
+  successfully.
+
+
+  WHAT TO AVOID: Do not apply broad destructive changes, skip evidence gathering, or fake completion with
+  marker files — the checker validates real system state.'
 objectives:
 - Search the filesystem by filename and by content for the flag
 - Inspect hidden directories/dotfiles and common stash locations
@@ -21,14 +41,72 @@ initial_state: Linux system with a hidden flag string FIXITLAB{...} placed somew
   a hidden directory or dotfile). Find it using standard search/forensics tools.
 hints:
 - order: 1
-  cost: 10
-  content: 'Start broad: `find / -iname ''*flag*'' 2>/dev/null` and search contents `grep -rIl ''FIXITLAB{''
-    / 2>/dev/null`. Don''t forget dotfiles in home directories (`ls -la ~`).'
+  cost: 0
+  content: 'Where to look: Run `df -h` and `du -xh /var /tmp /home | sort -h | tail -20` for large paths.'
 - order: 2
-  cost: 15
-  content: 'Check common hiding spots, e.g. hidden dirs under /var: look in `/var/backups/.secret/` for
-    a file like hint.txt that points to the flag.'
+  cost: 25
+  content: 'Diagnostic steps:
+
+    1. Find which mount is 100% — often `/` or `/var`.
+
+    2. `journalctl --disk-usage` and old logs under `/var/log`.
+
+    3. Look for core dumps, temp files, or oversized application data.'
 - order: 3
-  cost: 20
-  content: Once you find the file, read it (`cat <file>`) and copy the exact `FIXITLAB{...}` string (including
-    braces) to submit for validation.
+  cost: 50
+  content: 'Exact fix + verification:
+
+    1. Remove or rotate the largest safe files (logs, caches, old packages).
+
+    2. `df -h` should show free space on the affected mount.
+
+    3. Retry the command that failed with ''No space left on device''.
+
+
+    WHY: many services fail cryptically when disk is full.'
+summary: Complete the ctf — find the hidden flag security lab and verify success with the checker
+estimated_minutes: 15
+xp_reward: 100
+prerequisites:
+- Basic security literacy
+tags:
+- hack
+- hands-on
+- security
+linked_tutorial: security-fundamentals
+what_you_will_learn:
+- Search the filesystem by filename and by content for the flag
+- Inspect hidden directories/dotfiles and common stash locations
+- Locate the FIXITLAB{...} flag and submit it
+environment:
+  nodes:
+  - role: primary
+    os: FixitLab hardening lab
+    hostname: lab-primary
+    ip: 127.0.0.1
+    specs: local offline simulation
+  pre_installed:
+  - bash
+  - coreutils
+  - journalctl
+  - security
+  - systemctl
+  credentials:
+  - user: root
+    password: lab123
+tasks:
+- id: task_1
+  title: CTF — Find the Hidden Flag
+  description: Restore healthy behavior for CTF — Find the Hidden Flag by investigating the failure, applying
+    the smallest safe fix, and validating the outcome.
+  background: 'This security lab teaches systematic troubleshooting: observe, hypothesize, change, verify.'
+  validation:
+    type: custom_script
+    script: check.sh
+    error_message: Validation did not pass. Re-read the objectives and Hint 2 diagnostic steps.
+solution:
+  summary: Identify the misconfiguration affecting this security lab and apply the minimal fix.
+  files_changed: []
+  commands_run:
+  - bash check.sh
+  reference_docs: security-fundamentals

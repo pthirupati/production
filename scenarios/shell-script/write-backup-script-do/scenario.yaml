@@ -1,7 +1,7 @@
 title: Write Backup Shell Script
 slug: write-backup-script-do
-technology: Shell Scripting
-category: Build Lab
+technology: shell-script
+category: Build
 difficulty: easy
 scenario_type: do
 time_limit: 900
@@ -10,9 +10,29 @@ infrastructure_type: docker
 lab_mode: docker
 jira_priority: Low
 is_free: false
-description: 'Build task: write a robust backup shell script (deploy.sh) from scratch that runs cleanly
-  under strict mode. The script should use a proper shebang, enable safe options, and avoid unbound-variable
-  errors by giving its inputs sensible defaults, then perform its backup step and exit zero.'
+description: 'CONTEXT: A team operating shell scripting needs you to resolve `Write Backup Shell Script`
+  during a realistic incident. The business impact is reduced service reliability until the underlying
+  state is repaired.
+
+
+  ENVIRONMENT: You are working in FixitLab''s offline bash practice environment with scripts, cron, logs,
+  and shellcheck. All tools run locally; no paid APIs or external cloud calls are required.
+
+
+  SYMPTOM / STARTING STATE: Linux host with a shell available. No backup script exists yet; you''ll author
+  deploy.sh from scratch. Build task: write a robust backup shell script (deploy.sh) from scratch that
+  runs cleanly under strict mode. The script should use a proper shebang, enable safe options, and avoid
+  unbound-variable errors by giving its inputs sensible defaults, then perform its backup step and exit
+  zero.
+
+
+  OBJECTIVE: Create deploy.sh with a shebang and strict mode (set -euo pipefail); Provide safe defaults
+  so no unbound-variable errors occur; Run the script successfully and have it exit zero. Success means
+  `check.sh` exits successfully.
+
+
+  WHAT TO AVOID: Do not apply broad destructive changes, skip evidence gathering, or fake completion with
+  marker files — the checker validates real system state.'
 objectives:
 - Create deploy.sh with a shebang and strict mode (set -euo pipefail)
 - Provide safe defaults so no unbound-variable errors occur
@@ -21,14 +41,95 @@ initial_state: Linux host with a shell available. No backup script exists yet; y
   from scratch.
 hints:
 - order: 1
-  cost: 10
-  content: Start the file with `#!/usr/bin/env bash` and `set -euo pipefail`, then `chmod +x deploy.sh`
-    so it's executable.
+  cost: 0
+  content: 'Where to look: Create deploy.sh with a shebang and strict mode (set -euo pipefail)'
 - order: 2
-  cost: 15
-  content: 'Because `set -u` is on, default every optional input: `SRC="${SRC:-/var/www}"`, `DEST="${DEST:-/backups}"`
-    so the script never trips on an unset variable.'
+  cost: 25
+  content: 'Diagnostic steps:
+
+    1. Provide safe defaults so no unbound-variable errors occur
+
+    2. Run the script successfully and have it exit zero'
 - order: 3
-  cost: 20
-  content: Do the work safely (e.g. `mkdir -p "$DEST" && tar czf "$DEST/backup-$(date +%F).tgz" "$SRC"`)
-    and end with `exit 0`. Run `./deploy.sh` and confirm it completes with no errors.
+  cost: 50
+  content: 'Exact fix + verification:
+
+    1. Run the script successfully and have it exit zero.
+
+    2. Re-run the lab checker (`check.sh` or Check Solution).
+
+    3. Confirm every scenario objective is satisfied.
+
+
+    WHY: the grader validates real state — marker files are ignored.'
+summary: Complete the write backup shell script shell script lab and verify success with the checker
+estimated_minutes: 15
+xp_reward: 100
+prerequisites:
+- Basic shell script literacy
+tags:
+- do
+- hands-on
+- shell-script
+linked_tutorial: shell-script-fundamentals
+what_you_will_learn:
+- Create deploy.sh with a shebang and strict mode (set -euo pipefail)
+- Provide safe defaults so no unbound-variable errors occur
+- Run the script successfully and have it exit zero
+environment:
+  nodes:
+  - role: primary
+    os: FixitLab bash practice environment
+    hostname: lab-primary
+    ip: 127.0.0.1
+    specs: local offline simulation
+  pre_installed:
+  - bash
+  - coreutils
+  - journalctl
+  - shell script
+  - systemctl
+  credentials:
+  - user: root
+    password: lab123
+tasks:
+- id: task_1
+  title: Write Backup Shell Script
+  description: Restore healthy behavior for Write Backup Shell Script by investigating the failure, applying
+    the smallest safe fix, and validating the outcome.
+  background: 'This shell script lab teaches systematic troubleshooting: observe, hypothesize, change,
+    verify.'
+  validation:
+    type: custom_script
+    script: check.sh
+    error_message: Validation did not pass. Re-read the objectives and Hint 2 diagnostic steps.
+solution:
+  summary: Identify the misconfiguration affecting this shell script lab and apply the minimal fix.
+  files_changed: []
+  commands_run:
+  - bash check.sh
+  reference_docs: shell-script-fundamentals
+guided_mode:
+  enabled: true
+  steps:
+  - step: 1
+    title: Inspect current state
+    instruction: Run a read-only diagnostic before changing anything.
+    command: check.sh
+    expected_output: Output shows the current failure mode
+    explanation: Evidence-first troubleshooting avoids guessing.
+    next_on: command_success
+  - step: 2
+    title: Apply the minimal fix
+    instruction: Make one reversible change aligned with the objectives.
+    command: '# your fix command here'
+    expected_output: State moves toward the objective
+    explanation: Small changes make rollback easy if the hypothesis was wrong.
+    next_on: command_success
+  - step: 3
+    title: Verify with the grader
+    instruction: Run the same verification the checker uses.
+    command: check.sh
+    expected_output: '`check.sh` exits successfully'
+    explanation: The lab passes only when real state is healthy.
+    next_on: command_success

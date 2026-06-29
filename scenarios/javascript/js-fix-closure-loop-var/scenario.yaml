@@ -1,9 +1,26 @@
 title: Fix the Closure-in-Loop Capture Bug
 slug: js-fix-closure-loop-var
-category: JavaScript Development
-description: makeCounters(n) should return an array of n functions where the i-th function returns i,
-  but it declares the loop variable with `var`, so every closure captures the SAME final value of i. Fix
-  the capture so each function returns its own index.
+category: Fix
+description: 'CONTEXT: A team operating JavaScript needs you to resolve `Fix the Closure-in-Loop Capture
+  Bug` during a realistic incident. The business impact is reduced service reliability until the underlying
+  state is repaired.
+
+
+  ENVIRONMENT: You are working in FixitLab''s offline JavaScript practice project with modules, browser
+  console, and Node tooling. All tools run locally; no paid APIs or external cloud calls are required.
+
+
+  SYMPTOM / STARTING STATE: makeCounters(n) should return an array of n functions where the i-th function
+  returns i, but it declares the loop variable with `var`, so every closure captures the SAME final value
+  of i. Fix the capture so each function returns its own index.
+
+
+  OBJECTIVE: See every counter return the same number; Give each iteration its own binding; Make the i-th
+  function return i. Success means all hidden tests pass.
+
+
+  WHAT TO AVOID: Do not apply broad destructive changes, skip evidence gathering, or fake completion with
+  marker files — the checker validates real system state.'
 difficulty: medium
 scenario_type: fix
 lab_mode: simulation
@@ -21,56 +38,123 @@ objectives:
 initial_state: makeCounters(n) should return an array of n functions where the i-th function returns i,
   but it declares the loop variable with `var`, so every closure captures the SAME final value of i. Fix
   the capture so each function returns its own index.
-solution_explanation: |
-  var creates a single shared binding, so all closures read the final i. let gives each loop iteration its own binding, capturing the right value.
+solution_explanation: 'var creates a single shared binding, so all closures read the final i. let gives
+  each loop iteration its own binding, capturing the right value.
+
+  '
 coding_spec:
   language: javascript
   entrypoint: solution.js
   kind: fix
-  instructions: |
-    Fix makeCounters(n): return an array of n functions; calling the i-th returns i (0-indexed).
-      const fns = makeCounters(3); fns[0]() -> 0, fns[2]() -> 2
-    Click Run to try it, then Check Solution to grade against all tests.
+  instructions: "Fix makeCounters(n): return an array of n functions; calling the i-th returns i (0-indexed).\n\
+    \  const fns = makeCounters(3); fns[0]() -> 0, fns[2]() -> 2\nClick Run to try it, then Check Solution\
+    \ to grade against all tests.\n"
   files:
   - path: solution.js
-    content: |
-      function makeCounters(n) {
-        const fns = [];
-        for (var i = 0; i < n; i++) {  // var: shared binding
-          fns.push(function () { return i; });
-        }
-        return fns;
-      }
+    content: "function makeCounters(n) {\n  const fns = [];\n  for (var i = 0; i < n; i++) {  // var:\
+      \ shared binding\n    fns.push(function () { return i; });\n  }\n  return fns;\n}\n"
     readonly: false
   visible_tests:
   - name: each returns its index
-    code: |
-      const fns = makeCounters(3);
+    code: 'const fns = makeCounters(3);
+
       assert(fns[0]() === 0 && fns[1]() === 1 && fns[2]() === 2);
+
+      '
   - name: count matches n
-    code: |
-      assert(makeCounters(5).length === 5);
+    code: 'assert(makeCounters(5).length === 5);
+
+      '
   hidden_tests:
   - name: last function
-    code: |
-      const fns = makeCounters(4);
-      assert(fns[3]() === 3, 'got ' + fns[3]());
+    code: 'const fns = makeCounters(4);
+
+      assert(fns[3]() === 3, ''got '' + fns[3]());
+
+      '
   - name: all distinct
-    code: |
-      const fns = makeCounters(3);
+    code: 'const fns = makeCounters(3);
+
       const vals = fns.map(f => f());
+
       assert(JSON.stringify(vals) === JSON.stringify([0,1,2]));
+
+      '
   - name: zero counters
-    code: |
-      assert(makeCounters(0).length === 0);
+    code: 'assert(makeCounters(0).length === 0);
+
+      '
   timeout: 8
 hints:
 - order: 1
-  cost: 10
-  content: All counters return n (e.g. 3 for makeCounters(3)) — they share one i.
+  cost: 0
+  content: 'Where to look: Open `solution.js`, read the instructions, and run the visible tests to see
+    which assertion fails first.'
 - order: 2
-  cost: 20
-  content: var is function-scoped, so every closure sees the same final i.
+  cost: 25
+  content: 'Diagnostic steps:
+
+    1. Click Run and read the traceback — note line number and actual vs expected values.
+
+    2. Reproduce the failure with the smallest input from a visible test.
+
+    3. Compare your implementation to the bug described in the lab prompt.'
 - order: 3
-  cost: 30
-  content: Declare the loop variable with let to get a fresh binding per iteration.
+  cost: 50
+  content: 'Exact fix + verification:
+
+    1. Make the i-th function return i.
+
+    2. Re-run the lab checker (`check.sh` or Check Solution).
+
+    3. Confirm every scenario objective is satisfied.
+
+
+    WHY: the grader validates real state — marker files are ignored.'
+technology: javascript
+summary: Complete the fix the closure-in-loop capture bug javascript lab and verify success with the checker
+estimated_minutes: 25
+xp_reward: 100
+prerequisites:
+- Basic javascript literacy
+tags:
+- fix
+- hands-on
+- javascript
+linked_tutorial: javascript-fundamentals
+what_you_will_learn:
+- See every counter return the same number
+- Give each iteration its own binding
+- Make the i-th function return i
+environment:
+  nodes:
+  - role: primary
+    os: FixitLab JavaScript practice project
+    hostname: lab-primary
+    ip: 127.0.0.1
+    specs: local offline simulation
+  pre_installed:
+  - bash
+  - coreutils
+  - javascript
+  - journalctl
+  - systemctl
+  credentials:
+  - user: root
+    password: lab123
+tasks:
+- id: task_1
+  title: Fix the Closure-in-Loop Capture Bug
+  description: Restore healthy behavior for Fix the Closure-in-Loop Capture Bug by investigating the failure,
+    applying the smallest safe fix, and validating the outcome.
+  background: 'This javascript lab teaches systematic troubleshooting: observe, hypothesize, change, verify.'
+  validation:
+    type: custom_script
+    script: hidden_tests
+    error_message: One or more hidden tests failed. Read the public test output, fix your solution, and
+      submit again.
+solution:
+  summary: The solution passes all hidden tests by implementing the required behavior in code.
+  files_changed: []
+  commands_run: []
+  reference_docs: javascript-fundamentals

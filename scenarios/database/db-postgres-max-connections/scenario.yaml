@@ -1,8 +1,23 @@
 title: PostgreSQL Refusing New Connections (max_connections)
 slug: db-postgres-max-connections
 difficulty: medium
-category: Database Administration
-description: 'A production PostgreSQL instance is rejecting new client connections with
+category: Fix
+description: 'CONTEXT: A team operating database administration needs you to resolve `PostgreSQL Refusing
+  New Connections (max_connections)` during a realistic incident. The business impact is reduced service
+  reliability until the underlying state is repaired.
+
+
+  ENVIRONMENT: You are working in FixitLab''s offline database server with SQL client, schemas, backups,
+  and performance views. All tools run locally; no paid APIs or external cloud calls are required.
+
+
+  SYMPTOM / STARTING STATE: Simulated RHEL 9 database server. The postgresql service is down (it crashed
+  under the
+
+  connection storm). /var/lib/pgsql/data/postgresql.conf has max_connections = 20. psql
+
+  reports the server is not accepting connections. A production PostgreSQL instance is rejecting new client
+  connections with
 
   "FATAL: sorry, too many clients already". The configured max_connections is far too
 
@@ -12,7 +27,14 @@ description: 'A production PostgreSQL instance is rejecting new client connectio
 
   and restart PostgreSQL so the new limit takes effect.
 
-  '
+
+  OBJECTIVE: Inspect /var/lib/pgsql/data/postgresql.conf and find max_connections set too low; Raise max_connections
+  to a production-appropriate value (e.g. 200); Restart PostgreSQL so the new setting takes effect. Success
+  means `systemctl is-active postgresql` returns active.
+
+
+  WHAT TO AVOID: Do not apply broad destructive changes, skip evidence gathering, or fake completion with
+  marker files — the checker validates real system state.'
 initial_state: 'Simulated RHEL 9 database server. The postgresql service is down (it crashed under the
 
   connection storm). /var/lib/pgsql/data/postgresql.conf has max_connections = 20. psql
@@ -32,17 +54,81 @@ max_score: 100
 is_free: false
 hints:
 - order: 1
-  cost: 10
-  content: 'Inspect the running config: `grep -n max_connections /var/lib/pgsql/data/postgresql.conf`
-    — it''s set far too low (e.g. 20) for the scaled-up workload, which caused "too many clients".'
+  cost: 0
+  content: 'Where to look: Start with `systemctl status postgresql` and `journalctl -u postgresql -n 50
+    --no-pager` before changing anything.'
 - order: 2
-  cost: 20
-  content: 'Raise it: edit postgresql.conf and set `max_connections = 200`. This parameter is not reloadable
-    — it requires a full restart, not a `pg_ctl reload`.'
+  cost: 25
+  content: 'Diagnostic steps:
+
+    1. Run `systemctl status postgresql` — note Active/Failed and the last log lines.
+
+    2. Read `journalctl -u postgresql -n 50` for the root error.
+
+    3. Form a hypothesis about the smallest config or permission fix.'
 - order: 3
-  cost: 30
-  content: 'Apply and verify: `systemctl restart postgresql`, then `systemctl is-active postgresql` and
-    `psql -c ''SHOW max_connections;''` to confirm the new limit; new clients connect again.'
+  cost: 50
+  content: 'Exact fix + verification:
+
+    1. Apply the minimal fix (config, unit override, or missing directory).
+
+    2. Run `systemctl daemon-reload` if you edited a unit file.
+
+    3. Run `systemctl restart postgresql` and confirm `systemctl is-active postgresql` succeeds.
+
+
+    WHY: the grader checks real service state, not marker files.'
 requires_companion_hosts: false
 dual_terminal: false
 jira_priority: High
+technology: database
+summary: Complete the postgresql refusing new connections (max_connections) database lab and verify success
+  with the checker
+estimated_minutes: 15
+xp_reward: 100
+prerequisites:
+- Basic database literacy
+tags:
+- database
+- fix
+- hands-on
+linked_tutorial: database-fundamentals
+what_you_will_learn:
+- Inspect /var/lib/pgsql/data/postgresql.conf and find max_connections set too low
+- Raise max_connections to a production-appropriate value (e.g. 200)
+- Restart PostgreSQL so the new setting takes effect
+- Verify the service is active and accepting connections
+environment:
+  nodes:
+  - role: primary
+    os: FixitLab database server
+    hostname: lab-primary
+    ip: 127.0.0.1
+    specs: local offline simulation
+  pre_installed:
+  - bash
+  - coreutils
+  - database
+  - journalctl
+  - systemctl
+  credentials:
+  - user: root
+    password: lab123
+tasks:
+- id: task_1
+  title: PostgreSQL Refusing New Connections (max_connections)
+  description: Restore healthy behavior for PostgreSQL Refusing New Connections (max_connections) by investigating
+    the failure, applying the smallest safe fix, and validating the outcome.
+  background: 'This database lab teaches systematic troubleshooting: observe, hypothesize, change, verify.'
+  validation:
+    type: service_active
+    command: systemctl is-active postgresql
+    expected_status: active
+    error_message: The postgresql service is not active yet. Check `systemctl status postgresql` and `journalctl
+      -u postgresql -n 50`.
+solution:
+  summary: The root cause is an unhealthy `postgresql` service; repair it and verify active state.
+  files_changed: []
+  commands_run:
+  - systemctl is-active postgresql
+  reference_docs: database-fundamentals

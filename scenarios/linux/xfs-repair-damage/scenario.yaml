@@ -2,8 +2,8 @@ title: XFS Filesystem Requires xfs_repair
 slug: xfs-repair-damage
 lab_mode: simulation
 simulation_type: generic
-technology: Linux
-category: Storage / XFS
+technology: linux
+category: Fix
 difficulty: hard
 time_limit: 1500
 max_score: 100
@@ -11,10 +11,29 @@ infrastructure_type: docker
 docker_privileged: true
 jira_priority: Medium
 topics_covered: Q7 XFS repair — xfs_repair, mount after clean log
-description: The /data XFS filesystem fails to mount after an unclean shutdown, and the application can't
-  read its config until the volume is healthy. XFS may need its log replayed or, if that's not possible,
-  an explicit xfs_repair (which must be run on an UNMOUNTED filesystem). Check the errors, repair the
-  filesystem, and remount so /data accepts writes again.
+description: 'CONTEXT: A team operating Linux administration needs you to resolve `XFS Filesystem Requires
+  xfs_repair` during a realistic incident. The business impact is reduced service reliability until the
+  underlying state is repaired.
+
+
+  ENVIRONMENT: You are working in FixitLab''s offline Linux practice server with terminal and config files
+  under /etc and /var. All tools run locally; no paid APIs or external cloud calls are required.
+
+
+  SYMPTOM / STARTING STATE: Linux server where the XFS filesystem on /data won''t mount cleanly after
+  a crash; xfs_repair is required before the data is accessible. The /data XFS filesystem fails to mount
+  after an unclean shutdown, and the application can''t read its config until the volume is healthy. XFS
+  may need its log replayed or, if that''s not possible, an explicit xfs_repair (which must be run on
+  an UNMOUNTED filesystem). Check the errors, repair the filesystem, and remount so /data accepts writes
+  again.
+
+
+  OBJECTIVE: Read the mount/dmesg errors and confirm XFS corruption; Unmount and repair the filesystem
+  with xfs_repair; Remount /data and verify it accepts writes. Success means `check.sh` exits successfully.
+
+
+  WHAT TO AVOID: Do not apply broad destructive changes, skip evidence gathering, or fake completion with
+  marker files — the checker validates real system state.'
 objectives:
 - Read the mount/dmesg errors and confirm XFS corruption
 - Unmount and repair the filesystem with xfs_repair
@@ -23,14 +42,70 @@ initial_state: Linux server where the XFS filesystem on /data won't mount cleanl
   is required before the data is accessible.
 hints:
 - order: 1
-  cost: 10
-  content: 'See why mount fails: `mount /data` errors and `dmesg | tail` shows XFS corruption/log messages.
-    Preview the repair read-only: `xfs_repair -n /dev/loop0`.'
+  cost: 0
+  content: 'Where to look: Read the mount/dmesg errors and confirm XFS corruption'
 - order: 2
-  cost: 20
-  content: 'xfs_repair requires the FS unmounted: `umount /data` then `xfs_repair /dev/loop0`. (If it
-    asks to mount-and-replay the log first, do that; only use `-L` to zero a damaged log as a last resort.)'
+  cost: 25
+  content: 'Diagnostic steps:
+
+    1. Unmount and repair the filesystem with xfs_repair
+
+    2. Remount /data and verify it accepts writes'
 - order: 3
-  cost: 30
-  content: 'Remount and verify: `mount /data && touch /data/test && rm /data/test` succeeds, and the application
-    can read its config.'
+  cost: 50
+  content: 'Exact fix + verification:
+
+    1. Remount /data and verify it accepts writes.
+
+    2. Re-run the lab checker (`check.sh` or Check Solution).
+
+    3. Confirm every scenario objective is satisfied.
+
+
+    WHY: the grader validates real state — marker files are ignored.'
+summary: Complete the xfs filesystem requires xfs_repair linux lab and verify success with the checker
+estimated_minutes: 25
+xp_reward: 100
+prerequisites:
+- Basic linux literacy
+tags:
+- fix
+- hands-on
+- linux
+linked_tutorial: linux-fundamentals
+what_you_will_learn:
+- Read the mount/dmesg errors and confirm XFS corruption
+- Unmount and repair the filesystem with xfs_repair
+- Remount /data and verify it accepts writes
+environment:
+  nodes:
+  - role: primary
+    os: FixitLab Linux practice server
+    hostname: lab-primary
+    ip: 127.0.0.1
+    specs: local offline simulation
+  pre_installed:
+  - bash
+  - coreutils
+  - journalctl
+  - linux
+  - systemctl
+  credentials:
+  - user: root
+    password: lab123
+tasks:
+- id: task_1
+  title: XFS Filesystem Requires xfs_repair
+  description: Restore healthy behavior for XFS Filesystem Requires xfs_repair by investigating the failure,
+    applying the smallest safe fix, and validating the outcome.
+  background: 'This linux lab teaches systematic troubleshooting: observe, hypothesize, change, verify.'
+  validation:
+    type: custom_script
+    script: check.sh
+    error_message: Validation did not pass. Re-read the objectives and Hint 2 diagnostic steps.
+solution:
+  summary: Identify the misconfiguration affecting this linux lab and apply the minimal fix.
+  files_changed: []
+  commands_run:
+  - bash check.sh
+  reference_docs: linux-fundamentals

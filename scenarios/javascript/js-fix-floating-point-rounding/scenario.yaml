@@ -1,8 +1,26 @@
 title: Fix the Money Rounding Bug
 slug: js-fix-floating-point-rounding
-category: JavaScript Development
-description: roundMoney(x) should round a number to 2 decimal places, but it uses Math.round(x) which
-  rounds to the nearest integer, dropping the cents. Fix it to round to 2 decimals and return a number.
+category: Fix
+description: 'CONTEXT: A team operating JavaScript needs you to resolve `Fix the Money Rounding Bug` during
+  a realistic incident. The business impact is reduced service reliability until the underlying state
+  is repaired.
+
+
+  ENVIRONMENT: You are working in FixitLab''s offline JavaScript practice project with modules, browser
+  console, and Node tooling. All tools run locally; no paid APIs or external cloud calls are required.
+
+
+  SYMPTOM / STARTING STATE: roundMoney(x) should round a number to 2 decimal places, but it uses Math.round(x)
+  which rounds to the nearest integer, dropping the cents. Fix it to round to 2 decimals and return a
+  number.
+
+
+  OBJECTIVE: See cents disappear (1.005 -> 1); Scale by 100 before rounding, then divide back; Return
+  a number rounded to 2 decimals. Success means all hidden tests pass.
+
+
+  WHAT TO AVOID: Do not apply broad destructive changes, skip evidence gathering, or fake completion with
+  marker files — the checker validates real system state.'
 difficulty: medium
 scenario_type: fix
 lab_mode: simulation
@@ -19,51 +37,118 @@ objectives:
 - Return a number rounded to 2 decimals
 initial_state: roundMoney(x) should round a number to 2 decimal places, but it uses Math.round(x) which
   rounds to the nearest integer, dropping the cents. Fix it to round to 2 decimals and return a number.
-solution_explanation: |
-  Math.round alone rounds to an integer. Scaling by 100, rounding, then dividing rounds to two decimals.
+solution_explanation: 'Math.round alone rounds to an integer. Scaling by 100, rounding, then dividing
+  rounds to two decimals.
+
+  '
 coding_spec:
   language: javascript
   entrypoint: solution.js
   kind: fix
-  instructions: |
-    Fix roundMoney(x) to round to 2 decimal places.
-      roundMoney(1.005) -> 1.01 (approx), roundMoney(2.345) -> 2.35
-    Click Run to try it, then Check Solution to grade against all tests.
+  instructions: "Fix roundMoney(x) to round to 2 decimal places.\n  roundMoney(1.005) -> 1.01 (approx),\
+    \ roundMoney(2.345) -> 2.35\nClick Run to try it, then Check Solution to grade against all tests.\n"
   files:
   - path: solution.js
-    content: |
-      function roundMoney(x) {
-        return Math.round(x); // rounds to whole number, loses cents
-      }
+    content: "function roundMoney(x) {\n  return Math.round(x); // rounds to whole number, loses cents\n\
+      }\n"
     readonly: false
   visible_tests:
   - name: two decimals
-    code: |
-      assert(roundMoney(2.345) === 2.35, roundMoney(2.345));
+    code: 'assert(roundMoney(2.345) === 2.35, roundMoney(2.345));
+
+      '
   - name: already rounded
-    code: |
-      assert(roundMoney(3.10) === 3.1);
+    code: 'assert(roundMoney(3.10) === 3.1);
+
+      '
   hidden_tests:
   - name: rounds down
-    code: |
-      assert(roundMoney(1.234) === 1.23);
+    code: 'assert(roundMoney(1.234) === 1.23);
+
+      '
   - name: rounds up
-    code: |
-      assert(roundMoney(1.236) === 1.24);
+    code: 'assert(roundMoney(1.236) === 1.24);
+
+      '
   - name: whole number
-    code: |
-      assert(roundMoney(5) === 5);
+    code: 'assert(roundMoney(5) === 5);
+
+      '
   - name: keeps cents
-    code: |
-      assert(roundMoney(9.99) === 9.99);
+    code: 'assert(roundMoney(9.99) === 9.99);
+
+      '
   timeout: 8
 hints:
 - order: 1
-  cost: 10
-  content: roundMoney(2.345) returns 2 — Math.round goes to the nearest integer.
+  cost: 0
+  content: 'Where to look: Open `solution.js`, read the instructions, and run the visible tests to see
+    which assertion fails first.'
 - order: 2
-  cost: 20
-  content: Multiply by 100 first so the cents become whole numbers.
+  cost: 25
+  content: 'Diagnostic steps:
+
+    1. Click Run and read the traceback — note line number and actual vs expected values.
+
+    2. Reproduce the failure with the smallest input from a visible test.
+
+    3. Compare your implementation to the bug described in the lab prompt.'
 - order: 3
-  cost: 30
-  content: Return Math.round(x * 100) / 100.
+  cost: 50
+  content: 'Exact fix + verification:
+
+    1. Return a number rounded to 2 decimals.
+
+    2. Re-run the lab checker (`check.sh` or Check Solution).
+
+    3. Confirm every scenario objective is satisfied.
+
+
+    WHY: the grader validates real state — marker files are ignored.'
+technology: javascript
+summary: Complete the fix the money rounding bug javascript lab and verify success with the checker
+estimated_minutes: 25
+xp_reward: 100
+prerequisites:
+- Basic javascript literacy
+tags:
+- fix
+- hands-on
+- javascript
+linked_tutorial: javascript-fundamentals
+what_you_will_learn:
+- See cents disappear (1.005 -> 1)
+- Scale by 100 before rounding, then divide back
+- Return a number rounded to 2 decimals
+environment:
+  nodes:
+  - role: primary
+    os: FixitLab JavaScript practice project
+    hostname: lab-primary
+    ip: 127.0.0.1
+    specs: local offline simulation
+  pre_installed:
+  - bash
+  - coreutils
+  - javascript
+  - journalctl
+  - systemctl
+  credentials:
+  - user: root
+    password: lab123
+tasks:
+- id: task_1
+  title: Fix the Money Rounding Bug
+  description: Restore healthy behavior for Fix the Money Rounding Bug by investigating the failure, applying
+    the smallest safe fix, and validating the outcome.
+  background: 'This javascript lab teaches systematic troubleshooting: observe, hypothesize, change, verify.'
+  validation:
+    type: custom_script
+    script: hidden_tests
+    error_message: One or more hidden tests failed. Read the public test output, fix your solution, and
+      submit again.
+solution:
+  summary: The solution passes all hidden tests by implementing the required behavior in code.
+  files_changed: []
+  commands_run: []
+  reference_docs: javascript-fundamentals

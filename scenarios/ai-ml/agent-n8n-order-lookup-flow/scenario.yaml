@@ -1,10 +1,30 @@
 title: Wire an n8n-style order-lookup flow
 slug: agent-n8n-order-lookup-flow
-category: AI / ML / LLM & Agents
-description: A webhook delivers a raw customer message as a JSON body, and the team wants an automation
-  that parses it, pulls out the order id and email with a deterministic extractor, then calls the Order
-  API to fetch the order status. Wire the n8n-style flow in the Agent Workflow simulator. All tools are
-  canned and local — no external HTTP, no paid LLM.
+category: Fix
+description: 'CONTEXT: A team operating AI/ML workflows needs you to resolve `Wire an n8n-style order-lookup
+  flow` during a realistic incident. The business impact is reduced service reliability until the underlying
+  state is repaired.
+
+
+  ENVIRONMENT: You are working in FixitLab''s offline ML practice workspace with datasets, training scripts,
+  metrics, and model artifacts. All tools run locally; no paid APIs or external cloud calls are required.
+
+
+  SYMPTOM / STARTING STATE: The canvas has a Webhook trigger (carrying a raw JSON body string), a disconnected
+  Order API http_get tool, and an Output node. Nothing is wired and the body is never parsed — you must
+  build the parsing and extraction steps and connect the whole chain. A webhook delivers a raw customer
+  message as a JSON body, and the team wants an automation that parses it, pulls out the order id and
+  email with a deterministic extractor, then calls the Order API to fetch the order status. Wire the n8n-style
+  flow in the Agent Workflow simulator. All tools are canned and local — no external HTTP, no paid LLM.
+
+
+  OBJECTIVE: Open the Agent Workflow simulator from the lab toolbar; Add a Transform node (op json_parse)
+  to turn the raw webhook body string into structured fields; Add an LLM node in extract mode to pull
+  the order id and email out of the message text. Success means `check.sh` exits successfully.
+
+
+  WHAT TO AVOID: Do not apply broad destructive changes, skip evidence gathering, or fake completion with
+  marker files — the checker validates real system state.'
 difficulty: medium
 lab_mode: simulation
 simulation_type: ai-agent
@@ -25,17 +45,76 @@ initial_state: The canvas has a Webhook trigger (carrying a raw JSON body string
   the parsing and extraction steps and connect the whole chain.
 hints:
 - order: 1
-  cost: 10
-  content: The trigger's body is a JSON string under the "body" field. Add a Transform node with op
-    "json_parse" and field "body" so the inner {"text" ...} becomes real payload fields. Wire Trigger ->
-    Transform.
+  cost: 0
+  content: 'Where to look: Open the Agent Workflow simulator from the lab toolbar'
 - order: 2
-  cost: 15
-  content: Add an LLM node in "extract" mode (input_field "text"). It deterministically pulls out the
-    email and order_id via regex. Wire Transform -> LLM, then LLM -> the Order API tool that is already
-    on the canvas.
+  cost: 25
+  content: 'Diagnostic steps:
+
+    1. Add a Transform node (op json_parse) to turn the raw webhook body string into structured fields
+
+    2. Add an LLM node in extract mode to pull the order id and email out of the message text
+
+    3. Connect Trigger -> Transform -> LLM -> the existing Order API (http_get) tool -> Output and run
+    it so the order is looked up and its status is returned'
 - order: 3
-  cost: 20
-  content: Finally connect the Order API tool to the Output node and Run. The http_get tool returns the
-    canned order (status "shipped", order_id 1042); the flow passes once that order status reaches the
-    output.
+  cost: 50
+  content: 'Exact fix + verification:
+
+    1. Connect Trigger -> Transform -> LLM -> the existing Order API (http_get) tool -> Output and run
+    it so the order is looked up and its status is returned.
+
+    2. Re-run the lab checker (`check.sh` or Check Solution).
+
+    3. Confirm every scenario objective is satisfied.
+
+
+    WHY: the grader validates real state — marker files are ignored.'
+summary: Complete the wire an n8n-style order-lookup flow ai ml lab and verify success with the checker
+estimated_minutes: 20
+xp_reward: 100
+prerequisites:
+- Basic ai ml literacy
+tags:
+- ai-ml
+- fix
+- hands-on
+linked_tutorial: ai-ml-fundamentals
+what_you_will_learn:
+- Open the Agent Workflow simulator from the lab toolbar
+- Add a Transform node (op json_parse) to turn the raw webhook body string into structured fields
+- Add an LLM node in extract mode to pull the order id and email out of the message text
+- Connect Trigger -> Transform -> LLM -> the existing Order API (http_get) tool -> Output and run it so
+  the order is looked up and its status is returned
+environment:
+  nodes:
+  - role: primary
+    os: FixitLab ML practice workspace
+    hostname: lab-primary
+    ip: 127.0.0.1
+    specs: local offline simulation
+  pre_installed:
+  - ai ml
+  - bash
+  - coreutils
+  - pip
+  - python3
+  credentials:
+  - user: root
+    password: lab123
+tasks:
+- id: task_1
+  title: Wire an n8n-style order-lookup flow
+  description: Restore healthy behavior for Wire an n8n-style order-lookup flow by investigating the failure,
+    applying the smallest safe fix, and validating the outcome.
+  background: 'This ai ml lab teaches systematic troubleshooting: observe, hypothesize, change, verify.'
+  validation:
+    type: custom_script
+    script: check.sh
+    error_message: Validation did not pass. Re-read the objectives and Hint 2 diagnostic steps.
+solution:
+  summary: Identify the misconfiguration affecting this ai ml lab and apply the minimal fix.
+  files_changed: []
+  commands_run:
+  - bash check.sh
+  reference_docs: ai-ml-fundamentals

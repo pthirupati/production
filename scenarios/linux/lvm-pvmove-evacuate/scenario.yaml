@@ -2,8 +2,8 @@ title: LVM — Evacuate PV Before Disk Removal
 slug: lvm-pvmove-evacuate
 lab_mode: simulation
 simulation_type: generic
-technology: Linux
-category: Storage / LVM
+technology: linux
+category: Fix
 difficulty: hard
 time_limit: 1800
 max_score: 100
@@ -11,10 +11,30 @@ infrastructure_type: docker
 docker_privileged: true
 jira_priority: Medium
 topics_covered: Q14 pvmove — migrate extents off failing PV
-description: A physical volume (the /dev/loop 'disk1' device) is being retired, but the datalv logical
-  volume currently spans both PVs, so the disk can't simply be removed. Its extents must be migrated off
-  the doomed PV onto the remaining disk with pvmove (online, data-safe) before the PV is removed from
-  the volume group with vgreduce.
+description: 'CONTEXT: A team operating Linux administration needs you to resolve `LVM — Evacuate PV Before
+  Disk Removal` during a realistic incident. The business impact is reduced service reliability until
+  the underlying state is repaired.
+
+
+  ENVIRONMENT: You are working in FixitLab''s offline Linux practice server with terminal and config files
+  under /etc and /var. All tools run locally; no paid APIs or external cloud calls are required.
+
+
+  SYMPTOM / STARTING STATE: Linux server using LVM where datalv spans two PVs. The old PV (a /dev/loop
+  device) must be evacuated with pvmove and then removed from VG fixitlab, with data left intact. A physical
+  volume (the /dev/loop ''disk1'' device) is being retired, but the datalv logical volume currently spans
+  both PVs, so the disk can''t simply be removed. Its extents must be migrated off the doomed PV onto
+  the remaining disk with pvmove (online, data-safe) before the PV is removed from the volume group with
+  vgreduce.
+
+
+  OBJECTIVE: Inspect the PV/LV extent layout and confirm datalv uses the old PV; Evacuate all extents
+  off the old PV with pvmove; Verify the PV is empty and data intact, then vgreduce it out. Success means
+  `check.sh` exits successfully.
+
+
+  WHAT TO AVOID: Do not apply broad destructive changes, skip evidence gathering, or fake completion with
+  marker files — the checker validates real system state.'
 objectives:
 - Inspect the PV/LV extent layout and confirm datalv uses the old PV
 - Evacuate all extents off the old PV with pvmove
@@ -23,14 +43,72 @@ initial_state: Linux server using LVM where datalv spans two PVs. The old PV (a 
   be evacuated with pvmove and then removed from VG fixitlab, with data left intact.
 hints:
 - order: 1
-  cost: 10
-  content: 'Map the layout: `pvs -o+pv_used,vg_name` and `lvs -o+devices` show datalv occupying both PVs,
-    including the old loop device you must retire.'
+  cost: 0
+  content: 'Where to look: Run `df -h` and `du -xh /var /tmp /home | sort -h | tail -20` for large paths.'
 - order: 2
-  cost: 20
-  content: 'Migrate the extents off it (online, safe): `pvmove /dev/loop0p1` (use the real old-PV path
-    from pvs). Watch progress until it completes.'
+  cost: 25
+  content: 'Diagnostic steps:
+
+    1. Find which mount is 100% — often `/` or `/var`.
+
+    2. `journalctl --disk-usage` and old logs under `/var/log`.
+
+    3. Look for core dumps, temp files, or oversized application data.'
 - order: 3
-  cost: 30
-  content: 'Confirm it''s empty (`pvs` shows 0 used on that PV) and data is intact, then remove it: `vgreduce
-    fixitlab /dev/loop0p1` (and `pvremove` if decommissioning).'
+  cost: 50
+  content: 'Exact fix + verification:
+
+    1. Remove or rotate the largest safe files (logs, caches, old packages).
+
+    2. `df -h` should show free space on the affected mount.
+
+    3. Retry the command that failed with ''No space left on device''.
+
+
+    WHY: many services fail cryptically when disk is full.'
+summary: Complete the lvm — evacuate pv before disk removal linux lab and verify success with the checker
+estimated_minutes: 30
+xp_reward: 100
+prerequisites:
+- Basic linux literacy
+tags:
+- fix
+- hands-on
+- linux
+linked_tutorial: linux-fundamentals
+what_you_will_learn:
+- Inspect the PV/LV extent layout and confirm datalv uses the old PV
+- Evacuate all extents off the old PV with pvmove
+- Verify the PV is empty and data intact, then vgreduce it out
+environment:
+  nodes:
+  - role: primary
+    os: FixitLab Linux practice server
+    hostname: lab-primary
+    ip: 127.0.0.1
+    specs: local offline simulation
+  pre_installed:
+  - bash
+  - coreutils
+  - journalctl
+  - linux
+  - systemctl
+  credentials:
+  - user: root
+    password: lab123
+tasks:
+- id: task_1
+  title: LVM — Evacuate PV Before Disk Removal
+  description: Restore healthy behavior for LVM — Evacuate PV Before Disk Removal by investigating the
+    failure, applying the smallest safe fix, and validating the outcome.
+  background: 'This linux lab teaches systematic troubleshooting: observe, hypothesize, change, verify.'
+  validation:
+    type: custom_script
+    script: check.sh
+    error_message: Validation did not pass. Re-read the objectives and Hint 2 diagnostic steps.
+solution:
+  summary: Identify the misconfiguration affecting this linux lab and apply the minimal fix.
+  files_changed: []
+  commands_run:
+  - bash check.sh
+  reference_docs: linux-fundamentals

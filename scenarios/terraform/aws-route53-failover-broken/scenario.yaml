@@ -1,7 +1,7 @@
 title: AWS Route53 Health Check Failing Failover
 slug: aws-route53-failover-broken
-technology: Terraform
-category: Route53
+technology: terraform
+category: Fix
 difficulty: medium
 lab_mode: simulation
 simulation_type: terraform
@@ -10,8 +10,28 @@ max_score: 100
 is_free: true
 jira_priority: High
 dual_terminal: false
-description: A Route53 failover routing policy is not failing over because the health check endpoint path
-  is wrong. Fix the health check and confirm DNS fails over to the secondary when primary is unhealthy.
+description: 'CONTEXT: A team operating Terraform IaC needs you to resolve `AWS Route53 Health Check Failing
+  Failover` during a realistic incident. The business impact is reduced service reliability until the
+  underlying state is repaired.
+
+
+  ENVIRONMENT: You are working in FixitLab''s offline Terraform workspace with HCL files, state, and plan/apply
+  workflow. All tools run locally; no paid APIs or external cloud calls are required.
+
+
+  SYMPTOM / STARTING STATE: An AWS Route53 failover record whose health check targets a path that always
+  404s, so failover never triggers. A Route53 failover routing policy is not failing over because the
+  health check endpoint path is wrong. Fix the health check and confirm DNS fails over to the secondary
+  when primary is unhealthy.
+
+
+  OBJECTIVE: Identify why the Route53 health check stays unhealthy/healthy incorrectly; Correct the health
+  check resource path/port and apply; Verify failover behaves correctly. Success means `check.sh` exits
+  successfully.
+
+
+  WHAT TO AVOID: Do not apply broad destructive changes, skip evidence gathering, or fake completion with
+  marker files — the checker validates real system state.'
 initial_state: An AWS Route53 failover record whose health check targets a path that always 404s, so failover
   never triggers.
 objectives:
@@ -20,11 +40,69 @@ objectives:
 - Verify failover behaves correctly
 hints:
 - order: 1
-  cost: 10
-  content: aws route53 get-health-check-status shows the wrong result.
+  cost: 0
+  content: 'Where to look: Identify why the Route53 health check stays unhealthy/healthy incorrectly'
 - order: 2
-  cost: 15
-  content: Fix the health check ResourcePath/Port and apply.
+  cost: 25
+  content: 'Diagnostic steps:
+
+    1. Correct the health check resource path/port and apply
+
+    2. Verify failover behaves correctly'
 - order: 3
-  cost: 20
-  content: Failover now triggers on primary failure.
+  cost: 50
+  content: 'Exact fix + verification:
+
+    1. Verify failover behaves correctly.
+
+    2. Re-run the lab checker (`check.sh` or Check Solution).
+
+    3. Confirm every scenario objective is satisfied.
+
+
+    WHY: the grader validates real state — marker files are ignored.'
+summary: Complete the aws route53 health check failing failover terraform lab and verify success with
+  the checker
+estimated_minutes: 25
+xp_reward: 100
+prerequisites:
+- Basic terraform literacy
+tags:
+- fix
+- hands-on
+- terraform
+linked_tutorial: terraform-fundamentals
+what_you_will_learn:
+- Identify why the Route53 health check stays unhealthy/healthy incorrectly
+- Correct the health check resource path/port and apply
+- Verify failover behaves correctly
+environment:
+  nodes:
+  - role: primary
+    os: FixitLab Terraform workspace
+    hostname: lab-primary
+    ip: 127.0.0.1
+    specs: local offline simulation
+  pre_installed:
+  - bash
+  - coreutils
+  - terraform
+  credentials:
+  - user: root
+    password: lab123
+tasks:
+- id: task_1
+  title: AWS Route53 Health Check Failing Failover
+  description: Restore healthy behavior for AWS Route53 Health Check Failing Failover by investigating
+    the failure, applying the smallest safe fix, and validating the outcome.
+  background: 'This terraform lab teaches systematic troubleshooting: observe, hypothesize, change, verify.'
+  validation:
+    type: custom_script
+    script: check.sh
+    error_message: Validation did not pass. Re-read the objectives and Hint 2 diagnostic steps.
+solution:
+  summary: Identify the misconfiguration affecting this terraform lab and apply the minimal fix.
+  files_changed: []
+  commands_run:
+  - bash check.sh
+  reference_docs: terraform-fundamentals

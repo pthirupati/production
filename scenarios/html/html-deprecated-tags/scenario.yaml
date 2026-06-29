@@ -1,7 +1,7 @@
 title: Page Uses Deprecated Presentational Tags
 slug: html-deprecated-tags
-technology: HTML
-category: Standards
+technology: html
+category: Fix
 difficulty: easy
 lab_mode: simulation
 simulation_type: generic
@@ -10,7 +10,25 @@ max_score: 100
 is_free: true
 jira_priority: Medium
 dual_terminal: false
-description: Markup uses deprecated font/center tags that don't render reliably.
+description: 'CONTEXT: A team operating HTML and web delivery needs you to resolve `Page Uses Deprecated
+  Presentational Tags` during a realistic incident. The business impact is reduced service reliability
+  until the underlying state is repaired.
+
+
+  ENVIRONMENT: You are working in FixitLab''s offline web server lab with HTML pages, nginx/apache config,
+  and browser devtools. All tools run locally; no paid APIs or external cloud calls are required.
+
+
+  SYMPTOM / STARTING STATE: A page using deprecated presentational tags. Markup uses deprecated font/center
+  tags that don''t render reliably.
+
+
+  OBJECTIVE: Confirm the issue: Deprecated tags in markup; Apply the documented fix in /var/www/html/old.html;
+  Verify the file is corrected. Success means `check.sh` exits successfully.
+
+
+  WHAT TO AVOID: Do not apply broad destructive changes, skip evidence gathering, or fake completion with
+  marker files — the checker validates real system state.'
 initial_state: A page using deprecated presentational tags.
 objectives:
 - 'Confirm the issue: Deprecated tags in markup'
@@ -18,11 +36,70 @@ objectives:
 - Verify the file is corrected
 hints:
 - order: 1
-  cost: 10
-  content: Deprecated tags in markup
+  cost: 0
+  content: 'Where to look: Confirm the issue: Deprecated tags in markup'
 - order: 2
-  cost: 15
-  content: Replace with CSS-based markup.
+  cost: 25
+  content: 'Diagnostic steps:
+
+    1. Apply the documented fix in /var/www/html/old.html
+
+    2. Verify the file is corrected'
 - order: 3
-  cost: 20
-  content: /var/www/html/old.html carries the corrected markup/config.
+  cost: 50
+  content: 'Exact fix + verification:
+
+    1. Verify the file is corrected.
+
+    2. Re-run the lab checker (`check.sh` or Check Solution).
+
+    3. Confirm every scenario objective is satisfied.
+
+
+    WHY: the grader validates real state — marker files are ignored.'
+summary: Complete the page uses deprecated presentational tags html lab and verify success with the checker
+estimated_minutes: 20
+xp_reward: 100
+prerequisites:
+- Basic html literacy
+tags:
+- fix
+- hands-on
+- html
+linked_tutorial: html-fundamentals
+what_you_will_learn:
+- 'Confirm the issue: Deprecated tags in markup'
+- Apply the documented fix in /var/www/html/old.html
+- Verify the file is corrected
+environment:
+  nodes:
+  - role: primary
+    os: FixitLab web server lab
+    hostname: lab-primary
+    ip: 127.0.0.1
+    specs: local offline simulation
+  pre_installed:
+  - bash
+  - coreutils
+  - html
+  - journalctl
+  - systemctl
+  credentials:
+  - user: root
+    password: lab123
+tasks:
+- id: task_1
+  title: Page Uses Deprecated Presentational Tags
+  description: Restore healthy behavior for Page Uses Deprecated Presentational Tags by investigating
+    the failure, applying the smallest safe fix, and validating the outcome.
+  background: 'This html lab teaches systematic troubleshooting: observe, hypothesize, change, verify.'
+  validation:
+    type: custom_script
+    script: check.sh
+    error_message: Validation did not pass. Re-read the objectives and Hint 2 diagnostic steps.
+solution:
+  summary: Identify the misconfiguration affecting this html lab and apply the minimal fix.
+  files_changed: []
+  commands_run:
+  - bash check.sh
+  reference_docs: html-fundamentals

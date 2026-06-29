@@ -1,41 +1,119 @@
 title: WinRM Not Responding for Remote PowerShell
 slug: win-winrm-not-responding
 difficulty: medium
-category: Windows Server
-description: 'WinRM (Windows Remote Management) is not responding, preventing remote
-  PowerShell sessions and remote management tools from connecting. The WinRM service
-  may not be configured, the firewall may be blocking port 5985/5986, or the listener
-  may be misconfigured. You must diagnose and fix WinRM to restore remote management
-  capability.'
-initial_state: 'Windows Server 2022 with WinRM service installed but not properly
-  configured. Remote PowerShell commands are failing with connection refused or timeout
-  errors. The WinRM listener may not be created, the service may be stopped, or the
-  Windows Firewall may be blocking the WinRM ports (5985 HTTP, 5986 HTTPS).'
+category: Fix
+description: 'CONTEXT: A team operating Windows Server needs you to resolve `WinRM Not Responding for
+  Remote PowerShell` during a realistic incident. The business impact is reduced service reliability until
+  the underlying state is repaired.
+
+
+  ENVIRONMENT: You are working in FixitLab''s offline Windows Server host with PowerShell, Server Manager,
+  and AD tools. All tools run locally; no paid APIs or external cloud calls are required.
+
+
+  SYMPTOM / STARTING STATE: Windows Server 2022 with WinRM service installed but not properly configured.
+  Remote PowerShell commands are failing with connection refused or timeout errors. The WinRM listener
+  may not be created, the service may be stopped, or the Windows Firewall may be blocking the WinRM ports
+  (5985 HTTP, 5986 HTTPS). WinRM (Windows Remote Management) is not responding, preventing remote PowerShell
+  sessions and remote management tools from connecting. The WinRM service may not be configured, the firewall
+  may be blocking port 5985/5986, or the listener may be misconfigured. You must diagnose and fix WinRM
+  to restore remote management capability.
+
+
+  OBJECTIVE: Diagnose the WinRM configuration issue preventing remote connections; Configure WinRM listener
+  and ensure the firewall allows WinRM traffic; Verify remote PowerShell sessions work successfully after
+  the fix. Success means `check.sh` exits successfully.
+
+
+  WHAT TO AVOID: Do not apply broad destructive changes, skip evidence gathering, or fake completion with
+  marker files — the checker validates real system state.'
+initial_state: Windows Server 2022 with WinRM service installed but not properly configured. Remote PowerShell
+  commands are failing with connection refused or timeout errors. The WinRM listener may not be created,
+  the service may be stopped, or the Windows Firewall may be blocking the WinRM ports (5985 HTTP, 5986
+  HTTPS).
 objectives:
-  - Diagnose the WinRM configuration issue preventing remote connections
-  - Configure WinRM listener and ensure the firewall allows WinRM traffic
-  - Verify remote PowerShell sessions work successfully after the fix
+- Diagnose the WinRM configuration issue preventing remote connections
+- Configure WinRM listener and ensure the firewall allows WinRM traffic
+- Verify remote PowerShell sessions work successfully after the fix
 lab_mode: simulation
 simulation_type: windows
 time_limit: 1800
 max_score: 100
 is_free: false
 hints:
-  - content: 'Check WinRM status and config: Get-Service WinRM | Select Status and
-      winrm enumerate winrm/config/listener to see existing listeners. Test connectivity:
-      Test-WSMan -ComputerName <hostname>'
-    cost: 10
-    order: 1
-  - content: 'Enable and configure WinRM quickly: Enable-PSRemoting -Force which
-      starts the service, creates a listener, and adds firewall rules. Or manually:
-      winrm quickconfig -force'
-    cost: 15
-    order: 2
-  - content: 'Add trusted hosts if in a workgroup: Set-Item WSMan:\localhost\Client\TrustedHosts
-      -Value "*" -Force or specify IP ranges. Then test: Enter-PSSession -ComputerName
-      <hostname> -Credential (Get-Credential)'
-    cost: 20
-    order: 3
+- order: 1
+  cost: 0
+  content: 'Where to look: Open Event Viewer (System/Application) and the relevant Services mmc or Server
+    Manager role status.'
+- order: 2
+  cost: 25
+  content: 'Diagnostic steps:
+
+    1. Note the service state and dependency chain in services.msc.
+
+    2. Read the most recent error in Event Viewer for the failing component.
+
+    3. Use PowerShell (`Get-Service`, `Get-WinEvent`) for scripted evidence.'
+- order: 3
+  cost: 50
+  content: 'Exact fix + verification:
+
+    1. Apply the minimal fix (service start, GPO, binding, or permission).
+
+    2. Re-test the failing operation.
+
+    3. Confirm Check Solution passes.
+
+
+    WHY: Windows labs grade real role/service state.'
 requires_companion_hosts: false
 dual_terminal: false
 jira_priority: Medium
+technology: windows
+summary: Complete the winrm not responding for remote powershell windows lab and verify success with the
+  checker
+estimated_minutes: 30
+xp_reward: 100
+prerequisites:
+- Basic windows literacy
+tags:
+- fix
+- hands-on
+- windows
+linked_tutorial: windows-fundamentals
+what_you_will_learn:
+- Diagnose the WinRM configuration issue preventing remote connections
+- Configure WinRM listener and ensure the firewall allows WinRM traffic
+- Verify remote PowerShell sessions work successfully after the fix
+environment:
+  nodes:
+  - role: primary
+    os: FixitLab Windows Server host
+    hostname: lab-primary
+    ip: 127.0.0.1
+    specs: local offline simulation
+  pre_installed:
+  - bash
+  - coreutils
+  - journalctl
+  - systemctl
+  - windows
+  credentials:
+  - user: root
+    password: lab123
+tasks:
+- id: task_1
+  title: WinRM Not Responding for Remote PowerShell
+  description: Restore healthy behavior for WinRM Not Responding for Remote PowerShell by investigating
+    the failure, applying the smallest safe fix, and validating the outcome.
+  background: 'This windows lab teaches systematic troubleshooting: observe, hypothesize, change, verify.'
+  validation:
+    type: custom_script
+    script: check.sh
+    error_message: Validation did not pass. Re-read the objectives and Hint 2 diagnostic steps.
+solution:
+  summary: Identify the misconfiguration affecting this windows lab and apply the minimal fix.
+  files_changed: []
+  commands_run:
+  - bash check.sh
+  reference_docs: windows-fundamentals

@@ -1,25 +1,60 @@
-title: "Linux ↔ Network: Bonded VLAN Trunk Brings Down the App Subnet"
+title: 'Linux ↔ Network: Bonded VLAN Trunk Brings Down the App'
 slug: networking-linux-bond-vlan-trunk
-technology: Networking
-category: Linux Networking
+technology: networking
+category: Fix
 difficulty: hard
-description: |
-  CROSS-TECHNOLOGY task (Networking <-> Linux). The switch port for app-host-01
-  was reconfigured as an LACP trunk carrying VLAN 30 (the app subnet), but the
-  Linux side was never updated to match. The bond config at
-  /etc/sysconfig/network-scripts/ifcfg-bond0 uses the wrong bonding mode for LACP
-  and is missing the tagged VLAN 30 sub-interface, so the host has no carrier on
-  the app subnet and every service on it is unreachable. Align the Linux bonding
-  + VLAN configuration with the switch trunk.
-initial_state: |
-  A Linux host whose two NICs should form an 802.3ad (LACP) bond carrying a tagged
+description: 'CONTEXT: A team operating network operations needs you to resolve `Linux ↔ Network: Bonded
+  VLAN Trunk Brings Down the App` during a realistic incident. The business impact is reduced service
+  reliability until the underlying state is repaired.
+
+
+  ENVIRONMENT: You are working in FixitLab''s offline network lab with interfaces, routing tables, DNS,
+  and firewall rules. All tools run locally; no paid APIs or external cloud calls are required.
+
+
+  SYMPTOM / STARTING STATE: A Linux host whose two NICs should form an 802.3ad (LACP) bond carrying a
+  tagged
+
   VLAN 30 sub-interface. /etc/sysconfig/network-scripts/ifcfg-bond0 has the wrong
+
   bonding mode and no VLAN child, so bond0.30 never comes up and 10.30.0.0/24 is
+
+  dark. CROSS-TECHNOLOGY task (Networking <-> Linux). The switch port for app-host-01
+
+  was reconfigured as an LACP trunk carrying VLAN 30 (the app subnet), but the
+
+  Linux side was never updated to match. The bond config at
+
+  /etc/sysconfig/network-scripts/ifcfg-bond0 uses the wrong bonding mode for LACP
+
+  and is missing the tagged VLAN 30 sub-interface, so the host has no carrier on
+
+  the app subnet and every service on it is unreachable. Align the Linux bonding
+
+  + VLAN configuration with the switch trunk.
+
+
+  OBJECTIVE: Confirm the switch side is an LACP trunk with VLAN 30 tagged and compare it to the host bond
+  config; Correct ifcfg-bond0 to mode 802.3ad and define the tagged bond0.30 VLAN interface on 10.30.0.0/24;
+  Confirm the bonding/VLAN config is corrected so the app subnet comes back up. Success means `check.sh`
+  exits successfully.
+
+
+  WHAT TO AVOID: Do not apply broad destructive changes, skip evidence gathering, or fake completion with
+  marker files — the checker validates real system state.'
+initial_state: 'A Linux host whose two NICs should form an 802.3ad (LACP) bond carrying a tagged
+
+  VLAN 30 sub-interface. /etc/sysconfig/network-scripts/ifcfg-bond0 has the wrong
+
+  bonding mode and no VLAN child, so bond0.30 never comes up and 10.30.0.0/24 is
+
   dark.
+
+  '
 objectives:
-  - Confirm the switch side is an LACP trunk with VLAN 30 tagged and compare it to the host bond config
-  - Correct ifcfg-bond0 to mode 802.3ad and define the tagged bond0.30 VLAN interface on 10.30.0.0/24
-  - Confirm the bonding/VLAN config is corrected so the app subnet comes back up
+- Confirm the switch side is an LACP trunk with VLAN 30 tagged and compare it to the host bond config
+- Correct ifcfg-bond0 to mode 802.3ad and define the tagged bond0.30 VLAN interface on 10.30.0.0/24
+- Confirm the bonding/VLAN config is corrected so the app subnet comes back up
 lab_mode: simulation
 simulation_type: generic
 cross_technology: true
@@ -29,12 +64,73 @@ is_free: false
 jira_priority: Highest
 dual_terminal: false
 hints:
-  - order: 1
-    cost: 10
-    content: "An LACP (802.3ad) switch trunk requires `BONDING_OPTS=\"mode=802.3ad ...\"` on the host. The current ifcfg-bond0 uses an active-backup mode that will not negotiate LACP."
-  - order: 2
-    cost: 15
-    content: "VLAN 30 is tagged on the trunk, so the host needs a bond0.30 VLAN interface (VLAN=yes) addressed in 10.30.0.0/24 — it is missing entirely."
-  - order: 3
-    cost: 20
-    content: "Fix the bonding mode and add the tagged VLAN child. Once ifcfg-bond0 is corrected, the app subnet carrier returns."
+- order: 1
+  cost: 0
+  content: 'Where to look: Confirm the switch side is an LACP trunk with VLAN 30 tagged and compare it
+    to the host bond config'
+- order: 2
+  cost: 25
+  content: 'Diagnostic steps:
+
+    1. Correct ifcfg-bond0 to mode 802.3ad and define the tagged bond0.30 VLAN interface on 10.30.0.0/24
+
+    2. Confirm the bonding/VLAN config is corrected so the app subnet comes back up'
+- order: 3
+  cost: 50
+  content: 'Exact fix + verification:
+
+    1. Confirm the bonding/VLAN config is corrected so the app subnet comes back up.
+
+    2. Re-run the lab checker (`check.sh` or Check Solution).
+
+    3. Confirm every scenario objective is satisfied.
+
+
+    WHY: the grader validates real state — marker files are ignored.'
+summary: 'Complete the linux ↔ network: bonded vlan trunk brings down the app networking lab and verify
+  success with the checker'
+estimated_minutes: 25
+xp_reward: 100
+prerequisites:
+- Basic networking literacy
+tags:
+- fix
+- hands-on
+- networking
+linked_tutorial: networking-fundamentals
+what_you_will_learn:
+- Confirm the switch side is an LACP trunk with VLAN 30 tagged and compare it to the host bond config
+- Correct ifcfg-bond0 to mode 802.3ad and define the tagged bond0.30 VLAN interface on 10.30.0.0/24
+- Confirm the bonding/VLAN config is corrected so the app subnet comes back up
+environment:
+  nodes:
+  - role: primary
+    os: FixitLab network lab
+    hostname: lab-primary
+    ip: 127.0.0.1
+    specs: local offline simulation
+  pre_installed:
+  - bash
+  - coreutils
+  - journalctl
+  - networking
+  - systemctl
+  credentials:
+  - user: root
+    password: lab123
+tasks:
+- id: task_1
+  title: 'Linux ↔ Network: Bonded VLAN Trunk Brings Down the App'
+  description: 'Restore healthy behavior for Linux ↔ Network: Bonded VLAN Trunk Brings Down the App by
+    investigating the failure, applying the smallest safe fix, and validating the outcome.'
+  background: 'This networking lab teaches systematic troubleshooting: observe, hypothesize, change, verify.'
+  validation:
+    type: custom_script
+    script: check.sh
+    error_message: Validation did not pass. Re-read the objectives and Hint 2 diagnostic steps.
+solution:
+  summary: Identify the misconfiguration affecting this networking lab and apply the minimal fix.
+  files_changed: []
+  commands_run:
+  - bash check.sh
+  reference_docs: networking-fundamentals

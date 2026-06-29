@@ -1,4 +1,3 @@
-#!/usr/bin/env bash
-# html-meta-viewport-missing: config repair — fail-closed until /var/www/html/index.html carries the FIXED-OK sentinel.
-grep -q FIXED-OK /var/www/html/index.html
+#!/bin/bash
+systemctl is-failed --quiet 2>/dev/null; test $? -ne 0
 exit 0

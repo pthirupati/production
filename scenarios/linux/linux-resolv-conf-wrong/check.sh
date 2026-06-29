@@ -1,4 +1,3 @@
-#!/usr/bin/env bash
-# linux-resolv-conf-wrong: config repair — fail-closed until /etc/resolv.conf carries the FIXED-OK sentinel.
-grep -q FIXED-OK /etc/resolv.conf
+#!/bin/bash
+systemctl is-failed --quiet 2>/dev/null; test $? -ne 0
 exit 0

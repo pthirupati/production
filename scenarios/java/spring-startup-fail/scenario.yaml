@@ -1,8 +1,7 @@
----
 slug: sim-java-spring-fail
-title: "Spring Boot Port Already in Use — Startup Aborts"
-technology: Java
-category: "Spring Boot"
+title: Spring Boot Port Already in Use — Startup Aborts
+technology: java
+category: Fix
 difficulty: easy
 time_limit: 600
 max_score: 100
@@ -11,22 +10,108 @@ simulation_type: java
 infrastructure_type: simulation
 jira_priority: Medium
 is_free: false
-description: |
-  Spring Boot fails to start with 'Web server failed to start. Port 8080 was already in use.' Another process holds the configured port, so the embedded server cannot bind. Either free the port or move the app to a free port via configuration, then confirm a clean startup.
+description: 'CONTEXT: A team operating Java applications needs you to resolve `Spring Boot Port Already
+  in Use — Startup Aborts` during a realistic incident. The business impact is reduced service reliability
+  until the underlying state is repaired.
+
+
+  ENVIRONMENT: You are working in FixitLab''s offline Java project with Maven/Gradle, JVM logs, and Spring
+  configuration. All tools run locally; no paid APIs or external cloud calls are required.
+
+
+  SYMPTOM / STARTING STATE: Config at /app/src/main/resources/application.properties pins server.port=8080
+  which is already bound; startup aborts with ''Port 8080 was already in use''. Spring Boot fails to start
+  with ''Web server failed to start. Port 8080 was already in use.'' Another process holds the configured
+  port, so the embedded server cannot bind. Either free the port or move the app to a free port via configuration,
+  then confirm a clean startup.
+
+
+  OBJECTIVE: Confirm the bind failure is a port-in-use conflict; Identify what holds the port (or choose
+  a free one); Free the port or set server.port to an available value. Success means `check.sh` exits
+  successfully.
+
+
+  WHAT TO AVOID: Do not apply broad destructive changes, skip evidence gathering, or fake completion with
+  marker files — the checker validates real system state.'
 objectives:
-  - "Confirm the bind failure is a port-in-use conflict"
-  - "Identify what holds the port (or choose a free one)"
-  - "Free the port or set server.port to an available value"
-  - "Verify the app starts and serves on the chosen port"
-initial_state: |
-  Config at /app/src/main/resources/application.properties pins server.port=8080 which is already bound; startup aborts with 'Port 8080 was already in use'.
+- Confirm the bind failure is a port-in-use conflict
+- Identify what holds the port (or choose a free one)
+- Free the port or set server.port to an available value
+- Verify the app starts and serves on the chosen port
+initial_state: 'Config at /app/src/main/resources/application.properties pins server.port=8080 which is
+  already bound; startup aborts with ''Port 8080 was already in use''.
+
+  '
 hints:
-  - order: 1
-    cost: 10
-    content: "The message names the port; ss -tlnp | grep 8080 shows who holds it."
-  - order: 2
-    cost: 15
-    content: "Stop the conflicting process, or set server.port to a free port in application.properties."
-  - order: 3
-    cost: 20
-    content: "Restart and confirm 'Tomcat started on port(s)' with no bind error."
+- order: 1
+  cost: 0
+  content: 'Where to look: Confirm the bind failure is a port-in-use conflict'
+- order: 2
+  cost: 25
+  content: 'Diagnostic steps:
+
+    1. Identify what holds the port (or choose a free one)
+
+    2. Free the port or set server.port to an available value
+
+    3. Verify the app starts and serves on the chosen port'
+- order: 3
+  cost: 50
+  content: 'Exact fix + verification:
+
+    1. Verify the app starts and serves on the chosen port.
+
+    2. Re-run the lab checker (`check.sh` or Check Solution).
+
+    3. Confirm every scenario objective is satisfied.
+
+
+    WHY: the grader validates real state — marker files are ignored.'
+summary: Complete the spring boot port already in use — startup aborts java lab and verify success with
+  the checker
+estimated_minutes: 10
+xp_reward: 100
+prerequisites:
+- Basic java literacy
+tags:
+- fix
+- hands-on
+- java
+linked_tutorial: java-fundamentals
+what_you_will_learn:
+- Confirm the bind failure is a port-in-use conflict
+- Identify what holds the port (or choose a free one)
+- Free the port or set server.port to an available value
+- Verify the app starts and serves on the chosen port
+environment:
+  nodes:
+  - role: primary
+    os: FixitLab Java project
+    hostname: lab-primary
+    ip: 127.0.0.1
+    specs: local offline simulation
+  pre_installed:
+  - bash
+  - coreutils
+  - java
+  - journalctl
+  - systemctl
+  credentials:
+  - user: root
+    password: lab123
+tasks:
+- id: task_1
+  title: Spring Boot Port Already in Use — Startup Aborts
+  description: Restore healthy behavior for Spring Boot Port Already in Use — Startup Aborts by investigating
+    the failure, applying the smallest safe fix, and validating the outcome.
+  background: 'This java lab teaches systematic troubleshooting: observe, hypothesize, change, verify.'
+  validation:
+    type: custom_script
+    script: check.sh
+    error_message: Validation did not pass. Re-read the objectives and Hint 2 diagnostic steps.
+solution:
+  summary: Identify the misconfiguration affecting this java lab and apply the minimal fix.
+  files_changed: []
+  commands_run:
+  - bash check.sh
+  reference_docs: java-fundamentals

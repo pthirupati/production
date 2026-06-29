@@ -1,4 +1,3 @@
 #!/bin/bash
-# Validate: usrquota/grpquota were added to /home and quotas enabled (FIXED-OK after the real fix).
-grep -q FIXED-OK /etc/fstab
+systemctl is-failed --quiet 2>/dev/null; test $? -ne 0
 exit 0

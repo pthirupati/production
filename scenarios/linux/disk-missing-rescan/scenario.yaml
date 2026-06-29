@@ -1,10 +1,29 @@
 title: Rescan SCSI Bus for Missing Disk
 slug: linux-disk-missing-rescan
-category: Storage
+category: Fix
 difficulty: medium
-description: A new disk was hot-added at the hypervisor/SAN, but it doesn't appear inside the Linux guest
-  because the SCSI bus hasn't been rescanned. Linux won't see the device until the relevant SCSI host
-  is told to look for new LUNs. Trigger a rescan and confirm the new disk shows up in lsblk.
+description: 'CONTEXT: A team operating Linux administration needs you to resolve `Rescan SCSI Bus for
+  Missing Disk` during a realistic incident. The business impact is reduced service reliability until
+  the underlying state is repaired.
+
+
+  ENVIRONMENT: You are working in FixitLab''s offline Linux practice server with terminal and config files
+  under /etc and /var. All tools run locally; no paid APIs or external cloud calls are required.
+
+
+  SYMPTOM / STARTING STATE: Linux guest where a freshly attached disk is not yet visible (missing from
+  lsblk) because the SCSI host needs a rescan to detect it. A new disk was hot-added at the hypervisor/SAN,
+  but it doesn''t appear inside the Linux guest because the SCSI bus hasn''t been rescanned. Linux won''t
+  see the device until the relevant SCSI host is told to look for new LUNs. Trigger a rescan and confirm
+  the new disk shows up in lsblk.
+
+
+  OBJECTIVE: Confirm the new disk is not yet visible to the guest; Rescan the SCSI host bus to detect
+  the new device; Verify the new disk appears in lsblk. Success means `check.sh` exits successfully.
+
+
+  WHAT TO AVOID: Do not apply broad destructive changes, skip evidence gathering, or fake completion with
+  marker files — the checker validates real system state.'
 lab_mode: simulation
 simulation_type: rhel
 time_limit: 900
@@ -18,14 +37,73 @@ initial_state: Linux guest where a freshly attached disk is not yet visible (mis
   the SCSI host needs a rescan to detect it.
 hints:
 - order: 1
-  cost: 10
-  content: 'It''s not in `lsblk` yet. Identify the SCSI hosts: `ls /sys/class/scsi_host/` (host0, host1,
-    ...).'
+  cost: 0
+  content: 'Where to look: Run `df -h` and `du -xh /var /tmp /home | sort -h | tail -20` for large paths.'
 - order: 2
-  cost: 15
-  content: 'Trigger a rescan of the bus: `echo ''- - -'' > /sys/class/scsi_host/host0/scan` (repeat for
-    each host, or use `rescan-scsi-bus.sh` if available).'
+  cost: 25
+  content: 'Diagnostic steps:
+
+    1. Find which mount is 100% — often `/` or `/var`.
+
+    2. `journalctl --disk-usage` and old logs under `/var/log`.
+
+    3. Look for core dumps, temp files, or oversized application data.'
 - order: 3
-  cost: 20
-  content: 'Confirm the device now appears: `lsblk` (and `dmesg | tail` shows the new disk attaching).
-    You can now partition/format it.'
+  cost: 50
+  content: 'Exact fix + verification:
+
+    1. Remove or rotate the largest safe files (logs, caches, old packages).
+
+    2. `df -h` should show free space on the affected mount.
+
+    3. Retry the command that failed with ''No space left on device''.
+
+
+    WHY: many services fail cryptically when disk is full.'
+technology: linux
+summary: Complete the rescan scsi bus for missing disk linux lab and verify success with the checker
+estimated_minutes: 15
+xp_reward: 100
+prerequisites:
+- Basic linux literacy
+tags:
+- fix
+- hands-on
+- linux
+linked_tutorial: linux-fundamentals
+what_you_will_learn:
+- Confirm the new disk is not yet visible to the guest
+- Rescan the SCSI host bus to detect the new device
+- Verify the new disk appears in lsblk
+environment:
+  nodes:
+  - role: primary
+    os: FixitLab Linux practice server
+    hostname: lab-primary
+    ip: 127.0.0.1
+    specs: local offline simulation
+  pre_installed:
+  - bash
+  - coreutils
+  - journalctl
+  - linux
+  - systemctl
+  credentials:
+  - user: root
+    password: lab123
+tasks:
+- id: task_1
+  title: Rescan SCSI Bus for Missing Disk
+  description: Restore healthy behavior for Rescan SCSI Bus for Missing Disk by investigating the failure,
+    applying the smallest safe fix, and validating the outcome.
+  background: 'This linux lab teaches systematic troubleshooting: observe, hypothesize, change, verify.'
+  validation:
+    type: custom_script
+    script: check.sh
+    error_message: Validation did not pass. Re-read the objectives and Hint 2 diagnostic steps.
+solution:
+  summary: Identify the misconfiguration affecting this linux lab and apply the minimal fix.
+  files_changed: []
+  commands_run:
+  - bash check.sh
+  reference_docs: linux-fundamentals

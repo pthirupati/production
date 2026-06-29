@@ -1,38 +1,127 @@
 slug: tcp-syn-flood
-title: "TCP SYN Flood — Enable tcp_syncookies to Mitigate Attack"
-technology: Networking
-category: DDoS Mitigation
+title: TCP SYN Flood — Enable tcp_syncookies to Mitigate Attack
+technology: networking
+category: Fix
 difficulty: medium
 time_limit: 900
 max_score: 100
 infrastructure_type: docker
 jira_priority: Critical
 is_free: false
-description: |
-  The server is under an ongoing TCP SYN flood attack. The SYN backlog queue is
-  filling up and legitimate connections are being rejected. The kernel's SYN cookie
-  protection is disabled, allowing the attack to exhaust the half-open connection
-  table. Enable tcp_syncookies and tune the SYN backlog parameters to allow the
-  server to continue handling legitimate traffic during the attack.
-objectives:
-  - Identify that tcp_syncookies is disabled
-  - Enable tcp_syncookies and increase the SYN backlog size
-  - Persist the settings via sysctl.conf
-  - Verify the server can accept new legitimate connections
-initial_state: |
-  Ubuntu 22.04 server under SYN flood. `sysctl net.ipv4.tcp_syncookies` returns 0.
+description: 'CONTEXT: A team operating network operations needs you to resolve `TCP SYN Flood — Enable
+  tcp_syncookies to Mitigate Attack` during a realistic incident. The business impact is reduced service
+  reliability until the underlying state is repaired.
+
+
+  ENVIRONMENT: You are working in FixitLab''s offline network lab with interfaces, routing tables, DNS,
+  and firewall rules. All tools run locally; no paid APIs or external cloud calls are required.
+
+
+  SYMPTOM / STARTING STATE: Ubuntu 22.04 server under SYN flood. `sysctl net.ipv4.tcp_syncookies` returns
+  0.
+
   `netstat -an | grep SYN_RECV` shows hundreds of half-open connections. Legitimate
+
+  clients are getting connection refused or timeout. The server is under an ongoing TCP SYN flood attack.
+  The SYN backlog queue is
+
+  filling up and legitimate connections are being rejected. The kernel''s SYN cookie
+
+  protection is disabled, allowing the attack to exhaust the half-open connection
+
+  table. Enable tcp_syncookies and tune the SYN backlog parameters to allow the
+
+  server to continue handling legitimate traffic during the attack.
+
+
+  OBJECTIVE: Identify that tcp_syncookies is disabled; Enable tcp_syncookies and increase the SYN backlog
+  size; Persist the settings via sysctl.conf. Success means `check.sh` exits successfully.
+
+
+  WHAT TO AVOID: Do not apply broad destructive changes, skip evidence gathering, or fake completion with
+  marker files — the checker validates real system state.'
+objectives:
+- Identify that tcp_syncookies is disabled
+- Enable tcp_syncookies and increase the SYN backlog size
+- Persist the settings via sysctl.conf
+- Verify the server can accept new legitimate connections
+initial_state: 'Ubuntu 22.04 server under SYN flood. `sysctl net.ipv4.tcp_syncookies` returns 0.
+
+  `netstat -an | grep SYN_RECV` shows hundreds of half-open connections. Legitimate
+
   clients are getting connection refused or timeout.
+
+  '
 hints:
-  - order: 1
-    cost: 10
-    content: "Check current value: `sysctl net.ipv4.tcp_syncookies` and `sysctl net.ipv4.tcp_max_syn_backlog`."
-  - order: 2
-    cost: 15
-    content: "Enable immediately: `sysctl -w net.ipv4.tcp_syncookies=1` and `sysctl -w net.ipv4.tcp_max_syn_backlog=4096`"
-  - order: 3
-    cost: 15
-    content: "Also set: `sysctl -w net.ipv4.tcp_synack_retries=2` to reduce resource hold time for half-open connections."
-  - order: 4
-    cost: 10
-    content: "Persist: add settings to /etc/sysctl.conf and run `sysctl -p`."
+- order: 1
+  cost: 0
+  content: 'Where to look: Identify that tcp_syncookies is disabled'
+- order: 2
+  cost: 25
+  content: 'Diagnostic steps:
+
+    1. Enable tcp_syncookies and increase the SYN backlog size
+
+    2. Persist the settings via sysctl.conf
+
+    3. Verify the server can accept new legitimate connections'
+- order: 3
+  cost: 50
+  content: 'Exact fix + verification:
+
+    1. Verify the server can accept new legitimate connections.
+
+    2. Re-run the lab checker (`check.sh` or Check Solution).
+
+    3. Confirm every scenario objective is satisfied.
+
+
+    WHY: the grader validates real state — marker files are ignored.'
+summary: Complete the tcp syn flood — enable tcp_syncookies to mitigate attack networking lab and verify
+  success with the checker
+estimated_minutes: 15
+xp_reward: 100
+prerequisites:
+- Basic networking literacy
+tags:
+- fix
+- hands-on
+- networking
+linked_tutorial: networking-fundamentals
+what_you_will_learn:
+- Identify that tcp_syncookies is disabled
+- Enable tcp_syncookies and increase the SYN backlog size
+- Persist the settings via sysctl.conf
+- Verify the server can accept new legitimate connections
+environment:
+  nodes:
+  - role: primary
+    os: FixitLab network lab
+    hostname: lab-primary
+    ip: 127.0.0.1
+    specs: local offline simulation
+  pre_installed:
+  - bash
+  - coreutils
+  - journalctl
+  - networking
+  - systemctl
+  credentials:
+  - user: root
+    password: lab123
+tasks:
+- id: task_1
+  title: TCP SYN Flood — Enable tcp_syncookies to Mitigate Attack
+  description: Restore healthy behavior for TCP SYN Flood — Enable tcp_syncookies to Mitigate Attack by
+    investigating the failure, applying the smallest safe fix, and validating the outcome.
+  background: 'This networking lab teaches systematic troubleshooting: observe, hypothesize, change, verify.'
+  validation:
+    type: custom_script
+    script: check.sh
+    error_message: Validation did not pass. Re-read the objectives and Hint 2 diagnostic steps.
+solution:
+  summary: Identify the misconfiguration affecting this networking lab and apply the minimal fix.
+  files_changed: []
+  commands_run:
+  - bash check.sh
+  reference_docs: networking-fundamentals

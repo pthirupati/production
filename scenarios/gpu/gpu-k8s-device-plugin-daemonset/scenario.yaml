@@ -1,25 +1,60 @@
-title: "GPU ↔ Kubernetes: Device Plugin Won't Expose nvidia.com/gpu"
+title: 'GPU ↔ Kubernetes: Device Plugin Won''t Expose nvidia.com/gpu'
 slug: gpu-k8s-device-plugin-daemonset
-technology: GPU & NVIDIA
-category: Accelerated Kubernetes
+technology: gpu
+category: Fix
 difficulty: hard
-description: |
-  CROSS-TECHNOLOGY task (GPU <-> Kubernetes). GPU jobs sit Pending on the cluster
-  because no node advertises the `nvidia.com/gpu` resource. The NVIDIA device-plugin
-  DaemonSet manifest at /etc/nvidia-container-runtime/k8s-device-plugin.yaml is
-  broken: the container runtime is not set to `nvidia` in the runtime config it
-  references, the DaemonSet uses the wrong image tag, and it lacks the privileged
-  /var/lib/kubelet/device-plugins mount — so the plugin never registers the GPU.
-  Reconcile the GPU runtime + device-plugin manifest so the cluster can schedule
-  GPU workloads.
-initial_state: |
-  A GPU node feeding a Kubernetes cluster. The NVIDIA container runtime is not the
+description: 'CONTEXT: A team operating GPU operations needs you to resolve `GPU ↔ Kubernetes: Device
+  Plugin Won''t Expose nvidia.com/gpu` during a realistic incident. The business impact is reduced service
+  reliability until the underlying state is repaired.
+
+
+  ENVIRONMENT: You are working in FixitLab''s offline GPU node with nvidia-smi, drivers, CUDA, and container
+  toolkit. All tools run locally; no paid APIs or external cloud calls are required.
+
+
+  SYMPTOM / STARTING STATE: A GPU node feeding a Kubernetes cluster. The NVIDIA container runtime is not
+  the
+
   default, and /etc/nvidia-container-runtime/k8s-device-plugin.yaml (the device
+
+  plugin DaemonSet) is misconfigured, so `nvidia.com/gpu` is never advertised. CROSS-TECHNOLOGY task (GPU
+  <-> Kubernetes). GPU jobs sit Pending on the cluster
+
+  because no node advertises the `nvidia.com/gpu` resource. The NVIDIA device-plugin
+
+  DaemonSet manifest at /etc/nvidia-container-runtime/k8s-device-plugin.yaml is
+
+  broken: the container runtime is not set to `nvidia` in the runtime config it
+
+  references, the DaemonSet uses the wrong image tag, and it lacks the privileged
+
+  /var/lib/kubelet/device-plugins mount — so the plugin never registers the GPU.
+
+  Reconcile the GPU runtime + device-plugin manifest so the cluster can schedule
+
+  GPU workloads.
+
+
+  OBJECTIVE: Confirm no node advertises nvidia.com/gpu and GPU pods are Pending; Set the NVIDIA runtime
+  as default and correct the device-plugin DaemonSet manifest (image, device-plugins mount); Confirm the
+  manifest is corrected so the plugin registers and GPUs become schedulable. Success means `check.sh`
+  exits successfully.
+
+
+  WHAT TO AVOID: Do not apply broad destructive changes, skip evidence gathering, or fake completion with
+  marker files — the checker validates real system state.'
+initial_state: 'A GPU node feeding a Kubernetes cluster. The NVIDIA container runtime is not the
+
+  default, and /etc/nvidia-container-runtime/k8s-device-plugin.yaml (the device
+
   plugin DaemonSet) is misconfigured, so `nvidia.com/gpu` is never advertised.
+
+  '
 objectives:
-  - Confirm no node advertises nvidia.com/gpu and GPU pods are Pending
-  - Set the NVIDIA runtime as default and correct the device-plugin DaemonSet manifest (image, device-plugins mount)
-  - Confirm the manifest is corrected so the plugin registers and GPUs become schedulable
+- Confirm no node advertises nvidia.com/gpu and GPU pods are Pending
+- Set the NVIDIA runtime as default and correct the device-plugin DaemonSet manifest (image, device-plugins
+  mount)
+- Confirm the manifest is corrected so the plugin registers and GPUs become schedulable
 lab_mode: simulation
 simulation_type: gpu
 cross_technology: true
@@ -29,12 +64,77 @@ is_free: false
 jira_priority: Highest
 dual_terminal: false
 hints:
-  - order: 1
-    cost: 10
-    content: "`kubectl describe node` shows no `nvidia.com/gpu` capacity. The device plugin can only register if the NVIDIA container runtime is the default and the DaemonSet is correct."
-  - order: 2
-    cost: 15
-    content: "Fix /etc/nvidia-container-runtime/k8s-device-plugin.yaml: correct image tag, mount /var/lib/kubelet/device-plugins, and ensure the runtime config selects `nvidia`."
-  - order: 3
-    cost: 20
-    content: "Once the device-plugin manifest is corrected, the node advertises nvidia.com/gpu and GPU pods schedule."
+- order: 1
+  cost: 0
+  content: 'Where to look: Run `kubectl get pods -A` and `kubectl describe pod <name>` for any pod not
+    in Running state.'
+- order: 2
+  cost: 25
+  content: 'Diagnostic steps:
+
+    1. `kubectl get pods` — note CrashLoopBackOff, ImagePullBackOff, or Pending.
+
+    2. `kubectl describe pod <name>` — read Events at the bottom.
+
+    3. `kubectl logs <name> [--previous]` if the container restarted.'
+- order: 3
+  cost: 50
+  content: 'Exact fix + verification:
+
+    1. Fix the root cause (image name, env var, volume mount, or probe).
+
+    2. `kubectl apply -f` the corrected manifest or delete the pod to recreate.
+
+    3. Confirm `kubectl get pods` shows every pod Running.
+
+
+    WHY: Kubernetes only reports healthy when the workload actually runs.'
+summary: 'Complete the gpu ↔ kubernetes: device plugin won''t expose nvidia com/gpu gpu lab and verify
+  success with the checker'
+estimated_minutes: 25
+xp_reward: 100
+prerequisites:
+- Basic gpu literacy
+tags:
+- fix
+- gpu
+- hands-on
+linked_tutorial: gpu-fundamentals
+what_you_will_learn:
+- Confirm no node advertises nvidia.com/gpu and GPU pods are Pending
+- Set the NVIDIA runtime as default and correct the device-plugin DaemonSet manifest (image, device-plugins
+  mount)
+- Confirm the manifest is corrected so the plugin registers and GPUs become schedulable
+environment:
+  nodes:
+  - role: primary
+    os: FixitLab GPU node
+    hostname: lab-primary
+    ip: 127.0.0.1
+    specs: local offline simulation
+  pre_installed:
+  - bash
+  - coreutils
+  - gpu
+  - journalctl
+  - systemctl
+  credentials:
+  - user: root
+    password: lab123
+tasks:
+- id: task_1
+  title: 'GPU ↔ Kubernetes: Device Plugin Won''t Expose nvidia.com/gpu'
+  description: 'Restore healthy behavior for GPU ↔ Kubernetes: Device Plugin Won''t Expose nvidia.com/gpu
+    by investigating the failure, applying the smallest safe fix, and validating the outcome.'
+  background: 'This gpu lab teaches systematic troubleshooting: observe, hypothesize, change, verify.'
+  validation:
+    type: command_output
+    command: nvidia-smi
+    expected_output: NVIDIA-SMI
+    error_message: GPU health check still fails. Verify driver and device visibility.
+solution:
+  summary: Identify the misconfiguration affecting this gpu lab and apply the minimal fix.
+  files_changed: []
+  commands_run:
+  - nvidia-smi
+  reference_docs: gpu-fundamentals

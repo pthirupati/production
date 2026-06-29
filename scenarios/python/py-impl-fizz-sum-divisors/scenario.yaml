@@ -1,9 +1,26 @@
 title: Implement sum_of_divisors
 slug: py-impl-fizz-sum-divisors
-category: Python Development
-description: 'Implement sum_of_divisors(n) for a positive integer n: the sum of all positive divisors
-  of n that are strictly less than n (its proper divisors). sum_of_divisors(6) == 1+2+3 == 6. The stub
-  is empty so tests fail.'
+category: Build
+description: 'CONTEXT: A team operating Python development needs you to resolve `Implement sum_of_divisors`
+  during a realistic incident. The business impact is reduced service reliability until the underlying
+  state is repaired.
+
+
+  ENVIRONMENT: You are working in FixitLab''s offline Python project workspace with source files, venv,
+  tests, and CLI entrypoints. All tools run locally; no paid APIs or external cloud calls are required.
+
+
+  SYMPTOM / STARTING STATE: Implement sum_of_divisors(n) for a positive integer n: the sum of all positive
+  divisors of n that are strictly less than n (its proper divisors). sum_of_divisors(6) == 1+2+3 == 6.
+  The stub is empty so tests fail.
+
+
+  OBJECTIVE: Find all proper divisors of n; Exclude n itself; Return their sum (1 for primes, 0 for 1).
+  Success means all hidden tests pass.
+
+
+  WHAT TO AVOID: Do not apply broad destructive changes, skip evidence gathering, or fake completion with
+  marker files — the checker validates real system state.'
 difficulty: easy
 scenario_type: do
 lab_mode: simulation
@@ -21,51 +38,142 @@ objectives:
 initial_state: 'Implement sum_of_divisors(n) for a positive integer n: the sum of all positive divisors
   of n that are strictly less than n (its proper divisors). sum_of_divisors(6) == 1+2+3 == 6. The stub
   is empty so tests fail.'
-solution_explanation: |
-  Scanning to sqrt(n) and adding both members of each divisor pair (without double-counting a square root, and excluding n) gives the proper-divisor sum.
+solution_explanation: 'Scanning to sqrt(n) and adding both members of each divisor pair (without double-counting
+  a square root, and excluding n) gives the proper-divisor sum.
+
+  '
 coding_spec:
   language: python
   entrypoint: solution.py
   kind: impl
-  instructions: |
-    Implement sum_of_divisors(n) -> sum of proper divisors (divisors < n).
-      sum_of_divisors(6) -> 6 (1+2+3), sum_of_divisors(12) -> 16
-    Click Run to try it, then Check Solution to grade against all tests.
+  instructions: "Implement sum_of_divisors(n) -> sum of proper divisors (divisors < n).\n  sum_of_divisors(6)\
+    \ -> 6 (1+2+3), sum_of_divisors(12) -> 16\nClick Run to try it, then Check Solution to grade against\
+    \ all tests.\n"
   files:
   - path: solution.py
-    content: |
-      def sum_of_divisors(n):
-          # TODO: sum the proper divisors of n
-          pass
+    content: "def sum_of_divisors(n):\n    # TODO: sum the proper divisors of n\n    pass\n"
     readonly: false
   visible_tests:
   - name: perfect number
-    code: |
-      assert sum_of_divisors(6) == 6, sum_of_divisors(6)
+    code: 'assert sum_of_divisors(6) == 6, sum_of_divisors(6)
+
+      '
   - name: twelve
-    code: |
-      assert sum_of_divisors(12) == 16, sum_of_divisors(12)
+    code: 'assert sum_of_divisors(12) == 16, sum_of_divisors(12)
+
+      '
   hidden_tests:
   - name: prime
-    code: |
-      assert sum_of_divisors(7) == 1
+    code: 'assert sum_of_divisors(7) == 1
+
+      '
   - name: one
-    code: |
-      assert sum_of_divisors(1) == 0
+    code: 'assert sum_of_divisors(1) == 0
+
+      '
   - name: perfect square
-    code: |
-      assert sum_of_divisors(16) == 15, sum_of_divisors(16)
+    code: 'assert sum_of_divisors(16) == 15, sum_of_divisors(16)
+
+      '
   - name: 28 is perfect
-    code: |
-      assert sum_of_divisors(28) == 28
+    code: 'assert sum_of_divisors(28) == 28
+
+      '
   timeout: 8
 hints:
 - order: 1
-  cost: 10
-  content: 1 is a proper divisor of every n > 1; n itself is excluded.
+  cost: 0
+  content: 'Where to look: Open `solution.py`, read the instructions, and run the visible tests to see
+    which assertion fails first.'
 - order: 2
-  cost: 20
-  content: Divisors come in pairs i and n//i — only scan i up to sqrt(n).
+  cost: 25
+  content: 'Diagnostic steps:
+
+    1. Click Run and read the traceback — note line number and actual vs expected values.
+
+    2. Reproduce the failure with the smallest input from a visible test.
+
+    3. Compare your implementation to the bug described in the lab prompt.'
 - order: 3
-  cost: 30
-  content: Watch the perfect-square case (don't double-count i == n//i) and never add n.
+  cost: 50
+  content: 'Exact fix + verification:
+
+    1. Return their sum (1 for primes, 0 for 1).
+
+    2. Re-run the lab checker (`check.sh` or Check Solution).
+
+    3. Confirm every scenario objective is satisfied.
+
+
+    WHY: the grader validates real state — marker files are ignored.'
+technology: python
+summary: Complete the implement sum_of_divisors python lab and verify success with the checker
+estimated_minutes: 25
+xp_reward: 100
+prerequisites:
+- Basic python literacy
+tags:
+- do
+- hands-on
+- python
+linked_tutorial: python-fundamentals
+what_you_will_learn:
+- Find all proper divisors of n
+- Exclude n itself
+- Return their sum (1 for primes, 0 for 1)
+environment:
+  nodes:
+  - role: primary
+    os: FixitLab Python project workspace
+    hostname: lab-primary
+    ip: 127.0.0.1
+    specs: local offline simulation
+  pre_installed:
+  - bash
+  - coreutils
+  - pip
+  - python
+  - python3
+  credentials:
+  - user: root
+    password: lab123
+tasks:
+- id: task_1
+  title: Implement sum_of_divisors
+  description: Restore healthy behavior for Implement sum_of_divisors by investigating the failure, applying
+    the smallest safe fix, and validating the outcome.
+  background: 'This python lab teaches systematic troubleshooting: observe, hypothesize, change, verify.'
+  validation:
+    type: custom_script
+    script: hidden_tests
+    error_message: One or more hidden tests failed. Read the public test output, fix your solution, and
+      submit again.
+solution:
+  summary: The solution passes all hidden tests by implementing the required behavior in code.
+  files_changed: []
+  commands_run: []
+  reference_docs: python-fundamentals
+guided_mode:
+  enabled: true
+  steps:
+  - step: 1
+    title: Inspect current state
+    instruction: Run a read-only diagnostic before changing anything.
+    command: check.sh
+    expected_output: Output shows the current failure mode
+    explanation: Evidence-first troubleshooting avoids guessing.
+    next_on: command_success
+  - step: 2
+    title: Apply the minimal fix
+    instruction: Make one reversible change aligned with the objectives.
+    command: '# your fix command here'
+    expected_output: State moves toward the objective
+    explanation: Small changes make rollback easy if the hypothesis was wrong.
+    next_on: command_success
+  - step: 3
+    title: Verify with the grader
+    instruction: Run the same verification the checker uses.
+    command: check.sh
+    expected_output: all hidden tests pass
+    explanation: The lab passes only when real state is healthy.
+    next_on: command_success

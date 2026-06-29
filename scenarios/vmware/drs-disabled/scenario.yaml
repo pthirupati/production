@@ -1,8 +1,7 @@
----
 slug: drs-disabled
-title: "DRS Disabled — Hosts Severely Imbalanced, One Host Overloaded"
-technology: VMware
-category: Resource Management
+title: DRS Disabled - Hosts Severely Imbalanced, One Host
+technology: vmware
+category: Fix
 difficulty: easy
 time_limit: 900
 max_score: 100
@@ -11,35 +10,120 @@ simulation_type: vmware
 infrastructure_type: simulation
 jira_priority: Medium
 is_free: false
-description: |
-  vSphere DRS is showing as "Disabled" on the production cluster. One ESXi host
-  (esxi-01) is running at 95% CPU utilization while the other two hosts are at 30%.
-  DRS was disabled 6 weeks ago during a troubleshooting session and never re-enabled.
-  VMs are not being automatically balanced, causing performance degradation on the
-  overloaded host. Engineers must enable DRS and run an initial balance.
-objectives:
-  - Confirm DRS status is disabled on the cluster
-  - Enable DRS in "Fully Automated" mode with a medium migration threshold
-  - Run an initial DRS recommendation to balance the cluster
-  - Verify VMs begin migrating from esxi-01 to less-loaded hosts
-initial_state: |
-  VMware vCenter simulation. 3-host cluster. DRS: Disabled.
+description: 'CONTEXT: A team operating VMware vSphere needs you to resolve `DRS Disabled - Hosts Severely
+  Imbalanced, One Host` during a realistic incident. The business impact is reduced service reliability
+  until the underlying state is repaired.
+
+
+  ENVIRONMENT: You are working in FixitLab''s offline vSphere lab with VMs, datastores, vCenter, and ESXi
+  tasks. All tools run locally; no paid APIs or external cloud calls are required.
+
+
+  SYMPTOM / STARTING STATE: VMware vCenter simulation. 3-host cluster. DRS: Disabled.
+
   esxi-01: 95% CPU. esxi-02: 28% CPU. esxi-03: 32% CPU.
+
+  18 VMs running, mostly concentrated on esxi-01. vSphere DRS is showing as "Disabled" on the production
+  cluster. One ESXi host
+
+  (esxi-01) is running at 95% CPU utilization while the other two hosts are at 30%.
+
+  DRS was disabled 6 weeks ago during a troubleshooting session and never re-enabled.
+
+  VMs are not being automatically balanced, causing performance degradation on the
+
+  overloaded host. Engineers must enable DRS and run an initial balance.
+
+
+  OBJECTIVE: Confirm DRS status is disabled on the cluster; Enable DRS in "Fully Automated" mode with
+  a medium migration threshold; Run an initial DRS recommendation to balance the cluster. Success means
+  `check.sh` exits successfully.
+
+
+  WHAT TO AVOID: Do not apply broad destructive changes, skip evidence gathering, or fake completion with
+  marker files — the checker validates real system state.'
+objectives:
+- Confirm DRS status is disabled on the cluster
+- Enable DRS in "Fully Automated" mode with a medium migration threshold
+- Run an initial DRS recommendation to balance the cluster
+- Verify VMs begin migrating from esxi-01 to less-loaded hosts
+initial_state: 'VMware vCenter simulation. 3-host cluster. DRS: Disabled.
+
+  esxi-01: 95% CPU. esxi-02: 28% CPU. esxi-03: 32% CPU.
+
   18 VMs running, mostly concentrated on esxi-01.
+
+  '
 hints:
-  - order: 1
-    cost: 10
-    content: "Select the cluster → Configure → vSphere DRS → Edit.
-      The DRS status will show 'Off'. Change it to 'Fully Automated'.
-      Set the Migration Threshold slider to 3 (the middle/default value)."
-  - order: 2
-    cost: 15
-    content: "After enabling DRS, click 'Run DRS Now' from the cluster's Actions menu
-      to generate immediate migration recommendations without waiting for the
-      next automatic check interval (default is every 5 minutes)."
-  - order: 3
-    cost: 20
-    content: "Review DRS recommendations: cluster → Monitor → vSphere DRS → CPU Utilization
-      or Migration History. Confirm vMotion migrations are occurring.
-      Also check: Configure → DRS → DRS Settings and review VM overrides
-      to ensure no VMs have DRS set to 'Disabled' overriding the cluster setting."
+- order: 1
+  cost: 0
+  content: 'Where to look: Confirm DRS status is disabled on the cluster'
+- order: 2
+  cost: 25
+  content: 'Diagnostic steps:
+
+    1. Enable DRS in "Fully Automated" mode with a medium migration threshold
+
+    2. Run an initial DRS recommendation to balance the cluster
+
+    3. Verify VMs begin migrating from esxi-01 to less-loaded hosts'
+- order: 3
+  cost: 50
+  content: 'Exact fix + verification:
+
+    1. Verify VMs begin migrating from esxi-01 to less-loaded hosts.
+
+    2. Re-run the lab checker (`check.sh` or Check Solution).
+
+    3. Confirm every scenario objective is satisfied.
+
+
+    WHY: the grader validates real state — marker files are ignored.'
+summary: Complete the drs disabled - hosts severely imbalanced, one host vmware lab and verify success
+  with the checker
+estimated_minutes: 15
+xp_reward: 100
+prerequisites:
+- Basic vmware literacy
+tags:
+- fix
+- hands-on
+- vmware
+linked_tutorial: vmware-fundamentals
+what_you_will_learn:
+- Confirm DRS status is disabled on the cluster
+- Enable DRS in "Fully Automated" mode with a medium migration threshold
+- Run an initial DRS recommendation to balance the cluster
+- Verify VMs begin migrating from esxi-01 to less-loaded hosts
+environment:
+  nodes:
+  - role: primary
+    os: FixitLab vSphere lab
+    hostname: lab-primary
+    ip: 127.0.0.1
+    specs: local offline simulation
+  pre_installed:
+  - bash
+  - coreutils
+  - journalctl
+  - systemctl
+  - vmware
+  credentials:
+  - user: root
+    password: lab123
+tasks:
+- id: task_1
+  title: DRS Disabled - Hosts Severely Imbalanced, One Host
+  description: Restore healthy behavior for DRS Disabled - Hosts Severely Imbalanced, One Host by investigating
+    the failure, applying the smallest safe fix, and validating the outcome.
+  background: 'This vmware lab teaches systematic troubleshooting: observe, hypothesize, change, verify.'
+  validation:
+    type: custom_script
+    script: check.sh
+    error_message: Validation did not pass. Re-read the objectives and Hint 2 diagnostic steps.
+solution:
+  summary: Identify the misconfiguration affecting this vmware lab and apply the minimal fix.
+  files_changed: []
+  commands_run:
+  - bash check.sh
+  reference_docs: vmware-fundamentals

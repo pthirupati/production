@@ -1,9 +1,26 @@
 title: Implement deepEqual
 slug: js-impl-deep-equal
-category: JavaScript Development
-description: 'Implement deepEqual(a, b): structural equality for JSON-like values — primitives, arrays,
-  and plain objects (nested). Order of object keys doesn''t matter; array order does. The stub is empty
-  so tests fail.'
+category: Build
+description: 'CONTEXT: A team operating JavaScript needs you to resolve `Implement deepEqual` during a
+  realistic incident. The business impact is reduced service reliability until the underlying state is
+  repaired.
+
+
+  ENVIRONMENT: You are working in FixitLab''s offline JavaScript practice project with modules, browser
+  console, and Node tooling. All tools run locally; no paid APIs or external cloud calls are required.
+
+
+  SYMPTOM / STARTING STATE: Implement deepEqual(a, b): structural equality for JSON-like values — primitives,
+  arrays, and plain objects (nested). Order of object keys doesn''t matter; array order does. The stub
+  is empty so tests fail.
+
+
+  OBJECTIVE: Compare primitives strictly; Recurse into arrays (order-sensitive) and objects (order-insensitive);
+  Return false on any structural difference. Success means all hidden tests pass.
+
+
+  WHAT TO AVOID: Do not apply broad destructive changes, skip evidence gathering, or fake completion with
+  marker files — the checker validates real system state.'
 difficulty: hard
 scenario_type: do
 lab_mode: simulation
@@ -21,57 +38,150 @@ objectives:
 initial_state: 'Implement deepEqual(a, b): structural equality for JSON-like values — primitives, arrays,
   and plain objects (nested). Order of object keys doesn''t matter; array order does. The stub is empty
   so tests fail.'
-solution_explanation: |
-  After a strict-equality fast path, the function distinguishes arrays from objects, checks matching shape (length / key set), and recurses element- and value-wise.
+solution_explanation: 'After a strict-equality fast path, the function distinguishes arrays from objects,
+  checks matching shape (length / key set), and recurses element- and value-wise.
+
+  '
 coding_spec:
   language: javascript
   entrypoint: solution.js
   kind: impl
-  instructions: |
-    Implement deepEqual(a, b) -> boolean for nested arrays/objects/primitives.
-      deepEqual({x:[1,2]}, {x:[1,2]}) -> true
-    Click Run to try it, then Check Solution to grade against all tests.
+  instructions: "Implement deepEqual(a, b) -> boolean for nested arrays/objects/primitives.\n  deepEqual({x:[1,2]},\
+    \ {x:[1,2]}) -> true\nClick Run to try it, then Check Solution to grade against all tests.\n"
   files:
   - path: solution.js
-    content: |
-      function deepEqual(a, b) {
-        // TODO: structural equality for primitives, arrays, plain objects
-      }
+    content: "function deepEqual(a, b) {\n  // TODO: structural equality for primitives, arrays, plain\
+      \ objects\n}\n"
     readonly: false
   visible_tests:
   - name: nested equal
-    code: |
-      assert(deepEqual({x:[1,2]}, {x:[1,2]}) === true);
+    code: 'assert(deepEqual({x:[1,2]}, {x:[1,2]}) === true);
+
+      '
   - name: different value
-    code: |
-      assert(deepEqual({x:1}, {x:2}) === false);
+    code: 'assert(deepEqual({x:1}, {x:2}) === false);
+
+      '
   hidden_tests:
   - name: key order irrelevant
-    code: |
-      assert(deepEqual({a:1,b:2}, {b:2,a:1}) === true);
+    code: 'assert(deepEqual({a:1,b:2}, {b:2,a:1}) === true);
+
+      '
   - name: array order matters
-    code: |
-      assert(deepEqual([1,2], [2,1]) === false);
+    code: 'assert(deepEqual([1,2], [2,1]) === false);
+
+      '
   - name: primitives
-    code: |
-      assert(deepEqual(3, 3) === true && deepEqual('a', 'b') === false);
+    code: 'assert(deepEqual(3, 3) === true && deepEqual(''a'', ''b'') === false);
+
+      '
   - name: nested deep
-    code: |
-      assert(deepEqual({a:{b:{c:[1]}}}, {a:{b:{c:[1]}}}) === true);
+    code: 'assert(deepEqual({a:{b:{c:[1]}}}, {a:{b:{c:[1]}}}) === true);
+
+      '
   - name: missing key
-    code: |
-      assert(deepEqual({a:1}, {a:1,b:2}) === false);
+    code: 'assert(deepEqual({a:1}, {a:1,b:2}) === false);
+
+      '
   - name: array vs object
-    code: |
-      assert(deepEqual([], {}) === false);
+    code: 'assert(deepEqual([], {}) === false);
+
+      '
   timeout: 8
 hints:
 - order: 1
-  cost: 10
-  content: Strict-equal primitives short-circuit; otherwise both must be objects.
+  cost: 0
+  content: 'Where to look: Open `solution.js`, read the instructions, and run the visible tests to see
+    which assertion fails first.'
 - order: 2
-  cost: 20
-  content: Arrays compare length + each index in order; objects compare key sets + each value.
+  cost: 25
+  content: 'Diagnostic steps:
+
+    1. Click Run and read the traceback — note line number and actual vs expected values.
+
+    2. Reproduce the failure with the smallest input from a visible test.
+
+    3. Compare your implementation to the bug described in the lab prompt.'
 - order: 3
-  cost: 30
-  content: Recurse on each element/value with deepEqual.
+  cost: 50
+  content: 'Exact fix + verification:
+
+    1. Return false on any structural difference.
+
+    2. Re-run the lab checker (`check.sh` or Check Solution).
+
+    3. Confirm every scenario objective is satisfied.
+
+
+    WHY: the grader validates real state — marker files are ignored.'
+technology: javascript
+summary: Complete the implement deepequal javascript lab and verify success with the checker
+estimated_minutes: 25
+xp_reward: 100
+prerequisites:
+- Basic javascript literacy
+tags:
+- do
+- hands-on
+- javascript
+linked_tutorial: javascript-fundamentals
+what_you_will_learn:
+- Compare primitives strictly
+- Recurse into arrays (order-sensitive) and objects (order-insensitive)
+- Return false on any structural difference
+environment:
+  nodes:
+  - role: primary
+    os: FixitLab JavaScript practice project
+    hostname: lab-primary
+    ip: 127.0.0.1
+    specs: local offline simulation
+  pre_installed:
+  - bash
+  - coreutils
+  - javascript
+  - journalctl
+  - systemctl
+  credentials:
+  - user: root
+    password: lab123
+tasks:
+- id: task_1
+  title: Implement deepEqual
+  description: Restore healthy behavior for Implement deepEqual by investigating the failure, applying
+    the smallest safe fix, and validating the outcome.
+  background: 'This javascript lab teaches systematic troubleshooting: observe, hypothesize, change, verify.'
+  validation:
+    type: custom_script
+    script: hidden_tests
+    error_message: One or more hidden tests failed. Read the public test output, fix your solution, and
+      submit again.
+solution:
+  summary: The solution passes all hidden tests by implementing the required behavior in code.
+  files_changed: []
+  commands_run: []
+  reference_docs: javascript-fundamentals
+guided_mode:
+  enabled: true
+  steps:
+  - step: 1
+    title: Inspect current state
+    instruction: Run a read-only diagnostic before changing anything.
+    command: check.sh
+    expected_output: Output shows the current failure mode
+    explanation: Evidence-first troubleshooting avoids guessing.
+    next_on: command_success
+  - step: 2
+    title: Apply the minimal fix
+    instruction: Make one reversible change aligned with the objectives.
+    command: '# your fix command here'
+    expected_output: State moves toward the objective
+    explanation: Small changes make rollback easy if the hypothesis was wrong.
+    next_on: command_success
+  - step: 3
+    title: Verify with the grader
+    instruction: Run the same verification the checker uses.
+    command: check.sh
+    expected_output: all hidden tests pass
+    explanation: The lab passes only when real state is healthy.
+    next_on: command_success

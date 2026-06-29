@@ -1,10 +1,29 @@
 title: Memory Leak Profiling
 slug: sim-python-memory-leak
-category: Python Development
+category: Fix
 difficulty: hard
-description: A long-running Python process steadily grows in memory until it's killed (OOM) or slows the
-  host. Objects are being retained unintentionally — e.g. an ever-growing cache/list or a reference held
-  in a global. Profile allocations to find what accumulates, then fix the retention so memory stays flat.
+description: 'CONTEXT: A team operating Python development needs you to resolve `Memory Leak Profiling`
+  during a realistic incident. The business impact is reduced service reliability until the underlying
+  state is repaired.
+
+
+  ENVIRONMENT: You are working in FixitLab''s offline Python project workspace with source files, venv,
+  tests, and CLI entrypoints. All tools run locally; no paid APIs or external cloud calls are required.
+
+
+  SYMPTOM / STARTING STATE: Python service whose RSS grows over time without leveling off. Under sustained
+  use it eventually exhausts memory. Heap growth is driven by retained objects, not real workload. A long-running
+  Python process steadily grows in memory until it''s killed (OOM) or slows the host. Objects are being
+  retained unintentionally — e.g. an ever-growing cache/list or a reference held in a global. Profile
+  allocations to find what accumulates, then fix the retention so memory stays flat.
+
+
+  OBJECTIVE: Confirm RSS grows over time under steady load; Profile allocations to find the object type/site
+  that accumulates; Fix the retention so memory usage stabilizes. Success means `check.sh` exits successfully.
+
+
+  WHAT TO AVOID: Do not apply broad destructive changes, skip evidence gathering, or fake completion with
+  marker files — the checker validates real system state.'
 initial_state: Python service whose RSS grows over time without leveling off. Under sustained use it eventually
   exhausts memory. Heap growth is driven by retained objects, not real workload.
 lab_mode: simulation
@@ -21,14 +40,71 @@ objectives:
 - Fix the retention so memory usage stabilizes
 hints:
 - order: 1
-  cost: 10
-  content: 'Confirm the trend: watch the process RSS over time (`ps -o rss= -p <pid>` repeatedly, or `top`).
-    It climbs and never drops even when idle.'
+  cost: 0
+  content: 'Where to look: Confirm RSS grows over time under steady load'
 - order: 2
-  cost: 15
-  content: 'Find what''s growing with tracemalloc: start it, take two snapshots a while apart, and `snapshot2.compare_to(snapshot1,
-    ''lineno'')` — the top line is the leak site (often an unbounded list/dict or cache).'
+  cost: 25
+  content: 'Diagnostic steps:
+
+    1. Profile allocations to find the object type/site that accumulates
+
+    2. Fix the retention so memory usage stabilizes'
 - order: 3
-  cost: 20
-  content: 'Fix the retention: bound the cache (e.g. functools.lru_cache(maxsize=...)), clear/evict the
-    growing structure, or drop the lingering global reference. Re-profile to confirm RSS plateaus.'
+  cost: 50
+  content: 'Exact fix + verification:
+
+    1. Fix the retention so memory usage stabilizes.
+
+    2. Re-run the lab checker (`check.sh` or Check Solution).
+
+    3. Confirm every scenario objective is satisfied.
+
+
+    WHY: the grader validates real state — marker files are ignored.'
+technology: python
+summary: Complete the memory leak profiling python lab and verify success with the checker
+estimated_minutes: 15
+xp_reward: 100
+prerequisites:
+- Basic python literacy
+tags:
+- fix
+- hands-on
+- python
+linked_tutorial: python-fundamentals
+what_you_will_learn:
+- Confirm RSS grows over time under steady load
+- Profile allocations to find the object type/site that accumulates
+- Fix the retention so memory usage stabilizes
+environment:
+  nodes:
+  - role: primary
+    os: FixitLab Python project workspace
+    hostname: lab-primary
+    ip: 127.0.0.1
+    specs: local offline simulation
+  pre_installed:
+  - bash
+  - coreutils
+  - pip
+  - python
+  - python3
+  credentials:
+  - user: root
+    password: lab123
+tasks:
+- id: task_1
+  title: Memory Leak Profiling
+  description: Restore healthy behavior for Memory Leak Profiling by investigating the failure, applying
+    the smallest safe fix, and validating the outcome.
+  background: 'This python lab teaches systematic troubleshooting: observe, hypothesize, change, verify.'
+  validation:
+    type: custom_script
+    script: check.sh
+    error_message: Validation did not pass. Re-read the objectives and Hint 2 diagnostic steps.
+solution:
+  summary: Identify the misconfiguration affecting this python lab and apply the minimal fix.
+  files_changed: []
+  commands_run:
+  - bash check.sh
+  reference_docs: python-fundamentals

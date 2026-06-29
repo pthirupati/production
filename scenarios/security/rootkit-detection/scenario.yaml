@@ -1,37 +1,124 @@
-title: "Rootkit Detection — Scan and Remove Hidden Malware"
+title: Rootkit Detection — Scan and Remove Hidden Malware
 slug: rootkit-detection
-technology: Security
-category: Forensics
+technology: security
+category: Fix
 difficulty: hard
 time_limit: 1200
 max_score: 100
 infrastructure_type: docker
 jira_priority: Critical
 is_free: false
-description: |
-  Anomalous network traffic has been observed from a server that was breached
-  three weeks ago. The `ps` and `netstat` commands show no suspicious processes,
-  but CPU usage is consistently high. Rootkit activity is suspected. Use rkhunter
-  and chkrootkit to scan for rootkit artifacts, identify the hidden process, and
-  remove the malicious files.
-objectives:
-  - Run rkhunter --check and chkrootkit and review their output for warnings and positives
-  - Identify the hidden process or file by comparing /proc entries against ps output
-  - Remove the malicious binary and any persistence mechanisms (crontab, systemd unit)
-initial_state: |
-  CentOS server post-compromise. rkhunter and chkrootkit are installed. CPU
+description: 'CONTEXT: A team operating security hardening needs you to resolve `Rootkit Detection — Scan
+  and Remove Hidden Malware` during a realistic incident. The business impact is reduced service reliability
+  until the underlying state is repaired.
+
+
+  ENVIRONMENT: You are working in FixitLab''s offline hardening lab with SSH, firewall, TLS, audit logs,
+  and IAM settings. All tools run locally; no paid APIs or external cloud calls are required.
+
+
+  SYMPTOM / STARTING STATE: CentOS server post-compromise. rkhunter and chkrootkit are installed. CPU
+
   usage is at 90%. `ps aux` shows no high-CPU processes. A malicious binary is
+
+  hidden at /lib/.x86_64/syslogd and has a cron persistence entry. Anomalous network traffic has been
+  observed from a server that was breached
+
+  three weeks ago. The `ps` and `netstat` commands show no suspicious processes,
+
+  but CPU usage is consistently high. Rootkit activity is suspected. Use rkhunter
+
+  and chkrootkit to scan for rootkit artifacts, identify the hidden process, and
+
+  remove the malicious files.
+
+
+  OBJECTIVE: Run rkhunter --check and chkrootkit and review their output for warnings and positives; Identify
+  the hidden process or file by comparing /proc entries against ps output; Remove the malicious binary
+  and any persistence mechanisms (crontab, systemd unit). Success means `check.sh` exits successfully.
+
+
+  WHAT TO AVOID: Do not apply broad destructive changes, skip evidence gathering, or fake completion with
+  marker files — the checker validates real system state.'
+objectives:
+- Run rkhunter --check and chkrootkit and review their output for warnings and positives
+- Identify the hidden process or file by comparing /proc entries against ps output
+- Remove the malicious binary and any persistence mechanisms (crontab, systemd unit)
+initial_state: 'CentOS server post-compromise. rkhunter and chkrootkit are installed. CPU
+
+  usage is at 90%. `ps aux` shows no high-CPU processes. A malicious binary is
+
   hidden at /lib/.x86_64/syslogd and has a cron persistence entry.
+
+  '
 hints:
-  - order: 1
-    cost: 10
-    content: "Run initial scan: `rkhunter --update && rkhunter --check --sk` then `chkrootkit 2>/dev/null` — look for INFECTED or Warning lines."
-  - order: 2
-    cost: 15
-    content: "Find hidden processes: `for pid in /proc/[0-9]*; do pid=${pid##*/}; if ! ps -p $pid > /dev/null 2>&1; then echo \"Hidden PID: $pid\"; fi; done`"
-  - order: 3
-    cost: 20
-    content: "Once you identify the hidden PID, find its binary: `ls -la /proc/<PID>/exe` to resolve the symlink to the malicious executable path."
-  - order: 4
-    cost: 25
-    content: "Remove persistence: `kill -9 <PID>; rm -f /lib/.x86_64/syslogd; crontab -l | grep -v syslogd | crontab -; systemctl disable --now fake-syslog 2>/dev/null`"
+- order: 1
+  cost: 0
+  content: 'Where to look: Run rkhunter --check and chkrootkit and review their output for warnings and
+    positives'
+- order: 2
+  cost: 25
+  content: 'Diagnostic steps:
+
+    1. Identify the hidden process or file by comparing /proc entries against ps output
+
+    2. Remove the malicious binary and any persistence mechanisms (crontab, systemd unit)'
+- order: 3
+  cost: 50
+  content: 'Exact fix + verification:
+
+    1. Remove the malicious binary and any persistence mechanisms (crontab, systemd unit).
+
+    2. Re-run the lab checker (`check.sh` or Check Solution).
+
+    3. Confirm every scenario objective is satisfied.
+
+
+    WHY: the grader validates real state — marker files are ignored.'
+summary: Complete the rootkit detection — scan and remove hidden malware security lab and verify success
+  with the checker
+estimated_minutes: 20
+xp_reward: 100
+prerequisites:
+- Basic security literacy
+tags:
+- fix
+- hands-on
+- security
+linked_tutorial: security-fundamentals
+what_you_will_learn:
+- Run rkhunter --check and chkrootkit and review their output for warnings and positives
+- Identify the hidden process or file by comparing /proc entries against ps output
+- Remove the malicious binary and any persistence mechanisms (crontab, systemd unit)
+environment:
+  nodes:
+  - role: primary
+    os: FixitLab hardening lab
+    hostname: lab-primary
+    ip: 127.0.0.1
+    specs: local offline simulation
+  pre_installed:
+  - bash
+  - coreutils
+  - journalctl
+  - security
+  - systemctl
+  credentials:
+  - user: root
+    password: lab123
+tasks:
+- id: task_1
+  title: Rootkit Detection — Scan and Remove Hidden Malware
+  description: Restore healthy behavior for Rootkit Detection — Scan and Remove Hidden Malware by investigating
+    the failure, applying the smallest safe fix, and validating the outcome.
+  background: 'This security lab teaches systematic troubleshooting: observe, hypothesize, change, verify.'
+  validation:
+    type: custom_script
+    script: check.sh
+    error_message: Validation did not pass. Re-read the objectives and Hint 2 diagnostic steps.
+solution:
+  summary: Identify the misconfiguration affecting this security lab and apply the minimal fix.
+  files_changed: []
+  commands_run:
+  - bash check.sh
+  reference_docs: security-fundamentals

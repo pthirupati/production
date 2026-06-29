@@ -1,41 +1,136 @@
 title: Application Fails with Too Many Open Files (EMFILE)
 slug: linux-ulimit-open-files
 difficulty: medium
-category: Linux Administration
-description: |
-  A Java application server is crashing with "java.io.IOException: Too many open files"
+category: Fix
+description: 'CONTEXT: A team operating Linux administration needs you to resolve `Application Fails with
+  Too Many Open Files (EMFILE)` during a realistic incident. The business impact is reduced service reliability
+  until the underlying state is repaired.
+
+
+  ENVIRONMENT: You are working in FixitLab''s offline Linux practice server with terminal and config files
+  under /etc and /var. All tools run locally; no paid APIs or external cloud calls are required.
+
+
+  SYMPTOM / STARTING STATE: Simulated RHEL 9 server. The appserver service is failing. Checking the application
+
+  log at /var/log/appserver/app.log shows repeated errors:
+
+  "ERROR: java.io.IOException: Too many open files (EMFILE)"
+
+  Running ulimit -n as the ''appuser'' shows 1024, which is the system default. A Java application server
+  is crashing with "java.io.IOException: Too many open files"
+
   in its logs. The system default limit of 1024 open file descriptors is too low for a
+
   busy application server that opens thousands of connections and file handles. The limit
+
   must be raised permanently in /etc/security/limits.conf and the service must be
+
   restarted to pick up the new limit.
 
-initial_state: |
-  Simulated RHEL 9 server. The appserver service is failing. Checking the application
-  log at /var/log/appserver/app.log shows repeated errors:
-  "ERROR: java.io.IOException: Too many open files (EMFILE)"
-  Running ulimit -n as the 'appuser' shows 1024, which is the system default.
 
+  OBJECTIVE: Confirm the current limit with ulimit -n (shows 1024); Check /proc/<pid>/limits for the running
+  process''s actual limits; Edit /etc/security/limits.conf to add soft and hard nofile limits for appuser.
+  Success means `check.sh` exits successfully.
+
+
+  WHAT TO AVOID: Do not apply broad destructive changes, skip evidence gathering, or fake completion with
+  marker files — the checker validates real system state.'
+initial_state: 'Simulated RHEL 9 server. The appserver service is failing. Checking the application
+
+  log at /var/log/appserver/app.log shows repeated errors:
+
+  "ERROR: java.io.IOException: Too many open files (EMFILE)"
+
+  Running ulimit -n as the ''appuser'' shows 1024, which is the system default.
+
+  '
 objectives:
-  - Confirm the current limit with ulimit -n (shows 1024)
-  - Check /proc/<pid>/limits for the running process's actual limits
-  - Edit /etc/security/limits.conf to add soft and hard nofile limits for appuser
-  - Set: appuser soft nofile 65536 and appuser hard nofile 65536
-  - Restart the appserver service and verify the new limit with ulimit -n as appuser
+- Confirm the current limit with ulimit -n (shows 1024)
+- Check /proc/<pid>/limits for the running process's actual limits
+- Edit /etc/security/limits.conf to add soft and hard nofile limits for appuser
+- Set: appuser soft nofile 65536 and appuser hard nofile 65536
+- Restart the appserver service and verify the new limit with ulimit -n as appuser
 lab_mode: simulation
 simulation_type: generic
 time_limit: 900
 max_score: 100
 is_free: false
 hints:
-  - content: 'Add to /etc/security/limits.conf: appuser soft nofile 65536 and appuser hard nofile 65536. These take effect on new login sessions and service restarts.'
-    cost: 10
-    order: 1
-  - content: 'For systemd-managed services, also check the service unit file — you may need to add LimitNOFILE=65536 to the [Service] section if PAM limits are not applied to systemd services.'
-    cost: 20
-    order: 2
-  - content: 'Verify the limit applied to the process: cat /proc/$(pgrep -f appserver)/limits | grep open'
-    cost: 15
-    order: 3
+- order: 1
+  cost: 0
+  content: 'Where to look: Confirm the current limit with ulimit -n (shows 1024)'
+- order: 2
+  cost: 25
+  content: 'Diagnostic steps:
+
+    1. Check /proc/<pid>/limits for the running process''s actual limits
+
+    2. Edit /etc/security/limits.conf to add soft and hard nofile limits for appuser
+
+    3. {''Set'': ''appuser soft nofile 65536 and appuser hard nofile 65536''}'
+- order: 3
+  cost: 50
+  content: 'Exact fix + verification:
+
+    1. Restart the appserver service and verify the new limit with ulimit -n as appuser.
+
+    2. Re-run the lab checker (`check.sh` or Check Solution).
+
+    3. Confirm every scenario objective is satisfied.
+
+
+    WHY: the grader validates real state — marker files are ignored.'
 requires_companion_hosts: false
 dual_terminal: false
 jira_priority: Medium
+technology: linux
+summary: Complete the application fails with too many open files (emfile) linux lab and verify success
+  with the checker
+estimated_minutes: 15
+xp_reward: 100
+prerequisites:
+- Basic linux literacy
+tags:
+- fix
+- hands-on
+- linux
+linked_tutorial: linux-fundamentals
+what_you_will_learn:
+- Confirm the current limit with ulimit -n (shows 1024)
+- Check /proc/<pid>/limits for the running process's actual limits
+- Edit /etc/security/limits.conf to add soft and hard nofile limits for appuser
+- '{''Set'': ''appuser soft nofile 65536 and appuser hard nofile 65536''}'
+- Restart the appserver service and verify the new limit with ulimit -n as appuser
+environment:
+  nodes:
+  - role: primary
+    os: FixitLab Linux practice server
+    hostname: lab-primary
+    ip: 127.0.0.1
+    specs: local offline simulation
+  pre_installed:
+  - bash
+  - coreutils
+  - journalctl
+  - linux
+  - systemctl
+  credentials:
+  - user: root
+    password: lab123
+tasks:
+- id: task_1
+  title: Application Fails with Too Many Open Files (EMFILE)
+  description: Restore healthy behavior for Application Fails with Too Many Open Files (EMFILE) by investigating
+    the failure, applying the smallest safe fix, and validating the outcome.
+  background: 'This linux lab teaches systematic troubleshooting: observe, hypothesize, change, verify.'
+  validation:
+    type: custom_script
+    script: check.sh
+    error_message: Validation did not pass. Re-read the objectives and Hint 2 diagnostic steps.
+solution:
+  summary: Identify the misconfiguration affecting this linux lab and apply the minimal fix.
+  files_changed: []
+  commands_run:
+  - bash check.sh
+  reference_docs: linux-fundamentals

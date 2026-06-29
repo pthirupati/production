@@ -1,14 +1,27 @@
 title: Unlock a Locked Terraform State
 slug: terraform-state-lock
-technology: DevOps
-category: Infrastructure as Code
+technology: devops
+category: Fix
 difficulty: medium
 time_limit: 900
 max_score: 100
 infrastructure_type: docker
 jira_priority: High
 is_free: false
-description: 'A Terraform apply was interrupted mid-run and left the state file locked.
+description: 'CONTEXT: A team operating DevOps delivery needs you to resolve `Unlock a Locked Terraform
+  State` during a realistic incident. The business impact is reduced service reliability until the underlying
+  state is repaired.
+
+
+  ENVIRONMENT: You are working in FixitLab''s offline CI/CD lab with git repos, pipelines, artifacts,
+  and runbooks. All tools run locally; no paid APIs or external cloud calls are required.
+
+
+  SYMPTOM / STARTING STATE: Ubuntu server with Terraform installed. Working directory is /opt/terraform/infra.
+
+  The state file is locked by a previous interrupted run. Lock ID is stored
+
+  in the .terraform/lock_id file. A Terraform apply was interrupted mid-run and left the state file locked.
 
   Now no one on the team can run terraform plan or apply — every command
 
@@ -16,7 +29,13 @@ description: 'A Terraform apply was interrupted mid-run and left the state file 
 
   state and restore normal Terraform operations.
 
-  '
+
+  OBJECTIVE: Identify the Terraform state lock ID; Force-unlock the Terraform state; Verify terraform
+  plan runs without lock errors. Success means `check.sh` exits successfully.
+
+
+  WHAT TO AVOID: Do not apply broad destructive changes, skip evidence gathering, or fake completion with
+  marker files — the checker validates real system state.'
 objectives:
 - Identify the Terraform state lock ID
 - Force-unlock the Terraform state
@@ -30,17 +49,70 @@ initial_state: 'Ubuntu server with Terraform installed. Working directory is /op
   '
 hints:
 - order: 1
-  cost: 10
-  content: 'Reproduce the error: `terraform plan` fails with "Error acquiring the state lock". The message
-    itself prints the Lock ID and who holds it.'
+  cost: 0
+  content: 'Where to look: Identify the Terraform state lock ID'
 - order: 2
-  cost: 15
-  content: Make sure no apply is genuinely still running (force-unlocking a live operation corrupts state).
-    The stale lock id is shown in the error (or `cat .terraform/lock_id` in this lab).
-- order: 3
-  cost: 20
-  content: 'Release it: `cd /opt/terraform/infra && terraform force-unlock <LOCK_ID>` and confirm with
-    `yes`.'
-- order: 4
   cost: 25
-  content: 'Verify recovery: `terraform plan` now runs without the lock error.'
+  content: 'Diagnostic steps:
+
+    1. Force-unlock the Terraform state
+
+    2. Verify terraform plan runs without lock errors'
+- order: 3
+  cost: 50
+  content: 'Exact fix + verification:
+
+    1. Verify terraform plan runs without lock errors.
+
+    2. Re-run the lab checker (`check.sh` or Check Solution).
+
+    3. Confirm every scenario objective is satisfied.
+
+
+    WHY: the grader validates real state — marker files are ignored.'
+summary: Complete the unlock a locked terraform state devops lab and verify success with the checker
+estimated_minutes: 15
+xp_reward: 100
+prerequisites:
+- Basic devops literacy
+tags:
+- devops
+- fix
+- hands-on
+linked_tutorial: devops-fundamentals
+what_you_will_learn:
+- Identify the Terraform state lock ID
+- Force-unlock the Terraform state
+- Verify terraform plan runs without lock errors
+environment:
+  nodes:
+  - role: primary
+    os: FixitLab CI/CD lab
+    hostname: lab-primary
+    ip: 127.0.0.1
+    specs: local offline simulation
+  pre_installed:
+  - bash
+  - coreutils
+  - devops
+  - journalctl
+  - systemctl
+  credentials:
+  - user: root
+    password: lab123
+tasks:
+- id: task_1
+  title: Unlock a Locked Terraform State
+  description: Restore healthy behavior for Unlock a Locked Terraform State by investigating the failure,
+    applying the smallest safe fix, and validating the outcome.
+  background: 'This devops lab teaches systematic troubleshooting: observe, hypothesize, change, verify.'
+  validation:
+    type: custom_script
+    script: check.sh
+    error_message: Validation did not pass. Re-read the objectives and Hint 2 diagnostic steps.
+solution:
+  summary: Identify the misconfiguration affecting this devops lab and apply the minimal fix.
+  files_changed: []
+  commands_run:
+  - bash check.sh
+  reference_docs: devops-fundamentals

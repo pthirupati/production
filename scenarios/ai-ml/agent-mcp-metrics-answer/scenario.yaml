@@ -1,10 +1,31 @@
 title: Add an MCP tool so the agent can answer a data question
 slug: agent-mcp-metrics-answer
-category: AI / ML / LLM & Agents
-description: An ops chat agent recognises infrastructure questions but has no way to fetch live data, so
-  it just guesses. Give it real grounding by adding a Model-Context-Protocol (MCP) tool node that calls
-  the metrics MCP server, and wire it in so the agent's answer carries the real CPU figure for the host.
-  The MCP server is simulated and deterministic — same call, same data, no network.
+category: Fix
+description: 'CONTEXT: A team operating AI/ML workflows needs you to resolve `Add an MCP tool so the agent
+  can answer a data question` during a realistic incident. The business impact is reduced service reliability
+  until the underlying state is repaired.
+
+
+  ENVIRONMENT: You are working in FixitLab''s offline ML practice workspace with datasets, training scripts,
+  metrics, and model artifacts. All tools run locally; no paid APIs or external cloud calls are required.
+
+
+  SYMPTOM / STARTING STATE: The canvas has a Trigger (an ops question about CPU on web01) connected to
+  an LLM intent classifier, plus a disconnected Output node. There is no MCP tool, so the agent can recognise
+  the question but cannot fetch the metric — the output never contains a CPU figure. An ops chat agent
+  recognises infrastructure questions but has no way to fetch live data, so it just guesses. Give it real
+  grounding by adding a Model-Context-Protocol (MCP) tool node that calls the metrics MCP server, and
+  wire it in so the agent''s answer carries the real CPU figure for the host. The MCP server is simulated
+  and deterministic — same call, same data, no network.
+
+
+  OBJECTIVE: Open the Agent Workflow simulator and run the flow to see the agent answer without real data;
+  Add an MCP tool node configured for server "metrics" and tool "get_cpu"; Wire Trigger -> LLM -> MCP
+  tool -> Output so the live CPU metric flows into the final answer. Success means `check.sh` exits successfully.
+
+
+  WHAT TO AVOID: Do not apply broad destructive changes, skip evidence gathering, or fake completion with
+  marker files — the checker validates real system state.'
 difficulty: hard
 lab_mode: simulation
 simulation_type: ai-agent
@@ -20,20 +41,79 @@ objectives:
 - Wire Trigger -> LLM -> MCP tool -> Output so the live CPU metric flows into the final answer
 - Run the workflow so the answer includes the real CPU percentage returned by the MCP server
 initial_state: The canvas has a Trigger (an ops question about CPU on web01) connected to an LLM intent
-  classifier, plus a disconnected Output node. There is no MCP tool, so the agent can recognise the
-  question but cannot fetch the metric — the output never contains a CPU figure.
+  classifier, plus a disconnected Output node. There is no MCP tool, so the agent can recognise the question
+  but cannot fetch the metric — the output never contains a CPU figure.
 hints:
 - order: 1
-  cost: 10
-  content: The LLM already classifies the question, but classification alone can't answer "what is the
-    CPU?". Open the node palette and add an MCP Tool node. Inspect the catalog — the "metrics" MCP
-    server exposes a get_cpu tool.
+  cost: 0
+  content: 'Where to look: Open the Agent Workflow simulator and run the flow to see the agent answer
+    without real data'
 - order: 2
-  cost: 15
-  content: Configure the new MCP tool node with server "metrics" and tool "get_cpu". Then wire the LLM
-    node into the MCP tool node so the request flows through after intent is recognised.
+  cost: 25
+  content: 'Diagnostic steps:
+
+    1. Add an MCP tool node configured for server "metrics" and tool "get_cpu"
+
+    2. Wire Trigger -> LLM -> MCP tool -> Output so the live CPU metric flows into the final answer
+
+    3. Run the workflow so the answer includes the real CPU percentage returned by the MCP server'
 - order: 3
-  cost: 20
-  content: Connect the MCP tool node to the Output node and Run. The MCP server returns a deterministic
-    cpu_pct of 82 for web01 under mcp_data; once that real figure reaches the output, the agent can
-    answer the data question and the lab passes.
+  cost: 50
+  content: 'Exact fix + verification:
+
+    1. Run the workflow so the answer includes the real CPU percentage returned by the MCP server.
+
+    2. Re-run the lab checker (`check.sh` or Check Solution).
+
+    3. Confirm every scenario objective is satisfied.
+
+
+    WHY: the grader validates real state — marker files are ignored.'
+summary: Complete the add an mcp tool so the agent can answer a data question ai ml lab and verify success
+  with the checker
+estimated_minutes: 20
+xp_reward: 100
+prerequisites:
+- Basic ai ml literacy
+tags:
+- ai-ml
+- fix
+- hands-on
+linked_tutorial: ai-ml-fundamentals
+what_you_will_learn:
+- Open the Agent Workflow simulator and run the flow to see the agent answer without real data
+- Add an MCP tool node configured for server "metrics" and tool "get_cpu"
+- Wire Trigger -> LLM -> MCP tool -> Output so the live CPU metric flows into the final answer
+- Run the workflow so the answer includes the real CPU percentage returned by the MCP server
+environment:
+  nodes:
+  - role: primary
+    os: FixitLab ML practice workspace
+    hostname: lab-primary
+    ip: 127.0.0.1
+    specs: local offline simulation
+  pre_installed:
+  - ai ml
+  - bash
+  - coreutils
+  - pip
+  - python3
+  credentials:
+  - user: root
+    password: lab123
+tasks:
+- id: task_1
+  title: Add an MCP tool so the agent can answer a data question
+  description: Restore healthy behavior for Add an MCP tool so the agent can answer a data question by
+    investigating the failure, applying the smallest safe fix, and validating the outcome.
+  background: 'This ai ml lab teaches systematic troubleshooting: observe, hypothesize, change, verify.'
+  validation:
+    type: custom_script
+    script: check.sh
+    error_message: Validation did not pass. Re-read the objectives and Hint 2 diagnostic steps.
+solution:
+  summary: Identify the misconfiguration affecting this ai ml lab and apply the minimal fix.
+  files_changed: []
+  commands_run:
+  - bash check.sh
+  reference_docs: ai-ml-fundamentals

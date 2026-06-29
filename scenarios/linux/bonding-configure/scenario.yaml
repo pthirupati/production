@@ -1,41 +1,138 @@
 title: Configure Network Bonding Mode 1 (Active-Backup) for HA
 slug: linux-bonding-configure
 difficulty: hard
-category: Linux Administration
-description: |
-  The server has two physical NICs, eth0 and eth1, but only one is active at a time.
+category: Fix
+description: 'CONTEXT: A team operating Linux administration needs you to resolve `Configure Network Bonding
+  Mode 1 (Active-Backup) for HA` during a realistic incident. The business impact is reduced service reliability
+  until the underlying state is repaired.
+
+
+  ENVIRONMENT: You are working in FixitLab''s offline Linux practice server with terminal and config files
+  under /etc and /var. All tools run locally; no paid APIs or external cloud calls are required.
+
+
+  SYMPTOM / STARTING STATE: Simulated RHEL 9 server with two NICs: eth0 (192.168.1.100/24, active) and
+  eth1 (up,
+
+  no IP assigned). There is currently no bonding configured. Running cat /proc/net/bonding/
+
+  returns "No such file or directory". A network outage is expected during maintenance
+
+  and the server needs HA networking before then. The server has two physical NICs, eth0 and eth1, but
+  only one is active at a time.
+
   Network bonding in mode 1 (active-backup) must be configured so that if eth0 fails,
+
   eth1 automatically becomes the active link with no service interruption. This requires
+
   creating a bond interface, enslaving both NICs, and configuring the bonding options in
+
   the network scripts. The link failover must be verified.
 
-initial_state: |
-  Simulated RHEL 9 server with two NICs: eth0 (192.168.1.100/24, active) and eth1 (up,
+
+  OBJECTIVE: Create /etc/sysconfig/network-scripts/ifcfg-bond0 with BONDING_OPTS="mode=1 miimon=100";
+  Configure ifcfg-eth0 and ifcfg-eth1 as SLAVE with MASTER=bond0; Bring up the bond with ifup bond0 and
+  verify with ip link show bond0. Success means `check.sh` exits successfully.
+
+
+  WHAT TO AVOID: Do not apply broad destructive changes, skip evidence gathering, or fake completion with
+  marker files — the checker validates real system state.'
+initial_state: 'Simulated RHEL 9 server with two NICs: eth0 (192.168.1.100/24, active) and eth1 (up,
+
   no IP assigned). There is currently no bonding configured. Running cat /proc/net/bonding/
+
   returns "No such file or directory". A network outage is expected during maintenance
+
   and the server needs HA networking before then.
 
+  '
 objectives:
-  - Create /etc/sysconfig/network-scripts/ifcfg-bond0 with BONDING_OPTS="mode=1 miimon=100"
-  - Configure ifcfg-eth0 and ifcfg-eth1 as SLAVE with MASTER=bond0
-  - Bring up the bond with ifup bond0 and verify with ip link show bond0
-  - Read /proc/net/bonding/bond0 to confirm active slave and bonding mode
-  - Test failover by bringing down eth0 with ip link set eth0 down and verifying connectivity
+- Create /etc/sysconfig/network-scripts/ifcfg-bond0 with BONDING_OPTS="mode=1 miimon=100"
+- Configure ifcfg-eth0 and ifcfg-eth1 as SLAVE with MASTER=bond0
+- Bring up the bond with ifup bond0 and verify with ip link show bond0
+- Read /proc/net/bonding/bond0 to confirm active slave and bonding mode
+- Test failover by bringing down eth0 with ip link set eth0 down and verifying connectivity
 lab_mode: simulation
 simulation_type: generic
 time_limit: 1500
 max_score: 100
 is_free: false
 hints:
-  - content: 'Create ifcfg-bond0 with: DEVICE=bond0, BONDING_MASTER=yes, BONDING_OPTS="mode=1 miimon=100", BOOTPROTO=none, IPADDR=192.168.1.100, PREFIX=24, ONBOOT=yes'
-    cost: 10
-    order: 1
-  - content: 'Configure slave interfaces with: DEVICE=eth0, MASTER=bond0, SLAVE=yes, ONBOOT=yes. Set BOOTPROTO=none and remove any IPADDR from the slave ifcfg files.'
-    cost: 20
-    order: 2
-  - content: 'After bringing up the bond, verify with: cat /proc/net/bonding/bond0. Look for "Active Slave: eth0" and "MII Status: up" for both slaves.'
-    cost: 20
-    order: 3
+- order: 1
+  cost: 0
+  content: 'Where to look: Create /etc/sysconfig/network-scripts/ifcfg-bond0 with BONDING_OPTS="mode=1
+    miimon=100"'
+- order: 2
+  cost: 25
+  content: 'Diagnostic steps:
+
+    1. Configure ifcfg-eth0 and ifcfg-eth1 as SLAVE with MASTER=bond0
+
+    2. Bring up the bond with ifup bond0 and verify with ip link show bond0
+
+    3. Read /proc/net/bonding/bond0 to confirm active slave and bonding mode'
+- order: 3
+  cost: 50
+  content: 'Exact fix + verification:
+
+    1. Test failover by bringing down eth0 with ip link set eth0 down and verifying connectivity.
+
+    2. Re-run the lab checker (`check.sh` or Check Solution).
+
+    3. Confirm every scenario objective is satisfied.
+
+
+    WHY: the grader validates real state — marker files are ignored.'
 requires_companion_hosts: false
 dual_terminal: false
 jira_priority: Medium
+technology: linux
+summary: Complete the configure network bonding mode 1 (active-backup) for ha linux lab and verify success
+  with the checker
+estimated_minutes: 25
+xp_reward: 100
+prerequisites:
+- Basic linux literacy
+tags:
+- fix
+- hands-on
+- linux
+linked_tutorial: linux-fundamentals
+what_you_will_learn:
+- Create /etc/sysconfig/network-scripts/ifcfg-bond0 with BONDING_OPTS="mode=1 miimon=100"
+- Configure ifcfg-eth0 and ifcfg-eth1 as SLAVE with MASTER=bond0
+- Bring up the bond with ifup bond0 and verify with ip link show bond0
+- Read /proc/net/bonding/bond0 to confirm active slave and bonding mode
+- Test failover by bringing down eth0 with ip link set eth0 down and verifying connectivity
+environment:
+  nodes:
+  - role: primary
+    os: FixitLab Linux practice server
+    hostname: lab-primary
+    ip: 127.0.0.1
+    specs: local offline simulation
+  pre_installed:
+  - bash
+  - coreutils
+  - journalctl
+  - linux
+  - systemctl
+  credentials:
+  - user: root
+    password: lab123
+tasks:
+- id: task_1
+  title: Configure Network Bonding Mode 1 (Active-Backup) for HA
+  description: Restore healthy behavior for Configure Network Bonding Mode 1 (Active-Backup) for HA by
+    investigating the failure, applying the smallest safe fix, and validating the outcome.
+  background: 'This linux lab teaches systematic troubleshooting: observe, hypothesize, change, verify.'
+  validation:
+    type: custom_script
+    script: check.sh
+    error_message: Validation did not pass. Re-read the objectives and Hint 2 diagnostic steps.
+solution:
+  summary: Identify the misconfiguration affecting this linux lab and apply the minimal fix.
+  files_changed: []
+  commands_run:
+  - bash check.sh
+  reference_docs: linux-fundamentals

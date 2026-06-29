@@ -1,41 +1,137 @@
 title: Passwordless SSH Key Authentication Not Working
 slug: linux-ssh-key-auth-fail
 difficulty: medium
-category: Linux Administration
-description: |
-  A developer has copied their public key to the server with ssh-copy-id but SSH still
+category: Fix
+description: 'CONTEXT: A team operating Linux administration needs you to resolve `Passwordless SSH Key
+  Authentication Not Working` during a realistic incident. The business impact is reduced service reliability
+  until the underlying state is repaired.
+
+
+  ENVIRONMENT: You are working in FixitLab''s offline Linux practice server with terminal and config files
+  under /etc and /var. All tools run locally; no paid APIs or external cloud calls are required.
+
+
+  SYMPTOM / STARTING STATE: Simulated RHEL 9 server. User ''developer'' has ~/.ssh/authorized_keys in
+  place with
+
+  the correct public key. Running ssh developer@localhost still prompts for a password.
+
+  Running ssh -v developer@localhost shows "Server refused our key" in the verbose output.
+
+  SELinux is in Enforcing mode. A developer has copied their public key to the server with ssh-copy-id
+  but SSH still
+
   prompts for a password instead of authenticating with the key. This is a common problem
+
   caused by incorrect permissions on the ~/.ssh directory or authorized_keys file, or by
+
   sshd_config having PubkeyAuthentication disabled. On SELinux systems an incorrect file
+
   context can also prevent sshd from reading authorized_keys.
 
-initial_state: |
-  Simulated RHEL 9 server. User 'developer' has ~/.ssh/authorized_keys in place with
+
+  OBJECTIVE: Check ~/.ssh directory permissions — must be 700 (chmod 700 ~/.ssh); Check ~/.ssh/authorized_keys
+  permissions — must be 600 (chmod 600 ~/.ssh/authorized_keys); Verify /etc/ssh/sshd_config has PubkeyAuthentication
+  yes and AuthorizedKeysFile .ssh/authorized_keys. Success means `check.sh` exits successfully.
+
+
+  WHAT TO AVOID: Do not apply broad destructive changes, skip evidence gathering, or fake completion with
+  marker files — the checker validates real system state.'
+initial_state: 'Simulated RHEL 9 server. User ''developer'' has ~/.ssh/authorized_keys in place with
+
   the correct public key. Running ssh developer@localhost still prompts for a password.
+
   Running ssh -v developer@localhost shows "Server refused our key" in the verbose output.
+
   SELinux is in Enforcing mode.
 
+  '
 objectives:
-  - Check ~/.ssh directory permissions — must be 700 (chmod 700 ~/.ssh)
-  - Check ~/.ssh/authorized_keys permissions — must be 600 (chmod 600 ~/.ssh/authorized_keys)
-  - Verify /etc/ssh/sshd_config has PubkeyAuthentication yes and AuthorizedKeysFile .ssh/authorized_keys
-  - Restore SELinux context on the .ssh directory with restorecon -Rv ~/.ssh
-  - Test key auth with ssh -v and confirm no password is requested
+- Check ~/.ssh directory permissions — must be 700 (chmod 700 ~/.ssh)
+- Check ~/.ssh/authorized_keys permissions — must be 600 (chmod 600 ~/.ssh/authorized_keys)
+- Verify /etc/ssh/sshd_config has PubkeyAuthentication yes and AuthorizedKeysFile .ssh/authorized_keys
+- Restore SELinux context on the .ssh directory with restorecon -Rv ~/.ssh
+- Test key auth with ssh -v and confirm no password is requested
 lab_mode: simulation
 simulation_type: generic
 time_limit: 900
 max_score: 100
 is_free: false
 hints:
-  - content: 'Check permissions: ls -la ~/.ssh — the .ssh directory must be 700 and authorized_keys must be 600. sshd silently rejects keys if permissions are too open.'
-    cost: 10
-    order: 1
-  - content: 'Fix permissions: chmod 700 ~/.ssh && chmod 600 ~/.ssh/authorized_keys. Then check SELinux: restorecon -Rv ~/.ssh to restore the correct ssh_home_t context.'
-    cost: 20
-    order: 2
-  - content: 'Check sshd_config: grep -i pubkey /etc/ssh/sshd_config — ensure PubkeyAuthentication yes is set and not commented out. Restart sshd after any config change.'
-    cost: 20
-    order: 3
+- order: 1
+  cost: 0
+  content: 'Where to look: Run `systemctl status sshd` and `ss -tlnp | grep :22` on the target host.'
+- order: 2
+  cost: 25
+  content: 'Diagnostic steps:
+
+    1. Confirm sshd is active and listening on port 22.
+
+    2. Check `firewall-cmd` or iptables for blocked port 22.
+
+    3. Read `/var/log/secure` for auth or config errors.'
+- order: 3
+  cost: 50
+  content: 'Exact fix + verification:
+
+    1. Fix sshd_config, firewall, or socket unit as needed.
+
+    2. `systemctl restart sshd`.
+
+    3. `ssh -o BatchMode=yes user@localhost echo ok` succeeds.
+
+
+    WHY: SSH failures are usually service, firewall, or config — not credentials alone.'
 requires_companion_hosts: false
 dual_terminal: false
 jira_priority: Medium
+technology: linux
+summary: Complete the passwordless ssh key authentication not working linux lab and verify success with
+  the checker
+estimated_minutes: 15
+xp_reward: 100
+prerequisites:
+- Basic linux literacy
+tags:
+- fix
+- hands-on
+- linux
+linked_tutorial: linux-fundamentals
+what_you_will_learn:
+- Check ~/.ssh directory permissions — must be 700 (chmod 700 ~/.ssh)
+- Check ~/.ssh/authorized_keys permissions — must be 600 (chmod 600 ~/.ssh/authorized_keys)
+- Verify /etc/ssh/sshd_config has PubkeyAuthentication yes and AuthorizedKeysFile .ssh/authorized_keys
+- Restore SELinux context on the .ssh directory with restorecon -Rv ~/.ssh
+- Test key auth with ssh -v and confirm no password is requested
+environment:
+  nodes:
+  - role: primary
+    os: FixitLab Linux practice server
+    hostname: lab-primary
+    ip: 127.0.0.1
+    specs: local offline simulation
+  pre_installed:
+  - bash
+  - coreutils
+  - journalctl
+  - linux
+  - systemctl
+  credentials:
+  - user: root
+    password: lab123
+tasks:
+- id: task_1
+  title: Passwordless SSH Key Authentication Not Working
+  description: Restore healthy behavior for Passwordless SSH Key Authentication Not Working by investigating
+    the failure, applying the smallest safe fix, and validating the outcome.
+  background: 'This linux lab teaches systematic troubleshooting: observe, hypothesize, change, verify.'
+  validation:
+    type: custom_script
+    script: check.sh
+    error_message: Validation did not pass. Re-read the objectives and Hint 2 diagnostic steps.
+solution:
+  summary: Identify the misconfiguration affecting this linux lab and apply the minimal fix.
+  files_changed: []
+  commands_run:
+  - bash check.sh
+  reference_docs: linux-fundamentals

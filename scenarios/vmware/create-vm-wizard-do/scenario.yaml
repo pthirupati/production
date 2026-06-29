@@ -1,7 +1,7 @@
 slug: create-vm-wizard-do
 title: Create VM Using New Virtual Machine Wizard
-technology: VMware
-category: vCenter Administration
+technology: vmware
+category: Build
 difficulty: medium
 scenario_type: do
 time_limit: 1200
@@ -11,25 +11,126 @@ simulation_type: vmware
 infrastructure_type: simulation
 jira_priority: Medium
 is_free: false
-description: 'Build lab: create a brand-new virtual machine end to end using the full New Virtual Machine
-  wizard. Starting from an empty target, walk all wizard steps — name, compute resource, storage, compatibility,
-  guest OS, and hardware customization — and finish so the VM is created and visible in inventory.'
+description: 'CONTEXT: A team operating VMware vSphere needs you to resolve `Create VM Using New Virtual
+  Machine Wizard` during a realistic incident. The business impact is reduced service reliability until
+  the underlying state is repaired.
+
+
+  ENVIRONMENT: You are working in FixitLab''s offline vSphere lab with VMs, datastores, vCenter, and ESXi
+  tasks. All tools run locally; no paid APIs or external cloud calls are required.
+
+
+  SYMPTOM / STARTING STATE: vCenter with a cluster, datastore, and network available. No new VM has been
+  created yet; you will build one through the New Virtual Machine wizard. Build lab: create a brand-new
+  virtual machine end to end using the full New Virtual Machine wizard. Starting from an empty target,
+  walk all wizard steps — name, compute resource, storage, compatibility, guest OS, and hardware customization
+  — and finish so the VM is created and visible in inventory.
+
+
+  OBJECTIVE: Launch the New Virtual Machine wizard; Complete every wizard step (name, resource, storage,
+  OS, hardware); Finish the wizard and verify the VM appears in inventory. Success means `check.sh` exits
+  successfully.
+
+
+  WHAT TO AVOID: Do not apply broad destructive changes, skip evidence gathering, or fake completion with
+  marker files — the checker validates real system state.'
 objectives:
 - Launch the New Virtual Machine wizard
 - Complete every wizard step (name, resource, storage, OS, hardware)
 - Finish the wizard and verify the VM appears in inventory
 hints:
 - order: 1
-  cost: 10
-  content: 'Start it: right-click the cluster (or Datacenter) -> New Virtual Machine -> "Create a new
-    virtual machine".'
+  cost: 0
+  content: 'Where to look: Launch the New Virtual Machine wizard'
 - order: 2
-  cost: 15
-  content: 'Work through each step: give it a name and folder, pick the compute resource and datastore,
-    set compatibility and the guest OS, then customize CPU/memory/disk/network.'
+  cost: 25
+  content: 'Diagnostic steps:
+
+    1. Complete every wizard step (name, resource, storage, OS, hardware)
+
+    2. Finish the wizard and verify the VM appears in inventory'
 - order: 3
-  cost: 20
-  content: Click Finish on the Ready-to-complete step and confirm the new VM is listed in the inventory
-    tree (power it on if the task requires).
+  cost: 50
+  content: 'Exact fix + verification:
+
+    1. Finish the wizard and verify the VM appears in inventory.
+
+    2. Re-run the lab checker (`check.sh` or Check Solution).
+
+    3. Confirm every scenario objective is satisfied.
+
+
+    WHY: the grader validates real state — marker files are ignored.'
 initial_state: vCenter with a cluster, datastore, and network available. No new VM has been created yet;
   you will build one through the New Virtual Machine wizard.
+summary: Complete the create vm using new virtual machine wizard vmware lab and verify success with the
+  checker
+estimated_minutes: 20
+xp_reward: 100
+prerequisites:
+- Basic vmware literacy
+tags:
+- do
+- hands-on
+- vmware
+linked_tutorial: vmware-fundamentals
+what_you_will_learn:
+- Launch the New Virtual Machine wizard
+- Complete every wizard step (name, resource, storage, OS, hardware)
+- Finish the wizard and verify the VM appears in inventory
+environment:
+  nodes:
+  - role: primary
+    os: FixitLab vSphere lab
+    hostname: lab-primary
+    ip: 127.0.0.1
+    specs: local offline simulation
+  pre_installed:
+  - bash
+  - coreutils
+  - journalctl
+  - systemctl
+  - vmware
+  credentials:
+  - user: root
+    password: lab123
+tasks:
+- id: task_1
+  title: Create VM Using New Virtual Machine Wizard
+  description: Restore healthy behavior for Create VM Using New Virtual Machine Wizard by investigating
+    the failure, applying the smallest safe fix, and validating the outcome.
+  background: 'This vmware lab teaches systematic troubleshooting: observe, hypothesize, change, verify.'
+  validation:
+    type: custom_script
+    script: check.sh
+    error_message: Validation did not pass. Re-read the objectives and Hint 2 diagnostic steps.
+solution:
+  summary: Identify the misconfiguration affecting this vmware lab and apply the minimal fix.
+  files_changed: []
+  commands_run:
+  - bash check.sh
+  reference_docs: vmware-fundamentals
+guided_mode:
+  enabled: true
+  steps:
+  - step: 1
+    title: Inspect current state
+    instruction: Run a read-only diagnostic before changing anything.
+    command: check.sh
+    expected_output: Output shows the current failure mode
+    explanation: Evidence-first troubleshooting avoids guessing.
+    next_on: command_success
+  - step: 2
+    title: Apply the minimal fix
+    instruction: Make one reversible change aligned with the objectives.
+    command: '# your fix command here'
+    expected_output: State moves toward the objective
+    explanation: Small changes make rollback easy if the hypothesis was wrong.
+    next_on: command_success
+  - step: 3
+    title: Verify with the grader
+    instruction: Run the same verification the checker uses.
+    command: check.sh
+    expected_output: '`check.sh` exits successfully'
+    explanation: The lab passes only when real state is healthy.
+    next_on: command_success

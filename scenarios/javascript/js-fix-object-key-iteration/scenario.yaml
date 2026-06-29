@@ -1,8 +1,25 @@
 title: Fix sumValues Iterating Keys Not Values
 slug: js-fix-object-key-iteration
-category: JavaScript Development
-description: sumValues(obj) should sum the numeric VALUES of an object, but it sums Object.keys (the keys),
-  producing NaN/string concatenation. Iterate the values instead.
+category: Fix
+description: 'CONTEXT: A team operating JavaScript needs you to resolve `Fix sumValues Iterating Keys
+  Not Values` during a realistic incident. The business impact is reduced service reliability until the
+  underlying state is repaired.
+
+
+  ENVIRONMENT: You are working in FixitLab''s offline JavaScript practice project with modules, browser
+  console, and Node tooling. All tools run locally; no paid APIs or external cloud calls are required.
+
+
+  SYMPTOM / STARTING STATE: sumValues(obj) should sum the numeric VALUES of an object, but it sums Object.keys
+  (the keys), producing NaN/string concatenation. Iterate the values instead.
+
+
+  OBJECTIVE: See it operate on keys, not values; Iterate Object.values; Return the numeric sum. Success
+  means all hidden tests pass.
+
+
+  WHAT TO AVOID: Do not apply broad destructive changes, skip evidence gathering, or fake completion with
+  marker files — the checker validates real system state.'
 difficulty: easy
 scenario_type: fix
 lab_mode: simulation
@@ -19,48 +36,115 @@ objectives:
 - Return the numeric sum
 initial_state: sumValues(obj) should sum the numeric VALUES of an object, but it sums Object.keys (the
   keys), producing NaN/string concatenation. Iterate the values instead.
-solution_explanation: |
-  Reducing over Object.keys adds the property names. Object.values yields the values, which reduce sums numerically.
+solution_explanation: 'Reducing over Object.keys adds the property names. Object.values yields the values,
+  which reduce sums numerically.
+
+  '
 coding_spec:
   language: javascript
   entrypoint: solution.js
   kind: fix
-  instructions: |
-    Fix sumValues(obj): return the sum of the object's numeric values.
-      sumValues({a:1, b:2, c:3}) -> 6
-    Click Run to try it, then Check Solution to grade against all tests.
+  instructions: "Fix sumValues(obj): return the sum of the object's numeric values.\n  sumValues({a:1,\
+    \ b:2, c:3}) -> 6\nClick Run to try it, then Check Solution to grade against all tests.\n"
   files:
   - path: solution.js
-    content: |
-      function sumValues(obj) {
-        return Object.keys(obj).reduce((acc, k) => acc + k, 0); // adds keys
-      }
+    content: "function sumValues(obj) {\n  return Object.keys(obj).reduce((acc, k) => acc + k, 0); //\
+      \ adds keys\n}\n"
     readonly: false
   visible_tests:
   - name: basic
-    code: |
-      assert(sumValues({a:1, b:2, c:3}) === 6);
+    code: 'assert(sumValues({a:1, b:2, c:3}) === 6);
+
+      '
   - name: empty object
-    code: |
-      assert(sumValues({}) === 0);
+    code: 'assert(sumValues({}) === 0);
+
+      '
   hidden_tests:
   - name: single
-    code: |
-      assert(sumValues({x: 42}) === 42);
+    code: 'assert(sumValues({x: 42}) === 42);
+
+      '
   - name: negatives
-    code: |
-      assert(sumValues({a: -5, b: 5}) === 0);
+    code: 'assert(sumValues({a: -5, b: 5}) === 0);
+
+      '
   - name: is a number
-    code: |
-      assert(typeof sumValues({a: 1}) === 'number' && sumValues({a:1}) === 1);
+    code: 'assert(typeof sumValues({a: 1}) === ''number'' && sumValues({a:1}) === 1);
+
+      '
   timeout: 8
 hints:
 - order: 1
-  cost: 10
-  content: sumValues({a:1}) currently does 0 + 'a' = '0a' — it's adding keys.
+  cost: 0
+  content: 'Where to look: Open `solution.js`, read the instructions, and run the visible tests to see
+    which assertion fails first.'
 - order: 2
-  cost: 20
-  content: Object.values(obj) gives the values; Object.keys gives the keys.
+  cost: 25
+  content: 'Diagnostic steps:
+
+    1. Click Run and read the traceback — note line number and actual vs expected values.
+
+    2. Reproduce the failure with the smallest input from a visible test.
+
+    3. Compare your implementation to the bug described in the lab prompt.'
 - order: 3
-  cost: 30
-  content: Reduce over Object.values(obj).
+  cost: 50
+  content: 'Exact fix + verification:
+
+    1. Edit `solution.js` with the smallest correct change.
+
+    2. Re-run visible tests, then Check Solution (includes hidden tests).
+
+    3. Confirm every test passes.
+
+
+    WHY: coding labs grade against hidden test cases, not marker files.'
+technology: javascript
+summary: Complete the fix sumvalues iterating keys not values javascript lab and verify success with the
+  checker
+estimated_minutes: 25
+xp_reward: 100
+prerequisites:
+- Basic javascript literacy
+tags:
+- fix
+- hands-on
+- javascript
+linked_tutorial: javascript-fundamentals
+what_you_will_learn:
+- See it operate on keys, not values
+- Iterate Object.values
+- Return the numeric sum
+environment:
+  nodes:
+  - role: primary
+    os: FixitLab JavaScript practice project
+    hostname: lab-primary
+    ip: 127.0.0.1
+    specs: local offline simulation
+  pre_installed:
+  - bash
+  - coreutils
+  - javascript
+  - journalctl
+  - systemctl
+  credentials:
+  - user: root
+    password: lab123
+tasks:
+- id: task_1
+  title: Fix sumValues Iterating Keys Not Values
+  description: Restore healthy behavior for Fix sumValues Iterating Keys Not Values by investigating the
+    failure, applying the smallest safe fix, and validating the outcome.
+  background: 'This javascript lab teaches systematic troubleshooting: observe, hypothesize, change, verify.'
+  validation:
+    type: custom_script
+    script: hidden_tests
+    error_message: One or more hidden tests failed. Read the public test output, fix your solution, and
+      submit again.
+solution:
+  summary: The solution passes all hidden tests by implementing the required behavior in code.
+  files_changed: []
+  commands_run: []
+  reference_docs: javascript-fundamentals

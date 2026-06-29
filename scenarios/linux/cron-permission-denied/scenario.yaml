@@ -1,11 +1,30 @@
 title: User Cannot Create Cron Jobs — Access Denied
 slug: linux-cron-permission-denied
 difficulty: easy
-category: Linux Administration
-description: 'A developer running `crontab -e` gets "You (developer) are not allowed to use this program".
-  cron access is controlled by /etc/cron.allow and /etc/cron.deny: if cron.allow exists, only users listed
-  there may use cron; otherwise users in cron.deny are blocked. Grant the developer access per that precedence
-  and confirm crontab works.'
+category: Fix
+description: 'CONTEXT: A team operating Linux administration needs you to resolve `User Cannot Create
+  Cron Jobs — Access Denied` during a realistic incident. The business impact is reduced service reliability
+  until the underlying state is repaired.
+
+
+  ENVIRONMENT: You are working in FixitLab''s offline Linux practice server with terminal and config files
+  under /etc and /var. All tools run locally; no paid APIs or external cloud calls are required.
+
+
+  SYMPTOM / STARTING STATE: Linux server using cron access control. The developer user is blocked from
+  crontab — either listed in /etc/cron.deny or absent from an existing /etc/cron.allow. A developer running
+  `crontab -e` gets "You (developer) are not allowed to use this program". cron access is controlled by
+  /etc/cron.allow and /etc/cron.deny: if cron.allow exists, only users listed there may use cron; otherwise
+  users in cron.deny are blocked. Grant the developer access per that precedence and confirm crontab works.
+
+
+  OBJECTIVE: Check whether the user is in /etc/cron.deny; Check whether /etc/cron.allow exists and restricts
+  access (it takes precedence); Grant the developer access and verify crontab -l no longer errors. Success
+  means `check.sh` exits successfully.
+
+
+  WHAT TO AVOID: Do not apply broad destructive changes, skip evidence gathering, or fake completion with
+  marker files — the checker validates real system state.'
 initial_state: Linux server using cron access control. The developer user is blocked from crontab — either
   listed in /etc/cron.deny or absent from an existing /etc/cron.allow.
 objectives:
@@ -19,16 +38,75 @@ max_score: 100
 is_free: false
 hints:
 - order: 1
-  cost: 10
-  content: 'Inspect both files: `cat /etc/cron.deny /etc/cron.allow 2>/dev/null`. Remember cron.allow
-    takes priority — if it exists, only listed users may use cron.'
+  cost: 0
+  content: 'Where to look: Check whether the user is in /etc/cron.deny'
 - order: 2
-  cost: 15
-  content: If developer is in cron.deny, remove that line; if cron.allow exists, add `developer` to it.
+  cost: 25
+  content: 'Diagnostic steps:
+
+    1. Check whether /etc/cron.allow exists and restricts access (it takes precedence)
+
+    2. Grant the developer access and verify crontab -l no longer errors'
 - order: 3
-  cost: 20
-  content: 'Verify as the user: `sudo -u developer crontab -l` no longer returns the access-denied error
-    and `crontab -e` opens.'
+  cost: 50
+  content: 'Exact fix + verification:
+
+    1. Grant the developer access and verify crontab -l no longer errors.
+
+    2. Re-run the lab checker (`check.sh` or Check Solution).
+
+    3. Confirm every scenario objective is satisfied.
+
+
+    WHY: the grader validates real state — marker files are ignored.'
 requires_companion_hosts: false
 dual_terminal: false
 jira_priority: Medium
+technology: linux
+summary: Complete the user cannot create cron jobs — access denied linux lab and verify success with the
+  checker
+estimated_minutes: 15
+xp_reward: 100
+prerequisites:
+- Basic linux literacy
+tags:
+- fix
+- hands-on
+- linux
+linked_tutorial: linux-fundamentals
+what_you_will_learn:
+- Check whether the user is in /etc/cron.deny
+- Check whether /etc/cron.allow exists and restricts access (it takes precedence)
+- Grant the developer access and verify crontab -l no longer errors
+environment:
+  nodes:
+  - role: primary
+    os: FixitLab Linux practice server
+    hostname: lab-primary
+    ip: 127.0.0.1
+    specs: local offline simulation
+  pre_installed:
+  - bash
+  - coreutils
+  - journalctl
+  - linux
+  - systemctl
+  credentials:
+  - user: root
+    password: lab123
+tasks:
+- id: task_1
+  title: User Cannot Create Cron Jobs — Access Denied
+  description: Restore healthy behavior for User Cannot Create Cron Jobs — Access Denied by investigating
+    the failure, applying the smallest safe fix, and validating the outcome.
+  background: 'This linux lab teaches systematic troubleshooting: observe, hypothesize, change, verify.'
+  validation:
+    type: custom_script
+    script: check.sh
+    error_message: Validation did not pass. Re-read the objectives and Hint 2 diagnostic steps.
+solution:
+  summary: Identify the misconfiguration affecting this linux lab and apply the minimal fix.
+  files_changed: []
+  commands_run:
+  - bash check.sh
+  reference_docs: linux-fundamentals

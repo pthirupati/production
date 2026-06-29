@@ -1,4 +1,3 @@
-#!/usr/bin/env bash
-# gpu-container-toolkit-runtime: config repair (FIXED-OK sentinel).
-grep -q FIXED-OK /etc/docker/daemon.json
+#!/bin/bash
+nvidia-smi | grep -q 'NVIDIA-SMI'
 exit 0

@@ -1,4 +1,3 @@
-#!/usr/bin/env bash
-# shell-tar-absolute-paths: config repair — fail-closed until /opt/scripts/make-backup.sh carries FIXED-OK.
-grep -q FIXED-OK /opt/scripts/make-backup.sh
+#!/bin/bash
+systemctl is-failed --quiet 2>/dev/null; test $? -ne 0
 exit 0

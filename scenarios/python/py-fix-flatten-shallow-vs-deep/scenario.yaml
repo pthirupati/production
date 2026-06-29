@@ -1,9 +1,26 @@
 title: Fix flatten to Handle Deep Nesting
 slug: py-fix-flatten-shallow-vs-deep
-category: Python Development
-description: flatten(nested) should fully flatten an arbitrarily nested list of integers, but it only
-  flattens ONE level, leaving deeper lists intact. Make it recursive so any depth flattens to a single
-  list, in order.
+category: Fix
+description: 'CONTEXT: A team operating Python development needs you to resolve `Fix flatten to Handle
+  Deep Nesting` during a realistic incident. The business impact is reduced service reliability until
+  the underlying state is repaired.
+
+
+  ENVIRONMENT: You are working in FixitLab''s offline Python project workspace with source files, venv,
+  tests, and CLI entrypoints. All tools run locally; no paid APIs or external cloud calls are required.
+
+
+  SYMPTOM / STARTING STATE: flatten(nested) should fully flatten an arbitrarily nested list of integers,
+  but it only flattens ONE level, leaving deeper lists intact. Make it recursive so any depth flattens
+  to a single list, in order.
+
+
+  OBJECTIVE: See nested sublists survive the shallow flatten; Recurse into list elements; Preserve left-to-right
+  order at any depth. Success means all hidden tests pass.
+
+
+  WHAT TO AVOID: Do not apply broad destructive changes, skip evidence gathering, or fake completion with
+  marker files — the checker validates real system state.'
 difficulty: medium
 scenario_type: fix
 lab_mode: simulation
@@ -21,56 +38,120 @@ objectives:
 initial_state: flatten(nested) should fully flatten an arbitrarily nested list of integers, but it only
   flattens ONE level, leaving deeper lists intact. Make it recursive so any depth flattens to a single
   list, in order.
-solution_explanation: |
-  Extending with the raw sublist only removes one level. Recursing with flatten(el) handles arbitrary depth.
+solution_explanation: 'Extending with the raw sublist only removes one level. Recursing with flatten(el)
+  handles arbitrary depth.
+
+  '
 coding_spec:
   language: python
   entrypoint: solution.py
   kind: fix
-  instructions: |
-    Fix flatten(nested) so it returns a single flat list of all integers at any nesting depth, in order.
-      flatten([1, [2, [3, [4]]], 5]) -> [1, 2, 3, 4, 5]
-    Click Run to try it, then Check Solution to grade against all tests.
+  instructions: "Fix flatten(nested) so it returns a single flat list of all integers at any nesting depth,\
+    \ in order.\n  flatten([1, [2, [3, [4]]], 5]) -> [1, 2, 3, 4, 5]\nClick Run to try it, then Check\
+    \ Solution to grade against all tests.\n"
   files:
   - path: solution.py
-    content: |
-      def flatten(nested):
-          out = []
-          for el in nested:
-              if isinstance(el, list):
-                  out.extend(el)      # bug: only one level deep
-              else:
-                  out.append(el)
-          return out
+    content: "def flatten(nested):\n    out = []\n    for el in nested:\n        if isinstance(el, list):\n\
+      \            out.extend(el)      # bug: only one level deep\n        else:\n            out.append(el)\n\
+      \    return out\n"
     readonly: false
   visible_tests:
   - name: one level
-    code: |
-      assert flatten([1, [2, 3], 4]) == [1, 2, 3, 4]
+    code: 'assert flatten([1, [2, 3], 4]) == [1, 2, 3, 4]
+
+      '
   - name: deep example
-    code: |
-      assert flatten([1, [2, [3, [4]]], 5]) == [1, 2, 3, 4, 5]
+    code: 'assert flatten([1, [2, [3, [4]]], 5]) == [1, 2, 3, 4, 5]
+
+      '
   hidden_tests:
   - name: already flat
-    code: |
-      assert flatten([1, 2, 3]) == [1, 2, 3]
+    code: 'assert flatten([1, 2, 3]) == [1, 2, 3]
+
+      '
   - name: very deep
-    code: |
-      assert flatten([[[[[9]]]]]) == [9]
+    code: 'assert flatten([[[[[9]]]]]) == [9]
+
+      '
   - name: empty and nested empty
-    code: |
-      assert flatten([[], [[], []]]) == []
+    code: 'assert flatten([[], [[], []]]) == []
+
+      '
   - name: order preserved
-    code: |
-      assert flatten([1, [2, [3]], [4, [5, [6]]]]) == [1,2,3,4,5,6]
+    code: 'assert flatten([1, [2, [3]], [4, [5, [6]]]]) == [1,2,3,4,5,6]
+
+      '
   timeout: 8
 hints:
 - order: 1
-  cost: 10
-  content: flatten([1, [2, [3]]]) returns [1, 2, [3]] — the inner list survives.
+  cost: 0
+  content: 'Where to look: Open `solution.py`, read the instructions, and run the visible tests to see
+    which assertion fails first.'
 - order: 2
-  cost: 20
-  content: extend(el) copies one level; you need to flatten el first.
+  cost: 25
+  content: 'Diagnostic steps:
+
+    1. Click Run and read the traceback — note line number and actual vs expected values.
+
+    2. Reproduce the failure with the smallest input from a visible test.
+
+    3. Compare your implementation to the bug described in the lab prompt.'
 - order: 3
-  cost: 30
-  content: 'Recurse: out.extend(flatten(el)) when el is a list.'
+  cost: 50
+  content: 'Exact fix + verification:
+
+    1. Preserve left-to-right order at any depth.
+
+    2. Re-run the lab checker (`check.sh` or Check Solution).
+
+    3. Confirm every scenario objective is satisfied.
+
+
+    WHY: the grader validates real state — marker files are ignored.'
+technology: python
+summary: Complete the fix flatten to handle deep nesting python lab and verify success with the checker
+estimated_minutes: 25
+xp_reward: 100
+prerequisites:
+- Basic python literacy
+tags:
+- fix
+- hands-on
+- python
+linked_tutorial: python-fundamentals
+what_you_will_learn:
+- See nested sublists survive the shallow flatten
+- Recurse into list elements
+- Preserve left-to-right order at any depth
+environment:
+  nodes:
+  - role: primary
+    os: FixitLab Python project workspace
+    hostname: lab-primary
+    ip: 127.0.0.1
+    specs: local offline simulation
+  pre_installed:
+  - bash
+  - coreutils
+  - pip
+  - python
+  - python3
+  credentials:
+  - user: root
+    password: lab123
+tasks:
+- id: task_1
+  title: Fix flatten to Handle Deep Nesting
+  description: Restore healthy behavior for Fix flatten to Handle Deep Nesting by investigating the failure,
+    applying the smallest safe fix, and validating the outcome.
+  background: 'This python lab teaches systematic troubleshooting: observe, hypothesize, change, verify.'
+  validation:
+    type: custom_script
+    script: hidden_tests
+    error_message: One or more hidden tests failed. Read the public test output, fix your solution, and
+      submit again.
+solution:
+  summary: The solution passes all hidden tests by implementing the required behavior in code.
+  files_changed: []
+  commands_run: []
+  reference_docs: python-fundamentals

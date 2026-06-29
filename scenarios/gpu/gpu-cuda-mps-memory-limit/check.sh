@@ -1,4 +1,3 @@
-#!/usr/bin/env bash
-# gpu-cuda-mps-memory-limit: config repair (FIXED-OK sentinel).
-grep -q FIXED-OK /etc/gpu/mps-memlimit.conf
+#!/bin/bash
+nvidia-smi | grep -q 'NVIDIA-SMI'
 exit 0

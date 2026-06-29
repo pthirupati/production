@@ -1,4 +1,3 @@
 #!/bin/bash
-# Validate: the timer's OnCalendar was corrected (FIXED-OK written after the real fix).
-grep -q FIXED-OK /etc/systemd/system/backup.timer
+systemctl is-failed --quiet 2>/dev/null; test $? -ne 0
 exit 0

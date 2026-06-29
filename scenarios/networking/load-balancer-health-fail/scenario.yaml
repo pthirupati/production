@@ -1,38 +1,130 @@
 slug: load-balancer-health-fail
-title: "Load Balancer Health Check Failing — Fix Endpoint Path"
-technology: Networking
-category: Load Balancing
+title: Load Balancer Health Check Failing — Fix Endpoint Path
+technology: networking
+category: Fix
 difficulty: easy
 time_limit: 600
 max_score: 100
 infrastructure_type: docker
 jira_priority: High
 is_free: false
-description: |
-  The HAProxy load balancer is marking all backend servers as DOWN and returning
-  503 to clients. Investigation reveals the health check is configured to probe
-  /health but the application exposes its health endpoint at /healthz. This simple
-  path mismatch causes every backend to fail the health check and be removed from
-  the active pool.
-objectives:
-  - Identify the incorrect health check path in the HAProxy configuration
-  - Update the health check option to use /healthz
-  - Reload HAProxy and verify backends transition to UP state
-  - Confirm traffic is being load balanced to healthy backends
-initial_state: |
-  HAProxy 2.6 configured with 3 backend servers. Health check is `option httpchk
+description: 'CONTEXT: A team operating network operations needs you to resolve `Load Balancer Health
+  Check Failing — Fix Endpoint Path` during a realistic incident. The business impact is reduced service
+  reliability until the underlying state is repaired.
+
+
+  ENVIRONMENT: You are working in FixitLab''s offline network lab with interfaces, routing tables, DNS,
+  and firewall rules. All tools run locally; no paid APIs or external cloud calls are required.
+
+
+  SYMPTOM / STARTING STATE: HAProxy 2.6 configured with 3 backend servers. Health check is `option httpchk
+
   GET /health`. All backends return 404 for /health but 200 for /healthz. All 3
+
+  backends show as DOWN, stats page shows 0 active servers. The HAProxy load balancer is marking all backend
+  servers as DOWN and returning
+
+  503 to clients. Investigation reveals the health check is configured to probe
+
+  /health but the application exposes its health endpoint at /healthz. This simple
+
+  path mismatch causes every backend to fail the health check and be removed from
+
+  the active pool.
+
+
+  OBJECTIVE: Identify the incorrect health check path in the HAProxy configuration; Update the health
+  check option to use /healthz; Reload HAProxy and verify backends transition to UP state. Success means
+  `systemctl is-active --quiet` returns active.
+
+
+  WHAT TO AVOID: Do not apply broad destructive changes, skip evidence gathering, or fake completion with
+  marker files — the checker validates real system state.'
+objectives:
+- Identify the incorrect health check path in the HAProxy configuration
+- Update the health check option to use /healthz
+- Reload HAProxy and verify backends transition to UP state
+- Confirm traffic is being load balanced to healthy backends
+initial_state: 'HAProxy 2.6 configured with 3 backend servers. Health check is `option httpchk
+
+  GET /health`. All backends return 404 for /health but 200 for /healthz. All 3
+
   backends show as DOWN, stats page shows 0 active servers.
+
+  '
 hints:
-  - order: 1
-    cost: 10
-    content: "Check `/etc/haproxy/haproxy.cfg` — look for the `option httpchk` line in the backend block."
-  - order: 2
-    cost: 15
-    content: "Change `option httpchk GET /health` to `option httpchk GET /healthz HTTP/1.1\\r\\nHost: localhost`"
-  - order: 3
-    cost: 10
-    content: "Reload HAProxy: `systemctl reload haproxy` (or `haproxy -sf $(cat /run/haproxy.pid)`)"
-  - order: 4
-    cost: 15
-    content: "Check backend status: `echo 'show stat' | socat /run/haproxy/admin.sock stdio | cut -d',' -f1,2,18`"
+- order: 1
+  cost: 0
+  content: 'Where to look: Start with `systemctl status --quiet` and `journalctl -u --quiet -n 50 --no-pager`
+    before changing anything.'
+- order: 2
+  cost: 25
+  content: 'Diagnostic steps:
+
+    1. Run `systemctl status --quiet` — note Active/Failed and the last log lines.
+
+    2. Read `journalctl -u --quiet -n 50` for the root error.
+
+    3. Form a hypothesis about the smallest config or permission fix.'
+- order: 3
+  cost: 50
+  content: 'Exact fix + verification:
+
+    1. Apply the minimal fix (config, unit override, or missing directory).
+
+    2. Run `systemctl daemon-reload` if you edited a unit file.
+
+    3. Run `systemctl restart --quiet` and confirm `systemctl is-active --quiet` succeeds.
+
+
+    WHY: the grader checks real service state, not marker files.'
+summary: Complete the load balancer health check failing — fix endpoint path networking lab and verify
+  success with the checker
+estimated_minutes: 10
+xp_reward: 100
+prerequisites:
+- Basic networking literacy
+tags:
+- fix
+- hands-on
+- networking
+linked_tutorial: networking-fundamentals
+what_you_will_learn:
+- Identify the incorrect health check path in the HAProxy configuration
+- Update the health check option to use /healthz
+- Reload HAProxy and verify backends transition to UP state
+- Confirm traffic is being load balanced to healthy backends
+environment:
+  nodes:
+  - role: primary
+    os: FixitLab network lab
+    hostname: lab-primary
+    ip: 127.0.0.1
+    specs: local offline simulation
+  pre_installed:
+  - bash
+  - coreutils
+  - journalctl
+  - networking
+  - systemctl
+  credentials:
+  - user: root
+    password: lab123
+tasks:
+- id: task_1
+  title: Load Balancer Health Check Failing — Fix Endpoint Path
+  description: Restore healthy behavior for Load Balancer Health Check Failing — Fix Endpoint Path by
+    investigating the failure, applying the smallest safe fix, and validating the outcome.
+  background: 'This networking lab teaches systematic troubleshooting: observe, hypothesize, change, verify.'
+  validation:
+    type: service_active
+    command: systemctl is-active --quiet
+    expected_status: active
+    error_message: The --quiet service is not active yet. Check `systemctl status --quiet` and `journalctl
+      -u --quiet -n 50`.
+solution:
+  summary: The root cause is an unhealthy `--quiet` service; repair it and verify active state.
+  files_changed: []
+  commands_run:
+  - systemctl is-active --quiet
+  reference_docs: networking-fundamentals

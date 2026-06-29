@@ -1,9 +1,26 @@
 title: Implement a Simple Memoize
 slug: js-impl-debounce-logic
-category: JavaScript Development
-description: 'Implement memoize(fn): return a function that caches results by its single argument so fn
-  is only called once per distinct argument. A call counter is exposed by the tests via a wrapped fn.
-  The stub is empty so tests fail.'
+category: Build
+description: 'CONTEXT: A team operating JavaScript needs you to resolve `Implement a Simple Memoize` during
+  a realistic incident. The business impact is reduced service reliability until the underlying state
+  is repaired.
+
+
+  ENVIRONMENT: You are working in FixitLab''s offline JavaScript practice project with modules, browser
+  console, and Node tooling. All tools run locally; no paid APIs or external cloud calls are required.
+
+
+  SYMPTOM / STARTING STATE: Implement memoize(fn): return a function that caches results by its single
+  argument so fn is only called once per distinct argument. A call counter is exposed by the tests via
+  a wrapped fn. The stub is empty so tests fail.
+
+
+  OBJECTIVE: Cache results keyed by the argument; Return the cached value on repeat calls; Call the underlying
+  fn only once per distinct argument. Success means all hidden tests pass.
+
+
+  WHAT TO AVOID: Do not apply broad destructive changes, skip evidence gathering, or fake completion with
+  marker files — the checker validates real system state.'
 difficulty: medium
 scenario_type: do
 lab_mode: simulation
@@ -21,58 +38,163 @@ objectives:
 initial_state: 'Implement memoize(fn): return a function that caches results by its single argument so
   fn is only called once per distinct argument. A call counter is exposed by the tests via a wrapped fn.
   The stub is empty so tests fail.'
-solution_explanation: |
-  A Map captured in the returned closure stores results per argument; a cache hit short-circuits the call, so fn runs once per distinct input.
+solution_explanation: 'A Map captured in the returned closure stores results per argument; a cache hit
+  short-circuits the call, so fn runs once per distinct input.
+
+  '
 coding_spec:
   language: javascript
   entrypoint: solution.js
   kind: impl
-  instructions: |
-    Implement memoize(fn) -> memoized function of one argument. Repeated calls with the same argument return the cached result without re-calling fn.
+  instructions: 'Implement memoize(fn) -> memoized function of one argument. Repeated calls with the same
+    argument return the cached result without re-calling fn.
+
     Click Run to try it, then Check Solution to grade against all tests.
+
+    '
   files:
   - path: solution.js
-    content: |
-      function memoize(fn) {
-        // TODO: return a function that caches results by argument
-      }
+    content: "function memoize(fn) {\n  // TODO: return a function that caches results by argument\n}\n"
     readonly: false
   visible_tests:
   - name: returns correct result
-    code: |
-      const sq = memoize((n) => n * n);
+    code: 'const sq = memoize((n) => n * n);
+
       assert(sq(4) === 16 && sq(5) === 25);
+
+      '
   - name: caches repeated call
-    code: |
-      let calls = 0;
+    code: 'let calls = 0;
+
       const f = memoize((n) => { calls++; return n + 1; });
+
       f(2); f(2); f(2);
-      assert(calls === 1, 'fn called ' + calls + ' times');
+
+      assert(calls === 1, ''fn called '' + calls + '' times'');
+
+      '
   hidden_tests:
   - name: distinct args each computed once
-    code: |
-      let calls = 0;
+    code: 'let calls = 0;
+
       const f = memoize((n) => { calls++; return n * 2; });
+
       f(1); f(2); f(1); f(2);
-      assert(calls === 2, 'calls=' + calls);
+
+      assert(calls === 2, ''calls='' + calls);
+
+      '
   - name: cached value is correct after repeat
-    code: |
-      const f = memoize((n) => n + 100);
+    code: 'const f = memoize((n) => n + 100);
+
       assert(f(7) === 107 && f(7) === 107);
+
+      '
   - name: string keys
-    code: |
-      let calls = 0;
+    code: 'let calls = 0;
+
       const f = memoize((s) => { calls++; return s.length; });
-      f('ab'); f('ab');
-      assert(f('ab') === 2 && calls === 1);
+
+      f(''ab''); f(''ab'');
+
+      assert(f(''ab'') === 2 && calls === 1);
+
+      '
   timeout: 8
 hints:
 - order: 1
-  cost: 10
-  content: Keep a cache (a Map works well) keyed by the argument.
+  cost: 0
+  content: 'Where to look: Open `solution.js`, read the instructions, and run the visible tests to see
+    which assertion fails first.'
 - order: 2
-  cost: 20
-  content: 'On call: if the cache has the arg, return it; otherwise compute, store, return.'
+  cost: 25
+  content: 'Diagnostic steps:
+
+    1. Click Run and read the traceback — note line number and actual vs expected values.
+
+    2. Reproduce the failure with the smallest input from a visible test.
+
+    3. Compare your implementation to the bug described in the lab prompt.'
 - order: 3
-  cost: 30
-  content: Return a closure over the cache so it persists across calls.
+  cost: 50
+  content: 'Exact fix + verification:
+
+    1. Call the underlying fn only once per distinct argument.
+
+    2. Re-run the lab checker (`check.sh` or Check Solution).
+
+    3. Confirm every scenario objective is satisfied.
+
+
+    WHY: the grader validates real state — marker files are ignored.'
+technology: javascript
+summary: Complete the implement a simple memoize javascript lab and verify success with the checker
+estimated_minutes: 25
+xp_reward: 100
+prerequisites:
+- Basic javascript literacy
+tags:
+- do
+- hands-on
+- javascript
+linked_tutorial: javascript-fundamentals
+what_you_will_learn:
+- Cache results keyed by the argument
+- Return the cached value on repeat calls
+- Call the underlying fn only once per distinct argument
+environment:
+  nodes:
+  - role: primary
+    os: FixitLab JavaScript practice project
+    hostname: lab-primary
+    ip: 127.0.0.1
+    specs: local offline simulation
+  pre_installed:
+  - bash
+  - coreutils
+  - javascript
+  - journalctl
+  - systemctl
+  credentials:
+  - user: root
+    password: lab123
+tasks:
+- id: task_1
+  title: Implement a Simple Memoize
+  description: Restore healthy behavior for Implement a Simple Memoize by investigating the failure, applying
+    the smallest safe fix, and validating the outcome.
+  background: 'This javascript lab teaches systematic troubleshooting: observe, hypothesize, change, verify.'
+  validation:
+    type: custom_script
+    script: hidden_tests
+    error_message: One or more hidden tests failed. Read the public test output, fix your solution, and
+      submit again.
+solution:
+  summary: The solution passes all hidden tests by implementing the required behavior in code.
+  files_changed: []
+  commands_run: []
+  reference_docs: javascript-fundamentals
+guided_mode:
+  enabled: true
+  steps:
+  - step: 1
+    title: Inspect current state
+    instruction: Run a read-only diagnostic before changing anything.
+    command: check.sh
+    expected_output: Output shows the current failure mode
+    explanation: Evidence-first troubleshooting avoids guessing.
+    next_on: command_success
+  - step: 2
+    title: Apply the minimal fix
+    instruction: Make one reversible change aligned with the objectives.
+    command: '# your fix command here'
+    expected_output: State moves toward the objective
+    explanation: Small changes make rollback easy if the hypothesis was wrong.
+    next_on: command_success
+  - step: 3
+    title: Verify with the grader
+    instruction: Run the same verification the checker uses.
+    command: check.sh
+    expected_output: all hidden tests pass
+    explanation: The lab passes only when real state is healthy.
+    next_on: command_success

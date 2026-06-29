@@ -1,10 +1,29 @@
 title: Kernel Update Requires Reboot
 slug: linux-patch-reboot-required
-category: Patching
+category: Fix
 difficulty: easy
-description: Security patches (including a kernel update) were installed, but the system is still running
-  the old kernel because it hasn't been rebooted — the new kernel only takes effect after a reboot. Confirm
-  the running kernel lags the installed one, then reboot and verify the new kernel is active.
+description: 'CONTEXT: A team operating Linux administration needs you to resolve `Kernel Update Requires
+  Reboot` during a realistic incident. The business impact is reduced service reliability until the underlying
+  state is repaired.
+
+
+  ENVIRONMENT: You are working in FixitLab''s offline Linux practice server with terminal and config files
+  under /etc and /var. All tools run locally; no paid APIs or external cloud calls are required.
+
+
+  SYMPTOM / STARTING STATE: Linux server where a newer kernel package is installed but the running kernel
+  is older; a reboot is required to activate the patched kernel. Security patches (including a kernel
+  update) were installed, but the system is still running the old kernel because it hasn''t been rebooted
+  — the new kernel only takes effect after a reboot. Confirm the running kernel lags the installed one,
+  then reboot and verify the new kernel is active.
+
+
+  OBJECTIVE: Confirm the running kernel differs from the latest installed kernel; Reboot the system; Verify
+  the new kernel is active after reboot. Success means `check.sh` exits successfully.
+
+
+  WHAT TO AVOID: Do not apply broad destructive changes, skip evidence gathering, or fake completion with
+  marker files — the checker validates real system state.'
 lab_mode: simulation
 simulation_type: rhel
 time_limit: 600
@@ -16,15 +35,71 @@ objectives:
 - Verify the new kernel is active after reboot
 hints:
 - order: 1
-  cost: 10
-  content: 'Compare running vs installed: `uname -r` (running) against the newest in `rpm -q kernel --last`
-    (or `dpkg -l ''linux-image*''`). The running one is older.'
+  cost: 0
+  content: 'Where to look: Confirm the running kernel differs from the latest installed kernel'
 - order: 2
-  cost: 15
-  content: A kernel update only applies on boot — schedule and `reboot` (or `systemctl reboot`).
+  cost: 25
+  content: 'Diagnostic steps:
+
+    1. Verify the new kernel is active after reboot'
 - order: 3
-  cost: 20
-  content: After it comes back, `uname -r` matches the newly installed kernel, confirming the patch is
-    active.
+  cost: 50
+  content: 'Exact fix + verification:
+
+    1. Verify the new kernel is active after reboot.
+
+    2. Re-run the lab checker (`check.sh` or Check Solution).
+
+    3. Confirm every scenario objective is satisfied.
+
+
+    WHY: the grader validates real state — marker files are ignored.'
 initial_state: Linux server where a newer kernel package is installed but the running kernel is older;
   a reboot is required to activate the patched kernel.
+technology: linux
+summary: Complete the kernel update requires reboot linux lab and verify success with the checker
+estimated_minutes: 10
+xp_reward: 100
+prerequisites:
+- Basic linux literacy
+tags:
+- fix
+- hands-on
+- linux
+linked_tutorial: linux-fundamentals
+what_you_will_learn:
+- Confirm the running kernel differs from the latest installed kernel
+- Reboot the system
+- Verify the new kernel is active after reboot
+environment:
+  nodes:
+  - role: primary
+    os: FixitLab Linux practice server
+    hostname: lab-primary
+    ip: 127.0.0.1
+    specs: local offline simulation
+  pre_installed:
+  - bash
+  - coreutils
+  - journalctl
+  - linux
+  - systemctl
+  credentials:
+  - user: root
+    password: lab123
+tasks:
+- id: task_1
+  title: Kernel Update Requires Reboot
+  description: Restore healthy behavior for Kernel Update Requires Reboot by investigating the failure,
+    applying the smallest safe fix, and validating the outcome.
+  background: 'This linux lab teaches systematic troubleshooting: observe, hypothesize, change, verify.'
+  validation:
+    type: custom_script
+    script: check.sh
+    error_message: Validation did not pass. Re-read the objectives and Hint 2 diagnostic steps.
+solution:
+  summary: Identify the misconfiguration affecting this linux lab and apply the minimal fix.
+  files_changed: []
+  commands_run:
+  - bash check.sh
+  reference_docs: linux-fundamentals

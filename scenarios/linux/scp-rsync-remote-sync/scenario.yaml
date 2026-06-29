@@ -2,17 +2,37 @@ title: SCP and Rsync Mirror to Remote Host
 slug: scp-rsync-remote-sync
 lab_mode: simulation
 simulation_type: generic
-technology: Linux
-category: SSH / File transfer
+technology: linux
+category: Fix
 difficulty: medium
 time_limit: 900
 max_score: 100
 infrastructure_type: docker
 docker_privileged: false
 jira_priority: Medium
-description: 'Syncing /var/www/app to the backup server over SSH fails on the write side: SSH key auth
-  works, but the destination directory on backup-server isn''t writable by the sync user, so scp/rsync
-  errors with permission denied. Fix the ownership/permissions of the destination so the transfer completes.'
+description: 'CONTEXT: A team operating Linux administration needs you to resolve `SCP and Rsync Mirror
+  to Remote Host` during a realistic incident. The business impact is reduced service reliability until
+  the underlying state is repaired.
+
+
+  ENVIRONMENT: You are working in FixitLab''s offline Linux practice server with terminal and config files
+  under /etc and /var. All tools run locally; no paid APIs or external cloud calls are required.
+
+
+  SYMPTOM / STARTING STATE: Two-host lab. SSH key auth between client and backup-server works, but backup-server:/var/www/backup/
+  isn''t writable by syncuser, so rsync/scp can''t write there. Syncing /var/www/app to the backup server
+  over SSH fails on the write side: SSH key auth works, but the destination directory on backup-server
+  isn''t writable by the sync user, so scp/rsync errors with permission denied. Fix the ownership/permissions
+  of the destination so the transfer completes.
+
+
+  OBJECTIVE: Confirm the transfer fails on destination write permissions (not auth); Fix ownership/permissions
+  on backup-server:/var/www/backup/; Verify rsync/scp completes the sync successfully. Success means `check.sh`
+  exits successfully.
+
+
+  WHAT TO AVOID: Do not apply broad destructive changes, skip evidence gathering, or fake completion with
+  marker files — the checker validates real system state.'
 companion_hosts:
 - name: backup
   role: backup-server
@@ -36,17 +56,27 @@ objectives:
 - Verify rsync/scp completes the sync successfully
 hints:
 - order: 1
-  cost: 10
-  content: 'Auth succeeds but writes fail. On backup-server (the SSH tab), check the destination: `ls
-    -ld /var/www/backup` — it''s not owned/writable by syncuser.'
+  cost: 0
+  content: 'Where to look: Confirm the transfer fails on destination write permissions (not auth)'
 - order: 2
-  cost: 15
-  content: 'Grant write access: `chown -R syncuser /var/www/backup` (or add group write: `chmod -R g+w`
-    with the right group).'
+  cost: 25
+  content: 'Diagnostic steps:
+
+    1. Fix ownership/permissions on backup-server:/var/www/backup/
+
+    2. Verify rsync/scp completes the sync successfully'
 - order: 3
-  cost: 20
-  content: 'From the client, run the sync: `rsync -avz /var/www/app/ syncuser@backup-server:/var/www/backup/`
-    — it now completes without permission errors.'
+  cost: 50
+  content: 'Exact fix + verification:
+
+    1. Verify rsync/scp completes the sync successfully.
+
+    2. Re-run the lab checker (`check.sh` or Check Solution).
+
+    3. Confirm every scenario objective is satisfied.
+
+
+    WHY: the grader validates real state — marker files are ignored.'
 validation_script: 'test -f /var/www/app/index.html && rsync -az -e "ssh -o StrictHostKeyChecking=no"
   /var/www/app/ syncuser@backup-server:/var/www/backup/ && ssh -o BatchMode=yes syncuser@backup-server
   test -f /var/www/backup/index.html
@@ -54,3 +84,49 @@ validation_script: 'test -f /var/www/app/index.html && rsync -az -e "ssh -o Stri
   '
 initial_state: Two-host lab. SSH key auth between client and backup-server works, but backup-server:/var/www/backup/
   isn't writable by syncuser, so rsync/scp can't write there.
+summary: Complete the scp and rsync mirror to remote host linux lab and verify success with the checker
+estimated_minutes: 15
+xp_reward: 100
+prerequisites:
+- Basic linux literacy
+tags:
+- fix
+- hands-on
+- linux
+linked_tutorial: linux-fundamentals
+what_you_will_learn:
+- Confirm the transfer fails on destination write permissions (not auth)
+- Fix ownership/permissions on backup-server:/var/www/backup/
+- Verify rsync/scp completes the sync successfully
+environment:
+  nodes:
+  - role: primary
+    os: FixitLab Linux practice server
+    hostname: lab-primary
+    ip: 127.0.0.1
+    specs: local offline simulation
+  pre_installed:
+  - bash
+  - coreutils
+  - journalctl
+  - linux
+  - systemctl
+  credentials:
+  - user: root
+    password: lab123
+tasks:
+- id: task_1
+  title: SCP and Rsync Mirror to Remote Host
+  description: Restore healthy behavior for SCP and Rsync Mirror to Remote Host by investigating the failure,
+    applying the smallest safe fix, and validating the outcome.
+  background: 'This linux lab teaches systematic troubleshooting: observe, hypothesize, change, verify.'
+  validation:
+    type: custom_script
+    script: check.sh
+    error_message: Validation did not pass. Re-read the objectives and Hint 2 diagnostic steps.
+solution:
+  summary: Identify the misconfiguration affecting this linux lab and apply the minimal fix.
+  files_changed: []
+  commands_run:
+  - bash check.sh
+  reference_docs: linux-fundamentals

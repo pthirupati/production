@@ -1,38 +1,131 @@
 slug: apache-directory-listing
-title: "Apache Directory Listing Enabled — Disable Options Indexes"
-technology: Security
-category: Web Server Security
+title: Apache Directory Listing Enabled — Disable Options Indexes
+technology: security
+category: Fix
 difficulty: easy
 time_limit: 600
 max_score: 100
 infrastructure_type: docker
 jira_priority: Medium
 is_free: true
-description: |
-  Apache is serving directory listings for all directories that don't have an
-  index.html file. This exposes sensitive files including backup files, config
-  files, and application source code to anyone who can reach the server. The
-  Options Indexes directive is enabled in the virtual host configuration.
-  Disable it to prevent unauthorized file browsing.
-objectives:
-  - Confirm directory listing is enabled by accessing a directory without index
-  - Remove or disable the Options Indexes directive in the Apache config
-  - Reload Apache and verify directory listings are no longer served
-  - Ensure this is configured for all virtual hosts
-initial_state: |
-  Ubuntu 22.04 with Apache2. /var/www/html/ has no index.html. Apache returns a
+description: 'CONTEXT: A team operating security hardening needs you to resolve `Apache Directory Listing
+  Enabled — Disable Options Indexes` during a realistic incident. The business impact is reduced service
+  reliability until the underlying state is repaired.
+
+
+  ENVIRONMENT: You are working in FixitLab''s offline hardening lab with SSH, firewall, TLS, audit logs,
+  and IAM settings. All tools run locally; no paid APIs or external cloud calls are required.
+
+
+  SYMPTOM / STARTING STATE: Ubuntu 22.04 with Apache2. /var/www/html/ has no index.html. Apache returns
+  a
+
   directory listing when accessing the webroot. /etc/apache2/sites-enabled/000-default.conf
+
+  has `Options Indexes FollowSymLinks`. Apache is serving directory listings for all directories that
+  don''t have an
+
+  index.html file. This exposes sensitive files including backup files, config
+
+  files, and application source code to anyone who can reach the server. The
+
+  Options Indexes directive is enabled in the virtual host configuration.
+
+  Disable it to prevent unauthorized file browsing.
+
+
+  OBJECTIVE: Confirm directory listing is enabled by accessing a directory without index; Remove or disable
+  the Options Indexes directive in the Apache config; Reload Apache and verify directory listings are
+  no longer served. Success means `systemctl is-active --quiet` returns active.
+
+
+  WHAT TO AVOID: Do not apply broad destructive changes, skip evidence gathering, or fake completion with
+  marker files — the checker validates real system state.'
+objectives:
+- Confirm directory listing is enabled by accessing a directory without index
+- Remove or disable the Options Indexes directive in the Apache config
+- Reload Apache and verify directory listings are no longer served
+- Ensure this is configured for all virtual hosts
+initial_state: 'Ubuntu 22.04 with Apache2. /var/www/html/ has no index.html. Apache returns a
+
+  directory listing when accessing the webroot. /etc/apache2/sites-enabled/000-default.conf
+
   has `Options Indexes FollowSymLinks`.
+
+  '
 hints:
-  - order: 1
-    cost: 10
-    content: "Confirm the issue: `curl -s http://localhost/ | grep -i 'Index of'` — should show directory listing."
-  - order: 2
-    cost: 10
-    content: "Edit /etc/apache2/sites-enabled/000-default.conf — change `Options Indexes FollowSymLinks` to `Options -Indexes FollowSymLinks`"
-  - order: 3
-    cost: 10
-    content: "Also check /etc/apache2/apache2.conf for any global Options Indexes setting."
-  - order: 4
-    cost: 10
-    content: "Reload: `apache2ctl -t && systemctl reload apache2`. Verify: `curl http://localhost/` should return 403."
+- order: 1
+  cost: 0
+  content: 'Where to look: Start with `systemctl status --quiet` and `journalctl -u --quiet -n 50 --no-pager`
+    before changing anything.'
+- order: 2
+  cost: 25
+  content: 'Diagnostic steps:
+
+    1. Run `systemctl status --quiet` — note Active/Failed and the last log lines.
+
+    2. Read `journalctl -u --quiet -n 50` for the root error.
+
+    3. Form a hypothesis about the smallest config or permission fix.'
+- order: 3
+  cost: 50
+  content: 'Exact fix + verification:
+
+    1. Apply the minimal fix (config, unit override, or missing directory).
+
+    2. Run `systemctl daemon-reload` if you edited a unit file.
+
+    3. Run `systemctl restart --quiet` and confirm `systemctl is-active --quiet` succeeds.
+
+
+    WHY: the grader checks real service state, not marker files.'
+summary: Complete the apache directory listing enabled — disable options indexes security lab and verify
+  success with the checker
+estimated_minutes: 10
+xp_reward: 100
+prerequisites:
+- Basic security literacy
+tags:
+- fix
+- hands-on
+- security
+linked_tutorial: security-fundamentals
+what_you_will_learn:
+- Confirm directory listing is enabled by accessing a directory without index
+- Remove or disable the Options Indexes directive in the Apache config
+- Reload Apache and verify directory listings are no longer served
+- Ensure this is configured for all virtual hosts
+environment:
+  nodes:
+  - role: primary
+    os: FixitLab hardening lab
+    hostname: lab-primary
+    ip: 127.0.0.1
+    specs: local offline simulation
+  pre_installed:
+  - bash
+  - coreutils
+  - journalctl
+  - security
+  - systemctl
+  credentials:
+  - user: root
+    password: lab123
+tasks:
+- id: task_1
+  title: Apache Directory Listing Enabled — Disable Options Indexes
+  description: Restore healthy behavior for Apache Directory Listing Enabled — Disable Options Indexes
+    by investigating the failure, applying the smallest safe fix, and validating the outcome.
+  background: 'This security lab teaches systematic troubleshooting: observe, hypothesize, change, verify.'
+  validation:
+    type: service_active
+    command: systemctl is-active --quiet
+    expected_status: active
+    error_message: The --quiet service is not active yet. Check `systemctl status --quiet` and `journalctl
+      -u --quiet -n 50`.
+solution:
+  summary: The root cause is an unhealthy `--quiet` service; repair it and verify active state.
+  files_changed: []
+  commands_run:
+  - systemctl is-active --quiet
+  reference_docs: security-fundamentals

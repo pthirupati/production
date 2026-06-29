@@ -1,14 +1,29 @@
 slug: nginx-upstream-timeout
-title: nginx Upstream Timeout — Fix proxy_read_timeout for 504 Errors
-technology: Networking
-category: Reverse Proxy
+title: nginx Upstream Timeout - Fix proxy_read_timeout for 504
+technology: networking
+category: Fix
 difficulty: medium
 time_limit: 900
 max_score: 100
 infrastructure_type: docker
 jira_priority: High
 is_free: false
-description: 'Users are receiving 504 Gateway Timeout errors from nginx when accessing a
+description: 'CONTEXT: A team operating network operations needs you to resolve `nginx Upstream Timeout
+  - Fix proxy_read_timeout for 504` during a realistic incident. The business impact is reduced service
+  reliability until the underlying state is repaired.
+
+
+  ENVIRONMENT: You are working in FixitLab''s offline network lab with interfaces, routing tables, DNS,
+  and firewall rules. All tools run locally; no paid APIs or external cloud calls are required.
+
+
+  SYMPTOM / STARTING STATE: Ubuntu 22.04 with nginx as a reverse proxy. proxy_read_timeout=30s configured
+  in
+
+  /etc/nginx/conf.d/app.conf. Backend API at /api/export takes 60+ seconds.
+
+  All requests to /api/export return 504 Gateway Timeout. Users are receiving 504 Gateway Timeout errors
+  from nginx when accessing a
 
   long-running API endpoint. The backend application legitimately takes 45–90
 
@@ -18,7 +33,14 @@ description: 'Users are receiving 504 Gateway Timeout errors from nginx when acc
 
   time. Increase the timeout to allow these slow requests to complete successfully.
 
-  '
+
+  OBJECTIVE: Identify the proxy_read_timeout setting causing 504 errors; Increase proxy_read_timeout to
+  120 seconds in the nginx config; Also set proxy_connect_timeout and proxy_send_timeout appropriately.
+  Success means `systemctl is-active --quiet` returns active.
+
+
+  WHAT TO AVOID: Do not apply broad destructive changes, skip evidence gathering, or fake completion with
+  marker files — the checker validates real system state.'
 objectives:
 - Identify the proxy_read_timeout setting causing 504 errors
 - Increase proxy_read_timeout to 120 seconds in the nginx config
@@ -33,18 +55,76 @@ initial_state: 'Ubuntu 22.04 with nginx as a reverse proxy. proxy_read_timeout=3
   '
 hints:
 - order: 1
-  cost: 10
-  content: 'Reproduce the 504 on the slow endpoint, then check the current timeout: `grep -r proxy_read_timeout
-    /etc/nginx/` — it''s lower than the backend''s 45-90s response time.'
+  cost: 0
+  content: 'Where to look: Identify the proxy_read_timeout setting causing 504 errors'
 - order: 2
-  cost: 15
-  content: 'Raise it in the relevant location block (e.g. /etc/nginx/conf.d/app.conf): `proxy_read_timeout
-    120s;`.'
-- order: 3
-  cost: 20
-  content: 'Also set complementary timeouts so the whole proxy path tolerates the latency: `proxy_connect_timeout
-    10s;` and `proxy_send_timeout 120s;`.'
-- order: 4
   cost: 25
-  content: 'Validate and reload: `nginx -t && systemctl reload nginx`, then re-request the slow endpoint
-    and confirm it returns 200 instead of 504.'
+  content: 'Diagnostic steps:
+
+    1. Increase proxy_read_timeout to 120 seconds in the nginx config
+
+    2. Also set proxy_connect_timeout and proxy_send_timeout appropriately
+
+    3. Reload nginx and verify the endpoint no longer returns 504'
+- order: 3
+  cost: 50
+  content: 'Exact fix + verification:
+
+    1. Reload nginx and verify the endpoint no longer returns 504.
+
+    2. Re-run the lab checker (`check.sh` or Check Solution).
+
+    3. Confirm every scenario objective is satisfied.
+
+
+    WHY: the grader validates real state — marker files are ignored.'
+summary: Complete the nginx upstream timeout - fix proxy_read_timeout for 504 networking lab and verify
+  success with the checker
+estimated_minutes: 15
+xp_reward: 100
+prerequisites:
+- Basic networking literacy
+tags:
+- fix
+- hands-on
+- networking
+linked_tutorial: networking-fundamentals
+what_you_will_learn:
+- Identify the proxy_read_timeout setting causing 504 errors
+- Increase proxy_read_timeout to 120 seconds in the nginx config
+- Also set proxy_connect_timeout and proxy_send_timeout appropriately
+- Reload nginx and verify the endpoint no longer returns 504
+environment:
+  nodes:
+  - role: primary
+    os: FixitLab network lab
+    hostname: lab-primary
+    ip: 127.0.0.1
+    specs: local offline simulation
+  pre_installed:
+  - bash
+  - coreutils
+  - journalctl
+  - networking
+  - systemctl
+  credentials:
+  - user: root
+    password: lab123
+tasks:
+- id: task_1
+  title: nginx Upstream Timeout - Fix proxy_read_timeout for 504
+  description: Restore healthy behavior for nginx Upstream Timeout - Fix proxy_read_timeout for 504 by
+    investigating the failure, applying the smallest safe fix, and validating the outcome.
+  background: 'This networking lab teaches systematic troubleshooting: observe, hypothesize, change, verify.'
+  validation:
+    type: service_active
+    command: systemctl is-active --quiet
+    expected_status: active
+    error_message: The --quiet service is not active yet. Check `systemctl status --quiet` and `journalctl
+      -u --quiet -n 50`.
+solution:
+  summary: The root cause is an unhealthy `--quiet` service; repair it and verify active state.
+  files_changed: []
+  commands_run:
+  - systemctl is-active --quiet
+  reference_docs: networking-fundamentals

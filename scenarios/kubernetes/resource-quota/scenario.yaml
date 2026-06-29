@@ -1,11 +1,31 @@
 title: Pod Blocked by ResourceQuota
 slug: sim-k8s-resource-quota
-category: Kubernetes
+category: Fix
 difficulty: medium
-description: A deployment cannot scale up — new pods stay Pending because the namespace's ResourceQuota
-  has been exhausted. The sum of CPU/memory requests (or the pod count) for existing workloads has hit
-  the quota's hard limit, so the API server rejects additional pods. Raise the quota or reduce requests
-  so the deployment can schedule its replicas.
+description: 'CONTEXT: A team operating Kubernetes needs you to resolve `Pod Blocked by ResourceQuota`
+  during a realistic incident. The business impact is reduced service reliability until the underlying
+  state is repaired.
+
+
+  ENVIRONMENT: You are working in FixitLab''s offline Kubernetes cluster with kubectl, manifests, and
+  cluster resources. All tools run locally; no paid APIs or external cloud calls are required.
+
+
+  SYMPTOM / STARTING STATE: Simulated Kubernetes cluster. A namespace ResourceQuota caps total CPU/memory
+  requests and pod count. New replicas are rejected with "exceeded quota" and stay Pending. A deployment
+  cannot scale up — new pods stay Pending because the namespace''s ResourceQuota has been exhausted. The
+  sum of CPU/memory requests (or the pod count) for existing workloads has hit the quota''s hard limit,
+  so the API server rejects additional pods. Raise the quota or reduce requests so the deployment can
+  schedule its replicas.
+
+
+  OBJECTIVE: Identify that scheduling is blocked by the namespace ResourceQuota; Compare current usage
+  against the quota''s hard limits; Adjust the quota (or workload requests) so the new pods schedule.
+  Success means `kubectl get pods` shows every pod Running.
+
+
+  WHAT TO AVOID: Do not apply broad destructive changes, skip evidence gathering, or fake completion with
+  marker files — the checker validates real system state.'
 initial_state: Simulated Kubernetes cluster. A namespace ResourceQuota caps total CPU/memory requests
   and pod count. New replicas are rejected with "exceeded quota" and stay Pending.
 lab_mode: simulation
@@ -22,14 +42,76 @@ objectives:
 - Adjust the quota (or workload requests) so the new pods schedule
 hints:
 - order: 1
-  cost: 10
-  content: '`kubectl get pods` shows Pending replicas. `kubectl describe rs <rs>` Events show "exceeded
-    quota". Inspect it: `kubectl describe resourcequota -n <ns>`.'
+  cost: 0
+  content: 'Where to look: Run `kubectl get pods -A` and `kubectl describe pod <name>` for any pod not
+    in Running state.'
 - order: 2
-  cost: 15
-  content: The Used vs Hard columns show which dimension is maxed (e.g. requests.cpu Used=2 Hard=2). You
-    either raise that limit or lower the deployment's per-pod requests.
+  cost: 25
+  content: 'Diagnostic steps:
+
+    1. `kubectl get pods` — note CrashLoopBackOff, ImagePullBackOff, or Pending.
+
+    2. `kubectl describe pod <name>` — read Events at the bottom.
+
+    3. `kubectl logs <name> [--previous]` if the container restarted.'
 - order: 3
-  cost: 20
-  content: 'Raise the quota: `kubectl edit resourcequota <name> -n <ns>` and increase the maxed field
-    (e.g. requests.cpu: "4"). Pending pods schedule immediately; verify with `kubectl get pods`.'
+  cost: 50
+  content: 'Exact fix + verification:
+
+    1. Fix the root cause (image name, env var, volume mount, or probe).
+
+    2. `kubectl apply -f` the corrected manifest or delete the pod to recreate.
+
+    3. Confirm `kubectl get pods` shows every pod Running.
+
+
+    WHY: Kubernetes only reports healthy when the workload actually runs.'
+technology: kubernetes
+summary: Complete the pod blocked by resourcequota kubernetes lab and verify success with the checker
+estimated_minutes: 15
+xp_reward: 100
+prerequisites:
+- Basic kubernetes literacy
+tags:
+- fix
+- hands-on
+- kubernetes
+linked_tutorial: kubernetes-fundamentals
+what_you_will_learn:
+- Identify that scheduling is blocked by the namespace ResourceQuota
+- Compare current usage against the quota's hard limits
+- Adjust the quota (or workload requests) so the new pods schedule
+environment:
+  nodes:
+  - role: primary
+    os: FixitLab Kubernetes cluster
+    hostname: lab-primary
+    ip: 127.0.0.1
+    specs: local offline simulation
+  pre_installed:
+  - bash
+  - coreutils
+  - helm
+  - kubectl
+  - kubernetes
+  credentials:
+  - user: root
+    password: lab123
+tasks:
+- id: task_1
+  title: Pod Blocked by ResourceQuota
+  description: Restore healthy behavior for Pod Blocked by ResourceQuota by investigating the failure,
+    applying the smallest safe fix, and validating the outcome.
+  background: 'This kubernetes lab teaches systematic troubleshooting: observe, hypothesize, change, verify.'
+  validation:
+    type: k8s_resource_state
+    resource_kind: Pod
+    resource_name: all
+    namespace: default
+    expected_state: Running
+    error_message: One or more pods are not Running. Use kubectl describe pod and kubectl logs.
+solution:
+  summary: Identify the misconfiguration affecting this kubernetes lab and apply the minimal fix.
+  files_changed: []
+  commands_run: []
+  reference_docs: kubernetes-fundamentals

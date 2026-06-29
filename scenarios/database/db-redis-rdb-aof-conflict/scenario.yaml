@@ -1,7 +1,7 @@
 title: Redis Persistence Misconfigured
 slug: db-redis-rdb-aof-conflict
-technology: Database
-category: Persistence
+technology: database
+category: Fix
 difficulty: medium
 lab_mode: simulation
 simulation_type: generic
@@ -10,7 +10,25 @@ max_score: 100
 is_free: true
 jira_priority: High
 dual_terminal: false
-description: Redis persistence is unreliable because RDB/AOF settings conflict.
+description: 'CONTEXT: A team operating database administration needs you to resolve `Redis Persistence
+  Misconfigured` during a realistic incident. The business impact is reduced service reliability until
+  the underlying state is repaired.
+
+
+  ENVIRONMENT: You are working in FixitLab''s offline database server with SQL client, schemas, backups,
+  and performance views. All tools run locally; no paid APIs or external cloud calls are required.
+
+
+  SYMPTOM / STARTING STATE: A Redis host with conflicting persistence options. Redis persistence is unreliable
+  because RDB/AOF settings conflict.
+
+
+  OBJECTIVE: Confirm the issue: Inconsistent persistence behavior; Apply the documented fix in /etc/redis/redis.conf;
+  Verify the configuration is corrected. Success means `check.sh` exits successfully.
+
+
+  WHAT TO AVOID: Do not apply broad destructive changes, skip evidence gathering, or fake completion with
+  marker files — the checker validates real system state.'
 initial_state: A Redis host with conflicting persistence options.
 objectives:
 - 'Confirm the issue: Inconsistent persistence behavior'
@@ -18,11 +36,70 @@ objectives:
 - Verify the configuration is corrected
 hints:
 - order: 1
-  cost: 10
-  content: Inconsistent persistence behavior
+  cost: 0
+  content: 'Where to look: Confirm the issue: Inconsistent persistence behavior'
 - order: 2
-  cost: 15
-  content: Set a coherent AOF/RDB persistence policy.
+  cost: 25
+  content: 'Diagnostic steps:
+
+    1. Apply the documented fix in /etc/redis/redis.conf
+
+    2. Verify the configuration is corrected'
 - order: 3
-  cost: 20
-  content: /etc/redis/redis.conf carries the corrected configuration.
+  cost: 50
+  content: 'Exact fix + verification:
+
+    1. Verify the configuration is corrected.
+
+    2. Re-run the lab checker (`check.sh` or Check Solution).
+
+    3. Confirm every scenario objective is satisfied.
+
+
+    WHY: the grader validates real state — marker files are ignored.'
+summary: Complete the redis persistence misconfigured database lab and verify success with the checker
+estimated_minutes: 20
+xp_reward: 100
+prerequisites:
+- Basic database literacy
+tags:
+- database
+- fix
+- hands-on
+linked_tutorial: database-fundamentals
+what_you_will_learn:
+- 'Confirm the issue: Inconsistent persistence behavior'
+- Apply the documented fix in /etc/redis/redis.conf
+- Verify the configuration is corrected
+environment:
+  nodes:
+  - role: primary
+    os: FixitLab database server
+    hostname: lab-primary
+    ip: 127.0.0.1
+    specs: local offline simulation
+  pre_installed:
+  - bash
+  - coreutils
+  - database
+  - journalctl
+  - systemctl
+  credentials:
+  - user: root
+    password: lab123
+tasks:
+- id: task_1
+  title: Redis Persistence Misconfigured
+  description: Restore healthy behavior for Redis Persistence Misconfigured by investigating the failure,
+    applying the smallest safe fix, and validating the outcome.
+  background: 'This database lab teaches systematic troubleshooting: observe, hypothesize, change, verify.'
+  validation:
+    type: custom_script
+    script: check.sh
+    error_message: Validation did not pass. Re-read the objectives and Hint 2 diagnostic steps.
+solution:
+  summary: Identify the misconfiguration affecting this database lab and apply the minimal fix.
+  files_changed: []
+  commands_run:
+  - bash check.sh
+  reference_docs: database-fundamentals

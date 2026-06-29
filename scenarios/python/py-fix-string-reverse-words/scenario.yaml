@@ -1,8 +1,26 @@
 title: Fix reverse_words Token Order
 slug: py-fix-string-reverse-words
-category: Python Development
-description: reverse_words(s) should reverse the ORDER of words while keeping each word's characters intact,
-  but it reverses the whole string character by character. Fix it so 'hello world' becomes 'world hello'.
+category: Fix
+description: 'CONTEXT: A team operating Python development needs you to resolve `Fix reverse_words Token
+  Order` during a realistic incident. The business impact is reduced service reliability until the underlying
+  state is repaired.
+
+
+  ENVIRONMENT: You are working in FixitLab''s offline Python project workspace with source files, venv,
+  tests, and CLI entrypoints. All tools run locally; no paid APIs or external cloud calls are required.
+
+
+  SYMPTOM / STARTING STATE: reverse_words(s) should reverse the ORDER of words while keeping each word''s
+  characters intact, but it reverses the whole string character by character. Fix it so ''hello world''
+  becomes ''world hello''.
+
+
+  OBJECTIVE: See that characters are being reversed, not words; Split on whitespace, reverse the list
+  of words, re-join; Preserve single spaces between words. Success means all hidden tests pass.
+
+
+  WHAT TO AVOID: Do not apply broad destructive changes, skip evidence gathering, or fake completion with
+  marker files — the checker validates real system state.'
 difficulty: easy
 scenario_type: fix
 lab_mode: simulation
@@ -20,48 +38,114 @@ objectives:
 initial_state: reverse_words(s) should reverse the ORDER of words while keeping each word's characters
   intact, but it reverses the whole string character by character. Fix it so 'hello world' becomes 'world
   hello'.
-solution_explanation: |
-  s[::-1] reverses characters. Splitting into words, reversing that list, and re-joining with spaces reverses word order while keeping each word.
+solution_explanation: 's[::-1] reverses characters. Splitting into words, reversing that list, and re-joining
+  with spaces reverses word order while keeping each word.
+
+  '
 coding_spec:
   language: python
   entrypoint: solution.py
   kind: fix
-  instructions: |
-    Fix reverse_words(s) so it reverses the order of space-separated words.
-      reverse_words('hello world') -> 'world hello'
-    Assume words are separated by single spaces.
-    Click Run to try it, then Check Solution to grade against all tests.
+  instructions: "Fix reverse_words(s) so it reverses the order of space-separated words.\n  reverse_words('hello\
+    \ world') -> 'world hello'\nAssume words are separated by single spaces.\nClick Run to try it, then\
+    \ Check Solution to grade against all tests.\n"
   files:
   - path: solution.py
-    content: |
-      def reverse_words(s):
-          return s[::-1]
+    content: "def reverse_words(s):\n    return s[::-1]\n"
     readonly: false
   visible_tests:
   - name: two words
-    code: |
-      assert reverse_words('hello world') == 'world hello'
+    code: 'assert reverse_words(''hello world'') == ''world hello''
+
+      '
   - name: single word
-    code: |
-      assert reverse_words('python') == 'python'
+    code: 'assert reverse_words(''python'') == ''python''
+
+      '
   hidden_tests:
   - name: three words
-    code: |
-      assert reverse_words('a b c') == 'c b a'
+    code: 'assert reverse_words(''a b c'') == ''c b a''
+
+      '
   - name: keeps characters intact
-    code: |
-      assert reverse_words('abc def') == 'def abc'
+    code: 'assert reverse_words(''abc def'') == ''def abc''
+
+      '
   - name: empty string
-    code: |
-      assert reverse_words('') == ''
+    code: 'assert reverse_words('''') == ''''
+
+      '
   timeout: 8
 hints:
 - order: 1
-  cost: 10
-  content: reverse_words('hello world') currently gives 'dlrow olleh' — letters reversed, not words.
+  cost: 0
+  content: 'Where to look: Open `solution.py`, read the instructions, and run the visible tests to see
+    which assertion fails first.'
 - order: 2
-  cost: 20
-  content: Use s.split(' ') to get a list of words, then reverse the LIST.
+  cost: 25
+  content: 'Diagnostic steps:
+
+    1. Click Run and read the traceback — note line number and actual vs expected values.
+
+    2. Reproduce the failure with the smallest input from a visible test.
+
+    3. Compare your implementation to the bug described in the lab prompt.'
 - order: 3
-  cost: 30
-  content: Return ' '.join(s.split(' ')[::-1]).
+  cost: 50
+  content: 'Exact fix + verification:
+
+    1. Preserve single spaces between words.
+
+    2. Re-run the lab checker (`check.sh` or Check Solution).
+
+    3. Confirm every scenario objective is satisfied.
+
+
+    WHY: the grader validates real state — marker files are ignored.'
+technology: python
+summary: Complete the fix reverse_words token order python lab and verify success with the checker
+estimated_minutes: 25
+xp_reward: 100
+prerequisites:
+- Basic python literacy
+tags:
+- fix
+- hands-on
+- python
+linked_tutorial: python-fundamentals
+what_you_will_learn:
+- See that characters are being reversed, not words
+- Split on whitespace, reverse the list of words, re-join
+- Preserve single spaces between words
+environment:
+  nodes:
+  - role: primary
+    os: FixitLab Python project workspace
+    hostname: lab-primary
+    ip: 127.0.0.1
+    specs: local offline simulation
+  pre_installed:
+  - bash
+  - coreutils
+  - pip
+  - python
+  - python3
+  credentials:
+  - user: root
+    password: lab123
+tasks:
+- id: task_1
+  title: Fix reverse_words Token Order
+  description: Restore healthy behavior for Fix reverse_words Token Order by investigating the failure,
+    applying the smallest safe fix, and validating the outcome.
+  background: 'This python lab teaches systematic troubleshooting: observe, hypothesize, change, verify.'
+  validation:
+    type: custom_script
+    script: hidden_tests
+    error_message: One or more hidden tests failed. Read the public test output, fix your solution, and
+      submit again.
+solution:
+  summary: The solution passes all hidden tests by implementing the required behavior in code.
+  files_changed: []
+  commands_run: []
+  reference_docs: python-fundamentals

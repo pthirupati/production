@@ -1,44 +1,134 @@
-title: 'Mount a Data Filesystem by UUID in /etc/fstab'
+title: Mount a Data Filesystem by UUID in /etc/fstab
 slug: linux-fstab-mount-by-uuid-mkfs-mount
 difficulty: medium
-category: 'Storage / fstab'
+category: Fix
 technology: linux
-description: |
-  The spare disk /dev/sdc must back /data, but device names like /dev/sdc are not stable
+description: 'CONTEXT: A team operating Linux administration needs you to resolve `Mount a Data Filesystem
+  by UUID in /etc/fstab` during a realistic incident. The business impact is reduced service reliability
+  until the underlying state is repaired.
+
+
+  ENVIRONMENT: You are working in FixitLab''s offline Linux practice server with terminal and config files
+  under /etc and /var. All tools run locally; no paid APIs or external cloud calls are required.
+
+
+  SYMPTOM / STARTING STATE: Simulated RHEL 9 server. /dev/sdc (20G) is present but unformatted. /data
+  is not
+
+  mounted and /etc/fstab has no UUID-based entry for it. The spare disk /dev/sdc must back /data, but
+  device names like /dev/sdc are not stable
+
   across reboots and re-cabling — the team standard is to mount filesystems by UUID. Make
+
   a filesystem on /dev/sdc, look up its UUID with blkid, mount it at /data, and add an
+
   fstab entry that references the filesystem by UUID= (not by /dev/sdc). Persisting it by
+
   device name is not acceptable for this task.
-initial_state: |
-  Simulated RHEL 9 server. /dev/sdc (20G) is present but unformatted. /data is not
+
+
+  OBJECTIVE: {''Create a filesystem'': ''mkfs.xfs /dev/sdc''}; Find the UUID with blkid /dev/sdc; Mount
+  it at /data. Success means `check.sh` exits successfully.
+
+
+  WHAT TO AVOID: Do not apply broad destructive changes, skip evidence gathering, or fake completion with
+  marker files — the checker validates real system state.'
+initial_state: 'Simulated RHEL 9 server. /dev/sdc (20G) is present but unformatted. /data is not
+
   mounted and /etc/fstab has no UUID-based entry for it.
+
+  '
 objectives:
-  - Create a filesystem: mkfs.xfs /dev/sdc
-  - Find the UUID with blkid /dev/sdc
-  - Mount it at /data
-  - Add a UUID-based line to /etc/fstab (UUID=... /data xfs defaults 0 0)
-  - Verify the by-UUID mount resolves with mount -a and findmnt
+- Create a filesystem: mkfs.xfs /dev/sdc
+- Find the UUID with blkid /dev/sdc
+- Mount it at /data
+- Add a UUID-based line to /etc/fstab (UUID=... /data xfs defaults 0 0)
+- Verify the by-UUID mount resolves with mount -a and findmnt
 lab_mode: simulation
 simulation_type: generic
 time_limit: 900
 max_score: 100
 is_free: false
 topics_covered:
-  - fstab
-  - uuid
-  - blkid
-  - mkfs
-  - mount
+- fstab
+- uuid
+- blkid
+- mkfs
+- mount
 hints:
-  - content: 'Format the disk first so it has a UUID: mkfs.xfs /dev/sdc. Then read the UUID with blkid /dev/sdc.'
-    cost: 10
-    order: 1
-  - content: 'Mount it now and confirm: mkdir -p /data; mount /dev/sdc /data; mount | grep /data.'
-    cost: 15
-    order: 2
-  - content: 'For stability, the fstab entry must use the UUID, not /dev/sdc: add ''UUID=<the-uuid> /data xfs defaults 0 0'' to /etc/fstab and test with mount -a.'
-    cost: 20
-    order: 3
+- order: 1
+  cost: 0
+  content: 'Where to look: Run `df -h` and `du -xh /var /tmp /home | sort -h | tail -20` for large paths.'
+- order: 2
+  cost: 25
+  content: 'Diagnostic steps:
+
+    1. Find which mount is 100% — often `/` or `/var`.
+
+    2. `journalctl --disk-usage` and old logs under `/var/log`.
+
+    3. Look for core dumps, temp files, or oversized application data.'
+- order: 3
+  cost: 50
+  content: 'Exact fix + verification:
+
+    1. Remove or rotate the largest safe files (logs, caches, old packages).
+
+    2. `df -h` should show free space on the affected mount.
+
+    3. Retry the command that failed with ''No space left on device''.
+
+
+    WHY: many services fail cryptically when disk is full.'
 requires_companion_hosts: false
 dual_terminal: false
 jira_priority: Medium
+summary: Complete the mount a data filesystem by uuid in /etc/fstab linux lab and verify success with
+  the checker
+estimated_minutes: 15
+xp_reward: 100
+prerequisites:
+- Basic linux literacy
+tags:
+- fix
+- hands-on
+- linux
+linked_tutorial: linux-fundamentals
+what_you_will_learn:
+- '{''Create a filesystem'': ''mkfs.xfs /dev/sdc''}'
+- Find the UUID with blkid /dev/sdc
+- Mount it at /data
+- Add a UUID-based line to /etc/fstab (UUID=... /data xfs defaults 0 0)
+- Verify the by-UUID mount resolves with mount -a and findmnt
+environment:
+  nodes:
+  - role: primary
+    os: FixitLab Linux practice server
+    hostname: lab-primary
+    ip: 127.0.0.1
+    specs: local offline simulation
+  pre_installed:
+  - bash
+  - coreutils
+  - journalctl
+  - linux
+  - systemctl
+  credentials:
+  - user: root
+    password: lab123
+tasks:
+- id: task_1
+  title: Mount a Data Filesystem by UUID in /etc/fstab
+  description: Restore healthy behavior for Mount a Data Filesystem by UUID in /etc/fstab by investigating
+    the failure, applying the smallest safe fix, and validating the outcome.
+  background: 'This linux lab teaches systematic troubleshooting: observe, hypothesize, change, verify.'
+  validation:
+    type: custom_script
+    script: check.sh
+    error_message: Validation did not pass. Re-read the objectives and Hint 2 diagnostic steps.
+solution:
+  summary: Identify the misconfiguration affecting this linux lab and apply the minimal fix.
+  files_changed: []
+  commands_run:
+  - bash check.sh
+  reference_docs: linux-fundamentals

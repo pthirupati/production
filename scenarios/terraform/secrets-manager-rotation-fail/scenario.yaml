@@ -1,28 +1,112 @@
 title: Secrets Manager Rotation Lambda Failing
 slug: aws-secrets-rotation-fail
 difficulty: medium
-category: AWS
-description: 'Secrets Manager automatic rotation is failing because the rotation Lambda function lacks the necessary IAM permissions to call secretsmanager:RotateSecret and secretsmanager:PutSecretValue, leaving the secret stale and unrotated.'
-initial_state: 'Simulated AWS environment with a Secrets Manager secret configured for automatic rotation via a Lambda function. The Lambda execution role is missing the required Secrets Manager permissions, causing rotation to fail with AccessDenied errors in CloudWatch Logs.'
+category: Fix
+description: 'CONTEXT: A team operating Terraform IaC needs you to resolve `Secrets Manager Rotation Lambda
+  Failing` during a realistic incident. The business impact is reduced service reliability until the underlying
+  state is repaired.
+
+
+  ENVIRONMENT: You are working in FixitLab''s offline Terraform workspace with HCL files, state, and plan/apply
+  workflow. All tools run locally; no paid APIs or external cloud calls are required.
+
+
+  SYMPTOM / STARTING STATE: Simulated AWS environment with a Secrets Manager secret configured for automatic
+  rotation via a Lambda function. The Lambda execution role is missing the required Secrets Manager permissions,
+  causing rotation to fail with AccessDenied errors in CloudWatch Logs. Secrets Manager automatic rotation
+  is failing because the rotation Lambda function lacks the necessary IAM permissions to call secretsmanager:RotateSecret
+  and secretsmanager:PutSecretValue, leaving the secret stale and unrotated.
+
+
+  OBJECTIVE: Check CloudWatch Logs for the rotation Lambda and identify the AccessDenied error; Add the
+  missing secretsmanager permissions to the Lambda execution role; Trigger a manual rotation and confirm
+  it completes successfully. Success means `check.sh` exits successfully.
+
+
+  WHAT TO AVOID: Do not apply broad destructive changes, skip evidence gathering, or fake completion with
+  marker files — the checker validates real system state.'
+initial_state: Simulated AWS environment with a Secrets Manager secret configured for automatic rotation
+  via a Lambda function. The Lambda execution role is missing the required Secrets Manager permissions,
+  causing rotation to fail with AccessDenied errors in CloudWatch Logs.
 objectives:
-  - Check CloudWatch Logs for the rotation Lambda and identify the AccessDenied error
-  - Add the missing secretsmanager permissions to the Lambda execution role
-  - Trigger a manual rotation and confirm it completes successfully
+- Check CloudWatch Logs for the rotation Lambda and identify the AccessDenied error
+- Add the missing secretsmanager permissions to the Lambda execution role
+- Trigger a manual rotation and confirm it completes successfully
 lab_mode: simulation
 simulation_type: aws
 time_limit: 1800
 max_score: 100
 is_free: false
 hints:
-  - content: 'Run: aws secretsmanager describe-secret --secret-id <name> to see the rotation Lambda ARN and last rotation status.'
-    cost: 10
-    order: 1
-  - content: 'Check the Lambda execution role with aws iam list-attached-role-policies. Attach or inline a policy granting secretsmanager:GetSecretValue, PutSecretValue, DescribeSecret, and UpdateSecret.'
-    cost: 15
-    order: 2
-  - content: 'Trigger manual rotation: aws secretsmanager rotate-secret --secret-id <name> and then poll describe-secret to confirm RotationEnabled and LastRotatedDate update.'
-    cost: 20
-    order: 3
+- order: 1
+  cost: 0
+  content: 'Where to look: Check CloudWatch Logs for the rotation Lambda and identify the AccessDenied
+    error'
+- order: 2
+  cost: 25
+  content: 'Diagnostic steps:
+
+    1. Add the missing secretsmanager permissions to the Lambda execution role
+
+    2. Trigger a manual rotation and confirm it completes successfully'
+- order: 3
+  cost: 50
+  content: 'Exact fix + verification:
+
+    1. Trigger a manual rotation and confirm it completes successfully.
+
+    2. Re-run the lab checker (`check.sh` or Check Solution).
+
+    3. Confirm every scenario objective is satisfied.
+
+
+    WHY: the grader validates real state — marker files are ignored.'
 requires_companion_hosts: false
 dual_terminal: false
 jira_priority: High
+technology: terraform
+summary: Complete the secrets manager rotation lambda failing terraform lab and verify success with the
+  checker
+estimated_minutes: 30
+xp_reward: 100
+prerequisites:
+- Basic terraform literacy
+tags:
+- fix
+- hands-on
+- terraform
+linked_tutorial: terraform-fundamentals
+what_you_will_learn:
+- Check CloudWatch Logs for the rotation Lambda and identify the AccessDenied error
+- Add the missing secretsmanager permissions to the Lambda execution role
+- Trigger a manual rotation and confirm it completes successfully
+environment:
+  nodes:
+  - role: primary
+    os: FixitLab Terraform workspace
+    hostname: lab-primary
+    ip: 127.0.0.1
+    specs: local offline simulation
+  pre_installed:
+  - bash
+  - coreutils
+  - terraform
+  credentials:
+  - user: root
+    password: lab123
+tasks:
+- id: task_1
+  title: Secrets Manager Rotation Lambda Failing
+  description: Restore healthy behavior for Secrets Manager Rotation Lambda Failing by investigating the
+    failure, applying the smallest safe fix, and validating the outcome.
+  background: 'This terraform lab teaches systematic troubleshooting: observe, hypothesize, change, verify.'
+  validation:
+    type: custom_script
+    script: check.sh
+    error_message: Validation did not pass. Re-read the objectives and Hint 2 diagnostic steps.
+solution:
+  summary: Identify the misconfiguration affecting this terraform lab and apply the minimal fix.
+  files_changed: []
+  commands_run:
+  - bash check.sh
+  reference_docs: terraform-fundamentals

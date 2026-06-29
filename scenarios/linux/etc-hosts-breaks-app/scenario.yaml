@@ -2,8 +2,8 @@ title: /etc/hosts Breaks Application
 slug: etc-hosts-breaks-app
 lab_mode: simulation
 simulation_type: generic
-technology: Linux
-category: Networking
+technology: linux
+category: Fix
 difficulty: easy
 time_limit: 600
 max_score: 100
@@ -11,10 +11,29 @@ infrastructure_type: docker
 docker_privileged: false
 jira_priority: Medium
 topics_covered: Q62 /etc/hosts vs resolv.conf
-description: An application can't reach api.internal because a stale /etc/hosts entry overrides DNS with
-  the wrong IP address. Since /etc/hosts is consulted before DNS, the bad static mapping wins and connections
-  go to the wrong (or dead) host. Correct or remove the offending entry so the name resolves properly
-  again.
+description: 'CONTEXT: A team operating Linux administration needs you to resolve `/etc/hosts Breaks Application`
+  during a realistic incident. The business impact is reduced service reliability until the underlying
+  state is repaired.
+
+
+  ENVIRONMENT: You are working in FixitLab''s offline Linux practice server with terminal and config files
+  under /etc and /var. All tools run locally; no paid APIs or external cloud calls are required.
+
+
+  SYMPTOM / STARTING STATE: Linux server where /etc/hosts contains a wrong static mapping for api.internal,
+  so the app resolves it to the wrong address regardless of DNS. An application can''t reach api.internal
+  because a stale /etc/hosts entry overrides DNS with the wrong IP address. Since /etc/hosts is consulted
+  before DNS, the bad static mapping wins and connections go to the wrong (or dead) host. Correct or remove
+  the offending entry so the name resolves properly again.
+
+
+  OBJECTIVE: Confirm api.internal resolves to the wrong address and trace it to /etc/hosts; Correct or
+  remove the bad /etc/hosts entry; Verify the hostname now resolves correctly. Success means `check.sh`
+  exits successfully.
+
+
+  WHAT TO AVOID: Do not apply broad destructive changes, skip evidence gathering, or fake completion with
+  marker files — the checker validates real system state.'
 objectives:
 - Confirm api.internal resolves to the wrong address and trace it to /etc/hosts
 - Correct or remove the bad /etc/hosts entry
@@ -23,14 +42,70 @@ initial_state: Linux server where /etc/hosts contains a wrong static mapping for
   app resolves it to the wrong address regardless of DNS.
 hints:
 - order: 1
-  cost: 10
-  content: 'See what the resolver returns: `getent hosts api.internal`. Compare against DNS: `dig +short
-    api.internal`. They differ because /etc/hosts is checked first.'
+  cost: 0
+  content: 'Where to look: Confirm api.internal resolves to the wrong address and trace it to /etc/hosts'
 - order: 2
-  cost: 15
-  content: Open /etc/hosts and find the stale `api.internal` line with the wrong IP; fix the address or
-    remove the line so DNS is used.
+  cost: 25
+  content: 'Diagnostic steps:
+
+    1. Correct or remove the bad /etc/hosts entry
+
+    2. Verify the hostname now resolves correctly'
 - order: 3
-  cost: 20
-  content: 'Verify: `getent hosts api.internal` now returns the correct IP and the app can connect (`curl
-    -sI http://api.internal/`).'
+  cost: 50
+  content: 'Exact fix + verification:
+
+    1. Verify the hostname now resolves correctly.
+
+    2. Re-run the lab checker (`check.sh` or Check Solution).
+
+    3. Confirm every scenario objective is satisfied.
+
+
+    WHY: the grader validates real state — marker files are ignored.'
+summary: Complete the /etc/hosts breaks application linux lab and verify success with the checker
+estimated_minutes: 10
+xp_reward: 100
+prerequisites:
+- Basic linux literacy
+tags:
+- fix
+- hands-on
+- linux
+linked_tutorial: linux-fundamentals
+what_you_will_learn:
+- Confirm api.internal resolves to the wrong address and trace it to /etc/hosts
+- Correct or remove the bad /etc/hosts entry
+- Verify the hostname now resolves correctly
+environment:
+  nodes:
+  - role: primary
+    os: FixitLab Linux practice server
+    hostname: lab-primary
+    ip: 127.0.0.1
+    specs: local offline simulation
+  pre_installed:
+  - bash
+  - coreutils
+  - journalctl
+  - linux
+  - systemctl
+  credentials:
+  - user: root
+    password: lab123
+tasks:
+- id: task_1
+  title: /etc/hosts Breaks Application
+  description: Restore healthy behavior for /etc/hosts Breaks Application by investigating the failure,
+    applying the smallest safe fix, and validating the outcome.
+  background: 'This linux lab teaches systematic troubleshooting: observe, hypothesize, change, verify.'
+  validation:
+    type: custom_script
+    script: check.sh
+    error_message: Validation did not pass. Re-read the objectives and Hint 2 diagnostic steps.
+solution:
+  summary: Identify the misconfiguration affecting this linux lab and apply the minimal fix.
+  files_changed: []
+  commands_run:
+  - bash check.sh
+  reference_docs: linux-fundamentals

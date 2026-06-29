@@ -1,8 +1,28 @@
 title: Isolate a single conversation with a display filter
 slug: wireshark-isolate-conversation
-category: Wireshark Packet Analysis
-description: The capture mixes several conversations. Use a Wireshark display filter to isolate only the
+category: Fix
+description: 'CONTEXT: A team operating packet analysis needs you to resolve `Isolate a single conversation
+  with a display filter` during a realistic incident. The business impact is reduced service reliability
+  until the underlying state is repaired.
+
+
+  ENVIRONMENT: You are working in FixitLab''s offline capture lab with pcap files, display filters, and
+  protocol decode. All tools run locally; no paid APIs or external cloud calls are required.
+
+
+  SYMPTOM / STARTING STATE: The capture shows DNS, the HTTP conversation on port 80, a TLS handshake on
+  port 443, SSH on port 22, and a failed connection on port 8080 — all interleaved with no display filter
+  applied. The capture mixes several conversations. Use a Wireshark display filter to isolate only the
   conversation between the client and the web server on TCP port 80, then run Check Solution.
+
+
+  OBJECTIVE: Open the Wireshark simulator from the lab toolbar (toolbar -> Open Wireshark); Identify the
+  client-to-web-server conversation (TCP port 80, host 93.184.216.34); Apply a display filter that leaves
+  ONLY that single conversation in the packet list. Success means `check.sh` exits successfully.
+
+
+  WHAT TO AVOID: Do not apply broad destructive changes, skip evidence gathering, or fake completion with
+  marker files — the checker validates real system state.'
 difficulty: easy
 lab_mode: simulation
 simulation_type: wireshark
@@ -17,18 +37,78 @@ objectives:
 - Identify the client-to-web-server conversation (TCP port 80, host 93.184.216.34)
 - Apply a display filter that leaves ONLY that single conversation in the packet list
 - Run Check Solution to confirm exactly one conversation remains
-initial_state: The capture shows DNS, the HTTP conversation on port 80, a TLS handshake on port 443, SSH on
-  port 22, and a failed connection on port 8080 — all interleaved with no display filter applied.
+initial_state: The capture shows DNS, the HTTP conversation on port 80, a TLS handshake on port 443, SSH
+  on port 22, and a failed connection on port 8080 — all interleaved with no display filter applied.
 hints:
 - order: 1
-  cost: 5
-  content: A conversation can be isolated by its transport port or by host. The web conversation runs over
-    TCP port 80 to 93.184.216.34.
+  cost: 0
+  content: 'Where to look: Run `systemctl status sshd` and `ss -tlnp | grep :22` on the target host.'
 - order: 2
-  cost: 10
-  content: Try a display filter of tcp.port==80 (or ip.addr==93.184.216.34). Both narrow the list to the one
-    client/web-server stream.
+  cost: 25
+  content: 'Diagnostic steps:
+
+    1. Confirm sshd is active and listening on port 22.
+
+    2. Check `firewall-cmd` or iptables for blocked port 22.
+
+    3. Read `/var/log/secure` for auth or config errors.'
 - order: 3
-  cost: 15
-  content: After filtering, every packet in the list should belong to the same TCP stream (the example.com
-    web request). Then run Check Solution.
+  cost: 50
+  content: 'Exact fix + verification:
+
+    1. Fix sshd_config, firewall, or socket unit as needed.
+
+    2. `systemctl restart sshd`.
+
+    3. `ssh -o BatchMode=yes user@localhost echo ok` succeeds.
+
+
+    WHY: SSH failures are usually service, firewall, or config — not credentials alone.'
+summary: Complete the isolate a single conversation with a display filter wireshark lab and verify success
+  with the checker
+estimated_minutes: 15
+xp_reward: 100
+prerequisites:
+- Basic wireshark literacy
+tags:
+- fix
+- hands-on
+- wireshark
+linked_tutorial: wireshark-fundamentals
+what_you_will_learn:
+- Open the Wireshark simulator from the lab toolbar (toolbar -> Open Wireshark)
+- Identify the client-to-web-server conversation (TCP port 80, host 93.184.216.34)
+- Apply a display filter that leaves ONLY that single conversation in the packet list
+- Run Check Solution to confirm exactly one conversation remains
+environment:
+  nodes:
+  - role: primary
+    os: FixitLab capture lab
+    hostname: lab-primary
+    ip: 127.0.0.1
+    specs: local offline simulation
+  pre_installed:
+  - bash
+  - coreutils
+  - journalctl
+  - systemctl
+  - wireshark
+  credentials:
+  - user: root
+    password: lab123
+tasks:
+- id: task_1
+  title: Isolate a single conversation with a display filter
+  description: Restore healthy behavior for Isolate a single conversation with a display filter by investigating
+    the failure, applying the smallest safe fix, and validating the outcome.
+  background: 'This wireshark lab teaches systematic troubleshooting: observe, hypothesize, change, verify.'
+  validation:
+    type: custom_script
+    script: check.sh
+    error_message: Validation did not pass. Re-read the objectives and Hint 2 diagnostic steps.
+solution:
+  summary: Identify the misconfiguration affecting this wireshark lab and apply the minimal fix.
+  files_changed: []
+  commands_run:
+  - bash check.sh
+  reference_docs: wireshark-fundamentals

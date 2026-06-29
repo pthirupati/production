@@ -1,8 +1,26 @@
 title: Implement wordFrequency
 slug: js-impl-counter-frequency
-category: JavaScript Development
-description: 'Implement wordFrequency(text): return an object mapping each lowercased word to its count.
-  Words are separated by whitespace; trim surrounding punctuation (.,!?). The stub is empty so tests fail.'
+category: Build
+description: 'CONTEXT: A team operating JavaScript needs you to resolve `Implement wordFrequency` during
+  a realistic incident. The business impact is reduced service reliability until the underlying state
+  is repaired.
+
+
+  ENVIRONMENT: You are working in FixitLab''s offline JavaScript practice project with modules, browser
+  console, and Node tooling. All tools run locally; no paid APIs or external cloud calls are required.
+
+
+  SYMPTOM / STARTING STATE: Implement wordFrequency(text): return an object mapping each lowercased word
+  to its count. Words are separated by whitespace; trim surrounding punctuation (.,!?). The stub is empty
+  so tests fail.
+
+
+  OBJECTIVE: Split on whitespace and lowercase; Strip surrounding punctuation from words; Count occurrences
+  into an object. Success means all hidden tests pass.
+
+
+  WHAT TO AVOID: Do not apply broad destructive changes, skip evidence gathering, or fake completion with
+  marker files — the checker validates real system state.'
 difficulty: medium
 scenario_type: do
 lab_mode: simulation
@@ -19,51 +37,145 @@ objectives:
 - Count occurrences into an object
 initial_state: 'Implement wordFrequency(text): return an object mapping each lowercased word to its count.
   Words are separated by whitespace; trim surrounding punctuation (.,!?). The stub is empty so tests fail.'
-solution_explanation: |
-  Splitting on whitespace, stripping edge punctuation, lowercasing, and accumulating into an object yields a normalized frequency map.
+solution_explanation: 'Splitting on whitespace, stripping edge punctuation, lowercasing, and accumulating
+  into an object yields a normalized frequency map.
+
+  '
 coding_spec:
   language: javascript
   entrypoint: solution.js
   kind: impl
-  instructions: |
-    Implement wordFrequency(text) -> { word: count }. Lowercase words; strip leading/trailing .,!? ; split on whitespace; ignore empty tokens.
-      wordFrequency('Cat cat, dog.') -> {cat:2, dog:1}
-    Click Run to try it, then Check Solution to grade against all tests.
+  instructions: "Implement wordFrequency(text) -> { word: count }. Lowercase words; strip leading/trailing\
+    \ .,!? ; split on whitespace; ignore empty tokens.\n  wordFrequency('Cat cat, dog.') -> {cat:2, dog:1}\n\
+    Click Run to try it, then Check Solution to grade against all tests.\n"
   files:
   - path: solution.js
-    content: |
-      function wordFrequency(text) {
-        // TODO: return a map of normalized word -> count
-      }
+    content: "function wordFrequency(text) {\n  // TODO: return a map of normalized word -> count\n}\n"
     readonly: false
   visible_tests:
   - name: counts and normalizes
-    code: |
-      assert(JSON.stringify(wordFrequency('Cat cat, dog.')) === JSON.stringify({cat:2, dog:1}), JSON.stringify(wordFrequency('Cat cat, dog.')));
+    code: 'assert(JSON.stringify(wordFrequency(''Cat cat, dog.'')) === JSON.stringify({cat:2, dog:1}),
+      JSON.stringify(wordFrequency(''Cat cat, dog.'')));
+
+      '
   - name: single
-    code: |
-      assert(JSON.stringify(wordFrequency('hello')) === JSON.stringify({hello:1}), JSON.stringify(wordFrequency('hello')));
+    code: 'assert(JSON.stringify(wordFrequency(''hello'')) === JSON.stringify({hello:1}), JSON.stringify(wordFrequency(''hello'')));
+
+      '
   hidden_tests:
   - name: punctuation stripped
-    code: |
-      assert(JSON.stringify(wordFrequency('hi! hi? hi.')) === JSON.stringify({hi:3}), JSON.stringify(wordFrequency('hi! hi? hi.')));
+    code: 'assert(JSON.stringify(wordFrequency(''hi! hi? hi.'')) === JSON.stringify({hi:3}), JSON.stringify(wordFrequency(''hi!
+      hi? hi.'')));
+
+      '
   - name: case folded
-    code: |
-      assert(JSON.stringify(wordFrequency('The THE the')) === JSON.stringify({the:3}), JSON.stringify(wordFrequency('The THE the')));
+    code: 'assert(JSON.stringify(wordFrequency(''The THE the'')) === JSON.stringify({the:3}), JSON.stringify(wordFrequency(''The
+      THE the'')));
+
+      '
   - name: extra spaces
-    code: |
-      assert(JSON.stringify(wordFrequency('a   a  b')) === JSON.stringify({a:2, b:1}), JSON.stringify(wordFrequency('a   a  b')));
+    code: 'assert(JSON.stringify(wordFrequency(''a   a  b'')) === JSON.stringify({a:2, b:1}), JSON.stringify(wordFrequency(''a   a  b'')));
+
+      '
   - name: empty text
-    code: |
-      assert(JSON.stringify(wordFrequency('')) === JSON.stringify({}), JSON.stringify(wordFrequency('')));
+    code: 'assert(JSON.stringify(wordFrequency('''')) === JSON.stringify({}), JSON.stringify(wordFrequency('''')));
+
+      '
   timeout: 8
 hints:
 - order: 1
-  cost: 10
-  content: Split on /\s+/ to tolerate multiple spaces.
+  cost: 0
+  content: 'Where to look: Open `solution.js`, read the instructions, and run the visible tests to see
+    which assertion fails first.'
 - order: 2
-  cost: 20
-  content: Strip leading/trailing punctuation with a regex and lowercase the word.
+  cost: 25
+  content: 'Diagnostic steps:
+
+    1. Click Run and read the traceback — note line number and actual vs expected values.
+
+    2. Reproduce the failure with the smallest input from a visible test.
+
+    3. Compare your implementation to the bug described in the lab prompt.'
 - order: 3
-  cost: 30
-  content: Accumulate counts with out[word] = (out[word] || 0) + 1; skip empty tokens.
+  cost: 50
+  content: 'Exact fix + verification:
+
+    1. Count occurrences into an object.
+
+    2. Re-run the lab checker (`check.sh` or Check Solution).
+
+    3. Confirm every scenario objective is satisfied.
+
+
+    WHY: the grader validates real state — marker files are ignored.'
+technology: javascript
+summary: Complete the implement wordfrequency javascript lab and verify success with the checker
+estimated_minutes: 25
+xp_reward: 100
+prerequisites:
+- Basic javascript literacy
+tags:
+- do
+- hands-on
+- javascript
+linked_tutorial: javascript-fundamentals
+what_you_will_learn:
+- Split on whitespace and lowercase
+- Strip surrounding punctuation from words
+- Count occurrences into an object
+environment:
+  nodes:
+  - role: primary
+    os: FixitLab JavaScript practice project
+    hostname: lab-primary
+    ip: 127.0.0.1
+    specs: local offline simulation
+  pre_installed:
+  - bash
+  - coreutils
+  - javascript
+  - journalctl
+  - systemctl
+  credentials:
+  - user: root
+    password: lab123
+tasks:
+- id: task_1
+  title: Implement wordFrequency
+  description: Restore healthy behavior for Implement wordFrequency by investigating the failure, applying
+    the smallest safe fix, and validating the outcome.
+  background: 'This javascript lab teaches systematic troubleshooting: observe, hypothesize, change, verify.'
+  validation:
+    type: custom_script
+    script: hidden_tests
+    error_message: One or more hidden tests failed. Read the public test output, fix your solution, and
+      submit again.
+solution:
+  summary: The solution passes all hidden tests by implementing the required behavior in code.
+  files_changed: []
+  commands_run: []
+  reference_docs: javascript-fundamentals
+guided_mode:
+  enabled: true
+  steps:
+  - step: 1
+    title: Inspect current state
+    instruction: Run a read-only diagnostic before changing anything.
+    command: check.sh
+    expected_output: Output shows the current failure mode
+    explanation: Evidence-first troubleshooting avoids guessing.
+    next_on: command_success
+  - step: 2
+    title: Apply the minimal fix
+    instruction: Make one reversible change aligned with the objectives.
+    command: '# your fix command here'
+    expected_output: State moves toward the objective
+    explanation: Small changes make rollback easy if the hypothesis was wrong.
+    next_on: command_success
+  - step: 3
+    title: Verify with the grader
+    instruction: Run the same verification the checker uses.
+    command: check.sh
+    expected_output: all hidden tests pass
+    explanation: The lab passes only when real state is healthy.
+    next_on: command_success

@@ -1,8 +1,7 @@
----
 slug: kafka-producer-timeout
-title: "Kafka Producer Timing Out — TimeoutException on send()"
-technology: Java
-category: "Messaging"
+title: Kafka Producer Timing Out — TimeoutException on send()
+technology: java
+category: Fix
 difficulty: medium
 time_limit: 900
 max_score: 100
@@ -11,22 +10,108 @@ simulation_type: java
 infrastructure_type: simulation
 jira_priority: High
 is_free: false
-description: |
-  The Kafka producer fails with 'TimeoutException: Expiring records' / 'Failed to update metadata'. The bootstrap servers list points at a stale broker address and the request/delivery timeouts are too aggressive for the network path. Correct the bootstrap config and timeouts so records are delivered reliably.
+description: 'CONTEXT: A team operating Java applications needs you to resolve `Kafka Producer Timing
+  Out — TimeoutException on send()` during a realistic incident. The business impact is reduced service
+  reliability until the underlying state is repaired.
+
+
+  ENVIRONMENT: You are working in FixitLab''s offline Java project with Maven/Gradle, JVM logs, and Spring
+  configuration. All tools run locally; no paid APIs or external cloud calls are required.
+
+
+  SYMPTOM / STARTING STATE: Producer config at /app/src/main/resources/application.yml points bootstrap.servers
+  at a decommissioned broker and uses very short timeouts; send() times out. The Kafka producer fails
+  with ''TimeoutException: Expiring records'' / ''Failed to update metadata''. The bootstrap servers list
+  points at a stale broker address and the request/delivery timeouts are too aggressive for the network
+  path. Correct the bootstrap config and timeouts so records are delivered reliably.
+
+
+  OBJECTIVE: Reproduce the producer TimeoutException and read the broker it tried; Fix bootstrap.servers
+  to reachable, correct broker addresses; Tune delivery/request timeouts and retries appropriately. Success
+  means `check.sh` exits successfully.
+
+
+  WHAT TO AVOID: Do not apply broad destructive changes, skip evidence gathering, or fake completion with
+  marker files — the checker validates real system state.'
 objectives:
-  - "Reproduce the producer TimeoutException and read the broker it tried"
-  - "Fix bootstrap.servers to reachable, correct broker addresses"
-  - "Tune delivery/request timeouts and retries appropriately"
-  - "Confirm sends succeed and records land on the topic"
-initial_state: |
-  Producer config at /app/src/main/resources/application.yml points bootstrap.servers at a decommissioned broker and uses very short timeouts; send() times out.
+- Reproduce the producer TimeoutException and read the broker it tried
+- Fix bootstrap.servers to reachable, correct broker addresses
+- Tune delivery/request timeouts and retries appropriately
+- Confirm sends succeed and records land on the topic
+initial_state: 'Producer config at /app/src/main/resources/application.yml points bootstrap.servers at
+  a decommissioned broker and uses very short timeouts; send() times out.
+
+  '
 hints:
-  - order: 1
-    cost: 10
-    content: "Logs show 'Failed to update metadata' — the broker address is wrong/unreachable."
-  - order: 2
-    cost: 15
-    content: "Set spring.kafka.bootstrap-servers to the live brokers and verify with kafka-topics."
-  - order: 3
-    cost: 20
-    content: "Raise delivery.timeout.ms / request.timeout.ms and set retries so transient blips recover."
+- order: 1
+  cost: 0
+  content: 'Where to look: Reproduce the producer TimeoutException and read the broker it tried'
+- order: 2
+  cost: 25
+  content: 'Diagnostic steps:
+
+    1. Fix bootstrap.servers to reachable, correct broker addresses
+
+    2. Tune delivery/request timeouts and retries appropriately
+
+    3. Confirm sends succeed and records land on the topic'
+- order: 3
+  cost: 50
+  content: 'Exact fix + verification:
+
+    1. Confirm sends succeed and records land on the topic.
+
+    2. Re-run the lab checker (`check.sh` or Check Solution).
+
+    3. Confirm every scenario objective is satisfied.
+
+
+    WHY: the grader validates real state — marker files are ignored.'
+summary: Complete the kafka producer timing out — timeoutexception on send() java lab and verify success
+  with the checker
+estimated_minutes: 15
+xp_reward: 100
+prerequisites:
+- Basic java literacy
+tags:
+- fix
+- hands-on
+- java
+linked_tutorial: java-fundamentals
+what_you_will_learn:
+- Reproduce the producer TimeoutException and read the broker it tried
+- Fix bootstrap.servers to reachable, correct broker addresses
+- Tune delivery/request timeouts and retries appropriately
+- Confirm sends succeed and records land on the topic
+environment:
+  nodes:
+  - role: primary
+    os: FixitLab Java project
+    hostname: lab-primary
+    ip: 127.0.0.1
+    specs: local offline simulation
+  pre_installed:
+  - bash
+  - coreutils
+  - java
+  - journalctl
+  - systemctl
+  credentials:
+  - user: root
+    password: lab123
+tasks:
+- id: task_1
+  title: Kafka Producer Timing Out — TimeoutException on send()
+  description: Restore healthy behavior for Kafka Producer Timing Out — TimeoutException on send() by
+    investigating the failure, applying the smallest safe fix, and validating the outcome.
+  background: 'This java lab teaches systematic troubleshooting: observe, hypothesize, change, verify.'
+  validation:
+    type: custom_script
+    script: check.sh
+    error_message: Validation did not pass. Re-read the objectives and Hint 2 diagnostic steps.
+solution:
+  summary: Identify the misconfiguration affecting this java lab and apply the minimal fix.
+  files_changed: []
+  commands_run:
+  - bash check.sh
+  reference_docs: java-fundamentals

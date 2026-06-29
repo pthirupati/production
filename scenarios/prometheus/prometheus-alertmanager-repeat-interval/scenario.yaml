@@ -1,9 +1,29 @@
 title: Alertmanager repeat_interval too long
 slug: prometheus-alertmanager-repeat-interval
-category: Prometheus Observability
-description: repeat_interval too long; ongoing incidents go quiet. Use the in-app Prometheus simulator
-  to investigate, then apply the documented fix to /etc/prometheus/alertmanager.yml from the terminal
-  and verify with Check Solution.
+category: Fix
+description: 'CONTEXT: A team operating Prometheus monitoring needs you to resolve `Alertmanager repeat_interval
+  too long` during a realistic incident. The business impact is reduced service reliability until the
+  underlying state is repaired.
+
+
+  ENVIRONMENT: You are working in FixitLab''s offline Prometheus stack with scrape configs, PromQL, rules,
+  and Alertmanager. All tools run locally; no paid APIs or external cloud calls are required.
+
+
+  SYMPTOM / STARTING STATE: repeat_interval too long; ongoing incidents go quiet. The Prometheus simulator
+  renders the broken state; the configuration file /etc/prometheus/alertmanager.yml must be corrected.
+  repeat_interval too long; ongoing incidents go quiet. Use the in-app Prometheus simulator to investigate,
+  then apply the documented fix to /etc/prometheus/alertmanager.yml from the terminal and verify with
+  Check Solution.
+
+
+  OBJECTIVE: Open the Prometheus simulator from the lab toolbar and sign in (lab_prometheus / lab_prometheus@123);
+  Diagnose the fault — repeat_interval too long; ongoing incidents go quiet.; Edit /etc/prometheus/alertmanager.yml
+  in the terminal to apply the documented remediation. Success means `check.sh` exits successfully.
+
+
+  WHAT TO AVOID: Do not apply broad destructive changes, skip evidence gathering, or fake completion with
+  marker files — the checker validates real system state.'
 difficulty: easy
 lab_mode: simulation
 simulation_type: prometheus
@@ -21,14 +41,76 @@ initial_state: repeat_interval too long; ongoing incidents go quiet. The Prometh
   the broken state; the configuration file /etc/prometheus/alertmanager.yml must be corrected.
 hints:
 - order: 1
-  cost: 10
-  content: Open the Prometheus simulator (toolbar -> Open Prometheus). Inspect the affected area. repeat_interval
-    too long; ongoing incidents go quiet.
+  cost: 0
+  content: 'Where to look: Open Prometheus → Status → Targets and note which job is DOWN and the last
+    scrape error message.'
 - order: 2
-  cost: 15
-  content: The root cause is in /etc/prometheus/alertmanager.yml. Compare it against a known-good Prometheus
-    configuration.
+  cost: 25
+  content: 'Diagnostic steps:
+
+    1. Check `up` and `scrape_duration_seconds` for the failing target.
+
+    2. Inspect `/etc/prometheus/prometheus.yml` for wrong host, port, or scheme.
+
+    3. `curl` the exporter endpoint from the lab host to test connectivity.'
 - order: 3
-  cost: 20
-  content: Correct /etc/prometheus/alertmanager.yml and append the success remediation marker, then run
-    Check Solution. In a real cluster you would reload Prometheus (SIGHUP / restart) after editing.
+  cost: 50
+  content: 'Exact fix + verification:
+
+    1. Correct the scrape target or relabel rule in prometheus.yml.
+
+    2. Reload or restart Prometheus.
+
+    3. Confirm the target is UP and Check Solution passes.
+
+
+    WHY: Prometheus only collects metrics from correctly configured targets.'
+technology: prometheus
+summary: Complete the alertmanager repeat_interval too long prometheus lab and verify success with the
+  checker
+estimated_minutes: 20
+xp_reward: 100
+prerequisites:
+- Basic prometheus literacy
+tags:
+- fix
+- hands-on
+- prometheus
+linked_tutorial: prometheus-fundamentals
+what_you_will_learn:
+- Open the Prometheus simulator from the lab toolbar and sign in (lab_prometheus / lab_prometheus@123)
+- Diagnose the fault — repeat_interval too long; ongoing incidents go quiet.
+- Edit /etc/prometheus/alertmanager.yml in the terminal to apply the documented remediation
+- Run Check Solution to confirm the configuration is corrected
+environment:
+  nodes:
+  - role: primary
+    os: FixitLab Prometheus stack
+    hostname: lab-primary
+    ip: 127.0.0.1
+    specs: local offline simulation
+  pre_installed:
+  - bash
+  - coreutils
+  - journalctl
+  - prometheus
+  - systemctl
+  credentials:
+  - user: root
+    password: lab123
+tasks:
+- id: task_1
+  title: Alertmanager repeat_interval too long
+  description: Restore healthy behavior for Alertmanager repeat_interval too long by investigating the
+    failure, applying the smallest safe fix, and validating the outcome.
+  background: 'This prometheus lab teaches systematic troubleshooting: observe, hypothesize, change, verify.'
+  validation:
+    type: custom_script
+    script: check.sh
+    error_message: Validation did not pass. Re-read the objectives and Hint 2 diagnostic steps.
+solution:
+  summary: Identify the misconfiguration affecting this prometheus lab and apply the minimal fix.
+  files_changed: []
+  commands_run:
+  - bash check.sh
+  reference_docs: prometheus-fundamentals

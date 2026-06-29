@@ -1,3 +1,3 @@
 #!/bin/bash
-# Validation check for win-dhcp-exhausted scenario
+systemctl is-failed --quiet 2>/dev/null; test $? -ne 0
 exit 0

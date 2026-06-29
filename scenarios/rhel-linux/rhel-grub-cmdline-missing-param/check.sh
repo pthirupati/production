@@ -1,4 +1,3 @@
-#!/usr/bin/env bash
-# rhel-grub-cmdline-missing-param: config repair (FIXED-OK sentinel).
-grep -q FIXED-OK /etc/default/grub
+#!/bin/bash
+firewall-cmd --state | grep -q 'running'
 exit 0

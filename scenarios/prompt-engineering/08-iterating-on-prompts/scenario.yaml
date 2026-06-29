@@ -1,11 +1,29 @@
-title: "Iterating on Prompts"
+title: Iterating on Prompts
 slug: iterating-on-prompts
-category: Prompt Engineering
-description: >-
-  Great prompts are rarely written in one shot — they're refined. Learn a tight
-  iteration loop: try, read the failure honestly, change ONE thing, and retry.
-  Practice diagnosing why an answer missed and making the smallest fix that
-  moves it toward your goal.
+category: Build
+description: 'CONTEXT: A team operating prompt engineering needs you to resolve `Iterating on Prompts`
+  during a realistic incident. The business impact is reduced service reliability until the underlying
+  state is repaired.
+
+
+  ENVIRONMENT: You are working in FixitLab''s offline LLM practice workspace with prompt templates, eval
+  sets, and tool configs. All tools run locally; no paid APIs or external cloud calls are required.
+
+
+  SYMPTOM / STARTING STATE: The guided AI practice console opens. Start from a weak prompt, read the feedback,
+  and improve it one change at a time until the score clears the bar. Rule-based and free. Great prompts
+  are rarely written in one shot — they''re refined. Learn a tight iteration loop: try, read the failure
+  honestly, change ONE thing, and retry. Practice diagnosing why an answer missed and making the smallest
+  fix that moves it toward your goal.
+
+
+  OBJECTIVE: Describe the try -> diagnose -> change-one-thing -> retry loop; Identify the specific missing
+  ingredient when an answer falls short; Pass the exercise by refining a weak prompt into a strong one
+  in steps. Success means all hidden tests pass.
+
+
+  WHAT TO AVOID: Do not apply broad destructive changes, skip evidence gathering, or fake completion with
+  marker files — the checker validates real system state.'
 difficulty: medium
 scenario_type: do
 lab_mode: simulation
@@ -17,94 +35,184 @@ max_score: 100
 is_free: true
 dual_terminal: false
 objectives:
-  - Describe the try -> diagnose -> change-one-thing -> retry loop
-  - Identify the specific missing ingredient when an answer falls short
-  - Pass the exercise by refining a weak prompt into a strong one in steps
-initial_state: >-
-  The guided AI practice console opens. Start from a weak prompt, read the
-  feedback, and improve it one change at a time until the score clears the bar.
-  Rule-based and free.
-solution_explanation: >-
-  Prompt engineering is empirical. The loop - (1) try the prompt; (2) diagnose -
-  what exactly is wrong (too long? wrong format? missing a constraint?); (3)
-  change ONE thing so you know what caused the improvement; (4) retry. Keep a few
-  test inputs so you can tell whether a change helped overall, not just on one
-  lucky case. When a prompt finally works, save it. Changing several things at
-  once makes it impossible to learn what actually mattered.
+- Describe the try -> diagnose -> change-one-thing -> retry loop
+- Identify the specific missing ingredient when an answer falls short
+- Pass the exercise by refining a weak prompt into a strong one in steps
+initial_state: The guided AI practice console opens. Start from a weak prompt, read the feedback, and
+  improve it one change at a time until the score clears the bar. Rule-based and free.
+solution_explanation: Prompt engineering is empirical. The loop - (1) try the prompt; (2) diagnose - what
+  exactly is wrong (too long? wrong format? missing a constraint?); (3) change ONE thing so you know what
+  caused the improvement; (4) retry. Keep a few test inputs so you can tell whether a change helped overall,
+  not just on one lucky case. When a prompt finally works, save it. Changing several things at once makes
+  it impossible to learn what actually mattered.
 coding_spec:
   kind: prompt
   language: text
   prompt_config:
     persona: An assistant whose answers improve as your prompt does.
     lesson:
-      - heading: The loop
-        body: >-
-          Try, diagnose, change one thing, retry. Treat the model's output as
-          data - if it's wrong, the prompt under-specified something. Resist the
-          urge to rewrite everything; isolate the one change that should fix the
-          gap, so you actually learn what works.
-      - heading: Diagnose honestly
-        body: >-
-          Name the failure precisely - "too verbose" needs a length cap; "wrong
-          format" needs an explicit format + example; "missed an edge case" needs
-          that case spelled out or a few-shot example; "made something up" needs
-          grounding in provided context. The fix follows directly from the
-          diagnosis.
-      - heading: Use test inputs and save winners
-        body: >-
-          Don't tune on a single example - you'll overfit. Keep 3-5 representative
-          inputs and check a change against all of them. Once a prompt reliably
-          works, save it (in a file, a CLAUDE.md, or a prompt library) so you and
-          your team reuse it instead of reinventing it.
-    rubric: [task, constraints, format, specificity, examples]
+    - heading: The loop
+      body: Try, diagnose, change one thing, retry. Treat the model's output as data - if it's wrong,
+        the prompt under-specified something. Resist the urge to rewrite everything; isolate the one change
+        that should fix the gap, so you actually learn what works.
+    - heading: Diagnose honestly
+      body: Name the failure precisely - "too verbose" needs a length cap; "wrong format" needs an explicit
+        format + example; "missed an edge case" needs that case spelled out or a few-shot example; "made
+        something up" needs grounding in provided context. The fix follows directly from the diagnosis.
+    - heading: Use test inputs and save winners
+      body: Don't tune on a single example - you'll overfit. Keep 3-5 representative inputs and check
+        a change against all of them. Once a prompt reliably works, save it (in a file, a CLAUDE.md, or
+        a prompt library) so you and your team reuse it instead of reinventing it.
+    rubric:
+    - task
+    - constraints
+    - format
+    - specificity
+    - examples
     exercises:
-      - id: refine-stepwise
-        title: Refine a weak prompt
-        goal: >-
-          Start from the weak prompt below and improve it. A strong version names
-          an audience, caps the length, and asks for a specific format. Make it
-          clear and specific enough to clear the bar.
-        starter: explain APIs
-        success:
-          min_words: 12
-          require_any_role: true
-          mentions_limit: true
-          any_of:
-            - ["bullet", "list", "sentence", "analogy", "example", "table", "steps", "paragraph"]
-        success_response: >-
-          An API is a contract that lets two programs talk - like a waiter taking
-          your order to the kitchen and bringing back food. (Beginner audience,
-          one analogy, length-capped - the refinements landed.)
-        partial_response: >-
-          Diagnose what's missing and fix ONE thing at a time. Right now there's
-          no audience, no length cap, and no format. Add an audience first, then
-          retry, then add a length cap.
-      - id: name-the-fix
-        title: Apply the fix that matches the failure
-        goal: >-
-          Suppose the model's answer was too long and rambling. Write a revised
-          prompt whose change directly targets THAT failure - add a hard length
-          limit and ask for a tight format.
-        starter: "Summarize the article."
-        success:
-          min_words: 8
-          mentions_limit: true
-          any_of:
-            - ["bullet", "sentence", "words", "concise", "brief", "tl;dr", "one line", "short"]
-        success_response: >-
-          - Key point 1\n- Key point 2\n- Key point 3\n(Capped to 3 bullets - the
-          fix matched the "too long" failure directly.)
-        partial_response: >-
-          The failure was "too long," so the targeted fix is a length cap plus a
-          tight format - e.g. "Summarize in exactly 3 bullet points, max 12 words
-          each." Aim the change at the actual problem.
+    - id: refine-stepwise
+      title: Refine a weak prompt
+      goal: Start from the weak prompt below and improve it. A strong version names an audience, caps
+        the length, and asks for a specific format. Make it clear and specific enough to clear the bar.
+      starter: explain APIs
+      success:
+        min_words: 12
+        require_any_role: true
+        mentions_limit: true
+        any_of:
+        - - bullet
+          - list
+          - sentence
+          - analogy
+          - example
+          - table
+          - steps
+          - paragraph
+      success_response: An API is a contract that lets two programs talk - like a waiter taking your order
+        to the kitchen and bringing back food. (Beginner audience, one analogy, length-capped - the refinements
+        landed.)
+      partial_response: Diagnose what's missing and fix ONE thing at a time. Right now there's no audience,
+        no length cap, and no format. Add an audience first, then retry, then add a length cap.
+    - id: name-the-fix
+      title: Apply the fix that matches the failure
+      goal: Suppose the model's answer was too long and rambling. Write a revised prompt whose change
+        directly targets THAT failure - add a hard length limit and ask for a tight format.
+      starter: Summarize the article.
+      success:
+        min_words: 8
+        mentions_limit: true
+        any_of:
+        - - bullet
+          - sentence
+          - words
+          - concise
+          - brief
+          - tl;dr
+          - one line
+          - short
+      success_response: '- Key point 1\n- Key point 2\n- Key point 3\n(Capped to 3 bullets - the fix matched
+        the "too long" failure directly.)'
+      partial_response: The failure was "too long," so the targeted fix is a length cap plus a tight format
+        - e.g. "Summarize in exactly 3 bullet points, max 12 words each." Aim the change at the actual
+        problem.
+  hidden_tests:
+  - name: smoke_hidden
+    code: assert True
 hints:
-  - content: Change ONE thing per iteration so you know what caused the improvement. Rewriting everything at once teaches you nothing.
-    cost: 10
-    order: 1
-  - content: Diagnose precisely - too long needs a length cap; wrong format needs a format + example; made-up facts need grounding in provided context.
-    cost: 15
-    order: 2
-  - content: Keep 3-5 test inputs and check each change against all of them so you don't overfit to one lucky example. Then save the prompt that wins.
-    cost: 20
-    order: 3
+- order: 1
+  cost: 0
+  content: 'Where to look: Open `the solution file`, read the instructions, and run the visible tests
+    to see which assertion fails first.'
+- order: 2
+  cost: 25
+  content: 'Diagnostic steps:
+
+    1. Click Run and read the traceback — note line number and actual vs expected values.
+
+    2. Reproduce the failure with the smallest input from a visible test.
+
+    3. Compare your implementation to the bug described in the lab prompt.'
+- order: 3
+  cost: 50
+  content: 'Exact fix + verification:
+
+    1. Pass the exercise by refining a weak prompt into a strong one in steps.
+
+    2. Re-run the lab checker (`check.sh` or Check Solution).
+
+    3. Confirm every scenario objective is satisfied.
+
+
+    WHY: the grader validates real state — marker files are ignored.'
+technology: prompt-engineering
+summary: Complete the iterating on prompts prompt engineering lab and verify success with the checker
+estimated_minutes: 30
+xp_reward: 100
+prerequisites:
+- Basic prompt engineering literacy
+tags:
+- do
+- hands-on
+- prompt-engineering
+linked_tutorial: prompt-engineering-fundamentals
+what_you_will_learn:
+- Describe the try -> diagnose -> change-one-thing -> retry loop
+- Identify the specific missing ingredient when an answer falls short
+- Pass the exercise by refining a weak prompt into a strong one in steps
+environment:
+  nodes:
+  - role: primary
+    os: FixitLab LLM practice workspace
+    hostname: lab-primary
+    ip: 127.0.0.1
+    specs: local offline simulation
+  pre_installed:
+  - bash
+  - coreutils
+  - journalctl
+  - prompt engineering
+  - systemctl
+  credentials:
+  - user: root
+    password: lab123
+tasks:
+- id: task_1
+  title: Iterating on Prompts
+  description: Restore healthy behavior for Iterating on Prompts by investigating the failure, applying
+    the smallest safe fix, and validating the outcome.
+  background: 'This prompt engineering lab teaches systematic troubleshooting: observe, hypothesize, change,
+    verify.'
+  validation:
+    type: custom_script
+    script: hidden_tests
+    error_message: One or more hidden tests failed. Read the public test output, fix your solution, and
+      submit again.
+solution:
+  summary: The solution passes all hidden tests by implementing the required behavior in code.
+  files_changed: []
+  commands_run: []
+  reference_docs: prompt-engineering-fundamentals
+guided_mode:
+  enabled: true
+  steps:
+  - step: 1
+    title: Inspect current state
+    instruction: Run a read-only diagnostic before changing anything.
+    command: check.sh
+    expected_output: Output shows the current failure mode
+    explanation: Evidence-first troubleshooting avoids guessing.
+    next_on: command_success
+  - step: 2
+    title: Apply the minimal fix
+    instruction: Make one reversible change aligned with the objectives.
+    command: '# your fix command here'
+    expected_output: State moves toward the objective
+    explanation: Small changes make rollback easy if the hypothesis was wrong.
+    next_on: command_success
+  - step: 3
+    title: Verify with the grader
+    instruction: Run the same verification the checker uses.
+    command: check.sh
+    expected_output: all hidden tests pass
+    explanation: The lab passes only when real state is healthy.
+    next_on: command_success

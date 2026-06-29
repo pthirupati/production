@@ -1,8 +1,7 @@
----
 slug: vsan-disk-claim-failed
-title: "vSAN Disk Claiming Failed — Existing Partition Table Blocking"
-technology: VMware
-category: vSAN
+title: vSAN Disk Claiming Failed - Existing Partition Table
+technology: vmware
+category: Fix
 difficulty: hard
 time_limit: 1800
 max_score: 100
@@ -11,39 +10,122 @@ simulation_type: vmware
 infrastructure_type: simulation
 jira_priority: High
 is_free: false
-description: |
-  When attempting to add a new NVMe disk to the vSAN cluster, the disk claiming
-  fails with: "Cannot add disk to vSAN: The disk has an existing partition table."
-  The disk was previously used in a different storage system and still has GPT
-  partition data. vSAN requires disks to be completely clean before claiming.
-  Engineers must wipe the partition table from the ESXi host before vSAN can
-  claim the disk.
-objectives:
-  - Identify the disk that failed to be claimed by vSAN
-  - SSH into the ESXi host and verify the existing partition table
-  - Wipe the partition table using partedUtil or dd
-  - Retry the vSAN disk claim and verify the disk is successfully added
-initial_state: |
-  VMware vCenter simulation. vSAN cluster with 4 hosts. New NVMe disk /dev/nvme1n1
+description: 'CONTEXT: A team operating VMware vSphere needs you to resolve `vSAN Disk Claiming Failed
+  - Existing Partition Table` during a realistic incident. The business impact is reduced service reliability
+  until the underlying state is repaired.
+
+
+  ENVIRONMENT: You are working in FixitLab''s offline vSphere lab with VMs, datastores, vCenter, and ESXi
+  tasks. All tools run locally; no paid APIs or external cloud calls are required.
+
+
+  SYMPTOM / STARTING STATE: VMware vCenter simulation. vSAN cluster with 4 hosts. New NVMe disk /dev/nvme1n1
+
   added to esxi-04 but failing to claim. Disk has GPT partition table from previous use.
+
+  SSH access to esxi-04 available. When attempting to add a new NVMe disk to the vSAN cluster, the disk
+  claiming
+
+  fails with: "Cannot add disk to vSAN: The disk has an existing partition table."
+
+  The disk was previously used in a different storage system and still has GPT
+
+  partition data. vSAN requires disks to be completely clean before claiming.
+
+  Engineers must wipe the partition table from the ESXi host before vSAN can
+
+  claim the disk.
+
+
+  OBJECTIVE: Identify the disk that failed to be claimed by vSAN; SSH into the ESXi host and verify the
+  existing partition table; Wipe the partition table using partedUtil or dd. Success means `check.sh`
+  exits successfully.
+
+
+  WHAT TO AVOID: Do not apply broad destructive changes, skip evidence gathering, or fake completion with
+  marker files — the checker validates real system state.'
+objectives:
+- Identify the disk that failed to be claimed by vSAN
+- SSH into the ESXi host and verify the existing partition table
+- Wipe the partition table using partedUtil or dd
+- Retry the vSAN disk claim and verify the disk is successfully added
+initial_state: 'VMware vCenter simulation. vSAN cluster with 4 hosts. New NVMe disk /dev/nvme1n1
+
+  added to esxi-04 but failing to claim. Disk has GPT partition table from previous use.
+
   SSH access to esxi-04 available.
+
+  '
 hints:
-  - order: 1
-    cost: 10
-    content: "SSH to esxi-04: ssh root@esxi-04.lab.local
-      List disks: esxcli storage core device list | grep -i nvme
-      Check partition table: partedUtil getptbl /vmfs/devices/disks/t10.NVMe____<device-id>
-      Look for GPT header in the output."
-  - order: 2
-    cost: 15
-    content: "Wipe the partition table using partedUtil:
-      partedUtil mklabel /vmfs/devices/disks/<device-id> gpt
-      WARNING: ensure you have the correct device ID. Verify twice before running.
-      This destroys ALL data on the disk — confirm it is not in use anywhere."
-  - order: 3
-    cost: 20
-    content: "After wiping, verify the disk is clean:
-      partedUtil getptbl /vmfs/devices/disks/<device-id>
-      Should show 'gpt' with no partitions.
-      Then in vCenter: Hosts & Clusters → esxi-04 → Configure → vSAN → Disk Management
-      Click 'Claim Disks' and add the NVMe disk. Verify vSAN disk group health."
+- order: 1
+  cost: 0
+  content: 'Where to look: Run `df -h` and `du -xh /var /tmp /home | sort -h | tail -20` for large paths.'
+- order: 2
+  cost: 25
+  content: 'Diagnostic steps:
+
+    1. Find which mount is 100% — often `/` or `/var`.
+
+    2. `journalctl --disk-usage` and old logs under `/var/log`.
+
+    3. Look for core dumps, temp files, or oversized application data.'
+- order: 3
+  cost: 50
+  content: 'Exact fix + verification:
+
+    1. Remove or rotate the largest safe files (logs, caches, old packages).
+
+    2. `df -h` should show free space on the affected mount.
+
+    3. Retry the command that failed with ''No space left on device''.
+
+
+    WHY: many services fail cryptically when disk is full.'
+summary: Complete the vsan disk claiming failed - existing partition table vmware lab and verify success
+  with the checker
+estimated_minutes: 30
+xp_reward: 100
+prerequisites:
+- Basic vmware literacy
+tags:
+- fix
+- hands-on
+- vmware
+linked_tutorial: vmware-fundamentals
+what_you_will_learn:
+- Identify the disk that failed to be claimed by vSAN
+- SSH into the ESXi host and verify the existing partition table
+- Wipe the partition table using partedUtil or dd
+- Retry the vSAN disk claim and verify the disk is successfully added
+environment:
+  nodes:
+  - role: primary
+    os: FixitLab vSphere lab
+    hostname: lab-primary
+    ip: 127.0.0.1
+    specs: local offline simulation
+  pre_installed:
+  - bash
+  - coreutils
+  - journalctl
+  - systemctl
+  - vmware
+  credentials:
+  - user: root
+    password: lab123
+tasks:
+- id: task_1
+  title: vSAN Disk Claiming Failed - Existing Partition Table
+  description: Restore healthy behavior for vSAN Disk Claiming Failed - Existing Partition Table by investigating
+    the failure, applying the smallest safe fix, and validating the outcome.
+  background: 'This vmware lab teaches systematic troubleshooting: observe, hypothesize, change, verify.'
+  validation:
+    type: custom_script
+    script: check.sh
+    error_message: Validation did not pass. Re-read the objectives and Hint 2 diagnostic steps.
+solution:
+  summary: Identify the misconfiguration affecting this vmware lab and apply the minimal fix.
+  files_changed: []
+  commands_run:
+  - bash check.sh
+  reference_docs: vmware-fundamentals

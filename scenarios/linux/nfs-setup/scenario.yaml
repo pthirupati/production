@@ -1,40 +1,134 @@
 title: Set Up NFS Server and Client Mount
 slug: linux-nfs-setup
 difficulty: medium
-category: Linux Administration
-description: |
-  A shared directory /srv/shared exists on the NFS server and must be exported to client
+category: Fix
+description: 'CONTEXT: A team operating Linux administration needs you to resolve `Set Up NFS Server and
+  Client Mount` during a realistic incident. The business impact is reduced service reliability until
+  the underlying state is repaired.
+
+
+  ENVIRONMENT: You are working in FixitLab''s offline Linux practice server with terminal and config files
+  under /etc and /var. All tools run locally; no paid APIs or external cloud calls are required.
+
+
+  SYMPTOM / STARTING STATE: Simulated RHEL 9 server acting as both NFS server and client for this lab.
+  The directory
+
+  /srv/shared exists and contains sample files. The nfs-utils package is not installed.
+
+  Attempting to showmount -e localhost fails with "clnt_create: RPC: Program not registered"
+
+  because the NFS server is not yet running. A shared directory /srv/shared exists on the NFS server and
+  must be exported to client
+
   machines on the 192.168.1.0/24 network. The NFS server packages are not yet installed.
+
   After configuring the server, the client must mount the share and the mount must persist
+
   across reboots via /etc/fstab using the _netdev mount option.
 
-initial_state: |
-  Simulated RHEL 9 server acting as both NFS server and client for this lab. The directory
+
+  OBJECTIVE: Install nfs-utils with yum install -y nfs-utils; Configure /etc/exports to export /srv/shared
+  with rw,sync,no_subtree_check options; Run exportfs -a and systemctl enable --now nfs-server to start
+  the NFS server. Success means `check.sh` exits successfully.
+
+
+  WHAT TO AVOID: Do not apply broad destructive changes, skip evidence gathering, or fake completion with
+  marker files — the checker validates real system state.'
+initial_state: 'Simulated RHEL 9 server acting as both NFS server and client for this lab. The directory
+
   /srv/shared exists and contains sample files. The nfs-utils package is not installed.
+
   Attempting to showmount -e localhost fails with "clnt_create: RPC: Program not registered"
+
   because the NFS server is not yet running.
 
+  '
 objectives:
-  - Install nfs-utils with yum install -y nfs-utils
-  - Configure /etc/exports to export /srv/shared with rw,sync,no_subtree_check options
-  - Run exportfs -a and systemctl enable --now nfs-server to start the NFS server
-  - Mount the NFS share on the client with mount server:/srv/shared /mnt/shared
-  - Add a persistent fstab entry using the _netdev option and verify with mount -a
+- Install nfs-utils with yum install -y nfs-utils
+- Configure /etc/exports to export /srv/shared with rw,sync,no_subtree_check options
+- Run exportfs -a and systemctl enable --now nfs-server to start the NFS server
+- Mount the NFS share on the client with mount server:/srv/shared /mnt/shared
+- Add a persistent fstab entry using the _netdev option and verify with mount -a
 lab_mode: simulation
 simulation_type: generic
 time_limit: 1200
 max_score: 100
 is_free: false
 hints:
-  - content: 'Add to /etc/exports: /srv/shared 192.168.1.0/24(rw,sync,no_subtree_check) then run exportfs -a to activate the export.'
-    cost: 10
-    order: 1
-  - content: 'Enable and start the NFS server: systemctl enable --now nfs-server. Verify exports with showmount -e localhost before attempting the client mount.'
-    cost: 20
-    order: 2
-  - content: 'fstab entry format: server:/srv/shared /mnt/shared nfs defaults,_netdev 0 0. The _netdev option tells systemd to mount only after network is up.'
-    cost: 20
-    order: 3
+- order: 1
+  cost: 0
+  content: 'Where to look: Install nfs-utils with yum install -y nfs-utils'
+- order: 2
+  cost: 25
+  content: 'Diagnostic steps:
+
+    1. Configure /etc/exports to export /srv/shared with rw,sync,no_subtree_check options
+
+    2. Run exportfs -a and systemctl enable --now nfs-server to start the NFS server
+
+    3. Mount the NFS share on the client with mount server:/srv/shared /mnt/shared'
+- order: 3
+  cost: 50
+  content: 'Exact fix + verification:
+
+    1. Add a persistent fstab entry using the _netdev option and verify with mount -a.
+
+    2. Re-run the lab checker (`check.sh` or Check Solution).
+
+    3. Confirm every scenario objective is satisfied.
+
+
+    WHY: the grader validates real state — marker files are ignored.'
 requires_companion_hosts: false
 dual_terminal: false
 jira_priority: Medium
+technology: linux
+summary: Complete the set up nfs server and client mount linux lab and verify success with the checker
+estimated_minutes: 20
+xp_reward: 100
+prerequisites:
+- Basic linux literacy
+tags:
+- fix
+- hands-on
+- linux
+linked_tutorial: linux-fundamentals
+what_you_will_learn:
+- Install nfs-utils with yum install -y nfs-utils
+- Configure /etc/exports to export /srv/shared with rw,sync,no_subtree_check options
+- Run exportfs -a and systemctl enable --now nfs-server to start the NFS server
+- Mount the NFS share on the client with mount server:/srv/shared /mnt/shared
+- Add a persistent fstab entry using the _netdev option and verify with mount -a
+environment:
+  nodes:
+  - role: primary
+    os: FixitLab Linux practice server
+    hostname: lab-primary
+    ip: 127.0.0.1
+    specs: local offline simulation
+  pre_installed:
+  - bash
+  - coreutils
+  - journalctl
+  - linux
+  - systemctl
+  credentials:
+  - user: root
+    password: lab123
+tasks:
+- id: task_1
+  title: Set Up NFS Server and Client Mount
+  description: Restore healthy behavior for Set Up NFS Server and Client Mount by investigating the failure,
+    applying the smallest safe fix, and validating the outcome.
+  background: 'This linux lab teaches systematic troubleshooting: observe, hypothesize, change, verify.'
+  validation:
+    type: custom_script
+    script: check.sh
+    error_message: Validation did not pass. Re-read the objectives and Hint 2 diagnostic steps.
+solution:
+  summary: Identify the misconfiguration affecting this linux lab and apply the minimal fix.
+  files_changed: []
+  commands_run:
+  - bash check.sh
+  reference_docs: linux-fundamentals

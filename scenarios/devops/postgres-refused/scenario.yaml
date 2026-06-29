@@ -1,16 +1,35 @@
 title: PostgreSQL Connection Refused
 slug: postgres-refused
-technology: Devops
-category: Database
+technology: devops
+category: Fix
 difficulty: medium
 time_limit: 1200
 max_score: 100
 infrastructure_type: docker
 jira_priority: High
-description: The application team reports database connection failures after a recent PostgreSQL config
-  change. Connections to 127.0.0.1 are refused because listen_addresses was misconfigured (or an invalid
-  line keeps the service from starting), so Postgres isn't accepting TCP connections. Restore a valid
-  configuration and connectivity.
+description: 'CONTEXT: A team operating DevOps delivery needs you to resolve `PostgreSQL Connection Refused`
+  during a realistic incident. The business impact is reduced service reliability until the underlying
+  state is repaired.
+
+
+  ENVIRONMENT: You are working in FixitLab''s offline CI/CD lab with git repos, pipelines, artifacts,
+  and runbooks. All tools run locally; no paid APIs or external cloud calls are required.
+
+
+  SYMPTOM / STARTING STATE: Ubuntu server with PostgreSQL 14. Connections to 127.0.0.1 fail because postgresql.conf
+  (/etc/postgresql/14/main/postgresql.conf) has a bad listen_addresses/invalid line, so the server doesn''t
+  listen or won''t start. The application team reports database connection failures after a recent PostgreSQL
+  config change. Connections to 127.0.0.1 are refused because listen_addresses was misconfigured (or an
+  invalid line keeps the service from starting), so Postgres isn''t accepting TCP connections. Restore
+  a valid configuration and connectivity.
+
+
+  OBJECTIVE: Diagnose why PostgreSQL refuses connections; Fix listen_addresses (and any invalid line)
+  in postgresql.conf; Restart PostgreSQL and verify psql connects. Success means `check.sh` exits successfully.
+
+
+  WHAT TO AVOID: Do not apply broad destructive changes, skip evidence gathering, or fake completion with
+  marker files — the checker validates real system state.'
 objectives:
 - Diagnose why PostgreSQL refuses connections
 - Fix listen_addresses (and any invalid line) in postgresql.conf
@@ -20,14 +39,72 @@ initial_state: Ubuntu server with PostgreSQL 14. Connections to 127.0.0.1 fail b
   listen or won't start.
 hints:
 - order: 1
-  cost: 10
-  content: 'Check whether it''s even running/listening: `service postgresql status` and `ss -tlnp | grep
-    5432`. If it failed to start, read `journalctl -u postgresql`.'
+  cost: 0
+  content: 'Where to look: Run `systemctl status postgresql` and `pg_isready` for connection state.'
 - order: 2
-  cost: 15
-  content: Inspect `/etc/postgresql/14/main/postgresql.conf` — `listen_addresses` may be wrong/commented
-    (or there's an invalid directive). Set `listen_addresses = 'localhost'` (or `'*'`).
+  cost: 25
+  content: 'Diagnostic steps:
+
+    1. Check service status and `/var/log/postgresql/` logs.
+
+    2. Verify `pg_hba.conf` and `postgresql.conf` for listen addresses.
+
+    3. Test with `psql -U postgres -c ''SELECT 1''`.'
 - order: 3
-  cost: 20
-  content: 'Restart and verify: `systemctl restart postgresql`, then `psql -h 127.0.0.1 -U postgres -c
-    ''SELECT 1;''` (or `pg_isready -h 127.0.0.1`) connects.'
+  cost: 50
+  content: 'Exact fix + verification:
+
+    1. Fix auth rules, data directory permissions, or port conflict.
+
+    2. `systemctl restart postgresql`.
+
+    3. Confirm `pg_isready` reports accepting connections.
+
+
+    WHY: the database must accept connections, not just start.'
+summary: Complete the postgresql connection refused devops lab and verify success with the checker
+estimated_minutes: 20
+xp_reward: 100
+prerequisites:
+- Basic devops literacy
+tags:
+- devops
+- fix
+- hands-on
+linked_tutorial: devops-fundamentals
+what_you_will_learn:
+- Diagnose why PostgreSQL refuses connections
+- Fix listen_addresses (and any invalid line) in postgresql.conf
+- Restart PostgreSQL and verify psql connects
+environment:
+  nodes:
+  - role: primary
+    os: FixitLab CI/CD lab
+    hostname: lab-primary
+    ip: 127.0.0.1
+    specs: local offline simulation
+  pre_installed:
+  - bash
+  - coreutils
+  - devops
+  - journalctl
+  - systemctl
+  credentials:
+  - user: root
+    password: lab123
+tasks:
+- id: task_1
+  title: PostgreSQL Connection Refused
+  description: Restore healthy behavior for PostgreSQL Connection Refused by investigating the failure,
+    applying the smallest safe fix, and validating the outcome.
+  background: 'This devops lab teaches systematic troubleshooting: observe, hypothesize, change, verify.'
+  validation:
+    type: custom_script
+    script: check.sh
+    error_message: Validation did not pass. Re-read the objectives and Hint 2 diagnostic steps.
+solution:
+  summary: Identify the misconfiguration affecting this devops lab and apply the minimal fix.
+  files_changed: []
+  commands_run:
+  - bash check.sh
+  reference_docs: devops-fundamentals

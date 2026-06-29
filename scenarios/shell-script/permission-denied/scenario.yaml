@@ -1,13 +1,30 @@
 title: Script Not Executable
 slug: shell-permission-denied
 difficulty: easy
-category: Shell Scripting
-description: 'A deployment script fails with "Permission denied" when invoked from a CI pipeline. The
-  script file lacks the execute bit, the shebang line is missing so the shell cannot determine the interpreter,
-  and the script is owned by a different user than the one running the pipeline. All three must be resolved
-  for the script to execute correctly.
+category: Fix
+description: 'CONTEXT: A team operating shell scripting needs you to resolve `Script Not Executable` during
+  a realistic incident. The business impact is reduced service reliability until the underlying state
+  is repaired.
 
-  '
+
+  ENVIRONMENT: You are working in FixitLab''s offline bash practice environment with scripts, cron, logs,
+  and shellcheck. All tools run locally; no paid APIs or external cloud calls are required.
+
+
+  SYMPTOM / STARTING STATE: Simulated RHEL 9 server. Running ./deploy.sh returns "Permission denied".
+  The file exists and contains valid bash commands. A deployment script fails with "Permission denied"
+  when invoked from a CI pipeline. The script file lacks the execute bit, the shebang line is missing
+  so the shell cannot determine the interpreter, and the script is owned by a different user than the
+  one running the pipeline. All three must be resolved for the script to execute correctly.
+
+
+  OBJECTIVE: Diagnose why the script cannot be executed (missing execute bit and shebang); Add the correct
+  shebang line and set the execute permission with chmod; Fix file ownership so the CI user can run the
+  script. Success means `check.sh` exits successfully.
+
+
+  WHAT TO AVOID: Do not apply broad destructive changes, skip evidence gathering, or fake completion with
+  marker files — the checker validates real system state.'
 initial_state: 'Simulated RHEL 9 server. Running ./deploy.sh returns "Permission denied". The file exists
   and contains valid bash commands.
 
@@ -23,17 +40,75 @@ max_score: 100
 is_free: true
 hints:
 - order: 1
-  cost: 10
-  content: 'Check the file: `ls -l deploy.sh`. Look for the missing `x` (execute) bit and note the owner
-    — running `./deploy.sh` gives "Permission denied".'
+  cost: 0
+  content: 'Where to look: Diagnose why the script cannot be executed (missing execute bit and shebang)'
 - order: 2
-  cost: 15
-  content: 'Two more causes: a missing shebang means the kernel can''t pick an interpreter, and the file
-    may be owned by another user than the CI user. View the first line: `head -1 deploy.sh`.'
+  cost: 25
+  content: 'Diagnostic steps:
+
+    1. Add the correct shebang line and set the execute permission with chmod
+
+    2. Fix file ownership so the CI user can run the script'
 - order: 3
-  cost: 20
-  content: 'Fix all three: add `#!/usr/bin/env bash` as line 1, `chmod +x deploy.sh`, and `chown <ci-user>
-    deploy.sh` (or run via `bash deploy.sh`). Re-run `./deploy.sh` — it executes.'
+  cost: 50
+  content: 'Exact fix + verification:
+
+    1. Fix file ownership so the CI user can run the script.
+
+    2. Re-run the lab checker (`check.sh` or Check Solution).
+
+    3. Confirm every scenario objective is satisfied.
+
+
+    WHY: the grader validates real state — marker files are ignored.'
 requires_companion_hosts: false
 dual_terminal: false
 jira_priority: Low
+technology: shell-script
+summary: Complete the script not executable shell script lab and verify success with the checker
+estimated_minutes: 10
+xp_reward: 100
+prerequisites:
+- Basic shell script literacy
+tags:
+- fix
+- hands-on
+- shell-script
+linked_tutorial: shell-script-fundamentals
+what_you_will_learn:
+- Diagnose why the script cannot be executed (missing execute bit and shebang)
+- Add the correct shebang line and set the execute permission with chmod
+- Fix file ownership so the CI user can run the script
+environment:
+  nodes:
+  - role: primary
+    os: FixitLab bash practice environment
+    hostname: lab-primary
+    ip: 127.0.0.1
+    specs: local offline simulation
+  pre_installed:
+  - bash
+  - coreutils
+  - journalctl
+  - shell script
+  - systemctl
+  credentials:
+  - user: root
+    password: lab123
+tasks:
+- id: task_1
+  title: Script Not Executable
+  description: Restore healthy behavior for Script Not Executable by investigating the failure, applying
+    the smallest safe fix, and validating the outcome.
+  background: 'This shell script lab teaches systematic troubleshooting: observe, hypothesize, change,
+    verify.'
+  validation:
+    type: custom_script
+    script: check.sh
+    error_message: Validation did not pass. Re-read the objectives and Hint 2 diagnostic steps.
+solution:
+  summary: Identify the misconfiguration affecting this shell script lab and apply the minimal fix.
+  files_changed: []
+  commands_run:
+  - bash check.sh
+  reference_docs: shell-script-fundamentals

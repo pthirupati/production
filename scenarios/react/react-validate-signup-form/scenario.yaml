@@ -1,11 +1,31 @@
 title: Implement a Signup Form Validator
 slug: react-validate-signup-form
 technology: react
-category: React Development
-description: A React signup form keeps its fields in state and needs a pure validateSignup(values)
-  function it can call on submit to decide whether to enable the button and which inline errors
-  to show. Implement the validator so it returns a per-field errors object plus an isValid flag,
-  with no DOM access — just the rules.
+category: Build
+description: 'CONTEXT: A team operating React frontends needs you to resolve `Implement a Signup Form
+  Validator` during a realistic incident. The business impact is reduced service reliability until the
+  underlying state is repaired.
+
+
+  ENVIRONMENT: You are working in FixitLab''s offline React application with components, hooks, router,
+  and build output. All tools run locally; no paid APIs or external cloud calls are required.
+
+
+  SYMPTOM / STARTING STATE: A React signup form keeps its fields in state and needs a pure validateSignup(values)
+  function for submit-time validation. Implement the validator so it returns a per-field errors object
+  plus an isValid flag, with no DOM access. A React signup form keeps its fields in state and needs a
+  pure validateSignup(values) function it can call on submit to decide whether to enable the button and
+  which inline errors to show. Implement the validator so it returns a per-field errors object plus an
+  isValid flag, with no DOM access — just the rules.
+
+
+  OBJECTIVE: Turn form-field values into a per-field errors object; Apply each validation rule with the
+  correct precedence (first failing rule wins per field); Derive an isValid flag from the absence of any
+  errors. Success means all hidden tests pass.
+
+
+  WHAT TO AVOID: Do not apply broad destructive changes, skip evidence gathering, or fake completion with
+  marker files — the checker validates real system state.'
 difficulty: easy
 scenario_type: do
 lab_mode: simulation
@@ -20,106 +40,228 @@ objectives:
 - Turn form-field values into a per-field errors object
 - Apply each validation rule with the correct precedence (first failing rule wins per field)
 - Derive an isValid flag from the absence of any errors
-initial_state: A React signup form keeps its fields in state and needs a pure validateSignup(values)
-  function for submit-time validation. Implement the validator so it returns a per-field errors
-  object plus an isValid flag, with no DOM access.
-solution_explanation: |
-  Form validation in React is best kept as a pure function the component calls — it takes the
+initial_state: A React signup form keeps its fields in state and needs a pure validateSignup(values) function
+  for submit-time validation. Implement the validator so it returns a per-field errors object plus an
+  isValid flag, with no DOM access.
+solution_explanation: 'Form validation in React is best kept as a pure function the component calls —
+  it takes the
+
   current field values and returns { errors, isValid } so the UI can render inline messages and
+
   enable/disable submit. The key ideas: check one rule at a time per field and stop at the first
+
   failure (so the user sees the most relevant message), trim the email before the empty check,
+
   and compute isValid as "no keys in errors" using Object.keys(errors).length === 0. Each field
+
   only appears in errors when it actually fails a rule, so a fully valid form yields an empty
+
   errors object.
+
+  '
 coding_spec:
   language: javascript
   entrypoint: solution.js
   kind: implement
-  instructions: |
-    Implement validateSignup(values) where values = { email, password, confirm, age }.
-    Return an object { errors, isValid }:
-      errors is an object that contains a message ONLY for fields that fail, using the FIRST
-      failing rule per field (in the order listed):
-        email:    required (after trimming) -> 'Email is required';
-                  must contain exactly one '@' with non-empty text on both sides -> 'Email is invalid'.
-        password: required -> 'Password is required';
-                  at least 8 characters -> 'Password must be at least 8 characters';
-                  must contain a digit -> 'Password must contain a number'.
-        confirm:  must equal password -> 'Passwords do not match'.
-        age:      must be a number >= 18 -> 'You must be at least 18'.
-      isValid is true only when errors has no keys.
-    This is a pure function: no DOM, no state, no side effects.
-    Click Run to try it, then Check Solution to grade against all tests.
+  instructions: "Implement validateSignup(values) where values = { email, password, confirm, age }.\n\
+    Return an object { errors, isValid }:\n  errors is an object that contains a message ONLY for fields\
+    \ that fail, using the FIRST\n  failing rule per field (in the order listed):\n    email:    required\
+    \ (after trimming) -> 'Email is required';\n              must contain exactly one '@' with non-empty\
+    \ text on both sides -> 'Email is invalid'.\n    password: required -> 'Password is required';\n \
+    \             at least 8 characters -> 'Password must be at least 8 characters';\n              must\
+    \ contain a digit -> 'Password must contain a number'.\n    confirm:  must equal password -> 'Passwords\
+    \ do not match'.\n    age:      must be a number >= 18 -> 'You must be at least 18'.\n  isValid is\
+    \ true only when errors has no keys.\nThis is a pure function: no DOM, no state, no side effects.\n\
+    Click Run to try it, then Check Solution to grade against all tests.\n"
   files:
   - path: solution.js
-    content: |
-      function validateSignup(values) {
-        // TODO: build the per-field errors object and derive isValid.
-        // values = { email, password, confirm, age }
-        const errors = {};
-        return { errors, isValid: false };
-      }
+    content: "function validateSignup(values) {\n  // TODO: build the per-field errors object and derive\
+      \ isValid.\n  // values = { email, password, confirm, age }\n  const errors = {};\n  return { errors,\
+      \ isValid: false };\n}\n"
     readonly: false
   visible_tests:
   - name: a fully valid form has no errors
-    code: |
-      const r = validateSignup({ email: 'a@b.com', password: 'secret12', confirm: 'secret12', age: 18 });
-      assert(r.isValid === true, 'expected valid');
+    code: 'const r = validateSignup({ email: ''a@b.com'', password: ''secret12'', confirm: ''secret12'',
+      age: 18 });
+
+      assert(r.isValid === true, ''expected valid'');
+
       assert(Object.keys(r.errors).length === 0, JSON.stringify(r.errors));
+
+      '
   - name: missing email reports required
-    code: |
-      const r = validateSignup({ email: '   ', password: 'secret12', confirm: 'secret12', age: 20 });
-      assert(r.errors.email === 'Email is required', JSON.stringify(r.errors));
-      assert(r.isValid === false, 'should be invalid');
+    code: 'const r = validateSignup({ email: ''   '', password: ''secret12'', confirm: ''secret12'', age:
+      20 });
+
+      assert(r.errors.email === ''Email is required'', JSON.stringify(r.errors));
+
+      assert(r.isValid === false, ''should be invalid'');
+
+      '
   hidden_tests:
   - name: malformed email reports invalid
-    code: |
-      const r = validateSignup({ email: 'not-an-email', password: 'secret12', confirm: 'secret12', age: 20 });
-      assert(r.errors.email === 'Email is invalid', JSON.stringify(r.errors));
+    code: 'const r = validateSignup({ email: ''not-an-email'', password: ''secret12'', confirm: ''secret12'',
+      age: 20 });
+
+      assert(r.errors.email === ''Email is invalid'', JSON.stringify(r.errors));
+
+      '
   - name: email with two at signs is invalid
-    code: |
-      const r = validateSignup({ email: 'a@@b.com', password: 'secret12', confirm: 'secret12', age: 20 });
-      assert(r.errors.email === 'Email is invalid', JSON.stringify(r.errors));
+    code: 'const r = validateSignup({ email: ''a@@b.com'', password: ''secret12'', confirm: ''secret12'',
+      age: 20 });
+
+      assert(r.errors.email === ''Email is invalid'', JSON.stringify(r.errors));
+
+      '
   - name: short password message wins over missing-number
-    code: |
-      const r = validateSignup({ email: 'a@b.com', password: 'ab1', confirm: 'ab1', age: 20 });
-      assert(r.errors.password === 'Password must be at least 8 characters', JSON.stringify(r.errors));
+    code: 'const r = validateSignup({ email: ''a@b.com'', password: ''ab1'', confirm: ''ab1'', age: 20
+      });
+
+      assert(r.errors.password === ''Password must be at least 8 characters'', JSON.stringify(r.errors));
+
+      '
   - name: long password without a digit is rejected
-    code: |
-      const r = validateSignup({ email: 'a@b.com', password: 'abcdefgh', confirm: 'abcdefgh', age: 20 });
-      assert(r.errors.password === 'Password must contain a number', JSON.stringify(r.errors));
+    code: 'const r = validateSignup({ email: ''a@b.com'', password: ''abcdefgh'', confirm: ''abcdefgh'',
+      age: 20 });
+
+      assert(r.errors.password === ''Password must contain a number'', JSON.stringify(r.errors));
+
+      '
   - name: empty password reports required first
-    code: |
-      const r = validateSignup({ email: 'a@b.com', password: '', confirm: '', age: 20 });
-      assert(r.errors.password === 'Password is required', JSON.stringify(r.errors));
+    code: 'const r = validateSignup({ email: ''a@b.com'', password: '''', confirm: '''', age: 20 });
+
+      assert(r.errors.password === ''Password is required'', JSON.stringify(r.errors));
+
+      '
   - name: mismatched confirm reports an error
-    code: |
-      const r = validateSignup({ email: 'a@b.com', password: 'secret12', confirm: 'secret13', age: 20 });
-      assert(r.errors.confirm === 'Passwords do not match', JSON.stringify(r.errors));
+    code: 'const r = validateSignup({ email: ''a@b.com'', password: ''secret12'', confirm: ''secret13'',
+      age: 20 });
+
+      assert(r.errors.confirm === ''Passwords do not match'', JSON.stringify(r.errors));
+
+      '
   - name: under-18 age is rejected
-    code: |
-      const r = validateSignup({ email: 'a@b.com', password: 'secret12', confirm: 'secret12', age: 17 });
-      assert(r.errors.age === 'You must be at least 18', JSON.stringify(r.errors));
+    code: 'const r = validateSignup({ email: ''a@b.com'', password: ''secret12'', confirm: ''secret12'',
+      age: 17 });
+
+      assert(r.errors.age === ''You must be at least 18'', JSON.stringify(r.errors));
+
+      '
   - name: non-numeric age is rejected
-    code: |
-      const r = validateSignup({ email: 'a@b.com', password: 'secret12', confirm: 'secret12', age: 'old' });
-      assert(r.errors.age === 'You must be at least 18', JSON.stringify(r.errors));
+    code: 'const r = validateSignup({ email: ''a@b.com'', password: ''secret12'', confirm: ''secret12'',
+      age: ''old'' });
+
+      assert(r.errors.age === ''You must be at least 18'', JSON.stringify(r.errors));
+
+      '
   - name: multiple fields can fail at once
-    code: |
-      const r = validateSignup({ email: '', password: 'short', confirm: 'nope', age: 10 });
-      assert(r.errors.email === 'Email is required', JSON.stringify(r.errors));
-      assert(r.errors.password === 'Password must be at least 8 characters', JSON.stringify(r.errors));
-      assert(r.errors.confirm === 'Passwords do not match', JSON.stringify(r.errors));
-      assert(r.errors.age === 'You must be at least 18', JSON.stringify(r.errors));
-      assert(r.isValid === false, 'should be invalid');
+    code: 'const r = validateSignup({ email: '''', password: ''short'', confirm: ''nope'', age: 10 });
+
+      assert(r.errors.email === ''Email is required'', JSON.stringify(r.errors));
+
+      assert(r.errors.password === ''Password must be at least 8 characters'', JSON.stringify(r.errors));
+
+      assert(r.errors.confirm === ''Passwords do not match'', JSON.stringify(r.errors));
+
+      assert(r.errors.age === ''You must be at least 18'', JSON.stringify(r.errors));
+
+      assert(r.isValid === false, ''should be invalid'');
+
+      '
   timeout: 8
 hints:
 - order: 1
-  cost: 10
-  content: Build the errors object by checking one rule at a time per field and assigning errors.field the first time a rule fails; once a field has a message, skip its remaining rules.
+  cost: 0
+  content: 'Where to look: Open `solution.js`, read the instructions, and run the visible tests to see
+    which assertion fails first.'
 - order: 2
-  cost: 20
-  content: "For email, trim it first for the required check, then validate the shape — splitting on '@' and requiring exactly two non-empty halves (parts.length === 2 && parts[0] && parts[1]) is enough here."
+  cost: 25
+  content: 'Diagnostic steps:
+
+    1. Click Run and read the traceback — note line number and actual vs expected values.
+
+    2. Reproduce the failure with the smallest input from a visible test.
+
+    3. Compare your implementation to the bug described in the lab prompt.'
 - order: 3
-  cost: 30
-  content: "For age use Number(values.age) and check Number.isFinite(n) && n >= 18. At the end, isValid = Object.keys(errors).length === 0."
+  cost: 50
+  content: 'Exact fix + verification:
+
+    1. Derive an isValid flag from the absence of any errors.
+
+    2. Re-run the lab checker (`check.sh` or Check Solution).
+
+    3. Confirm every scenario objective is satisfied.
+
+
+    WHY: the grader validates real state — marker files are ignored.'
+summary: Complete the implement a signup form validator react lab and verify success with the checker
+estimated_minutes: 20
+xp_reward: 100
+prerequisites:
+- Basic react literacy
+tags:
+- do
+- hands-on
+- react
+linked_tutorial: react-fundamentals
+what_you_will_learn:
+- Turn form-field values into a per-field errors object
+- Apply each validation rule with the correct precedence (first failing rule wins per field)
+- Derive an isValid flag from the absence of any errors
+environment:
+  nodes:
+  - role: primary
+    os: FixitLab React application
+    hostname: lab-primary
+    ip: 127.0.0.1
+    specs: local offline simulation
+  pre_installed:
+  - bash
+  - coreutils
+  - journalctl
+  - react
+  - systemctl
+  credentials:
+  - user: root
+    password: lab123
+tasks:
+- id: task_1
+  title: Implement a Signup Form Validator
+  description: Restore healthy behavior for Implement a Signup Form Validator by investigating the failure,
+    applying the smallest safe fix, and validating the outcome.
+  background: 'This react lab teaches systematic troubleshooting: observe, hypothesize, change, verify.'
+  validation:
+    type: custom_script
+    script: hidden_tests
+    error_message: One or more hidden tests failed. Read the public test output, fix your solution, and
+      submit again.
+solution:
+  summary: The solution passes all hidden tests by implementing the required behavior in code.
+  files_changed: []
+  commands_run: []
+  reference_docs: react-fundamentals
+guided_mode:
+  enabled: true
+  steps:
+  - step: 1
+    title: Inspect current state
+    instruction: Run a read-only diagnostic before changing anything.
+    command: check.sh
+    expected_output: Output shows the current failure mode
+    explanation: Evidence-first troubleshooting avoids guessing.
+    next_on: command_success
+  - step: 2
+    title: Apply the minimal fix
+    instruction: Make one reversible change aligned with the objectives.
+    command: '# your fix command here'
+    expected_output: State moves toward the objective
+    explanation: Small changes make rollback easy if the hypothesis was wrong.
+    next_on: command_success
+  - step: 3
+    title: Verify with the grader
+    instruction: Run the same verification the checker uses.
+    command: check.sh
+    expected_output: all hidden tests pass
+    explanation: The lab passes only when real state is healthy.
+    next_on: command_success

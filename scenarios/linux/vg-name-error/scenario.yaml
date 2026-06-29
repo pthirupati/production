@@ -1,11 +1,29 @@
 title: vgcreate Fails — Invalid VG Name with Hyphen
 slug: linux-vg-name-error
 difficulty: easy
-category: Linux Administration
-description: 'Creating an LVM volume group fails: `vgcreate vg-data /dev/sdb` errors because the name
-  contains a hyphen. LVM/device-mapper reserve the hyphen as a separator in /dev/mapper device names,
-  so VG and LV names can''t contain it. Recreate the volume group with a valid name (underscore instead
-  of hyphen) and verify it exists.'
+category: Fix
+description: 'CONTEXT: A team operating Linux administration needs you to resolve `vgcreate Fails — Invalid
+  VG Name with Hyphen` during a realistic incident. The business impact is reduced service reliability
+  until the underlying state is repaired.
+
+
+  ENVIRONMENT: You are working in FixitLab''s offline Linux practice server with terminal and config files
+  under /etc and /var. All tools run locally; no paid APIs or external cloud calls are required.
+
+
+  SYMPTOM / STARTING STATE: Linux server where `vgcreate vg-data /dev/sdb` fails due to the hyphen in
+  the VG name (invalid for device-mapper). Creating an LVM volume group fails: `vgcreate vg-data /dev/sdb`
+  errors because the name contains a hyphen. LVM/device-mapper reserve the hyphen as a separator in /dev/mapper
+  device names, so VG and LV names can''t contain it. Recreate the volume group with a valid name (underscore
+  instead of hyphen) and verify it exists.
+
+
+  OBJECTIVE: Read the vgcreate error and understand the naming restriction; Recreate the VG with a valid
+  name (no hyphen); Verify the volume group was created with vgs. Success means `check.sh` exits successfully.
+
+
+  WHAT TO AVOID: Do not apply broad destructive changes, skip evidence gathering, or fake completion with
+  marker files — the checker validates real system state.'
 initial_state: Linux server where `vgcreate vg-data /dev/sdb` fails due to the hyphen in the VG name (invalid
   for device-mapper).
 objectives:
@@ -19,15 +37,75 @@ max_score: 100
 is_free: false
 hints:
 - order: 1
-  cost: 10
-  content: 'The error is about the name: LVM names can''t contain `-` because device-mapper uses it as
-    a separator in /dev/mapper paths.'
+  cost: 0
+  content: 'Where to look: Read the vgcreate error and understand the naming restriction'
 - order: 2
-  cost: 15
-  content: 'Use an underscore instead: `vgcreate vg_data /dev/sdb`.'
+  cost: 25
+  content: 'Diagnostic steps:
+
+    1. Recreate the VG with a valid name (no hyphen)
+
+    2. Verify the volume group was created with vgs'
 - order: 3
-  cost: 20
-  content: 'Verify it was created: `vgs` lists `vg_data` on /dev/sdb.'
+  cost: 50
+  content: 'Exact fix + verification:
+
+    1. Verify the volume group was created with vgs.
+
+    2. Re-run the lab checker (`check.sh` or Check Solution).
+
+    3. Confirm every scenario objective is satisfied.
+
+
+    WHY: the grader validates real state — marker files are ignored.'
 requires_companion_hosts: false
 dual_terminal: false
 jira_priority: Medium
+technology: linux
+summary: Complete the vgcreate fails — invalid vg name with hyphen linux lab and verify success with the
+  checker
+estimated_minutes: 15
+xp_reward: 100
+prerequisites:
+- Basic linux literacy
+tags:
+- fix
+- hands-on
+- linux
+linked_tutorial: linux-fundamentals
+what_you_will_learn:
+- Read the vgcreate error and understand the naming restriction
+- Recreate the VG with a valid name (no hyphen)
+- Verify the volume group was created with vgs
+environment:
+  nodes:
+  - role: primary
+    os: FixitLab Linux practice server
+    hostname: lab-primary
+    ip: 127.0.0.1
+    specs: local offline simulation
+  pre_installed:
+  - bash
+  - coreutils
+  - journalctl
+  - linux
+  - systemctl
+  credentials:
+  - user: root
+    password: lab123
+tasks:
+- id: task_1
+  title: vgcreate Fails — Invalid VG Name with Hyphen
+  description: Restore healthy behavior for vgcreate Fails — Invalid VG Name with Hyphen by investigating
+    the failure, applying the smallest safe fix, and validating the outcome.
+  background: 'This linux lab teaches systematic troubleshooting: observe, hypothesize, change, verify.'
+  validation:
+    type: custom_script
+    script: check.sh
+    error_message: Validation did not pass. Re-read the objectives and Hint 2 diagnostic steps.
+solution:
+  summary: Identify the misconfiguration affecting this linux lab and apply the minimal fix.
+  files_changed: []
+  commands_run:
+  - bash check.sh
+  reference_docs: linux-fundamentals

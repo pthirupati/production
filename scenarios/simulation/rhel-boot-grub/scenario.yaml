@@ -25,8 +25,7 @@ difficulty: medium
 hints:
 - order: 1
   cost: 0
-  content: 'Where to look: Treat this as a bootloader repair. Focus on grub configuration and whether
-    the simulated host can reach a healthy boot state.'
+  content: 'Where to look: Boot the default RHEL entry from the GRUB menu'
 - order: 2
   cost: 25
   content: 'Diagnostic steps:
@@ -64,55 +63,55 @@ slug: sim-rhel-boot-grub
 technology: simulation
 time_limit: 900
 title: 'RHEL Simulation: GRUB Boot & Rescue'
-summary: Diagnose and restore a rhel boot grub simulation workflow, then prove the real state is healthy.
+summary: 'Complete the rhel simulation: grub boot & rescue simulation lab and verify success with the
+  checker'
 estimated_minutes: 15
 xp_reward: 100
 prerequisites:
 - Basic Linux terminal navigation
 - Reading systemd service status
 tags:
+- fix
+- hands-on
 - real-validation
 - rhel
 - simulation
 - systemd
-linked_tutorial: simulation-labs-fundamentals
+linked_tutorial: simulation-fundamentals
 what_you_will_learn:
-- Recognize the unhealthy simulation signal for rhel boot grub
-- Use command output and logs to diagnose bootloader configuration
-- Apply a minimal operational fix without relying on marker files
-- Verify the repaired state with the same command the grader uses
+- Boot the default RHEL entry from the GRUB menu
+- Log in as root
+- Run systemctl status sshd in the full shell to confirm the system is operational
 environment:
   nodes:
   - role: primary
-    os: FixitLab RHEL-like simulation
-    hostname: sim-primary
+    os: FixitLab simulation sandbox
+    hostname: lab-primary
     ip: 127.0.0.1
-    specs: local in-memory simulation
+    specs: local offline simulation
   pre_installed:
   - bash
-  - systemctl
-  - journalctl
   - coreutils
+  - journalctl
+  - simulation
+  - systemctl
   credentials:
   - user: root
     password: lab123
 tasks:
 - id: task_1
   title: 'RHEL Simulation: GRUB Boot & Rescue'
-  description: Restore the rhel boot grub simulation workflow by diagnosing the failed service state,
-    applying the smallest safe fix, and proving the service is healthy.
-  background: FixitLab simulation labs model real operating-system state. The checker reads that state
-    directly, so the lab only passes when the system itself is repaired.
+  description: 'Restore healthy behavior for RHEL Simulation: GRUB Boot & Rescue by investigating the
+    failure, applying the smallest safe fix, and validating the outcome.'
+  background: 'This simulation lab teaches systematic troubleshooting: observe, hypothesize, change, verify.'
   validation:
-    type: command_output
-    command: grub2-mkconfig -o /boot/grub2/grub.cfg
-    expected_output: done
-    error_message: The bootloader repair has not completed. Regenerate the grub configuration and re-check
-      boot state.
+    type: custom_script
+    script: check.sh
+    error_message: Validation did not pass. Re-read the objectives and Hint 2 diagnostic steps.
 solution:
   summary: The root cause is an incomplete bootloader configuration; regenerate grub config and verify
     boot health.
   files_changed: []
   commands_run:
-  - grub2-mkconfig -o /boot/grub2/grub.cfg
-  reference_docs: 'linked tutorial: simulation-labs-fundamentals'
+  - bash check.sh
+  reference_docs: simulation-fundamentals

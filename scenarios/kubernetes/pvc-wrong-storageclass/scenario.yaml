@@ -1,10 +1,30 @@
 title: PVC Stuck — Wrong StorageClass
 slug: sim-k8s-pvc-storageclass
-category: Kubernetes
+category: Fix
 difficulty: medium
-description: A PVC will not bind because it requests a StorageClass that does not exist in the cluster.
-  The claim names a class (e.g. fast-ssd) with no matching provisioner or PV, so it stays Pending forever
-  and the workload can't start. Point the PVC at an existing StorageClass so it can be provisioned.
+description: 'CONTEXT: A team operating Kubernetes needs you to resolve `PVC Stuck — Wrong StorageClass`
+  during a realistic incident. The business impact is reduced service reliability until the underlying
+  state is repaired.
+
+
+  ENVIRONMENT: You are working in FixitLab''s offline Kubernetes cluster with kubectl, manifests, and
+  cluster resources. All tools run locally; no paid APIs or external cloud calls are required.
+
+
+  SYMPTOM / STARTING STATE: Simulated Kubernetes cluster. A PVC specifies storageClassName: fast-ssd,
+  but no such StorageClass exists. The PVC remains Pending and its pod stays ContainerCreating. A PVC
+  will not bind because it requests a StorageClass that does not exist in the cluster. The claim names
+  a class (e.g. fast-ssd) with no matching provisioner or PV, so it stays Pending forever and the workload
+  can''t start. Point the PVC at an existing StorageClass so it can be provisioned.
+
+
+  OBJECTIVE: Confirm the PVC is Pending due to a missing StorageClass; List the StorageClasses that actually
+  exist in the cluster; Bind the PVC to a valid StorageClass so the volume provisions. Success means `kubectl
+  get pods` shows every pod Running.
+
+
+  WHAT TO AVOID: Do not apply broad destructive changes, skip evidence gathering, or fake completion with
+  marker files — the checker validates real system state.'
 initial_state: 'Simulated Kubernetes cluster. A PVC specifies storageClassName: fast-ssd, but no such
   StorageClass exists. The PVC remains Pending and its pod stays ContainerCreating.'
 lab_mode: simulation
@@ -21,15 +41,76 @@ objectives:
 - Bind the PVC to a valid StorageClass so the volume provisions
 hints:
 - order: 1
-  cost: 10
-  content: '`kubectl describe pvc <name>` shows it references storageClassName fast-ssd and Events report
-    it can''t find a provisioner for that class.'
+  cost: 0
+  content: 'Where to look: Run `kubectl get pods -A` and `kubectl describe pod <name>` for any pod not
+    in Running state.'
 - order: 2
-  cost: 15
-  content: 'See what''s available: `kubectl get storageclass`. The requested class isn''t listed — you
-    must use one that is (often `standard` or the cluster default).'
+  cost: 25
+  content: 'Diagnostic steps:
+
+    1. `kubectl get pods` — note CrashLoopBackOff, ImagePullBackOff, or Pending.
+
+    2. `kubectl describe pod <name>` — read Events at the bottom.
+
+    3. `kubectl logs <name> [--previous]` if the container restarted.'
 - order: 3
-  cost: 20
-  content: 'A PVC''s storageClassName is immutable, so recreate it: edit the manifest to `storageClassName:
-    standard` (or drop it to use the default), `kubectl delete pvc <name>` and re-apply. It binds and
-    the pod starts.'
+  cost: 50
+  content: 'Exact fix + verification:
+
+    1. Fix the root cause (image name, env var, volume mount, or probe).
+
+    2. `kubectl apply -f` the corrected manifest or delete the pod to recreate.
+
+    3. Confirm `kubectl get pods` shows every pod Running.
+
+
+    WHY: Kubernetes only reports healthy when the workload actually runs.'
+technology: kubernetes
+summary: Complete the pvc stuck — wrong storageclass kubernetes lab and verify success with the checker
+estimated_minutes: 15
+xp_reward: 100
+prerequisites:
+- Basic kubernetes literacy
+tags:
+- fix
+- hands-on
+- kubernetes
+linked_tutorial: kubernetes-fundamentals
+what_you_will_learn:
+- Confirm the PVC is Pending due to a missing StorageClass
+- List the StorageClasses that actually exist in the cluster
+- Bind the PVC to a valid StorageClass so the volume provisions
+environment:
+  nodes:
+  - role: primary
+    os: FixitLab Kubernetes cluster
+    hostname: lab-primary
+    ip: 127.0.0.1
+    specs: local offline simulation
+  pre_installed:
+  - bash
+  - coreutils
+  - helm
+  - kubectl
+  - kubernetes
+  credentials:
+  - user: root
+    password: lab123
+tasks:
+- id: task_1
+  title: PVC Stuck — Wrong StorageClass
+  description: Restore healthy behavior for PVC Stuck — Wrong StorageClass by investigating the failure,
+    applying the smallest safe fix, and validating the outcome.
+  background: 'This kubernetes lab teaches systematic troubleshooting: observe, hypothesize, change, verify.'
+  validation:
+    type: k8s_resource_state
+    resource_kind: Pod
+    resource_name: all
+    namespace: default
+    expected_state: Running
+    error_message: One or more pods are not Running. Use kubectl describe pod and kubectl logs.
+solution:
+  summary: Identify the misconfiguration affecting this kubernetes lab and apply the minimal fix.
+  files_changed: []
+  commands_run: []
+  reference_docs: kubernetes-fundamentals

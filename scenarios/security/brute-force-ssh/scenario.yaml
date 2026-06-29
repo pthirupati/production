@@ -1,35 +1,119 @@
-title: "SSH Brute-Force Attack — Detect and Block"
+title: SSH Brute-Force Attack — Detect and Block
 slug: brute-force-ssh
-technology: Security
-category: Intrusion Detection
+technology: security
+category: Fix
 difficulty: medium
 time_limit: 900
 max_score: 100
 infrastructure_type: docker
 jira_priority: High
 is_free: false
-description: |
-  The auth.log on your server shows thousands of failed SSH login attempts from
+description: 'CONTEXT: A team operating security hardening needs you to resolve `SSH Brute-Force Attack
+  — Detect and Block` during a realistic incident. The business impact is reduced service reliability
+  until the underlying state is repaired.
+
+
+  ENVIRONMENT: You are working in FixitLab''s offline hardening lab with SSH, firewall, TLS, audit logs,
+  and IAM settings. All tools run locally; no paid APIs or external cloud calls are required.
+
+
+  SYMPTOM / STARTING STATE: Ubuntu server with SSH exposed on port 22. auth.log contains thousands of
+
+  failed login attempts. iptables is running with default ACCEPT policies. The auth.log on your server
+  shows thousands of failed SSH login attempts from
+
   the IP 203.0.113.47 over the past hour targeting the root and admin accounts.
+
   The attack is ongoing. Identify the source IP from the logs, block it using
+
   iptables, and configure sshd to disable password authentication entirely.
+
+
+  OBJECTIVE: Parse /var/log/auth.log to identify the attacking IP address; Block the attacker IP with
+  an iptables DROP rule; Disable PasswordAuthentication in /etc/ssh/sshd_config and reload sshd. Success
+  means `check.sh` exits successfully.
+
+
+  WHAT TO AVOID: Do not apply broad destructive changes, skip evidence gathering, or fake completion with
+  marker files — the checker validates real system state.'
 objectives:
-  - Parse /var/log/auth.log to identify the attacking IP address
-  - Block the attacker IP with an iptables DROP rule
-  - Disable PasswordAuthentication in /etc/ssh/sshd_config and reload sshd
-initial_state: |
-  Ubuntu server with SSH exposed on port 22. auth.log contains thousands of
+- Parse /var/log/auth.log to identify the attacking IP address
+- Block the attacker IP with an iptables DROP rule
+- Disable PasswordAuthentication in /etc/ssh/sshd_config and reload sshd
+initial_state: 'Ubuntu server with SSH exposed on port 22. auth.log contains thousands of
+
   failed login attempts. iptables is running with default ACCEPT policies.
+
+  '
 hints:
-  - order: 1
-    cost: 10
-    content: "Run `grep 'Failed password' /var/log/auth.log | awk '{print $11}' | sort | uniq -c | sort -rn | head` to find the top offending IP."
-  - order: 2
-    cost: 15
-    content: "Block the IP with `iptables -I INPUT -s 203.0.113.47 -j DROP` and verify with `iptables -L INPUT -n -v`."
-  - order: 3
-    cost: 20
-    content: "Edit /etc/ssh/sshd_config and set `PasswordAuthentication no`, then run `systemctl reload sshd`."
-  - order: 4
-    cost: 25
-    content: "Confirm with `iptables-save | grep 203.0.113.47` and `sshd -T | grep passwordauthentication`."
+- order: 1
+  cost: 0
+  content: 'Where to look: Run `systemctl status sshd` and `ss -tlnp | grep :22` on the target host.'
+- order: 2
+  cost: 25
+  content: 'Diagnostic steps:
+
+    1. Confirm sshd is active and listening on port 22.
+
+    2. Check `firewall-cmd` or iptables for blocked port 22.
+
+    3. Read `/var/log/secure` for auth or config errors.'
+- order: 3
+  cost: 50
+  content: 'Exact fix + verification:
+
+    1. Fix sshd_config, firewall, or socket unit as needed.
+
+    2. `systemctl restart sshd`.
+
+    3. `ssh -o BatchMode=yes user@localhost echo ok` succeeds.
+
+
+    WHY: SSH failures are usually service, firewall, or config — not credentials alone.'
+summary: Complete the ssh brute-force attack — detect and block security lab and verify success with the
+  checker
+estimated_minutes: 15
+xp_reward: 100
+prerequisites:
+- Basic security literacy
+tags:
+- fix
+- hands-on
+- security
+linked_tutorial: security-fundamentals
+what_you_will_learn:
+- Parse /var/log/auth.log to identify the attacking IP address
+- Block the attacker IP with an iptables DROP rule
+- Disable PasswordAuthentication in /etc/ssh/sshd_config and reload sshd
+environment:
+  nodes:
+  - role: primary
+    os: FixitLab hardening lab
+    hostname: lab-primary
+    ip: 127.0.0.1
+    specs: local offline simulation
+  pre_installed:
+  - bash
+  - coreutils
+  - journalctl
+  - security
+  - systemctl
+  credentials:
+  - user: root
+    password: lab123
+tasks:
+- id: task_1
+  title: SSH Brute-Force Attack — Detect and Block
+  description: Restore healthy behavior for SSH Brute-Force Attack — Detect and Block by investigating
+    the failure, applying the smallest safe fix, and validating the outcome.
+  background: 'This security lab teaches systematic troubleshooting: observe, hypothesize, change, verify.'
+  validation:
+    type: custom_script
+    script: check.sh
+    error_message: Validation did not pass. Re-read the objectives and Hint 2 diagnostic steps.
+solution:
+  summary: Identify the misconfiguration affecting this security lab and apply the minimal fix.
+  files_changed: []
+  commands_run:
+  - bash check.sh
+  reference_docs: security-fundamentals

@@ -1,9 +1,30 @@
 title: Get past the firewall to the blocked database port
 slug: nmap-fix-blocked-syn-scan
-category: Nmap Network Scanning
-description: The DBA insists PostgreSQL is listening on db01 (10.10.10.20:5432), but your scan reports
-  the port as "filtered". A stateful edge firewall is silently dropping unsolicited SYN packets. Use a
-  privileged SYN scan to confirm the port is really open.
+category: Fix
+description: 'CONTEXT: A team operating network scanning needs you to resolve `Get past the firewall to
+  the blocked database port` during a realistic incident. The business impact is reduced service reliability
+  until the underlying state is repaired.
+
+
+  ENVIRONMENT: You are working in FixitLab''s offline scanning lab with nmap CLI, targets, and scan output.
+  All tools run locally; no paid APIs or external cloud calls are required.
+
+
+  SYMPTOM / STARTING STATE: A default unprivileged scan of db01 (10.10.10.20) port 5432 returns "filtered"
+  because the edge firewall drops the probe. The port is actually open behind the firewall. The DBA insists
+  PostgreSQL is listening on db01 (10.10.10.20:5432), but your scan reports the port as "filtered". A
+  stateful edge firewall is silently dropping unsolicited SYN packets. Use a privileged SYN scan to confirm
+  the port is really open.
+
+
+  OBJECTIVE: Open the Nmap simulator and scan db01:5432 — observe it reported as "filtered"; Recognise
+  that the firewall is dropping unsolicited SYNs (no RST/closed response); Re-run with a privileged TCP
+  SYN scan (sudo nmap -sS -p 5432 10.10.10.20) to confirm the port is open. Success means `check.sh` exits
+  successfully.
+
+
+  WHAT TO AVOID: Do not apply broad destructive changes, skip evidence gathering, or fake completion with
+  marker files — the checker validates real system state.'
 difficulty: medium
 lab_mode: simulation
 simulation_type: nmap
@@ -21,14 +42,74 @@ initial_state: A default unprivileged scan of db01 (10.10.10.20) port 5432 retur
   the edge firewall drops the probe. The port is actually open behind the firewall.
 hints:
 - order: 1
-  cost: 10
-  content: Scan the port first to see the problem, e.g. nmap -p 5432 10.10.10.20. "filtered" means no
-    response came back at all — a firewall is dropping the packet (unlike "closed", which sends a RST).
+  cost: 0
+  content: 'Where to look: Run `systemctl status postgresql` and `pg_isready` for connection state.'
 - order: 2
-  cost: 15
-  content: A half-open TCP SYN scan (-sS) is stealthier and gets through the firewall's allow rule for
-    the probe. SYN scans need raw sockets, so they require root — prefix the command with sudo.
+  cost: 25
+  content: 'Diagnostic steps:
+
+    1. Check service status and `/var/log/postgresql/` logs.
+
+    2. Verify `pg_hba.conf` and `postgresql.conf` for listen addresses.
+
+    3. Test with `psql -U postgres -c ''SELECT 1''`.'
 - order: 3
-  cost: 20
-  content: Run sudo nmap -sS -p 5432 10.10.10.20. Without sudo, nmap falls back to a connect scan that
-    the firewall still drops. The task completes when db01:5432 is confirmed OPEN.
+  cost: 50
+  content: 'Exact fix + verification:
+
+    1. Fix auth rules, data directory permissions, or port conflict.
+
+    2. `systemctl restart postgresql`.
+
+    3. Confirm `pg_isready` reports accepting connections.
+
+
+    WHY: the database must accept connections, not just start.'
+summary: Complete the get past the firewall to the blocked database port nmap lab and verify success with
+  the checker
+estimated_minutes: 20
+xp_reward: 100
+prerequisites:
+- Basic nmap literacy
+tags:
+- fix
+- hands-on
+- nmap
+linked_tutorial: nmap-fundamentals
+what_you_will_learn:
+- Open the Nmap simulator and scan db01:5432 — observe it reported as "filtered"
+- Recognise that the firewall is dropping unsolicited SYNs (no RST/closed response)
+- Re-run with a privileged TCP SYN scan (sudo nmap -sS -p 5432 10.10.10.20) to confirm the port is open
+environment:
+  nodes:
+  - role: primary
+    os: FixitLab scanning lab
+    hostname: lab-primary
+    ip: 127.0.0.1
+    specs: local offline simulation
+  pre_installed:
+  - bash
+  - coreutils
+  - journalctl
+  - nmap
+  - systemctl
+  credentials:
+  - user: root
+    password: lab123
+tasks:
+- id: task_1
+  title: Get past the firewall to the blocked database port
+  description: Restore healthy behavior for Get past the firewall to the blocked database port by investigating
+    the failure, applying the smallest safe fix, and validating the outcome.
+  background: 'This nmap lab teaches systematic troubleshooting: observe, hypothesize, change, verify.'
+  validation:
+    type: command_output
+    command: pg_isready
+    expected_output: accepting connections
+    error_message: PostgreSQL is not accepting connections. Check service status and pg_hba.conf.
+solution:
+  summary: Identify the misconfiguration affecting this nmap lab and apply the minimal fix.
+  files_changed: []
+  commands_run:
+  - pg_isready
+  reference_docs: nmap-fundamentals

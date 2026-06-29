@@ -1,8 +1,7 @@
----
 slug: vm-question-pending
-title: "VM Stuck at Pending Question — Cannot Power On or Operate"
-technology: VMware
-category: VM Management
+title: VM Stuck at Pending Question — Cannot Power On or Operate
+technology: vmware
+category: Fix
 difficulty: easy
 time_limit: 600
 max_score: 100
@@ -11,36 +10,120 @@ simulation_type: vmware
 infrastructure_type: simulation
 jira_priority: High
 is_free: false
-description: |
-  VM "test-lab-07" is in a suspended state and all operations (power on, power off,
-  vMotion) are failing with: "The virtual machine requires user input to continue."
-  The VM has a pending question asking whether to keep the existing UUID or generate
-  a new one — this happens when a VM is copied or imported without properly clearing
-  the UUID. The question must be answered before the VM can be operated.
-objectives:
-  - Identify the pending question on the VM in vSphere Client
-  - Answer the question appropriately (Yes to keep UUID or No to generate a new one)
-  - Verify the VM can be powered on after answering the question
-  - Document why this happens and how to prevent it during VM cloning
-initial_state: |
-  VMware vCenter simulation. test-lab-07 shows a question/warning badge in vCenter.
+description: 'CONTEXT: A team operating VMware vSphere needs you to resolve `VM Stuck at Pending Question
+  — Cannot Power On or Operate` during a realistic incident. The business impact is reduced service reliability
+  until the underlying state is repaired.
+
+
+  ENVIRONMENT: You are working in FixitLab''s offline vSphere lab with VMs, datastores, vCenter, and ESXi
+  tasks. All tools run locally; no paid APIs or external cloud calls are required.
+
+
+  SYMPTOM / STARTING STATE: VMware vCenter simulation. test-lab-07 shows a question/warning badge in vCenter.
+
   The VM cannot be powered on or migrated. A question dialog is blocking operations.
+
+  The question: "This virtual machine might have been moved or copied. What do you want to do?" VM "test-lab-07"
+  is in a suspended state and all operations (power on, power off,
+
+  vMotion) are failing with: "The virtual machine requires user input to continue."
+
+  The VM has a pending question asking whether to keep the existing UUID or generate
+
+  a new one — this happens when a VM is copied or imported without properly clearing
+
+  the UUID. The question must be answered before the VM can be operated.
+
+
+  OBJECTIVE: Identify the pending question on the VM in vSphere Client; Answer the question appropriately
+  (Yes to keep UUID or No to generate a new one); Verify the VM can be powered on after answering the
+  question. Success means `check.sh` exits successfully.
+
+
+  WHAT TO AVOID: Do not apply broad destructive changes, skip evidence gathering, or fake completion with
+  marker files — the checker validates real system state.'
+objectives:
+- Identify the pending question on the VM in vSphere Client
+- Answer the question appropriately (Yes to keep UUID or No to generate a new one)
+- Verify the VM can be powered on after answering the question
+- Document why this happens and how to prevent it during VM cloning
+initial_state: 'VMware vCenter simulation. test-lab-07 shows a question/warning badge in vCenter.
+
+  The VM cannot be powered on or migrated. A question dialog is blocking operations.
+
   The question: "This virtual machine might have been moved or copied. What do you want to do?"
+
+  '
 hints:
-  - order: 1
-    cost: 10
-    content: "In vSphere Client, select test-lab-07. Look for an orange warning badge
-      or a 'Questions' button in the Summary tab. Click 'Answer' or look in the
-      Monitor → Tasks & Events → Events tab for the pending question event."
-  - order: 2
-    cost: 15
-    content: "The question asks whether the VM was moved or copied:
-      - Select 'I moved it' if this is the original VM and UUID should be kept.
-      - Select 'I copied it' if this is a copy and it should get a new UUID.
-      For lab VMs that were cloned, select 'I copied it' to generate a new UUID."
-  - order: 3
-    cost: 20
-    content: "To prevent future occurrences when cloning VMs:
-      Use the 'Clone' function in vCenter rather than copying VMDK files manually.
-      When using templates, always use 'Deploy from Template' which handles UUID
-      generation automatically. Check /etc/vmware/config for uuid.action setting."
+- order: 1
+  cost: 0
+  content: 'Where to look: Identify the pending question on the VM in vSphere Client'
+- order: 2
+  cost: 25
+  content: 'Diagnostic steps:
+
+    1. Answer the question appropriately (Yes to keep UUID or No to generate a new one)
+
+    2. Verify the VM can be powered on after answering the question
+
+    3. Document why this happens and how to prevent it during VM cloning'
+- order: 3
+  cost: 50
+  content: 'Exact fix + verification:
+
+    1. Document why this happens and how to prevent it during VM cloning.
+
+    2. Re-run the lab checker (`check.sh` or Check Solution).
+
+    3. Confirm every scenario objective is satisfied.
+
+
+    WHY: the grader validates real state — marker files are ignored.'
+summary: Complete the vm stuck at pending question — cannot power on or operate vmware lab and verify
+  success with the checker
+estimated_minutes: 10
+xp_reward: 100
+prerequisites:
+- Basic vmware literacy
+tags:
+- fix
+- hands-on
+- vmware
+linked_tutorial: vmware-fundamentals
+what_you_will_learn:
+- Identify the pending question on the VM in vSphere Client
+- Answer the question appropriately (Yes to keep UUID or No to generate a new one)
+- Verify the VM can be powered on after answering the question
+- Document why this happens and how to prevent it during VM cloning
+environment:
+  nodes:
+  - role: primary
+    os: FixitLab vSphere lab
+    hostname: lab-primary
+    ip: 127.0.0.1
+    specs: local offline simulation
+  pre_installed:
+  - bash
+  - coreutils
+  - journalctl
+  - systemctl
+  - vmware
+  credentials:
+  - user: root
+    password: lab123
+tasks:
+- id: task_1
+  title: VM Stuck at Pending Question — Cannot Power On or Operate
+  description: Restore healthy behavior for VM Stuck at Pending Question — Cannot Power On or Operate
+    by investigating the failure, applying the smallest safe fix, and validating the outcome.
+  background: 'This vmware lab teaches systematic troubleshooting: observe, hypothesize, change, verify.'
+  validation:
+    type: custom_script
+    script: check.sh
+    error_message: Validation did not pass. Re-read the objectives and Hint 2 diagnostic steps.
+solution:
+  summary: Identify the misconfiguration affecting this vmware lab and apply the minimal fix.
+  files_changed: []
+  commands_run:
+  - bash check.sh
+  reference_docs: vmware-fundamentals

@@ -1,7 +1,7 @@
 title: Windows IIS App Pool Recycling Too Often
 slug: win-iis-apppool-recycle-storm
-technology: Windows Server
-category: IIS
+technology: windows
+category: Fix
 difficulty: medium
 lab_mode: simulation
 simulation_type: windows
@@ -10,8 +10,27 @@ max_score: 100
 is_free: true
 jira_priority: High
 dual_terminal: false
-description: An IIS application pool recycles every few minutes due to a low private-memory limit, dropping
-  sessions. Tune the recycling settings and confirm the pool stays up.
+description: 'CONTEXT: A team operating Windows Server needs you to resolve `Windows IIS App Pool Recycling
+  Too Often` during a realistic incident. The business impact is reduced service reliability until the
+  underlying state is repaired.
+
+
+  ENVIRONMENT: You are working in FixitLab''s offline Windows Server host with PowerShell, Server Manager,
+  and AD tools. All tools run locally; no paid APIs or external cloud calls are required.
+
+
+  SYMPTOM / STARTING STATE: A Windows IIS app pool with an aggressive memory-based recycle limit, causing
+  frequent recycles and dropped sessions. An IIS application pool recycles every few minutes due to a
+  low private-memory limit, dropping sessions. Tune the recycling settings and confirm the pool stays
+  up.
+
+
+  OBJECTIVE: Confirm the app pool recycles frequently from the memory limit; Tune the recycling thresholds
+  appropriately; Verify the pool stops thrashing. Success means `check.sh` exits successfully.
+
+
+  WHAT TO AVOID: Do not apply broad destructive changes, skip evidence gathering, or fake completion with
+  marker files — the checker validates real system state.'
 initial_state: A Windows IIS app pool with an aggressive memory-based recycle limit, causing frequent
   recycles and dropped sessions.
 objectives:
@@ -20,11 +39,74 @@ objectives:
 - Verify the pool stops thrashing
 hints:
 - order: 1
-  cost: 10
-  content: System log shows WAS recycle events every few minutes.
+  cost: 0
+  content: 'Where to look: Open Event Viewer (System/Application) and the relevant Services mmc or Server
+    Manager role status.'
 - order: 2
-  cost: 15
-  content: Raise/disable the private memory recycle limit appropriately.
+  cost: 25
+  content: 'Diagnostic steps:
+
+    1. Note the service state and dependency chain in services.msc.
+
+    2. Read the most recent error in Event Viewer for the failing component.
+
+    3. Use PowerShell (`Get-Service`, `Get-WinEvent`) for scripted evidence.'
 - order: 3
-  cost: 20
-  content: Pool stays up.
+  cost: 50
+  content: 'Exact fix + verification:
+
+    1. Apply the minimal fix (service start, GPO, binding, or permission).
+
+    2. Re-test the failing operation.
+
+    3. Confirm Check Solution passes.
+
+
+    WHY: Windows labs grade real role/service state.'
+summary: Complete the windows iis app pool recycling too often windows lab and verify success with the
+  checker
+estimated_minutes: 20
+xp_reward: 100
+prerequisites:
+- Basic windows literacy
+tags:
+- fix
+- hands-on
+- windows
+linked_tutorial: windows-fundamentals
+what_you_will_learn:
+- Confirm the app pool recycles frequently from the memory limit
+- Tune the recycling thresholds appropriately
+- Verify the pool stops thrashing
+environment:
+  nodes:
+  - role: primary
+    os: FixitLab Windows Server host
+    hostname: lab-primary
+    ip: 127.0.0.1
+    specs: local offline simulation
+  pre_installed:
+  - bash
+  - coreutils
+  - journalctl
+  - systemctl
+  - windows
+  credentials:
+  - user: root
+    password: lab123
+tasks:
+- id: task_1
+  title: Windows IIS App Pool Recycling Too Often
+  description: Restore healthy behavior for Windows IIS App Pool Recycling Too Often by investigating
+    the failure, applying the smallest safe fix, and validating the outcome.
+  background: 'This windows lab teaches systematic troubleshooting: observe, hypothesize, change, verify.'
+  validation:
+    type: custom_script
+    script: check.sh
+    error_message: Validation did not pass. Re-read the objectives and Hint 2 diagnostic steps.
+solution:
+  summary: Identify the misconfiguration affecting this windows lab and apply the minimal fix.
+  files_changed: []
+  commands_run:
+  - bash check.sh
+  reference_docs: windows-fundamentals

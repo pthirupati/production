@@ -67,58 +67,56 @@ hints:
 
 
     WHY: the simulation engine validates real service state. A marker file or note is ignored.'
-summary: Diagnose and restore a repair simulation clustering (lab 33) simulation workflow, then prove
-  the real state is healthy.
+summary: Complete the repair simulation clustering (lab 33) simulation lab and verify success with the
+  checker
 estimated_minutes: 20
 xp_reward: 100
 prerequisites:
 - Basic Linux terminal navigation
 - Reading systemd service status
 tags:
+- fix
+- hands-on
 - real-validation
 - repair
 - simulation
 - systemd
-linked_tutorial: simulation-labs-fundamentals
+linked_tutorial: simulation-fundamentals
 what_you_will_learn:
-- Recognize the unhealthy simulation signal for repair simulation clustering (lab 33)
-- Use command output and logs to diagnose nginx
-- Apply a minimal operational fix without relying on marker files
-- Verify the repaired state with the same command the grader uses
+- The `nginx` service is active (running)
+- '`systemctl is-active nginx` returns active'
+- The fix survives a status re-check (no marker files)
 environment:
   nodes:
   - role: primary
-    os: FixitLab RHEL-like simulation
-    hostname: sim-primary
+    os: FixitLab simulation sandbox
+    hostname: lab-primary
     ip: 127.0.0.1
-    specs: local in-memory simulation
+    specs: local offline simulation
   pre_installed:
   - bash
-  - systemctl
-  - journalctl
   - coreutils
+  - journalctl
+  - simulation
+  - systemctl
   credentials:
   - user: root
     password: lab123
 tasks:
 - id: task_1
   title: Repair simulation clustering (lab 33)
-  description: Restore the repair simulation clustering (lab 33) simulation workflow by diagnosing the
-    failed service state, applying the smallest safe fix, and proving the service is healthy.
-  background: FixitLab simulation labs model real operating-system state. The checker reads that state
-    directly, so the lab only passes when the system itself is repaired.
+  description: Restore healthy behavior for Repair simulation clustering (lab 33) by investigating the
+    failure, applying the smallest safe fix, and validating the outcome.
+  background: 'This simulation lab teaches systematic troubleshooting: observe, hypothesize, change, verify.'
   validation:
     type: service_active
     command: systemctl is-active nginx
     expected_status: active
     error_message: The nginx service is not active yet. Check `systemctl status nginx` and `journalctl
-      -u nginx -n 50` for the remaining blocker.
+      -u nginx -n 50`.
 solution:
   summary: The root cause is an inactive/failed `nginx` service; start it and verify active state.
   files_changed: []
   commands_run:
-  - systemctl status nginx
-  - journalctl -u nginx -n 50
-  - systemctl start nginx
   - systemctl is-active nginx
-  reference_docs: 'linked tutorial: simulation-labs-fundamentals'
+  reference_docs: simulation-fundamentals

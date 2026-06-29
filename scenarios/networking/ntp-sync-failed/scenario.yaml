@@ -1,38 +1,131 @@
 slug: ntp-sync-failed
-title: "NTP Sync Failed — Fix Time Sync to Resolve Certificate Errors"
-technology: Networking
-category: Time Synchronization
+title: NTP Sync Failed - Fix Time Sync to Resolve Certificate
+technology: networking
+category: Fix
 difficulty: easy
 time_limit: 600
 max_score: 100
 infrastructure_type: docker
 jira_priority: High
 is_free: false
-description: |
-  The server's clock has drifted over 5 minutes from actual time. TLS connections
-  are failing because certificates appear expired from the server's perspective.
-  The systemd-timesyncd service is configured to use an unreachable internal NTP
-  server (ntp.internal.corp). Update the NTP configuration to use public NTP
-  servers, force an immediate sync, and verify time is correct.
-objectives:
-  - Identify that NTP sync is failing due to misconfigured server
-  - Update /etc/systemd/timesyncd.conf with public NTP servers
-  - Force an immediate time sync
-  - Verify system clock is synchronized and within acceptable drift
-initial_state: |
-  Ubuntu 22.04. systemd-timesyncd configured with NTP=ntp.internal.corp which is
+description: 'CONTEXT: A team operating network operations needs you to resolve `NTP Sync Failed - Fix
+  Time Sync to Resolve Certificate` during a realistic incident. The business impact is reduced service
+  reliability until the underlying state is repaired.
+
+
+  ENVIRONMENT: You are working in FixitLab''s offline network lab with interfaces, routing tables, DNS,
+  and firewall rules. All tools run locally; no paid APIs or external cloud calls are required.
+
+
+  SYMPTOM / STARTING STATE: Ubuntu 22.04. systemd-timesyncd configured with NTP=ntp.internal.corp which
+  is
+
   unreachable. System clock shows time from 6 minutes ago. TLS connections to
+
+  public services are failing with CERTIFICATE_VERIFY_FAILED. The server''s clock has drifted over 5 minutes
+  from actual time. TLS connections
+
+  are failing because certificates appear expired from the server''s perspective.
+
+  The systemd-timesyncd service is configured to use an unreachable internal NTP
+
+  server (ntp.internal.corp). Update the NTP configuration to use public NTP
+
+  servers, force an immediate sync, and verify time is correct.
+
+
+  OBJECTIVE: Identify that NTP sync is failing due to misconfigured server; Update /etc/systemd/timesyncd.conf
+  with public NTP servers; Force an immediate time sync. Success means `systemctl is-active --quiet` returns
+  active.
+
+
+  WHAT TO AVOID: Do not apply broad destructive changes, skip evidence gathering, or fake completion with
+  marker files — the checker validates real system state.'
+objectives:
+- Identify that NTP sync is failing due to misconfigured server
+- Update /etc/systemd/timesyncd.conf with public NTP servers
+- Force an immediate time sync
+- Verify system clock is synchronized and within acceptable drift
+initial_state: 'Ubuntu 22.04. systemd-timesyncd configured with NTP=ntp.internal.corp which is
+
+  unreachable. System clock shows time from 6 minutes ago. TLS connections to
+
   public services are failing with CERTIFICATE_VERIFY_FAILED.
+
+  '
 hints:
-  - order: 1
-    cost: 10
-    content: "Check status: `timedatectl status` and `systemctl status systemd-timesyncd`."
-  - order: 2
-    cost: 10
-    content: "Edit /etc/systemd/timesyncd.conf — set NTP=pool.ntp.org and FallbackNTP=time.cloudflare.com"
-  - order: 3
-    cost: 10
-    content: "Restart and sync: `systemctl restart systemd-timesyncd` then `timedatectl set-ntp true`"
-  - order: 4
-    cost: 15
-    content: "Force immediate sync: `chronyc makestep` (if using chrony) or `ntpdate pool.ntp.org`"
+- order: 1
+  cost: 0
+  content: 'Where to look: Start with `systemctl status --quiet` and `journalctl -u --quiet -n 50 --no-pager`
+    before changing anything.'
+- order: 2
+  cost: 25
+  content: 'Diagnostic steps:
+
+    1. Run `systemctl status --quiet` — note Active/Failed and the last log lines.
+
+    2. Read `journalctl -u --quiet -n 50` for the root error.
+
+    3. Form a hypothesis about the smallest config or permission fix.'
+- order: 3
+  cost: 50
+  content: 'Exact fix + verification:
+
+    1. Apply the minimal fix (config, unit override, or missing directory).
+
+    2. Run `systemctl daemon-reload` if you edited a unit file.
+
+    3. Run `systemctl restart --quiet` and confirm `systemctl is-active --quiet` succeeds.
+
+
+    WHY: the grader checks real service state, not marker files.'
+summary: Complete the ntp sync failed - fix time sync to resolve certificate networking lab and verify
+  success with the checker
+estimated_minutes: 10
+xp_reward: 100
+prerequisites:
+- Basic networking literacy
+tags:
+- fix
+- hands-on
+- networking
+linked_tutorial: networking-fundamentals
+what_you_will_learn:
+- Identify that NTP sync is failing due to misconfigured server
+- Update /etc/systemd/timesyncd.conf with public NTP servers
+- Force an immediate time sync
+- Verify system clock is synchronized and within acceptable drift
+environment:
+  nodes:
+  - role: primary
+    os: FixitLab network lab
+    hostname: lab-primary
+    ip: 127.0.0.1
+    specs: local offline simulation
+  pre_installed:
+  - bash
+  - coreutils
+  - journalctl
+  - networking
+  - systemctl
+  credentials:
+  - user: root
+    password: lab123
+tasks:
+- id: task_1
+  title: NTP Sync Failed - Fix Time Sync to Resolve Certificate
+  description: Restore healthy behavior for NTP Sync Failed - Fix Time Sync to Resolve Certificate by
+    investigating the failure, applying the smallest safe fix, and validating the outcome.
+  background: 'This networking lab teaches systematic troubleshooting: observe, hypothesize, change, verify.'
+  validation:
+    type: service_active
+    command: systemctl is-active --quiet
+    expected_status: active
+    error_message: The --quiet service is not active yet. Check `systemctl status --quiet` and `journalctl
+      -u --quiet -n 50`.
+solution:
+  summary: The root cause is an unhealthy `--quiet` service; repair it and verify active state.
+  files_changed: []
+  commands_run:
+  - systemctl is-active --quiet
+  reference_docs: networking-fundamentals

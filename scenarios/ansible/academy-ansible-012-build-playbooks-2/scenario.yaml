@@ -1,7 +1,7 @@
-title: 'Ansible Automation: Ansible Playbooks — Build From Scratch'
+title: Ansible Playbooks — Build Lab
 slug: academy-ansible-012-build-playbooks-2
-technology: Ansible Automation
-category: Build Lab
+technology: ansible
+category: Build
 difficulty: medium
 scenario_type: do
 lab_mode: simulation
@@ -11,46 +11,134 @@ max_score: 100
 is_free: false
 infrastructure_type: docker
 jira_priority: Low
-description: Ansible control-node troubleshooting. The managed hosts in the `webservers` group are unreachable
-  over SSH from the control node, so every play fails at the connection stage. Establish key-based SSH
-  access to the inventory hosts so Ansible can reach them. Verify with `ansible webservers -m ping` (every
-  host should return SUCCESS / pong).
+description: 'CONTEXT: A team operating Ansible automation needs you to resolve `ansible: Ansible Playbooks
+  — Build From Scratch` during a realistic incident. The business impact is reduced service reliability
+  until the underlying state is repaired.
+
+
+  ENVIRONMENT: You are working in FixitLab''s offline Ansible control node with inventory, playbooks,
+  roles, and ansible-playbook. All tools run locally; no paid APIs or external cloud calls are required.
+
+
+  SYMPTOM / STARTING STATE: The Ansible control node is ready but Ansible playbooks is not configured
+  yet. Required tools may already be installed; your job is to create the configuration and bring the
+  capability online. Build Ansible playbooks from scratch in this ansible lab. You start from a minimal
+  environment and must produce a working configuration that demonstrates plays, tasks, handlers, idempotency,
+  and check mode. Plan, implement, then prove it works.
+
+
+  OBJECTIVE: A working Ansible playbooks setup must exist by the end of this lab; Configuration should
+  follow team conventions and be easy to audit; The result should pass validation without manual cleanup.
+  Success means `ansible webservers -m ping` includes `SUCCESS`.
+
+
+  WHAT TO AVOID: Do not apply broad destructive changes, skip evidence gathering, or fake completion with
+  marker files — the checker validates real system state.'
 objectives:
-- All hosts in the webservers group are reachable from the control node
-- Key-based SSH authentication works without a password prompt
-- ansible webservers -m ping returns SUCCESS for every host
-initial_state: The Ansible control node cannot authenticate to the managed hosts in the `webservers` group
-  — `ansible webservers -m ping` fails with unreachable/permission-denied errors.
+- A working Ansible playbooks setup must exist by the end of this lab
+- Configuration should follow team conventions and be easy to audit
+- The result should pass validation without manual cleanup
+initial_state: The Ansible control node is ready but Ansible playbooks is not configured yet. Required
+  tools may already be installed; your job is to create the configuration and bring the capability online.
 hints:
 - order: 1
-  cost: 10
+  cost: 0
   content: 'Orient yourself before changing anything:
 
-    1. Inspect the current state — `ansible webservers -m ping` and check `ansible-inventory --list` to
-    see the target hosts.
+    1. Inspect the current state — `ansible-playbook --syntax-check`, `--check`, and task output.
 
-    2. Write down what looks normal versus wrong or missing.
+    2. Write down what looks normal versus wrong or missing for Ansible playbooks.
 
-    3. Form one hypothesis about the root cause before you change anything.'
+    3. Recall the core idea: plays, tasks, handlers, idempotency, and check mode. Form one hypothesis
+    before you act.'
 - order: 2
-  cost: 15
-  content: 'Plan your approach (still no spoilers):
+  cost: 25
+  content: 'Diagnostic steps:
 
-    1. Confirm the exact gap between current and desired state.
+    1. Verify `inventory` hostnames resolve and SSH keys work.
 
-    2. Decide the single smallest change that moves you toward the objective.
+    2. Check `ansible.cfg` for remote_user and privilege escalation.
 
-    3. Capture command output before the change so you can prove it worked afterward.'
+    3. Test manual `ssh user@host` from the control node.'
 - order: 3
-  cost: 20
-  content: 'Guided walkthrough:
+  cost: 50
+  content: 'Exact fix + verification:
 
-    1. Re-check the current state — Confirm the failure: `ansible webservers -m ping` and check `ansible-inventory
-    --list` to see the target hosts.
+    1. Re-check the current state — `ansible-playbook --syntax-check`, `--check`, and task output.
 
-    2. The inventory is correct — the problem is SSH authentication to the managed nodes.
+    2. Create the smallest working slice of Ansible playbooks first, validate it, then add the remaining
+    pieces one at a time.
 
-    3. Verify the result — Distribute your key with `ssh-copy-id` to each managed host (e.g. `ssh-copy-id
-    root@web1`), then re-run `ansible webservers -m ping` and Check Solution.
+    3. Verify the result — a second run reports no unexpected changes.
 
-    4. Click Check Solution once every objective is met.'
+    4. Click Check Solution once the objective is met (graded on real state, not a marker file).'
+summary: Complete the ansible playbooks — build lab ansible lab and verify success with the checker
+estimated_minutes: 15
+xp_reward: 100
+prerequisites:
+- Basic ansible literacy
+tags:
+- ansible
+- do
+- hands-on
+linked_tutorial: ansible-fundamentals
+what_you_will_learn:
+- A working Ansible playbooks setup must exist by the end of this lab
+- Configuration should follow team conventions and be easy to audit
+- The result should pass validation without manual cleanup
+environment:
+  nodes:
+  - role: primary
+    os: FixitLab Ansible control node
+    hostname: lab-primary
+    ip: 127.0.0.1
+    specs: local offline simulation
+  pre_installed:
+  - ansible
+  - ansible-playbook
+  - bash
+  - coreutils
+  credentials:
+  - user: root
+    password: lab123
+tasks:
+- id: task_1
+  title: Ansible Playbooks — Build Lab
+  description: Restore healthy behavior for Ansible Playbooks — Build Lab by investigating the failure,
+    applying the smallest safe fix, and validating the outcome.
+  background: 'This ansible lab teaches systematic troubleshooting: observe, hypothesize, change, verify.'
+  validation:
+    type: command_output
+    command: ansible webservers -m ping
+    expected_output: SUCCESS
+    error_message: Ansible hosts are still unreachable. Verify SSH keys and inventory.
+solution:
+  summary: Identify the misconfiguration affecting this ansible lab and apply the minimal fix.
+  files_changed: []
+  commands_run:
+  - ansible webservers -m ping
+  reference_docs: ansible-fundamentals
+guided_mode:
+  enabled: true
+  steps:
+  - step: 1
+    title: Inspect current state
+    instruction: Run a read-only diagnostic before changing anything.
+    command: ansible webservers -m ping
+    expected_output: Output shows the current failure mode
+    explanation: Evidence-first troubleshooting avoids guessing.
+    next_on: command_success
+  - step: 2
+    title: Apply the minimal fix
+    instruction: Make one reversible change aligned with the objectives.
+    command: '# your fix command here'
+    expected_output: State moves toward the objective
+    explanation: Small changes make rollback easy if the hypothesis was wrong.
+    next_on: command_success
+  - step: 3
+    title: Verify with the grader
+    instruction: Run the same verification the checker uses.
+    command: ansible webservers -m ping
+    expected_output: '`ansible webservers -m ping` includes `SUCCESS`'
+    explanation: The lab passes only when real state is healthy.
+    next_on: command_success

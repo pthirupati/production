@@ -2,8 +2,8 @@ title: fstab Wrong UUID — /mnt/data Won't Mount
 slug: fstab-bad-uuid
 lab_mode: simulation
 simulation_type: generic
-technology: Linux
-category: Storage / fstab
+technology: linux
+category: Fix
 difficulty: hard
 time_limit: 1200
 max_score: 100
@@ -11,10 +11,29 @@ infrastructure_type: docker
 docker_privileged: true
 jira_priority: Medium
 topics_covered: Q9 fstab UUID — blkid, fix mount entry
-description: After a reboot, /mnt/data is empty because /etc/fstab references a UUID that no longer matches
-  the data volume (e.g. the disk was re-created or cloned). The mount silently fails (or mounts nothing),
-  so the data appears missing. Find the correct UUID, fix the fstab entry, and remount so the data is
-  accessible.
+description: 'CONTEXT: A team operating Linux administration needs you to resolve `fstab Wrong UUID —
+  /mnt/data Won''t Mount` during a realistic incident. The business impact is reduced service reliability
+  until the underlying state is repaired.
+
+
+  ENVIRONMENT: You are working in FixitLab''s offline Linux practice server with terminal and config files
+  under /etc and /var. All tools run locally; no paid APIs or external cloud calls are required.
+
+
+  SYMPTOM / STARTING STATE: Linux server where /etc/fstab has a stale/wrong UUID for the /mnt/data volume,
+  so it doesn''t mount on boot and /mnt/data shows empty. After a reboot, /mnt/data is empty because /etc/fstab
+  references a UUID that no longer matches the data volume (e.g. the disk was re-created or cloned). The
+  mount silently fails (or mounts nothing), so the data appears missing. Find the correct UUID, fix the
+  fstab entry, and remount so the data is accessible.
+
+
+  OBJECTIVE: Confirm /mnt/data isn''t mounted and find the wrong UUID in fstab; Look up the device''s
+  real UUID and correct the fstab entry; Run mount -a and verify the data is accessible. Success means
+  `check.sh` exits successfully.
+
+
+  WHAT TO AVOID: Do not apply broad destructive changes, skip evidence gathering, or fake completion with
+  marker files — the checker validates real system state.'
 objectives:
 - Confirm /mnt/data isn't mounted and find the wrong UUID in fstab
 - Look up the device's real UUID and correct the fstab entry
@@ -23,13 +42,72 @@ initial_state: Linux server where /etc/fstab has a stale/wrong UUID for the /mnt
   mount on boot and /mnt/data shows empty.
 hints:
 - order: 1
-  cost: 10
-  content: '`findmnt /mnt/data` shows nothing mounted. Compare the fstab UUID against reality: `blkid`
-    lists each device''s true UUID.'
+  cost: 0
+  content: 'Where to look: Run `df -h` and `du -xh /var /tmp /home | sort -h | tail -20` for large paths.'
 - order: 2
-  cost: 15
-  content: Edit /etc/fstab and replace the bad UUID on the /mnt/data line with the correct one from blkid.
+  cost: 25
+  content: 'Diagnostic steps:
+
+    1. Find which mount is 100% — often `/` or `/var`.
+
+    2. `journalctl --disk-usage` and old logs under `/var/log`.
+
+    3. Look for core dumps, temp files, or oversized application data.'
 - order: 3
-  cost: 20
-  content: 'Apply it: `mount -a` (no errors), then `ls /mnt/data` shows the data (e.g. production.dat)
-    and `findmnt /mnt/data` confirms it''s mounted.'
+  cost: 50
+  content: 'Exact fix + verification:
+
+    1. Remove or rotate the largest safe files (logs, caches, old packages).
+
+    2. `df -h` should show free space on the affected mount.
+
+    3. Retry the command that failed with ''No space left on device''.
+
+
+    WHY: many services fail cryptically when disk is full.'
+summary: Complete the fstab wrong uuid — /mnt/data won't mount linux lab and verify success with the checker
+estimated_minutes: 20
+xp_reward: 100
+prerequisites:
+- Basic linux literacy
+tags:
+- fix
+- hands-on
+- linux
+linked_tutorial: linux-fundamentals
+what_you_will_learn:
+- Confirm /mnt/data isn't mounted and find the wrong UUID in fstab
+- Look up the device's real UUID and correct the fstab entry
+- Run mount -a and verify the data is accessible
+environment:
+  nodes:
+  - role: primary
+    os: FixitLab Linux practice server
+    hostname: lab-primary
+    ip: 127.0.0.1
+    specs: local offline simulation
+  pre_installed:
+  - bash
+  - coreutils
+  - journalctl
+  - linux
+  - systemctl
+  credentials:
+  - user: root
+    password: lab123
+tasks:
+- id: task_1
+  title: fstab Wrong UUID — /mnt/data Won't Mount
+  description: Restore healthy behavior for fstab Wrong UUID — /mnt/data Won't Mount by investigating
+    the failure, applying the smallest safe fix, and validating the outcome.
+  background: 'This linux lab teaches systematic troubleshooting: observe, hypothesize, change, verify.'
+  validation:
+    type: custom_script
+    script: check.sh
+    error_message: Validation did not pass. Re-read the objectives and Hint 2 diagnostic steps.
+solution:
+  summary: Identify the misconfiguration affecting this linux lab and apply the minimal fix.
+  files_changed: []
+  commands_run:
+  - bash check.sh
+  reference_docs: linux-fundamentals

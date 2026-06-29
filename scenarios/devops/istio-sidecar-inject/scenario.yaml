@@ -1,14 +1,28 @@
 title: Fix Istio Sidecar Injection Label
 slug: istio-sidecar-inject
-technology: DevOps
-category: Service Mesh
+technology: devops
+category: Fix
 difficulty: hard
 time_limit: 1200
 max_score: 100
 infrastructure_type: docker
 jira_priority: High
 is_free: false
-description: 'Istio sidecar injection is not happening for pods in the "myapp" namespace.
+description: 'CONTEXT: A team operating DevOps delivery needs you to resolve `Fix Istio Sidecar Injection
+  Label` during a realistic incident. The business impact is reduced service reliability until the underlying
+  state is repaired.
+
+
+  ENVIRONMENT: You are working in FixitLab''s offline CI/CD lab with git repos, pipelines, artifacts,
+  and runbooks. All tools run locally; no paid APIs or external cloud calls are required.
+
+
+  SYMPTOM / STARTING STATE: Kubernetes cluster with Istio installed. The "myapp" namespace exists but
+
+  does not have the label istio-injection=enabled. Pods lack the Envoy sidecar.
+
+  The namespace currently has label istio-injection=disabled. Istio sidecar injection is not happening
+  for pods in the "myapp" namespace.
 
   The Envoy proxy is not being injected, so mTLS and traffic management
 
@@ -18,7 +32,14 @@ description: 'Istio sidecar injection is not happening for pods in the "myapp" n
 
   automatic sidecar injection.
 
-  '
+
+  OBJECTIVE: Verify that pods in the myapp namespace lack the Istio sidecar; Add the istio-injection=enabled
+  label to the myapp namespace; Roll out new pods to pick up the sidecar injection. Success means `kubectl
+  get pods` shows every pod Running.
+
+
+  WHAT TO AVOID: Do not apply broad destructive changes, skip evidence gathering, or fake completion with
+  marker files — the checker validates real system state.'
 objectives:
 - Verify that pods in the myapp namespace lack the Istio sidecar
 - Add the istio-injection=enabled label to the myapp namespace
@@ -33,17 +54,76 @@ initial_state: 'Kubernetes cluster with Istio installed. The "myapp" namespace e
   '
 hints:
 - order: 1
-  cost: 10
-  content: 'Confirm pods lack the sidecar: `kubectl get pods -n myapp -o jsonpath=''{.items[*].spec.containers[*].name}''`
-    shows no istio-proxy. Check labels: `kubectl get ns myapp --show-labels`.'
+  cost: 0
+  content: 'Where to look: Run `kubectl get pods -A` and `kubectl describe pod <name>` for any pod not
+    in Running state.'
 - order: 2
-  cost: 15
-  content: The namespace has `istio-injection=disabled` (or the label is missing), so the injector skips
-    it.
-- order: 3
-  cost: 20
-  content: 'Enable injection: `kubectl label namespace myapp istio-injection=enabled --overwrite`.'
-- order: 4
   cost: 25
-  content: 'Injection happens at pod creation, so roll the workloads: `kubectl rollout restart deployment
-    -n myapp`, then re-check that the new pods contain the istio-proxy container.'
+  content: 'Diagnostic steps:
+
+    1. `kubectl get pods` — note CrashLoopBackOff, ImagePullBackOff, or Pending.
+
+    2. `kubectl describe pod <name>` — read Events at the bottom.
+
+    3. `kubectl logs <name> [--previous]` if the container restarted.'
+- order: 3
+  cost: 50
+  content: 'Exact fix + verification:
+
+    1. Fix the root cause (image name, env var, volume mount, or probe).
+
+    2. `kubectl apply -f` the corrected manifest or delete the pod to recreate.
+
+    3. Confirm `kubectl get pods` shows every pod Running.
+
+
+    WHY: Kubernetes only reports healthy when the workload actually runs.'
+summary: Complete the fix istio sidecar injection label devops lab and verify success with the checker
+estimated_minutes: 20
+xp_reward: 100
+prerequisites:
+- Basic devops literacy
+tags:
+- devops
+- fix
+- hands-on
+linked_tutorial: devops-fundamentals
+what_you_will_learn:
+- Verify that pods in the myapp namespace lack the Istio sidecar
+- Add the istio-injection=enabled label to the myapp namespace
+- Roll out new pods to pick up the sidecar injection
+- Verify pods have the istio-proxy container running
+environment:
+  nodes:
+  - role: primary
+    os: FixitLab CI/CD lab
+    hostname: lab-primary
+    ip: 127.0.0.1
+    specs: local offline simulation
+  pre_installed:
+  - bash
+  - coreutils
+  - devops
+  - journalctl
+  - systemctl
+  credentials:
+  - user: root
+    password: lab123
+tasks:
+- id: task_1
+  title: Fix Istio Sidecar Injection Label
+  description: Restore healthy behavior for Fix Istio Sidecar Injection Label by investigating the failure,
+    applying the smallest safe fix, and validating the outcome.
+  background: 'This devops lab teaches systematic troubleshooting: observe, hypothesize, change, verify.'
+  validation:
+    type: k8s_resource_state
+    resource_kind: Pod
+    resource_name: all
+    namespace: default
+    expected_state: Running
+    error_message: One or more pods are not Running. Use kubectl describe pod and kubectl logs.
+solution:
+  summary: Identify the misconfiguration affecting this devops lab and apply the minimal fix.
+  files_changed: []
+  commands_run: []
+  reference_docs: devops-fundamentals

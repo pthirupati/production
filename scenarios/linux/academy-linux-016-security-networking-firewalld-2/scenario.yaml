@@ -1,7 +1,7 @@
-title: 'Linux Administration: Networking And Firewalld — Security Practice'
+title: Networking And Firewalld — Security Lab
 slug: academy-linux-016-security-networking-firewalld-2
-technology: Linux Administration
-category: Security
+technology: linux
+category: Harden
 difficulty: medium
 scenario_type: fix
 lab_mode: simulation
@@ -11,46 +11,135 @@ max_score: 100
 is_free: false
 infrastructure_type: docker
 jira_priority: Medium
-description: Firewall administration with firewalld. Clients cannot reach the HTTP service because the
-  active firewalld zone does not permit web traffic on port 80. Open HTTP persistently and reload firewalld
-  so the rule survives, then confirm the zone allows it. Verify with `firewall-cmd --list-all`.
+description: 'CONTEXT: A team operating Linux administration needs you to resolve `linux: Networking And
+  Firewalld — Security Practice` during a realistic incident. The business impact is reduced service reliability
+  until the underlying state is repaired.
+
+
+  ENVIRONMENT: You are working in FixitLab''s offline Linux practice server with terminal and config files
+  under /etc and /var. All tools run locally; no paid APIs or external cloud calls are required.
+
+
+  SYMPTOM / STARTING STATE: The environment is functional but overly permissive around networking and
+  firewalld. Assume an auditor or pen test is next week — tighten controls with evidence. Security review:
+  harden networking and firewalld on this linux system. Close unsafe defaults, enforce least privilege,
+  and ensure interfaces, zones, and persistent firewall rules cannot be abused — without breaking legitimate
+  use.
+
+
+  OBJECTIVE: Unsafe defaults related to networking and firewalld are removed or constrained; Access follows
+  least privilege and is auditable; Security checks pass without breaking required functionality. Success
+  means `firewall-cmd --list-ports` includes `80/tcp`.
+
+
+  WHAT TO AVOID: Do not apply broad destructive changes, skip evidence gathering, or fake completion with
+  marker files — the checker validates real system state.'
 objectives:
-- HTTP (port 80/tcp) is permitted in the active firewalld zone
-- The rule is persistent across a firewalld reload
-- firewall-cmd shows the HTTP port/service open
-initial_state: Port 80/tcp (HTTP) is not allowed through firewalld in the active zone, so the web service
-  is unreachable from clients.
+- Unsafe defaults related to networking and firewalld are removed or constrained
+- Access follows least privilege and is auditable
+- Security checks pass without breaking required functionality
+initial_state: The environment is functional but overly permissive around networking and firewalld. Assume
+  an auditor or pen test is next week — tighten controls with evidence.
 hints:
 - order: 1
-  cost: 10
+  cost: 0
   content: 'Orient yourself before changing anything:
 
-    1. Inspect the current state — `firewall-cmd --list-all` to see which services/ports are currently
-    allowed.
+    1. Inspect the current state — `ip a`, `nmcli con show`, and `firewall-cmd --list-all`.
 
-    2. Write down what looks normal versus wrong or missing.
+    2. Write down what looks normal versus wrong or missing for networking and firewalld.
 
-    3. Form one hypothesis about the root cause before you change anything.'
+    3. Recall the core idea: interfaces, zones, and persistent firewall rules. Form one hypothesis before
+    you act.'
 - order: 2
-  cost: 15
-  content: 'Plan your approach (still no spoilers):
+  cost: 25
+  content: 'Diagnostic steps:
 
-    1. Confirm the exact gap between current and desired state.
+    1. Identify which zone is active and which ports/services are allowed.
 
-    2. Decide the single smallest change that moves you toward the objective.
+    2. Compare to the port the scenario expects (often 80/tcp or 443/tcp).
 
-    3. Capture command output before the change so you can prove it worked afterward.'
+    3. Check if the service is bound but blocked externally.'
 - order: 3
-  cost: 20
-  content: 'Guided walkthrough:
+  cost: 50
+  content: 'Exact fix + verification:
 
-    1. Re-check the current state — Inspect the active zone: `firewall-cmd --list-all` to see which services/ports
-    are currently allowed.
+    1. Re-check the current state — `ip a`, `nmcli con show`, and `firewall-cmd --list-all`.
 
-    2. Make the change persistent (`--permanent`) and remember runtime rules need a `--reload` to take
-    effect.
+    2. Apply least privilege: remove the unsafe default, then grant only the explicit access the workload
+    actually needs.
 
-    3. Verify the result — Run `sudo firewall-cmd --permanent --add-service=http` (or `--add-port=80/tcp`)
-    then `sudo firewall-cmd --reload`; verify with `firewall-cmd --list-all`, then Check Solution.
+    3. Verify the result — the intended ports are open in the right zone and survive reload.
 
-    4. Click Check Solution once every objective is met.'
+    4. Click Check Solution once the objective is met (graded on real state, not a marker file).'
+summary: Complete the networking and firewalld — security lab linux lab and verify success with the checker
+estimated_minutes: 20
+xp_reward: 100
+prerequisites:
+- Basic linux literacy
+tags:
+- fix
+- hands-on
+- linux
+linked_tutorial: linux-fundamentals
+what_you_will_learn:
+- Unsafe defaults related to networking and firewalld are removed or constrained
+- Access follows least privilege and is auditable
+- Security checks pass without breaking required functionality
+environment:
+  nodes:
+  - role: primary
+    os: FixitLab Linux practice server
+    hostname: lab-primary
+    ip: 127.0.0.1
+    specs: local offline simulation
+  pre_installed:
+  - bash
+  - coreutils
+  - journalctl
+  - linux
+  - systemctl
+  credentials:
+  - user: root
+    password: lab123
+tasks:
+- id: task_1
+  title: Networking And Firewalld — Security Lab
+  description: Restore healthy behavior for Networking And Firewalld — Security Lab by investigating the
+    failure, applying the smallest safe fix, and validating the outcome.
+  background: 'This linux lab teaches systematic troubleshooting: observe, hypothesize, change, verify.'
+  validation:
+    type: command_output
+    command: firewall-cmd --list-ports
+    expected_output: 80/tcp
+    error_message: HTTP is still blocked by firewalld. Allow the service and reload.
+solution:
+  summary: Identify the misconfiguration affecting this linux lab and apply the minimal fix.
+  files_changed: []
+  commands_run:
+  - firewall-cmd --list-ports
+  reference_docs: linux-fundamentals
+guided_mode:
+  enabled: true
+  steps:
+  - step: 1
+    title: Inspect current state
+    instruction: Run a read-only diagnostic before changing anything.
+    command: firewall-cmd --list-ports
+    expected_output: Output shows the current failure mode
+    explanation: Evidence-first troubleshooting avoids guessing.
+    next_on: command_success
+  - step: 2
+    title: Apply the minimal fix
+    instruction: Make one reversible change aligned with the objectives.
+    command: '# your fix command here'
+    expected_output: State moves toward the objective
+    explanation: Small changes make rollback easy if the hypothesis was wrong.
+    next_on: command_success
+  - step: 3
+    title: Verify with the grader
+    instruction: Run the same verification the checker uses.
+    command: firewall-cmd --list-ports
+    expected_output: '`firewall-cmd --list-ports` includes `80/tcp`'
+    explanation: The lab passes only when real state is healthy.
+    next_on: command_success

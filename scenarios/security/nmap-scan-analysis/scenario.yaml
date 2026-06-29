@@ -1,37 +1,123 @@
-title: "Nmap Scan Analysis — Interpret Results and Reduce Attack Surface"
+title: Nmap Scan Analysis - Interpret Results and Reduce Attack
 slug: nmap-scan-analysis
-technology: Security
-category: Forensics
+technology: security
+category: Fix
 difficulty: easy
 time_limit: 600
 max_score: 100
 infrastructure_type: docker
 jira_priority: Medium
 is_free: false
-description: |
-  A full nmap scan of the production server reveals 14 open ports, many of which
-  are unexpected services left running from a test deployment: rpcbind (111),
-  telnet (23), FTP (21), and an unknown service on port 8888. Your task is to
-  analyze the nmap output, identify the unnecessary services, disable them with
-  systemctl, and produce a report of what was found and removed.
-objectives:
-  - Run a full nmap TCP scan against localhost and save the output to /tmp/nmap-full.txt
-  - Identify all non-essential listening services and stop and disable them with systemctl
-  - Write a summary of removed services and remaining open ports to /tmp/scan-report.txt
-initial_state: |
-  Ubuntu server with multiple services running: sshd (22), nginx (80/443),
+description: 'CONTEXT: A team operating security hardening needs you to resolve `Nmap Scan Analysis -
+  Interpret Results and Reduce Attack` during a realistic incident. The business impact is reduced service
+  reliability until the underlying state is repaired.
+
+
+  ENVIRONMENT: You are working in FixitLab''s offline hardening lab with SSH, firewall, TLS, audit logs,
+  and IAM settings. All tools run locally; no paid APIs or external cloud calls are required.
+
+
+  SYMPTOM / STARTING STATE: Ubuntu server with multiple services running: sshd (22), nginx (80/443),
+
   telnetd (23), vsftpd (21), rpcbind (111), and a test app on 8888. All are
+
+  active systemd services. nmap is installed and available. A full nmap scan of the production server
+  reveals 14 open ports, many of which
+
+  are unexpected services left running from a test deployment: rpcbind (111),
+
+  telnet (23), FTP (21), and an unknown service on port 8888. Your task is to
+
+  analyze the nmap output, identify the unnecessary services, disable them with
+
+  systemctl, and produce a report of what was found and removed.
+
+
+  OBJECTIVE: Run a full nmap TCP scan against localhost and save the output to /tmp/nmap-full.txt; Identify
+  all non-essential listening services and stop and disable them with systemctl; Write a summary of removed
+  services and remaining open ports to /tmp/scan-report.txt. Success means `check.sh` exits successfully.
+
+
+  WHAT TO AVOID: Do not apply broad destructive changes, skip evidence gathering, or fake completion with
+  marker files — the checker validates real system state.'
+objectives:
+- Run a full nmap TCP scan against localhost and save the output to /tmp/nmap-full.txt
+- Identify all non-essential listening services and stop and disable them with systemctl
+- Write a summary of removed services and remaining open ports to /tmp/scan-report.txt
+initial_state: 'Ubuntu server with multiple services running: sshd (22), nginx (80/443),
+
+  telnetd (23), vsftpd (21), rpcbind (111), and a test app on 8888. All are
+
   active systemd services. nmap is installed and available.
+
+  '
 hints:
-  - order: 1
-    cost: 10
-    content: "Scan all ports: `nmap -sV -p- -oN /tmp/nmap-full.txt 127.0.0.1` — use -sV for service version detection."
-  - order: 2
-    cost: 15
-    content: "Identify service names from open ports: `ss -tlnp` maps port numbers to process names for cross-referencing with nmap output."
-  - order: 3
-    cost: 20
-    content: "Disable unnecessary services: `systemctl stop telnet vsftpd rpcbind && systemctl disable telnet vsftpd rpcbind` to remove them permanently."
-  - order: 4
-    cost: 25
-    content: "Re-scan to confirm: `nmap -p 21,23,111,8888 127.0.0.1` should show all four as closed, leaving only 22, 80, 443 open."
+- order: 1
+  cost: 0
+  content: 'Where to look: Run a full nmap TCP scan against localhost and save the output to /tmp/nmap-full.txt'
+- order: 2
+  cost: 25
+  content: 'Diagnostic steps:
+
+    1. Identify all non-essential listening services and stop and disable them with systemctl
+
+    2. Write a summary of removed services and remaining open ports to /tmp/scan-report.txt'
+- order: 3
+  cost: 50
+  content: 'Exact fix + verification:
+
+    1. Write a summary of removed services and remaining open ports to /tmp/scan-report.txt.
+
+    2. Re-run the lab checker (`check.sh` or Check Solution).
+
+    3. Confirm every scenario objective is satisfied.
+
+
+    WHY: the grader validates real state — marker files are ignored.'
+summary: Complete the nmap scan analysis - interpret results and reduce attack security lab and verify
+  success with the checker
+estimated_minutes: 10
+xp_reward: 100
+prerequisites:
+- Basic security literacy
+tags:
+- fix
+- hands-on
+- security
+linked_tutorial: security-fundamentals
+what_you_will_learn:
+- Run a full nmap TCP scan against localhost and save the output to /tmp/nmap-full.txt
+- Identify all non-essential listening services and stop and disable them with systemctl
+- Write a summary of removed services and remaining open ports to /tmp/scan-report.txt
+environment:
+  nodes:
+  - role: primary
+    os: FixitLab hardening lab
+    hostname: lab-primary
+    ip: 127.0.0.1
+    specs: local offline simulation
+  pre_installed:
+  - bash
+  - coreutils
+  - journalctl
+  - security
+  - systemctl
+  credentials:
+  - user: root
+    password: lab123
+tasks:
+- id: task_1
+  title: Nmap Scan Analysis - Interpret Results and Reduce Attack
+  description: Restore healthy behavior for Nmap Scan Analysis - Interpret Results and Reduce Attack by
+    investigating the failure, applying the smallest safe fix, and validating the outcome.
+  background: 'This security lab teaches systematic troubleshooting: observe, hypothesize, change, verify.'
+  validation:
+    type: custom_script
+    script: check.sh
+    error_message: Validation did not pass. Re-read the objectives and Hint 2 diagnostic steps.
+solution:
+  summary: Identify the misconfiguration affecting this security lab and apply the minimal fix.
+  files_changed: []
+  commands_run:
+  - bash check.sh
+  reference_docs: security-fundamentals

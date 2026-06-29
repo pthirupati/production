@@ -1,7 +1,7 @@
-title: 'Oracle PeopleSoft: Permission Lists — Troubleshooting Drill'
+title: Permission Lists — Troubleshoot Lab
 slug: academy-peoplesoft-094-troubleshoot-permission-lists-10
-technology: Oracle PeopleSoft
-category: Troubleshooting
+technology: peoplesoft
+category: Fix
 difficulty: medium
 scenario_type: fix
 lab_mode: simulation
@@ -11,9 +11,30 @@ max_score: 100
 is_free: false
 infrastructure_type: docker
 jira_priority: Medium
-description: 'Production alert: users cannot access required pages. You are on call for Oracle PeopleSoft
-  and must troubleshoot permission lists methodically — triage symptoms, isolate root cause, apply the
-  smallest safe fix, and confirm recovery.'
+description: 'CONTEXT: A team operating PeopleSoft administration needs you to resolve `peoplesoft: Permission
+  Lists — Troubleshooting Drill` during a realistic incident. The business impact is reduced service reliability
+  until the underlying state is repaired.
+
+
+  ENVIRONMENT: You are working in FixitLab''s offline PeopleSoft app server lab with PIA, Process Scheduler,
+  Integration Broker, and app server logs. All tools run locally; no paid APIs or external cloud calls
+  are required.
+
+
+  SYMPTOM / STARTING STATE: The PeopleSoft app server lab is degraded. Users cannot access required pages.
+  Recent changes may exist around permission lists, but do not restart blindly — gather evidence first.
+  Production alert: users cannot access required pages. You are on call for peoplesoft and must troubleshoot
+  permission lists methodically — triage symptoms, isolate root cause, apply the smallest safe fix, and
+  confirm recovery.
+
+
+  OBJECTIVE: The incident symptom is clear: users cannot access required pages; Root cause is isolated
+  with evidence, not guesswork; Service behavior returns to normal after the fix. Success means `check.sh`
+  exits successfully.
+
+
+  WHAT TO AVOID: Do not apply broad destructive changes, skip evidence gathering, or fake completion with
+  marker files — the checker validates real system state.'
 objectives:
 - 'The incident symptom is clear: users cannot access required pages'
 - Root cause is isolated with evidence, not guesswork
@@ -22,32 +43,94 @@ initial_state: The PeopleSoft app server lab is degraded. Users cannot access re
   may exist around permission lists, but do not restart blindly — gather evidence first.
 hints:
 - order: 1
-  cost: 10
-  content: 'Orient yourself before changing anything:
-
-    1. Inspect the current state — permission list and role security.
-
-    2. Write down what looks normal versus wrong or missing for permission lists.
-
-    3. Recall the core idea: pages, components, and access. Form one hypothesis before you act.'
+  cost: 0
+  content: 'Where to look: The incident symptom is clear: users cannot access required pages'
 - order: 2
-  cost: 15
-  content: 'Plan your approach (still no spoilers):
-
-    1. Confirm the exact gap between current and desired state for permission lists.
-
-    2. Decide the single smallest change that moves you toward the objective.
-
-    3. Capture evidence (command output / status) before the change so you can prove it worked afterward.'
-- order: 3
   cost: 25
-  content: 'Guided walkthrough:
+  content: 'Diagnostic steps:
 
-    1. Re-check the current state — permission list and role security.
+    1. Root cause is isolated with evidence, not guesswork
 
-    2. Fix the underlying misconfiguration you identified (not just the noisy log line), changing one
-    thing at a time.
+    2. Service behavior returns to normal after the fix'
+- order: 3
+  cost: 50
+  content: 'Exact fix + verification:
 
-    3. Verify the result — access matches the security design.
+    1. Service behavior returns to normal after the fix.
 
-    4. Click Check Solution once `systemctl is-active nginx` returns active.'
+    2. Re-run the lab checker (`check.sh` or Check Solution).
+
+    3. Confirm every scenario objective is satisfied.
+
+
+    WHY: the grader validates real state — marker files are ignored.'
+summary: Complete the permission lists — troubleshoot lab peoplesoft lab and verify success with the checker
+estimated_minutes: 20
+xp_reward: 100
+prerequisites:
+- Basic peoplesoft literacy
+tags:
+- fix
+- hands-on
+- peoplesoft
+linked_tutorial: peoplesoft-fundamentals
+what_you_will_learn:
+- 'The incident symptom is clear: users cannot access required pages'
+- Root cause is isolated with evidence, not guesswork
+- Service behavior returns to normal after the fix
+environment:
+  nodes:
+  - role: primary
+    os: FixitLab PeopleSoft app server lab
+    hostname: lab-primary
+    ip: 127.0.0.1
+    specs: local offline simulation
+  pre_installed:
+  - bash
+  - coreutils
+  - journalctl
+  - peoplesoft
+  - systemctl
+  credentials:
+  - user: root
+    password: lab123
+tasks:
+- id: task_1
+  title: Permission Lists — Troubleshoot Lab
+  description: Restore healthy behavior for Permission Lists — Troubleshoot Lab by investigating the failure,
+    applying the smallest safe fix, and validating the outcome.
+  background: 'This peoplesoft lab teaches systematic troubleshooting: observe, hypothesize, change, verify.'
+  validation:
+    type: custom_script
+    script: check.sh
+    error_message: Validation did not pass. Re-read the objectives and Hint 2 diagnostic steps.
+solution:
+  summary: Identify the misconfiguration affecting this peoplesoft lab and apply the minimal fix.
+  files_changed: []
+  commands_run:
+  - bash check.sh
+  reference_docs: peoplesoft-fundamentals
+guided_mode:
+  enabled: true
+  steps:
+  - step: 1
+    title: Inspect current state
+    instruction: Run a read-only diagnostic before changing anything.
+    command: check.sh
+    expected_output: Output shows the current failure mode
+    explanation: Evidence-first troubleshooting avoids guessing.
+    next_on: command_success
+  - step: 2
+    title: Apply the minimal fix
+    instruction: Make one reversible change aligned with the objectives.
+    command: '# your fix command here'
+    expected_output: State moves toward the objective
+    explanation: Small changes make rollback easy if the hypothesis was wrong.
+    next_on: command_success
+  - step: 3
+    title: Verify with the grader
+    instruction: Run the same verification the checker uses.
+    command: check.sh
+    expected_output: '`check.sh` exits successfully'
+    explanation: The lab passes only when real state is healthy.
+    next_on: command_success

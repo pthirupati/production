@@ -1,23 +1,54 @@
-category: Linux Administration
-description: It's the monthly patching change window. Before touching the server you must coordinate in
-  Jira with the @backup, @database, and @application teams to stop services and take backups. Then run
-  a pre-check, apply updates with dnf, reboot, and run a post-check — resolving any mount problem that
-  appears after reboot before bringing services back via Jira.
+category: Fix
+description: 'CONTEXT: A team operating Linux administration needs you to resolve `RHEL System Patching
+  (Jira change window)` during a realistic incident. The business impact is reduced service reliability
+  until the underlying state is repaired.
+
+
+  ENVIRONMENT: You are working in FixitLab''s offline Linux practice server with terminal and config files
+  under /etc and /var. All tools run locally; no paid APIs or external cloud calls are required.
+
+
+  SYMPTOM / STARTING STATE: Simulated RHEL 9 server in a change window. Use the Jira ticket to request
+  change-window actions from the @backup, @database, and @application teams (~30s replies), then patch
+  and reboot in the terminal. It''s the monthly patching change window. Before touching the server you
+  must coordinate in Jira with the @backup, @database, and @application teams to stop services and take
+  backups. Then run a pre-check, apply updates with dnf, reboot, and run a post-check — resolving any
+  mount problem that appears after reboot before bringing services back via Jira.
+
+
+  OBJECTIVE: Request stop/backup from the @backup, @database, and @application teams in Jira before patching;
+  Run precheck, apply dnf update, reboot, and run postcheck in the terminal; Fix any mount issue reported
+  after reboot, then start DB/app via Jira. Success means `check.sh` exits successfully.
+
+
+  WHAT TO AVOID: Do not apply broad destructive changes, skip evidence gathering, or fake completion with
+  marker files — the checker validates real system state.'
 difficulty: medium
 dual_terminal: false
 hints:
 - order: 1
-  cost: 10
-  content: 'Jira: @backup team @database team @application team — stop and backup before patch'
+  cost: 0
+  content: 'Where to look: Request stop/backup from the @backup, @database, and @application teams in
+    Jira before patching'
 - order: 2
-  cost: 20
-  content: 'After approvals, pre-check and patch: `uname -r` / `df -h` for a baseline, then `dnf update
-    -y` and `systemctl reboot`.'
+  cost: 25
+  content: 'Diagnostic steps:
+
+    1. Run precheck, apply dnf update, reboot, and run postcheck in the terminal
+
+    2. Fix any mount issue reported after reboot, then start DB/app via Jira'
 - order: 3
-  cost: 30
-  content: 'Post-reboot, validate: `uname -r` shows the new kernel; if a mount failed, check `systemctl
-    --failed` and `mount -a` (fix the offending /etc/fstab line). Then have the teams start the DB/app
-    via Jira.'
+  cost: 50
+  content: 'Exact fix + verification:
+
+    1. Fix any mount issue reported after reboot, then start DB/app via Jira.
+
+    2. Re-run the lab checker (`check.sh` or Check Solution).
+
+    3. Confirm every scenario objective is satisfied.
+
+
+    WHY: the grader validates real state — marker files are ignored.'
 initial_state: Simulated RHEL 9 server in a change window. Use the Jira ticket to request change-window
   actions from the @backup, @database, and @application teams (~30s replies), then patch and reboot in
   the terminal.
@@ -34,3 +65,51 @@ simulation_type: rhel
 slug: sim-rhel-patching
 time_limit: 1200
 title: RHEL System Patching (Jira change window)
+technology: linux
+summary: Complete the rhel system patching (jira change window) linux lab and verify success with the
+  checker
+estimated_minutes: 20
+xp_reward: 100
+prerequisites:
+- Basic linux literacy
+tags:
+- fix
+- hands-on
+- linux
+linked_tutorial: linux-fundamentals
+what_you_will_learn:
+- Request stop/backup from the @backup, @database, and @application teams in Jira before patching
+- Run precheck, apply dnf update, reboot, and run postcheck in the terminal
+- Fix any mount issue reported after reboot, then start DB/app via Jira
+environment:
+  nodes:
+  - role: primary
+    os: FixitLab Linux practice server
+    hostname: lab-primary
+    ip: 127.0.0.1
+    specs: local offline simulation
+  pre_installed:
+  - bash
+  - coreutils
+  - journalctl
+  - linux
+  - systemctl
+  credentials:
+  - user: root
+    password: lab123
+tasks:
+- id: task_1
+  title: RHEL System Patching (Jira change window)
+  description: Restore healthy behavior for RHEL System Patching (Jira change window) by investigating
+    the failure, applying the smallest safe fix, and validating the outcome.
+  background: 'This linux lab teaches systematic troubleshooting: observe, hypothesize, change, verify.'
+  validation:
+    type: custom_script
+    script: check.sh
+    error_message: Validation did not pass. Re-read the objectives and Hint 2 diagnostic steps.
+solution:
+  summary: Identify the misconfiguration affecting this linux lab and apply the minimal fix.
+  files_changed: []
+  commands_run:
+  - bash check.sh
+  reference_docs: linux-fundamentals

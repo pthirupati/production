@@ -1,7 +1,7 @@
 title: Secure Boot Blocking Custom Driver
 slug: baremetal-secure-boot-blocking
-technology: Baremetal
-category: Boot
+technology: baremetal
+category: Fix
 difficulty: medium
 lab_mode: simulation
 simulation_type: baremetal
@@ -10,8 +10,26 @@ max_score: 100
 is_free: true
 jira_priority: High
 dual_terminal: false
-description: A required out-of-tree driver won't load because Secure Boot rejects the unsigned module.
-  Enroll the key (or adjust policy) and confirm the config is corrected.
+description: 'CONTEXT: A team operating bare metal operations needs you to resolve `Secure Boot Blocking
+  Custom Driver` during a realistic incident. The business impact is reduced service reliability until
+  the underlying state is repaired.
+
+
+  ENVIRONMENT: You are working in FixitLab''s offline physical server lab with IPMI, RAID, BIOS, and out-of-band
+  console. All tools run locally; no paid APIs or external cloud calls are required.
+
+
+  SYMPTOM / STARTING STATE: A bare-metal server where Secure Boot blocks a needed unsigned kernel module.
+  A required out-of-tree driver won''t load because Secure Boot rejects the unsigned module. Enroll the
+  key (or adjust policy) and confirm the config is corrected.
+
+
+  OBJECTIVE: Confirm Secure Boot blocks the module; Enroll the signing key / adjust policy; Verify the
+  boot config is corrected. Success means `check.sh` exits successfully.
+
+
+  WHAT TO AVOID: Do not apply broad destructive changes, skip evidence gathering, or fake completion with
+  marker files — the checker validates real system state.'
 initial_state: A bare-metal server where Secure Boot blocks a needed unsigned kernel module.
 objectives:
 - Confirm Secure Boot blocks the module
@@ -19,11 +37,70 @@ objectives:
 - Verify the boot config is corrected
 hints:
 - order: 1
-  cost: 10
-  content: dmesg shows module signature rejected.
+  cost: 0
+  content: 'Where to look: Confirm Secure Boot blocks the module'
 - order: 2
-  cost: 15
-  content: Enroll the MOK key for the driver.
+  cost: 25
+  content: 'Diagnostic steps:
+
+    1. Enroll the signing key / adjust policy
+
+    2. Verify the boot config is corrected'
 - order: 3
-  cost: 20
-  content: secureboot.cfg carries the corrected policy.
+  cost: 50
+  content: 'Exact fix + verification:
+
+    1. Verify the boot config is corrected.
+
+    2. Re-run the lab checker (`check.sh` or Check Solution).
+
+    3. Confirm every scenario objective is satisfied.
+
+
+    WHY: the grader validates real state — marker files are ignored.'
+summary: Complete the secure boot blocking custom driver baremetal lab and verify success with the checker
+estimated_minutes: 20
+xp_reward: 100
+prerequisites:
+- Basic baremetal literacy
+tags:
+- baremetal
+- fix
+- hands-on
+linked_tutorial: baremetal-fundamentals
+what_you_will_learn:
+- Confirm Secure Boot blocks the module
+- Enroll the signing key / adjust policy
+- Verify the boot config is corrected
+environment:
+  nodes:
+  - role: primary
+    os: FixitLab physical server lab
+    hostname: lab-primary
+    ip: 127.0.0.1
+    specs: local offline simulation
+  pre_installed:
+  - baremetal
+  - bash
+  - coreutils
+  - journalctl
+  - systemctl
+  credentials:
+  - user: root
+    password: lab123
+tasks:
+- id: task_1
+  title: Secure Boot Blocking Custom Driver
+  description: Restore healthy behavior for Secure Boot Blocking Custom Driver by investigating the failure,
+    applying the smallest safe fix, and validating the outcome.
+  background: 'This baremetal lab teaches systematic troubleshooting: observe, hypothesize, change, verify.'
+  validation:
+    type: custom_script
+    script: check.sh
+    error_message: Validation did not pass. Re-read the objectives and Hint 2 diagnostic steps.
+solution:
+  summary: Identify the misconfiguration affecting this baremetal lab and apply the minimal fix.
+  files_changed: []
+  commands_run:
+  - bash check.sh
+  reference_docs: baremetal-fundamentals

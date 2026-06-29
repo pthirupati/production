@@ -1,37 +1,124 @@
 title: Enable IP Forwarding via sysctl
 slug: linux-sysctl-ip-forward
 difficulty: easy
-category: Networking
-description: |
-  This host is meant to act as a router/NAT gateway for a lab network, but packets are
+category: Fix
+description: 'CONTEXT: A team operating Linux administration needs you to resolve `Enable IP Forwarding
+  via sysctl` during a realistic incident. The business impact is reduced service reliability until the
+  underlying state is repaired.
+
+
+  ENVIRONMENT: You are working in FixitLab''s offline Linux practice server with terminal and config files
+  under /etc and /var. All tools run locally; no paid APIs or external cloud calls are required.
+
+
+  SYMPTOM / STARTING STATE: Simulated RHEL 9 server with two interfaces. net.ipv4.ip_forward is 0, so
+  traffic
+
+  arriving on one interface destined for another is silently dropped. No sysctl drop-in
+
+  enables forwarding, so even a runtime change would be lost on reboot. This host is meant to act as a
+  router/NAT gateway for a lab network, but packets are
+
   not being forwarded between interfaces because net.ipv4.ip_forward is 0. You must
+
   enable IP forwarding and make the change persistent so it is reapplied on every boot by
+
   adding net.ipv4.ip_forward = 1 to a file under /etc/sysctl.d (or /etc/sysctl.conf).
 
-initial_state: |
-  Simulated RHEL 9 server with two interfaces. net.ipv4.ip_forward is 0, so traffic
+
+  OBJECTIVE: Enable forwarding at runtime (sysctl -w net.ipv4.ip_forward=1); Persist it by writing net.ipv4.ip_forward
+  = 1 into /etc/sysctl.d/99-ipforward.conf; Confirm the persistent setting is present so it survives a
+  reboot. Success means `check.sh` exits successfully.
+
+
+  WHAT TO AVOID: Do not apply broad destructive changes, skip evidence gathering, or fake completion with
+  marker files — the checker validates real system state.'
+initial_state: 'Simulated RHEL 9 server with two interfaces. net.ipv4.ip_forward is 0, so traffic
+
   arriving on one interface destined for another is silently dropped. No sysctl drop-in
+
   enables forwarding, so even a runtime change would be lost on reboot.
 
+  '
 objectives:
-  - Enable forwarding at runtime (sysctl -w net.ipv4.ip_forward=1)
-  - Persist it by writing net.ipv4.ip_forward = 1 into /etc/sysctl.d/99-ipforward.conf
-  - Confirm the persistent setting is present so it survives a reboot
+- Enable forwarding at runtime (sysctl -w net.ipv4.ip_forward=1)
+- Persist it by writing net.ipv4.ip_forward = 1 into /etc/sysctl.d/99-ipforward.conf
+- Confirm the persistent setting is present so it survives a reboot
 lab_mode: simulation
 simulation_type: generic
 time_limit: 600
 max_score: 100
 is_free: false
 hints:
-  - content: 'Set it now with sysctl -w net.ipv4.ip_forward=1, but that alone is lost on reboot.'
-    cost: 10
-    order: 1
-  - content: 'Persist it in a sysctl drop-in: echo "net.ipv4.ip_forward = 1" > /etc/sysctl.d/99-ipforward.conf (then sysctl --system).'
-    cost: 15
-    order: 2
-  - content: 'You may also add the line to /etc/sysctl.conf. The validator checks the persistent config, not just the live kernel value.'
-    cost: 15
-    order: 3
+- order: 1
+  cost: 0
+  content: 'Where to look: Enable forwarding at runtime (sysctl -w net.ipv4.ip_forward=1)'
+- order: 2
+  cost: 25
+  content: 'Diagnostic steps:
+
+    1. Persist it by writing net.ipv4.ip_forward = 1 into /etc/sysctl.d/99-ipforward.conf
+
+    2. Confirm the persistent setting is present so it survives a reboot'
+- order: 3
+  cost: 50
+  content: 'Exact fix + verification:
+
+    1. Confirm the persistent setting is present so it survives a reboot.
+
+    2. Re-run the lab checker (`check.sh` or Check Solution).
+
+    3. Confirm every scenario objective is satisfied.
+
+
+    WHY: the grader validates real state — marker files are ignored.'
 requires_companion_hosts: false
 dual_terminal: false
 jira_priority: Medium
+technology: linux
+summary: Complete the enable ip forwarding via sysctl linux lab and verify success with the checker
+estimated_minutes: 10
+xp_reward: 100
+prerequisites:
+- Basic linux literacy
+tags:
+- fix
+- hands-on
+- linux
+linked_tutorial: linux-fundamentals
+what_you_will_learn:
+- Enable forwarding at runtime (sysctl -w net.ipv4.ip_forward=1)
+- Persist it by writing net.ipv4.ip_forward = 1 into /etc/sysctl.d/99-ipforward.conf
+- Confirm the persistent setting is present so it survives a reboot
+environment:
+  nodes:
+  - role: primary
+    os: FixitLab Linux practice server
+    hostname: lab-primary
+    ip: 127.0.0.1
+    specs: local offline simulation
+  pre_installed:
+  - bash
+  - coreutils
+  - journalctl
+  - linux
+  - systemctl
+  credentials:
+  - user: root
+    password: lab123
+tasks:
+- id: task_1
+  title: Enable IP Forwarding via sysctl
+  description: Restore healthy behavior for Enable IP Forwarding via sysctl by investigating the failure,
+    applying the smallest safe fix, and validating the outcome.
+  background: 'This linux lab teaches systematic troubleshooting: observe, hypothesize, change, verify.'
+  validation:
+    type: custom_script
+    script: check.sh
+    error_message: Validation did not pass. Re-read the objectives and Hint 2 diagnostic steps.
+solution:
+  summary: Identify the misconfiguration affecting this linux lab and apply the minimal fix.
+  files_changed: []
+  commands_run:
+  - bash check.sh
+  reference_docs: linux-fundamentals

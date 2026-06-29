@@ -1,22 +1,54 @@
-category: Linux Administration
-description: The server won't boot and GRUB shows a stage1.5 / "error 15" failure because the MBR bootloader
-  code is corrupt and can't locate the next boot stage. From a rescue environment you must reinstall GRUB
-  to the disk's boot sector and regenerate its configuration so the system boots normally.
+category: Fix
+description: 'CONTEXT: A team operating Linux administration needs you to resolve `Corrupt MBR / Bootloader`
+  during a realistic incident. The business impact is reduced service reliability until the underlying
+  state is repaired.
+
+
+  ENVIRONMENT: You are working in FixitLab''s offline Linux practice server with terminal and config files
+  under /etc and /var. All tools run locally; no paid APIs or external cloud calls are required.
+
+
+  SYMPTOM / STARTING STATE: Simulated RHEL 9 server. GRUB fails early with a stage1.5 / error-15 message;
+  the MBR bootloader is corrupt and the OS does not load. The server won''t boot and GRUB shows a stage1.5
+  / "error 15" failure because the MBR bootloader code is corrupt and can''t locate the next boot stage.
+  From a rescue environment you must reinstall GRUB to the disk''s boot sector and regenerate its configuration
+  so the system boots normally.
+
+
+  OBJECTIVE: Recognize the corrupt MBR/bootloader from the GRUB error; Boot a rescue environment and access
+  the root install; Reinstall GRUB to the disk and regenerate its config so the system boots. Success
+  means `check.sh` exits successfully.
+
+
+  WHAT TO AVOID: Do not apply broad destructive changes, skip evidence gathering, or fake completion with
+  marker files — the checker validates real system state.'
 difficulty: hard
 dual_terminal: false
 hints:
 - order: 1
-  cost: 10
-  content: The stage1.5/error-15 means GRUB's MBR code can't find its next stage. Boot from rescue media
-    and identify the root disk/partitions with `lsblk` / `blkid`.
+  cost: 0
+  content: 'Where to look: Run `df -h` and `du -xh /var /tmp /home | sort -h | tail -20` for large paths.'
 - order: 2
-  cost: 15
-  content: Mount and chroot into the installed system (e.g. mount root at /mnt, bind /dev /proc /sys,
-    `chroot /mnt`) so grub2-install targets the real installation.
+  cost: 25
+  content: 'Diagnostic steps:
+
+    1. Find which mount is 100% — often `/` or `/var`.
+
+    2. `journalctl --disk-usage` and old logs under `/var/log`.
+
+    3. Look for core dumps, temp files, or oversized application data.'
 - order: 3
-  cost: 20
-  content: 'Reinstall the bootloader to the disk and rebuild config: `grub2-install /dev/sda` then `grub2-mkconfig
-    -o /boot/grub2/grub.cfg`. Exit, reboot, and confirm normal boot.'
+  cost: 50
+  content: 'Exact fix + verification:
+
+    1. Remove or rotate the largest safe files (logs, caches, old packages).
+
+    2. `df -h` should show free space on the affected mount.
+
+    3. Retry the command that failed with ''No space left on device''.
+
+
+    WHY: many services fail cryptically when disk is full.'
 initial_state: Simulated RHEL 9 server. GRUB fails early with a stage1.5 / error-15 message; the MBR bootloader
   is corrupt and the OS does not load.
 is_free: false
@@ -32,3 +64,50 @@ simulation_type: rhel
 slug: sim-rhel-mbr-corrupt
 time_limit: 900
 title: Corrupt MBR / Bootloader
+technology: linux
+summary: Complete the corrupt mbr / bootloader linux lab and verify success with the checker
+estimated_minutes: 15
+xp_reward: 100
+prerequisites:
+- Basic linux literacy
+tags:
+- fix
+- hands-on
+- linux
+linked_tutorial: linux-fundamentals
+what_you_will_learn:
+- Recognize the corrupt MBR/bootloader from the GRUB error
+- Boot a rescue environment and access the root install
+- Reinstall GRUB to the disk and regenerate its config so the system boots
+environment:
+  nodes:
+  - role: primary
+    os: FixitLab Linux practice server
+    hostname: lab-primary
+    ip: 127.0.0.1
+    specs: local offline simulation
+  pre_installed:
+  - bash
+  - coreutils
+  - journalctl
+  - linux
+  - systemctl
+  credentials:
+  - user: root
+    password: lab123
+tasks:
+- id: task_1
+  title: Corrupt MBR / Bootloader
+  description: Restore healthy behavior for Corrupt MBR / Bootloader by investigating the failure, applying
+    the smallest safe fix, and validating the outcome.
+  background: 'This linux lab teaches systematic troubleshooting: observe, hypothesize, change, verify.'
+  validation:
+    type: custom_script
+    script: check.sh
+    error_message: Validation did not pass. Re-read the objectives and Hint 2 diagnostic steps.
+solution:
+  summary: Identify the misconfiguration affecting this linux lab and apply the minimal fix.
+  files_changed: []
+  commands_run:
+  - bash check.sh
+  reference_docs: linux-fundamentals

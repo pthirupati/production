@@ -1,8 +1,7 @@
----
 slug: storage-vmotion-stuck
-title: "Storage vMotion Stuck at 73% — Migration Stalled for Hours"
-technology: VMware
-category: Storage
+title: Storage vMotion Stuck at 73% — Migration Stalled for Hours
+technology: vmware
+category: Fix
 difficulty: hard
 time_limit: 1500
 max_score: 100
@@ -11,38 +10,120 @@ simulation_type: vmware
 infrastructure_type: simulation
 jira_priority: High
 is_free: false
-description: |
-  A Storage vMotion operation for VM "data-proc-01" from datastore1 to datastore2
-  has been stuck at 73% for over 3 hours. The VM is still running but any further
-  progress has halted. The stall is caused by high I/O on the VM combined with
-  snapshots created during the migration, which are now growing faster than they
-  can be committed. Engineers must safely abort the migration and retry during off-hours.
-objectives:
-  - Check the Storage vMotion task status and duration in Recent Tasks
-  - Verify the VM is still running normally despite the stalled migration
-  - Cancel the Storage vMotion task safely from vCenter
-  - Plan and retry the migration during a low-I/O maintenance window
-initial_state: |
-  VMware vCenter simulation. data-proc-01 Storage vMotion at 73% for 3+ hours.
+description: 'CONTEXT: A team operating VMware vSphere needs you to resolve `Storage vMotion Stuck at
+  73% — Migration Stalled for Hours` during a realistic incident. The business impact is reduced service
+  reliability until the underlying state is repaired.
+
+
+  ENVIRONMENT: You are working in FixitLab''s offline vSphere lab with VMs, datastores, vCenter, and ESXi
+  tasks. All tools run locally; no paid APIs or external cloud calls are required.
+
+
+  SYMPTOM / STARTING STATE: VMware vCenter simulation. data-proc-01 Storage vMotion at 73% for 3+ hours.
+
   VM is powered on and serving traffic. Source: datastore1. Destination: datastore2.
+
+  datastore1 snapshot delta files growing at 2 GB/hr due to continued VM writes. A Storage vMotion operation
+  for VM "data-proc-01" from datastore1 to datastore2
+
+  has been stuck at 73% for over 3 hours. The VM is still running but any further
+
+  progress has halted. The stall is caused by high I/O on the VM combined with
+
+  snapshots created during the migration, which are now growing faster than they
+
+  can be committed. Engineers must safely abort the migration and retry during off-hours.
+
+
+  OBJECTIVE: Check the Storage vMotion task status and duration in Recent Tasks; Verify the VM is still
+  running normally despite the stalled migration; Cancel the Storage vMotion task safely from vCenter.
+  Success means `check.sh` exits successfully.
+
+
+  WHAT TO AVOID: Do not apply broad destructive changes, skip evidence gathering, or fake completion with
+  marker files — the checker validates real system state.'
+objectives:
+- Check the Storage vMotion task status and duration in Recent Tasks
+- Verify the VM is still running normally despite the stalled migration
+- Cancel the Storage vMotion task safely from vCenter
+- Plan and retry the migration during a low-I/O maintenance window
+initial_state: 'VMware vCenter simulation. data-proc-01 Storage vMotion at 73% for 3+ hours.
+
+  VM is powered on and serving traffic. Source: datastore1. Destination: datastore2.
+
   datastore1 snapshot delta files growing at 2 GB/hr due to continued VM writes.
+
+  '
 hints:
-  - order: 1
-    cost: 10
-    content: "Select data-proc-01 → Monitor → Tasks & Events → Tasks to see the
-      Storage vMotion task. Note the start time and check if progress has changed
-      in the last 30 minutes. If stuck, confirm with datastore storage browser
-      that delta VMDKs are growing on the source datastore."
-  - order: 2
-    cost: 15
-    content: "To cancel: find the Storage vMotion task in Recent Tasks.
-      Right-click it and select 'Cancel Task'. Allow up to 10 minutes for
-      cancellation as VMware must safely roll back the partial migration.
-      Do NOT power off the VM — it is still running from source datastore."
-  - order: 3
-    cost: 20
-    content: "After cancellation, verify: the VM shows no snapshots (they should
-      be automatically cleaned up), the VM storage policy shows datastore1 as the
-      home datastore, and VM I/O is back to normal.
-      For the retry: schedule for 2am when VM write rate drops. Consider using
-      storage I/O control to throttle the VM during migration."
+- order: 1
+  cost: 0
+  content: 'Where to look: Check the Storage vMotion task status and duration in Recent Tasks'
+- order: 2
+  cost: 25
+  content: 'Diagnostic steps:
+
+    1. Verify the VM is still running normally despite the stalled migration
+
+    2. Cancel the Storage vMotion task safely from vCenter
+
+    3. Plan and retry the migration during a low-I/O maintenance window'
+- order: 3
+  cost: 50
+  content: 'Exact fix + verification:
+
+    1. Plan and retry the migration during a low-I/O maintenance window.
+
+    2. Re-run the lab checker (`check.sh` or Check Solution).
+
+    3. Confirm every scenario objective is satisfied.
+
+
+    WHY: the grader validates real state — marker files are ignored.'
+summary: Complete the storage vmotion stuck at 73% — migration stalled for hours vmware lab and verify
+  success with the checker
+estimated_minutes: 25
+xp_reward: 100
+prerequisites:
+- Basic vmware literacy
+tags:
+- fix
+- hands-on
+- vmware
+linked_tutorial: vmware-fundamentals
+what_you_will_learn:
+- Check the Storage vMotion task status and duration in Recent Tasks
+- Verify the VM is still running normally despite the stalled migration
+- Cancel the Storage vMotion task safely from vCenter
+- Plan and retry the migration during a low-I/O maintenance window
+environment:
+  nodes:
+  - role: primary
+    os: FixitLab vSphere lab
+    hostname: lab-primary
+    ip: 127.0.0.1
+    specs: local offline simulation
+  pre_installed:
+  - bash
+  - coreutils
+  - journalctl
+  - systemctl
+  - vmware
+  credentials:
+  - user: root
+    password: lab123
+tasks:
+- id: task_1
+  title: Storage vMotion Stuck at 73% — Migration Stalled for Hours
+  description: Restore healthy behavior for Storage vMotion Stuck at 73% — Migration Stalled for Hours
+    by investigating the failure, applying the smallest safe fix, and validating the outcome.
+  background: 'This vmware lab teaches systematic troubleshooting: observe, hypothesize, change, verify.'
+  validation:
+    type: custom_script
+    script: check.sh
+    error_message: Validation did not pass. Re-read the objectives and Hint 2 diagnostic steps.
+solution:
+  summary: Identify the misconfiguration affecting this vmware lab and apply the minimal fix.
+  files_changed: []
+  commands_run:
+  - bash check.sh
+  reference_docs: vmware-fundamentals

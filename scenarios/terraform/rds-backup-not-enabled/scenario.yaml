@@ -1,11 +1,31 @@
 title: RDS Automated Backups Disabled
 slug: aws-rds-backup-not-enabled
 difficulty: easy
-category: AWS
-description: An RDS instance has automated backups disabled (BackupRetentionPeriod = 0), so the database
-  takes no automated snapshots and can't be point-in-time restored — a serious data-loss and compliance
-  risk. Enable automated backups with a sensible retention period and backup window so the instance is
-  recoverable.
+category: Fix
+description: 'CONTEXT: A team operating Terraform IaC needs you to resolve `RDS Automated Backups Disabled`
+  during a realistic incident. The business impact is reduced service reliability until the underlying
+  state is repaired.
+
+
+  ENVIRONMENT: You are working in FixitLab''s offline Terraform workspace with HCL files, state, and plan/apply
+  workflow. All tools run locally; no paid APIs or external cloud calls are required.
+
+
+  SYMPTOM / STARTING STATE: Simulated AWS environment with an RDS MySQL instance where BackupRetentionPeriod
+  is 0. No automated snapshots are being taken, leaving the database unprotected against accidental data
+  loss or corruption. An RDS instance has automated backups disabled (BackupRetentionPeriod = 0), so the
+  database takes no automated snapshots and can''t be point-in-time restored — a serious data-loss and
+  compliance risk. Enable automated backups with a sensible retention period and backup window so the
+  instance is recoverable.
+
+
+  OBJECTIVE: Identify the RDS instance with backups disabled using the AWS CLI; Enable automated backups
+  with a retention period of at least 7 days; Set an appropriate backup window and confirm backups are
+  enabled. Success means `check.sh` exits successfully.
+
+
+  WHAT TO AVOID: Do not apply broad destructive changes, skip evidence gathering, or fake completion with
+  marker files — the checker validates real system state.'
 initial_state: Simulated AWS environment with an RDS MySQL instance where BackupRetentionPeriod is 0.
   No automated snapshots are being taken, leaving the database unprotected against accidental data loss
   or corruption.
@@ -19,18 +39,75 @@ time_limit: 1200
 max_score: 100
 is_free: true
 hints:
-- content: 'Run: aws rds describe-db-instances --query "DBInstances[].[DBInstanceIdentifier,BackupRetentionPeriod]"
-    to find instances with retention 0.'
-  cost: 10
-  order: 1
-- content: Use aws rds modify-db-instance --db-instance-identifier <id> --backup-retention-period 7 --apply-immediately
-    to enable backups.
-  cost: 15
-  order: 2
-- content: Set --preferred-backup-window to a low-traffic time (e.g., "03:00-04:00") when enabling backups
-    to minimize impact.
-  cost: 20
-  order: 3
+- order: 1
+  cost: 0
+  content: 'Where to look: Run `systemctl status mysqld` and tail `/var/log/mysqld.log`.'
+- order: 2
+  cost: 25
+  content: 'Diagnostic steps:
+
+    1. Read the error log for InnoDB or permission failures.
+
+    2. Check disk space with `df -h`.
+
+    3. Verify `my.cnf` for bad paths or bind-address.'
+- order: 3
+  cost: 50
+  content: 'Exact fix + verification:
+
+    1. Fix config or ownership under `/var/lib/mysql`.
+
+    2. `systemctl restart mysqld`.
+
+    3. Confirm `systemctl is-active mysqld` returns active.
+
+
+    WHY: MySQL often fails silently until you read the error log.'
 requires_companion_hosts: false
 dual_terminal: false
 jira_priority: High
+technology: terraform
+summary: Complete the rds automated backups disabled terraform lab and verify success with the checker
+estimated_minutes: 20
+xp_reward: 100
+prerequisites:
+- Basic terraform literacy
+tags:
+- fix
+- hands-on
+- terraform
+linked_tutorial: terraform-fundamentals
+what_you_will_learn:
+- Identify the RDS instance with backups disabled using the AWS CLI
+- Enable automated backups with a retention period of at least 7 days
+- Set an appropriate backup window and confirm backups are enabled
+environment:
+  nodes:
+  - role: primary
+    os: FixitLab Terraform workspace
+    hostname: lab-primary
+    ip: 127.0.0.1
+    specs: local offline simulation
+  pre_installed:
+  - bash
+  - coreutils
+  - terraform
+  credentials:
+  - user: root
+    password: lab123
+tasks:
+- id: task_1
+  title: RDS Automated Backups Disabled
+  description: Restore healthy behavior for RDS Automated Backups Disabled by investigating the failure,
+    applying the smallest safe fix, and validating the outcome.
+  background: 'This terraform lab teaches systematic troubleshooting: observe, hypothesize, change, verify.'
+  validation:
+    type: custom_script
+    script: check.sh
+    error_message: Validation did not pass. Re-read the objectives and Hint 2 diagnostic steps.
+solution:
+  summary: Identify the misconfiguration affecting this terraform lab and apply the minimal fix.
+  files_changed: []
+  commands_run:
+  - bash check.sh
+  reference_docs: terraform-fundamentals

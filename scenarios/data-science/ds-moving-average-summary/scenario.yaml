@@ -1,10 +1,31 @@
 title: Trailing Moving Average of a Time Series
 slug: ds-moving-average-summary
 technology: data-science
-category: Data Science & Analytics
-description: An analytics helper should compute the trailing moving average of a numeric series over a
-  window of size k, but the starter's window is off by one — it includes one extra future-looking value
-  and divides by the wrong count, so every smoothed point is wrong. Fix the window math.
+category: Fix
+description: 'CONTEXT: A team operating data science needs you to resolve `Trailing Moving Average of
+  a Time Series` during a realistic incident. The business impact is reduced service reliability until
+  the underlying state is repaired.
+
+
+  ENVIRONMENT: You are working in FixitLab''s offline notebook lab with pandas/notebook workflows, joins,
+  and charts. All tools run locally; no paid APIs or external cloud calls are required.
+
+
+  SYMPTOM / STARTING STATE: An analytics helper should compute the trailing moving average of a numeric
+  series over a window of size k, but the starter''s window slicing is off by one and it divides by k
+  even before k points exist, so every smoothed value is wrong. Fix the window so each output averages
+  the current point and the k-1 points before it. An analytics helper should compute the trailing moving
+  average of a numeric series over a window of size k, but the starter''s window is off by one — it includes
+  one extra future-looking value and divides by the wrong count, so every smoothed point is wrong. Fix
+  the window math.
+
+
+  OBJECTIVE: Build sliding windows over a numeric series; Use statistics.mean to average each window;
+  Handle the warm-up region and short series correctly. Success means all hidden tests pass.
+
+
+  WHAT TO AVOID: Do not apply broad destructive changes, skip evidence gathering, or fake completion with
+  marker files — the checker validates real system state.'
 difficulty: medium
 scenario_type: fix
 lab_mode: simulation
@@ -19,68 +40,137 @@ objectives:
 - Build sliding windows over a numeric series
 - Use statistics.mean to average each window
 - Handle the warm-up region and short series correctly
-initial_state: An analytics helper should compute the trailing moving average of a numeric series over a
-  window of size k, but the starter's window slicing is off by one and it divides by k even before k
-  points exist, so every smoothed value is wrong. Fix the window so each output averages the current
-  point and the k-1 points before it.
-solution_explanation: |
-  A trailing moving average at index i should average values[i-k+1 .. i] (the current point and the k-1
+initial_state: An analytics helper should compute the trailing moving average of a numeric series over
+  a window of size k, but the starter's window slicing is off by one and it divides by k even before k
+  points exist, so every smoothed value is wrong. Fix the window so each output averages the current point
+  and the k-1 points before it.
+solution_explanation: 'A trailing moving average at index i should average values[i-k+1 .. i] (the current
+  point and the k-1
+
   before it), using statistics.mean over exactly the points available. For indices before k-1 points
+
   exist, average just the points seen so far. The starter sliced values[i:i+k] (looking FORWARD) and
+
   always divided by k, producing wrong, future-leaking values.
+
+  '
 coding_spec:
   language: python
   entrypoint: solution.py
   kind: fix
-  instructions: |
-    Fix solution(values, k): return a list the SAME length as values where element i is the trailing
-    moving average over the window ending at i — that is, mean of values[max(0, i-k+1) .. i].
-      moving([1,2,3,4], 2) -> [1.0, 1.5, 2.5, 3.5]
-    Window must look BACKWARD, never forward, and short windows average only the points available.
-    Click Run to try it, then Check Solution to grade against all tests.
+  instructions: "Fix solution(values, k): return a list the SAME length as values where element i is the\
+    \ trailing\nmoving average over the window ending at i — that is, mean of values[max(0, i-k+1) ..\
+    \ i].\n  moving([1,2,3,4], 2) -> [1.0, 1.5, 2.5, 3.5]\nWindow must look BACKWARD, never forward, and\
+    \ short windows average only the points available.\nClick Run to try it, then Check Solution to grade\
+    \ against all tests.\n"
   files:
   - path: solution.py
-    content: |
-      import statistics
-
-      def solution(values, k):
-          out = []
-          for i in range(len(values)):
-              # BUG: this looks FORWARD (values[i:i+k]) and divides by a fixed k,
-              # so it leaks future points and mishandles the series tail/warm-up.
-              window = values[i:i + k]
-              out.append(sum(window) / k)
-          return out
+    content: "import statistics\n\ndef solution(values, k):\n    out = []\n    for i in range(len(values)):\n\
+      \        # BUG: this looks FORWARD (values[i:i+k]) and divides by a fixed k,\n        # so it leaks\
+      \ future points and mishandles the series tail/warm-up.\n        window = values[i:i + k]\n    \
+      \    out.append(sum(window) / k)\n    return out\n"
     readonly: false
   visible_tests:
   - name: window of 2
-    code: |
-      assert solution([1, 2, 3, 4], 2) == [1.0, 1.5, 2.5, 3.5], solution([1, 2, 3, 4], 2)
+    code: 'assert solution([1, 2, 3, 4], 2) == [1.0, 1.5, 2.5, 3.5], solution([1, 2, 3, 4], 2)
+
+      '
   - name: window of 1 is identity
-    code: |
-      assert solution([5, 6, 7], 1) == [5.0, 6.0, 7.0], solution([5, 6, 7], 1)
+    code: 'assert solution([5, 6, 7], 1) == [5.0, 6.0, 7.0], solution([5, 6, 7], 1)
+
+      '
   hidden_tests:
   - name: window of 3 with warm-up
-    code: |
-      assert solution([2, 4, 6, 8, 10], 3) == [2.0, 3.0, 4.0, 6.0, 8.0], solution([2, 4, 6, 8, 10], 3)
+    code: 'assert solution([2, 4, 6, 8, 10], 3) == [2.0, 3.0, 4.0, 6.0, 8.0], solution([2, 4, 6, 8, 10],
+      3)
+
+      '
   - name: window larger than series
-    code: |
-      assert solution([10, 20], 5) == [10.0, 15.0], solution([10, 20], 5)
+    code: 'assert solution([10, 20], 5) == [10.0, 15.0], solution([10, 20], 5)
+
+      '
   - name: same length as input
-    code: |
-      vals = [1, 3, 5, 7, 9, 11]
+    code: 'vals = [1, 3, 5, 7, 9, 11]
+
       assert len(solution(vals, 4)) == len(vals), solution(vals, 4)
+
+      '
   - name: empty series
-    code: |
-      assert solution([], 3) == [], solution([], 3)
+    code: 'assert solution([], 3) == [], solution([], 3)
+
+      '
   timeout: 8
 hints:
 - order: 1
-  cost: 10
-  content: Compare against [1.0, 1.5, 2.5, 3.5] for moving([1,2,3,4], 2). Your values use points AFTER i, not before.
+  cost: 0
+  content: 'Where to look: Open `solution.py`, read the instructions, and run the visible tests to see
+    which assertion fails first.'
 - order: 2
-  cost: 20
-  content: 'The trailing window ending at i is values[max(0, i-k+1) : i+1]. Average exactly those, not a fixed k.'
+  cost: 25
+  content: 'Diagnostic steps:
+
+    1. Click Run and read the traceback — note line number and actual vs expected values.
+
+    2. Reproduce the failure with the smallest input from a visible test.
+
+    3. Compare your implementation to the bug described in the lab prompt.'
 - order: 3
-  cost: 30
-  content: 'window = values[max(0, i - k + 1) : i + 1]; out.append(statistics.mean(window)).'
+  cost: 50
+  content: 'Exact fix + verification:
+
+    1. Handle the warm-up region and short series correctly.
+
+    2. Re-run the lab checker (`check.sh` or Check Solution).
+
+    3. Confirm every scenario objective is satisfied.
+
+
+    WHY: the grader validates real state — marker files are ignored.'
+summary: Complete the trailing moving average of a time series data science lab and verify success with
+  the checker
+estimated_minutes: 20
+xp_reward: 100
+prerequisites:
+- Basic data science literacy
+tags:
+- data-science
+- fix
+- hands-on
+linked_tutorial: data-science-fundamentals
+what_you_will_learn:
+- Build sliding windows over a numeric series
+- Use statistics.mean to average each window
+- Handle the warm-up region and short series correctly
+environment:
+  nodes:
+  - role: primary
+    os: FixitLab notebook lab
+    hostname: lab-primary
+    ip: 127.0.0.1
+    specs: local offline simulation
+  pre_installed:
+  - bash
+  - coreutils
+  - data science
+  - pip
+  - python3
+  credentials:
+  - user: root
+    password: lab123
+tasks:
+- id: task_1
+  title: Trailing Moving Average of a Time Series
+  description: Restore healthy behavior for Trailing Moving Average of a Time Series by investigating
+    the failure, applying the smallest safe fix, and validating the outcome.
+  background: 'This data science lab teaches systematic troubleshooting: observe, hypothesize, change,
+    verify.'
+  validation:
+    type: custom_script
+    script: hidden_tests
+    error_message: One or more hidden tests failed. Read the public test output, fix your solution, and
+      submit again.
+solution:
+  summary: The solution passes all hidden tests by implementing the required behavior in code.
+  files_changed: []
+  commands_run: []
+  reference_docs: data-science-fundamentals

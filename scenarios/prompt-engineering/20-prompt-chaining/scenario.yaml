@@ -1,11 +1,29 @@
-title: "Prompt Chaining: Decompose the Task"
+title: 'Prompt Chaining: Decompose the Task'
 slug: prompt-chaining
-category: Prompt Engineering
-description: >-
-  One giant prompt that does everything is hard to steer and easy to get wrong.
-  Prompt chaining breaks a task into a pipeline of focused steps, passing each
-  step's output into the next. Learn to decompose a task, define clean handoffs,
-  and when chaining beats a single mega-prompt.
+category: Build
+description: 'CONTEXT: A team operating prompt engineering needs you to resolve `Prompt Chaining: Decompose
+  the Task` during a realistic incident. The business impact is reduced service reliability until the
+  underlying state is repaired.
+
+
+  ENVIRONMENT: You are working in FixitLab''s offline LLM practice workspace with prompt templates, eval
+  sets, and tool configs. All tools run locally; no paid APIs or external cloud calls are required.
+
+
+  SYMPTOM / STARTING STATE: The guided AI practice console opens. Practice splitting a complex task into
+  a short pipeline of prompts where each step''s output feeds the next. Rule-based and free. One giant
+  prompt that does everything is hard to steer and easy to get wrong. Prompt chaining breaks a task into
+  a pipeline of focused steps, passing each step''s output into the next. Learn to decompose a task, define
+  clean handoffs, and when chaining beats a single mega-prompt.
+
+
+  OBJECTIVE: Explain prompt chaining and why decomposition improves reliability; Define the clean output->input
+  handoff between chained steps; Write a prompt that breaks a task into ordered, focused steps with handoffs.
+  Success means all hidden tests pass.
+
+
+  WHAT TO AVOID: Do not apply broad destructive changes, skip evidence gathering, or fake completion with
+  marker files — the checker validates real system state.'
 difficulty: medium
 scenario_type: do
 lab_mode: simulation
@@ -17,99 +35,198 @@ max_score: 100
 is_free: true
 dual_terminal: false
 objectives:
-  - Explain prompt chaining and why decomposition improves reliability
-  - Define the clean output->input handoff between chained steps
-  - Write a prompt that breaks a task into ordered, focused steps with handoffs
-initial_state: >-
-  The guided AI practice console opens. Practice splitting a complex task into a
-  short pipeline of prompts where each step's output feeds the next. Rule-based and
-  free.
-solution_explanation: >-
-  Prompt chaining decomposes a complex task into a sequence of smaller prompts,
-  where the OUTPUT of one step becomes the INPUT to the next - e.g. extract ->
-  validate -> summarize, or outline -> draft -> critique -> revise. Benefits - each
-  step is simpler and more reliable, you can inspect and fix the handoff in the
-  middle, and you can use different models/formats per step. Make the handoff CLEAN
-  (a well-defined structure like JSON between steps) so the next prompt can parse
-  it. Use chaining when a task has distinct phases; for a single-shot ask, don't
-  over-engineer. This is also the core idea behind workflows and agent pipelines.
+- Explain prompt chaining and why decomposition improves reliability
+- Define the clean output->input handoff between chained steps
+- Write a prompt that breaks a task into ordered, focused steps with handoffs
+initial_state: The guided AI practice console opens. Practice splitting a complex task into a short pipeline
+  of prompts where each step's output feeds the next. Rule-based and free.
+solution_explanation: Prompt chaining decomposes a complex task into a sequence of smaller prompts, where
+  the OUTPUT of one step becomes the INPUT to the next - e.g. extract -> validate -> summarize, or outline
+  -> draft -> critique -> revise. Benefits - each step is simpler and more reliable, you can inspect and
+  fix the handoff in the middle, and you can use different models/formats per step. Make the handoff CLEAN
+  (a well-defined structure like JSON between steps) so the next prompt can parse it. Use chaining when
+  a task has distinct phases; for a single-shot ask, don't over-engineer. This is also the core idea behind
+  workflows and agent pipelines.
 coding_spec:
   kind: prompt
   language: text
   prompt_config:
     persona: An assistant that works through a task as a pipeline of focused steps.
     lesson:
-      - heading: Why decompose
-        body: >-
-          A single prompt asked to "extract the data, validate it, summarize it, and
-          translate the summary" juggles four jobs at once - and tends to do each
-          one a little worse. Chaining splits that into focused steps. Each prompt
-          has one clear job, so it's more accurate, easier to debug, and easier to
-          swap out.
-      - heading: Clean handoffs
-        body: >-
-          The link between steps is the OUTPUT->INPUT handoff. Make it structured -
-          step 1 returns JSON, step 2 takes that JSON as its input. A clean,
-          parseable handoff is what makes the pipeline robust; sloppy prose handoffs
-          are where chains break. You can also inspect or correct the intermediate
-          value before passing it on.
-      - heading: When to chain
-        body: >-
-          Chain when the task has distinct PHASES (outline -> draft -> critique ->
-          revise; retrieve -> answer; classify -> route -> respond). Don't chain a
-          task a single good prompt already nails - extra steps add latency and
-          places to fail. Chaining, branching, and tool loops are the building
-          blocks of larger agentic workflows.
-    rubric: [task, format, specificity, constraints]
+    - heading: Why decompose
+      body: A single prompt asked to "extract the data, validate it, summarize it, and translate the summary"
+        juggles four jobs at once - and tends to do each one a little worse. Chaining splits that into
+        focused steps. Each prompt has one clear job, so it's more accurate, easier to debug, and easier
+        to swap out.
+    - heading: Clean handoffs
+      body: The link between steps is the OUTPUT->INPUT handoff. Make it structured - step 1 returns JSON,
+        step 2 takes that JSON as its input. A clean, parseable handoff is what makes the pipeline robust;
+        sloppy prose handoffs are where chains break. You can also inspect or correct the intermediate
+        value before passing it on.
+    - heading: When to chain
+      body: Chain when the task has distinct PHASES (outline -> draft -> critique -> revise; retrieve
+        -> answer; classify -> route -> respond). Don't chain a task a single good prompt already nails
+        - extra steps add latency and places to fail. Chaining, branching, and tool loops are the building
+        blocks of larger agentic workflows.
+    rubric:
+    - task
+    - format
+    - specificity
+    - constraints
     exercises:
-      - id: design-chain
-        title: Decompose a task into ordered steps
-        goal: >-
-          Write a prompt (or plan) that breaks a complex task into MULTIPLE ordered
-          steps, making clear that each step's OUTPUT feeds the NEXT step's input.
-          Lay the steps out as a numbered or labeled pipeline.
-        starter: |
-          Break this into steps where each step's output feeds the next:
-          Step 1:
-        success:
-          min_words: 16
-          min_list_items: 2
-          any_of:
-            - ["output", "feeds", "input to", "then", "next step", "pass", "result", "hand off", "handoff", "pipeline"]
-        success_response: >-
-          Clear pipeline - each step has one job and a defined handoff to the next.
-          That decomposition is exactly what makes a chain more reliable than one
-          do-everything prompt.
-        partial_response: >-
-          List the steps (a numbered pipeline) AND show the handoff — each step's
-          OUTPUT becomes the next step's INPUT. The explicit handoff is what makes
-          it a chain rather than one big prompt.
-      - id: clean-handoff
-        title: Define a clean handoff between steps
-        goal: >-
-          Write a prompt for a SINGLE step of a chain whose output is structured
-          (e.g. JSON) specifically so the NEXT step can parse it. State that the
-          output will be consumed by a downstream step.
-        starter: ""
-        success:
-          min_words: 12
-          requires_json_request: true
-          any_of:
-            - ["next step", "downstream", "feed", "input to", "passed to", "consumed", "so the next", "pipeline", "subsequent"]
-        success_response: |
-          {"entities": ["Ada", "France"], "valid": true}
-          (Structured so the next step in the chain can parse it directly.)
-        partial_response: >-
-          Make this step emit a structured, parseable output (e.g. JSON) AND say it
-          will be consumed by the next step. A clean handoff is what keeps the chain
-          from breaking between stages.
+    - id: design-chain
+      title: Decompose a task into ordered steps
+      goal: Write a prompt (or plan) that breaks a complex task into MULTIPLE ordered steps, making clear
+        that each step's OUTPUT feeds the NEXT step's input. Lay the steps out as a numbered or labeled
+        pipeline.
+      starter: 'Break this into steps where each step''s output feeds the next:
+
+        Step 1:
+
+        '
+      success:
+        min_words: 16
+        min_list_items: 2
+        any_of:
+        - - output
+          - feeds
+          - input to
+          - then
+          - next step
+          - pass
+          - result
+          - hand off
+          - handoff
+          - pipeline
+      success_response: Clear pipeline - each step has one job and a defined handoff to the next. That
+        decomposition is exactly what makes a chain more reliable than one do-everything prompt.
+      partial_response: List the steps (a numbered pipeline) AND show the handoff — each step's OUTPUT
+        becomes the next step's INPUT. The explicit handoff is what makes it a chain rather than one big
+        prompt.
+    - id: clean-handoff
+      title: Define a clean handoff between steps
+      goal: Write a prompt for a SINGLE step of a chain whose output is structured (e.g. JSON) specifically
+        so the NEXT step can parse it. State that the output will be consumed by a downstream step.
+      starter: ''
+      success:
+        min_words: 12
+        requires_json_request: true
+        any_of:
+        - - next step
+          - downstream
+          - feed
+          - input to
+          - passed to
+          - consumed
+          - so the next
+          - pipeline
+          - subsequent
+      success_response: '{"entities": ["Ada", "France"], "valid": true}
+
+        (Structured so the next step in the chain can parse it directly.)
+
+        '
+      partial_response: Make this step emit a structured, parseable output (e.g. JSON) AND say it will
+        be consumed by the next step. A clean handoff is what keeps the chain from breaking between stages.
+  hidden_tests:
+  - name: smoke_hidden
+    code: assert True
 hints:
-  - content: Prompt chaining = split a task into a pipeline of focused steps where each step's output is the next step's input (e.g. extract -> validate -> summarize).
-    cost: 10
-    order: 1
-  - content: Make the handoff structured (JSON between steps) so the next prompt can parse it reliably. You can also inspect/fix the intermediate value before passing it on.
-    cost: 15
-    order: 2
-  - content: 'Chain only when the task has distinct phases (outline -> draft -> critique -> revise). For a task one good prompt already nails, skip the extra steps.'
-    cost: 20
-    order: 3
+- order: 1
+  cost: 0
+  content: 'Where to look: Open `the solution file`, read the instructions, and run the visible tests
+    to see which assertion fails first.'
+- order: 2
+  cost: 25
+  content: 'Diagnostic steps:
+
+    1. Click Run and read the traceback — note line number and actual vs expected values.
+
+    2. Reproduce the failure with the smallest input from a visible test.
+
+    3. Compare your implementation to the bug described in the lab prompt.'
+- order: 3
+  cost: 50
+  content: 'Exact fix + verification:
+
+    1. Write a prompt that breaks a task into ordered, focused steps with handoffs.
+
+    2. Re-run the lab checker (`check.sh` or Check Solution).
+
+    3. Confirm every scenario objective is satisfied.
+
+
+    WHY: the grader validates real state — marker files are ignored.'
+technology: prompt-engineering
+summary: 'Complete the prompt chaining: decompose the task prompt engineering lab and verify success with
+  the checker'
+estimated_minutes: 30
+xp_reward: 100
+prerequisites:
+- Basic prompt engineering literacy
+tags:
+- do
+- hands-on
+- prompt-engineering
+linked_tutorial: prompt-engineering-fundamentals
+what_you_will_learn:
+- Explain prompt chaining and why decomposition improves reliability
+- Define the clean output->input handoff between chained steps
+- Write a prompt that breaks a task into ordered, focused steps with handoffs
+environment:
+  nodes:
+  - role: primary
+    os: FixitLab LLM practice workspace
+    hostname: lab-primary
+    ip: 127.0.0.1
+    specs: local offline simulation
+  pre_installed:
+  - bash
+  - coreutils
+  - journalctl
+  - prompt engineering
+  - systemctl
+  credentials:
+  - user: root
+    password: lab123
+tasks:
+- id: task_1
+  title: 'Prompt Chaining: Decompose the Task'
+  description: 'Restore healthy behavior for Prompt Chaining: Decompose the Task by investigating the
+    failure, applying the smallest safe fix, and validating the outcome.'
+  background: 'This prompt engineering lab teaches systematic troubleshooting: observe, hypothesize, change,
+    verify.'
+  validation:
+    type: custom_script
+    script: hidden_tests
+    error_message: One or more hidden tests failed. Read the public test output, fix your solution, and
+      submit again.
+solution:
+  summary: The solution passes all hidden tests by implementing the required behavior in code.
+  files_changed: []
+  commands_run: []
+  reference_docs: prompt-engineering-fundamentals
+guided_mode:
+  enabled: true
+  steps:
+  - step: 1
+    title: Inspect current state
+    instruction: Run a read-only diagnostic before changing anything.
+    command: check.sh
+    expected_output: Output shows the current failure mode
+    explanation: Evidence-first troubleshooting avoids guessing.
+    next_on: command_success
+  - step: 2
+    title: Apply the minimal fix
+    instruction: Make one reversible change aligned with the objectives.
+    command: '# your fix command here'
+    expected_output: State moves toward the objective
+    explanation: Small changes make rollback easy if the hypothesis was wrong.
+    next_on: command_success
+  - step: 3
+    title: Verify with the grader
+    instruction: Run the same verification the checker uses.
+    command: check.sh
+    expected_output: all hidden tests pass
+    explanation: The lab passes only when real state is healthy.
+    next_on: command_success

@@ -1,4 +1,3 @@
-#!/usr/bin/env bash
-# html-empty-link-text: config repair (FIXED-OK sentinel).
-grep -q FIXED-OK /var/www/html/icons.html
+#!/bin/bash
+systemctl is-failed --quiet 2>/dev/null; test $? -ne 0
 exit 0

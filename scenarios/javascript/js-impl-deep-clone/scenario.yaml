@@ -1,9 +1,26 @@
 title: Implement deepClone
 slug: js-impl-deep-clone
-category: JavaScript Development
-description: 'Implement deepClone(value): return a deep copy of a JSON-like value (primitives, arrays,
-  plain objects, nested). Mutating the clone must not affect the original, at any depth. Do not use structuredClone.
-  The stub is empty so tests fail.'
+category: Build
+description: 'CONTEXT: A team operating JavaScript needs you to resolve `Implement deepClone` during a
+  realistic incident. The business impact is reduced service reliability until the underlying state is
+  repaired.
+
+
+  ENVIRONMENT: You are working in FixitLab''s offline JavaScript practice project with modules, browser
+  console, and Node tooling. All tools run locally; no paid APIs or external cloud calls are required.
+
+
+  SYMPTOM / STARTING STATE: Implement deepClone(value): return a deep copy of a JSON-like value (primitives,
+  arrays, plain objects, nested). Mutating the clone must not affect the original, at any depth. Do not
+  use structuredClone. The stub is empty so tests fail.
+
+
+  OBJECTIVE: Return primitives as-is; Recursively copy arrays and plain objects; Ensure nested mutations
+  don''t leak back to the source. Success means all hidden tests pass.
+
+
+  WHAT TO AVOID: Do not apply broad destructive changes, skip evidence gathering, or fake completion with
+  marker files — the checker validates real system state.'
 difficulty: medium
 scenario_type: do
 lab_mode: simulation
@@ -21,65 +38,169 @@ objectives:
 initial_state: 'Implement deepClone(value): return a deep copy of a JSON-like value (primitives, arrays,
   plain objects, nested). Mutating the clone must not affect the original, at any depth. Do not use structuredClone.
   The stub is empty so tests fail.'
-solution_explanation: |
-  Primitives are returned as-is; arrays and plain objects are rebuilt with each element/value recursively cloned, producing a structure that shares no references with the original at any depth.
+solution_explanation: 'Primitives are returned as-is; arrays and plain objects are rebuilt with each element/value
+  recursively cloned, producing a structure that shares no references with the original at any depth.
+
+  '
 coding_spec:
   language: javascript
   entrypoint: solution.js
   kind: impl
-  instructions: |
-    Implement deepClone(value) -> a deep copy. Nested arrays/objects are copied recursively so the clone is fully independent.
-      const c = deepClone({a:[1,2]}); c.a.push(3); // original.a stays [1,2]
-    Click Run to try it, then Check Solution to grade against all tests.
+  instructions: "Implement deepClone(value) -> a deep copy. Nested arrays/objects are copied recursively\
+    \ so the clone is fully independent.\n  const c = deepClone({a:[1,2]}); c.a.push(3); // original.a\
+    \ stays [1,2]\nClick Run to try it, then Check Solution to grade against all tests.\n"
   files:
   - path: solution.js
-    content: |
-      function deepClone(value) {
-        // TODO: return a deep copy of value (primitives, arrays, plain objects)
-      }
+    content: "function deepClone(value) {\n  // TODO: return a deep copy of value (primitives, arrays,\
+      \ plain objects)\n}\n"
     readonly: false
   visible_tests:
   - name: clones nested object
-    code: |
-      const src = {a:1, b:{c:2}};
+    code: 'const src = {a:1, b:{c:2}};
+
       const c = deepClone(src);
-      assert(JSON.stringify(c) === JSON.stringify(src) && c !== src && c.b !== src.b, 'shallow or unequal');
+
+      assert(JSON.stringify(c) === JSON.stringify(src) && c !== src && c.b !== src.b, ''shallow or unequal'');
+
+      '
   - name: primitive passthrough
-    code: |
-      assert(deepClone(5) === 5 && deepClone('x') === 'x' && deepClone(null) === null);
+    code: 'assert(deepClone(5) === 5 && deepClone(''x'') === ''x'' && deepClone(null) === null);
+
+      '
   hidden_tests:
   - name: nested mutation does not leak
-    code: |
-      const src = {a:[1,2]};
+    code: 'const src = {a:[1,2]};
+
       const c = deepClone(src);
+
       c.a.push(3);
-      assert(JSON.stringify(src.a) === JSON.stringify([1,2]), 'source mutated: ' + JSON.stringify(src.a));
+
+      assert(JSON.stringify(src.a) === JSON.stringify([1,2]), ''source mutated: '' + JSON.stringify(src.a));
+
+      '
   - name: array of objects independent
-    code: |
-      const src = [{n:1}, {n:2}];
+    code: 'const src = [{n:1}, {n:2}];
+
       const c = deepClone(src);
+
       c[0].n = 99;
-      assert(src[0].n === 1, 'source element mutated');
+
+      assert(src[0].n === 1, ''source element mutated'');
+
+      '
   - name: deep equality preserved
-    code: |
-      const src = {a:{b:{c:[1,{d:2}]}}};
+    code: 'const src = {a:{b:{c:[1,{d:2}]}}};
+
       assert(JSON.stringify(deepClone(src)) === JSON.stringify(src));
+
+      '
   - name: empty structures
-    code: |
-      assert(JSON.stringify(deepClone({})) === '{}' && JSON.stringify(deepClone([])) === '[]');
+    code: 'assert(JSON.stringify(deepClone({})) === ''{}'' && JSON.stringify(deepClone([])) === ''[]'');
+
+      '
   - name: top-level array copy is new
-    code: |
-      const src = [1,2,3];
+    code: 'const src = [1,2,3];
+
       const c = deepClone(src);
+
       assert(c !== src && JSON.stringify(c) === JSON.stringify(src));
+
+      '
   timeout: 8
 hints:
 - order: 1
-  cost: 10
-  content: Primitives (and null) can be returned directly — there's nothing to copy.
+  cost: 0
+  content: 'Where to look: Open `solution.js`, read the instructions, and run the visible tests to see
+    which assertion fails first.'
 - order: 2
-  cost: 20
-  content: For arrays, map each element through deepClone; for objects, rebuild key by key.
+  cost: 25
+  content: 'Diagnostic steps:
+
+    1. Click Run and read the traceback — note line number and actual vs expected values.
+
+    2. Reproduce the failure with the smallest input from a visible test.
+
+    3. Compare your implementation to the bug described in the lab prompt.'
 - order: 3
-  cost: 30
-  content: Recurse on every element/value so nested containers are also fresh copies.
+  cost: 50
+  content: 'Exact fix + verification:
+
+    1. Ensure nested mutations don''t leak back to the source.
+
+    2. Re-run the lab checker (`check.sh` or Check Solution).
+
+    3. Confirm every scenario objective is satisfied.
+
+
+    WHY: the grader validates real state — marker files are ignored.'
+technology: javascript
+summary: Complete the implement deepclone javascript lab and verify success with the checker
+estimated_minutes: 25
+xp_reward: 100
+prerequisites:
+- Basic javascript literacy
+tags:
+- do
+- hands-on
+- javascript
+linked_tutorial: javascript-fundamentals
+what_you_will_learn:
+- Return primitives as-is
+- Recursively copy arrays and plain objects
+- Ensure nested mutations don't leak back to the source
+environment:
+  nodes:
+  - role: primary
+    os: FixitLab JavaScript practice project
+    hostname: lab-primary
+    ip: 127.0.0.1
+    specs: local offline simulation
+  pre_installed:
+  - bash
+  - coreutils
+  - javascript
+  - journalctl
+  - systemctl
+  credentials:
+  - user: root
+    password: lab123
+tasks:
+- id: task_1
+  title: Implement deepClone
+  description: Restore healthy behavior for Implement deepClone by investigating the failure, applying
+    the smallest safe fix, and validating the outcome.
+  background: 'This javascript lab teaches systematic troubleshooting: observe, hypothesize, change, verify.'
+  validation:
+    type: custom_script
+    script: hidden_tests
+    error_message: One or more hidden tests failed. Read the public test output, fix your solution, and
+      submit again.
+solution:
+  summary: The solution passes all hidden tests by implementing the required behavior in code.
+  files_changed: []
+  commands_run: []
+  reference_docs: javascript-fundamentals
+guided_mode:
+  enabled: true
+  steps:
+  - step: 1
+    title: Inspect current state
+    instruction: Run a read-only diagnostic before changing anything.
+    command: check.sh
+    expected_output: Output shows the current failure mode
+    explanation: Evidence-first troubleshooting avoids guessing.
+    next_on: command_success
+  - step: 2
+    title: Apply the minimal fix
+    instruction: Make one reversible change aligned with the objectives.
+    command: '# your fix command here'
+    expected_output: State moves toward the objective
+    explanation: Small changes make rollback easy if the hypothesis was wrong.
+    next_on: command_success
+  - step: 3
+    title: Verify with the grader
+    instruction: Run the same verification the checker uses.
+    command: check.sh
+    expected_output: all hidden tests pass
+    explanation: The lab passes only when real state is healthy.
+    next_on: command_success

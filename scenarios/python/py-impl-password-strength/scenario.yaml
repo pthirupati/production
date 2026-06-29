@@ -1,9 +1,26 @@
 title: Implement a Password Strength Validator
 slug: py-impl-password-strength
-category: Python Development
-description: 'Implement is_strong_password(p): True only if p is at least 8 characters AND contains at
-  least one lowercase letter, one uppercase letter, one digit, and one of the symbols !@#$%^&*. Otherwise
-  False. The stub is empty so tests fail.'
+category: Build
+description: 'CONTEXT: A team operating Python development needs you to resolve `Implement a Password
+  Strength Validator` during a realistic incident. The business impact is reduced service reliability
+  until the underlying state is repaired.
+
+
+  ENVIRONMENT: You are working in FixitLab''s offline Python project workspace with source files, venv,
+  tests, and CLI entrypoints. All tools run locally; no paid APIs or external cloud calls are required.
+
+
+  SYMPTOM / STARTING STATE: Implement is_strong_password(p): True only if p is at least 8 characters AND
+  contains at least one lowercase letter, one uppercase letter, one digit, and one of the symbols !@#$%^&*.
+  Otherwise False. The stub is empty so tests fail.
+
+
+  OBJECTIVE: Enforce the minimum length; Require lowercase, uppercase, digit, and symbol; Return False
+  if any rule is unmet. Success means all hidden tests pass.
+
+
+  WHAT TO AVOID: Do not apply broad destructive changes, skip evidence gathering, or fake completion with
+  marker files — the checker validates real system state.'
 difficulty: medium
 scenario_type: do
 lab_mode: simulation
@@ -21,53 +38,149 @@ objectives:
 initial_state: 'Implement is_strong_password(p): True only if p is at least 8 characters AND contains
   at least one lowercase letter, one uppercase letter, one digit, and one of the symbols !@#$%^&*. Otherwise
   False. The stub is empty so tests fail.'
-solution_explanation: |
-  Each rule is an independent any() check over the characters; the password is strong only when the length and all four character-class checks pass.
+solution_explanation: 'Each rule is an independent any() check over the characters; the password is strong
+  only when the length and all four character-class checks pass.
+
+  '
 coding_spec:
   language: python
   entrypoint: solution.py
   kind: impl
-  instructions: |
-    Implement is_strong_password(p) -> bool. Rules: len >= 8; >=1 lowercase; >=1 uppercase; >=1 digit; >=1 symbol from !@#$%^&*.
+  instructions: 'Implement is_strong_password(p) -> bool. Rules: len >= 8; >=1 lowercase; >=1 uppercase;
+    >=1 digit; >=1 symbol from !@#$%^&*.
+
     Click Run to try it, then Check Solution to grade against all tests.
+
+    '
   files:
   - path: solution.py
-    content: |
-      def is_strong_password(p):
-          # TODO: validate per the rules in the brief/tests
-          pass
+    content: "def is_strong_password(p):\n    # TODO: validate per the rules in the brief/tests\n    pass\n"
     readonly: false
   visible_tests:
   - name: strong
-    code: |
-      assert is_strong_password('Abcdef1!') is True
+    code: 'assert is_strong_password(''Abcdef1!'') is True
+
+      '
   - name: too short
-    code: |
-      assert is_strong_password('Ab1!') is False
+    code: 'assert is_strong_password(''Ab1!'') is False
+
+      '
   hidden_tests:
   - name: no uppercase
-    code: |
-      assert is_strong_password('abcdef1!') is False
+    code: 'assert is_strong_password(''abcdef1!'') is False
+
+      '
   - name: no lowercase
-    code: |
-      assert is_strong_password('ABCDEF1!') is False
+    code: 'assert is_strong_password(''ABCDEF1!'') is False
+
+      '
   - name: no digit
-    code: |
-      assert is_strong_password('Abcdefg!') is False
+    code: 'assert is_strong_password(''Abcdefg!'') is False
+
+      '
   - name: no symbol
-    code: |
-      assert is_strong_password('Abcdefg1') is False
+    code: 'assert is_strong_password(''Abcdefg1'') is False
+
+      '
   - name: long and complete
-    code: |
-      assert is_strong_password('Sup3r$ecretPass') is True
+    code: 'assert is_strong_password(''Sup3r$ecretPass'') is True
+
+      '
   timeout: 8
 hints:
 - order: 1
-  cost: 10
-  content: Check the length first; short passwords fail immediately.
+  cost: 0
+  content: 'Where to look: Open `solution.py`, read the instructions, and run the visible tests to see
+    which assertion fails first.'
 - order: 2
-  cost: 20
-  content: Use any(c.islower() ...), any(c.isupper() ...), any(c.isdigit() ...).
+  cost: 25
+  content: 'Diagnostic steps:
+
+    1. Click Run and read the traceback — note line number and actual vs expected values.
+
+    2. Reproduce the failure with the smallest input from a visible test.
+
+    3. Compare your implementation to the bug described in the lab prompt.'
 - order: 3
-  cost: 30
-  content: Check membership against the set of allowed symbols and require all four classes.
+  cost: 50
+  content: 'Exact fix + verification:
+
+    1. Return False if any rule is unmet.
+
+    2. Re-run the lab checker (`check.sh` or Check Solution).
+
+    3. Confirm every scenario objective is satisfied.
+
+
+    WHY: the grader validates real state — marker files are ignored.'
+technology: python
+summary: Complete the implement a password strength validator python lab and verify success with the checker
+estimated_minutes: 25
+xp_reward: 100
+prerequisites:
+- Basic python literacy
+tags:
+- do
+- hands-on
+- python
+linked_tutorial: python-fundamentals
+what_you_will_learn:
+- Enforce the minimum length
+- Require lowercase, uppercase, digit, and symbol
+- Return False if any rule is unmet
+environment:
+  nodes:
+  - role: primary
+    os: FixitLab Python project workspace
+    hostname: lab-primary
+    ip: 127.0.0.1
+    specs: local offline simulation
+  pre_installed:
+  - bash
+  - coreutils
+  - pip
+  - python
+  - python3
+  credentials:
+  - user: root
+    password: lab123
+tasks:
+- id: task_1
+  title: Implement a Password Strength Validator
+  description: Restore healthy behavior for Implement a Password Strength Validator by investigating the
+    failure, applying the smallest safe fix, and validating the outcome.
+  background: 'This python lab teaches systematic troubleshooting: observe, hypothesize, change, verify.'
+  validation:
+    type: custom_script
+    script: hidden_tests
+    error_message: One or more hidden tests failed. Read the public test output, fix your solution, and
+      submit again.
+solution:
+  summary: The solution passes all hidden tests by implementing the required behavior in code.
+  files_changed: []
+  commands_run: []
+  reference_docs: python-fundamentals
+guided_mode:
+  enabled: true
+  steps:
+  - step: 1
+    title: Inspect current state
+    instruction: Run a read-only diagnostic before changing anything.
+    command: check.sh
+    expected_output: Output shows the current failure mode
+    explanation: Evidence-first troubleshooting avoids guessing.
+    next_on: command_success
+  - step: 2
+    title: Apply the minimal fix
+    instruction: Make one reversible change aligned with the objectives.
+    command: '# your fix command here'
+    expected_output: State moves toward the objective
+    explanation: Small changes make rollback easy if the hypothesis was wrong.
+    next_on: command_success
+  - step: 3
+    title: Verify with the grader
+    instruction: Run the same verification the checker uses.
+    command: check.sh
+    expected_output: all hidden tests pass
+    explanation: The lab passes only when real state is healthy.
+    next_on: command_success

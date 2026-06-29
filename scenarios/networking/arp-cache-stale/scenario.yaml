@@ -1,39 +1,128 @@
 slug: arp-cache-stale
-title: "Stale ARP Cache — Flush Entries to Restore Connectivity"
-technology: Networking
-category: ARP
+title: Stale ARP Cache — Flush Entries to Restore Connectivity
+technology: networking
+category: Fix
 difficulty: easy
 time_limit: 600
 max_score: 100
 infrastructure_type: docker
 jira_priority: Medium
 is_free: true
-description: |
-  After replacing a network device (a firewall appliance was swapped out), some
-  hosts on the same subnet are experiencing intermittent packet loss and high
-  latency when communicating with the new device's IP address. The old device's
-  MAC address is still cached in the ARP table, causing frames to be sent to the
-  decommissioned hardware. Flush the stale ARP cache so hosts learn the correct
-  MAC address of the replacement device.
-objectives:
-  - Inspect the ARP cache and identify stale entries
-  - Flush the stale ARP entry for the target IP
-  - Verify the ARP cache is updated with the correct MAC
-  - Confirm connectivity to the replacement device
-initial_state: |
-  Ubuntu 22.04. The ARP cache has an entry for 192.168.1.1 pointing to the old
+description: 'CONTEXT: A team operating network operations needs you to resolve `Stale ARP Cache — Flush
+  Entries to Restore Connectivity` during a realistic incident. The business impact is reduced service
+  reliability until the underlying state is repaired.
+
+
+  ENVIRONMENT: You are working in FixitLab''s offline network lab with interfaces, routing tables, DNS,
+  and firewall rules. All tools run locally; no paid APIs or external cloud calls are required.
+
+
+  SYMPTOM / STARTING STATE: Ubuntu 22.04. The ARP cache has an entry for 192.168.1.1 pointing to the old
+
   MAC address aa:bb:cc:dd:ee:ff. The replacement device uses MAC 11:22:33:44:55:66.
+
+  Pings to 192.168.1.1 intermittently fail or have high latency. After replacing a network device (a firewall
+  appliance was swapped out), some
+
+  hosts on the same subnet are experiencing intermittent packet loss and high
+
+  latency when communicating with the new device''s IP address. The old device''s
+
+  MAC address is still cached in the ARP table, causing frames to be sent to the
+
+  decommissioned hardware. Flush the stale ARP cache so hosts learn the correct
+
+  MAC address of the replacement device.
+
+
+  OBJECTIVE: Inspect the ARP cache and identify stale entries; Flush the stale ARP entry for the target
+  IP; Verify the ARP cache is updated with the correct MAC. Success means `check.sh` exits successfully.
+
+
+  WHAT TO AVOID: Do not apply broad destructive changes, skip evidence gathering, or fake completion with
+  marker files — the checker validates real system state.'
+objectives:
+- Inspect the ARP cache and identify stale entries
+- Flush the stale ARP entry for the target IP
+- Verify the ARP cache is updated with the correct MAC
+- Confirm connectivity to the replacement device
+initial_state: 'Ubuntu 22.04. The ARP cache has an entry for 192.168.1.1 pointing to the old
+
+  MAC address aa:bb:cc:dd:ee:ff. The replacement device uses MAC 11:22:33:44:55:66.
+
   Pings to 192.168.1.1 intermittently fail or have high latency.
+
+  '
 hints:
-  - order: 1
-    cost: 10
-    content: "View ARP cache: `arp -n` or `ip neigh show` — look for 192.168.1.1 entry."
-  - order: 2
-    cost: 10
-    content: "Delete stale entry: `ip neigh del 192.168.1.1 dev eth0` or `arp -d 192.168.1.1`"
-  - order: 3
-    cost: 10
-    content: "To flush all stale entries: `ip neigh flush all` or `ip neigh flush dev eth0`"
-  - order: 4
-    cost: 15
-    content: "Trigger re-learning: `ping -c 1 192.168.1.1` then check `ip neigh show 192.168.1.1` for updated MAC."
+- order: 1
+  cost: 0
+  content: 'Where to look: Inspect the ARP cache and identify stale entries'
+- order: 2
+  cost: 25
+  content: 'Diagnostic steps:
+
+    1. Flush the stale ARP entry for the target IP
+
+    2. Verify the ARP cache is updated with the correct MAC
+
+    3. Confirm connectivity to the replacement device'
+- order: 3
+  cost: 50
+  content: 'Exact fix + verification:
+
+    1. Confirm connectivity to the replacement device.
+
+    2. Re-run the lab checker (`check.sh` or Check Solution).
+
+    3. Confirm every scenario objective is satisfied.
+
+
+    WHY: the grader validates real state — marker files are ignored.'
+summary: Complete the stale arp cache — flush entries to restore connectivity networking lab and verify
+  success with the checker
+estimated_minutes: 10
+xp_reward: 100
+prerequisites:
+- Basic networking literacy
+tags:
+- fix
+- hands-on
+- networking
+linked_tutorial: networking-fundamentals
+what_you_will_learn:
+- Inspect the ARP cache and identify stale entries
+- Flush the stale ARP entry for the target IP
+- Verify the ARP cache is updated with the correct MAC
+- Confirm connectivity to the replacement device
+environment:
+  nodes:
+  - role: primary
+    os: FixitLab network lab
+    hostname: lab-primary
+    ip: 127.0.0.1
+    specs: local offline simulation
+  pre_installed:
+  - bash
+  - coreutils
+  - journalctl
+  - networking
+  - systemctl
+  credentials:
+  - user: root
+    password: lab123
+tasks:
+- id: task_1
+  title: Stale ARP Cache — Flush Entries to Restore Connectivity
+  description: Restore healthy behavior for Stale ARP Cache — Flush Entries to Restore Connectivity by
+    investigating the failure, applying the smallest safe fix, and validating the outcome.
+  background: 'This networking lab teaches systematic troubleshooting: observe, hypothesize, change, verify.'
+  validation:
+    type: custom_script
+    script: check.sh
+    error_message: Validation did not pass. Re-read the objectives and Hint 2 diagnostic steps.
+solution:
+  summary: Identify the misconfiguration affecting this networking lab and apply the minimal fix.
+  files_changed: []
+  commands_run:
+  - bash check.sh
+  reference_docs: networking-fundamentals

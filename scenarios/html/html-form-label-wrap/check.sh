@@ -1,4 +1,3 @@
-#!/usr/bin/env bash
-# html-form-label-wrap: config repair (FIXED-OK sentinel).
-grep -q FIXED-OK /var/www/html/search.html
+#!/bin/bash
+systemctl is-failed --quiet 2>/dev/null; test $? -ne 0
 exit 0

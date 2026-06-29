@@ -2,17 +2,37 @@ title: SSH Configuration Lockout
 slug: ssh-lockout
 lab_mode: simulation
 simulation_type: generic
-technology: Linux
-category: Security
+technology: linux
+category: Fix
 difficulty: hard
 time_limit: 1200
 max_score: 100
 infrastructure_type: docker
 jira_priority: High
-description: 'After a rushed security hardening pass, SSH to the production host is broken: sshd_config
+description: 'CONTEXT: A team operating Linux administration needs you to resolve `SSH Configuration Lockout`
+  during a realistic incident. The business impact is reduced service reliability until the underlying
+  state is repaired.
+
+
+  ENVIRONMENT: You are working in FixitLab''s offline Linux practice server with terminal and config files
+  under /etc and /var. All tools run locally; no paid APIs or external cloud calls are required.
+
+
+  SYMPTOM / STARTING STATE: Linux server where over-aggressive hardening broke SSH: sshd_config has invalid
+  options (and/or a non-standard port), and /etc/ssh/ssh_host_*_key files have wrong permissions, so sshd
+  fails to serve. After a rushed security hardening pass, SSH to the production host is broken: sshd_config
   contains invalid directives so the service won''t start (or won''t listen on port 22), and the host
   key file permissions were changed so sshd refuses them. Validate and fix the config, restore correct
-  host-key permissions, and get sshd listening on 22 again.'
+  host-key permissions, and get sshd listening on 22 again.
+
+
+  OBJECTIVE: Validate sshd_config and identify the invalid directives; Fix the config (restore listening
+  on port 22) and host-key file permissions; Start sshd and verify it is serving SSH. Success means `check.sh`
+  exits successfully.
+
+
+  WHAT TO AVOID: Do not apply broad destructive changes, skip evidence gathering, or fake completion with
+  marker files — the checker validates real system state.'
 objectives:
 - Validate sshd_config and identify the invalid directives
 - Fix the config (restore listening on port 22) and host-key file permissions
@@ -22,14 +42,72 @@ initial_state: 'Linux server where over-aggressive hardening broke SSH: sshd_con
   to serve.'
 hints:
 - order: 1
-  cost: 10
-  content: 'Validate the config: `sshd -t` prints the offending line(s). Also confirm the intended `Port
-    22`/`ListenAddress` settings.'
+  cost: 0
+  content: 'Where to look: Run `systemctl status sshd` and `ss -tlnp | grep :22` on the target host.'
 - order: 2
-  cost: 15
-  content: 'Correct the invalid directives in /etc/ssh/sshd_config. Host keys must be tightly permissioned:
-    `chmod 600 /etc/ssh/ssh_host_*_key`.'
+  cost: 25
+  content: 'Diagnostic steps:
+
+    1. Confirm sshd is active and listening on port 22.
+
+    2. Check `firewall-cmd` or iptables for blocked port 22.
+
+    3. Read `/var/log/secure` for auth or config errors.'
 - order: 3
-  cost: 20
-  content: 'Once `sshd -t` is clean, `systemctl restart sshd` and confirm it''s listening: `ss -tlnp |
-    grep :22`. Test a connection before closing your current session.'
+  cost: 50
+  content: 'Exact fix + verification:
+
+    1. Fix sshd_config, firewall, or socket unit as needed.
+
+    2. `systemctl restart sshd`.
+
+    3. `ssh -o BatchMode=yes user@localhost echo ok` succeeds.
+
+
+    WHY: SSH failures are usually service, firewall, or config — not credentials alone.'
+summary: Complete the ssh configuration lockout linux lab and verify success with the checker
+estimated_minutes: 20
+xp_reward: 100
+prerequisites:
+- Basic linux literacy
+tags:
+- fix
+- hands-on
+- linux
+linked_tutorial: linux-fundamentals
+what_you_will_learn:
+- Validate sshd_config and identify the invalid directives
+- Fix the config (restore listening on port 22) and host-key file permissions
+- Start sshd and verify it is serving SSH
+environment:
+  nodes:
+  - role: primary
+    os: FixitLab Linux practice server
+    hostname: lab-primary
+    ip: 127.0.0.1
+    specs: local offline simulation
+  pre_installed:
+  - bash
+  - coreutils
+  - journalctl
+  - linux
+  - systemctl
+  credentials:
+  - user: root
+    password: lab123
+tasks:
+- id: task_1
+  title: SSH Configuration Lockout
+  description: Restore healthy behavior for SSH Configuration Lockout by investigating the failure, applying
+    the smallest safe fix, and validating the outcome.
+  background: 'This linux lab teaches systematic troubleshooting: observe, hypothesize, change, verify.'
+  validation:
+    type: custom_script
+    script: check.sh
+    error_message: Validation did not pass. Re-read the objectives and Hint 2 diagnostic steps.
+solution:
+  summary: Identify the misconfiguration affecting this linux lab and apply the minimal fix.
+  files_changed: []
+  commands_run:
+  - bash check.sh
+  reference_docs: linux-fundamentals

@@ -1,8 +1,7 @@
----
 slug: jpa-n-plus-1
-title: "JPA N+1 Query Storm Hammering the Database"
-technology: Java
-category: "Spring Data JPA"
+title: JPA N+1 Query Storm Hammering the Database
+technology: java
+category: Fix
 difficulty: hard
 time_limit: 1200
 max_score: 100
@@ -11,22 +10,108 @@ simulation_type: java
 infrastructure_type: simulation
 jira_priority: High
 is_free: false
-description: |
-  Listing orders triggers hundreds of SQL queries: one for the orders plus one per order for its line items (the classic N+1 problem from lazy associations). The database is saturated and the endpoint is slow. Fetch the association eagerly for this query path with a JOIN FETCH / entity graph and enable SQL logging to prove it.
+description: 'CONTEXT: A team operating Java applications needs you to resolve `JPA N+1 Query Storm Hammering
+  the Database` during a realistic incident. The business impact is reduced service reliability until
+  the underlying state is repaired.
+
+
+  ENVIRONMENT: You are working in FixitLab''s offline Java project with Maven/Gradle, JVM logs, and Spring
+  configuration. All tools run locally; no paid APIs or external cloud calls are required.
+
+
+  SYMPTOM / STARTING STATE: Config at /app/src/main/resources/application.yml has SQL logging off; the
+  order-list path lazily loads line items, producing an N+1 query storm. Listing orders triggers hundreds
+  of SQL queries: one for the orders plus one per order for its line items (the classic N+1 problem from
+  lazy associations). The database is saturated and the endpoint is slow. Fetch the association eagerly
+  for this query path with a JOIN FETCH / entity graph and enable SQL logging to prove it.
+
+
+  OBJECTIVE: Enable SQL logging and confirm 1 + N queries per list call; Identify the lazily-loaded association
+  causing the per-row queries; Use JOIN FETCH or an @EntityGraph to batch the load. Success means `check.sh`
+  exits successfully.
+
+
+  WHAT TO AVOID: Do not apply broad destructive changes, skip evidence gathering, or fake completion with
+  marker files — the checker validates real system state.'
 objectives:
-  - "Enable SQL logging and confirm 1 + N queries per list call"
-  - "Identify the lazily-loaded association causing the per-row queries"
-  - "Use JOIN FETCH or an @EntityGraph to batch the load"
-  - "Verify the list endpoint now issues a small constant number of queries"
-initial_state: |
-  Config at /app/src/main/resources/application.yml has SQL logging off; the order-list path lazily loads line items, producing an N+1 query storm.
+- Enable SQL logging and confirm 1 + N queries per list call
+- Identify the lazily-loaded association causing the per-row queries
+- Use JOIN FETCH or an @EntityGraph to batch the load
+- Verify the list endpoint now issues a small constant number of queries
+initial_state: 'Config at /app/src/main/resources/application.yml has SQL logging off; the order-list
+  path lazily loads line items, producing an N+1 query storm.
+
+  '
 hints:
-  - order: 1
-    cost: 10
-    content: "Turn on spring.jpa.show-sql / hibernate SQL logging and count the queries per request."
-  - order: 2
-    cost: 15
-    content: "Add a query with 'JOIN FETCH o.lineItems' or annotate the repo method @EntityGraph."
-  - order: 3
-    cost: 20
-    content: "Or set hibernate.default_batch_fetch_size to batch lazy loads; confirm queries drop."
+- order: 1
+  cost: 0
+  content: 'Where to look: Enable SQL logging and confirm 1 + N queries per list call'
+- order: 2
+  cost: 25
+  content: 'Diagnostic steps:
+
+    1. Identify the lazily-loaded association causing the per-row queries
+
+    2. Use JOIN FETCH or an @EntityGraph to batch the load
+
+    3. Verify the list endpoint now issues a small constant number of queries'
+- order: 3
+  cost: 50
+  content: 'Exact fix + verification:
+
+    1. Verify the list endpoint now issues a small constant number of queries.
+
+    2. Re-run the lab checker (`check.sh` or Check Solution).
+
+    3. Confirm every scenario objective is satisfied.
+
+
+    WHY: the grader validates real state — marker files are ignored.'
+summary: Complete the jpa n+1 query storm hammering the database java lab and verify success with the
+  checker
+estimated_minutes: 20
+xp_reward: 100
+prerequisites:
+- Basic java literacy
+tags:
+- fix
+- hands-on
+- java
+linked_tutorial: java-fundamentals
+what_you_will_learn:
+- Enable SQL logging and confirm 1 + N queries per list call
+- Identify the lazily-loaded association causing the per-row queries
+- Use JOIN FETCH or an @EntityGraph to batch the load
+- Verify the list endpoint now issues a small constant number of queries
+environment:
+  nodes:
+  - role: primary
+    os: FixitLab Java project
+    hostname: lab-primary
+    ip: 127.0.0.1
+    specs: local offline simulation
+  pre_installed:
+  - bash
+  - coreutils
+  - java
+  - journalctl
+  - systemctl
+  credentials:
+  - user: root
+    password: lab123
+tasks:
+- id: task_1
+  title: JPA N+1 Query Storm Hammering the Database
+  description: Restore healthy behavior for JPA N+1 Query Storm Hammering the Database by investigating
+    the failure, applying the smallest safe fix, and validating the outcome.
+  background: 'This java lab teaches systematic troubleshooting: observe, hypothesize, change, verify.'
+  validation:
+    type: custom_script
+    script: check.sh
+    error_message: Validation did not pass. Re-read the objectives and Hint 2 diagnostic steps.
+solution:
+  summary: Identify the misconfiguration affecting this java lab and apply the minimal fix.
+  files_changed: []
+  commands_run:
+  - bash check.sh
+  reference_docs: java-fundamentals

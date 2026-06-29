@@ -1,8 +1,7 @@
----
 slug: sim-java-classpath
-title: "ClassNotFoundException — Missing JAR on the Runtime Classpath"
-technology: Java
-category: "Java Development"
+title: ClassNotFoundException - Missing JAR on the Runtime
+technology: java
+category: Fix
 difficulty: easy
 time_limit: 600
 max_score: 100
@@ -11,22 +10,108 @@ simulation_type: java
 infrastructure_type: simulation
 jira_priority: Medium
 is_free: false
-description: |
-  A Java application fails at runtime with java.lang.ClassNotFoundException (or NoClassDefFoundError). A required class lives in a JAR under lib/ that is not on the runtime classpath, so the JVM cannot load it when that code path runs. Identify the missing dependency JAR and launch the app with a correct -cp.
+description: 'CONTEXT: A team operating Java applications needs you to resolve `ClassNotFoundException
+  - Missing JAR on the Runtime` during a realistic incident. The business impact is reduced service reliability
+  until the underlying state is repaired.
+
+
+  ENVIRONMENT: You are working in FixitLab''s offline Java project with Maven/Gradle, JVM logs, and Spring
+  configuration. All tools run locally; no paid APIs or external cloud calls are required.
+
+
+  SYMPTOM / STARTING STATE: RHEL 9 server with a Java app. Dependency JARs are in lib/. The launch script
+  /app/run-app.sh omits a JAR, so runtime throws ClassNotFoundException. A Java application fails at runtime
+  with java.lang.ClassNotFoundException (or NoClassDefFoundError). A required class lives in a JAR under
+  lib/ that is not on the runtime classpath, so the JVM cannot load it when that code path runs. Identify
+  the missing dependency JAR and launch the app with a correct -cp.
+
+
+  OBJECTIVE: Reproduce the ClassNotFoundException and read the missing class name; Locate the JAR under
+  lib/ that provides the missing class; Add that JAR to the runtime classpath in the launch command. Success
+  means `check.sh` exits successfully.
+
+
+  WHAT TO AVOID: Do not apply broad destructive changes, skip evidence gathering, or fake completion with
+  marker files — the checker validates real system state.'
 objectives:
-  - "Reproduce the ClassNotFoundException and read the missing class name"
-  - "Locate the JAR under lib/ that provides the missing class"
-  - "Add that JAR to the runtime classpath in the launch command"
-  - "Run the app so the class resolves and it starts cleanly"
-initial_state: |
-  RHEL 9 server with a Java app. Dependency JARs are in lib/. The launch script /app/run-app.sh omits a JAR, so runtime throws ClassNotFoundException.
+- Reproduce the ClassNotFoundException and read the missing class name
+- Locate the JAR under lib/ that provides the missing class
+- Add that JAR to the runtime classpath in the launch command
+- Run the app so the class resolves and it starts cleanly
+initial_state: 'RHEL 9 server with a Java app. Dependency JARs are in lib/. The launch script /app/run-app.sh
+  omits a JAR, so runtime throws ClassNotFoundException.
+
+  '
 hints:
-  - order: 1
-    cost: 10
-    content: "java -cp app.jar Main throws ClassNotFoundException — note the fully-qualified class."
-  - order: 2
-    cost: 15
-    content: "Find the JAR: for j in lib/*.jar; do unzip -l \"$j\" | grep -q TheClass && echo \"$j\"; done."
-  - order: 3
-    cost: 20
-    content: "Launch with every JAR on the classpath: java -cp 'app.jar:lib/*' com.example.Main."
+- order: 1
+  cost: 0
+  content: 'Where to look: Reproduce the ClassNotFoundException and read the missing class name'
+- order: 2
+  cost: 25
+  content: 'Diagnostic steps:
+
+    1. Locate the JAR under lib/ that provides the missing class
+
+    2. Add that JAR to the runtime classpath in the launch command
+
+    3. Run the app so the class resolves and it starts cleanly'
+- order: 3
+  cost: 50
+  content: 'Exact fix + verification:
+
+    1. Run the app so the class resolves and it starts cleanly.
+
+    2. Re-run the lab checker (`check.sh` or Check Solution).
+
+    3. Confirm every scenario objective is satisfied.
+
+
+    WHY: the grader validates real state — marker files are ignored.'
+summary: Complete the classnotfoundexception - missing jar on the runtime java lab and verify success
+  with the checker
+estimated_minutes: 10
+xp_reward: 100
+prerequisites:
+- Basic java literacy
+tags:
+- fix
+- hands-on
+- java
+linked_tutorial: java-fundamentals
+what_you_will_learn:
+- Reproduce the ClassNotFoundException and read the missing class name
+- Locate the JAR under lib/ that provides the missing class
+- Add that JAR to the runtime classpath in the launch command
+- Run the app so the class resolves and it starts cleanly
+environment:
+  nodes:
+  - role: primary
+    os: FixitLab Java project
+    hostname: lab-primary
+    ip: 127.0.0.1
+    specs: local offline simulation
+  pre_installed:
+  - bash
+  - coreutils
+  - java
+  - journalctl
+  - systemctl
+  credentials:
+  - user: root
+    password: lab123
+tasks:
+- id: task_1
+  title: ClassNotFoundException - Missing JAR on the Runtime
+  description: Restore healthy behavior for ClassNotFoundException - Missing JAR on the Runtime by investigating
+    the failure, applying the smallest safe fix, and validating the outcome.
+  background: 'This java lab teaches systematic troubleshooting: observe, hypothesize, change, verify.'
+  validation:
+    type: custom_script
+    script: check.sh
+    error_message: Validation did not pass. Re-read the objectives and Hint 2 diagnostic steps.
+solution:
+  summary: Identify the misconfiguration affecting this java lab and apply the minimal fix.
+  files_changed: []
+  commands_run:
+  - bash check.sh
+  reference_docs: java-fundamentals

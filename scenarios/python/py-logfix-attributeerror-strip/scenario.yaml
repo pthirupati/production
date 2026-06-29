@@ -1,9 +1,27 @@
 title: 'Log Analysis: Fix the AttributeError on int.strip'
 slug: py-logfix-attributeerror-strip
-category: Python Development
-description: 'The log shows `AttributeError: ''int'' object has no attribute ''strip''` from normalize()
-  because it calls .strip().lower() on every value, but some values are non-strings. Coerce to str first
-  (or skip non-strings) so it never crashes, returning a lowercased, stripped string for every input.'
+category: Fix
+description: 'CONTEXT: A team operating Python development needs you to resolve `Log Analysis: Fix the
+  AttributeError on int.strip` during a realistic incident. The business impact is reduced service reliability
+  until the underlying state is repaired.
+
+
+  ENVIRONMENT: You are working in FixitLab''s offline Python project workspace with source files, venv,
+  tests, and CLI entrypoints. All tools run locally; no paid APIs or external cloud calls are required.
+
+
+  SYMPTOM / STARTING STATE: The log shows `AttributeError: ''int'' object has no attribute ''strip''`
+  from normalize() because it calls .strip().lower() on every value, but some values are non-strings.
+  Coerce to str first (or skip non-strings) so it never crashes, returning a lowercased, stripped string
+  for every input.
+
+
+  OBJECTIVE: Read the AttributeError and find the unsafe .strip call; Coerce the value to a string before
+  string operations; Return a normalized string for any input type. Success means all hidden tests pass.
+
+
+  WHAT TO AVOID: Do not apply broad destructive changes, skip evidence gathering, or fake completion with
+  marker files — the checker validates real system state.'
 difficulty: medium
 scenario_type: fix
 lab_mode: simulation
@@ -21,54 +39,122 @@ objectives:
 initial_state: 'The log shows `AttributeError: ''int'' object has no attribute ''strip''` from normalize()
   because it calls .strip().lower() on every value, but some values are non-strings. Coerce to str first
   (or skip non-strings) so it never crashes, returning a lowercased, stripped string for every input.'
-solution_explanation: |
-  String methods only exist on strings. Wrapping the value in str() first makes the normalization total over any input type.
+solution_explanation: 'String methods only exist on strings. Wrapping the value in str() first makes the
+  normalization total over any input type.
+
+  '
 coding_spec:
   language: python
   entrypoint: solution.py
   kind: logfix
-  instructions: |
-    Fix normalize(value): return str(value) lowercased and stripped of surrounding whitespace. It must work for strings AND non-strings (ints, etc). The log shows it crashes on an int.
-      normalize('  Hi ') -> 'hi', normalize(42) -> '42'
-    Click Run to try it, then Check Solution to grade against all tests.
+  instructions: "Fix normalize(value): return str(value) lowercased and stripped of surrounding whitespace.\
+    \ It must work for strings AND non-strings (ints, etc). The log shows it crashes on an int.\n  normalize('\
+    \  Hi ') -> 'hi', normalize(42) -> '42'\nClick Run to try it, then Check Solution to grade against\
+    \ all tests.\n"
   files:
   - path: solution.py
-    content: |
-      # Production log:
-      #   AttributeError: 'int' object has no attribute 'strip'
-      #     at normalize(value) -> return value.strip().lower()
-
-      def normalize(value):
-          return value.strip().lower()   # fails for non-strings
+    content: "# Production log:\n#   AttributeError: 'int' object has no attribute 'strip'\n#     at normalize(value)\
+      \ -> return value.strip().lower()\n\ndef normalize(value):\n    return value.strip().lower()   #\
+      \ fails for non-strings\n"
     readonly: false
   visible_tests:
   - name: string normalized
-    code: |
-      assert normalize('  Hi ') == 'hi'
+    code: 'assert normalize(''  Hi '') == ''hi''
+
+      '
   - name: int coerced
-    code: |
-      assert normalize(42) == '42'
+    code: 'assert normalize(42) == ''42''
+
+      '
   hidden_tests:
   - name: already clean
-    code: |
-      assert normalize('abc') == 'abc'
+    code: 'assert normalize(''abc'') == ''abc''
+
+      '
   - name: uppercase
-    code: |
-      assert normalize('HELLO') == 'hello'
+    code: 'assert normalize(''HELLO'') == ''hello''
+
+      '
   - name: float
-    code: |
-      assert normalize(3.5) == '3.5'
+    code: 'assert normalize(3.5) == ''3.5''
+
+      '
   - name: whitespace only
-    code: |
-      assert normalize('   ') == ''
+    code: 'assert normalize(''   '') == ''''
+
+      '
   timeout: 8
 hints:
 - order: 1
-  cost: 10
-  content: The log shows .strip() called on an int.
+  cost: 0
+  content: 'Where to look: Open `solution.py`, read the instructions, and run the visible tests to see
+    which assertion fails first.'
 - order: 2
-  cost: 20
-  content: Convert with str(value) before calling string methods.
+  cost: 25
+  content: 'Diagnostic steps:
+
+    1. Click Run and read the traceback — note line number and actual vs expected values.
+
+    2. Reproduce the failure with the smallest input from a visible test.
+
+    3. Compare your implementation to the bug described in the lab prompt.'
 - order: 3
-  cost: 30
-  content: Return str(value).strip().lower().
+  cost: 50
+  content: 'Exact fix + verification:
+
+    1. Return a normalized string for any input type.
+
+    2. Re-run the lab checker (`check.sh` or Check Solution).
+
+    3. Confirm every scenario objective is satisfied.
+
+
+    WHY: the grader validates real state — marker files are ignored.'
+technology: python
+summary: 'Complete the log analysis: fix the attributeerror on int strip python lab and verify success
+  with the checker'
+estimated_minutes: 25
+xp_reward: 100
+prerequisites:
+- Basic python literacy
+tags:
+- fix
+- hands-on
+- python
+linked_tutorial: python-fundamentals
+what_you_will_learn:
+- Read the AttributeError and find the unsafe .strip call
+- Coerce the value to a string before string operations
+- Return a normalized string for any input type
+environment:
+  nodes:
+  - role: primary
+    os: FixitLab Python project workspace
+    hostname: lab-primary
+    ip: 127.0.0.1
+    specs: local offline simulation
+  pre_installed:
+  - bash
+  - coreutils
+  - pip
+  - python
+  - python3
+  credentials:
+  - user: root
+    password: lab123
+tasks:
+- id: task_1
+  title: 'Log Analysis: Fix the AttributeError on int.strip'
+  description: 'Restore healthy behavior for Log Analysis: Fix the AttributeError on int.strip by investigating
+    the failure, applying the smallest safe fix, and validating the outcome.'
+  background: 'This python lab teaches systematic troubleshooting: observe, hypothesize, change, verify.'
+  validation:
+    type: custom_script
+    script: hidden_tests
+    error_message: One or more hidden tests failed. Read the public test output, fix your solution, and
+      submit again.
+solution:
+  summary: The solution passes all hidden tests by implementing the required behavior in code.
+  files_changed: []
+  commands_run: []
+  reference_docs: python-fundamentals

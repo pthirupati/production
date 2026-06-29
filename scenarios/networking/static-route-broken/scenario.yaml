@@ -1,17 +1,35 @@
 title: Missing Static Route
 slug: static-route-broken
-technology: Networking
-category: Routing
+technology: networking
+category: Fix
 difficulty: medium
 time_limit: 900
 max_score: 100
 infrastructure_type: docker
 docker_privileged: true
 jira_priority: Medium
-description: Applications can't reach hosts on the 10.50.0.0/24 subnet after a network change because
-  the static route to that network is missing from the routing table — packets fall through to a default
-  gateway that can't deliver them (or are dropped). Add the correct static route via the proper next-hop
-  and make it persistent.
+description: 'CONTEXT: A team operating network operations needs you to resolve `Missing Static Route`
+  during a realistic incident. The business impact is reduced service reliability until the underlying
+  state is repaired.
+
+
+  ENVIRONMENT: You are working in FixitLab''s offline network lab with interfaces, routing tables, DNS,
+  and firewall rules. All tools run locally; no paid APIs or external cloud calls are required.
+
+
+  SYMPTOM / STARTING STATE: Linux server missing a static route for 10.50.0.0/24, so traffic to that subnet
+  isn''t delivered after a recent network change. Applications can''t reach hosts on the 10.50.0.0/24
+  subnet after a network change because the static route to that network is missing from the routing table
+  — packets fall through to a default gateway that can''t deliver them (or are dropped). Add the correct
+  static route via the proper next-hop and make it persistent.
+
+
+  OBJECTIVE: Confirm 10.50.0.0/24 is unreachable and the route is missing; Add the static route via the
+  correct gateway; Verify connectivity and persist the route. Success means `check.sh` exits successfully.
+
+
+  WHAT TO AVOID: Do not apply broad destructive changes, skip evidence gathering, or fake completion with
+  marker files — the checker validates real system state.'
 objectives:
 - Confirm 10.50.0.0/24 is unreachable and the route is missing
 - Add the static route via the correct gateway
@@ -20,14 +38,70 @@ initial_state: Linux server missing a static route for 10.50.0.0/24, so traffic 
   after a recent network change.
 hints:
 - order: 1
-  cost: 10
-  content: 'Confirm the gap: `ip route get 10.50.0.10` shows it using the default route (or no route).
-    Inspect the table: `ip route` — there''s no 10.50.0.0/24 entry.'
+  cost: 0
+  content: 'Where to look: Confirm 10.50.0.0/24 is unreachable and the route is missing'
 - order: 2
-  cost: 15
-  content: 'Add the route via the correct next-hop: `ip route add 10.50.0.0/24 via 172.16.0.1` (adjust
-    the gateway to your topology).'
+  cost: 25
+  content: 'Diagnostic steps:
+
+    1. Add the static route via the correct gateway
+
+    2. Verify connectivity and persist the route'
 - order: 3
-  cost: 20
-  content: 'Verify: `ip route get 10.50.0.10` now uses the new route and a ping/connection to the subnet
-    works. Persist it (NetworkManager route or /etc/sysconfig/network-scripts) so it survives reboot.'
+  cost: 50
+  content: 'Exact fix + verification:
+
+    1. Verify connectivity and persist the route.
+
+    2. Re-run the lab checker (`check.sh` or Check Solution).
+
+    3. Confirm every scenario objective is satisfied.
+
+
+    WHY: the grader validates real state — marker files are ignored.'
+summary: Complete the missing static route networking lab and verify success with the checker
+estimated_minutes: 15
+xp_reward: 100
+prerequisites:
+- Basic networking literacy
+tags:
+- fix
+- hands-on
+- networking
+linked_tutorial: networking-fundamentals
+what_you_will_learn:
+- Confirm 10.50.0.0/24 is unreachable and the route is missing
+- Add the static route via the correct gateway
+- Verify connectivity and persist the route
+environment:
+  nodes:
+  - role: primary
+    os: FixitLab network lab
+    hostname: lab-primary
+    ip: 127.0.0.1
+    specs: local offline simulation
+  pre_installed:
+  - bash
+  - coreutils
+  - journalctl
+  - networking
+  - systemctl
+  credentials:
+  - user: root
+    password: lab123
+tasks:
+- id: task_1
+  title: Missing Static Route
+  description: Restore healthy behavior for Missing Static Route by investigating the failure, applying
+    the smallest safe fix, and validating the outcome.
+  background: 'This networking lab teaches systematic troubleshooting: observe, hypothesize, change, verify.'
+  validation:
+    type: custom_script
+    script: check.sh
+    error_message: Validation did not pass. Re-read the objectives and Hint 2 diagnostic steps.
+solution:
+  summary: Identify the misconfiguration affecting this networking lab and apply the minimal fix.
+  files_changed: []
+  commands_run:
+  - bash check.sh
+  reference_docs: networking-fundamentals

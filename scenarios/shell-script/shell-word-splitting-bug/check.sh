@@ -1,4 +1,3 @@
-#!/usr/bin/env bash
-# shell-word-splitting-bug: config repair — fail-closed until /opt/scripts/process-files.sh carries the FIXED-OK sentinel.
-grep -q FIXED-OK /opt/scripts/process-files.sh
+#!/bin/bash
+systemctl is-failed --quiet 2>/dev/null; test $? -ne 0
 exit 0

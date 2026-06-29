@@ -1,7 +1,7 @@
-title: 'Kubernetes: Role-Based Access Control — Observability Practice'
+title: Role-Based Access Control — Observability Lab
 slug: academy-kubernetes-078-observability-rbac-8
-technology: Kubernetes
-category: Observability
+technology: kubernetes
+category: Optimize
 difficulty: medium
 scenario_type: do
 lab_mode: simulation
@@ -11,42 +11,130 @@ max_score: 100
 is_free: false
 infrastructure_type: docker
 jira_priority: Medium
-description: Kubernetes operations lab. One or more pods are **not Running** — workloads for Observability
-  Practice cannot serve traffic. Inspect with `kubectl get pods`, read `kubectl describe pod` events,
-  fix the root cause, and confirm all pods Running.
+description: 'CONTEXT: A team operating Kubernetes needs you to resolve `Role-Based Access Control — Observability`
+  during a realistic incident. The business impact is reduced service reliability until the underlying
+  state is repaired.
+
+
+  ENVIRONMENT: You are working in FixitLab''s offline Kubernetes cluster with kubectl, manifests, and
+  cluster resources. All tools run locally; no paid APIs or external cloud calls are required.
+
+
+  SYMPTOM / STARTING STATE: The system runs, but role-based access control lacks useful telemetry. Dashboards/alerts
+  are blank or noisy — improve signal quality. Observability task: make role-based access control visible
+  in logs, metrics, or traces. On-call should answer ''what is broken?'' quickly using signals from roles,
+  bindings, least privilege, and auditability.
+
+
+  OBJECTIVE: Day-2 role-based access control work completes safely in this environment; Changes are verified
+  with before/after checks; The system remains stable for dependent teams. Success means `kubectl get
+  pods` shows every pod Running.
+
+
+  WHAT TO AVOID: Do not apply broad destructive changes, skip evidence gathering, or fake completion with
+  marker files — the checker validates real system state.'
 objectives:
-- All pods in the default namespace are Running
-- '`kubectl get pods` shows every pod Running'
-- The deployment survives `kubectl get pods` re-check
-initial_state: The cluster is up but at least one pod is CrashLoopBackOff or Pending.
+- Day-2 role-based access control work completes safely in this environment
+- Changes are verified with before/after checks
+- The system remains stable for dependent teams
+initial_state: The system runs, but role-based access control lacks useful telemetry. Dashboards/alerts
+  are blank or noisy — improve signal quality.
 hints:
 - order: 1
-  cost: 10
-  content: 'Orient yourself before changing anything:
-
-    1. Inspect the current state — RBAC policy objects, role assignments, and effective permissions.
-
-    2. Write down what looks normal versus wrong or missing for role-based access control.
-
-    3. Recall the core idea: roles, bindings, least privilege, and auditability. Form one hypothesis before
-    you act.'
+  cost: 0
+  content: 'Where to look: Run `kubectl get pods -A` and `kubectl describe pod <name>` for any pod not
+    in Running state.'
 - order: 2
-  cost: 15
-  content: 'Plan your approach (still no spoilers):
-
-    1. Confirm the exact gap between current and desired state for role-based access control.
-
-    2. Decide the single smallest change that moves you toward the objective.
-
-    3. Capture evidence (command output / status) before the change so you can prove it worked afterward.'
-- order: 3
   cost: 25
-  content: 'Guided walkthrough:
+  content: 'Diagnostic steps:
 
-    1. Re-check the current state — RBAC policy objects, role assignments, and effective permissions.
+    1. `kubectl get pods` — note CrashLoopBackOff, ImagePullBackOff, or Pending.
 
-    2. Add or fix the exporter / dashboard / alert with clear names, labels, and a sensible threshold.
+    2. `kubectl describe pod <name>` — read Events at the bottom.
 
-    3. Verify the result — effective permissions match the policy of least privilege.
+    3. `kubectl logs <name> [--previous]` if the container restarted.'
+- order: 3
+  cost: 50
+  content: 'Exact fix + verification:
 
-    4. Click Check Solution once `kubectl get pods` shows every pod Running.'
+    1. Fix the root cause (image name, env var, volume mount, or probe).
+
+    2. `kubectl apply -f` the corrected manifest or delete the pod to recreate.
+
+    3. Confirm `kubectl get pods` shows every pod Running.
+
+
+    WHY: Kubernetes only reports healthy when the workload actually runs.'
+summary: Complete the role-based access control — observability lab kubernetes lab and verify success
+  with the checker
+estimated_minutes: 20
+xp_reward: 100
+prerequisites:
+- Basic kubernetes literacy
+tags:
+- do
+- hands-on
+- kubernetes
+linked_tutorial: kubernetes-fundamentals
+what_you_will_learn:
+- Day-2 role-based access control work completes safely in this environment
+- Changes are verified with before/after checks
+- The system remains stable for dependent teams
+environment:
+  nodes:
+  - role: primary
+    os: FixitLab Kubernetes cluster
+    hostname: lab-primary
+    ip: 127.0.0.1
+    specs: local offline simulation
+  pre_installed:
+  - bash
+  - coreutils
+  - helm
+  - kubectl
+  - kubernetes
+  credentials:
+  - user: root
+    password: lab123
+tasks:
+- id: task_1
+  title: Role-Based Access Control — Observability Lab
+  description: Restore healthy behavior for Role-Based Access Control — Observability Lab by investigating
+    the failure, applying the smallest safe fix, and validating the outcome.
+  background: 'This kubernetes lab teaches systematic troubleshooting: observe, hypothesize, change, verify.'
+  validation:
+    type: k8s_resource_state
+    resource_kind: Pod
+    resource_name: all
+    namespace: default
+    expected_state: Running
+    error_message: One or more pods are not Running. Use kubectl describe pod and kubectl logs.
+solution:
+  summary: Identify the misconfiguration affecting this kubernetes lab and apply the minimal fix.
+  files_changed: []
+  commands_run: []
+  reference_docs: kubernetes-fundamentals
+guided_mode:
+  enabled: true
+  steps:
+  - step: 1
+    title: Inspect current state
+    instruction: Run a read-only diagnostic before changing anything.
+    command: check.sh
+    expected_output: Output shows the current failure mode
+    explanation: Evidence-first troubleshooting avoids guessing.
+    next_on: command_success
+  - step: 2
+    title: Apply the minimal fix
+    instruction: Make one reversible change aligned with the objectives.
+    command: '# your fix command here'
+    expected_output: State moves toward the objective
+    explanation: Small changes make rollback easy if the hypothesis was wrong.
+    next_on: command_success
+  - step: 3
+    title: Verify with the grader
+    instruction: Run the same verification the checker uses.
+    command: check.sh
+    expected_output: '`kubectl get pods` shows every pod Running'
+    explanation: The lab passes only when real state is healthy.
+    next_on: command_success

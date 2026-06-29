@@ -1,23 +1,54 @@
-category: Database Administration
-description: The mysqld service fails to start and the database is down. The error log points at a concrete
-  cause — usually a bad directive in the MySQL config, wrong datadir permissions, or a stale PID/socket
-  — so systemd reports the unit as failed. Read the log, fix the underlying problem, and bring mysqld
-  back to active.
+category: Fix
+description: 'CONTEXT: A team operating database administration needs you to resolve `MySQL Service Won''t
+  Start` during a realistic incident. The business impact is reduced service reliability until the underlying
+  state is repaired.
+
+
+  ENVIRONMENT: You are working in FixitLab''s offline database server with SQL client, schemas, backups,
+  and performance views. All tools run locally; no paid APIs or external cloud calls are required.
+
+
+  SYMPTOM / STARTING STATE: Simulated RHEL host. `systemctl start mysqld` fails and the unit is in a failed
+  state; the MySQL error log records why startup aborted (config error or permission/lock issue). The
+  mysqld service fails to start and the database is down. The error log points at a concrete cause — usually
+  a bad directive in the MySQL config, wrong datadir permissions, or a stale PID/socket — so systemd reports
+  the unit as failed. Read the log, fix the underlying problem, and bring mysqld back to active.
+
+
+  OBJECTIVE: Read the MySQL error log to find why startup fails; Fix the underlying cause (config directive,
+  permissions, or stale lock); Start mysqld and confirm the service is active. Success means `check.sh`
+  exits successfully.
+
+
+  WHAT TO AVOID: Do not apply broad destructive changes, skip evidence gathering, or fake completion with
+  marker files — the checker validates real system state.'
 difficulty: easy
 dual_terminal: false
 hints:
 - order: 1
-  cost: 10
-  content: 'See the failure reason: `systemctl status mysqld` then `journalctl -u mysqld -n 40` (and `/var/log/mysqld.log`).
-    The last lines name the bad directive or the path it can''t access.'
+  cost: 0
+  content: 'Where to look: Run `systemctl status mysqld` and tail `/var/log/mysqld.log`.'
 - order: 2
-  cost: 15
-  content: 'Common causes: an invalid line in /etc/my.cnf, the datadir (/var/lib/mysql) owned by the wrong
-    user, or a leftover PID/socket. Validate options with `mysqld --validate-config` if available.'
+  cost: 25
+  content: 'Diagnostic steps:
+
+    1. Read the error log for InnoDB or permission failures.
+
+    2. Check disk space with `df -h`.
+
+    3. Verify `my.cnf` for bad paths or bind-address.'
 - order: 3
-  cost: 20
-  content: Apply the fix (correct/remove the bad my.cnf line, `chown -R mysql:mysql /var/lib/mysql`, or
-    remove the stale lock), then `systemctl start mysqld` and confirm `systemctl is-active mysqld`.
+  cost: 50
+  content: 'Exact fix + verification:
+
+    1. Fix config or ownership under `/var/lib/mysql`.
+
+    2. `systemctl restart mysqld`.
+
+    3. Confirm `systemctl is-active mysqld` returns active.
+
+
+    WHY: MySQL often fails silently until you read the error log.'
 initial_state: Simulated RHEL host. `systemctl start mysqld` fails and the unit is in a failed state;
   the MySQL error log records why startup aborted (config error or permission/lock issue).
 is_free: false
@@ -33,3 +64,52 @@ simulation_type: database
 slug: sim-mysql-wont-start
 time_limit: 900
 title: MySQL Service Won't Start
+technology: database
+summary: Complete the mysql service won't start database lab and verify success with the checker
+estimated_minutes: 15
+xp_reward: 100
+prerequisites:
+- Basic database literacy
+tags:
+- database
+- fix
+- hands-on
+linked_tutorial: database-fundamentals
+what_you_will_learn:
+- Read the MySQL error log to find why startup fails
+- Fix the underlying cause (config directive, permissions, or stale lock)
+- Start mysqld and confirm the service is active
+environment:
+  nodes:
+  - role: primary
+    os: FixitLab database server
+    hostname: lab-primary
+    ip: 127.0.0.1
+    specs: local offline simulation
+  pre_installed:
+  - bash
+  - coreutils
+  - database
+  - journalctl
+  - systemctl
+  credentials:
+  - user: root
+    password: lab123
+tasks:
+- id: task_1
+  title: MySQL Service Won't Start
+  description: Restore healthy behavior for MySQL Service Won't Start by investigating the failure, applying
+    the smallest safe fix, and validating the outcome.
+  background: 'This database lab teaches systematic troubleshooting: observe, hypothesize, change, verify.'
+  validation:
+    type: service_active
+    command: systemctl is-active mysqld
+    expected_status: active
+    error_message: The mysqld service is not active yet. Check `systemctl status mysqld` and `journalctl
+      -u mysqld -n 50`.
+solution:
+  summary: Identify the misconfiguration affecting this database lab and apply the minimal fix.
+  files_changed: []
+  commands_run:
+  - systemctl is-active mysqld
+  reference_docs: database-fundamentals

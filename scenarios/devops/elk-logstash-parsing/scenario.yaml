@@ -1,14 +1,30 @@
 title: Fix Logstash Grok Pattern Parsing Failure
 slug: elk-logstash-parsing
-technology: DevOps
-category: Observability
+technology: devops
+category: Fix
 difficulty: hard
 time_limit: 1200
 max_score: 100
 infrastructure_type: docker
 jira_priority: High
 is_free: false
-description: 'The ELK stack Logstash pipeline is generating _grokparsefailure tags on
+description: 'CONTEXT: A team operating DevOps delivery needs you to resolve `Fix Logstash Grok Pattern
+  Parsing Failure` during a realistic incident. The business impact is reduced service reliability until
+  the underlying state is repaired.
+
+
+  ENVIRONMENT: You are working in FixitLab''s offline CI/CD lab with git repos, pipelines, artifacts,
+  and runbooks. All tools run locally; no paid APIs or external cloud calls are required.
+
+
+  SYMPTOM / STARTING STATE: Ubuntu server running Logstash. Pipeline config at /etc/logstash/conf.d/app.conf.
+
+  Logs at /var/log/app/app.log use format: [2024-01-15 10:30:45] ERROR myapp - Connection timeout
+
+  But the grok pattern uses %{TIMESTAMP_ISO8601:timestamp} which does not match
+
+  the bracket-enclosed date format. The ELK stack Logstash pipeline is generating _grokparsefailure tags
+  on
 
   all incoming log events. The grok pattern in the filter section does not
 
@@ -16,7 +32,14 @@ description: 'The ELK stack Logstash pipeline is generating _grokparsefailure ta
 
   parsed and structured fields are extracted.
 
-  '
+
+  OBJECTIVE: Identify the broken grok pattern in the Logstash pipeline config; Examine sample logs to
+  understand the actual format; Fix the grok pattern to correctly parse the log entries. Success means
+  `check.sh` exits successfully.
+
+
+  WHAT TO AVOID: Do not apply broad destructive changes, skip evidence gathering, or fake completion with
+  marker files — the checker validates real system state.'
 objectives:
 - Identify the broken grok pattern in the Logstash pipeline config
 - Examine sample logs to understand the actual format
@@ -33,18 +56,74 @@ initial_state: 'Ubuntu server running Logstash. Pipeline config at /etc/logstash
   '
 hints:
 - order: 1
-  cost: 10
-  content: 'Inspect the pipeline filter: `cat /etc/logstash/conf.d/app.conf` — the grok pattern is producing
-    `_grokparsefailure` on every event.'
+  cost: 0
+  content: 'Where to look: Identify the broken grok pattern in the Logstash pipeline config'
 - order: 2
-  cost: 15
-  content: 'Compare the pattern to a real log line: `tail -5 /var/log/app/app.log`. The actual format
-    is `[2024-01-15 10:30:45] LEVEL app - message`.'
-- order: 3
-  cost: 20
-  content: 'Match that format with: `\[%{TIMESTAMP_ISO8601:timestamp}\] %{LOGLEVEL:level} %{WORD:app}
-    - %{GREEDYDATA:message}` (test it in the Grok Debugger first).'
-- order: 4
   cost: 25
-  content: Update the filter, restart Logstash (`systemctl restart logstash`), and confirm new events
-    no longer carry the `_grokparsefailure` tag.
+  content: 'Diagnostic steps:
+
+    1. Examine sample logs to understand the actual format
+
+    2. Fix the grok pattern to correctly parse the log entries
+
+    3. Verify Logstash processes logs without _grokparsefailure'
+- order: 3
+  cost: 50
+  content: 'Exact fix + verification:
+
+    1. Verify Logstash processes logs without _grokparsefailure.
+
+    2. Re-run the lab checker (`check.sh` or Check Solution).
+
+    3. Confirm every scenario objective is satisfied.
+
+
+    WHY: the grader validates real state — marker files are ignored.'
+summary: Complete the fix logstash grok pattern parsing failure devops lab and verify success with the
+  checker
+estimated_minutes: 20
+xp_reward: 100
+prerequisites:
+- Basic devops literacy
+tags:
+- devops
+- fix
+- hands-on
+linked_tutorial: devops-fundamentals
+what_you_will_learn:
+- Identify the broken grok pattern in the Logstash pipeline config
+- Examine sample logs to understand the actual format
+- Fix the grok pattern to correctly parse the log entries
+- Verify Logstash processes logs without _grokparsefailure
+environment:
+  nodes:
+  - role: primary
+    os: FixitLab CI/CD lab
+    hostname: lab-primary
+    ip: 127.0.0.1
+    specs: local offline simulation
+  pre_installed:
+  - bash
+  - coreutils
+  - devops
+  - journalctl
+  - systemctl
+  credentials:
+  - user: root
+    password: lab123
+tasks:
+- id: task_1
+  title: Fix Logstash Grok Pattern Parsing Failure
+  description: Restore healthy behavior for Fix Logstash Grok Pattern Parsing Failure by investigating
+    the failure, applying the smallest safe fix, and validating the outcome.
+  background: 'This devops lab teaches systematic troubleshooting: observe, hypothesize, change, verify.'
+  validation:
+    type: custom_script
+    script: check.sh
+    error_message: Validation did not pass. Re-read the objectives and Hint 2 diagnostic steps.
+solution:
+  summary: Identify the misconfiguration affecting this devops lab and apply the minimal fix.
+  files_changed: []
+  commands_run:
+  - bash check.sh
+  reference_docs: devops-fundamentals

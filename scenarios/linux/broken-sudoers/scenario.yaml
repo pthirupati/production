@@ -2,17 +2,35 @@ title: Broken sudoers Configuration
 slug: broken-sudoers
 lab_mode: simulation
 simulation_type: generic
-technology: Linux
-category: User Management
+technology: linux
+category: Build
 difficulty: easy
 time_limit: 600
 max_score: 100
 infrastructure_type: docker
 jira_priority: Low
-description: User 'devops' can no longer run sudo — commands fail (often with a parse/syntax complaint)
-  because a typo was introduced into the sudoers configuration (e.g. `ALLL` instead of `ALL`). A malformed
-  sudoers line breaks privilege escalation for that user. Repair the entry safely with visudo and confirm
-  devops regains sudo.
+description: 'CONTEXT: A team operating Linux administration needs you to resolve `Broken sudoers Configuration`
+  during a realistic incident. The business impact is reduced service reliability until the underlying
+  state is repaired.
+
+
+  ENVIRONMENT: You are working in FixitLab''s offline Linux practice server with terminal and config files
+  under /etc and /var. All tools run locally; no paid APIs or external cloud calls are required.
+
+
+  SYMPTOM / STARTING STATE: Linux server where the sudoers configuration has a typo in the devops rule,
+  so devops cannot use sudo. Editing must be done safely to avoid locking out sudo entirely. User ''devops''
+  can no longer run sudo — commands fail (often with a parse/syntax complaint) because a typo was introduced
+  into the sudoers configuration (e.g. `ALLL` instead of `ALL`). A malformed sudoers line breaks privilege
+  escalation for that user. Repair the entry safely with visudo and confirm devops regains sudo.
+
+
+  OBJECTIVE: Diagnose why sudo fails for devops; Fix the sudoers typo safely with visudo; Verify devops
+  can run sudo commands again. Success means `check.sh` exits successfully.
+
+
+  WHAT TO AVOID: Do not apply broad destructive changes, skip evidence gathering, or fake completion with
+  marker files — the checker validates real system state.'
 objectives:
 - Diagnose why sudo fails for devops
 - Fix the sudoers typo safely with visudo
@@ -21,13 +39,94 @@ initial_state: Linux server where the sudoers configuration has a typo in the de
   use sudo. Editing must be done safely to avoid locking out sudo entirely.
 hints:
 - order: 1
-  cost: 10
-  content: 'Reproduce and inspect: `sudo -l -U devops` or `sudo -u devops sudo -n true` surfaces the error.
-    Always edit with `visudo` (it validates before saving).'
+  cost: 0
+  content: 'Where to look: Diagnose why sudo fails for devops'
 - order: 2
-  cost: 15
-  content: The devops line has a typo — e.g. `devops ALLL=(ALL) ...`. Correct `ALLL` to `ALL`.
+  cost: 25
+  content: 'Diagnostic steps:
+
+    1. Fix the sudoers typo safely with visudo
+
+    2. Verify devops can run sudo commands again'
 - order: 3
-  cost: 20
-  content: visudo will refuse to save a broken file; once it saves cleanly, verify with `sudo -u devops
-    sudo -n true` (no error) — devops has sudo back.
+  cost: 50
+  content: 'Exact fix + verification:
+
+    1. Verify devops can run sudo commands again.
+
+    2. Re-run the lab checker (`check.sh` or Check Solution).
+
+    3. Confirm every scenario objective is satisfied.
+
+
+    WHY: the grader validates real state — marker files are ignored.'
+summary: Complete the broken sudoers configuration linux lab and verify success with the checker
+estimated_minutes: 10
+xp_reward: 100
+prerequisites:
+- Basic linux literacy
+tags:
+- fix
+- hands-on
+- linux
+linked_tutorial: linux-fundamentals
+what_you_will_learn:
+- Diagnose why sudo fails for devops
+- Fix the sudoers typo safely with visudo
+- Verify devops can run sudo commands again
+environment:
+  nodes:
+  - role: primary
+    os: FixitLab Linux practice server
+    hostname: lab-primary
+    ip: 127.0.0.1
+    specs: local offline simulation
+  pre_installed:
+  - bash
+  - coreutils
+  - journalctl
+  - linux
+  - systemctl
+  credentials:
+  - user: root
+    password: lab123
+tasks:
+- id: task_1
+  title: Broken sudoers Configuration
+  description: Restore healthy behavior for Broken sudoers Configuration by investigating the failure,
+    applying the smallest safe fix, and validating the outcome.
+  background: 'This linux lab teaches systematic troubleshooting: observe, hypothesize, change, verify.'
+  validation:
+    type: custom_script
+    script: check.sh
+    error_message: Validation did not pass. Re-read the objectives and Hint 2 diagnostic steps.
+solution:
+  summary: Identify the misconfiguration affecting this linux lab and apply the minimal fix.
+  files_changed: []
+  commands_run:
+  - bash check.sh
+  reference_docs: linux-fundamentals
+guided_mode:
+  enabled: true
+  steps:
+  - step: 1
+    title: Inspect current state
+    instruction: Run a read-only diagnostic before changing anything.
+    command: check.sh
+    expected_output: Output shows the current failure mode
+    explanation: Evidence-first troubleshooting avoids guessing.
+    next_on: command_success
+  - step: 2
+    title: Apply the minimal fix
+    instruction: Make one reversible change aligned with the objectives.
+    command: '# your fix command here'
+    expected_output: State moves toward the objective
+    explanation: Small changes make rollback easy if the hypothesis was wrong.
+    next_on: command_success
+  - step: 3
+    title: Verify with the grader
+    instruction: Run the same verification the checker uses.
+    command: check.sh
+    expected_output: '`check.sh` exits successfully'
+    explanation: The lab passes only when real state is healthy.
+    next_on: command_success

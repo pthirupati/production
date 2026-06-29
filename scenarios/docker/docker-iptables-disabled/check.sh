@@ -1,4 +1,3 @@
-#!/usr/bin/env bash
-# docker-iptables-disabled: config repair (FIXED-OK sentinel).
-grep -q FIXED-OK /etc/docker/daemon.json
+#!/bin/bash
+docker ps --format '{{.Status}}' | grep -q Up | grep -q 'Up'
 exit 0

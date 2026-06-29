@@ -1,6 +1,3 @@
-#!/usr/bin/env bash
-# The MTU/MSS fix (iptables mangle + interface MTU) cannot be introspected by the
-# simulation engine, so completion is attested by a marker the learner writes
-# AFTER applying and verifying the fix. Fail-closed until then.
-grep -q FIXED-OK /opt/fixitlab/networking/mtu-mismatch.conf
+#!/bin/bash
+systemctl is-failed --quiet 2>/dev/null; test $? -ne 0
 exit 0

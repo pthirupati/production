@@ -2,17 +2,37 @@ title: Disk Space Crisis
 slug: disk-full
 lab_mode: simulation
 simulation_type: generic
-technology: Linux
-category: Storage
+technology: linux
+category: Fix
 difficulty: medium
 time_limit: 1200
 max_score: 100
 infrastructure_type: docker
 jira_priority: High
-description: 'Production alerts fired: a filesystem is at 98% and the web application can no longer write
-  logs, so services are failing. Disk space is being consumed by oversized logs, a hidden cache directory,
-  and a runaway process that keeps generating log data. Find the consumers, stop the runaway writer, and
-  reclaim enough space to restore service.'
+description: 'CONTEXT: A team operating Linux administration needs you to resolve `Disk Space Crisis`
+  during a realistic incident. The business impact is reduced service reliability until the underlying
+  state is repaired.
+
+
+  ENVIRONMENT: You are working in FixitLab''s offline Linux practice server with terminal and config files
+  under /etc and /var. All tools run locally; no paid APIs or external cloud calls are required.
+
+
+  SYMPTOM / STARTING STATE: Linux server with a filesystem at ~98% capacity. A log_generator process keeps
+  growing logs, oversized files sit under /var/log, and hidden cache files add to the pressure; the app
+  can''t write. Production alerts fired: a filesystem is at 98% and the web application can no longer
+  write logs, so services are failing. Disk space is being consumed by oversized logs, a hidden cache
+  directory, and a runaway process that keeps generating log data. Find the consumers, stop the runaway
+  writer, and reclaim enough space to restore service.
+
+
+  OBJECTIVE: Identify the largest files/directories consuming disk space; Find and remove hidden cache
+  files and oversized logs; Kill the log_generator process so logs stop growing, and confirm space is
+  reclaimed. Success means `check.sh` exits successfully.
+
+
+  WHAT TO AVOID: Do not apply broad destructive changes, skip evidence gathering, or fake completion with
+  marker files — the checker validates real system state.'
 objectives:
 - Identify the largest files/directories consuming disk space
 - Find and remove hidden cache files and oversized logs
@@ -22,15 +42,72 @@ initial_state: Linux server with a filesystem at ~98% capacity. A log_generator 
   write.
 hints:
 - order: 1
-  cost: 10
-  content: 'Find the big consumers top-down: `df -h` then `du -sh /* 2>/dev/null | sort -h` and drill
-    into the largest (e.g. /var/log/webapp/).'
+  cost: 0
+  content: 'Where to look: Run `df -h` and `du -xh /var /tmp /home | sort -h | tail -20` for large paths.'
 - order: 2
-  cost: 15
-  content: 'Don''t forget hidden dirs: `du -sh /tmp/.* 2>/dev/null`. And catch the writer: `ps aux | grep
-    log_generator` shows a process appending continuously.'
+  cost: 25
+  content: 'Diagnostic steps:
+
+    1. Find which mount is 100% — often `/` or `/var`.
+
+    2. `journalctl --disk-usage` and old logs under `/var/log`.
+
+    3. Look for core dumps, temp files, or oversized application data.'
 - order: 3
-  cost: 20
-  content: Stop the runaway first (`pkill -f log_generator`) so space stops filling, then truncate/remove
-    oversized logs (`truncate -s 0 /var/log/webapp/*.log`) and clear the cache. Confirm `df -h` drops
-    well below the alert threshold.
+  cost: 50
+  content: 'Exact fix + verification:
+
+    1. Remove or rotate the largest safe files (logs, caches, old packages).
+
+    2. `df -h` should show free space on the affected mount.
+
+    3. Retry the command that failed with ''No space left on device''.
+
+
+    WHY: many services fail cryptically when disk is full.'
+summary: Complete the disk space crisis linux lab and verify success with the checker
+estimated_minutes: 20
+xp_reward: 100
+prerequisites:
+- Basic linux literacy
+tags:
+- fix
+- hands-on
+- linux
+linked_tutorial: linux-fundamentals
+what_you_will_learn:
+- Identify the largest files/directories consuming disk space
+- Find and remove hidden cache files and oversized logs
+- Kill the log_generator process so logs stop growing, and confirm space is reclaimed
+environment:
+  nodes:
+  - role: primary
+    os: FixitLab Linux practice server
+    hostname: lab-primary
+    ip: 127.0.0.1
+    specs: local offline simulation
+  pre_installed:
+  - bash
+  - coreutils
+  - journalctl
+  - linux
+  - systemctl
+  credentials:
+  - user: root
+    password: lab123
+tasks:
+- id: task_1
+  title: Disk Space Crisis
+  description: Restore healthy behavior for Disk Space Crisis by investigating the failure, applying the
+    smallest safe fix, and validating the outcome.
+  background: 'This linux lab teaches systematic troubleshooting: observe, hypothesize, change, verify.'
+  validation:
+    type: custom_script
+    script: check.sh
+    error_message: Validation did not pass. Re-read the objectives and Hint 2 diagnostic steps.
+solution:
+  summary: Identify the misconfiguration affecting this linux lab and apply the minimal fix.
+  files_changed: []
+  commands_run:
+  - bash check.sh
+  reference_docs: linux-fundamentals

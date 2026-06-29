@@ -1,7 +1,7 @@
 slug: ansible-awx-create-template
 title: Create AWX Job Template from Project
-technology: Ansible
-category: AWX / Tower
+technology: ansible
+category: Build
 difficulty: medium
 scenario_type: do
 time_limit: 900
@@ -10,20 +10,117 @@ lab_mode: simulation
 simulation_type: ansible-awx
 infrastructure_type: simulation
 is_free: false
-description: >-
-  After syncing the ansible-playbooks project, create a new job template and prepare it for launch.
+description: 'CONTEXT: A team operating Ansible automation needs you to resolve `Create AWX Job Template
+  from Project` during a realistic incident. The business impact is reduced service reliability until
+  the underlying state is repaired.
+
+
+  ENVIRONMENT: You are working in FixitLab''s offline Ansible control node with inventory, playbooks,
+  roles, and ansible-playbook. All tools run locally; no paid APIs or external cloud calls are required.
+
+
+  SYMPTOM / STARTING STATE: AWX with a synced project but no job template for the new site playbook. After
+  syncing the ansible-playbooks project, create a new job template and prepare it for launch.
+
+
+  OBJECTIVE: Sign in to AWX; Create a new job template from the synced project; Verify the template appears
+  under Job Templates. Success means `check.sh` exits successfully.
+
+
+  WHAT TO AVOID: Do not apply broad destructive changes, skip evidence gathering, or fake completion with
+  marker files — the checker validates real system state.'
 objectives:
-  - Sign in to AWX
-  - Create a new job template from the synced project
-  - Verify the template appears under Job Templates
+- Sign in to AWX
+- Create a new job template from the synced project
+- Verify the template appears under Job Templates
 initial_state: AWX with a synced project but no job template for the new site playbook.
 hints:
-  - order: 1
-    cost: 10
-    content: Go to **Templates** and click **+ New Template**.
-  - order: 2
-    cost: 15
-    content: Name it (e.g. Site Deploy) and link it to the Production inventory.
-  - order: 3
-    cost: 20
-    content: Click **Check** once the template is created.
+- order: 1
+  cost: 0
+  content: 'Where to look: Create a new job template from the synced project'
+- order: 2
+  cost: 25
+  content: 'Diagnostic steps:
+
+    1. Verify the template appears under Job Templates'
+- order: 3
+  cost: 50
+  content: 'Exact fix + verification:
+
+    1. Verify the template appears under Job Templates.
+
+    2. Re-run the lab checker (`check.sh` or Check Solution).
+
+    3. Confirm every scenario objective is satisfied.
+
+
+    WHY: the grader validates real state — marker files are ignored.'
+summary: Complete the create awx job template from project ansible lab and verify success with the checker
+estimated_minutes: 15
+xp_reward: 100
+prerequisites:
+- Basic ansible literacy
+tags:
+- ansible
+- do
+- hands-on
+linked_tutorial: ansible-fundamentals
+what_you_will_learn:
+- Sign in to AWX
+- Create a new job template from the synced project
+- Verify the template appears under Job Templates
+environment:
+  nodes:
+  - role: primary
+    os: FixitLab Ansible control node
+    hostname: lab-primary
+    ip: 127.0.0.1
+    specs: local offline simulation
+  pre_installed:
+  - ansible
+  - ansible-playbook
+  - bash
+  - coreutils
+  credentials:
+  - user: root
+    password: lab123
+tasks:
+- id: task_1
+  title: Create AWX Job Template from Project
+  description: Restore healthy behavior for Create AWX Job Template from Project by investigating the
+    failure, applying the smallest safe fix, and validating the outcome.
+  background: 'This ansible lab teaches systematic troubleshooting: observe, hypothesize, change, verify.'
+  validation:
+    type: custom_script
+    script: check.sh
+    error_message: Validation did not pass. Re-read the objectives and Hint 2 diagnostic steps.
+solution:
+  summary: Identify the misconfiguration affecting this ansible lab and apply the minimal fix.
+  files_changed: []
+  commands_run:
+  - bash check.sh
+  reference_docs: ansible-fundamentals
+guided_mode:
+  enabled: true
+  steps:
+  - step: 1
+    title: Inspect current state
+    instruction: Run a read-only diagnostic before changing anything.
+    command: check.sh
+    expected_output: Output shows the current failure mode
+    explanation: Evidence-first troubleshooting avoids guessing.
+    next_on: command_success
+  - step: 2
+    title: Apply the minimal fix
+    instruction: Make one reversible change aligned with the objectives.
+    command: '# your fix command here'
+    expected_output: State moves toward the objective
+    explanation: Small changes make rollback easy if the hypothesis was wrong.
+    next_on: command_success
+  - step: 3
+    title: Verify with the grader
+    instruction: Run the same verification the checker uses.
+    command: check.sh
+    expected_output: '`check.sh` exits successfully'
+    explanation: The lab passes only when real state is healthy.
+    next_on: command_success

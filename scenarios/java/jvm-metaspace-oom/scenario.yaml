@@ -1,8 +1,7 @@
----
 slug: jvm-metaspace-oom
-title: "OutOfMemoryError: Metaspace From Classloader Leak"
-technology: Java
-category: "JVM Performance"
+title: 'OutOfMemoryError: Metaspace From Classloader Leak'
+technology: java
+category: Fix
 difficulty: hard
 time_limit: 1200
 max_score: 100
@@ -11,22 +10,108 @@ simulation_type: java
 infrastructure_type: simulation
 jira_priority: High
 is_free: false
-description: |
-  After repeated hot redeploys the JVM throws java.lang.OutOfMemoryError: Metaspace. Old application classloaders are never collected (a classloader leak), so loaded class metadata accumulates in Metaspace. Cap Metaspace to surface the leak early and address the retained classloaders.
+description: 'CONTEXT: A team operating Java applications needs you to resolve `OutOfMemoryError: Metaspace
+  From Classloader Leak` during a realistic incident. The business impact is reduced service reliability
+  until the underlying state is repaired.
+
+
+  ENVIRONMENT: You are working in FixitLab''s offline Java project with Maven/Gradle, JVM logs, and Spring
+  configuration. All tools run locally; no paid APIs or external cloud calls are required.
+
+
+  SYMPTOM / STARTING STATE: JVM flags at /app/jvm.options leave Metaspace unbounded; repeated redeploys
+  leak classloaders until ''OutOfMemoryError: Metaspace''. After repeated hot redeploys the JVM throws
+  java.lang.OutOfMemoryError: Metaspace. Old application classloaders are never collected (a classloader
+  leak), so loaded class metadata accumulates in Metaspace. Cap Metaspace to surface the leak early and
+  address the retained classloaders.
+
+
+  OBJECTIVE: Confirm the OOM is Metaspace (not heap) and that class count keeps rising; Set a Metaspace
+  size cap so the leak is bounded and visible; Identify the retained classloaders / static references
+  pinning old classes. Success means `check.sh` exits successfully.
+
+
+  WHAT TO AVOID: Do not apply broad destructive changes, skip evidence gathering, or fake completion with
+  marker files — the checker validates real system state.'
 objectives:
-  - "Confirm the OOM is Metaspace (not heap) and that class count keeps rising"
-  - "Set a Metaspace size cap so the leak is bounded and visible"
-  - "Identify the retained classloaders / static references pinning old classes"
-  - "Verify Metaspace stabilizes across redeploys"
-initial_state: |
-  JVM flags at /app/jvm.options leave Metaspace unbounded; repeated redeploys leak classloaders until 'OutOfMemoryError: Metaspace'.
+- Confirm the OOM is Metaspace (not heap) and that class count keeps rising
+- Set a Metaspace size cap so the leak is bounded and visible
+- Identify the retained classloaders / static references pinning old classes
+- Verify Metaspace stabilizes across redeploys
+initial_state: 'JVM flags at /app/jvm.options leave Metaspace unbounded; repeated redeploys leak classloaders
+  until ''OutOfMemoryError: Metaspace''.
+
+  '
 hints:
-  - order: 1
-    cost: 10
-    content: "jcmd <pid> GC.class_stats / VM.metaspace shows class metadata climbing each redeploy."
-  - order: 2
-    cost: 15
-    content: "Add -XX:MaxMetaspaceSize=256m so the leak fails fast instead of swallowing all memory."
-  - order: 3
-    cost: 20
-    content: "Find static refs / thread-locals pinning old classloaders and release them on shutdown."
+- order: 1
+  cost: 0
+  content: 'Where to look: Confirm the OOM is Metaspace (not heap) and that class count keeps rising'
+- order: 2
+  cost: 25
+  content: 'Diagnostic steps:
+
+    1. Set a Metaspace size cap so the leak is bounded and visible
+
+    2. Identify the retained classloaders / static references pinning old classes
+
+    3. Verify Metaspace stabilizes across redeploys'
+- order: 3
+  cost: 50
+  content: 'Exact fix + verification:
+
+    1. Verify Metaspace stabilizes across redeploys.
+
+    2. Re-run the lab checker (`check.sh` or Check Solution).
+
+    3. Confirm every scenario objective is satisfied.
+
+
+    WHY: the grader validates real state — marker files are ignored.'
+summary: 'Complete the outofmemoryerror: metaspace from classloader leak java lab and verify success with
+  the checker'
+estimated_minutes: 20
+xp_reward: 100
+prerequisites:
+- Basic java literacy
+tags:
+- fix
+- hands-on
+- java
+linked_tutorial: java-fundamentals
+what_you_will_learn:
+- Confirm the OOM is Metaspace (not heap) and that class count keeps rising
+- Set a Metaspace size cap so the leak is bounded and visible
+- Identify the retained classloaders / static references pinning old classes
+- Verify Metaspace stabilizes across redeploys
+environment:
+  nodes:
+  - role: primary
+    os: FixitLab Java project
+    hostname: lab-primary
+    ip: 127.0.0.1
+    specs: local offline simulation
+  pre_installed:
+  - bash
+  - coreutils
+  - java
+  - journalctl
+  - systemctl
+  credentials:
+  - user: root
+    password: lab123
+tasks:
+- id: task_1
+  title: 'OutOfMemoryError: Metaspace From Classloader Leak'
+  description: 'Restore healthy behavior for OutOfMemoryError: Metaspace From Classloader Leak by investigating
+    the failure, applying the smallest safe fix, and validating the outcome.'
+  background: 'This java lab teaches systematic troubleshooting: observe, hypothesize, change, verify.'
+  validation:
+    type: custom_script
+    script: check.sh
+    error_message: Validation did not pass. Re-read the objectives and Hint 2 diagnostic steps.
+solution:
+  summary: Identify the misconfiguration affecting this java lab and apply the minimal fix.
+  files_changed: []
+  commands_run:
+  - bash check.sh
+  reference_docs: java-fundamentals

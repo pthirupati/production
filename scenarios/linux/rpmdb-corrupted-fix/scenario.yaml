@@ -1,43 +1,140 @@
 title: yum Fails with Corrupted RPM Database
 slug: linux-rpmdb-corrupted-fix
 difficulty: medium
-category: Linux Administration
-description: |
-  Package management is broken on this server. Running yum install or yum update returns
+category: Fix
+description: 'CONTEXT: A team operating Linux administration needs you to resolve `yum Fails with Corrupted
+  RPM Database` during a realistic incident. The business impact is reduced service reliability until
+  the underlying state is repaired.
+
+
+  ENVIRONMENT: You are working in FixitLab''s offline Linux practice server with terminal and config files
+  under /etc and /var. All tools run locally; no paid APIs or external cloud calls are required.
+
+
+  SYMPTOM / STARTING STATE: Simulated RHEL 9 server. Running yum install vim returns:
+
+  "error: rpmdb: damaged header at cursor EOF"
+
+  "RPMDB altered outside of yum."
+
+  yum clean all also fails. The server is missing critical security updates and packages
+
+  cannot be installed or queried until the RPM database is repaired. Package management is broken on this
+  server. Running yum install or yum update returns
+
   an error about a damaged or corrupted RPM database. The RPM database files in
+
   /var/lib/rpm/ have become corrupted, possibly from a system crash or interrupted package
+
   operation. The database must be rebuilt using rpm --rebuilddb before package operations
+
   can resume.
 
-initial_state: |
-  Simulated RHEL 9 server. Running yum install vim returns:
+
+  OBJECTIVE: Confirm the error with yum install vim and note the exact error message; Remove the corrupted
+  RPM database lock files with rm -f /var/lib/rpm/__db.*; Rebuild the RPM database with rpm --rebuilddb.
+  Success means `check.sh` exits successfully.
+
+
+  WHAT TO AVOID: Do not apply broad destructive changes, skip evidence gathering, or fake completion with
+  marker files — the checker validates real system state.'
+initial_state: 'Simulated RHEL 9 server. Running yum install vim returns:
+
   "error: rpmdb: damaged header at cursor EOF"
+
   "RPMDB altered outside of yum."
+
   yum clean all also fails. The server is missing critical security updates and packages
+
   cannot be installed or queried until the RPM database is repaired.
 
+  '
 objectives:
-  - Confirm the error with yum install vim and note the exact error message
-  - Remove the corrupted RPM database lock files with rm -f /var/lib/rpm/__db.*
-  - Rebuild the RPM database with rpm --rebuilddb
-  - Run yum clean all to clear cached metadata
-  - Verify yum list installed | head works correctly
-  - Successfully install a test package to confirm package management is restored
+- Confirm the error with yum install vim and note the exact error message
+- Remove the corrupted RPM database lock files with rm -f /var/lib/rpm/__db.*
+- Rebuild the RPM database with rpm --rebuilddb
+- Run yum clean all to clear cached metadata
+- Verify yum list installed | head works correctly
+- Successfully install a test package to confirm package management is restored
 lab_mode: simulation
 simulation_type: generic
 time_limit: 900
 max_score: 100
 is_free: false
 hints:
-  - content: 'Remove stale lock files first: rm -f /var/lib/rpm/__db.*. These are BDB lock/cache files, not the actual database, and are safe to delete.'
-    cost: 10
-    order: 1
-  - content: 'Rebuild the database: rpm --rebuilddb. This rebuilds the index from the actual package headers stored in /var/lib/rpm/Packages. It may take a few minutes on a system with many packages.'
-    cost: 20
-    order: 2
-  - content: 'After rpm --rebuilddb, run yum clean all then yum makecache to refresh repository metadata. Test with yum install vim or rpm -q bash to verify the DB is working.'
-    cost: 15
-    order: 3
+- order: 1
+  cost: 0
+  content: 'Where to look: Confirm the error with yum install vim and note the exact error message'
+- order: 2
+  cost: 25
+  content: 'Diagnostic steps:
+
+    1. Remove the corrupted RPM database lock files with rm -f /var/lib/rpm/__db.*
+
+    2. Rebuild the RPM database with rpm --rebuilddb
+
+    3. Run yum clean all to clear cached metadata'
+- order: 3
+  cost: 50
+  content: 'Exact fix + verification:
+
+    1. Verify yum list installed | head works correctly.
+
+    2. Re-run the lab checker (`check.sh` or Check Solution).
+
+    3. Confirm every scenario objective is satisfied.
+
+
+    WHY: the grader validates real state — marker files are ignored.'
 requires_companion_hosts: false
 dual_terminal: false
 jira_priority: Medium
+technology: linux
+summary: Complete the yum fails with corrupted rpm database linux lab and verify success with the checker
+estimated_minutes: 15
+xp_reward: 100
+prerequisites:
+- Basic linux literacy
+tags:
+- fix
+- hands-on
+- linux
+linked_tutorial: linux-fundamentals
+what_you_will_learn:
+- Confirm the error with yum install vim and note the exact error message
+- Remove the corrupted RPM database lock files with rm -f /var/lib/rpm/__db.*
+- Rebuild the RPM database with rpm --rebuilddb
+- Run yum clean all to clear cached metadata
+- Verify yum list installed | head works correctly
+environment:
+  nodes:
+  - role: primary
+    os: FixitLab Linux practice server
+    hostname: lab-primary
+    ip: 127.0.0.1
+    specs: local offline simulation
+  pre_installed:
+  - bash
+  - coreutils
+  - journalctl
+  - linux
+  - systemctl
+  credentials:
+  - user: root
+    password: lab123
+tasks:
+- id: task_1
+  title: yum Fails with Corrupted RPM Database
+  description: Restore healthy behavior for yum Fails with Corrupted RPM Database by investigating the
+    failure, applying the smallest safe fix, and validating the outcome.
+  background: 'This linux lab teaches systematic troubleshooting: observe, hypothesize, change, verify.'
+  validation:
+    type: custom_script
+    script: check.sh
+    error_message: Validation did not pass. Re-read the objectives and Hint 2 diagnostic steps.
+solution:
+  summary: Identify the misconfiguration affecting this linux lab and apply the minimal fix.
+  files_changed: []
+  commands_run:
+  - bash check.sh
+  reference_docs: linux-fundamentals

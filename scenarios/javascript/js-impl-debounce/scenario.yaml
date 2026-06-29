@@ -1,9 +1,27 @@
 title: Implement debounce
 slug: js-impl-debounce
-category: JavaScript Development
-description: 'Implement debounce(fn, delay): return a function that postpones calling fn until `delay`
-  ms have passed since the LAST invocation; rapid repeated calls collapse into a single trailing call
-  with the most recent arguments. Use setTimeout/clearTimeout. The stub is empty so tests fail.'
+category: Build
+description: 'CONTEXT: A team operating JavaScript needs you to resolve `Implement debounce` during a
+  realistic incident. The business impact is reduced service reliability until the underlying state is
+  repaired.
+
+
+  ENVIRONMENT: You are working in FixitLab''s offline JavaScript practice project with modules, browser
+  console, and Node tooling. All tools run locally; no paid APIs or external cloud calls are required.
+
+
+  SYMPTOM / STARTING STATE: Implement debounce(fn, delay): return a function that postpones calling fn
+  until `delay` ms have passed since the LAST invocation; rapid repeated calls collapse into a single
+  trailing call with the most recent arguments. Use setTimeout/clearTimeout. The stub is empty so tests
+  fail.
+
+
+  OBJECTIVE: Schedule the call with setTimeout after delay; Cancel the pending timer on each new call
+  (clearTimeout); Fire once, with the latest arguments. Success means all hidden tests pass.
+
+
+  WHAT TO AVOID: Do not apply broad destructive changes, skip evidence gathering, or fake completion with
+  marker files — the checker validates real system state.'
 difficulty: hard
 scenario_type: do
 lab_mode: simulation
@@ -21,91 +39,162 @@ objectives:
 initial_state: 'Implement debounce(fn, delay): return a function that postpones calling fn until `delay`
   ms have passed since the LAST invocation; rapid repeated calls collapse into a single trailing call
   with the most recent arguments. Use setTimeout/clearTimeout. The stub is empty so tests fail.'
-solution_explanation: |
-  A closure holds the pending timer. Each call cancels the previous timer and schedules a fresh one, so only the final call in a burst survives and fires after `delay` ms with the most recent arguments.
+solution_explanation: 'A closure holds the pending timer. Each call cancels the previous timer and schedules
+  a fresh one, so only the final call in a burst survives and fires after `delay` ms with the most recent
+  arguments.
+
+  '
 coding_spec:
   language: javascript
   entrypoint: solution.js
   kind: impl
-  instructions: |
-    Implement debounce(fn, delay) -> debounced function. Only the final call in a burst runs, after `delay` ms of quiet, with the latest args.
+  instructions: 'Implement debounce(fn, delay) -> debounced function. Only the final call in a burst runs,
+    after `delay` ms of quiet, with the latest args.
+
     Use the global setTimeout/clearTimeout.
+
     Click Run to try it, then Check Solution to grade against all tests.
+
+    '
   files:
   - path: solution.js
-    content: |
-      function debounce(fn, delay) {
-        // TODO: return a function that defers fn until `delay` ms after the last call
-      }
+    content: "function debounce(fn, delay) {\n  // TODO: return a function that defers fn until `delay`\
+      \ ms after the last call\n}\n"
     readonly: false
   visible_tests:
   - name: defers until flush
-    code: |
-      const _oST=globalThis.setTimeout,_oCT=globalThis.clearTimeout;let _q=[];
-      globalThis.setTimeout=(cb)=>{const id={};_q.push({id,cb});return id;};
-      globalThis.clearTimeout=(id)=>{_q=_q.filter(e=>e.id!==id);};
-      const flush=()=>{const live=_q.slice();_q=[];live.forEach(e=>e.cb());};
-      try {
-        let calls=0; const d=debounce(()=>{calls++;},100);
-        d(); d(); d();
-        assert(calls===0,'should not fire before flush, got '+calls);
-        flush();
-        assert(calls===1,'should fire once after quiet, got '+calls);
-      } finally { globalThis.setTimeout=_oST; globalThis.clearTimeout=_oCT; }
+    code: "const _oST=globalThis.setTimeout,_oCT=globalThis.clearTimeout;let _q=[];\nglobalThis.setTimeout=(cb)=>{const\
+      \ id={};_q.push({id,cb});return id;};\nglobalThis.clearTimeout=(id)=>{_q=_q.filter(e=>e.id!==id);};\n\
+      const flush=()=>{const live=_q.slice();_q=[];live.forEach(e=>e.cb());};\ntry {\n  let calls=0; const\
+      \ d=debounce(()=>{calls++;},100);\n  d(); d(); d();\n  assert(calls===0,'should not fire before\
+      \ flush, got '+calls);\n  flush();\n  assert(calls===1,'should fire once after quiet, got '+calls);\n\
+      } finally { globalThis.setTimeout=_oST; globalThis.clearTimeout=_oCT; }\n"
   - name: uses latest args
-    code: |
-      const _oST=globalThis.setTimeout,_oCT=globalThis.clearTimeout;let _q=[];
-      globalThis.setTimeout=(cb)=>{const id={};_q.push({id,cb});return id;};
-      globalThis.clearTimeout=(id)=>{_q=_q.filter(e=>e.id!==id);};
-      const flush=()=>{const live=_q.slice();_q=[];live.forEach(e=>e.cb());};
-      try {
-        let last=null; const d=debounce((x)=>{last=x;},50);
-        d(1); d(2); d(3); flush();
-        assert(last===3,'expected latest arg 3, got '+last);
-      } finally { globalThis.setTimeout=_oST; globalThis.clearTimeout=_oCT; }
+    code: "const _oST=globalThis.setTimeout,_oCT=globalThis.clearTimeout;let _q=[];\nglobalThis.setTimeout=(cb)=>{const\
+      \ id={};_q.push({id,cb});return id;};\nglobalThis.clearTimeout=(id)=>{_q=_q.filter(e=>e.id!==id);};\n\
+      const flush=()=>{const live=_q.slice();_q=[];live.forEach(e=>e.cb());};\ntry {\n  let last=null;\
+      \ const d=debounce((x)=>{last=x;},50);\n  d(1); d(2); d(3); flush();\n  assert(last===3,'expected\
+      \ latest arg 3, got '+last);\n} finally { globalThis.setTimeout=_oST; globalThis.clearTimeout=_oCT;\
+      \ }\n"
   hidden_tests:
   - name: only one timer survives a burst
-    code: |
-      const _oST=globalThis.setTimeout,_oCT=globalThis.clearTimeout;let _q=[];
-      globalThis.setTimeout=(cb)=>{const id={};_q.push({id,cb});return id;};
-      globalThis.clearTimeout=(id)=>{_q=_q.filter(e=>e.id!==id);};
-      try {
-        const d=debounce(()=>{},10); d(); d(); d(); d();
-        assert(_q.length===1,'expected 1 pending timer, got '+_q.length);
-      } finally { globalThis.setTimeout=_oST; globalThis.clearTimeout=_oCT; }
+    code: "const _oST=globalThis.setTimeout,_oCT=globalThis.clearTimeout;let _q=[];\nglobalThis.setTimeout=(cb)=>{const\
+      \ id={};_q.push({id,cb});return id;};\nglobalThis.clearTimeout=(id)=>{_q=_q.filter(e=>e.id!==id);};\n\
+      try {\n  const d=debounce(()=>{},10); d(); d(); d(); d();\n  assert(_q.length===1,'expected 1 pending\
+      \ timer, got '+_q.length);\n} finally { globalThis.setTimeout=_oST; globalThis.clearTimeout=_oCT;\
+      \ }\n"
   - name: separate bursts each fire
-    code: |
-      const _oST=globalThis.setTimeout,_oCT=globalThis.clearTimeout;let _q=[];
-      globalThis.setTimeout=(cb)=>{const id={};_q.push({id,cb});return id;};
-      globalThis.clearTimeout=(id)=>{_q=_q.filter(e=>e.id!==id);};
-      const flush=()=>{const live=_q.slice();_q=[];live.forEach(e=>e.cb());};
-      try {
-        let calls=0; const d=debounce(()=>{calls++;},10);
-        d(); flush(); d(); flush();
-        assert(calls===2,'expected 2 calls across bursts, got '+calls);
-      } finally { globalThis.setTimeout=_oST; globalThis.clearTimeout=_oCT; }
+    code: "const _oST=globalThis.setTimeout,_oCT=globalThis.clearTimeout;let _q=[];\nglobalThis.setTimeout=(cb)=>{const\
+      \ id={};_q.push({id,cb});return id;};\nglobalThis.clearTimeout=(id)=>{_q=_q.filter(e=>e.id!==id);};\n\
+      const flush=()=>{const live=_q.slice();_q=[];live.forEach(e=>e.cb());};\ntry {\n  let calls=0; const\
+      \ d=debounce(()=>{calls++;},10);\n  d(); flush(); d(); flush();\n  assert(calls===2,'expected 2\
+      \ calls across bursts, got '+calls);\n} finally { globalThis.setTimeout=_oST; globalThis.clearTimeout=_oCT;\
+      \ }\n"
   - name: returns a function
-    code: |
-      assert(typeof debounce(()=>{},10)==='function');
+    code: 'assert(typeof debounce(()=>{},10)===''function'');
+
+      '
   - name: forwards multiple args
-    code: |
-      const _oST=globalThis.setTimeout,_oCT=globalThis.clearTimeout;let _q=[];
-      globalThis.setTimeout=(cb)=>{const id={};_q.push({id,cb});return id;};
-      globalThis.clearTimeout=(id)=>{_q=_q.filter(e=>e.id!==id);};
-      const flush=()=>{const live=_q.slice();_q=[];live.forEach(e=>e.cb());};
-      try {
-        let sum=0; const d=debounce((a,b)=>{sum=a+b;},10);
-        d(2,3); flush();
-        assert(sum===5,'expected 5, got '+sum);
-      } finally { globalThis.setTimeout=_oST; globalThis.clearTimeout=_oCT; }
+    code: "const _oST=globalThis.setTimeout,_oCT=globalThis.clearTimeout;let _q=[];\nglobalThis.setTimeout=(cb)=>{const\
+      \ id={};_q.push({id,cb});return id;};\nglobalThis.clearTimeout=(id)=>{_q=_q.filter(e=>e.id!==id);};\n\
+      const flush=()=>{const live=_q.slice();_q=[];live.forEach(e=>e.cb());};\ntry {\n  let sum=0; const\
+      \ d=debounce((a,b)=>{sum=a+b;},10);\n  d(2,3); flush();\n  assert(sum===5,'expected 5, got '+sum);\n\
+      } finally { globalThis.setTimeout=_oST; globalThis.clearTimeout=_oCT; }\n"
   timeout: 8
 hints:
 - order: 1
-  cost: 10
-  content: Keep a timer handle in a closure variable shared across calls.
+  cost: 0
+  content: 'Where to look: Open `solution.js`, read the instructions, and run the visible tests to see
+    which assertion fails first.'
 - order: 2
-  cost: 20
-  content: On each call, clearTimeout the previous handle, then setTimeout a new one for `delay`.
+  cost: 25
+  content: 'Diagnostic steps:
+
+    1. Click Run and read the traceback — note line number and actual vs expected values.
+
+    2. Reproduce the failure with the smallest input from a visible test.
+
+    3. Compare your implementation to the bug described in the lab prompt.'
 - order: 3
-  cost: 30
-  content: In the timeout callback, call fn with the latest args (fn.apply(this, args)).
+  cost: 50
+  content: 'Exact fix + verification:
+
+    1. Fire once, with the latest arguments.
+
+    2. Re-run the lab checker (`check.sh` or Check Solution).
+
+    3. Confirm every scenario objective is satisfied.
+
+
+    WHY: the grader validates real state — marker files are ignored.'
+technology: javascript
+summary: Complete the implement debounce javascript lab and verify success with the checker
+estimated_minutes: 25
+xp_reward: 100
+prerequisites:
+- Basic javascript literacy
+tags:
+- do
+- hands-on
+- javascript
+linked_tutorial: javascript-fundamentals
+what_you_will_learn:
+- Schedule the call with setTimeout after delay
+- Cancel the pending timer on each new call (clearTimeout)
+- Fire once, with the latest arguments
+environment:
+  nodes:
+  - role: primary
+    os: FixitLab JavaScript practice project
+    hostname: lab-primary
+    ip: 127.0.0.1
+    specs: local offline simulation
+  pre_installed:
+  - bash
+  - coreutils
+  - javascript
+  - journalctl
+  - systemctl
+  credentials:
+  - user: root
+    password: lab123
+tasks:
+- id: task_1
+  title: Implement debounce
+  description: Restore healthy behavior for Implement debounce by investigating the failure, applying
+    the smallest safe fix, and validating the outcome.
+  background: 'This javascript lab teaches systematic troubleshooting: observe, hypothesize, change, verify.'
+  validation:
+    type: custom_script
+    script: hidden_tests
+    error_message: One or more hidden tests failed. Read the public test output, fix your solution, and
+      submit again.
+solution:
+  summary: The solution passes all hidden tests by implementing the required behavior in code.
+  files_changed: []
+  commands_run: []
+  reference_docs: javascript-fundamentals
+guided_mode:
+  enabled: true
+  steps:
+  - step: 1
+    title: Inspect current state
+    instruction: Run a read-only diagnostic before changing anything.
+    command: check.sh
+    expected_output: Output shows the current failure mode
+    explanation: Evidence-first troubleshooting avoids guessing.
+    next_on: command_success
+  - step: 2
+    title: Apply the minimal fix
+    instruction: Make one reversible change aligned with the objectives.
+    command: '# your fix command here'
+    expected_output: State moves toward the objective
+    explanation: Small changes make rollback easy if the hypothesis was wrong.
+    next_on: command_success
+  - step: 3
+    title: Verify with the grader
+    instruction: Run the same verification the checker uses.
+    command: check.sh
+    expected_output: all hidden tests pass
+    explanation: The lab passes only when real state is healthy.
+    next_on: command_success

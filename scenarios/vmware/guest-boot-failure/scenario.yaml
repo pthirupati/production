@@ -1,10 +1,29 @@
 title: Guest OS Boot Failure (initramfs)
 slug: vmware-guest-boot-failure
-category: VMware vSphere
-description: The guest web-prod-01 powers on but drops into an initramfs/recovery shell instead of booting
-  normally — a failed patch left the root filesystem needing a check (or an entry needs resolving). The
-  fix is done from the VM web console. Diagnose the boot failure and recover the boot so the OS comes
-  up.
+category: Fix
+description: 'CONTEXT: A team operating VMware vSphere needs you to resolve `Guest OS Boot Failure (initramfs)`
+  during a realistic incident. The business impact is reduced service reliability until the underlying
+  state is repaired.
+
+
+  ENVIRONMENT: You are working in FixitLab''s offline vSphere lab with VMs, datastores, vCenter, and ESXi
+  tasks. All tools run locally; no paid APIs or external cloud calls are required.
+
+
+  SYMPTOM / STARTING STATE: vCenter guest web-prod-01 that powers on but lands in the initramfs/maintenance
+  shell after a failed patch; recovery is performed from the VM console. The guest web-prod-01 powers
+  on but drops into an initramfs/recovery shell instead of booting normally — a failed patch left the
+  root filesystem needing a check (or an entry needs resolving). The fix is done from the VM web console.
+  Diagnose the boot failure and recover the boot so the OS comes up.
+
+
+  OBJECTIVE: Open the web console and identify why boot drops to the recovery shell; Repair the root filesystem
+  (or resolve the failing step); Complete the boot so the guest reaches normal multi-user state. Success
+  means `check.sh` exits successfully.
+
+
+  WHAT TO AVOID: Do not apply broad destructive changes, skip evidence gathering, or fake completion with
+  marker files — the checker validates real system state.'
 difficulty: hard
 lab_mode: simulation
 simulation_type: vmware
@@ -20,14 +39,71 @@ initial_state: vCenter guest web-prod-01 that powers on but lands in the initram
   a failed patch; recovery is performed from the VM console.
 hints:
 - order: 1
-  cost: 10
-  content: Open the web console for web-prod-01 — it's sitting at an `(initramfs)` / emergency prompt.
-    Read the message to see which device/filesystem failed.
+  cost: 0
+  content: 'Where to look: Open the web console and identify why boot drops to the recovery shell'
 - order: 2
-  cost: 15
-  content: 'Run a filesystem check on the root device: `fsck -y /dev/sda1` (answer yes to repairs). A
-    dirty/damaged root FS after a failed patch is the usual cause.'
+  cost: 25
+  content: 'Diagnostic steps:
+
+    1. Repair the root filesystem (or resolve the failing step)
+
+    2. Complete the boot so the guest reaches normal multi-user state'
 - order: 3
-  cost: 20
-  content: 'Once fsck is clean, continue booting: type `exit` (or reboot). The guest proceeds to a normal
-    login; verify services are back up.'
+  cost: 50
+  content: 'Exact fix + verification:
+
+    1. Complete the boot so the guest reaches normal multi-user state.
+
+    2. Re-run the lab checker (`check.sh` or Check Solution).
+
+    3. Confirm every scenario objective is satisfied.
+
+
+    WHY: the grader validates real state — marker files are ignored.'
+technology: vmware
+summary: Complete the guest os boot failure (initramfs) vmware lab and verify success with the checker
+estimated_minutes: 20
+xp_reward: 100
+prerequisites:
+- Basic vmware literacy
+tags:
+- fix
+- hands-on
+- vmware
+linked_tutorial: vmware-fundamentals
+what_you_will_learn:
+- Open the web console and identify why boot drops to the recovery shell
+- Repair the root filesystem (or resolve the failing step)
+- Complete the boot so the guest reaches normal multi-user state
+environment:
+  nodes:
+  - role: primary
+    os: FixitLab vSphere lab
+    hostname: lab-primary
+    ip: 127.0.0.1
+    specs: local offline simulation
+  pre_installed:
+  - bash
+  - coreutils
+  - journalctl
+  - systemctl
+  - vmware
+  credentials:
+  - user: root
+    password: lab123
+tasks:
+- id: task_1
+  title: Guest OS Boot Failure (initramfs)
+  description: Restore healthy behavior for Guest OS Boot Failure (initramfs) by investigating the failure,
+    applying the smallest safe fix, and validating the outcome.
+  background: 'This vmware lab teaches systematic troubleshooting: observe, hypothesize, change, verify.'
+  validation:
+    type: custom_script
+    script: check.sh
+    error_message: Validation did not pass. Re-read the objectives and Hint 2 diagnostic steps.
+solution:
+  summary: Identify the misconfiguration affecting this vmware lab and apply the minimal fix.
+  files_changed: []
+  commands_run:
+  - bash check.sh
+  reference_docs: vmware-fundamentals

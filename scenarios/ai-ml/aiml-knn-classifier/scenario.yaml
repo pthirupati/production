@@ -1,12 +1,29 @@
 title: K-Nearest-Neighbours Classifier
 slug: aiml-knn-classifier
 technology: ai-ml
-category: AI / ML / LLM & Agents
-description: >-
-  k-NN is the simplest classifier there is — to label a new point you find the k closest
-  labelled points and let them vote. The catch is determinism: distance ties and vote ties must
-  break the same way every run. Implement Euclidean k-NN with explicit, repeatable tie-breaking so
-  the same query always returns the same label.
+category: Build
+description: 'CONTEXT: A team operating AI/ML workflows needs you to resolve `K-Nearest-Neighbours Classifier`
+  during a realistic incident. The business impact is reduced service reliability until the underlying
+  state is repaired.
+
+
+  ENVIRONMENT: You are working in FixitLab''s offline ML practice workspace with datasets, training scripts,
+  metrics, and model artifacts. All tools run locally; no paid APIs or external cloud calls are required.
+
+
+  SYMPTOM / STARTING STATE: k-NN is the simplest classifier there is — to label a new point you find the
+  k closest labelled points and let them vote. The catch is determinism: distance ties and vote ties must
+  break the same way every run. Implement Euclidean k-NN with explicit, repeatable tie-breaking so the
+  same query always returns the same label.
+
+
+  OBJECTIVE: Compute Euclidean distance between feature vectors; Select the k nearest training points
+  with a deterministic distance tie-break; Take a majority vote of their labels with a deterministic label
+  tie-break. Success means all hidden tests pass.
+
+
+  WHAT TO AVOID: Do not apply broad destructive changes, skip evidence gathering, or fake completion with
+  marker files — the checker validates real system state.'
 difficulty: medium
 scenario_type: do
 lab_mode: simulation
@@ -21,91 +38,193 @@ objectives:
 - Compute Euclidean distance between feature vectors
 - Select the k nearest training points with a deterministic distance tie-break
 - Take a majority vote of their labels with a deterministic label tie-break
-initial_state: >-
-  k-NN is the simplest classifier there is — to label a new point you find the k closest
-  labelled points and let them vote. The catch is determinism: distance ties and vote ties must
-  break the same way every run. Implement Euclidean k-NN with explicit, repeatable tie-breaking so
-  the same query always returns the same label.
-solution_explanation: |
-  euclidean_distance is sqrt(sum((ai-bi)^2)). classify computes the distance from the query to every
+initial_state: 'k-NN is the simplest classifier there is — to label a new point you find the k closest
+  labelled points and let them vote. The catch is determinism: distance ties and vote ties must break
+  the same way every run. Implement Euclidean k-NN with explicit, repeatable tie-breaking so the same
+  query always returns the same label.'
+solution_explanation: 'euclidean_distance is sqrt(sum((ai-bi)^2)). classify computes the distance from
+  the query to every
+
   training point, then sorts by (distance, original_index) so equal distances break toward the
+
   lower index — fully deterministic, no reliance on input order surviving an unstable sort. It takes
+
   the first k labels and tallies them with a Counter. When two labels tie on count, it breaks the tie
+
   by picking the smallest label (sorted order), so the winner never depends on dict/iteration order.
+
+  '
 coding_spec:
   language: python
   entrypoint: solution.py
   kind: impl
-  instructions: |
-    Implement two functions (import math, collections allowed):
-      euclidean_distance(a, b) -> float: the straight-line distance sqrt(sum((ai-bi)^2)).
-      classify(train, query, k) -> label: train is a list of (features, label) pairs. Find the k
-        training points nearest to query and return the majority label.
-        DETERMINISTIC TIE-BREAKS (required):
-          * distance ties: prefer the point with the smaller index in train.
-          * vote ties: prefer the smaller label (as given by sorted()).
-    Click Run to try it, then Check Solution to grade against all tests.
+  instructions: "Implement two functions (import math, collections allowed):\n  euclidean_distance(a,\
+    \ b) -> float: the straight-line distance sqrt(sum((ai-bi)^2)).\n  classify(train, query, k) -> label:\
+    \ train is a list of (features, label) pairs. Find the k\n    training points nearest to query and\
+    \ return the majority label.\n    DETERMINISTIC TIE-BREAKS (required):\n      * distance ties: prefer\
+    \ the point with the smaller index in train.\n      * vote ties: prefer the smaller label (as given\
+    \ by sorted()).\nClick Run to try it, then Check Solution to grade against all tests.\n"
   files:
   - path: solution.py
-    content: |
-      import math
-      import collections
-
-      def euclidean_distance(a, b):
-          # TODO: sqrt of the sum of squared differences.
-          pass
-
-      def classify(train, query, k):
-          # TODO: k nearest by (distance, index); majority vote with smaller-label tie-break.
-          pass
+    content: "import math\nimport collections\n\ndef euclidean_distance(a, b):\n    # TODO: sqrt of the\
+      \ sum of squared differences.\n    pass\n\ndef classify(train, query, k):\n    # TODO: k nearest\
+      \ by (distance, index); majority vote with smaller-label tie-break.\n    pass\n"
     readonly: false
   visible_tests:
   - name: euclidean distance of a 3-4-5 triangle
-    code: |
-      import math
-      assert math.isclose(euclidean_distance([0, 0], [3, 4]), 5.0, rel_tol=1e-9), euclidean_distance([0, 0], [3, 4])
+    code: 'import math
+
+      assert math.isclose(euclidean_distance([0, 0], [3, 4]), 5.0, rel_tol=1e-9), euclidean_distance([0,
+      0], [3, 4])
+
+      '
   - name: classifies to the obvious nearest cluster
-    code: |
-      train = [([0, 0], "a"), ([0, 1], "a"), ([10, 10], "b"), ([10, 11], "b")]
+    code: 'train = [([0, 0], "a"), ([0, 1], "a"), ([10, 10], "b"), ([10, 11], "b")]
+
       assert classify(train, [0, 2], 1) == "a", classify(train, [0, 2], 1)
+
       assert classify(train, [9, 9], 1) == "b", classify(train, [9, 9], 1)
+
+      '
   hidden_tests:
   - name: majority vote among k neighbours
-    code: |
-      train = [([0], "a"), ([1], "a"), ([2], "b"), ([10], "b")]
+    code: 'train = [([0], "a"), ([1], "a"), ([2], "b"), ([10], "b")]
+
       # query 1.0: nearest 3 are idx1(d0,a), idx0(d1,a), idx2(d1,b) -> a wins 2-1
+
       assert classify(train, [1], 3) == "a", classify(train, [1], 3)
+
+      '
   - name: distance tie breaks toward lower index
-    code: |
-      # query [0,0] is equidistant (d=1) from both points; k=1 must pick the lower index -> 'first'
+    code: '# query [0,0] is equidistant (d=1) from both points; k=1 must pick the lower index -> ''first''
+
       train = [([1, 0], "first"), ([0, 1], "second")]
+
       assert classify(train, [0, 0], 1) == "first", classify(train, [0, 0], 1)
+
+      '
   - name: vote tie breaks toward smaller label
-    code: |
-      # k=2 with one 'x' and one 'z' equally close -> tie, smaller label 'x' wins
+    code: '# k=2 with one ''x'' and one ''z'' equally close -> tie, smaller label ''x'' wins
+
       train = [([0], "z"), ([2], "x")]
+
       assert classify(train, [1], 2) == "x", classify(train, [1], 2)
+
+      '
   - name: k larger than dataset uses all points
-    code: |
-      train = [([0], "a"), ([1], "a"), ([5], "b")]
+    code: 'train = [([0], "a"), ([1], "a"), ([5], "b")]
+
       assert classify(train, [3], 99) == "a", classify(train, [3], 99)
+
+      '
   - name: multi-dimensional features
-    code: |
-      train = [([1, 1, 1], "near"), ([9, 9, 9], "far")]
+    code: 'train = [([1, 1, 1], "near"), ([9, 9, 9], "far")]
+
       assert classify(train, [2, 2, 2], 1) == "near", classify(train, [2, 2, 2], 1)
+
+      '
   - name: deterministic across repeated calls
-    code: |
-      train = [([0], "z"), ([2], "x"), ([0], "x"), ([2], "z")]
+    code: 'train = [([0], "z"), ([2], "x"), ([0], "x"), ([2], "z")]
+
       first = classify(train, [1], 4)
+
       assert all(classify(train, [1], 4) == first for _ in range(5)), first
+
+      '
   timeout: 8
 hints:
 - order: 1
-  cost: 10
-  content: euclidean_distance is math.sqrt(sum((x - y) ** 2 for x, y in zip(a, b))). Pair coordinates with zip.
+  cost: 0
+  content: 'Where to look: Open `solution.py`, read the instructions, and run the visible tests to see
+    which assertion fails first.'
 - order: 2
-  cost: 20
-  content: 'Build a list of (distance, index, label) for every train point, then sort it. Sorting by (distance, index) makes distance ties break toward the lower index deterministically.'
+  cost: 25
+  content: 'Diagnostic steps:
+
+    1. Click Run and read the traceback — note line number and actual vs expected values.
+
+    2. Reproduce the failure with the smallest input from a visible test.
+
+    3. Compare your implementation to the bug described in the lab prompt.'
 - order: 3
-  cost: 30
-  content: 'Take the first k labels, count them with collections.Counter, then pick the winner as max over sorted(counts) keyed on count — sorted() first means equal counts break toward the smaller label.'
+  cost: 50
+  content: 'Exact fix + verification:
+
+    1. Take a majority vote of their labels with a deterministic label tie-break.
+
+    2. Re-run the lab checker (`check.sh` or Check Solution).
+
+    3. Confirm every scenario objective is satisfied.
+
+
+    WHY: the grader validates real state — marker files are ignored.'
+summary: Complete the k-nearest-neighbours classifier ai ml lab and verify success with the checker
+estimated_minutes: 30
+xp_reward: 100
+prerequisites:
+- Basic ai ml literacy
+tags:
+- ai-ml
+- do
+- hands-on
+linked_tutorial: ai-ml-fundamentals
+what_you_will_learn:
+- Compute Euclidean distance between feature vectors
+- Select the k nearest training points with a deterministic distance tie-break
+- Take a majority vote of their labels with a deterministic label tie-break
+environment:
+  nodes:
+  - role: primary
+    os: FixitLab ML practice workspace
+    hostname: lab-primary
+    ip: 127.0.0.1
+    specs: local offline simulation
+  pre_installed:
+  - ai ml
+  - bash
+  - coreutils
+  - pip
+  - python3
+  credentials:
+  - user: root
+    password: lab123
+tasks:
+- id: task_1
+  title: K-Nearest-Neighbours Classifier
+  description: Restore healthy behavior for K-Nearest-Neighbours Classifier by investigating the failure,
+    applying the smallest safe fix, and validating the outcome.
+  background: 'This ai ml lab teaches systematic troubleshooting: observe, hypothesize, change, verify.'
+  validation:
+    type: custom_script
+    script: hidden_tests
+    error_message: One or more hidden tests failed. Read the public test output, fix your solution, and
+      submit again.
+solution:
+  summary: The solution passes all hidden tests by implementing the required behavior in code.
+  files_changed: []
+  commands_run: []
+  reference_docs: ai-ml-fundamentals
+guided_mode:
+  enabled: true
+  steps:
+  - step: 1
+    title: Inspect current state
+    instruction: Run a read-only diagnostic before changing anything.
+    command: check.sh
+    expected_output: Output shows the current failure mode
+    explanation: Evidence-first troubleshooting avoids guessing.
+    next_on: command_success
+  - step: 2
+    title: Apply the minimal fix
+    instruction: Make one reversible change aligned with the objectives.
+    command: '# your fix command here'
+    expected_output: State moves toward the objective
+    explanation: Small changes make rollback easy if the hypothesis was wrong.
+    next_on: command_success
+  - step: 3
+    title: Verify with the grader
+    instruction: Run the same verification the checker uses.
+    command: check.sh
+    expected_output: all hidden tests pass
+    explanation: The lab passes only when real state is healthy.
+    next_on: command_success

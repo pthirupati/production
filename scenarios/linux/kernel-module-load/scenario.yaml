@@ -1,11 +1,30 @@
 title: Load Kernel Module and Make It Persistent Across Reboots
 slug: linux-kernel-module-load
 difficulty: easy
-category: Linux Administration
-description: A Kubernetes node setup requires the br_netfilter kernel module so that bridged pod traffic
-  is processed by iptables, but the module isn't loaded (and won't persist across reboots). Without it,
-  the related sysctls can't be set and pod networking misbehaves. Load the module now, make it load at
-  boot, and enable the bridge-nf sysctl.
+category: Fix
+description: 'CONTEXT: A team operating Linux administration needs you to resolve `Load Kernel Module
+  and Make It Persistent Across Reboots` during a realistic incident. The business impact is reduced service
+  reliability until the underlying state is repaired.
+
+
+  ENVIRONMENT: You are working in FixitLab''s offline Linux practice server with terminal and config files
+  under /etc and /var. All tools run locally; no paid APIs or external cloud calls are required.
+
+
+  SYMPTOM / STARTING STATE: Linux node intended for Kubernetes where br_netfilter is not loaded; bridged
+  traffic isn''t subject to iptables and the bridge-nf sysctls are unavailable. A Kubernetes node setup
+  requires the br_netfilter kernel module so that bridged pod traffic is processed by iptables, but the
+  module isn''t loaded (and won''t persist across reboots). Without it, the related sysctls can''t be
+  set and pod networking misbehaves. Load the module now, make it load at boot, and enable the bridge-nf
+  sysctl.
+
+
+  OBJECTIVE: Load br_netfilter immediately and confirm with lsmod; Make it load on boot via /etc/modules-load.d/;
+  Enable net.bridge.bridge-nf-call-iptables=1 persistently. Success means `check.sh` exits successfully.
+
+
+  WHAT TO AVOID: Do not apply broad destructive changes, skip evidence gathering, or fake completion with
+  marker files — the checker validates real system state.'
 initial_state: Linux node intended for Kubernetes where br_netfilter is not loaded; bridged traffic isn't
   subject to iptables and the bridge-nf sysctls are unavailable.
 objectives:
@@ -19,16 +38,78 @@ max_score: 100
 is_free: false
 hints:
 - order: 1
-  cost: 10
-  content: 'Load it now: `modprobe br_netfilter`, then confirm `lsmod | grep br_netfilter`.'
+  cost: 0
+  content: 'Where to look: Run `kubectl get pods -A` and `kubectl describe pod <name>` for any pod not
+    in Running state.'
 - order: 2
-  cost: 15
-  content: 'Persist the module: create `/etc/modules-load.d/k8s.conf` containing `br_netfilter` (systemd-modules-load
-    reads it at boot).'
+  cost: 25
+  content: 'Diagnostic steps:
+
+    1. `kubectl get pods` — note CrashLoopBackOff, ImagePullBackOff, or Pending.
+
+    2. `kubectl describe pod <name>` — read Events at the bottom.
+
+    3. `kubectl logs <name> [--previous]` if the container restarted.'
 - order: 3
-  cost: 20
-  content: 'Enable the sysctl persistently: add `net.bridge.bridge-nf-call-iptables=1` to `/etc/sysctl.d/k8s.conf`
-    and apply with `sysctl --system`. Verify with `sysctl net.bridge.bridge-nf-call-iptables`.'
+  cost: 50
+  content: 'Exact fix + verification:
+
+    1. Fix the root cause (image name, env var, volume mount, or probe).
+
+    2. `kubectl apply -f` the corrected manifest or delete the pod to recreate.
+
+    3. Confirm `kubectl get pods` shows every pod Running.
+
+
+    WHY: Kubernetes only reports healthy when the workload actually runs.'
 requires_companion_hosts: false
 dual_terminal: false
 jira_priority: Medium
+technology: linux
+summary: Complete the load kernel module and make it persistent across reboots linux lab and verify success
+  with the checker
+estimated_minutes: 15
+xp_reward: 100
+prerequisites:
+- Basic linux literacy
+tags:
+- fix
+- hands-on
+- linux
+linked_tutorial: linux-fundamentals
+what_you_will_learn:
+- Load br_netfilter immediately and confirm with lsmod
+- Make it load on boot via /etc/modules-load.d/
+- Enable net.bridge.bridge-nf-call-iptables=1 persistently
+environment:
+  nodes:
+  - role: primary
+    os: FixitLab Linux practice server
+    hostname: lab-primary
+    ip: 127.0.0.1
+    specs: local offline simulation
+  pre_installed:
+  - bash
+  - coreutils
+  - journalctl
+  - linux
+  - systemctl
+  credentials:
+  - user: root
+    password: lab123
+tasks:
+- id: task_1
+  title: Load Kernel Module and Make It Persistent Across Reboots
+  description: Restore healthy behavior for Load Kernel Module and Make It Persistent Across Reboots by
+    investigating the failure, applying the smallest safe fix, and validating the outcome.
+  background: 'This linux lab teaches systematic troubleshooting: observe, hypothesize, change, verify.'
+  validation:
+    type: custom_script
+    script: check.sh
+    error_message: Validation did not pass. Re-read the objectives and Hint 2 diagnostic steps.
+solution:
+  summary: Identify the misconfiguration affecting this linux lab and apply the minimal fix.
+  files_changed: []
+  commands_run:
+  - bash check.sh
+  reference_docs: linux-fundamentals

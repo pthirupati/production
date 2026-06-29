@@ -1,8 +1,25 @@
 title: 'Log Analysis: Fix the IndexError on Empty Input'
 slug: py-logfix-indexerror-last
-category: Python Development
-description: 'The log shows `IndexError: list index out of range` from last_or_none() when the list is
-  empty. It should return None for an empty list instead of indexing [-1].'
+category: Fix
+description: 'CONTEXT: A team operating Python development needs you to resolve `Log Analysis: Fix the
+  IndexError on Empty Input` during a realistic incident. The business impact is reduced service reliability
+  until the underlying state is repaired.
+
+
+  ENVIRONMENT: You are working in FixitLab''s offline Python project workspace with source files, venv,
+  tests, and CLI entrypoints. All tools run locally; no paid APIs or external cloud calls are required.
+
+
+  SYMPTOM / STARTING STATE: The log shows `IndexError: list index out of range` from last_or_none() when
+  the list is empty. It should return None for an empty list instead of indexing [-1].
+
+
+  OBJECTIVE: Spot the [-1] access that fails on empty lists; Guard the empty case; Return None when there
+  is no last element. Success means all hidden tests pass.
+
+
+  WHAT TO AVOID: Do not apply broad destructive changes, skip evidence gathering, or fake completion with
+  marker files — the checker validates real system state.'
 difficulty: easy
 scenario_type: fix
 lab_mode: simulation
@@ -19,50 +36,120 @@ objectives:
 - Return None when there is no last element
 initial_state: 'The log shows `IndexError: list index out of range` from last_or_none() when the list
   is empty. It should return None for an empty list instead of indexing [-1].'
-solution_explanation: |
-  Indexing [-1] requires at least one element. An empty-check returning None avoids the IndexError.
+solution_explanation: 'Indexing [-1] requires at least one element. An empty-check returning None avoids
+  the IndexError.
+
+  '
 coding_spec:
   language: python
   entrypoint: solution.py
   kind: logfix
-  instructions: |
-    Fix last_or_none(items): return the last element, or None if the list is empty. The log shows an IndexError on empty input.
+  instructions: 'Fix last_or_none(items): return the last element, or None if the list is empty. The log
+    shows an IndexError on empty input.
+
     Click Run to try it, then Check Solution to grade against all tests.
+
+    '
   files:
   - path: solution.py
-    content: |
-      # Production log:
-      #   IndexError: list index out of range
-      #     at last_or_none(items) -> return items[-1]
-
-      def last_or_none(items):
-          return items[-1]   # IndexError when items is empty
+    content: "# Production log:\n#   IndexError: list index out of range\n#     at last_or_none(items)\
+      \ -> return items[-1]\n\ndef last_or_none(items):\n    return items[-1]   # IndexError when items\
+      \ is empty\n"
     readonly: false
   visible_tests:
   - name: last element
-    code: |
-      assert last_or_none([1, 2, 3]) == 3
+    code: 'assert last_or_none([1, 2, 3]) == 3
+
+      '
   - name: empty is none
-    code: |
-      assert last_or_none([]) is None
+    code: 'assert last_or_none([]) is None
+
+      '
   hidden_tests:
   - name: single element
-    code: |
-      assert last_or_none([42]) == 42
+    code: 'assert last_or_none([42]) == 42
+
+      '
   - name: strings
-    code: |
-      assert last_or_none(['a', 'b']) == 'b'
+    code: 'assert last_or_none([''a'', ''b'']) == ''b''
+
+      '
   - name: empty does not raise
-    code: |
-      assert last_or_none([]) is None
+    code: 'assert last_or_none([]) is None
+
+      '
   timeout: 8
 hints:
 - order: 1
-  cost: 10
-  content: items[-1] on an empty list raises IndexError (per the log).
+  cost: 0
+  content: 'Where to look: Open `solution.py`, read the instructions, and run the visible tests to see
+    which assertion fails first.'
 - order: 2
-  cost: 20
-  content: Check `if not items` first.
+  cost: 25
+  content: 'Diagnostic steps:
+
+    1. Click Run and read the traceback — note line number and actual vs expected values.
+
+    2. Reproduce the failure with the smallest input from a visible test.
+
+    3. Compare your implementation to the bug described in the lab prompt.'
 - order: 3
-  cost: 30
-  content: Return None when empty, otherwise items[-1].
+  cost: 50
+  content: 'Exact fix + verification:
+
+    1. Return None when there is no last element.
+
+    2. Re-run the lab checker (`check.sh` or Check Solution).
+
+    3. Confirm every scenario objective is satisfied.
+
+
+    WHY: the grader validates real state — marker files are ignored.'
+technology: python
+summary: 'Complete the log analysis: fix the indexerror on empty input python lab and verify success with
+  the checker'
+estimated_minutes: 25
+xp_reward: 100
+prerequisites:
+- Basic python literacy
+tags:
+- fix
+- hands-on
+- python
+linked_tutorial: python-fundamentals
+what_you_will_learn:
+- Spot the [-1] access that fails on empty lists
+- Guard the empty case
+- Return None when there is no last element
+environment:
+  nodes:
+  - role: primary
+    os: FixitLab Python project workspace
+    hostname: lab-primary
+    ip: 127.0.0.1
+    specs: local offline simulation
+  pre_installed:
+  - bash
+  - coreutils
+  - pip
+  - python
+  - python3
+  credentials:
+  - user: root
+    password: lab123
+tasks:
+- id: task_1
+  title: 'Log Analysis: Fix the IndexError on Empty Input'
+  description: 'Restore healthy behavior for Log Analysis: Fix the IndexError on Empty Input by investigating
+    the failure, applying the smallest safe fix, and validating the outcome.'
+  background: 'This python lab teaches systematic troubleshooting: observe, hypothesize, change, verify.'
+  validation:
+    type: custom_script
+    script: hidden_tests
+    error_message: One or more hidden tests failed. Read the public test output, fix your solution, and
+      submit again.
+solution:
+  summary: The solution passes all hidden tests by implementing the required behavior in code.
+  files_changed: []
+  commands_run: []
+  reference_docs: python-fundamentals

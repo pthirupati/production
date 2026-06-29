@@ -1,39 +1,129 @@
 slug: bonding-failover-broken
-title: "Network Bonding Failover Broken — Fix Active-Backup Config"
-technology: Networking
-category: High Availability
+title: Network Bonding Failover Broken — Fix Active-Backup Config
+technology: networking
+category: Fix
 difficulty: hard
 time_limit: 1200
 max_score: 100
 infrastructure_type: docker
 jira_priority: High
 is_free: false
-description: |
-  A server with two NICs uses Linux bonding in active-backup mode for link
-  redundancy. When the primary link (eth0) is brought down, traffic does not
-  fail over to the backup link (eth1). Investigation reveals miimon (link
-  monitoring interval) is set to 0, disabling link detection entirely. Without
-  miimon, the bond driver never detects link failures and never promotes the
-  backup interface. Fix the bonding configuration and test failover.
-objectives:
-  - Identify that miimon=0 is disabling link monitoring
-  - Set miimon to 100ms for reliable failover detection
-  - Verify that bringing down eth0 causes traffic to shift to eth1
-  - Confirm bond0 remains reachable during the failover test
-initial_state: |
-  Ubuntu 22.04. Bond interface bond0 in mode=active-backup. miimon=0 (disabled).
+description: 'CONTEXT: A team operating network operations needs you to resolve `Network Bonding Failover
+  Broken — Fix Active-Backup Config` during a realistic incident. The business impact is reduced service
+  reliability until the underlying state is repaired.
+
+
+  ENVIRONMENT: You are working in FixitLab''s offline network lab with interfaces, routing tables, DNS,
+  and firewall rules. All tools run locally; no paid APIs or external cloud calls are required.
+
+
+  SYMPTOM / STARTING STATE: Ubuntu 22.04. Bond interface bond0 in mode=active-backup. miimon=0 (disabled).
+
   eth0 is active slave, eth1 is backup. Bringing down eth0 leaves bond0 unreachable
+
+  instead of failing over to eth1. A server with two NICs uses Linux bonding in active-backup mode for
+  link
+
+  redundancy. When the primary link (eth0) is brought down, traffic does not
+
+  fail over to the backup link (eth1). Investigation reveals miimon (link
+
+  monitoring interval) is set to 0, disabling link detection entirely. Without
+
+  miimon, the bond driver never detects link failures and never promotes the
+
+  backup interface. Fix the bonding configuration and test failover.
+
+
+  OBJECTIVE: Identify that miimon=0 is disabling link monitoring; Set miimon to 100ms for reliable failover
+  detection; Verify that bringing down eth0 causes traffic to shift to eth1. Success means `check.sh`
+  exits successfully.
+
+
+  WHAT TO AVOID: Do not apply broad destructive changes, skip evidence gathering, or fake completion with
+  marker files — the checker validates real system state.'
+objectives:
+- Identify that miimon=0 is disabling link monitoring
+- Set miimon to 100ms for reliable failover detection
+- Verify that bringing down eth0 causes traffic to shift to eth1
+- Confirm bond0 remains reachable during the failover test
+initial_state: 'Ubuntu 22.04. Bond interface bond0 in mode=active-backup. miimon=0 (disabled).
+
+  eth0 is active slave, eth1 is backup. Bringing down eth0 leaves bond0 unreachable
+
   instead of failing over to eth1.
+
+  '
 hints:
-  - order: 1
-    cost: 10
-    content: "Check current bonding params: `cat /proc/net/bonding/bond0` — look for MII Status and MII Polling Interval."
-  - order: 2
-    cost: 20
-    content: "Set miimon: edit /etc/network/interfaces or /etc/netplan yaml to add `bond-miimon 100`. Then `ifdown bond0 && ifup bond0`."
-  - order: 3
-    cost: 20
-    content: "Test failover: `ip link set eth0 down` and verify `cat /proc/net/bonding/bond0` shows eth1 as active slave."
-  - order: 4
-    cost: 10
-    content: "Restore: `ip link set eth0 up` and verify bond0 returns to eth0 as active (if primary_reselect=always)."
+- order: 1
+  cost: 0
+  content: 'Where to look: Identify that miimon=0 is disabling link monitoring'
+- order: 2
+  cost: 25
+  content: 'Diagnostic steps:
+
+    1. Set miimon to 100ms for reliable failover detection
+
+    2. Verify that bringing down eth0 causes traffic to shift to eth1
+
+    3. Confirm bond0 remains reachable during the failover test'
+- order: 3
+  cost: 50
+  content: 'Exact fix + verification:
+
+    1. Confirm bond0 remains reachable during the failover test.
+
+    2. Re-run the lab checker (`check.sh` or Check Solution).
+
+    3. Confirm every scenario objective is satisfied.
+
+
+    WHY: the grader validates real state — marker files are ignored.'
+summary: Complete the network bonding failover broken — fix active-backup config networking lab and verify
+  success with the checker
+estimated_minutes: 20
+xp_reward: 100
+prerequisites:
+- Basic networking literacy
+tags:
+- fix
+- hands-on
+- networking
+linked_tutorial: networking-fundamentals
+what_you_will_learn:
+- Identify that miimon=0 is disabling link monitoring
+- Set miimon to 100ms for reliable failover detection
+- Verify that bringing down eth0 causes traffic to shift to eth1
+- Confirm bond0 remains reachable during the failover test
+environment:
+  nodes:
+  - role: primary
+    os: FixitLab network lab
+    hostname: lab-primary
+    ip: 127.0.0.1
+    specs: local offline simulation
+  pre_installed:
+  - bash
+  - coreutils
+  - journalctl
+  - networking
+  - systemctl
+  credentials:
+  - user: root
+    password: lab123
+tasks:
+- id: task_1
+  title: Network Bonding Failover Broken — Fix Active-Backup Config
+  description: Restore healthy behavior for Network Bonding Failover Broken — Fix Active-Backup Config
+    by investigating the failure, applying the smallest safe fix, and validating the outcome.
+  background: 'This networking lab teaches systematic troubleshooting: observe, hypothesize, change, verify.'
+  validation:
+    type: custom_script
+    script: check.sh
+    error_message: Validation did not pass. Re-read the objectives and Hint 2 diagnostic steps.
+solution:
+  summary: Identify the misconfiguration affecting this networking lab and apply the minimal fix.
+  files_changed: []
+  commands_run:
+  - bash check.sh
+  reference_docs: networking-fundamentals

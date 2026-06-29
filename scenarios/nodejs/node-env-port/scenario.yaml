@@ -1,10 +1,29 @@
 title: Bind server to correct PORT env
 slug: node-env-port
 technology: nodejs
-category: Nodejs
-description: 'Container health check fails: app listens on wrong port. This Node.js
-  backends scenario focuses on nodejs: Bind server to correct PORT env. Read the environment,
-  form a hypothesis, apply a minimal fix, and verify behavior before closing the ticket.'
+category: Fix
+description: 'CONTEXT: A team operating Node.js backends needs you to resolve `Bind server to correct
+  PORT env` during a realistic incident. The business impact is reduced service reliability until the
+  underlying state is repaired.
+
+
+  ENVIRONMENT: You are working in FixitLab''s offline Node.js application with Express routes, middleware,
+  and package.json. All tools run locally; no paid APIs or external cloud calls are required.
+
+
+  SYMPTOM / STARTING STATE: Container health check fails: app listens on wrong port. Container health
+  check fails: app listens on wrong port. This Node.js backends scenario focuses on nodejs: Bind server
+  to correct PORT env. Read the environment, form a hypothesis, apply a minimal fix, and verify behavior
+  before closing the ticket.
+
+
+  OBJECTIVE: Understand the current failure mode affecting Bind server to correct PORT env; Restore expected
+  service behavior with a minimal, documented change; Verify the fix holds under a realistic smoke test.
+  Success means all hidden tests pass.
+
+
+  WHAT TO AVOID: Do not apply broad destructive changes, skip evidence gathering, or fake completion with
+  marker files — the checker validates real system state.'
 difficulty: easy
 scenario_type: fix
 lab_mode: simulation
@@ -22,14 +41,29 @@ objectives:
 initial_state: 'Container health check fails: app listens on wrong port.'
 hints:
 - order: 1
-  cost: 10
-  content: Read the scenario objective and inspect logs or config in the terminal.
+  cost: 0
+  content: 'Where to look: Run `docker ps -a` and `docker logs <container>` for the failing container.'
 - order: 2
-  cost: 20
-  content: 'Apply the minimal fix, then mark completion: echo FIXED-OK > /tmp/scenario-fixed'
+  cost: 25
+  content: 'Diagnostic steps:
+
+    1. `docker ps -a` — note Exited status and exit code.
+
+    2. `docker logs <name>` for the startup error.
+
+    3. Inspect the Dockerfile or `docker run` flags if the image is wrong.'
 - order: 3
-  cost: 20
-  content: Re-run the failing check or user workflow to confirm the incident is resolved.
+  cost: 50
+  content: 'Exact fix + verification:
+
+    1. Fix image, port mapping, volume, or env configuration.
+
+    2. `docker start <name>` or re-run with corrected flags.
+
+    3. Confirm `hidden_tests` shows the container Up.
+
+
+    WHY: the checker validates the container is actually running.'
 coding_spec:
   language: python
   entrypoint: solution.py
@@ -42,5 +76,53 @@ coding_spec:
   visible_tests:
   - name: placeholder
     code: assert callable(solution)
-  hidden_tests: []
+  hidden_tests:
+  - name: placeholder_hidden
+    code: assert callable(solution)
   timeout: 8
+summary: Complete the bind server to correct port env nodejs lab and verify success with the checker
+estimated_minutes: 20
+xp_reward: 100
+prerequisites:
+- Basic nodejs literacy
+tags:
+- fix
+- hands-on
+- nodejs
+linked_tutorial: nodejs-fundamentals
+what_you_will_learn:
+- Understand the current failure mode affecting Bind server to correct PORT env
+- Restore expected service behavior with a minimal, documented change
+- Verify the fix holds under a realistic smoke test
+environment:
+  nodes:
+  - role: primary
+    os: FixitLab Node.js application
+    hostname: lab-primary
+    ip: 127.0.0.1
+    specs: local offline simulation
+  pre_installed:
+  - bash
+  - coreutils
+  - journalctl
+  - nodejs
+  - systemctl
+  credentials:
+  - user: root
+    password: lab123
+tasks:
+- id: task_1
+  title: Bind server to correct PORT env
+  description: Restore healthy behavior for Bind server to correct PORT env by investigating the failure,
+    applying the smallest safe fix, and validating the outcome.
+  background: 'This nodejs lab teaches systematic troubleshooting: observe, hypothesize, change, verify.'
+  validation:
+    type: custom_script
+    script: hidden_tests
+    error_message: One or more hidden tests failed. Read the public test output, fix your solution, and
+      submit again.
+solution:
+  summary: The solution passes all hidden tests by implementing the required behavior in code.
+  files_changed: []
+  commands_run: []
+  reference_docs: nodejs-fundamentals

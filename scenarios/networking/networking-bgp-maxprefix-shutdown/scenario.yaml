@@ -1,7 +1,7 @@
 title: BGP Max-Prefix Limit Tripped Shutdown
 slug: networking-bgp-maxprefix-shutdown
-technology: Networking
-category: Routing / BGP
+technology: networking
+category: Build
 difficulty: hard
 lab_mode: simulation
 simulation_type: networking
@@ -10,8 +10,26 @@ max_score: 100
 is_free: true
 jira_priority: High
 dual_terminal: false
-description: A peer announced more prefixes than the configured maximum-prefix limit, shutting the session
+description: 'CONTEXT: A team operating network operations needs you to resolve `BGP Max-Prefix Limit
+  Tripped Shutdown` during a realistic incident. The business impact is reduced service reliability until
+  the underlying state is repaired.
+
+
+  ENVIRONMENT: You are working in FixitLab''s offline network lab with interfaces, routing tables, DNS,
+  and firewall rules. All tools run locally; no paid APIs or external cloud calls are required.
+
+
+  SYMPTOM / STARTING STATE: A router whose BGP neighbor was shut down after exceeding the maximum-prefix
+  limit. A peer announced more prefixes than the configured maximum-prefix limit, shutting the session
   down. Raise the limit appropriately and re-establish the session.
+
+
+  OBJECTIVE: Confirm the neighbor is down from max-prefix; Raise the maximum-prefix limit appropriately
+  and clear; Verify the session is Established with full prefixes. Success means `check.sh` exits successfully.
+
+
+  WHAT TO AVOID: Do not apply broad destructive changes, skip evidence gathering, or fake completion with
+  marker files — the checker validates real system state.'
 initial_state: A router whose BGP neighbor was shut down after exceeding the maximum-prefix limit.
 objectives:
 - Confirm the neighbor is down from max-prefix
@@ -19,11 +37,95 @@ objectives:
 - Verify the session is Established with full prefixes
 hints:
 - order: 1
-  cost: 10
-  content: show ip bgp summary shows the neighbor down/Idle.
+  cost: 0
+  content: 'Where to look: Confirm the neighbor is down from max-prefix'
 - order: 2
-  cost: 15
-  content: Raise maximum-prefix and clear the neighbor.
+  cost: 25
+  content: 'Diagnostic steps:
+
+    1. Raise the maximum-prefix limit appropriately and clear
+
+    2. Verify the session is Established with full prefixes'
 - order: 3
-  cost: 20
-  content: Established with prefixes.
+  cost: 50
+  content: 'Exact fix + verification:
+
+    1. Verify the session is Established with full prefixes.
+
+    2. Re-run the lab checker (`check.sh` or Check Solution).
+
+    3. Confirm every scenario objective is satisfied.
+
+
+    WHY: the grader validates real state — marker files are ignored.'
+summary: Complete the bgp max-prefix limit tripped shutdown networking lab and verify success with the
+  checker
+estimated_minutes: 25
+xp_reward: 100
+prerequisites:
+- Basic networking literacy
+tags:
+- fix
+- hands-on
+- networking
+linked_tutorial: networking-fundamentals
+what_you_will_learn:
+- Confirm the neighbor is down from max-prefix
+- Raise the maximum-prefix limit appropriately and clear
+- Verify the session is Established with full prefixes
+environment:
+  nodes:
+  - role: primary
+    os: FixitLab network lab
+    hostname: lab-primary
+    ip: 127.0.0.1
+    specs: local offline simulation
+  pre_installed:
+  - bash
+  - coreutils
+  - journalctl
+  - networking
+  - systemctl
+  credentials:
+  - user: root
+    password: lab123
+tasks:
+- id: task_1
+  title: BGP Max-Prefix Limit Tripped Shutdown
+  description: Restore healthy behavior for BGP Max-Prefix Limit Tripped Shutdown by investigating the
+    failure, applying the smallest safe fix, and validating the outcome.
+  background: 'This networking lab teaches systematic troubleshooting: observe, hypothesize, change, verify.'
+  validation:
+    type: custom_script
+    script: check.sh
+    error_message: Validation did not pass. Re-read the objectives and Hint 2 diagnostic steps.
+solution:
+  summary: Identify the misconfiguration affecting this networking lab and apply the minimal fix.
+  files_changed: []
+  commands_run:
+  - bash check.sh
+  reference_docs: networking-fundamentals
+guided_mode:
+  enabled: true
+  steps:
+  - step: 1
+    title: Inspect current state
+    instruction: Run a read-only diagnostic before changing anything.
+    command: check.sh
+    expected_output: Output shows the current failure mode
+    explanation: Evidence-first troubleshooting avoids guessing.
+    next_on: command_success
+  - step: 2
+    title: Apply the minimal fix
+    instruction: Make one reversible change aligned with the objectives.
+    command: '# your fix command here'
+    expected_output: State moves toward the objective
+    explanation: Small changes make rollback easy if the hypothesis was wrong.
+    next_on: command_success
+  - step: 3
+    title: Verify with the grader
+    instruction: Run the same verification the checker uses.
+    command: check.sh
+    expected_output: '`check.sh` exits successfully'
+    explanation: The lab passes only when real state is healthy.
+    next_on: command_success

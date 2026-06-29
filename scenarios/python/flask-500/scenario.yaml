@@ -1,10 +1,30 @@
 title: Flask App Returns 500
 slug: sim-python-flask-500
-category: Python Development
+category: Fix
 difficulty: medium
-description: A Flask endpoint returns HTTP 500 Internal Server Error. An unhandled exception is raised
-  inside the view (a bug, a None value, a missing key, or a failed dependency call). Read the traceback
-  from the server log, fix the offending code path, and confirm the route returns a successful response.
+description: 'CONTEXT: A team operating Python development needs you to resolve `Flask App Returns 500`
+  during a realistic incident. The business impact is reduced service reliability until the underlying
+  state is repaired.
+
+
+  ENVIRONMENT: You are working in FixitLab''s offline Python project workspace with source files, venv,
+  tests, and CLI entrypoints. All tools run locally; no paid APIs or external cloud calls are required.
+
+
+  SYMPTOM / STARTING STATE: Flask application serving a route that raises an unhandled exception, so the
+  endpoint responds 500. The traceback is visible in the server''s stderr/log. A Flask endpoint returns
+  HTTP 500 Internal Server Error. An unhandled exception is raised inside the view (a bug, a None value,
+  a missing key, or a failed dependency call). Read the traceback from the server log, fix the offending
+  code path, and confirm the route returns a successful response.
+
+
+  OBJECTIVE: Reproduce the 500 and capture the traceback from the Flask log; Identify the line/exception
+  inside the view that fails; Fix the code so the endpoint returns a 2xx response. Success means `check.sh`
+  exits successfully.
+
+
+  WHAT TO AVOID: Do not apply broad destructive changes, skip evidence gathering, or fake completion with
+  marker files — the checker validates real system state.'
 initial_state: Flask application serving a route that raises an unhandled exception, so the endpoint responds
   500. The traceback is visible in the server's stderr/log.
 lab_mode: simulation
@@ -21,14 +41,71 @@ objectives:
 - Fix the code so the endpoint returns a 2xx response
 hints:
 - order: 1
-  cost: 10
-  content: Hit the route (`curl -i http://localhost:5000/<path>`) to get the 500, then read the Flask
-    process log — the traceback's last frame points to the failing line in the view.
+  cost: 0
+  content: 'Where to look: Reproduce the 500 and capture the traceback from the Flask log'
 - order: 2
-  cost: 15
-  content: 'Common causes: indexing a dict/JSON key that''s absent, calling a method on None, or an uncaught
-    error from a downstream call. Reproduce with the same input to confirm.'
+  cost: 25
+  content: 'Diagnostic steps:
+
+    1. Identify the line/exception inside the view that fails
+
+    2. Fix the code so the endpoint returns a 2xx response'
 - order: 3
-  cost: 20
-  content: Fix the view (guard the missing key with .get(), null-check the value, or handle the downstream
-    error), reload the app, and re-curl — the route now returns 200.
+  cost: 50
+  content: 'Exact fix + verification:
+
+    1. Fix the code so the endpoint returns a 2xx response.
+
+    2. Re-run the lab checker (`check.sh` or Check Solution).
+
+    3. Confirm every scenario objective is satisfied.
+
+
+    WHY: the grader validates real state — marker files are ignored.'
+technology: python
+summary: Complete the flask app returns 500 python lab and verify success with the checker
+estimated_minutes: 15
+xp_reward: 100
+prerequisites:
+- Basic python literacy
+tags:
+- fix
+- hands-on
+- python
+linked_tutorial: python-fundamentals
+what_you_will_learn:
+- Reproduce the 500 and capture the traceback from the Flask log
+- Identify the line/exception inside the view that fails
+- Fix the code so the endpoint returns a 2xx response
+environment:
+  nodes:
+  - role: primary
+    os: FixitLab Python project workspace
+    hostname: lab-primary
+    ip: 127.0.0.1
+    specs: local offline simulation
+  pre_installed:
+  - bash
+  - coreutils
+  - pip
+  - python
+  - python3
+  credentials:
+  - user: root
+    password: lab123
+tasks:
+- id: task_1
+  title: Flask App Returns 500
+  description: Restore healthy behavior for Flask App Returns 500 by investigating the failure, applying
+    the smallest safe fix, and validating the outcome.
+  background: 'This python lab teaches systematic troubleshooting: observe, hypothesize, change, verify.'
+  validation:
+    type: custom_script
+    script: check.sh
+    error_message: Validation did not pass. Re-read the objectives and Hint 2 diagnostic steps.
+solution:
+  summary: Identify the misconfiguration affecting this python lab and apply the minimal fix.
+  files_changed: []
+  commands_run:
+  - bash check.sh
+  reference_docs: python-fundamentals

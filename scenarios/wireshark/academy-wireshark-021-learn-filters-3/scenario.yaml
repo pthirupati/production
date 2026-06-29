@@ -1,7 +1,7 @@
-title: 'Wireshark Packet Analysis: Capture/Display Filters — Fundamentals Lab'
+title: Capture/Display Filters — Learn Lab
 slug: academy-wireshark-021-learn-filters-3
-technology: Wireshark Packet Analysis
-category: Core Skills
+technology: wireshark
+category: Learn
 difficulty: easy
 scenario_type: do
 lab_mode: simulation
@@ -11,9 +11,29 @@ max_score: 100
 is_free: false
 infrastructure_type: docker
 jira_priority: Low
-description: This beginner-friendly Wireshark Packet Analysis lab introduces capture/display filters.
-  You will explore BPF/display filters, protocol fields, and follow streams on the capture lab. Read the
-  environment first, then follow the guided steps — no prior production experience required.
+description: 'CONTEXT: A team operating packet analysis needs you to resolve `wireshark: Capture/Display
+  Filters — Fundamentals Lab` during a realistic incident. The business impact is reduced service reliability
+  until the underlying state is repaired.
+
+
+  ENVIRONMENT: You are working in FixitLab''s offline capture lab with pcap files, display filters, and
+  protocol decode. All tools run locally; no paid APIs or external cloud calls are required.
+
+
+  SYMPTOM / STARTING STATE: The capture lab is online with a starter capture/display filters setup. Some
+  pieces are intentionally incomplete so you can learn how they fit together. Nothing is on fire — focus
+  on observation. This beginner-friendly wireshark lab introduces capture/display filters. You will explore
+  BPF/display filters, protocol fields, and follow streams on the capture lab. Read the environment first,
+  then follow the guided steps — no prior production experience required.
+
+
+  OBJECTIVE: Understand how capture/display filters work in this lab environment; Identify the main status
+  and configuration signals for capture/display filters; Confirm you can read the current state confidently
+  before changing anything. Success means `check.sh` exits successfully.
+
+
+  WHAT TO AVOID: Do not apply broad destructive changes, skip evidence gathering, or fake completion with
+  marker files — the checker validates real system state.'
 objectives:
 - Understand how capture/display filters work in this lab environment
 - Identify the main status and configuration signals for capture/display filters
@@ -22,33 +42,96 @@ initial_state: The capture lab is online with a starter capture/display filters 
   intentionally incomplete so you can learn how they fit together. Nothing is on fire — focus on observation.
 hints:
 - order: 1
-  cost: 10
-  content: 'Orient yourself before changing anything:
-
-    1. Inspect the current state — Wireshark filter bar, protocol decode panes, and IO graphs.
-
-    2. Write down what looks normal versus wrong or missing for capture/display filters.
-
-    3. Recall the core idea: BPF/display filters, protocol fields, and follow streams. Form one hypothesis
-    before you act.'
+  cost: 0
+  content: 'Where to look: Load the capture in Wireshark and apply a display filter matching the symptom.'
 - order: 2
-  cost: 15
-  content: 'Plan your approach (still no spoilers):
-
-    1. Confirm the exact gap between current and desired state for capture/display filters.
-
-    2. Decide the single smallest change that moves you toward the objective.
-
-    3. Capture evidence (command output / status) before the change so you can prove it worked afterward.'
-- order: 3
   cost: 25
-  content: 'Guided walkthrough:
+  content: 'Diagnostic steps:
 
-    1. Re-check the current state — Wireshark filter bar, protocol decode panes, and IO graphs.
+    1. Note protocol, source/dest IP, and TCP flags on failing packets.
 
-    2. Make one small, reversible change toward the objective, re-reading status after each step so you
-    understand cause and effect.
+    2. Follow TCP stream or export objects if HTTP/DNS is involved.
 
-    3. Verify the result — the target flow is isolated with enough context to explain latency/errors.
+    3. Compare timing (retransmissions, RST, TLS alerts) to the lab question.'
+- order: 3
+  cost: 50
+  content: 'Exact fix + verification:
 
-    4. Click Check Solution once `systemctl is-active nginx` returns active.'
+    1. Apply the filter or analysis steps the objectives describe.
+
+    2. Document the answer (host, port, flag, or root cause).
+
+    3. Submit via Check Solution in the Wireshark simulator.
+
+
+    WHY: packet labs grade your analysis, not arbitrary shell markers.'
+summary: Complete the capture/display filters — learn lab wireshark lab and verify success with the checker
+estimated_minutes: 15
+xp_reward: 100
+prerequisites:
+- Basic wireshark literacy
+tags:
+- do
+- hands-on
+- wireshark
+linked_tutorial: wireshark-fundamentals
+what_you_will_learn:
+- Understand how capture/display filters work in this lab environment
+- Identify the main status and configuration signals for capture/display filters
+- Confirm you can read the current state confidently before changing anything
+environment:
+  nodes:
+  - role: primary
+    os: FixitLab capture lab
+    hostname: lab-primary
+    ip: 127.0.0.1
+    specs: local offline simulation
+  pre_installed:
+  - bash
+  - coreutils
+  - journalctl
+  - systemctl
+  - wireshark
+  credentials:
+  - user: root
+    password: lab123
+tasks:
+- id: task_1
+  title: Capture/Display Filters — Learn Lab
+  description: Restore healthy behavior for Capture/Display Filters — Learn Lab by investigating the failure,
+    applying the smallest safe fix, and validating the outcome.
+  background: 'This wireshark lab teaches systematic troubleshooting: observe, hypothesize, change, verify.'
+  validation:
+    type: custom_script
+    script: check.sh
+    error_message: Validation did not pass. Re-read the objectives and Hint 2 diagnostic steps.
+solution:
+  summary: Identify the misconfiguration affecting this wireshark lab and apply the minimal fix.
+  files_changed: []
+  commands_run:
+  - bash check.sh
+  reference_docs: wireshark-fundamentals
+guided_mode:
+  enabled: true
+  steps:
+  - step: 1
+    title: Inspect current state
+    instruction: Run a read-only diagnostic before changing anything.
+    command: check.sh
+    expected_output: Output shows the current failure mode
+    explanation: Evidence-first troubleshooting avoids guessing.
+    next_on: command_success
+  - step: 2
+    title: Apply the minimal fix
+    instruction: Make one reversible change aligned with the objectives.
+    command: '# your fix command here'
+    expected_output: State moves toward the objective
+    explanation: Small changes make rollback easy if the hypothesis was wrong.
+    next_on: command_success
+  - step: 3
+    title: Verify with the grader
+    instruction: Run the same verification the checker uses.
+    command: check.sh
+    expected_output: '`check.sh` exits successfully'
+    explanation: The lab passes only when real state is healthy.
+    next_on: command_success

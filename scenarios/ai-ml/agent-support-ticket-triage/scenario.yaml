@@ -1,10 +1,31 @@
 title: Build a support-ticket triage agent
 slug: agent-support-ticket-triage
-category: AI / ML / LLM & Agents
-description: A new support ticket has arrived and your team wants it triaged automatically. Open the
-  Agent Workflow simulator and build a small agent that classifies the incoming ticket with a
-  deterministic rule-based "LLM" node, then routes high-priority tickets to a notification tool so the
-  on-call engineer is paged. Everything runs free and local — no paid LLM, no network.
+category: Fix
+description: 'CONTEXT: A team operating AI/ML workflows needs you to resolve `Build a support-ticket triage
+  agent` during a realistic incident. The business impact is reduced service reliability until the underlying
+  state is repaired.
+
+
+  ENVIRONMENT: You are working in FixitLab''s offline ML practice workspace with datasets, training scripts,
+  metrics, and model artifacts. All tools run locally; no paid APIs or external cloud calls are required.
+
+
+  SYMPTOM / STARTING STATE: The canvas starts with only a Trigger node (an urgent security ticket) and
+  an Output node, unconnected. There is no classifier, no routing, and nothing fires — you must build
+  the agent. A new support ticket has arrived and your team wants it triaged automatically. Open the Agent
+  Workflow simulator and build a small agent that classifies the incoming ticket with a deterministic
+  rule-based "LLM" node, then routes high-priority tickets to a notification tool so the on-call engineer
+  is paged. Everything runs free and local — no paid LLM, no network.
+
+
+  OBJECTIVE: Open the Agent Workflow simulator from the lab toolbar; Add an LLM node in classify mode
+  and feed it the ticket text from the trigger; Add a condition node that detects a high-priority ticket
+  and route the true branch to a send_notification tool, then connect the notification to the output.
+  Success means `check.sh` exits successfully.
+
+
+  WHAT TO AVOID: Do not apply broad destructive changes, skip evidence gathering, or fake completion with
+  marker files — the checker validates real system state.'
 difficulty: easy
 lab_mode: simulation
 simulation_type: ai-agent
@@ -17,24 +38,82 @@ dual_terminal: false
 objectives:
 - Open the Agent Workflow simulator from the lab toolbar
 - Add an LLM node in classify mode and feed it the ticket text from the trigger
-- Add a condition node that detects a high-priority ticket and route the true branch to a
-  send_notification tool, then connect the notification to the output
+- Add a condition node that detects a high-priority ticket and route the true branch to a send_notification
+  tool, then connect the notification to the output
 - Run the workflow so the security incident is classified high priority and an escalation is sent
-initial_state: The canvas starts with only a Trigger node (an urgent security ticket) and an Output
-  node, unconnected. There is no classifier, no routing, and nothing fires — you must build the agent.
+initial_state: The canvas starts with only a Trigger node (an urgent security ticket) and an Output node,
+  unconnected. There is no classifier, no routing, and nothing fires — you must build the agent.
 hints:
 - order: 1
-  cost: 10
-  content: From the node palette, add an LLM node and set its mode to "classify" with input_field "text".
-    Connect the Trigger to the LLM so the ticket text flows in. Click Run and inspect the trace — the
-    LLM should tag the ticket with a category and a priority.
+  cost: 0
+  content: 'Where to look: Open the Agent Workflow simulator from the lab toolbar'
 - order: 2
-  cost: 15
-  content: Add a Condition node after the LLM. Set field=priority, op=equals, value=high. Wire the LLM
-    into the condition, then connect the condition's TRUE branch onward (use the branch=true edge).
+  cost: 25
+  content: 'Diagnostic steps:
+
+    1. Add an LLM node in classify mode and feed it the ticket text from the trigger
+
+    2. Add a condition node that detects a high-priority ticket and route the true branch to a send_notification
+    tool, then connect the notification to the output
+
+    3. Run the workflow so the security incident is classified high priority and an escalation is sent'
 - order: 3
-  cost: 20
-  content: Add a Tool node of kind send_notification (set a channel like "oncall" and a message such as
-    "Escalate {ticket_id}"). Connect the condition's true branch to this tool, then the tool to the
-    Output node. Run the workflow — the security ticket classifies as high priority and the notification
-    fires, completing the lab.
+  cost: 50
+  content: 'Exact fix + verification:
+
+    1. Run the workflow so the security incident is classified high priority and an escalation is sent.
+
+    2. Re-run the lab checker (`check.sh` or Check Solution).
+
+    3. Confirm every scenario objective is satisfied.
+
+
+    WHY: the grader validates real state — marker files are ignored.'
+summary: Complete the build a support-ticket triage agent ai ml lab and verify success with the checker
+estimated_minutes: 15
+xp_reward: 100
+prerequisites:
+- Basic ai ml literacy
+tags:
+- ai-ml
+- fix
+- hands-on
+linked_tutorial: ai-ml-fundamentals
+what_you_will_learn:
+- Open the Agent Workflow simulator from the lab toolbar
+- Add an LLM node in classify mode and feed it the ticket text from the trigger
+- Add a condition node that detects a high-priority ticket and route the true branch to a send_notification
+  tool, then connect the notification to the output
+- Run the workflow so the security incident is classified high priority and an escalation is sent
+environment:
+  nodes:
+  - role: primary
+    os: FixitLab ML practice workspace
+    hostname: lab-primary
+    ip: 127.0.0.1
+    specs: local offline simulation
+  pre_installed:
+  - ai ml
+  - bash
+  - coreutils
+  - pip
+  - python3
+  credentials:
+  - user: root
+    password: lab123
+tasks:
+- id: task_1
+  title: Build a support-ticket triage agent
+  description: Restore healthy behavior for Build a support-ticket triage agent by investigating the failure,
+    applying the smallest safe fix, and validating the outcome.
+  background: 'This ai ml lab teaches systematic troubleshooting: observe, hypothesize, change, verify.'
+  validation:
+    type: custom_script
+    script: check.sh
+    error_message: Validation did not pass. Re-read the objectives and Hint 2 diagnostic steps.
+solution:
+  summary: Identify the misconfiguration affecting this ai ml lab and apply the minimal fix.
+  files_changed: []
+  commands_run:
+  - bash check.sh
+  reference_docs: ai-ml-fundamentals

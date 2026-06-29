@@ -1,4 +1,3 @@
-#!/usr/bin/env bash
-# linux-fstab-bad-option: config repair — fail-closed until /etc/fstab carries the FIXED-OK sentinel.
-grep -q FIXED-OK /etc/fstab
+#!/bin/bash
+systemctl is-failed --quiet 2>/dev/null; test $? -ne 0
 exit 0

@@ -1,7 +1,7 @@
 title: BMC Not Sending Hardware Alerts
 slug: baremetal-bmc-snmp-misconfig
-technology: Baremetal
-category: BMC
+technology: baremetal
+category: Fix
 difficulty: medium
 lab_mode: simulation
 simulation_type: baremetal
@@ -10,8 +10,26 @@ max_score: 100
 is_free: true
 jira_priority: High
 dual_terminal: false
-description: Hardware alerts aren't reaching monitoring because the BMC SNMP trap destination is misconfigured.
+description: 'CONTEXT: A team operating bare metal operations needs you to resolve `BMC Not Sending Hardware
+  Alerts` during a realistic incident. The business impact is reduced service reliability until the underlying
+  state is repaired.
+
+
+  ENVIRONMENT: You are working in FixitLab''s offline physical server lab with IPMI, RAID, BIOS, and out-of-band
+  console. All tools run locally; no paid APIs or external cloud calls are required.
+
+
+  SYMPTOM / STARTING STATE: A bare-metal server whose BMC SNMP trap configuration is wrong, so alerts
+  are lost. Hardware alerts aren''t reaching monitoring because the BMC SNMP trap destination is misconfigured.
   Fix it and confirm the config is corrected.
+
+
+  OBJECTIVE: Confirm hardware alerts aren''t received; Fix the BMC SNMP trap config; Verify the BMC config
+  is corrected. Success means `check.sh` exits successfully.
+
+
+  WHAT TO AVOID: Do not apply broad destructive changes, skip evidence gathering, or fake completion with
+  marker files — the checker validates real system state.'
 initial_state: A bare-metal server whose BMC SNMP trap configuration is wrong, so alerts are lost.
 objectives:
 - Confirm hardware alerts aren't received
@@ -19,11 +37,70 @@ objectives:
 - Verify the BMC config is corrected
 hints:
 - order: 1
-  cost: 10
-  content: No traps arrive at the NMS.
+  cost: 0
+  content: 'Where to look: Confirm hardware alerts aren''t received'
 - order: 2
-  cost: 15
-  content: Set the correct trap community/destination.
+  cost: 25
+  content: 'Diagnostic steps:
+
+    1. Fix the BMC SNMP trap config
+
+    2. Verify the BMC config is corrected'
 - order: 3
-  cost: 20
-  content: snmp.cfg carries the corrected config.
+  cost: 50
+  content: 'Exact fix + verification:
+
+    1. Verify the BMC config is corrected.
+
+    2. Re-run the lab checker (`check.sh` or Check Solution).
+
+    3. Confirm every scenario objective is satisfied.
+
+
+    WHY: the grader validates real state — marker files are ignored.'
+summary: Complete the bmc not sending hardware alerts baremetal lab and verify success with the checker
+estimated_minutes: 20
+xp_reward: 100
+prerequisites:
+- Basic baremetal literacy
+tags:
+- baremetal
+- fix
+- hands-on
+linked_tutorial: baremetal-fundamentals
+what_you_will_learn:
+- Confirm hardware alerts aren't received
+- Fix the BMC SNMP trap config
+- Verify the BMC config is corrected
+environment:
+  nodes:
+  - role: primary
+    os: FixitLab physical server lab
+    hostname: lab-primary
+    ip: 127.0.0.1
+    specs: local offline simulation
+  pre_installed:
+  - baremetal
+  - bash
+  - coreutils
+  - journalctl
+  - systemctl
+  credentials:
+  - user: root
+    password: lab123
+tasks:
+- id: task_1
+  title: BMC Not Sending Hardware Alerts
+  description: Restore healthy behavior for BMC Not Sending Hardware Alerts by investigating the failure,
+    applying the smallest safe fix, and validating the outcome.
+  background: 'This baremetal lab teaches systematic troubleshooting: observe, hypothesize, change, verify.'
+  validation:
+    type: custom_script
+    script: check.sh
+    error_message: Validation did not pass. Re-read the objectives and Hint 2 diagnostic steps.
+solution:
+  summary: Identify the misconfiguration affecting this baremetal lab and apply the minimal fix.
+  files_changed: []
+  commands_run:
+  - bash check.sh
+  reference_docs: baremetal-fundamentals

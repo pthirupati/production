@@ -1,7 +1,7 @@
 title: BGP Neighbor Stuck in Idle After AS Mismatch
 slug: networking-bgp-as-mismatch
-technology: Networking
-category: Routing / BGP
+technology: networking
+category: Fix
 difficulty: hard
 lab_mode: simulation
 simulation_type: networking
@@ -10,8 +10,26 @@ max_score: 100
 is_free: true
 jira_priority: High
 dual_terminal: false
-description: A BGP session is stuck Idle because the configured remote-AS does not match the peer. Correct
-  the neighbor remote-as and confirm the session reaches Established.
+description: 'CONTEXT: A team operating network operations needs you to resolve `BGP Neighbor Stuck in
+  Idle After AS Mismatch` during a realistic incident. The business impact is reduced service reliability
+  until the underlying state is repaired.
+
+
+  ENVIRONMENT: You are working in FixitLab''s offline network lab with interfaces, routing tables, DNS,
+  and firewall rules. All tools run locally; no paid APIs or external cloud calls are required.
+
+
+  SYMPTOM / STARTING STATE: A router whose BGP neighbor is misconfigured with the wrong remote-AS, leaving
+  the session Idle and no prefixes learned. A BGP session is stuck Idle because the configured remote-AS
+  does not match the peer. Correct the neighbor remote-as and confirm the session reaches Established.
+
+
+  OBJECTIVE: Confirm the BGP session is Idle with an AS mismatch; Correct the neighbor remote-as configuration;
+  Verify the session reaches Established and learns prefixes. Success means `check.sh` exits successfully.
+
+
+  WHAT TO AVOID: Do not apply broad destructive changes, skip evidence gathering, or fake completion with
+  marker files — the checker validates real system state.'
 initial_state: A router whose BGP neighbor is misconfigured with the wrong remote-AS, leaving the session
   Idle and no prefixes learned.
 objectives:
@@ -20,11 +38,71 @@ objectives:
 - Verify the session reaches Established and learns prefixes
 hints:
 - order: 1
-  cost: 10
-  content: show ip bgp summary shows the neighbor Idle.
+  cost: 0
+  content: 'Where to look: Confirm the BGP session is Idle with an AS mismatch'
 - order: 2
-  cost: 15
-  content: Set the correct neighbor remote-as and clear the session.
+  cost: 25
+  content: 'Diagnostic steps:
+
+    1. Correct the neighbor remote-as configuration
+
+    2. Verify the session reaches Established and learns prefixes'
 - order: 3
-  cost: 20
-  content: Neighbor Established with prefixes.
+  cost: 50
+  content: 'Exact fix + verification:
+
+    1. Verify the session reaches Established and learns prefixes.
+
+    2. Re-run the lab checker (`check.sh` or Check Solution).
+
+    3. Confirm every scenario objective is satisfied.
+
+
+    WHY: the grader validates real state — marker files are ignored.'
+summary: Complete the bgp neighbor stuck in idle after as mismatch networking lab and verify success with
+  the checker
+estimated_minutes: 25
+xp_reward: 100
+prerequisites:
+- Basic networking literacy
+tags:
+- fix
+- hands-on
+- networking
+linked_tutorial: networking-fundamentals
+what_you_will_learn:
+- Confirm the BGP session is Idle with an AS mismatch
+- Correct the neighbor remote-as configuration
+- Verify the session reaches Established and learns prefixes
+environment:
+  nodes:
+  - role: primary
+    os: FixitLab network lab
+    hostname: lab-primary
+    ip: 127.0.0.1
+    specs: local offline simulation
+  pre_installed:
+  - bash
+  - coreutils
+  - journalctl
+  - networking
+  - systemctl
+  credentials:
+  - user: root
+    password: lab123
+tasks:
+- id: task_1
+  title: BGP Neighbor Stuck in Idle After AS Mismatch
+  description: Restore healthy behavior for BGP Neighbor Stuck in Idle After AS Mismatch by investigating
+    the failure, applying the smallest safe fix, and validating the outcome.
+  background: 'This networking lab teaches systematic troubleshooting: observe, hypothesize, change, verify.'
+  validation:
+    type: custom_script
+    script: check.sh
+    error_message: Validation did not pass. Re-read the objectives and Hint 2 diagnostic steps.
+solution:
+  summary: Identify the misconfiguration affecting this networking lab and apply the minimal fix.
+  files_changed: []
+  commands_run:
+  - bash check.sh
+  reference_docs: networking-fundamentals

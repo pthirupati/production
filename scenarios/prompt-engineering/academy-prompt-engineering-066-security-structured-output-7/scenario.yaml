@@ -1,7 +1,7 @@
-title: 'Prompt Engineering & AI Mastery: Structured Output — Security Practice'
+title: Structured Output — Security Lab
 slug: academy-prompt-engineering-066-security-structured-output-7
-technology: Prompt Engineering & AI Mastery
-category: Security
+technology: prompt-engineering
+category: Harden
 difficulty: hard
 scenario_type: fix
 lab_mode: simulation
@@ -11,43 +11,128 @@ max_score: 100
 is_free: false
 infrastructure_type: docker
 jira_priority: Medium
-description: Service operations lab. The `nginx` systemd unit is **failed/inactive** on this host — a
-  realistic fault for Security Practice workflows that depend on it. Diagnose with `systemctl status nginx`
-  and journal logs, apply the smallest reliable fix, then verify with `systemctl is-active nginx`.
+description: 'CONTEXT: A team operating prompt engineering needs you to resolve `prompt-engineering: Structured
+  Output — Security Practice` during a realistic incident. The business impact is reduced service reliability
+  until the underlying state is repaired.
+
+
+  ENVIRONMENT: You are working in FixitLab''s offline LLM practice workspace with prompt templates, eval
+  sets, and tool configs. All tools run locally; no paid APIs or external cloud calls are required.
+
+
+  SYMPTOM / STARTING STATE: The environment is functional but overly permissive around structured output.
+  Assume an auditor or pen test is next week — tighten controls with evidence. Security review: harden
+  structured output on this prompt-engineering system. Close unsafe defaults, enforce least privilege,
+  and ensure JSON schemas and validation cannot be abused — without breaking legitimate use.
+
+
+  OBJECTIVE: Unsafe defaults related to structured output are removed or constrained; Access follows least
+  privilege and is auditable; Security checks pass without breaking required functionality. Success means
+  `systemctl is-active nginx` returns active.
+
+
+  WHAT TO AVOID: Do not apply broad destructive changes, skip evidence gathering, or fake completion with
+  marker files — the checker validates real system state.'
 objectives:
-- The `nginx` service is active (running)
-- '`systemctl is-active nginx` returns active'
-- The fix survives a status re-check (no marker files)
-initial_state: The `nginx` service is not running (`systemctl is-active nginx` → inactive/failed). Dependent
-  Security Practice tasks cannot succeed until the unit is healthy again.
+- Unsafe defaults related to structured output are removed or constrained
+- Access follows least privilege and is auditable
+- Security checks pass without breaking required functionality
+initial_state: The environment is functional but overly permissive around structured output. Assume an
+  auditor or pen test is next week — tighten controls with evidence.
 hints:
 - order: 1
-  cost: 10
-  content: 'Orient yourself before changing anything:
-
-    1. Inspect the current state — output schema and parse results.
-
-    2. Write down what looks normal versus wrong or missing for structured output.
-
-    3. Recall the core idea: JSON schemas and validation. Form one hypothesis before you act.'
+  cost: 0
+  content: 'Where to look: Unsafe defaults related to structured output are removed or constrained'
 - order: 2
-  cost: 15
-  content: 'Plan your approach (still no spoilers):
-
-    1. Confirm the exact gap between current and desired state for structured output.
-
-    2. Decide the single smallest change that moves you toward the objective.
-
-    3. Capture evidence (command output / status) before the change so you can prove it worked afterward.'
-- order: 3
   cost: 25
-  content: 'Guided walkthrough:
+  content: 'Diagnostic steps:
 
-    1. Re-check the current state — output schema and parse results.
+    1. Access follows least privilege and is auditable
 
-    2. Apply least privilege: remove the unsafe default, then grant only the explicit access the workload
-    actually needs.
+    2. Security checks pass without breaking required functionality'
+- order: 3
+  cost: 50
+  content: 'Exact fix + verification:
 
-    3. Verify the result — output matches the schema.
+    1. Security checks pass without breaking required functionality.
 
-    4. Click Check Solution once `systemctl is-active nginx` returns active.'
+    2. Re-run the lab checker (`check.sh` or Check Solution).
+
+    3. Confirm every scenario objective is satisfied.
+
+
+    WHY: the grader validates real state — marker files are ignored.'
+summary: Complete the structured output — security lab prompt engineering lab and verify success with
+  the checker
+estimated_minutes: 20
+xp_reward: 100
+prerequisites:
+- Basic prompt engineering literacy
+tags:
+- fix
+- hands-on
+- prompt-engineering
+linked_tutorial: prompt-engineering-fundamentals
+what_you_will_learn:
+- Unsafe defaults related to structured output are removed or constrained
+- Access follows least privilege and is auditable
+- Security checks pass without breaking required functionality
+environment:
+  nodes:
+  - role: primary
+    os: FixitLab LLM practice workspace
+    hostname: lab-primary
+    ip: 127.0.0.1
+    specs: local offline simulation
+  pre_installed:
+  - bash
+  - coreutils
+  - journalctl
+  - prompt engineering
+  - systemctl
+  credentials:
+  - user: root
+    password: lab123
+tasks:
+- id: task_1
+  title: Structured Output — Security Lab
+  description: Restore healthy behavior for Structured Output — Security Lab by investigating the failure,
+    applying the smallest safe fix, and validating the outcome.
+  background: 'This prompt engineering lab teaches systematic troubleshooting: observe, hypothesize, change,
+    verify.'
+  validation:
+    type: service_active
+    command: systemctl is-active nginx
+    expected_status: active
+    error_message: The nginx service is not active yet. Check `systemctl status nginx` and `journalctl
+      -u nginx -n 50`.
+solution:
+  summary: The root cause is an unhealthy `nginx` service; repair it and verify active state.
+  files_changed: []
+  commands_run:
+  - systemctl is-active nginx
+  reference_docs: prompt-engineering-fundamentals
+guided_mode:
+  enabled: true
+  steps:
+  - step: 1
+    title: Inspect current state
+    instruction: Run a read-only diagnostic before changing anything.
+    command: systemctl is-active nginx
+    expected_output: Output shows the current failure mode
+    explanation: Evidence-first troubleshooting avoids guessing.
+    next_on: command_success
+  - step: 2
+    title: Apply the minimal fix
+    instruction: Make one reversible change aligned with the objectives.
+    command: '# your fix command here'
+    expected_output: State moves toward the objective
+    explanation: Small changes make rollback easy if the hypothesis was wrong.
+    next_on: command_success
+  - step: 3
+    title: Verify with the grader
+    instruction: Run the same verification the checker uses.
+    command: systemctl is-active nginx
+    expected_output: '`systemctl is-active nginx` returns active'
+    explanation: The lab passes only when real state is healthy.
+    next_on: command_success

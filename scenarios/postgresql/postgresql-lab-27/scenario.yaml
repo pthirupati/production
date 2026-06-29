@@ -1,11 +1,29 @@
 title: Monitor postgresql replication (lab 27)
 slug: postgresql-lab-27
 technology: postgresql
-category: Postgresql
-description: 'Hands-on postgresql scenario: monitor replication in a simulated environment.
-  This PostgreSQL scenario focuses on postgresql: Monitor postgresql replication (lab
-  27). Read the environment, form a hypothesis, apply a minimal fix, and verify behavior
-  before closing the ticket.'
+category: Fix
+description: 'CONTEXT: A team operating PostgreSQL needs you to resolve `Monitor postgresql replication
+  (lab 27)` during a realistic incident. The business impact is reduced service reliability until the
+  underlying state is repaired.
+
+
+  ENVIRONMENT: You are working in FixitLab''s offline PostgreSQL cluster with psql, pg_hba.conf, roles,
+  and WAL. All tools run locally; no paid APIs or external cloud calls are required.
+
+
+  SYMPTOM / STARTING STATE: Hands-on postgresql scenario: monitor replication in a simulated environment.
+  Hands-on postgresql scenario: monitor replication in a simulated environment. This PostgreSQL scenario
+  focuses on postgresql: Monitor postgresql replication (lab 27). Read the environment, form a hypothesis,
+  apply a minimal fix, and verify behavior before closing the ticket.
+
+
+  OBJECTIVE: Understand the current failure mode affecting Monitor postgresql replication (lab 27); Restore
+  expected service behavior with a minimal, documented change; Verify the fix holds under a realistic
+  smoke test. Success means all hidden tests pass.
+
+
+  WHAT TO AVOID: Do not apply broad destructive changes, skip evidence gathering, or fake completion with
+  marker files — the checker validates real system state.'
 difficulty: easy
 scenario_type: fix
 lab_mode: simulation
@@ -17,27 +35,40 @@ max_score: 100
 is_free: false
 dual_terminal: false
 objectives:
-- Understand the current failure mode affecting Monitor postgresql replication (lab
-  27)
+- Understand the current failure mode affecting Monitor postgresql replication (lab 27)
 - Restore expected service behavior with a minimal, documented change
 - Verify the fix holds under a realistic smoke test
 initial_state: 'Hands-on postgresql scenario: monitor replication in a simulated environment.'
 hints:
 - order: 1
-  cost: 10
-  content: Read the scenario objective and inspect logs or config in the terminal.
+  cost: 0
+  content: 'Where to look: Run `systemctl status postgresql` and `pg_isready` for connection state.'
 - order: 2
-  cost: 20
-  content: 'Apply the minimal fix, then mark completion: echo FIXED-OK > /tmp/scenario-fixed'
+  cost: 25
+  content: 'Diagnostic steps:
+
+    1. Check service status and `/var/log/postgresql/` logs.
+
+    2. Verify `pg_hba.conf` and `postgresql.conf` for listen addresses.
+
+    3. Test with `psql -U postgres -c ''SELECT 1''`.'
 - order: 3
-  cost: 20
-  content: Re-run the failing check or user workflow to confirm the incident is resolved.
+  cost: 50
+  content: 'Exact fix + verification:
+
+    1. Fix auth rules, data directory permissions, or port conflict.
+
+    2. `systemctl restart postgresql`.
+
+    3. Confirm `pg_isready` reports accepting connections.
+
+
+    WHY: the database must accept connections, not just start.'
 coding_spec:
   language: python
   entrypoint: solution.py
   kind: fix
-  instructions: 'Hands-on postgresql scenario: monitor replication in a simulated
-    environment.'
+  instructions: 'Hands-on postgresql scenario: monitor replication in a simulated environment.'
   files:
   - path: solution.py
     content: "def solution():\n    raise NotImplementedError('Apply the fix')\n"
@@ -45,5 +76,54 @@ coding_spec:
   visible_tests:
   - name: placeholder
     code: assert callable(solution)
-  hidden_tests: []
+  hidden_tests:
+  - name: placeholder_hidden
+    code: assert callable(solution)
   timeout: 8
+summary: Complete the monitor postgresql replication (lab 27) postgresql lab and verify success with the
+  checker
+estimated_minutes: 20
+xp_reward: 100
+prerequisites:
+- Basic postgresql literacy
+tags:
+- fix
+- hands-on
+- postgresql
+linked_tutorial: postgresql-fundamentals
+what_you_will_learn:
+- Understand the current failure mode affecting Monitor postgresql replication (lab 27)
+- Restore expected service behavior with a minimal, documented change
+- Verify the fix holds under a realistic smoke test
+environment:
+  nodes:
+  - role: primary
+    os: FixitLab PostgreSQL cluster
+    hostname: lab-primary
+    ip: 127.0.0.1
+    specs: local offline simulation
+  pre_installed:
+  - bash
+  - coreutils
+  - journalctl
+  - postgresql
+  - systemctl
+  credentials:
+  - user: root
+    password: lab123
+tasks:
+- id: task_1
+  title: Monitor postgresql replication (lab 27)
+  description: Restore healthy behavior for Monitor postgresql replication (lab 27) by investigating the
+    failure, applying the smallest safe fix, and validating the outcome.
+  background: 'This postgresql lab teaches systematic troubleshooting: observe, hypothesize, change, verify.'
+  validation:
+    type: custom_script
+    script: hidden_tests
+    error_message: One or more hidden tests failed. Read the public test output, fix your solution, and
+      submit again.
+solution:
+  summary: The solution passes all hidden tests by implementing the required behavior in code.
+  files_changed: []
+  commands_run: []
+  reference_docs: postgresql-fundamentals

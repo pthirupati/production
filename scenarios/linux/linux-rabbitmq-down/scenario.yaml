@@ -1,7 +1,7 @@
 title: RabbitMQ Broker Service Down
 slug: linux-rabbitmq-down
-technology: Linux
-category: Messaging
+technology: linux
+category: Build
 difficulty: medium
 lab_mode: simulation
 simulation_type: generic
@@ -10,8 +10,25 @@ max_score: 100
 is_free: true
 jira_priority: High
 dual_terminal: false
-description: The RabbitMQ broker is down, so message producers/consumers can't connect. Restore the broker
-  service.
+description: 'CONTEXT: A team operating Linux administration needs you to resolve `RabbitMQ Broker Service
+  Down` during a realistic incident. The business impact is reduced service reliability until the underlying
+  state is repaired.
+
+
+  ENVIRONMENT: You are working in FixitLab''s offline Linux practice server with terminal and config files
+  under /etc and /var. All tools run locally; no paid APIs or external cloud calls are required.
+
+
+  SYMPTOM / STARTING STATE: A Linux host where the rabbitmq-server service is failed, halting messaging.
+  The RabbitMQ broker is down, so message producers/consumers can''t connect. Restore the broker service.
+
+
+  OBJECTIVE: Confirm rabbitmq-server is down; Resolve and start the broker; Verify it is active. Success
+  means `systemctl is-active rabbitmq-server` returns active.
+
+
+  WHAT TO AVOID: Do not apply broad destructive changes, skip evidence gathering, or fake completion with
+  marker files — the checker validates real system state.'
 initial_state: A Linux host where the rabbitmq-server service is failed, halting messaging.
 objectives:
 - Confirm rabbitmq-server is down
@@ -19,11 +36,99 @@ objectives:
 - Verify it is active
 hints:
 - order: 1
-  cost: 10
-  content: rabbitmqctl status fails; service down.
+  cost: 0
+  content: 'Where to look: Start with `systemctl status rabbitmq-server` and `journalctl -u rabbitmq-server
+    -n 50 --no-pager` before changing anything.'
 - order: 2
-  cost: 15
-  content: Fix and systemctl start rabbitmq-server.
+  cost: 25
+  content: 'Diagnostic steps:
+
+    1. Run `systemctl status rabbitmq-server` — note Active/Failed and the last log lines.
+
+    2. Read `journalctl -u rabbitmq-server -n 50` for the root error.
+
+    3. Form a hypothesis about the smallest config or permission fix.'
 - order: 3
-  cost: 20
-  content: rabbitmq-server active.
+  cost: 50
+  content: 'Exact fix + verification:
+
+    1. Apply the minimal fix (config, unit override, or missing directory).
+
+    2. Run `systemctl daemon-reload` if you edited a unit file.
+
+    3. Run `systemctl restart rabbitmq-server` and confirm `systemctl is-active rabbitmq-server` succeeds.
+
+
+    WHY: the grader checks real service state, not marker files.'
+summary: Complete the rabbitmq broker service down linux lab and verify success with the checker
+estimated_minutes: 20
+xp_reward: 100
+prerequisites:
+- Basic linux literacy
+tags:
+- fix
+- hands-on
+- linux
+linked_tutorial: linux-fundamentals
+what_you_will_learn:
+- Confirm rabbitmq-server is down
+- Resolve and start the broker
+- Verify it is active
+environment:
+  nodes:
+  - role: primary
+    os: FixitLab Linux practice server
+    hostname: lab-primary
+    ip: 127.0.0.1
+    specs: local offline simulation
+  pre_installed:
+  - bash
+  - coreutils
+  - journalctl
+  - linux
+  - systemctl
+  credentials:
+  - user: root
+    password: lab123
+tasks:
+- id: task_1
+  title: RabbitMQ Broker Service Down
+  description: Restore healthy behavior for RabbitMQ Broker Service Down by investigating the failure,
+    applying the smallest safe fix, and validating the outcome.
+  background: 'This linux lab teaches systematic troubleshooting: observe, hypothesize, change, verify.'
+  validation:
+    type: service_active
+    command: systemctl is-active rabbitmq-server
+    expected_status: active
+    error_message: The rabbitmq-server service is not active yet. Check `systemctl status rabbitmq-server`
+      and `journalctl -u rabbitmq-server -n 50`.
+solution:
+  summary: The root cause is an unhealthy `rabbitmq-server` service; repair it and verify active state.
+  files_changed: []
+  commands_run:
+  - systemctl is-active rabbitmq-server
+  reference_docs: linux-fundamentals
+guided_mode:
+  enabled: true
+  steps:
+  - step: 1
+    title: Inspect current state
+    instruction: Run a read-only diagnostic before changing anything.
+    command: systemctl is-active rabbitmq-server
+    expected_output: Output shows the current failure mode
+    explanation: Evidence-first troubleshooting avoids guessing.
+    next_on: command_success
+  - step: 2
+    title: Apply the minimal fix
+    instruction: Make one reversible change aligned with the objectives.
+    command: '# your fix command here'
+    expected_output: State moves toward the objective
+    explanation: Small changes make rollback easy if the hypothesis was wrong.
+    next_on: command_success
+  - step: 3
+    title: Verify with the grader
+    instruction: Run the same verification the checker uses.
+    command: systemctl is-active rabbitmq-server
+    expected_output: '`systemctl is-active rabbitmq-server` returns active'
+    explanation: The lab passes only when real state is healthy.
+    next_on: command_success

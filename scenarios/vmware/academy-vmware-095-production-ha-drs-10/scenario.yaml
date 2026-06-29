@@ -1,7 +1,7 @@
-title: 'VMware vSphere: Ha And Drs — Production Readiness'
+title: Ha And Drs — Production Lab
 slug: academy-vmware-095-production-ha-drs-10
-technology: VMware vSphere
-category: Production
+technology: vmware
+category: Project
 difficulty: medium
 scenario_type: fix
 lab_mode: simulation
@@ -11,8 +11,26 @@ max_score: 100
 is_free: false
 infrastructure_type: docker
 jira_priority: Medium
-description: Production readiness for HA and DRS. Harden, document, and validate cluster availability
-  and load balancing so the change is safe to run during a maintenance window.
+description: 'CONTEXT: A team operating VMware vSphere needs you to resolve `vmware: Ha And Drs — Production
+  Readiness` during a realistic incident. The business impact is reduced service reliability until the
+  underlying state is repaired.
+
+
+  ENVIRONMENT: You are working in FixitLab''s offline vSphere lab with VMs, datastores, vCenter, and ESXi
+  tasks. All tools run locally; no paid APIs or external cloud calls are required.
+
+
+  SYMPTOM / STARTING STATE: A feature fix works in dev, but HA and DRS is not production ready — missing
+  guardrails, runbooks, or capacity checks. Production readiness for HA and DRS. Harden, document, and
+  validate cluster availability and load balancing so the change is safe to run during a maintenance window.
+
+
+  OBJECTIVE: Day-2 HA and DRS work completes safely in this environment; Changes are verified with before/after
+  checks; The system remains stable for dependent teams. Success means `check.sh` exits successfully.
+
+
+  WHAT TO AVOID: Do not apply broad destructive changes, skip evidence gathering, or fake completion with
+  marker files — the checker validates real system state.'
 objectives:
 - Day-2 HA and DRS work completes safely in this environment
 - Changes are verified with before/after checks
@@ -21,33 +39,95 @@ initial_state: A feature fix works in dev, but HA and DRS is not production read
   runbooks, or capacity checks.
 hints:
 - order: 1
-  cost: 10
-  content: 'Orient yourself before changing anything:
-
-    1. Inspect the current state — cluster HA/DRS settings and recommendations.
-
-    2. Write down what looks normal versus wrong or missing for HA and DRS.
-
-    3. Recall the core idea: cluster availability and load balancing. Form one hypothesis before you act.'
+  cost: 0
+  content: 'Where to look: Day-2 HA and DRS work completes safely in this environment'
 - order: 2
-  cost: 15
-  content: 'Plan your approach (still no spoilers):
-
-    1. Confirm the exact gap between current and desired state for HA and DRS.
-
-    2. Decide the single smallest change that moves you toward the objective.
-
-    3. Capture evidence (command output / status) before the change so you can prove it worked afterward.'
-- order: 3
   cost: 25
-  content: 'Guided walkthrough:
+  content: 'Diagnostic steps:
 
-    1. Re-check the current state — cluster HA/DRS settings and recommendations.
+    1. Changes are verified with before/after checks
 
-    2. Apply production standards for HA and DRS: resource limits, monitoring, access controls, and a
-    written rollback step.
+    2. The system remains stable for dependent teams'
+- order: 3
+  cost: 50
+  content: 'Exact fix + verification:
 
-    3. Verify the result — HA restarts VMs and DRS balances load.
+    1. The system remains stable for dependent teams.
 
-    4. Click Check Solution once `systemctl is-active nginx` returns active.'
+    2. Re-run the lab checker (`check.sh` or Check Solution).
+
+    3. Confirm every scenario objective is satisfied.
+
+
+    WHY: the grader validates real state — marker files are ignored.'
 vmware_link: true
+summary: Complete the ha and drs — production lab vmware lab and verify success with the checker
+estimated_minutes: 20
+xp_reward: 100
+prerequisites:
+- Basic vmware literacy
+tags:
+- fix
+- hands-on
+- vmware
+linked_tutorial: vmware-fundamentals
+what_you_will_learn:
+- Day-2 HA and DRS work completes safely in this environment
+- Changes are verified with before/after checks
+- The system remains stable for dependent teams
+environment:
+  nodes:
+  - role: primary
+    os: FixitLab vSphere lab
+    hostname: lab-primary
+    ip: 127.0.0.1
+    specs: local offline simulation
+  pre_installed:
+  - bash
+  - coreutils
+  - journalctl
+  - systemctl
+  - vmware
+  credentials:
+  - user: root
+    password: lab123
+tasks:
+- id: task_1
+  title: Ha And Drs — Production Lab
+  description: Restore healthy behavior for Ha And Drs — Production Lab by investigating the failure,
+    applying the smallest safe fix, and validating the outcome.
+  background: 'This vmware lab teaches systematic troubleshooting: observe, hypothesize, change, verify.'
+  validation:
+    type: custom_script
+    script: check.sh
+    error_message: Validation did not pass. Re-read the objectives and Hint 2 diagnostic steps.
+solution:
+  summary: Identify the misconfiguration affecting this vmware lab and apply the minimal fix.
+  files_changed: []
+  commands_run:
+  - bash check.sh
+  reference_docs: vmware-fundamentals
+guided_mode:
+  enabled: true
+  steps:
+  - step: 1
+    title: Inspect current state
+    instruction: Run a read-only diagnostic before changing anything.
+    command: check.sh
+    expected_output: Output shows the current failure mode
+    explanation: Evidence-first troubleshooting avoids guessing.
+    next_on: command_success
+  - step: 2
+    title: Apply the minimal fix
+    instruction: Make one reversible change aligned with the objectives.
+    command: '# your fix command here'
+    expected_output: State moves toward the objective
+    explanation: Small changes make rollback easy if the hypothesis was wrong.
+    next_on: command_success
+  - step: 3
+    title: Verify with the grader
+    instruction: Run the same verification the checker uses.
+    command: check.sh
+    expected_output: '`check.sh` exits successfully'
+    explanation: The lab passes only when real state is healthy.
+    next_on: command_success

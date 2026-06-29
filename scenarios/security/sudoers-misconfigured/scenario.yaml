@@ -1,14 +1,28 @@
 slug: sudoers-misconfigured
 title: Sudoers Misconfigured — Restrict www-data ALL Command Access
-technology: Security
-category: Privilege Escalation
+technology: security
+category: Build
 difficulty: medium
 time_limit: 900
 max_score: 100
 infrastructure_type: docker
 jira_priority: Critical
 is_free: false
-description: 'A security audit discovered that the www-data user (the nginx/Apache web server
+description: 'CONTEXT: A team operating security hardening needs you to resolve `Sudoers Misconfigured
+  — Restrict www-data ALL Command Access` during a realistic incident. The business impact is reduced
+  service reliability until the underlying state is repaired.
+
+
+  ENVIRONMENT: You are working in FixitLab''s offline hardening lab with SSH, firewall, TLS, audit logs,
+  and IAM settings. All tools run locally; no paid APIs or external cloud calls are required.
+
+
+  SYMPTOM / STARTING STATE: Ubuntu 22.04. File /etc/sudoers.d/webserver contains:
+
+  www-data ALL=(ALL) NOPASSWD: ALL
+
+  This grants the web server process root access without any password. A security audit discovered that
+  the www-data user (the nginx/Apache web server
 
   process account) has been granted unrestricted sudo access in the sudoers file.
 
@@ -18,7 +32,14 @@ description: 'A security audit discovered that the www-data user (the nginx/Apac
 
   it with a minimal scoped permission if needed (or remove entirely).
 
-  '
+
+  OBJECTIVE: Identify the dangerous sudoers entry for www-data; {''Remove the ALL=(ALL) NOPASSWD'': ''ALL
+  grant from /etc/sudoers.d/ or /etc/sudoers''}; Verify www-data can no longer execute arbitrary commands
+  as root. Success means `check.sh` exits successfully.
+
+
+  WHAT TO AVOID: Do not apply broad destructive changes, skip evidence gathering, or fake completion with
+  marker files — the checker validates real system state.'
 objectives:
 - Identify the dangerous sudoers entry for www-data
 - Remove the ALL=(ALL) NOPASSWD: ALL grant from /etc/sudoers.d/ or /etc/sudoers
@@ -33,17 +54,99 @@ initial_state: 'Ubuntu 22.04. File /etc/sudoers.d/webserver contains:
   '
 hints:
 - order: 1
-  cost: 10
-  content: 'Audit the web account: `sudo -l -U www-data` shows it has unrestricted sudo — a serious risk
-    if the web server is compromised.'
+  cost: 0
+  content: 'Where to look: Test the config to get the exact file and line: `nginx -t`. It prints the offending
+    directive (e.g. unknown directive "listn").'
 - order: 2
-  cost: 15
-  content: 'Remove the dangerous grant: delete the offending drop-in (`rm /etc/sudoers.d/webserver`) or
-    edit it to drop the line — always via `visudo`.'
-- order: 3
-  cost: 20
-  content: 'Check syntax after editing: `visudo -c` must report the sudoers files are OK.'
-- order: 4
   cost: 25
-  content: 'Verify: `sudo -l -U www-data` now shows no sudo rights (or only a minimal, intended scoped
-    rule) — www-data can no longer run arbitrary root commands.'
+  content: 'Diagnostic steps:
+
+    1. Run `nginx -t` and note the file path and line number in the error.
+
+    2. Open that file (often `/etc/nginx/nginx.conf` or under `/etc/nginx/conf.d/`).
+
+    3. Compare the bad directive to the nginx docs — typos like `listn` should be `listen`.'
+- order: 3
+  cost: 50
+  content: 'Exact fix + verification:
+
+    1. Correct the typo on the reported line and save the file.
+
+    2. Re-run `nginx -t` until it reports syntax is ok.
+
+    3. Run `systemctl enable --now nginx`, then `curl -I http://localhost` (expect HTTP 200).
+
+
+    WHY: systemd will not start nginx until `nginx -t` passes.'
+summary: Complete the sudoers misconfigured — restrict www-data all command access security lab and verify
+  success with the checker
+estimated_minutes: 15
+xp_reward: 100
+prerequisites:
+- Basic security literacy
+tags:
+- fix
+- hands-on
+- security
+linked_tutorial: security-fundamentals
+what_you_will_learn:
+- Identify the dangerous sudoers entry for www-data
+- '{''Remove the ALL=(ALL) NOPASSWD'': ''ALL grant from /etc/sudoers.d/ or /etc/sudoers''}'
+- Verify www-data can no longer execute arbitrary commands as root
+- Ensure the sudoers file syntax is valid after editing
+environment:
+  nodes:
+  - role: primary
+    os: FixitLab hardening lab
+    hostname: lab-primary
+    ip: 127.0.0.1
+    specs: local offline simulation
+  pre_installed:
+  - bash
+  - coreutils
+  - journalctl
+  - security
+  - systemctl
+  credentials:
+  - user: root
+    password: lab123
+tasks:
+- id: task_1
+  title: Sudoers Misconfigured — Restrict www-data ALL Command Access
+  description: Restore healthy behavior for Sudoers Misconfigured — Restrict www-data ALL Command Access
+    by investigating the failure, applying the smallest safe fix, and validating the outcome.
+  background: 'This security lab teaches systematic troubleshooting: observe, hypothesize, change, verify.'
+  validation:
+    type: custom_script
+    script: check.sh
+    error_message: Validation did not pass. Re-read the objectives and Hint 2 diagnostic steps.
+solution:
+  summary: Identify the misconfiguration affecting this security lab and apply the minimal fix.
+  files_changed: []
+  commands_run:
+  - bash check.sh
+  reference_docs: security-fundamentals
+guided_mode:
+  enabled: true
+  steps:
+  - step: 1
+    title: Inspect current state
+    instruction: Run a read-only diagnostic before changing anything.
+    command: check.sh
+    expected_output: Output shows the current failure mode
+    explanation: Evidence-first troubleshooting avoids guessing.
+    next_on: command_success
+  - step: 2
+    title: Apply the minimal fix
+    instruction: Make one reversible change aligned with the objectives.
+    command: '# your fix command here'
+    expected_output: State moves toward the objective
+    explanation: Small changes make rollback easy if the hypothesis was wrong.
+    next_on: command_success
+  - step: 3
+    title: Verify with the grader
+    instruction: Run the same verification the checker uses.
+    command: check.sh
+    expected_output: '`check.sh` exits successfully'
+    explanation: The lab passes only when real state is healthy.
+    next_on: command_success

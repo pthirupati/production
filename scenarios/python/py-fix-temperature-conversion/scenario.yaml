@@ -1,8 +1,25 @@
 title: Fix the Celsius-to-Fahrenheit Formula
 slug: py-fix-temperature-conversion
-category: Python Development
-description: c_to_f(c) converts Celsius to Fahrenheit but uses the wrong formula (forgets the *9/5 factor),
-  so every conversion is off. Fix it to the correct F = C * 9/5 + 32.
+category: Fix
+description: 'CONTEXT: A team operating Python development needs you to resolve `Fix the Celsius-to-Fahrenheit
+  Formula` during a realistic incident. The business impact is reduced service reliability until the underlying
+  state is repaired.
+
+
+  ENVIRONMENT: You are working in FixitLab''s offline Python project workspace with source files, venv,
+  tests, and CLI entrypoints. All tools run locally; no paid APIs or external cloud calls are required.
+
+
+  SYMPTOM / STARTING STATE: c_to_f(c) converts Celsius to Fahrenheit but uses the wrong formula (forgets
+  the *9/5 factor), so every conversion is off. Fix it to the correct F = C * 9/5 + 32.
+
+
+  OBJECTIVE: Compare known conversions (0C, 100C) to the output; Apply the correct multiplier and offset;
+  Return a correct float. Success means all hidden tests pass.
+
+
+  WHAT TO AVOID: Do not apply broad destructive changes, skip evidence gathering, or fake completion with
+  marker files — the checker validates real system state.'
 difficulty: easy
 scenario_type: fix
 lab_mode: simulation
@@ -19,47 +36,113 @@ objectives:
 - Return a correct float
 initial_state: c_to_f(c) converts Celsius to Fahrenheit but uses the wrong formula (forgets the *9/5 factor),
   so every conversion is off. Fix it to the correct F = C * 9/5 + 32.
-solution_explanation: |
-  The conversion needs the 9/5 scaling factor before adding 32; omitting it only offsets the value.
+solution_explanation: 'The conversion needs the 9/5 scaling factor before adding 32; omitting it only
+  offsets the value.
+
+  '
 coding_spec:
   language: python
   entrypoint: solution.py
   kind: fix
-  instructions: |
-    Fix c_to_f(c): Fahrenheit = c * 9/5 + 32.
-      c_to_f(0) -> 32.0, c_to_f(100) -> 212.0
-    Click Run to try it, then Check Solution to grade against all tests.
+  instructions: "Fix c_to_f(c): Fahrenheit = c * 9/5 + 32.\n  c_to_f(0) -> 32.0, c_to_f(100) -> 212.0\n\
+    Click Run to try it, then Check Solution to grade against all tests.\n"
   files:
   - path: solution.py
-    content: |
-      def c_to_f(c):
-          return c + 32      # bug: missing * 9/5
+    content: "def c_to_f(c):\n    return c + 32      # bug: missing * 9/5\n"
     readonly: false
   visible_tests:
   - name: freezing
-    code: |
-      assert c_to_f(0) == 32.0
+    code: 'assert c_to_f(0) == 32.0
+
+      '
   - name: boiling
-    code: |
-      assert c_to_f(100) == 212.0, c_to_f(100)
+    code: 'assert c_to_f(100) == 212.0, c_to_f(100)
+
+      '
   hidden_tests:
   - name: body temp
-    code: |
-      assert abs(c_to_f(37) - 98.6) < 1e-9, c_to_f(37)
+    code: 'assert abs(c_to_f(37) - 98.6) < 1e-9, c_to_f(37)
+
+      '
   - name: negative
-    code: |
-      assert c_to_f(-40) == -40.0, c_to_f(-40)
+    code: 'assert c_to_f(-40) == -40.0, c_to_f(-40)
+
+      '
   - name: twenty c
-    code: |
-      assert c_to_f(20) == 68.0
+    code: 'assert c_to_f(20) == 68.0
+
+      '
   timeout: 8
 hints:
 - order: 1
-  cost: 10
-  content: c_to_f(100) returns 132, but boiling water is 212F.
+  cost: 0
+  content: 'Where to look: Open `solution.py`, read the instructions, and run the visible tests to see
+    which assertion fails first.'
 - order: 2
-  cost: 20
-  content: You scaled by nothing — Celsius degrees are larger than Fahrenheit degrees.
+  cost: 25
+  content: 'Diagnostic steps:
+
+    1. Click Run and read the traceback — note line number and actual vs expected values.
+
+    2. Reproduce the failure with the smallest input from a visible test.
+
+    3. Compare your implementation to the bug described in the lab prompt.'
 - order: 3
-  cost: 30
-  content: Use c * 9 / 5 + 32.
+  cost: 50
+  content: 'Exact fix + verification:
+
+    1. Apply the correct multiplier and offset.
+
+    2. Re-run the lab checker (`check.sh` or Check Solution).
+
+    3. Confirm every scenario objective is satisfied.
+
+
+    WHY: the grader validates real state — marker files are ignored.'
+technology: python
+summary: Complete the fix the celsius-to-fahrenheit formula python lab and verify success with the checker
+estimated_minutes: 25
+xp_reward: 100
+prerequisites:
+- Basic python literacy
+tags:
+- fix
+- hands-on
+- python
+linked_tutorial: python-fundamentals
+what_you_will_learn:
+- Compare known conversions (0C, 100C) to the output
+- Apply the correct multiplier and offset
+- Return a correct float
+environment:
+  nodes:
+  - role: primary
+    os: FixitLab Python project workspace
+    hostname: lab-primary
+    ip: 127.0.0.1
+    specs: local offline simulation
+  pre_installed:
+  - bash
+  - coreutils
+  - pip
+  - python
+  - python3
+  credentials:
+  - user: root
+    password: lab123
+tasks:
+- id: task_1
+  title: Fix the Celsius-to-Fahrenheit Formula
+  description: Restore healthy behavior for Fix the Celsius-to-Fahrenheit Formula by investigating the
+    failure, applying the smallest safe fix, and validating the outcome.
+  background: 'This python lab teaches systematic troubleshooting: observe, hypothesize, change, verify.'
+  validation:
+    type: custom_script
+    script: hidden_tests
+    error_message: One or more hidden tests failed. Read the public test output, fix your solution, and
+      submit again.
+solution:
+  summary: The solution passes all hidden tests by implementing the required behavior in code.
+  files_changed: []
+  commands_run: []
+  reference_docs: python-fundamentals

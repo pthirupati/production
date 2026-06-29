@@ -1,7 +1,7 @@
 title: BGP Route Dampening Suppressing Prefixes
 slug: networking-bgp-dampening-suppress
-technology: Networking
-category: Routing / BGP
+technology: networking
+category: Fix
 difficulty: hard
 lab_mode: simulation
 simulation_type: networking
@@ -10,8 +10,26 @@ max_score: 100
 is_free: true
 jira_priority: High
 dual_terminal: false
-description: Flapping upstream links triggered route dampening and key prefixes are now suppressed. Stabilize
+description: 'CONTEXT: A team operating network operations needs you to resolve `BGP Route Dampening Suppressing
+  Prefixes` during a realistic incident. The business impact is reduced service reliability until the
+  underlying state is repaired.
+
+
+  ENVIRONMENT: You are working in FixitLab''s offline network lab with interfaces, routing tables, DNS,
+  and firewall rules. All tools run locally; no paid APIs or external cloud calls are required.
+
+
+  SYMPTOM / STARTING STATE: A router where BGP route dampening is suppressing prefixes after upstream
+  flaps. Flapping upstream links triggered route dampening and key prefixes are now suppressed. Stabilize
   the link and clear dampening so the BGP session is healthy.
+
+
+  OBJECTIVE: Confirm prefixes are suppressed by dampening; Stabilize the neighbor and clear dampening;
+  Verify the session is Established with full prefixes. Success means `check.sh` exits successfully.
+
+
+  WHAT TO AVOID: Do not apply broad destructive changes, skip evidence gathering, or fake completion with
+  marker files — the checker validates real system state.'
 initial_state: A router where BGP route dampening is suppressing prefixes after upstream flaps.
 objectives:
 - Confirm prefixes are suppressed by dampening
@@ -19,11 +37,71 @@ objectives:
 - Verify the session is Established with full prefixes
 hints:
 - order: 1
-  cost: 10
-  content: show ip bgp summary shows the neighbor unhealthy.
+  cost: 0
+  content: 'Where to look: Confirm prefixes are suppressed by dampening'
 - order: 2
-  cost: 15
-  content: Stabilize the peer and clear dampening/the session.
+  cost: 25
+  content: 'Diagnostic steps:
+
+    1. Stabilize the neighbor and clear dampening
+
+    2. Verify the session is Established with full prefixes'
 - order: 3
-  cost: 20
-  content: Session Established.
+  cost: 50
+  content: 'Exact fix + verification:
+
+    1. Verify the session is Established with full prefixes.
+
+    2. Re-run the lab checker (`check.sh` or Check Solution).
+
+    3. Confirm every scenario objective is satisfied.
+
+
+    WHY: the grader validates real state — marker files are ignored.'
+summary: Complete the bgp route dampening suppressing prefixes networking lab and verify success with
+  the checker
+estimated_minutes: 25
+xp_reward: 100
+prerequisites:
+- Basic networking literacy
+tags:
+- fix
+- hands-on
+- networking
+linked_tutorial: networking-fundamentals
+what_you_will_learn:
+- Confirm prefixes are suppressed by dampening
+- Stabilize the neighbor and clear dampening
+- Verify the session is Established with full prefixes
+environment:
+  nodes:
+  - role: primary
+    os: FixitLab network lab
+    hostname: lab-primary
+    ip: 127.0.0.1
+    specs: local offline simulation
+  pre_installed:
+  - bash
+  - coreutils
+  - journalctl
+  - networking
+  - systemctl
+  credentials:
+  - user: root
+    password: lab123
+tasks:
+- id: task_1
+  title: BGP Route Dampening Suppressing Prefixes
+  description: Restore healthy behavior for BGP Route Dampening Suppressing Prefixes by investigating
+    the failure, applying the smallest safe fix, and validating the outcome.
+  background: 'This networking lab teaches systematic troubleshooting: observe, hypothesize, change, verify.'
+  validation:
+    type: custom_script
+    script: check.sh
+    error_message: Validation did not pass. Re-read the objectives and Hint 2 diagnostic steps.
+solution:
+  summary: Identify the misconfiguration affecting this networking lab and apply the minimal fix.
+  files_changed: []
+  commands_run:
+  - bash check.sh
+  reference_docs: networking-fundamentals

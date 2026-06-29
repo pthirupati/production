@@ -1,29 +1,116 @@
 title: EC2 Private Subnet Has No Internet Access
 slug: aws-vpc-routing-broken
 difficulty: hard
-category: AWS
-description: 'An EC2 instance in a private subnet cannot reach the internet to download packages or call external APIs. The route table is missing a route to a NAT Gateway, or the NAT Gateway itself is misconfigured or in a wrong subnet.'
-initial_state: 'Simulated AWS environment with a VPC containing public and private subnets, an Internet Gateway, and a NAT Gateway. The private subnet route table has no entry for 0.0.0.0/0 pointing to the NAT Gateway, so outbound internet traffic from private EC2 instances is dropped.'
+category: Fix
+description: 'CONTEXT: A team operating Terraform IaC needs you to resolve `EC2 Private Subnet Has No
+  Internet Access` during a realistic incident. The business impact is reduced service reliability until
+  the underlying state is repaired.
+
+
+  ENVIRONMENT: You are working in FixitLab''s offline Terraform workspace with HCL files, state, and plan/apply
+  workflow. All tools run locally; no paid APIs or external cloud calls are required.
+
+
+  SYMPTOM / STARTING STATE: Simulated AWS environment with a VPC containing public and private subnets,
+  an Internet Gateway, and a NAT Gateway. The private subnet route table has no entry for 0.0.0.0/0 pointing
+  to the NAT Gateway, so outbound internet traffic from private EC2 instances is dropped. An EC2 instance
+  in a private subnet cannot reach the internet to download packages or call external APIs. The route
+  table is missing a route to a NAT Gateway, or the NAT Gateway itself is misconfigured or in a wrong
+  subnet.
+
+
+  OBJECTIVE: Identify the private subnet route table and confirm the missing 0.0.0.0/0 route; Verify the
+  NAT Gateway is in a public subnet and has an Elastic IP; {''Add the missing route'': ''destination 0.0.0.0/0,
+  target the NAT Gateway ID''}. Success means `check.sh` exits successfully.
+
+
+  WHAT TO AVOID: Do not apply broad destructive changes, skip evidence gathering, or fake completion with
+  marker files — the checker validates real system state.'
+initial_state: Simulated AWS environment with a VPC containing public and private subnets, an Internet
+  Gateway, and a NAT Gateway. The private subnet route table has no entry for 0.0.0.0/0 pointing to the
+  NAT Gateway, so outbound internet traffic from private EC2 instances is dropped.
 objectives:
-  - Identify the private subnet route table and confirm the missing 0.0.0.0/0 route
-  - Verify the NAT Gateway is in a public subnet and has an Elastic IP
-  - Add the missing route: destination 0.0.0.0/0, target the NAT Gateway ID
-  - Confirm the EC2 instance can reach the internet (e.g., curl an external URL)
+- Identify the private subnet route table and confirm the missing 0.0.0.0/0 route
+- Verify the NAT Gateway is in a public subnet and has an Elastic IP
+- Add the missing route: destination 0.0.0.0/0, target the NAT Gateway ID
+- Confirm the EC2 instance can reach the internet (e.g., curl an external URL)
 lab_mode: simulation
 simulation_type: aws
 time_limit: 2400
 max_score: 100
 is_free: false
 hints:
-  - content: 'Run: aws ec2 describe-route-tables --filters Name=association.subnet-id,Values=<private-subnet-id> and look for a 0.0.0.0/0 entry. If absent, the route is missing.'
-    cost: 10
-    order: 1
-  - content: 'Find the NAT Gateway: aws ec2 describe-nat-gateways --filter Name=state,Values=available. It must be in a public subnet (one with an IGW route).'
-    cost: 15
-    order: 2
-  - content: 'Add the route: aws ec2 create-route --route-table-id <rtb-id> --destination-cidr-block 0.0.0.0/0 --nat-gateway-id <ngw-id>. Then test outbound connectivity from the instance.'
-    cost: 25
-    order: 3
+- order: 1
+  cost: 0
+  content: 'Where to look: Identify the private subnet route table and confirm the missing 0.0.0.0/0 route'
+- order: 2
+  cost: 25
+  content: 'Diagnostic steps:
+
+    1. Verify the NAT Gateway is in a public subnet and has an Elastic IP
+
+    2. {''Add the missing route'': ''destination 0.0.0.0/0, target the NAT Gateway ID''}
+
+    3. Confirm the EC2 instance can reach the internet (e.g., curl an external URL)'
+- order: 3
+  cost: 50
+  content: 'Exact fix + verification:
+
+    1. Confirm the EC2 instance can reach the internet (e.g., curl an external URL).
+
+    2. Re-run the lab checker (`check.sh` or Check Solution).
+
+    3. Confirm every scenario objective is satisfied.
+
+
+    WHY: the grader validates real state — marker files are ignored.'
 requires_companion_hosts: false
 dual_terminal: false
 jira_priority: High
+technology: terraform
+summary: Complete the ec2 private subnet has no internet access terraform lab and verify success with
+  the checker
+estimated_minutes: 40
+xp_reward: 100
+prerequisites:
+- Basic terraform literacy
+tags:
+- fix
+- hands-on
+- terraform
+linked_tutorial: terraform-fundamentals
+what_you_will_learn:
+- Identify the private subnet route table and confirm the missing 0.0.0.0/0 route
+- Verify the NAT Gateway is in a public subnet and has an Elastic IP
+- '{''Add the missing route'': ''destination 0.0.0.0/0, target the NAT Gateway ID''}'
+- Confirm the EC2 instance can reach the internet (e.g., curl an external URL)
+environment:
+  nodes:
+  - role: primary
+    os: FixitLab Terraform workspace
+    hostname: lab-primary
+    ip: 127.0.0.1
+    specs: local offline simulation
+  pre_installed:
+  - bash
+  - coreutils
+  - terraform
+  credentials:
+  - user: root
+    password: lab123
+tasks:
+- id: task_1
+  title: EC2 Private Subnet Has No Internet Access
+  description: Restore healthy behavior for EC2 Private Subnet Has No Internet Access by investigating
+    the failure, applying the smallest safe fix, and validating the outcome.
+  background: 'This terraform lab teaches systematic troubleshooting: observe, hypothesize, change, verify.'
+  validation:
+    type: custom_script
+    script: check.sh
+    error_message: Validation did not pass. Re-read the objectives and Hint 2 diagnostic steps.
+solution:
+  summary: Identify the misconfiguration affecting this terraform lab and apply the minimal fix.
+  files_changed: []
+  commands_run:
+  - bash check.sh
+  reference_docs: terraform-fundamentals

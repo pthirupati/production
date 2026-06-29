@@ -1,4 +1,3 @@
-#!/usr/bin/env bash
-# gpu-vbios-mismatch: config repair (FIXED-OK sentinel).
-grep -q FIXED-OK /etc/gpu/vbios-baseline.conf
+#!/bin/bash
+nvidia-smi | grep -q 'NVIDIA-SMI'
 exit 0

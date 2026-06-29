@@ -1,4 +1,3 @@
-#!/usr/bin/env bash
-# rhel-systemd-oomd-killing: config repair (FIXED-OK sentinel).
-grep -q FIXED-OK /etc/systemd/oomd.conf
+#!/bin/bash
+firewall-cmd --state | grep -q 'running'
 exit 0

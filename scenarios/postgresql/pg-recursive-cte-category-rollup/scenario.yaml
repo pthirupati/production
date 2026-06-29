@@ -1,13 +1,34 @@
 title: Merge Counts and Roll Them Up a Category Tree
 slug: pg-recursive-cte-category-rollup
 technology: postgresql
-category: PostgreSQL Development
-description: A catalog stores categories in a self-referencing tree (each row points at its parent_id) and
-  a nightly `incoming` table carries fresh direct product counts per category. Two things are broken. First,
-  the merge uses a plain INSERT that collides on the primary key for categories that already exist, so it
-  errors instead of updating them. Second, the rollup only reports each category's own direct_count instead
-  of its own count plus every descendant's. Fix the merge to be a proper UPSERT and compute a true recursive
+category: Fix
+description: 'CONTEXT: A team operating PostgreSQL needs you to resolve `Merge Counts and Roll Them Up
+  a Category Tree` during a realistic incident. The business impact is reduced service reliability until
+  the underlying state is repaired.
+
+
+  ENVIRONMENT: You are working in FixitLab''s offline PostgreSQL cluster with psql, pg_hba.conf, roles,
+  and WAL. All tools run locally; no paid APIs or external cloud calls are required.
+
+
+  SYMPTOM / STARTING STATE: A category tree must merge fresh counts from an `incoming` table then report,
+  per category, its own count plus all descendants''. The starter uses a plain INSERT that collides on
+  existing ids and a flat sum that ignores descendants. Fix the UPSERT and add a recursive subtree rollup.
+  A catalog stores categories in a self-referencing tree (each row points at its parent_id) and a nightly
+  `incoming` table carries fresh direct product counts per category. Two things are broken. First, the
+  merge uses a plain INSERT that collides on the primary key for categories that already exist, so it
+  errors instead of updating them. Second, the rollup only reports each category''s own direct_count instead
+  of its own count plus every descendant''s. Fix the merge to be a proper UPSERT and compute a true recursive
   subtree rollup.
+
+
+  OBJECTIVE: Express an idempotent UPSERT (INSERT ... ON CONFLICT DO UPDATE) for existing rows; Insert
+  genuinely new categories without clobbering existing parent links; Walk a self-referencing tree with
+  a recursive CTE. Success means all hidden tests pass.
+
+
+  WHAT TO AVOID: Do not apply broad destructive changes, skip evidence gathering, or fake completion with
+  marker files — the checker validates real system state.'
 difficulty: hard
 scenario_type: fix
 lab_mode: simulation
@@ -24,155 +45,171 @@ objectives:
 - Walk a self-referencing tree with a recursive CTE
 - Roll each category's count up to include all of its descendants
 initial_state: A category tree must merge fresh counts from an `incoming` table then report, per category,
-  its own count plus all descendants'. The starter uses a plain INSERT that collides on existing ids and a
-  flat sum that ignores descendants. Fix the UPSERT and add a recursive subtree rollup.
-solution_explanation: |
-  Two independent fixes. (1) Merge: a plain INSERT violates the primary key for categories that already
+  its own count plus all descendants'. The starter uses a plain INSERT that collides on existing ids and
+  a flat sum that ignores descendants. Fix the UPSERT and add a recursive subtree rollup.
+solution_explanation: 'Two independent fixes. (1) Merge: a plain INSERT violates the primary key for categories
+  that already
+
   exist. INSERT ... ON CONFLICT(id) DO UPDATE SET direct_count = excluded.direct_count makes the write
+
   idempotent — existing rows are updated in place (keeping their parent_id), and only truly new ids are
+
   inserted. Splitting the statement into "ids that already exist" (upsert, preserving parent_id) and "ids
+
   that do not" (insert as a new root) avoids ever overwriting a known parent link with NULL.
-  (2) Rollup: a flat SUM(direct_count) GROUP BY id only sees one row. To total a whole subtree you need a
+
+  (2) Rollup: a flat SUM(direct_count) GROUP BY id only sees one row. To total a whole subtree you need
+  a
+
   recursive CTE that, starting from each category as its own root, repeatedly joins children via
+
   parent_id = node_id, then SUMs direct_count over every node reached from each root.
+
+  '
 coding_spec:
   language: python
   entrypoint: solution.py
   kind: fix
-  instructions: |
-    Fix solution(conn). It must do two steps against the given connection:
-      1. Merge the `incoming(id, direct_count)` rows into `categories(id, parent_id, direct_count)`.
-         For an id that already exists, UPDATE its direct_count (keep its parent_id). For a new id,
-         INSERT it as a root (parent_id NULL). Do not create duplicate rows and do not error on conflict.
-      2. Return (id, total_count) for EVERY category, where total_count is that category's own
-         direct_count PLUS the direct_count of all its descendants (children, grandchildren, ...).
-         Order by id ascending.
-    The conn argument is a fresh sqlite3 connection. `categories` has a PRIMARY KEY on id.
-    Calling solution twice on the same connection must give the same answer (it is idempotent).
-    Click Run to try it, then Check Solution to grade against all tests.
+  instructions: "Fix solution(conn). It must do two steps against the given connection:\n  1. Merge the\
+    \ `incoming(id, direct_count)` rows into `categories(id, parent_id, direct_count)`.\n     For an id\
+    \ that already exists, UPDATE its direct_count (keep its parent_id). For a new id,\n     INSERT it\
+    \ as a root (parent_id NULL). Do not create duplicate rows and do not error on conflict.\n  2. Return\
+    \ (id, total_count) for EVERY category, where total_count is that category's own\n     direct_count\
+    \ PLUS the direct_count of all its descendants (children, grandchildren, ...).\n     Order by id ascending.\n\
+    The conn argument is a fresh sqlite3 connection. `categories` has a PRIMARY KEY on id.\nCalling solution\
+    \ twice on the same connection must give the same answer (it is idempotent).\nClick Run to try it,\
+    \ then Check Solution to grade against all tests.\n"
   files:
   - path: solution.py
-    content: |
-      import sqlite3
-
-      def solution(conn):
-          # BUG 1: a plain INSERT collides on the primary key for categories that
-          # already exist, raising IntegrityError instead of updating them.
-          conn.execute(
-              """
-              INSERT INTO categories (id, parent_id, direct_count)
-              SELECT i.id, NULL, i.direct_count
-              FROM incoming i
-              """
-          )
-
-          # BUG 2: this sums only each category's OWN direct_count; it never walks
-          # the tree, so parents do not include their descendants' counts.
-          return conn.execute(
-              """
-              SELECT id, SUM(direct_count) AS total_count
-              FROM categories
-              GROUP BY id
-              ORDER BY id
-              """
-          ).fetchall()
+    content: "import sqlite3\n\ndef solution(conn):\n    # BUG 1: a plain INSERT collides on the primary\
+      \ key for categories that\n    # already exist, raising IntegrityError instead of updating them.\n\
+      \    conn.execute(\n        \"\"\"\n        INSERT INTO categories (id, parent_id, direct_count)\n\
+      \        SELECT i.id, NULL, i.direct_count\n        FROM incoming i\n        \"\"\"\n    )\n\n \
+      \   # BUG 2: this sums only each category's OWN direct_count; it never walks\n    # the tree, so\
+      \ parents do not include their descendants' counts.\n    return conn.execute(\n        \"\"\"\n\
+      \        SELECT id, SUM(direct_count) AS total_count\n        FROM categories\n        GROUP BY\
+      \ id\n        ORDER BY id\n        \"\"\"\n    ).fetchall()\n"
     readonly: false
   visible_tests:
   - name: counts roll up the tree
-    code: |
-      import sqlite3
-      conn = sqlite3.connect(':memory:')
-      conn.executescript(
-          "CREATE TABLE categories (id INTEGER PRIMARY KEY, parent_id INTEGER, direct_count INTEGER);"
-          "CREATE TABLE incoming (id INTEGER PRIMARY KEY, direct_count INTEGER);"
-          "INSERT INTO categories (id, parent_id, direct_count) VALUES (1,NULL,0),(2,1,0),(3,1,0),(4,2,0);"
-          "INSERT INTO incoming (id, direct_count) VALUES (1,5),(2,3),(3,7),(4,2);"
-      )
-      assert solution(conn) == [(1, 17), (2, 5), (3, 7), (4, 2)], solution(conn)
+    code: "import sqlite3\nconn = sqlite3.connect(':memory:')\nconn.executescript(\n    \"CREATE TABLE\
+      \ categories (id INTEGER PRIMARY KEY, parent_id INTEGER, direct_count INTEGER);\"\n    \"CREATE\
+      \ TABLE incoming (id INTEGER PRIMARY KEY, direct_count INTEGER);\"\n    \"INSERT INTO categories\
+      \ (id, parent_id, direct_count) VALUES (1,NULL,0),(2,1,0),(3,1,0),(4,2,0);\"\n    \"INSERT INTO\
+      \ incoming (id, direct_count) VALUES (1,5),(2,3),(3,7),(4,2);\"\n)\nassert solution(conn) == [(1,\
+      \ 17), (2, 5), (3, 7), (4, 2)], solution(conn)\n"
   - name: upsert updates in place without duplicating
-    code: |
-      import sqlite3
-      conn = sqlite3.connect(':memory:')
-      conn.executescript(
-          "CREATE TABLE categories (id INTEGER PRIMARY KEY, parent_id INTEGER, direct_count INTEGER);"
-          "CREATE TABLE incoming (id INTEGER PRIMARY KEY, direct_count INTEGER);"
-          "INSERT INTO categories (id, parent_id, direct_count) VALUES (1,NULL,0),(2,1,0),(3,1,0),(4,2,0);"
-          "INSERT INTO incoming (id, direct_count) VALUES (2,3);"
-      )
-      solution(conn)
-      assert conn.execute("SELECT COUNT(*) FROM categories WHERE id=2").fetchone()[0] == 1
-      assert conn.execute("SELECT parent_id FROM categories WHERE id=2").fetchone()[0] == 1
+    code: "import sqlite3\nconn = sqlite3.connect(':memory:')\nconn.executescript(\n    \"CREATE TABLE\
+      \ categories (id INTEGER PRIMARY KEY, parent_id INTEGER, direct_count INTEGER);\"\n    \"CREATE\
+      \ TABLE incoming (id INTEGER PRIMARY KEY, direct_count INTEGER);\"\n    \"INSERT INTO categories\
+      \ (id, parent_id, direct_count) VALUES (1,NULL,0),(2,1,0),(3,1,0),(4,2,0);\"\n    \"INSERT INTO\
+      \ incoming (id, direct_count) VALUES (2,3);\"\n)\nsolution(conn)\nassert conn.execute(\"SELECT COUNT(*)\
+      \ FROM categories WHERE id=2\").fetchone()[0] == 1\nassert conn.execute(\"SELECT parent_id FROM\
+      \ categories WHERE id=2\").fetchone()[0] == 1\n"
   hidden_tests:
   - name: deeper subtree with a new leaf
-    code: |
-      import sqlite3
-      conn = sqlite3.connect(':memory:')
-      conn.executescript(
-          "CREATE TABLE categories (id INTEGER PRIMARY KEY, parent_id INTEGER, direct_count INTEGER);"
-          "CREATE TABLE incoming (id INTEGER PRIMARY KEY, direct_count INTEGER);"
-          "INSERT INTO categories (id, parent_id, direct_count) VALUES (1,NULL,0),(2,1,0),(3,1,0),(4,2,0),(5,4,0);"
-          "INSERT INTO incoming (id, direct_count) VALUES (1,1),(2,1),(3,1),(4,1),(5,9);"
-      )
-      assert solution(conn) == [(1, 13), (2, 11), (3, 1), (4, 10), (5, 9)], solution(conn)
+    code: "import sqlite3\nconn = sqlite3.connect(':memory:')\nconn.executescript(\n    \"CREATE TABLE\
+      \ categories (id INTEGER PRIMARY KEY, parent_id INTEGER, direct_count INTEGER);\"\n    \"CREATE\
+      \ TABLE incoming (id INTEGER PRIMARY KEY, direct_count INTEGER);\"\n    \"INSERT INTO categories\
+      \ (id, parent_id, direct_count) VALUES (1,NULL,0),(2,1,0),(3,1,0),(4,2,0),(5,4,0);\"\n    \"INSERT\
+      \ INTO incoming (id, direct_count) VALUES (1,1),(2,1),(3,1),(4,1),(5,9);\"\n)\nassert solution(conn)\
+      \ == [(1, 13), (2, 11), (3, 1), (4, 10), (5, 9)], solution(conn)\n"
   - name: categories absent from incoming keep their count
-    code: |
-      import sqlite3
-      conn = sqlite3.connect(':memory:')
-      conn.executescript(
-          "CREATE TABLE categories (id INTEGER PRIMARY KEY, parent_id INTEGER, direct_count INTEGER);"
-          "CREATE TABLE incoming (id INTEGER PRIMARY KEY, direct_count INTEGER);"
-          "INSERT INTO categories VALUES (1,NULL,4),(2,1,6);"
-          "INSERT INTO incoming VALUES (2,10);"
-      )
-      assert solution(conn) == [(1, 14), (2, 10)], solution(conn)
+    code: "import sqlite3\nconn = sqlite3.connect(':memory:')\nconn.executescript(\n    \"CREATE TABLE\
+      \ categories (id INTEGER PRIMARY KEY, parent_id INTEGER, direct_count INTEGER);\"\n    \"CREATE\
+      \ TABLE incoming (id INTEGER PRIMARY KEY, direct_count INTEGER);\"\n    \"INSERT INTO categories\
+      \ VALUES (1,NULL,4),(2,1,6);\"\n    \"INSERT INTO incoming VALUES (2,10);\"\n)\nassert solution(conn)\
+      \ == [(1, 14), (2, 10)], solution(conn)\n"
   - name: brand-new root category from incoming
-    code: |
-      import sqlite3
-      conn = sqlite3.connect(':memory:')
-      conn.executescript(
-          "CREATE TABLE categories (id INTEGER PRIMARY KEY, parent_id INTEGER, direct_count INTEGER);"
-          "CREATE TABLE incoming (id INTEGER PRIMARY KEY, direct_count INTEGER);"
-          "INSERT INTO categories VALUES (1,NULL,2);"
-          "INSERT INTO incoming VALUES (1,2),(99,8);"
-      )
-      assert solution(conn) == [(1, 2), (99, 8)], solution(conn)
+    code: "import sqlite3\nconn = sqlite3.connect(':memory:')\nconn.executescript(\n    \"CREATE TABLE\
+      \ categories (id INTEGER PRIMARY KEY, parent_id INTEGER, direct_count INTEGER);\"\n    \"CREATE\
+      \ TABLE incoming (id INTEGER PRIMARY KEY, direct_count INTEGER);\"\n    \"INSERT INTO categories\
+      \ VALUES (1,NULL,2);\"\n    \"INSERT INTO incoming VALUES (1,2),(99,8);\"\n)\nassert solution(conn)\
+      \ == [(1, 2), (99, 8)], solution(conn)\n"
   - name: single-node tree
-    code: |
-      import sqlite3
-      conn = sqlite3.connect(':memory:')
-      conn.executescript(
-          "CREATE TABLE categories (id INTEGER PRIMARY KEY, parent_id INTEGER, direct_count INTEGER);"
-          "CREATE TABLE incoming (id INTEGER PRIMARY KEY, direct_count INTEGER);"
-          "INSERT INTO categories VALUES (1,NULL,0);"
-          "INSERT INTO incoming VALUES (1,42);"
-      )
-      assert solution(conn) == [(1, 42)], solution(conn)
+    code: "import sqlite3\nconn = sqlite3.connect(':memory:')\nconn.executescript(\n    \"CREATE TABLE\
+      \ categories (id INTEGER PRIMARY KEY, parent_id INTEGER, direct_count INTEGER);\"\n    \"CREATE\
+      \ TABLE incoming (id INTEGER PRIMARY KEY, direct_count INTEGER);\"\n    \"INSERT INTO categories\
+      \ VALUES (1,NULL,0);\"\n    \"INSERT INTO incoming VALUES (1,42);\"\n)\nassert solution(conn) ==\
+      \ [(1, 42)], solution(conn)\n"
   - name: idempotent on repeated calls
-    code: |
-      import sqlite3
-      conn = sqlite3.connect(':memory:')
-      conn.executescript(
-          "CREATE TABLE categories (id INTEGER PRIMARY KEY, parent_id INTEGER, direct_count INTEGER);"
-          "CREATE TABLE incoming (id INTEGER PRIMARY KEY, direct_count INTEGER);"
-          "INSERT INTO categories (id, parent_id, direct_count) VALUES (1,NULL,0),(2,1,0),(3,1,0),(4,2,0);"
-          "INSERT INTO incoming (id, direct_count) VALUES (1,5),(2,3),(3,7),(4,2);"
-      )
-      first = solution(conn)
-      second = solution(conn)
-      assert first == second == [(1, 17), (2, 5), (3, 7), (4, 2)], (first, second)
+    code: "import sqlite3\nconn = sqlite3.connect(':memory:')\nconn.executescript(\n    \"CREATE TABLE\
+      \ categories (id INTEGER PRIMARY KEY, parent_id INTEGER, direct_count INTEGER);\"\n    \"CREATE\
+      \ TABLE incoming (id INTEGER PRIMARY KEY, direct_count INTEGER);\"\n    \"INSERT INTO categories\
+      \ (id, parent_id, direct_count) VALUES (1,NULL,0),(2,1,0),(3,1,0),(4,2,0);\"\n    \"INSERT INTO\
+      \ incoming (id, direct_count) VALUES (1,5),(2,3),(3,7),(4,2);\"\n)\nfirst = solution(conn)\nsecond\
+      \ = solution(conn)\nassert first == second == [(1, 17), (2, 5), (3, 7), (4, 2)], (first, second)\n"
   timeout: 8
 hints:
 - order: 1
-  cost: 10
-  content: The merge crashes because a plain INSERT hits the primary key of categories that already exist.
-    You need an upsert — INSERT ... ON CONFLICT(id) DO UPDATE — and a separate insert for genuinely new ids.
+  cost: 0
+  content: 'Where to look: Run `systemctl status postgresql` and `pg_isready` for connection state.'
 - order: 2
-  cost: 20
-  content: A flat SUM over one row can never include descendants. Use a recursive CTE that starts from each
-    category as its own subtree root and repeatedly joins children on parent_id = node_id.
+  cost: 25
+  content: 'Diagnostic steps:
+
+    1. Check service status and `/var/log/postgresql/` logs.
+
+    2. Verify `pg_hba.conf` and `postgresql.conf` for listen addresses.
+
+    3. Test with `psql -U postgres -c ''SELECT 1''`.'
 - order: 3
-  cost: 30
-  content: 'Upsert existing ids with `ON CONFLICT(id) DO UPDATE SET direct_count = excluded.direct_count`
-    (preserving parent_id), insert new ids as roots, then roll up with `WITH RECURSIVE subtree(root_id,
-    node_id) AS (SELECT id, id FROM categories UNION ALL SELECT s.root_id, c.id FROM subtree s JOIN
-    categories c ON c.parent_id = s.node_id)` and SUM direct_count grouped by root_id.'
+  cost: 50
+  content: 'Exact fix + verification:
+
+    1. Fix auth rules, data directory permissions, or port conflict.
+
+    2. `systemctl restart postgresql`.
+
+    3. Confirm `pg_isready` reports accepting connections.
+
+
+    WHY: the database must accept connections, not just start.'
+summary: Complete the merge counts and roll them up a category tree postgresql lab and verify success
+  with the checker
+estimated_minutes: 30
+xp_reward: 100
+prerequisites:
+- Basic postgresql literacy
+tags:
+- fix
+- hands-on
+- postgresql
+linked_tutorial: postgresql-fundamentals
+what_you_will_learn:
+- Express an idempotent UPSERT (INSERT ... ON CONFLICT DO UPDATE) for existing rows
+- Insert genuinely new categories without clobbering existing parent links
+- Walk a self-referencing tree with a recursive CTE
+- Roll each category's count up to include all of its descendants
+environment:
+  nodes:
+  - role: primary
+    os: FixitLab PostgreSQL cluster
+    hostname: lab-primary
+    ip: 127.0.0.1
+    specs: local offline simulation
+  pre_installed:
+  - bash
+  - coreutils
+  - journalctl
+  - postgresql
+  - systemctl
+  credentials:
+  - user: root
+    password: lab123
+tasks:
+- id: task_1
+  title: Merge Counts and Roll Them Up a Category Tree
+  description: Restore healthy behavior for Merge Counts and Roll Them Up a Category Tree by investigating
+    the failure, applying the smallest safe fix, and validating the outcome.
+  background: 'This postgresql lab teaches systematic troubleshooting: observe, hypothesize, change, verify.'
+  validation:
+    type: custom_script
+    script: hidden_tests
+    error_message: One or more hidden tests failed. Read the public test output, fix your solution, and
+      submit again.
+solution:
+  summary: The solution passes all hidden tests by implementing the required behavior in code.
+  files_changed: []
+  commands_run: []
+  reference_docs: postgresql-fundamentals

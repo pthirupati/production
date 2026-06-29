@@ -1,7 +1,7 @@
 title: MongoDB Oplog Too Small for Replication
 slug: db-mongodb-oplog-too-small
-technology: Database
-category: Replication
+technology: database
+category: Fix
 difficulty: hard
 lab_mode: simulation
 simulation_type: generic
@@ -10,7 +10,25 @@ max_score: 100
 is_free: true
 jira_priority: High
 dual_terminal: false
-description: Secondaries fall off replication because the oplog window is too short.
+description: 'CONTEXT: A team operating database administration needs you to resolve `MongoDB Oplog Too
+  Small for Replication` during a realistic incident. The business impact is reduced service reliability
+  until the underlying state is repaired.
+
+
+  ENVIRONMENT: You are working in FixitLab''s offline database server with SQL client, schemas, backups,
+  and performance views. All tools run locally; no paid APIs or external cloud calls are required.
+
+
+  SYMPTOM / STARTING STATE: A MongoDB replica set with an undersized oplog. Secondaries fall off replication
+  because the oplog window is too short.
+
+
+  OBJECTIVE: Confirm the issue: Secondaries go stale quickly; Apply the documented fix in /etc/mongod.conf;
+  Verify the configuration is corrected. Success means `check.sh` exits successfully.
+
+
+  WHAT TO AVOID: Do not apply broad destructive changes, skip evidence gathering, or fake completion with
+  marker files — the checker validates real system state.'
 initial_state: A MongoDB replica set with an undersized oplog.
 objectives:
 - 'Confirm the issue: Secondaries go stale quickly'
@@ -18,11 +36,71 @@ objectives:
 - Verify the configuration is corrected
 hints:
 - order: 1
-  cost: 10
-  content: Secondaries go stale quickly
+  cost: 0
+  content: 'Where to look: Confirm the issue: Secondaries go stale quickly'
 - order: 2
-  cost: 15
-  content: Increase the oplog size.
+  cost: 25
+  content: 'Diagnostic steps:
+
+    1. Apply the documented fix in /etc/mongod.conf
+
+    2. Verify the configuration is corrected'
 - order: 3
-  cost: 20
-  content: /etc/mongod.conf carries the corrected configuration.
+  cost: 50
+  content: 'Exact fix + verification:
+
+    1. Verify the configuration is corrected.
+
+    2. Re-run the lab checker (`check.sh` or Check Solution).
+
+    3. Confirm every scenario objective is satisfied.
+
+
+    WHY: the grader validates real state — marker files are ignored.'
+summary: Complete the mongodb oplog too small for replication database lab and verify success with the
+  checker
+estimated_minutes: 20
+xp_reward: 100
+prerequisites:
+- Basic database literacy
+tags:
+- database
+- fix
+- hands-on
+linked_tutorial: database-fundamentals
+what_you_will_learn:
+- 'Confirm the issue: Secondaries go stale quickly'
+- Apply the documented fix in /etc/mongod.conf
+- Verify the configuration is corrected
+environment:
+  nodes:
+  - role: primary
+    os: FixitLab database server
+    hostname: lab-primary
+    ip: 127.0.0.1
+    specs: local offline simulation
+  pre_installed:
+  - bash
+  - coreutils
+  - database
+  - journalctl
+  - systemctl
+  credentials:
+  - user: root
+    password: lab123
+tasks:
+- id: task_1
+  title: MongoDB Oplog Too Small for Replication
+  description: Restore healthy behavior for MongoDB Oplog Too Small for Replication by investigating the
+    failure, applying the smallest safe fix, and validating the outcome.
+  background: 'This database lab teaches systematic troubleshooting: observe, hypothesize, change, verify.'
+  validation:
+    type: custom_script
+    script: check.sh
+    error_message: Validation did not pass. Re-read the objectives and Hint 2 diagnostic steps.
+solution:
+  summary: Identify the misconfiguration affecting this database lab and apply the minimal fix.
+  files_changed: []
+  commands_run:
+  - bash check.sh
+  reference_docs: database-fundamentals

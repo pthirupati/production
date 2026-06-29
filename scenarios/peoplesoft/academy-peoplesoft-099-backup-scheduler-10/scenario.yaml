@@ -1,7 +1,7 @@
-title: 'Oracle PeopleSoft: Process Scheduler — Backup and Recovery'
+title: Process Scheduler — Backup Lab
 slug: academy-peoplesoft-099-backup-scheduler-10
-technology: Oracle PeopleSoft
-category: Backup & Recovery
+technology: peoplesoft
+category: Fix
 difficulty: medium
 scenario_type: do
 lab_mode: simulation
@@ -11,8 +11,28 @@ max_score: 100
 is_free: false
 infrastructure_type: docker
 jira_priority: Medium
-description: Backup and recovery drill for process scheduler. Ensure backups run on schedule, retention
-  is correct, and you can restore server status, queues, and load within the lab RTO.
+description: 'CONTEXT: A team operating PeopleSoft administration needs you to resolve `peoplesoft: Process
+  Scheduler — Backup and Recovery` during a realistic incident. The business impact is reduced service
+  reliability until the underlying state is repaired.
+
+
+  ENVIRONMENT: You are working in FixitLab''s offline PeopleSoft app server lab with PIA, Process Scheduler,
+  Integration Broker, and app server logs. All tools run locally; no paid APIs or external cloud calls
+  are required.
+
+
+  SYMPTOM / STARTING STATE: Backup jobs exist but reliability is uncertain for process scheduler. Leadership
+  wants proof that restore works — not just that scripts exit zero. Backup and recovery drill for process
+  scheduler. Ensure backups run on schedule, retention is correct, and you can restore server status,
+  queues, and load within the lab RTO.
+
+
+  OBJECTIVE: Backup coverage for process scheduler is complete and restorable; Retention and encryption
+  meet the stated policy; A restore drill proves data integrity. Success means `check.sh` exits successfully.
+
+
+  WHAT TO AVOID: Do not apply broad destructive changes, skip evidence gathering, or fake completion with
+  marker files — the checker validates real system state.'
 objectives:
 - Backup coverage for process scheduler is complete and restorable
 - Retention and encryption meet the stated policy
@@ -21,32 +41,94 @@ initial_state: Backup jobs exist but reliability is uncertain for process schedu
   proof that restore works — not just that scripts exit zero.
 hints:
 - order: 1
-  cost: 10
-  content: 'Orient yourself before changing anything:
-
-    1. Inspect the current state — scheduler server status.
-
-    2. Write down what looks normal versus wrong or missing for process scheduler.
-
-    3. Recall the core idea: server status, queues, and load. Form one hypothesis before you act.'
+  cost: 0
+  content: 'Where to look: Backup coverage for process scheduler is complete and restorable'
 - order: 2
-  cost: 15
-  content: 'Plan your approach (still no spoilers):
-
-    1. Confirm the exact gap between current and desired state for process scheduler.
-
-    2. Decide the single smallest change that moves you toward the objective.
-
-    3. Capture evidence (command output / status) before the change so you can prove it worked afterward.'
-- order: 3
   cost: 25
-  content: 'Guided walkthrough:
+  content: 'Diagnostic steps:
 
-    1. Re-check the current state — scheduler server status.
+    1. Retention and encryption meet the stated policy
 
-    2. Repair or run the backup job, then perform a controlled restore into a scratch location to prove
-    it works.
+    2. A restore drill proves data integrity'
+- order: 3
+  cost: 50
+  content: 'Exact fix + verification:
 
-    3. Verify the result — the scheduler processes the queue.
+    1. A restore drill proves data integrity.
 
-    4. Click Check Solution once `systemctl is-active nginx` returns active.'
+    2. Re-run the lab checker (`check.sh` or Check Solution).
+
+    3. Confirm every scenario objective is satisfied.
+
+
+    WHY: the grader validates real state — marker files are ignored.'
+summary: Complete the process scheduler — backup lab peoplesoft lab and verify success with the checker
+estimated_minutes: 20
+xp_reward: 100
+prerequisites:
+- Basic peoplesoft literacy
+tags:
+- do
+- hands-on
+- peoplesoft
+linked_tutorial: peoplesoft-fundamentals
+what_you_will_learn:
+- Backup coverage for process scheduler is complete and restorable
+- Retention and encryption meet the stated policy
+- A restore drill proves data integrity
+environment:
+  nodes:
+  - role: primary
+    os: FixitLab PeopleSoft app server lab
+    hostname: lab-primary
+    ip: 127.0.0.1
+    specs: local offline simulation
+  pre_installed:
+  - bash
+  - coreutils
+  - journalctl
+  - peoplesoft
+  - systemctl
+  credentials:
+  - user: root
+    password: lab123
+tasks:
+- id: task_1
+  title: Process Scheduler — Backup Lab
+  description: Restore healthy behavior for Process Scheduler — Backup Lab by investigating the failure,
+    applying the smallest safe fix, and validating the outcome.
+  background: 'This peoplesoft lab teaches systematic troubleshooting: observe, hypothesize, change, verify.'
+  validation:
+    type: custom_script
+    script: check.sh
+    error_message: Validation did not pass. Re-read the objectives and Hint 2 diagnostic steps.
+solution:
+  summary: Identify the misconfiguration affecting this peoplesoft lab and apply the minimal fix.
+  files_changed: []
+  commands_run:
+  - bash check.sh
+  reference_docs: peoplesoft-fundamentals
+guided_mode:
+  enabled: true
+  steps:
+  - step: 1
+    title: Inspect current state
+    instruction: Run a read-only diagnostic before changing anything.
+    command: check.sh
+    expected_output: Output shows the current failure mode
+    explanation: Evidence-first troubleshooting avoids guessing.
+    next_on: command_success
+  - step: 2
+    title: Apply the minimal fix
+    instruction: Make one reversible change aligned with the objectives.
+    command: '# your fix command here'
+    expected_output: State moves toward the objective
+    explanation: Small changes make rollback easy if the hypothesis was wrong.
+    next_on: command_success
+  - step: 3
+    title: Verify with the grader
+    instruction: Run the same verification the checker uses.
+    command: check.sh
+    expected_output: '`check.sh` exits successfully'
+    explanation: The lab passes only when real state is healthy.
+    next_on: command_success

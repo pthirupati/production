@@ -1,9 +1,26 @@
 title: Fix Integer Division in percentage
 slug: py-fix-percentage-int-division
-category: Python Development
-description: percentage(part, whole) should return what percent `part` is of `whole` as a float, but it
-  uses floor division (//) so it truncates to whole numbers (e.g. 1/3 -> 0.0). Fix it to return a true
-  float percentage and guard whole == 0 (return 0.0).
+category: Fix
+description: 'CONTEXT: A team operating Python development needs you to resolve `Fix Integer Division
+  in percentage` during a realistic incident. The business impact is reduced service reliability until
+  the underlying state is repaired.
+
+
+  ENVIRONMENT: You are working in FixitLab''s offline Python project workspace with source files, venv,
+  tests, and CLI entrypoints. All tools run locally; no paid APIs or external cloud calls are required.
+
+
+  SYMPTOM / STARTING STATE: percentage(part, whole) should return what percent `part` is of `whole` as
+  a float, but it uses floor division (//) so it truncates to whole numbers (e.g. 1/3 -> 0.0). Fix it
+  to return a true float percentage and guard whole == 0 (return 0.0).
+
+
+  OBJECTIVE: See the truncated 0.0 result; Use true division; Guard division by zero. Success means all
+  hidden tests pass.
+
+
+  WHAT TO AVOID: Do not apply broad destructive changes, skip evidence gathering, or fake completion with
+  marker files — the checker validates real system state.'
 difficulty: easy
 scenario_type: fix
 lab_mode: simulation
@@ -21,52 +38,119 @@ objectives:
 initial_state: percentage(part, whole) should return what percent `part` is of `whole` as a float, but
   it uses floor division (//) so it truncates to whole numbers (e.g. 1/3 -> 0.0). Fix it to return a true
   float percentage and guard whole == 0 (return 0.0).
-solution_explanation: |
-  Floor division throws away the fractional part before multiplying, so small ratios collapse to 0. True division keeps the fraction.
+solution_explanation: 'Floor division throws away the fractional part before multiplying, so small ratios
+  collapse to 0. True division keeps the fraction.
+
+  '
 coding_spec:
   language: python
   entrypoint: solution.py
   kind: fix
-  instructions: |
-    Fix percentage(part, whole): return part/whole * 100 as a float. If whole is 0, return 0.0.
-      percentage(1, 4) -> 25.0
-    Click Run to try it, then Check Solution to grade against all tests.
+  instructions: "Fix percentage(part, whole): return part/whole * 100 as a float. If whole is 0, return\
+    \ 0.0.\n  percentage(1, 4) -> 25.0\nClick Run to try it, then Check Solution to grade against all\
+    \ tests.\n"
   files:
   - path: solution.py
-    content: |
-      def percentage(part, whole):
-          if whole == 0:
-              return 0.0
-          return part // whole * 100
+    content: "def percentage(part, whole):\n    if whole == 0:\n        return 0.0\n    return part //\
+      \ whole * 100\n"
     readonly: false
   visible_tests:
   - name: quarter
-    code: |
-      assert percentage(1, 4) == 25.0, percentage(1, 4)
+    code: 'assert percentage(1, 4) == 25.0, percentage(1, 4)
+
+      '
   - name: zero whole
-    code: |
-      assert percentage(5, 0) == 0.0
+    code: 'assert percentage(5, 0) == 0.0
+
+      '
   hidden_tests:
   - name: one third
-    code: |
-      assert abs(percentage(1, 3) - 33.3333333) < 1e-3, percentage(1, 3)
+    code: 'assert abs(percentage(1, 3) - 33.3333333) < 1e-3, percentage(1, 3)
+
+      '
   - name: full
-    code: |
-      assert percentage(3, 3) == 100.0
+    code: 'assert percentage(3, 3) == 100.0
+
+      '
   - name: returns float
-    code: |
-      assert isinstance(percentage(1, 2), float)
+    code: 'assert isinstance(percentage(1, 2), float)
+
+      '
   - name: half
-    code: |
-      assert percentage(1, 2) == 50.0
+    code: 'assert percentage(1, 2) == 50.0
+
+      '
   timeout: 8
 hints:
 - order: 1
-  cost: 10
-  content: percentage(1, 4) returns 0.0 because 1 // 4 == 0.
+  cost: 0
+  content: 'Where to look: Open `solution.py`, read the instructions, and run the visible tests to see
+    which assertion fails first.'
 - order: 2
-  cost: 20
-  content: // is floor division; use / for a real fraction.
+  cost: 25
+  content: 'Diagnostic steps:
+
+    1. Click Run and read the traceback — note line number and actual vs expected values.
+
+    2. Reproduce the failure with the smallest input from a visible test.
+
+    3. Compare your implementation to the bug described in the lab prompt.'
 - order: 3
-  cost: 30
-  content: Return part / whole * 100.
+  cost: 50
+  content: 'Exact fix + verification:
+
+    1. Edit `solution.py` with the smallest correct change.
+
+    2. Re-run visible tests, then Check Solution (includes hidden tests).
+
+    3. Confirm every test passes.
+
+
+    WHY: coding labs grade against hidden test cases, not marker files.'
+technology: python
+summary: Complete the fix integer division in percentage python lab and verify success with the checker
+estimated_minutes: 25
+xp_reward: 100
+prerequisites:
+- Basic python literacy
+tags:
+- fix
+- hands-on
+- python
+linked_tutorial: python-fundamentals
+what_you_will_learn:
+- See the truncated 0.0 result
+- Use true division
+- Guard division by zero
+environment:
+  nodes:
+  - role: primary
+    os: FixitLab Python project workspace
+    hostname: lab-primary
+    ip: 127.0.0.1
+    specs: local offline simulation
+  pre_installed:
+  - bash
+  - coreutils
+  - pip
+  - python
+  - python3
+  credentials:
+  - user: root
+    password: lab123
+tasks:
+- id: task_1
+  title: Fix Integer Division in percentage
+  description: Restore healthy behavior for Fix Integer Division in percentage by investigating the failure,
+    applying the smallest safe fix, and validating the outcome.
+  background: 'This python lab teaches systematic troubleshooting: observe, hypothesize, change, verify.'
+  validation:
+    type: custom_script
+    script: hidden_tests
+    error_message: One or more hidden tests failed. Read the public test output, fix your solution, and
+      submit again.
+solution:
+  summary: The solution passes all hidden tests by implementing the required behavior in code.
+  files_changed: []
+  commands_run: []
+  reference_docs: python-fundamentals

@@ -1,10 +1,30 @@
 title: Service Cannot Reach Pod
 slug: k8s-service-unreachable
 difficulty: medium
-category: Kubernetes
-description: A Service's ClusterIP is unreachable from other pods even though the target pods are running.
-  The most common causes are a selector that doesn't match the pod labels (no endpoints) or a port/targetPort
+category: Fix
+description: 'CONTEXT: A team operating Kubernetes needs you to resolve `Service Cannot Reach Pod` during
+  a realistic incident. The business impact is reduced service reliability until the underlying state
+  is repaired.
+
+
+  ENVIRONMENT: You are working in FixitLab''s offline Kubernetes cluster with kubectl, manifests, and
+  cluster resources. All tools run locally; no paid APIs or external cloud calls are required.
+
+
+  SYMPTOM / STARTING STATE: Simulated Kubernetes cluster. Pods are Running, but connecting to the Service''s
+  ClusterIP from another pod times out or is refused. Endpoints may be empty or the ports may not line
+  up. A Service''s ClusterIP is unreachable from other pods even though the target pods are running. The
+  most common causes are a selector that doesn''t match the pod labels (no endpoints) or a port/targetPort
   mismatch. Diagnose which it is and restore connectivity between the Service and its pods.
+
+
+  OBJECTIVE: Reproduce the failed connection to the Service ClusterIP; Check the Service''s endpoints,
+  selector, and ports against the pods; Fix the selector or port mapping so the Service reaches the pods.
+  Success means `kubectl get pods` shows every pod Running.
+
+
+  WHAT TO AVOID: Do not apply broad destructive changes, skip evidence gathering, or fake completion with
+  marker files — the checker validates real system state.'
 initial_state: Simulated Kubernetes cluster. Pods are Running, but connecting to the Service's ClusterIP
   from another pod times out or is refused. Endpoints may be empty or the ports may not line up.
 objectives:
@@ -18,17 +38,79 @@ max_score: 100
 is_free: false
 hints:
 - order: 1
-  cost: 10
-  content: 'From a debug pod: `kubectl run tmp --image=busybox -it --rm -- wget -qO- <svc>:<port>` fails.
-    First check `kubectl get endpoints <svc>`.'
+  cost: 0
+  content: 'Where to look: Run `kubectl get pods -A` and `kubectl describe pod <name>` for any pod not
+    in Running state.'
 - order: 2
-  cost: 15
-  content: If endpoints are <none>, the selector is wrong — compare `kubectl get svc <svc> -o jsonpath='{.spec.selector}'`
-    to `kubectl get pods --show-labels`. If endpoints exist, it's a targetPort mismatch.
+  cost: 25
+  content: 'Diagnostic steps:
+
+    1. `kubectl get pods` — note CrashLoopBackOff, ImagePullBackOff, or Pending.
+
+    2. `kubectl describe pod <name>` — read Events at the bottom.
+
+    3. `kubectl logs <name> [--previous]` if the container restarted.'
 - order: 3
-  cost: 20
-  content: 'Fix the mismatch: patch the selector to match the pods, or set targetPort to the real containerPort
-    (`kubectl patch svc <svc> -p ''{"spec":{"ports":[{"port":80,"targetPort":80}]}}''`). Re-test the connection.'
+  cost: 50
+  content: 'Exact fix + verification:
+
+    1. Fix the root cause (image name, env var, volume mount, or probe).
+
+    2. `kubectl apply -f` the corrected manifest or delete the pod to recreate.
+
+    3. Confirm `kubectl get pods` shows every pod Running.
+
+
+    WHY: Kubernetes only reports healthy when the workload actually runs.'
 requires_companion_hosts: false
 dual_terminal: false
 jira_priority: Medium
+technology: kubernetes
+summary: Complete the service cannot reach pod kubernetes lab and verify success with the checker
+estimated_minutes: 15
+xp_reward: 100
+prerequisites:
+- Basic kubernetes literacy
+tags:
+- fix
+- hands-on
+- kubernetes
+linked_tutorial: kubernetes-fundamentals
+what_you_will_learn:
+- Reproduce the failed connection to the Service ClusterIP
+- Check the Service's endpoints, selector, and ports against the pods
+- Fix the selector or port mapping so the Service reaches the pods
+environment:
+  nodes:
+  - role: primary
+    os: FixitLab Kubernetes cluster
+    hostname: lab-primary
+    ip: 127.0.0.1
+    specs: local offline simulation
+  pre_installed:
+  - bash
+  - coreutils
+  - helm
+  - kubectl
+  - kubernetes
+  credentials:
+  - user: root
+    password: lab123
+tasks:
+- id: task_1
+  title: Service Cannot Reach Pod
+  description: Restore healthy behavior for Service Cannot Reach Pod by investigating the failure, applying
+    the smallest safe fix, and validating the outcome.
+  background: 'This kubernetes lab teaches systematic troubleshooting: observe, hypothesize, change, verify.'
+  validation:
+    type: k8s_resource_state
+    resource_kind: Pod
+    resource_name: all
+    namespace: default
+    expected_state: Running
+    error_message: One or more pods are not Running. Use kubectl describe pod and kubectl logs.
+solution:
+  summary: Identify the misconfiguration affecting this kubernetes lab and apply the minimal fix.
+  files_changed: []
+  commands_run: []
+  reference_docs: kubernetes-fundamentals

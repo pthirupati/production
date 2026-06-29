@@ -1,13 +1,34 @@
 title: Implement a Layered Config Loader (Deep-Merge + Validate)
 slug: nodejs-impl-config-deepmerge-validate
 technology: nodejs
-category: Node.js Development
-description: 'Implement loadConfig(layers, schema): deep-merge an array of plain config objects (defaults
-  first, then overrides, last wins) and validate the result against a schema. Deep-merge means nested
-  plain objects merge recursively while scalars and arrays are replaced. Then for each schema field apply
-  its default when the key is absent, fail on a missing required key, and fail on a type mismatch. Return
-  {ok:true, config} or {ok:false, errors:[...]} (errors sorted by key). The stub returns undefined so
-  tests fail.'
+category: Build
+description: 'CONTEXT: A team operating Node.js backends needs you to resolve `Implement a Layered Config
+  Loader (Deep-Merge + Validate)` during a realistic incident. The business impact is reduced service
+  reliability until the underlying state is repaired.
+
+
+  ENVIRONMENT: You are working in FixitLab''s offline Node.js application with Express routes, middleware,
+  and package.json. All tools run locally; no paid APIs or external cloud calls are required.
+
+
+  SYMPTOM / STARTING STATE: Implement loadConfig(layers, schema): deep-merge an array of plain config
+  objects (last wins; nested objects merge recursively, scalars/arrays replace) then validate against
+  a schema — apply defaults, fail on missing required keys, fail on type mismatches. Return {ok:true,
+  config} or {ok:false, errors:[...]} sorted by key. The stub returns undefined so tests fail. Implement
+  loadConfig(layers, schema): deep-merge an array of plain config objects (defaults first, then overrides,
+  last wins) and validate the result against a schema. Deep-merge means nested plain objects merge recursively
+  while scalars and arrays are replaced. Then for each schema field apply its default when the key is
+  absent, fail on a missing required key, and fail on a type mismatch. Return {ok:true, config} or {ok:false,
+  errors:[...]} (errors sorted by key). The stub returns undefined so tests fail.
+
+
+  OBJECTIVE: Deep-merge layered objects so nested objects combine but scalars/arrays replace; Apply schema
+  defaults and detect missing required keys; Type-check each value and report sorted, structured errors.
+  Success means all hidden tests pass.
+
+
+  WHAT TO AVOID: Do not apply broad destructive changes, skip evidence gathering, or fake completion with
+  marker files — the checker validates real system state.'
 difficulty: hard
 scenario_type: do
 lab_mode: simulation
@@ -26,119 +47,220 @@ initial_state: 'Implement loadConfig(layers, schema): deep-merge an array of pla
   wins; nested objects merge recursively, scalars/arrays replace) then validate against a schema — apply
   defaults, fail on missing required keys, fail on type mismatches. Return {ok:true, config} or {ok:false,
   errors:[...]} sorted by key. The stub returns undefined so tests fail.'
-solution_explanation: |
-  Real apps build config from layers — built-in defaults, a config file, then environment overrides — where later layers win. A correct deep-merge recurses only into *plain objects*: when both sides have a plain object at a key, merge their keys; otherwise the later value replaces the earlier one (so arrays and scalars are not concatenated or merged element-wise). After merging, validation walks the schema: a missing key falls back to its `default` if one is given, is an error if `required`, and is otherwise simply absent. Present values are type-checked with a small helper (note `typeof [] === 'object'`, so arrays need an explicit Array.isArray check). Collecting errors (rather than throwing on the first) and sorting them by key gives callers a stable, complete report.
+solution_explanation: 'Real apps build config from layers — built-in defaults, a config file, then environment
+  overrides — where later layers win. A correct deep-merge recurses only into *plain objects*: when both
+  sides have a plain object at a key, merge their keys; otherwise the later value replaces the earlier
+  one (so arrays and scalars are not concatenated or merged element-wise). After merging, validation walks
+  the schema: a missing key falls back to its `default` if one is given, is an error if `required`, and
+  is otherwise simply absent. Present values are type-checked with a small helper (note `typeof [] ===
+  ''object''`, so arrays need an explicit Array.isArray check). Collecting errors (rather than throwing
+  on the first) and sorting them by key gives callers a stable, complete report.
+
+  '
 coding_spec:
   language: javascript
   entrypoint: solution.js
   kind: impl
-  instructions: |
-    Implement loadConfig(layers, schema):
-      1. Deep-merge layers left-to-right (later wins). Merge recursively ONLY when both values are
-         plain objects; otherwise the later value replaces the earlier (arrays + scalars replace).
-      2. Validate the merged object against schema. Each schema entry is
-         { type: 'string'|'number'|'boolean'|'object'|'array', required?: bool, default?: any }.
-           - key absent + has default  -> use the default
-           - key absent + required     -> error "missing required key: <key>"
-           - key present, wrong type   -> error "invalid type for <key>: expected <type>"
-      3. Return { ok: true, config } if no errors, else { ok: false, errors } with errors sorted by key.
-    Do not mutate the input layers. Click Run, then Check Solution to grade against all tests.
+  instructions: "Implement loadConfig(layers, schema):\n  1. Deep-merge layers left-to-right (later wins).\
+    \ Merge recursively ONLY when both values are\n     plain objects; otherwise the later value replaces\
+    \ the earlier (arrays + scalars replace).\n  2. Validate the merged object against schema. Each schema\
+    \ entry is\n     { type: 'string'|'number'|'boolean'|'object'|'array', required?: bool, default?:\
+    \ any }.\n       - key absent + has default  -> use the default\n       - key absent + required  \
+    \   -> error \"missing required key: <key>\"\n       - key present, wrong type   -> error \"invalid\
+    \ type for <key>: expected <type>\"\n  3. Return { ok: true, config } if no errors, else { ok: false,\
+    \ errors } with errors sorted by key.\nDo not mutate the input layers. Click Run, then Check Solution\
+    \ to grade against all tests.\n"
   files:
   - path: solution.js
-    content: |
-      function loadConfig(layers, schema) {
-        // TODO:
-        // 1. Deep-merge `layers` (array of plain objects), later layers winning.
-        //    Recurse only into plain objects; arrays and scalars are replaced, not merged.
-        // 2. For each key in `schema`, apply default / check required / check type.
-        // 3. Return { ok: true, config } or { ok: false, errors } (errors sorted by key).
-      }
+    content: "function loadConfig(layers, schema) {\n  // TODO:\n  // 1. Deep-merge `layers` (array of\
+      \ plain objects), later layers winning.\n  //    Recurse only into plain objects; arrays and scalars\
+      \ are replaced, not merged.\n  // 2. For each key in `schema`, apply default / check required /\
+      \ check type.\n  // 3. Return { ok: true, config } or { ok: false, errors } (errors sorted by key).\n\
+      }\n"
     readonly: false
   visible_tests:
   - name: deep-merges nested objects, later layer wins
-    code: |
-      const schema = {
-        server: { type: 'object', required: true },
-        debug:  { type: 'boolean', default: false }
-      };
-      const r = loadConfig(
-        [{ server: { host: 'localhost', port: 80 } }, { server: { port: 443 } }],
-        schema
-      );
-      assert(r.ok === true, JSON.stringify(r));
-      assert(r.config.server.host === 'localhost' && r.config.server.port === 443, JSON.stringify(r.config));
-      assert(r.config.debug === false, 'default not applied: ' + JSON.stringify(r.config));
+    code: "const schema = {\n  server: { type: 'object', required: true },\n  debug:  { type: 'boolean',\
+      \ default: false }\n};\nconst r = loadConfig(\n  [{ server: { host: 'localhost', port: 80 } }, {\
+      \ server: { port: 443 } }],\n  schema\n);\nassert(r.ok === true, JSON.stringify(r));\nassert(r.config.server.host\
+      \ === 'localhost' && r.config.server.port === 443, JSON.stringify(r.config));\nassert(r.config.debug\
+      \ === false, 'default not applied: ' + JSON.stringify(r.config));\n"
   - name: reports missing required key
-    code: |
-      const schema = { apiKey: { type: 'string', required: true } };
+    code: 'const schema = { apiKey: { type: ''string'', required: true } };
+
       const r = loadConfig([{}], schema);
+
       assert(r.ok === false, JSON.stringify(r));
-      assert(JSON.stringify(r.errors) === JSON.stringify(['missing required key: apiKey']), JSON.stringify(r.errors));
+
+      assert(JSON.stringify(r.errors) === JSON.stringify([''missing required key: apiKey'']), JSON.stringify(r.errors));
+
+      '
   hidden_tests:
   - name: arrays replace, they do not concat
-    code: |
-      const schema = { tags: { type: 'array', required: true } };
-      const r = loadConfig([{ tags: ['a', 'b'] }, { tags: ['c'] }], schema);
+    code: 'const schema = { tags: { type: ''array'', required: true } };
+
+      const r = loadConfig([{ tags: [''a'', ''b''] }, { tags: [''c''] }], schema);
+
       assert(r.ok === true, JSON.stringify(r));
-      assert(JSON.stringify(r.config.tags) === JSON.stringify(['c']), 'arrays must replace: ' + JSON.stringify(r.config.tags));
+
+      assert(JSON.stringify(r.config.tags) === JSON.stringify([''c'']), ''arrays must replace: '' + JSON.stringify(r.config.tags));
+
+      '
   - name: type mismatch is reported
-    code: |
-      const schema = { port: { type: 'number', required: true } };
-      const r = loadConfig([{ port: '443' }], schema);
+    code: 'const schema = { port: { type: ''number'', required: true } };
+
+      const r = loadConfig([{ port: ''443'' }], schema);
+
       assert(r.ok === false, JSON.stringify(r));
-      assert(JSON.stringify(r.errors) === JSON.stringify(['invalid type for port: expected number']), JSON.stringify(r.errors));
+
+      assert(JSON.stringify(r.errors) === JSON.stringify([''invalid type for port: expected number'']),
+      JSON.stringify(r.errors));
+
+      '
   - name: errors are sorted by key
-    code: |
-      const schema = {
-        zeta:  { type: 'string', required: true },
-        alpha: { type: 'number', required: true }
-      };
-      const r = loadConfig([{}], schema);
-      assert(r.ok === false, JSON.stringify(r));
-      assert(JSON.stringify(r.errors) === JSON.stringify(['missing required key: alpha', 'missing required key: zeta']), JSON.stringify(r.errors));
+    code: "const schema = {\n  zeta:  { type: 'string', required: true },\n  alpha: { type: 'number',\
+      \ required: true }\n};\nconst r = loadConfig([{}], schema);\nassert(r.ok === false, JSON.stringify(r));\n\
+      assert(JSON.stringify(r.errors) === JSON.stringify(['missing required key: alpha', 'missing required\
+      \ key: zeta']), JSON.stringify(r.errors));\n"
   - name: array type is distinguished from object
-    code: |
-      const schema = { items: { type: 'object', required: true } };
+    code: 'const schema = { items: { type: ''object'', required: true } };
+
       const r = loadConfig([{ items: [1, 2, 3] }], schema);
-      assert(r.ok === false, 'an array is not an object: ' + JSON.stringify(r));
-      assert(r.errors[0] === 'invalid type for items: expected object', JSON.stringify(r.errors));
+
+      assert(r.ok === false, ''an array is not an object: '' + JSON.stringify(r));
+
+      assert(r.errors[0] === ''invalid type for items: expected object'', JSON.stringify(r.errors));
+
+      '
   - name: does not mutate input layers
-    code: |
-      const base = { db: { host: 'a' } };
-      const over = { db: { host: 'b', port: 5432 } };
-      const schema = { db: { type: 'object', required: true } };
+    code: 'const base = { db: { host: ''a'' } };
+
+      const over = { db: { host: ''b'', port: 5432 } };
+
+      const schema = { db: { type: ''object'', required: true } };
+
       const r = loadConfig([base, over], schema);
-      assert(r.config.db.host === 'b' && r.config.db.port === 5432, JSON.stringify(r.config));
-      assert(JSON.stringify(base) === JSON.stringify({ db: { host: 'a' } }), 'base layer was mutated: ' + JSON.stringify(base));
-      assert(JSON.stringify(over) === JSON.stringify({ db: { host: 'b', port: 5432 } }), 'override layer was mutated: ' + JSON.stringify(over));
+
+      assert(r.config.db.host === ''b'' && r.config.db.port === 5432, JSON.stringify(r.config));
+
+      assert(JSON.stringify(base) === JSON.stringify({ db: { host: ''a'' } }), ''base layer was mutated:
+      '' + JSON.stringify(base));
+
+      assert(JSON.stringify(over) === JSON.stringify({ db: { host: ''b'', port: 5432 } }), ''override
+      layer was mutated: '' + JSON.stringify(over));
+
+      '
   - name: passes a fully valid multi-layer config
-    code: |
-      const schema = {
-        name:    { type: 'string', required: true },
-        retries: { type: 'number', default: 3 },
-        flags:   { type: 'object', default: {} }
-      };
-      const r = loadConfig(
-        [{ name: 'svc', flags: { a: true } }, { retries: 5, flags: { b: false } }],
-        schema
-      );
-      assert(r.ok === true, JSON.stringify(r));
-      assert(r.config.name === 'svc' && r.config.retries === 5, JSON.stringify(r.config));
-      assert(r.config.flags.a === true && r.config.flags.b === false, JSON.stringify(r.config.flags));
+    code: "const schema = {\n  name:    { type: 'string', required: true },\n  retries: { type: 'number',\
+      \ default: 3 },\n  flags:   { type: 'object', default: {} }\n};\nconst r = loadConfig(\n  [{ name:\
+      \ 'svc', flags: { a: true } }, { retries: 5, flags: { b: false } }],\n  schema\n);\nassert(r.ok\
+      \ === true, JSON.stringify(r));\nassert(r.config.name === 'svc' && r.config.retries === 5, JSON.stringify(r.config));\n\
+      assert(r.config.flags.a === true && r.config.flags.b === false, JSON.stringify(r.config.flags));\n"
   - name: empty layers with all defaults succeeds
-    code: |
-      const schema = { level: { type: 'string', default: 'info' } };
+    code: 'const schema = { level: { type: ''string'', default: ''info'' } };
+
       const r = loadConfig([], schema);
+
       assert(r.ok === true, JSON.stringify(r));
-      assert(r.config.level === 'info', JSON.stringify(r.config));
+
+      assert(r.config.level === ''info'', JSON.stringify(r.config));
+
+      '
   timeout: 8
 hints:
 - order: 1
-  cost: 10
-  content: Write a helper isPlainObject(v) = v !== null && typeof v === 'object' && !Array.isArray(v). Use it for both merging and the 'object' type check.
+  cost: 0
+  content: 'Where to look: Open `solution.js`, read the instructions, and run the visible tests to see
+    which assertion fails first.'
 - order: 2
-  cost: 20
-  content: deepMerge(a, b) — for each key in b, if both a[key] and b[key] are plain objects, recurse; otherwise take b[key]. Reduce the layers with it starting from {}.
+  cost: 25
+  content: 'Diagnostic steps:
+
+    1. Click Run and read the traceback — note line number and actual vs expected values.
+
+    2. Reproduce the failure with the smallest input from a visible test.
+
+    3. Compare your implementation to the bug described in the lab prompt.'
 - order: 3
-  cost: 30
-  content: 'After merging, loop schema keys: if absent and has default use it; if absent and required push an error; if present check type (typeWord maps array->Array.isArray, object->isPlainObject, else typeof). Sort errors and return ok=errors.length===0.'
+  cost: 50
+  content: 'Exact fix + verification:
+
+    1. Type-check each value and report sorted, structured errors.
+
+    2. Re-run the lab checker (`check.sh` or Check Solution).
+
+    3. Confirm every scenario objective is satisfied.
+
+
+    WHY: the grader validates real state — marker files are ignored.'
+summary: Complete the implement a layered config loader (deep-merge + validate) nodejs lab and verify
+  success with the checker
+estimated_minutes: 40
+xp_reward: 100
+prerequisites:
+- Basic nodejs literacy
+tags:
+- do
+- hands-on
+- nodejs
+linked_tutorial: nodejs-fundamentals
+what_you_will_learn:
+- Deep-merge layered objects so nested objects combine but scalars/arrays replace
+- Apply schema defaults and detect missing required keys
+- Type-check each value and report sorted, structured errors
+environment:
+  nodes:
+  - role: primary
+    os: FixitLab Node.js application
+    hostname: lab-primary
+    ip: 127.0.0.1
+    specs: local offline simulation
+  pre_installed:
+  - bash
+  - coreutils
+  - journalctl
+  - nodejs
+  - systemctl
+  credentials:
+  - user: root
+    password: lab123
+tasks:
+- id: task_1
+  title: Implement a Layered Config Loader (Deep-Merge + Validate)
+  description: Restore healthy behavior for Implement a Layered Config Loader (Deep-Merge + Validate)
+    by investigating the failure, applying the smallest safe fix, and validating the outcome.
+  background: 'This nodejs lab teaches systematic troubleshooting: observe, hypothesize, change, verify.'
+  validation:
+    type: custom_script
+    script: hidden_tests
+    error_message: One or more hidden tests failed. Read the public test output, fix your solution, and
+      submit again.
+solution:
+  summary: The solution passes all hidden tests by implementing the required behavior in code.
+  files_changed: []
+  commands_run: []
+  reference_docs: nodejs-fundamentals
+guided_mode:
+  enabled: true
+  steps:
+  - step: 1
+    title: Inspect current state
+    instruction: Run a read-only diagnostic before changing anything.
+    command: check.sh
+    expected_output: Output shows the current failure mode
+    explanation: Evidence-first troubleshooting avoids guessing.
+    next_on: command_success
+  - step: 2
+    title: Apply the minimal fix
+    instruction: Make one reversible change aligned with the objectives.
+    command: '# your fix command here'
+    expected_output: State moves toward the objective
+    explanation: Small changes make rollback easy if the hypothesis was wrong.
+    next_on: command_success
+  - step: 3
+    title: Verify with the grader
+    instruction: Run the same verification the checker uses.
+    command: check.sh
+    expected_output: all hidden tests pass
+    explanation: The lab passes only when real state is healthy.
+    next_on: command_success

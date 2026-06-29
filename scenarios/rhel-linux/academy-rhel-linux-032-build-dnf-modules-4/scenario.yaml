@@ -1,7 +1,7 @@
-title: 'RHEL Linux: Dnf Modules — Build From Scratch'
+title: Dnf Modules — Build Lab
 slug: academy-rhel-linux-032-build-dnf-modules-4
-technology: RHEL Linux
-category: Build Lab
+technology: rhel-linux
+category: Build
 difficulty: medium
 scenario_type: do
 lab_mode: simulation
@@ -11,18 +11,38 @@ max_score: 100
 is_free: false
 infrastructure_type: docker
 jira_priority: Low
-description: Service operations lab. The `sssd` systemd unit is **failed/inactive** on this host — a realistic
-  fault for Build From Scratch workflows that depend on it. Diagnose with `systemctl status sssd` and
-  journal logs, apply the smallest reliable fix, then verify with `systemctl is-active sssd`.
+description: 'CONTEXT: A team operating Red Hat Enterprise Linux needs you to resolve `rhel-linux: Dnf
+  Modules — Build From Scratch` during a realistic incident. The business impact is reduced service reliability
+  until the underlying state is repaired.
+
+
+  ENVIRONMENT: You are working in FixitLab''s offline RHEL practice host with dnf, subscription-manager,
+  firewalld, and SELinux. All tools run locally; no paid APIs or external cloud calls are required.
+
+
+  SYMPTOM / STARTING STATE: The RHEL practice host is ready but dnf modules is not configured yet. Required
+  tools may already be installed; your job is to create the configuration and bring the capability online.
+  Build dnf modules from scratch in this rhel-linux lab. You start from a minimal environment and must
+  produce a working configuration that demonstrates module streams, profiles, and default versions. Plan,
+  implement, then prove it works.
+
+
+  OBJECTIVE: A working dnf modules setup must exist by the end of this lab; Configuration should follow
+  team conventions and be easy to audit; The result should pass validation without manual cleanup. Success
+  means `systemctl is-active sssd` returns active.
+
+
+  WHAT TO AVOID: Do not apply broad destructive changes, skip evidence gathering, or fake completion with
+  marker files — the checker validates real system state.'
 objectives:
-- The `sssd` service is active (running)
-- '`systemctl is-active sssd` returns active'
-- The fix survives a status re-check (no marker files)
-initial_state: The `sssd` service is not running (`systemctl is-active sssd` → inactive/failed). Dependent
-  Build From Scratch tasks cannot succeed until the unit is healthy again.
+- A working dnf modules setup must exist by the end of this lab
+- Configuration should follow team conventions and be easy to audit
+- The result should pass validation without manual cleanup
+initial_state: The RHEL practice host is ready but dnf modules is not configured yet. Required tools may
+  already be installed; your job is to create the configuration and bring the capability online.
 hints:
 - order: 1
-  cost: 10
+  cost: 0
   content: 'Orient yourself before changing anything:
 
     1. Inspect the current state — `dnf module list` and `dnf module info`.
@@ -32,17 +52,17 @@ hints:
     3. Recall the core idea: module streams, profiles, and default versions. Form one hypothesis before
     you act.'
 - order: 2
-  cost: 15
-  content: 'Plan your approach (still no spoilers):
-
-    1. Confirm the exact gap between current and desired state for dnf modules.
-
-    2. Decide the single smallest change that moves you toward the objective.
-
-    3. Capture evidence (command output / status) before the change so you can prove it worked afterward.'
-- order: 3
   cost: 25
-  content: 'Guided walkthrough:
+  content: 'Diagnostic steps:
+
+    1. Run `systemctl status sssd` — note Active/Failed and the last log lines.
+
+    2. Read `journalctl -u sssd -n 50` for the root error.
+
+    3. Form a hypothesis about the smallest config or permission fix.'
+- order: 3
+  cost: 50
+  content: 'Exact fix + verification:
 
     1. Re-check the current state — `dnf module list` and `dnf module info`.
 
@@ -51,4 +71,76 @@ hints:
 
     3. Verify the result — the intended module stream/profile is enabled and installed.
 
-    4. Click Check Solution once `systemctl is-active sssd` returns active.'
+    4. Click Check Solution once the objective is met (graded on real state, not a marker file).'
+summary: Complete the dnf modules — build lab rhel linux lab and verify success with the checker
+estimated_minutes: 15
+xp_reward: 100
+prerequisites:
+- Basic rhel linux literacy
+tags:
+- do
+- hands-on
+- rhel-linux
+linked_tutorial: rhel-linux-fundamentals
+what_you_will_learn:
+- A working dnf modules setup must exist by the end of this lab
+- Configuration should follow team conventions and be easy to audit
+- The result should pass validation without manual cleanup
+environment:
+  nodes:
+  - role: primary
+    os: FixitLab RHEL practice host
+    hostname: lab-primary
+    ip: 127.0.0.1
+    specs: local offline simulation
+  pre_installed:
+  - bash
+  - coreutils
+  - journalctl
+  - rhel linux
+  - systemctl
+  credentials:
+  - user: root
+    password: lab123
+tasks:
+- id: task_1
+  title: Dnf Modules — Build Lab
+  description: Restore healthy behavior for Dnf Modules — Build Lab by investigating the failure, applying
+    the smallest safe fix, and validating the outcome.
+  background: 'This rhel linux lab teaches systematic troubleshooting: observe, hypothesize, change, verify.'
+  validation:
+    type: service_active
+    command: systemctl is-active sssd
+    expected_status: active
+    error_message: The sssd service is not active yet. Check `systemctl status sssd` and `journalctl -u
+      sssd -n 50`.
+solution:
+  summary: The root cause is an unhealthy `sssd` service; repair it and verify active state.
+  files_changed: []
+  commands_run:
+  - systemctl is-active sssd
+  reference_docs: rhel-linux-fundamentals
+guided_mode:
+  enabled: true
+  steps:
+  - step: 1
+    title: Inspect current state
+    instruction: Run a read-only diagnostic before changing anything.
+    command: systemctl is-active sssd
+    expected_output: Output shows the current failure mode
+    explanation: Evidence-first troubleshooting avoids guessing.
+    next_on: command_success
+  - step: 2
+    title: Apply the minimal fix
+    instruction: Make one reversible change aligned with the objectives.
+    command: '# your fix command here'
+    expected_output: State moves toward the objective
+    explanation: Small changes make rollback easy if the hypothesis was wrong.
+    next_on: command_success
+  - step: 3
+    title: Verify with the grader
+    instruction: Run the same verification the checker uses.
+    command: systemctl is-active sssd
+    expected_output: '`systemctl is-active sssd` returns active'
+    explanation: The lab passes only when real state is healthy.
+    next_on: command_success

@@ -1,8 +1,25 @@
 title: PostgreSQL Down — WAL Archive Filled the Disk
 slug: db-postgres-disk-full-archive
 difficulty: hard
-category: Database Administration
-description: 'PostgreSQL has stopped because the data partition is 100% full. A failing archive_command
+category: Fix
+description: 'CONTEXT: A team operating database administration needs you to resolve `PostgreSQL Down
+  — WAL Archive Filled the Disk` during a realistic incident. The business impact is reduced service reliability
+  until the underlying state is repaired.
+
+
+  ENVIRONMENT: You are working in FixitLab''s offline database server with SQL client, schemas, backups,
+  and performance views. All tools run locally; no paid APIs or external cloud calls are required.
+
+
+  SYMPTOM / STARTING STATE: Simulated RHEL 9 database server. The postgresql service is down. df shows
+  the data
+
+  filesystem at 100%. Stale WAL archive files have accumulated under
+
+  /var/lib/pgsql/data/pg_wal/archive_status and an old dump in
+
+  /var/lib/pgsql/archive is consuming the space. psql cannot connect. PostgreSQL has stopped because the
+  data partition is 100% full. A failing archive_command
 
   meant WAL segments piled up in pg_wal and the archive_status directory until the disk
 
@@ -10,7 +27,14 @@ description: 'PostgreSQL has stopped because the data partition is 100% full. A 
 
   clearing the backed-up WAL archive, then restart PostgreSQL.
 
-  '
+
+  OBJECTIVE: Identify the data partition is full and PostgreSQL stopped because of it; Reclaim space by
+  clearing the stale archived WAL files (e.g. rm the archive backlog); Restart PostgreSQL once there is
+  free space. Success means `systemctl is-active postgresql` returns active.
+
+
+  WHAT TO AVOID: Do not apply broad destructive changes, skip evidence gathering, or fake completion with
+  marker files — the checker validates real system state.'
 initial_state: 'Simulated RHEL 9 database server. The postgresql service is down. df shows the data
 
   filesystem at 100%. Stale WAL archive files have accumulated under
@@ -32,19 +56,81 @@ max_score: 100
 is_free: false
 hints:
 - order: 1
-  cost: 10
-  content: 'Confirm the disk is the cause: `df -h` shows the data filesystem at 100%. PostgreSQL halts
-    when it can''t write WAL. Look under the archive dir (e.g. /var/lib/pgsql/archive) for a backlog of
-    already-archived segments.'
+  cost: 0
+  content: 'Where to look: Start with `systemctl status postgresql` and `journalctl -u postgresql -n 50
+    --no-pager` before changing anything.'
 - order: 2
-  cost: 20
-  content: Reclaim space by deleting the ALREADY-ARCHIVED backlog only — e.g. `rm -f /var/lib/pgsql/archive/*`.
-    Do NOT touch live segments in pg_wal/ directly, and never delete from pg_wal by hand.
+  cost: 25
+  content: 'Diagnostic steps:
+
+    1. Run `systemctl status postgresql` — note Active/Failed and the last log lines.
+
+    2. Read `journalctl -u postgresql -n 50` for the root error.
+
+    3. Form a hypothesis about the smallest config or permission fix.'
 - order: 3
-  cost: 30
-  content: 'Once `df -h` shows free space, start the service: `systemctl start postgresql` and confirm
-    with `systemctl is-active postgresql` plus `psql -c ''SELECT 1;''`. Then fix the failing archive_command
-    so WAL is archived going forward.'
+  cost: 50
+  content: 'Exact fix + verification:
+
+    1. Apply the minimal fix (config, unit override, or missing directory).
+
+    2. Run `systemctl daemon-reload` if you edited a unit file.
+
+    3. Run `systemctl restart postgresql` and confirm `systemctl is-active postgresql` succeeds.
+
+
+    WHY: the grader checks real service state, not marker files.'
 requires_companion_hosts: false
 dual_terminal: false
 jira_priority: Critical
+technology: database
+summary: Complete the postgresql down — wal archive filled the disk database lab and verify success with
+  the checker
+estimated_minutes: 20
+xp_reward: 100
+prerequisites:
+- Basic database literacy
+tags:
+- database
+- fix
+- hands-on
+linked_tutorial: database-fundamentals
+what_you_will_learn:
+- Identify the data partition is full and PostgreSQL stopped because of it
+- Reclaim space by clearing the stale archived WAL files (e.g. rm the archive backlog)
+- Restart PostgreSQL once there is free space
+- Verify the service is active and accepting connections
+environment:
+  nodes:
+  - role: primary
+    os: FixitLab database server
+    hostname: lab-primary
+    ip: 127.0.0.1
+    specs: local offline simulation
+  pre_installed:
+  - bash
+  - coreutils
+  - database
+  - journalctl
+  - systemctl
+  credentials:
+  - user: root
+    password: lab123
+tasks:
+- id: task_1
+  title: PostgreSQL Down — WAL Archive Filled the Disk
+  description: Restore healthy behavior for PostgreSQL Down — WAL Archive Filled the Disk by investigating
+    the failure, applying the smallest safe fix, and validating the outcome.
+  background: 'This database lab teaches systematic troubleshooting: observe, hypothesize, change, verify.'
+  validation:
+    type: service_active
+    command: systemctl is-active postgresql
+    expected_status: active
+    error_message: The postgresql service is not active yet. Check `systemctl status postgresql` and `journalctl
+      -u postgresql -n 50`.
+solution:
+  summary: The root cause is an unhealthy `postgresql` service; repair it and verify active state.
+  files_changed: []
+  commands_run:
+  - systemctl is-active postgresql
+  reference_docs: database-fundamentals

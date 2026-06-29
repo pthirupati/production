@@ -1,28 +1,110 @@
 title: Lambda Function Timing Out
 slug: aws-lambda-timeout
 difficulty: medium
-category: AWS
-description: 'A Lambda function is timing out when processing large payloads. The function timeout is set to the default 3 seconds, which is insufficient for the workload, and the memory allocation is too low, slowing down execution further.'
-initial_state: 'Simulated AWS environment with a Lambda function configured with a 3-second timeout and 128 MB memory. Processing a large S3 object or complex computation consistently exceeds the timeout, resulting in Task timed out errors in CloudWatch Logs.'
+category: Fix
+description: 'CONTEXT: A team operating Terraform IaC needs you to resolve `Lambda Function Timing Out`
+  during a realistic incident. The business impact is reduced service reliability until the underlying
+  state is repaired.
+
+
+  ENVIRONMENT: You are working in FixitLab''s offline Terraform workspace with HCL files, state, and plan/apply
+  workflow. All tools run locally; no paid APIs or external cloud calls are required.
+
+
+  SYMPTOM / STARTING STATE: Simulated AWS environment with a Lambda function configured with a 3-second
+  timeout and 128 MB memory. Processing a large S3 object or complex computation consistently exceeds
+  the timeout, resulting in Task timed out errors in CloudWatch Logs. A Lambda function is timing out
+  when processing large payloads. The function timeout is set to the default 3 seconds, which is insufficient
+  for the workload, and the memory allocation is too low, slowing down execution further.
+
+
+  OBJECTIVE: Review the Lambda configuration and CloudWatch Logs to confirm timeout errors; Increase the
+  function timeout to an appropriate value (e.g., 60 seconds); Increase memory allocation to improve CPU
+  proportioning and reduce execution time. Success means `check.sh` exits successfully.
+
+
+  WHAT TO AVOID: Do not apply broad destructive changes, skip evidence gathering, or fake completion with
+  marker files — the checker validates real system state.'
+initial_state: Simulated AWS environment with a Lambda function configured with a 3-second timeout and
+  128 MB memory. Processing a large S3 object or complex computation consistently exceeds the timeout,
+  resulting in Task timed out errors in CloudWatch Logs.
 objectives:
-  - Review the Lambda configuration and CloudWatch Logs to confirm timeout errors
-  - Increase the function timeout to an appropriate value (e.g., 60 seconds)
-  - Increase memory allocation to improve CPU proportioning and reduce execution time
+- Review the Lambda configuration and CloudWatch Logs to confirm timeout errors
+- Increase the function timeout to an appropriate value (e.g., 60 seconds)
+- Increase memory allocation to improve CPU proportioning and reduce execution time
 lab_mode: simulation
 simulation_type: aws
 time_limit: 1800
 max_score: 100
 is_free: false
 hints:
-  - content: 'Run: aws lambda get-function-configuration --function-name <name> to see current Timeout and MemorySize settings.'
-    cost: 10
-    order: 1
-  - content: 'Use aws lambda update-function-configuration --function-name <name> --timeout 60 --memory-size 512 to increase both values.'
-    cost: 15
-    order: 2
-  - content: 'Lambda CPU scales proportionally with memory. Doubling memory from 128 to 256 MB roughly doubles CPU allocation and can cut execution time significantly.'
-    cost: 20
-    order: 3
+- order: 1
+  cost: 0
+  content: 'Where to look: Review the Lambda configuration and CloudWatch Logs to confirm timeout errors'
+- order: 2
+  cost: 25
+  content: 'Diagnostic steps:
+
+    1. Increase the function timeout to an appropriate value (e.g., 60 seconds)
+
+    2. Increase memory allocation to improve CPU proportioning and reduce execution time'
+- order: 3
+  cost: 50
+  content: 'Exact fix + verification:
+
+    1. Increase memory allocation to improve CPU proportioning and reduce execution time.
+
+    2. Re-run the lab checker (`check.sh` or Check Solution).
+
+    3. Confirm every scenario objective is satisfied.
+
+
+    WHY: the grader validates real state — marker files are ignored.'
 requires_companion_hosts: false
 dual_terminal: false
 jira_priority: Medium
+technology: terraform
+summary: Complete the lambda function timing out terraform lab and verify success with the checker
+estimated_minutes: 30
+xp_reward: 100
+prerequisites:
+- Basic terraform literacy
+tags:
+- fix
+- hands-on
+- terraform
+linked_tutorial: terraform-fundamentals
+what_you_will_learn:
+- Review the Lambda configuration and CloudWatch Logs to confirm timeout errors
+- Increase the function timeout to an appropriate value (e.g., 60 seconds)
+- Increase memory allocation to improve CPU proportioning and reduce execution time
+environment:
+  nodes:
+  - role: primary
+    os: FixitLab Terraform workspace
+    hostname: lab-primary
+    ip: 127.0.0.1
+    specs: local offline simulation
+  pre_installed:
+  - bash
+  - coreutils
+  - terraform
+  credentials:
+  - user: root
+    password: lab123
+tasks:
+- id: task_1
+  title: Lambda Function Timing Out
+  description: Restore healthy behavior for Lambda Function Timing Out by investigating the failure, applying
+    the smallest safe fix, and validating the outcome.
+  background: 'This terraform lab teaches systematic troubleshooting: observe, hypothesize, change, verify.'
+  validation:
+    type: custom_script
+    script: check.sh
+    error_message: Validation did not pass. Re-read the objectives and Hint 2 diagnostic steps.
+solution:
+  summary: Identify the misconfiguration affecting this terraform lab and apply the minimal fix.
+  files_changed: []
+  commands_run:
+  - bash check.sh
+  reference_docs: terraform-fundamentals

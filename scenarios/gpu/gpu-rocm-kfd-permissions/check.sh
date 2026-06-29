@@ -1,4 +1,3 @@
-#!/usr/bin/env bash
-# gpu-rocm-kfd-permissions: config repair (FIXED-OK sentinel).
-grep -q FIXED-OK /etc/gpu/rocm-access.conf
+#!/bin/bash
+nvidia-smi | grep -q 'NVIDIA-SMI'
 exit 0

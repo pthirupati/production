@@ -1,7 +1,7 @@
 slug: ansible-awx-credentials
 title: Attach Machine Credential to AWX Template
-technology: Ansible
-category: AWX / Tower
+technology: ansible
+category: Fix
 difficulty: medium
 scenario_type: fix
 time_limit: 900
@@ -10,21 +10,97 @@ lab_mode: simulation
 simulation_type: ansible-awx
 infrastructure_type: simulation
 is_free: false
-description: >-
-  A job template fails because the Machine SSH credential is not attached. Fix credential assignment
-  in AWX so launches can authenticate to managed hosts.
+description: 'CONTEXT: A team operating Ansible automation needs you to resolve `Attach Machine Credential
+  to AWX Template` during a realistic incident. The business impact is reduced service reliability until
+  the underlying state is repaired.
+
+
+  ENVIRONMENT: You are working in FixitLab''s offline Ansible control node with inventory, playbooks,
+  roles, and ansible-playbook. All tools run locally; no paid APIs or external cloud calls are required.
+
+
+  SYMPTOM / STARTING STATE: AWX with Machine credential defined but not linked to the failing job template.
+  A job template fails because the Machine SSH credential is not attached. Fix credential assignment in
+  AWX so launches can authenticate to managed hosts.
+
+
+  OBJECTIVE: Open AWX Credentials section; Attach the Machine credential to the failing template; Validate
+  the template can launch. Success means `check.sh` exits successfully.
+
+
+  WHAT TO AVOID: Do not apply broad destructive changes, skip evidence gathering, or fake completion with
+  marker files — the checker validates real system state.'
 objectives:
-  - Open AWX Credentials section
-  - Attach the Machine credential to the failing template
-  - Validate the template can launch
+- Open AWX Credentials section
+- Attach the Machine credential to the failing template
+- Validate the template can launch
 initial_state: AWX with Machine credential defined but not linked to the failing job template.
 hints:
-  - order: 1
-    cost: 10
-    content: Open **Credentials** and use **Attach Machine credential to template**.
-  - order: 2
-    cost: 15
-    content: Launch the template from **Templates** to confirm SSH auth works.
-  - order: 3
-    cost: 20
-    content: Click **Check** when the credential issue is resolved.
+- order: 1
+  cost: 0
+  content: 'Where to look: Open AWX Credentials section'
+- order: 2
+  cost: 25
+  content: 'Diagnostic steps:
+
+    1. Attach the Machine credential to the failing template
+
+    2. Validate the template can launch'
+- order: 3
+  cost: 50
+  content: 'Exact fix + verification:
+
+    1. Validate the template can launch.
+
+    2. Re-run the lab checker (`check.sh` or Check Solution).
+
+    3. Confirm every scenario objective is satisfied.
+
+
+    WHY: the grader validates real state — marker files are ignored.'
+summary: Complete the attach machine credential to awx template ansible lab and verify success with the
+  checker
+estimated_minutes: 15
+xp_reward: 100
+prerequisites:
+- Basic ansible literacy
+tags:
+- ansible
+- fix
+- hands-on
+linked_tutorial: ansible-fundamentals
+what_you_will_learn:
+- Open AWX Credentials section
+- Attach the Machine credential to the failing template
+- Validate the template can launch
+environment:
+  nodes:
+  - role: primary
+    os: FixitLab Ansible control node
+    hostname: lab-primary
+    ip: 127.0.0.1
+    specs: local offline simulation
+  pre_installed:
+  - ansible
+  - ansible-playbook
+  - bash
+  - coreutils
+  credentials:
+  - user: root
+    password: lab123
+tasks:
+- id: task_1
+  title: Attach Machine Credential to AWX Template
+  description: Restore healthy behavior for Attach Machine Credential to AWX Template by investigating
+    the failure, applying the smallest safe fix, and validating the outcome.
+  background: 'This ansible lab teaches systematic troubleshooting: observe, hypothesize, change, verify.'
+  validation:
+    type: custom_script
+    script: check.sh
+    error_message: Validation did not pass. Re-read the objectives and Hint 2 diagnostic steps.
+solution:
+  summary: Identify the misconfiguration affecting this ansible lab and apply the minimal fix.
+  files_changed: []
+  commands_run:
+  - bash check.sh
+  reference_docs: ansible-fundamentals

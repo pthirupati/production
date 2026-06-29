@@ -1,9 +1,26 @@
 title: Implement binarySearch
 slug: js-impl-binary-search
-category: JavaScript Development
-description: 'Implement binarySearch(sortedArr, target): return the index of target in an ascending-sorted
-  array, or -1 if absent. Must be O(log n) (halve the search range each step), not a linear scan. The
-  stub is empty so tests fail.'
+category: Build
+description: 'CONTEXT: A team operating JavaScript needs you to resolve `Implement binarySearch` during
+  a realistic incident. The business impact is reduced service reliability until the underlying state
+  is repaired.
+
+
+  ENVIRONMENT: You are working in FixitLab''s offline JavaScript practice project with modules, browser
+  console, and Node tooling. All tools run locally; no paid APIs or external cloud calls are required.
+
+
+  SYMPTOM / STARTING STATE: Implement binarySearch(sortedArr, target): return the index of target in an
+  ascending-sorted array, or -1 if absent. Must be O(log n) (halve the search range each step), not a
+  linear scan. The stub is empty so tests fail.
+
+
+  OBJECTIVE: Maintain low/high bounds and inspect the midpoint; Halve the range based on the comparison;
+  Return the index, or -1 when not found. Success means all hidden tests pass.
+
+
+  WHAT TO AVOID: Do not apply broad destructive changes, skip evidence gathering, or fake completion with
+  marker files — the checker validates real system state.'
 difficulty: medium
 scenario_type: do
 lab_mode: simulation
@@ -21,64 +38,162 @@ objectives:
 initial_state: 'Implement binarySearch(sortedArr, target): return the index of target in an ascending-sorted
   array, or -1 if absent. Must be O(log n) (halve the search range each step), not a linear scan. The
   stub is empty so tests fail.'
-solution_explanation: |
-  Binary search keeps a [low, high] window, compares the midpoint to the target, and discards half the range each iteration, finding the index in O(log n) or returning -1 when the window closes.
+solution_explanation: 'Binary search keeps a [low, high] window, compares the midpoint to the target,
+  and discards half the range each iteration, finding the index in O(log n) or returning -1 when the window
+  closes.
+
+  '
 coding_spec:
   language: javascript
   entrypoint: solution.js
   kind: impl
-  instructions: |
-    Implement binarySearch(sortedArr, target) -> index or -1.
-      binarySearch([1,3,5,7,9], 7) -> 3; binarySearch([1,3,5], 4) -> -1
-    Click Run to try it, then Check Solution to grade against all tests.
+  instructions: "Implement binarySearch(sortedArr, target) -> index or -1.\n  binarySearch([1,3,5,7,9],\
+    \ 7) -> 3; binarySearch([1,3,5], 4) -> -1\nClick Run to try it, then Check Solution to grade against\
+    \ all tests.\n"
   files:
   - path: solution.js
-    content: |
-      function binarySearch(sortedArr, target) {
-        // TODO: return index of target via binary search, or -1
-      }
+    content: "function binarySearch(sortedArr, target) {\n  // TODO: return index of target via binary\
+      \ search, or -1\n}\n"
     readonly: false
   visible_tests:
   - name: finds middle
-    code: |
-      assert(binarySearch([1,3,5,7,9], 7) === 3, binarySearch([1,3,5,7,9], 7));
+    code: 'assert(binarySearch([1,3,5,7,9], 7) === 3, binarySearch([1,3,5,7,9], 7));
+
+      '
   - name: absent is -1
-    code: |
-      assert(binarySearch([1,3,5], 4) === -1);
+    code: 'assert(binarySearch([1,3,5], 4) === -1);
+
+      '
   hidden_tests:
   - name: first element
-    code: |
-      assert(binarySearch([2,4,6], 2) === 0);
+    code: 'assert(binarySearch([2,4,6], 2) === 0);
+
+      '
   - name: last element
-    code: |
-      assert(binarySearch([2,4,6,8], 8) === 3);
+    code: 'assert(binarySearch([2,4,6,8], 8) === 3);
+
+      '
   - name: empty array
-    code: |
-      assert(binarySearch([], 1) === -1);
+    code: 'assert(binarySearch([], 1) === -1);
+
+      '
   - name: single found
-    code: |
-      assert(binarySearch([5], 5) === 0);
+    code: 'assert(binarySearch([5], 5) === 0);
+
+      '
   - name: single absent
-    code: |
-      assert(binarySearch([5], 9) === -1);
+    code: 'assert(binarySearch([5], 9) === -1);
+
+      '
   - name: below range
-    code: |
-      assert(binarySearch([10,20,30], 5) === -1);
+    code: 'assert(binarySearch([10,20,30], 5) === -1);
+
+      '
   - name: all positions
-    code: |
-      const a = [1,2,3,4,5,6,7,8];
+    code: 'const a = [1,2,3,4,5,6,7,8];
+
       let ok = true;
+
       for (let i = 0; i < a.length; i++) { if (binarySearch(a, a[i]) !== i) ok = false; }
-      assert(ok, 'wrong index somewhere');
+
+      assert(ok, ''wrong index somewhere'');
+
+      '
   timeout: 8
 hints:
 - order: 1
-  cost: 10
-  content: Track low and high indices bounding the remaining search range.
+  cost: 0
+  content: 'Where to look: Open `solution.js`, read the instructions, and run the visible tests to see
+    which assertion fails first.'
 - order: 2
-  cost: 20
-  content: 'Compare the middle element to target: equal -> return mid; smaller -> search right; larger
-    -> search left.'
+  cost: 25
+  content: 'Diagnostic steps:
+
+    1. Click Run and read the traceback — note line number and actual vs expected values.
+
+    2. Reproduce the failure with the smallest input from a visible test.
+
+    3. Compare your implementation to the bug described in the lab prompt.'
 - order: 3
-  cost: 30
-  content: Loop while low <= high; return -1 if the range empties.
+  cost: 50
+  content: 'Exact fix + verification:
+
+    1. Return the index, or -1 when not found.
+
+    2. Re-run the lab checker (`check.sh` or Check Solution).
+
+    3. Confirm every scenario objective is satisfied.
+
+
+    WHY: the grader validates real state — marker files are ignored.'
+technology: javascript
+summary: Complete the implement binarysearch javascript lab and verify success with the checker
+estimated_minutes: 25
+xp_reward: 100
+prerequisites:
+- Basic javascript literacy
+tags:
+- do
+- hands-on
+- javascript
+linked_tutorial: javascript-fundamentals
+what_you_will_learn:
+- Maintain low/high bounds and inspect the midpoint
+- Halve the range based on the comparison
+- Return the index, or -1 when not found
+environment:
+  nodes:
+  - role: primary
+    os: FixitLab JavaScript practice project
+    hostname: lab-primary
+    ip: 127.0.0.1
+    specs: local offline simulation
+  pre_installed:
+  - bash
+  - coreutils
+  - javascript
+  - journalctl
+  - systemctl
+  credentials:
+  - user: root
+    password: lab123
+tasks:
+- id: task_1
+  title: Implement binarySearch
+  description: Restore healthy behavior for Implement binarySearch by investigating the failure, applying
+    the smallest safe fix, and validating the outcome.
+  background: 'This javascript lab teaches systematic troubleshooting: observe, hypothesize, change, verify.'
+  validation:
+    type: custom_script
+    script: hidden_tests
+    error_message: One or more hidden tests failed. Read the public test output, fix your solution, and
+      submit again.
+solution:
+  summary: The solution passes all hidden tests by implementing the required behavior in code.
+  files_changed: []
+  commands_run: []
+  reference_docs: javascript-fundamentals
+guided_mode:
+  enabled: true
+  steps:
+  - step: 1
+    title: Inspect current state
+    instruction: Run a read-only diagnostic before changing anything.
+    command: check.sh
+    expected_output: Output shows the current failure mode
+    explanation: Evidence-first troubleshooting avoids guessing.
+    next_on: command_success
+  - step: 2
+    title: Apply the minimal fix
+    instruction: Make one reversible change aligned with the objectives.
+    command: '# your fix command here'
+    expected_output: State moves toward the objective
+    explanation: Small changes make rollback easy if the hypothesis was wrong.
+    next_on: command_success
+  - step: 3
+    title: Verify with the grader
+    instruction: Run the same verification the checker uses.
+    command: check.sh
+    expected_output: all hidden tests pass
+    explanation: The lab passes only when real state is healthy.
+    next_on: command_success

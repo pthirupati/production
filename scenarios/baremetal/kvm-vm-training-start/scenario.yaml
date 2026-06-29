@@ -1,7 +1,7 @@
 slug: kvm-vm-training-start
 title: Start Shut-Off KVM Training VM
-technology: Bare Metal
-category: KVM
+technology: baremetal
+category: Fix
 difficulty: easy
 scenario_type: fix
 time_limit: 900
@@ -10,21 +10,94 @@ lab_mode: simulation
 simulation_type: baremetal
 infrastructure_type: simulation
 is_free: false
-description: >-
-  The train-vm-2 KVM guest is shut off after maintenance. Power it on and confirm
-  it is reachable on the libvirt network.
+description: 'CONTEXT: A team operating bare metal operations needs you to resolve `Start Shut-Off KVM
+  Training VM` during a realistic incident. The business impact is reduced service reliability until the
+  underlying state is repaired.
+
+
+  ENVIRONMENT: You are working in FixitLab''s offline physical server lab with IPMI, RAID, BIOS, and out-of-band
+  console. All tools run locally; no paid APIs or external cloud calls are required.
+
+
+  SYMPTOM / STARTING STATE: KVM VM train-vm-2 is shut off. The train-vm-2 KVM guest is shut off after
+  maintenance. Power it on and confirm it is reachable on the libvirt network.
+
+
+  OBJECTIVE: Open Bare Metal console → KVM tab; Start train-vm-2; Verify the VM state is running with
+  an IP. Success means `check.sh` exits successfully.
+
+
+  WHAT TO AVOID: Do not apply broad destructive changes, skip evidence gathering, or fake completion with
+  marker files — the checker validates real system state.'
 objectives:
-  - Open Bare Metal console → KVM tab
-  - Start train-vm-2
-  - Verify the VM state is running with an IP
+- Open Bare Metal console → KVM tab
+- Start train-vm-2
+- Verify the VM state is running with an IP
 initial_state: KVM VM train-vm-2 is shut off.
 hints:
-  - order: 1
-    cost: 10
-    content: "**Open Bare Metal** → **KVM** → select train-vm-2."
-  - order: 2
-    cost: 15
-    content: Click **Start** and wait for running state.
-  - order: 3
-    cost: 20
-    content: Click **Check**.
+- order: 1
+  cost: 0
+  content: 'Where to look: Open Bare Metal console → KVM tab'
+- order: 2
+  cost: 25
+  content: 'Diagnostic steps:
+
+    1. Verify the VM state is running with an IP'
+- order: 3
+  cost: 50
+  content: 'Exact fix + verification:
+
+    1. Verify the VM state is running with an IP.
+
+    2. Re-run the lab checker (`check.sh` or Check Solution).
+
+    3. Confirm every scenario objective is satisfied.
+
+
+    WHY: the grader validates real state — marker files are ignored.'
+summary: Complete the start shut-off kvm training vm baremetal lab and verify success with the checker
+estimated_minutes: 15
+xp_reward: 100
+prerequisites:
+- Basic baremetal literacy
+tags:
+- baremetal
+- fix
+- hands-on
+linked_tutorial: baremetal-fundamentals
+what_you_will_learn:
+- Open Bare Metal console → KVM tab
+- Start train-vm-2
+- Verify the VM state is running with an IP
+environment:
+  nodes:
+  - role: primary
+    os: FixitLab physical server lab
+    hostname: lab-primary
+    ip: 127.0.0.1
+    specs: local offline simulation
+  pre_installed:
+  - baremetal
+  - bash
+  - coreutils
+  - journalctl
+  - systemctl
+  credentials:
+  - user: root
+    password: lab123
+tasks:
+- id: task_1
+  title: Start Shut-Off KVM Training VM
+  description: Restore healthy behavior for Start Shut-Off KVM Training VM by investigating the failure,
+    applying the smallest safe fix, and validating the outcome.
+  background: 'This baremetal lab teaches systematic troubleshooting: observe, hypothesize, change, verify.'
+  validation:
+    type: custom_script
+    script: check.sh
+    error_message: Validation did not pass. Re-read the objectives and Hint 2 diagnostic steps.
+solution:
+  summary: Identify the misconfiguration affecting this baremetal lab and apply the minimal fix.
+  files_changed: []
+  commands_run:
+  - bash check.sh
+  reference_docs: baremetal-fundamentals

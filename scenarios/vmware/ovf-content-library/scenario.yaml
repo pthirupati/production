@@ -1,10 +1,29 @@
 title: Deploy VM from Content Library OVF
 slug: vmware-ovf-content-library
-category: VMware vSphere
-description: A new Linux VM should be deployed from the FixitLab content library's OVF template (tiny-linux.ova)
-  using the Deploy OVF wizard, but it hasn't been done yet. Deploying from the content library is the
-  standard, repeatable way to stamp out VMs from a known-good image. Run the OVF deploy wizard to create
-  the VM on the cluster.
+category: Fix
+description: 'CONTEXT: A team operating VMware vSphere needs you to resolve `Deploy VM from Content Library
+  OVF` during a realistic incident. The business impact is reduced service reliability until the underlying
+  state is repaired.
+
+
+  ENVIRONMENT: You are working in FixitLab''s offline vSphere lab with VMs, datastores, vCenter, and ESXi
+  tasks. All tools run locally; no paid APIs or external cloud calls are required.
+
+
+  SYMPTOM / STARTING STATE: vCenter with a content library containing OVF templates (including tiny-linux.ova).
+  No VM has been deployed from it yet. A new Linux VM should be deployed from the FixitLab content library''s
+  OVF template (tiny-linux.ova) using the Deploy OVF wizard, but it hasn''t been done yet. Deploying from
+  the content library is the standard, repeatable way to stamp out VMs from a known-good image. Run the
+  OVF deploy wizard to create the VM on the cluster.
+
+
+  OBJECTIVE: Open the content library and locate the tiny-linux OVF template; Deploy tiny-linux.ova to
+  the cluster via the OVF wizard; Verify the new VM is created in inventory. Success means `check.sh`
+  exits successfully.
+
+
+  WHAT TO AVOID: Do not apply broad destructive changes, skip evidence gathering, or fake completion with
+  marker files — the checker validates real system state.'
 difficulty: easy
 lab_mode: simulation
 simulation_type: vmware
@@ -20,13 +39,71 @@ initial_state: vCenter with a content library containing OVF templates (includin
   VM has been deployed from it yet.
 hints:
 - order: 1
-  cost: 10
-  content: Open the content library (the O button on the inventory toolbar in the simulator) and find
-    tiny-linux.ova.
+  cost: 0
+  content: 'Where to look: Open the content library and locate the tiny-linux OVF template'
 - order: 2
-  cost: 15
-  content: Select tiny-linux.ova -> Deploy. In the wizard, choose a name, the target cluster, and a datastore/network.
+  cost: 25
+  content: 'Diagnostic steps:
+
+    1. Deploy tiny-linux.ova to the cluster via the OVF wizard
+
+    2. Verify the new VM is created in inventory'
 - order: 3
-  cost: 20
-  content: Finish the wizard and confirm the new VM appears in the cluster's inventory (power it on if
-    the task requires).
+  cost: 50
+  content: 'Exact fix + verification:
+
+    1. Verify the new VM is created in inventory.
+
+    2. Re-run the lab checker (`check.sh` or Check Solution).
+
+    3. Confirm every scenario objective is satisfied.
+
+
+    WHY: the grader validates real state — marker files are ignored.'
+technology: vmware
+summary: Complete the deploy vm from content library ovf vmware lab and verify success with the checker
+estimated_minutes: 10
+xp_reward: 100
+prerequisites:
+- Basic vmware literacy
+tags:
+- fix
+- hands-on
+- vmware
+linked_tutorial: vmware-fundamentals
+what_you_will_learn:
+- Open the content library and locate the tiny-linux OVF template
+- Deploy tiny-linux.ova to the cluster via the OVF wizard
+- Verify the new VM is created in inventory
+environment:
+  nodes:
+  - role: primary
+    os: FixitLab vSphere lab
+    hostname: lab-primary
+    ip: 127.0.0.1
+    specs: local offline simulation
+  pre_installed:
+  - bash
+  - coreutils
+  - journalctl
+  - systemctl
+  - vmware
+  credentials:
+  - user: root
+    password: lab123
+tasks:
+- id: task_1
+  title: Deploy VM from Content Library OVF
+  description: Restore healthy behavior for Deploy VM from Content Library OVF by investigating the failure,
+    applying the smallest safe fix, and validating the outcome.
+  background: 'This vmware lab teaches systematic troubleshooting: observe, hypothesize, change, verify.'
+  validation:
+    type: custom_script
+    script: check.sh
+    error_message: Validation did not pass. Re-read the objectives and Hint 2 diagnostic steps.
+solution:
+  summary: Identify the misconfiguration affecting this vmware lab and apply the minimal fix.
+  files_changed: []
+  commands_run:
+  - bash check.sh
+  reference_docs: vmware-fundamentals

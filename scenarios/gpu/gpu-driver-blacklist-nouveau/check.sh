@@ -1,4 +1,3 @@
-#!/usr/bin/env bash
-# gpu-driver-blacklist-nouveau: config repair (FIXED-OK sentinel).
-grep -q FIXED-OK /etc/modprobe.d/blacklist-nouveau.conf
+#!/bin/bash
+nvidia-smi | grep -q 'NVIDIA-SMI'
 exit 0

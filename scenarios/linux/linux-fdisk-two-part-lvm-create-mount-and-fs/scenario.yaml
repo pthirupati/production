@@ -1,53 +1,127 @@
 title: 'Two fdisk Partitions: One for LVM, One Plain Filesystem'
 slug: linux-fdisk-two-part-lvm-create-mount-and-fs
 difficulty: hard
-category: 'Storage / Partitioning'
+category: Fix
 technology: linux
-description: |
-  A 30G disk /dev/sdc is attached and raw. You must split it into TWO primary partitions
-  with fdisk and provision them differently:
-    - /dev/sdc1 becomes part of LVM — initialise it as a physical volume, create the
-      volume group vgdata on it, carve a logical volume named lvdata, format it, and
-      mount it at /data.
-    - /dev/sdc2 becomes a plain standalone filesystem — format it directly (no LVM) and
-      mount it at /mnt/data2.
-  Both must end up mounted and recorded in /etc/fstab. The lab only passes when the LV
-  lvdata exists, /data is mounted from the LV, and the plain /dev/sdc2 filesystem is
-  mounted and persisted.
-initial_state: |
-  Simulated RHEL 9 server. lsblk shows /dev/sdc (30G) with no partitions. There is no
+description: "CONTEXT: A team operating Linux administration needs you to resolve `Two fdisk Partitions:\
+  \ One for LVM, One Plain Filesystem` during a realistic incident. The business impact is reduced service\
+  \ reliability until the underlying state is repaired.\n\nENVIRONMENT: You are working in FixitLab's\
+  \ offline Linux practice server with terminal and config files under /etc and /var. All tools run locally;\
+  \ no paid APIs or external cloud calls are required.\n\nSYMPTOM / STARTING STATE: Simulated RHEL 9 server.\
+  \ lsblk shows /dev/sdc (30G) with no partitions. There is no\nvgdata volume group, no lvdata LV, /data\
+  \ is empty, and /mnt/data2 is empty. /etc/fstab\nhas no entries for either device. A 30G disk /dev/sdc\
+  \ is attached and raw. You must split it into TWO primary partitions\nwith fdisk and provision them\
+  \ differently:\n  - /dev/sdc1 becomes part of LVM — initialise it as a physical volume, create the\n\
+  \    volume group vgdata on it, carve a logical volume named lvdata, format it, and\n    mount it at\
+  \ /data.\n  - /dev/sdc2 becomes a plain standalone filesystem — format it directly (no LVM) and\n  \
+  \  mount it at /mnt/data2.\nBoth must end up mounted and recorded in /etc/fstab. The lab only passes\
+  \ when the LV\nlvdata exists, /data is mounted from the LV, and the plain /dev/sdc2 filesystem is\n\
+  mounted and persisted.\n\nOBJECTIVE: Create two primary partitions on /dev/sdc with fdisk (/dev/sdc1\
+  \ and /dev/sdc2); {'LVM leg': 'pvcreate /dev/sdc1; vgcreate vgdata /dev/sdc1; lvcreate -L 15G -n lvdata\
+  \ vgdata'}; {'Format and mount the LV': 'mkfs.xfs /dev/vgdata/lvdata; mount it at /data'}. Success means\
+  \ `check.sh` exits successfully.\n\nWHAT TO AVOID: Do not apply broad destructive changes, skip evidence\
+  \ gathering, or fake completion with marker files — the checker validates real system state."
+initial_state: 'Simulated RHEL 9 server. lsblk shows /dev/sdc (30G) with no partitions. There is no
+
   vgdata volume group, no lvdata LV, /data is empty, and /mnt/data2 is empty. /etc/fstab
+
   has no entries for either device.
+
+  '
 objectives:
-  - Create two primary partitions on /dev/sdc with fdisk (/dev/sdc1 and /dev/sdc2)
-  - LVM leg: pvcreate /dev/sdc1; vgcreate vgdata /dev/sdc1; lvcreate -L 15G -n lvdata vgdata
-  - Format and mount the LV: mkfs.xfs /dev/vgdata/lvdata; mount it at /data
-  - Plain leg: mkfs.ext4 /dev/sdc2; mount it at /mnt/data2
-  - Add both mounts to /etc/fstab so they come back after a reboot
+- Create two primary partitions on /dev/sdc with fdisk (/dev/sdc1 and /dev/sdc2)
+- LVM leg: pvcreate /dev/sdc1; vgcreate vgdata /dev/sdc1; lvcreate -L 15G -n lvdata vgdata
+- Format and mount the LV: mkfs.xfs /dev/vgdata/lvdata; mount it at /data
+- Plain leg: mkfs.ext4 /dev/sdc2; mount it at /mnt/data2
+- Add both mounts to /etc/fstab so they come back after a reboot
 lab_mode: simulation
 simulation_type: generic
 time_limit: 1500
 max_score: 100
 is_free: false
 topics_covered:
-  - fdisk
-  - lvm
-  - pvcreate
-  - vgcreate
-  - lvcreate
-  - mkfs
-  - mount
-  - fstab
+- fdisk
+- lvm
+- pvcreate
+- vgcreate
+- lvcreate
+- mkfs
+- mount
+- fstab
 hints:
-  - content: 'Start with two partitions: run fdisk /dev/sdc twice (n, p, sizes, w) to create /dev/sdc1 and /dev/sdc2. Confirm with lsblk.'
-    cost: 10
-    order: 1
-  - content: 'Build the LVM stack on the FIRST partition only: pvcreate /dev/sdc1; vgcreate vgdata /dev/sdc1; lvcreate -L 15G -n lvdata vgdata; mkfs.xfs /dev/vgdata/lvdata; mount /dev/vgdata/lvdata /data. Verify with pvs, vgs, lvs.'
-    cost: 20
-    order: 2
-  - content: 'The SECOND partition is a plain filesystem (no LVM): mkfs.ext4 /dev/sdc2; mkdir -p /mnt/data2; mount /dev/sdc2 /mnt/data2. Add both to /etc/fstab and verify with mount and lvs.'
-    cost: 25
-    order: 3
+- order: 1
+  cost: 0
+  content: 'Where to look: Run `df -h` and `du -xh /var /tmp /home | sort -h | tail -20` for large paths.'
+- order: 2
+  cost: 25
+  content: 'Diagnostic steps:
+
+    1. Find which mount is 100% — often `/` or `/var`.
+
+    2. `journalctl --disk-usage` and old logs under `/var/log`.
+
+    3. Look for core dumps, temp files, or oversized application data.'
+- order: 3
+  cost: 50
+  content: 'Exact fix + verification:
+
+    1. Remove or rotate the largest safe files (logs, caches, old packages).
+
+    2. `df -h` should show free space on the affected mount.
+
+    3. Retry the command that failed with ''No space left on device''.
+
+
+    WHY: many services fail cryptically when disk is full.'
 requires_companion_hosts: false
 dual_terminal: false
 jira_priority: Medium
+summary: 'Complete the two fdisk partitions: one for lvm, one plain filesystem linux lab and verify success
+  with the checker'
+estimated_minutes: 25
+xp_reward: 100
+prerequisites:
+- Basic linux literacy
+tags:
+- fix
+- hands-on
+- linux
+linked_tutorial: linux-fundamentals
+what_you_will_learn:
+- Create two primary partitions on /dev/sdc with fdisk (/dev/sdc1 and /dev/sdc2)
+- '{''LVM leg'': ''pvcreate /dev/sdc1; vgcreate vgdata /dev/sdc1; lvcreate -L 15G -n lvdata vgdata''}'
+- '{''Format and mount the LV'': ''mkfs.xfs /dev/vgdata/lvdata; mount it at /data''}'
+- '{''Plain leg'': ''mkfs.ext4 /dev/sdc2; mount it at /mnt/data2''}'
+- Add both mounts to /etc/fstab so they come back after a reboot
+environment:
+  nodes:
+  - role: primary
+    os: FixitLab Linux practice server
+    hostname: lab-primary
+    ip: 127.0.0.1
+    specs: local offline simulation
+  pre_installed:
+  - bash
+  - coreutils
+  - journalctl
+  - linux
+  - systemctl
+  credentials:
+  - user: root
+    password: lab123
+tasks:
+- id: task_1
+  title: 'Two fdisk Partitions: One for LVM, One Plain Filesystem'
+  description: 'Restore healthy behavior for Two fdisk Partitions: One for LVM, One Plain Filesystem by
+    investigating the failure, applying the smallest safe fix, and validating the outcome.'
+  background: 'This linux lab teaches systematic troubleshooting: observe, hypothesize, change, verify.'
+  validation:
+    type: custom_script
+    script: check.sh
+    error_message: Validation did not pass. Re-read the objectives and Hint 2 diagnostic steps.
+solution:
+  summary: Identify the misconfiguration affecting this linux lab and apply the minimal fix.
+  files_changed: []
+  commands_run:
+  - bash check.sh
+  reference_docs: linux-fundamentals

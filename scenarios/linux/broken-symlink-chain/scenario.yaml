@@ -2,8 +2,8 @@ title: Broken Symbolic Link Chain
 slug: broken-symlink-chain
 lab_mode: simulation
 simulation_type: generic
-technology: Linux
-category: Filesystem
+technology: linux
+category: Fix
 difficulty: easy
 time_limit: 600
 max_score: 100
@@ -11,9 +11,29 @@ infrastructure_type: docker
 docker_privileged: false
 jira_priority: Medium
 topics_covered: Q17 soft links — readlink, ln -sf
-description: The application launcher /usr/local/bin/apptool is a broken (dangling) symlink — it points
-  at a target that no longer exists, so running apptool fails with "No such file or directory". Trace
-  the symlink, find where the real binary lives, and recreate the link to the correct target.
+description: 'CONTEXT: A team operating Linux administration needs you to resolve `Broken Symbolic Link
+  Chain` during a realistic incident. The business impact is reduced service reliability until the underlying
+  state is repaired.
+
+
+  ENVIRONMENT: You are working in FixitLab''s offline Linux practice server with terminal and config files
+  under /etc and /var. All tools run locally; no paid APIs or external cloud calls are required.
+
+
+  SYMPTOM / STARTING STATE: Linux server where /usr/local/bin/apptool is a dangling symlink whose target
+  is missing, so invoking apptool fails. The application launcher /usr/local/bin/apptool is a broken (dangling)
+  symlink — it points at a target that no longer exists, so running apptool fails with "No such file or
+  directory". Trace the symlink, find where the real binary lives, and recreate the link to the correct
+  target.
+
+
+  OBJECTIVE: Confirm apptool is a broken symlink and find its current (missing) target; Locate the real
+  binary the link should point to; Recreate the symlink to the correct target and verify apptool runs.
+  Success means `check.sh` exits successfully.
+
+
+  WHAT TO AVOID: Do not apply broad destructive changes, skip evidence gathering, or fake completion with
+  marker files — the checker validates real system state.'
 objectives:
 - Confirm apptool is a broken symlink and find its current (missing) target
 - Locate the real binary the link should point to
@@ -22,14 +42,70 @@ initial_state: Linux server where /usr/local/bin/apptool is a dangling symlink w
   so invoking apptool fails.
 hints:
 - order: 1
-  cost: 10
-  content: 'Inspect the link: `ls -l /usr/local/bin/apptool` and `readlink /usr/local/bin/apptool` show
-    it points to a path that no longer exists. `readlink -f` traces the whole chain.'
+  cost: 0
+  content: 'Where to look: Confirm apptool is a broken symlink and find its current (missing) target'
 - order: 2
-  cost: 15
-  content: 'Find where the real binary is now: `find / -name apptool -type f 2>/dev/null` (or check the
-    package: `which`/`rpm -ql`/`dpkg -L`).'
+  cost: 25
+  content: 'Diagnostic steps:
+
+    1. Locate the real binary the link should point to
+
+    2. Recreate the symlink to the correct target and verify apptool runs'
 - order: 3
-  cost: 20
-  content: 'Recreate the link: `ln -sf /correct/path/to/apptool /usr/local/bin/apptool`, then run `apptool`
-    (or `apptool --version`) to confirm it executes.'
+  cost: 50
+  content: 'Exact fix + verification:
+
+    1. Recreate the symlink to the correct target and verify apptool runs.
+
+    2. Re-run the lab checker (`check.sh` or Check Solution).
+
+    3. Confirm every scenario objective is satisfied.
+
+
+    WHY: the grader validates real state — marker files are ignored.'
+summary: Complete the broken symbolic link chain linux lab and verify success with the checker
+estimated_minutes: 10
+xp_reward: 100
+prerequisites:
+- Basic linux literacy
+tags:
+- fix
+- hands-on
+- linux
+linked_tutorial: linux-fundamentals
+what_you_will_learn:
+- Confirm apptool is a broken symlink and find its current (missing) target
+- Locate the real binary the link should point to
+- Recreate the symlink to the correct target and verify apptool runs
+environment:
+  nodes:
+  - role: primary
+    os: FixitLab Linux practice server
+    hostname: lab-primary
+    ip: 127.0.0.1
+    specs: local offline simulation
+  pre_installed:
+  - bash
+  - coreutils
+  - journalctl
+  - linux
+  - systemctl
+  credentials:
+  - user: root
+    password: lab123
+tasks:
+- id: task_1
+  title: Broken Symbolic Link Chain
+  description: Restore healthy behavior for Broken Symbolic Link Chain by investigating the failure, applying
+    the smallest safe fix, and validating the outcome.
+  background: 'This linux lab teaches systematic troubleshooting: observe, hypothesize, change, verify.'
+  validation:
+    type: custom_script
+    script: check.sh
+    error_message: Validation did not pass. Re-read the objectives and Hint 2 diagnostic steps.
+solution:
+  summary: Identify the misconfiguration affecting this linux lab and apply the minimal fix.
+  files_changed: []
+  commands_run:
+  - bash check.sh
+  reference_docs: linux-fundamentals

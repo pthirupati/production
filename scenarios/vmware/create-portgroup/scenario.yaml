@@ -1,10 +1,29 @@
 title: Create Missing Distributed Port Group
 slug: vmware-create-portgroup
-category: VMware Networking
-description: A new VLAN segment, Prod-VLAN-200, is needed on the distributed switch dvSwitch-Prod, but
-  the corresponding distributed port group was never created. Until it exists, VMs cannot be attached
-  to that VLAN and can't be migrated to the correct network. Create the port group with the right VLAN
-  ID and confirm it appears in the network inventory.
+category: Fix
+description: 'CONTEXT: A team operating VMware vSphere needs you to resolve `Create Missing Distributed
+  Port Group` during a realistic incident. The business impact is reduced service reliability until the
+  underlying state is repaired.
+
+
+  ENVIRONMENT: You are working in FixitLab''s offline vSphere lab with VMs, datastores, vCenter, and ESXi
+  tasks. All tools run locally; no paid APIs or external cloud calls are required.
+
+
+  SYMPTOM / STARTING STATE: vCenter with dvSwitch-Prod present but missing the Prod-VLAN-200 distributed
+  port group, so VMs have no way to connect to that VLAN segment. A new VLAN segment, Prod-VLAN-200, is
+  needed on the distributed switch dvSwitch-Prod, but the corresponding distributed port group was never
+  created. Until it exists, VMs cannot be attached to that VLAN and can''t be migrated to the correct
+  network. Create the port group with the right VLAN ID and confirm it appears in the network inventory.
+
+
+  OBJECTIVE: Identify that the Prod-VLAN-200 port group is missing from dvSwitch-Prod; Create the distributed
+  port group with VLAN ID 200; Verify the new port group appears in the network inventory. Success means
+  `check.sh` exits successfully.
+
+
+  WHAT TO AVOID: Do not apply broad destructive changes, skip evidence gathering, or fake completion with
+  marker files — the checker validates real system state.'
 difficulty: easy
 lab_mode: simulation
 simulation_type: vmware
@@ -20,14 +39,71 @@ initial_state: vCenter with dvSwitch-Prod present but missing the Prod-VLAN-200 
   so VMs have no way to connect to that VLAN segment.
 hints:
 - order: 1
-  cost: 10
-  content: In the Networking inventory, select dvSwitch-Prod and confirm there's no Prod-VLAN-200 port
-    group under it.
+  cost: 0
+  content: 'Where to look: Identify that the Prod-VLAN-200 port group is missing from dvSwitch-Prod'
 - order: 2
-  cost: 15
-  content: 'Create it: right-click dvSwitch-Prod -> Distributed Port Group -> New Distributed Port Group
-    (or Actions -> New Port Group). Name it Prod-VLAN-200.'
+  cost: 25
+  content: 'Diagnostic steps:
+
+    1. Create the distributed port group with VLAN ID 200
+
+    2. Verify the new port group appears in the network inventory'
 - order: 3
-  cost: 20
-  content: Set the VLAN type to VLAN and VLAN ID 200, finish the wizard, and confirm Prod-VLAN-200 now
-    lists under dvSwitch-Prod so VMs can attach to it.
+  cost: 50
+  content: 'Exact fix + verification:
+
+    1. Verify the new port group appears in the network inventory.
+
+    2. Re-run the lab checker (`check.sh` or Check Solution).
+
+    3. Confirm every scenario objective is satisfied.
+
+
+    WHY: the grader validates real state — marker files are ignored.'
+technology: vmware
+summary: Complete the create missing distributed port group vmware lab and verify success with the checker
+estimated_minutes: 15
+xp_reward: 100
+prerequisites:
+- Basic vmware literacy
+tags:
+- fix
+- hands-on
+- vmware
+linked_tutorial: vmware-fundamentals
+what_you_will_learn:
+- Identify that the Prod-VLAN-200 port group is missing from dvSwitch-Prod
+- Create the distributed port group with VLAN ID 200
+- Verify the new port group appears in the network inventory
+environment:
+  nodes:
+  - role: primary
+    os: FixitLab vSphere lab
+    hostname: lab-primary
+    ip: 127.0.0.1
+    specs: local offline simulation
+  pre_installed:
+  - bash
+  - coreutils
+  - journalctl
+  - systemctl
+  - vmware
+  credentials:
+  - user: root
+    password: lab123
+tasks:
+- id: task_1
+  title: Create Missing Distributed Port Group
+  description: Restore healthy behavior for Create Missing Distributed Port Group by investigating the
+    failure, applying the smallest safe fix, and validating the outcome.
+  background: 'This vmware lab teaches systematic troubleshooting: observe, hypothesize, change, verify.'
+  validation:
+    type: custom_script
+    script: check.sh
+    error_message: Validation did not pass. Re-read the objectives and Hint 2 diagnostic steps.
+solution:
+  summary: Identify the misconfiguration affecting this vmware lab and apply the minimal fix.
+  files_changed: []
+  commands_run:
+  - bash check.sh
+  reference_docs: vmware-fundamentals

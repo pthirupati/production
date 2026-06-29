@@ -1,16 +1,36 @@
 title: Fix the Broken CI/CD Pipeline
 slug: cicd-pipeline-broken
-technology: Devops
-category: CI/CD
+technology: devops
+category: Fix
 difficulty: easy
 time_limit: 900
 max_score: 100
 infrastructure_type: docker
 jira_priority: Medium
-description: The deployment pipeline has failed since yesterday's merge. GitLab CI rejects the .gitlab-ci.yml
-  with YAML errors (bad indentation under script:) and the build references a Docker image whose tag is
-  mistyped, so jobs never run. Fix the YAML structure and the image reference so the pipeline parses and
-  the build succeeds.
+description: 'CONTEXT: A team operating DevOps delivery needs you to resolve `Fix the Broken CI/CD Pipeline`
+  during a realistic incident. The business impact is reduced service reliability until the underlying
+  state is repaired.
+
+
+  ENVIRONMENT: You are working in FixitLab''s offline CI/CD lab with git repos, pipelines, artifacts,
+  and runbooks. All tools run locally; no paid APIs or external cloud calls are required.
+
+
+  SYMPTOM / STARTING STATE: Repository at /opt/app with a broken .gitlab-ci.yml: inconsistent indentation
+  under the script: block and a typo''d Docker image tag cause the pipeline to fail validation/builds.
+  The deployment pipeline has failed since yesterday''s merge. GitLab CI rejects the .gitlab-ci.yml with
+  YAML errors (bad indentation under script:) and the build references a Docker image whose tag is mistyped,
+  so jobs never run. Fix the YAML structure and the image reference so the pipeline parses and the build
+  succeeds.
+
+
+  OBJECTIVE: Validate the .gitlab-ci.yml and find the YAML/indentation errors; Fix the indentation under
+  script: and correct the Docker image tag; Confirm the pipeline parses and the build job succeeds. Success
+  means `check.sh` exits successfully.
+
+
+  WHAT TO AVOID: Do not apply broad destructive changes, skip evidence gathering, or fake completion with
+  marker files — the checker validates real system state.'
 objectives:
 - Validate the .gitlab-ci.yml and find the YAML/indentation errors
 - 'Fix the indentation under script: and correct the Docker image tag'
@@ -19,14 +39,72 @@ initial_state: 'Repository at /opt/app with a broken .gitlab-ci.yml: inconsisten
   script: block and a typo''d Docker image tag cause the pipeline to fail validation/builds.'
 hints:
 - order: 1
-  cost: 10
-  content: 'Validate the YAML locally: `python3 -c "import yaml; yaml.safe_load(open(''.gitlab-ci.yml''))"`
-    (or GitLab''s CI Lint) to get the exact parse error.'
+  cost: 0
+  content: 'Where to look: Run `docker ps -a` and `docker logs <container>` for the failing container.'
 - order: 2
-  cost: 15
-  content: Fix the indentation under `script:` (YAML needs consistent spacing for the list items) and
-    check the `image:` line for a typo in the tag (e.g. `node:18-buster` not `node:18-bustr`).
+  cost: 25
+  content: 'Diagnostic steps:
+
+    1. `docker ps -a` — note Exited status and exit code.
+
+    2. `docker logs <name>` for the startup error.
+
+    3. Inspect the Dockerfile or `docker run` flags if the image is wrong.'
 - order: 3
-  cost: 20
-  content: Re-validate until the YAML parses cleanly, then push/re-run — the build job picks the correct
-    image and the pipeline succeeds.
+  cost: 50
+  content: 'Exact fix + verification:
+
+    1. Fix image, port mapping, volume, or env configuration.
+
+    2. `docker start <name>` or re-run with corrected flags.
+
+    3. Confirm `bash check.sh` shows the container Up.
+
+
+    WHY: the checker validates the container is actually running.'
+summary: Complete the fix the broken ci/cd pipeline devops lab and verify success with the checker
+estimated_minutes: 15
+xp_reward: 100
+prerequisites:
+- Basic devops literacy
+tags:
+- devops
+- fix
+- hands-on
+linked_tutorial: devops-fundamentals
+what_you_will_learn:
+- Validate the .gitlab-ci.yml and find the YAML/indentation errors
+- 'Fix the indentation under script: and correct the Docker image tag'
+- Confirm the pipeline parses and the build job succeeds
+environment:
+  nodes:
+  - role: primary
+    os: FixitLab CI/CD lab
+    hostname: lab-primary
+    ip: 127.0.0.1
+    specs: local offline simulation
+  pre_installed:
+  - bash
+  - coreutils
+  - devops
+  - journalctl
+  - systemctl
+  credentials:
+  - user: root
+    password: lab123
+tasks:
+- id: task_1
+  title: Fix the Broken CI/CD Pipeline
+  description: Restore healthy behavior for Fix the Broken CI/CD Pipeline by investigating the failure,
+    applying the smallest safe fix, and validating the outcome.
+  background: 'This devops lab teaches systematic troubleshooting: observe, hypothesize, change, verify.'
+  validation:
+    type: custom_script
+    script: check.sh
+    error_message: Validation did not pass. Re-read the objectives and Hint 2 diagnostic steps.
+solution:
+  summary: Identify the misconfiguration affecting this devops lab and apply the minimal fix.
+  files_changed: []
+  commands_run:
+  - bash check.sh
+  reference_docs: devops-fundamentals

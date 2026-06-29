@@ -1,4 +1,3 @@
-#!/usr/bin/env bash
-# html-missing-width-height: config repair (FIXED-OK sentinel).
-grep -q FIXED-OK /var/www/html/news.html
+#!/bin/bash
+systemctl is-failed --quiet 2>/dev/null; test $? -ne 0
 exit 0

@@ -1,40 +1,131 @@
 slug: file-integrity-tripwire
-title: "File Integrity Alert — Investigate and Restore Modified Files"
-technology: Security
-category: File Integrity Monitoring
+title: File Integrity Alert - Investigate and Restore Modified
+technology: security
+category: Fix
 difficulty: hard
 time_limit: 1200
 max_score: 100
 infrastructure_type: docker
 jira_priority: Critical
 is_free: false
-description: |
-  AIDE (Advanced Intrusion Detection Environment) triggered an alert — it detected
-  that /usr/bin/find and /etc/passwd were modified outside of the normal change
-  window. The modification times and checksums have changed. This could indicate
-  a compromised system or unauthorized changes. Investigate the modified files,
-  restore them from known-good backups, re-initialize the AIDE database, and
-  document your findings.
-objectives:
-  - Run AIDE check to identify all modified files
-  - Investigate /usr/bin/find and /etc/passwd for suspicious changes
-  - Restore the files from known-good backups in /var/backup/
-  - Re-initialize the AIDE database after confirming system integrity
-  - Write investigation findings to /tmp/integrity-report.txt
-initial_state: |
-  Ubuntu 22.04 with aide installed. `/usr/sbin/aide --check` reports modifications
+description: 'CONTEXT: A team operating security hardening needs you to resolve `File Integrity Alert
+  - Investigate and Restore Modified` during a realistic incident. The business impact is reduced service
+  reliability until the underlying state is repaired.
+
+
+  ENVIRONMENT: You are working in FixitLab''s offline hardening lab with SSH, firewall, TLS, audit logs,
+  and IAM settings. All tools run locally; no paid APIs or external cloud calls are required.
+
+
+  SYMPTOM / STARTING STATE: Ubuntu 22.04 with aide installed. `/usr/sbin/aide --check` reports modifications
+
   to /usr/bin/find and /etc/passwd. Backups exist at /var/backup/find.backup and
+
+  /var/backup/passwd.backup. AIDE database is at /var/lib/aide/aide.db. AIDE (Advanced Intrusion Detection
+  Environment) triggered an alert — it detected
+
+  that /usr/bin/find and /etc/passwd were modified outside of the normal change
+
+  window. The modification times and checksums have changed. This could indicate
+
+  a compromised system or unauthorized changes. Investigate the modified files,
+
+  restore them from known-good backups, re-initialize the AIDE database, and
+
+  document your findings.
+
+
+  OBJECTIVE: Run AIDE check to identify all modified files; Investigate /usr/bin/find and /etc/passwd
+  for suspicious changes; Restore the files from known-good backups in /var/backup/. Success means `check.sh`
+  exits successfully.
+
+
+  WHAT TO AVOID: Do not apply broad destructive changes, skip evidence gathering, or fake completion with
+  marker files — the checker validates real system state.'
+objectives:
+- Run AIDE check to identify all modified files
+- Investigate /usr/bin/find and /etc/passwd for suspicious changes
+- Restore the files from known-good backups in /var/backup/
+- Re-initialize the AIDE database after confirming system integrity
+- Write investigation findings to /tmp/integrity-report.txt
+initial_state: 'Ubuntu 22.04 with aide installed. `/usr/sbin/aide --check` reports modifications
+
+  to /usr/bin/find and /etc/passwd. Backups exist at /var/backup/find.backup and
+
   /var/backup/passwd.backup. AIDE database is at /var/lib/aide/aide.db.
+
+  '
 hints:
-  - order: 1
-    cost: 10
-    content: "Run check: `aide --check 2>&1 | head -50` — lists all changed files and attributes."
-  - order: 2
-    cost: 15
-    content: "Investigate changes: `diff /usr/bin/find /var/backup/find.backup` and `diff /etc/passwd /var/backup/passwd.backup`"
-  - order: 3
-    cost: 15
-    content: "Restore: `cp /var/backup/find.backup /usr/bin/find && cp /var/backup/passwd.backup /etc/passwd`"
-  - order: 4
-    cost: 20
-    content: "Reinitialize AIDE: `aide --init && mv /var/lib/aide/aide.db.new /var/lib/aide/aide.db`"
+- order: 1
+  cost: 0
+  content: 'Where to look: Run AIDE check to identify all modified files'
+- order: 2
+  cost: 25
+  content: 'Diagnostic steps:
+
+    1. Investigate /usr/bin/find and /etc/passwd for suspicious changes
+
+    2. Restore the files from known-good backups in /var/backup/
+
+    3. Re-initialize the AIDE database after confirming system integrity'
+- order: 3
+  cost: 50
+  content: 'Exact fix + verification:
+
+    1. Write investigation findings to /tmp/integrity-report.txt.
+
+    2. Re-run the lab checker (`check.sh` or Check Solution).
+
+    3. Confirm every scenario objective is satisfied.
+
+
+    WHY: the grader validates real state — marker files are ignored.'
+summary: Complete the file integrity alert - investigate and restore modified security lab and verify
+  success with the checker
+estimated_minutes: 20
+xp_reward: 100
+prerequisites:
+- Basic security literacy
+tags:
+- fix
+- hands-on
+- security
+linked_tutorial: security-fundamentals
+what_you_will_learn:
+- Run AIDE check to identify all modified files
+- Investigate /usr/bin/find and /etc/passwd for suspicious changes
+- Restore the files from known-good backups in /var/backup/
+- Re-initialize the AIDE database after confirming system integrity
+- Write investigation findings to /tmp/integrity-report.txt
+environment:
+  nodes:
+  - role: primary
+    os: FixitLab hardening lab
+    hostname: lab-primary
+    ip: 127.0.0.1
+    specs: local offline simulation
+  pre_installed:
+  - bash
+  - coreutils
+  - journalctl
+  - security
+  - systemctl
+  credentials:
+  - user: root
+    password: lab123
+tasks:
+- id: task_1
+  title: File Integrity Alert - Investigate and Restore Modified
+  description: Restore healthy behavior for File Integrity Alert - Investigate and Restore Modified by
+    investigating the failure, applying the smallest safe fix, and validating the outcome.
+  background: 'This security lab teaches systematic troubleshooting: observe, hypothesize, change, verify.'
+  validation:
+    type: custom_script
+    script: check.sh
+    error_message: Validation did not pass. Re-read the objectives and Hint 2 diagnostic steps.
+solution:
+  summary: Identify the misconfiguration affecting this security lab and apply the minimal fix.
+  files_changed: []
+  commands_run:
+  - bash check.sh
+  reference_docs: security-fundamentals

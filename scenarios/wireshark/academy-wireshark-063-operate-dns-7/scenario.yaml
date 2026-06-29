@@ -1,7 +1,7 @@
-title: 'Wireshark Packet Analysis: Dns — Daily Operations'
+title: Dns — Operate Lab
 slug: academy-wireshark-063-operate-dns-7
-technology: Wireshark Packet Analysis
-category: Operations
+technology: wireshark
+category: Build
 difficulty: medium
 scenario_type: do
 lab_mode: simulation
@@ -11,9 +11,27 @@ max_score: 100
 is_free: false
 infrastructure_type: docker
 jira_priority: Medium
-description: 'Day-2 operations: perform a routine DNS task safely in Wireshark Packet Analysis. Follow
-  change control — inspect, change, verify — while working with name resolution, records, forward/reverse
-  lookups, and resolver config.'
+description: 'CONTEXT: A team operating packet analysis needs you to resolve `wireshark: Dns — Daily Operations`
+  during a realistic incident. The business impact is reduced service reliability until the underlying
+  state is repaired.
+
+
+  ENVIRONMENT: You are working in FixitLab''s offline capture lab with pcap files, display filters, and
+  protocol decode. All tools run locally; no paid APIs or external cloud calls are required.
+
+
+  SYMPTOM / STARTING STATE: The capture lab is healthy enough for scheduled work on DNS. Complete the
+  maintenance task without unnecessary downtime. Day-2 operations: perform a routine DNS task safely in
+  wireshark. Follow change control — inspect, change, verify — while working with name resolution, records,
+  forward/reverse lookups, and resolver config.
+
+
+  OBJECTIVE: Day-2 DNS work completes safely in this environment; Changes are verified with before/after
+  checks; The system remains stable for dependent teams. Success means `check.sh` exits successfully.
+
+
+  WHAT TO AVOID: Do not apply broad destructive changes, skip evidence gathering, or fake completion with
+  marker files — the checker validates real system state.'
 objectives:
 - Day-2 DNS work completes safely in this environment
 - Changes are verified with before/after checks
@@ -22,7 +40,7 @@ initial_state: The capture lab is healthy enough for scheduled work on DNS. Comp
   without unnecessary downtime.
 hints:
 - order: 1
-  cost: 10
+  cost: 0
   content: 'Orient yourself before changing anything:
 
     1. Inspect the current state — `dig`, `nslookup`, or `Resolve-DnsName` plus zone/config files.
@@ -32,17 +50,17 @@ hints:
     3. Recall the core idea: name resolution, records, forward/reverse lookups, and resolver config. Form
     one hypothesis before you act.'
 - order: 2
-  cost: 15
-  content: 'Plan your approach (still no spoilers):
-
-    1. Confirm the exact gap between current and desired state for DNS.
-
-    2. Decide the single smallest change that moves you toward the objective.
-
-    3. Capture evidence (command output / status) before the change so you can prove it worked afterward.'
-- order: 3
   cost: 25
-  content: 'Guided walkthrough:
+  content: 'Diagnostic steps:
+
+    1. Note protocol, source/dest IP, and TCP flags on failing packets.
+
+    2. Follow TCP stream or export objects if HTTP/DNS is involved.
+
+    3. Compare timing (retransmissions, RST, TLS alerts) to the lab question.'
+- order: 3
+  cost: 50
+  content: 'Exact fix + verification:
 
     1. Re-check the current state — `dig`, `nslookup`, or `Resolve-DnsName` plus zone/config files.
 
@@ -51,4 +69,74 @@ hints:
 
     3. Verify the result — queries return the expected records from the intended resolver.
 
-    4. Click Check Solution once `systemctl is-active nginx` returns active.'
+    4. Click Check Solution once the objective is met (graded on real state, not a marker file).'
+summary: Complete the dns — operate lab wireshark lab and verify success with the checker
+estimated_minutes: 20
+xp_reward: 100
+prerequisites:
+- Basic wireshark literacy
+tags:
+- do
+- hands-on
+- wireshark
+linked_tutorial: wireshark-fundamentals
+what_you_will_learn:
+- Day-2 DNS work completes safely in this environment
+- Changes are verified with before/after checks
+- The system remains stable for dependent teams
+environment:
+  nodes:
+  - role: primary
+    os: FixitLab capture lab
+    hostname: lab-primary
+    ip: 127.0.0.1
+    specs: local offline simulation
+  pre_installed:
+  - bash
+  - coreutils
+  - journalctl
+  - systemctl
+  - wireshark
+  credentials:
+  - user: root
+    password: lab123
+tasks:
+- id: task_1
+  title: Dns — Operate Lab
+  description: Restore healthy behavior for Dns — Operate Lab by investigating the failure, applying the
+    smallest safe fix, and validating the outcome.
+  background: 'This wireshark lab teaches systematic troubleshooting: observe, hypothesize, change, verify.'
+  validation:
+    type: custom_script
+    script: check.sh
+    error_message: Validation did not pass. Re-read the objectives and Hint 2 diagnostic steps.
+solution:
+  summary: Identify the misconfiguration affecting this wireshark lab and apply the minimal fix.
+  files_changed: []
+  commands_run:
+  - bash check.sh
+  reference_docs: wireshark-fundamentals
+guided_mode:
+  enabled: true
+  steps:
+  - step: 1
+    title: Inspect current state
+    instruction: Run a read-only diagnostic before changing anything.
+    command: check.sh
+    expected_output: Output shows the current failure mode
+    explanation: Evidence-first troubleshooting avoids guessing.
+    next_on: command_success
+  - step: 2
+    title: Apply the minimal fix
+    instruction: Make one reversible change aligned with the objectives.
+    command: '# your fix command here'
+    expected_output: State moves toward the objective
+    explanation: Small changes make rollback easy if the hypothesis was wrong.
+    next_on: command_success
+  - step: 3
+    title: Verify with the grader
+    instruction: Run the same verification the checker uses.
+    command: check.sh
+    expected_output: '`check.sh` exits successfully'
+    explanation: The lab passes only when real state is healthy.
+    next_on: command_success

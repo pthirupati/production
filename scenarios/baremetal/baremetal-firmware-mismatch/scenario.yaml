@@ -1,7 +1,7 @@
 title: NIC Firmware Mismatch Causing Drops
 slug: baremetal-firmware-mismatch
-technology: Baremetal
-category: Firmware
+technology: baremetal
+category: Fix
 difficulty: hard
 lab_mode: simulation
 simulation_type: baremetal
@@ -10,8 +10,26 @@ max_score: 100
 is_free: true
 jira_priority: High
 dual_terminal: false
-description: A NIC is dropping packets under load because its firmware is mismatched with the driver.
+description: 'CONTEXT: A team operating bare metal operations needs you to resolve `NIC Firmware Mismatch
+  Causing Drops` during a realistic incident. The business impact is reduced service reliability until
+  the underlying state is repaired.
+
+
+  ENVIRONMENT: You are working in FixitLab''s offline physical server lab with IPMI, RAID, BIOS, and out-of-band
+  console. All tools run locally; no paid APIs or external cloud calls are required.
+
+
+  SYMPTOM / STARTING STATE: A bare-metal server whose NIC firmware/driver versions are mismatched, causing
+  packet drops. A NIC is dropping packets under load because its firmware is mismatched with the driver.
   Pin/upgrade to the matched firmware and confirm the config is corrected.
+
+
+  OBJECTIVE: Confirm drops tied to firmware mismatch; Align NIC firmware with the driver; Verify the firmware
+  config is corrected. Success means `check.sh` exits successfully.
+
+
+  WHAT TO AVOID: Do not apply broad destructive changes, skip evidence gathering, or fake completion with
+  marker files — the checker validates real system state.'
 initial_state: A bare-metal server whose NIC firmware/driver versions are mismatched, causing packet drops.
 objectives:
 - Confirm drops tied to firmware mismatch
@@ -19,11 +37,70 @@ objectives:
 - Verify the firmware config is corrected
 hints:
 - order: 1
-  cost: 10
-  content: ethtool stats show rising drops.
+  cost: 0
+  content: 'Where to look: Confirm drops tied to firmware mismatch'
 - order: 2
-  cost: 15
-  content: Flash the matched firmware version.
+  cost: 25
+  content: 'Diagnostic steps:
+
+    1. Align NIC firmware with the driver
+
+    2. Verify the firmware config is corrected'
 - order: 3
-  cost: 20
-  content: nic_version.cfg carries the corrected version.
+  cost: 50
+  content: 'Exact fix + verification:
+
+    1. Verify the firmware config is corrected.
+
+    2. Re-run the lab checker (`check.sh` or Check Solution).
+
+    3. Confirm every scenario objective is satisfied.
+
+
+    WHY: the grader validates real state — marker files are ignored.'
+summary: Complete the nic firmware mismatch causing drops baremetal lab and verify success with the checker
+estimated_minutes: 20
+xp_reward: 100
+prerequisites:
+- Basic baremetal literacy
+tags:
+- baremetal
+- fix
+- hands-on
+linked_tutorial: baremetal-fundamentals
+what_you_will_learn:
+- Confirm drops tied to firmware mismatch
+- Align NIC firmware with the driver
+- Verify the firmware config is corrected
+environment:
+  nodes:
+  - role: primary
+    os: FixitLab physical server lab
+    hostname: lab-primary
+    ip: 127.0.0.1
+    specs: local offline simulation
+  pre_installed:
+  - baremetal
+  - bash
+  - coreutils
+  - journalctl
+  - systemctl
+  credentials:
+  - user: root
+    password: lab123
+tasks:
+- id: task_1
+  title: NIC Firmware Mismatch Causing Drops
+  description: Restore healthy behavior for NIC Firmware Mismatch Causing Drops by investigating the failure,
+    applying the smallest safe fix, and validating the outcome.
+  background: 'This baremetal lab teaches systematic troubleshooting: observe, hypothesize, change, verify.'
+  validation:
+    type: custom_script
+    script: check.sh
+    error_message: Validation did not pass. Re-read the objectives and Hint 2 diagnostic steps.
+solution:
+  summary: Identify the misconfiguration affecting this baremetal lab and apply the minimal fix.
+  files_changed: []
+  commands_run:
+  - bash check.sh
+  reference_docs: baremetal-fundamentals

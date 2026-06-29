@@ -2,8 +2,8 @@ title: sudo secure_path Blocks Admin Commands
 slug: sudo-secure-path-broken
 lab_mode: simulation
 simulation_type: generic
-technology: Linux
-category: Sudo / Security
+technology: linux
+category: Build
 difficulty: hard
 time_limit: 1200
 max_score: 100
@@ -11,10 +11,28 @@ infrastructure_type: docker
 docker_privileged: false
 jira_priority: Medium
 topics_covered: Q32 sudoers secure_path — visudo
-description: Commands like `sudo ip ...` or `sudo systemctl ...` fail with "command not found" even though
-  the binaries exist, because the sudoers `secure_path` was edited and no longer includes /usr/sbin and
-  /sbin. sudo replaces PATH with secure_path, so admin tools in sbin become invisible. Restore a complete
-  secure_path so privileged commands resolve.
+description: 'CONTEXT: A team operating Linux administration needs you to resolve `sudo secure_path Blocks
+  Admin Commands` during a realistic incident. The business impact is reduced service reliability until
+  the underlying state is repaired.
+
+
+  ENVIRONMENT: You are working in FixitLab''s offline Linux practice server with terminal and config files
+  under /etc and /var. All tools run locally; no paid APIs or external cloud calls are required.
+
+
+  SYMPTOM / STARTING STATE: Linux server where sudoers `secure_path` omits /usr/sbin and /sbin, so sudo
+  can''t find sbin-based commands (ip, systemctl, etc.). Commands like `sudo ip ...` or `sudo systemctl
+  ...` fail with "command not found" even though the binaries exist, because the sudoers `secure_path`
+  was edited and no longer includes /usr/sbin and /sbin. sudo replaces PATH with secure_path, so admin
+  tools in sbin become invisible. Restore a complete secure_path so privileged commands resolve.
+
+
+  OBJECTIVE: Confirm sudo''s secure_path is missing the sbin directories; Restore a complete secure_path
+  in sudoers; Verify sudo can run sbin commands again. Success means `check.sh` exits successfully.
+
+
+  WHAT TO AVOID: Do not apply broad destructive changes, skip evidence gathering, or fake completion with
+  marker files — the checker validates real system state.'
 objectives:
 - Confirm sudo's secure_path is missing the sbin directories
 - Restore a complete secure_path in sudoers
@@ -23,13 +41,94 @@ initial_state: Linux server where sudoers `secure_path` omits /usr/sbin and /sbi
   sbin-based commands (ip, systemctl, etc.).
 hints:
 - order: 1
-  cost: 10
-  content: 'Check what sudo uses: `sudo -l` shows the `secure_path` value — /usr/sbin and /sbin are missing,
-    which is why sudo can''t find those tools.'
+  cost: 0
+  content: 'Where to look: Confirm sudo''s secure_path is missing the sbin directories'
 - order: 2
-  cost: 15
-  content: 'Fix it with visudo (check /etc/sudoers and /etc/sudoers.d/): set `Defaults secure_path="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"`.'
+  cost: 25
+  content: 'Diagnostic steps:
+
+    1. Restore a complete secure_path in sudoers
+
+    2. Verify sudo can run sbin commands again'
 - order: 3
-  cost: 20
-  content: 'Verify: `sudo -l` shows the full path, and `sudo ip a` / `sudo systemctl status sshd` now
-    run instead of "command not found".'
+  cost: 50
+  content: 'Exact fix + verification:
+
+    1. Verify sudo can run sbin commands again.
+
+    2. Re-run the lab checker (`check.sh` or Check Solution).
+
+    3. Confirm every scenario objective is satisfied.
+
+
+    WHY: the grader validates real state — marker files are ignored.'
+summary: Complete the sudo secure_path blocks admin commands linux lab and verify success with the checker
+estimated_minutes: 20
+xp_reward: 100
+prerequisites:
+- Basic linux literacy
+tags:
+- fix
+- hands-on
+- linux
+linked_tutorial: linux-fundamentals
+what_you_will_learn:
+- Confirm sudo's secure_path is missing the sbin directories
+- Restore a complete secure_path in sudoers
+- Verify sudo can run sbin commands again
+environment:
+  nodes:
+  - role: primary
+    os: FixitLab Linux practice server
+    hostname: lab-primary
+    ip: 127.0.0.1
+    specs: local offline simulation
+  pre_installed:
+  - bash
+  - coreutils
+  - journalctl
+  - linux
+  - systemctl
+  credentials:
+  - user: root
+    password: lab123
+tasks:
+- id: task_1
+  title: sudo secure_path Blocks Admin Commands
+  description: Restore healthy behavior for sudo secure_path Blocks Admin Commands by investigating the
+    failure, applying the smallest safe fix, and validating the outcome.
+  background: 'This linux lab teaches systematic troubleshooting: observe, hypothesize, change, verify.'
+  validation:
+    type: custom_script
+    script: check.sh
+    error_message: Validation did not pass. Re-read the objectives and Hint 2 diagnostic steps.
+solution:
+  summary: Identify the misconfiguration affecting this linux lab and apply the minimal fix.
+  files_changed: []
+  commands_run:
+  - bash check.sh
+  reference_docs: linux-fundamentals
+guided_mode:
+  enabled: true
+  steps:
+  - step: 1
+    title: Inspect current state
+    instruction: Run a read-only diagnostic before changing anything.
+    command: check.sh
+    expected_output: Output shows the current failure mode
+    explanation: Evidence-first troubleshooting avoids guessing.
+    next_on: command_success
+  - step: 2
+    title: Apply the minimal fix
+    instruction: Make one reversible change aligned with the objectives.
+    command: '# your fix command here'
+    expected_output: State moves toward the objective
+    explanation: Small changes make rollback easy if the hypothesis was wrong.
+    next_on: command_success
+  - step: 3
+    title: Verify with the grader
+    instruction: Run the same verification the checker uses.
+    command: check.sh
+    expected_output: '`check.sh` exits successfully'
+    explanation: The lab passes only when real state is healthy.
+    next_on: command_success

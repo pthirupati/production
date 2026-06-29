@@ -1,7 +1,7 @@
-title: 'RHEL Linux: Tuned Profiles — Production Readiness'
+title: Tuned Profiles — Production Lab
 slug: academy-rhel-linux-035-production-tuned-profile-4
-technology: RHEL Linux
-category: Production
+technology: rhel-linux
+category: Project
 difficulty: medium
 scenario_type: fix
 lab_mode: simulation
@@ -11,19 +11,36 @@ max_score: 100
 is_free: false
 infrastructure_type: docker
 jira_priority: Medium
-description: Service operations lab. The `firewalld` systemd unit is **failed/inactive** on this host
-  — a realistic fault for Production Readiness workflows that depend on it. Diagnose with `systemctl status
-  firewalld` and journal logs, apply the smallest reliable fix, then verify with `systemctl is-active
-  firewalld`.
+description: 'CONTEXT: A team operating Red Hat Enterprise Linux needs you to resolve `rhel-linux: Tuned
+  Profiles — Production Readiness` during a realistic incident. The business impact is reduced service
+  reliability until the underlying state is repaired.
+
+
+  ENVIRONMENT: You are working in FixitLab''s offline RHEL practice host with dnf, subscription-manager,
+  firewalld, and SELinux. All tools run locally; no paid APIs or external cloud calls are required.
+
+
+  SYMPTOM / STARTING STATE: A feature fix works in dev, but tuned profiles is not production ready — missing
+  guardrails, runbooks, or capacity checks. Production readiness for tuned profiles. Harden, document,
+  and validate performance profiles and tunables so the change is safe to run during a maintenance window.
+
+
+  OBJECTIVE: Day-2 tuned profiles work completes safely in this environment; Changes are verified with
+  before/after checks; The system remains stable for dependent teams. Success means `systemctl is-active
+  firewalld` returns active.
+
+
+  WHAT TO AVOID: Do not apply broad destructive changes, skip evidence gathering, or fake completion with
+  marker files — the checker validates real system state.'
 objectives:
-- The `firewalld` service is active (running)
-- '`systemctl is-active firewalld` returns active'
-- The fix survives a status re-check (no marker files)
-initial_state: The `firewalld` service is not running (`systemctl is-active firewalld` → inactive/failed).
-  Dependent Production Readiness tasks cannot succeed until the unit is healthy again.
+- Day-2 tuned profiles work completes safely in this environment
+- Changes are verified with before/after checks
+- The system remains stable for dependent teams
+initial_state: A feature fix works in dev, but tuned profiles is not production ready — missing guardrails,
+  runbooks, or capacity checks.
 hints:
 - order: 1
-  cost: 10
+  cost: 0
   content: 'Orient yourself before changing anything:
 
     1. Inspect the current state — `tuned-adm active` and `tuned-adm list`.
@@ -32,17 +49,17 @@ hints:
 
     3. Recall the core idea: performance profiles and tunables. Form one hypothesis before you act.'
 - order: 2
-  cost: 15
-  content: 'Plan your approach (still no spoilers):
-
-    1. Confirm the exact gap between current and desired state for tuned profiles.
-
-    2. Decide the single smallest change that moves you toward the objective.
-
-    3. Capture evidence (command output / status) before the change so you can prove it worked afterward.'
-- order: 3
   cost: 25
-  content: 'Guided walkthrough:
+  content: 'Diagnostic steps:
+
+    1. Run `systemctl status firewalld` — note Active/Failed and the last log lines.
+
+    2. Read `journalctl -u firewalld -n 50` for the root error.
+
+    3. Form a hypothesis about the smallest config or permission fix.'
+- order: 3
+  cost: 50
+  content: 'Exact fix + verification:
 
     1. Re-check the current state — `tuned-adm active` and `tuned-adm list`.
 
@@ -51,4 +68,76 @@ hints:
 
     3. Verify the result — the correct tuned profile is active.
 
-    4. Click Check Solution once `systemctl is-active firewalld` returns active.'
+    4. Click Check Solution once the objective is met (graded on real state, not a marker file).'
+summary: Complete the tuned profiles — production lab rhel linux lab and verify success with the checker
+estimated_minutes: 20
+xp_reward: 100
+prerequisites:
+- Basic rhel linux literacy
+tags:
+- fix
+- hands-on
+- rhel-linux
+linked_tutorial: rhel-linux-fundamentals
+what_you_will_learn:
+- Day-2 tuned profiles work completes safely in this environment
+- Changes are verified with before/after checks
+- The system remains stable for dependent teams
+environment:
+  nodes:
+  - role: primary
+    os: FixitLab RHEL practice host
+    hostname: lab-primary
+    ip: 127.0.0.1
+    specs: local offline simulation
+  pre_installed:
+  - bash
+  - coreutils
+  - journalctl
+  - rhel linux
+  - systemctl
+  credentials:
+  - user: root
+    password: lab123
+tasks:
+- id: task_1
+  title: Tuned Profiles — Production Lab
+  description: Restore healthy behavior for Tuned Profiles — Production Lab by investigating the failure,
+    applying the smallest safe fix, and validating the outcome.
+  background: 'This rhel linux lab teaches systematic troubleshooting: observe, hypothesize, change, verify.'
+  validation:
+    type: service_active
+    command: systemctl is-active firewalld
+    expected_status: active
+    error_message: The firewalld service is not active yet. Check `systemctl status firewalld` and `journalctl
+      -u firewalld -n 50`.
+solution:
+  summary: The root cause is an unhealthy `firewalld` service; repair it and verify active state.
+  files_changed: []
+  commands_run:
+  - systemctl is-active firewalld
+  reference_docs: rhel-linux-fundamentals
+guided_mode:
+  enabled: true
+  steps:
+  - step: 1
+    title: Inspect current state
+    instruction: Run a read-only diagnostic before changing anything.
+    command: systemctl is-active firewalld
+    expected_output: Output shows the current failure mode
+    explanation: Evidence-first troubleshooting avoids guessing.
+    next_on: command_success
+  - step: 2
+    title: Apply the minimal fix
+    instruction: Make one reversible change aligned with the objectives.
+    command: '# your fix command here'
+    expected_output: State moves toward the objective
+    explanation: Small changes make rollback easy if the hypothesis was wrong.
+    next_on: command_success
+  - step: 3
+    title: Verify with the grader
+    instruction: Run the same verification the checker uses.
+    command: systemctl is-active firewalld
+    expected_output: '`systemctl is-active firewalld` returns active'
+    explanation: The lab passes only when real state is healthy.
+    next_on: command_success

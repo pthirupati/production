@@ -1,8 +1,7 @@
----
 slug: template-convert-failed
-title: "Converting VM to Template Failed — Snapshots Blocking Conversion"
-technology: VMware
-category: VM Management
+title: Converting VM to Template Failed - Snapshots Blocking
+technology: vmware
+category: Fix
 difficulty: easy
 time_limit: 600
 max_score: 100
@@ -11,36 +10,120 @@ simulation_type: vmware
 infrastructure_type: simulation
 jira_priority: Medium
 is_free: false
-description: |
-  An attempt to convert VM "golden-image-ubuntu22" to a template failed with:
-  "Cannot convert a virtual machine that has one or more snapshots to a template."
-  The golden image VM was prepared for templating but a backup snapshot was taken
-  before the final sysprep/cloud-init configuration was applied. The snapshot must
-  be committed before template conversion can proceed.
-objectives:
-  - Verify the error by checking the Recent Tasks for the failed conversion task
-  - Open Snapshot Manager for golden-image-ubuntu22 and review existing snapshots
-  - Delete the backup snapshot to consolidate the disk
-  - Convert the VM to a template successfully and verify it appears in VM Templates
-initial_state: |
-  VMware vCenter simulation. golden-image-ubuntu22 has 1 snapshot: "pre-sysprep-backup".
+description: 'CONTEXT: A team operating VMware vSphere needs you to resolve `Converting VM to Template
+  Failed - Snapshots Blocking` during a realistic incident. The business impact is reduced service reliability
+  until the underlying state is repaired.
+
+
+  ENVIRONMENT: You are working in FixitLab''s offline vSphere lab with VMs, datastores, vCenter, and ESXi
+  tasks. All tools run locally; no paid APIs or external cloud calls are required.
+
+
+  SYMPTOM / STARTING STATE: VMware vCenter simulation. golden-image-ubuntu22 has 1 snapshot: "pre-sysprep-backup".
+
   VM is powered off. Template conversion fails with snapshot error.
+
+  Target template name: ubuntu-22-04-template. An attempt to convert VM "golden-image-ubuntu22" to a template
+  failed with:
+
+  "Cannot convert a virtual machine that has one or more snapshots to a template."
+
+  The golden image VM was prepared for templating but a backup snapshot was taken
+
+  before the final sysprep/cloud-init configuration was applied. The snapshot must
+
+  be committed before template conversion can proceed.
+
+
+  OBJECTIVE: Verify the error by checking the Recent Tasks for the failed conversion task; Open Snapshot
+  Manager for golden-image-ubuntu22 and review existing snapshots; Delete the backup snapshot to consolidate
+  the disk. Success means `check.sh` exits successfully.
+
+
+  WHAT TO AVOID: Do not apply broad destructive changes, skip evidence gathering, or fake completion with
+  marker files — the checker validates real system state.'
+objectives:
+- Verify the error by checking the Recent Tasks for the failed conversion task
+- Open Snapshot Manager for golden-image-ubuntu22 and review existing snapshots
+- Delete the backup snapshot to consolidate the disk
+- Convert the VM to a template successfully and verify it appears in VM Templates
+initial_state: 'VMware vCenter simulation. golden-image-ubuntu22 has 1 snapshot: "pre-sysprep-backup".
+
+  VM is powered off. Template conversion fails with snapshot error.
+
   Target template name: ubuntu-22-04-template.
+
+  '
 hints:
-  - order: 1
-    cost: 10
-    content: "Right-click golden-image-ubuntu22 → Snapshots → Manage Snapshots.
-      You will see the 'pre-sysprep-backup' snapshot. Confirm the VM has only this
-      one snapshot (no linked clones depend on it before deleting)."
-  - order: 2
-    cost: 15
-    content: "Delete the snapshot: in Snapshot Manager, select 'pre-sysprep-backup'
-      and click 'Delete'. This commits the delta VMDK into the base disk.
-      Wait for the task to complete (shown in Recent Tasks)."
-  - order: 3
-    cost: 20
-    content: "After snapshot deletion, right-click golden-image-ubuntu22 →
-      Template → Convert to Template.
-      The VM will disappear from the VM inventory and appear under
-      VM Templates in the content library or under VMs and Templates as a template icon.
-      Verify it can be deployed: right-click template → New VM from this Template."
+- order: 1
+  cost: 0
+  content: 'Where to look: Run `df -h` and `du -xh /var /tmp /home | sort -h | tail -20` for large paths.'
+- order: 2
+  cost: 25
+  content: 'Diagnostic steps:
+
+    1. Find which mount is 100% — often `/` or `/var`.
+
+    2. `journalctl --disk-usage` and old logs under `/var/log`.
+
+    3. Look for core dumps, temp files, or oversized application data.'
+- order: 3
+  cost: 50
+  content: 'Exact fix + verification:
+
+    1. Remove or rotate the largest safe files (logs, caches, old packages).
+
+    2. `df -h` should show free space on the affected mount.
+
+    3. Retry the command that failed with ''No space left on device''.
+
+
+    WHY: many services fail cryptically when disk is full.'
+summary: Complete the converting vm to template failed - snapshots blocking vmware lab and verify success
+  with the checker
+estimated_minutes: 10
+xp_reward: 100
+prerequisites:
+- Basic vmware literacy
+tags:
+- fix
+- hands-on
+- vmware
+linked_tutorial: vmware-fundamentals
+what_you_will_learn:
+- Verify the error by checking the Recent Tasks for the failed conversion task
+- Open Snapshot Manager for golden-image-ubuntu22 and review existing snapshots
+- Delete the backup snapshot to consolidate the disk
+- Convert the VM to a template successfully and verify it appears in VM Templates
+environment:
+  nodes:
+  - role: primary
+    os: FixitLab vSphere lab
+    hostname: lab-primary
+    ip: 127.0.0.1
+    specs: local offline simulation
+  pre_installed:
+  - bash
+  - coreutils
+  - journalctl
+  - systemctl
+  - vmware
+  credentials:
+  - user: root
+    password: lab123
+tasks:
+- id: task_1
+  title: Converting VM to Template Failed - Snapshots Blocking
+  description: Restore healthy behavior for Converting VM to Template Failed - Snapshots Blocking by investigating
+    the failure, applying the smallest safe fix, and validating the outcome.
+  background: 'This vmware lab teaches systematic troubleshooting: observe, hypothesize, change, verify.'
+  validation:
+    type: custom_script
+    script: check.sh
+    error_message: Validation did not pass. Re-read the objectives and Hint 2 diagnostic steps.
+solution:
+  summary: Identify the misconfiguration affecting this vmware lab and apply the minimal fix.
+  files_changed: []
+  commands_run:
+  - bash check.sh
+  reference_docs: vmware-fundamentals

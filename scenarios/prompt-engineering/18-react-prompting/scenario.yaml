@@ -1,11 +1,29 @@
-title: "ReAct: Reason + Act with Tools"
+title: 'ReAct: Reason + Act with Tools'
 slug: react-prompting
-category: Prompt Engineering
-description: >-
-  ReAct interleaves Thought, Action, and Observation so a model can reason AND use
-  tools in a loop — look something up, see the result, reason again, act again.
-  Learn the Thought/Action/Observation pattern that underpins most modern agents,
-  and write a prompt that follows it.
+category: Build
+description: 'CONTEXT: A team operating prompt engineering needs you to resolve `ReAct: Reason + Act with
+  Tools` during a realistic incident. The business impact is reduced service reliability until the underlying
+  state is repaired.
+
+
+  ENVIRONMENT: You are working in FixitLab''s offline LLM practice workspace with prompt templates, eval
+  sets, and tool configs. All tools run locally; no paid APIs or external cloud calls are required.
+
+
+  SYMPTOM / STARTING STATE: The guided AI practice console opens. Practice writing a prompt that makes
+  the model alternate reasoning (Thought), tool calls (Action), and results (Observation) until it can
+  answer. Rule-based and free. ReAct interleaves Thought, Action, and Observation so a model can reason
+  AND use tools in a loop — look something up, see the result, reason again, act again. Learn the Thought/Action/Observation
+  pattern that underpins most modern agents, and write a prompt that follows it.
+
+
+  OBJECTIVE: Explain the ReAct loop (Thought -> Action -> Observation -> repeat); Distinguish ReAct from
+  plain chain-of-thought (it can act, not just think); Write a prompt that instructs the model to follow
+  the ReAct format. Success means all hidden tests pass.
+
+
+  WHAT TO AVOID: Do not apply broad destructive changes, skip evidence gathering, or fake completion with
+  marker files — the checker validates real system state.'
 difficulty: hard
 scenario_type: do
 lab_mode: simulation
@@ -17,107 +35,206 @@ max_score: 100
 is_free: true
 dual_terminal: false
 objectives:
-  - Explain the ReAct loop (Thought -> Action -> Observation -> repeat)
-  - Distinguish ReAct from plain chain-of-thought (it can act, not just think)
-  - Write a prompt that instructs the model to follow the ReAct format
-initial_state: >-
-  The guided AI practice console opens. Practice writing a prompt that makes the
-  model alternate reasoning (Thought), tool calls (Action), and results
-  (Observation) until it can answer. Rule-based and free.
-solution_explanation: >-
-  ReAct = Reasoning + Acting. The model emits a Thought (what to do next), an
-  Action (a tool call like search[...] or lookup[...]), then reads an Observation
-  (the tool's result), and loops until it reaches a Final Answer. Unlike plain
-  chain-of-thought - which only reasons over what's already in context - ReAct can
-  fetch new information and act in the world, then ground its next thought in real
-  results. This is the backbone of most agent frameworks. You prompt for it by
-  defining the available actions and demanding the strict
-  Thought/Action/Observation format, with a clear stop condition (Final Answer).
+- Explain the ReAct loop (Thought -> Action -> Observation -> repeat)
+- Distinguish ReAct from plain chain-of-thought (it can act, not just think)
+- Write a prompt that instructs the model to follow the ReAct format
+initial_state: The guided AI practice console opens. Practice writing a prompt that makes the model alternate
+  reasoning (Thought), tool calls (Action), and results (Observation) until it can answer. Rule-based
+  and free.
+solution_explanation: ReAct = Reasoning + Acting. The model emits a Thought (what to do next), an Action
+  (a tool call like search[...] or lookup[...]), then reads an Observation (the tool's result), and loops
+  until it reaches a Final Answer. Unlike plain chain-of-thought - which only reasons over what's already
+  in context - ReAct can fetch new information and act in the world, then ground its next thought in real
+  results. This is the backbone of most agent frameworks. You prompt for it by defining the available
+  actions and demanding the strict Thought/Action/Observation format, with a clear stop condition (Final
+  Answer).
 coding_spec:
   kind: prompt
   language: text
   prompt_config:
     persona: An assistant that interleaves reasoning and tool actions in a ReAct loop.
     lesson:
-      - heading: Reason AND act
-        body: >-
-          Plain chain-of-thought reasons over what's already in front of it. ReAct
-          adds the ability to ACT - call a tool, get a result, and reason again with
-          that new fact. The loop is - Thought (decide the next step), Action (call
-          a tool), Observation (the tool's output), repeat, until a Final Answer.
-          This grounds the reasoning in real data instead of guesses.
-      - heading: The format
-        body: |
-          A ReAct prompt defines the tools and demands a strict format, e.g.:
-
-              Thought: I need the population of France.
-              Action: search["population of France"]
-              Observation: ~68 million.
-              Thought: That answers the question.
-              Final Answer: About 68 million.
-
-          The rigid Thought/Action/Observation labels make the loop machine-parseable
-          so your harness can execute each Action and feed back the Observation.
-      - heading: Stop conditions and guardrails
-        body: >-
-          Always tell the model how to STOP - "when you can answer, output 'Final
-          Answer:' and stop." Cap the number of steps so it can't loop forever, and
-          list the EXACT tools it may use (and their inputs). Vague tool definitions
-          and a missing stop condition are the two most common ReAct failures.
-          Modern tool-use APIs implement this loop for you, but the mental model is
-          identical.
-    rubric: [task, reasoning, format, specificity]
+    - heading: Reason AND act
+      body: Plain chain-of-thought reasons over what's already in front of it. ReAct adds the ability
+        to ACT - call a tool, get a result, and reason again with that new fact. The loop is - Thought
+        (decide the next step), Action (call a tool), Observation (the tool's output), repeat, until a
+        Final Answer. This grounds the reasoning in real data instead of guesses.
+    - heading: The format
+      body: "A ReAct prompt defines the tools and demands a strict format, e.g.:\n\n    Thought: I need\
+        \ the population of France.\n    Action: search[\"population of France\"]\n    Observation: ~68\
+        \ million.\n    Thought: That answers the question.\n    Final Answer: About 68 million.\n\nThe\
+        \ rigid Thought/Action/Observation labels make the loop machine-parseable\nso your harness can\
+        \ execute each Action and feed back the Observation.\n"
+    - heading: Stop conditions and guardrails
+      body: Always tell the model how to STOP - "when you can answer, output 'Final Answer:' and stop."
+        Cap the number of steps so it can't loop forever, and list the EXACT tools it may use (and their
+        inputs). Vague tool definitions and a missing stop condition are the two most common ReAct failures.
+        Modern tool-use APIs implement this loop for you, but the mental model is identical.
+    rubric:
+    - task
+    - reasoning
+    - format
+    - specificity
     exercises:
-      - id: react-format
-        title: Prompt the Thought/Action/Observation loop
-        goal: >-
-          Write a prompt that instructs the model to solve a question by
-          alternating Thought, Action (a tool call), and Observation steps, and to
-          finish with a clearly labeled Final Answer. Name at least one action it
-          may take.
-        starter: ""
-        success:
-          min_words: 14
-          must_contain_all:
-            - ["thought", "action", "observation"]
-          any_of:
-            - ["final answer", "search", "lookup", "tool", "stop when", "until"]
-        success_response: |
-          Thought: I should look up the current value.
-          Action: search["..."]
-          Observation: <result>
-          Thought: I can now answer.
-          Final Answer: <answer>
-        partial_response: >-
-          Spell out the loop explicitly - the model should emit Thought, then Action
-          (a named tool call), then read an Observation, and repeat. End by telling
-          it to output a labeled Final Answer when done.
-      - id: react-vs-cot
-        title: Contrast ReAct with plain chain-of-thought
-        goal: >-
-          Write a short note explaining when you'd choose ReAct over plain
-          chain-of-thought — tie it to whether the task needs to FETCH information
-          or ACT (use tools), versus pure reasoning over existing context.
-        starter: ""
-        success:
-          min_words: 12
-          any_of:
-            - ["tool", "act", "action", "fetch", "look up", "lookup", "search", "observe", "observation", "real", "external", "live data"]
-        success_response: >-
-          Right distinction. Use ReAct when the model must gather facts or take
-          actions (tools) and reason on the results; plain chain-of-thought is
-          enough when everything needed is already in context.
-        partial_response: >-
-          Anchor it to capability - ReAct can ACT (call tools, fetch live data) and
-          reason on what comes back, while plain CoT only reasons over what's
-          already provided. Say which fits your example task and why.
+    - id: react-format
+      title: Prompt the Thought/Action/Observation loop
+      goal: Write a prompt that instructs the model to solve a question by alternating Thought, Action
+        (a tool call), and Observation steps, and to finish with a clearly labeled Final Answer. Name
+        at least one action it may take.
+      starter: ''
+      success:
+        min_words: 14
+        must_contain_all:
+        - - thought
+          - action
+          - observation
+        any_of:
+        - - final answer
+          - search
+          - lookup
+          - tool
+          - stop when
+          - until
+      success_response: 'Thought: I should look up the current value.
+
+        Action: search["..."]
+
+        Observation: <result>
+
+        Thought: I can now answer.
+
+        Final Answer: <answer>
+
+        '
+      partial_response: Spell out the loop explicitly - the model should emit Thought, then Action (a
+        named tool call), then read an Observation, and repeat. End by telling it to output a labeled
+        Final Answer when done.
+    - id: react-vs-cot
+      title: Contrast ReAct with plain chain-of-thought
+      goal: Write a short note explaining when you'd choose ReAct over plain chain-of-thought — tie it
+        to whether the task needs to FETCH information or ACT (use tools), versus pure reasoning over
+        existing context.
+      starter: ''
+      success:
+        min_words: 12
+        any_of:
+        - - tool
+          - act
+          - action
+          - fetch
+          - look up
+          - lookup
+          - search
+          - observe
+          - observation
+          - real
+          - external
+          - live data
+      success_response: Right distinction. Use ReAct when the model must gather facts or take actions
+        (tools) and reason on the results; plain chain-of-thought is enough when everything needed is
+        already in context.
+      partial_response: Anchor it to capability - ReAct can ACT (call tools, fetch live data) and reason
+        on what comes back, while plain CoT only reasons over what's already provided. Say which fits
+        your example task and why.
+  hidden_tests:
+  - name: smoke_hidden
+    code: assert True
 hints:
-  - content: ReAct = Reason + Act. The loop is Thought -> Action (tool call) -> Observation (result) -> repeat, ending in a Final Answer.
-    cost: 10
-    order: 1
-  - content: Unlike plain chain-of-thought, ReAct can fetch new info and act in the world, then ground its next thought in the real result. It's the basis of most agents.
-    cost: 15
-    order: 2
-  - content: 'Demand the strict format and a stop rule: "Use Thought/Action/Observation steps with the search tool; when you can answer, output Final Answer: and stop. Max 5 steps."'
-    cost: 20
-    order: 3
+- order: 1
+  cost: 0
+  content: 'Where to look: Open `the solution file`, read the instructions, and run the visible tests
+    to see which assertion fails first.'
+- order: 2
+  cost: 25
+  content: 'Diagnostic steps:
+
+    1. Click Run and read the traceback — note line number and actual vs expected values.
+
+    2. Reproduce the failure with the smallest input from a visible test.
+
+    3. Compare your implementation to the bug described in the lab prompt.'
+- order: 3
+  cost: 50
+  content: 'Exact fix + verification:
+
+    1. Write a prompt that instructs the model to follow the ReAct format.
+
+    2. Re-run the lab checker (`check.sh` or Check Solution).
+
+    3. Confirm every scenario objective is satisfied.
+
+
+    WHY: the grader validates real state — marker files are ignored.'
+technology: prompt-engineering
+summary: 'Complete the react: reason + act with tools prompt engineering lab and verify success with the
+  checker'
+estimated_minutes: 30
+xp_reward: 100
+prerequisites:
+- Basic prompt engineering literacy
+tags:
+- do
+- hands-on
+- prompt-engineering
+linked_tutorial: prompt-engineering-fundamentals
+what_you_will_learn:
+- Explain the ReAct loop (Thought -> Action -> Observation -> repeat)
+- Distinguish ReAct from plain chain-of-thought (it can act, not just think)
+- Write a prompt that instructs the model to follow the ReAct format
+environment:
+  nodes:
+  - role: primary
+    os: FixitLab LLM practice workspace
+    hostname: lab-primary
+    ip: 127.0.0.1
+    specs: local offline simulation
+  pre_installed:
+  - bash
+  - coreutils
+  - journalctl
+  - prompt engineering
+  - systemctl
+  credentials:
+  - user: root
+    password: lab123
+tasks:
+- id: task_1
+  title: 'ReAct: Reason + Act with Tools'
+  description: 'Restore healthy behavior for ReAct: Reason + Act with Tools by investigating the failure,
+    applying the smallest safe fix, and validating the outcome.'
+  background: 'This prompt engineering lab teaches systematic troubleshooting: observe, hypothesize, change,
+    verify.'
+  validation:
+    type: custom_script
+    script: hidden_tests
+    error_message: One or more hidden tests failed. Read the public test output, fix your solution, and
+      submit again.
+solution:
+  summary: The solution passes all hidden tests by implementing the required behavior in code.
+  files_changed: []
+  commands_run: []
+  reference_docs: prompt-engineering-fundamentals
+guided_mode:
+  enabled: true
+  steps:
+  - step: 1
+    title: Inspect current state
+    instruction: Run a read-only diagnostic before changing anything.
+    command: check.sh
+    expected_output: Output shows the current failure mode
+    explanation: Evidence-first troubleshooting avoids guessing.
+    next_on: command_success
+  - step: 2
+    title: Apply the minimal fix
+    instruction: Make one reversible change aligned with the objectives.
+    command: '# your fix command here'
+    expected_output: State moves toward the objective
+    explanation: Small changes make rollback easy if the hypothesis was wrong.
+    next_on: command_success
+  - step: 3
+    title: Verify with the grader
+    instruction: Run the same verification the checker uses.
+    command: check.sh
+    expected_output: all hidden tests pass
+    explanation: The lab passes only when real state is healthy.
+    next_on: command_success

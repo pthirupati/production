@@ -1,14 +1,29 @@
 title: Fix Alertmanager Routing for Wrong Severity
 slug: alertmanager-silence
-technology: DevOps
-category: Monitoring
+technology: devops
+category: Fix
 difficulty: hard
 time_limit: 1200
 max_score: 100
 infrastructure_type: docker
 jira_priority: Medium
 is_free: false
-description: 'Alertmanager is routing all alerts — including critical ones — to a low-priority
+description: 'CONTEXT: A team operating DevOps delivery needs you to resolve `Fix Alertmanager Routing
+  for Wrong Severity` during a realistic incident. The business impact is reduced service reliability
+  until the underlying state is repaired.
+
+
+  ENVIRONMENT: You are working in FixitLab''s offline CI/CD lab with git repos, pipelines, artifacts,
+  and runbooks. All tools run locally; no paid APIs or external cloud calls are required.
+
+
+  SYMPTOM / STARTING STATE: Ubuntu server running Alertmanager. Config at /etc/alertmanager/alertmanager.yml.
+
+  The routes section has a catch-all route before the severity-specific routes,
+
+  meaning critical alerts match the first catch-all rule and never reach the
+
+  critical severity route. Alertmanager is routing all alerts — including critical ones — to a low-priority
 
   Slack channel for warnings. The routing tree has a catch-all rule that sends
 
@@ -18,7 +33,14 @@ description: 'Alertmanager is routing all alerts — including critical ones —
 
   warning alerts go to the warning channel.
 
-  '
+
+  OBJECTIVE: Inspect the Alertmanager routing configuration; Identify why critical alerts are misrouted
+  to the warning receiver; Fix the route matchers/ordering in alertmanager.yml. Success means `check.sh`
+  exits successfully.
+
+
+  WHAT TO AVOID: Do not apply broad destructive changes, skip evidence gathering, or fake completion with
+  marker files — the checker validates real system state.'
 objectives:
 - Inspect the Alertmanager routing configuration
 - Identify why critical alerts are misrouted to the warning receiver
@@ -35,18 +57,74 @@ initial_state: 'Ubuntu server running Alertmanager. Config at /etc/alertmanager/
   '
 hints:
 - order: 1
-  cost: 10
-  content: 'Read the routing tree: `cat /etc/alertmanager/alertmanager.yml` and find the catch-all route
-    that''s swallowing everything.'
+  cost: 0
+  content: 'Where to look: Inspect the Alertmanager routing configuration'
 - order: 2
-  cost: 15
-  content: In Alertmanager, route matching is first-match-wins within a level — a broad catch-all placed
-    before specific routes captures critical alerts.
-- order: 3
-  cost: 20
-  content: 'Reorder so specific severity routes come BEFORE the catch-all: add a first route `match: {severity:
-    critical}` -> `receiver: critical-channel`.'
-- order: 4
   cost: 25
-  content: 'Validate the config with `amtool check-config /etc/alertmanager/alertmanager.yml`, then reload:
-    `curl -X POST http://localhost:9093/-/reload` and confirm critical alerts hit the right receiver.'
+  content: 'Diagnostic steps:
+
+    1. Identify why critical alerts are misrouted to the warning receiver
+
+    2. Fix the route matchers/ordering in alertmanager.yml
+
+    3. Verify critical alerts route to the correct receiver'
+- order: 3
+  cost: 50
+  content: 'Exact fix + verification:
+
+    1. Verify critical alerts route to the correct receiver.
+
+    2. Re-run the lab checker (`check.sh` or Check Solution).
+
+    3. Confirm every scenario objective is satisfied.
+
+
+    WHY: the grader validates real state — marker files are ignored.'
+summary: Complete the fix alertmanager routing for wrong severity devops lab and verify success with the
+  checker
+estimated_minutes: 20
+xp_reward: 100
+prerequisites:
+- Basic devops literacy
+tags:
+- devops
+- fix
+- hands-on
+linked_tutorial: devops-fundamentals
+what_you_will_learn:
+- Inspect the Alertmanager routing configuration
+- Identify why critical alerts are misrouted to the warning receiver
+- Fix the route matchers/ordering in alertmanager.yml
+- Verify critical alerts route to the correct receiver
+environment:
+  nodes:
+  - role: primary
+    os: FixitLab CI/CD lab
+    hostname: lab-primary
+    ip: 127.0.0.1
+    specs: local offline simulation
+  pre_installed:
+  - bash
+  - coreutils
+  - devops
+  - journalctl
+  - systemctl
+  credentials:
+  - user: root
+    password: lab123
+tasks:
+- id: task_1
+  title: Fix Alertmanager Routing for Wrong Severity
+  description: Restore healthy behavior for Fix Alertmanager Routing for Wrong Severity by investigating
+    the failure, applying the smallest safe fix, and validating the outcome.
+  background: 'This devops lab teaches systematic troubleshooting: observe, hypothesize, change, verify.'
+  validation:
+    type: custom_script
+    script: check.sh
+    error_message: Validation did not pass. Re-read the objectives and Hint 2 diagnostic steps.
+solution:
+  summary: Identify the misconfiguration affecting this devops lab and apply the minimal fix.
+  files_changed: []
+  commands_run:
+  - bash check.sh
+  reference_docs: devops-fundamentals

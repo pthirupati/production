@@ -1,9 +1,26 @@
 title: Fix Roman Numeral Subtractive Notation
 slug: py-fix-roman-numeral-subtractive
-category: Python Development
-description: to_roman(n) converts 1..3999 to Roman numerals, but its value table omits the subtractive
-  pairs (4=IV, 9=IX, 40=XL, ...), so it emits IIII instead of IV. Add the subtractive entries in the right
-  order so output is canonical.
+category: Fix
+description: 'CONTEXT: A team operating Python development needs you to resolve `Fix Roman Numeral Subtractive
+  Notation` during a realistic incident. The business impact is reduced service reliability until the
+  underlying state is repaired.
+
+
+  ENVIRONMENT: You are working in FixitLab''s offline Python project workspace with source files, venv,
+  tests, and CLI entrypoints. All tools run locally; no paid APIs or external cloud calls are required.
+
+
+  SYMPTOM / STARTING STATE: to_roman(n) converts 1..3999 to Roman numerals, but its value table omits
+  the subtractive pairs (4=IV, 9=IX, 40=XL, ...), so it emits IIII instead of IV. Add the subtractive
+  entries in the right order so output is canonical.
+
+
+  OBJECTIVE: See non-canonical output like IIII or VIIII; Add subtractive pairs (IV, IX, XL, XC, CD, CM)
+  in descending order; Produce canonical Roman numerals. Success means all hidden tests pass.
+
+
+  WHAT TO AVOID: Do not apply broad destructive changes, skip evidence gathering, or fake completion with
+  marker files — the checker validates real system state.'
 difficulty: hard
 scenario_type: fix
 lab_mode: simulation
@@ -21,62 +38,124 @@ objectives:
 initial_state: to_roman(n) converts 1..3999 to Roman numerals, but its value table omits the subtractive
   pairs (4=IV, 9=IX, 40=XL, ...), so it emits IIII instead of IV. Add the subtractive entries in the right
   order so output is canonical.
-solution_explanation: |
-  Greedy conversion only produces canonical numerals when the subtractive pairs are present as table entries in descending order.
+solution_explanation: 'Greedy conversion only produces canonical numerals when the subtractive pairs are
+  present as table entries in descending order.
+
+  '
 coding_spec:
   language: python
   entrypoint: solution.py
   kind: fix
-  instructions: |
-    Fix to_roman(n) for 1 <= n <= 3999 to produce canonical Roman numerals with subtractive notation.
-      to_roman(4) -> 'IV', to_roman(1994) -> 'MCMXCIV'
-    Click Run to try it, then Check Solution to grade against all tests.
+  instructions: "Fix to_roman(n) for 1 <= n <= 3999 to produce canonical Roman numerals with subtractive\
+    \ notation.\n  to_roman(4) -> 'IV', to_roman(1994) -> 'MCMXCIV'\nClick Run to try it, then Check Solution\
+    \ to grade against all tests.\n"
   files:
   - path: solution.py
-    content: |
-      def to_roman(n):
-          table = [
-              (1000, 'M'), (500, 'D'), (100, 'C'),
-              (50, 'L'), (10, 'X'), (5, 'V'), (1, 'I'),
-          ]
-          out = []
-          for value, sym in table:
-              while n >= value:
-                  out.append(sym)
-                  n -= value
-          return ''.join(out)
+    content: "def to_roman(n):\n    table = [\n        (1000, 'M'), (500, 'D'), (100, 'C'),\n        (50,\
+      \ 'L'), (10, 'X'), (5, 'V'), (1, 'I'),\n    ]\n    out = []\n    for value, sym in table:\n    \
+      \    while n >= value:\n            out.append(sym)\n            n -= value\n    return ''.join(out)\n"
     readonly: false
   visible_tests:
   - name: four
-    code: |
-      assert to_roman(4) == 'IV', to_roman(4)
+    code: 'assert to_roman(4) == ''IV'', to_roman(4)
+
+      '
   - name: nine
-    code: |
-      assert to_roman(9) == 'IX', to_roman(9)
+    code: 'assert to_roman(9) == ''IX'', to_roman(9)
+
+      '
   hidden_tests:
   - name: forty
-    code: |
-      assert to_roman(40) == 'XL', to_roman(40)
+    code: 'assert to_roman(40) == ''XL'', to_roman(40)
+
+      '
   - name: ninety-nine
-    code: |
-      assert to_roman(99) == 'XCIX', to_roman(99)
+    code: 'assert to_roman(99) == ''XCIX'', to_roman(99)
+
+      '
   - name: '1994'
-    code: |
-      assert to_roman(1994) == 'MCMXCIV', to_roman(1994)
+    code: 'assert to_roman(1994) == ''MCMXCIV'', to_roman(1994)
+
+      '
   - name: 3888 (long)
-    code: |
-      assert to_roman(3888) == 'MMMDCCCLXXXVIII'
+    code: 'assert to_roman(3888) == ''MMMDCCCLXXXVIII''
+
+      '
   - name: plain values still work
-    code: |
-      assert to_roman(3) == 'III' and to_roman(2000) == 'MM'
+    code: 'assert to_roman(3) == ''III'' and to_roman(2000) == ''MM''
+
+      '
   timeout: 8
 hints:
 - order: 1
-  cost: 10
-  content: to_roman(4) returns 'IIII' instead of 'IV' — subtractive pairs are missing.
+  cost: 0
+  content: 'Where to look: Open `solution.py`, read the instructions, and run the visible tests to see
+    which assertion fails first.'
 - order: 2
-  cost: 20
-  content: Insert 900/CM, 400/CD, 90/XC, 40/XL, 9/IX, 4/IV into the value table.
+  cost: 25
+  content: 'Diagnostic steps:
+
+    1. Click Run and read the traceback — note line number and actual vs expected values.
+
+    2. Reproduce the failure with the smallest input from a visible test.
+
+    3. Compare your implementation to the bug described in the lab prompt.'
 - order: 3
-  cost: 30
-  content: Keep the table in strictly descending value order so the greedy loop stays canonical.
+  cost: 50
+  content: 'Exact fix + verification:
+
+    1. Produce canonical Roman numerals.
+
+    2. Re-run the lab checker (`check.sh` or Check Solution).
+
+    3. Confirm every scenario objective is satisfied.
+
+
+    WHY: the grader validates real state — marker files are ignored.'
+technology: python
+summary: Complete the fix roman numeral subtractive notation python lab and verify success with the checker
+estimated_minutes: 25
+xp_reward: 100
+prerequisites:
+- Basic python literacy
+tags:
+- fix
+- hands-on
+- python
+linked_tutorial: python-fundamentals
+what_you_will_learn:
+- See non-canonical output like IIII or VIIII
+- Add subtractive pairs (IV, IX, XL, XC, CD, CM) in descending order
+- Produce canonical Roman numerals
+environment:
+  nodes:
+  - role: primary
+    os: FixitLab Python project workspace
+    hostname: lab-primary
+    ip: 127.0.0.1
+    specs: local offline simulation
+  pre_installed:
+  - bash
+  - coreutils
+  - pip
+  - python
+  - python3
+  credentials:
+  - user: root
+    password: lab123
+tasks:
+- id: task_1
+  title: Fix Roman Numeral Subtractive Notation
+  description: Restore healthy behavior for Fix Roman Numeral Subtractive Notation by investigating the
+    failure, applying the smallest safe fix, and validating the outcome.
+  background: 'This python lab teaches systematic troubleshooting: observe, hypothesize, change, verify.'
+  validation:
+    type: custom_script
+    script: hidden_tests
+    error_message: One or more hidden tests failed. Read the public test output, fix your solution, and
+      submit again.
+solution:
+  summary: The solution passes all hidden tests by implementing the required behavior in code.
+  files_changed: []
+  commands_run: []
+  reference_docs: python-fundamentals

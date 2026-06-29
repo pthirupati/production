@@ -1,9 +1,26 @@
 title: Fix the Object Mutation in updateUser
 slug: js-fix-spread-shallow-copy
-category: JavaScript Development
-description: updateUser(user, patch) should return a NEW object with patch applied, leaving the original
-  user unchanged, but it mutates user with Object.assign(user, patch). Fix it to copy first so the input
-  is not mutated and patch overrides.
+category: Fix
+description: 'CONTEXT: A team operating JavaScript needs you to resolve `Fix the Object Mutation in updateUser`
+  during a realistic incident. The business impact is reduced service reliability until the underlying
+  state is repaired.
+
+
+  ENVIRONMENT: You are working in FixitLab''s offline JavaScript practice project with modules, browser
+  console, and Node tooling. All tools run locally; no paid APIs or external cloud calls are required.
+
+
+  SYMPTOM / STARTING STATE: updateUser(user, patch) should return a NEW object with patch applied, leaving
+  the original user unchanged, but it mutates user with Object.assign(user, patch). Fix it to copy first
+  so the input is not mutated and patch overrides.
+
+
+  OBJECTIVE: See the original user object get mutated; Build a new object via spread/assign-into-empty;
+  Apply patch on top so it overrides. Success means all hidden tests pass.
+
+
+  WHAT TO AVOID: Do not apply broad destructive changes, skip evidence gathering, or fake completion with
+  marker files — the checker validates real system state.'
 difficulty: medium
 scenario_type: fix
 lab_mode: simulation
@@ -21,52 +38,127 @@ objectives:
 initial_state: updateUser(user, patch) should return a NEW object with patch applied, leaving the original
   user unchanged, but it mutates user with Object.assign(user, patch). Fix it to copy first so the input
   is not mutated and patch overrides.
-solution_explanation: |
-  Object.assign(user, patch) mutates user. Spreading into a new object literal copies user, then patch overrides, leaving the input intact.
+solution_explanation: 'Object.assign(user, patch) mutates user. Spreading into a new object literal copies
+  user, then patch overrides, leaving the input intact.
+
+  '
 coding_spec:
   language: javascript
   entrypoint: solution.js
   kind: fix
-  instructions: |
-    Fix updateUser(user, patch): return a NEW object combining user and patch (patch wins), WITHOUT mutating user.
-      updateUser({a:1,b:2}, {b:9}) -> {a:1, b:9}
-    Click Run to try it, then Check Solution to grade against all tests.
+  instructions: "Fix updateUser(user, patch): return a NEW object combining user and patch (patch wins),\
+    \ WITHOUT mutating user.\n  updateUser({a:1,b:2}, {b:9}) -> {a:1, b:9}\nClick Run to try it, then\
+    \ Check Solution to grade against all tests.\n"
   files:
   - path: solution.js
-    content: |
-      function updateUser(user, patch) {
-        return Object.assign(user, patch); // mutates user
-      }
+    content: "function updateUser(user, patch) {\n  return Object.assign(user, patch); // mutates user\n\
+      }\n"
     readonly: false
   visible_tests:
   - name: patch overrides
-    code: |
-      assert(JSON.stringify(updateUser({a:1,b:2}, {b:9})) === JSON.stringify({a:1,b:9}), JSON.stringify(updateUser({a:1,b:2}, {b:9})));
+    code: 'assert(JSON.stringify(updateUser({a:1,b:2}, {b:9})) === JSON.stringify({a:1,b:9}), JSON.stringify(updateUser({a:1,b:2},
+      {b:9})));
+
+      '
   - name: adds new key
-    code: |
-      assert(JSON.stringify(updateUser({a:1}, {c:3})) === JSON.stringify({a:1,c:3}), JSON.stringify(updateUser({a:1}, {c:3})));
+    code: 'assert(JSON.stringify(updateUser({a:1}, {c:3})) === JSON.stringify({a:1,c:3}), JSON.stringify(updateUser({a:1},
+      {c:3})));
+
+      '
   hidden_tests:
   - name: does not mutate user
-    code: |
-      const u = {a:1,b:2};
+    code: 'const u = {a:1,b:2};
+
       updateUser(u, {b:9});
-      assert(JSON.stringify(u) === JSON.stringify({a:1,b:2}), 'user mutated');
+
+      assert(JSON.stringify(u) === JSON.stringify({a:1,b:2}), ''user mutated'');
+
+      '
   - name: returns a new object
-    code: |
-      const u = {a:1};
+    code: 'const u = {a:1};
+
       const r = updateUser(u, {});
+
       assert(r !== u);
+
+      '
   - name: empty patch copies
-    code: |
-      assert(JSON.stringify(updateUser({x:5}, {})) === JSON.stringify({x:5}), JSON.stringify(updateUser({x:5}, {})));
+    code: 'assert(JSON.stringify(updateUser({x:5}, {})) === JSON.stringify({x:5}), JSON.stringify(updateUser({x:5},
+      {})));
+
+      '
   timeout: 8
 hints:
 - order: 1
-  cost: 10
-  content: After updateUser(u, {b:9}), u itself changed — that's the mutation bug.
+  cost: 0
+  content: 'Where to look: Open `solution.js`, read the instructions, and run the visible tests to see
+    which assertion fails first.'
 - order: 2
-  cost: 20
-  content: Object.assign(target, src) writes into target; use a fresh target.
+  cost: 25
+  content: 'Diagnostic steps:
+
+    1. Click Run and read the traceback — note line number and actual vs expected values.
+
+    2. Reproduce the failure with the smallest input from a visible test.
+
+    3. Compare your implementation to the bug described in the lab prompt.'
 - order: 3
-  cost: 30
-  content: Return { ...user, ...patch } to copy then override.
+  cost: 50
+  content: 'Exact fix + verification:
+
+    1. Apply patch on top so it overrides.
+
+    2. Re-run the lab checker (`check.sh` or Check Solution).
+
+    3. Confirm every scenario objective is satisfied.
+
+
+    WHY: the grader validates real state — marker files are ignored.'
+technology: javascript
+summary: Complete the fix the object mutation in updateuser javascript lab and verify success with the
+  checker
+estimated_minutes: 25
+xp_reward: 100
+prerequisites:
+- Basic javascript literacy
+tags:
+- fix
+- hands-on
+- javascript
+linked_tutorial: javascript-fundamentals
+what_you_will_learn:
+- See the original user object get mutated
+- Build a new object via spread/assign-into-empty
+- Apply patch on top so it overrides
+environment:
+  nodes:
+  - role: primary
+    os: FixitLab JavaScript practice project
+    hostname: lab-primary
+    ip: 127.0.0.1
+    specs: local offline simulation
+  pre_installed:
+  - bash
+  - coreutils
+  - javascript
+  - journalctl
+  - systemctl
+  credentials:
+  - user: root
+    password: lab123
+tasks:
+- id: task_1
+  title: Fix the Object Mutation in updateUser
+  description: Restore healthy behavior for Fix the Object Mutation in updateUser by investigating the
+    failure, applying the smallest safe fix, and validating the outcome.
+  background: 'This javascript lab teaches systematic troubleshooting: observe, hypothesize, change, verify.'
+  validation:
+    type: custom_script
+    script: hidden_tests
+    error_message: One or more hidden tests failed. Read the public test output, fix your solution, and
+      submit again.
+solution:
+  summary: The solution passes all hidden tests by implementing the required behavior in code.
+  files_changed: []
+  commands_run: []
+  reference_docs: javascript-fundamentals

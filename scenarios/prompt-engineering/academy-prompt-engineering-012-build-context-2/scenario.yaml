@@ -1,7 +1,7 @@
-title: 'Prompt Engineering & AI Mastery: Context Management — Build From Scratch'
+title: Context Management — Build Lab
 slug: academy-prompt-engineering-012-build-context-2
-technology: Prompt Engineering & AI Mastery
-category: Build Lab
+technology: prompt-engineering
+category: Build
 difficulty: medium
 scenario_type: do
 lab_mode: simulation
@@ -11,43 +11,129 @@ max_score: 100
 is_free: false
 infrastructure_type: docker
 jira_priority: Low
-description: Service operations lab. The `nginx` systemd unit is **failed/inactive** on this host — a
-  realistic fault for Build From Scratch workflows that depend on it. Diagnose with `systemctl status
-  nginx` and journal logs, apply the smallest reliable fix, then verify with `systemctl is-active nginx`.
+description: 'CONTEXT: A team operating prompt engineering needs you to resolve `prompt-engineering: Context
+  Management — Build From Scratch` during a realistic incident. The business impact is reduced service
+  reliability until the underlying state is repaired.
+
+
+  ENVIRONMENT: You are working in FixitLab''s offline LLM practice workspace with prompt templates, eval
+  sets, and tool configs. All tools run locally; no paid APIs or external cloud calls are required.
+
+
+  SYMPTOM / STARTING STATE: The LLM practice workspace is ready but context management is not configured
+  yet. Required tools may already be installed; your job is to create the configuration and bring the
+  capability online. Build context management from scratch in this prompt-engineering lab. You start from
+  a minimal environment and must produce a working configuration that demonstrates context windows and
+  retrieval. Plan, implement, then prove it works.
+
+
+  OBJECTIVE: A working context management setup must exist by the end of this lab; Configuration should
+  follow team conventions and be easy to audit; The result should pass validation without manual cleanup.
+  Success means `systemctl is-active nginx` returns active.
+
+
+  WHAT TO AVOID: Do not apply broad destructive changes, skip evidence gathering, or fake completion with
+  marker files — the checker validates real system state.'
 objectives:
-- The `nginx` service is active (running)
-- '`systemctl is-active nginx` returns active'
-- The fix survives a status re-check (no marker files)
-initial_state: The `nginx` service is not running (`systemctl is-active nginx` → inactive/failed). Dependent
-  Build From Scratch tasks cannot succeed until the unit is healthy again.
+- A working context management setup must exist by the end of this lab
+- Configuration should follow team conventions and be easy to audit
+- The result should pass validation without manual cleanup
+initial_state: The LLM practice workspace is ready but context management is not configured yet. Required
+  tools may already be installed; your job is to create the configuration and bring the capability online.
 hints:
 - order: 1
-  cost: 10
-  content: 'Orient yourself before changing anything:
-
-    1. Inspect the current state — the assembled context.
-
-    2. Write down what looks normal versus wrong or missing for context management.
-
-    3. Recall the core idea: context windows and retrieval. Form one hypothesis before you act.'
+  cost: 0
+  content: 'Where to look: A working context management setup must exist by the end of this lab'
 - order: 2
-  cost: 15
-  content: 'Plan your approach (still no spoilers):
-
-    1. Confirm the exact gap between current and desired state for context management.
-
-    2. Decide the single smallest change that moves you toward the objective.
-
-    3. Capture evidence (command output / status) before the change so you can prove it worked afterward.'
-- order: 3
   cost: 25
-  content: 'Guided walkthrough:
+  content: 'Diagnostic steps:
 
-    1. Re-check the current state — the assembled context.
+    1. Configuration should follow team conventions and be easy to audit
 
-    2. Create the smallest working slice of context management first, validate it, then add the remaining
-    pieces one at a time.
+    2. The result should pass validation without manual cleanup'
+- order: 3
+  cost: 50
+  content: 'Exact fix + verification:
 
-    3. Verify the result — the right context fits the window.
+    1. The result should pass validation without manual cleanup.
 
-    4. Click Check Solution once `systemctl is-active nginx` returns active.'
+    2. Re-run the lab checker (`check.sh` or Check Solution).
+
+    3. Confirm every scenario objective is satisfied.
+
+
+    WHY: the grader validates real state — marker files are ignored.'
+summary: Complete the context management — build lab prompt engineering lab and verify success with the
+  checker
+estimated_minutes: 15
+xp_reward: 100
+prerequisites:
+- Basic prompt engineering literacy
+tags:
+- do
+- hands-on
+- prompt-engineering
+linked_tutorial: prompt-engineering-fundamentals
+what_you_will_learn:
+- A working context management setup must exist by the end of this lab
+- Configuration should follow team conventions and be easy to audit
+- The result should pass validation without manual cleanup
+environment:
+  nodes:
+  - role: primary
+    os: FixitLab LLM practice workspace
+    hostname: lab-primary
+    ip: 127.0.0.1
+    specs: local offline simulation
+  pre_installed:
+  - bash
+  - coreutils
+  - journalctl
+  - prompt engineering
+  - systemctl
+  credentials:
+  - user: root
+    password: lab123
+tasks:
+- id: task_1
+  title: Context Management — Build Lab
+  description: Restore healthy behavior for Context Management — Build Lab by investigating the failure,
+    applying the smallest safe fix, and validating the outcome.
+  background: 'This prompt engineering lab teaches systematic troubleshooting: observe, hypothesize, change,
+    verify.'
+  validation:
+    type: service_active
+    command: systemctl is-active nginx
+    expected_status: active
+    error_message: The nginx service is not active yet. Check `systemctl status nginx` and `journalctl
+      -u nginx -n 50`.
+solution:
+  summary: The root cause is an unhealthy `nginx` service; repair it and verify active state.
+  files_changed: []
+  commands_run:
+  - systemctl is-active nginx
+  reference_docs: prompt-engineering-fundamentals
+guided_mode:
+  enabled: true
+  steps:
+  - step: 1
+    title: Inspect current state
+    instruction: Run a read-only diagnostic before changing anything.
+    command: systemctl is-active nginx
+    expected_output: Output shows the current failure mode
+    explanation: Evidence-first troubleshooting avoids guessing.
+    next_on: command_success
+  - step: 2
+    title: Apply the minimal fix
+    instruction: Make one reversible change aligned with the objectives.
+    command: '# your fix command here'
+    expected_output: State moves toward the objective
+    explanation: Small changes make rollback easy if the hypothesis was wrong.
+    next_on: command_success
+  - step: 3
+    title: Verify with the grader
+    instruction: Run the same verification the checker uses.
+    command: systemctl is-active nginx
+    expected_output: '`systemctl is-active nginx` returns active'
+    explanation: The lab passes only when real state is healthy.
+    next_on: command_success

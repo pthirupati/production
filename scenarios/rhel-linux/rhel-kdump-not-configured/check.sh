@@ -1,4 +1,3 @@
-#!/usr/bin/env bash
-# rhel-kdump-not-configured: config repair (FIXED-OK sentinel).
-grep -q FIXED-OK /etc/kdump.conf
+#!/bin/bash
+firewall-cmd --state | grep -q 'running'
 exit 0

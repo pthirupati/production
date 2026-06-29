@@ -1,9 +1,26 @@
 title: Fix the String-Concatenation Bug in addUp
 slug: js-fix-coercion-plus-concat
-category: JavaScript Development
-description: addUp(values) should numerically sum an array that may contain numeric STRINGS (like '3'),
-  but reduce uses `+` directly, so a string operand turns the whole thing into string concatenation ('0'
-  + 3 -> '03'). Coerce each value to a Number before adding.
+category: Fix
+description: 'CONTEXT: A team operating JavaScript needs you to resolve `Fix the String-Concatenation
+  Bug in addUp` during a realistic incident. The business impact is reduced service reliability until
+  the underlying state is repaired.
+
+
+  ENVIRONMENT: You are working in FixitLab''s offline JavaScript practice project with modules, browser
+  console, and Node tooling. All tools run locally; no paid APIs or external cloud calls are required.
+
+
+  SYMPTOM / STARTING STATE: addUp(values) should numerically sum an array that may contain numeric STRINGS
+  (like ''3''), but reduce uses `+` directly, so a string operand turns the whole thing into string concatenation
+  (''0'' + 3 -> ''03''). Coerce each value to a Number before adding.
+
+
+  OBJECTIVE: See numbers concatenated instead of added; Convert each value to a Number before summing;
+  Return a numeric total. Success means all hidden tests pass.
+
+
+  WHAT TO AVOID: Do not apply broad destructive changes, skip evidence gathering, or fake completion with
+  marker files — the checker validates real system state.'
 difficulty: easy
 scenario_type: fix
 lab_mode: simulation
@@ -21,51 +38,119 @@ objectives:
 initial_state: addUp(values) should numerically sum an array that may contain numeric STRINGS (like '3'),
   but reduce uses `+` directly, so a string operand turns the whole thing into string concatenation ('0'
   + 3 -> '03'). Coerce each value to a Number before adding.
-solution_explanation: |
-  A single string operand flips + into concatenation. Coercing each value with Number keeps the reduce arithmetic and returns a numeric total.
+solution_explanation: 'A single string operand flips + into concatenation. Coercing each value with Number
+  keeps the reduce arithmetic and returns a numeric total.
+
+  '
 coding_spec:
   language: javascript
   entrypoint: solution.js
   kind: fix
-  instructions: |
-    Fix addUp(values): return the numeric sum, coercing numeric strings.
-      addUp([1, '2', 3]) -> 6
-    Click Run to try it, then Check Solution to grade against all tests.
+  instructions: "Fix addUp(values): return the numeric sum, coercing numeric strings.\n  addUp([1, '2',\
+    \ 3]) -> 6\nClick Run to try it, then Check Solution to grade against all tests.\n"
   files:
   - path: solution.js
-    content: |
-      function addUp(values) {
-        return values.reduce((acc, v) => acc + v, 0); // '2' makes acc a string
-      }
+    content: "function addUp(values) {\n  return values.reduce((acc, v) => acc + v, 0); // '2' makes acc\
+      \ a string\n}\n"
     readonly: false
   visible_tests:
   - name: mixed strings and numbers
-    code: |
-      assert(addUp([1, '2', 3]) === 6, addUp([1, '2', 3]));
+    code: 'assert(addUp([1, ''2'', 3]) === 6, addUp([1, ''2'', 3]));
+
+      '
   - name: all numbers
-    code: |
-      assert(addUp([1, 2, 3]) === 6);
+    code: 'assert(addUp([1, 2, 3]) === 6);
+
+      '
   hidden_tests:
   - name: all strings
-    code: |
-      assert(addUp(['10', '20']) === 30, addUp(['10', '20']));
+    code: 'assert(addUp([''10'', ''20'']) === 30, addUp([''10'', ''20'']));
+
+      '
   - name: returns a number
-    code: |
-      assert(typeof addUp(['1', 2]) === 'number' && addUp(['1', 2]) === 3);
+    code: 'assert(typeof addUp([''1'', 2]) === ''number'' && addUp([''1'', 2]) === 3);
+
+      '
   - name: empty is zero
-    code: |
-      assert(addUp([]) === 0);
+    code: 'assert(addUp([]) === 0);
+
+      '
   - name: negatives as strings
-    code: |
-      assert(addUp(['-5', 5]) === 0);
+    code: 'assert(addUp([''-5'', 5]) === 0);
+
+      '
   timeout: 8
 hints:
 - order: 1
-  cost: 10
-  content: addUp([1, '2', 3]) returns '0123' — once acc meets a string, + concatenates.
+  cost: 0
+  content: 'Where to look: Open `solution.js`, read the instructions, and run the visible tests to see
+    which assertion fails first.'
 - order: 2
-  cost: 20
-  content: The + operator concatenates if either side is a string.
+  cost: 25
+  content: 'Diagnostic steps:
+
+    1. Click Run and read the traceback — note line number and actual vs expected values.
+
+    2. Reproduce the failure with the smallest input from a visible test.
+
+    3. Compare your implementation to the bug described in the lab prompt.'
 - order: 3
-  cost: 30
-  content: 'Add Number(v) (or +v) so every operand is numeric: acc + Number(v).'
+  cost: 50
+  content: 'Exact fix + verification:
+
+    1. Convert each value to a Number before summing.
+
+    2. Re-run the lab checker (`check.sh` or Check Solution).
+
+    3. Confirm every scenario objective is satisfied.
+
+
+    WHY: the grader validates real state — marker files are ignored.'
+technology: javascript
+summary: Complete the fix the string-concatenation bug in addup javascript lab and verify success with
+  the checker
+estimated_minutes: 25
+xp_reward: 100
+prerequisites:
+- Basic javascript literacy
+tags:
+- fix
+- hands-on
+- javascript
+linked_tutorial: javascript-fundamentals
+what_you_will_learn:
+- See numbers concatenated instead of added
+- Convert each value to a Number before summing
+- Return a numeric total
+environment:
+  nodes:
+  - role: primary
+    os: FixitLab JavaScript practice project
+    hostname: lab-primary
+    ip: 127.0.0.1
+    specs: local offline simulation
+  pre_installed:
+  - bash
+  - coreutils
+  - javascript
+  - journalctl
+  - systemctl
+  credentials:
+  - user: root
+    password: lab123
+tasks:
+- id: task_1
+  title: Fix the String-Concatenation Bug in addUp
+  description: Restore healthy behavior for Fix the String-Concatenation Bug in addUp by investigating
+    the failure, applying the smallest safe fix, and validating the outcome.
+  background: 'This javascript lab teaches systematic troubleshooting: observe, hypothesize, change, verify.'
+  validation:
+    type: custom_script
+    script: hidden_tests
+    error_message: One or more hidden tests failed. Read the public test output, fix your solution, and
+      submit again.
+solution:
+  summary: The solution passes all hidden tests by implementing the required behavior in code.
+  files_changed: []
+  commands_run: []
+  reference_docs: javascript-fundamentals

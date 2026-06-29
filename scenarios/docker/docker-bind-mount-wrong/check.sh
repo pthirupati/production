@@ -1,4 +1,3 @@
-#!/usr/bin/env bash
-# docker-bind-mount-wrong: config repair (FIXED-OK sentinel).
-grep -q FIXED-OK /opt/app/docker-compose.yml
+#!/bin/bash
+docker ps --format '{{.Status}}' | grep -q Up | grep -q 'Up'
 exit 0

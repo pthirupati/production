@@ -2,8 +2,8 @@ title: User Has Invalid Primary Group
 slug: user-invalid-primary-group
 lab_mode: simulation
 simulation_type: generic
-technology: Linux
-category: User Management
+technology: linux
+category: Fix
 difficulty: medium
 time_limit: 900
 max_score: 100
@@ -11,9 +11,28 @@ infrastructure_type: docker
 docker_privileged: false
 jira_priority: Medium
 topics_covered: Q21 primary group — usermod -g
-description: User 'baduser' can't log in because the primary GID listed in /etc/passwd doesn't correspond
-  to any group in /etc/group. The login process can't resolve the user's primary group, so the session
-  setup fails. Point the user at a valid primary group (or create the missing group) so login works.
+description: 'CONTEXT: A team operating Linux administration needs you to resolve `User Has Invalid Primary
+  Group` during a realistic incident. The business impact is reduced service reliability until the underlying
+  state is repaired.
+
+
+  ENVIRONMENT: You are working in FixitLab''s offline Linux practice server with terminal and config files
+  under /etc and /var. All tools run locally; no paid APIs or external cloud calls are required.
+
+
+  SYMPTOM / STARTING STATE: Linux server where baduser''s primary GID in /etc/passwd references a non-existent
+  group, breaking login. User ''baduser'' can''t log in because the primary GID listed in /etc/passwd
+  doesn''t correspond to any group in /etc/group. The login process can''t resolve the user''s primary
+  group, so the session setup fails. Point the user at a valid primary group (or create the missing group)
+  so login works.
+
+
+  OBJECTIVE: Confirm baduser''s primary GID has no matching group entry; Assign a valid primary group
+  (or create the missing one); Verify baduser can log in. Success means `check.sh` exits successfully.
+
+
+  WHAT TO AVOID: Do not apply broad destructive changes, skip evidence gathering, or fake completion with
+  marker files — the checker validates real system state.'
 objectives:
 - Confirm baduser's primary GID has no matching group entry
 - Assign a valid primary group (or create the missing one)
@@ -22,14 +41,68 @@ initial_state: Linux server where baduser's primary GID in /etc/passwd reference
   breaking login.
 hints:
 - order: 1
-  cost: 10
-  content: 'Compare the user''s GID to existing groups: `getent passwd baduser` (note the GID) vs `getent
-    group <GID>` (returns nothing — that''s the problem).'
+  cost: 0
+  content: 'Where to look: Confirm baduser''s primary GID has no matching group entry'
 - order: 2
-  cost: 15
-  content: 'Fix it: set a valid primary group with `usermod -g <existing-group> baduser`, or create the
-    intended group (`groupadd -g <GID> <name>`) if it should exist.'
+  cost: 25
+  content: 'Diagnostic steps:
+
+    1. Assign a valid primary group (or create the missing one)'
 - order: 3
-  cost: 20
-  content: 'Verify resolution and login: `id baduser` shows a valid primary group and `su - baduser` opens
-    a shell.'
+  cost: 50
+  content: 'Exact fix + verification:
+
+    1. Assign a valid primary group (or create the missing one).
+
+    2. Re-run the lab checker (`check.sh` or Check Solution).
+
+    3. Confirm every scenario objective is satisfied.
+
+
+    WHY: the grader validates real state — marker files are ignored.'
+summary: Complete the user has invalid primary group linux lab and verify success with the checker
+estimated_minutes: 15
+xp_reward: 100
+prerequisites:
+- Basic linux literacy
+tags:
+- fix
+- hands-on
+- linux
+linked_tutorial: linux-fundamentals
+what_you_will_learn:
+- Confirm baduser's primary GID has no matching group entry
+- Assign a valid primary group (or create the missing one)
+- Verify baduser can log in
+environment:
+  nodes:
+  - role: primary
+    os: FixitLab Linux practice server
+    hostname: lab-primary
+    ip: 127.0.0.1
+    specs: local offline simulation
+  pre_installed:
+  - bash
+  - coreutils
+  - journalctl
+  - linux
+  - systemctl
+  credentials:
+  - user: root
+    password: lab123
+tasks:
+- id: task_1
+  title: User Has Invalid Primary Group
+  description: Restore healthy behavior for User Has Invalid Primary Group by investigating the failure,
+    applying the smallest safe fix, and validating the outcome.
+  background: 'This linux lab teaches systematic troubleshooting: observe, hypothesize, change, verify.'
+  validation:
+    type: custom_script
+    script: check.sh
+    error_message: Validation did not pass. Re-read the objectives and Hint 2 diagnostic steps.
+solution:
+  summary: Identify the misconfiguration affecting this linux lab and apply the minimal fix.
+  files_changed: []
+  commands_run:
+  - bash check.sh
+  reference_docs: linux-fundamentals

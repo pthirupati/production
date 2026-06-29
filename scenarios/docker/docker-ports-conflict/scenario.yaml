@@ -1,7 +1,7 @@
 title: Compose Port Already in Use
 slug: docker-ports-conflict
-technology: Docker
-category: Networking
+technology: docker
+category: Build
 difficulty: easy
 lab_mode: simulation
 simulation_type: generic
@@ -10,7 +10,25 @@ max_score: 100
 is_free: true
 jira_priority: High
 dual_terminal: false
-description: A container won't start because its published port collides with another service.
+description: 'CONTEXT: A team operating Docker containers needs you to resolve `Compose Port Already in
+  Use` during a realistic incident. The business impact is reduced service reliability until the underlying
+  state is repaired.
+
+
+  ENVIRONMENT: You are working in FixitLab''s offline Docker host with docker CLI, images, containers,
+  and compose files. All tools run locally; no paid APIs or external cloud calls are required.
+
+
+  SYMPTOM / STARTING STATE: A compose service with a conflicting host port. A container won''t start because
+  its published port collides with another service.
+
+
+  OBJECTIVE: Confirm the issue: ''port is already allocated''; Apply the documented fix in /opt/app/docker-compose.yml;
+  Verify the configuration is corrected. Success means `check.sh` exits successfully.
+
+
+  WHAT TO AVOID: Do not apply broad destructive changes, skip evidence gathering, or fake completion with
+  marker files — the checker validates real system state.'
 initial_state: A compose service with a conflicting host port.
 objectives:
 - 'Confirm the issue: ''port is already allocated'''
@@ -18,11 +36,95 @@ objectives:
 - Verify the configuration is corrected
 hints:
 - order: 1
-  cost: 10
-  content: '''port is already allocated'''
+  cost: 0
+  content: 'Where to look: Run `docker ps -a` and `docker logs <container>` for the failing container.'
 - order: 2
-  cost: 15
-  content: Change the published host port.
+  cost: 25
+  content: 'Diagnostic steps:
+
+    1. `docker ps -a` — note Exited status and exit code.
+
+    2. `docker logs <name>` for the startup error.
+
+    3. Inspect the Dockerfile or `docker run` flags if the image is wrong.'
 - order: 3
-  cost: 20
-  content: /opt/app/docker-compose.yml carries the corrected configuration.
+  cost: 50
+  content: 'Exact fix + verification:
+
+    1. Fix image, port mapping, volume, or env configuration.
+
+    2. `docker start <name>` or re-run with corrected flags.
+
+    3. Confirm `bash check.sh` shows the container Up.
+
+
+    WHY: the checker validates the container is actually running.'
+summary: Complete the compose port already in use docker lab and verify success with the checker
+estimated_minutes: 20
+xp_reward: 100
+prerequisites:
+- Basic docker literacy
+tags:
+- docker
+- fix
+- hands-on
+linked_tutorial: docker-fundamentals
+what_you_will_learn:
+- 'Confirm the issue: ''port is already allocated'''
+- Apply the documented fix in /opt/app/docker-compose.yml
+- Verify the configuration is corrected
+environment:
+  nodes:
+  - role: primary
+    os: FixitLab Docker host
+    hostname: lab-primary
+    ip: 127.0.0.1
+    specs: local offline simulation
+  pre_installed:
+  - bash
+  - coreutils
+  - docker
+  - docker-compose
+  credentials:
+  - user: root
+    password: lab123
+tasks:
+- id: task_1
+  title: Compose Port Already in Use
+  description: Restore healthy behavior for Compose Port Already in Use by investigating the failure,
+    applying the smallest safe fix, and validating the outcome.
+  background: 'This docker lab teaches systematic troubleshooting: observe, hypothesize, change, verify.'
+  validation:
+    type: custom_script
+    script: check.sh
+    error_message: Validation did not pass. Re-read the objectives and Hint 2 diagnostic steps.
+solution:
+  summary: Identify the misconfiguration affecting this docker lab and apply the minimal fix.
+  files_changed: []
+  commands_run:
+  - bash check.sh
+  reference_docs: docker-fundamentals
+guided_mode:
+  enabled: true
+  steps:
+  - step: 1
+    title: Inspect current state
+    instruction: Run a read-only diagnostic before changing anything.
+    command: check.sh
+    expected_output: Output shows the current failure mode
+    explanation: Evidence-first troubleshooting avoids guessing.
+    next_on: command_success
+  - step: 2
+    title: Apply the minimal fix
+    instruction: Make one reversible change aligned with the objectives.
+    command: '# your fix command here'
+    expected_output: State moves toward the objective
+    explanation: Small changes make rollback easy if the hypothesis was wrong.
+    next_on: command_success
+  - step: 3
+    title: Verify with the grader
+    instruction: Run the same verification the checker uses.
+    command: check.sh
+    expected_output: '`check.sh` exits successfully'
+    explanation: The lab passes only when real state is healthy.
+    next_on: command_success

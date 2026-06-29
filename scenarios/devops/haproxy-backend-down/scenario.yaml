@@ -1,37 +1,151 @@
 title: Fix HAProxy Backend Health Check Path
 slug: haproxy-backend-down
-technology: DevOps
-category: Load Balancing
+technology: devops
+category: Build
 difficulty: medium
 time_limit: 900
 max_score: 100
 infrastructure_type: docker
 jira_priority: High
 is_free: false
-description: |
-  HAProxy is showing all backend servers as DOWN in the stats page. The health
-  checks are sending HTTP requests to /health but the application's actual
-  health endpoint is at /api/health. Fix the health check path in
-  haproxy.cfg so backends show as UP and traffic can be served.
-objectives:
-  - Check HAProxy stats to confirm all backends are DOWN
-  - Identify the incorrect health check path in haproxy.cfg
-  - Fix the option httpchk path from /health to /api/health
-  - Reload HAProxy and verify backends show as UP
-initial_state: |
-  Ubuntu server running HAProxy. Config at /etc/haproxy/haproxy.cfg.
+description: 'CONTEXT: A team operating DevOps delivery needs you to resolve `Fix HAProxy Backend Health
+  Check Path` during a realistic incident. The business impact is reduced service reliability until the
+  underlying state is repaired.
+
+
+  ENVIRONMENT: You are working in FixitLab''s offline CI/CD lab with git repos, pipelines, artifacts,
+  and runbooks. All tools run locally; no paid APIs or external cloud calls are required.
+
+
+  SYMPTOM / STARTING STATE: Ubuntu server running HAProxy. Config at /etc/haproxy/haproxy.cfg.
+
   The backend section uses "option httpchk GET /health" but the app
+
+  health endpoint is at /api/health — returns 404 causing health check failure. HAProxy is showing all
+  backend servers as DOWN in the stats page. The health
+
+  checks are sending HTTP requests to /health but the application''s actual
+
+  health endpoint is at /api/health. Fix the health check path in
+
+  haproxy.cfg so backends show as UP and traffic can be served.
+
+
+  OBJECTIVE: Check HAProxy stats to confirm all backends are DOWN; Identify the incorrect health check
+  path in haproxy.cfg; Fix the option httpchk path from /health to /api/health. Success means `systemctl
+  is-active haproxy` returns active.
+
+
+  WHAT TO AVOID: Do not apply broad destructive changes, skip evidence gathering, or fake completion with
+  marker files — the checker validates real system state.'
+objectives:
+- Check HAProxy stats to confirm all backends are DOWN
+- Identify the incorrect health check path in haproxy.cfg
+- Fix the option httpchk path from /health to /api/health
+- Reload HAProxy and verify backends show as UP
+initial_state: 'Ubuntu server running HAProxy. Config at /etc/haproxy/haproxy.cfg.
+
+  The backend section uses "option httpchk GET /health" but the app
+
   health endpoint is at /api/health — returns 404 causing health check failure.
+
+  '
 hints:
-  - order: 1
-    cost: 10
-    content: "Check haproxy stats: curl -s http://localhost:9000/stats | grep -i backend"
-  - order: 2
-    cost: 15
-    content: "View backend config: cat /etc/haproxy/haproxy.cfg | grep -A20 'backend'"
-  - order: 3
-    cost: 20
-    content: "Find the line: option httpchk GET /health — the path is wrong"
-  - order: 4
-    cost: 25
-    content: "Change to: option httpchk GET /api/health then reload: systemctl reload haproxy"
+- order: 1
+  cost: 0
+  content: 'Where to look: Start with `systemctl status haproxy` and `journalctl -u haproxy -n 50 --no-pager`
+    before changing anything.'
+- order: 2
+  cost: 25
+  content: 'Diagnostic steps:
+
+    1. Run `systemctl status haproxy` — note Active/Failed and the last log lines.
+
+    2. Read `journalctl -u haproxy -n 50` for the root error.
+
+    3. Form a hypothesis about the smallest config or permission fix.'
+- order: 3
+  cost: 50
+  content: 'Exact fix + verification:
+
+    1. Apply the minimal fix (config, unit override, or missing directory).
+
+    2. Run `systemctl daemon-reload` if you edited a unit file.
+
+    3. Run `systemctl restart haproxy` and confirm `systemctl is-active haproxy` succeeds.
+
+
+    WHY: the grader checks real service state, not marker files.'
+summary: Complete the fix haproxy backend health check path devops lab and verify success with the checker
+estimated_minutes: 15
+xp_reward: 100
+prerequisites:
+- Basic devops literacy
+tags:
+- devops
+- fix
+- hands-on
+linked_tutorial: devops-fundamentals
+what_you_will_learn:
+- Check HAProxy stats to confirm all backends are DOWN
+- Identify the incorrect health check path in haproxy.cfg
+- Fix the option httpchk path from /health to /api/health
+- Reload HAProxy and verify backends show as UP
+environment:
+  nodes:
+  - role: primary
+    os: FixitLab CI/CD lab
+    hostname: lab-primary
+    ip: 127.0.0.1
+    specs: local offline simulation
+  pre_installed:
+  - bash
+  - coreutils
+  - devops
+  - journalctl
+  - systemctl
+  credentials:
+  - user: root
+    password: lab123
+tasks:
+- id: task_1
+  title: Fix HAProxy Backend Health Check Path
+  description: Restore healthy behavior for Fix HAProxy Backend Health Check Path by investigating the
+    failure, applying the smallest safe fix, and validating the outcome.
+  background: 'This devops lab teaches systematic troubleshooting: observe, hypothesize, change, verify.'
+  validation:
+    type: service_active
+    command: systemctl is-active haproxy
+    expected_status: active
+    error_message: The haproxy service is not active yet. Check `systemctl status haproxy` and `journalctl
+      -u haproxy -n 50`.
+solution:
+  summary: The root cause is an unhealthy `haproxy` service; repair it and verify active state.
+  files_changed: []
+  commands_run:
+  - systemctl is-active haproxy
+  reference_docs: devops-fundamentals
+guided_mode:
+  enabled: true
+  steps:
+  - step: 1
+    title: Inspect current state
+    instruction: Run a read-only diagnostic before changing anything.
+    command: systemctl is-active haproxy
+    expected_output: Output shows the current failure mode
+    explanation: Evidence-first troubleshooting avoids guessing.
+    next_on: command_success
+  - step: 2
+    title: Apply the minimal fix
+    instruction: Make one reversible change aligned with the objectives.
+    command: '# your fix command here'
+    expected_output: State moves toward the objective
+    explanation: Small changes make rollback easy if the hypothesis was wrong.
+    next_on: command_success
+  - step: 3
+    title: Verify with the grader
+    instruction: Run the same verification the checker uses.
+    command: systemctl is-active haproxy
+    expected_output: '`systemctl is-active haproxy` returns active'
+    explanation: The lab passes only when real state is healthy.
+    next_on: command_success

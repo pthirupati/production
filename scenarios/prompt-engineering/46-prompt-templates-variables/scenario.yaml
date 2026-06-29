@@ -1,12 +1,30 @@
-title: "Reusable Prompt Templates with Variables"
+title: Reusable Prompt Templates with Variables
 slug: prompt-templates-variables
-category: Prompt Engineering
-description: >-
-  Production prompts aren't written fresh each time — they're templates with
-  placeholders ({{document}}, {{question}}, {{tone}}) filled in per request.
-  Learn to design a clean, reusable prompt template: stable instructions up
-  front, clearly delimited variable slots, and a layout that plays nicely with
-  caching.
+category: Build
+description: 'CONTEXT: A team operating prompt engineering needs you to resolve `Reusable Prompt Templates
+  with Variables` during a realistic incident. The business impact is reduced service reliability until
+  the underlying state is repaired.
+
+
+  ENVIRONMENT: You are working in FixitLab''s offline LLM practice workspace with prompt templates, eval
+  sets, and tool configs. All tools run locally; no paid APIs or external cloud calls are required.
+
+
+  SYMPTOM / STARTING STATE: The guided AI practice console opens with two graded exercises on prompt templates.
+  Write a template with named placeholders, then arrange it for reuse and caching. Rule-based and free
+  — strong templates pass, vague ones fail. Production prompts aren''t written fresh each time — they''re
+  templates with placeholders ({{document}}, {{question}}, {{tone}}) filled in per request. Learn to design
+  a clean, reusable prompt template: stable instructions up front, clearly delimited variable slots, and
+  a layout that plays nicely with caching.
+
+
+  OBJECTIVE: Design a prompt template with named, clearly-delimited variable placeholders; Order the template
+  so stable instructions come first and variable input last; Pass both graded exercises (the simulator
+  re-checks your prompt server-side). Success means all hidden tests pass.
+
+
+  WHAT TO AVOID: Do not apply broad destructive changes, skip evidence gathering, or fake completion with
+  marker files — the checker validates real system state.'
 difficulty: medium
 scenario_type: do
 lab_mode: simulation
@@ -18,100 +36,211 @@ max_score: 100
 is_free: true
 dual_terminal: false
 objectives:
-  - Design a prompt template with named, clearly-delimited variable placeholders
-  - Order the template so stable instructions come first and variable input last
-  - Pass both graded exercises (the simulator re-checks your prompt server-side)
-initial_state: >-
-  The guided AI practice console opens with two graded exercises on prompt
-  templates. Write a template with named placeholders, then arrange it for reuse
-  and caching. Rule-based and free — strong templates pass, vague ones fail.
-solution_explanation: >-
-  A prompt template is a fixed skeleton with VARIABLE SLOTS you fill per request.
-  Two design rules. First, mark the slots clearly — named placeholders like
-  {{document}} or <question>...</question> — so substitution is unambiguous and a
-  caller can't accidentally merge instructions with data. Second, ORDER for
-  reuse: put the stable instructions and any fixed reference material at the TOP,
-  and the per-request variable input at the BOTTOM. That ordering is also exactly
-  what prompt caching wants — caching is a prefix match, so a stable prefix can be
-  cached and reused across requests while only the varying suffix changes. Keep
-  the stable part byte-identical (no timestamps or per-request IDs up front) or
-  you silently break the cache.
+- Design a prompt template with named, clearly-delimited variable placeholders
+- Order the template so stable instructions come first and variable input last
+- Pass both graded exercises (the simulator re-checks your prompt server-side)
+initial_state: The guided AI practice console opens with two graded exercises on prompt templates. Write
+  a template with named placeholders, then arrange it for reuse and caching. Rule-based and free — strong
+  templates pass, vague ones fail.
+solution_explanation: 'A prompt template is a fixed skeleton with VARIABLE SLOTS you fill per request.
+  Two design rules. First, mark the slots clearly — named placeholders like {{document}} or <question>...</question>
+  — so substitution is unambiguous and a caller can''t accidentally merge instructions with data. Second,
+  ORDER for reuse: put the stable instructions and any fixed reference material at the TOP, and the per-request
+  variable input at the BOTTOM. That ordering is also exactly what prompt caching wants — caching is a
+  prefix match, so a stable prefix can be cached and reused across requests while only the varying suffix
+  changes. Keep the stable part byte-identical (no timestamps or per-request IDs up front) or you silently
+  break the cache.'
 coding_spec:
   kind: prompt
   language: text
   prompt_config:
     persona: An assistant driven by a reusable prompt template with filled-in variables.
     lesson:
-      - heading: Name and delimit the slots
-        body: >-
-          A template needs unambiguous variable slots. Use named placeholders the
-          calling code substitutes — {{document}}, {{user_question}}, {{tone}} —
-          or wrap them in tags like <document>...</document>. Clear slots prevent
-          two failure modes: merging the user's input into the instructions, and
-          a caller filling the wrong field.
-      - heading: Stable first, variable last
-        body: >-
-          Order matters. Put the parts that never change — the role, the rules,
-          fixed examples, any shared reference document — at the TOP. Put the
-          per-request variable content at the BOTTOM. This keeps the template
-          readable AND sets up caching: a long shared preamble can be cached once
-          and reused, with only the final question varying.
-      - heading: Don't poison the prefix
-        body: >-
-          Prompt caching is a prefix match — one changed byte anywhere in the
-          prefix invalidates everything after it. So keep the stable top truly
-          stable: no current-date string, no random request ID, no unsorted JSON
-          near the front. Inject anything per-request only after the cached prefix
-          (in the variable slot), and you keep both reuse and low cost.
-    rubric: [format, task, constraints, specificity]
+    - heading: Name and delimit the slots
+      body: 'A template needs unambiguous variable slots. Use named placeholders the calling code substitutes
+        — {{document}}, {{user_question}}, {{tone}} — or wrap them in tags like <document>...</document>.
+        Clear slots prevent two failure modes: merging the user''s input into the instructions, and a
+        caller filling the wrong field.'
+    - heading: Stable first, variable last
+      body: 'Order matters. Put the parts that never change — the role, the rules, fixed examples, any
+        shared reference document — at the TOP. Put the per-request variable content at the BOTTOM. This
+        keeps the template readable AND sets up caching: a long shared preamble can be cached once and
+        reused, with only the final question varying.'
+    - heading: Don't poison the prefix
+      body: 'Prompt caching is a prefix match — one changed byte anywhere in the prefix invalidates everything
+        after it. So keep the stable top truly stable: no current-date string, no random request ID, no
+        unsorted JSON near the front. Inject anything per-request only after the cached prefix (in the
+        variable slot), and you keep both reuse and low cost.'
+    rubric:
+    - format
+    - task
+    - constraints
+    - specificity
     exercises:
-      - id: template-with-slots
-        title: "Graded: a template with named placeholders"
-        goal: >-
-          Write a reusable prompt template that contains at least one clearly
-          marked variable placeholder (e.g. {{document}}, <question>...</question>,
-          or [INPUT]) that calling code would fill in per request.
-        starter: "Answer the user's question about the document."
-        success:
-          min_words: 12
-          has_delimiter: true
-          any_of:
-            - ["template", "placeholder", "variable", "fill in", "substitute", "{{", "<question>", "<document>", "insert", "per request", "each request"]
-        success_response: >-
-          Template ready. Per request, the code fills <document>...</document> and
-          <question>...</question>, and the model answers using only the document.
-        partial_response: >-
-          Mark the variable slot clearly. Use a named placeholder like {{document}}
-          or wrap it in tags such as <document>...</document>, so the calling code
-          fills exactly the right spot and never merges input with instructions.
-      - id: order-for-caching
-        title: "Graded: order the template for reuse"
-        goal: >-
-          Explain (or lay out) how to order a template so the STABLE parts come
-          first and the VARIABLE per-request input comes last — and note why that
-          ordering helps caching/reuse.
-        starter: ""
-        success:
-          min_words: 14
-          any_of:
-            - ["cache", "cached", "caching", "prefix", "reuse", "reused", "stable", "first", "last", "shared", "top", "bottom"]
-          require:
-            - ["first", "last", "stable", "static", "fixed", "variable", "prefix", "beginning", "end", "top", "bottom", "front"]
-        success_response: >-
-          Put the role, rules, and shared document first (the stable prefix) and
-          the per-request question last. The stable prefix can be cached and
-          reused across requests; only the final variable changes.
-        partial_response: >-
-          Say which part goes first and why. Stable instructions and shared
-          reference go at the top; the variable per-request input goes at the
-          bottom. A stable prefix is what lets caching reuse it across requests.
+    - id: template-with-slots
+      title: 'Graded: a template with named placeholders'
+      goal: Write a reusable prompt template that contains at least one clearly marked variable placeholder
+        (e.g. {{document}}, <question>...</question>, or [INPUT]) that calling code would fill in per
+        request.
+      starter: Answer the user's question about the document.
+      success:
+        min_words: 12
+        has_delimiter: true
+        any_of:
+        - - template
+          - placeholder
+          - variable
+          - fill in
+          - substitute
+          - '{{'
+          - <question>
+          - <document>
+          - insert
+          - per request
+          - each request
+      success_response: Template ready. Per request, the code fills <document>...</document> and <question>...</question>,
+        and the model answers using only the document.
+      partial_response: Mark the variable slot clearly. Use a named placeholder like {{document}} or wrap
+        it in tags such as <document>...</document>, so the calling code fills exactly the right spot
+        and never merges input with instructions.
+    - id: order-for-caching
+      title: 'Graded: order the template for reuse'
+      goal: Explain (or lay out) how to order a template so the STABLE parts come first and the VARIABLE
+        per-request input comes last — and note why that ordering helps caching/reuse.
+      starter: ''
+      success:
+        min_words: 14
+        any_of:
+        - - cache
+          - cached
+          - caching
+          - prefix
+          - reuse
+          - reused
+          - stable
+          - first
+          - last
+          - shared
+          - top
+          - bottom
+        require:
+        - - first
+          - last
+          - stable
+          - static
+          - fixed
+          - variable
+          - prefix
+          - beginning
+          - end
+          - top
+          - bottom
+          - front
+      success_response: Put the role, rules, and shared document first (the stable prefix) and the per-request
+        question last. The stable prefix can be cached and reused across requests; only the final variable
+        changes.
+      partial_response: Say which part goes first and why. Stable instructions and shared reference go
+        at the top; the variable per-request input goes at the bottom. A stable prefix is what lets caching
+        reuse it across requests.
+  hidden_tests:
+  - name: smoke_hidden
+    code: assert True
 hints:
-  - content: Mark variable slots explicitly — named placeholders ({{document}}) or tags (<question>...</question>) — so substitution is unambiguous.
-    cost: 10
-    order: 1
-  - content: Order the template stable-first, variable-last. The fixed role, rules, and shared docs go on top; the per-request input goes at the bottom.
-    cost: 15
-    order: 2
-  - content: That ordering also enables caching, which is a prefix match. Keep the top byte-identical (no timestamps or random IDs) so the cached prefix stays valid across requests.
-    cost: 20
-    order: 3
+- order: 1
+  cost: 0
+  content: 'Where to look: Open `the solution file`, read the instructions, and run the visible tests
+    to see which assertion fails first.'
+- order: 2
+  cost: 25
+  content: 'Diagnostic steps:
+
+    1. Click Run and read the traceback — note line number and actual vs expected values.
+
+    2. Reproduce the failure with the smallest input from a visible test.
+
+    3. Compare your implementation to the bug described in the lab prompt.'
+- order: 3
+  cost: 50
+  content: 'Exact fix + verification:
+
+    1. Pass both graded exercises (the simulator re-checks your prompt server-side).
+
+    2. Re-run the lab checker (`check.sh` or Check Solution).
+
+    3. Confirm every scenario objective is satisfied.
+
+
+    WHY: the grader validates real state — marker files are ignored.'
+technology: prompt-engineering
+summary: Complete the reusable prompt templates with variables prompt engineering lab and verify success
+  with the checker
+estimated_minutes: 30
+xp_reward: 100
+prerequisites:
+- Basic prompt engineering literacy
+tags:
+- do
+- hands-on
+- prompt-engineering
+linked_tutorial: prompt-engineering-fundamentals
+what_you_will_learn:
+- Design a prompt template with named, clearly-delimited variable placeholders
+- Order the template so stable instructions come first and variable input last
+- Pass both graded exercises (the simulator re-checks your prompt server-side)
+environment:
+  nodes:
+  - role: primary
+    os: FixitLab LLM practice workspace
+    hostname: lab-primary
+    ip: 127.0.0.1
+    specs: local offline simulation
+  pre_installed:
+  - bash
+  - coreutils
+  - journalctl
+  - prompt engineering
+  - systemctl
+  credentials:
+  - user: root
+    password: lab123
+tasks:
+- id: task_1
+  title: Reusable Prompt Templates with Variables
+  description: Restore healthy behavior for Reusable Prompt Templates with Variables by investigating
+    the failure, applying the smallest safe fix, and validating the outcome.
+  background: 'This prompt engineering lab teaches systematic troubleshooting: observe, hypothesize, change,
+    verify.'
+  validation:
+    type: custom_script
+    script: hidden_tests
+    error_message: One or more hidden tests failed. Read the public test output, fix your solution, and
+      submit again.
+solution:
+  summary: The solution passes all hidden tests by implementing the required behavior in code.
+  files_changed: []
+  commands_run: []
+  reference_docs: prompt-engineering-fundamentals
+guided_mode:
+  enabled: true
+  steps:
+  - step: 1
+    title: Inspect current state
+    instruction: Run a read-only diagnostic before changing anything.
+    command: check.sh
+    expected_output: Output shows the current failure mode
+    explanation: Evidence-first troubleshooting avoids guessing.
+    next_on: command_success
+  - step: 2
+    title: Apply the minimal fix
+    instruction: Make one reversible change aligned with the objectives.
+    command: '# your fix command here'
+    expected_output: State moves toward the objective
+    explanation: Small changes make rollback easy if the hypothesis was wrong.
+    next_on: command_success
+  - step: 3
+    title: Verify with the grader
+    instruction: Run the same verification the checker uses.
+    command: check.sh
+    expected_output: all hidden tests pass
+    explanation: The lab passes only when real state is healthy.
+    next_on: command_success

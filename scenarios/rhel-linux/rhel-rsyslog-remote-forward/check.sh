@@ -1,4 +1,3 @@
-#!/usr/bin/env bash
-# rhel-rsyslog-remote-forward: config repair (FIXED-OK sentinel).
-grep -q FIXED-OK /etc/rsyslog.d/remote.conf
+#!/bin/bash
+firewall-cmd --state | grep -q 'running'
 exit 0

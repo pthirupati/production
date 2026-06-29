@@ -1,11 +1,29 @@
-title: "Guardrails & Refusal Handling"
+title: Guardrails & Refusal Handling
 slug: guardrails-and-refusals
-category: Prompt Engineering
-description: >-
-  A production assistant needs boundaries: stay on topic, refuse what it shouldn't
-  do, and decline gracefully. Learn to write guardrails that scope an assistant,
-  define a clear refusal style, and avoid both over-refusing legitimate requests
-  and under-refusing harmful ones.
+category: Build
+description: 'CONTEXT: A team operating prompt engineering needs you to resolve `Guardrails & Refusal
+  Handling` during a realistic incident. The business impact is reduced service reliability until the
+  underlying state is repaired.
+
+
+  ENVIRONMENT: You are working in FixitLab''s offline LLM practice workspace with prompt templates, eval
+  sets, and tool configs. All tools run locally; no paid APIs or external cloud calls are required.
+
+
+  SYMPTOM / STARTING STATE: The guided AI practice console opens. Practice writing a system prompt that
+  scopes an assistant and defines how it should refuse off-topic or disallowed requests. Rule-based and
+  free. A production assistant needs boundaries: stay on topic, refuse what it shouldn''t do, and decline
+  gracefully. Learn to write guardrails that scope an assistant, define a clear refusal style, and avoid
+  both over-refusing legitimate requests and under-refusing harmful ones.
+
+
+  OBJECTIVE: Write scope guardrails that keep an assistant on-topic; Define a graceful refusal style with
+  a redirect; Balance over-refusal vs under-refusal of edge-case requests. Success means all hidden tests
+  pass.
+
+
+  WHAT TO AVOID: Do not apply broad destructive changes, skip evidence gathering, or fake completion with
+  marker files — the checker validates real system state.'
 difficulty: medium
 scenario_type: do
 lab_mode: simulation
@@ -17,104 +35,213 @@ max_score: 100
 is_free: true
 dual_terminal: false
 objectives:
-  - Write scope guardrails that keep an assistant on-topic
-  - Define a graceful refusal style with a redirect
-  - Balance over-refusal vs under-refusal of edge-case requests
-initial_state: >-
-  The guided AI practice console opens. Practice writing a system prompt that
-  scopes an assistant and defines how it should refuse off-topic or disallowed
-  requests. Rule-based and free.
-solution_explanation: >-
-  Guardrails are instructions that bound what an assistant will do. Three layers -
-  (1) SCOPE - state the allowed topics/tasks and that it should decline anything
-  outside them ("You only answer questions about FixitLab billing"); (2) REFUSAL
-  STYLE - how to say no - briefly, without lecturing, and ideally with a redirect
-  ("I can't help with that, but I can ...")); (3) CALIBRATION - avoid over-refusing
-  legitimate edge cases and under-refusing genuinely harmful ones. Put guardrails in
-  the system role so they hold every turn, give a couple of allowed/declined
-  examples, and test with adversarial inputs. Guardrails complement, not replace,
-  platform-level safety.
+- Write scope guardrails that keep an assistant on-topic
+- Define a graceful refusal style with a redirect
+- Balance over-refusal vs under-refusal of edge-case requests
+initial_state: The guided AI practice console opens. Practice writing a system prompt that scopes an assistant
+  and defines how it should refuse off-topic or disallowed requests. Rule-based and free.
+solution_explanation: Guardrails are instructions that bound what an assistant will do. Three layers -
+  (1) SCOPE - state the allowed topics/tasks and that it should decline anything outside them ("You only
+  answer questions about FixitLab billing"); (2) REFUSAL STYLE - how to say no - briefly, without lecturing,
+  and ideally with a redirect ("I can't help with that, but I can ...")); (3) CALIBRATION - avoid over-refusing
+  legitimate edge cases and under-refusing genuinely harmful ones. Put guardrails in the system role so
+  they hold every turn, give a couple of allowed/declined examples, and test with adversarial inputs.
+  Guardrails complement, not replace, platform-level safety.
 coding_spec:
   kind: prompt
   language: text
   prompt_config:
     persona: A scoped support assistant that politely declines out-of-scope requests.
     lesson:
-      - heading: Scope the assistant
-        body: >-
-          The first guardrail is SCOPE - say what the assistant is for and that it
-          should decline everything else. "You are FixitLab's billing assistant.
-          Answer only questions about plans, invoices, and refunds. For anything
-          else, politely say it's out of scope and point the user to the right
-          channel." A clear boundary prevents the assistant from being pulled into
-          unrelated or risky territory.
-      - heading: A graceful refusal style
-        body: >-
-          Specify HOW to refuse. Good refusals are brief, non-judgmental, and offer a
-          path forward - "I can't help with that here, but I can answer billing
-          questions or connect you to support." Avoid moralizing, walls of text, or
-          repeating the user's request back. Define this once in the system prompt so
-          every refusal sounds the same.
-      - heading: Calibrate - over vs under-refusal
-        body: >-
-          Two failure modes - OVER-refusal (declining safe, legitimate requests
-          because they pattern-match a rule) frustrates users; UNDER-refusal
-          (complying with something it shouldn't) is a real risk. Give a couple of
-          examples of what IS and ISN'T allowed, encourage asking a clarifying
-          question when intent is ambiguous, and test with adversarial prompts. These
-          app-level guardrails sit on top of the model's built-in safety, not instead
-          of it.
-    rubric: [role, constraints, specificity, tone]
+    - heading: Scope the assistant
+      body: The first guardrail is SCOPE - say what the assistant is for and that it should decline everything
+        else. "You are FixitLab's billing assistant. Answer only questions about plans, invoices, and
+        refunds. For anything else, politely say it's out of scope and point the user to the right channel."
+        A clear boundary prevents the assistant from being pulled into unrelated or risky territory.
+    - heading: A graceful refusal style
+      body: Specify HOW to refuse. Good refusals are brief, non-judgmental, and offer a path forward -
+        "I can't help with that here, but I can answer billing questions or connect you to support." Avoid
+        moralizing, walls of text, or repeating the user's request back. Define this once in the system
+        prompt so every refusal sounds the same.
+    - heading: Calibrate - over vs under-refusal
+      body: Two failure modes - OVER-refusal (declining safe, legitimate requests because they pattern-match
+        a rule) frustrates users; UNDER-refusal (complying with something it shouldn't) is a real risk.
+        Give a couple of examples of what IS and ISN'T allowed, encourage asking a clarifying question
+        when intent is ambiguous, and test with adversarial prompts. These app-level guardrails sit on
+        top of the model's built-in safety, not instead of it.
+    rubric:
+    - role
+    - constraints
+    - specificity
+    - tone
     exercises:
-      - id: scope-and-refuse
-        title: Scope an assistant and define refusals
-        goal: >-
-          Write a system prompt that (a) limits the assistant to a specific topic and
-          (b) instructs it to politely DECLINE/refuse anything out of scope, ideally
-          with a redirect. Make both the scope and the refusal behavior explicit.
-        starter: "You are a support assistant for "
-        success:
-          min_words: 16
-          require_any_role: true
-          require:
-            - ["only", "out of scope", "off-topic", "off topic", "decline", "refuse", "politely", "not answer", "won't", "stay on"]
-          any_of:
-            - ["redirect", "instead", "point them", "direct them", "i can", "i can't", "i cannot", "say it's", "explain that"]
-        success_response: >-
-          Well-scoped. I'll answer only within that topic and decline anything else
-          gracefully with a redirect, every turn — exactly how a production assistant
-          should behave.
-        partial_response: >-
-          Pin BOTH halves - the SCOPE (only this topic) and the REFUSAL behavior
-          (politely decline out-of-scope asks, ideally with a redirect like "I can't
-          help with that, but I can ..."). Make the boundary explicit.
-      - id: refusal-tone
-        title: Define a graceful refusal style
-        goal: >-
-          Write an instruction describing HOW the assistant should refuse — brief,
-          polite/non-judgmental, and offering an alternative — so refusals are
-          consistent and don't lecture the user.
-        starter: ""
-        success:
-          min_words: 12
-          any_of:
-            - ["brief", "concise", "short", "polite", "politely", "without lecturing", "no lecture", "non-judgmental", "kind", "friendly", "one sentence"]
-          require:
-            - ["refuse", "decline", "say no", "can't", "cannot", "won't", "not able", "turn down"]
-        success_response: >-
-          Good — a brief, kind refusal with an offered alternative reads far better
-          than a lecture, and defining it once keeps every "no" consistent.
-        partial_response: >-
-          Describe the refusal STYLE - keep it brief and polite, skip the moralizing,
-          and offer an alternative. And make sure it's clearly about how to REFUSE
-          (decline/say no), not just general tone.
+    - id: scope-and-refuse
+      title: Scope an assistant and define refusals
+      goal: Write a system prompt that (a) limits the assistant to a specific topic and (b) instructs
+        it to politely DECLINE/refuse anything out of scope, ideally with a redirect. Make both the scope
+        and the refusal behavior explicit.
+      starter: 'You are a support assistant for '
+      success:
+        min_words: 16
+        require_any_role: true
+        require:
+        - - only
+          - out of scope
+          - off-topic
+          - off topic
+          - decline
+          - refuse
+          - politely
+          - not answer
+          - won't
+          - stay on
+        any_of:
+        - - redirect
+          - instead
+          - point them
+          - direct them
+          - i can
+          - i can't
+          - i cannot
+          - say it's
+          - explain that
+      success_response: Well-scoped. I'll answer only within that topic and decline anything else gracefully
+        with a redirect, every turn — exactly how a production assistant should behave.
+      partial_response: Pin BOTH halves - the SCOPE (only this topic) and the REFUSAL behavior (politely
+        decline out-of-scope asks, ideally with a redirect like "I can't help with that, but I can ...").
+        Make the boundary explicit.
+    - id: refusal-tone
+      title: Define a graceful refusal style
+      goal: Write an instruction describing HOW the assistant should refuse — brief, polite/non-judgmental,
+        and offering an alternative — so refusals are consistent and don't lecture the user.
+      starter: ''
+      success:
+        min_words: 12
+        any_of:
+        - - brief
+          - concise
+          - short
+          - polite
+          - politely
+          - without lecturing
+          - no lecture
+          - non-judgmental
+          - kind
+          - friendly
+          - one sentence
+        require:
+        - - refuse
+          - decline
+          - say no
+          - can't
+          - cannot
+          - won't
+          - not able
+          - turn down
+      success_response: Good — a brief, kind refusal with an offered alternative reads far better than
+        a lecture, and defining it once keeps every "no" consistent.
+      partial_response: Describe the refusal STYLE - keep it brief and polite, skip the moralizing, and
+        offer an alternative. And make sure it's clearly about how to REFUSE (decline/say no), not just
+        general tone.
+  hidden_tests:
+  - name: smoke_hidden
+    code: assert True
 hints:
-  - content: 'Guardrails have three layers: SCOPE (allowed topics, decline the rest), REFUSAL STYLE (how to say no), and CALIBRATION (don''t over- or under-refuse).'
-    cost: 10
-    order: 1
-  - content: 'Put scope + refusal rules in the system role so they hold every turn: "Answer only X; for anything else, politely decline and redirect."'
-    cost: 15
-    order: 2
-  - content: Make refusals brief, non-judgmental, and helpful ("I can't help with that, but I can ..."). Give allowed/declined examples and test with adversarial inputs. App guardrails complement, not replace, model safety.
-    cost: 20
-    order: 3
+- order: 1
+  cost: 0
+  content: 'Where to look: Open `the solution file`, read the instructions, and run the visible tests
+    to see which assertion fails first.'
+- order: 2
+  cost: 25
+  content: 'Diagnostic steps:
+
+    1. Click Run and read the traceback — note line number and actual vs expected values.
+
+    2. Reproduce the failure with the smallest input from a visible test.
+
+    3. Compare your implementation to the bug described in the lab prompt.'
+- order: 3
+  cost: 50
+  content: 'Exact fix + verification:
+
+    1. Balance over-refusal vs under-refusal of edge-case requests.
+
+    2. Re-run the lab checker (`check.sh` or Check Solution).
+
+    3. Confirm every scenario objective is satisfied.
+
+
+    WHY: the grader validates real state — marker files are ignored.'
+technology: prompt-engineering
+summary: Complete the guardrails & refusal handling prompt engineering lab and verify success with the
+  checker
+estimated_minutes: 30
+xp_reward: 100
+prerequisites:
+- Basic prompt engineering literacy
+tags:
+- do
+- hands-on
+- prompt-engineering
+linked_tutorial: prompt-engineering-fundamentals
+what_you_will_learn:
+- Write scope guardrails that keep an assistant on-topic
+- Define a graceful refusal style with a redirect
+- Balance over-refusal vs under-refusal of edge-case requests
+environment:
+  nodes:
+  - role: primary
+    os: FixitLab LLM practice workspace
+    hostname: lab-primary
+    ip: 127.0.0.1
+    specs: local offline simulation
+  pre_installed:
+  - bash
+  - coreutils
+  - journalctl
+  - prompt engineering
+  - systemctl
+  credentials:
+  - user: root
+    password: lab123
+tasks:
+- id: task_1
+  title: Guardrails & Refusal Handling
+  description: Restore healthy behavior for Guardrails & Refusal Handling by investigating the failure,
+    applying the smallest safe fix, and validating the outcome.
+  background: 'This prompt engineering lab teaches systematic troubleshooting: observe, hypothesize, change,
+    verify.'
+  validation:
+    type: custom_script
+    script: hidden_tests
+    error_message: One or more hidden tests failed. Read the public test output, fix your solution, and
+      submit again.
+solution:
+  summary: The solution passes all hidden tests by implementing the required behavior in code.
+  files_changed: []
+  commands_run: []
+  reference_docs: prompt-engineering-fundamentals
+guided_mode:
+  enabled: true
+  steps:
+  - step: 1
+    title: Inspect current state
+    instruction: Run a read-only diagnostic before changing anything.
+    command: check.sh
+    expected_output: Output shows the current failure mode
+    explanation: Evidence-first troubleshooting avoids guessing.
+    next_on: command_success
+  - step: 2
+    title: Apply the minimal fix
+    instruction: Make one reversible change aligned with the objectives.
+    command: '# your fix command here'
+    expected_output: State moves toward the objective
+    explanation: Small changes make rollback easy if the hypothesis was wrong.
+    next_on: command_success
+  - step: 3
+    title: Verify with the grader
+    instruction: Run the same verification the checker uses.
+    command: check.sh
+    expected_output: all hidden tests pass
+    explanation: The lab passes only when real state is healthy.
+    next_on: command_success

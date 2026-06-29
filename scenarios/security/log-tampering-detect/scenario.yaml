@@ -1,37 +1,127 @@
-title: "Log Tampering — Detect Deleted and Altered Log Entries"
+title: Log Tampering — Detect Deleted and Altered Log Entries
 slug: log-tampering-detect
-technology: Security
-category: Forensics
+technology: security
+category: Fix
 difficulty: hard
 time_limit: 1200
 max_score: 100
 infrastructure_type: docker
 jira_priority: Critical
 is_free: false
-description: |
-  During an incident response, evidence suggests an attacker gained root access
-  and attempted to cover their tracks by deleting entries from /var/log/auth.log
-  and modifying /var/log/syslog. Use last, wtmp, btmp, and filesystem metadata
-  to reconstruct the attacker's timeline and identify what evidence was removed
-  from the logs.
-objectives:
-  - Use `last` and `lastb` against /var/log/wtmp and /var/log/btmp to find login history the attacker could not erase
-  - Compare auth.log timestamps to syslog and journalctl output to find gaps indicating deleted entries
-  - Write a timeline of the attack to /tmp/incident-timeline.txt with at least 3 timestamped events
-initial_state: |
-  Ubuntu server post-compromise. /var/log/auth.log has gaps between 02:00-03:00
+description: 'CONTEXT: A team operating security hardening needs you to resolve `Log Tampering — Detect
+  Deleted and Altered Log Entries` during a realistic incident. The business impact is reduced service
+  reliability until the underlying state is repaired.
+
+
+  ENVIRONMENT: You are working in FixitLab''s offline hardening lab with SSH, firewall, TLS, audit logs,
+  and IAM settings. All tools run locally; no paid APIs or external cloud calls are required.
+
+
+  SYMPTOM / STARTING STATE: Ubuntu server post-compromise. /var/log/auth.log has gaps between 02:00-03:00
+
   UTC. wtmp and btmp binary logs are intact. journald journal is also intact.
+
+  The attacker had root access for approximately one hour overnight. During an incident response, evidence
+  suggests an attacker gained root access
+
+  and attempted to cover their tracks by deleting entries from /var/log/auth.log
+
+  and modifying /var/log/syslog. Use last, wtmp, btmp, and filesystem metadata
+
+  to reconstruct the attacker''s timeline and identify what evidence was removed
+
+  from the logs.
+
+
+  OBJECTIVE: Use `last` and `lastb` against /var/log/wtmp and /var/log/btmp to find login history the
+  attacker could not erase; Compare auth.log timestamps to syslog and journalctl output to find gaps indicating
+  deleted entries; Write a timeline of the attack to /tmp/incident-timeline.txt with at least 3 timestamped
+  events. Success means `check.sh` exits successfully.
+
+
+  WHAT TO AVOID: Do not apply broad destructive changes, skip evidence gathering, or fake completion with
+  marker files — the checker validates real system state.'
+objectives:
+- Use `last` and `lastb` against /var/log/wtmp and /var/log/btmp to find login history the attacker could
+  not erase
+- Compare auth.log timestamps to syslog and journalctl output to find gaps indicating deleted entries
+- Write a timeline of the attack to /tmp/incident-timeline.txt with at least 3 timestamped events
+initial_state: 'Ubuntu server post-compromise. /var/log/auth.log has gaps between 02:00-03:00
+
+  UTC. wtmp and btmp binary logs are intact. journald journal is also intact.
+
   The attacker had root access for approximately one hour overnight.
+
+  '
 hints:
-  - order: 1
-    cost: 10
-    content: "Check login history that survives log deletion: `last -F -f /var/log/wtmp` and `lastb -F -f /var/log/btmp` to see all login attempts."
-  - order: 2
-    cost: 15
-    content: "Find log gaps: `awk '{print $1}' /var/log/auth.log | grep -c 'Jun'` and compare to journalctl: `journalctl --since '2024-01-01' -u ssh | wc -l`."
-  - order: 3
-    cost: 20
-    content: "Check file metadata: `stat /var/log/auth.log` — look for mtime that differs from ctime, indicating the file was edited after writing."
-  - order: 4
-    cost: 25
-    content: "Cross-reference: `journalctl _COMM=sshd --since yesterday | grep -E 'Accepted|Failed'` shows entries the attacker could not delete from the binary journal."
+- order: 1
+  cost: 0
+  content: 'Where to look: Use `last` and `lastb` against /var/log/wtmp and /var/log/btmp to find login
+    history the attacker could not erase'
+- order: 2
+  cost: 25
+  content: 'Diagnostic steps:
+
+    1. Compare auth.log timestamps to syslog and journalctl output to find gaps indicating deleted entries
+
+    2. Write a timeline of the attack to /tmp/incident-timeline.txt with at least 3 timestamped events'
+- order: 3
+  cost: 50
+  content: 'Exact fix + verification:
+
+    1. Write a timeline of the attack to /tmp/incident-timeline.txt with at least 3 timestamped events.
+
+    2. Re-run the lab checker (`check.sh` or Check Solution).
+
+    3. Confirm every scenario objective is satisfied.
+
+
+    WHY: the grader validates real state — marker files are ignored.'
+summary: Complete the log tampering — detect deleted and altered log entries security lab and verify success
+  with the checker
+estimated_minutes: 20
+xp_reward: 100
+prerequisites:
+- Basic security literacy
+tags:
+- fix
+- hands-on
+- security
+linked_tutorial: security-fundamentals
+what_you_will_learn:
+- Use `last` and `lastb` against /var/log/wtmp and /var/log/btmp to find login history the attacker could
+  not erase
+- Compare auth.log timestamps to syslog and journalctl output to find gaps indicating deleted entries
+- Write a timeline of the attack to /tmp/incident-timeline.txt with at least 3 timestamped events
+environment:
+  nodes:
+  - role: primary
+    os: FixitLab hardening lab
+    hostname: lab-primary
+    ip: 127.0.0.1
+    specs: local offline simulation
+  pre_installed:
+  - bash
+  - coreutils
+  - journalctl
+  - security
+  - systemctl
+  credentials:
+  - user: root
+    password: lab123
+tasks:
+- id: task_1
+  title: Log Tampering — Detect Deleted and Altered Log Entries
+  description: Restore healthy behavior for Log Tampering — Detect Deleted and Altered Log Entries by
+    investigating the failure, applying the smallest safe fix, and validating the outcome.
+  background: 'This security lab teaches systematic troubleshooting: observe, hypothesize, change, verify.'
+  validation:
+    type: custom_script
+    script: check.sh
+    error_message: Validation did not pass. Re-read the objectives and Hint 2 diagnostic steps.
+solution:
+  summary: Identify the misconfiguration affecting this security lab and apply the minimal fix.
+  files_changed: []
+  commands_run:
+  - bash check.sh
+  reference_docs: security-fundamentals

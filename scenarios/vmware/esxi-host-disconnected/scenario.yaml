@@ -1,8 +1,7 @@
----
 slug: esxi-host-disconnected
-title: "ESXi Host Disconnected from vCenter — VMs Inaccessible via GUI"
-technology: VMware
-category: Host Management
+title: ESXi Host Disconnected from vCenter - VMs Inaccessible via
+technology: vmware
+category: Fix
 difficulty: medium
 time_limit: 1200
 max_score: 100
@@ -11,37 +10,120 @@ simulation_type: vmware
 infrastructure_type: simulation
 jira_priority: High
 is_free: false
-description: |
-  ESXi host esxi-02.lab.local shows as "Disconnected" in vCenter. VMs on this host
-  are still running but cannot be managed through vCenter. The disconnection was
-  caused by the vpxd service on vCenter being unable to reach the host agent (hostd)
-  after a firewall rule change blocked port 902. Engineers must restore connectivity
-  and reconnect the host to vCenter without disrupting running VMs.
-objectives:
-  - Verify ESXi host is reachable via ICMP and SSH
-  - Check if the hostd service is running on the ESXi host
-  - Restore firewall access on port 902 between vCenter and ESXi
-  - Reconnect the host from vCenter and verify VMs become manageable
-initial_state: |
-  VMware vCenter simulation. esxi-02.lab.local shows Disconnected in vCenter.
+description: 'CONTEXT: A team operating VMware vSphere needs you to resolve `ESXi Host Disconnected from
+  vCenter - VMs Inaccessible via` during a realistic incident. The business impact is reduced service
+  reliability until the underlying state is repaired.
+
+
+  ENVIRONMENT: You are working in FixitLab''s offline vSphere lab with VMs, datastores, vCenter, and ESXi
+  tasks. All tools run locally; no paid APIs or external cloud calls are required.
+
+
+  SYMPTOM / STARTING STATE: VMware vCenter simulation. esxi-02.lab.local shows Disconnected in vCenter.
+
   Host IP: 192.168.10.12. Port 902 is blocked by a firewall rule change.
+
+  VMs on the host are running but appear grayed out in vCenter. ESXi host esxi-02.lab.local shows as "Disconnected"
+  in vCenter. VMs on this host
+
+  are still running but cannot be managed through vCenter. The disconnection was
+
+  caused by the vpxd service on vCenter being unable to reach the host agent (hostd)
+
+  after a firewall rule change blocked port 902. Engineers must restore connectivity
+
+  and reconnect the host to vCenter without disrupting running VMs.
+
+
+  OBJECTIVE: Verify ESXi host is reachable via ICMP and SSH; Check if the hostd service is running on
+  the ESXi host; Restore firewall access on port 902 between vCenter and ESXi. Success means `check.sh`
+  exits successfully.
+
+
+  WHAT TO AVOID: Do not apply broad destructive changes, skip evidence gathering, or fake completion with
+  marker files — the checker validates real system state.'
+objectives:
+- Verify ESXi host is reachable via ICMP and SSH
+- Check if the hostd service is running on the ESXi host
+- Restore firewall access on port 902 between vCenter and ESXi
+- Reconnect the host from vCenter and verify VMs become manageable
+initial_state: 'VMware vCenter simulation. esxi-02.lab.local shows Disconnected in vCenter.
+
+  Host IP: 192.168.10.12. Port 902 is blocked by a firewall rule change.
+
   VMs on the host are running but appear grayed out in vCenter.
+
+  '
 hints:
-  - order: 1
-    cost: 10
-    content: "SSH to ESXi: ssh root@192.168.10.12
-      Check hostd: /etc/init.d/hostd status
-      Check vpxa (vCenter agent): /etc/init.d/vpxa status
-      Both must be running for vCenter communication."
-  - order: 2
-    cost: 15
-    content: "Test port 902 from vCenter: nc -zv 192.168.10.12 902
-      If blocked, update firewall rules to allow vCenter IP → ESXi port 902.
-      On ESXi: esxcli network firewall ruleset set --ruleset-id=vpxHeartbeat --enabled=true"
-  - order: 3
-    cost: 20
-    content: "After restoring network access, reconnect from vCenter GUI:
-      Right-click esxi-02 → Connection → Connect.
-      Or right-click → Connection → Reconnect.
-      Wait for the host to show as 'Connected' and VMs to become manageable.
-      Check Recent Tasks for any reconnection errors."
+- order: 1
+  cost: 0
+  content: 'Where to look: Run `systemctl status sshd` and `ss -tlnp | grep :22` on the target host.'
+- order: 2
+  cost: 25
+  content: 'Diagnostic steps:
+
+    1. Confirm sshd is active and listening on port 22.
+
+    2. Check `firewall-cmd` or iptables for blocked port 22.
+
+    3. Read `/var/log/secure` for auth or config errors.'
+- order: 3
+  cost: 50
+  content: 'Exact fix + verification:
+
+    1. Fix sshd_config, firewall, or socket unit as needed.
+
+    2. `systemctl restart sshd`.
+
+    3. `ssh -o BatchMode=yes user@localhost echo ok` succeeds.
+
+
+    WHY: SSH failures are usually service, firewall, or config — not credentials alone.'
+summary: Complete the esxi host disconnected from vcenter - vms inaccessible via vmware lab and verify
+  success with the checker
+estimated_minutes: 20
+xp_reward: 100
+prerequisites:
+- Basic vmware literacy
+tags:
+- fix
+- hands-on
+- vmware
+linked_tutorial: vmware-fundamentals
+what_you_will_learn:
+- Verify ESXi host is reachable via ICMP and SSH
+- Check if the hostd service is running on the ESXi host
+- Restore firewall access on port 902 between vCenter and ESXi
+- Reconnect the host from vCenter and verify VMs become manageable
+environment:
+  nodes:
+  - role: primary
+    os: FixitLab vSphere lab
+    hostname: lab-primary
+    ip: 127.0.0.1
+    specs: local offline simulation
+  pre_installed:
+  - bash
+  - coreutils
+  - journalctl
+  - systemctl
+  - vmware
+  credentials:
+  - user: root
+    password: lab123
+tasks:
+- id: task_1
+  title: ESXi Host Disconnected from vCenter - VMs Inaccessible via
+  description: Restore healthy behavior for ESXi Host Disconnected from vCenter - VMs Inaccessible via
+    by investigating the failure, applying the smallest safe fix, and validating the outcome.
+  background: 'This vmware lab teaches systematic troubleshooting: observe, hypothesize, change, verify.'
+  validation:
+    type: custom_script
+    script: check.sh
+    error_message: Validation did not pass. Re-read the objectives and Hint 2 diagnostic steps.
+solution:
+  summary: Identify the misconfiguration affecting this vmware lab and apply the minimal fix.
+  files_changed: []
+  commands_run:
+  - bash check.sh
+  reference_docs: vmware-fundamentals

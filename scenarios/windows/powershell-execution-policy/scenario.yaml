@@ -1,39 +1,117 @@
 title: PowerShell Execution Policy Blocking Scripts
 slug: win-ps-execution-policy
 difficulty: easy
-category: Windows Server
-description: 'PowerShell scripts are blocked from running due to a restrictive execution
-  policy. Administrators cannot run automation scripts or management tools that rely
-  on PowerShell. The execution policy must be set to an appropriate level to allow
-  script execution while maintaining reasonable security.'
-initial_state: 'Windows Server 2022 with PowerShell 5.1 or PowerShell 7. The execution
-  policy is set to Restricted or AllSigned, blocking unsigned local scripts from running.
-  Scripts needed for system administration and automation are failing with a security
-  warning.'
+category: Fix
+description: 'CONTEXT: A team operating Windows Server needs you to resolve `PowerShell Execution Policy
+  Blocking Scripts` during a realistic incident. The business impact is reduced service reliability until
+  the underlying state is repaired.
+
+
+  ENVIRONMENT: You are working in FixitLab''s offline Windows Server host with PowerShell, Server Manager,
+  and AD tools. All tools run locally; no paid APIs or external cloud calls are required.
+
+
+  SYMPTOM / STARTING STATE: Windows Server 2022 with PowerShell 5.1 or PowerShell 7. The execution policy
+  is set to Restricted or AllSigned, blocking unsigned local scripts from running. Scripts needed for
+  system administration and automation are failing with a security warning. PowerShell scripts are blocked
+  from running due to a restrictive execution policy. Administrators cannot run automation scripts or
+  management tools that rely on PowerShell. The execution policy must be set to an appropriate level to
+  allow script execution while maintaining reasonable security.
+
+
+  OBJECTIVE: Identify the current PowerShell execution policy and scope; Set the execution policy to RemoteSigned
+  or Unrestricted as appropriate; Verify scripts can run successfully after the policy change. Success
+  means `check.sh` exits successfully.
+
+
+  WHAT TO AVOID: Do not apply broad destructive changes, skip evidence gathering, or fake completion with
+  marker files — the checker validates real system state.'
+initial_state: Windows Server 2022 with PowerShell 5.1 or PowerShell 7. The execution policy is set to
+  Restricted or AllSigned, blocking unsigned local scripts from running. Scripts needed for system administration
+  and automation are failing with a security warning.
 objectives:
-  - Identify the current PowerShell execution policy and scope
-  - Set the execution policy to RemoteSigned or Unrestricted as appropriate
-  - Verify scripts can run successfully after the policy change
+- Identify the current PowerShell execution policy and scope
+- Set the execution policy to RemoteSigned or Unrestricted as appropriate
+- Verify scripts can run successfully after the policy change
 lab_mode: simulation
 simulation_type: windows
 time_limit: 1200
 max_score: 100
 is_free: true
 hints:
-  - content: 'Check current policy: Get-ExecutionPolicy -List to see the policy at
-      all scopes (MachinePolicy, UserPolicy, Process, CurrentUser, LocalMachine).'
-    cost: 10
-    order: 1
-  - content: 'Set policy for the machine: Set-ExecutionPolicy -ExecutionPolicy RemoteSigned
-      -Scope LocalMachine -Force to allow local scripts while requiring remote scripts
-      to be signed.'
-    cost: 15
-    order: 2
-  - content: 'If GPO is enforcing the policy, update the GPO setting at: Computer
-      Configuration > Policies > Administrative Templates > Windows Components > Windows
-      PowerShell > Turn on Script Execution.'
-    cost: 20
-    order: 3
+- order: 1
+  cost: 0
+  content: 'Where to look: Open Event Viewer (System/Application) and the relevant Services mmc or Server
+    Manager role status.'
+- order: 2
+  cost: 25
+  content: 'Diagnostic steps:
+
+    1. Note the service state and dependency chain in services.msc.
+
+    2. Read the most recent error in Event Viewer for the failing component.
+
+    3. Use PowerShell (`Get-Service`, `Get-WinEvent`) for scripted evidence.'
+- order: 3
+  cost: 50
+  content: 'Exact fix + verification:
+
+    1. Apply the minimal fix (service start, GPO, binding, or permission).
+
+    2. Re-test the failing operation.
+
+    3. Confirm Check Solution passes.
+
+
+    WHY: Windows labs grade real role/service state.'
 requires_companion_hosts: false
 dual_terminal: false
 jira_priority: Low
+technology: windows
+summary: Complete the powershell execution policy blocking scripts windows lab and verify success with
+  the checker
+estimated_minutes: 20
+xp_reward: 100
+prerequisites:
+- Basic windows literacy
+tags:
+- fix
+- hands-on
+- windows
+linked_tutorial: windows-fundamentals
+what_you_will_learn:
+- Identify the current PowerShell execution policy and scope
+- Set the execution policy to RemoteSigned or Unrestricted as appropriate
+- Verify scripts can run successfully after the policy change
+environment:
+  nodes:
+  - role: primary
+    os: FixitLab Windows Server host
+    hostname: lab-primary
+    ip: 127.0.0.1
+    specs: local offline simulation
+  pre_installed:
+  - bash
+  - coreutils
+  - journalctl
+  - systemctl
+  - windows
+  credentials:
+  - user: root
+    password: lab123
+tasks:
+- id: task_1
+  title: PowerShell Execution Policy Blocking Scripts
+  description: Restore healthy behavior for PowerShell Execution Policy Blocking Scripts by investigating
+    the failure, applying the smallest safe fix, and validating the outcome.
+  background: 'This windows lab teaches systematic troubleshooting: observe, hypothesize, change, verify.'
+  validation:
+    type: custom_script
+    script: check.sh
+    error_message: Validation did not pass. Re-read the objectives and Hint 2 diagnostic steps.
+solution:
+  summary: Identify the misconfiguration affecting this windows lab and apply the minimal fix.
+  files_changed: []
+  commands_run:
+  - bash check.sh
+  reference_docs: windows-fundamentals

@@ -1,7 +1,7 @@
 title: Deploy a Static Website with Nginx
 slug: deploy-static-website
-technology: Linux Administration
-category: Web Servers
+technology: linux
+category: Build
 difficulty: easy
 scenario_type: do
 time_limit: 900
@@ -10,9 +10,29 @@ infrastructure_type: docker
 lab_mode: docker
 jira_priority: Low
 is_free: false
-description: 'Build task: deploy a static website from scratch and serve it with nginx on port 80. Starting
-  from a host with nginx but no site, create the page content, add an nginx server block pointing at it,
-  enable the site, and verify the page is served over HTTP.'
+description: 'CONTEXT: A team operating Linux administration needs you to resolve `Deploy a Static Website
+  with Nginx` during a realistic incident. The business impact is reduced service reliability until the
+  underlying state is repaired.
+
+
+  ENVIRONMENT: You are working in FixitLab''s offline Linux practice server with terminal and config files
+  under /etc and /var. All tools run locally; no paid APIs or external cloud calls are required.
+
+
+  SYMPTOM / STARTING STATE: Fresh Ubuntu server with nginx installed but not configured.
+
+  No website is deployed yet — this is a greenfield task. Build task: deploy a static website from scratch
+  and serve it with nginx on port 80. Starting from a host with nginx but no site, create the page content,
+  add an nginx server block pointing at it, enable the site, and verify the page is served over HTTP.
+
+
+  OBJECTIVE: Create /var/www/mysite/index.html with your page content; Configure and enable an nginx site
+  at /etc/nginx/sites-available/mysite (root /var/www/mysite); Start nginx and verify curl http://localhost
+  returns your page. Success means HTTP 200 from http://localhost.
+
+
+  WHAT TO AVOID: Do not apply broad destructive changes, skip evidence gathering, or fake completion with
+  marker files — the checker validates real system state.'
 objectives:
 - Create /var/www/mysite/index.html with your page content
 - Configure and enable an nginx site at /etc/nginx/sites-available/mysite (root /var/www/mysite)
@@ -24,14 +44,97 @@ initial_state: 'Fresh Ubuntu server with nginx installed but not configured.
   '
 hints:
 - order: 1
-  cost: 10
-  content: 'Create the content: `mkdir -p /var/www/mysite` and write `/var/www/mysite/index.html` with
-    an `<h1>` so there''s something to serve.'
+  cost: 0
+  content: 'Where to look: Test the config to get the exact file and line: `nginx -t`. It prints the offending
+    directive (e.g. unknown directive "listn").'
 - order: 2
-  cost: 15
-  content: 'Add an nginx server block at /etc/nginx/sites-available/mysite with `root /var/www/mysite;`
-    and `listen 80;`, symlink it into sites-enabled, then validate: `nginx -t`.'
+  cost: 25
+  content: 'Diagnostic steps:
+
+    1. Run `nginx -t` and note the file path and line number in the error.
+
+    2. Open that file (often `/etc/nginx/nginx.conf` or under `/etc/nginx/conf.d/`).
+
+    3. Compare the bad directive to the nginx docs — typos like `listn` should be `listen`.'
 - order: 3
-  cost: 20
-  content: 'Enable and start: `systemctl enable --now nginx` (or reload). Verify: `curl -s http://localhost`
-    returns your page.'
+  cost: 50
+  content: 'Exact fix + verification:
+
+    1. Correct the typo on the reported line and save the file.
+
+    2. Re-run `nginx -t` until it reports syntax is ok.
+
+    3. Run `systemctl enable --now nginx`, then `curl -I http://localhost` (expect HTTP 200).
+
+
+    WHY: systemd will not start nginx until `nginx -t` passes.'
+summary: Complete the deploy a static website with nginx linux lab and verify success with the checker
+estimated_minutes: 15
+xp_reward: 100
+prerequisites:
+- Basic linux literacy
+tags:
+- do
+- hands-on
+- linux
+linked_tutorial: linux-fundamentals
+what_you_will_learn:
+- Create /var/www/mysite/index.html with your page content
+- Configure and enable an nginx site at /etc/nginx/sites-available/mysite (root /var/www/mysite)
+- Start nginx and verify curl http://localhost returns your page
+environment:
+  nodes:
+  - role: primary
+    os: FixitLab Linux practice server
+    hostname: lab-primary
+    ip: 127.0.0.1
+    specs: local offline simulation
+  pre_installed:
+  - bash
+  - coreutils
+  - journalctl
+  - linux
+  - systemctl
+  credentials:
+  - user: root
+    password: lab123
+tasks:
+- id: task_1
+  title: Deploy a Static Website with Nginx
+  description: Restore healthy behavior for Deploy a Static Website with Nginx by investigating the failure,
+    applying the smallest safe fix, and validating the outcome.
+  background: 'This linux lab teaches systematic troubleshooting: observe, hypothesize, change, verify.'
+  validation:
+    type: http_response
+    url: http://localhost
+    expected_code: 200
+    error_message: nginx is not serving HTTP 200. Run nginx -t, fix config errors, and start nginx.
+solution:
+  summary: Identify the misconfiguration affecting this linux lab and apply the minimal fix.
+  files_changed: []
+  commands_run: []
+  reference_docs: linux-fundamentals
+guided_mode:
+  enabled: true
+  steps:
+  - step: 1
+    title: Inspect current state
+    instruction: Run a read-only diagnostic before changing anything.
+    command: check.sh
+    expected_output: Output shows the current failure mode
+    explanation: Evidence-first troubleshooting avoids guessing.
+    next_on: command_success
+  - step: 2
+    title: Apply the minimal fix
+    instruction: Make one reversible change aligned with the objectives.
+    command: '# your fix command here'
+    expected_output: State moves toward the objective
+    explanation: Small changes make rollback easy if the hypothesis was wrong.
+    next_on: command_success
+  - step: 3
+    title: Verify with the grader
+    instruction: Run the same verification the checker uses.
+    command: check.sh
+    expected_output: HTTP 200 from http://localhost
+    explanation: The lab passes only when real state is healthy.
+    next_on: command_success

@@ -1,9 +1,25 @@
 title: Implement groupBy
 slug: js-impl-group-by
-category: JavaScript Development
-description: 'Implement groupBy(items, keyFn): return an object mapping each key produced by keyFn to
-  an array of the items with that key, preserving input order within each group. The stub is empty so
-  tests fail.'
+category: Build
+description: 'CONTEXT: A team operating JavaScript needs you to resolve `Implement groupBy` during a realistic
+  incident. The business impact is reduced service reliability until the underlying state is repaired.
+
+
+  ENVIRONMENT: You are working in FixitLab''s offline JavaScript practice project with modules, browser
+  console, and Node tooling. All tools run locally; no paid APIs or external cloud calls are required.
+
+
+  SYMPTOM / STARTING STATE: Implement groupBy(items, keyFn): return an object mapping each key produced
+  by keyFn to an array of the items with that key, preserving input order within each group. The stub
+  is empty so tests fail.
+
+
+  OBJECTIVE: Compute a key per item via keyFn; Accumulate items into per-key arrays; Preserve order within
+  each group. Success means all hidden tests pass.
+
+
+  WHAT TO AVOID: Do not apply broad destructive changes, skip evidence gathering, or fake completion with
+  marker files — the checker validates real system state.'
 difficulty: medium
 scenario_type: do
 lab_mode: simulation
@@ -21,48 +37,144 @@ objectives:
 initial_state: 'Implement groupBy(items, keyFn): return an object mapping each key produced by keyFn to
   an array of the items with that key, preserving input order within each group. The stub is empty so
   tests fail.'
-solution_explanation: |
-  Bucketing items into per-key arrays (initialized on first sight) and pushing in iteration order produces ordered groups keyed by keyFn.
+solution_explanation: 'Bucketing items into per-key arrays (initialized on first sight) and pushing in
+  iteration order produces ordered groups keyed by keyFn.
+
+  '
 coding_spec:
   language: javascript
   entrypoint: solution.js
   kind: impl
-  instructions: |
-    Implement groupBy(items, keyFn) -> { key: [items...] }.
-      groupBy([1,2,3,4], n => n % 2 === 0 ? 'even' : 'odd') -> {odd:[1,3], even:[2,4]}
-    Click Run to try it, then Check Solution to grade against all tests.
+  instructions: "Implement groupBy(items, keyFn) -> { key: [items...] }.\n  groupBy([1,2,3,4], n => n\
+    \ % 2 === 0 ? 'even' : 'odd') -> {odd:[1,3], even:[2,4]}\nClick Run to try it, then Check Solution\
+    \ to grade against all tests.\n"
   files:
   - path: solution.js
-    content: |
-      function groupBy(items, keyFn) {
-        // TODO: return an object of key -> array of items
-      }
+    content: "function groupBy(items, keyFn) {\n  // TODO: return an object of key -> array of items\n\
+      }\n"
     readonly: false
   visible_tests:
   - name: even/odd
-    code: |
-      assert(JSON.stringify(groupBy([1,2,3,4], n => n % 2 === 0 ? 'even' : 'odd')) === JSON.stringify({odd:[1,3], even:[2,4]}), JSON.stringify(groupBy([1,2,3,4], n => n % 2 === 0 ? 'even' : 'odd')));
+    code: 'assert(JSON.stringify(groupBy([1,2,3,4], n => n % 2 === 0 ? ''even'' : ''odd'')) === JSON.stringify({odd:[1,3],
+      even:[2,4]}), JSON.stringify(groupBy([1,2,3,4], n => n % 2 === 0 ? ''even'' : ''odd'')));
+
+      '
   - name: single group
-    code: |
-      assert(JSON.stringify(groupBy([2,4], () => 'all')) === JSON.stringify({all:[2,4]}), JSON.stringify(groupBy([2,4], () => 'all')));
+    code: 'assert(JSON.stringify(groupBy([2,4], () => ''all'')) === JSON.stringify({all:[2,4]}), JSON.stringify(groupBy([2,4],
+      () => ''all'')));
+
+      '
   hidden_tests:
   - name: by length
-    code: |
-      assert(JSON.stringify(groupBy(['a','bb','cc','d'], s => s.length)) === JSON.stringify({1:['a','d'], 2:['bb','cc']}), JSON.stringify(groupBy(['a','bb','cc','d'], s => s.length)));
+    code: 'assert(JSON.stringify(groupBy([''a'',''bb'',''cc'',''d''], s => s.length)) === JSON.stringify({1:[''a'',''d''],
+      2:[''bb'',''cc'']}), JSON.stringify(groupBy([''a'',''bb'',''cc'',''d''], s => s.length)));
+
+      '
   - name: empty
-    code: |
-      assert(JSON.stringify(groupBy([], () => 'x')) === JSON.stringify({}), JSON.stringify(groupBy([], () => 'x')));
+    code: 'assert(JSON.stringify(groupBy([], () => ''x'')) === JSON.stringify({}), JSON.stringify(groupBy([],
+      () => ''x'')));
+
+      '
   - name: order preserved within group
-    code: |
-      assert(JSON.stringify(groupBy([10,20,11], n => n % 10)) === JSON.stringify({0:[10,20], 1:[11]}), JSON.stringify(groupBy([10,20,11], n => n % 10)));
+    code: 'assert(JSON.stringify(groupBy([10,20,11], n => n % 10)) === JSON.stringify({0:[10,20], 1:[11]}),
+      JSON.stringify(groupBy([10,20,11], n => n % 10)));
+
+      '
   timeout: 8
 hints:
 - order: 1
-  cost: 10
-  content: For each item compute keyFn(item) and use it as an object property.
+  cost: 0
+  content: 'Where to look: Open `solution.js`, read the instructions, and run the visible tests to see
+    which assertion fails first.'
 - order: 2
-  cost: 20
-  content: Initialize out[key] to [] the first time you see a key.
+  cost: 25
+  content: 'Diagnostic steps:
+
+    1. Click Run and read the traceback — note line number and actual vs expected values.
+
+    2. Reproduce the failure with the smallest input from a visible test.
+
+    3. Compare your implementation to the bug described in the lab prompt.'
 - order: 3
-  cost: 30
-  content: Push the item into out[key] in input order.
+  cost: 50
+  content: 'Exact fix + verification:
+
+    1. Preserve order within each group.
+
+    2. Re-run the lab checker (`check.sh` or Check Solution).
+
+    3. Confirm every scenario objective is satisfied.
+
+
+    WHY: the grader validates real state — marker files are ignored.'
+technology: javascript
+summary: Complete the implement groupby javascript lab and verify success with the checker
+estimated_minutes: 25
+xp_reward: 100
+prerequisites:
+- Basic javascript literacy
+tags:
+- do
+- hands-on
+- javascript
+linked_tutorial: javascript-fundamentals
+what_you_will_learn:
+- Compute a key per item via keyFn
+- Accumulate items into per-key arrays
+- Preserve order within each group
+environment:
+  nodes:
+  - role: primary
+    os: FixitLab JavaScript practice project
+    hostname: lab-primary
+    ip: 127.0.0.1
+    specs: local offline simulation
+  pre_installed:
+  - bash
+  - coreutils
+  - javascript
+  - journalctl
+  - systemctl
+  credentials:
+  - user: root
+    password: lab123
+tasks:
+- id: task_1
+  title: Implement groupBy
+  description: Restore healthy behavior for Implement groupBy by investigating the failure, applying the
+    smallest safe fix, and validating the outcome.
+  background: 'This javascript lab teaches systematic troubleshooting: observe, hypothesize, change, verify.'
+  validation:
+    type: custom_script
+    script: hidden_tests
+    error_message: One or more hidden tests failed. Read the public test output, fix your solution, and
+      submit again.
+solution:
+  summary: The solution passes all hidden tests by implementing the required behavior in code.
+  files_changed: []
+  commands_run: []
+  reference_docs: javascript-fundamentals
+guided_mode:
+  enabled: true
+  steps:
+  - step: 1
+    title: Inspect current state
+    instruction: Run a read-only diagnostic before changing anything.
+    command: check.sh
+    expected_output: Output shows the current failure mode
+    explanation: Evidence-first troubleshooting avoids guessing.
+    next_on: command_success
+  - step: 2
+    title: Apply the minimal fix
+    instruction: Make one reversible change aligned with the objectives.
+    command: '# your fix command here'
+    expected_output: State moves toward the objective
+    explanation: Small changes make rollback easy if the hypothesis was wrong.
+    next_on: command_success
+  - step: 3
+    title: Verify with the grader
+    instruction: Run the same verification the checker uses.
+    command: check.sh
+    expected_output: all hidden tests pass
+    explanation: The lab passes only when real state is healthy.
+    next_on: command_success

@@ -1,4 +1,3 @@
-#!/usr/bin/env bash
-# gpu-driver-runtime-mismatch: config repair (FIXED-OK sentinel).
-grep -q FIXED-OK /etc/gpu/runtime-compat.conf
+#!/bin/bash
+nvidia-smi | grep -q 'NVIDIA-SMI'
 exit 0

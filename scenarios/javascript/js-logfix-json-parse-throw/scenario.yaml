@@ -1,8 +1,26 @@
 title: 'Log Analysis: Fix the JSON.parse Crash'
 slug: js-logfix-json-parse-throw
-category: JavaScript Development
-description: 'The log shows `SyntaxError: Unexpected token ... in JSON` from safeParse() because JSON.parse
-  throws on malformed input. Wrap it so invalid JSON returns a provided fallback instead of crashing.'
+category: Fix
+description: 'CONTEXT: A team operating JavaScript needs you to resolve `Log Analysis: Fix the JSON.parse
+  Crash` during a realistic incident. The business impact is reduced service reliability until the underlying
+  state is repaired.
+
+
+  ENVIRONMENT: You are working in FixitLab''s offline JavaScript practice project with modules, browser
+  console, and Node tooling. All tools run locally; no paid APIs or external cloud calls are required.
+
+
+  SYMPTOM / STARTING STATE: The log shows `SyntaxError: Unexpected token ... in JSON` from safeParse()
+  because JSON.parse throws on malformed input. Wrap it so invalid JSON returns a provided fallback instead
+  of crashing.
+
+
+  OBJECTIVE: Identify the throwing JSON.parse from the log; Catch the parse error; Return the fallback
+  on failure. Success means all hidden tests pass.
+
+
+  WHAT TO AVOID: Do not apply broad destructive changes, skip evidence gathering, or fake completion with
+  marker files — the checker validates real system state.'
 difficulty: medium
 scenario_type: fix
 lab_mode: simulation
@@ -19,57 +37,128 @@ objectives:
 - Return the fallback on failure
 initial_state: 'The log shows `SyntaxError: Unexpected token ... in JSON` from safeParse() because JSON.parse
   throws on malformed input. Wrap it so invalid JSON returns a provided fallback instead of crashing.'
-solution_explanation: |
-  JSON.parse throws on malformed input. A try/catch returning the fallback makes parsing total and crash-free.
+solution_explanation: 'JSON.parse throws on malformed input. A try/catch returning the fallback makes
+  parsing total and crash-free.
+
+  '
 coding_spec:
   language: javascript
   entrypoint: solution.js
   kind: logfix
-  instructions: |
-    Fix safeParse(str, fallback): return the parsed JSON, or `fallback` if str is not valid JSON. Never throw.
-      safeParse('{"a":1}', null) -> {a:1}; safeParse('oops', null) -> null
-    Click Run to try it, then Check Solution to grade against all tests.
+  instructions: "Fix safeParse(str, fallback): return the parsed JSON, or `fallback` if str is not valid\
+    \ JSON. Never throw.\n  safeParse('{\"a\":1}', null) -> {a:1}; safeParse('oops', null) -> null\nClick\
+    \ Run to try it, then Check Solution to grade against all tests.\n"
   files:
   - path: solution.js
-    content: |
-      // Production log:
-      //   SyntaxError: Unexpected token o in JSON at position 0
-      //     at safeParse -> JSON.parse(str)
-
-      function safeParse(str, fallback) {
-        return JSON.parse(str); // throws on invalid JSON
-      }
+    content: "// Production log:\n//   SyntaxError: Unexpected token o in JSON at position 0\n//     at\
+      \ safeParse -> JSON.parse(str)\n\nfunction safeParse(str, fallback) {\n  return JSON.parse(str);\
+      \ // throws on invalid JSON\n}\n"
     readonly: false
   visible_tests:
   - name: valid json
-    code: |
-      assert(JSON.stringify(safeParse('{"a":1}', null)) === JSON.stringify({a:1}), JSON.stringify(safeParse('{"a":1}', null)));
+    code: 'assert(JSON.stringify(safeParse(''{"a":1}'', null)) === JSON.stringify({a:1}), JSON.stringify(safeParse(''{"a":1}'',
+      null)));
+
+      '
   - name: invalid returns fallback
-    code: |
-      assert(safeParse('oops', null) === null);
+    code: 'assert(safeParse(''oops'', null) === null);
+
+      '
   hidden_tests:
   - name: array json
-    code: |
-      assert(JSON.stringify(safeParse('[1,2,3]', [])) === JSON.stringify([1,2,3]), JSON.stringify(safeParse('[1,2,3]', [])));
+    code: 'assert(JSON.stringify(safeParse(''[1,2,3]'', [])) === JSON.stringify([1,2,3]), JSON.stringify(safeParse(''[1,2,3]'',
+      [])));
+
+      '
   - name: invalid uses custom fallback
-    code: |
-      assert(JSON.stringify(safeParse('not json', {error: true})) === JSON.stringify({error: true}), JSON.stringify(safeParse('not json', {error: true})));
+    code: 'assert(JSON.stringify(safeParse(''not json'', {error: true})) === JSON.stringify({error: true}),
+      JSON.stringify(safeParse(''not json'', {error: true})));
+
+      '
   - name: does not throw
-    code: |
-      let threw = false;
-      try { safeParse('{bad', 0); } catch (e) { threw = true; }
+    code: 'let threw = false;
+
+      try { safeParse(''{bad'', 0); } catch (e) { threw = true; }
+
       assert(threw === false);
+
+      '
   - name: number json
-    code: |
-      assert(safeParse('42', null) === 42);
+    code: 'assert(safeParse(''42'', null) === 42);
+
+      '
   timeout: 8
 hints:
 - order: 1
-  cost: 10
-  content: The log shows JSON.parse throwing a SyntaxError on bad input.
+  cost: 0
+  content: 'Where to look: Open `solution.js`, read the instructions, and run the visible tests to see
+    which assertion fails first.'
 - order: 2
-  cost: 20
-  content: Wrap JSON.parse in try/catch.
+  cost: 25
+  content: 'Diagnostic steps:
+
+    1. Click Run and read the traceback — note line number and actual vs expected values.
+
+    2. Reproduce the failure with the smallest input from a visible test.
+
+    3. Compare your implementation to the bug described in the lab prompt.'
 - order: 3
-  cost: 30
-  content: Return fallback from the catch block.
+  cost: 50
+  content: 'Exact fix + verification:
+
+    1. Return the fallback on failure.
+
+    2. Re-run the lab checker (`check.sh` or Check Solution).
+
+    3. Confirm every scenario objective is satisfied.
+
+
+    WHY: the grader validates real state — marker files are ignored.'
+technology: javascript
+summary: 'Complete the log analysis: fix the json parse crash javascript lab and verify success with the
+  checker'
+estimated_minutes: 25
+xp_reward: 100
+prerequisites:
+- Basic javascript literacy
+tags:
+- fix
+- hands-on
+- javascript
+linked_tutorial: javascript-fundamentals
+what_you_will_learn:
+- Identify the throwing JSON.parse from the log
+- Catch the parse error
+- Return the fallback on failure
+environment:
+  nodes:
+  - role: primary
+    os: FixitLab JavaScript practice project
+    hostname: lab-primary
+    ip: 127.0.0.1
+    specs: local offline simulation
+  pre_installed:
+  - bash
+  - coreutils
+  - javascript
+  - journalctl
+  - systemctl
+  credentials:
+  - user: root
+    password: lab123
+tasks:
+- id: task_1
+  title: 'Log Analysis: Fix the JSON.parse Crash'
+  description: 'Restore healthy behavior for Log Analysis: Fix the JSON.parse Crash by investigating the
+    failure, applying the smallest safe fix, and validating the outcome.'
+  background: 'This javascript lab teaches systematic troubleshooting: observe, hypothesize, change, verify.'
+  validation:
+    type: custom_script
+    script: hidden_tests
+    error_message: One or more hidden tests failed. Read the public test output, fix your solution, and
+      submit again.
+solution:
+  summary: The solution passes all hidden tests by implementing the required behavior in code.
+  files_changed: []
+  commands_run: []
+  reference_docs: javascript-fundamentals

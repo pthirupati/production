@@ -1,8 +1,7 @@
----
 slug: java-runtime-version-mismatch
-title: "UnsupportedClassVersionError — Compiled for a Newer JDK"
-technology: Java
-category: "Java Development"
+title: UnsupportedClassVersionError — Compiled for a Newer JDK
+technology: java
+category: Fix
 difficulty: easy
 time_limit: 600
 max_score: 100
@@ -11,22 +10,108 @@ simulation_type: java
 infrastructure_type: simulation
 jira_priority: Medium
 is_free: false
-description: |
-  The app crashes at startup with 'UnsupportedClassVersionError: ... has been compiled by a more recent version of the Java Runtime (class file version 61.0), this version of the Java Runtime only recognizes class file versions up to 55.0'. The build targets a newer bytecode level than the runtime JRE. Align the compiler release with the runtime.
+description: 'CONTEXT: A team operating Java applications needs you to resolve `UnsupportedClassVersionError
+  — Compiled for a Newer JDK` during a realistic incident. The business impact is reduced service reliability
+  until the underlying state is repaired.
+
+
+  ENVIRONMENT: You are working in FixitLab''s offline Java project with Maven/Gradle, JVM logs, and Spring
+  configuration. All tools run locally; no paid APIs or external cloud calls are required.
+
+
+  SYMPTOM / STARTING STATE: POM at /app/pom.xml sets maven.compiler.release above the JRE used to run
+  the app, producing UnsupportedClassVersionError at startup. The app crashes at startup with ''UnsupportedClassVersionError:
+  ... has been compiled by a more recent version of the Java Runtime (class file version 61.0), this version
+  of the Java Runtime only recognizes class file versions up to 55.0''. The build targets a newer bytecode
+  level than the runtime JRE. Align the compiler release with the runtime.
+
+
+  OBJECTIVE: Decode the class file version error to source/target JDK levels; Set the Maven compiler release
+  to match the runtime JRE; Rebuild so bytecode targets the supported version. Success means `check.sh`
+  exits successfully.
+
+
+  WHAT TO AVOID: Do not apply broad destructive changes, skip evidence gathering, or fake completion with
+  marker files — the checker validates real system state.'
 objectives:
-  - "Decode the class file version error to source/target JDK levels"
-  - "Set the Maven compiler release to match the runtime JRE"
-  - "Rebuild so bytecode targets the supported version"
-  - "Verify the app starts without the version error"
-initial_state: |
-  POM at /app/pom.xml sets maven.compiler.release above the JRE used to run the app, producing UnsupportedClassVersionError at startup.
+- Decode the class file version error to source/target JDK levels
+- Set the Maven compiler release to match the runtime JRE
+- Rebuild so bytecode targets the supported version
+- Verify the app starts without the version error
+initial_state: 'POM at /app/pom.xml sets maven.compiler.release above the JRE used to run the app, producing
+  UnsupportedClassVersionError at startup.
+
+  '
 hints:
-  - order: 1
-    cost: 10
-    content: "Class file version 61 = Java 17, 55 = Java 11 — the runtime is older than the build."
-  - order: 2
-    cost: 15
-    content: "Set <maven.compiler.release> to the runtime JDK (or upgrade the JRE)."
-  - order: 3
-    cost: 20
-    content: "Rebuild and confirm the bytecode major version is now accepted."
+- order: 1
+  cost: 0
+  content: 'Where to look: Decode the class file version error to source/target JDK levels'
+- order: 2
+  cost: 25
+  content: 'Diagnostic steps:
+
+    1. Set the Maven compiler release to match the runtime JRE
+
+    2. Rebuild so bytecode targets the supported version
+
+    3. Verify the app starts without the version error'
+- order: 3
+  cost: 50
+  content: 'Exact fix + verification:
+
+    1. Verify the app starts without the version error.
+
+    2. Re-run the lab checker (`check.sh` or Check Solution).
+
+    3. Confirm every scenario objective is satisfied.
+
+
+    WHY: the grader validates real state — marker files are ignored.'
+summary: Complete the unsupportedclassversionerror — compiled for a newer jdk java lab and verify success
+  with the checker
+estimated_minutes: 10
+xp_reward: 100
+prerequisites:
+- Basic java literacy
+tags:
+- fix
+- hands-on
+- java
+linked_tutorial: java-fundamentals
+what_you_will_learn:
+- Decode the class file version error to source/target JDK levels
+- Set the Maven compiler release to match the runtime JRE
+- Rebuild so bytecode targets the supported version
+- Verify the app starts without the version error
+environment:
+  nodes:
+  - role: primary
+    os: FixitLab Java project
+    hostname: lab-primary
+    ip: 127.0.0.1
+    specs: local offline simulation
+  pre_installed:
+  - bash
+  - coreutils
+  - java
+  - journalctl
+  - systemctl
+  credentials:
+  - user: root
+    password: lab123
+tasks:
+- id: task_1
+  title: UnsupportedClassVersionError — Compiled for a Newer JDK
+  description: Restore healthy behavior for UnsupportedClassVersionError — Compiled for a Newer JDK by
+    investigating the failure, applying the smallest safe fix, and validating the outcome.
+  background: 'This java lab teaches systematic troubleshooting: observe, hypothesize, change, verify.'
+  validation:
+    type: custom_script
+    script: check.sh
+    error_message: Validation did not pass. Re-read the objectives and Hint 2 diagnostic steps.
+solution:
+  summary: Identify the misconfiguration affecting this java lab and apply the minimal fix.
+  files_changed: []
+  commands_run:
+  - bash check.sh
+  reference_docs: java-fundamentals

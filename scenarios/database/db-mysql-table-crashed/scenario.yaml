@@ -1,8 +1,23 @@
 title: MySQL MyISAM Table Marked as Crashed
 slug: db-mysql-table-crashed
 difficulty: medium
-category: Database Administration
-description: 'After an unclean shutdown, a heavily-used MyISAM table reports "Table ''./appdb/orders''
+category: Fix
+description: 'CONTEXT: A team operating database administration needs you to resolve `MySQL MyISAM Table
+  Marked as Crashed` during a realistic incident. The business impact is reduced service reliability until
+  the underlying state is repaired.
+
+
+  ENVIRONMENT: You are working in FixitLab''s offline database server with SQL client, schemas, backups,
+  and performance views. All tools run locally; no paid APIs or external cloud calls are required.
+
+
+  SYMPTOM / STARTING STATE: Simulated RHEL 9 database server. mysqld has failed. The error log shows the
+  orders
+
+  MyISAM table is marked as crashed following a power loss. A repair flag file exists at
+
+  /var/lib/mysql/appdb/orders.CRASHED. After an unclean shutdown, a heavily-used MyISAM table reports
+  "Table ''./appdb/orders''
 
   is marked as crashed and should be repaired" and the mysqld service has failed. The
 
@@ -10,7 +25,14 @@ description: 'After an unclean shutdown, a heavily-used MyISAM table reports "Ta
 
   mysqld back up.
 
-  '
+
+  OBJECTIVE: Diagnose the crashed MyISAM table from the error log; Repair the table (myisamchk -r or REPAIR
+  TABLE / mysqlcheck --repair); Restart the mysqld service. Success means `systemctl is-active mysqld`
+  returns active.
+
+
+  WHAT TO AVOID: Do not apply broad destructive changes, skip evidence gathering, or fake completion with
+  marker files — the checker validates real system state.'
 initial_state: 'Simulated RHEL 9 database server. mysqld has failed. The error log shows the orders
 
   MyISAM table is marked as crashed following a power loss. A repair flag file exists at
@@ -30,18 +52,80 @@ max_score: 100
 is_free: false
 hints:
 - order: 1
-  cost: 10
-  content: 'Confirm the cause from the error log: `journalctl -u mysqld -n 30` / `tail /var/log/mysqld.log`
-    points at the orders MyISAM table being "marked as crashed".'
+  cost: 0
+  content: 'Where to look: Start with `systemctl status mysqld` and `journalctl -u mysqld -n 50 --no-pager`
+    before changing anything.'
 - order: 2
-  cost: 20
-  content: 'Repair the MyISAM table in place: with mysqld stopped, `myisamchk -r /var/lib/mysql/appdb/orders`
-    (or, if mysqld can start, `mysqlcheck --repair appdb orders`). This clears the crashed flag and rebuilds
-    indexes.'
+  cost: 25
+  content: 'Diagnostic steps:
+
+    1. Run `systemctl status mysqld` — note Active/Failed and the last log lines.
+
+    2. Read `journalctl -u mysqld -n 50` for the root error.
+
+    3. Form a hypothesis about the smallest config or permission fix.'
 - order: 3
-  cost: 30
-  content: 'Bring the service back and verify: `systemctl restart mysqld`, `systemctl is-active mysqld`,
-    and `mysql -e ''SELECT COUNT(*) FROM appdb.orders;''` to confirm the table reads cleanly.'
+  cost: 50
+  content: 'Exact fix + verification:
+
+    1. Apply the minimal fix (config, unit override, or missing directory).
+
+    2. Run `systemctl daemon-reload` if you edited a unit file.
+
+    3. Run `systemctl restart mysqld` and confirm `systemctl is-active mysqld` succeeds.
+
+
+    WHY: the grader checks real service state, not marker files.'
 requires_companion_hosts: false
 dual_terminal: false
 jira_priority: High
+technology: database
+summary: Complete the mysql myisam table marked as crashed database lab and verify success with the checker
+estimated_minutes: 15
+xp_reward: 100
+prerequisites:
+- Basic database literacy
+tags:
+- database
+- fix
+- hands-on
+linked_tutorial: database-fundamentals
+what_you_will_learn:
+- Diagnose the crashed MyISAM table from the error log
+- Repair the table (myisamchk -r or REPAIR TABLE / mysqlcheck --repair)
+- Restart the mysqld service
+- Verify mysqld is active and the table is readable
+environment:
+  nodes:
+  - role: primary
+    os: FixitLab database server
+    hostname: lab-primary
+    ip: 127.0.0.1
+    specs: local offline simulation
+  pre_installed:
+  - bash
+  - coreutils
+  - database
+  - journalctl
+  - systemctl
+  credentials:
+  - user: root
+    password: lab123
+tasks:
+- id: task_1
+  title: MySQL MyISAM Table Marked as Crashed
+  description: Restore healthy behavior for MySQL MyISAM Table Marked as Crashed by investigating the
+    failure, applying the smallest safe fix, and validating the outcome.
+  background: 'This database lab teaches systematic troubleshooting: observe, hypothesize, change, verify.'
+  validation:
+    type: service_active
+    command: systemctl is-active mysqld
+    expected_status: active
+    error_message: The mysqld service is not active yet. Check `systemctl status mysqld` and `journalctl
+      -u mysqld -n 50`.
+solution:
+  summary: The root cause is an unhealthy `mysqld` service; repair it and verify active state.
+  files_changed: []
+  commands_run:
+  - systemctl is-active mysqld
+  reference_docs: database-fundamentals

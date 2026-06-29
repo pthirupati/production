@@ -1,11 +1,29 @@
-title: "Controlling Output Format"
+title: Controlling Output Format
 slug: output-formatting
-category: Prompt Engineering
-description: >-
-  The shape of the answer matters as much as the content. Learn to pin the output
-  format precisely — a markdown table, a numbered list, exactly N bullets, a single
-  word, a fixed template — so downstream code or readers always get what they
-  expect.
+category: Build
+description: 'CONTEXT: A team operating prompt engineering needs you to resolve `Controlling Output Format`
+  during a realistic incident. The business impact is reduced service reliability until the underlying
+  state is repaired.
+
+
+  ENVIRONMENT: You are working in FixitLab''s offline LLM practice workspace with prompt templates, eval
+  sets, and tool configs. All tools run locally; no paid APIs or external cloud calls are required.
+
+
+  SYMPTOM / STARTING STATE: The guided AI practice console opens. Practice asking for a precise output
+  format — a table, exactly three bullets, or a one-line answer — and watch the simulated reply snap to
+  the shape you named. Rule-based and free. The shape of the answer matters as much as the content. Learn
+  to pin the output format precisely — a markdown table, a numbered list, exactly N bullets, a single
+  word, a fixed template — so downstream code or readers always get what they expect.
+
+
+  OBJECTIVE: List the levers that control output shape (format type, count, template, "only"); Write a
+  prompt that specifies an exact format and forbids extra text; Pass the exercise that demands a fixed-shape
+  answer. Success means all hidden tests pass.
+
+
+  WHAT TO AVOID: Do not apply broad destructive changes, skip evidence gathering, or fake completion with
+  marker files — the checker validates real system state.'
 difficulty: easy
 scenario_type: do
 lab_mode: simulation
@@ -17,102 +35,205 @@ max_score: 100
 is_free: true
 dual_terminal: false
 objectives:
-  - List the levers that control output shape (format type, count, template, "only")
-  - Write a prompt that specifies an exact format and forbids extra text
-  - Pass the exercise that demands a fixed-shape answer
-initial_state: >-
-  The guided AI practice console opens. Practice asking for a precise output
-  format — a table, exactly three bullets, or a one-line answer — and watch the
-  simulated reply snap to the shape you named. Rule-based and free.
-solution_explanation: >-
-  Models default to prose unless told otherwise. To control the shape - (1) name
-  the FORMAT explicitly (markdown table with columns X and Y; numbered list; JSON;
-  one word); (2) pin the COUNT ("exactly 3 bullets," "in one sentence"); (3) give a
-  TEMPLATE the model fills in; (4) forbid extras ("return only the table, no
-  preamble"). Showing one example of the target shape is the most reliable trick of
-  all. For machine consumption, prefer JSON/tool use; for humans, tables and tight
-  bullet lists.
+- List the levers that control output shape (format type, count, template, "only")
+- Write a prompt that specifies an exact format and forbids extra text
+- Pass the exercise that demands a fixed-shape answer
+initial_state: The guided AI practice console opens. Practice asking for a precise output format — a table,
+  exactly three bullets, or a one-line answer — and watch the simulated reply snap to the shape you named.
+  Rule-based and free.
+solution_explanation: Models default to prose unless told otherwise. To control the shape - (1) name the
+  FORMAT explicitly (markdown table with columns X and Y; numbered list; JSON; one word); (2) pin the
+  COUNT ("exactly 3 bullets," "in one sentence"); (3) give a TEMPLATE the model fills in; (4) forbid extras
+  ("return only the table, no preamble"). Showing one example of the target shape is the most reliable
+  trick of all. For machine consumption, prefer JSON/tool use; for humans, tables and tight bullet lists.
 coding_spec:
   kind: prompt
   language: text
   prompt_config:
     persona: A formatting assistant that returns exactly the shape you specify.
     lesson:
-      - heading: Name the format
-        body: >-
-          Don't leave the shape to chance. Say "as a markdown table with columns
-          Name and Status," or "as a numbered list," or "answer with a single
-          word." A model asked vaguely will pick a format for you — usually prose —
-          and you'll be parsing or reformatting it later.
-      - heading: Pin the count and use a template
-        body: >-
-          Quantify - "exactly 3 bullets," "in one sentence," "no more than 50
-          words." For repeatable structure, hand the model a TEMPLATE to fill -
-          "Reply in this format - Summary: <one line> / Risk: <low|med|high> /
-          Action: <one line>." Templates make many answers line up identically,
-          which is gold for downstream parsing.
-      - heading: Forbid the extras
-        body: >-
-          The #1 formatting failure is stray prose - "Sure! Here's your table:" or a
-          trailing "Let me know if you need more." Add a hard rule - "Return ONLY
-          the table, with no preamble or closing remark." And the single most
-          effective technique is to SHOW one example of the exact output; the model
-          copies the shape faithfully.
-    rubric: [format, constraints, task, examples, specificity]
+    - heading: Name the format
+      body: Don't leave the shape to chance. Say "as a markdown table with columns Name and Status," or
+        "as a numbered list," or "answer with a single word." A model asked vaguely will pick a format
+        for you — usually prose — and you'll be parsing or reformatting it later.
+    - heading: Pin the count and use a template
+      body: 'Quantify - "exactly 3 bullets," "in one sentence," "no more than 50 words." For repeatable
+        structure, hand the model a TEMPLATE to fill - "Reply in this format - Summary: <one line> / Risk:
+        <low|med|high> / Action: <one line>." Templates make many answers line up identically, which is
+        gold for downstream parsing.'
+    - heading: Forbid the extras
+      body: 'The #1 formatting failure is stray prose - "Sure! Here''s your table:" or a trailing "Let
+        me know if you need more." Add a hard rule - "Return ONLY the table, with no preamble or closing
+        remark." And the single most effective technique is to SHOW one example of the exact output; the
+        model copies the shape faithfully.'
+    rubric:
+    - format
+    - constraints
+    - task
+    - examples
+    - specificity
     exercises:
-      - id: table-only
-        title: Ask for a clean table, nothing else
-        goal: >-
-          Write a prompt that asks for the answer as a markdown table with named
-          columns, and explicitly forbids any preamble or closing text — return
-          ONLY the table.
-        starter: ""
-        success:
-          min_words: 10
-          any_of:
-            - ["table", "column", "markdown"]
-          require:
-            - ["only", "no preamble", "no other text", "nothing else", "no extra", "just the", "no explanation"]
-        success_response: |
-          | Name | Status |
-          | --- | --- |
-          | reset-email | broken |
-          | login | ok |
-        partial_response: >-
-          Name the FORMAT (a markdown table with columns) AND forbid extras
-          ("return only the table, no preamble"). Otherwise I'll likely wrap it in a
-          sentence or two.
-      - id: fixed-template
-        title: Fill a fixed template
-        goal: >-
-          Write a prompt that gives the model an exact response TEMPLATE to fill in
-          (with labeled fields and a fixed number of parts), so every answer comes
-          back in the same shape. Include the template in your prompt.
-        starter: |
-          Reply using exactly this template:
-          Summary: <one sentence>
-          Risk: <low|medium|high>
-          Action: <one sentence>
-        success:
-          min_words: 12
-          any_of:
-            - ["template", "format", "exactly this", "this format", "fill", "fields"]
-          mentions_limit: true
-        success_response: |
-          Summary: The reset email never sends because the SMTP credentials expired.
-          Risk: high
-          Action: Rotate the SMTP key and add a send-failure alert.
-        partial_response: >-
-          Give me the exact TEMPLATE to fill (labeled fields, fixed parts) and pin
-          the length of each field. A template is what makes every answer line up
-          the same way.
+    - id: table-only
+      title: Ask for a clean table, nothing else
+      goal: Write a prompt that asks for the answer as a markdown table with named columns, and explicitly
+        forbids any preamble or closing text — return ONLY the table.
+      starter: ''
+      success:
+        min_words: 10
+        any_of:
+        - - table
+          - column
+          - markdown
+        require:
+        - - only
+          - no preamble
+          - no other text
+          - nothing else
+          - no extra
+          - just the
+          - no explanation
+      success_response: '| Name | Status |
+
+        | --- | --- |
+
+        | reset-email | broken |
+
+        | login | ok |
+
+        '
+      partial_response: Name the FORMAT (a markdown table with columns) AND forbid extras ("return only
+        the table, no preamble"). Otherwise I'll likely wrap it in a sentence or two.
+    - id: fixed-template
+      title: Fill a fixed template
+      goal: Write a prompt that gives the model an exact response TEMPLATE to fill in (with labeled fields
+        and a fixed number of parts), so every answer comes back in the same shape. Include the template
+        in your prompt.
+      starter: 'Reply using exactly this template:
+
+        Summary: <one sentence>
+
+        Risk: <low|medium|high>
+
+        Action: <one sentence>
+
+        '
+      success:
+        min_words: 12
+        any_of:
+        - - template
+          - format
+          - exactly this
+          - this format
+          - fill
+          - fields
+        mentions_limit: true
+      success_response: 'Summary: The reset email never sends because the SMTP credentials expired.
+
+        Risk: high
+
+        Action: Rotate the SMTP key and add a send-failure alert.
+
+        '
+      partial_response: Give me the exact TEMPLATE to fill (labeled fields, fixed parts) and pin the length
+        of each field. A template is what makes every answer line up the same way.
+  hidden_tests:
+  - name: smoke_hidden
+    code: assert True
 hints:
-  - content: Name the format explicitly — "as a markdown table with columns X and Y," "as exactly 3 bullets," or "answer with one word."
-    cost: 10
-    order: 1
-  - content: 'Forbid stray text: add "Return ONLY the table/list, with no preamble or closing remark." The "only" rule is what stops "Sure, here you go:".'
-    cost: 15
-    order: 2
-  - content: 'The strongest trick is to SHOW one example of the exact shape, or hand the model a fill-in template like "Summary: <…> / Risk: <low|med|high>". The model copies it.'
-    cost: 20
-    order: 3
+- order: 1
+  cost: 0
+  content: 'Where to look: Open `the solution file`, read the instructions, and run the visible tests
+    to see which assertion fails first.'
+- order: 2
+  cost: 25
+  content: 'Diagnostic steps:
+
+    1. Click Run and read the traceback — note line number and actual vs expected values.
+
+    2. Reproduce the failure with the smallest input from a visible test.
+
+    3. Compare your implementation to the bug described in the lab prompt.'
+- order: 3
+  cost: 50
+  content: 'Exact fix + verification:
+
+    1. Pass the exercise that demands a fixed-shape answer.
+
+    2. Re-run the lab checker (`check.sh` or Check Solution).
+
+    3. Confirm every scenario objective is satisfied.
+
+
+    WHY: the grader validates real state — marker files are ignored.'
+technology: prompt-engineering
+summary: Complete the controlling output format prompt engineering lab and verify success with the checker
+estimated_minutes: 30
+xp_reward: 100
+prerequisites:
+- Basic prompt engineering literacy
+tags:
+- do
+- hands-on
+- prompt-engineering
+linked_tutorial: prompt-engineering-fundamentals
+what_you_will_learn:
+- List the levers that control output shape (format type, count, template, "only")
+- Write a prompt that specifies an exact format and forbids extra text
+- Pass the exercise that demands a fixed-shape answer
+environment:
+  nodes:
+  - role: primary
+    os: FixitLab LLM practice workspace
+    hostname: lab-primary
+    ip: 127.0.0.1
+    specs: local offline simulation
+  pre_installed:
+  - bash
+  - coreutils
+  - journalctl
+  - prompt engineering
+  - systemctl
+  credentials:
+  - user: root
+    password: lab123
+tasks:
+- id: task_1
+  title: Controlling Output Format
+  description: Restore healthy behavior for Controlling Output Format by investigating the failure, applying
+    the smallest safe fix, and validating the outcome.
+  background: 'This prompt engineering lab teaches systematic troubleshooting: observe, hypothesize, change,
+    verify.'
+  validation:
+    type: custom_script
+    script: hidden_tests
+    error_message: One or more hidden tests failed. Read the public test output, fix your solution, and
+      submit again.
+solution:
+  summary: The solution passes all hidden tests by implementing the required behavior in code.
+  files_changed: []
+  commands_run: []
+  reference_docs: prompt-engineering-fundamentals
+guided_mode:
+  enabled: true
+  steps:
+  - step: 1
+    title: Inspect current state
+    instruction: Run a read-only diagnostic before changing anything.
+    command: check.sh
+    expected_output: Output shows the current failure mode
+    explanation: Evidence-first troubleshooting avoids guessing.
+    next_on: command_success
+  - step: 2
+    title: Apply the minimal fix
+    instruction: Make one reversible change aligned with the objectives.
+    command: '# your fix command here'
+    expected_output: State moves toward the objective
+    explanation: Small changes make rollback easy if the hypothesis was wrong.
+    next_on: command_success
+  - step: 3
+    title: Verify with the grader
+    instruction: Run the same verification the checker uses.
+    command: check.sh
+    expected_output: all hidden tests pass
+    explanation: The lab passes only when real state is healthy.
+    next_on: command_success

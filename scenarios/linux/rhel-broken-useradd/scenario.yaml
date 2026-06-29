@@ -1,7 +1,7 @@
 title: 'RHEL Simulation: Repair Broken /etc/passwd'
 slug: sim-rhel-broken-useradd
-technology: Linux Administration
-category: User Management
+technology: linux
+category: Fix
 difficulty: medium
 time_limit: 900
 max_score: 100
@@ -10,10 +10,29 @@ simulation_type: generic
 infrastructure_type: docker
 jira_priority: Medium
 is_free: true
-description: New user creation fails because /etc/passwd contains a malformed account entry. useradd and
-  related tools refuse to run (or behave unpredictably) when the passwd database is corrupt — a line is
-  missing required colon-separated fields. Identify the bad line with pwck, repair or remove it, and then
-  successfully create the appuser account.
+description: 'CONTEXT: A team operating Linux administration needs you to resolve `RHEL Simulation: Repair
+  Broken /etc/passwd` during a realistic incident. The business impact is reduced service reliability
+  until the underlying state is repaired.
+
+
+  ENVIRONMENT: You are working in FixitLab''s offline Linux practice server with terminal and config files
+  under /etc and /var. All tools run locally; no paid APIs or external cloud calls are required.
+
+
+  SYMPTOM / STARTING STATE: Simulated RHEL 9 server whose /etc/passwd has a corrupt line (e.g. missing
+  UID/GID fields), which blocks creating new users until the passwd database is clean. New user creation
+  fails because /etc/passwd contains a malformed account entry. useradd and related tools refuse to run
+  (or behave unpredictably) when the passwd database is corrupt — a line is missing required colon-separated
+  fields. Identify the bad line with pwck, repair or remove it, and then successfully create the appuser
+  account.
+
+
+  OBJECTIVE: Identify the malformed passwd entry; Remove or fix the corrupt line; Run pwck to verify account
+  files. Success means `check.sh` exits successfully.
+
+
+  WHAT TO AVOID: Do not apply broad destructive changes, skip evidence gathering, or fake completion with
+  marker files — the checker validates real system state.'
 objectives:
 - Identify the malformed passwd entry
 - Remove or fix the corrupt line
@@ -23,14 +42,74 @@ initial_state: Simulated RHEL 9 server whose /etc/passwd has a corrupt line (e.g
   which blocks creating new users until the passwd database is clean.
 hints:
 - order: 1
-  cost: 10
-  content: 'Find the corrupt account entry: `pwck` reports which line in /etc/passwd is malformed (e.g.
-    missing UID/GID fields).'
+  cost: 0
+  content: 'Where to look: Identify the malformed passwd entry'
 - order: 2
-  cost: 15
-  content: Open /etc/passwd and remove or correct that malformed line (a passwd entry needs all 7 colon-separated
-    fields). Keep a backup first.
+  cost: 25
+  content: 'Diagnostic steps:
+
+    1. Remove or fix the corrupt line
+
+    2. Run pwck to verify account files
+
+    3. Create user appuser with useradd -m'
 - order: 3
-  cost: 20
-  content: 'Re-run `pwck` until it''s clean, then create the user: `useradd -m appuser`. Confirm with
-    `id appuser`.'
+  cost: 50
+  content: 'Exact fix + verification:
+
+    1. Create user appuser with useradd -m.
+
+    2. Re-run the lab checker (`check.sh` or Check Solution).
+
+    3. Confirm every scenario objective is satisfied.
+
+
+    WHY: the grader validates real state — marker files are ignored.'
+summary: 'Complete the rhel simulation: repair broken /etc/passwd linux lab and verify success with the
+  checker'
+estimated_minutes: 15
+xp_reward: 100
+prerequisites:
+- Basic linux literacy
+tags:
+- fix
+- hands-on
+- linux
+linked_tutorial: linux-fundamentals
+what_you_will_learn:
+- Identify the malformed passwd entry
+- Remove or fix the corrupt line
+- Run pwck to verify account files
+- Create user appuser with useradd -m
+environment:
+  nodes:
+  - role: primary
+    os: FixitLab Linux practice server
+    hostname: lab-primary
+    ip: 127.0.0.1
+    specs: local offline simulation
+  pre_installed:
+  - bash
+  - coreutils
+  - journalctl
+  - linux
+  - systemctl
+  credentials:
+  - user: root
+    password: lab123
+tasks:
+- id: task_1
+  title: 'RHEL Simulation: Repair Broken /etc/passwd'
+  description: 'Restore healthy behavior for RHEL Simulation: Repair Broken /etc/passwd by investigating
+    the failure, applying the smallest safe fix, and validating the outcome.'
+  background: 'This linux lab teaches systematic troubleshooting: observe, hypothesize, change, verify.'
+  validation:
+    type: custom_script
+    script: check.sh
+    error_message: Validation did not pass. Re-read the objectives and Hint 2 diagnostic steps.
+solution:
+  summary: Identify the misconfiguration affecting this linux lab and apply the minimal fix.
+  files_changed: []
+  commands_run:
+  - bash check.sh
+  reference_docs: linux-fundamentals

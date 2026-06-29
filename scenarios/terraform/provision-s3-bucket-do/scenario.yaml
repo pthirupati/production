@@ -1,7 +1,7 @@
 title: Provision S3 Bucket with Terraform
 slug: provision-s3-bucket-do
-technology: Terraform
-category: Build Lab
+technology: terraform
+category: Build
 difficulty: easy
 scenario_type: do
 time_limit: 900
@@ -10,9 +10,28 @@ infrastructure_type: docker
 lab_mode: docker
 jira_priority: Low
 is_free: false
-description: 'Build task: provision an S3 bucket with Terraform from scratch. Starting with no Terraform
+description: 'CONTEXT: A team operating Terraform IaC needs you to resolve `Provision S3 Bucket with Terraform`
+  during a realistic incident. The business impact is reduced service reliability until the underlying
+  state is repaired.
+
+
+  ENVIRONMENT: You are working in FixitLab''s offline Terraform workspace with HCL files, state, and plan/apply
+  workflow. All tools run locally; no paid APIs or external cloud calls are required.
+
+
+  SYMPTOM / STARTING STATE: Empty Terraform working directory with AWS access available. No .tf files
+  exist yet. Build task: provision an S3 bucket with Terraform from scratch. Starting with no Terraform
   configuration, write the provider and an aws_s3_bucket resource (with sensible settings), validate the
-  configuration, and run it through plan/apply so the bucket is created and the config is clean.'
+  configuration, and run it through plan/apply so the bucket is created and the config is clean.
+
+
+  OBJECTIVE: Write Terraform config: the AWS provider and an aws_s3_bucket resource; Run terraform init
+  and terraform validate successfully; Apply the plan and confirm the bucket is created. Success means
+  `check.sh` exits successfully.
+
+
+  WHAT TO AVOID: Do not apply broad destructive changes, skip evidence gathering, or fake completion with
+  marker files — the checker validates real system state.'
 objectives:
 - 'Write Terraform config: the AWS provider and an aws_s3_bucket resource'
 - Run terraform init and terraform validate successfully
@@ -20,14 +39,94 @@ objectives:
 initial_state: Empty Terraform working directory with AWS access available. No .tf files exist yet.
 hints:
 - order: 1
-  cost: 10
-  content: 'Create main.tf with a `provider "aws" { region = "us-east-1" }` block and a resource: `resource
-    "aws_s3_bucket" "this" { bucket = "my-unique-bucket-name" }`.'
+  cost: 0
+  content: 'Where to look: Run `terraform validate` in the module directory for precise error paths.'
 - order: 2
-  cost: 15
-  content: 'Initialize and validate: `terraform init` then `terraform validate` (fix any HCL/type errors
-    it reports).'
+  cost: 25
+  content: 'Diagnostic steps:
+
+    1. `terraform init` if providers are missing.
+
+    2. `terraform validate` — read file:line references.
+
+    3. Cross-check variable names and resource blocks against the error.'
 - order: 3
-  cost: 20
-  content: 'Preview and apply: `terraform plan` then `terraform apply`. Confirm the bucket exists with
-    `aws s3 ls | grep my-unique-bucket-name` (or `terraform state list`).'
+  cost: 50
+  content: 'Exact fix + verification:
+
+    1. Fix the reported syntax or reference error.
+
+    2. Re-run `terraform validate` until it prints Success.
+
+    3. Optionally `terraform plan` to confirm no new errors.
+
+
+    WHY: validate catches config errors before any apply.'
+summary: Complete the provision s3 bucket with terraform terraform lab and verify success with the checker
+estimated_minutes: 15
+xp_reward: 100
+prerequisites:
+- Basic terraform literacy
+tags:
+- do
+- hands-on
+- terraform
+linked_tutorial: terraform-fundamentals
+what_you_will_learn:
+- 'Write Terraform config: the AWS provider and an aws_s3_bucket resource'
+- Run terraform init and terraform validate successfully
+- Apply the plan and confirm the bucket is created
+environment:
+  nodes:
+  - role: primary
+    os: FixitLab Terraform workspace
+    hostname: lab-primary
+    ip: 127.0.0.1
+    specs: local offline simulation
+  pre_installed:
+  - bash
+  - coreutils
+  - terraform
+  credentials:
+  - user: root
+    password: lab123
+tasks:
+- id: task_1
+  title: Provision S3 Bucket with Terraform
+  description: Restore healthy behavior for Provision S3 Bucket with Terraform by investigating the failure,
+    applying the smallest safe fix, and validating the outcome.
+  background: 'This terraform lab teaches systematic troubleshooting: observe, hypothesize, change, verify.'
+  validation:
+    type: custom_script
+    script: check.sh
+    error_message: Validation did not pass. Re-read the objectives and Hint 2 diagnostic steps.
+solution:
+  summary: Identify the misconfiguration affecting this terraform lab and apply the minimal fix.
+  files_changed: []
+  commands_run:
+  - bash check.sh
+  reference_docs: terraform-fundamentals
+guided_mode:
+  enabled: true
+  steps:
+  - step: 1
+    title: Inspect current state
+    instruction: Run a read-only diagnostic before changing anything.
+    command: check.sh
+    expected_output: Output shows the current failure mode
+    explanation: Evidence-first troubleshooting avoids guessing.
+    next_on: command_success
+  - step: 2
+    title: Apply the minimal fix
+    instruction: Make one reversible change aligned with the objectives.
+    command: '# your fix command here'
+    expected_output: State moves toward the objective
+    explanation: Small changes make rollback easy if the hypothesis was wrong.
+    next_on: command_success
+  - step: 3
+    title: Verify with the grader
+    instruction: Run the same verification the checker uses.
+    command: check.sh
+    expected_output: '`check.sh` exits successfully'
+    explanation: The lab passes only when real state is healthy.
+    next_on: command_success

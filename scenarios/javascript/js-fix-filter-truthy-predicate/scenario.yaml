@@ -1,9 +1,26 @@
 title: Fix compact Dropping Valid Falsy-ish Values
 slug: js-fix-filter-truthy-predicate
-category: JavaScript Development
-description: compact(arr) should remove only null and undefined, keeping every other value (including
-  0, '', false, NaN). It currently filters with the value itself as the predicate (`arr.filter(x => x)`),
-  which also drops 0, '', false, and NaN. Fix the predicate to reject only null/undefined.
+category: Fix
+description: 'CONTEXT: A team operating JavaScript needs you to resolve `Fix compact Dropping Valid Falsy-ish
+  Values` during a realistic incident. The business impact is reduced service reliability until the underlying
+  state is repaired.
+
+
+  ENVIRONMENT: You are working in FixitLab''s offline JavaScript practice project with modules, browser
+  console, and Node tooling. All tools run locally; no paid APIs or external cloud calls are required.
+
+
+  SYMPTOM / STARTING STATE: compact(arr) should remove only null and undefined, keeping every other value
+  (including 0, '''', false, NaN). It currently filters with the value itself as the predicate (`arr.filter(x
+  => x)`), which also drops 0, '''', false, and NaN. Fix the predicate to reject only null/undefined.
+
+
+  OBJECTIVE: See 0, '''', false, NaN wrongly removed; Keep all defined values, including falsy ones; Remove
+  only null and undefined. Success means all hidden tests pass.
+
+
+  WHAT TO AVOID: Do not apply broad destructive changes, skip evidence gathering, or fake completion with
+  marker files — the checker validates real system state.'
 difficulty: medium
 scenario_type: fix
 lab_mode: simulation
@@ -21,55 +38,132 @@ objectives:
 initial_state: compact(arr) should remove only null and undefined, keeping every other value (including
   0, '', false, NaN). It currently filters with the value itself as the predicate (`arr.filter(x => x)`),
   which also drops 0, '', false, and NaN. Fix the predicate to reject only null/undefined.
-solution_explanation: |
-  Using the value as the predicate drops every falsy value. Explicitly comparing against null and undefined keeps legitimate falsy values like 0, '', false, and NaN.
+solution_explanation: 'Using the value as the predicate drops every falsy value. Explicitly comparing
+  against null and undefined keeps legitimate falsy values like 0, '''', false, and NaN.
+
+  '
 coding_spec:
   language: javascript
   entrypoint: solution.js
   kind: fix
-  instructions: |
-    Fix compact(arr): return a new array with only null and undefined removed; keep 0, '', false, and NaN.
-      compact([0, null, 1, undefined, '']) -> [0, 1, '']
-    Click Run to try it, then Check Solution to grade against all tests.
+  instructions: "Fix compact(arr): return a new array with only null and undefined removed; keep 0, '',\
+    \ false, and NaN.\n  compact([0, null, 1, undefined, '']) -> [0, 1, '']\nClick Run to try it, then\
+    \ Check Solution to grade against all tests.\n"
   files:
   - path: solution.js
-    content: |
-      function compact(arr) {
-        return arr.filter((x) => x); // also drops 0, '', false, NaN
-      }
+    content: "function compact(arr) {\n  return arr.filter((x) => x); // also drops 0, '', false, NaN\n\
+      }\n"
     readonly: false
   visible_tests:
   - name: keeps falsy, drops nullish
-    code: |
-      assert(JSON.stringify(compact([0, null, 1, undefined, ''])) === JSON.stringify([0, 1, '']), JSON.stringify(compact([0, null, 1, undefined, ''])));
+    code: 'assert(JSON.stringify(compact([0, null, 1, undefined, ''''])) === JSON.stringify([0, 1, '''']),
+      JSON.stringify(compact([0, null, 1, undefined, ''''])));
+
+      '
   - name: keeps false
-    code: |
-      assert(JSON.stringify(compact([false, null])) === JSON.stringify([false]), JSON.stringify(compact([false, null])));
+    code: 'assert(JSON.stringify(compact([false, null])) === JSON.stringify([false]), JSON.stringify(compact([false,
+      null])));
+
+      '
   hidden_tests:
   - name: keeps zero
-    code: |
-      assert(JSON.stringify(compact([0, 0, null])) === JSON.stringify([0, 0]), JSON.stringify(compact([0, 0, null])));
+    code: 'assert(JSON.stringify(compact([0, 0, null])) === JSON.stringify([0, 0]), JSON.stringify(compact([0,
+      0, null])));
+
+      '
   - name: drops only nullish
-    code: |
-      assert(JSON.stringify(compact([1, null, 2, undefined, 3])) === JSON.stringify([1, 2, 3]), JSON.stringify(compact([1, null, 2, undefined, 3])));
+    code: 'assert(JSON.stringify(compact([1, null, 2, undefined, 3])) === JSON.stringify([1, 2, 3]), JSON.stringify(compact([1,
+      null, 2, undefined, 3])));
+
+      '
   - name: keeps NaN
-    code: |
-      const r = compact([NaN, null, 1]);
+    code: 'const r = compact([NaN, null, 1]);
+
       assert(r.length === 2 && Number.isNaN(r[0]) && r[1] === 1, JSON.stringify(r));
+
+      '
   - name: nothing to drop
-    code: |
-      assert(JSON.stringify(compact([1, 2, 3])) === JSON.stringify([1, 2, 3]), JSON.stringify(compact([1, 2, 3])));
+    code: 'assert(JSON.stringify(compact([1, 2, 3])) === JSON.stringify([1, 2, 3]), JSON.stringify(compact([1,
+      2, 3])));
+
+      '
   - name: all nullish
-    code: |
-      assert(JSON.stringify(compact([null, undefined])) === JSON.stringify([]), JSON.stringify(compact([null, undefined])));
+    code: 'assert(JSON.stringify(compact([null, undefined])) === JSON.stringify([]), JSON.stringify(compact([null,
+      undefined])));
+
+      '
   timeout: 8
 hints:
 - order: 1
-  cost: 10
-  content: compact([0, '']) returns [] because 0 and '' are falsy and the predicate is just `x`.
+  cost: 0
+  content: 'Where to look: Open `solution.js`, read the instructions, and run the visible tests to see
+    which assertion fails first.'
 - order: 2
-  cost: 20
-  content: You want to remove ONLY null and undefined, not all falsy values.
+  cost: 25
+  content: 'Diagnostic steps:
+
+    1. Click Run and read the traceback — note line number and actual vs expected values.
+
+    2. Reproduce the failure with the smallest input from a visible test.
+
+    3. Compare your implementation to the bug described in the lab prompt.'
 - order: 3
-  cost: 30
-  content: Filter with (x) => x !== null && x !== undefined (or x != null).
+  cost: 50
+  content: 'Exact fix + verification:
+
+    1. Remove only null and undefined.
+
+    2. Re-run the lab checker (`check.sh` or Check Solution).
+
+    3. Confirm every scenario objective is satisfied.
+
+
+    WHY: the grader validates real state — marker files are ignored.'
+technology: javascript
+summary: Complete the fix compact dropping valid falsy-ish values javascript lab and verify success with
+  the checker
+estimated_minutes: 25
+xp_reward: 100
+prerequisites:
+- Basic javascript literacy
+tags:
+- fix
+- hands-on
+- javascript
+linked_tutorial: javascript-fundamentals
+what_you_will_learn:
+- See 0, '', false, NaN wrongly removed
+- Keep all defined values, including falsy ones
+- Remove only null and undefined
+environment:
+  nodes:
+  - role: primary
+    os: FixitLab JavaScript practice project
+    hostname: lab-primary
+    ip: 127.0.0.1
+    specs: local offline simulation
+  pre_installed:
+  - bash
+  - coreutils
+  - javascript
+  - journalctl
+  - systemctl
+  credentials:
+  - user: root
+    password: lab123
+tasks:
+- id: task_1
+  title: Fix compact Dropping Valid Falsy-ish Values
+  description: Restore healthy behavior for Fix compact Dropping Valid Falsy-ish Values by investigating
+    the failure, applying the smallest safe fix, and validating the outcome.
+  background: 'This javascript lab teaches systematic troubleshooting: observe, hypothesize, change, verify.'
+  validation:
+    type: custom_script
+    script: hidden_tests
+    error_message: One or more hidden tests failed. Read the public test output, fix your solution, and
+      submit again.
+solution:
+  summary: The solution passes all hidden tests by implementing the required behavior in code.
+  files_changed: []
+  commands_run: []
+  reference_docs: javascript-fundamentals

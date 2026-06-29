@@ -1,43 +1,79 @@
 title: Extend a Full Filesystem via a ServiceNow Storage Ticket
 slug: linux-disk-extend-itsm-ticket
 difficulty: medium
-category: Linux Administration
-description: |
-  The root volume on web-prod-01 is almost full and you have NO spare disk to extend
-  the LVM volume group with. This is an ITSM (ServiceNow) workflow task: you own the
-  Incident, but adding hardware is the Storage team's job. From the ticket panel, raise
-  a SUB-TICKET to the Storage team requesting a 50 GiB disk. The (simulated) Storage
-  team provisions and attaches it, then resolves the sub-ticket. Back on the server,
-  run a SCSI rescan so the kernel sees the new disk, then pvcreate / vgextend / lvextend
-  to grow the volume — exactly as you would in a real change. The disk does NOT exist on
-  the server until the Storage team actions your sub-ticket.
-initial_state: |
-  Simulated RHEL 9 server (web-prod-01). The volume group `rhel` has no free extents and
+category: Fix
+description: 'CONTEXT: A team operating Linux administration needs you to resolve `Extend a Full Filesystem
+  via a ServiceNow Storage Ticket` during a realistic incident. The business impact is reduced service
+  reliability until the underlying state is repaired.
+
+
+  ENVIRONMENT: You are working in FixitLab''s offline Linux practice server with terminal and config files
+  under /etc and /var. All tools run locally; no paid APIs or external cloud calls are required.
+
+
+  SYMPTOM / STARTING STATE: Simulated RHEL 9 server (web-prod-01). The volume group `rhel` has no free
+  extents and
+
   there is no spare disk attached. A ServiceNow Incident is open and assigned to the
+
+  Service Desk; the Storage team must add a disk before the LV can be extended. The root volume on web-prod-01
+  is almost full and you have NO spare disk to extend
+
+  the LVM volume group with. This is an ITSM (ServiceNow) workflow task: you own the
+
+  Incident, but adding hardware is the Storage team''s job. From the ticket panel, raise
+
+  a SUB-TICKET to the Storage team requesting a 50 GiB disk. The (simulated) Storage
+
+  team provisions and attaches it, then resolves the sub-ticket. Back on the server,
+
+  run a SCSI rescan so the kernel sees the new disk, then pvcreate / vgextend / lvextend
+
+  to grow the volume — exactly as you would in a real change. The disk does NOT exist on
+
+  the server until the Storage team actions your sub-ticket.
+
+
+  OBJECTIVE: Open the Ticket panel and review the Incident assigned to you; Raise a sub-ticket to the
+  Storage team for a 50 GiB disk; After the Storage team resolves it, run a SCSI rescan so the new disk
+  (/dev/sdc) appears. Success means `check.sh` exits successfully.
+
+
+  WHAT TO AVOID: Do not apply broad destructive changes, skip evidence gathering, or fake completion with
+  marker files — the checker validates real system state.'
+initial_state: 'Simulated RHEL 9 server (web-prod-01). The volume group `rhel` has no free extents and
+
+  there is no spare disk attached. A ServiceNow Incident is open and assigned to the
+
   Service Desk; the Storage team must add a disk before the LV can be extended.
+
+  '
 objectives:
-  - Open the Ticket panel and review the Incident assigned to you
-  - Raise a sub-ticket to the Storage team for a 50 GiB disk
-  - After the Storage team resolves it, run a SCSI rescan so the new disk (/dev/sdc) appears
-  - pvcreate the new disk, vgextend the rhel VG, and lvextend the root LV to use the space
-  - Resolve the Incident with a close code once the filesystem is extended
+- Open the Ticket panel and review the Incident assigned to you
+- Raise a sub-ticket to the Storage team for a 50 GiB disk
+- After the Storage team resolves it, run a SCSI rescan so the new disk (/dev/sdc) appears
+- pvcreate the new disk, vgextend the rhel VG, and lvextend the root LV to use the space
+- Resolve the Incident with a close code once the filesystem is extended
 lab_mode: simulation
 simulation_type: rhel
 itsm_enabled: true
 itsm_ticket_type: incident
 itsm_config:
-  short_description: "/ filesystem nearly full on web-prod-01 — need to extend"
-  description: |
-    Monitoring alerted that / on web-prod-01 is at 98%. The LVM volume group has no
+  short_description: / filesystem nearly full on web-prod-01 — need to extend
+  description: 'Monitoring alerted that / on web-prod-01 is at 98%. The LVM volume group has no
+
     free space. Raise a request to the Storage team for additional disk, attach it,
+
     and extend the root logical volume. Resolve this Incident once / has free space.
-  priority: "2"
+
+    '
+  priority: '2'
   assignment_group: service_desk
   allowed_actions:
-    - add_disk
+  - add_disk
   teams:
-    - service_desk
-    - storage
+  - service_desk
+  - storage
 cross_technology: false
 vmware_link: false
 docker_privileged: false
@@ -46,14 +82,80 @@ max_score: 100
 is_free: false
 jira_priority: High
 hints:
-  - content: 'Open the Ticket tab. Click "Raise sub-ticket", choose "Add a disk — Storage Team", set 50 GiB, and submit. The parent Incident moves to On Hold while Storage works.'
-    cost: 10
-    order: 1
-  - content: 'When the sub-ticket resolves, the disk is attached but the kernel cannot see it yet. Run a SCSI rescan: echo "- - -" > /sys/class/scsi_host/host0/scan (or rescan-scsi-bus.sh), then lsblk to confirm /dev/sdc.'
-    cost: 15
-    order: 2
-  - content: 'Extend the volume: pvcreate /dev/sdc; vgextend rhel /dev/sdc; lvextend -l +100%FREE /dev/mapper/rhel-root; then xfs_growfs / (or resize2fs). Verify with df -h /.'
-    cost: 20
-    order: 3
-objectives_validation: |
-  Pass when /dev/sdc is a PV in the rhel VG and the root LV has been extended.
+- order: 1
+  cost: 0
+  content: 'Where to look: Run `df -h` and `du -xh /var /tmp /home | sort -h | tail -20` for large paths.'
+- order: 2
+  cost: 25
+  content: 'Diagnostic steps:
+
+    1. Find which mount is 100% — often `/` or `/var`.
+
+    2. `journalctl --disk-usage` and old logs under `/var/log`.
+
+    3. Look for core dumps, temp files, or oversized application data.'
+- order: 3
+  cost: 50
+  content: 'Exact fix + verification:
+
+    1. Remove or rotate the largest safe files (logs, caches, old packages).
+
+    2. `df -h` should show free space on the affected mount.
+
+    3. Retry the command that failed with ''No space left on device''.
+
+
+    WHY: many services fail cryptically when disk is full.'
+objectives_validation: 'Pass when /dev/sdc is a PV in the rhel VG and the root LV has been extended.
+
+  '
+technology: linux
+summary: Complete the extend a full filesystem via a servicenow storage ticket linux lab and verify success
+  with the checker
+estimated_minutes: 20
+xp_reward: 100
+prerequisites:
+- Basic linux literacy
+tags:
+- fix
+- hands-on
+- linux
+linked_tutorial: linux-fundamentals
+what_you_will_learn:
+- Open the Ticket panel and review the Incident assigned to you
+- Raise a sub-ticket to the Storage team for a 50 GiB disk
+- After the Storage team resolves it, run a SCSI rescan so the new disk (/dev/sdc) appears
+- pvcreate the new disk, vgextend the rhel VG, and lvextend the root LV to use the space
+- Resolve the Incident with a close code once the filesystem is extended
+environment:
+  nodes:
+  - role: primary
+    os: FixitLab Linux practice server
+    hostname: lab-primary
+    ip: 127.0.0.1
+    specs: local offline simulation
+  pre_installed:
+  - bash
+  - coreutils
+  - journalctl
+  - linux
+  - systemctl
+  credentials:
+  - user: root
+    password: lab123
+tasks:
+- id: task_1
+  title: Extend a Full Filesystem via a ServiceNow Storage Ticket
+  description: Restore healthy behavior for Extend a Full Filesystem via a ServiceNow Storage Ticket by
+    investigating the failure, applying the smallest safe fix, and validating the outcome.
+  background: 'This linux lab teaches systematic troubleshooting: observe, hypothesize, change, verify.'
+  validation:
+    type: custom_script
+    script: check.sh
+    error_message: Validation did not pass. Re-read the objectives and Hint 2 diagnostic steps.
+solution:
+  summary: Identify the misconfiguration affecting this linux lab and apply the minimal fix.
+  files_changed: []
+  commands_run:
+  - bash check.sh
+  reference_docs: linux-fundamentals

@@ -1,28 +1,112 @@
 title: IAM Privilege Escalation via iam:PassRole
 slug: aws-iam-privilege-escalation
 difficulty: hard
-category: AWS
-description: 'An IAM user has the iam:PassRole permission combined with ec2:RunInstances, allowing them to launch EC2 instances with any IAM role — including admin roles — and escalate their effective privileges beyond what is intended.'
-initial_state: 'Simulated AWS environment where an IAM user policy grants iam:PassRole with a wildcard resource alongside ec2:RunInstances. This allows the user to attach high-privilege roles to instances and gain indirect admin access.'
+category: Fix
+description: 'CONTEXT: A team operating Terraform IaC needs you to resolve `IAM Privilege Escalation via
+  iam:PassRole` during a realistic incident. The business impact is reduced service reliability until
+  the underlying state is repaired.
+
+
+  ENVIRONMENT: You are working in FixitLab''s offline Terraform workspace with HCL files, state, and plan/apply
+  workflow. All tools run locally; no paid APIs or external cloud calls are required.
+
+
+  SYMPTOM / STARTING STATE: Simulated AWS environment where an IAM user policy grants iam:PassRole with
+  a wildcard resource alongside ec2:RunInstances. This allows the user to attach high-privilege roles
+  to instances and gain indirect admin access. An IAM user has the iam:PassRole permission combined with
+  ec2:RunInstances, allowing them to launch EC2 instances with any IAM role — including admin roles —
+  and escalate their effective privileges beyond what is intended.
+
+
+  OBJECTIVE: Identify the dangerous iam:PassRole + ec2:RunInstances combination in the IAM policy; Remove
+  or scope down the iam:PassRole permission to restrict it to specific safe roles only; Confirm the user
+  can no longer pass arbitrary roles to EC2 instances. Success means `check.sh` exits successfully.
+
+
+  WHAT TO AVOID: Do not apply broad destructive changes, skip evidence gathering, or fake completion with
+  marker files — the checker validates real system state.'
+initial_state: Simulated AWS environment where an IAM user policy grants iam:PassRole with a wildcard
+  resource alongside ec2:RunInstances. This allows the user to attach high-privilege roles to instances
+  and gain indirect admin access.
 objectives:
-  - Identify the dangerous iam:PassRole + ec2:RunInstances combination in the IAM policy
-  - Remove or scope down the iam:PassRole permission to restrict it to specific safe roles only
-  - Confirm the user can no longer pass arbitrary roles to EC2 instances
+- Identify the dangerous iam:PassRole + ec2:RunInstances combination in the IAM policy
+- Remove or scope down the iam:PassRole permission to restrict it to specific safe roles only
+- Confirm the user can no longer pass arbitrary roles to EC2 instances
 lab_mode: simulation
 simulation_type: aws
 time_limit: 2400
 max_score: 100
 is_free: false
 hints:
-  - content: 'Run: aws iam get-user-policy or list-attached-user-policies to retrieve the policy document and look for iam:PassRole with Resource: "*".'
-    cost: 10
-    order: 1
-  - content: 'Scope iam:PassRole to a specific role ARN resource condition, e.g. arn:aws:iam::*:role/safe-instance-role, instead of wildcard.'
-    cost: 20
-    order: 2
-  - content: 'Use the IAM Access Analyzer to detect privilege escalation paths. Policies granting iam:PassRole + ec2:RunInstances together are flagged as high-risk.'
-    cost: 25
-    order: 3
+- order: 1
+  cost: 0
+  content: 'Where to look: Identify the dangerous iam:PassRole + ec2:RunInstances combination in the IAM
+    policy'
+- order: 2
+  cost: 25
+  content: 'Diagnostic steps:
+
+    1. Remove or scope down the iam:PassRole permission to restrict it to specific safe roles only
+
+    2. Confirm the user can no longer pass arbitrary roles to EC2 instances'
+- order: 3
+  cost: 50
+  content: 'Exact fix + verification:
+
+    1. Confirm the user can no longer pass arbitrary roles to EC2 instances.
+
+    2. Re-run the lab checker (`check.sh` or Check Solution).
+
+    3. Confirm every scenario objective is satisfied.
+
+
+    WHY: the grader validates real state — marker files are ignored.'
 requires_companion_hosts: false
 dual_terminal: false
 jira_priority: Critical
+technology: terraform
+summary: Complete the iam privilege escalation via iam:passrole terraform lab and verify success with
+  the checker
+estimated_minutes: 40
+xp_reward: 100
+prerequisites:
+- Basic terraform literacy
+tags:
+- fix
+- hands-on
+- terraform
+linked_tutorial: terraform-fundamentals
+what_you_will_learn:
+- Identify the dangerous iam:PassRole + ec2:RunInstances combination in the IAM policy
+- Remove or scope down the iam:PassRole permission to restrict it to specific safe roles only
+- Confirm the user can no longer pass arbitrary roles to EC2 instances
+environment:
+  nodes:
+  - role: primary
+    os: FixitLab Terraform workspace
+    hostname: lab-primary
+    ip: 127.0.0.1
+    specs: local offline simulation
+  pre_installed:
+  - bash
+  - coreutils
+  - terraform
+  credentials:
+  - user: root
+    password: lab123
+tasks:
+- id: task_1
+  title: IAM Privilege Escalation via iam:PassRole
+  description: Restore healthy behavior for IAM Privilege Escalation via iam:PassRole by investigating
+    the failure, applying the smallest safe fix, and validating the outcome.
+  background: 'This terraform lab teaches systematic troubleshooting: observe, hypothesize, change, verify.'
+  validation:
+    type: custom_script
+    script: check.sh
+    error_message: Validation did not pass. Re-read the objectives and Hint 2 diagnostic steps.
+solution:
+  summary: Identify the misconfiguration affecting this terraform lab and apply the minimal fix.
+  files_changed: []
+  commands_run:
+  - bash check.sh
+  reference_docs: terraform-fundamentals

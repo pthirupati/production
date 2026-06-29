@@ -1,10 +1,30 @@
 title: CUDA Driver Version Mismatch
 slug: sim-gpu-driver-mismatch
-category: GPU & NVIDIA
+category: Fix
 difficulty: easy
-description: CUDA workloads fail with "CUDA driver version is insufficient for CUDA runtime version".
-  The installed NVIDIA kernel driver is older than what the CUDA runtime/toolkit in use requires, so applications
-  can't initialize the GPU. Reconcile the driver and runtime versions so CUDA initializes successfully.
+description: 'CONTEXT: A team operating GPU operations needs you to resolve `CUDA Driver Version Mismatch`
+  during a realistic incident. The business impact is reduced service reliability until the underlying
+  state is repaired.
+
+
+  ENVIRONMENT: You are working in FixitLab''s offline GPU node with nvidia-smi, drivers, CUDA, and container
+  toolkit. All tools run locally; no paid APIs or external cloud calls are required.
+
+
+  SYMPTOM / STARTING STATE: Linux host with NVIDIA GPU. The CUDA runtime/toolkit is newer than the installed
+  driver, so GPU programs abort with "CUDA driver version is insufficient for CUDA runtime version". CUDA
+  workloads fail with "CUDA driver version is insufficient for CUDA runtime version". The installed NVIDIA
+  kernel driver is older than what the CUDA runtime/toolkit in use requires, so applications can''t initialize
+  the GPU. Reconcile the driver and runtime versions so CUDA initializes successfully.
+
+
+  OBJECTIVE: Read the driver and CUDA runtime versions and confirm the mismatch; Determine the minimum
+  driver required by the CUDA version in use; Align driver/runtime versions so CUDA programs initialize.
+  Success means `check.sh` exits successfully.
+
+
+  WHAT TO AVOID: Do not apply broad destructive changes, skip evidence gathering, or fake completion with
+  marker files — the checker validates real system state.'
 initial_state: Linux host with NVIDIA GPU. The CUDA runtime/toolkit is newer than the installed driver,
   so GPU programs abort with "CUDA driver version is insufficient for CUDA runtime version".
 lab_mode: simulation
@@ -21,15 +41,74 @@ objectives:
 - Align driver/runtime versions so CUDA programs initialize
 hints:
 - order: 1
-  cost: 10
-  content: 'Check what''s installed: `nvidia-smi` shows the driver version and the max CUDA it supports
-    (top-right). `nvcc --version` shows the toolkit version — note the gap.'
+  cost: 0
+  content: 'Where to look: Run `docker ps -a` and `docker logs <container>` for the failing container.'
 - order: 2
-  cost: 15
-  content: Each CUDA release has a minimum driver. Either upgrade the driver to satisfy the newer CUDA,
-    or use a CUDA runtime compatible with the current driver.
+  cost: 25
+  content: 'Diagnostic steps:
+
+    1. `docker ps -a` — note Exited status and exit code.
+
+    2. `docker logs <name>` for the startup error.
+
+    3. Inspect the Dockerfile or `docker run` flags if the image is wrong.'
 - order: 3
-  cost: 20
-  content: Upgrade the driver to a version that supports the CUDA runtime, then reload the modules (or
-    reboot) and re-run `nvidia-smi`; the CUDA program now initializes without the insufficient-driver
-    error.
+  cost: 50
+  content: 'Exact fix + verification:
+
+    1. Fix image, port mapping, volume, or env configuration.
+
+    2. `docker start <name>` or re-run with corrected flags.
+
+    3. Confirm `nvidia-smi` shows the container Up.
+
+
+    WHY: the checker validates the container is actually running.'
+technology: gpu
+summary: Complete the cuda driver version mismatch gpu lab and verify success with the checker
+estimated_minutes: 15
+xp_reward: 100
+prerequisites:
+- Basic gpu literacy
+tags:
+- fix
+- gpu
+- hands-on
+linked_tutorial: gpu-fundamentals
+what_you_will_learn:
+- Read the driver and CUDA runtime versions and confirm the mismatch
+- Determine the minimum driver required by the CUDA version in use
+- Align driver/runtime versions so CUDA programs initialize
+environment:
+  nodes:
+  - role: primary
+    os: FixitLab GPU node
+    hostname: lab-primary
+    ip: 127.0.0.1
+    specs: local offline simulation
+  pre_installed:
+  - bash
+  - coreutils
+  - gpu
+  - journalctl
+  - systemctl
+  credentials:
+  - user: root
+    password: lab123
+tasks:
+- id: task_1
+  title: CUDA Driver Version Mismatch
+  description: Restore healthy behavior for CUDA Driver Version Mismatch by investigating the failure,
+    applying the smallest safe fix, and validating the outcome.
+  background: 'This gpu lab teaches systematic troubleshooting: observe, hypothesize, change, verify.'
+  validation:
+    type: command_output
+    command: nvidia-smi
+    expected_output: NVIDIA-SMI
+    error_message: GPU health check still fails. Verify driver and device visibility.
+solution:
+  summary: Identify the misconfiguration affecting this gpu lab and apply the minimal fix.
+  files_changed: []
+  commands_run:
+  - nvidia-smi
+  reference_docs: gpu-fundamentals

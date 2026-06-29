@@ -1,39 +1,130 @@
 title: Provision LVM Storage and Mount at /data
 slug: linux-lvm-create-mount
 difficulty: medium
-category: Storage / LVM
-description: |
-  A spare disk /dev/sdc has been presented to the server but no LVM structures exist on
+category: Fix
+description: 'CONTEXT: A team operating Linux administration needs you to resolve `Provision LVM Storage
+  and Mount at /data` during a realistic incident. The business impact is reduced service reliability
+  until the underlying state is repaired.
+
+
+  ENVIRONMENT: You are working in FixitLab''s offline Linux practice server with terminal and config files
+  under /etc and /var. All tools run locally; no paid APIs or external cloud calls are required.
+
+
+  SYMPTOM / STARTING STATE: Simulated RHEL 9 server. lsblk shows an unused 20G /dev/sdc with no partitions
+  or LVM
+
+  metadata. There is no volume group named vgdata and no /data mount. The application
+
+  team is blocked until /data is available. A spare disk /dev/sdc has been presented to the server but
+  no LVM structures exist on
+
   it. Applications are waiting for /data to be provisioned. You must build the full LVM
+
   stack from scratch — physical volume, volume group, logical volume — format it, mount
+
   it at /data, and persist the mount in /etc/fstab.
 
-initial_state: |
-  Simulated RHEL 9 server. lsblk shows an unused 20G /dev/sdc with no partitions or LVM
+
+  OBJECTIVE: Initialise the disk as a physical volume with pvcreate /dev/sdc; Create a volume group named
+  vgdata with vgcreate vgdata /dev/sdc; Create a logical volume named lvdata with lvcreate -L 10G -n lvdata
+  vgdata. Success means `check.sh` exits successfully.
+
+
+  WHAT TO AVOID: Do not apply broad destructive changes, skip evidence gathering, or fake completion with
+  marker files — the checker validates real system state.'
+initial_state: 'Simulated RHEL 9 server. lsblk shows an unused 20G /dev/sdc with no partitions or LVM
+
   metadata. There is no volume group named vgdata and no /data mount. The application
+
   team is blocked until /data is available.
 
+  '
 objectives:
-  - Initialise the disk as a physical volume with pvcreate /dev/sdc
-  - Create a volume group named vgdata with vgcreate vgdata /dev/sdc
-  - Create a logical volume named lvdata with lvcreate -L 10G -n lvdata vgdata
-  - Format the LV with mkfs.xfs /dev/vgdata/lvdata
-  - Mount it at /data and add it to /etc/fstab so it survives a reboot
+- Initialise the disk as a physical volume with pvcreate /dev/sdc
+- Create a volume group named vgdata with vgcreate vgdata /dev/sdc
+- Create a logical volume named lvdata with lvcreate -L 10G -n lvdata vgdata
+- Format the LV with mkfs.xfs /dev/vgdata/lvdata
+- Mount it at /data and add it to /etc/fstab so it survives a reboot
 lab_mode: simulation
 simulation_type: generic
 time_limit: 1200
 max_score: 100
 is_free: false
 hints:
-  - content: 'Confirm /dev/sdc with lsblk, then build the stack: pvcreate /dev/sdc; vgcreate vgdata /dev/sdc; lvcreate -L 10G -n lvdata vgdata.'
-    cost: 10
-    order: 1
-  - content: 'Format and mount: mkfs.xfs /dev/vgdata/lvdata, then mkdir -p /data && mount /dev/vgdata/lvdata /data. Verify with pvs, lvs, and df -h.'
-    cost: 20
-    order: 2
-  - content: 'Persist the mount in /etc/fstab, e.g. /dev/vgdata/lvdata /data xfs defaults 0 0.'
-    cost: 15
-    order: 3
+- order: 1
+  cost: 0
+  content: 'Where to look: Run `df -h` and `du -xh /var /tmp /home | sort -h | tail -20` for large paths.'
+- order: 2
+  cost: 25
+  content: 'Diagnostic steps:
+
+    1. Find which mount is 100% — often `/` or `/var`.
+
+    2. `journalctl --disk-usage` and old logs under `/var/log`.
+
+    3. Look for core dumps, temp files, or oversized application data.'
+- order: 3
+  cost: 50
+  content: 'Exact fix + verification:
+
+    1. Remove or rotate the largest safe files (logs, caches, old packages).
+
+    2. `df -h` should show free space on the affected mount.
+
+    3. Retry the command that failed with ''No space left on device''.
+
+
+    WHY: many services fail cryptically when disk is full.'
 requires_companion_hosts: false
 dual_terminal: false
 jira_priority: Medium
+technology: linux
+summary: Complete the provision lvm storage and mount at /data linux lab and verify success with the checker
+estimated_minutes: 20
+xp_reward: 100
+prerequisites:
+- Basic linux literacy
+tags:
+- fix
+- hands-on
+- linux
+linked_tutorial: linux-fundamentals
+what_you_will_learn:
+- Initialise the disk as a physical volume with pvcreate /dev/sdc
+- Create a volume group named vgdata with vgcreate vgdata /dev/sdc
+- Create a logical volume named lvdata with lvcreate -L 10G -n lvdata vgdata
+- Format the LV with mkfs.xfs /dev/vgdata/lvdata
+- Mount it at /data and add it to /etc/fstab so it survives a reboot
+environment:
+  nodes:
+  - role: primary
+    os: FixitLab Linux practice server
+    hostname: lab-primary
+    ip: 127.0.0.1
+    specs: local offline simulation
+  pre_installed:
+  - bash
+  - coreutils
+  - journalctl
+  - linux
+  - systemctl
+  credentials:
+  - user: root
+    password: lab123
+tasks:
+- id: task_1
+  title: Provision LVM Storage and Mount at /data
+  description: Restore healthy behavior for Provision LVM Storage and Mount at /data by investigating
+    the failure, applying the smallest safe fix, and validating the outcome.
+  background: 'This linux lab teaches systematic troubleshooting: observe, hypothesize, change, verify.'
+  validation:
+    type: custom_script
+    script: check.sh
+    error_message: Validation did not pass. Re-read the objectives and Hint 2 diagnostic steps.
+solution:
+  summary: Identify the misconfiguration affecting this linux lab and apply the minimal fix.
+  files_changed: []
+  commands_run:
+  - bash check.sh
+  reference_docs: linux-fundamentals

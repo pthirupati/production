@@ -1,10 +1,30 @@
 title: Add Swap Space to Prevent OOM Kills
 slug: linux-swap-create
 difficulty: easy
-category: Linux Administration
-description: The system is suffering OOM (out-of-memory) kills because no swap space is configured — `swapon
-  --show` is empty. Adding swap gives the kernel overflow room and reduces OOM events. Create a 2GB swap
-  file with secure permissions, initialize and activate it, and make it persistent via fstab.
+category: Fix
+description: 'CONTEXT: A team operating Linux administration needs you to resolve `Add Swap Space to Prevent
+  OOM Kills` during a realistic incident. The business impact is reduced service reliability until the
+  underlying state is repaired.
+
+
+  ENVIRONMENT: You are working in FixitLab''s offline Linux practice server with terminal and config files
+  under /etc and /var. All tools run locally; no paid APIs or external cloud calls are required.
+
+
+  SYMPTOM / STARTING STATE: Linux server with no active swap (swapon --show is empty), leading to OOM
+  kills under memory pressure. A swap file needs to be created and enabled. The system is suffering OOM
+  (out-of-memory) kills because no swap space is configured — `swapon --show` is empty. Adding swap gives
+  the kernel overflow room and reduces OOM events. Create a 2GB swap file with secure permissions, initialize
+  and activate it, and make it persistent via fstab.
+
+
+  OBJECTIVE: Create a 2GB swap file with secure (600) permissions; Initialize it with mkswap and activate
+  it with swapon; Verify with swapon --show / free -h and persist it in fstab. Success means `check.sh`
+  exits successfully.
+
+
+  WHAT TO AVOID: Do not apply broad destructive changes, skip evidence gathering, or fake completion with
+  marker files — the checker validates real system state.'
 initial_state: Linux server with no active swap (swapon --show is empty), leading to OOM kills under memory
   pressure. A swap file needs to be created and enabled.
 objectives:
@@ -18,16 +38,74 @@ max_score: 100
 is_free: false
 hints:
 - order: 1
-  cost: 10
-  content: 'Create the file: `fallocate -l 2G /swapfile` (or `dd if=/dev/zero of=/swapfile bs=1M count=2048`
-    if fallocate is unavailable), then secure it: `chmod 600 /swapfile`.'
+  cost: 0
+  content: 'Where to look: Create a 2GB swap file with secure (600) permissions'
 - order: 2
-  cost: 15
-  content: 'Make it swap and turn it on: `mkswap /swapfile && swapon /swapfile`.'
+  cost: 25
+  content: 'Diagnostic steps:
+
+    1. Initialize it with mkswap and activate it with swapon
+
+    2. Verify with swapon --show / free -h and persist it in fstab'
 - order: 3
-  cost: 20
-  content: 'Confirm with `swapon --show` and `free -h`, then persist: add `/swapfile none swap sw 0 0`
-    to /etc/fstab.'
+  cost: 50
+  content: 'Exact fix + verification:
+
+    1. Verify with swapon --show / free -h and persist it in fstab.
+
+    2. Re-run the lab checker (`check.sh` or Check Solution).
+
+    3. Confirm every scenario objective is satisfied.
+
+
+    WHY: the grader validates real state — marker files are ignored.'
 requires_companion_hosts: false
 dual_terminal: false
 jira_priority: Medium
+technology: linux
+summary: Complete the add swap space to prevent oom kills linux lab and verify success with the checker
+estimated_minutes: 15
+xp_reward: 100
+prerequisites:
+- Basic linux literacy
+tags:
+- fix
+- hands-on
+- linux
+linked_tutorial: linux-fundamentals
+what_you_will_learn:
+- Create a 2GB swap file with secure (600) permissions
+- Initialize it with mkswap and activate it with swapon
+- Verify with swapon --show / free -h and persist it in fstab
+environment:
+  nodes:
+  - role: primary
+    os: FixitLab Linux practice server
+    hostname: lab-primary
+    ip: 127.0.0.1
+    specs: local offline simulation
+  pre_installed:
+  - bash
+  - coreutils
+  - journalctl
+  - linux
+  - systemctl
+  credentials:
+  - user: root
+    password: lab123
+tasks:
+- id: task_1
+  title: Add Swap Space to Prevent OOM Kills
+  description: Restore healthy behavior for Add Swap Space to Prevent OOM Kills by investigating the failure,
+    applying the smallest safe fix, and validating the outcome.
+  background: 'This linux lab teaches systematic troubleshooting: observe, hypothesize, change, verify.'
+  validation:
+    type: custom_script
+    script: check.sh
+    error_message: Validation did not pass. Re-read the objectives and Hint 2 diagnostic steps.
+solution:
+  summary: Identify the misconfiguration affecting this linux lab and apply the minimal fix.
+  files_changed: []
+  commands_run:
+  - bash check.sh
+  reference_docs: linux-fundamentals

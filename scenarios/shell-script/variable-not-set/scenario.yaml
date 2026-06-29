@@ -1,13 +1,31 @@
 title: Unbound Variable Error in Script
 slug: shell-variable-not-set
 difficulty: easy
-category: Shell Scripting
-description: 'A bash script exits immediately with "unbound variable" errors when run with strict mode
-  (set -euo pipefail). Variables are referenced before assignment, one variable has a typo in its name,
-  and an array element is accessed without a bounds check. The script must be fixed to handle unset variables
-  gracefully using default values and proper quoting.
+category: Fix
+description: 'CONTEXT: A team operating shell scripting needs you to resolve `Unbound Variable Error in
+  Script` during a realistic incident. The business impact is reduced service reliability until the underlying
+  state is repaired.
 
-  '
+
+  ENVIRONMENT: You are working in FixitLab''s offline bash practice environment with scripts, cron, logs,
+  and shellcheck. All tools run locally; no paid APIs or external cloud calls are required.
+
+
+  SYMPTOM / STARTING STATE: Simulated RHEL 9 server. Running backup.sh with set -u active causes it to
+  abort immediately with "BACKUP_DIR: unbound variable" before any backup is created. A bash script exits
+  immediately with "unbound variable" errors when run with strict mode (set -euo pipefail). Variables
+  are referenced before assignment, one variable has a typo in its name, and an array element is accessed
+  without a bounds check. The script must be fixed to handle unset variables gracefully using default
+  values and proper quoting.
+
+
+  OBJECTIVE: Identify all unbound variable references using bash -n and the error output; Add default
+  value assignments or parameter expansions to handle unset variables; Confirm the script runs to completion
+  without unbound variable errors. Success means `check.sh` exits successfully.
+
+
+  WHAT TO AVOID: Do not apply broad destructive changes, skip evidence gathering, or fake completion with
+  marker files — the checker validates real system state.'
 initial_state: 'Simulated RHEL 9 server. Running backup.sh with set -u active causes it to abort immediately
   with "BACKUP_DIR: unbound variable" before any backup is created.
 
@@ -23,18 +41,75 @@ max_score: 100
 is_free: false
 hints:
 - order: 1
-  cost: 10
-  content: 'Run with tracing to see where it aborts: `bash -x backup.sh`. The error names the unbound
-    variable (e.g. BACKUP_DIR) because `set -u` is active. `bash -n backup.sh` checks syntax.'
+  cost: 0
+  content: 'Where to look: Identify all unbound variable references using bash -n and the error output'
 - order: 2
-  cost: 15
-  content: 'Causes: a variable used before assignment, a typo in a variable name, and an array element
-    accessed out of bounds. Use default expansions like `${BACKUP_DIR:-/tmp/backup}` to make unset variables
-    safe.'
+  cost: 25
+  content: 'Diagnostic steps:
+
+    1. Add default value assignments or parameter expansions to handle unset variables
+
+    2. Confirm the script runs to completion without unbound variable errors'
 - order: 3
-  cost: 20
-  content: Fix the typo so the name matches its assignment, add `:-default` expansions for the optionally-unset
-    variables, and guard the array index. Re-run backup.sh — it completes without unbound-variable errors.
+  cost: 50
+  content: 'Exact fix + verification:
+
+    1. Confirm the script runs to completion without unbound variable errors.
+
+    2. Re-run the lab checker (`check.sh` or Check Solution).
+
+    3. Confirm every scenario objective is satisfied.
+
+
+    WHY: the grader validates real state — marker files are ignored.'
 requires_companion_hosts: false
 dual_terminal: false
 jira_priority: Low
+technology: shell-script
+summary: Complete the unbound variable error in script shell script lab and verify success with the checker
+estimated_minutes: 10
+xp_reward: 100
+prerequisites:
+- Basic shell script literacy
+tags:
+- fix
+- hands-on
+- shell-script
+linked_tutorial: shell-script-fundamentals
+what_you_will_learn:
+- Identify all unbound variable references using bash -n and the error output
+- Add default value assignments or parameter expansions to handle unset variables
+- Confirm the script runs to completion without unbound variable errors
+environment:
+  nodes:
+  - role: primary
+    os: FixitLab bash practice environment
+    hostname: lab-primary
+    ip: 127.0.0.1
+    specs: local offline simulation
+  pre_installed:
+  - bash
+  - coreutils
+  - journalctl
+  - shell script
+  - systemctl
+  credentials:
+  - user: root
+    password: lab123
+tasks:
+- id: task_1
+  title: Unbound Variable Error in Script
+  description: Restore healthy behavior for Unbound Variable Error in Script by investigating the failure,
+    applying the smallest safe fix, and validating the outcome.
+  background: 'This shell script lab teaches systematic troubleshooting: observe, hypothesize, change,
+    verify.'
+  validation:
+    type: custom_script
+    script: check.sh
+    error_message: Validation did not pass. Re-read the objectives and Hint 2 diagnostic steps.
+solution:
+  summary: Identify the misconfiguration affecting this shell script lab and apply the minimal fix.
+  files_changed: []
+  commands_run:
+  - bash check.sh
+  reference_docs: shell-script-fundamentals

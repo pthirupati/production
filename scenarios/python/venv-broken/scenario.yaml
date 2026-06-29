@@ -1,10 +1,30 @@
 title: Broken Virtual Environment
 slug: sim-python-venv-broken
-category: Python Development
+category: Fix
 difficulty: medium
-description: A Python virtual environment is broken — activating it fails or its interpreter/pip errors
-  (commonly because the base Python it was created against moved, or the venv is corrupt). Packages can't
-  be installed and scripts won't run in it. Recreate or repair the venv and reinstall the project's dependencies.
+description: 'CONTEXT: A team operating Python development needs you to resolve `Broken Virtual Environment`
+  during a realistic incident. The business impact is reduced service reliability until the underlying
+  state is repaired.
+
+
+  ENVIRONMENT: You are working in FixitLab''s offline Python project workspace with source files, venv,
+  tests, and CLI entrypoints. All tools run locally; no paid APIs or external cloud calls are required.
+
+
+  SYMPTOM / STARTING STATE: Project with a virtual environment that no longer works: activation or the
+  venv''s python/pip fails (e.g. "bad interpreter" or missing modules), blocking installs and runs. A
+  Python virtual environment is broken — activating it fails or its interpreter/pip errors (commonly because
+  the base Python it was created against moved, or the venv is corrupt). Packages can''t be installed
+  and scripts won''t run in it. Recreate or repair the venv and reinstall the project''s dependencies.
+
+
+  OBJECTIVE: Confirm the existing venv''s interpreter/pip is broken; Recreate (or repair) the virtual
+  environment; Reinstall dependencies and confirm the project runs in the venv. Success means `check.sh`
+  exits successfully.
+
+
+  WHAT TO AVOID: Do not apply broad destructive changes, skip evidence gathering, or fake completion with
+  marker files — the checker validates real system state.'
 initial_state: 'Project with a virtual environment that no longer works: activation or the venv''s python/pip
   fails (e.g. "bad interpreter" or missing modules), blocking installs and runs.'
 lab_mode: simulation
@@ -21,13 +41,71 @@ objectives:
 - Reinstall dependencies and confirm the project runs in the venv
 hints:
 - order: 1
-  cost: 10
-  content: 'Activate and test: `source venv/bin/activate` then `python -V` / `pip -V`. A "bad interpreter"
-    or import error confirms the venv is broken (often the base python it linked changed).'
+  cost: 0
+  content: 'Where to look: Confirm the existing venv''s interpreter/pip is broken'
 - order: 2
-  cost: 15
-  content: 'Cleanly recreate it: `deactivate; rm -rf venv; python3 -m venv venv; source venv/bin/activate`.'
+  cost: 25
+  content: 'Diagnostic steps:
+
+    1. Recreate (or repair) the virtual environment
+
+    2. Reinstall dependencies and confirm the project runs in the venv'
 - order: 3
-  cost: 20
-  content: 'Reinstall the project''s deps: `pip install -r requirements.txt` (or `pip install -e .`).
-    Run the app/tests inside the fresh venv to confirm it works.'
+  cost: 50
+  content: 'Exact fix + verification:
+
+    1. Reinstall dependencies and confirm the project runs in the venv.
+
+    2. Re-run the lab checker (`check.sh` or Check Solution).
+
+    3. Confirm every scenario objective is satisfied.
+
+
+    WHY: the grader validates real state — marker files are ignored.'
+technology: python
+summary: Complete the broken virtual environment python lab and verify success with the checker
+estimated_minutes: 15
+xp_reward: 100
+prerequisites:
+- Basic python literacy
+tags:
+- fix
+- hands-on
+- python
+linked_tutorial: python-fundamentals
+what_you_will_learn:
+- Confirm the existing venv's interpreter/pip is broken
+- Recreate (or repair) the virtual environment
+- Reinstall dependencies and confirm the project runs in the venv
+environment:
+  nodes:
+  - role: primary
+    os: FixitLab Python project workspace
+    hostname: lab-primary
+    ip: 127.0.0.1
+    specs: local offline simulation
+  pre_installed:
+  - bash
+  - coreutils
+  - pip
+  - python
+  - python3
+  credentials:
+  - user: root
+    password: lab123
+tasks:
+- id: task_1
+  title: Broken Virtual Environment
+  description: Restore healthy behavior for Broken Virtual Environment by investigating the failure, applying
+    the smallest safe fix, and validating the outcome.
+  background: 'This python lab teaches systematic troubleshooting: observe, hypothesize, change, verify.'
+  validation:
+    type: custom_script
+    script: check.sh
+    error_message: Validation did not pass. Re-read the objectives and Hint 2 diagnostic steps.
+solution:
+  summary: Identify the misconfiguration affecting this python lab and apply the minimal fix.
+  files_changed: []
+  commands_run:
+  - bash check.sh
+  reference_docs: python-fundamentals

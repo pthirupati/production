@@ -1,23 +1,56 @@
-category: HTML & Web Servers
-description: A website is serving the wrong content (or a 404/403) because nginx's `root` directive points
-  at the wrong directory. The document root in the server block doesn't match where the site's files actually
-  live, so requests don't find index.html. Correct the root path, reload nginx, and confirm the right
-  page is served.
+category: Fix
+description: 'CONTEXT: A team operating HTML and web delivery needs you to resolve `Nginx Wrong Document
+  Root` during a realistic incident. The business impact is reduced service reliability until the underlying
+  state is repaired.
+
+
+  ENVIRONMENT: You are working in FixitLab''s offline web server lab with HTML pages, nginx/apache config,
+  and browser devtools. All tools run locally; no paid APIs or external cloud calls are required.
+
+
+  SYMPTOM / STARTING STATE: Simulated RHEL host running nginx. The active server block''s `root` points
+  to a directory that doesn''t contain the intended site files, so the wrong page (or an error) is returned
+  on port 80. A website is serving the wrong content (or a 404/403) because nginx''s `root` directive
+  points at the wrong directory. The document root in the server block doesn''t match where the site''s
+  files actually live, so requests don''t find index.html. Correct the root path, reload nginx, and confirm
+  the right page is served.
+
+
+  OBJECTIVE: Confirm nginx is serving the wrong content and find the active server block; Correct the
+  root directive to the directory holding the site files; Reload nginx and verify the correct page is
+  served. Success means HTTP 200 from http://localhost.
+
+
+  WHAT TO AVOID: Do not apply broad destructive changes, skip evidence gathering, or fake completion with
+  marker files — the checker validates real system state.'
 difficulty: easy
 dual_terminal: false
 hints:
 - order: 1
-  cost: 10
-  content: 'See what''s served (`curl -s http://localhost/`), then find the active config and its root:
-    `nginx -T | grep -nE ''root|server_name''`. Note the path the root points to.'
+  cost: 0
+  content: 'Where to look: Test the config to get the exact file and line: `nginx -t`. It prints the offending
+    directive (e.g. unknown directive "listn").'
 - order: 2
-  cost: 15
-  content: Compare that path against where the real site files live (the directory containing the intended
-    index.html). They differ — that's why the wrong content shows.
+  cost: 25
+  content: 'Diagnostic steps:
+
+    1. Run `nginx -t` and note the file path and line number in the error.
+
+    2. Open that file (often `/etc/nginx/nginx.conf` or under `/etc/nginx/conf.d/`).
+
+    3. Compare the bad directive to the nginx docs — typos like `listn` should be `listen`.'
 - order: 3
-  cost: 20
-  content: Edit the server block's `root` to the correct directory, validate with `nginx -t`, then `systemctl
-    reload nginx`. Re-curl http://localhost/ and confirm the correct page returns.
+  cost: 50
+  content: 'Exact fix + verification:
+
+    1. Correct the typo on the reported line and save the file.
+
+    2. Re-run `nginx -t` until it reports syntax is ok.
+
+    3. Run `systemctl enable --now nginx`, then `curl -I http://localhost` (expect HTTP 200).
+
+
+    WHY: systemd will not start nginx until `nginx -t` passes.'
 initial_state: Simulated RHEL host running nginx. The active server block's `root` points to a directory
   that doesn't contain the intended site files, so the wrong page (or an error) is returned on port 80.
 is_free: false
@@ -33,3 +66,50 @@ simulation_type: rhel
 slug: sim-html-nginx-root
 time_limit: 900
 title: Nginx Wrong Document Root
+technology: html
+summary: Complete the nginx wrong document root html lab and verify success with the checker
+estimated_minutes: 15
+xp_reward: 100
+prerequisites:
+- Basic html literacy
+tags:
+- fix
+- hands-on
+- html
+linked_tutorial: html-fundamentals
+what_you_will_learn:
+- Confirm nginx is serving the wrong content and find the active server block
+- Correct the root directive to the directory holding the site files
+- Reload nginx and verify the correct page is served
+environment:
+  nodes:
+  - role: primary
+    os: FixitLab web server lab
+    hostname: lab-primary
+    ip: 127.0.0.1
+    specs: local offline simulation
+  pre_installed:
+  - bash
+  - coreutils
+  - html
+  - journalctl
+  - systemctl
+  credentials:
+  - user: root
+    password: lab123
+tasks:
+- id: task_1
+  title: Nginx Wrong Document Root
+  description: Restore healthy behavior for Nginx Wrong Document Root by investigating the failure, applying
+    the smallest safe fix, and validating the outcome.
+  background: 'This html lab teaches systematic troubleshooting: observe, hypothesize, change, verify.'
+  validation:
+    type: http_response
+    url: http://localhost
+    expected_code: 200
+    error_message: nginx is not serving HTTP 200. Run nginx -t, fix config errors, and start nginx.
+solution:
+  summary: Identify the misconfiguration affecting this html lab and apply the minimal fix.
+  files_changed: []
+  commands_run: []
+  reference_docs: html-fundamentals

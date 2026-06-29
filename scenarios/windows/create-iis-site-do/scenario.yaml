@@ -1,7 +1,7 @@
 title: Create IIS Website
 slug: create-iis-site-do
-technology: Windows Server
-category: Build Lab
+technology: windows
+category: Build
 difficulty: easy
 scenario_type: do
 time_limit: 900
@@ -10,9 +10,28 @@ infrastructure_type: docker
 lab_mode: docker
 jira_priority: Low
 is_free: false
-description: 'Build task: publish a website on Windows IIS from scratch. Starting with no site configured,
-  create a dedicated application pool and an IIS website bound to HTTP, drop in a default document, start
-  the site, and verify it returns HTTP 200.'
+description: 'CONTEXT: A team operating Windows Server needs you to resolve `Create IIS Website` during
+  a realistic incident. The business impact is reduced service reliability until the underlying state
+  is repaired.
+
+
+  ENVIRONMENT: You are working in FixitLab''s offline Windows Server host with PowerShell, Server Manager,
+  and AD tools. All tools run locally; no paid APIs or external cloud calls are required.
+
+
+  SYMPTOM / STARTING STATE: Windows Server with the IIS role available but no application site configured
+  yet. You will create the app pool, site, and content. Build task: publish a website on Windows IIS from
+  scratch. Starting with no site configured, create a dedicated application pool and an IIS website bound
+  to HTTP, drop in a default document, start the site, and verify it returns HTTP 200.
+
+
+  OBJECTIVE: Create a dedicated IIS application pool; Create a website bound to HTTP (port 80) with a
+  physical path and a default document; Start the site and verify it returns HTTP 200. Success means `check.sh`
+  exits successfully.
+
+
+  WHAT TO AVOID: Do not apply broad destructive changes, skip evidence gathering, or fake completion with
+  marker files — the checker validates real system state.'
 objectives:
 - Create a dedicated IIS application pool
 - Create a website bound to HTTP (port 80) with a physical path and a default document
@@ -21,14 +40,97 @@ initial_state: Windows Server with the IIS role available but no application sit
   will create the app pool, site, and content.
 hints:
 - order: 1
-  cost: 10
-  content: 'Create an app pool (PowerShell, WebAdministration module): `New-WebAppPool -Name MyAppPool`.
-    Create the content folder and an index file (e.g. C:\inetpub\mysite\index.html).'
+  cost: 0
+  content: 'Where to look: Open Event Viewer (System/Application) and the relevant Services mmc or Server
+    Manager role status.'
 - order: 2
-  cost: 15
-  content: 'Create the site bound to port 80 using that pool: `New-Website -Name MySite -Port 80 -PhysicalPath
-    C:\inetpub\mysite -ApplicationPool MyAppPool`.'
+  cost: 25
+  content: 'Diagnostic steps:
+
+    1. Note the service state and dependency chain in services.msc.
+
+    2. Read the most recent error in Event Viewer for the failing component.
+
+    3. Use PowerShell (`Get-Service`, `Get-WinEvent`) for scripted evidence.'
 - order: 3
-  cost: 20
-  content: 'Start it and verify: `Start-Website -Name MySite`, then `Invoke-WebRequest http://localhost
-    -UseBasicParsing` returns StatusCode 200 (or check in IIS Manager).'
+  cost: 50
+  content: 'Exact fix + verification:
+
+    1. Apply the minimal fix (service start, GPO, binding, or permission).
+
+    2. Re-test the failing operation.
+
+    3. Confirm Check Solution passes.
+
+
+    WHY: Windows labs grade real role/service state.'
+summary: Complete the create iis website windows lab and verify success with the checker
+estimated_minutes: 15
+xp_reward: 100
+prerequisites:
+- Basic windows literacy
+tags:
+- do
+- hands-on
+- windows
+linked_tutorial: windows-fundamentals
+what_you_will_learn:
+- Create a dedicated IIS application pool
+- Create a website bound to HTTP (port 80) with a physical path and a default document
+- Start the site and verify it returns HTTP 200
+environment:
+  nodes:
+  - role: primary
+    os: FixitLab Windows Server host
+    hostname: lab-primary
+    ip: 127.0.0.1
+    specs: local offline simulation
+  pre_installed:
+  - bash
+  - coreutils
+  - journalctl
+  - systemctl
+  - windows
+  credentials:
+  - user: root
+    password: lab123
+tasks:
+- id: task_1
+  title: Create IIS Website
+  description: Restore healthy behavior for Create IIS Website by investigating the failure, applying
+    the smallest safe fix, and validating the outcome.
+  background: 'This windows lab teaches systematic troubleshooting: observe, hypothesize, change, verify.'
+  validation:
+    type: custom_script
+    script: check.sh
+    error_message: Validation did not pass. Re-read the objectives and Hint 2 diagnostic steps.
+solution:
+  summary: Identify the misconfiguration affecting this windows lab and apply the minimal fix.
+  files_changed: []
+  commands_run:
+  - bash check.sh
+  reference_docs: windows-fundamentals
+guided_mode:
+  enabled: true
+  steps:
+  - step: 1
+    title: Inspect current state
+    instruction: Run a read-only diagnostic before changing anything.
+    command: check.sh
+    expected_output: Output shows the current failure mode
+    explanation: Evidence-first troubleshooting avoids guessing.
+    next_on: command_success
+  - step: 2
+    title: Apply the minimal fix
+    instruction: Make one reversible change aligned with the objectives.
+    command: '# your fix command here'
+    expected_output: State moves toward the objective
+    explanation: Small changes make rollback easy if the hypothesis was wrong.
+    next_on: command_success
+  - step: 3
+    title: Verify with the grader
+    instruction: Run the same verification the checker uses.
+    command: check.sh
+    expected_output: '`check.sh` exits successfully'
+    explanation: The lab passes only when real state is healthy.
+    next_on: command_success

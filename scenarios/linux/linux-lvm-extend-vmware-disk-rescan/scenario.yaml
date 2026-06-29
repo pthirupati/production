@@ -1,27 +1,67 @@
 title: Grow /data — Add a Disk in VMware, Rescan, then Extend LVM
 slug: linux-lvm-extend-vmware-disk-rescan
 difficulty: medium
-category: Linux Administration
-description: |
-  The /data filesystem on web-prod-01 is full and there is NO spare disk in the
-  server. This is a CROSS-TECHNOLOGY task: the same server lives in both the
-  vCenter simulator and this Linux terminal. You must first ADD A NEW VIRTUAL
-  DISK to web-prod-01 in VMware (Edit Settings -> Add Hard Disk), then come back
-  to the terminal and trigger a SCSI rescan so the kernel discovers /dev/sdc.
-  Only then can you initialise it as an LVM physical volume, add it to the vgdata
-  volume group, and extend the lvdata logical volume (and its filesystem) online.
-initial_state: |
-  Simulated RHEL 9 server (web-prod-01), also present in the vCenter simulator for
+category: Fix
+description: 'CONTEXT: A team operating Linux administration needs you to resolve `Grow /data — Add a
+  Disk in VMware, Rescan, then Extend LVM` during a realistic incident. The business impact is reduced
+  service reliability until the underlying state is repaired.
+
+
+  ENVIRONMENT: You are working in FixitLab''s offline Linux practice server with terminal and config files
+  under /etc and /var. All tools run locally; no paid APIs or external cloud calls are required.
+
+
+  SYMPTOM / STARTING STATE: Simulated RHEL 9 server (web-prod-01), also present in the vCenter simulator
+  for
+
   this lab. /data is an XFS filesystem on /dev/mapper/vgdata-lvdata (VG vgdata, on
+
   /dev/sdb) and is out of space. The volume group has 0 free extents and there is
+
   no spare disk attached yet. Open the VMware simulator from the lab toolbar to add
+
+  one. The /data filesystem on web-prod-01 is full and there is NO spare disk in the
+
+  server. This is a CROSS-TECHNOLOGY task: the same server lives in both the
+
+  vCenter simulator and this Linux terminal. You must first ADD A NEW VIRTUAL
+
+  DISK to web-prod-01 in VMware (Edit Settings -> Add Hard Disk), then come back
+
+  to the terminal and trigger a SCSI rescan so the kernel discovers /dev/sdc.
+
+  Only then can you initialise it as an LVM physical volume, add it to the vgdata
+
+  volume group, and extend the lvdata logical volume (and its filesystem) online.
+
+
+  OBJECTIVE: Open the VMware simulator for this server (toolbar link) and add a new Hard Disk to web-prod-01;
+  Back in the terminal, rescan the SCSI bus so the kernel sees /dev/sdc (echo "- - -" > /sys/class/scsi_host/host0/scan,
+  or rescan-scsi-bus.sh); Initialise the new disk as a PV (pvcreate /dev/sdc) and add it to the volume
+  group (vgextend vgdata /dev/sdc). Success means `check.sh` exits successfully.
+
+
+  WHAT TO AVOID: Do not apply broad destructive changes, skip evidence gathering, or fake completion with
+  marker files — the checker validates real system state.'
+initial_state: 'Simulated RHEL 9 server (web-prod-01), also present in the vCenter simulator for
+
+  this lab. /data is an XFS filesystem on /dev/mapper/vgdata-lvdata (VG vgdata, on
+
+  /dev/sdb) and is out of space. The volume group has 0 free extents and there is
+
+  no spare disk attached yet. Open the VMware simulator from the lab toolbar to add
+
   one.
+
+  '
 objectives:
-  - Open the VMware simulator for this server (toolbar link) and add a new Hard Disk to web-prod-01
-  - Back in the terminal, rescan the SCSI bus so the kernel sees /dev/sdc (echo "- - -" > /sys/class/scsi_host/host0/scan, or rescan-scsi-bus.sh)
-  - Initialise the new disk as a PV (pvcreate /dev/sdc) and add it to the volume group (vgextend vgdata /dev/sdc)
-  - Extend the logical volume and grow the filesystem (lvextend -r -l +100%FREE /dev/vgdata/lvdata)
-  - Confirm /data is larger with vgs, lvs and df -h
+- Open the VMware simulator for this server (toolbar link) and add a new Hard Disk to web-prod-01
+- Back in the terminal, rescan the SCSI bus so the kernel sees /dev/sdc (echo "- - -" > /sys/class/scsi_host/host0/scan,
+  or rescan-scsi-bus.sh)
+- Initialise the new disk as a PV (pvcreate /dev/sdc) and add it to the volume group (vgextend vgdata
+  /dev/sdc)
+- Extend the logical volume and grow the filesystem (lvextend -r -l +100%FREE /dev/vgdata/lvdata)
+- Confirm /data is larger with vgs, lvs and df -h
 lab_mode: simulation
 simulation_type: generic
 cross_technology: true
@@ -30,18 +70,82 @@ time_limit: 1200
 max_score: 100
 is_free: false
 hints:
-  - content: 'There is no spare disk to extend the VG. Open the VMware simulator (toolbar -> Open VMware) and Edit Settings on web-prod-01 -> Add Hard Disk -> 50 GB -> OK.'
-    cost: 10
-    order: 1
-  - content: 'The hot-added disk is invisible until the kernel rescans the SCSI bus: echo "- - -" > /sys/class/scsi_host/host0/scan (or run rescan-scsi-bus.sh), then lsblk should show /dev/sdc.'
-    cost: 15
-    order: 2
-  - content: 'Add the new disk to LVM: pvcreate /dev/sdc, then vgextend vgdata /dev/sdc. Confirm free space with vgs.'
-    cost: 20
-    order: 3
-  - content: 'Grow the LV and its XFS in one step: lvextend -r -l +100%FREE /dev/vgdata/lvdata. Verify with lvs and df -h /data.'
-    cost: 20
-    order: 4
+- order: 1
+  cost: 0
+  content: 'Where to look: Run `df -h` and `du -xh /var /tmp /home | sort -h | tail -20` for large paths.'
+- order: 2
+  cost: 25
+  content: 'Diagnostic steps:
+
+    1. Find which mount is 100% — often `/` or `/var`.
+
+    2. `journalctl --disk-usage` and old logs under `/var/log`.
+
+    3. Look for core dumps, temp files, or oversized application data.'
+- order: 3
+  cost: 50
+  content: 'Exact fix + verification:
+
+    1. Remove or rotate the largest safe files (logs, caches, old packages).
+
+    2. `df -h` should show free space on the affected mount.
+
+    3. Retry the command that failed with ''No space left on device''.
+
+
+    WHY: many services fail cryptically when disk is full.'
 requires_companion_hosts: false
 dual_terminal: false
 jira_priority: High
+technology: linux
+summary: Complete the grow /data — add a disk in vmware, rescan, then extend lvm linux lab and verify
+  success with the checker
+estimated_minutes: 20
+xp_reward: 100
+prerequisites:
+- Basic linux literacy
+tags:
+- fix
+- hands-on
+- linux
+linked_tutorial: linux-fundamentals
+what_you_will_learn:
+- Open the VMware simulator for this server (toolbar link) and add a new Hard Disk to web-prod-01
+- Back in the terminal, rescan the SCSI bus so the kernel sees /dev/sdc (echo "- - -" > /sys/class/scsi_host/host0/scan,
+  or rescan-scsi-bus.sh)
+- Initialise the new disk as a PV (pvcreate /dev/sdc) and add it to the volume group (vgextend vgdata
+  /dev/sdc)
+- Extend the logical volume and grow the filesystem (lvextend -r -l +100%FREE /dev/vgdata/lvdata)
+- Confirm /data is larger with vgs, lvs and df -h
+environment:
+  nodes:
+  - role: primary
+    os: FixitLab Linux practice server
+    hostname: lab-primary
+    ip: 127.0.0.1
+    specs: local offline simulation
+  pre_installed:
+  - bash
+  - coreutils
+  - journalctl
+  - linux
+  - systemctl
+  credentials:
+  - user: root
+    password: lab123
+tasks:
+- id: task_1
+  title: Grow /data — Add a Disk in VMware, Rescan, then Extend LVM
+  description: Restore healthy behavior for Grow /data — Add a Disk in VMware, Rescan, then Extend LVM
+    by investigating the failure, applying the smallest safe fix, and validating the outcome.
+  background: 'This linux lab teaches systematic troubleshooting: observe, hypothesize, change, verify.'
+  validation:
+    type: custom_script
+    script: check.sh
+    error_message: Validation did not pass. Re-read the objectives and Hint 2 diagnostic steps.
+solution:
+  summary: Identify the misconfiguration affecting this linux lab and apply the minimal fix.
+  files_changed: []
+  commands_run:
+  - bash check.sh
+  reference_docs: linux-fundamentals

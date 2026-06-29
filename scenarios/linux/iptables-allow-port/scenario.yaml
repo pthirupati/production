@@ -1,11 +1,30 @@
 title: Application Unreachable — Firewall Blocking Port 8080
 slug: linux-iptables-allow-port
 difficulty: easy
-category: Linux Administration
-description: A web application is up and listening on port 8080 locally but is unreachable from external
-  clients because the active firewall (firewalld) does not permit that port. The service binds fine; the
-  firewall drops inbound connections. Add and persist a rule allowing 8080/tcp, reload the firewall, and
-  confirm external access.
+category: Fix
+description: 'CONTEXT: A team operating Linux administration needs you to resolve `Application Unreachable
+  — Firewall Blocking Port 8080` during a realistic incident. The business impact is reduced service reliability
+  until the underlying state is repaired.
+
+
+  ENVIRONMENT: You are working in FixitLab''s offline Linux practice server with terminal and config files
+  under /etc and /var. All tools run locally; no paid APIs or external cloud calls are required.
+
+
+  SYMPTOM / STARTING STATE: Linux server where an app listens on 8080 (confirmed by ss) but firewalld
+  blocks inbound traffic to that port, so remote clients can''t connect. A web application is up and listening
+  on port 8080 locally but is unreachable from external clients because the active firewall (firewalld)
+  does not permit that port. The service binds fine; the firewall drops inbound connections. Add and persist
+  a rule allowing 8080/tcp, reload the firewall, and confirm external access.
+
+
+  OBJECTIVE: Confirm the service listens locally (ss -tlnp) and that the firewall blocks 8080; Add a permanent
+  firewalld rule for 8080/tcp and reload; Verify the rule is active and the port is reachable. Success
+  means `check.sh` exits successfully.
+
+
+  WHAT TO AVOID: Do not apply broad destructive changes, skip evidence gathering, or fake completion with
+  marker files — the checker validates real system state.'
 initial_state: Linux server where an app listens on 8080 (confirmed by ss) but firewalld blocks inbound
   traffic to that port, so remote clients can't connect.
 objectives:
@@ -19,17 +38,78 @@ max_score: 100
 is_free: false
 hints:
 - order: 1
-  cost: 10
-  content: 'Confirm it''s a firewall issue, not the app: `ss -tlnp | grep 8080` shows it listening; `firewall-cmd
-    --list-all` shows 8080 isn''t allowed.'
+  cost: 0
+  content: 'Where to look: Run `firewall-cmd --state` and `firewall-cmd --list-all` for active zones.'
 - order: 2
-  cost: 15
-  content: 'Add and persist the rule: `firewall-cmd --permanent --add-port=8080/tcp` then `firewall-cmd
-    --reload` (or `--add-service=http` if it''s standard HTTP).'
+  cost: 25
+  content: 'Diagnostic steps:
+
+    1. Identify which zone is active and which ports/services are allowed.
+
+    2. Compare to the port the scenario expects (often 80/tcp or 443/tcp).
+
+    3. Check if the service is bound but blocked externally.'
 - order: 3
-  cost: 20
-  content: 'Verify: `firewall-cmd --list-ports` shows 8080/tcp, and a request from another host (or `curl
-    http://<server-ip>:8080`) now succeeds.'
+  cost: 50
+  content: 'Exact fix + verification:
+
+    1. `firewall-cmd --permanent --add-service=http` (or the needed port).
+
+    2. `firewall-cmd --reload`.
+
+    3. Confirm `firewall-cmd --list-ports` includes the required port.
+
+
+    WHY: a running service behind a closed firewall still fails health checks.'
 requires_companion_hosts: false
 dual_terminal: false
 jira_priority: Medium
+technology: linux
+summary: Complete the application unreachable — firewall blocking port 8080 linux lab and verify success
+  with the checker
+estimated_minutes: 15
+xp_reward: 100
+prerequisites:
+- Basic linux literacy
+tags:
+- fix
+- hands-on
+- linux
+linked_tutorial: linux-fundamentals
+what_you_will_learn:
+- Confirm the service listens locally (ss -tlnp) and that the firewall blocks 8080
+- Add a permanent firewalld rule for 8080/tcp and reload
+- Verify the rule is active and the port is reachable
+environment:
+  nodes:
+  - role: primary
+    os: FixitLab Linux practice server
+    hostname: lab-primary
+    ip: 127.0.0.1
+    specs: local offline simulation
+  pre_installed:
+  - bash
+  - coreutils
+  - journalctl
+  - linux
+  - systemctl
+  credentials:
+  - user: root
+    password: lab123
+tasks:
+- id: task_1
+  title: Application Unreachable — Firewall Blocking Port 8080
+  description: Restore healthy behavior for Application Unreachable — Firewall Blocking Port 8080 by investigating
+    the failure, applying the smallest safe fix, and validating the outcome.
+  background: 'This linux lab teaches systematic troubleshooting: observe, hypothesize, change, verify.'
+  validation:
+    type: command_output
+    command: firewall-cmd --list-ports
+    expected_output: 80/tcp
+    error_message: HTTP is still blocked by firewalld. Allow the service and reload.
+solution:
+  summary: Identify the misconfiguration affecting this linux lab and apply the minimal fix.
+  files_changed: []
+  commands_run:
+  - firewall-cmd --list-ports
+  reference_docs: linux-fundamentals

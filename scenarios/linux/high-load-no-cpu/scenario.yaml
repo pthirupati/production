@@ -1,40 +1,115 @@
 title: High Load Average But CPU Is Idle
 slug: linux-high-load-no-cpu
 difficulty: hard
-category: Linux Administration
-description: 'The system load average is above 30 but CPU usage (us + sy) is near
-  zero. This is a classic I/O wait problem — processes are blocked waiting for a slow
-  or failing storage device. The disk is experiencing high latency due to a degraded
-  RAID member. Identify the I/O bottleneck, pin down the offending process and device,
-  and mitigate the issue.
+category: Fix
+description: 'CONTEXT: A team operating Linux administration needs you to resolve `High Load Average But
+  CPU Is Idle` during a realistic incident. The business impact is reduced service reliability until the
+  underlying state is repaired.
 
-  '
-initial_state: 'Simulated RHEL 9 server. Load average reads 32.5 in top. CPU iowait
-  column is at 95%. Application response times are extremely high.
+
+  ENVIRONMENT: You are working in FixitLab''s offline Linux practice server with terminal and config files
+  under /etc and /var. All tools run locally; no paid APIs or external cloud calls are required.
+
+
+  SYMPTOM / STARTING STATE: Simulated RHEL 9 server. Load average reads 32.5 in top. CPU iowait column
+  is at 95%. Application response times are extremely high. The system load average is above 30 but CPU
+  usage (us + sy) is near zero. This is a classic I/O wait problem — processes are blocked waiting for
+  a slow or failing storage device. The disk is experiencing high latency due to a degraded RAID member.
+  Identify the I/O bottleneck, pin down the offending process and device, and mitigate the issue.
+
+
+  OBJECTIVE: Use iostat and iotop to identify the device and process causing I/O wait; Determine the root
+  cause of the storage latency (degraded array member); Initiate a fix or workaround to restore acceptable
+  I/O throughput. Success means `check.sh` exits successfully.
+
+
+  WHAT TO AVOID: Do not apply broad destructive changes, skip evidence gathering, or fake completion with
+  marker files — the checker validates real system state.'
+initial_state: 'Simulated RHEL 9 server. Load average reads 32.5 in top. CPU iowait column is at 95%.
+  Application response times are extremely high.
 
   '
 objectives:
-  - Use iostat and iotop to identify the device and process causing I/O wait
-  - Determine the root cause of the storage latency (degraded array member)
-  - Initiate a fix or workaround to restore acceptable I/O throughput
+- Use iostat and iotop to identify the device and process causing I/O wait
+- Determine the root cause of the storage latency (degraded array member)
+- Initiate a fix or workaround to restore acceptable I/O throughput
 lab_mode: simulation
 simulation_type: generic
 time_limit: 1800
 max_score: 100
 is_free: false
 hints:
-  - content: 'Run: iostat -xz 1 5 and look for the device with high await and util
-      values.'
-    cost: 10
-    order: 1
-  - content: 'Use iotop -o to see which processes are contributing most to disk I/O
-      in real time.'
-    cost: 15
-    order: 2
-  - content: 'Check RAID status: cat /proc/mdstat or mdadm --detail /dev/md0 to see
-      if a disk is faulty.'
-    cost: 20
-    order: 3
+- order: 1
+  cost: 0
+  content: 'Where to look: Run `df -h` and `du -xh /var /tmp /home | sort -h | tail -20` for large paths.'
+- order: 2
+  cost: 25
+  content: 'Diagnostic steps:
+
+    1. Find which mount is 100% — often `/` or `/var`.
+
+    2. `journalctl --disk-usage` and old logs under `/var/log`.
+
+    3. Look for core dumps, temp files, or oversized application data.'
+- order: 3
+  cost: 50
+  content: 'Exact fix + verification:
+
+    1. Remove or rotate the largest safe files (logs, caches, old packages).
+
+    2. `df -h` should show free space on the affected mount.
+
+    3. Retry the command that failed with ''No space left on device''.
+
+
+    WHY: many services fail cryptically when disk is full.'
 requires_companion_hosts: false
 dual_terminal: false
 jira_priority: High
+technology: linux
+summary: Complete the high load average but cpu is idle linux lab and verify success with the checker
+estimated_minutes: 30
+xp_reward: 100
+prerequisites:
+- Basic linux literacy
+tags:
+- fix
+- hands-on
+- linux
+linked_tutorial: linux-fundamentals
+what_you_will_learn:
+- Use iostat and iotop to identify the device and process causing I/O wait
+- Determine the root cause of the storage latency (degraded array member)
+- Initiate a fix or workaround to restore acceptable I/O throughput
+environment:
+  nodes:
+  - role: primary
+    os: FixitLab Linux practice server
+    hostname: lab-primary
+    ip: 127.0.0.1
+    specs: local offline simulation
+  pre_installed:
+  - bash
+  - coreutils
+  - journalctl
+  - linux
+  - systemctl
+  credentials:
+  - user: root
+    password: lab123
+tasks:
+- id: task_1
+  title: High Load Average But CPU Is Idle
+  description: Restore healthy behavior for High Load Average But CPU Is Idle by investigating the failure,
+    applying the smallest safe fix, and validating the outcome.
+  background: 'This linux lab teaches systematic troubleshooting: observe, hypothesize, change, verify.'
+  validation:
+    type: custom_script
+    script: check.sh
+    error_message: Validation did not pass. Re-read the objectives and Hint 2 diagnostic steps.
+solution:
+  summary: Identify the misconfiguration affecting this linux lab and apply the minimal fix.
+  files_changed: []
+  commands_run:
+  - bash check.sh
+  reference_docs: linux-fundamentals

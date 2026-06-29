@@ -1,7 +1,7 @@
 title: Container Not on Application Network
 slug: sim-docker-network-connect
-technology: Docker & Containers
-category: Docker Networking
+technology: docker
+category: Build
 difficulty: medium
 lab_mode: simulation
 simulation_type: docker
@@ -9,10 +9,30 @@ time_limit: 900
 max_score: 100
 jira_priority: Medium
 is_free: false
-description: Two containers that need to talk to each other can't resolve or reach one another because
-  they are not on the same user-defined Docker network. On the default bridge, DNS-based service discovery
-  doesn't work; on separate networks, there's no connectivity at all. Put both containers on a shared
-  user-defined network so they can communicate by name.
+description: 'CONTEXT: A team operating Docker containers needs you to resolve `Container Not on Application
+  Network` during a realistic incident. The business impact is reduced service reliability until the underlying
+  state is repaired.
+
+
+  ENVIRONMENT: You are working in FixitLab''s offline Docker host with docker CLI, images, containers,
+  and compose files. All tools run locally; no paid APIs or external cloud calls are required.
+
+
+  SYMPTOM / STARTING STATE: Docker host running an app container and its dependency (e.g. a database)
+  on different networks. The app can''t reach the dependency by name; connections fail with name-resolution
+  or connection errors. Two containers that need to talk to each other can''t resolve or reach one another
+  because they are not on the same user-defined Docker network. On the default bridge, DNS-based service
+  discovery doesn''t work; on separate networks, there''s no connectivity at all. Put both containers
+  on a shared user-defined network so they can communicate by name.
+
+
+  OBJECTIVE: Confirm the containers cannot reach each other across networks; Identify which networks each
+  container is attached to; Attach both to a shared user-defined network and verify name-based connectivity.
+  Success means `systemctl is-active docker` returns active.
+
+
+  WHAT TO AVOID: Do not apply broad destructive changes, skip evidence gathering, or fake completion with
+  marker files — the checker validates real system state.'
 objectives:
 - Confirm the containers cannot reach each other across networks
 - Identify which networks each container is attached to
@@ -22,14 +42,98 @@ initial_state: Docker host running an app container and its dependency (e.g. a d
   errors.
 hints:
 - order: 1
-  cost: 10
-  content: 'See each container''s networks: `docker inspect <container> --format ''{{json .NetworkSettings.Networks}}''`.
-    They''re on different networks (or the default bridge, which has no DNS).'
+  cost: 0
+  content: 'Where to look: Start with `systemctl status docker` and `journalctl -u docker -n 50 --no-pager`
+    before changing anything.'
 - order: 2
-  cost: 15
-  content: 'Create a user-defined network (DNS works there): `docker network create appnet`, then connect
-    the dependency: `docker network connect appnet <db-container>`.'
+  cost: 25
+  content: 'Diagnostic steps:
+
+    1. Run `systemctl status docker` — note Active/Failed and the last log lines.
+
+    2. Read `journalctl -u docker -n 50` for the root error.
+
+    3. Form a hypothesis about the smallest config or permission fix.'
 - order: 3
-  cost: 20
-  content: 'Connect the app too: `docker network connect appnet <app-container>`. Now `docker exec <app>
-    ping <db-container-name>` resolves and succeeds — DNS works by container name on user-defined networks.'
+  cost: 50
+  content: 'Exact fix + verification:
+
+    1. Apply the minimal fix (config, unit override, or missing directory).
+
+    2. Run `systemctl daemon-reload` if you edited a unit file.
+
+    3. Run `systemctl restart docker` and confirm `systemctl is-active docker` succeeds.
+
+
+    WHY: the grader checks real service state, not marker files.'
+summary: Complete the container not on application network docker lab and verify success with the checker
+estimated_minutes: 15
+xp_reward: 100
+prerequisites:
+- Basic docker literacy
+tags:
+- docker
+- fix
+- hands-on
+linked_tutorial: docker-fundamentals
+what_you_will_learn:
+- Confirm the containers cannot reach each other across networks
+- Identify which networks each container is attached to
+- Attach both to a shared user-defined network and verify name-based connectivity
+environment:
+  nodes:
+  - role: primary
+    os: FixitLab Docker host
+    hostname: lab-primary
+    ip: 127.0.0.1
+    specs: local offline simulation
+  pre_installed:
+  - bash
+  - coreutils
+  - docker
+  - docker-compose
+  credentials:
+  - user: root
+    password: lab123
+tasks:
+- id: task_1
+  title: Container Not on Application Network
+  description: Restore healthy behavior for Container Not on Application Network by investigating the
+    failure, applying the smallest safe fix, and validating the outcome.
+  background: 'This docker lab teaches systematic troubleshooting: observe, hypothesize, change, verify.'
+  validation:
+    type: service_active
+    command: systemctl is-active docker
+    expected_status: active
+    error_message: The docker service is not active yet. Check `systemctl status docker` and `journalctl
+      -u docker -n 50`.
+solution:
+  summary: The root cause is an unhealthy `docker` service; repair it and verify active state.
+  files_changed: []
+  commands_run:
+  - systemctl is-active docker
+  reference_docs: docker-fundamentals
+guided_mode:
+  enabled: true
+  steps:
+  - step: 1
+    title: Inspect current state
+    instruction: Run a read-only diagnostic before changing anything.
+    command: systemctl is-active docker
+    expected_output: Output shows the current failure mode
+    explanation: Evidence-first troubleshooting avoids guessing.
+    next_on: command_success
+  - step: 2
+    title: Apply the minimal fix
+    instruction: Make one reversible change aligned with the objectives.
+    command: '# your fix command here'
+    expected_output: State moves toward the objective
+    explanation: Small changes make rollback easy if the hypothesis was wrong.
+    next_on: command_success
+  - step: 3
+    title: Verify with the grader
+    instruction: Run the same verification the checker uses.
+    command: systemctl is-active docker
+    expected_output: '`systemctl is-active docker` returns active'
+    explanation: The lab passes only when real state is healthy.
+    next_on: command_success

@@ -1,23 +1,53 @@
-category: Ansible Automation
-description: An Ansible playbook run fails on host web2 during execution. A task (typically starting or
-  enabling a service) returns a non-zero result on that host while the others succeed, so the play aborts.
-  Read the failed task output, fix the underlying problem on web2, and re-run the playbook to a clean
-  PLAY RECAP.
+category: Fix
+description: 'CONTEXT: A team operating Ansible automation needs you to resolve `Ansible Playbook Failure`
+  during a realistic incident. The business impact is reduced service reliability until the underlying
+  state is repaired.
+
+
+  ENVIRONMENT: You are working in FixitLab''s offline Ansible control node with inventory, playbooks,
+  roles, and ansible-playbook. All tools run locally; no paid APIs or external cloud calls are required.
+
+
+  SYMPTOM / STARTING STATE: Simulated Ansible control node with an inventory including web1 and web2.
+  Running ansible-playbook site.yml fails on web2 (a task errors there); web1 completes successfully.
+  An Ansible playbook run fails on host web2 during execution. A task (typically starting or enabling
+  a service) returns a non-zero result on that host while the others succeed, so the play aborts. Read
+  the failed task output, fix the underlying problem on web2, and re-run the playbook to a clean PLAY
+  RECAP.
+
+
+  OBJECTIVE: Run the playbook and identify the exact failed task and host (web2); Fix the underlying cause
+  on web2 (e.g. the failing service or its config); Re-run the playbook and confirm web2 shows ok/changed
+  with failed=0. Success means `check.sh` exits successfully.
+
+
+  WHAT TO AVOID: Do not apply broad destructive changes, skip evidence gathering, or fake completion with
+  marker files — the checker validates real system state.'
 difficulty: hard
 dual_terminal: false
 hints:
 - order: 1
-  cost: 10
-  content: 'Run it and read the failure: `ansible-playbook site.yml`. The fatal line names the task and
-    web2. Re-run just that host verbosely: `ansible-playbook site.yml --limit web2 -vvv`.'
+  cost: 0
+  content: 'Where to look: Run the playbook and identify the exact failed task and host (web2)'
 - order: 2
-  cost: 15
-  content: 'Reproduce the failing step directly on web2 to see the real error, e.g. `ansible web2 -m service
-    -a ''name=<svc> state=started''` or check the service: `ansible web2 -a ''systemctl status <svc>''`.'
+  cost: 25
+  content: 'Diagnostic steps:
+
+    1. Fix the underlying cause on web2 (e.g. the failing service or its config)
+
+    2. Re-run the playbook and confirm web2 shows ok/changed with failed=0'
 - order: 3
-  cost: 20
-  content: Fix the root cause on web2 (correct the service unit/config or install the missing package),
-    then re-run `ansible-playbook site.yml`. The PLAY RECAP should show web2 with failed=0.
+  cost: 50
+  content: 'Exact fix + verification:
+
+    1. Re-run the playbook and confirm web2 shows ok/changed with failed=0.
+
+    2. Re-run the lab checker (`check.sh` or Check Solution).
+
+    3. Confirm every scenario objective is satisfied.
+
+
+    WHY: the grader validates real state — marker files are ignored.'
 initial_state: Simulated Ansible control node with an inventory including web1 and web2. Running ansible-playbook
   site.yml fails on web2 (a task errors there); web1 completes successfully.
 is_free: false
@@ -33,3 +63,50 @@ simulation_type: ansible
 slug: sim-ansible-playbook-fail
 time_limit: 900
 title: Ansible Playbook Failure
+technology: ansible
+summary: Complete the ansible playbook failure ansible lab and verify success with the checker
+estimated_minutes: 15
+xp_reward: 100
+prerequisites:
+- Basic ansible literacy
+tags:
+- ansible
+- fix
+- hands-on
+linked_tutorial: ansible-fundamentals
+what_you_will_learn:
+- Run the playbook and identify the exact failed task and host (web2)
+- Fix the underlying cause on web2 (e.g. the failing service or its config)
+- Re-run the playbook and confirm web2 shows ok/changed with failed=0
+environment:
+  nodes:
+  - role: primary
+    os: FixitLab Ansible control node
+    hostname: lab-primary
+    ip: 127.0.0.1
+    specs: local offline simulation
+  pre_installed:
+  - ansible
+  - ansible-playbook
+  - bash
+  - coreutils
+  credentials:
+  - user: root
+    password: lab123
+tasks:
+- id: task_1
+  title: Ansible Playbook Failure
+  description: Restore healthy behavior for Ansible Playbook Failure by investigating the failure, applying
+    the smallest safe fix, and validating the outcome.
+  background: 'This ansible lab teaches systematic troubleshooting: observe, hypothesize, change, verify.'
+  validation:
+    type: command_output
+    command: ansible webservers -m ping
+    expected_output: SUCCESS
+    error_message: Ansible hosts are still unreachable. Verify SSH keys and inventory.
+solution:
+  summary: Identify the misconfiguration affecting this ansible lab and apply the minimal fix.
+  files_changed: []
+  commands_run:
+  - ansible webservers -m ping
+  reference_docs: ansible-fundamentals

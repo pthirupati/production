@@ -1,7 +1,7 @@
 title: Pipeline Hides Failures Without pipefail
 slug: shell-pipefail-missing
-technology: Shell-script
-category: Reliability
+technology: shell-script
+category: Fix
 difficulty: medium
 lab_mode: simulation
 simulation_type: generic
@@ -10,8 +10,26 @@ max_score: 100
 is_free: true
 jira_priority: High
 dual_terminal: false
-description: A deploy script reports success even when a piped command fails because pipefail isn't set.
-  Harden the script and confirm it is corrected.
+description: 'CONTEXT: A team operating shell scripting needs you to resolve `Pipeline Hides Failures
+  Without pipefail` during a realistic incident. The business impact is reduced service reliability until
+  the underlying state is repaired.
+
+
+  ENVIRONMENT: You are working in FixitLab''s offline bash practice environment with scripts, cron, logs,
+  and shellcheck. All tools run locally; no paid APIs or external cloud calls are required.
+
+
+  SYMPTOM / STARTING STATE: An ops shell script whose pipelines mask failures because set -o pipefail
+  is missing. A deploy script reports success even when a piped command fails because pipefail isn''t
+  set. Harden the script and confirm it is corrected.
+
+
+  OBJECTIVE: Confirm failures in pipes are swallowed; Add set -euo pipefail; Verify the script is corrected.
+  Success means `check.sh` exits successfully.
+
+
+  WHAT TO AVOID: Do not apply broad destructive changes, skip evidence gathering, or fake completion with
+  marker files — the checker validates real system state.'
 initial_state: An ops shell script whose pipelines mask failures because set -o pipefail is missing.
 objectives:
 - Confirm failures in pipes are swallowed
@@ -19,11 +37,70 @@ objectives:
 - Verify the script is corrected
 hints:
 - order: 1
-  cost: 10
-  content: A failing stage still exits 0.
+  cost: 0
+  content: 'Where to look: Confirm failures in pipes are swallowed'
 - order: 2
-  cost: 15
-  content: Add set -euo pipefail at the top.
+  cost: 25
+  content: 'Diagnostic steps:
+
+    1. Verify the script is corrected'
 - order: 3
-  cost: 20
-  content: Script carries the corrected pipefail.
+  cost: 50
+  content: 'Exact fix + verification:
+
+    1. Verify the script is corrected.
+
+    2. Re-run the lab checker (`check.sh` or Check Solution).
+
+    3. Confirm every scenario objective is satisfied.
+
+
+    WHY: the grader validates real state — marker files are ignored.'
+summary: Complete the pipeline hides failures without pipefail shell script lab and verify success with
+  the checker
+estimated_minutes: 20
+xp_reward: 100
+prerequisites:
+- Basic shell script literacy
+tags:
+- fix
+- hands-on
+- shell-script
+linked_tutorial: shell-script-fundamentals
+what_you_will_learn:
+- Confirm failures in pipes are swallowed
+- Add set -euo pipefail
+- Verify the script is corrected
+environment:
+  nodes:
+  - role: primary
+    os: FixitLab bash practice environment
+    hostname: lab-primary
+    ip: 127.0.0.1
+    specs: local offline simulation
+  pre_installed:
+  - bash
+  - coreutils
+  - journalctl
+  - shell script
+  - systemctl
+  credentials:
+  - user: root
+    password: lab123
+tasks:
+- id: task_1
+  title: Pipeline Hides Failures Without pipefail
+  description: Restore healthy behavior for Pipeline Hides Failures Without pipefail by investigating
+    the failure, applying the smallest safe fix, and validating the outcome.
+  background: 'This shell script lab teaches systematic troubleshooting: observe, hypothesize, change,
+    verify.'
+  validation:
+    type: custom_script
+    script: check.sh
+    error_message: Validation did not pass. Re-read the objectives and Hint 2 diagnostic steps.
+solution:
+  summary: Identify the misconfiguration affecting this shell script lab and apply the minimal fix.
+  files_changed: []
+  commands_run:
+  - bash check.sh
+  reference_docs: shell-script-fundamentals

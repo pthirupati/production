@@ -1,8 +1,26 @@
 title: vCenter SSO Administrator Locked Out
 slug: vcenter-sso-account-lockout
-category: VMware vSphere
-description: The vCenter SSO administrator account is locked after repeated failed logins, blocking admin
-  access. Unlock the account and confirm access is restored.
+category: Fix
+description: 'CONTEXT: A team operating VMware vSphere needs you to resolve `vCenter SSO Administrator
+  Locked Out` during a realistic incident. The business impact is reduced service reliability until the
+  underlying state is repaired.
+
+
+  ENVIRONMENT: You are working in FixitLab''s offline vSphere lab with VMs, datastores, vCenter, and ESXi
+  tasks. All tools run locally; no paid APIs or external cloud calls are required.
+
+
+  SYMPTOM / STARTING STATE: vCenter shows the SSO administrator account locked. The vCenter SSO administrator
+  account is locked after repeated failed logins, blocking admin access. Unlock the account and confirm
+  access is restored.
+
+
+  OBJECTIVE: Confirm the SSO admin account is locked; Unlock the SSO administrator account; Verify the
+  account is unlocked. Success means `check.sh` exits successfully.
+
+
+  WHAT TO AVOID: Do not apply broad destructive changes, skip evidence gathering, or fake completion with
+  marker files — the checker validates real system state.'
 difficulty: hard
 lab_mode: simulation
 simulation_type: vmware
@@ -18,11 +36,71 @@ objectives:
 initial_state: vCenter shows the SSO administrator account locked.
 hints:
 - order: 1
-  cost: 10
-  content: 'In the vCenter simulator, locate the issue: confirm the sso admin account is locked.'
+  cost: 0
+  content: 'Where to look: Confirm the SSO admin account is locked'
 - order: 2
-  cost: 15
-  content: 'Apply the remediation in the GUI: unlock the sso administrator account.'
+  cost: 25
+  content: 'Diagnostic steps:
+
+    1. Unlock the SSO administrator account
+
+    2. Verify the account is unlocked'
 - order: 3
-  cost: 20
-  content: 'Confirm resolution: verify the account is unlocked.'
+  cost: 50
+  content: 'Exact fix + verification:
+
+    1. Verify the account is unlocked.
+
+    2. Re-run the lab checker (`check.sh` or Check Solution).
+
+    3. Confirm every scenario objective is satisfied.
+
+
+    WHY: the grader validates real state — marker files are ignored.'
+technology: vmware
+summary: Complete the vcenter sso administrator locked out vmware lab and verify success with the checker
+estimated_minutes: 15
+xp_reward: 100
+prerequisites:
+- Basic vmware literacy
+tags:
+- fix
+- hands-on
+- vmware
+linked_tutorial: vmware-fundamentals
+what_you_will_learn:
+- Confirm the SSO admin account is locked
+- Unlock the SSO administrator account
+- Verify the account is unlocked
+environment:
+  nodes:
+  - role: primary
+    os: FixitLab vSphere lab
+    hostname: lab-primary
+    ip: 127.0.0.1
+    specs: local offline simulation
+  pre_installed:
+  - bash
+  - coreutils
+  - journalctl
+  - systemctl
+  - vmware
+  credentials:
+  - user: root
+    password: lab123
+tasks:
+- id: task_1
+  title: vCenter SSO Administrator Locked Out
+  description: Restore healthy behavior for vCenter SSO Administrator Locked Out by investigating the
+    failure, applying the smallest safe fix, and validating the outcome.
+  background: 'This vmware lab teaches systematic troubleshooting: observe, hypothesize, change, verify.'
+  validation:
+    type: custom_script
+    script: check.sh
+    error_message: Validation did not pass. Re-read the objectives and Hint 2 diagnostic steps.
+solution:
+  summary: Identify the misconfiguration affecting this vmware lab and apply the minimal fix.
+  files_changed: []
+  commands_run:
+  - bash check.sh
+  reference_docs: vmware-fundamentals

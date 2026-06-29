@@ -1,8 +1,7 @@
----
 slug: spring-db-connection-pool
-title: "HikariCP Pool Exhausted — Connection Is Not Available"
-technology: Java
-category: "Spring Boot"
+title: HikariCP Pool Exhausted — Connection Is Not Available
+technology: java
+category: Fix
 difficulty: hard
 time_limit: 1200
 max_score: 100
@@ -11,22 +10,107 @@ simulation_type: java
 infrastructure_type: simulation
 jira_priority: High
 is_free: false
-description: |
-  Requests fail with 'HikariPool-1 - Connection is not available, request timed out'. The Hikari maximum-pool-size is far too small for the concurrency and a slow query holds connections, so the pool starves. Size the pool and connection timeout correctly and address the long-held connection so the app stops timing out.
+description: 'CONTEXT: A team operating Java applications needs you to resolve `HikariCP Pool Exhausted
+  — Connection Is Not Available` during a realistic incident. The business impact is reduced service reliability
+  until the underlying state is repaired.
+
+
+  ENVIRONMENT: You are working in FixitLab''s offline Java project with Maven/Gradle, JVM logs, and Spring
+  configuration. All tools run locally; no paid APIs or external cloud calls are required.
+
+
+  SYMPTOM / STARTING STATE: Config at /app/src/main/resources/application.yml sets Hikari maximum-pool-size
+  to 1; under load requests time out waiting for a connection. Requests fail with ''HikariPool-1 - Connection
+  is not available, request timed out''. The Hikari maximum-pool-size is far too small for the concurrency
+  and a slow query holds connections, so the pool starves. Size the pool and connection timeout correctly
+  and address the long-held connection so the app stops timing out.
+
+
+  OBJECTIVE: Reproduce the Hikari connection-timeout under load; Right-size maximum-pool-size for the
+  real concurrency; Set a sane connection-timeout and detect leaks. Success means `check.sh` exits successfully.
+
+
+  WHAT TO AVOID: Do not apply broad destructive changes, skip evidence gathering, or fake completion with
+  marker files — the checker validates real system state.'
 objectives:
-  - "Reproduce the Hikari connection-timeout under load"
-  - "Right-size maximum-pool-size for the real concurrency"
-  - "Set a sane connection-timeout and detect leaks"
-  - "Verify requests stop timing out under load"
-initial_state: |
-  Config at /app/src/main/resources/application.yml sets Hikari maximum-pool-size to 1; under load requests time out waiting for a connection.
+- Reproduce the Hikari connection-timeout under load
+- Right-size maximum-pool-size for the real concurrency
+- Set a sane connection-timeout and detect leaks
+- Verify requests stop timing out under load
+initial_state: 'Config at /app/src/main/resources/application.yml sets Hikari maximum-pool-size to 1;
+  under load requests time out waiting for a connection.
+
+  '
 hints:
-  - order: 1
-    cost: 10
-    content: "'Connection is not available, request timed out' = pool too small or connections held."
-  - order: 2
-    cost: 15
-    content: "Raise spring.datasource.hikari.maximum-pool-size to match concurrent demand."
-  - order: 3
-    cost: 20
-    content: "Set a connection-timeout and leak-detection-threshold to surface held connections."
+- order: 1
+  cost: 0
+  content: 'Where to look: Reproduce the Hikari connection-timeout under load'
+- order: 2
+  cost: 25
+  content: 'Diagnostic steps:
+
+    1. Right-size maximum-pool-size for the real concurrency
+
+    2. Set a sane connection-timeout and detect leaks
+
+    3. Verify requests stop timing out under load'
+- order: 3
+  cost: 50
+  content: 'Exact fix + verification:
+
+    1. Verify requests stop timing out under load.
+
+    2. Re-run the lab checker (`check.sh` or Check Solution).
+
+    3. Confirm every scenario objective is satisfied.
+
+
+    WHY: the grader validates real state — marker files are ignored.'
+summary: Complete the hikaricp pool exhausted — connection is not available java lab and verify success
+  with the checker
+estimated_minutes: 20
+xp_reward: 100
+prerequisites:
+- Basic java literacy
+tags:
+- fix
+- hands-on
+- java
+linked_tutorial: java-fundamentals
+what_you_will_learn:
+- Reproduce the Hikari connection-timeout under load
+- Right-size maximum-pool-size for the real concurrency
+- Set a sane connection-timeout and detect leaks
+- Verify requests stop timing out under load
+environment:
+  nodes:
+  - role: primary
+    os: FixitLab Java project
+    hostname: lab-primary
+    ip: 127.0.0.1
+    specs: local offline simulation
+  pre_installed:
+  - bash
+  - coreutils
+  - java
+  - journalctl
+  - systemctl
+  credentials:
+  - user: root
+    password: lab123
+tasks:
+- id: task_1
+  title: HikariCP Pool Exhausted — Connection Is Not Available
+  description: Restore healthy behavior for HikariCP Pool Exhausted — Connection Is Not Available by investigating
+    the failure, applying the smallest safe fix, and validating the outcome.
+  background: 'This java lab teaches systematic troubleshooting: observe, hypothesize, change, verify.'
+  validation:
+    type: custom_script
+    script: check.sh
+    error_message: Validation did not pass. Re-read the objectives and Hint 2 diagnostic steps.
+solution:
+  summary: Identify the misconfiguration affecting this java lab and apply the minimal fix.
+  files_changed: []
+  commands_run:
+  - bash check.sh
+  reference_docs: java-fundamentals

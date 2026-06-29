@@ -1,12 +1,32 @@
 title: NULL-Safe Mismatch Detection
 slug: pg-null-safe-customer-match
 technology: postgresql
-category: PostgreSQL Development
-description: A logistics audit must flag shipments whose assigned warehouse differs from where the order
-  actually shipped. The query uses `assigned_wh <> shipped_wh`, but in SQL any comparison with NULL yields
-  UNKNOWN (not true), so rows where exactly one side is NULL are silently dropped — the very rows an audit
-  cares about. Make the comparison NULL-safe so a one-sided NULL counts as a mismatch and two NULLs count
-  as a match.
+category: Fix
+description: 'CONTEXT: A team operating PostgreSQL needs you to resolve `NULL-Safe Mismatch Detection`
+  during a realistic incident. The business impact is reduced service reliability until the underlying
+  state is repaired.
+
+
+  ENVIRONMENT: You are working in FixitLab''s offline PostgreSQL cluster with psql, pg_hba.conf, roles,
+  and WAL. All tools run locally; no paid APIs or external cloud calls are required.
+
+
+  SYMPTOM / STARTING STATE: A logistics audit must flag shipments whose assigned warehouse differs from
+  where the order shipped, but `assigned_wh <> shipped_wh` drops rows where one side is NULL because NULL
+  comparisons are UNKNOWN. Make the comparison NULL-safe. A logistics audit must flag shipments whose
+  assigned warehouse differs from where the order actually shipped. The query uses `assigned_wh <> shipped_wh`,
+  but in SQL any comparison with NULL yields UNKNOWN (not true), so rows where exactly one side is NULL
+  are silently dropped — the very rows an audit cares about. Make the comparison NULL-safe so a one-sided
+  NULL counts as a mismatch and two NULLs count as a match.
+
+
+  OBJECTIVE: Understand that `<>` against NULL returns UNKNOWN, not true; Use a NULL-safe distinctness
+  test so one-sided NULLs are caught; Treat two NULLs as equal and return the right mismatched ids. Success
+  means all hidden tests pass.
+
+
+  WHAT TO AVOID: Do not apply broad destructive changes, skip evidence gathering, or fake completion with
+  marker files — the checker validates real system state.'
 difficulty: easy
 scenario_type: fix
 lab_mode: simulation
@@ -22,101 +42,140 @@ objectives:
 - Use a NULL-safe distinctness test so one-sided NULLs are caught
 - Treat two NULLs as equal and return the right mismatched ids
 initial_state: A logistics audit must flag shipments whose assigned warehouse differs from where the order
-  shipped, but `assigned_wh <> shipped_wh` drops rows where one side is NULL because NULL comparisons are
-  UNKNOWN. Make the comparison NULL-safe.
-solution_explanation: |
-  Three-valued logic means `assigned_wh <> shipped_wh` is UNKNOWN whenever either side is NULL, and WHERE
+  shipped, but `assigned_wh <> shipped_wh` drops rows where one side is NULL because NULL comparisons
+  are UNKNOWN. Make the comparison NULL-safe.
+solution_explanation: 'Three-valued logic means `assigned_wh <> shipped_wh` is UNKNOWN whenever either
+  side is NULL, and WHERE
+
   only keeps rows that are TRUE — so one-sided-NULL mismatches vanish. The fix is a NULL-safe distinctness
+
   operator. In standard SQL that is `IS DISTINCT FROM`; SQLite spells the same idea as `IS NOT`. Both
-  treat NULL as a comparable value: one NULL vs a non-NULL is "distinct" (a mismatch), and NULL vs NULL is
+
+  treat NULL as a comparable value: one NULL vs a non-NULL is "distinct" (a mismatch), and NULL vs NULL
+  is
+
   "not distinct" (a match).
+
+  '
 coding_spec:
   language: python
   entrypoint: solution.py
   kind: fix
-  instructions: |
-    Fix solution(conn). It must return the ids (as tuples) of shipments where assigned_wh differs from
+  instructions: 'Fix solution(conn). It must return the ids (as tuples) of shipments where assigned_wh
+    differs from
+
     shipped_wh, using NULL-safe comparison: if exactly one of the two columns is NULL the row IS a
+
     mismatch; if BOTH are NULL the row is a match (not returned). Order by id ascending.
+
     The conn argument is a fresh sqlite3 connection with a `shipments(id, assigned_wh, shipped_wh)` table.
-    Hint: SQLite's NULL-safe inequality is `IS NOT` (the analogue of standard SQL `IS DISTINCT FROM`).
+
+    Hint: SQLite''s NULL-safe inequality is `IS NOT` (the analogue of standard SQL `IS DISTINCT FROM`).
+
     Click Run to try it, then Check Solution to grade against all tests.
+
+    '
   files:
   - path: solution.py
-    content: |
-      import sqlite3
-
-      def solution(conn):
-          # BUG: `<>` with a NULL operand evaluates to UNKNOWN, so rows where
-          # exactly one side is NULL are dropped instead of flagged as mismatches.
-          return conn.execute(
-              """
-              SELECT id
-              FROM shipments
-              WHERE assigned_wh <> shipped_wh
-              ORDER BY id
-              """
-          ).fetchall()
+    content: "import sqlite3\n\ndef solution(conn):\n    # BUG: `<>` with a NULL operand evaluates to\
+      \ UNKNOWN, so rows where\n    # exactly one side is NULL are dropped instead of flagged as mismatches.\n\
+      \    return conn.execute(\n        \"\"\"\n        SELECT id\n        FROM shipments\n        WHERE\
+      \ assigned_wh <> shipped_wh\n        ORDER BY id\n        \"\"\"\n    ).fetchall()\n"
     readonly: false
   visible_tests:
   - name: one-sided NULLs are flagged
-    code: |
-      import sqlite3
-      conn = sqlite3.connect(':memory:')
-      conn.executescript(
-          "CREATE TABLE shipments (id INTEGER PRIMARY KEY, assigned_wh TEXT, shipped_wh TEXT);"
-          "INSERT INTO shipments (id, assigned_wh, shipped_wh) VALUES "
-          "(1,'A','A'),(2,'A','B'),(3,NULL,'A'),(4,'A',NULL),(5,NULL,NULL);"
-      )
-      assert solution(conn) == [(2,), (3,), (4,)], solution(conn)
+    code: "import sqlite3\nconn = sqlite3.connect(':memory:')\nconn.executescript(\n    \"CREATE TABLE\
+      \ shipments (id INTEGER PRIMARY KEY, assigned_wh TEXT, shipped_wh TEXT);\"\n    \"INSERT INTO shipments\
+      \ (id, assigned_wh, shipped_wh) VALUES \"\n    \"(1,'A','A'),(2,'A','B'),(3,NULL,'A'),(4,'A',NULL),(5,NULL,NULL);\"\
+      \n)\nassert solution(conn) == [(2,), (3,), (4,)], solution(conn)\n"
   - name: two NULLs count as a match
-    code: |
-      import sqlite3
-      conn = sqlite3.connect(':memory:')
-      conn.executescript(
-          "CREATE TABLE shipments (id INTEGER PRIMARY KEY, assigned_wh TEXT, shipped_wh TEXT);"
-          "INSERT INTO shipments (id, assigned_wh, shipped_wh) VALUES "
-          "(1,'A','A'),(2,'A','B'),(3,NULL,'A'),(4,'A',NULL),(5,NULL,NULL);"
-      )
-      assert (5,) not in solution(conn), solution(conn)
+    code: "import sqlite3\nconn = sqlite3.connect(':memory:')\nconn.executescript(\n    \"CREATE TABLE\
+      \ shipments (id INTEGER PRIMARY KEY, assigned_wh TEXT, shipped_wh TEXT);\"\n    \"INSERT INTO shipments\
+      \ (id, assigned_wh, shipped_wh) VALUES \"\n    \"(1,'A','A'),(2,'A','B'),(3,NULL,'A'),(4,'A',NULL),(5,NULL,NULL);\"\
+      \n)\nassert (5,) not in solution(conn), solution(conn)\n"
   hidden_tests:
   - name: all matching rows return nothing
-    code: |
-      import sqlite3
-      conn = sqlite3.connect(':memory:')
-      conn.executescript(
-          "CREATE TABLE shipments (id INTEGER PRIMARY KEY, assigned_wh TEXT, shipped_wh TEXT);"
-          "INSERT INTO shipments VALUES (1,'X','X'),(2,NULL,NULL);"
-      )
-      assert solution(conn) == [], solution(conn)
+    code: "import sqlite3\nconn = sqlite3.connect(':memory:')\nconn.executescript(\n    \"CREATE TABLE\
+      \ shipments (id INTEGER PRIMARY KEY, assigned_wh TEXT, shipped_wh TEXT);\"\n    \"INSERT INTO shipments\
+      \ VALUES (1,'X','X'),(2,NULL,NULL);\"\n)\nassert solution(conn) == [], solution(conn)\n"
   - name: every row a one-sided NULL
-    code: |
-      import sqlite3
-      conn = sqlite3.connect(':memory:')
-      conn.executescript(
-          "CREATE TABLE shipments (id INTEGER PRIMARY KEY, assigned_wh TEXT, shipped_wh TEXT);"
-          "INSERT INTO shipments VALUES (10,NULL,'Q'),(11,'Q',NULL);"
-      )
-      assert solution(conn) == [(10,), (11,)], solution(conn)
+    code: "import sqlite3\nconn = sqlite3.connect(':memory:')\nconn.executescript(\n    \"CREATE TABLE\
+      \ shipments (id INTEGER PRIMARY KEY, assigned_wh TEXT, shipped_wh TEXT);\"\n    \"INSERT INTO shipments\
+      \ VALUES (10,NULL,'Q'),(11,'Q',NULL);\"\n)\nassert solution(conn) == [(10,), (11,)], solution(conn)\n"
   - name: result ordered by id
-    code: |
-      import sqlite3
-      conn = sqlite3.connect(':memory:')
-      conn.executescript(
-          "CREATE TABLE shipments (id INTEGER PRIMARY KEY, assigned_wh TEXT, shipped_wh TEXT);"
-          "INSERT INTO shipments VALUES (3,'a','b'),(1,'c','d'),(2,NULL,'z');"
-      )
-      assert solution(conn) == [(1,), (2,), (3,)], solution(conn)
+    code: "import sqlite3\nconn = sqlite3.connect(':memory:')\nconn.executescript(\n    \"CREATE TABLE\
+      \ shipments (id INTEGER PRIMARY KEY, assigned_wh TEXT, shipped_wh TEXT);\"\n    \"INSERT INTO shipments\
+      \ VALUES (3,'a','b'),(1,'c','d'),(2,NULL,'z');\"\n)\nassert solution(conn) == [(1,), (2,), (3,)],\
+      \ solution(conn)\n"
   timeout: 8
 hints:
 - order: 1
-  cost: 10
-  content: Try a row where assigned_wh is NULL and shipped_wh is 'A'. With `<>` it disappears, because
-    NULL `<>` 'A' is UNKNOWN and WHERE keeps only TRUE rows.
+  cost: 0
+  content: 'Where to look: Run `systemctl status postgresql` and `pg_isready` for connection state.'
 - order: 2
-  cost: 20
-  content: You need an operator that treats NULL as just another value to compare. Standard SQL calls it
-    IS DISTINCT FROM; SQLite writes it as `IS NOT`.
+  cost: 25
+  content: 'Diagnostic steps:
+
+    1. Check service status and `/var/log/postgresql/` logs.
+
+    2. Verify `pg_hba.conf` and `postgresql.conf` for listen addresses.
+
+    3. Test with `psql -U postgres -c ''SELECT 1''`.'
 - order: 3
-  cost: 30
-  content: 'Replace `assigned_wh <> shipped_wh` with `assigned_wh IS NOT shipped_wh`.'
+  cost: 50
+  content: 'Exact fix + verification:
+
+    1. Fix auth rules, data directory permissions, or port conflict.
+
+    2. `systemctl restart postgresql`.
+
+    3. Confirm `pg_isready` reports accepting connections.
+
+
+    WHY: the database must accept connections, not just start.'
+summary: Complete the null-safe mismatch detection postgresql lab and verify success with the checker
+estimated_minutes: 15
+xp_reward: 100
+prerequisites:
+- Basic postgresql literacy
+tags:
+- fix
+- hands-on
+- postgresql
+linked_tutorial: postgresql-fundamentals
+what_you_will_learn:
+- Understand that `<>` against NULL returns UNKNOWN, not true
+- Use a NULL-safe distinctness test so one-sided NULLs are caught
+- Treat two NULLs as equal and return the right mismatched ids
+environment:
+  nodes:
+  - role: primary
+    os: FixitLab PostgreSQL cluster
+    hostname: lab-primary
+    ip: 127.0.0.1
+    specs: local offline simulation
+  pre_installed:
+  - bash
+  - coreutils
+  - journalctl
+  - postgresql
+  - systemctl
+  credentials:
+  - user: root
+    password: lab123
+tasks:
+- id: task_1
+  title: NULL-Safe Mismatch Detection
+  description: Restore healthy behavior for NULL-Safe Mismatch Detection by investigating the failure,
+    applying the smallest safe fix, and validating the outcome.
+  background: 'This postgresql lab teaches systematic troubleshooting: observe, hypothesize, change, verify.'
+  validation:
+    type: custom_script
+    script: hidden_tests
+    error_message: One or more hidden tests failed. Read the public test output, fix your solution, and
+      submit again.
+solution:
+  summary: The solution passes all hidden tests by implementing the required behavior in code.
+  files_changed: []
+  commands_run: []
+  reference_docs: postgresql-fundamentals

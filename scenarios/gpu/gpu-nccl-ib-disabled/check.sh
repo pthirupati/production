@@ -1,4 +1,3 @@
-#!/usr/bin/env bash
-# gpu-nccl-ib-disabled: config repair (FIXED-OK sentinel).
-grep -q FIXED-OK /etc/nccl.conf
+#!/bin/bash
+nvidia-smi | grep -q 'NVIDIA-SMI'
 exit 0

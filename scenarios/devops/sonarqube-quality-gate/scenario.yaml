@@ -1,14 +1,30 @@
 title: Fix SonarQube Quality Gate Code Coverage
 slug: sonarqube-quality-gate
-technology: DevOps
-category: Code Quality
+technology: devops
+category: Fix
 difficulty: medium
 time_limit: 900
 max_score: 100
 infrastructure_type: docker
 jira_priority: Medium
 is_free: false
-description: 'The CI pipeline is blocked by a failing SonarQube quality gate. The gate
+description: 'CONTEXT: A team operating DevOps delivery needs you to resolve `Fix SonarQube Quality Gate
+  Code Coverage` during a realistic incident. The business impact is reduced service reliability until
+  the underlying state is repaired.
+
+
+  ENVIRONMENT: You are working in FixitLab''s offline CI/CD lab with git repos, pipelines, artifacts,
+  and runbooks. All tools run locally; no paid APIs or external cloud calls are required.
+
+
+  SYMPTOM / STARTING STATE: Ubuntu server. Project at /opt/app. sonar-project.properties has
+
+  sonar.python.coverage.reportPaths=coverage/coverage.xml but coverage
+
+  report is actually at /opt/app/reports/coverage.xml. The quality gate
+
+  fails because no coverage data is found. The CI pipeline is blocked by a failing SonarQube quality gate.
+  The gate
 
   requires 80% code coverage but the project is reporting 0% because the
 
@@ -16,7 +32,14 @@ description: 'The CI pipeline is blocked by a failing SonarQube quality gate. Th
 
   so SonarQube picks up the coverage data.
 
-  '
+
+  OBJECTIVE: Identify the incorrect coverage report path in sonar-project.properties; Fix the sonar.coverage.exclusions
+  or sonar.python.coverage.reportPaths; Verify SonarQube analysis reports coverage above the quality gate
+  threshold. Success means `check.sh` exits successfully.
+
+
+  WHAT TO AVOID: Do not apply broad destructive changes, skip evidence gathering, or fake completion with
+  marker files — the checker validates real system state.'
 objectives:
 - Identify the incorrect coverage report path in sonar-project.properties
 - Fix the sonar.coverage.exclusions or sonar.python.coverage.reportPaths
@@ -32,17 +55,71 @@ initial_state: 'Ubuntu server. Project at /opt/app. sonar-project.properties has
   '
 hints:
 - order: 1
-  cost: 10
-  content: 'Inspect the analysis config: `cat /opt/app/sonar-project.properties`. Coverage reads 0%, so
-    the gate (80%) fails — the report path is wrong.'
+  cost: 0
+  content: 'Where to look: Identify the incorrect coverage report path in sonar-project.properties'
 - order: 2
-  cost: 15
-  content: 'Find where the coverage report actually is: `find /opt/app -name coverage.xml` (it''s at reports/coverage.xml,
-    not coverage/coverage.xml).'
-- order: 3
-  cost: 20
-  content: Fix `sonar.python.coverage.reportPaths` to point at the real path `reports/coverage.xml`.
-- order: 4
   cost: 25
-  content: Re-run the scanner (`sonar-scanner`) and confirm reported coverage clears the quality-gate
-    threshold so the pipeline passes.
+  content: 'Diagnostic steps:
+
+    1. Fix the sonar.coverage.exclusions or sonar.python.coverage.reportPaths
+
+    2. Verify SonarQube analysis reports coverage above the quality gate threshold'
+- order: 3
+  cost: 50
+  content: 'Exact fix + verification:
+
+    1. Verify SonarQube analysis reports coverage above the quality gate threshold.
+
+    2. Re-run the lab checker (`check.sh` or Check Solution).
+
+    3. Confirm every scenario objective is satisfied.
+
+
+    WHY: the grader validates real state — marker files are ignored.'
+summary: Complete the fix sonarqube quality gate code coverage devops lab and verify success with the
+  checker
+estimated_minutes: 15
+xp_reward: 100
+prerequisites:
+- Basic devops literacy
+tags:
+- devops
+- fix
+- hands-on
+linked_tutorial: devops-fundamentals
+what_you_will_learn:
+- Identify the incorrect coverage report path in sonar-project.properties
+- Fix the sonar.coverage.exclusions or sonar.python.coverage.reportPaths
+- Verify SonarQube analysis reports coverage above the quality gate threshold
+environment:
+  nodes:
+  - role: primary
+    os: FixitLab CI/CD lab
+    hostname: lab-primary
+    ip: 127.0.0.1
+    specs: local offline simulation
+  pre_installed:
+  - bash
+  - coreutils
+  - devops
+  - journalctl
+  - systemctl
+  credentials:
+  - user: root
+    password: lab123
+tasks:
+- id: task_1
+  title: Fix SonarQube Quality Gate Code Coverage
+  description: Restore healthy behavior for Fix SonarQube Quality Gate Code Coverage by investigating
+    the failure, applying the smallest safe fix, and validating the outcome.
+  background: 'This devops lab teaches systematic troubleshooting: observe, hypothesize, change, verify.'
+  validation:
+    type: custom_script
+    script: check.sh
+    error_message: Validation did not pass. Re-read the objectives and Hint 2 diagnostic steps.
+solution:
+  summary: Identify the misconfiguration affecting this devops lab and apply the minimal fix.
+  files_changed: []
+  commands_run:
+  - bash check.sh
+  reference_docs: devops-fundamentals

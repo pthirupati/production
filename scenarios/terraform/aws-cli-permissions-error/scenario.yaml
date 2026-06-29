@@ -1,28 +1,111 @@
 title: AWS CLI AccessDenied Error
 slug: aws-cli-permissions-error
 difficulty: easy
-category: AWS
-description: 'An IAM user receives an AccessDenied error when running AWS CLI commands against S3 and EC2. The user exists but is missing the required IAM policy permissions needed to perform the intended operations.'
-initial_state: 'Simulated AWS environment with an IAM user configured in the CLI profile. The user has no inline or managed policies granting the necessary actions, causing all resource API calls to fail with AccessDenied.'
+category: Fix
+description: 'CONTEXT: A team operating Terraform IaC needs you to resolve `AWS CLI AccessDenied Error`
+  during a realistic incident. The business impact is reduced service reliability until the underlying
+  state is repaired.
+
+
+  ENVIRONMENT: You are working in FixitLab''s offline Terraform workspace with HCL files, state, and plan/apply
+  workflow. All tools run locally; no paid APIs or external cloud calls are required.
+
+
+  SYMPTOM / STARTING STATE: Simulated AWS environment with an IAM user configured in the CLI profile.
+  The user has no inline or managed policies granting the necessary actions, causing all resource API
+  calls to fail with AccessDenied. An IAM user receives an AccessDenied error when running AWS CLI commands
+  against S3 and EC2. The user exists but is missing the required IAM policy permissions needed to perform
+  the intended operations.
+
+
+  OBJECTIVE: Identify which IAM actions are being denied using the CLI error output or IAM policy simulator;
+  Attach or create an IAM policy granting the minimum required permissions; Confirm the CLI commands succeed
+  after the policy change. Success means `check.sh` exits successfully.
+
+
+  WHAT TO AVOID: Do not apply broad destructive changes, skip evidence gathering, or fake completion with
+  marker files — the checker validates real system state.'
+initial_state: Simulated AWS environment with an IAM user configured in the CLI profile. The user has
+  no inline or managed policies granting the necessary actions, causing all resource API calls to fail
+  with AccessDenied.
 objectives:
-  - Identify which IAM actions are being denied using the CLI error output or IAM policy simulator
-  - Attach or create an IAM policy granting the minimum required permissions
-  - Confirm the CLI commands succeed after the policy change
+- Identify which IAM actions are being denied using the CLI error output or IAM policy simulator
+- Attach or create an IAM policy granting the minimum required permissions
+- Confirm the CLI commands succeed after the policy change
 lab_mode: simulation
 simulation_type: aws
 time_limit: 1200
 max_score: 100
 is_free: true
 hints:
-  - content: 'Run: aws iam list-attached-user-policies --user-name <user> and aws iam list-user-policies --user-name <user> to see current permissions.'
-    cost: 10
-    order: 1
-  - content: 'Use aws iam simulate-principal-policy to test specific actions before attaching a policy.'
-    cost: 15
-    order: 2
-  - content: 'Attach the AmazonS3ReadOnlyAccess and AmazonEC2ReadOnlyAccess managed policies as a starting point, then scope down to least privilege.'
-    cost: 20
-    order: 3
+- order: 1
+  cost: 0
+  content: 'Where to look: Identify which IAM actions are being denied using the CLI error output or IAM
+    policy simulator'
+- order: 2
+  cost: 25
+  content: 'Diagnostic steps:
+
+    1. Attach or create an IAM policy granting the minimum required permissions
+
+    2. Confirm the CLI commands succeed after the policy change'
+- order: 3
+  cost: 50
+  content: 'Exact fix + verification:
+
+    1. Confirm the CLI commands succeed after the policy change.
+
+    2. Re-run the lab checker (`check.sh` or Check Solution).
+
+    3. Confirm every scenario objective is satisfied.
+
+
+    WHY: the grader validates real state — marker files are ignored.'
 requires_companion_hosts: false
 dual_terminal: false
 jira_priority: Low
+technology: terraform
+summary: Complete the aws cli accessdenied error terraform lab and verify success with the checker
+estimated_minutes: 20
+xp_reward: 100
+prerequisites:
+- Basic terraform literacy
+tags:
+- fix
+- hands-on
+- terraform
+linked_tutorial: terraform-fundamentals
+what_you_will_learn:
+- Identify which IAM actions are being denied using the CLI error output or IAM policy simulator
+- Attach or create an IAM policy granting the minimum required permissions
+- Confirm the CLI commands succeed after the policy change
+environment:
+  nodes:
+  - role: primary
+    os: FixitLab Terraform workspace
+    hostname: lab-primary
+    ip: 127.0.0.1
+    specs: local offline simulation
+  pre_installed:
+  - bash
+  - coreutils
+  - terraform
+  credentials:
+  - user: root
+    password: lab123
+tasks:
+- id: task_1
+  title: AWS CLI AccessDenied Error
+  description: Restore healthy behavior for AWS CLI AccessDenied Error by investigating the failure, applying
+    the smallest safe fix, and validating the outcome.
+  background: 'This terraform lab teaches systematic troubleshooting: observe, hypothesize, change, verify.'
+  validation:
+    type: custom_script
+    script: check.sh
+    error_message: Validation did not pass. Re-read the objectives and Hint 2 diagnostic steps.
+solution:
+  summary: Identify the misconfiguration affecting this terraform lab and apply the minimal fix.
+  files_changed: []
+  commands_run:
+  - bash check.sh
+  reference_docs: terraform-fundamentals

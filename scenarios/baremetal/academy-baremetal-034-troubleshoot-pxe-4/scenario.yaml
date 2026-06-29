@@ -1,7 +1,7 @@
-title: 'Bare Metal & IPMI: Pxe Boot — Troubleshooting Drill'
+title: Pxe Boot — Troubleshoot Lab
 slug: academy-baremetal-034-troubleshoot-pxe-4
-technology: Bare Metal & IPMI
-category: Troubleshooting
+technology: baremetal
+category: Fix
 difficulty: medium
 scenario_type: fix
 lab_mode: simulation
@@ -11,9 +11,28 @@ max_score: 100
 is_free: false
 infrastructure_type: docker
 jira_priority: Medium
-description: 'Production alert: the host fails to network boot. You are on call for Bare Metal & IPMI
-  and must troubleshoot PXE boot methodically — triage symptoms, isolate root cause, apply the smallest
-  safe fix, and confirm recovery.'
+description: 'CONTEXT: A team operating bare metal operations needs you to resolve `baremetal: Pxe Boot
+  — Troubleshooting Drill` during a realistic incident. The business impact is reduced service reliability
+  until the underlying state is repaired.
+
+
+  ENVIRONMENT: You are working in FixitLab''s offline physical server lab with IPMI, RAID, BIOS, and out-of-band
+  console. All tools run locally; no paid APIs or external cloud calls are required.
+
+
+  SYMPTOM / STARTING STATE: The physical server lab is degraded. The host fails to network boot. Recent
+  changes may exist around PXE boot, but do not restart blindly — gather evidence first. Production alert:
+  the host fails to network boot. You are on call for baremetal and must troubleshoot PXE boot methodically
+  — triage symptoms, isolate root cause, apply the smallest safe fix, and confirm recovery.
+
+
+  OBJECTIVE: The incident symptom is clear: the host fails to network boot; Root cause is isolated with
+  evidence, not guesswork; Service behavior returns to normal after the fix. Success means `check.sh`
+  exits successfully.
+
+
+  WHAT TO AVOID: Do not apply broad destructive changes, skip evidence gathering, or fake completion with
+  marker files — the checker validates real system state.'
 objectives:
 - 'The incident symptom is clear: the host fails to network boot'
 - Root cause is isolated with evidence, not guesswork
@@ -22,32 +41,94 @@ initial_state: The physical server lab is degraded. The host fails to network bo
   exist around PXE boot, but do not restart blindly — gather evidence first.
 hints:
 - order: 1
-  cost: 10
-  content: 'Orient yourself before changing anything:
-
-    1. Inspect the current state — PXE/DHCP/TFTP config and boot logs.
-
-    2. Write down what looks normal versus wrong or missing for PXE boot.
-
-    3. Recall the core idea: network boot, DHCP, and TFTP. Form one hypothesis before you act.'
+  cost: 0
+  content: 'Where to look: The incident symptom is clear: the host fails to network boot'
 - order: 2
-  cost: 15
-  content: 'Plan your approach (still no spoilers):
-
-    1. Confirm the exact gap between current and desired state for PXE boot.
-
-    2. Decide the single smallest change that moves you toward the objective.
-
-    3. Capture evidence (command output / status) before the change so you can prove it worked afterward.'
-- order: 3
   cost: 25
-  content: 'Guided walkthrough:
+  content: 'Diagnostic steps:
 
-    1. Re-check the current state — PXE/DHCP/TFTP config and boot logs.
+    1. Root cause is isolated with evidence, not guesswork
 
-    2. Fix the underlying misconfiguration you identified (not just the noisy log line), changing one
-    thing at a time.
+    2. Service behavior returns to normal after the fix'
+- order: 3
+  cost: 50
+  content: 'Exact fix + verification:
 
-    3. Verify the result — PXE delivers the boot image.
+    1. Service behavior returns to normal after the fix.
 
-    4. Click Check Solution once `systemctl is-active chronyd` returns active.'
+    2. Re-run the lab checker (`check.sh` or Check Solution).
+
+    3. Confirm every scenario objective is satisfied.
+
+
+    WHY: the grader validates real state — marker files are ignored.'
+summary: Complete the pxe boot — troubleshoot lab baremetal lab and verify success with the checker
+estimated_minutes: 20
+xp_reward: 100
+prerequisites:
+- Basic baremetal literacy
+tags:
+- baremetal
+- fix
+- hands-on
+linked_tutorial: baremetal-fundamentals
+what_you_will_learn:
+- 'The incident symptom is clear: the host fails to network boot'
+- Root cause is isolated with evidence, not guesswork
+- Service behavior returns to normal after the fix
+environment:
+  nodes:
+  - role: primary
+    os: FixitLab physical server lab
+    hostname: lab-primary
+    ip: 127.0.0.1
+    specs: local offline simulation
+  pre_installed:
+  - baremetal
+  - bash
+  - coreutils
+  - journalctl
+  - systemctl
+  credentials:
+  - user: root
+    password: lab123
+tasks:
+- id: task_1
+  title: Pxe Boot — Troubleshoot Lab
+  description: Restore healthy behavior for Pxe Boot — Troubleshoot Lab by investigating the failure,
+    applying the smallest safe fix, and validating the outcome.
+  background: 'This baremetal lab teaches systematic troubleshooting: observe, hypothesize, change, verify.'
+  validation:
+    type: custom_script
+    script: check.sh
+    error_message: Validation did not pass. Re-read the objectives and Hint 2 diagnostic steps.
+solution:
+  summary: Identify the misconfiguration affecting this baremetal lab and apply the minimal fix.
+  files_changed: []
+  commands_run:
+  - bash check.sh
+  reference_docs: baremetal-fundamentals
+guided_mode:
+  enabled: true
+  steps:
+  - step: 1
+    title: Inspect current state
+    instruction: Run a read-only diagnostic before changing anything.
+    command: check.sh
+    expected_output: Output shows the current failure mode
+    explanation: Evidence-first troubleshooting avoids guessing.
+    next_on: command_success
+  - step: 2
+    title: Apply the minimal fix
+    instruction: Make one reversible change aligned with the objectives.
+    command: '# your fix command here'
+    expected_output: State moves toward the objective
+    explanation: Small changes make rollback easy if the hypothesis was wrong.
+    next_on: command_success
+  - step: 3
+    title: Verify with the grader
+    instruction: Run the same verification the checker uses.
+    command: check.sh
+    expected_output: '`check.sh` exits successfully'
+    explanation: The lab passes only when real state is healthy.
+    next_on: command_success

@@ -1,9 +1,26 @@
 title: Fix the Recursive sumTo Base Case
 slug: js-fix-recursion-base-case-js
-category: JavaScript Development
-description: sumTo(n) recursively sums 1..n, but its base case is wrong — it stops at n === 1 returning
-  0, so the result is off by one (it drops the final 1). Also it overflows the stack for n === 0. Fix
-  the base case to handle n <= 0 (return 0) and include 1.
+category: Fix
+description: 'CONTEXT: A team operating JavaScript needs you to resolve `Fix the Recursive sumTo Base
+  Case` during a realistic incident. The business impact is reduced service reliability until the underlying
+  state is repaired.
+
+
+  ENVIRONMENT: You are working in FixitLab''s offline JavaScript practice project with modules, browser
+  console, and Node tooling. All tools run locally; no paid APIs or external cloud calls are required.
+
+
+  SYMPTOM / STARTING STATE: sumTo(n) recursively sums 1..n, but its base case is wrong — it stops at n
+  === 1 returning 0, so the result is off by one (it drops the final 1). Also it overflows the stack for
+  n === 0. Fix the base case to handle n <= 0 (return 0) and include 1.
+
+
+  OBJECTIVE: See sums come out one short; Stop recursion at n <= 0; Include 1 in the total. Success means
+  all hidden tests pass.
+
+
+  WHAT TO AVOID: Do not apply broad destructive changes, skip evidence gathering, or fake completion with
+  marker files — the checker validates real system state.'
 difficulty: medium
 scenario_type: fix
 lab_mode: simulation
@@ -21,52 +38,118 @@ objectives:
 initial_state: sumTo(n) recursively sums 1..n, but its base case is wrong — it stops at n === 1 returning
   0, so the result is off by one (it drops the final 1). Also it overflows the stack for n === 0. Fix
   the base case to handle n <= 0 (return 0) and include 1.
-solution_explanation: |
-  Returning 0 at n === 1 drops the final 1 and never terminates for n <= 0. Basing out at n <= 0 includes 1 and handles non-positive inputs.
+solution_explanation: 'Returning 0 at n === 1 drops the final 1 and never terminates for n <= 0. Basing
+  out at n <= 0 includes 1 and handles non-positive inputs.
+
+  '
 coding_spec:
   language: javascript
   entrypoint: solution.js
   kind: fix
-  instructions: |
-    Fix sumTo(n): return 1 + 2 + ... + n (0 for n <= 0).
-      sumTo(5) -> 15, sumTo(0) -> 0
-    Click Run to try it, then Check Solution to grade against all tests.
+  instructions: "Fix sumTo(n): return 1 + 2 + ... + n (0 for n <= 0).\n  sumTo(5) -> 15, sumTo(0) -> 0\n\
+    Click Run to try it, then Check Solution to grade against all tests.\n"
   files:
   - path: solution.js
-    content: |
-      function sumTo(n) {
-        if (n === 1) return 0; // bug: drops 1 and recurses forever for n<=0
-        return n + sumTo(n - 1);
-      }
+    content: "function sumTo(n) {\n  if (n === 1) return 0; // bug: drops 1 and recurses forever for n<=0\n\
+      \  return n + sumTo(n - 1);\n}\n"
     readonly: false
   visible_tests:
   - name: sum to 5
-    code: |
-      assert(sumTo(5) === 15, sumTo(5));
+    code: 'assert(sumTo(5) === 15, sumTo(5));
+
+      '
   - name: sum to 1
-    code: |
-      assert(sumTo(1) === 1, sumTo(1));
+    code: 'assert(sumTo(1) === 1, sumTo(1));
+
+      '
   hidden_tests:
   - name: sum to 0
-    code: |
-      assert(sumTo(0) === 0);
+    code: 'assert(sumTo(0) === 0);
+
+      '
   - name: sum to 10
-    code: |
-      assert(sumTo(10) === 55);
+    code: 'assert(sumTo(10) === 55);
+
+      '
   - name: sum to 3
-    code: |
-      assert(sumTo(3) === 6);
+    code: 'assert(sumTo(3) === 6);
+
+      '
   - name: negative is 0
-    code: |
-      assert(sumTo(-3) === 0);
+    code: 'assert(sumTo(-3) === 0);
+
+      '
   timeout: 8
 hints:
 - order: 1
-  cost: 10
-  content: sumTo(5) returns 14 — one short, because the base case returns 0 at n === 1.
+  cost: 0
+  content: 'Where to look: Open `solution.js`, read the instructions, and run the visible tests to see
+    which assertion fails first.'
 - order: 2
-  cost: 20
-  content: The base case should return when n <= 0 and must let n === 1 add its 1.
+  cost: 25
+  content: 'Diagnostic steps:
+
+    1. Click Run and read the traceback — note line number and actual vs expected values.
+
+    2. Reproduce the failure with the smallest input from a visible test.
+
+    3. Compare your implementation to the bug described in the lab prompt.'
 - order: 3
-  cost: 30
-  content: Use `if (n <= 0) return 0;` and keep `return n + sumTo(n - 1);`.
+  cost: 50
+  content: 'Exact fix + verification:
+
+    1. Edit `solution.js` with the smallest correct change.
+
+    2. Re-run visible tests, then Check Solution (includes hidden tests).
+
+    3. Confirm every test passes.
+
+
+    WHY: coding labs grade against hidden test cases, not marker files.'
+technology: javascript
+summary: Complete the fix the recursive sumto base case javascript lab and verify success with the checker
+estimated_minutes: 25
+xp_reward: 100
+prerequisites:
+- Basic javascript literacy
+tags:
+- fix
+- hands-on
+- javascript
+linked_tutorial: javascript-fundamentals
+what_you_will_learn:
+- See sums come out one short
+- Stop recursion at n <= 0
+- Include 1 in the total
+environment:
+  nodes:
+  - role: primary
+    os: FixitLab JavaScript practice project
+    hostname: lab-primary
+    ip: 127.0.0.1
+    specs: local offline simulation
+  pre_installed:
+  - bash
+  - coreutils
+  - javascript
+  - journalctl
+  - systemctl
+  credentials:
+  - user: root
+    password: lab123
+tasks:
+- id: task_1
+  title: Fix the Recursive sumTo Base Case
+  description: Restore healthy behavior for Fix the Recursive sumTo Base Case by investigating the failure,
+    applying the smallest safe fix, and validating the outcome.
+  background: 'This javascript lab teaches systematic troubleshooting: observe, hypothesize, change, verify.'
+  validation:
+    type: custom_script
+    script: hidden_tests
+    error_message: One or more hidden tests failed. Read the public test output, fix your solution, and
+      submit again.
+solution:
+  summary: The solution passes all hidden tests by implementing the required behavior in code.
+  files_changed: []
+  commands_run: []
+  reference_docs: javascript-fundamentals

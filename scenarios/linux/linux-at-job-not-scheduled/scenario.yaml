@@ -1,41 +1,130 @@
-title: 'One-Off at Job Never Runs — atd and Queue'
+title: One-Off at Job Never Runs — atd and Queue
 slug: linux-at-job-not-scheduled
 difficulty: easy
-category: 'Linux Administration'
+category: Fix
 technology: linux
-description: |
-  A one-off maintenance task was supposed to run tonight via the `at` command, but the job
+description: 'CONTEXT: A team operating Linux administration needs you to resolve `One-Off at Job Never
+  Runs — atd and Queue` during a realistic incident. The business impact is reduced service reliability
+  until the underlying state is repaired.
+
+
+  ENVIRONMENT: You are working in FixitLab''s offline Linux practice server with terminal and config files
+  under /etc and /var. All tools run locally; no paid APIs or external cloud calls are required.
+
+
+  SYMPTOM / STARTING STATE: Simulated RHEL 9 server. `atq` shows a job but it never runs; `systemctl is-enabled
+  atd`
+
+  reports disabled. The job script under /var/spool/at references a missing command path. A one-off maintenance
+  task was supposed to run tonight via the `at` command, but the job
+
   never executes. The atd daemon is not enabled, and the queued job definition under
+
   /var/spool/at is malformed. Fix the at job definition and ensure atd is running/enabled so
+
   the job fires at its scheduled time. Record the remediation.
-initial_state: |
-  Simulated RHEL 9 server. `atq` shows a job but it never runs; `systemctl is-enabled atd`
+
+
+  OBJECTIVE: List queued jobs with atq and inspect the job body with at -c <id>; Correct the malformed
+  job definition (fix the command/PATH); Enable and start atd so queued jobs actually run. Success means
+  `check.sh` exits successfully.
+
+
+  WHAT TO AVOID: Do not apply broad destructive changes, skip evidence gathering, or fake completion with
+  marker files — the checker validates real system state.'
+initial_state: 'Simulated RHEL 9 server. `atq` shows a job but it never runs; `systemctl is-enabled atd`
+
   reports disabled. The job script under /var/spool/at references a missing command path.
+
+  '
 objectives:
-  - List queued jobs with atq and inspect the job body with at -c <id>
-  - Correct the malformed job definition (fix the command/PATH)
-  - Enable and start atd so queued jobs actually run
-  - Record the remediation in the job definition file
+- List queued jobs with atq and inspect the job body with at -c <id>
+- Correct the malformed job definition (fix the command/PATH)
+- Enable and start atd so queued jobs actually run
+- Record the remediation in the job definition file
 lab_mode: simulation
 simulation_type: generic
 time_limit: 900
 max_score: 100
 is_free: false
 topics_covered:
-  - at
-  - atd
-  - scheduling
-  - systemd
+- at
+- atd
+- scheduling
+- systemd
 hints:
-  - content: 'atq shows the job is queued, but `systemctl is-enabled atd` is disabled — nothing will execute it. Also inspect the job body with at -c <jobid>.'
-    cost: 10
-    order: 1
-  - content: 'Fix the job definition under /var/spool/at (correct the command path / add the needed PATH), then enable the daemon: systemctl enable --now atd.'
-    cost: 15
-    order: 2
-  - content: 'Re-queue if needed (echo ''cmd'' | at <time>) and confirm with atq. Make sure the corrected job file is saved.'
-    cost: 15
-    order: 3
+- order: 1
+  cost: 0
+  content: 'Where to look: List queued jobs with atq and inspect the job body with at -c <id>'
+- order: 2
+  cost: 25
+  content: 'Diagnostic steps:
+
+    1. Correct the malformed job definition (fix the command/PATH)
+
+    2. Enable and start atd so queued jobs actually run
+
+    3. Record the remediation in the job definition file'
+- order: 3
+  cost: 50
+  content: 'Exact fix + verification:
+
+    1. Record the remediation in the job definition file.
+
+    2. Re-run the lab checker (`check.sh` or Check Solution).
+
+    3. Confirm every scenario objective is satisfied.
+
+
+    WHY: the grader validates real state — marker files are ignored.'
 requires_companion_hosts: false
 dual_terminal: false
 jira_priority: Medium
+summary: Complete the one-off at job never runs — atd and queue linux lab and verify success with the
+  checker
+estimated_minutes: 15
+xp_reward: 100
+prerequisites:
+- Basic linux literacy
+tags:
+- fix
+- hands-on
+- linux
+linked_tutorial: linux-fundamentals
+what_you_will_learn:
+- List queued jobs with atq and inspect the job body with at -c <id>
+- Correct the malformed job definition (fix the command/PATH)
+- Enable and start atd so queued jobs actually run
+- Record the remediation in the job definition file
+environment:
+  nodes:
+  - role: primary
+    os: FixitLab Linux practice server
+    hostname: lab-primary
+    ip: 127.0.0.1
+    specs: local offline simulation
+  pre_installed:
+  - bash
+  - coreutils
+  - journalctl
+  - linux
+  - systemctl
+  credentials:
+  - user: root
+    password: lab123
+tasks:
+- id: task_1
+  title: One-Off at Job Never Runs — atd and Queue
+  description: Restore healthy behavior for One-Off at Job Never Runs — atd and Queue by investigating
+    the failure, applying the smallest safe fix, and validating the outcome.
+  background: 'This linux lab teaches systematic troubleshooting: observe, hypothesize, change, verify.'
+  validation:
+    type: custom_script
+    script: check.sh
+    error_message: Validation did not pass. Re-read the objectives and Hint 2 diagnostic steps.
+solution:
+  summary: Identify the misconfiguration affecting this linux lab and apply the minimal fix.
+  files_changed: []
+  commands_run:
+  - bash check.sh
+  reference_docs: linux-fundamentals

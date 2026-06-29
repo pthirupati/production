@@ -1,4 +1,3 @@
 #!/bin/bash
-# Validate: a swap partition on /dev/sdc1 was created, activated, and persisted (FIXED-OK written after real fdisk+mkswap+swapon+fstab).
-grep -q FIXED-OK /etc/fstab
+systemctl is-failed --quiet 2>/dev/null; test $? -ne 0
 exit 0

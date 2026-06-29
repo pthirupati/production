@@ -1,10 +1,30 @@
 title: NetworkPolicy Blocks Backend Traffic
 slug: k8s-network-policy-block
-category: Kubernetes
+category: Fix
 difficulty: hard
-description: Backend pods became unreachable after a NetworkPolicy was applied. A default-deny or overly-narrow
-  ingress policy now blocks traffic from the frontend pods to the backend, causing connection timeouts.
-  Adjust the NetworkPolicy to allow the legitimate frontend traffic while keeping everything else denied.
+description: 'CONTEXT: A team operating Kubernetes needs you to resolve `NetworkPolicy Blocks Backend
+  Traffic` during a realistic incident. The business impact is reduced service reliability until the underlying
+  state is repaired.
+
+
+  ENVIRONMENT: You are working in FixitLab''s offline Kubernetes cluster with kubectl, manifests, and
+  cluster resources. All tools run locally; no paid APIs or external cloud calls are required.
+
+
+  SYMPTOM / STARTING STATE: Simulated Kubernetes cluster with NetworkPolicies enforced. A NetworkPolicy
+  on the backend denies ingress from the frontend pods, so frontend-to-backend calls time out. Backend
+  pods became unreachable after a NetworkPolicy was applied. A default-deny or overly-narrow ingress policy
+  now blocks traffic from the frontend pods to the backend, causing connection timeouts. Adjust the NetworkPolicy
+  to allow the legitimate frontend traffic while keeping everything else denied.
+
+
+  OBJECTIVE: Reproduce the blocked frontend-to-backend connection; Inspect the NetworkPolicy selecting
+  the backend pods; Add an ingress rule that permits the frontend pods and verify connectivity. Success
+  means `kubectl get pods` shows every pod Running.
+
+
+  WHAT TO AVOID: Do not apply broad destructive changes, skip evidence gathering, or fake completion with
+  marker files — the checker validates real system state.'
 lab_mode: simulation
 simulation_type: kubernetes
 time_limit: 900
@@ -16,16 +36,79 @@ objectives:
 - Add an ingress rule that permits the frontend pods and verify connectivity
 hints:
 - order: 1
-  cost: 10
-  content: 'From a frontend pod, calls to the backend hang. List policies: `kubectl get networkpolicy`
-    and describe the one on the backend: `kubectl describe networkpolicy <name>`.'
+  cost: 0
+  content: 'Where to look: Run `kubectl get pods -A` and `kubectl describe pod <name>` for any pod not
+    in Running state.'
 - order: 2
-  cost: 15
-  content: Check the policy's podSelector (which pods it protects) and its ingress.from rules. A default-deny
-    with no matching `from` for the frontend label is what blocks the traffic.
+  cost: 25
+  content: 'Diagnostic steps:
+
+    1. `kubectl get pods` — note CrashLoopBackOff, ImagePullBackOff, or Pending.
+
+    2. `kubectl describe pod <name>` — read Events at the bottom.
+
+    3. `kubectl logs <name> [--previous]` if the container restarted.'
 - order: 3
-  cost: 20
-  content: 'Edit the policy (`kubectl edit networkpolicy <name>`) and add an ingress rule with `from:
-    - podSelector: matchLabels: {app: frontend}` on the backend''s port. Re-test the call.'
+  cost: 50
+  content: 'Exact fix + verification:
+
+    1. Fix the root cause (image name, env var, volume mount, or probe).
+
+    2. `kubectl apply -f` the corrected manifest or delete the pod to recreate.
+
+    3. Confirm `kubectl get pods` shows every pod Running.
+
+
+    WHY: Kubernetes only reports healthy when the workload actually runs.'
 initial_state: Simulated Kubernetes cluster with NetworkPolicies enforced. A NetworkPolicy on the backend
   denies ingress from the frontend pods, so frontend-to-backend calls time out.
+technology: kubernetes
+summary: Complete the networkpolicy blocks backend traffic kubernetes lab and verify success with the
+  checker
+estimated_minutes: 15
+xp_reward: 100
+prerequisites:
+- Basic kubernetes literacy
+tags:
+- fix
+- hands-on
+- kubernetes
+linked_tutorial: kubernetes-fundamentals
+what_you_will_learn:
+- Reproduce the blocked frontend-to-backend connection
+- Inspect the NetworkPolicy selecting the backend pods
+- Add an ingress rule that permits the frontend pods and verify connectivity
+environment:
+  nodes:
+  - role: primary
+    os: FixitLab Kubernetes cluster
+    hostname: lab-primary
+    ip: 127.0.0.1
+    specs: local offline simulation
+  pre_installed:
+  - bash
+  - coreutils
+  - helm
+  - kubectl
+  - kubernetes
+  credentials:
+  - user: root
+    password: lab123
+tasks:
+- id: task_1
+  title: NetworkPolicy Blocks Backend Traffic
+  description: Restore healthy behavior for NetworkPolicy Blocks Backend Traffic by investigating the
+    failure, applying the smallest safe fix, and validating the outcome.
+  background: 'This kubernetes lab teaches systematic troubleshooting: observe, hypothesize, change, verify.'
+  validation:
+    type: k8s_resource_state
+    resource_kind: Pod
+    resource_name: all
+    namespace: default
+    expected_state: Running
+    error_message: One or more pods are not Running. Use kubectl describe pod and kubectl logs.
+solution:
+  summary: Identify the misconfiguration affecting this kubernetes lab and apply the minimal fix.
+  files_changed: []
+  commands_run: []
+  reference_docs: kubernetes-fundamentals

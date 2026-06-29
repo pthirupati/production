@@ -1,8 +1,28 @@
 title: Enumerate open ports on the web server
 slug: nmap-enumerate-open-ports
-category: Nmap Network Scanning
-description: A new web server web01 (10.10.10.10) just came online and the security team wants its
-  exposed TCP ports documented. Use the Nmap simulator to scan the host and enumerate every open port.
+category: Fix
+description: 'CONTEXT: A team operating network scanning needs you to resolve `Enumerate open ports on
+  the web server` during a realistic incident. The business impact is reduced service reliability until
+  the underlying state is repaired.
+
+
+  ENVIRONMENT: You are working in FixitLab''s offline scanning lab with nmap CLI, targets, and scan output.
+  All tools run locally; no paid APIs or external cloud calls are required.
+
+
+  SYMPTOM / STARTING STATE: web01 (10.10.10.10) is reachable but its open ports are unknown until you
+  scan it. The Discovered Hosts panel shows no ports for the host yet. A new web server web01 (10.10.10.10)
+  just came online and the security team wants its exposed TCP ports documented. Use the Nmap simulator
+  to scan the host and enumerate every open port.
+
+
+  OBJECTIVE: Open the Nmap simulator from the lab toolbar (Open Nmap); Run a TCP port scan against web01
+  (10.10.10.10); Identify all of its open ports — SSH (22), HTTP (80) and HTTPS (443). Success means `check.sh`
+  exits successfully.
+
+
+  WHAT TO AVOID: Do not apply broad destructive changes, skip evidence gathering, or fake completion with
+  marker files — the checker validates real system state.'
 difficulty: easy
 lab_mode: simulation
 simulation_type: nmap
@@ -20,14 +40,70 @@ initial_state: web01 (10.10.10.10) is reachable but its open ports are unknown u
   Discovered Hosts panel shows no ports for the host yet.
 hints:
 - order: 1
-  cost: 10
-  content: Open the Nmap simulator and scan the single target, e.g. nmap 10.10.10.10. A default scan
-    probes the common top ports and reports their state (open / closed / filtered).
+  cost: 0
+  content: 'Where to look: Open the Nmap simulator from the lab toolbar (Open Nmap)'
 - order: 2
-  cost: 15
-  content: To be thorough, scan a specific port list with -p, e.g. nmap -p 22,80,443 10.10.10.10, or
-    run a privileged SYN scan (sudo nmap -sS 10.10.10.10) for the fastest accurate result.
+  cost: 25
+  content: 'Diagnostic steps:
+
+    1. Run a TCP port scan against web01 (10.10.10.10)
+
+    2. Identify all of its open ports — SSH (22), HTTP (80) and HTTPS (443)'
 - order: 3
-  cost: 20
-  content: You are looking for three OPEN ports on web01 — 22 (ssh), 80 (http) and 443 (https). The
-    task is complete once all three show as open in the Discovered Hosts panel.
+  cost: 50
+  content: 'Exact fix + verification:
+
+    1. Identify all of its open ports — SSH (22), HTTP (80) and HTTPS (443).
+
+    2. Re-run the lab checker (`check.sh` or Check Solution).
+
+    3. Confirm every scenario objective is satisfied.
+
+
+    WHY: the grader validates real state — marker files are ignored.'
+summary: Complete the enumerate open ports on the web server nmap lab and verify success with the checker
+estimated_minutes: 15
+xp_reward: 100
+prerequisites:
+- Basic nmap literacy
+tags:
+- fix
+- hands-on
+- nmap
+linked_tutorial: nmap-fundamentals
+what_you_will_learn:
+- Open the Nmap simulator from the lab toolbar (Open Nmap)
+- Run a TCP port scan against web01 (10.10.10.10)
+- Identify all of its open ports — SSH (22), HTTP (80) and HTTPS (443)
+environment:
+  nodes:
+  - role: primary
+    os: FixitLab scanning lab
+    hostname: lab-primary
+    ip: 127.0.0.1
+    specs: local offline simulation
+  pre_installed:
+  - bash
+  - coreutils
+  - journalctl
+  - nmap
+  - systemctl
+  credentials:
+  - user: root
+    password: lab123
+tasks:
+- id: task_1
+  title: Enumerate open ports on the web server
+  description: Restore healthy behavior for Enumerate open ports on the web server by investigating the
+    failure, applying the smallest safe fix, and validating the outcome.
+  background: 'This nmap lab teaches systematic troubleshooting: observe, hypothesize, change, verify.'
+  validation:
+    type: custom_script
+    script: check.sh
+    error_message: Validation did not pass. Re-read the objectives and Hint 2 diagnostic steps.
+solution:
+  summary: Identify the misconfiguration affecting this nmap lab and apply the minimal fix.
+  files_changed: []
+  commands_run:
+  - bash check.sh
+  reference_docs: nmap-fundamentals

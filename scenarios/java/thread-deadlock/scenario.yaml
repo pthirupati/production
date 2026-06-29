@@ -1,8 +1,7 @@
----
 slug: thread-deadlock
-title: "Thread Pool Starvation From a Synchronized Bottleneck"
-technology: Java
-category: "Concurrency"
+title: Thread Pool Starvation From a Synchronized Bottleneck
+technology: java
+category: Fix
 difficulty: hard
 time_limit: 1200
 max_score: 100
@@ -11,22 +10,108 @@ simulation_type: java
 infrastructure_type: simulation
 jira_priority: High
 is_free: false
-description: |
-  The request thread pool is exhausted and latency climbs to timeouts. A coarse synchronized block around a cache refresh serializes every request behind one slow I/O call, so all worker threads pile up waiting on the same monitor. Narrow the critical section (or use a concurrent structure) so threads stop starving.
+description: 'CONTEXT: A team operating Java applications needs you to resolve `Thread Pool Starvation
+  From a Synchronized Bottleneck` during a realistic incident. The business impact is reduced service
+  reliability until the underlying state is repaired.
+
+
+  ENVIRONMENT: You are working in FixitLab''s offline Java project with Maven/Gradle, JVM logs, and Spring
+  configuration. All tools run locally; no paid APIs or external cloud calls are required.
+
+
+  SYMPTOM / STARTING STATE: Code at /app/src/main/java/com/example/CacheManager.java holds a synchronized
+  lock across a slow refresh; worker threads block en masse. The request thread pool is exhausted and
+  latency climbs to timeouts. A coarse synchronized block around a cache refresh serializes every request
+  behind one slow I/O call, so all worker threads pile up waiting on the same monitor. Narrow the critical
+  section (or use a concurrent structure) so threads stop starving.
+
+
+  OBJECTIVE: Capture a thread dump and see many threads BLOCKED on one monitor; Locate the over-broad
+  synchronized region doing slow work under the lock; Move slow I/O out of the lock / use a concurrent
+  cache. Success means `check.sh` exits successfully.
+
+
+  WHAT TO AVOID: Do not apply broad destructive changes, skip evidence gathering, or fake completion with
+  marker files — the checker validates real system state.'
 objectives:
-  - "Capture a thread dump and see many threads BLOCKED on one monitor"
-  - "Locate the over-broad synchronized region doing slow work under the lock"
-  - "Move slow I/O out of the lock / use a concurrent cache"
-  - "Verify threads are no longer blocked and latency recovers"
-initial_state: |
-  Code at /app/src/main/java/com/example/CacheManager.java holds a synchronized lock across a slow refresh; worker threads block en masse.
+- Capture a thread dump and see many threads BLOCKED on one monitor
+- Locate the over-broad synchronized region doing slow work under the lock
+- Move slow I/O out of the lock / use a concurrent cache
+- Verify threads are no longer blocked and latency recovers
+initial_state: 'Code at /app/src/main/java/com/example/CacheManager.java holds a synchronized lock across
+  a slow refresh; worker threads block en masse.
+
+  '
 hints:
-  - order: 1
-    cost: 10
-    content: "jstack shows N threads BLOCKED waiting to lock the same <CacheManager> monitor."
-  - order: 2
-    cost: 15
-    content: "Do the slow load OUTSIDE the lock; only synchronize the brief map update."
-  - order: 3
-    cost: 20
-    content: "Better: use ConcurrentHashMap.computeIfAbsent / a loading cache to avoid the global lock."
+- order: 1
+  cost: 0
+  content: 'Where to look: Capture a thread dump and see many threads BLOCKED on one monitor'
+- order: 2
+  cost: 25
+  content: 'Diagnostic steps:
+
+    1. Locate the over-broad synchronized region doing slow work under the lock
+
+    2. Move slow I/O out of the lock / use a concurrent cache
+
+    3. Verify threads are no longer blocked and latency recovers'
+- order: 3
+  cost: 50
+  content: 'Exact fix + verification:
+
+    1. Verify threads are no longer blocked and latency recovers.
+
+    2. Re-run the lab checker (`check.sh` or Check Solution).
+
+    3. Confirm every scenario objective is satisfied.
+
+
+    WHY: the grader validates real state — marker files are ignored.'
+summary: Complete the thread pool starvation from a synchronized bottleneck java lab and verify success
+  with the checker
+estimated_minutes: 20
+xp_reward: 100
+prerequisites:
+- Basic java literacy
+tags:
+- fix
+- hands-on
+- java
+linked_tutorial: java-fundamentals
+what_you_will_learn:
+- Capture a thread dump and see many threads BLOCKED on one monitor
+- Locate the over-broad synchronized region doing slow work under the lock
+- Move slow I/O out of the lock / use a concurrent cache
+- Verify threads are no longer blocked and latency recovers
+environment:
+  nodes:
+  - role: primary
+    os: FixitLab Java project
+    hostname: lab-primary
+    ip: 127.0.0.1
+    specs: local offline simulation
+  pre_installed:
+  - bash
+  - coreutils
+  - java
+  - journalctl
+  - systemctl
+  credentials:
+  - user: root
+    password: lab123
+tasks:
+- id: task_1
+  title: Thread Pool Starvation From a Synchronized Bottleneck
+  description: Restore healthy behavior for Thread Pool Starvation From a Synchronized Bottleneck by investigating
+    the failure, applying the smallest safe fix, and validating the outcome.
+  background: 'This java lab teaches systematic troubleshooting: observe, hypothesize, change, verify.'
+  validation:
+    type: custom_script
+    script: check.sh
+    error_message: Validation did not pass. Re-read the objectives and Hint 2 diagnostic steps.
+solution:
+  summary: Identify the misconfiguration affecting this java lab and apply the minimal fix.
+  files_changed: []
+  commands_run:
+  - bash check.sh
+  reference_docs: java-fundamentals

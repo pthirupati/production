@@ -1,8 +1,26 @@
 title: Fix takeFirst Mutating the Input
 slug: js-fix-splice-vs-slice
-category: JavaScript Development
-description: takeFirst(arr, k) should return the first k elements WITHOUT modifying the input, but it
-  uses splice, which removes elements from the original array. Use slice instead so the input is untouched.
+category: Fix
+description: 'CONTEXT: A team operating JavaScript needs you to resolve `Fix takeFirst Mutating the Input`
+  during a realistic incident. The business impact is reduced service reliability until the underlying
+  state is repaired.
+
+
+  ENVIRONMENT: You are working in FixitLab''s offline JavaScript practice project with modules, browser
+  console, and Node tooling. All tools run locally; no paid APIs or external cloud calls are required.
+
+
+  SYMPTOM / STARTING STATE: takeFirst(arr, k) should return the first k elements WITHOUT modifying the
+  input, but it uses splice, which removes elements from the original array. Use slice instead so the
+  input is untouched.
+
+
+  OBJECTIVE: See the input array get shortened; Use slice (non-mutating) instead of splice; Return the
+  first k elements as a copy. Success means all hidden tests pass.
+
+
+  WHAT TO AVOID: Do not apply broad destructive changes, skip evidence gathering, or fake completion with
+  marker files — the checker validates real system state.'
 difficulty: easy
 scenario_type: fix
 lab_mode: simulation
@@ -19,50 +37,122 @@ objectives:
 - Return the first k elements as a copy
 initial_state: takeFirst(arr, k) should return the first k elements WITHOUT modifying the input, but it
   uses splice, which removes elements from the original array. Use slice instead so the input is untouched.
-solution_explanation: |
-  splice mutates by removing elements. slice returns a shallow copy of the requested range and leaves the source array intact.
+solution_explanation: 'splice mutates by removing elements. slice returns a shallow copy of the requested
+  range and leaves the source array intact.
+
+  '
 coding_spec:
   language: javascript
   entrypoint: solution.js
   kind: fix
-  instructions: |
-    Fix takeFirst(arr, k): return the first k elements as a NEW array, leaving arr unchanged.
-      takeFirst([1,2,3,4], 2) -> [1,2]
-    Click Run to try it, then Check Solution to grade against all tests.
+  instructions: "Fix takeFirst(arr, k): return the first k elements as a NEW array, leaving arr unchanged.\n\
+    \  takeFirst([1,2,3,4], 2) -> [1,2]\nClick Run to try it, then Check Solution to grade against all\
+    \ tests.\n"
   files:
   - path: solution.js
-    content: |
-      function takeFirst(arr, k) {
-        return arr.splice(0, k); // splice mutates arr
-      }
+    content: "function takeFirst(arr, k) {\n  return arr.splice(0, k); // splice mutates arr\n}\n"
     readonly: false
   visible_tests:
   - name: first two
-    code: |
-      assert(JSON.stringify(takeFirst([1,2,3,4], 2)) === JSON.stringify([1,2]), JSON.stringify(takeFirst([1,2,3,4], 2)));
+    code: 'assert(JSON.stringify(takeFirst([1,2,3,4], 2)) === JSON.stringify([1,2]), JSON.stringify(takeFirst([1,2,3,4],
+      2)));
+
+      '
   - name: k zero
-    code: |
-      assert(JSON.stringify(takeFirst([1,2], 0)) === JSON.stringify([]), JSON.stringify(takeFirst([1,2], 0)));
+    code: 'assert(JSON.stringify(takeFirst([1,2], 0)) === JSON.stringify([]), JSON.stringify(takeFirst([1,2],
+      0)));
+
+      '
   hidden_tests:
   - name: does not mutate input
-    code: |
-      const src = [1,2,3,4];
+    code: 'const src = [1,2,3,4];
+
       takeFirst(src, 2);
-      assert(JSON.stringify(src) === JSON.stringify([1,2,3,4]), 'input mutated');
+
+      assert(JSON.stringify(src) === JSON.stringify([1,2,3,4]), ''input mutated'');
+
+      '
   - name: k larger than length
-    code: |
-      assert(JSON.stringify(takeFirst([1,2], 5)) === JSON.stringify([1,2]), JSON.stringify(takeFirst([1,2], 5)));
+    code: 'assert(JSON.stringify(takeFirst([1,2], 5)) === JSON.stringify([1,2]), JSON.stringify(takeFirst([1,2],
+      5)));
+
+      '
   - name: empty array
-    code: |
-      assert(JSON.stringify(takeFirst([], 3)) === JSON.stringify([]), JSON.stringify(takeFirst([], 3)));
+    code: 'assert(JSON.stringify(takeFirst([], 3)) === JSON.stringify([]), JSON.stringify(takeFirst([],
+      3)));
+
+      '
   timeout: 8
 hints:
 - order: 1
-  cost: 10
-  content: After takeFirst(src, 2), src lost its first two elements.
+  cost: 0
+  content: 'Where to look: Open `solution.js`, read the instructions, and run the visible tests to see
+    which assertion fails first.'
 - order: 2
-  cost: 20
-  content: splice removes from the array; slice returns a copy.
+  cost: 25
+  content: 'Diagnostic steps:
+
+    1. Click Run and read the traceback — note line number and actual vs expected values.
+
+    2. Reproduce the failure with the smallest input from a visible test.
+
+    3. Compare your implementation to the bug described in the lab prompt.'
 - order: 3
-  cost: 30
-  content: Return arr.slice(0, k).
+  cost: 50
+  content: 'Exact fix + verification:
+
+    1. Return the first k elements as a copy.
+
+    2. Re-run the lab checker (`check.sh` or Check Solution).
+
+    3. Confirm every scenario objective is satisfied.
+
+
+    WHY: the grader validates real state — marker files are ignored.'
+technology: javascript
+summary: Complete the fix takefirst mutating the input javascript lab and verify success with the checker
+estimated_minutes: 25
+xp_reward: 100
+prerequisites:
+- Basic javascript literacy
+tags:
+- fix
+- hands-on
+- javascript
+linked_tutorial: javascript-fundamentals
+what_you_will_learn:
+- See the input array get shortened
+- Use slice (non-mutating) instead of splice
+- Return the first k elements as a copy
+environment:
+  nodes:
+  - role: primary
+    os: FixitLab JavaScript practice project
+    hostname: lab-primary
+    ip: 127.0.0.1
+    specs: local offline simulation
+  pre_installed:
+  - bash
+  - coreutils
+  - javascript
+  - journalctl
+  - systemctl
+  credentials:
+  - user: root
+    password: lab123
+tasks:
+- id: task_1
+  title: Fix takeFirst Mutating the Input
+  description: Restore healthy behavior for Fix takeFirst Mutating the Input by investigating the failure,
+    applying the smallest safe fix, and validating the outcome.
+  background: 'This javascript lab teaches systematic troubleshooting: observe, hypothesize, change, verify.'
+  validation:
+    type: custom_script
+    script: hidden_tests
+    error_message: One or more hidden tests failed. Read the public test output, fix your solution, and
+      submit again.
+solution:
+  summary: The solution passes all hidden tests by implementing the required behavior in code.
+  files_changed: []
+  commands_run: []
+  reference_docs: javascript-fundamentals

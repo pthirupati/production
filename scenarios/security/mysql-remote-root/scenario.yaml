@@ -1,39 +1,128 @@
 slug: mysql-remote-root
-title: "MySQL Root Accessible Remotely — Restrict to Localhost"
-technology: Security
-category: Database Security
+title: MySQL Root Accessible Remotely — Restrict to Localhost
+technology: security
+category: Fix
 difficulty: medium
 time_limit: 900
 max_score: 100
 infrastructure_type: docker
 jira_priority: Critical
 is_free: false
-description: |
-  The MySQL root user account has been granted access from any host ('%'),
+description: 'CONTEXT: A team operating security hardening needs you to resolve `MySQL Root Accessible
+  Remotely — Restrict to Localhost` during a realistic incident. The business impact is reduced service
+  reliability until the underlying state is repaired.
+
+
+  ENVIRONMENT: You are working in FixitLab''s offline hardening lab with SSH, firewall, TLS, audit logs,
+  and IAM settings. All tools run locally; no paid APIs or external cloud calls are required.
+
+
+  SYMPTOM / STARTING STATE: Ubuntu 22.04 with MySQL 8.0. `SELECT user, host FROM mysql.user WHERE user=''root''`
+
+  shows entries for root@''%'', root@localhost, root@127.0.0.1.
+
+  Remote root login works. Root password is ''admin123''. The MySQL root user account has been granted
+  access from any host (''%''),
+
   allowing remote root connections to the database server. Combined with a
+
   weak root password discovered in a leaked config file, this gives an attacker
+
   full control over all databases. Revoke the remote root grant, ensure root
+
   can only connect from localhost, and update the root password.
+
+
+  OBJECTIVE: Connect to MySQL and check root user host grants; Revoke the root@''%'' grant; Ensure root
+  exists only for localhost and 127.0.0.1. Success means `check.sh` exits successfully.
+
+
+  WHAT TO AVOID: Do not apply broad destructive changes, skip evidence gathering, or fake completion with
+  marker files — the checker validates real system state.'
 objectives:
-  - Connect to MySQL and check root user host grants
-  - Revoke the root@'%' grant
-  - Ensure root exists only for localhost and 127.0.0.1
-  - Change the root password to a strong value
-  - Verify remote root login is rejected
-initial_state: |
-  Ubuntu 22.04 with MySQL 8.0. `SELECT user, host FROM mysql.user WHERE user='root'`
-  shows entries for root@'%', root@localhost, root@127.0.0.1.
-  Remote root login works. Root password is 'admin123'.
+- Connect to MySQL and check root user host grants
+- Revoke the root@'%' grant
+- Ensure root exists only for localhost and 127.0.0.1
+- Change the root password to a strong value
+- Verify remote root login is rejected
+initial_state: 'Ubuntu 22.04 with MySQL 8.0. `SELECT user, host FROM mysql.user WHERE user=''root''`
+
+  shows entries for root@''%'', root@localhost, root@127.0.0.1.
+
+  Remote root login works. Root password is ''admin123''.
+
+  '
 hints:
-  - order: 1
-    cost: 10
-    content: "`mysql -u root -p` then `SELECT user, host FROM mysql.user WHERE user='root';`"
-  - order: 2
-    cost: 15
-    content: "Revoke remote access: `DROP USER 'root'@'%'; FLUSH PRIVILEGES;`"
-  - order: 3
-    cost: 15
-    content: "Change password: `ALTER USER 'root'@'localhost' IDENTIFIED BY '<strong-password>';`"
-  - order: 4
-    cost: 10
-    content: "Also update bind-address in /etc/mysql/mysql.conf.d/mysqld.cnf: `bind-address = 127.0.0.1`"
+- order: 1
+  cost: 0
+  content: 'Where to look: Run `systemctl status mysqld` and tail `/var/log/mysqld.log`.'
+- order: 2
+  cost: 25
+  content: 'Diagnostic steps:
+
+    1. Read the error log for InnoDB or permission failures.
+
+    2. Check disk space with `df -h`.
+
+    3. Verify `my.cnf` for bad paths or bind-address.'
+- order: 3
+  cost: 50
+  content: 'Exact fix + verification:
+
+    1. Fix config or ownership under `/var/lib/mysql`.
+
+    2. `systemctl restart mysqld`.
+
+    3. Confirm `systemctl is-active mysqld` returns active.
+
+
+    WHY: MySQL often fails silently until you read the error log.'
+summary: Complete the mysql root accessible remotely — restrict to localhost security lab and verify success
+  with the checker
+estimated_minutes: 15
+xp_reward: 100
+prerequisites:
+- Basic security literacy
+tags:
+- fix
+- hands-on
+- security
+linked_tutorial: security-fundamentals
+what_you_will_learn:
+- Connect to MySQL and check root user host grants
+- Revoke the root@'%' grant
+- Ensure root exists only for localhost and 127.0.0.1
+- Change the root password to a strong value
+- Verify remote root login is rejected
+environment:
+  nodes:
+  - role: primary
+    os: FixitLab hardening lab
+    hostname: lab-primary
+    ip: 127.0.0.1
+    specs: local offline simulation
+  pre_installed:
+  - bash
+  - coreutils
+  - journalctl
+  - security
+  - systemctl
+  credentials:
+  - user: root
+    password: lab123
+tasks:
+- id: task_1
+  title: MySQL Root Accessible Remotely — Restrict to Localhost
+  description: Restore healthy behavior for MySQL Root Accessible Remotely — Restrict to Localhost by
+    investigating the failure, applying the smallest safe fix, and validating the outcome.
+  background: 'This security lab teaches systematic troubleshooting: observe, hypothesize, change, verify.'
+  validation:
+    type: custom_script
+    script: check.sh
+    error_message: Validation did not pass. Re-read the objectives and Hint 2 diagnostic steps.
+solution:
+  summary: Identify the misconfiguration affecting this security lab and apply the minimal fix.
+  files_changed: []
+  commands_run:
+  - bash check.sh
+  reference_docs: security-fundamentals

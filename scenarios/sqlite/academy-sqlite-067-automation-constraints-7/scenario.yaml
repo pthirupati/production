@@ -1,7 +1,7 @@
-title: 'SQLite: Constraints — Automation Practice'
+title: Constraints — Automation Lab
 slug: academy-sqlite-067-automation-constraints-7
-technology: SQLite
-category: Automation
+technology: sqlite
+category: Optimize
 difficulty: medium
 scenario_type: do
 lab_mode: simulation
@@ -11,44 +11,128 @@ max_score: 100
 is_free: false
 infrastructure_type: docker
 jira_priority: Medium
-description: Service operations lab. The `postgresql` systemd unit is **failed/inactive** on this host
-  — a realistic fault for Automation Practice workflows that depend on it. Diagnose with `systemctl status
-  postgresql` and journal logs, apply the smallest reliable fix, then verify with `systemctl is-active
-  postgresql`.
+description: 'CONTEXT: A team operating SQLite needs you to resolve `sqlite: Constraints — Automation
+  Practice` during a realistic incident. The business impact is reduced service reliability until the
+  underlying state is repaired.
+
+
+  ENVIRONMENT: You are working in FixitLab''s offline SQLite database file with sqlite3 CLI, schema, WAL
+  mode, and pragmas. All tools run locally; no paid APIs or external cloud calls are required.
+
+
+  SYMPTOM / STARTING STATE: Operators still perform manual steps for constraints. Automate the boring
+  parts without hiding important safety checks. Automation lab: remove toil around constraints. Codify
+  repeatable steps for NOT NULL, UNIQUE, FK, and CHECK and prove the automation is idempotent.
+
+
+  OBJECTIVE: Day-2 constraints work completes safely in this environment; Changes are verified with before/after
+  checks; The system remains stable for dependent teams. Success means `systemctl is-active postgresql`
+  returns active.
+
+
+  WHAT TO AVOID: Do not apply broad destructive changes, skip evidence gathering, or fake completion with
+  marker files — the checker validates real system state.'
 objectives:
-- The `postgresql` service is active (running)
-- '`systemctl is-active postgresql` returns active'
-- The fix survives a status re-check (no marker files)
-initial_state: The `postgresql` service is not running (`systemctl is-active postgresql` → inactive/failed).
-  Dependent Automation Practice tasks cannot succeed until the unit is healthy again.
+- Day-2 constraints work completes safely in this environment
+- Changes are verified with before/after checks
+- The system remains stable for dependent teams
+initial_state: Operators still perform manual steps for constraints. Automate the boring parts without
+  hiding important safety checks.
 hints:
 - order: 1
-  cost: 10
-  content: 'Orient yourself before changing anything:
-
-    1. Inspect the current state — table constraints and violation errors.
-
-    2. Write down what looks normal versus wrong or missing for constraints.
-
-    3. Recall the core idea: NOT NULL, UNIQUE, FK, and CHECK. Form one hypothesis before you act.'
+  cost: 0
+  content: 'Where to look: Start with `systemctl status postgresql` and `journalctl -u postgresql -n 50
+    --no-pager` before changing anything.'
 - order: 2
-  cost: 15
-  content: 'Plan your approach (still no spoilers):
-
-    1. Confirm the exact gap between current and desired state for constraints.
-
-    2. Decide the single smallest change that moves you toward the objective.
-
-    3. Capture evidence (command output / status) before the change so you can prove it worked afterward.'
-- order: 3
   cost: 25
-  content: 'Guided walkthrough:
+  content: 'Diagnostic steps:
 
-    1. Re-check the current state — table constraints and violation errors.
+    1. Run `systemctl status postgresql` — note Active/Failed and the last log lines.
 
-    2. Implement the automation with dry-run / check mode, then run it twice — the second run must report
-    no changes.
+    2. Read `journalctl -u postgresql -n 50` for the root error.
 
-    3. Verify the result — constraints reject bad data.
+    3. Form a hypothesis about the smallest config or permission fix.'
+- order: 3
+  cost: 50
+  content: 'Exact fix + verification:
 
-    4. Click Check Solution once `systemctl is-active postgresql` returns active.'
+    1. Apply the minimal fix (config, unit override, or missing directory).
+
+    2. Run `systemctl daemon-reload` if you edited a unit file.
+
+    3. Run `systemctl restart postgresql` and confirm `systemctl is-active postgresql` succeeds.
+
+
+    WHY: the grader checks real service state, not marker files.'
+summary: Complete the constraints — automation lab sqlite lab and verify success with the checker
+estimated_minutes: 20
+xp_reward: 100
+prerequisites:
+- Basic sqlite literacy
+tags:
+- do
+- hands-on
+- sqlite
+linked_tutorial: sqlite-fundamentals
+what_you_will_learn:
+- Day-2 constraints work completes safely in this environment
+- Changes are verified with before/after checks
+- The system remains stable for dependent teams
+environment:
+  nodes:
+  - role: primary
+    os: FixitLab SQLite database file
+    hostname: lab-primary
+    ip: 127.0.0.1
+    specs: local offline simulation
+  pre_installed:
+  - bash
+  - coreutils
+  - journalctl
+  - sqlite
+  - systemctl
+  credentials:
+  - user: root
+    password: lab123
+tasks:
+- id: task_1
+  title: Constraints — Automation Lab
+  description: Restore healthy behavior for Constraints — Automation Lab by investigating the failure,
+    applying the smallest safe fix, and validating the outcome.
+  background: 'This sqlite lab teaches systematic troubleshooting: observe, hypothesize, change, verify.'
+  validation:
+    type: service_active
+    command: systemctl is-active postgresql
+    expected_status: active
+    error_message: The postgresql service is not active yet. Check `systemctl status postgresql` and `journalctl
+      -u postgresql -n 50`.
+solution:
+  summary: The root cause is an unhealthy `postgresql` service; repair it and verify active state.
+  files_changed: []
+  commands_run:
+  - systemctl is-active postgresql
+  reference_docs: sqlite-fundamentals
+guided_mode:
+  enabled: true
+  steps:
+  - step: 1
+    title: Inspect current state
+    instruction: Run a read-only diagnostic before changing anything.
+    command: systemctl is-active postgresql
+    expected_output: Output shows the current failure mode
+    explanation: Evidence-first troubleshooting avoids guessing.
+    next_on: command_success
+  - step: 2
+    title: Apply the minimal fix
+    instruction: Make one reversible change aligned with the objectives.
+    command: '# your fix command here'
+    expected_output: State moves toward the objective
+    explanation: Small changes make rollback easy if the hypothesis was wrong.
+    next_on: command_success
+  - step: 3
+    title: Verify with the grader
+    instruction: Run the same verification the checker uses.
+    command: systemctl is-active postgresql
+    expected_output: '`systemctl is-active postgresql` returns active'
+    explanation: The lab passes only when real state is healthy.
+    next_on: command_success

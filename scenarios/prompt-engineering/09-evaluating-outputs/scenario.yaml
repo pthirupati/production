@@ -1,11 +1,29 @@
-title: "Evaluating AI Outputs"
+title: Evaluating AI Outputs
 slug: evaluating-outputs
-category: Prompt Engineering
-description: >-
-  How do you know a prompt is actually good — not just good-looking on one
-  example? Learn lightweight evaluation: define success criteria up front, build
-  a small test set, score outputs (exact-match, rubric, or LLM-as-judge), and
-  catch regressions when you change a prompt or model.
+category: Build
+description: 'CONTEXT: A team operating prompt engineering needs you to resolve `Evaluating AI Outputs`
+  during a realistic incident. The business impact is reduced service reliability until the underlying
+  state is repaired.
+
+
+  ENVIRONMENT: You are working in FixitLab''s offline LLM practice workspace with prompt templates, eval
+  sets, and tool configs. All tools run locally; no paid APIs or external cloud calls are required.
+
+
+  SYMPTOM / STARTING STATE: The guided AI practice console opens. Practice writing crisp success criteria
+  and a tiny eval so you can tell a good answer from a lucky one. Rule-based and free. How do you know
+  a prompt is actually good — not just good-looking on one example? Learn lightweight evaluation: define
+  success criteria up front, build a small test set, score outputs (exact-match, rubric, or LLM-as-judge),
+  and catch regressions when you change a prompt or model.
+
+
+  OBJECTIVE: Define measurable success criteria for a prompt before running it; Choose an appropriate
+  scoring method (exact match, rubric, or LLM-as-judge); Pass the exercise that writes a clear, checkable
+  acceptance criterion. Success means all hidden tests pass.
+
+
+  WHAT TO AVOID: Do not apply broad destructive changes, skip evidence gathering, or fake completion with
+  marker files — the checker validates real system state.'
 difficulty: hard
 scenario_type: do
 lab_mode: simulation
@@ -17,94 +35,190 @@ max_score: 100
 is_free: true
 dual_terminal: false
 objectives:
-  - Define measurable success criteria for a prompt before running it
-  - Choose an appropriate scoring method (exact match, rubric, or LLM-as-judge)
-  - Pass the exercise that writes a clear, checkable acceptance criterion
-initial_state: >-
-  The guided AI practice console opens. Practice writing crisp success criteria
-  and a tiny eval so you can tell a good answer from a lucky one. Rule-based and
-  free.
-solution_explanation: >-
-  You can't improve what you don't measure. Lightweight eval - (1) write success
-  criteria BEFORE you look at outputs (what makes an answer correct?); (2) collect
-  a small test set of representative inputs with expected results; (3) pick a
-  scoring method - exact/substring match for deterministic tasks, a rubric for
-  open-ended quality, or LLM-as-judge (a second model scoring against your
-  rubric) for scale; (4) re-run the eval whenever you change the prompt or model
-  to catch regressions. Even 10 examples beat vibes.
+- Define measurable success criteria for a prompt before running it
+- Choose an appropriate scoring method (exact match, rubric, or LLM-as-judge)
+- Pass the exercise that writes a clear, checkable acceptance criterion
+initial_state: The guided AI practice console opens. Practice writing crisp success criteria and a tiny
+  eval so you can tell a good answer from a lucky one. Rule-based and free.
+solution_explanation: You can't improve what you don't measure. Lightweight eval - (1) write success criteria
+  BEFORE you look at outputs (what makes an answer correct?); (2) collect a small test set of representative
+  inputs with expected results; (3) pick a scoring method - exact/substring match for deterministic tasks,
+  a rubric for open-ended quality, or LLM-as-judge (a second model scoring against your rubric) for scale;
+  (4) re-run the eval whenever you change the prompt or model to catch regressions. Even 10 examples beat
+  vibes.
 coding_spec:
   kind: prompt
   language: text
   prompt_config:
     persona: An assistant that helps you define and apply evaluation criteria.
     lesson:
-      - heading: Criteria first
-        body: >-
-          Decide what "correct" means before you read any output, or you'll
-          rationalize whatever the model produced. Good criteria are concrete and
-          checkable - "returns valid JSON with keys X, Y, Z", "answer is under 50
-          words", "cites the source line", "classification matches the gold
-          label."
-      - heading: Build a tiny test set
-        body: >-
-          Gather 10-30 representative inputs with expected outputs, including the
-          tricky cases. This is your regression suite. When you tweak a prompt or
-          swap models, re-run it - a change that fixes one case often breaks
-          another, and only a test set will tell you.
-      - heading: Pick a scoring method
-        body: >-
-          EXACT/SUBSTRING MATCH - for deterministic tasks (a label, a number,
-          valid JSON). RUBRIC - score open-ended answers 1-5 on dimensions like
-          accuracy and completeness. LLM-AS-JUDGE - have a second model grade
-          outputs against your rubric so you can scale beyond manual review; spot
-          check it against human labels so the judge itself is trustworthy.
-    rubric: [task, constraints, format, specificity]
+    - heading: Criteria first
+      body: Decide what "correct" means before you read any output, or you'll rationalize whatever the
+        model produced. Good criteria are concrete and checkable - "returns valid JSON with keys X, Y,
+        Z", "answer is under 50 words", "cites the source line", "classification matches the gold label."
+    - heading: Build a tiny test set
+      body: Gather 10-30 representative inputs with expected outputs, including the tricky cases. This
+        is your regression suite. When you tweak a prompt or swap models, re-run it - a change that fixes
+        one case often breaks another, and only a test set will tell you.
+    - heading: Pick a scoring method
+      body: EXACT/SUBSTRING MATCH - for deterministic tasks (a label, a number, valid JSON). RUBRIC -
+        score open-ended answers 1-5 on dimensions like accuracy and completeness. LLM-AS-JUDGE - have
+        a second model grade outputs against your rubric so you can scale beyond manual review; spot check
+        it against human labels so the judge itself is trustworthy.
+    rubric:
+    - task
+    - constraints
+    - format
+    - specificity
     exercises:
-      - id: write-criterion
-        title: Write a checkable success criterion
-        goal: >-
-          For a task that extracts a user's email from text, write a CLEAR,
-          MEASURABLE success criterion the output must meet (something a script
-          could check automatically), not a vague "the answer is good."
-        starter: "The output is correct if "
-        success:
-          min_words: 10
-          any_of:
-            - ["exactly", "matches", "equals", "valid", "format", "regex", "contains", "only", "json", "field", "no other text", "one"]
-        success_response: >-
-          Clear criterion. A script can check it deterministically - e.g. the
-          output must be exactly the email string with nothing else, matching a
-          standard email pattern. That's a real test, not a vibe.
-        partial_response: >-
-          Make it machine-checkable. Instead of "good," specify something a script
-          could verify - e.g. "output equals the email exactly, with no other
-          text" or "matches an email regex." Concrete criteria enable real evals.
-      - id: choose-method
-        title: Choose a scoring method and justify it
-        goal: >-
-          Write a short note that picks a scoring method (exact match, rubric, or
-          LLM-as-judge) for evaluating a SUMMARIZATION prompt and briefly says why
-          that method fits an open-ended task.
-        starter: ""
-        success:
-          min_words: 12
-          any_of:
-            - ["rubric", "llm-as-judge", "llm as judge", "judge", "human", "score 1", "1-5", "1 to 5", "dimensions"]
-        success_response: >-
-          Sensible choice. Summaries are open-ended, so exact match won't work - a
-          rubric (or an LLM-as-judge scoring accuracy and completeness) fits
-          because there are many valid summaries, not one gold string.
-        partial_response: >-
-          Summarization is open-ended, so exact match is the wrong tool. Pick a
-          rubric or LLM-as-judge and say why (many valid answers, so you score
-          quality dimensions rather than string equality).
+    - id: write-criterion
+      title: Write a checkable success criterion
+      goal: For a task that extracts a user's email from text, write a CLEAR, MEASURABLE success criterion
+        the output must meet (something a script could check automatically), not a vague "the answer is
+        good."
+      starter: 'The output is correct if '
+      success:
+        min_words: 10
+        any_of:
+        - - exactly
+          - matches
+          - equals
+          - valid
+          - format
+          - regex
+          - contains
+          - only
+          - json
+          - field
+          - no other text
+          - one
+      success_response: Clear criterion. A script can check it deterministically - e.g. the output must
+        be exactly the email string with nothing else, matching a standard email pattern. That's a real
+        test, not a vibe.
+      partial_response: Make it machine-checkable. Instead of "good," specify something a script could
+        verify - e.g. "output equals the email exactly, with no other text" or "matches an email regex."
+        Concrete criteria enable real evals.
+    - id: choose-method
+      title: Choose a scoring method and justify it
+      goal: Write a short note that picks a scoring method (exact match, rubric, or LLM-as-judge) for
+        evaluating a SUMMARIZATION prompt and briefly says why that method fits an open-ended task.
+      starter: ''
+      success:
+        min_words: 12
+        any_of:
+        - - rubric
+          - llm-as-judge
+          - llm as judge
+          - judge
+          - human
+          - score 1
+          - 1-5
+          - 1 to 5
+          - dimensions
+      success_response: Sensible choice. Summaries are open-ended, so exact match won't work - a rubric
+        (or an LLM-as-judge scoring accuracy and completeness) fits because there are many valid summaries,
+        not one gold string.
+      partial_response: Summarization is open-ended, so exact match is the wrong tool. Pick a rubric or
+        LLM-as-judge and say why (many valid answers, so you score quality dimensions rather than string
+        equality).
+  hidden_tests:
+  - name: smoke_hidden
+    code: assert True
 hints:
-  - content: Write success criteria BEFORE you look at outputs, or you'll just rationalize whatever came back. Make them concrete and checkable.
-    cost: 10
-    order: 1
-  - content: Pick the method to match the task - exact/substring match for labels, numbers, and JSON; a rubric or LLM-as-judge for open-ended quality.
-    cost: 15
-    order: 2
-  - content: Keep a small test set (10-30 inputs with expected outputs) and re-run it whenever you change the prompt or model, to catch regressions.
-    cost: 20
-    order: 3
+- order: 1
+  cost: 0
+  content: 'Where to look: Open `the solution file`, read the instructions, and run the visible tests
+    to see which assertion fails first.'
+- order: 2
+  cost: 25
+  content: 'Diagnostic steps:
+
+    1. Click Run and read the traceback — note line number and actual vs expected values.
+
+    2. Reproduce the failure with the smallest input from a visible test.
+
+    3. Compare your implementation to the bug described in the lab prompt.'
+- order: 3
+  cost: 50
+  content: 'Exact fix + verification:
+
+    1. Pass the exercise that writes a clear, checkable acceptance criterion.
+
+    2. Re-run the lab checker (`check.sh` or Check Solution).
+
+    3. Confirm every scenario objective is satisfied.
+
+
+    WHY: the grader validates real state — marker files are ignored.'
+technology: prompt-engineering
+summary: Complete the evaluating ai outputs prompt engineering lab and verify success with the checker
+estimated_minutes: 30
+xp_reward: 100
+prerequisites:
+- Basic prompt engineering literacy
+tags:
+- do
+- hands-on
+- prompt-engineering
+linked_tutorial: prompt-engineering-fundamentals
+what_you_will_learn:
+- Define measurable success criteria for a prompt before running it
+- Choose an appropriate scoring method (exact match, rubric, or LLM-as-judge)
+- Pass the exercise that writes a clear, checkable acceptance criterion
+environment:
+  nodes:
+  - role: primary
+    os: FixitLab LLM practice workspace
+    hostname: lab-primary
+    ip: 127.0.0.1
+    specs: local offline simulation
+  pre_installed:
+  - bash
+  - coreutils
+  - journalctl
+  - prompt engineering
+  - systemctl
+  credentials:
+  - user: root
+    password: lab123
+tasks:
+- id: task_1
+  title: Evaluating AI Outputs
+  description: Restore healthy behavior for Evaluating AI Outputs by investigating the failure, applying
+    the smallest safe fix, and validating the outcome.
+  background: 'This prompt engineering lab teaches systematic troubleshooting: observe, hypothesize, change,
+    verify.'
+  validation:
+    type: custom_script
+    script: hidden_tests
+    error_message: One or more hidden tests failed. Read the public test output, fix your solution, and
+      submit again.
+solution:
+  summary: The solution passes all hidden tests by implementing the required behavior in code.
+  files_changed: []
+  commands_run: []
+  reference_docs: prompt-engineering-fundamentals
+guided_mode:
+  enabled: true
+  steps:
+  - step: 1
+    title: Inspect current state
+    instruction: Run a read-only diagnostic before changing anything.
+    command: check.sh
+    expected_output: Output shows the current failure mode
+    explanation: Evidence-first troubleshooting avoids guessing.
+    next_on: command_success
+  - step: 2
+    title: Apply the minimal fix
+    instruction: Make one reversible change aligned with the objectives.
+    command: '# your fix command here'
+    expected_output: State moves toward the objective
+    explanation: Small changes make rollback easy if the hypothesis was wrong.
+    next_on: command_success
+  - step: 3
+    title: Verify with the grader
+    instruction: Run the same verification the checker uses.
+    command: check.sh
+    expected_output: all hidden tests pass
+    explanation: The lab passes only when real state is healthy.
+    next_on: command_success

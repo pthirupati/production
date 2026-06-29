@@ -1,28 +1,111 @@
 title: Sensitive Variable Leaking in Terraform Plan
 slug: terraform-variable-sensitive
 difficulty: easy
-category: Terraform
-description: 'A Terraform variable holding a database password or API key is not marked as sensitive, causing its plaintext value to appear in terraform plan output and be stored unmasked in logs. Mark the variable as sensitive to suppress its value.'
-initial_state: 'Simulated Terraform project with a variable "db_password" or "api_key" that is passed to a resource argument. The variable declaration is missing sensitive = true, so terraform plan prints the secret value in plaintext to stdout.'
+category: Fix
+description: 'CONTEXT: A team operating Terraform IaC needs you to resolve `Sensitive Variable Leaking
+  in Terraform Plan` during a realistic incident. The business impact is reduced service reliability until
+  the underlying state is repaired.
+
+
+  ENVIRONMENT: You are working in FixitLab''s offline Terraform workspace with HCL files, state, and plan/apply
+  workflow. All tools run locally; no paid APIs or external cloud calls are required.
+
+
+  SYMPTOM / STARTING STATE: Simulated Terraform project with a variable "db_password" or "api_key" that
+  is passed to a resource argument. The variable declaration is missing sensitive = true, so terraform
+  plan prints the secret value in plaintext to stdout. A Terraform variable holding a database password
+  or API key is not marked as sensitive, causing its plaintext value to appear in terraform plan output
+  and be stored unmasked in logs. Mark the variable as sensitive to suppress its value.
+
+
+  OBJECTIVE: Identify the variable(s) containing secret values in the Terraform configuration; Add sensitive
+  = true to each secret variable declaration; Run terraform plan and confirm the value is shown as (sensitive
+  value) in the output. Success means `check.sh` exits successfully.
+
+
+  WHAT TO AVOID: Do not apply broad destructive changes, skip evidence gathering, or fake completion with
+  marker files — the checker validates real system state.'
+initial_state: Simulated Terraform project with a variable "db_password" or "api_key" that is passed to
+  a resource argument. The variable declaration is missing sensitive = true, so terraform plan prints
+  the secret value in plaintext to stdout.
 objectives:
-  - Identify the variable(s) containing secret values in the Terraform configuration
-  - Add sensitive = true to each secret variable declaration
-  - Run terraform plan and confirm the value is shown as (sensitive value) in the output
+- Identify the variable(s) containing secret values in the Terraform configuration
+- Add sensitive = true to each secret variable declaration
+- Run terraform plan and confirm the value is shown as (sensitive value) in the output
 lab_mode: simulation
 simulation_type: terraform
 time_limit: 1200
 max_score: 100
 is_free: true
 hints:
-  - content: 'Look in variables.tf for variable blocks that hold passwords, tokens, or keys but lack sensitive = true.'
-    cost: 10
-    order: 1
-  - content: 'Add sensitive = true inside the variable block: variable "db_password" { type = string; sensitive = true }.'
-    cost: 15
-    order: 2
-  - content: 'After adding sensitive = true, run terraform plan and verify the output shows "(sensitive value)" instead of the plaintext secret.'
-    cost: 20
-    order: 3
+- order: 1
+  cost: 0
+  content: 'Where to look: Identify the variable(s) containing secret values in the Terraform configuration'
+- order: 2
+  cost: 25
+  content: 'Diagnostic steps:
+
+    1. Add sensitive = true to each secret variable declaration
+
+    2. Run terraform plan and confirm the value is shown as (sensitive value) in the output'
+- order: 3
+  cost: 50
+  content: 'Exact fix + verification:
+
+    1. Run terraform plan and confirm the value is shown as (sensitive value) in the output.
+
+    2. Re-run the lab checker (`check.sh` or Check Solution).
+
+    3. Confirm every scenario objective is satisfied.
+
+
+    WHY: the grader validates real state — marker files are ignored.'
 requires_companion_hosts: false
 dual_terminal: false
 jira_priority: High
+technology: terraform
+summary: Complete the sensitive variable leaking in terraform plan terraform lab and verify success with
+  the checker
+estimated_minutes: 20
+xp_reward: 100
+prerequisites:
+- Basic terraform literacy
+tags:
+- fix
+- hands-on
+- terraform
+linked_tutorial: terraform-fundamentals
+what_you_will_learn:
+- Identify the variable(s) containing secret values in the Terraform configuration
+- Add sensitive = true to each secret variable declaration
+- Run terraform plan and confirm the value is shown as (sensitive value) in the output
+environment:
+  nodes:
+  - role: primary
+    os: FixitLab Terraform workspace
+    hostname: lab-primary
+    ip: 127.0.0.1
+    specs: local offline simulation
+  pre_installed:
+  - bash
+  - coreutils
+  - terraform
+  credentials:
+  - user: root
+    password: lab123
+tasks:
+- id: task_1
+  title: Sensitive Variable Leaking in Terraform Plan
+  description: Restore healthy behavior for Sensitive Variable Leaking in Terraform Plan by investigating
+    the failure, applying the smallest safe fix, and validating the outcome.
+  background: 'This terraform lab teaches systematic troubleshooting: observe, hypothesize, change, verify.'
+  validation:
+    type: custom_script
+    script: check.sh
+    error_message: Validation did not pass. Re-read the objectives and Hint 2 diagnostic steps.
+solution:
+  summary: Identify the misconfiguration affecting this terraform lab and apply the minimal fix.
+  files_changed: []
+  commands_run:
+  - bash check.sh
+  reference_docs: terraform-fundamentals

@@ -1,8 +1,7 @@
----
 slug: java-spring-profile-not-active
-title: "Wrong Spring Profile Active in Production"
-technology: Java
-category: "Spring Boot"
+title: Wrong Spring Profile Active in Production
+technology: java
+category: Fix
 difficulty: easy
 time_limit: 600
 max_score: 100
@@ -11,22 +10,107 @@ simulation_type: java
 infrastructure_type: simulation
 jira_priority: High
 is_free: false
-description: |
-  Production is accidentally running with development settings (H2 in-memory DB, debug logging, permissive CORS) because no production profile is activated, so Spring falls back to defaults. Make the prod profile active and ensure prod-specific properties (datasource, logging) take effect.
+description: 'CONTEXT: A team operating Java applications needs you to resolve `Wrong Spring Profile Active
+  in Production` during a realistic incident. The business impact is reduced service reliability until
+  the underlying state is repaired.
+
+
+  ENVIRONMENT: You are working in FixitLab''s offline Java project with Maven/Gradle, JVM logs, and Spring
+  configuration. All tools run locally; no paid APIs or external cloud calls are required.
+
+
+  SYMPTOM / STARTING STATE: application.yml at /app/src/main/resources/ does not set spring.profiles.active,
+  so the app uses dev defaults in production. Production is accidentally running with development settings
+  (H2 in-memory DB, debug logging, permissive CORS) because no production profile is activated, so Spring
+  falls back to defaults. Make the prod profile active and ensure prod-specific properties (datasource,
+  logging) take effect.
+
+
+  OBJECTIVE: Confirm the app booted with dev/default settings in prod; Set the active profile to prod
+  (config or env); Ensure application-prod.yml properties override the defaults. Success means `check.sh`
+  exits successfully.
+
+
+  WHAT TO AVOID: Do not apply broad destructive changes, skip evidence gathering, or fake completion with
+  marker files — the checker validates real system state.'
 objectives:
-  - "Confirm the app booted with dev/default settings in prod"
-  - "Set the active profile to prod (config or env)"
-  - "Ensure application-prod.yml properties override the defaults"
-  - "Verify the prod datasource and logging are in effect"
-initial_state: |
-  application.yml at /app/src/main/resources/ does not set spring.profiles.active, so the app uses dev defaults in production.
+- Confirm the app booted with dev/default settings in prod
+- Set the active profile to prod (config or env)
+- Ensure application-prod.yml properties override the defaults
+- Verify the prod datasource and logging are in effect
+initial_state: 'application.yml at /app/src/main/resources/ does not set spring.profiles.active, so the
+  app uses dev defaults in production.
+
+  '
 hints:
-  - order: 1
-    cost: 10
-    content: "Startup logs 'No active profile set, falling back to default'."
-  - order: 2
-    cost: 15
-    content: "Set spring.profiles.active=prod (in config or SPRING_PROFILES_ACTIVE)."
-  - order: 3
-    cost: 20
-    content: "Confirm application-prod.yml is loaded and its datasource/logging win."
+- order: 1
+  cost: 0
+  content: 'Where to look: Confirm the app booted with dev/default settings in prod'
+- order: 2
+  cost: 25
+  content: 'Diagnostic steps:
+
+    1. Set the active profile to prod (config or env)
+
+    2. Ensure application-prod.yml properties override the defaults
+
+    3. Verify the prod datasource and logging are in effect'
+- order: 3
+  cost: 50
+  content: 'Exact fix + verification:
+
+    1. Verify the prod datasource and logging are in effect.
+
+    2. Re-run the lab checker (`check.sh` or Check Solution).
+
+    3. Confirm every scenario objective is satisfied.
+
+
+    WHY: the grader validates real state — marker files are ignored.'
+summary: Complete the wrong spring profile active in production java lab and verify success with the checker
+estimated_minutes: 10
+xp_reward: 100
+prerequisites:
+- Basic java literacy
+tags:
+- fix
+- hands-on
+- java
+linked_tutorial: java-fundamentals
+what_you_will_learn:
+- Confirm the app booted with dev/default settings in prod
+- Set the active profile to prod (config or env)
+- Ensure application-prod.yml properties override the defaults
+- Verify the prod datasource and logging are in effect
+environment:
+  nodes:
+  - role: primary
+    os: FixitLab Java project
+    hostname: lab-primary
+    ip: 127.0.0.1
+    specs: local offline simulation
+  pre_installed:
+  - bash
+  - coreutils
+  - java
+  - journalctl
+  - systemctl
+  credentials:
+  - user: root
+    password: lab123
+tasks:
+- id: task_1
+  title: Wrong Spring Profile Active in Production
+  description: Restore healthy behavior for Wrong Spring Profile Active in Production by investigating
+    the failure, applying the smallest safe fix, and validating the outcome.
+  background: 'This java lab teaches systematic troubleshooting: observe, hypothesize, change, verify.'
+  validation:
+    type: custom_script
+    script: check.sh
+    error_message: Validation did not pass. Re-read the objectives and Hint 2 diagnostic steps.
+solution:
+  summary: Identify the misconfiguration affecting this java lab and apply the minimal fix.
+  files_changed: []
+  commands_run:
+  - bash check.sh
+  reference_docs: java-fundamentals

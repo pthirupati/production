@@ -1,7 +1,7 @@
 title: Configure Ansible Inventory Host
 slug: configure-ansible-inventory
-technology: Ansible
-category: Build Lab
+technology: ansible
+category: Build
 difficulty: easy
 scenario_type: do
 time_limit: 900
@@ -10,9 +10,28 @@ infrastructure_type: docker
 lab_mode: docker
 jira_priority: Low
 is_free: false
-description: 'Build task: register a new webserver host in the Ansible inventory and confirm Ansible can
-  see it. Starting from an empty inventory, add the host under an appropriate group with its connection
-  details, then verify it appears via ansible-inventory and responds to a ping.'
+description: 'CONTEXT: A team operating Ansible automation needs you to resolve `Configure Ansible Inventory
+  Host` during a realistic incident. The business impact is reduced service reliability until the underlying
+  state is repaired.
+
+
+  ENVIRONMENT: You are working in FixitLab''s offline Ansible control node with inventory, playbooks,
+  roles, and ansible-playbook. All tools run locally; no paid APIs or external cloud calls are required.
+
+
+  SYMPTOM / STARTING STATE: Ansible control node with a default/empty inventory. No managed webserver
+  host is defined yet. Build task: register a new webserver host in the Ansible inventory and confirm
+  Ansible can see it. Starting from an empty inventory, add the host under an appropriate group with its
+  connection details, then verify it appears via ansible-inventory and responds to a ping.
+
+
+  OBJECTIVE: Add a webserver host (with ansible_host/user) under a [webservers] group in the inventory;
+  List the inventory and confirm the host and group are present; Verify Ansible can reach the host with
+  the ping module. Success means `check.sh` exits successfully.
+
+
+  WHAT TO AVOID: Do not apply broad destructive changes, skip evidence gathering, or fake completion with
+  marker files — the checker validates real system state.'
 objectives:
 - Add a webserver host (with ansible_host/user) under a [webservers] group in the inventory
 - List the inventory and confirm the host and group are present
@@ -21,17 +40,96 @@ initial_state: Ansible control node with a default/empty inventory. No managed w
   yet.
 hints:
 - order: 1
-  cost: 10
-  content: 'Add the host to the inventory (e.g. /etc/ansible/hosts or ./inventory.ini):
-
-    [webservers]
-
-    web1 ansible_host=10.0.0.11 ansible_user=ansible'
+  cost: 0
+  content: 'Where to look: Run `ansible webservers -m ping -vvv` to see SSH and inventory errors.'
 - order: 2
-  cost: 15
-  content: 'Confirm Ansible parses it: `ansible-inventory --list` (or `-i inventory.ini --list`) should
-    show web1 under the webservers group.'
+  cost: 25
+  content: 'Diagnostic steps:
+
+    1. Verify `inventory` hostnames resolve and SSH keys work.
+
+    2. Check `ansible.cfg` for remote_user and privilege escalation.
+
+    3. Test manual `ssh user@host` from the control node.'
 - order: 3
-  cost: 20
-  content: 'Verify connectivity: `ansible webservers -m ping` returns "pong" for web1. If it''s UNREACHABLE,
-    check ansible_host/user and SSH key access.'
+  cost: 50
+  content: 'Exact fix + verification:
+
+    1. Fix inventory, SSH key, or `ansible_user` in group_vars.
+
+    2. Re-run `ansible webservers -m ping`.
+
+    3. Confirm every host returns SUCCESS.
+
+
+    WHY: Ansible cannot manage hosts it cannot reach.'
+summary: Complete the configure ansible inventory host ansible lab and verify success with the checker
+estimated_minutes: 15
+xp_reward: 100
+prerequisites:
+- Basic ansible literacy
+tags:
+- ansible
+- do
+- hands-on
+linked_tutorial: ansible-fundamentals
+what_you_will_learn:
+- Add a webserver host (with ansible_host/user) under a [webservers] group in the inventory
+- List the inventory and confirm the host and group are present
+- Verify Ansible can reach the host with the ping module
+environment:
+  nodes:
+  - role: primary
+    os: FixitLab Ansible control node
+    hostname: lab-primary
+    ip: 127.0.0.1
+    specs: local offline simulation
+  pre_installed:
+  - ansible
+  - ansible-playbook
+  - bash
+  - coreutils
+  credentials:
+  - user: root
+    password: lab123
+tasks:
+- id: task_1
+  title: Configure Ansible Inventory Host
+  description: Restore healthy behavior for Configure Ansible Inventory Host by investigating the failure,
+    applying the smallest safe fix, and validating the outcome.
+  background: 'This ansible lab teaches systematic troubleshooting: observe, hypothesize, change, verify.'
+  validation:
+    type: command_output
+    command: ansible webservers -m ping
+    expected_output: SUCCESS
+    error_message: Ansible hosts are still unreachable. Verify SSH keys and inventory.
+solution:
+  summary: Identify the misconfiguration affecting this ansible lab and apply the minimal fix.
+  files_changed: []
+  commands_run:
+  - ansible webservers -m ping
+  reference_docs: ansible-fundamentals
+guided_mode:
+  enabled: true
+  steps:
+  - step: 1
+    title: Inspect current state
+    instruction: Run a read-only diagnostic before changing anything.
+    command: ansible webservers -m ping
+    expected_output: Output shows the current failure mode
+    explanation: Evidence-first troubleshooting avoids guessing.
+    next_on: command_success
+  - step: 2
+    title: Apply the minimal fix
+    instruction: Make one reversible change aligned with the objectives.
+    command: '# your fix command here'
+    expected_output: State moves toward the objective
+    explanation: Small changes make rollback easy if the hypothesis was wrong.
+    next_on: command_success
+  - step: 3
+    title: Verify with the grader
+    instruction: Run the same verification the checker uses.
+    command: ansible webservers -m ping
+    expected_output: '`ansible webservers -m ping` includes `SUCCESS`'
+    explanation: The lab passes only when real state is healthy.
+    next_on: command_success

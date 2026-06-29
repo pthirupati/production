@@ -1,8 +1,7 @@
----
 slug: java-gradle-wrapper-version-mismatch
-title: "Gradle Wrapper Version Mismatch Breaks the Build"
-technology: Java
-category: "Gradle Build"
+title: Gradle Wrapper Version Mismatch Breaks the Build
+technology: java
+category: Fix
 difficulty: medium
 time_limit: 900
 max_score: 100
@@ -11,22 +10,108 @@ simulation_type: java
 infrastructure_type: simulation
 jira_priority: Medium
 is_free: false
-description: |
-  The build fails because the Gradle wrapper pins a distribution version incompatible with the project's plugins (e.g. an old Gradle with a newer Android/Spring plugin), producing 'Unsupported class file major version' or 'requires Gradle X'. Align the wrapper distributionUrl to a supported Gradle version so the build runs.
+description: 'CONTEXT: A team operating Java applications needs you to resolve `Gradle Wrapper Version
+  Mismatch Breaks the Build` during a realistic incident. The business impact is reduced service reliability
+  until the underlying state is repaired.
+
+
+  ENVIRONMENT: You are working in FixitLab''s offline Java project with Maven/Gradle, JVM logs, and Spring
+  configuration. All tools run locally; no paid APIs or external cloud calls are required.
+
+
+  SYMPTOM / STARTING STATE: gradle-wrapper.properties at /app/gradle/wrapper/ pins an old Gradle distribution
+  that the configured plugins reject. The build fails because the Gradle wrapper pins a distribution version
+  incompatible with the project''s plugins (e.g. an old Gradle with a newer Android/Spring plugin), producing
+  ''Unsupported class file major version'' or ''requires Gradle X''. Align the wrapper distributionUrl
+  to a supported Gradle version so the build runs.
+
+
+  OBJECTIVE: Read the build error naming the required vs configured Gradle version; Update distributionUrl
+  in gradle-wrapper.properties to a compatible version; Re-run ./gradlew --version to confirm the new
+  distribution. Success means `check.sh` exits successfully.
+
+
+  WHAT TO AVOID: Do not apply broad destructive changes, skip evidence gathering, or fake completion with
+  marker files — the checker validates real system state.'
 objectives:
-  - "Read the build error naming the required vs configured Gradle version"
-  - "Update distributionUrl in gradle-wrapper.properties to a compatible version"
-  - "Re-run ./gradlew --version to confirm the new distribution"
-  - "Verify the build succeeds with the aligned wrapper"
-initial_state: |
-  gradle-wrapper.properties at /app/gradle/wrapper/ pins an old Gradle distribution that the configured plugins reject.
+- Read the build error naming the required vs configured Gradle version
+- Update distributionUrl in gradle-wrapper.properties to a compatible version
+- Re-run ./gradlew --version to confirm the new distribution
+- Verify the build succeeds with the aligned wrapper
+initial_state: 'gradle-wrapper.properties at /app/gradle/wrapper/ pins an old Gradle distribution that
+  the configured plugins reject.
+
+  '
 hints:
-  - order: 1
-    cost: 10
-    content: "The error says 'plugin requires Gradle X' or 'unsupported class file major version'."
-  - order: 2
-    cost: 15
-    content: "Edit distributionUrl in gradle-wrapper.properties to the supported gradle-X-bin.zip."
-  - order: 3
-    cost: 20
-    content: "./gradlew --version then ./gradlew build to confirm compatibility."
+- order: 1
+  cost: 0
+  content: 'Where to look: Read the build error naming the required vs configured Gradle version'
+- order: 2
+  cost: 25
+  content: 'Diagnostic steps:
+
+    1. Update distributionUrl in gradle-wrapper.properties to a compatible version
+
+    2. Re-run ./gradlew --version to confirm the new distribution
+
+    3. Verify the build succeeds with the aligned wrapper'
+- order: 3
+  cost: 50
+  content: 'Exact fix + verification:
+
+    1. Verify the build succeeds with the aligned wrapper.
+
+    2. Re-run the lab checker (`check.sh` or Check Solution).
+
+    3. Confirm every scenario objective is satisfied.
+
+
+    WHY: the grader validates real state — marker files are ignored.'
+summary: Complete the gradle wrapper version mismatch breaks the build java lab and verify success with
+  the checker
+estimated_minutes: 15
+xp_reward: 100
+prerequisites:
+- Basic java literacy
+tags:
+- fix
+- hands-on
+- java
+linked_tutorial: java-fundamentals
+what_you_will_learn:
+- Read the build error naming the required vs configured Gradle version
+- Update distributionUrl in gradle-wrapper.properties to a compatible version
+- Re-run ./gradlew --version to confirm the new distribution
+- Verify the build succeeds with the aligned wrapper
+environment:
+  nodes:
+  - role: primary
+    os: FixitLab Java project
+    hostname: lab-primary
+    ip: 127.0.0.1
+    specs: local offline simulation
+  pre_installed:
+  - bash
+  - coreutils
+  - java
+  - journalctl
+  - systemctl
+  credentials:
+  - user: root
+    password: lab123
+tasks:
+- id: task_1
+  title: Gradle Wrapper Version Mismatch Breaks the Build
+  description: Restore healthy behavior for Gradle Wrapper Version Mismatch Breaks the Build by investigating
+    the failure, applying the smallest safe fix, and validating the outcome.
+  background: 'This java lab teaches systematic troubleshooting: observe, hypothesize, change, verify.'
+  validation:
+    type: custom_script
+    script: check.sh
+    error_message: Validation did not pass. Re-read the objectives and Hint 2 diagnostic steps.
+solution:
+  summary: Identify the misconfiguration affecting this java lab and apply the minimal fix.
+  files_changed: []
+  commands_run:
+  - bash check.sh
+  reference_docs: java-fundamentals

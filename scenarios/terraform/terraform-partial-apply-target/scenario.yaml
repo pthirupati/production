@@ -1,7 +1,7 @@
 title: Terraform Resource Targeting Left Partial State
 slug: terraform-partial-apply-target
-technology: Terraform
-category: State / Plan
+technology: terraform
+category: Fix
 difficulty: hard
 lab_mode: simulation
 simulation_type: terraform
@@ -10,8 +10,27 @@ max_score: 100
 is_free: true
 jira_priority: High
 dual_terminal: false
-description: Someone ran terraform apply -target on one resource during an incident and now state is partially
-  applied and inconsistent with code. Reconcile the drift with a full plan/apply and confirm convergence.
+description: 'CONTEXT: A team operating Terraform IaC needs you to resolve `Terraform Resource Targeting
+  Left Partial State` during a realistic incident. The business impact is reduced service reliability
+  until the underlying state is repaired.
+
+
+  ENVIRONMENT: You are working in FixitLab''s offline Terraform workspace with HCL files, state, and plan/apply
+  workflow. All tools run locally; no paid APIs or external cloud calls are required.
+
+
+  SYMPTOM / STARTING STATE: A Terraform workspace where a -target apply left the state inconsistent; a
+  normal plan now shows surprising changes. Someone ran terraform apply -target on one resource during
+  an incident and now state is partially applied and inconsistent with code. Reconcile the drift with
+  a full plan/apply and confirm convergence.
+
+
+  OBJECTIVE: Confirm state is partial after the -target apply; Run a full terraform plan and reconcile
+  the drift; Apply and confirm terraform plan reports no changes. Success means `check.sh` exits successfully.
+
+
+  WHAT TO AVOID: Do not apply broad destructive changes, skip evidence gathering, or fake completion with
+  marker files — the checker validates real system state.'
 initial_state: A Terraform workspace where a -target apply left the state inconsistent; a normal plan
   now shows surprising changes.
 objectives:
@@ -20,11 +39,69 @@ objectives:
 - Apply and confirm terraform plan reports no changes
 hints:
 - order: 1
-  cost: 10
-  content: A previous -target run skipped dependent resources.
+  cost: 0
+  content: 'Where to look: Confirm state is partial after the -target apply'
 - order: 2
-  cost: 15
-  content: Run a full plan (no -target) and review the diff.
+  cost: 25
+  content: 'Diagnostic steps:
+
+    1. Run a full terraform plan and reconcile the drift
+
+    2. Apply and confirm terraform plan reports no changes'
 - order: 3
-  cost: 20
-  content: Apply; final plan shows no changes.
+  cost: 50
+  content: 'Exact fix + verification:
+
+    1. Apply and confirm terraform plan reports no changes.
+
+    2. Re-run the lab checker (`check.sh` or Check Solution).
+
+    3. Confirm every scenario objective is satisfied.
+
+
+    WHY: the grader validates real state — marker files are ignored.'
+summary: Complete the terraform resource targeting left partial state terraform lab and verify success
+  with the checker
+estimated_minutes: 25
+xp_reward: 100
+prerequisites:
+- Basic terraform literacy
+tags:
+- fix
+- hands-on
+- terraform
+linked_tutorial: terraform-fundamentals
+what_you_will_learn:
+- Confirm state is partial after the -target apply
+- Run a full terraform plan and reconcile the drift
+- Apply and confirm terraform plan reports no changes
+environment:
+  nodes:
+  - role: primary
+    os: FixitLab Terraform workspace
+    hostname: lab-primary
+    ip: 127.0.0.1
+    specs: local offline simulation
+  pre_installed:
+  - bash
+  - coreutils
+  - terraform
+  credentials:
+  - user: root
+    password: lab123
+tasks:
+- id: task_1
+  title: Terraform Resource Targeting Left Partial State
+  description: Restore healthy behavior for Terraform Resource Targeting Left Partial State by investigating
+    the failure, applying the smallest safe fix, and validating the outcome.
+  background: 'This terraform lab teaches systematic troubleshooting: observe, hypothesize, change, verify.'
+  validation:
+    type: custom_script
+    script: check.sh
+    error_message: Validation did not pass. Re-read the objectives and Hint 2 diagnostic steps.
+solution:
+  summary: Identify the misconfiguration affecting this terraform lab and apply the minimal fix.
+  files_changed: []
+  commands_run:
+  - bash check.sh
+  reference_docs: terraform-fundamentals

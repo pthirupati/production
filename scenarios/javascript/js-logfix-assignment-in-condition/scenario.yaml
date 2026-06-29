@@ -1,9 +1,27 @@
 title: 'Log Analysis: Fix the Accidental Assignment in an if'
 slug: js-logfix-assignment-in-condition
-category: JavaScript Development
-description: 'QA reported that classify(n) labels EVERYTHING ''special'', even normal numbers. The log
-  shows the branch always taken. The bug: the if condition uses assignment (=) instead of comparison (===),
-  so it assigns 0 to a variable and the truthiness is wrong. Fix the comparison so only n === 0 is ''special''.'
+category: Fix
+description: 'CONTEXT: A team operating JavaScript needs you to resolve `Log Analysis: Fix the Accidental
+  Assignment in an if` during a realistic incident. The business impact is reduced service reliability
+  until the underlying state is repaired.
+
+
+  ENVIRONMENT: You are working in FixitLab''s offline JavaScript practice project with modules, browser
+  console, and Node tooling. All tools run locally; no paid APIs or external cloud calls are required.
+
+
+  SYMPTOM / STARTING STATE: QA reported that classify(n) labels EVERYTHING ''special'', even normal numbers.
+  The log shows the branch always taken. The bug: the if condition uses assignment (=) instead of comparison
+  (===), so it assigns 0 to a variable and the truthiness is wrong. Fix the comparison so only n === 0
+  is ''special''.
+
+
+  OBJECTIVE: Read the log and spot the always-true branch; Replace assignment (=) with comparison (===);
+  Label only 0 as ''special''. Success means all hidden tests pass.
+
+
+  WHAT TO AVOID: Do not apply broad destructive changes, skip evidence gathering, or fake completion with
+  marker files — the checker validates real system state.'
 difficulty: medium
 scenario_type: fix
 lab_mode: simulation
@@ -21,60 +39,122 @@ objectives:
 initial_state: 'QA reported that classify(n) labels EVERYTHING ''special'', even normal numbers. The log
   shows the branch always taken. The bug: the if condition uses assignment (=) instead of comparison (===),
   so it assigns 0 to a variable and the truthiness is wrong. Fix the comparison so only n === 0 is ''special''.'
-solution_explanation: |
-  A single = assigns instead of compares, so the condition's value was the assigned operand, not a comparison. Using n === 0 tests the actual value and labels only zero as special.
+solution_explanation: 'A single = assigns instead of compares, so the condition''s value was the assigned
+  operand, not a comparison. Using n === 0 tests the actual value and labels only zero as special.
+
+  '
 coding_spec:
   language: javascript
   entrypoint: solution.js
   kind: logfix
-  instructions: |
-    Fix classify(n): return 'special' when n === 0, otherwise 'normal'. The log shows the branch is always taken because of an accidental assignment.
-      classify(0) -> 'special'; classify(5) -> 'normal'
-    Click Run to try it, then Check Solution to grade against all tests.
+  instructions: "Fix classify(n): return 'special' when n === 0, otherwise 'normal'. The log shows the\
+    \ branch is always taken because of an accidental assignment.\n  classify(0) -> 'special'; classify(5)\
+    \ -> 'normal'\nClick Run to try it, then Check Solution to grade against all tests.\n"
   files:
   - path: solution.js
-    content: |
-      // QA log:
-      //   classify(5) -> 'special'  (expected 'normal')
-      //   classify(9) -> 'special'  (expected 'normal')
-      //   every input takes the 'special' branch
-
-      function classify(n) {
-        let flag = 1;
-        if (flag = 0) {            // assignment, not comparison
-          return 'normal';
-        }
-        return 'special';
-      }
+    content: "// QA log:\n//   classify(5) -> 'special'  (expected 'normal')\n//   classify(9) -> 'special'\
+      \  (expected 'normal')\n//   every input takes the 'special' branch\n\nfunction classify(n) {\n\
+      \  let flag = 1;\n  if (flag = 0) {            // assignment, not comparison\n    return 'normal';\n\
+      \  }\n  return 'special';\n}\n"
     readonly: false
   visible_tests:
   - name: zero is special
-    code: |
-      assert(classify(0) === 'special', classify(0));
+    code: 'assert(classify(0) === ''special'', classify(0));
+
+      '
   - name: nonzero is normal
-    code: |
-      assert(classify(5) === 'normal', classify(5));
+    code: 'assert(classify(5) === ''normal'', classify(5));
+
+      '
   hidden_tests:
   - name: negative is normal
-    code: |
-      assert(classify(-3) === 'normal');
+    code: 'assert(classify(-3) === ''normal'');
+
+      '
   - name: large is normal
-    code: |
-      assert(classify(1000) === 'normal');
+    code: 'assert(classify(1000) === ''normal'');
+
+      '
   - name: one is normal
-    code: |
-      assert(classify(1) === 'normal');
+    code: 'assert(classify(1) === ''normal'');
+
+      '
   - name: zero stays special
-    code: |
-      assert(classify(0) === 'special');
+    code: 'assert(classify(0) === ''special'');
+
+      '
   timeout: 8
 hints:
 - order: 1
-  cost: 10
-  content: The log shows every input is 'special' — the if branch never runs as intended.
+  cost: 0
+  content: 'Where to look: Open `solution.js`, read the instructions, and run the visible tests to see
+    which assertion fails first.'
 - order: 2
-  cost: 20
-  content: '`if (flag = 0)` assigns 0 (falsy) and evaluates to 0, so the branch is always skipped.'
+  cost: 25
+  content: 'Diagnostic steps:
+
+    1. Click Run and read the traceback — note line number and actual vs expected values.
+
+    2. Reproduce the failure with the smallest input from a visible test.
+
+    3. Compare your implementation to the bug described in the lab prompt.'
 - order: 3
-  cost: 30
-  content: 'Compare n to 0 with ===: `if (n === 0) return ''special'';` else ''normal''.'
+  cost: 50
+  content: 'Exact fix + verification:
+
+    1. Replace assignment (=) with comparison (===).
+
+    2. Re-run the lab checker (`check.sh` or Check Solution).
+
+    3. Confirm every scenario objective is satisfied.
+
+
+    WHY: the grader validates real state — marker files are ignored.'
+technology: javascript
+summary: 'Complete the log analysis: fix the accidental assignment in an if javascript lab and verify
+  success with the checker'
+estimated_minutes: 25
+xp_reward: 100
+prerequisites:
+- Basic javascript literacy
+tags:
+- fix
+- hands-on
+- javascript
+linked_tutorial: javascript-fundamentals
+what_you_will_learn:
+- Read the log and spot the always-true branch
+- Replace assignment (=) with comparison (===)
+- Label only 0 as 'special'
+environment:
+  nodes:
+  - role: primary
+    os: FixitLab JavaScript practice project
+    hostname: lab-primary
+    ip: 127.0.0.1
+    specs: local offline simulation
+  pre_installed:
+  - bash
+  - coreutils
+  - javascript
+  - journalctl
+  - systemctl
+  credentials:
+  - user: root
+    password: lab123
+tasks:
+- id: task_1
+  title: 'Log Analysis: Fix the Accidental Assignment in an if'
+  description: 'Restore healthy behavior for Log Analysis: Fix the Accidental Assignment in an if by investigating
+    the failure, applying the smallest safe fix, and validating the outcome.'
+  background: 'This javascript lab teaches systematic troubleshooting: observe, hypothesize, change, verify.'
+  validation:
+    type: custom_script
+    script: hidden_tests
+    error_message: One or more hidden tests failed. Read the public test output, fix your solution, and
+      submit again.
+solution:
+  summary: The solution passes all hidden tests by implementing the required behavior in code.
+  files_changed: []
+  commands_run: []
+  reference_docs: javascript-fundamentals

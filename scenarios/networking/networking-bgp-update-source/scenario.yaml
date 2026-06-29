@@ -1,7 +1,7 @@
 title: BGP Session Down From Wrong Update-Source
 slug: networking-bgp-update-source
-technology: Networking
-category: Routing / BGP
+technology: networking
+category: Fix
 difficulty: hard
 lab_mode: simulation
 simulation_type: networking
@@ -10,8 +10,26 @@ max_score: 100
 is_free: true
 jira_priority: High
 dual_terminal: false
-description: A multihop BGP session is down because the update-source interface is wrong, so the peer
-  rejects the connection. Fix update-source and confirm Established.
+description: 'CONTEXT: A team operating network operations needs you to resolve `BGP Session Down From
+  Wrong Update-Source` during a realistic incident. The business impact is reduced service reliability
+  until the underlying state is repaired.
+
+
+  ENVIRONMENT: You are working in FixitLab''s offline network lab with interfaces, routing tables, DNS,
+  and firewall rules. All tools run locally; no paid APIs or external cloud calls are required.
+
+
+  SYMPTOM / STARTING STATE: A router whose BGP update-source is misconfigured, breaking the session. A
+  multihop BGP session is down because the update-source interface is wrong, so the peer rejects the connection.
+  Fix update-source and confirm Established.
+
+
+  OBJECTIVE: Confirm the issue: show ip bgp summary shows the neighbor not Established.; Apply the documented
+  fix; Verify the network is healthy. Success means `check.sh` exits successfully.
+
+
+  WHAT TO AVOID: Do not apply broad destructive changes, skip evidence gathering, or fake completion with
+  marker files — the checker validates real system state.'
 initial_state: A router whose BGP update-source is misconfigured, breaking the session.
 objectives:
 - 'Confirm the issue: show ip bgp summary shows the neighbor not Established.'
@@ -19,11 +37,69 @@ objectives:
 - Verify the network is healthy
 hints:
 - order: 1
-  cost: 10
-  content: show ip bgp summary shows the neighbor not Established.
+  cost: 0
+  content: 'Where to look: Confirm the issue: show ip bgp summary shows the neighbor not Established.'
 - order: 2
-  cost: 15
-  content: Correct the BGP config and clear the session.
+  cost: 25
+  content: 'Diagnostic steps:
+
+    1. Verify the network is healthy'
 - order: 3
-  cost: 20
-  content: The session/sync/MTU is healthy.
+  cost: 50
+  content: 'Exact fix + verification:
+
+    1. Verify the network is healthy.
+
+    2. Re-run the lab checker (`check.sh` or Check Solution).
+
+    3. Confirm every scenario objective is satisfied.
+
+
+    WHY: the grader validates real state — marker files are ignored.'
+summary: Complete the bgp session down from wrong update-source networking lab and verify success with
+  the checker
+estimated_minutes: 25
+xp_reward: 100
+prerequisites:
+- Basic networking literacy
+tags:
+- fix
+- hands-on
+- networking
+linked_tutorial: networking-fundamentals
+what_you_will_learn:
+- 'Confirm the issue: show ip bgp summary shows the neighbor not Established.'
+- Apply the documented fix
+- Verify the network is healthy
+environment:
+  nodes:
+  - role: primary
+    os: FixitLab network lab
+    hostname: lab-primary
+    ip: 127.0.0.1
+    specs: local offline simulation
+  pre_installed:
+  - bash
+  - coreutils
+  - journalctl
+  - networking
+  - systemctl
+  credentials:
+  - user: root
+    password: lab123
+tasks:
+- id: task_1
+  title: BGP Session Down From Wrong Update-Source
+  description: Restore healthy behavior for BGP Session Down From Wrong Update-Source by investigating
+    the failure, applying the smallest safe fix, and validating the outcome.
+  background: 'This networking lab teaches systematic troubleshooting: observe, hypothesize, change, verify.'
+  validation:
+    type: custom_script
+    script: check.sh
+    error_message: Validation did not pass. Re-read the objectives and Hint 2 diagnostic steps.
+solution:
+  summary: Identify the misconfiguration affecting this networking lab and apply the minimal fix.
+  files_changed: []
+  commands_run:
+  - bash check.sh
+  reference_docs: networking-fundamentals

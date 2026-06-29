@@ -1,7 +1,7 @@
 title: Fix Kubernetes Service Port Mismatch
 slug: k8s-manifest-port-fix
-technology: Kubernetes
-category: Kubernetes
+technology: kubernetes
+category: Fix
 difficulty: hard
 scenario_type: fix
 time_limit: 1200
@@ -10,9 +10,29 @@ infrastructure_type: docker
 lab_mode: docker
 jira_priority: High
 is_free: false
-description: A Service cannot reach its pods because of a port mismatch. The Service's targetPort does
-  not match the containerPort the application actually listens on, so connections to the Service are refused
-  even though endpoints exist. Align the targetPort with the container's real listening port.
+description: 'CONTEXT: A team operating Kubernetes needs you to resolve `Fix Kubernetes Service Port Mismatch`
+  during a realistic incident. The business impact is reduced service reliability until the underlying
+  state is repaired.
+
+
+  ENVIRONMENT: You are working in FixitLab''s offline Kubernetes cluster with kubectl, manifests, and
+  cluster resources. All tools run locally; no paid APIs or external cloud calls are required.
+
+
+  SYMPTOM / STARTING STATE: Simulated Kubernetes cluster. A Service routes to healthy pods, but its targetPort
+  (e.g. 8080) doesn''t match the container''s listening port (e.g. 80), so requests are refused. A Service
+  cannot reach its pods because of a port mismatch. The Service''s targetPort does not match the containerPort
+  the application actually listens on, so connections to the Service are refused even though endpoints
+  exist. Align the targetPort with the container''s real listening port.
+
+
+  OBJECTIVE: Confirm the pods are Ready but Service requests are refused; Compare the Service targetPort
+  with the container''s listening port; Fix the targetPort so the Service reaches the application. Success
+  means `check.sh` exits successfully.
+
+
+  WHAT TO AVOID: Do not apply broad destructive changes, skip evidence gathering, or fake completion with
+  marker files — the checker validates real system state.'
 objectives:
 - Confirm the pods are Ready but Service requests are refused
 - Compare the Service targetPort with the container's listening port
@@ -21,14 +41,74 @@ initial_state: Simulated Kubernetes cluster. A Service routes to healthy pods, b
   8080) doesn't match the container's listening port (e.g. 80), so requests are refused.
 hints:
 - order: 1
-  cost: 10
-  content: Endpoints exist (`kubectl get endpoints <svc>`) but curling the Service is refused. That points
-    to a port mismatch rather than a selector problem.
+  cost: 0
+  content: 'Where to look: Run `kubectl get pods -A` and `kubectl describe pod <name>` for any pod not
+    in Running state.'
 - order: 2
-  cost: 15
-  content: 'Compare: `kubectl get svc <svc> -o jsonpath=''{.spec.ports[0].targetPort}''` vs the container''s
-    port `kubectl get pod <pod> -o jsonpath=''{.spec.containers[0].ports[0].containerPort}''`. They differ.'
+  cost: 25
+  content: 'Diagnostic steps:
+
+    1. `kubectl get pods` — note CrashLoopBackOff, ImagePullBackOff, or Pending.
+
+    2. `kubectl describe pod <name>` — read Events at the bottom.
+
+    3. `kubectl logs <name> [--previous]` if the container restarted.'
 - order: 3
-  cost: 20
-  content: 'Set targetPort to the real container port: `kubectl patch svc <svc> -p ''{"spec":{"ports":[{"port":80,"targetPort":80}]}}''`,
-    then re-test the Service.'
+  cost: 50
+  content: 'Exact fix + verification:
+
+    1. Fix the root cause (image name, env var, volume mount, or probe).
+
+    2. `kubectl apply -f` the corrected manifest or delete the pod to recreate.
+
+    3. Confirm `kubectl get pods` shows every pod Running.
+
+
+    WHY: Kubernetes only reports healthy when the workload actually runs.'
+summary: Complete the fix kubernetes service port mismatch kubernetes lab and verify success with the
+  checker
+estimated_minutes: 20
+xp_reward: 100
+prerequisites:
+- Basic kubernetes literacy
+tags:
+- fix
+- hands-on
+- kubernetes
+linked_tutorial: kubernetes-fundamentals
+what_you_will_learn:
+- Confirm the pods are Ready but Service requests are refused
+- Compare the Service targetPort with the container's listening port
+- Fix the targetPort so the Service reaches the application
+environment:
+  nodes:
+  - role: primary
+    os: FixitLab Kubernetes cluster
+    hostname: lab-primary
+    ip: 127.0.0.1
+    specs: local offline simulation
+  pre_installed:
+  - bash
+  - coreutils
+  - helm
+  - kubectl
+  - kubernetes
+  credentials:
+  - user: root
+    password: lab123
+tasks:
+- id: task_1
+  title: Fix Kubernetes Service Port Mismatch
+  description: Restore healthy behavior for Fix Kubernetes Service Port Mismatch by investigating the
+    failure, applying the smallest safe fix, and validating the outcome.
+  background: 'This kubernetes lab teaches systematic troubleshooting: observe, hypothesize, change, verify.'
+  validation:
+    type: custom_script
+    script: check.sh
+    error_message: Validation did not pass. Re-read the objectives and Hint 2 diagnostic steps.
+solution:
+  summary: Identify the misconfiguration affecting this kubernetes lab and apply the minimal fix.
+  files_changed: []
+  commands_run:
+  - bash check.sh
+  reference_docs: kubernetes-fundamentals

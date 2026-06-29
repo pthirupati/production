@@ -1,14 +1,28 @@
 slug: ssh-brute-force
 title: SSH Brute Force — Fix fail2ban jail.conf to Block Attackers
-technology: Security
-category: Intrusion Prevention
+technology: security
+category: Fix
 difficulty: medium
 time_limit: 900
 max_score: 100
 infrastructure_type: docker
 jira_priority: High
 is_free: false
-description: 'The server is receiving thousands of SSH brute force login attempts per hour.
+description: 'CONTEXT: A team operating security hardening needs you to resolve `SSH Brute Force — Fix
+  fail2ban jail.conf to Block Attackers` during a realistic incident. The business impact is reduced service
+  reliability until the underlying state is repaired.
+
+
+  ENVIRONMENT: You are working in FixitLab''s offline hardening lab with SSH, firewall, TLS, audit logs,
+  and IAM settings. All tools run locally; no paid APIs or external cloud calls are required.
+
+
+  SYMPTOM / STARTING STATE: Ubuntu 22.04 with fail2ban installed. /etc/fail2ban/jail.conf has [sshd] jail
+
+  with enabled=false. /var/log/auth.log shows hundreds of failed password attempts.
+
+  No IPs are being banned. fail2ban service is running but doing nothing for SSH. The server is receiving
+  thousands of SSH brute force login attempts per hour.
 
   fail2ban is installed but not blocking the attackers. The SSH jail in jail.conf
 
@@ -18,7 +32,13 @@ description: 'The server is receiving thousands of SSH brute force login attempt
 
   of 3 and a bantime of 1 hour, then verify it is actively banning attacking IPs.
 
-  '
+
+  OBJECTIVE: Identify that the fail2ban SSH jail is disabled; Enable the sshd jail in /etc/fail2ban/jail.local;
+  Set maxretry=3 and bantime=3600. Success means `systemctl is-active --quiet` returns active.
+
+
+  WHAT TO AVOID: Do not apply broad destructive changes, skip evidence gathering, or fake completion with
+  marker files — the checker validates real system state.'
 objectives:
 - Identify that the fail2ban SSH jail is disabled
 - Enable the sshd jail in /etc/fail2ban/jail.local
@@ -33,17 +53,77 @@ initial_state: 'Ubuntu 22.04 with fail2ban installed. /etc/fail2ban/jail.conf ha
   '
 hints:
 - order: 1
-  cost: 10
-  content: 'Check the jail: `fail2ban-client status sshd` shows it''s not actually banning despite the
-    flood of attempts (the jail isn''t enabled/configured).'
+  cost: 0
+  content: 'Where to look: Start with `systemctl status --quiet` and `journalctl -u --quiet -n 50 --no-pager`
+    before changing anything.'
 - order: 2
-  cost: 15
-  content: 'Create /etc/fail2ban/jail.local with an active sshd jail: `[sshd]` `enabled = true` `maxretry
-    = 3` `findtime = 600` `bantime = 3600`.'
-- order: 3
-  cost: 20
-  content: 'Apply: `systemctl restart fail2ban`, then re-check `fail2ban-client status sshd`.'
-- order: 4
   cost: 25
-  content: 'Verify it''s working: `fail2ban-client status sshd` lists "Banned IP list" containing the
-    attacking addresses, and the auth log shows new attempts being dropped.'
+  content: 'Diagnostic steps:
+
+    1. Run `systemctl status --quiet` — note Active/Failed and the last log lines.
+
+    2. Read `journalctl -u --quiet -n 50` for the root error.
+
+    3. Form a hypothesis about the smallest config or permission fix.'
+- order: 3
+  cost: 50
+  content: 'Exact fix + verification:
+
+    1. Apply the minimal fix (config, unit override, or missing directory).
+
+    2. Run `systemctl daemon-reload` if you edited a unit file.
+
+    3. Run `systemctl restart --quiet` and confirm `systemctl is-active --quiet` succeeds.
+
+
+    WHY: the grader checks real service state, not marker files.'
+summary: Complete the ssh brute force — fix fail2ban jail conf to block attackers security lab and verify
+  success with the checker
+estimated_minutes: 15
+xp_reward: 100
+prerequisites:
+- Basic security literacy
+tags:
+- fix
+- hands-on
+- security
+linked_tutorial: security-fundamentals
+what_you_will_learn:
+- Identify that the fail2ban SSH jail is disabled
+- Enable the sshd jail in /etc/fail2ban/jail.local
+- Set maxretry=3 and bantime=3600
+- Restart fail2ban and verify it bans repeated failed login IPs
+environment:
+  nodes:
+  - role: primary
+    os: FixitLab hardening lab
+    hostname: lab-primary
+    ip: 127.0.0.1
+    specs: local offline simulation
+  pre_installed:
+  - bash
+  - coreutils
+  - journalctl
+  - security
+  - systemctl
+  credentials:
+  - user: root
+    password: lab123
+tasks:
+- id: task_1
+  title: SSH Brute Force — Fix fail2ban jail.conf to Block Attackers
+  description: Restore healthy behavior for SSH Brute Force — Fix fail2ban jail.conf to Block Attackers
+    by investigating the failure, applying the smallest safe fix, and validating the outcome.
+  background: 'This security lab teaches systematic troubleshooting: observe, hypothesize, change, verify.'
+  validation:
+    type: service_active
+    command: systemctl is-active --quiet
+    expected_status: active
+    error_message: The --quiet service is not active yet. Check `systemctl status --quiet` and `journalctl
+      -u --quiet -n 50`.
+solution:
+  summary: The root cause is an unhealthy `--quiet` service; repair it and verify active state.
+  files_changed: []
+  commands_run:
+  - systemctl is-active --quiet
+  reference_docs: security-fundamentals

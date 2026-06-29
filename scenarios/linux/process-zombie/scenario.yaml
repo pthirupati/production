@@ -1,11 +1,29 @@
 title: Zombie Processes Accumulating
 slug: linux-process-zombie
 difficulty: medium
-category: Linux Administration
-description: The process table is filling with zombie (defunct) processes because a parent process isn't
-  reaping its children — it fails to call wait(), so finished children linger as <defunct>. Zombies hold
-  PID-table slots and can eventually exhaust them. Trace the zombies to their parent and clear them by
-  signaling or restarting that parent.
+category: Fix
+description: 'CONTEXT: A team operating Linux administration needs you to resolve `Zombie Processes Accumulating`
+  during a realistic incident. The business impact is reduced service reliability until the underlying
+  state is repaired.
+
+
+  ENVIRONMENT: You are working in FixitLab''s offline Linux practice server with terminal and config files
+  under /etc and /var. All tools run locally; no paid APIs or external cloud calls are required.
+
+
+  SYMPTOM / STARTING STATE: Linux server accumulating zombie processes from a buggy parent that doesn''t
+  reap children; the process table is approaching exhaustion. The process table is filling with zombie
+  (defunct) processes because a parent process isn''t reaping its children — it fails to call wait(),
+  so finished children linger as <defunct>. Zombies hold PID-table slots and can eventually exhaust them.
+  Trace the zombies to their parent and clear them by signaling or restarting that parent.
+
+
+  OBJECTIVE: Identify the zombie processes and their parent (PPID); Determine why the parent isn''t reaping
+  children; Clear the zombies by signaling or restarting the parent. Success means `check.sh` exits successfully.
+
+
+  WHAT TO AVOID: Do not apply broad destructive changes, skip evidence gathering, or fake completion with
+  marker files — the checker validates real system state.'
 initial_state: Linux server accumulating zombie processes from a buggy parent that doesn't reap children;
   the process table is approaching exhaustion.
 objectives:
@@ -19,17 +37,74 @@ max_score: 100
 is_free: false
 hints:
 - order: 1
-  cost: 10
-  content: 'List zombies and note the PPID column: `ps aux | awk ''$8 ~ /Z/''` (or `ps -el | grep Z`).
-    Zombies can''t be killed directly — their parent must reap them.'
+  cost: 0
+  content: 'Where to look: Identify the zombie processes and their parent (PPID)'
 - order: 2
-  cost: 15
-  content: 'Nudge the parent to reap: `kill -SIGCHLD <ppid>`. If it''s stuck/buggy and ignores it, the
-    parent itself must be restarted.'
+  cost: 25
+  content: 'Diagnostic steps:
+
+    1. Determine why the parent isn''t reaping children
+
+    2. Clear the zombies by signaling or restarting the parent'
 - order: 3
-  cost: 20
-  content: 'Restart (or kill) the offending parent so init reaps the orphans: `kill <ppid>` (then restart
-    the service). Confirm the zombies are gone with `ps aux | grep -c defunct`.'
+  cost: 50
+  content: 'Exact fix + verification:
+
+    1. Clear the zombies by signaling or restarting the parent.
+
+    2. Re-run the lab checker (`check.sh` or Check Solution).
+
+    3. Confirm every scenario objective is satisfied.
+
+
+    WHY: the grader validates real state — marker files are ignored.'
 requires_companion_hosts: false
 dual_terminal: false
 jira_priority: Medium
+technology: linux
+summary: Complete the zombie processes accumulating linux lab and verify success with the checker
+estimated_minutes: 15
+xp_reward: 100
+prerequisites:
+- Basic linux literacy
+tags:
+- fix
+- hands-on
+- linux
+linked_tutorial: linux-fundamentals
+what_you_will_learn:
+- Identify the zombie processes and their parent (PPID)
+- Determine why the parent isn't reaping children
+- Clear the zombies by signaling or restarting the parent
+environment:
+  nodes:
+  - role: primary
+    os: FixitLab Linux practice server
+    hostname: lab-primary
+    ip: 127.0.0.1
+    specs: local offline simulation
+  pre_installed:
+  - bash
+  - coreutils
+  - journalctl
+  - linux
+  - systemctl
+  credentials:
+  - user: root
+    password: lab123
+tasks:
+- id: task_1
+  title: Zombie Processes Accumulating
+  description: Restore healthy behavior for Zombie Processes Accumulating by investigating the failure,
+    applying the smallest safe fix, and validating the outcome.
+  background: 'This linux lab teaches systematic troubleshooting: observe, hypothesize, change, verify.'
+  validation:
+    type: custom_script
+    script: check.sh
+    error_message: Validation did not pass. Re-read the objectives and Hint 2 diagnostic steps.
+solution:
+  summary: Identify the misconfiguration affecting this linux lab and apply the minimal fix.
+  files_changed: []
+  commands_run:
+  - bash check.sh
+  reference_docs: linux-fundamentals

@@ -1,7 +1,7 @@
-title: 'PostgreSQL: Ansible Roles — Fundamentals Lab'
+title: Ansible Roles — Learn Lab
 slug: academy-postgresql-091-learn-roles-10
-technology: PostgreSQL
-category: Core Skills
+technology: postgresql
+category: Learn
 difficulty: easy
 scenario_type: do
 lab_mode: simulation
@@ -11,19 +11,38 @@ max_score: 100
 is_free: false
 infrastructure_type: docker
 jira_priority: Low
-description: Service operations lab. The `postgresql` systemd unit is **failed/inactive** on this host
-  — a realistic fault for Fundamentals Lab workflows that depend on it. Diagnose with `systemctl status
-  postgresql` and journal logs, apply the smallest reliable fix, then verify with `systemctl is-active
-  postgresql`.
+description: 'CONTEXT: A team operating PostgreSQL needs you to resolve `postgresql: Ansible Roles — Fundamentals
+  Lab` during a realistic incident. The business impact is reduced service reliability until the underlying
+  state is repaired.
+
+
+  ENVIRONMENT: You are working in FixitLab''s offline PostgreSQL cluster with psql, pg_hba.conf, roles,
+  and WAL. All tools run locally; no paid APIs or external cloud calls are required.
+
+
+  SYMPTOM / STARTING STATE: The PostgreSQL cluster is online with a starter Ansible roles setup. Some
+  pieces are intentionally incomplete so you can learn how they fit together. Nothing is on fire — focus
+  on observation. This beginner-friendly postgresql lab introduces Ansible roles. You will explore role
+  layout, defaults/vars, tasks, handlers, and dependencies on the PostgreSQL cluster. Read the environment
+  first, then follow the guided steps — no prior production experience required.
+
+
+  OBJECTIVE: Understand how Ansible roles work in this lab environment; Identify the main status and configuration
+  signals for Ansible roles; Confirm you can read the current state confidently before changing anything.
+  Success means `systemctl is-active postgresql` returns active.
+
+
+  WHAT TO AVOID: Do not apply broad destructive changes, skip evidence gathering, or fake completion with
+  marker files — the checker validates real system state.'
 objectives:
-- The `postgresql` service is active (running)
-- '`systemctl is-active postgresql` returns active'
-- The fix survives a status re-check (no marker files)
-initial_state: The `postgresql` service is not running (`systemctl is-active postgresql` → inactive/failed).
-  Dependent Fundamentals Lab tasks cannot succeed until the unit is healthy again.
+- Understand how Ansible roles work in this lab environment
+- Identify the main status and configuration signals for Ansible roles
+- Confirm you can read the current state confidently before changing anything
+initial_state: The PostgreSQL cluster is online with a starter Ansible roles setup. Some pieces are intentionally
+  incomplete so you can learn how they fit together. Nothing is on fire — focus on observation.
 hints:
 - order: 1
-  cost: 10
+  cost: 0
   content: 'Orient yourself before changing anything:
 
     1. Inspect the current state — roles/ tree, `ansible-galaxy list`, and role variable precedence.
@@ -33,17 +52,17 @@ hints:
     3. Recall the core idea: role layout, defaults/vars, tasks, handlers, and dependencies. Form one hypothesis
     before you act.'
 - order: 2
-  cost: 15
-  content: 'Plan your approach (still no spoilers):
-
-    1. Confirm the exact gap between current and desired state for Ansible roles.
-
-    2. Decide the single smallest change that moves you toward the objective.
-
-    3. Capture evidence (command output / status) before the change so you can prove it worked afterward.'
-- order: 3
   cost: 25
-  content: 'Guided walkthrough:
+  content: 'Diagnostic steps:
+
+    1. Run `systemctl status postgresql` — note Active/Failed and the last log lines.
+
+    2. Read `journalctl -u postgresql -n 50` for the root error.
+
+    3. Form a hypothesis about the smallest config or permission fix.'
+- order: 3
+  cost: 50
+  content: 'Exact fix + verification:
 
     1. Re-check the current state — roles/ tree, `ansible-galaxy list`, and role variable precedence.
 
@@ -52,4 +71,76 @@ hints:
 
     3. Verify the result — role applies idempotently with the expected variables per group.
 
-    4. Click Check Solution once `systemctl is-active postgresql` returns active.'
+    4. Click Check Solution once the objective is met (graded on real state, not a marker file).'
+summary: Complete the ansible roles — learn lab postgresql lab and verify success with the checker
+estimated_minutes: 15
+xp_reward: 100
+prerequisites:
+- Basic postgresql literacy
+tags:
+- do
+- hands-on
+- postgresql
+linked_tutorial: postgresql-fundamentals
+what_you_will_learn:
+- Understand how Ansible roles work in this lab environment
+- Identify the main status and configuration signals for Ansible roles
+- Confirm you can read the current state confidently before changing anything
+environment:
+  nodes:
+  - role: primary
+    os: FixitLab PostgreSQL cluster
+    hostname: lab-primary
+    ip: 127.0.0.1
+    specs: local offline simulation
+  pre_installed:
+  - bash
+  - coreutils
+  - journalctl
+  - postgresql
+  - systemctl
+  credentials:
+  - user: root
+    password: lab123
+tasks:
+- id: task_1
+  title: Ansible Roles — Learn Lab
+  description: Restore healthy behavior for Ansible Roles — Learn Lab by investigating the failure, applying
+    the smallest safe fix, and validating the outcome.
+  background: 'This postgresql lab teaches systematic troubleshooting: observe, hypothesize, change, verify.'
+  validation:
+    type: service_active
+    command: systemctl is-active postgresql
+    expected_status: active
+    error_message: The postgresql service is not active yet. Check `systemctl status postgresql` and `journalctl
+      -u postgresql -n 50`.
+solution:
+  summary: The root cause is an unhealthy `postgresql` service; repair it and verify active state.
+  files_changed: []
+  commands_run:
+  - systemctl is-active postgresql
+  reference_docs: postgresql-fundamentals
+guided_mode:
+  enabled: true
+  steps:
+  - step: 1
+    title: Inspect current state
+    instruction: Run a read-only diagnostic before changing anything.
+    command: systemctl is-active postgresql
+    expected_output: Output shows the current failure mode
+    explanation: Evidence-first troubleshooting avoids guessing.
+    next_on: command_success
+  - step: 2
+    title: Apply the minimal fix
+    instruction: Make one reversible change aligned with the objectives.
+    command: '# your fix command here'
+    expected_output: State moves toward the objective
+    explanation: Small changes make rollback easy if the hypothesis was wrong.
+    next_on: command_success
+  - step: 3
+    title: Verify with the grader
+    instruction: Run the same verification the checker uses.
+    command: systemctl is-active postgresql
+    expected_output: '`systemctl is-active postgresql` returns active'
+    explanation: The lab passes only when real state is healthy.
+    next_on: command_success

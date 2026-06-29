@@ -1,4 +1,4 @@
-title: Gui Simulation - Troubleshooting Drill
+title: Gui Simulation — Troubleshoot Lab
 slug: academy-simulation-024-troubleshoot-gui-3
 technology: simulation
 category: Fix
@@ -11,136 +11,130 @@ max_score: 100
 is_free: false
 infrastructure_type: docker
 jira_priority: Medium
-description: 'CONTEXT: The FixitLab platform team uses this lab to teach how local simulation engines
-  model real operational failures. A learner is asked to restore a troubleshoot gui workflow after the
-  backing simulation state becomes unhealthy.
+description: 'CONTEXT: A team operating FixitLab simulation needs you to resolve `simulation: Gui Simulation
+  — Troubleshooting Drill` during a realistic incident. The business impact is reduced service reliability
+  until the underlying state is repaired.
 
 
-  ENVIRONMENT: You are working in an offline, RHEL-like FixitLab simulation shell. The host is `sim-primary`,
-  core Linux tools are installed, and the lab checker reads the in-memory service state directly through
-  the local simulation engine.
+  ENVIRONMENT: You are working in FixitLab''s offline simulation sandbox with terminal state, validation
+  hooks, and lab authoring markers. All tools run locally; no paid APIs or external cloud calls are required.
 
 
-  SYMPTOM / STARTING STATE: The `nginx` service is not running (`systemctl is-active nginx` → inactive/failed).
-  Dependent Troubleshooting Drill tasks cannot succeed until the unit is healthy again. Commands that
-  depend on the simulated service cannot reach the expected healthy state.
+  SYMPTOM / STARTING STATE: The simulation sandbox is degraded. A gui action does not persist. Recent
+  changes may exist around GUI simulation, but do not restart blindly — gather evidence first. Production
+  alert: a GUI action does not persist. You are on call for simulation and must troubleshoot GUI simulation
+  methodically — triage symptoms, isolate root cause, apply the smallest safe fix, and confirm recovery.
 
 
-  OBJECTIVE: Restore the service-backed simulation workflow so `systemctl is-active nginx` returns active.
-  The fix must be observable through normal system commands and must not depend on a manual completion
-  marker.
+  OBJECTIVE: The incident symptom is clear: a GUI action does not persist; Root cause is isolated with
+  evidence, not guesswork; Service behavior returns to normal after the fix. Success means `systemctl
+  is-active nginx` returns active.
 
 
-  WHAT TO AVOID: Do not write marker files, skip the diagnostic step, or make broad unrelated changes;
-  repair only the failing service state needed for this scenario.'
+  WHAT TO AVOID: Do not apply broad destructive changes, skip evidence gathering, or fake completion with
+  marker files — the checker validates real system state.'
 objectives:
-- The `nginx` service is active (running)
-- '`systemctl is-active nginx` returns active'
-- The fix survives a status re-check (no marker files)
-initial_state: The `nginx` service is not running (`systemctl is-active nginx` → inactive/failed). Dependent
-  Troubleshooting Drill tasks cannot succeed until the unit is healthy again.
+- 'The incident symptom is clear: a GUI action does not persist'
+- Root cause is isolated with evidence, not guesswork
+- Service behavior returns to normal after the fix
+initial_state: The simulation sandbox is degraded. A gui action does not persist. Recent changes may exist
+  around GUI simulation, but do not restart blindly — gather evidence first.
 hints:
 - order: 1
   cost: 0
-  content: 'Where to look: Start with the service layer. The workflow depends on `nginx`, so first decide
-    whether the service is stopped, failed, or healthy before changing anything.'
+  content: 'Where to look: The incident symptom is clear: a GUI action does not persist'
 - order: 2
   cost: 25
   content: 'Diagnostic steps:
 
-    1. Run `systemctl status nginx` and read the Active line.
+    1. Root cause is isolated with evidence, not guesswork
 
-    2. Run `journalctl -u nginx -n 50` and look for the latest startup error.
-
-    3. If the unit is simply inactive or failed without a persistent config error, restart it and re-check.'
+    2. Service behavior returns to normal after the fix'
 - order: 3
   cost: 50
   content: 'Exact fix + verification:
 
-    1. Run `sudo systemctl start nginx`.
+    1. Service behavior returns to normal after the fix.
 
-    2. If this is a guided fundamentals lab, run `sudo systemctl enable nginx` so the state survives a
-    reboot.
+    2. Re-run the lab checker (`check.sh` or Check Solution).
 
-    3. Verify with `systemctl is-active nginx` returns active.
+    3. Confirm every scenario objective is satisfied.
 
 
-    WHY: the simulation engine validates real service state. A marker file or note is ignored.'
-summary: Diagnose and restore a troubleshoot gui simulation workflow, then prove the real state is healthy.
+    WHY: the grader validates real state — marker files are ignored.'
+summary: Complete the gui simulation — troubleshoot lab simulation lab and verify success with the checker
 estimated_minutes: 20
 xp_reward: 100
 prerequisites:
 - Basic Linux terminal navigation
 - Reading systemd service status
 tags:
+- fix
+- hands-on
 - real-validation
 - simulation
 - systemd
 - troubleshoot
-linked_tutorial: simulation-labs-fundamentals
+linked_tutorial: simulation-fundamentals
 what_you_will_learn:
-- Recognize the unhealthy simulation signal for troubleshoot gui
-- Use command output and logs to diagnose nginx
-- Apply a minimal operational fix without relying on marker files
-- Verify the repaired state with the same command the grader uses
+- 'The incident symptom is clear: a GUI action does not persist'
+- Root cause is isolated with evidence, not guesswork
+- Service behavior returns to normal after the fix
 environment:
   nodes:
   - role: primary
-    os: FixitLab RHEL-like simulation
-    hostname: sim-primary
+    os: FixitLab simulation sandbox
+    hostname: lab-primary
     ip: 127.0.0.1
-    specs: local in-memory simulation
+    specs: local offline simulation
   pre_installed:
   - bash
-  - systemctl
-  - journalctl
   - coreutils
+  - journalctl
+  - simulation
+  - systemctl
   credentials:
   - user: root
     password: lab123
 tasks:
 - id: task_1
-  title: Gui Simulation - Troubleshooting Drill
-  description: Restore the troubleshoot gui simulation workflow by diagnosing the failed service state,
-    applying the smallest safe fix, and proving the service is healthy.
-  background: FixitLab simulation labs model real operating-system state. The checker reads that state
-    directly, so the lab only passes when the system itself is repaired.
+  title: Gui Simulation — Troubleshoot Lab
+  description: Restore healthy behavior for Gui Simulation — Troubleshoot Lab by investigating the failure,
+    applying the smallest safe fix, and validating the outcome.
+  background: 'This simulation lab teaches systematic troubleshooting: observe, hypothesize, change, verify.'
   validation:
     type: service_active
     command: systemctl is-active nginx
     expected_status: active
     error_message: The nginx service is not active yet. Check `systemctl status nginx` and `journalctl
-      -u nginx -n 50` for the remaining blocker.
+      -u nginx -n 50`.
 solution:
   summary: The root cause is an inactive/failed `nginx` service; start it and verify active state.
   files_changed: []
   commands_run:
-  - systemctl status nginx
-  - journalctl -u nginx -n 50
-  - systemctl start nginx
   - systemctl is-active nginx
-  reference_docs: 'linked tutorial: simulation-labs-fundamentals'
+  reference_docs: simulation-fundamentals
 guided_mode:
   enabled: true
   steps:
   - step: 1
-    title: Inspect the failing state
-    instruction: Check whether the backing service for Gui Simulation - Troubleshooting Drill is active.
-    command: systemctl status nginx
-    expected_output: Healthy output after the fix
-    explanation: The Active line tells you whether the workflow is blocked by service state.
+    title: Inspect current state
+    instruction: Run a read-only diagnostic before changing anything.
+    command: systemctl is-active nginx
+    expected_output: Output shows the current failure mode
+    explanation: Evidence-first troubleshooting avoids guessing.
     next_on: command_success
   - step: 2
-    title: Gather supporting evidence
-    instruction: Use a second command to confirm the failure mode before changing state.
-    command: journalctl -u nginx -n 50
-    expected_output: Output points at the same root cause
-    explanation: A second signal prevents guessing and makes the fix explainable.
+    title: Apply the minimal fix
+    instruction: Make one reversible change aligned with the objectives.
+    command: '# your fix command here'
+    expected_output: State moves toward the objective
+    explanation: Small changes make rollback easy if the hypothesis was wrong.
     next_on: command_success
   - step: 3
-    title: Verify the repaired state
-    instruction: Run the same healthy-state command used by the grader.
+    title: Verify with the grader
+    instruction: Run the same verification the checker uses.
     command: systemctl is-active nginx
     expected_output: '`systemctl is-active nginx` returns active'
-    explanation: Validation is based on real service state, not a marker file.
+    explanation: The lab passes only when real state is healthy.
     next_on: command_success

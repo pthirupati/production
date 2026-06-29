@@ -1,23 +1,54 @@
-category: Database Administration
-description: Clients get "connection refused" when connecting to PostgreSQL because the service is down
-  (or not listening on the expected address). The postgresql unit failed to start, or listen_addresses/port
-  is misconfigured, so nothing is accepting connections. Start the service (fixing any startup error)
-  and confirm it accepts connections.
+category: Fix
+description: 'CONTEXT: A team operating database administration needs you to resolve `PostgreSQL Connection
+  Refused` during a realistic incident. The business impact is reduced service reliability until the underlying
+  state is repaired.
+
+
+  ENVIRONMENT: You are working in FixitLab''s offline database server with SQL client, schemas, backups,
+  and performance views. All tools run locally; no paid APIs or external cloud calls are required.
+
+
+  SYMPTOM / STARTING STATE: Simulated RHEL host. PostgreSQL is not accepting connections — the service
+  is stopped or failed. Connection attempts return "could not connect ... Connection refused". Clients
+  get "connection refused" when connecting to PostgreSQL because the service is down (or not listening
+  on the expected address). The postgresql unit failed to start, or listen_addresses/port is misconfigured,
+  so nothing is accepting connections. Start the service (fixing any startup error) and confirm it accepts
+  connections.
+
+
+  OBJECTIVE: Confirm PostgreSQL is down / not listening and why; Start the service, resolving any startup
+  error; Verify the server accepts connections. Success means `check.sh` exits successfully.
+
+
+  WHAT TO AVOID: Do not apply broad destructive changes, skip evidence gathering, or fake completion with
+  marker files — the checker validates real system state.'
 difficulty: medium
 dual_terminal: false
 hints:
 - order: 1
-  cost: 10
-  content: 'Check the service: `systemctl status postgresql`. If it failed, read `journalctl -u postgresql
-    -n 40` for the startup error; if it''s just stopped, that alone explains the refusal.'
+  cost: 0
+  content: 'Where to look: Run `systemctl status postgresql` and `pg_isready` for connection state.'
 - order: 2
-  cost: 15
-  content: If it won't start, the log names the cause (bad postgresql.conf, permissions on the data dir,
-    or a port conflict). If it's running but still refused, check listen_addresses/port and pg_hba.conf.
+  cost: 25
+  content: 'Diagnostic steps:
+
+    1. Check service status and `/var/log/postgresql/` logs.
+
+    2. Verify `pg_hba.conf` and `postgresql.conf` for listen addresses.
+
+    3. Test with `psql -U postgres -c ''SELECT 1''`.'
 - order: 3
-  cost: 20
-  content: 'Start it and verify: `systemctl start postgresql`, then `systemctl is-active postgresql` and
-    `psql -h localhost -c ''SELECT 1;''` (or `pg_isready`) to confirm it accepts connections.'
+  cost: 50
+  content: 'Exact fix + verification:
+
+    1. Fix auth rules, data directory permissions, or port conflict.
+
+    2. `systemctl restart postgresql`.
+
+    3. Confirm `pg_isready` reports accepting connections.
+
+
+    WHY: the database must accept connections, not just start.'
 initial_state: Simulated RHEL host. PostgreSQL is not accepting connections — the service is stopped or
   failed. Connection attempts return "could not connect ... Connection refused".
 is_free: false
@@ -33,3 +64,50 @@ simulation_type: database
 slug: sim-postgres-refused
 time_limit: 900
 title: PostgreSQL Connection Refused
+technology: database
+summary: Complete the postgresql connection refused database lab and verify success with the checker
+estimated_minutes: 15
+xp_reward: 100
+prerequisites:
+- Basic database literacy
+tags:
+- database
+- fix
+- hands-on
+linked_tutorial: database-fundamentals
+what_you_will_learn:
+- Confirm PostgreSQL is down / not listening and why
+- Start the service, resolving any startup error
+- Verify the server accepts connections
+environment:
+  nodes:
+  - role: primary
+    os: FixitLab database server
+    hostname: lab-primary
+    ip: 127.0.0.1
+    specs: local offline simulation
+  pre_installed:
+  - bash
+  - coreutils
+  - database
+  - journalctl
+  - systemctl
+  credentials:
+  - user: root
+    password: lab123
+tasks:
+- id: task_1
+  title: PostgreSQL Connection Refused
+  description: Restore healthy behavior for PostgreSQL Connection Refused by investigating the failure,
+    applying the smallest safe fix, and validating the outcome.
+  background: 'This database lab teaches systematic troubleshooting: observe, hypothesize, change, verify.'
+  validation:
+    type: custom_script
+    script: check.sh
+    error_message: Validation did not pass. Re-read the objectives and Hint 2 diagnostic steps.
+solution:
+  summary: Identify the misconfiguration affecting this database lab and apply the minimal fix.
+  files_changed: []
+  commands_run:
+  - bash check.sh
+  reference_docs: database-fundamentals

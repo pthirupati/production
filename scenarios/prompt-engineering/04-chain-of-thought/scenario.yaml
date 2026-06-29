@@ -1,11 +1,29 @@
-title: "Chain-of-Thought Reasoning"
+title: Chain-of-Thought Reasoning
 slug: chain-of-thought
-category: Prompt Engineering
-description: >-
-  For multi-step problems — math, logic, debugging, planning — asking the AI to
-  reason step by step before answering produces dramatically better results.
-  Learn how and when to use chain-of-thought, and how to keep the reasoning from
-  bloating your final output.
+category: Build
+description: 'CONTEXT: A team operating prompt engineering needs you to resolve `Chain-of-Thought Reasoning`
+  during a realistic incident. The business impact is reduced service reliability until the underlying
+  state is repaired.
+
+
+  ENVIRONMENT: You are working in FixitLab''s offline LLM practice workspace with prompt templates, eval
+  sets, and tool configs. All tools run locally; no paid APIs or external cloud calls are required.
+
+
+  SYMPTOM / STARTING STATE: The guided AI practice console opens. Pose a multi-step problem two ways —
+  "just give the answer" vs "think step by step, then answer" — and compare. Rule-based and free. For
+  multi-step problems — math, logic, debugging, planning — asking the AI to reason step by step before
+  answering produces dramatically better results. Learn how and when to use chain-of-thought, and how
+  to keep the reasoning from bloating your final output.
+
+
+  OBJECTIVE: Explain why step-by-step reasoning improves accuracy on hard tasks; Write a prompt that explicitly
+  requests reasoning before the answer; Pass the exercise that asks the model to think first, then give
+  a final answer. Success means all hidden tests pass.
+
+
+  WHAT TO AVOID: Do not apply broad destructive changes, skip evidence gathering, or fake completion with
+  marker files — the checker validates real system state.'
 difficulty: medium
 scenario_type: do
 lab_mode: simulation
@@ -17,98 +35,200 @@ max_score: 100
 is_free: true
 dual_terminal: false
 objectives:
-  - Explain why step-by-step reasoning improves accuracy on hard tasks
-  - Write a prompt that explicitly requests reasoning before the answer
-  - Pass the exercise that asks the model to think first, then give a final answer
-initial_state: >-
-  The guided AI practice console opens. Pose a multi-step problem two ways — "just
-  give the answer" vs "think step by step, then answer" — and compare. Rule-based
-  and free.
-solution_explanation: >-
-  Chain-of-thought (CoT) means instructing the model to lay out its reasoning
-  before committing to an answer ("Let's think step by step"). It helps most on
-  arithmetic, logic, debugging, and planning. Two practical patterns: (1) ask for
-  reasoning then a clearly-labeled final answer; (2) when you only want the
-  answer, ask it to reason privately and return just the conclusion — or use a
-  scratchpad section you then ignore. Modern reasoning models do much of this
-  internally, but explicit CoT still helps on novel, multi-step tasks.
+- Explain why step-by-step reasoning improves accuracy on hard tasks
+- Write a prompt that explicitly requests reasoning before the answer
+- Pass the exercise that asks the model to think first, then give a final answer
+initial_state: The guided AI practice console opens. Pose a multi-step problem two ways — "just give the
+  answer" vs "think step by step, then answer" — and compare. Rule-based and free.
+solution_explanation: 'Chain-of-thought (CoT) means instructing the model to lay out its reasoning before
+  committing to an answer ("Let''s think step by step"). It helps most on arithmetic, logic, debugging,
+  and planning. Two practical patterns: (1) ask for reasoning then a clearly-labeled final answer; (2)
+  when you only want the answer, ask it to reason privately and return just the conclusion — or use a
+  scratchpad section you then ignore. Modern reasoning models do much of this internally, but explicit
+  CoT still helps on novel, multi-step tasks.'
 coding_spec:
   kind: prompt
   language: text
   prompt_config:
     persona: A reasoning assistant that can show its work when asked.
     lesson:
-      - heading: Why it works
-        body: >-
-          Language models predict the next token. When the answer requires
-          several steps, jumping straight to a conclusion forces the model to
-          compress all that work into one leap — and it often slips. Writing the
-          steps out gives each intermediate result a place to live, so the final
-          answer is grounded in explicit reasoning rather than a guess.
-      - heading: How to trigger it
-        body: >-
-          The classic trigger is "Let's think step by step." More structured:
-          "First list what we know. Then work through it one step at a time.
-          Finally, give the answer on its own line prefixed with ANSWER:." For
-          debugging: "Walk through what each line does, identify where the actual
-          behavior diverges from expected, then propose the fix."
-      - heading: Keeping output clean
-        body: >-
-          Reasoning can be verbose. If you only want the result, either ask the
-          model to "reason briefly, then give just the final answer" or request a
-          dedicated section (e.g. <scratchpad>...</scratchpad>) that you discard
-          programmatically. Reasoning models (extended thinking) handle much of
-          this internally, but explicit CoT still helps for unusual problems.
-    rubric: [task, reasoning, format, specificity]
+    - heading: Why it works
+      body: Language models predict the next token. When the answer requires several steps, jumping straight
+        to a conclusion forces the model to compress all that work into one leap — and it often slips.
+        Writing the steps out gives each intermediate result a place to live, so the final answer is grounded
+        in explicit reasoning rather than a guess.
+    - heading: How to trigger it
+      body: 'The classic trigger is "Let''s think step by step." More structured: "First list what we
+        know. Then work through it one step at a time. Finally, give the answer on its own line prefixed
+        with ANSWER:." For debugging: "Walk through what each line does, identify where the actual behavior
+        diverges from expected, then propose the fix."'
+    - heading: Keeping output clean
+      body: Reasoning can be verbose. If you only want the result, either ask the model to "reason briefly,
+        then give just the final answer" or request a dedicated section (e.g. <scratchpad>...</scratchpad>)
+        that you discard programmatically. Reasoning models (extended thinking) handle much of this internally,
+        but explicit CoT still helps for unusual problems.
+    rubric:
+    - task
+    - reasoning
+    - format
+    - specificity
     exercises:
-      - id: request-reasoning
-        title: Ask for step-by-step reasoning
-        goal: >-
-          Write a prompt for a multi-step problem (math, logic, or debugging) that
-          explicitly tells the model to reason step by step BEFORE giving its
-          final answer.
-        starter: ""
-        success:
-          min_words: 10
-          any_of:
-            - ["step by step", "step-by-step", "reason", "reasoning", "think through", "work through", "show your work", "walk through", "one step at a time"]
-        success_response: |
-          Step 1: A train travels 60 km in the first hour.
-          Step 2: It travels 90 km in the next 1.5 hours (60 km/h is wrong here; given speeds differ).
-          Step 3: Total distance = 60 + 90 = 150 km over 2.5 hours.
-          ANSWER: average speed = 150 / 2.5 = 60 km/h.
-        partial_response: >-
-          Add an explicit instruction to reason step by step (e.g. "think through
-          it one step at a time, then give the final answer"). Otherwise I may
-          jump straight to a guess.
-      - id: reason-then-answer
-        title: Reason first, then a clean final answer
-        goal: >-
-          Write a prompt that asks the model to reason step by step AND to put the
-          final answer on its own line in a fixed format (for example prefixed
-          with "ANSWER:") so it's easy to extract.
-        starter: ""
-        success:
-          min_words: 12
-          any_of:
-            - ["step by step", "reason", "think", "work through", "walk through"]
-          require:
-            - ["answer:", "final answer", "on its own line", "prefix", "label", "format", "last line"]
-        success_response: |
-          Reasoning: there are 3 boxes, each with 4 apples, and 2 are removed.
-          3 x 4 = 12, minus 2 = 10.
-          ANSWER: 10
-        partial_response: >-
-          Good — you asked for reasoning. Now also pin the final answer's format
-          (e.g. "put the result on its own line as ANSWER: <value>") so it's
-          trivial to parse out.
+    - id: request-reasoning
+      title: Ask for step-by-step reasoning
+      goal: Write a prompt for a multi-step problem (math, logic, or debugging) that explicitly tells
+        the model to reason step by step BEFORE giving its final answer.
+      starter: ''
+      success:
+        min_words: 10
+        any_of:
+        - - step by step
+          - step-by-step
+          - reason
+          - reasoning
+          - think through
+          - work through
+          - show your work
+          - walk through
+          - one step at a time
+      success_response: 'Step 1: A train travels 60 km in the first hour.
+
+        Step 2: It travels 90 km in the next 1.5 hours (60 km/h is wrong here; given speeds differ).
+
+        Step 3: Total distance = 60 + 90 = 150 km over 2.5 hours.
+
+        ANSWER: average speed = 150 / 2.5 = 60 km/h.
+
+        '
+      partial_response: Add an explicit instruction to reason step by step (e.g. "think through it one
+        step at a time, then give the final answer"). Otherwise I may jump straight to a guess.
+    - id: reason-then-answer
+      title: Reason first, then a clean final answer
+      goal: Write a prompt that asks the model to reason step by step AND to put the final answer on its
+        own line in a fixed format (for example prefixed with "ANSWER:") so it's easy to extract.
+      starter: ''
+      success:
+        min_words: 12
+        any_of:
+        - - step by step
+          - reason
+          - think
+          - work through
+          - walk through
+        require:
+        - - 'answer:'
+          - final answer
+          - on its own line
+          - prefix
+          - label
+          - format
+          - last line
+      success_response: 'Reasoning: there are 3 boxes, each with 4 apples, and 2 are removed.
+
+        3 x 4 = 12, minus 2 = 10.
+
+        ANSWER: 10
+
+        '
+      partial_response: 'Good — you asked for reasoning. Now also pin the final answer''s format (e.g.
+        "put the result on its own line as ANSWER: <value>") so it''s trivial to parse out.'
+  hidden_tests:
+  - name: smoke_hidden
+    code: assert True
 hints:
-  - content: The simplest trigger is literally "Let's think step by step." It reliably improves multi-step math and logic.
-    cost: 10
-    order: 1
-  - content: 'To keep output tidy, ask the model to reason first and then put the result on its own line, e.g. with an "ANSWER:" prefix. That makes it easy to extract programmatically.'
-    cost: 15
-    order: 2
-  - content: 'Try: "Solve this step by step, showing each calculation. Then on the last line, give just the result prefixed with ANSWER:."'
-    cost: 20
-    order: 3
+- order: 1
+  cost: 0
+  content: 'Where to look: Open `the solution file`, read the instructions, and run the visible tests
+    to see which assertion fails first.'
+- order: 2
+  cost: 25
+  content: 'Diagnostic steps:
+
+    1. Click Run and read the traceback — note line number and actual vs expected values.
+
+    2. Reproduce the failure with the smallest input from a visible test.
+
+    3. Compare your implementation to the bug described in the lab prompt.'
+- order: 3
+  cost: 50
+  content: 'Exact fix + verification:
+
+    1. Pass the exercise that asks the model to think first, then give a final answer.
+
+    2. Re-run the lab checker (`check.sh` or Check Solution).
+
+    3. Confirm every scenario objective is satisfied.
+
+
+    WHY: the grader validates real state — marker files are ignored.'
+technology: prompt-engineering
+summary: Complete the chain-of-thought reasoning prompt engineering lab and verify success with the checker
+estimated_minutes: 30
+xp_reward: 100
+prerequisites:
+- Basic prompt engineering literacy
+tags:
+- do
+- hands-on
+- prompt-engineering
+linked_tutorial: prompt-engineering-fundamentals
+what_you_will_learn:
+- Explain why step-by-step reasoning improves accuracy on hard tasks
+- Write a prompt that explicitly requests reasoning before the answer
+- Pass the exercise that asks the model to think first, then give a final answer
+environment:
+  nodes:
+  - role: primary
+    os: FixitLab LLM practice workspace
+    hostname: lab-primary
+    ip: 127.0.0.1
+    specs: local offline simulation
+  pre_installed:
+  - bash
+  - coreutils
+  - journalctl
+  - prompt engineering
+  - systemctl
+  credentials:
+  - user: root
+    password: lab123
+tasks:
+- id: task_1
+  title: Chain-of-Thought Reasoning
+  description: Restore healthy behavior for Chain-of-Thought Reasoning by investigating the failure, applying
+    the smallest safe fix, and validating the outcome.
+  background: 'This prompt engineering lab teaches systematic troubleshooting: observe, hypothesize, change,
+    verify.'
+  validation:
+    type: custom_script
+    script: hidden_tests
+    error_message: One or more hidden tests failed. Read the public test output, fix your solution, and
+      submit again.
+solution:
+  summary: The solution passes all hidden tests by implementing the required behavior in code.
+  files_changed: []
+  commands_run: []
+  reference_docs: prompt-engineering-fundamentals
+guided_mode:
+  enabled: true
+  steps:
+  - step: 1
+    title: Inspect current state
+    instruction: Run a read-only diagnostic before changing anything.
+    command: check.sh
+    expected_output: Output shows the current failure mode
+    explanation: Evidence-first troubleshooting avoids guessing.
+    next_on: command_success
+  - step: 2
+    title: Apply the minimal fix
+    instruction: Make one reversible change aligned with the objectives.
+    command: '# your fix command here'
+    expected_output: State moves toward the objective
+    explanation: Small changes make rollback easy if the hypothesis was wrong.
+    next_on: command_success
+  - step: 3
+    title: Verify with the grader
+    instruction: Run the same verification the checker uses.
+    command: check.sh
+    expected_output: all hidden tests pass
+    explanation: The lab passes only when real state is healthy.
+    next_on: command_success

@@ -1,9 +1,26 @@
 title: Implement Merge Intervals
 slug: py-impl-merge-intervals
-category: Python Development
-description: 'Implement merge_intervals(intervals): given a list of [start, end] pairs, return the list
-  of merged, non-overlapping intervals sorted by start. Touching intervals ([1,2],[2,3]) merge. The stub
-  is empty so tests fail.'
+category: Build
+description: 'CONTEXT: A team operating Python development needs you to resolve `Implement Merge Intervals`
+  during a realistic incident. The business impact is reduced service reliability until the underlying
+  state is repaired.
+
+
+  ENVIRONMENT: You are working in FixitLab''s offline Python project workspace with source files, venv,
+  tests, and CLI entrypoints. All tools run locally; no paid APIs or external cloud calls are required.
+
+
+  SYMPTOM / STARTING STATE: Implement merge_intervals(intervals): given a list of [start, end] pairs,
+  return the list of merged, non-overlapping intervals sorted by start. Touching intervals ([1,2],[2,3])
+  merge. The stub is empty so tests fail.
+
+
+  OBJECTIVE: Sort intervals by start; Merge overlapping or touching intervals; Return sorted, non-overlapping
+  intervals. Success means all hidden tests pass.
+
+
+  WHAT TO AVOID: Do not apply broad destructive changes, skip evidence gathering, or fake completion with
+  marker files — the checker validates real system state.'
 difficulty: medium
 scenario_type: do
 lab_mode: simulation
@@ -21,54 +38,147 @@ objectives:
 initial_state: 'Implement merge_intervals(intervals): given a list of [start, end] pairs, return the list
   of merged, non-overlapping intervals sorted by start. Touching intervals ([1,2],[2,3]) merge. The stub
   is empty so tests fail.'
-solution_explanation: |
-  Sorting by start lets a single left-to-right pass merge any interval whose start is within the current merged end, extending it as needed.
+solution_explanation: 'Sorting by start lets a single left-to-right pass merge any interval whose start
+  is within the current merged end, extending it as needed.
+
+  '
 coding_spec:
   language: python
   entrypoint: solution.py
   kind: impl
-  instructions: |
-    Implement merge_intervals(intervals) -> merged list. Intervals that overlap OR touch are merged.
-      merge_intervals([[1,3],[2,6],[8,10],[15,18]]) -> [[1,6],[8,10],[15,18]]
-    Click Run to try it, then Check Solution to grade against all tests.
+  instructions: "Implement merge_intervals(intervals) -> merged list. Intervals that overlap OR touch\
+    \ are merged.\n  merge_intervals([[1,3],[2,6],[8,10],[15,18]]) -> [[1,6],[8,10],[15,18]]\nClick Run\
+    \ to try it, then Check Solution to grade against all tests.\n"
   files:
   - path: solution.py
-    content: |
-      def merge_intervals(intervals):
-          # TODO: return merged, sorted, non-overlapping intervals
-          pass
+    content: "def merge_intervals(intervals):\n    # TODO: return merged, sorted, non-overlapping intervals\n\
+      \    pass\n"
     readonly: false
   visible_tests:
   - name: classic example
-    code: |
-      assert merge_intervals([[1,3],[2,6],[8,10],[15,18]]) == [[1,6],[8,10],[15,18]]
+    code: 'assert merge_intervals([[1,3],[2,6],[8,10],[15,18]]) == [[1,6],[8,10],[15,18]]
+
+      '
   - name: no overlap
-    code: |
-      assert merge_intervals([[1,2],[3,4]]) == [[1,2],[3,4]]
+    code: 'assert merge_intervals([[1,2],[3,4]]) == [[1,2],[3,4]]
+
+      '
   hidden_tests:
   - name: touching merges
-    code: |
-      assert merge_intervals([[1,4],[4,5]]) == [[1,5]]
+    code: 'assert merge_intervals([[1,4],[4,5]]) == [[1,5]]
+
+      '
   - name: unsorted input
-    code: |
-      assert merge_intervals([[8,10],[1,3],[2,6]]) == [[1,6],[8,10]]
+    code: 'assert merge_intervals([[8,10],[1,3],[2,6]]) == [[1,6],[8,10]]
+
+      '
   - name: nested interval
-    code: |
-      assert merge_intervals([[1,10],[2,3],[4,5]]) == [[1,10]]
+    code: 'assert merge_intervals([[1,10],[2,3],[4,5]]) == [[1,10]]
+
+      '
   - name: empty
-    code: |
-      assert merge_intervals([]) == []
+    code: 'assert merge_intervals([]) == []
+
+      '
   - name: single
-    code: |
-      assert merge_intervals([[5,7]]) == [[5,7]]
+    code: 'assert merge_intervals([[5,7]]) == [[5,7]]
+
+      '
   timeout: 8
 hints:
 - order: 1
-  cost: 10
-  content: Sort by start first so overlaps are adjacent.
+  cost: 0
+  content: 'Where to look: Open `solution.py`, read the instructions, and run the visible tests to see
+    which assertion fails first.'
 - order: 2
-  cost: 20
-  content: Keep a list of merged intervals; compare each new start to the last merged end.
+  cost: 25
+  content: 'Diagnostic steps:
+
+    1. Click Run and read the traceback — note line number and actual vs expected values.
+
+    2. Reproduce the failure with the smallest input from a visible test.
+
+    3. Compare your implementation to the bug described in the lab prompt.'
 - order: 3
-  cost: 30
-  content: If start <= last_end, extend the end to max(last_end, end); else append a new interval.
+  cost: 50
+  content: 'Exact fix + verification:
+
+    1. Return sorted, non-overlapping intervals.
+
+    2. Re-run the lab checker (`check.sh` or Check Solution).
+
+    3. Confirm every scenario objective is satisfied.
+
+
+    WHY: the grader validates real state — marker files are ignored.'
+technology: python
+summary: Complete the implement merge intervals python lab and verify success with the checker
+estimated_minutes: 25
+xp_reward: 100
+prerequisites:
+- Basic python literacy
+tags:
+- do
+- hands-on
+- python
+linked_tutorial: python-fundamentals
+what_you_will_learn:
+- Sort intervals by start
+- Merge overlapping or touching intervals
+- Return sorted, non-overlapping intervals
+environment:
+  nodes:
+  - role: primary
+    os: FixitLab Python project workspace
+    hostname: lab-primary
+    ip: 127.0.0.1
+    specs: local offline simulation
+  pre_installed:
+  - bash
+  - coreutils
+  - pip
+  - python
+  - python3
+  credentials:
+  - user: root
+    password: lab123
+tasks:
+- id: task_1
+  title: Implement Merge Intervals
+  description: Restore healthy behavior for Implement Merge Intervals by investigating the failure, applying
+    the smallest safe fix, and validating the outcome.
+  background: 'This python lab teaches systematic troubleshooting: observe, hypothesize, change, verify.'
+  validation:
+    type: custom_script
+    script: hidden_tests
+    error_message: One or more hidden tests failed. Read the public test output, fix your solution, and
+      submit again.
+solution:
+  summary: The solution passes all hidden tests by implementing the required behavior in code.
+  files_changed: []
+  commands_run: []
+  reference_docs: python-fundamentals
+guided_mode:
+  enabled: true
+  steps:
+  - step: 1
+    title: Inspect current state
+    instruction: Run a read-only diagnostic before changing anything.
+    command: check.sh
+    expected_output: Output shows the current failure mode
+    explanation: Evidence-first troubleshooting avoids guessing.
+    next_on: command_success
+  - step: 2
+    title: Apply the minimal fix
+    instruction: Make one reversible change aligned with the objectives.
+    command: '# your fix command here'
+    expected_output: State moves toward the objective
+    explanation: Small changes make rollback easy if the hypothesis was wrong.
+    next_on: command_success
+  - step: 3
+    title: Verify with the grader
+    instruction: Run the same verification the checker uses.
+    command: check.sh
+    expected_output: all hidden tests pass
+    explanation: The lab passes only when real state is healthy.
+    next_on: command_success

@@ -1,7 +1,7 @@
 title: Create PostgreSQL Database
 slug: create-postgres-database
-technology: Database
-category: Build Lab
+technology: database
+category: Build
 difficulty: easy
 scenario_type: do
 time_limit: 900
@@ -10,10 +10,29 @@ infrastructure_type: docker
 lab_mode: docker
 jira_priority: Low
 is_free: false
-description: 'Build task: provision a PostgreSQL application database and a dedicated user with the right
-  privileges. Starting from a running PostgreSQL with only the default roles, create the database appdb
-  and a login role appuser, grant appuser ownership/privileges on appdb, and verify appuser can connect
-  and use it.'
+description: 'CONTEXT: A team operating database administration needs you to resolve `Create PostgreSQL
+  Database` during a realistic incident. The business impact is reduced service reliability until the
+  underlying state is repaired.
+
+
+  ENVIRONMENT: You are working in FixitLab''s offline database server with SQL client, schemas, backups,
+  and performance views. All tools run locally; no paid APIs or external cloud calls are required.
+
+
+  SYMPTOM / STARTING STATE: RHEL host with PostgreSQL running and only default roles present. No appdb
+  database or appuser role exists yet. Build task: provision a PostgreSQL application database and a dedicated
+  user with the right privileges. Starting from a running PostgreSQL with only the default roles, create
+  the database appdb and a login role appuser, grant appuser ownership/privileges on appdb, and verify
+  appuser can connect and use it.
+
+
+  OBJECTIVE: Create a login role appuser with a password; Create database appdb owned by (or granted to)
+  appuser; Verify appuser can connect to appdb and the grants are correct. Success means `check.sh` exits
+  successfully.
+
+
+  WHAT TO AVOID: Do not apply broad destructive changes, skip evidence gathering, or fake completion with
+  marker files — the checker validates real system state.'
 objectives:
 - Create a login role appuser with a password
 - Create database appdb owned by (or granted to) appuser
@@ -22,14 +41,96 @@ initial_state: RHEL host with PostgreSQL running and only default roles present.
   appuser role exists yet.
 hints:
 - order: 1
-  cost: 10
-  content: 'As the postgres superuser, open psql: `sudo -u postgres psql`. Create the role: `CREATE ROLE
-    appuser WITH LOGIN PASSWORD ''secret'';`'
+  cost: 0
+  content: 'Where to look: Run `systemctl status postgresql` and `pg_isready` for connection state.'
 - order: 2
-  cost: 15
-  content: 'Create the database owned by the new user: `CREATE DATABASE appdb OWNER appuser;` then `GRANT
-    ALL PRIVILEGES ON DATABASE appdb TO appuser;`'
+  cost: 25
+  content: 'Diagnostic steps:
+
+    1. Check service status and `/var/log/postgresql/` logs.
+
+    2. Verify `pg_hba.conf` and `postgresql.conf` for listen addresses.
+
+    3. Test with `psql -U postgres -c ''SELECT 1''`.'
 - order: 3
-  cost: 20
-  content: 'Verify the user can actually connect and use it: `psql ''postgresql://appuser:secret@localhost/appdb''
-    -c ''\conninfo''` (or `psql -U appuser -d appdb -h localhost`).'
+  cost: 50
+  content: 'Exact fix + verification:
+
+    1. Fix auth rules, data directory permissions, or port conflict.
+
+    2. `systemctl restart postgresql`.
+
+    3. Confirm `pg_isready` reports accepting connections.
+
+
+    WHY: the database must accept connections, not just start.'
+summary: Complete the create postgresql database database lab and verify success with the checker
+estimated_minutes: 15
+xp_reward: 100
+prerequisites:
+- Basic database literacy
+tags:
+- database
+- do
+- hands-on
+linked_tutorial: database-fundamentals
+what_you_will_learn:
+- Create a login role appuser with a password
+- Create database appdb owned by (or granted to) appuser
+- Verify appuser can connect to appdb and the grants are correct
+environment:
+  nodes:
+  - role: primary
+    os: FixitLab database server
+    hostname: lab-primary
+    ip: 127.0.0.1
+    specs: local offline simulation
+  pre_installed:
+  - bash
+  - coreutils
+  - database
+  - journalctl
+  - systemctl
+  credentials:
+  - user: root
+    password: lab123
+tasks:
+- id: task_1
+  title: Create PostgreSQL Database
+  description: Restore healthy behavior for Create PostgreSQL Database by investigating the failure, applying
+    the smallest safe fix, and validating the outcome.
+  background: 'This database lab teaches systematic troubleshooting: observe, hypothesize, change, verify.'
+  validation:
+    type: custom_script
+    script: check.sh
+    error_message: Validation did not pass. Re-read the objectives and Hint 2 diagnostic steps.
+solution:
+  summary: Identify the misconfiguration affecting this database lab and apply the minimal fix.
+  files_changed: []
+  commands_run:
+  - bash check.sh
+  reference_docs: database-fundamentals
+guided_mode:
+  enabled: true
+  steps:
+  - step: 1
+    title: Inspect current state
+    instruction: Run a read-only diagnostic before changing anything.
+    command: check.sh
+    expected_output: Output shows the current failure mode
+    explanation: Evidence-first troubleshooting avoids guessing.
+    next_on: command_success
+  - step: 2
+    title: Apply the minimal fix
+    instruction: Make one reversible change aligned with the objectives.
+    command: '# your fix command here'
+    expected_output: State moves toward the objective
+    explanation: Small changes make rollback easy if the hypothesis was wrong.
+    next_on: command_success
+  - step: 3
+    title: Verify with the grader
+    instruction: Run the same verification the checker uses.
+    command: check.sh
+    expected_output: '`check.sh` exits successfully'
+    explanation: The lab passes only when real state is healthy.
+    next_on: command_success

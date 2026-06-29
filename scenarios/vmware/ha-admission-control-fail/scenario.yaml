@@ -1,8 +1,7 @@
----
 slug: ha-admission-control-fail
-title: "HA Admission Control Blocking VM Power-On"
-technology: VMware
-category: High Availability
+title: HA Admission Control Blocking VM Power-On
+technology: vmware
+category: Fix
 difficulty: medium
 time_limit: 1200
 max_score: 100
@@ -11,36 +10,122 @@ simulation_type: vmware
 infrastructure_type: simulation
 jira_priority: High
 is_free: false
-description: |
-  Engineers cannot power on a VM "analytics-01" in the production cluster. The error
-  is: "Insufficient resources to satisfy configured failover level for vSphere HA."
-  The cluster's HA admission control is set to guarantee failover capacity for 2 hosts,
-  but the cluster only has 3 hosts and current usage is too high. A recent host failure
-  took one host to maintenance mode, leaving only 2 active hosts, which cannot satisfy
-  the 2-host failover reservation.
-objectives:
-  - Review the cluster HA configuration and current admission control policy
-  - Understand why power-on is being rejected given current host count
-  - Adjust the admission control policy to "1 host failure" to match current capacity
-  - Successfully power on analytics-01 and verify HA is still protecting the cluster
-initial_state: |
-  VMware vCenter simulation. 3-host cluster: esxi-01 (active), esxi-02 (active),
+description: 'CONTEXT: A team operating VMware vSphere needs you to resolve `HA Admission Control Blocking
+  VM Power-On` during a realistic incident. The business impact is reduced service reliability until the
+  underlying state is repaired.
+
+
+  ENVIRONMENT: You are working in FixitLab''s offline vSphere lab with VMs, datastores, vCenter, and ESXi
+  tasks. All tools run locally; no paid APIs or external cloud calls are required.
+
+
+  SYMPTOM / STARTING STATE: VMware vCenter simulation. 3-host cluster: esxi-01 (active), esxi-02 (active),
+
   esxi-03 (maintenance mode). HA admission control: slot-based, 2 host failures.
+
+  analytics-01 power-on fails with insufficient failover resources error. Engineers cannot power on a
+  VM "analytics-01" in the production cluster. The error
+
+  is: "Insufficient resources to satisfy configured failover level for vSphere HA."
+
+  The cluster''s HA admission control is set to guarantee failover capacity for 2 hosts,
+
+  but the cluster only has 3 hosts and current usage is too high. A recent host failure
+
+  took one host to maintenance mode, leaving only 2 active hosts, which cannot satisfy
+
+  the 2-host failover reservation.
+
+
+  OBJECTIVE: Review the cluster HA configuration and current admission control policy; Understand why
+  power-on is being rejected given current host count; Adjust the admission control policy to "1 host
+  failure" to match current capacity. Success means `check.sh` exits successfully.
+
+
+  WHAT TO AVOID: Do not apply broad destructive changes, skip evidence gathering, or fake completion with
+  marker files — the checker validates real system state.'
+objectives:
+- Review the cluster HA configuration and current admission control policy
+- Understand why power-on is being rejected given current host count
+- Adjust the admission control policy to "1 host failure" to match current capacity
+- Successfully power on analytics-01 and verify HA is still protecting the cluster
+initial_state: 'VMware vCenter simulation. 3-host cluster: esxi-01 (active), esxi-02 (active),
+
+  esxi-03 (maintenance mode). HA admission control: slot-based, 2 host failures.
+
   analytics-01 power-on fails with insufficient failover resources error.
+
+  '
 hints:
-  - order: 1
-    cost: 10
-    content: "Select the cluster → Configure → vSphere Availability → Edit.
-      Look at the Admission Control section. Note the current 'Host failures cluster
-      tolerates' value (2) and compare to available active hosts (2)."
-  - order: 2
-    cost: 15
-    content: "Change 'Host failures cluster tolerates' from 2 to 1.
-      This is appropriate while one host is in maintenance mode.
-      Document this change and create a task to revert when esxi-03 comes back online."
-  - order: 3
-    cost: 20
-    content: "After changing admission control, retry powering on analytics-01.
-      Also check: Monitor → vSphere HA → Summary to see the current slot size and
-      available capacity. Consider using 'Percentage of cluster resources reserved'
-      instead of slot-based policy for more flexibility."
+- order: 1
+  cost: 0
+  content: 'Where to look: Review the cluster HA configuration and current admission control policy'
+- order: 2
+  cost: 25
+  content: 'Diagnostic steps:
+
+    1. Understand why power-on is being rejected given current host count
+
+    2. Adjust the admission control policy to "1 host failure" to match current capacity
+
+    3. Successfully power on analytics-01 and verify HA is still protecting the cluster'
+- order: 3
+  cost: 50
+  content: 'Exact fix + verification:
+
+    1. Successfully power on analytics-01 and verify HA is still protecting the cluster.
+
+    2. Re-run the lab checker (`check.sh` or Check Solution).
+
+    3. Confirm every scenario objective is satisfied.
+
+
+    WHY: the grader validates real state — marker files are ignored.'
+summary: Complete the ha admission control blocking vm power-on vmware lab and verify success with the
+  checker
+estimated_minutes: 20
+xp_reward: 100
+prerequisites:
+- Basic vmware literacy
+tags:
+- fix
+- hands-on
+- vmware
+linked_tutorial: vmware-fundamentals
+what_you_will_learn:
+- Review the cluster HA configuration and current admission control policy
+- Understand why power-on is being rejected given current host count
+- Adjust the admission control policy to "1 host failure" to match current capacity
+- Successfully power on analytics-01 and verify HA is still protecting the cluster
+environment:
+  nodes:
+  - role: primary
+    os: FixitLab vSphere lab
+    hostname: lab-primary
+    ip: 127.0.0.1
+    specs: local offline simulation
+  pre_installed:
+  - bash
+  - coreutils
+  - journalctl
+  - systemctl
+  - vmware
+  credentials:
+  - user: root
+    password: lab123
+tasks:
+- id: task_1
+  title: HA Admission Control Blocking VM Power-On
+  description: Restore healthy behavior for HA Admission Control Blocking VM Power-On by investigating
+    the failure, applying the smallest safe fix, and validating the outcome.
+  background: 'This vmware lab teaches systematic troubleshooting: observe, hypothesize, change, verify.'
+  validation:
+    type: custom_script
+    script: check.sh
+    error_message: Validation did not pass. Re-read the objectives and Hint 2 diagnostic steps.
+solution:
+  summary: Identify the misconfiguration affecting this vmware lab and apply the minimal fix.
+  files_changed: []
+  commands_run:
+  - bash check.sh
+  reference_docs: vmware-fundamentals

@@ -2,8 +2,8 @@ title: SUID Binary Not Working
 slug: suid-binary-broken
 lab_mode: simulation
 simulation_type: generic
-technology: Linux
-category: Permissions
+technology: linux
+category: Fix
 difficulty: medium
 time_limit: 900
 max_score: 100
@@ -11,10 +11,28 @@ infrastructure_type: docker
 docker_privileged: false
 jira_priority: Medium
 topics_covered: Q19 SUID — chmod u+s
-description: A custom privileged helper no longer works because it lost its SUID bit, so it runs as the
-  calling user instead of its owner (root) and fails its privileged operation. Confirm the missing setuid
-  bit, restore it, and verify the helper runs with elevated privileges again — being mindful that SUID
-  root binaries are security-sensitive.
+description: 'CONTEXT: A team operating Linux administration needs you to resolve `SUID Binary Not Working`
+  during a realistic incident. The business impact is reduced service reliability until the underlying
+  state is repaired.
+
+
+  ENVIRONMENT: You are working in FixitLab''s offline Linux practice server with terminal and config files
+  under /etc and /var. All tools run locally; no paid APIs or external cloud calls are required.
+
+
+  SYMPTOM / STARTING STATE: Linux server where a setuid helper (e.g. /usr/local/bin/reads-shadow) had
+  its SUID bit removed, so it no longer executes with its owner''s privileges. A custom privileged helper
+  no longer works because it lost its SUID bit, so it runs as the calling user instead of its owner (root)
+  and fails its privileged operation. Confirm the missing setuid bit, restore it, and verify the helper
+  runs with elevated privileges again — being mindful that SUID root binaries are security-sensitive.
+
+
+  OBJECTIVE: Confirm the binary is missing its SUID bit (ls -l); Restore the setuid bit on the helper;
+  Verify the helper runs with elevated privileges again. Success means `check.sh` exits successfully.
+
+
+  WHAT TO AVOID: Do not apply broad destructive changes, skip evidence gathering, or fake completion with
+  marker files — the checker validates real system state.'
 objectives:
 - Confirm the binary is missing its SUID bit (ls -l)
 - Restore the setuid bit on the helper
@@ -23,13 +41,70 @@ initial_state: Linux server where a setuid helper (e.g. /usr/local/bin/reads-sha
   removed, so it no longer executes with its owner's privileges.
 hints:
 - order: 1
-  cost: 10
-  content: 'Inspect the binary: `ls -l /usr/local/bin/reads-shadow` — the owner-execute shows `x` instead
-    of `s`, so setuid is gone.'
+  cost: 0
+  content: 'Where to look: Confirm the binary is missing its SUID bit (ls -l)'
 - order: 2
-  cost: 15
-  content: 'Restore it (it must be owned by the intended privileged user, usually root): `chmod u+s /usr/local/bin/reads-shadow`.'
+  cost: 25
+  content: 'Diagnostic steps:
+
+    1. Restore the setuid bit on the helper
+
+    2. Verify the helper runs with elevated privileges again'
 - order: 3
-  cost: 20
-  content: 'Verify: `ls -l` now shows `-rwsr-xr-x` and running the helper as an unprivileged user succeeds
-    in its privileged action. (Only keep SUID on trusted binaries.)'
+  cost: 50
+  content: 'Exact fix + verification:
+
+    1. Verify the helper runs with elevated privileges again.
+
+    2. Re-run the lab checker (`check.sh` or Check Solution).
+
+    3. Confirm every scenario objective is satisfied.
+
+
+    WHY: the grader validates real state — marker files are ignored.'
+summary: Complete the suid binary not working linux lab and verify success with the checker
+estimated_minutes: 15
+xp_reward: 100
+prerequisites:
+- Basic linux literacy
+tags:
+- fix
+- hands-on
+- linux
+linked_tutorial: linux-fundamentals
+what_you_will_learn:
+- Confirm the binary is missing its SUID bit (ls -l)
+- Restore the setuid bit on the helper
+- Verify the helper runs with elevated privileges again
+environment:
+  nodes:
+  - role: primary
+    os: FixitLab Linux practice server
+    hostname: lab-primary
+    ip: 127.0.0.1
+    specs: local offline simulation
+  pre_installed:
+  - bash
+  - coreutils
+  - journalctl
+  - linux
+  - systemctl
+  credentials:
+  - user: root
+    password: lab123
+tasks:
+- id: task_1
+  title: SUID Binary Not Working
+  description: Restore healthy behavior for SUID Binary Not Working by investigating the failure, applying
+    the smallest safe fix, and validating the outcome.
+  background: 'This linux lab teaches systematic troubleshooting: observe, hypothesize, change, verify.'
+  validation:
+    type: custom_script
+    script: check.sh
+    error_message: Validation did not pass. Re-read the objectives and Hint 2 diagnostic steps.
+solution:
+  summary: Identify the misconfiguration affecting this linux lab and apply the minimal fix.
+  files_changed: []
+  commands_run:
+  - bash check.sh
+  reference_docs: linux-fundamentals

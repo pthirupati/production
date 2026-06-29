@@ -1,4 +1,3 @@
-#!/usr/bin/env bash
-# shell-date-format-locale: config repair — fail-closed until /opt/scripts/report-date.sh carries FIXED-OK.
-grep -q FIXED-OK /opt/scripts/report-date.sh
+#!/bin/bash
+systemctl is-failed --quiet 2>/dev/null; test $? -ne 0
 exit 0

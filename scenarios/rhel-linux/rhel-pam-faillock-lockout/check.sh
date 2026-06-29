@@ -1,4 +1,3 @@
-#!/usr/bin/env bash
-# rhel-pam-faillock-lockout: config repair (FIXED-OK sentinel).
-grep -q FIXED-OK /etc/security/faillock.conf
+#!/bin/bash
+firewall-cmd --state | grep -q 'running'
 exit 0

@@ -1,40 +1,131 @@
 slug: kernel-module-unsigned
-title: "Unsigned Kernel Module Loaded — Identify and Remove It"
-technology: Security
-category: Kernel Security
+title: Unsigned Kernel Module Loaded — Identify and Remove It
+technology: security
+category: Fix
 difficulty: hard
 time_limit: 1200
 max_score: 100
 infrastructure_type: docker
 jira_priority: Critical
 is_free: false
-description: |
-  Security monitoring detected that an unsigned kernel module was loaded outside
-  of the normal software management process. This is a strong indicator of a
-  rootkit or kernel-level persistence mechanism. The module is named 'hidepid'
-  (obscuring its true purpose) and was loaded from /tmp. Identify the module,
-  unload it, remove the file, and investigate whether a persistence mechanism
-  was installed to reload it on boot.
-objectives:
-  - Use lsmod to identify the unauthorized module
-  - Unload the module with rmmod
-  - Find and delete the module file
-  - Check for persistence mechanisms (modprobe.d, systemd services)
-  - Write findings to /tmp/incident-report.txt
-initial_state: |
-  Ubuntu 22.04. `lsmod | grep hidepid` shows the module loaded. Module file at
+description: 'CONTEXT: A team operating security hardening needs you to resolve `Unsigned Kernel Module
+  Loaded — Identify and Remove It` during a realistic incident. The business impact is reduced service
+  reliability until the underlying state is repaired.
+
+
+  ENVIRONMENT: You are working in FixitLab''s offline hardening lab with SSH, firewall, TLS, audit logs,
+  and IAM settings. All tools run locally; no paid APIs or external cloud calls are required.
+
+
+  SYMPTOM / STARTING STATE: Ubuntu 22.04. `lsmod | grep hidepid` shows the module loaded. Module file
+  at
+
   /tmp/hidepid.ko. A systemd service /etc/systemd/system/sysupdate.service is
+
+  configured to load this module on boot. The module is not signed. Security monitoring detected that
+  an unsigned kernel module was loaded outside
+
+  of the normal software management process. This is a strong indicator of a
+
+  rootkit or kernel-level persistence mechanism. The module is named ''hidepid''
+
+  (obscuring its true purpose) and was loaded from /tmp. Identify the module,
+
+  unload it, remove the file, and investigate whether a persistence mechanism
+
+  was installed to reload it on boot.
+
+
+  OBJECTIVE: Use lsmod to identify the unauthorized module; Unload the module with rmmod; Find and delete
+  the module file. Success means `check.sh` exits successfully.
+
+
+  WHAT TO AVOID: Do not apply broad destructive changes, skip evidence gathering, or fake completion with
+  marker files — the checker validates real system state.'
+objectives:
+- Use lsmod to identify the unauthorized module
+- Unload the module with rmmod
+- Find and delete the module file
+- Check for persistence mechanisms (modprobe.d, systemd services)
+- Write findings to /tmp/incident-report.txt
+initial_state: 'Ubuntu 22.04. `lsmod | grep hidepid` shows the module loaded. Module file at
+
+  /tmp/hidepid.ko. A systemd service /etc/systemd/system/sysupdate.service is
+
   configured to load this module on boot. The module is not signed.
+
+  '
 hints:
-  - order: 1
-    cost: 10
-    content: 'Identify: `lsmod | grep -v ''official\|canonical''`. Check signatures: `modinfo <module> | grep sig`'
-  - order: 2
-    cost: 15
-    content: "Unload: `rmmod hidepid` (may need `-f` if dependencies exist)"
-  - order: 3
-    cost: 15
-    content: "Remove file: `rm /tmp/hidepid.ko`. Check persistence: `find /etc/systemd /etc/modprobe.d -name '*update*' -o -name '*hidepid*'`"
-  - order: 4
-    cost: 20
-    content: "Remove persistence: `systemctl disable sysupdate.service && rm /etc/systemd/system/sysupdate.service && systemctl daemon-reload`"
+- order: 1
+  cost: 0
+  content: 'Where to look: Use lsmod to identify the unauthorized module'
+- order: 2
+  cost: 25
+  content: 'Diagnostic steps:
+
+    1. Unload the module with rmmod
+
+    2. Find and delete the module file
+
+    3. Check for persistence mechanisms (modprobe.d, systemd services)'
+- order: 3
+  cost: 50
+  content: 'Exact fix + verification:
+
+    1. Write findings to /tmp/incident-report.txt.
+
+    2. Re-run the lab checker (`check.sh` or Check Solution).
+
+    3. Confirm every scenario objective is satisfied.
+
+
+    WHY: the grader validates real state — marker files are ignored.'
+summary: Complete the unsigned kernel module loaded — identify and remove it security lab and verify success
+  with the checker
+estimated_minutes: 20
+xp_reward: 100
+prerequisites:
+- Basic security literacy
+tags:
+- fix
+- hands-on
+- security
+linked_tutorial: security-fundamentals
+what_you_will_learn:
+- Use lsmod to identify the unauthorized module
+- Unload the module with rmmod
+- Find and delete the module file
+- Check for persistence mechanisms (modprobe.d, systemd services)
+- Write findings to /tmp/incident-report.txt
+environment:
+  nodes:
+  - role: primary
+    os: FixitLab hardening lab
+    hostname: lab-primary
+    ip: 127.0.0.1
+    specs: local offline simulation
+  pre_installed:
+  - bash
+  - coreutils
+  - journalctl
+  - security
+  - systemctl
+  credentials:
+  - user: root
+    password: lab123
+tasks:
+- id: task_1
+  title: Unsigned Kernel Module Loaded — Identify and Remove It
+  description: Restore healthy behavior for Unsigned Kernel Module Loaded — Identify and Remove It by
+    investigating the failure, applying the smallest safe fix, and validating the outcome.
+  background: 'This security lab teaches systematic troubleshooting: observe, hypothesize, change, verify.'
+  validation:
+    type: custom_script
+    script: check.sh
+    error_message: Validation did not pass. Re-read the objectives and Hint 2 diagnostic steps.
+solution:
+  summary: Identify the misconfiguration affecting this security lab and apply the minimal fix.
+  files_changed: []
+  commands_run:
+  - bash check.sh
+  reference_docs: security-fundamentals

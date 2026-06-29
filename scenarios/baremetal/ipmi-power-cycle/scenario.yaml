@@ -1,21 +1,52 @@
-category: Bare Metal & IPMI
-description: A bare-metal server has become unresponsive (hung OS, no SSH, no console response) and must
-  be recovered out-of-band. Using the IPMI/BMC interface, check the current chassis power state and perform
-  a controlled power cycle to bring the host back, then confirm it powers on.
+category: Fix
+description: 'CONTEXT: A team operating bare metal operations needs you to resolve `IPMI Power Cycle`
+  during a realistic incident. The business impact is reduced service reliability until the underlying
+  state is repaired.
+
+
+  ENVIRONMENT: You are working in FixitLab''s offline physical server lab with IPMI, RAID, BIOS, and out-of-band
+  console. All tools run locally; no paid APIs or external cloud calls are required.
+
+
+  SYMPTOM / STARTING STATE: Simulated bare-metal host reachable only via its BMC/IPMI interface. The operating
+  system is hung and unreachable in-band; power must be managed through ipmitool. A bare-metal server
+  has become unresponsive (hung OS, no SSH, no console response) and must be recovered out-of-band. Using
+  the IPMI/BMC interface, check the current chassis power state and perform a controlled power cycle to
+  bring the host back, then confirm it powers on.
+
+
+  OBJECTIVE: Query the current chassis power state via IPMI; Perform a power cycle (or off/on) on the
+  unresponsive host; Confirm the server powers back on after the cycle. Success means `check.sh` exits
+  successfully.
+
+
+  WHAT TO AVOID: Do not apply broad destructive changes, skip evidence gathering, or fake completion with
+  marker files — the checker validates real system state.'
 difficulty: easy
 dual_terminal: false
 hints:
 - order: 1
-  cost: 10
-  content: 'Check current state out-of-band: `ipmitool chassis power status` (or `ipmitool power status`).'
+  cost: 0
+  content: 'Where to look: Query the current chassis power state via IPMI'
 - order: 2
-  cost: 15
-  content: 'Cycle power to recover the hung host: `ipmitool chassis power cycle`. If it''s already off,
-    use `ipmitool chassis power on`.'
+  cost: 25
+  content: 'Diagnostic steps:
+
+    1. Perform a power cycle (or off/on) on the unresponsive host
+
+    2. Confirm the server powers back on after the cycle'
 - order: 3
-  cost: 20
-  content: Re-query `ipmitool chassis power status` and confirm it reports "on". Watch the SOL console
-    (`ipmitool sol activate`) to verify it boots back up.
+  cost: 50
+  content: 'Exact fix + verification:
+
+    1. Confirm the server powers back on after the cycle.
+
+    2. Re-run the lab checker (`check.sh` or Check Solution).
+
+    3. Confirm every scenario objective is satisfied.
+
+
+    WHY: the grader validates real state — marker files are ignored.'
 initial_state: Simulated bare-metal host reachable only via its BMC/IPMI interface. The operating system
   is hung and unreachable in-band; power must be managed through ipmitool.
 is_free: false
@@ -31,3 +62,50 @@ simulation_type: baremetal
 slug: sim-baremetal-ipmi
 time_limit: 900
 title: IPMI Power Cycle
+technology: baremetal
+summary: Complete the ipmi power cycle baremetal lab and verify success with the checker
+estimated_minutes: 15
+xp_reward: 100
+prerequisites:
+- Basic baremetal literacy
+tags:
+- baremetal
+- fix
+- hands-on
+linked_tutorial: baremetal-fundamentals
+what_you_will_learn:
+- Query the current chassis power state via IPMI
+- Perform a power cycle (or off/on) on the unresponsive host
+- Confirm the server powers back on after the cycle
+environment:
+  nodes:
+  - role: primary
+    os: FixitLab physical server lab
+    hostname: lab-primary
+    ip: 127.0.0.1
+    specs: local offline simulation
+  pre_installed:
+  - baremetal
+  - bash
+  - coreutils
+  - journalctl
+  - systemctl
+  credentials:
+  - user: root
+    password: lab123
+tasks:
+- id: task_1
+  title: IPMI Power Cycle
+  description: Restore healthy behavior for IPMI Power Cycle by investigating the failure, applying the
+    smallest safe fix, and validating the outcome.
+  background: 'This baremetal lab teaches systematic troubleshooting: observe, hypothesize, change, verify.'
+  validation:
+    type: custom_script
+    script: check.sh
+    error_message: Validation did not pass. Re-read the objectives and Hint 2 diagnostic steps.
+solution:
+  summary: Identify the misconfiguration affecting this baremetal lab and apply the minimal fix.
+  files_changed: []
+  commands_run:
+  - bash check.sh
+  reference_docs: baremetal-fundamentals

@@ -1,14 +1,28 @@
 slug: world-writable-files
 title: World-Writable Files in /etc — Fix Permissions
-technology: Security
-category: File Permissions
+technology: security
+category: Fix
 difficulty: easy
 time_limit: 600
 max_score: 100
 infrastructure_type: docker
 jira_priority: High
 is_free: true
-description: 'A security scan flagged several world-writable files in /etc, including critical
+description: 'CONTEXT: A team operating security hardening needs you to resolve `World-Writable Files
+  in /etc — Fix Permissions` during a realistic incident. The business impact is reduced service reliability
+  until the underlying state is repaired.
+
+
+  ENVIRONMENT: You are working in FixitLab''s offline hardening lab with SSH, firewall, TLS, audit logs,
+  and IAM settings. All tools run locally; no paid APIs or external cloud calls are required.
+
+
+  SYMPTOM / STARTING STATE: Ubuntu 22.04. Multiple files in /etc are world-writable (mode 777 or o+w).
+
+  At minimum: /etc/cron.d/app (777), /etc/logrotate.d/myapp (666).
+
+  `find /etc -perm -o+w` returns several results. A security scan flagged several world-writable files
+  in /etc, including critical
 
   configuration files like /etc/cron.d/app and /etc/logrotate.d/myapp. World-writable
 
@@ -18,7 +32,13 @@ description: 'A security scan flagged several world-writable files in /etc, incl
 
   files in /etc and remove the write permission for others.
 
-  '
+
+  OBJECTIVE: Find all world-writable files in /etc using find; Remove the world-writable bit from each
+  identified file; Verify no world-writable files remain in /etc. Success means `check.sh` exits successfully.
+
+
+  WHAT TO AVOID: Do not apply broad destructive changes, skip evidence gathering, or fake completion with
+  marker files — the checker validates real system state.'
 objectives:
 - Find all world-writable files in /etc using find
 - Remove the world-writable bit from each identified file
@@ -33,16 +53,74 @@ initial_state: 'Ubuntu 22.04. Multiple files in /etc are world-writable (mode 77
   '
 hints:
 - order: 1
-  cost: 10
-  content: 'Find the offenders: `find /etc -perm -o+w -type f 2>/dev/null` lists world-writable files,
-    including sensitive ones like /etc/cron.d/app and /etc/logrotate.d/myapp.'
+  cost: 0
+  content: 'Where to look: Find all world-writable files in /etc using find'
 - order: 2
-  cost: 15
-  content: 'Fix an individual file: `chmod o-w /etc/cron.d/app`.'
-- order: 3
-  cost: 20
-  content: 'Remediate them all at once: `find /etc -perm -o+w -type f -exec chmod o-w {} \;`.'
-- order: 4
   cost: 25
-  content: 'Verify nothing remains: `find /etc -perm -o+w -type f 2>/dev/null` returns no output — no
-    config under /etc is world-writable.'
+  content: 'Diagnostic steps:
+
+    1. Remove the world-writable bit from each identified file
+
+    2. Verify no world-writable files remain in /etc
+
+    3. Identify which process likely caused the misconfiguration'
+- order: 3
+  cost: 50
+  content: 'Exact fix + verification:
+
+    1. Identify which process likely caused the misconfiguration.
+
+    2. Re-run the lab checker (`check.sh` or Check Solution).
+
+    3. Confirm every scenario objective is satisfied.
+
+
+    WHY: the grader validates real state — marker files are ignored.'
+summary: Complete the world-writable files in /etc — fix permissions security lab and verify success with
+  the checker
+estimated_minutes: 10
+xp_reward: 100
+prerequisites:
+- Basic security literacy
+tags:
+- fix
+- hands-on
+- security
+linked_tutorial: security-fundamentals
+what_you_will_learn:
+- Find all world-writable files in /etc using find
+- Remove the world-writable bit from each identified file
+- Verify no world-writable files remain in /etc
+- Identify which process likely caused the misconfiguration
+environment:
+  nodes:
+  - role: primary
+    os: FixitLab hardening lab
+    hostname: lab-primary
+    ip: 127.0.0.1
+    specs: local offline simulation
+  pre_installed:
+  - bash
+  - coreutils
+  - journalctl
+  - security
+  - systemctl
+  credentials:
+  - user: root
+    password: lab123
+tasks:
+- id: task_1
+  title: World-Writable Files in /etc — Fix Permissions
+  description: Restore healthy behavior for World-Writable Files in /etc — Fix Permissions by investigating
+    the failure, applying the smallest safe fix, and validating the outcome.
+  background: 'This security lab teaches systematic troubleshooting: observe, hypothesize, change, verify.'
+  validation:
+    type: custom_script
+    script: check.sh
+    error_message: Validation did not pass. Re-read the objectives and Hint 2 diagnostic steps.
+solution:
+  summary: Identify the misconfiguration affecting this security lab and apply the minimal fix.
+  files_changed: []
+  commands_run:
+  - bash check.sh
+  reference_docs: security-fundamentals

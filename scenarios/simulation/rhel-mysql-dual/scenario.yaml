@@ -66,57 +66,56 @@ hints:
 
 
     WHY: the simulation engine validates real service state. A marker file or note is ignored.'
-summary: Diagnose and restore a rhel mysql dual simulation workflow, then prove the real state is healthy.
+summary: 'Complete the rhel simulation: mysql down (dual terminal) simulation lab and verify success with
+  the checker'
 estimated_minutes: 15
 xp_reward: 100
 prerequisites:
 - Basic Linux terminal navigation
 - Reading systemd service status
 tags:
+- fix
+- hands-on
 - real-validation
 - rhel
 - simulation
 - systemd
-linked_tutorial: simulation-labs-fundamentals
+linked_tutorial: simulation-fundamentals
 what_you_will_learn:
-- Recognize the unhealthy simulation signal for rhel mysql dual
-- Use command output and logs to diagnose mysqld
-- Apply a minimal operational fix without relying on marker files
-- Verify the repaired state with the same command the grader uses
+- From the SSH client, confirm mysqladmin ping fails while mysqld is down
+- Start mysqld on the server console
+- Verify the remote mysqladmin ping from the client now succeeds
 environment:
   nodes:
   - role: primary
-    os: FixitLab RHEL-like simulation
-    hostname: sim-primary
+    os: FixitLab simulation sandbox
+    hostname: lab-primary
     ip: 127.0.0.1
-    specs: local in-memory simulation
+    specs: local offline simulation
   pre_installed:
   - bash
-  - systemctl
-  - journalctl
   - coreutils
+  - journalctl
+  - simulation
+  - systemctl
   credentials:
   - user: root
     password: lab123
 tasks:
 - id: task_1
   title: 'RHEL Simulation: MySQL Down (Dual Terminal)'
-  description: Restore the rhel mysql dual simulation workflow by diagnosing the failed service state,
-    applying the smallest safe fix, and proving the service is healthy.
-  background: FixitLab simulation labs model real operating-system state. The checker reads that state
-    directly, so the lab only passes when the system itself is repaired.
+  description: 'Restore healthy behavior for RHEL Simulation: MySQL Down (Dual Terminal) by investigating
+    the failure, applying the smallest safe fix, and validating the outcome.'
+  background: 'This simulation lab teaches systematic troubleshooting: observe, hypothesize, change, verify.'
   validation:
     type: service_active
     command: systemctl is-active mysqld
     expected_status: active
     error_message: The mysqld service is not active yet. Check `systemctl status mysqld` and `journalctl
-      -u mysqld -n 50` for the remaining blocker.
+      -u mysqld -n 50`.
 solution:
   summary: The root cause is an inactive/failed `mysqld` service; start it and verify active state.
   files_changed: []
   commands_run:
-  - systemctl status mysqld
-  - journalctl -u mysqld -n 50
-  - systemctl start mysqld
   - systemctl is-active mysqld
-  reference_docs: 'linked tutorial: simulation-labs-fundamentals'
+  reference_docs: simulation-fundamentals

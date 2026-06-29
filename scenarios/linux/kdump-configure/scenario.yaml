@@ -1,41 +1,136 @@
 title: Configure kdump to Capture Kernel Crash Dumps
 slug: linux-kdump-configure
 difficulty: medium
-category: Linux Administration
-description: |
-  The server had an unexpected kernel panic last week but no vmcore dump was captured
+category: Fix
+description: 'CONTEXT: A team operating Linux administration needs you to resolve `Configure kdump to
+  Capture Kernel Crash Dumps` during a realistic incident. The business impact is reduced service reliability
+  until the underlying state is repaired.
+
+
+  ENVIRONMENT: You are working in FixitLab''s offline Linux practice server with terminal and config files
+  under /etc and /var. All tools run locally; no paid APIs or external cloud calls are required.
+
+
+  SYMPTOM / STARTING STATE: Simulated RHEL 9 server. systemctl status kdump shows "Unit kdump.service
+  could not
+
+  be found". The /etc/default/grub file does not have crashkernel= in GRUB_CMDLINE_LINUX.
+
+  The previous kernel panic left no trace in /var/crash/ because kdump was absent. The server had an unexpected
+  kernel panic last week but no vmcore dump was captured
+
   for analysis because kdump was not configured. kdump uses kexec to boot a capture
+
   kernel when the main kernel crashes and saves the memory dump to disk. It must be
+
   properly installed and configured so future crashes produce a vmcore that can be
+
   analyzed with crash or gdb.
 
-initial_state: |
-  Simulated RHEL 9 server. systemctl status kdump shows "Unit kdump.service could not
+
+  OBJECTIVE: Install kexec-tools with yum install -y kexec-tools; Add crashkernel=auto to GRUB_CMDLINE_LINUX
+  in /etc/default/grub; Regenerate GRUB config with grub2-mkconfig -o /boot/grub2/grub.cfg. Success means
+  `check.sh` exits successfully.
+
+
+  WHAT TO AVOID: Do not apply broad destructive changes, skip evidence gathering, or fake completion with
+  marker files — the checker validates real system state.'
+initial_state: 'Simulated RHEL 9 server. systemctl status kdump shows "Unit kdump.service could not
+
   be found". The /etc/default/grub file does not have crashkernel= in GRUB_CMDLINE_LINUX.
+
   The previous kernel panic left no trace in /var/crash/ because kdump was absent.
 
+  '
 objectives:
-  - Install kexec-tools with yum install -y kexec-tools
-  - Add crashkernel=auto to GRUB_CMDLINE_LINUX in /etc/default/grub
-  - Regenerate GRUB config with grub2-mkconfig -o /boot/grub2/grub.cfg
-  - Configure /etc/kdump.conf to set path /var/crash and core_collector makedumpfile -l --message-level 1
-  - Enable and start kdump with systemctl enable --now kdump
-  - Reboot and verify kdump service is active after reboot
+- Install kexec-tools with yum install -y kexec-tools
+- Add crashkernel=auto to GRUB_CMDLINE_LINUX in /etc/default/grub
+- Regenerate GRUB config with grub2-mkconfig -o /boot/grub2/grub.cfg
+- Configure /etc/kdump.conf to set path /var/crash and core_collector makedumpfile -l --message-level
+  1
+- Enable and start kdump with systemctl enable --now kdump
+- Reboot and verify kdump service is active after reboot
 lab_mode: simulation
 simulation_type: generic
 time_limit: 900
 max_score: 100
 is_free: false
 hints:
-  - content: 'After adding crashkernel=auto to /etc/default/grub, run grub2-mkconfig -o /boot/grub2/grub.cfg to regenerate. A reboot is required for the crashkernel memory reservation to take effect.'
-    cost: 10
-    order: 1
-  - content: 'Key /etc/kdump.conf settings: path /var/crash (dump destination) and core_collector makedumpfile -l --message-level 1 -d 31 (compress dump, exclude unnecessary pages).'
-    cost: 20
-    order: 2
-  - content: 'Verify kdump is ready after reboot with: systemctl status kdump — it should show "Kdump is operational". If it shows failed, check available memory for the capture kernel.'
-    cost: 15
-    order: 3
+- order: 1
+  cost: 0
+  content: 'Where to look: Run `df -h` and `du -xh /var /tmp /home | sort -h | tail -20` for large paths.'
+- order: 2
+  cost: 25
+  content: 'Diagnostic steps:
+
+    1. Find which mount is 100% — often `/` or `/var`.
+
+    2. `journalctl --disk-usage` and old logs under `/var/log`.
+
+    3. Look for core dumps, temp files, or oversized application data.'
+- order: 3
+  cost: 50
+  content: 'Exact fix + verification:
+
+    1. Remove or rotate the largest safe files (logs, caches, old packages).
+
+    2. `df -h` should show free space on the affected mount.
+
+    3. Retry the command that failed with ''No space left on device''.
+
+
+    WHY: many services fail cryptically when disk is full.'
 requires_companion_hosts: false
 dual_terminal: false
 jira_priority: Medium
+technology: linux
+summary: Complete the configure kdump to capture kernel crash dumps linux lab and verify success with
+  the checker
+estimated_minutes: 15
+xp_reward: 100
+prerequisites:
+- Basic linux literacy
+tags:
+- fix
+- hands-on
+- linux
+linked_tutorial: linux-fundamentals
+what_you_will_learn:
+- Install kexec-tools with yum install -y kexec-tools
+- Add crashkernel=auto to GRUB_CMDLINE_LINUX in /etc/default/grub
+- Regenerate GRUB config with grub2-mkconfig -o /boot/grub2/grub.cfg
+- Configure /etc/kdump.conf to set path /var/crash and core_collector makedumpfile -l --message-level
+  1
+- Enable and start kdump with systemctl enable --now kdump
+environment:
+  nodes:
+  - role: primary
+    os: FixitLab Linux practice server
+    hostname: lab-primary
+    ip: 127.0.0.1
+    specs: local offline simulation
+  pre_installed:
+  - bash
+  - coreutils
+  - journalctl
+  - linux
+  - systemctl
+  credentials:
+  - user: root
+    password: lab123
+tasks:
+- id: task_1
+  title: Configure kdump to Capture Kernel Crash Dumps
+  description: Restore healthy behavior for Configure kdump to Capture Kernel Crash Dumps by investigating
+    the failure, applying the smallest safe fix, and validating the outcome.
+  background: 'This linux lab teaches systematic troubleshooting: observe, hypothesize, change, verify.'
+  validation:
+    type: custom_script
+    script: check.sh
+    error_message: Validation did not pass. Re-read the objectives and Hint 2 diagnostic steps.
+solution:
+  summary: Identify the misconfiguration affecting this linux lab and apply the minimal fix.
+  files_changed: []
+  commands_run:
+  - bash check.sh
+  reference_docs: linux-fundamentals

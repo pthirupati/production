@@ -1,22 +1,51 @@
-category: Python Development
-description: 'A Python script fails with "ModuleNotFoundError: No module named X" because a required third-party
-  package is not installed in the active environment. Identify the missing dependency, install it (ideally
-  pinned via requirements), and confirm the script imports and runs.'
+category: Fix
+description: 'CONTEXT: A team operating Python development needs you to resolve `Missing Python Package`
+  during a realistic incident. The business impact is reduced service reliability until the underlying
+  state is repaired.
+
+
+  ENVIRONMENT: You are working in FixitLab''s offline Python project workspace with source files, venv,
+  tests, and CLI entrypoints. All tools run locally; no paid APIs or external cloud calls are required.
+
+
+  SYMPTOM / STARTING STATE: Python environment where a script imports a third-party package that isn''t
+  installed. Running it raises ModuleNotFoundError for that package. A Python script fails with "ModuleNotFoundError:
+  No module named X" because a required third-party package is not installed in the active environment.
+  Identify the missing dependency, install it (ideally pinned via requirements), and confirm the script
+  imports and runs.
+
+
+  OBJECTIVE: Identify the missing module from the traceback; Install the correct package into the active
+  environment; Confirm the script imports and runs successfully. Success means `check.sh` exits successfully.
+
+
+  WHAT TO AVOID: Do not apply broad destructive changes, skip evidence gathering, or fake completion with
+  marker files — the checker validates real system state.'
 difficulty: easy
 dual_terminal: false
 hints:
 - order: 1
-  cost: 10
-  content: 'Run the script and read the error: `ModuleNotFoundError: No module named ''requests''` names
-    the missing import. Confirm it''s absent: `pip show requests`.'
+  cost: 0
+  content: 'Where to look: Identify the missing module from the traceback'
 - order: 2
-  cost: 15
-  content: 'Install it into the active interpreter (note the import name can differ from the package name,
-    e.g. `import cv2` → `pip install opencv-python`): `pip install requests`.'
+  cost: 25
+  content: 'Diagnostic steps:
+
+    1. Install the correct package into the active environment
+
+    2. Confirm the script imports and runs successfully'
 - order: 3
-  cost: 20
-  content: Re-run the script — the import resolves. Pin it for reproducibility by adding it to requirements.txt
-    (`pip freeze | grep requests >> requirements.txt`).
+  cost: 50
+  content: 'Exact fix + verification:
+
+    1. Confirm the script imports and runs successfully.
+
+    2. Re-run the lab checker (`check.sh` or Check Solution).
+
+    3. Confirm every scenario objective is satisfied.
+
+
+    WHY: the grader validates real state — marker files are ignored.'
 initial_state: Python environment where a script imports a third-party package that isn't installed. Running
   it raises ModuleNotFoundError for that package.
 is_free: false
@@ -32,3 +61,50 @@ simulation_type: python
 slug: sim-python-pip-missing
 time_limit: 900
 title: Missing Python Package
+technology: python
+summary: Complete the missing python package python lab and verify success with the checker
+estimated_minutes: 15
+xp_reward: 100
+prerequisites:
+- Basic python literacy
+tags:
+- fix
+- hands-on
+- python
+linked_tutorial: python-fundamentals
+what_you_will_learn:
+- Identify the missing module from the traceback
+- Install the correct package into the active environment
+- Confirm the script imports and runs successfully
+environment:
+  nodes:
+  - role: primary
+    os: FixitLab Python project workspace
+    hostname: lab-primary
+    ip: 127.0.0.1
+    specs: local offline simulation
+  pre_installed:
+  - bash
+  - coreutils
+  - pip
+  - python
+  - python3
+  credentials:
+  - user: root
+    password: lab123
+tasks:
+- id: task_1
+  title: Missing Python Package
+  description: Restore healthy behavior for Missing Python Package by investigating the failure, applying
+    the smallest safe fix, and validating the outcome.
+  background: 'This python lab teaches systematic troubleshooting: observe, hypothesize, change, verify.'
+  validation:
+    type: custom_script
+    script: check.sh
+    error_message: Validation did not pass. Re-read the objectives and Hint 2 diagnostic steps.
+solution:
+  summary: Identify the misconfiguration affecting this python lab and apply the minimal fix.
+  files_changed: []
+  commands_run:
+  - bash check.sh
+  reference_docs: python-fundamentals

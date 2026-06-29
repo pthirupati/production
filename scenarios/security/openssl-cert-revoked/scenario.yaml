@@ -1,38 +1,130 @@
 slug: openssl-cert-revoked
-title: "Certificate Revoked — Update CRL and Reconfigure Verification"
-technology: Security
-category: PKI/Certificates
+title: Certificate Revoked - Update CRL and Reconfigure
+technology: security
+category: Fix
 difficulty: hard
 time_limit: 1200
 max_score: 100
 infrastructure_type: docker
 jira_priority: Critical
 is_free: false
-description: |
-  The internal CA has revoked a service certificate after a private key compromise.
-  Services that perform CRL checking are now rejecting connections from this service.
-  However, the CRL configured in nginx is outdated — it was last downloaded 30 days
-  ago and doesn't include the revocation. Update the CRL, configure nginx to use
-  the fresh CRL, and ensure CRL checking is properly enforced for client certificates.
-objectives:
-  - Download the current CRL from the internal CA
-  - Convert the CRL to PEM format if necessary
-  - Update the ssl_crl directive in nginx to point to the new CRL
-  - Reload nginx and verify revoked certificates are rejected
-initial_state: |
-  Ubuntu 22.04 with nginx. ssl_crl=/etc/nginx/ssl/ca.crl (outdated, 30 days old).
+description: 'CONTEXT: A team operating security hardening needs you to resolve `Certificate Revoked -
+  Update CRL and Reconfigure` during a realistic incident. The business impact is reduced service reliability
+  until the underlying state is repaired.
+
+
+  ENVIRONMENT: You are working in FixitLab''s offline hardening lab with SSH, firewall, TLS, audit logs,
+  and IAM settings. All tools run locally; no paid APIs or external cloud calls are required.
+
+
+  SYMPTOM / STARTING STATE: Ubuntu 22.04 with nginx. ssl_crl=/etc/nginx/ssl/ca.crl (outdated, 30 days
+  old).
+
   New CRL available at http://ca.internal/crl/latest.crl.
+
+  A test with a revoked certificate returns 200 instead of 400/403 — not being checked. The internal CA
+  has revoked a service certificate after a private key compromise.
+
+  Services that perform CRL checking are now rejecting connections from this service.
+
+  However, the CRL configured in nginx is outdated — it was last downloaded 30 days
+
+  ago and doesn''t include the revocation. Update the CRL, configure nginx to use
+
+  the fresh CRL, and ensure CRL checking is properly enforced for client certificates.
+
+
+  OBJECTIVE: Download the current CRL from the internal CA; Convert the CRL to PEM format if necessary;
+  Update the ssl_crl directive in nginx to point to the new CRL. Success means `systemctl is-active --quiet`
+  returns active.
+
+
+  WHAT TO AVOID: Do not apply broad destructive changes, skip evidence gathering, or fake completion with
+  marker files — the checker validates real system state.'
+objectives:
+- Download the current CRL from the internal CA
+- Convert the CRL to PEM format if necessary
+- Update the ssl_crl directive in nginx to point to the new CRL
+- Reload nginx and verify revoked certificates are rejected
+initial_state: 'Ubuntu 22.04 with nginx. ssl_crl=/etc/nginx/ssl/ca.crl (outdated, 30 days old).
+
+  New CRL available at http://ca.internal/crl/latest.crl.
+
   A test with a revoked certificate returns 200 instead of 400/403 — not being checked.
+
+  '
 hints:
-  - order: 1
-    cost: 10
-    content: "Download new CRL: `curl -o /tmp/latest.crl http://ca.internal/crl/latest.crl`"
-  - order: 2
-    cost: 15
-    content: "Verify and convert: `openssl crl -in /tmp/latest.crl -inform DER -out /etc/nginx/ssl/ca.crl -outform PEM`"
-  - order: 3
-    cost: 10
-    content: "Check nginx config has: `ssl_verify_client on;` and `ssl_crl /etc/nginx/ssl/ca.crl;`"
-  - order: 4
-    cost: 10
-    content: "Reload: `nginx -t && systemctl reload nginx`. Test with revoked cert — should get 400 Bad Request."
+- order: 1
+  cost: 0
+  content: 'Where to look: Run `systemctl status sshd` and `ss -tlnp | grep :22` on the target host.'
+- order: 2
+  cost: 25
+  content: 'Diagnostic steps:
+
+    1. Confirm sshd is active and listening on port 22.
+
+    2. Check `firewall-cmd` or iptables for blocked port 22.
+
+    3. Read `/var/log/secure` for auth or config errors.'
+- order: 3
+  cost: 50
+  content: 'Exact fix + verification:
+
+    1. Fix sshd_config, firewall, or socket unit as needed.
+
+    2. `systemctl restart sshd`.
+
+    3. `ssh -o BatchMode=yes user@localhost echo ok` succeeds.
+
+
+    WHY: SSH failures are usually service, firewall, or config — not credentials alone.'
+summary: Complete the certificate revoked - update crl and reconfigure security lab and verify success
+  with the checker
+estimated_minutes: 20
+xp_reward: 100
+prerequisites:
+- Basic security literacy
+tags:
+- fix
+- hands-on
+- security
+linked_tutorial: security-fundamentals
+what_you_will_learn:
+- Download the current CRL from the internal CA
+- Convert the CRL to PEM format if necessary
+- Update the ssl_crl directive in nginx to point to the new CRL
+- Reload nginx and verify revoked certificates are rejected
+environment:
+  nodes:
+  - role: primary
+    os: FixitLab hardening lab
+    hostname: lab-primary
+    ip: 127.0.0.1
+    specs: local offline simulation
+  pre_installed:
+  - bash
+  - coreutils
+  - journalctl
+  - security
+  - systemctl
+  credentials:
+  - user: root
+    password: lab123
+tasks:
+- id: task_1
+  title: Certificate Revoked - Update CRL and Reconfigure
+  description: Restore healthy behavior for Certificate Revoked - Update CRL and Reconfigure by investigating
+    the failure, applying the smallest safe fix, and validating the outcome.
+  background: 'This security lab teaches systematic troubleshooting: observe, hypothesize, change, verify.'
+  validation:
+    type: service_active
+    command: systemctl is-active --quiet
+    expected_status: active
+    error_message: The --quiet service is not active yet. Check `systemctl status --quiet` and `journalctl
+      -u --quiet -n 50`.
+solution:
+  summary: The root cause is an unhealthy `--quiet` service; repair it and verify active state.
+  files_changed: []
+  commands_run:
+  - systemctl is-active --quiet
+  reference_docs: security-fundamentals

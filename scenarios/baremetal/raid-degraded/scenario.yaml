@@ -1,10 +1,30 @@
 title: RAID Array Degraded
 slug: sim-bm-raid-degraded
-category: Bare Metal & IPMI
+category: Fix
 difficulty: medium
-description: A software RAID-1 array (/dev/md0) is running in a degraded state — one of its member disks
-  has failed and the array is operating on a single drive with no redundancy. Identify the failed disk,
-  remove it, add a healthy replacement, and let the array rebuild back to a clean redundant state.
+description: 'CONTEXT: A team operating bare metal operations needs you to resolve `RAID Array Degraded`
+  during a realistic incident. The business impact is reduced service reliability until the underlying
+  state is repaired.
+
+
+  ENVIRONMENT: You are working in FixitLab''s offline physical server lab with IPMI, RAID, BIOS, and out-of-band
+  console. All tools run locally; no paid APIs or external cloud calls are required.
+
+
+  SYMPTOM / STARTING STATE: Simulated bare-metal RHEL host. mdadm reports /dev/md0 (RAID-1) as degraded:
+  one member is [F]/removed, the array is active on the remaining disk, and redundancy is lost. A software
+  RAID-1 array (/dev/md0) is running in a degraded state — one of its member disks has failed and the
+  array is operating on a single drive with no redundancy. Identify the failed disk, remove it, add a
+  healthy replacement, and let the array rebuild back to a clean redundant state.
+
+
+  OBJECTIVE: Inspect the array and identify the failed member disk; Remove the failed disk and add a healthy
+  replacement; Confirm the array rebuilds and returns to a clean, redundant state. Success means `check.sh`
+  exits successfully.
+
+
+  WHAT TO AVOID: Do not apply broad destructive changes, skip evidence gathering, or fake completion with
+  marker files — the checker validates real system state.'
 initial_state: 'Simulated bare-metal RHEL host. mdadm reports /dev/md0 (RAID-1) as degraded: one member
   is [F]/removed, the array is active on the remaining disk, and redundancy is lost.'
 lab_mode: simulation
@@ -21,14 +41,73 @@ objectives:
 - Confirm the array rebuilds and returns to a clean, redundant state
 hints:
 - order: 1
-  cost: 10
-  content: 'Inspect the array: `mdadm --detail /dev/md0` and `cat /proc/mdstat`. The failed disk is marked
-    (F) or shows as removed; note which device it is.'
+  cost: 0
+  content: 'Where to look: Run `df -h` and `du -xh /var /tmp /home | sort -h | tail -20` for large paths.'
 - order: 2
-  cost: 15
-  content: 'Remove the failed member, then add the replacement disk: `mdadm /dev/md0 --remove /dev/sdX`
-    then `mdadm /dev/md0 --add /dev/sdY`.'
+  cost: 25
+  content: 'Diagnostic steps:
+
+    1. Find which mount is 100% — often `/` or `/var`.
+
+    2. `journalctl --disk-usage` and old logs under `/var/log`.
+
+    3. Look for core dumps, temp files, or oversized application data.'
 - order: 3
-  cost: 20
-  content: 'Watch the rebuild: `cat /proc/mdstat` shows a recovery progress bar. When it finishes, `mdadm
-    --detail /dev/md0` reports State: clean and both members active/in-sync.'
+  cost: 50
+  content: 'Exact fix + verification:
+
+    1. Remove or rotate the largest safe files (logs, caches, old packages).
+
+    2. `df -h` should show free space on the affected mount.
+
+    3. Retry the command that failed with ''No space left on device''.
+
+
+    WHY: many services fail cryptically when disk is full.'
+technology: baremetal
+summary: Complete the raid array degraded baremetal lab and verify success with the checker
+estimated_minutes: 15
+xp_reward: 100
+prerequisites:
+- Basic baremetal literacy
+tags:
+- baremetal
+- fix
+- hands-on
+linked_tutorial: baremetal-fundamentals
+what_you_will_learn:
+- Inspect the array and identify the failed member disk
+- Remove the failed disk and add a healthy replacement
+- Confirm the array rebuilds and returns to a clean, redundant state
+environment:
+  nodes:
+  - role: primary
+    os: FixitLab physical server lab
+    hostname: lab-primary
+    ip: 127.0.0.1
+    specs: local offline simulation
+  pre_installed:
+  - baremetal
+  - bash
+  - coreutils
+  - journalctl
+  - systemctl
+  credentials:
+  - user: root
+    password: lab123
+tasks:
+- id: task_1
+  title: RAID Array Degraded
+  description: Restore healthy behavior for RAID Array Degraded by investigating the failure, applying
+    the smallest safe fix, and validating the outcome.
+  background: 'This baremetal lab teaches systematic troubleshooting: observe, hypothesize, change, verify.'
+  validation:
+    type: custom_script
+    script: check.sh
+    error_message: Validation did not pass. Re-read the objectives and Hint 2 diagnostic steps.
+solution:
+  summary: Identify the misconfiguration affecting this baremetal lab and apply the minimal fix.
+  files_changed: []
+  commands_run:
+  - bash check.sh
+  reference_docs: baremetal-fundamentals

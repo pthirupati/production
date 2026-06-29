@@ -1,9 +1,28 @@
 title: Enable HA and DRS on Production Cluster
 slug: vmware-enable-ha-drs
-category: VMware vSphere
-description: After maintenance, Cluster-01 has both vSphere HA and DRS left disabled. Without HA, VMs
-  won't automatically restart if a host fails; without DRS, load is not balanced and one host is overloaded.
-  Re-enable HA for failover protection and DRS for load balancing, then trigger an initial balancing pass.
+category: Fix
+description: 'CONTEXT: A team operating VMware vSphere needs you to resolve `Enable HA and DRS on Production
+  Cluster` during a realistic incident. The business impact is reduced service reliability until the underlying
+  state is repaired.
+
+
+  ENVIRONMENT: You are working in FixitLab''s offline vSphere lab with VMs, datastores, vCenter, and ESXi
+  tasks. All tools run locally; no paid APIs or external cloud calls are required.
+
+
+  SYMPTOM / STARTING STATE: vCenter cluster Cluster-01 with vSphere HA and DRS turned off; hosts are imbalanced
+  and VMs have no failover protection. After maintenance, Cluster-01 has both vSphere HA and DRS left
+  disabled. Without HA, VMs won''t automatically restart if a host fails; without DRS, load is not balanced
+  and one host is overloaded. Re-enable HA for failover protection and DRS for load balancing, then trigger
+  an initial balancing pass.
+
+
+  OBJECTIVE: Open the cluster Configure tab and confirm HA and DRS are off; Enable vSphere HA on Cluster-01;
+  Enable vSphere DRS and run an initial balancing pass. Success means `check.sh` exits successfully.
+
+
+  WHAT TO AVOID: Do not apply broad destructive changes, skip evidence gathering, or fake completion with
+  marker files — the checker validates real system state.'
 difficulty: medium
 lab_mode: simulation
 simulation_type: vmware
@@ -19,14 +38,71 @@ initial_state: vCenter cluster Cluster-01 with vSphere HA and DRS turned off; ho
   VMs have no failover protection.
 hints:
 - order: 1
-  cost: 10
-  content: Select Cluster-01 -> Configure tab. Under "vSphere Availability" and "vSphere DRS" both show
-    disabled.
+  cost: 0
+  content: 'Where to look: Open the cluster Configure tab and confirm HA and DRS are off'
 - order: 2
-  cost: 15
-  content: 'Enable HA first: Configure -> vSphere Availability -> Edit -> turn on vSphere HA (this provides
-    VM restart on host failure).'
+  cost: 25
+  content: 'Diagnostic steps:
+
+    1. Enable vSphere HA on Cluster-01
+
+    2. Enable vSphere DRS and run an initial balancing pass'
 - order: 3
-  cost: 20
-  content: Then Configure -> vSphere DRS -> Edit -> enable DRS (set automation, e.g. Fully Automated),
-    and use the cluster Actions -> "Run DRS Now" to rebalance the hosts.
+  cost: 50
+  content: 'Exact fix + verification:
+
+    1. Enable vSphere DRS and run an initial balancing pass.
+
+    2. Re-run the lab checker (`check.sh` or Check Solution).
+
+    3. Confirm every scenario objective is satisfied.
+
+
+    WHY: the grader validates real state — marker files are ignored.'
+technology: vmware
+summary: Complete the enable ha and drs on production cluster vmware lab and verify success with the checker
+estimated_minutes: 15
+xp_reward: 100
+prerequisites:
+- Basic vmware literacy
+tags:
+- fix
+- hands-on
+- vmware
+linked_tutorial: vmware-fundamentals
+what_you_will_learn:
+- Open the cluster Configure tab and confirm HA and DRS are off
+- Enable vSphere HA on Cluster-01
+- Enable vSphere DRS and run an initial balancing pass
+environment:
+  nodes:
+  - role: primary
+    os: FixitLab vSphere lab
+    hostname: lab-primary
+    ip: 127.0.0.1
+    specs: local offline simulation
+  pre_installed:
+  - bash
+  - coreutils
+  - journalctl
+  - systemctl
+  - vmware
+  credentials:
+  - user: root
+    password: lab123
+tasks:
+- id: task_1
+  title: Enable HA and DRS on Production Cluster
+  description: Restore healthy behavior for Enable HA and DRS on Production Cluster by investigating the
+    failure, applying the smallest safe fix, and validating the outcome.
+  background: 'This vmware lab teaches systematic troubleshooting: observe, hypothesize, change, verify.'
+  validation:
+    type: custom_script
+    script: check.sh
+    error_message: Validation did not pass. Re-read the objectives and Hint 2 diagnostic steps.
+solution:
+  summary: Identify the misconfiguration affecting this vmware lab and apply the minimal fix.
+  files_changed: []
+  commands_run:
+  - bash check.sh
+  reference_docs: vmware-fundamentals

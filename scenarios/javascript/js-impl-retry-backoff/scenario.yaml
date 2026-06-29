@@ -1,10 +1,28 @@
 title: Implement retry with Backoff (Synchronous)
 slug: js-impl-retry-backoff
-category: JavaScript Development
-description: 'Implement retry(fn, maxAttempts, onWait): call the synchronous fn; if it throws, retry up
-  to maxAttempts total attempts. Before each RETRY (not the first attempt), call onWait(attemptNumber)
+category: Build
+description: 'CONTEXT: A team operating JavaScript needs you to resolve `Implement retry with Backoff
+  (Synchronous)` during a realistic incident. The business impact is reduced service reliability until
+  the underlying state is repaired.
+
+
+  ENVIRONMENT: You are working in FixitLab''s offline JavaScript practice project with modules, browser
+  console, and Node tooling. All tools run locally; no paid APIs or external cloud calls are required.
+
+
+  SYMPTOM / STARTING STATE: Implement retry(fn, maxAttempts, onWait): call the synchronous fn; if it throws,
+  retry up to maxAttempts total attempts. Before each RETRY (not the first attempt), call onWait(attemptNumber)
   so a caller can observe the backoff schedule. Return fn''s value on success; if all attempts throw,
-  rethrow the last error. The stub is empty so tests fail.'
+  rethrow the last error. The stub is empty so tests fail.
+
+
+  OBJECTIVE: Attempt fn and return its value on success; Retry on throw up to maxAttempts, signalling
+  each wait via onWait; Rethrow the final error if every attempt fails. Success means all hidden tests
+  pass.
+
+
+  WHAT TO AVOID: Do not apply broad destructive changes, skip evidence gathering, or fake completion with
+  marker files — the checker validates real system state.'
 difficulty: medium
 scenario_type: do
 lab_mode: simulation
@@ -23,65 +41,178 @@ initial_state: 'Implement retry(fn, maxAttempts, onWait): call the synchronous f
   up to maxAttempts total attempts. Before each RETRY (not the first attempt), call onWait(attemptNumber)
   so a caller can observe the backoff schedule. Return fn''s value on success; if all attempts throw,
   rethrow the last error. The stub is empty so tests fail.'
-solution_explanation: |
-  A loop tries fn each attempt, returning on success. On failure it records the error and, when attempts remain, signals onWait(attempt) for the backoff. If the loop ends without success, the last error is rethrown.
+solution_explanation: 'A loop tries fn each attempt, returning on success. On failure it records the error
+  and, when attempts remain, signals onWait(attempt) for the backoff. If the loop ends without success,
+  the last error is rethrown.
+
+  '
 coding_spec:
   language: javascript
   entrypoint: solution.js
   kind: impl
-  instructions: |
-    Implement retry(fn, maxAttempts, onWait) -> fn's result, retrying on throw. Call onWait(n) before the n-th retry (n starts at 1). Rethrow the last error if all attempts fail.
+  instructions: 'Implement retry(fn, maxAttempts, onWait) -> fn''s result, retrying on throw. Call onWait(n)
+    before the n-th retry (n starts at 1). Rethrow the last error if all attempts fail.
+
     Click Run to try it, then Check Solution to grade against all tests.
+
+    '
   files:
   - path: solution.js
-    content: |
-      function retry(fn, maxAttempts, onWait) {
-        // TODO: call fn; on throw, retry up to maxAttempts, onWait(n) before each retry
-      }
+    content: "function retry(fn, maxAttempts, onWait) {\n  // TODO: call fn; on throw, retry up to maxAttempts,\
+      \ onWait(n) before each retry\n}\n"
     readonly: false
   visible_tests:
   - name: succeeds after failures
-    code: |
-      let n = 0;
-      const r = retry(() => { n++; if (n < 3) throw new Error('no'); return 'ok'; }, 5, () => {});
-      assert(r === 'ok' && n === 3, 'r=' + r + ' n=' + n);
+    code: 'let n = 0;
+
+      const r = retry(() => { n++; if (n < 3) throw new Error(''no''); return ''ok''; }, 5, () => {});
+
+      assert(r === ''ok'' && n === 3, ''r='' + r + '' n='' + n);
+
+      '
   - name: first try success calls fn once
-    code: |
-      let n = 0;
+    code: 'let n = 0;
+
       const r = retry(() => { n++; return 42; }, 3, () => {});
-      assert(r === 42 && n === 1, 'n=' + n);
+
+      assert(r === 42 && n === 1, ''n='' + n);
+
+      '
   hidden_tests:
   - name: rethrows after exhausting attempts
-    code: |
-      let threw = false; let n = 0;
-      try { retry(() => { n++; throw new Error('always'); }, 3, () => {}); }
-      catch (e) { threw = (e.message === 'always'); }
-      assert(threw && n === 3, 'threw=' + threw + ' n=' + n);
+    code: 'let threw = false; let n = 0;
+
+      try { retry(() => { n++; throw new Error(''always''); }, 3, () => {}); }
+
+      catch (e) { threw = (e.message === ''always''); }
+
+      assert(threw && n === 3, ''threw='' + threw + '' n='' + n);
+
+      '
   - name: onWait called once per retry, not before first
-    code: |
-      let waits = [];
+    code: 'let waits = [];
+
       let n = 0;
-      retry(() => { n++; if (n < 3) throw new Error('x'); return 1; }, 5, (a) => waits.push(a));
-      assert(JSON.stringify(waits) === JSON.stringify([1, 2]), 'waits=' + JSON.stringify(waits));
+
+      retry(() => { n++; if (n < 3) throw new Error(''x''); return 1; }, 5, (a) => waits.push(a));
+
+      assert(JSON.stringify(waits) === JSON.stringify([1, 2]), ''waits='' + JSON.stringify(waits));
+
+      '
   - name: no wait on immediate success
-    code: |
-      let waited = false;
-      retry(() => 'done', 3, () => { waited = true; });
-      assert(waited === false, 'should not wait on success');
+    code: 'let waited = false;
+
+      retry(() => ''done'', 3, () => { waited = true; });
+
+      assert(waited === false, ''should not wait on success'');
+
+      '
   - name: single attempt rethrows without waiting
-    code: |
-      let waited = false; let threw = false;
-      try { retry(() => { throw new Error('one'); }, 1, () => { waited = true; }); }
+    code: 'let waited = false; let threw = false;
+
+      try { retry(() => { throw new Error(''one''); }, 1, () => { waited = true; }); }
+
       catch (e) { threw = true; }
-      assert(threw && waited === false, 'threw=' + threw + ' waited=' + waited);
+
+      assert(threw && waited === false, ''threw='' + threw + '' waited='' + waited);
+
+      '
   timeout: 8
 hints:
 - order: 1
-  cost: 10
-  content: Loop attempt from 1 to maxAttempts; return fn() inside a try.
+  cost: 0
+  content: 'Where to look: Open `solution.js`, read the instructions, and run the visible tests to see
+    which assertion fails first.'
 - order: 2
-  cost: 20
-  content: On catch, remember the error; if more attempts remain, call onWait(attempt).
+  cost: 25
+  content: 'Diagnostic steps:
+
+    1. Click Run and read the traceback — note line number and actual vs expected values.
+
+    2. Reproduce the failure with the smallest input from a visible test.
+
+    3. Compare your implementation to the bug described in the lab prompt.'
 - order: 3
-  cost: 30
-  content: After the loop (all failed), throw the last error you saved.
+  cost: 50
+  content: 'Exact fix + verification:
+
+    1. Rethrow the final error if every attempt fails.
+
+    2. Re-run the lab checker (`check.sh` or Check Solution).
+
+    3. Confirm every scenario objective is satisfied.
+
+
+    WHY: the grader validates real state — marker files are ignored.'
+technology: javascript
+summary: Complete the implement retry with backoff (synchronous) javascript lab and verify success with
+  the checker
+estimated_minutes: 25
+xp_reward: 100
+prerequisites:
+- Basic javascript literacy
+tags:
+- do
+- hands-on
+- javascript
+linked_tutorial: javascript-fundamentals
+what_you_will_learn:
+- Attempt fn and return its value on success
+- Retry on throw up to maxAttempts, signalling each wait via onWait
+- Rethrow the final error if every attempt fails
+environment:
+  nodes:
+  - role: primary
+    os: FixitLab JavaScript practice project
+    hostname: lab-primary
+    ip: 127.0.0.1
+    specs: local offline simulation
+  pre_installed:
+  - bash
+  - coreutils
+  - javascript
+  - journalctl
+  - systemctl
+  credentials:
+  - user: root
+    password: lab123
+tasks:
+- id: task_1
+  title: Implement retry with Backoff (Synchronous)
+  description: Restore healthy behavior for Implement retry with Backoff (Synchronous) by investigating
+    the failure, applying the smallest safe fix, and validating the outcome.
+  background: 'This javascript lab teaches systematic troubleshooting: observe, hypothesize, change, verify.'
+  validation:
+    type: custom_script
+    script: hidden_tests
+    error_message: One or more hidden tests failed. Read the public test output, fix your solution, and
+      submit again.
+solution:
+  summary: The solution passes all hidden tests by implementing the required behavior in code.
+  files_changed: []
+  commands_run: []
+  reference_docs: javascript-fundamentals
+guided_mode:
+  enabled: true
+  steps:
+  - step: 1
+    title: Inspect current state
+    instruction: Run a read-only diagnostic before changing anything.
+    command: check.sh
+    expected_output: Output shows the current failure mode
+    explanation: Evidence-first troubleshooting avoids guessing.
+    next_on: command_success
+  - step: 2
+    title: Apply the minimal fix
+    instruction: Make one reversible change aligned with the objectives.
+    command: '# your fix command here'
+    expected_output: State moves toward the objective
+    explanation: Small changes make rollback easy if the hypothesis was wrong.
+    next_on: command_success
+  - step: 3
+    title: Verify with the grader
+    instruction: Run the same verification the checker uses.
+    command: check.sh
+    expected_output: all hidden tests pass
+    explanation: The lab passes only when real state is healthy.
+    next_on: command_success

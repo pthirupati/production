@@ -1,9 +1,26 @@
 title: 'Log Analysis: Fix the RecursionError in factorial'
 slug: py-logfix-recursion-depth
-category: Python Development
-description: 'The log shows `RecursionError: maximum recursion depth exceeded` from factorial() because
-  its base case is wrong (it never stops at 0), so it recurses forever into negatives. Fix the base case
-  so factorial(0) == 1 and recursion terminates.'
+category: Fix
+description: 'CONTEXT: A team operating Python development needs you to resolve `Log Analysis: Fix the
+  RecursionError in factorial` during a realistic incident. The business impact is reduced service reliability
+  until the underlying state is repaired.
+
+
+  ENVIRONMENT: You are working in FixitLab''s offline Python project workspace with source files, venv,
+  tests, and CLI entrypoints. All tools run locally; no paid APIs or external cloud calls are required.
+
+
+  SYMPTOM / STARTING STATE: The log shows `RecursionError: maximum recursion depth exceeded` from factorial()
+  because its base case is wrong (it never stops at 0), so it recurses forever into negatives. Fix the
+  base case so factorial(0) == 1 and recursion terminates.
+
+
+  OBJECTIVE: Read the RecursionError and find the missing/wrong base case; Stop recursion at n == 0 (or
+  n <= 1); Return the correct factorial. Success means all hidden tests pass.
+
+
+  WHAT TO AVOID: Do not apply broad destructive changes, skip evidence gathering, or fake completion with
+  marker files — the checker validates real system state.'
 difficulty: medium
 scenario_type: fix
 lab_mode: simulation
@@ -21,50 +38,120 @@ objectives:
 initial_state: 'The log shows `RecursionError: maximum recursion depth exceeded` from factorial() because
   its base case is wrong (it never stops at 0), so it recurses forever into negatives. Fix the base case
   so factorial(0) == 1 and recursion terminates.'
-solution_explanation: |
-  Without a base case the recursion descends past 0 forever. Returning 1 for n <= 1 terminates it with the correct value.
+solution_explanation: 'Without a base case the recursion descends past 0 forever. Returning 1 for n <=
+  1 terminates it with the correct value.
+
+  '
 coding_spec:
   language: python
   entrypoint: solution.py
   kind: logfix
-  instructions: |
-    Fix factorial(n) for n >= 0 so recursion terminates: factorial(0) == 1. The log shows infinite recursion.
+  instructions: 'Fix factorial(n) for n >= 0 so recursion terminates: factorial(0) == 1. The log shows
+    infinite recursion.
+
     Click Run to try it, then Check Solution to grade against all tests.
+
+    '
   files:
   - path: solution.py
-    content: |
-      # Production log:
-      #   RecursionError: maximum recursion depth exceeded
-      #     factorial(n) keeps calling factorial(n - 1) past 0
-
-      def factorial(n):
-          return n * factorial(n - 1)   # no base case -> infinite recursion
+    content: "# Production log:\n#   RecursionError: maximum recursion depth exceeded\n#     factorial(n)\
+      \ keeps calling factorial(n - 1) past 0\n\ndef factorial(n):\n    return n * factorial(n - 1)  \
+      \ # no base case -> infinite recursion\n"
     readonly: false
   visible_tests:
   - name: factorial 0
-    code: |
-      assert factorial(0) == 1
+    code: 'assert factorial(0) == 1
+
+      '
   - name: factorial 5
-    code: |
-      assert factorial(5) == 120
+    code: 'assert factorial(5) == 120
+
+      '
   hidden_tests:
   - name: factorial 1
-    code: |
-      assert factorial(1) == 1
+    code: 'assert factorial(1) == 1
+
+      '
   - name: factorial 10
-    code: |
-      assert factorial(10) == 3628800
+    code: 'assert factorial(10) == 3628800
+
+      '
   - name: factorial 3
-    code: |
-      assert factorial(3) == 6
+    code: 'assert factorial(3) == 6
+
+      '
   timeout: 8
 hints:
 - order: 1
-  cost: 10
-  content: The log says recursion never stops — there is no base case.
+  cost: 0
+  content: 'Where to look: Open `solution.py`, read the instructions, and run the visible tests to see
+    which assertion fails first.'
 - order: 2
-  cost: 20
-  content: factorial(0) and factorial(1) are both 1.
+  cost: 25
+  content: 'Diagnostic steps:
+
+    1. Click Run and read the traceback — note line number and actual vs expected values.
+
+    2. Reproduce the failure with the smallest input from a visible test.
+
+    3. Compare your implementation to the bug described in the lab prompt.'
 - order: 3
-  cost: 30
-  content: 'Add `if n <= 1: return 1` before recursing.'
+  cost: 50
+  content: 'Exact fix + verification:
+
+    1. Return the correct factorial.
+
+    2. Re-run the lab checker (`check.sh` or Check Solution).
+
+    3. Confirm every scenario objective is satisfied.
+
+
+    WHY: the grader validates real state — marker files are ignored.'
+technology: python
+summary: 'Complete the log analysis: fix the recursionerror in factorial python lab and verify success
+  with the checker'
+estimated_minutes: 25
+xp_reward: 100
+prerequisites:
+- Basic python literacy
+tags:
+- fix
+- hands-on
+- python
+linked_tutorial: python-fundamentals
+what_you_will_learn:
+- Read the RecursionError and find the missing/wrong base case
+- Stop recursion at n == 0 (or n <= 1)
+- Return the correct factorial
+environment:
+  nodes:
+  - role: primary
+    os: FixitLab Python project workspace
+    hostname: lab-primary
+    ip: 127.0.0.1
+    specs: local offline simulation
+  pre_installed:
+  - bash
+  - coreutils
+  - pip
+  - python
+  - python3
+  credentials:
+  - user: root
+    password: lab123
+tasks:
+- id: task_1
+  title: 'Log Analysis: Fix the RecursionError in factorial'
+  description: 'Restore healthy behavior for Log Analysis: Fix the RecursionError in factorial by investigating
+    the failure, applying the smallest safe fix, and validating the outcome.'
+  background: 'This python lab teaches systematic troubleshooting: observe, hypothesize, change, verify.'
+  validation:
+    type: custom_script
+    script: hidden_tests
+    error_message: One or more hidden tests failed. Read the public test output, fix your solution, and
+      submit again.
+solution:
+  summary: The solution passes all hidden tests by implementing the required behavior in code.
+  files_changed: []
+  commands_run: []
+  reference_docs: python-fundamentals

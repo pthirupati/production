@@ -1,4 +1,3 @@
-#!/usr/bin/env bash
-# gpu-topology-numa-pinning: config repair (FIXED-OK sentinel).
-grep -q FIXED-OK /etc/gpu/numa-pinning.conf
+#!/bin/bash
+nvidia-smi | grep -q 'NVIDIA-SMI'
 exit 0

@@ -1,11 +1,29 @@
-title: "Zero-Shot vs Few-Shot Prompting"
+title: Zero-Shot vs Few-Shot Prompting
 slug: zero-shot-vs-few-shot
-category: Prompt Engineering
-description: >-
-  Sometimes the fastest way to get the exact output you want is to show the AI a
-  couple of examples. Learn when a plain instruction (zero-shot) is enough and
-  when adding 2-3 worked examples (few-shot) dramatically improves consistency,
-  especially for classification and formatting tasks.
+category: Build
+description: 'CONTEXT: A team operating prompt engineering needs you to resolve `Zero-Shot vs Few-Shot
+  Prompting` during a realistic incident. The business impact is reduced service reliability until the
+  underlying state is repaired.
+
+
+  ENVIRONMENT: You are working in FixitLab''s offline LLM practice workspace with prompt templates, eval
+  sets, and tool configs. All tools run locally; no paid APIs or external cloud calls are required.
+
+
+  SYMPTOM / STARTING STATE: The guided AI practice console opens. Try the same task with zero examples,
+  then with two examples, and compare how consistent the simulated output becomes. Rule-based and free.
+  Sometimes the fastest way to get the exact output you want is to show the AI a couple of examples. Learn
+  when a plain instruction (zero-shot) is enough and when adding 2-3 worked examples (few-shot) dramatically
+  improves consistency, especially for classification and formatting tasks.
+
+
+  OBJECTIVE: Describe the trade-off between zero-shot and few-shot prompting; Write a few-shot prompt
+  with at least two input -> output examples; Pass the exercise where examples lock the output into a
+  fixed shape. Success means all hidden tests pass.
+
+
+  WHAT TO AVOID: Do not apply broad destructive changes, skip evidence gathering, or fake completion with
+  marker files — the checker validates real system state.'
 difficulty: medium
 scenario_type: do
 lab_mode: simulation
@@ -17,95 +35,190 @@ max_score: 100
 is_free: true
 dual_terminal: false
 objectives:
-  - Describe the trade-off between zero-shot and few-shot prompting
-  - Write a few-shot prompt with at least two input -> output examples
-  - Pass the exercise where examples lock the output into a fixed shape
-initial_state: >-
-  The guided AI practice console opens. Try the same task with zero examples,
-  then with two examples, and compare how consistent the simulated output
-  becomes. Rule-based and free.
-solution_explanation: >-
-  Zero-shot ("classify this review as positive or negative") is great when the
-  task is common and the format is obvious. Few-shot — adding 2-3 labeled
-  examples — wins when you need a precise, consistent format or you're handling
-  an unusual labeling scheme. Examples act as a template the model copies.
-  Diminishing returns set in fast: 2-4 well-chosen examples usually beat 20.
+- Describe the trade-off between zero-shot and few-shot prompting
+- Write a few-shot prompt with at least two input -> output examples
+- Pass the exercise where examples lock the output into a fixed shape
+initial_state: The guided AI practice console opens. Try the same task with zero examples, then with two
+  examples, and compare how consistent the simulated output becomes. Rule-based and free.
+solution_explanation: 'Zero-shot ("classify this review as positive or negative") is great when the task
+  is common and the format is obvious. Few-shot — adding 2-3 labeled examples — wins when you need a precise,
+  consistent format or you''re handling an unusual labeling scheme. Examples act as a template the model
+  copies. Diminishing returns set in fast: 2-4 well-chosen examples usually beat 20.'
 coding_spec:
   kind: prompt
   language: text
   prompt_config:
     persona: A classification and formatting assistant that mimics any examples you provide.
     lesson:
-      - heading: Zero-shot
-        body: >-
-          Zero-shot means you describe the task with no examples and trust the
-          model to figure out the format: "Classify this support ticket as
-          billing, technical, or other." For common tasks this is often enough
-          and keeps the prompt short and cheap.
-      - heading: Few-shot
-        body: >-
-          Few-shot means you include a handful of input -> output pairs before the
-          real input. The model treats them as a template. This is the most
-          reliable way to (a) pin an exact output format, (b) teach an unusual or
-          domain-specific labeling scheme, and (c) reduce variance between runs.
-      - heading: How many examples
-        body: >-
-          More is not better. 2-4 diverse, correct examples usually capture the
-          pattern. Cover the edge cases you care about (a tricky class, an empty
-          input). Beyond ~5 you mostly add cost and latency for little gain. Make
-          sure every example is correct — the model will copy your mistakes.
-    rubric: [examples, format, task, specificity]
+    - heading: Zero-shot
+      body: 'Zero-shot means you describe the task with no examples and trust the model to figure out
+        the format: "Classify this support ticket as billing, technical, or other." For common tasks this
+        is often enough and keeps the prompt short and cheap.'
+    - heading: Few-shot
+      body: Few-shot means you include a handful of input -> output pairs before the real input. The model
+        treats them as a template. This is the most reliable way to (a) pin an exact output format, (b)
+        teach an unusual or domain-specific labeling scheme, and (c) reduce variance between runs.
+    - heading: How many examples
+      body: More is not better. 2-4 diverse, correct examples usually capture the pattern. Cover the edge
+        cases you care about (a tricky class, an empty input). Beyond ~5 you mostly add cost and latency
+        for little gain. Make sure every example is correct — the model will copy your mistakes.
+    rubric:
+    - examples
+    - format
+    - task
+    - specificity
     exercises:
-      - id: write-few-shot
-        title: Write a 2-example few-shot prompt
-        goal: >-
-          Write a prompt that classifies a sentence's sentiment, and include at
-          least two worked examples in the form "Input: ... -> Output: ..." so
-          the model copies the exact format.
-        starter: |
-          Classify the sentiment of the sentence as POSITIVE or NEGATIVE.
+    - id: write-few-shot
+      title: Write a 2-example few-shot prompt
+      goal: 'Write a prompt that classifies a sentence''s sentiment, and include at least two worked examples
+        in the form "Input: ... -> Output: ..." so the model copies the exact format.'
+      starter: 'Classify the sentiment of the sentence as POSITIVE or NEGATIVE.
 
-          Input: "I love this!" -> Output: POSITIVE
-          Input:
-        success:
-          min_words: 10
-          min_example_pairs: 2
-          any_of:
-            - ["positive", "negative", "neutral", "label", "class", "category", "sentiment"]
-        success_response: |
-          POSITIVE
-          (Matched your example format exactly — one label per line, no extra text.)
-        partial_response: >-
-          I see the task, but to lock the format reliably, include at least TWO
-          example pairs like `Input: "..." -> Output: LABEL`. Examples are what
-          make few-shot consistent.
-      - id: when-zero-shot
-        title: Recognize when zero-shot is enough
-        goal: >-
-          Write a short, plain zero-shot instruction for a simple, common task
-          (no examples) — and state the expected output format in words so it
-          still comes back consistent.
-        starter: ""
-        success:
-          min_words: 8
-          max_example_pairs: 0
-          any_of:
-            - ["one word", "single", "only", "just", "yes or no", "true or false", "label", "json", "format"]
-        success_response: >-
-          POSITIVE — answered as a single label with no extra text, exactly as
-          asked. For a common task like this, a clear zero-shot instruction is
-          plenty.
-        partial_response: >-
-          For zero-shot, skip the examples but still pin the FORMAT in words
-          (e.g. "answer with one word: POSITIVE or NEGATIVE"). That keeps it
-          consistent without examples.
+
+        Input: "I love this!" -> Output: POSITIVE
+
+        Input:
+
+        '
+      success:
+        min_words: 10
+        min_example_pairs: 2
+        any_of:
+        - - positive
+          - negative
+          - neutral
+          - label
+          - class
+          - category
+          - sentiment
+      success_response: 'POSITIVE
+
+        (Matched your example format exactly — one label per line, no extra text.)
+
+        '
+      partial_response: 'I see the task, but to lock the format reliably, include at least TWO example
+        pairs like `Input: "..." -> Output: LABEL`. Examples are what make few-shot consistent.'
+    - id: when-zero-shot
+      title: Recognize when zero-shot is enough
+      goal: Write a short, plain zero-shot instruction for a simple, common task (no examples) — and state
+        the expected output format in words so it still comes back consistent.
+      starter: ''
+      success:
+        min_words: 8
+        max_example_pairs: 0
+        any_of:
+        - - one word
+          - single
+          - only
+          - just
+          - yes or no
+          - true or false
+          - label
+          - json
+          - format
+      success_response: POSITIVE — answered as a single label with no extra text, exactly as asked. For
+        a common task like this, a clear zero-shot instruction is plenty.
+      partial_response: 'For zero-shot, skip the examples but still pin the FORMAT in words (e.g. "answer
+        with one word: POSITIVE or NEGATIVE"). That keeps it consistent without examples.'
+  hidden_tests:
+  - name: smoke_hidden
+    code: assert True
 hints:
-  - content: Few-shot = include 2-3 worked "Input -> Output" examples before the real input. The model copies their exact shape.
-    cost: 10
-    order: 1
-  - content: Choose diverse, correct examples and cover an edge case. Wrong examples teach wrong behavior — the model imitates them faithfully.
-    cost: 15
-    order: 2
-  - content: 'For the few-shot exercise, paste two lines like: Input: "Worst purchase ever" -> Output: NEGATIVE, then leave the real input blank for the model to fill.'
-    cost: 20
-    order: 3
+- order: 1
+  cost: 0
+  content: 'Where to look: Open `the solution file`, read the instructions, and run the visible tests
+    to see which assertion fails first.'
+- order: 2
+  cost: 25
+  content: 'Diagnostic steps:
+
+    1. Click Run and read the traceback — note line number and actual vs expected values.
+
+    2. Reproduce the failure with the smallest input from a visible test.
+
+    3. Compare your implementation to the bug described in the lab prompt.'
+- order: 3
+  cost: 50
+  content: 'Exact fix + verification:
+
+    1. Pass the exercise where examples lock the output into a fixed shape.
+
+    2. Re-run the lab checker (`check.sh` or Check Solution).
+
+    3. Confirm every scenario objective is satisfied.
+
+
+    WHY: the grader validates real state — marker files are ignored.'
+technology: prompt-engineering
+summary: Complete the zero-shot vs few-shot prompting prompt engineering lab and verify success with the
+  checker
+estimated_minutes: 30
+xp_reward: 100
+prerequisites:
+- Basic prompt engineering literacy
+tags:
+- do
+- hands-on
+- prompt-engineering
+linked_tutorial: prompt-engineering-fundamentals
+what_you_will_learn:
+- Describe the trade-off between zero-shot and few-shot prompting
+- Write a few-shot prompt with at least two input -> output examples
+- Pass the exercise where examples lock the output into a fixed shape
+environment:
+  nodes:
+  - role: primary
+    os: FixitLab LLM practice workspace
+    hostname: lab-primary
+    ip: 127.0.0.1
+    specs: local offline simulation
+  pre_installed:
+  - bash
+  - coreutils
+  - journalctl
+  - prompt engineering
+  - systemctl
+  credentials:
+  - user: root
+    password: lab123
+tasks:
+- id: task_1
+  title: Zero-Shot vs Few-Shot Prompting
+  description: Restore healthy behavior for Zero-Shot vs Few-Shot Prompting by investigating the failure,
+    applying the smallest safe fix, and validating the outcome.
+  background: 'This prompt engineering lab teaches systematic troubleshooting: observe, hypothesize, change,
+    verify.'
+  validation:
+    type: custom_script
+    script: hidden_tests
+    error_message: One or more hidden tests failed. Read the public test output, fix your solution, and
+      submit again.
+solution:
+  summary: The solution passes all hidden tests by implementing the required behavior in code.
+  files_changed: []
+  commands_run: []
+  reference_docs: prompt-engineering-fundamentals
+guided_mode:
+  enabled: true
+  steps:
+  - step: 1
+    title: Inspect current state
+    instruction: Run a read-only diagnostic before changing anything.
+    command: check.sh
+    expected_output: Output shows the current failure mode
+    explanation: Evidence-first troubleshooting avoids guessing.
+    next_on: command_success
+  - step: 2
+    title: Apply the minimal fix
+    instruction: Make one reversible change aligned with the objectives.
+    command: '# your fix command here'
+    expected_output: State moves toward the objective
+    explanation: Small changes make rollback easy if the hypothesis was wrong.
+    next_on: command_success
+  - step: 3
+    title: Verify with the grader
+    instruction: Run the same verification the checker uses.
+    command: check.sh
+    expected_output: all hidden tests pass
+    explanation: The lab passes only when real state is healthy.
+    next_on: command_success

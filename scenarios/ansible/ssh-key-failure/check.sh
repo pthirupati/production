@@ -1,4 +1,3 @@
 #!/bin/bash
-# Simulation validation
-true
+ansible webservers -m ping
 exit 0

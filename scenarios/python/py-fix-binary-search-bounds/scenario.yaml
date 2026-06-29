@@ -1,9 +1,26 @@
 title: Fix the Binary Search Bounds
 slug: py-fix-binary-search-bounds
-category: Python Development
-description: binary_search(arr, target) returns the index of target in a sorted list or -1, but the loop
-  condition uses `lo < hi` with an inclusive `hi = len(arr) - 1`, so it never checks the last element
-  — the final candidate is skipped. Fix the bound handling.
+category: Fix
+description: 'CONTEXT: A team operating Python development needs you to resolve `Fix the Binary Search
+  Bounds` during a realistic incident. The business impact is reduced service reliability until the underlying
+  state is repaired.
+
+
+  ENVIRONMENT: You are working in FixitLab''s offline Python project workspace with source files, venv,
+  tests, and CLI entrypoints. All tools run locally; no paid APIs or external cloud calls are required.
+
+
+  SYMPTOM / STARTING STATE: binary_search(arr, target) returns the index of target in a sorted list or
+  -1, but the loop condition uses `lo < hi` with an inclusive `hi = len(arr) - 1`, so it never checks
+  the last element — the final candidate is skipped. Fix the bound handling.
+
+
+  OBJECTIVE: Find an input where the last element is missed; Make the loop condition and bounds consistent;
+  Return the correct index, or -1 when absent. Success means all hidden tests pass.
+
+
+  WHAT TO AVOID: Do not apply broad destructive changes, skip evidence gathering, or fake completion with
+  marker files — the checker validates real system state.'
 difficulty: medium
 scenario_type: fix
 lab_mode: simulation
@@ -21,61 +38,128 @@ objectives:
 initial_state: binary_search(arr, target) returns the index of target in a sorted list or -1, but the
   loop condition uses `lo < hi` with an inclusive `hi = len(arr) - 1`, so it never checks the last element
   — the final candidate is skipped. Fix the bound handling.
-solution_explanation: |
-  When hi is inclusive (len-1), `lo < hi` exits before examining the final single-element window. Using `lo <= hi` checks it.
+solution_explanation: 'When hi is inclusive (len-1), `lo < hi` exits before examining the final single-element
+  window. Using `lo <= hi` checks it.
+
+  '
 coding_spec:
   language: python
   entrypoint: solution.py
   kind: fix
-  instructions: |
-    Fix binary_search(arr, target) so it returns the index of target in the sorted list arr, or -1 if not present. The current bounds skip the last element.
+  instructions: 'Fix binary_search(arr, target) so it returns the index of target in the sorted list arr,
+    or -1 if not present. The current bounds skip the last element.
+
     Click Run to try it, then Check Solution to grade against all tests.
+
+    '
   files:
   - path: solution.py
-    content: |
-      def binary_search(arr, target):
-          lo, hi = 0, len(arr) - 1
-          while lo < hi:                  # bug: should be lo <= hi
-              mid = (lo + hi) // 2
-              if arr[mid] == target:
-                  return mid
-              elif arr[mid] < target:
-                  lo = mid + 1
-              else:
-                  hi = mid - 1
-          return -1
+    content: "def binary_search(arr, target):\n    lo, hi = 0, len(arr) - 1\n    while lo < hi:      \
+      \            # bug: should be lo <= hi\n        mid = (lo + hi) // 2\n        if arr[mid] == target:\n\
+      \            return mid\n        elif arr[mid] < target:\n            lo = mid + 1\n        else:\n\
+      \            hi = mid - 1\n    return -1\n"
     readonly: false
   visible_tests:
   - name: found in middle
-    code: |
-      assert binary_search([1,3,5,7,9], 5) == 2
+    code: 'assert binary_search([1,3,5,7,9], 5) == 2
+
+      '
   - name: absent
-    code: |
-      assert binary_search([1,3,5,7,9], 4) == -1
+    code: 'assert binary_search([1,3,5,7,9], 4) == -1
+
+      '
   hidden_tests:
   - name: last element
-    code: |
-      assert binary_search([1,3,5,7,9], 9) == 4, binary_search([1,3,5,7,9], 9)
+    code: 'assert binary_search([1,3,5,7,9], 9) == 4, binary_search([1,3,5,7,9], 9)
+
+      '
   - name: first element
-    code: |
-      assert binary_search([1,3,5,7,9], 1) == 0
+    code: 'assert binary_search([1,3,5,7,9], 1) == 0
+
+      '
   - name: single element present
-    code: |
-      assert binary_search([42], 42) == 0, binary_search([42], 42)
+    code: 'assert binary_search([42], 42) == 0, binary_search([42], 42)
+
+      '
   - name: single element absent
-    code: |
-      assert binary_search([42], 7) == -1
+    code: 'assert binary_search([42], 7) == -1
+
+      '
   - name: two elements last
-    code: |
-      assert binary_search([1, 2], 2) == 1
+    code: 'assert binary_search([1, 2], 2) == 1
+
+      '
   timeout: 8
 hints:
 - order: 1
-  cost: 10
-  content: Search for the last value (e.g. 9 in [1,3,5,7,9]) — it returns -1 even though it's present.
+  cost: 0
+  content: 'Where to look: Open `solution.py`, read the instructions, and run the visible tests to see
+    which assertion fails first.'
 - order: 2
-  cost: 20
-  content: With an inclusive hi = len-1, the loop must run while lo <= hi, not lo < hi.
+  cost: 25
+  content: 'Diagnostic steps:
+
+    1. Click Run and read the traceback — note line number and actual vs expected values.
+
+    2. Reproduce the failure with the smallest input from a visible test.
+
+    3. Compare your implementation to the bug described in the lab prompt.'
 - order: 3
-  cost: 30
-  content: Change the condition to `while lo <= hi:`.
+  cost: 50
+  content: 'Exact fix + verification:
+
+    1. Return the correct index, or -1 when absent.
+
+    2. Re-run the lab checker (`check.sh` or Check Solution).
+
+    3. Confirm every scenario objective is satisfied.
+
+
+    WHY: the grader validates real state — marker files are ignored.'
+technology: python
+summary: Complete the fix the binary search bounds python lab and verify success with the checker
+estimated_minutes: 25
+xp_reward: 100
+prerequisites:
+- Basic python literacy
+tags:
+- fix
+- hands-on
+- python
+linked_tutorial: python-fundamentals
+what_you_will_learn:
+- Find an input where the last element is missed
+- Make the loop condition and bounds consistent
+- Return the correct index, or -1 when absent
+environment:
+  nodes:
+  - role: primary
+    os: FixitLab Python project workspace
+    hostname: lab-primary
+    ip: 127.0.0.1
+    specs: local offline simulation
+  pre_installed:
+  - bash
+  - coreutils
+  - pip
+  - python
+  - python3
+  credentials:
+  - user: root
+    password: lab123
+tasks:
+- id: task_1
+  title: Fix the Binary Search Bounds
+  description: Restore healthy behavior for Fix the Binary Search Bounds by investigating the failure,
+    applying the smallest safe fix, and validating the outcome.
+  background: 'This python lab teaches systematic troubleshooting: observe, hypothesize, change, verify.'
+  validation:
+    type: custom_script
+    script: hidden_tests
+    error_message: One or more hidden tests failed. Read the public test output, fix your solution, and
+      submit again.
+solution:
+  summary: The solution passes all hidden tests by implementing the required behavior in code.
+  files_changed: []
+  commands_run: []
+  reference_docs: python-fundamentals

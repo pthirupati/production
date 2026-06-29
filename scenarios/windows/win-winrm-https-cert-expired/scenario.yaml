@@ -1,7 +1,7 @@
 title: Windows WinRM HTTPS Listener Cert Expired
 slug: win-winrm-https-cert-expired
-technology: Windows Server
-category: Remoting
+technology: windows
+category: Fix
 difficulty: medium
 lab_mode: simulation
 simulation_type: windows
@@ -10,8 +10,26 @@ max_score: 100
 is_free: true
 jira_priority: High
 dual_terminal: false
-description: Remote management over WinRM HTTPS fails because the listener's certificate expired. Bind
-  a new certificate to the HTTPS listener and confirm remoting works.
+description: 'CONTEXT: A team operating Windows Server needs you to resolve `Windows WinRM HTTPS Listener
+  Cert Expired` during a realistic incident. The business impact is reduced service reliability until
+  the underlying state is repaired.
+
+
+  ENVIRONMENT: You are working in FixitLab''s offline Windows Server host with PowerShell, Server Manager,
+  and AD tools. All tools run locally; no paid APIs or external cloud calls are required.
+
+
+  SYMPTOM / STARTING STATE: A Windows Server whose WinRM HTTPS listener uses an expired certificate, breaking
+  secure remote management. Remote management over WinRM HTTPS fails because the listener''s certificate
+  expired. Bind a new certificate to the HTTPS listener and confirm remoting works.
+
+
+  OBJECTIVE: Confirm the WinRM HTTPS listener cert is expired; Bind a valid certificate to the listener;
+  Verify a remote PowerShell session connects. Success means `check.sh` exits successfully.
+
+
+  WHAT TO AVOID: Do not apply broad destructive changes, skip evidence gathering, or fake completion with
+  marker files — the checker validates real system state.'
 initial_state: A Windows Server whose WinRM HTTPS listener uses an expired certificate, breaking secure
   remote management.
 objectives:
@@ -20,11 +38,74 @@ objectives:
 - Verify a remote PowerShell session connects
 hints:
 - order: 1
-  cost: 10
-  content: winrm enumerate winrm/config/listener shows expired thumbprint.
+  cost: 0
+  content: 'Where to look: Open Event Viewer (System/Application) and the relevant Services mmc or Server
+    Manager role status.'
 - order: 2
-  cost: 15
-  content: Create the HTTPS listener with a valid cert thumbprint.
+  cost: 25
+  content: 'Diagnostic steps:
+
+    1. Note the service state and dependency chain in services.msc.
+
+    2. Read the most recent error in Event Viewer for the failing component.
+
+    3. Use PowerShell (`Get-Service`, `Get-WinEvent`) for scripted evidence.'
 - order: 3
-  cost: 20
-  content: Remoting works.
+  cost: 50
+  content: 'Exact fix + verification:
+
+    1. Apply the minimal fix (service start, GPO, binding, or permission).
+
+    2. Re-test the failing operation.
+
+    3. Confirm Check Solution passes.
+
+
+    WHY: Windows labs grade real role/service state.'
+summary: Complete the windows winrm https listener cert expired windows lab and verify success with the
+  checker
+estimated_minutes: 20
+xp_reward: 100
+prerequisites:
+- Basic windows literacy
+tags:
+- fix
+- hands-on
+- windows
+linked_tutorial: windows-fundamentals
+what_you_will_learn:
+- Confirm the WinRM HTTPS listener cert is expired
+- Bind a valid certificate to the listener
+- Verify a remote PowerShell session connects
+environment:
+  nodes:
+  - role: primary
+    os: FixitLab Windows Server host
+    hostname: lab-primary
+    ip: 127.0.0.1
+    specs: local offline simulation
+  pre_installed:
+  - bash
+  - coreutils
+  - journalctl
+  - systemctl
+  - windows
+  credentials:
+  - user: root
+    password: lab123
+tasks:
+- id: task_1
+  title: Windows WinRM HTTPS Listener Cert Expired
+  description: Restore healthy behavior for Windows WinRM HTTPS Listener Cert Expired by investigating
+    the failure, applying the smallest safe fix, and validating the outcome.
+  background: 'This windows lab teaches systematic troubleshooting: observe, hypothesize, change, verify.'
+  validation:
+    type: custom_script
+    script: check.sh
+    error_message: Validation did not pass. Re-read the objectives and Hint 2 diagnostic steps.
+solution:
+  summary: Identify the misconfiguration affecting this windows lab and apply the minimal fix.
+  files_changed: []
+  commands_run:
+  - bash check.sh
+  reference_docs: windows-fundamentals

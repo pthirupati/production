@@ -1,15 +1,34 @@
 title: Renew Expired SSL Certificate
 slug: ssl-cert-expired
-technology: Security
-category: TLS/SSL
+technology: security
+category: Fix
 difficulty: medium
 time_limit: 900
 max_score: 100
 infrastructure_type: docker
 jira_priority: High
-description: HTTPS endpoints are failing certificate validation because the nginx TLS certificate is expired
-  (or expires within a day). Browsers and clients reject the connection. Generate/install a valid certificate,
-  point nginx at it, and reload so secure connections work again with a non-expired certificate.
+description: 'CONTEXT: A team operating security hardening needs you to resolve `Renew Expired SSL Certificate`
+  during a realistic incident. The business impact is reduced service reliability until the underlying
+  state is repaired.
+
+
+  ENVIRONMENT: You are working in FixitLab''s offline hardening lab with SSH, firewall, TLS, audit logs,
+  and IAM settings. All tools run locally; no paid APIs or external cloud calls are required.
+
+
+  SYMPTOM / STARTING STATE: Linux server running nginx with an expired (or about-to-expire) TLS certificate
+  at /etc/nginx/ssl/cert.pem, causing HTTPS validation failures. HTTPS endpoints are failing certificate
+  validation because the nginx TLS certificate is expired (or expires within a day). Browsers and clients
+  reject the connection. Generate/install a valid certificate, point nginx at it, and reload so secure
+  connections work again with a non-expired certificate.
+
+
+  OBJECTIVE: Confirm the current certificate''s expiry; Generate/install a new valid certificate and key;
+  Reload nginx and verify HTTPS serves a non-expired certificate. Success means HTTP 200 from http://localhost.
+
+
+  WHAT TO AVOID: Do not apply broad destructive changes, skip evidence gathering, or fake completion with
+  marker files — the checker validates real system state.'
 objectives:
 - Confirm the current certificate's expiry
 - Generate/install a new valid certificate and key
@@ -18,15 +37,72 @@ initial_state: Linux server running nginx with an expired (or about-to-expire) T
   causing HTTPS validation failures.
 hints:
 - order: 1
-  cost: 10
-  content: 'Check the dates: `openssl x509 -in /etc/nginx/ssl/cert.pem -noout -dates` — notAfter is in
-    the past (or imminent).'
+  cost: 0
+  content: 'Where to look: Run `systemctl status sshd` and `ss -tlnp | grep :22` on the target host.'
 - order: 2
-  cost: 15
-  content: 'Issue a replacement (self-signed here; in prod use your CA/ACME): `openssl req -x509 -newkey
-    rsa:2048 -nodes -keyout /etc/nginx/ssl/key.pem -out /etc/nginx/ssl/cert.pem -days 365 -subj ''/CN=<host>''`.'
+  cost: 25
+  content: 'Diagnostic steps:
+
+    1. Confirm sshd is active and listening on port 22.
+
+    2. Check `firewall-cmd` or iptables for blocked port 22.
+
+    3. Read `/var/log/secure` for auth or config errors.'
 - order: 3
-  cost: 20
-  content: 'Make sure nginx points at the new cert/key, validate and reload: `nginx -t && systemctl reload
-    nginx`. Verify: `echo | openssl s_client -connect localhost:443 2>/dev/null | openssl x509 -noout
-    -dates` shows a future notAfter.'
+  cost: 50
+  content: 'Exact fix + verification:
+
+    1. Fix sshd_config, firewall, or socket unit as needed.
+
+    2. `systemctl restart sshd`.
+
+    3. `ssh -o BatchMode=yes user@localhost echo ok` succeeds.
+
+
+    WHY: SSH failures are usually service, firewall, or config — not credentials alone.'
+summary: Complete the renew expired ssl certificate security lab and verify success with the checker
+estimated_minutes: 15
+xp_reward: 100
+prerequisites:
+- Basic security literacy
+tags:
+- fix
+- hands-on
+- security
+linked_tutorial: security-fundamentals
+what_you_will_learn:
+- Confirm the current certificate's expiry
+- Generate/install a new valid certificate and key
+- Reload nginx and verify HTTPS serves a non-expired certificate
+environment:
+  nodes:
+  - role: primary
+    os: FixitLab hardening lab
+    hostname: lab-primary
+    ip: 127.0.0.1
+    specs: local offline simulation
+  pre_installed:
+  - bash
+  - coreutils
+  - journalctl
+  - security
+  - systemctl
+  credentials:
+  - user: root
+    password: lab123
+tasks:
+- id: task_1
+  title: Renew Expired SSL Certificate
+  description: Restore healthy behavior for Renew Expired SSL Certificate by investigating the failure,
+    applying the smallest safe fix, and validating the outcome.
+  background: 'This security lab teaches systematic troubleshooting: observe, hypothesize, change, verify.'
+  validation:
+    type: http_response
+    url: http://localhost
+    expected_code: 200
+    error_message: nginx is not serving HTTP 200. Run nginx -t, fix config errors, and start nginx.
+solution:
+  summary: Identify the misconfiguration affecting this security lab and apply the minimal fix.
+  files_changed: []
+  commands_run: []
+  reference_docs: security-fundamentals

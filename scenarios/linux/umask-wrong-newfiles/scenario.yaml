@@ -2,8 +2,8 @@ title: Wrong umask — Insecure New Files
 slug: umask-wrong-newfiles
 lab_mode: simulation
 simulation_type: generic
-technology: Linux
-category: Permissions
+technology: linux
+category: Fix
 difficulty: easy
 time_limit: 600
 max_score: 100
@@ -11,10 +11,28 @@ infrastructure_type: docker
 docker_privileged: false
 jira_priority: Medium
 topics_covered: Q24 umask — /etc/profile.d
-description: Newly created files are coming out world-writable because the global umask was set to 000
-  (in a /etc/profile.d script or login config). A 000 umask removes no permission bits, so files are created
-  666 and directories 777 — a security problem. Restore a safe default umask (022) and verify new files
-  get sane permissions.
+description: 'CONTEXT: A team operating Linux administration needs you to resolve `Wrong umask — Insecure
+  New Files` during a realistic incident. The business impact is reduced service reliability until the
+  underlying state is repaired.
+
+
+  ENVIRONMENT: You are working in FixitLab''s offline Linux practice server with terminal and config files
+  under /etc and /var. All tools run locally; no paid APIs or external cloud calls are required.
+
+
+  SYMPTOM / STARTING STATE: Linux server where a global umask of 000 causes new files to be created world-writable;
+  the umask is set too permissively in the login environment. Newly created files are coming out world-writable
+  because the global umask was set to 000 (in a /etc/profile.d script or login config). A 000 umask removes
+  no permission bits, so files are created 666 and directories 777 — a security problem. Restore a safe
+  default umask (022) and verify new files get sane permissions.
+
+
+  OBJECTIVE: Confirm the current umask is 000 and find where it''s set; Restore a safe default umask (022);
+  Verify newly created files get correct permissions. Success means `check.sh` exits successfully.
+
+
+  WHAT TO AVOID: Do not apply broad destructive changes, skip evidence gathering, or fake completion with
+  marker files — the checker validates real system state.'
 objectives:
 - Confirm the current umask is 000 and find where it's set
 - Restore a safe default umask (022)
@@ -23,14 +41,70 @@ initial_state: Linux server where a global umask of 000 causes new files to be c
   the umask is set too permissively in the login environment.
 hints:
 - order: 1
-  cost: 10
-  content: 'Check it: `umask` prints `0000`. Find the source: `grep -rn umask /etc/profile /etc/profile.d/
-    /etc/login.defs`.'
+  cost: 0
+  content: 'Where to look: Confirm the current umask is 000 and find where it''s set'
 - order: 2
-  cost: 15
-  content: 'Set a sane default: change the offending entry to `umask 022` (in the profile.d file or login.defs
-    UMASK).'
+  cost: 25
+  content: 'Diagnostic steps:
+
+    1. Restore a safe default umask (022)
+
+    2. Verify newly created files get correct permissions'
 - order: 3
-  cost: 20
-  content: 'Apply in a fresh login shell and verify: `umask` shows `0022`, and `touch /tmp/t; ls -l /tmp/t`
-    shows `-rw-r--r--` (644).'
+  cost: 50
+  content: 'Exact fix + verification:
+
+    1. Verify newly created files get correct permissions.
+
+    2. Re-run the lab checker (`check.sh` or Check Solution).
+
+    3. Confirm every scenario objective is satisfied.
+
+
+    WHY: the grader validates real state — marker files are ignored.'
+summary: Complete the wrong umask — insecure new files linux lab and verify success with the checker
+estimated_minutes: 10
+xp_reward: 100
+prerequisites:
+- Basic linux literacy
+tags:
+- fix
+- hands-on
+- linux
+linked_tutorial: linux-fundamentals
+what_you_will_learn:
+- Confirm the current umask is 000 and find where it's set
+- Restore a safe default umask (022)
+- Verify newly created files get correct permissions
+environment:
+  nodes:
+  - role: primary
+    os: FixitLab Linux practice server
+    hostname: lab-primary
+    ip: 127.0.0.1
+    specs: local offline simulation
+  pre_installed:
+  - bash
+  - coreutils
+  - journalctl
+  - linux
+  - systemctl
+  credentials:
+  - user: root
+    password: lab123
+tasks:
+- id: task_1
+  title: Wrong umask — Insecure New Files
+  description: Restore healthy behavior for Wrong umask — Insecure New Files by investigating the failure,
+    applying the smallest safe fix, and validating the outcome.
+  background: 'This linux lab teaches systematic troubleshooting: observe, hypothesize, change, verify.'
+  validation:
+    type: custom_script
+    script: check.sh
+    error_message: Validation did not pass. Re-read the objectives and Hint 2 diagnostic steps.
+solution:
+  summary: Identify the misconfiguration affecting this linux lab and apply the minimal fix.
+  files_changed: []
+  commands_run:
+  - bash check.sh
+  reference_docs: linux-fundamentals

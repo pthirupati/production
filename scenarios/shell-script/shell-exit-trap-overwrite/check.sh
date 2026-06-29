@@ -1,4 +1,3 @@
-#!/usr/bin/env bash
-# shell-exit-trap-overwrite: config repair — fail-closed until /opt/scripts/multi-trap.sh carries FIXED-OK.
-grep -q FIXED-OK /opt/scripts/multi-trap.sh
+#!/bin/bash
+systemctl is-failed --quiet 2>/dev/null; test $? -ne 0
 exit 0

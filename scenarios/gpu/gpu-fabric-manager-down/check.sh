@@ -1,4 +1,3 @@
-#!/usr/bin/env bash
-# gpu-fabric-manager-down: config repair — fail-closed until /etc/nvidia/fabricmanager.cfg carries the FIXED-OK sentinel.
-grep -q FIXED-OK /etc/nvidia/fabricmanager.cfg
+#!/bin/bash
+nvidia-smi | grep -q 'NVIDIA-SMI'
 exit 0

@@ -1,7 +1,7 @@
 title: Deep C-States Causing Latency Jitter
 slug: baremetal-cpu-cstates-latency
-technology: Bare Metal
-category: Performance
+technology: baremetal
+category: Fix
 difficulty: hard
 lab_mode: simulation
 simulation_type: baremetal
@@ -10,7 +10,25 @@ max_score: 100
 is_free: true
 jira_priority: High
 dual_terminal: false
-description: A latency-sensitive workload has jitter because deep CPU C-states are enabled.
+description: 'CONTEXT: A team operating bare metal operations needs you to resolve `Deep C-States Causing
+  Latency Jitter` during a realistic incident. The business impact is reduced service reliability until
+  the underlying state is repaired.
+
+
+  ENVIRONMENT: You are working in FixitLab''s offline physical server lab with IPMI, RAID, BIOS, and out-of-band
+  console. All tools run locally; no paid APIs or external cloud calls are required.
+
+
+  SYMPTOM / STARTING STATE: A server whose CPU C-state config hurts latency. A latency-sensitive workload
+  has jitter because deep CPU C-states are enabled.
+
+
+  OBJECTIVE: Confirm the issue: Latency jitter under load; Apply the documented fix in /etc/bios/cstates.cfg;
+  Verify the configuration is corrected. Success means `check.sh` exits successfully.
+
+
+  WHAT TO AVOID: Do not apply broad destructive changes, skip evidence gathering, or fake completion with
+  marker files — the checker validates real system state.'
 initial_state: A server whose CPU C-state config hurts latency.
 objectives:
 - 'Confirm the issue: Latency jitter under load'
@@ -18,11 +36,70 @@ objectives:
 - Verify the configuration is corrected
 hints:
 - order: 1
-  cost: 10
-  content: Latency jitter under load
+  cost: 0
+  content: 'Where to look: Confirm the issue: Latency jitter under load'
 - order: 2
-  cost: 15
-  content: Restrict deep C-states for low latency.
+  cost: 25
+  content: 'Diagnostic steps:
+
+    1. Apply the documented fix in /etc/bios/cstates.cfg
+
+    2. Verify the configuration is corrected'
 - order: 3
-  cost: 20
-  content: /etc/bios/cstates.cfg carries the corrected configuration.
+  cost: 50
+  content: 'Exact fix + verification:
+
+    1. Verify the configuration is corrected.
+
+    2. Re-run the lab checker (`check.sh` or Check Solution).
+
+    3. Confirm every scenario objective is satisfied.
+
+
+    WHY: the grader validates real state — marker files are ignored.'
+summary: Complete the deep c-states causing latency jitter baremetal lab and verify success with the checker
+estimated_minutes: 20
+xp_reward: 100
+prerequisites:
+- Basic baremetal literacy
+tags:
+- baremetal
+- fix
+- hands-on
+linked_tutorial: baremetal-fundamentals
+what_you_will_learn:
+- 'Confirm the issue: Latency jitter under load'
+- Apply the documented fix in /etc/bios/cstates.cfg
+- Verify the configuration is corrected
+environment:
+  nodes:
+  - role: primary
+    os: FixitLab physical server lab
+    hostname: lab-primary
+    ip: 127.0.0.1
+    specs: local offline simulation
+  pre_installed:
+  - baremetal
+  - bash
+  - coreutils
+  - journalctl
+  - systemctl
+  credentials:
+  - user: root
+    password: lab123
+tasks:
+- id: task_1
+  title: Deep C-States Causing Latency Jitter
+  description: Restore healthy behavior for Deep C-States Causing Latency Jitter by investigating the
+    failure, applying the smallest safe fix, and validating the outcome.
+  background: 'This baremetal lab teaches systematic troubleshooting: observe, hypothesize, change, verify.'
+  validation:
+    type: custom_script
+    script: check.sh
+    error_message: Validation did not pass. Re-read the objectives and Hint 2 diagnostic steps.
+solution:
+  summary: Identify the misconfiguration affecting this baremetal lab and apply the minimal fix.
+  files_changed: []
+  commands_run:
+  - bash check.sh
+  reference_docs: baremetal-fundamentals

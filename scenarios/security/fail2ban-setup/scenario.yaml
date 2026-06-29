@@ -1,35 +1,119 @@
-title: "fail2ban Setup — Protect SSH from Brute-Force Attacks"
+title: fail2ban Setup — Protect SSH from Brute-Force Attacks
 slug: fail2ban-setup
-technology: Security
-category: Hardening
+technology: security
+category: Fix
 difficulty: easy
 time_limit: 600
 max_score: 100
 infrastructure_type: docker
 jira_priority: Medium
 is_free: false
-description: |
-  A Linux server is exposed to the internet with SSH on port 22 and has no
+description: 'CONTEXT: A team operating security hardening needs you to resolve `fail2ban Setup — Protect
+  SSH from Brute-Force Attacks` during a realistic incident. The business impact is reduced service reliability
+  until the underlying state is repaired.
+
+
+  ENVIRONMENT: You are working in FixitLab''s offline hardening lab with SSH, firewall, TLS, audit logs,
+  and IAM settings. All tools run locally; no paid APIs or external cloud calls are required.
+
+
+  SYMPTOM / STARTING STATE: Ubuntu server with fail2ban installed but unconfigured. SSH is running on
+
+  port 22 with password authentication enabled. No jail.local file exists yet. A Linux server is exposed
+  to the internet with SSH on port 22 and has no
+
   automated brute-force protection in place. fail2ban is installed but not
+
   configured. Set up and enable the SSH jail with a ban time of 1 hour,
+
   a find time of 10 minutes, and a maximum retry count of 5 failed attempts.
+
+
+  OBJECTIVE: Create /etc/fail2ban/jail.local with an [sshd] jail configured for port 22; Set bantime=3600,
+  findtime=600, and maxretry=5; Enable and start fail2ban, then verify the sshd jail is active. Success
+  means `check.sh` exits successfully.
+
+
+  WHAT TO AVOID: Do not apply broad destructive changes, skip evidence gathering, or fake completion with
+  marker files — the checker validates real system state.'
 objectives:
-  - Create /etc/fail2ban/jail.local with an [sshd] jail configured for port 22
-  - Set bantime=3600, findtime=600, and maxretry=5
-  - Enable and start fail2ban, then verify the sshd jail is active
-initial_state: |
-  Ubuntu server with fail2ban installed but unconfigured. SSH is running on
+- Create /etc/fail2ban/jail.local with an [sshd] jail configured for port 22
+- Set bantime=3600, findtime=600, and maxretry=5
+- Enable and start fail2ban, then verify the sshd jail is active
+initial_state: 'Ubuntu server with fail2ban installed but unconfigured. SSH is running on
+
   port 22 with password authentication enabled. No jail.local file exists yet.
+
+  '
 hints:
-  - order: 1
-    cost: 10
-    content: "Copy the template: `cp /etc/fail2ban/jail.conf /etc/fail2ban/jail.local` and then edit the [DEFAULT] and [sshd] sections."
-  - order: 2
-    cost: 15
-    content: "In jail.local under [DEFAULT] set `bantime = 3600`, `findtime = 600`, `maxretry = 5`. Under [sshd] set `enabled = true` and `port = 22`."
-  - order: 3
-    cost: 20
-    content: "Start fail2ban: `systemctl enable --now fail2ban` then check status with `systemctl status fail2ban`."
-  - order: 4
-    cost: 25
-    content: "Verify the jail is active: `fail2ban-client status sshd` — you should see the sshd jail listed with Jail list."
+- order: 1
+  cost: 0
+  content: 'Where to look: Run `systemctl status sshd` and `ss -tlnp | grep :22` on the target host.'
+- order: 2
+  cost: 25
+  content: 'Diagnostic steps:
+
+    1. Confirm sshd is active and listening on port 22.
+
+    2. Check `firewall-cmd` or iptables for blocked port 22.
+
+    3. Read `/var/log/secure` for auth or config errors.'
+- order: 3
+  cost: 50
+  content: 'Exact fix + verification:
+
+    1. Fix sshd_config, firewall, or socket unit as needed.
+
+    2. `systemctl restart sshd`.
+
+    3. `ssh -o BatchMode=yes user@localhost echo ok` succeeds.
+
+
+    WHY: SSH failures are usually service, firewall, or config — not credentials alone.'
+summary: Complete the fail2ban setup — protect ssh from brute-force attacks security lab and verify success
+  with the checker
+estimated_minutes: 10
+xp_reward: 100
+prerequisites:
+- Basic security literacy
+tags:
+- fix
+- hands-on
+- security
+linked_tutorial: security-fundamentals
+what_you_will_learn:
+- Create /etc/fail2ban/jail.local with an [sshd] jail configured for port 22
+- Set bantime=3600, findtime=600, and maxretry=5
+- Enable and start fail2ban, then verify the sshd jail is active
+environment:
+  nodes:
+  - role: primary
+    os: FixitLab hardening lab
+    hostname: lab-primary
+    ip: 127.0.0.1
+    specs: local offline simulation
+  pre_installed:
+  - bash
+  - coreutils
+  - journalctl
+  - security
+  - systemctl
+  credentials:
+  - user: root
+    password: lab123
+tasks:
+- id: task_1
+  title: fail2ban Setup — Protect SSH from Brute-Force Attacks
+  description: Restore healthy behavior for fail2ban Setup — Protect SSH from Brute-Force Attacks by investigating
+    the failure, applying the smallest safe fix, and validating the outcome.
+  background: 'This security lab teaches systematic troubleshooting: observe, hypothesize, change, verify.'
+  validation:
+    type: custom_script
+    script: check.sh
+    error_message: Validation did not pass. Re-read the objectives and Hint 2 diagnostic steps.
+solution:
+  summary: Identify the misconfiguration affecting this security lab and apply the minimal fix.
+  files_changed: []
+  commands_run:
+  - bash check.sh
+  reference_docs: security-fundamentals

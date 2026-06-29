@@ -1,7 +1,7 @@
 title: RHEL rsyslog Stopped — No System Logs
 slug: rhel-rsyslog-down
-technology: RHEL Linux
-category: Logging
+technology: rhel-linux
+category: Build
 difficulty: medium
 lab_mode: simulation
 simulation_type: generic
@@ -10,8 +10,26 @@ max_score: 100
 is_free: true
 jira_priority: High
 dual_terminal: false
-description: System logging stopped on a RHEL host because rsyslog failed, so /var/log/messages isn't
-  updating. Restore logging.
+description: 'CONTEXT: A team operating Red Hat Enterprise Linux needs you to resolve `RHEL rsyslog Stopped
+  — No System Logs` during a realistic incident. The business impact is reduced service reliability until
+  the underlying state is repaired.
+
+
+  ENVIRONMENT: You are working in FixitLab''s offline RHEL practice host with dnf, subscription-manager,
+  firewalld, and SELinux. All tools run locally; no paid APIs or external cloud calls are required.
+
+
+  SYMPTOM / STARTING STATE: A RHEL host where the rsyslog service is failed, halting system logging. System
+  logging stopped on a RHEL host because rsyslog failed, so /var/log/messages isn''t updating. Restore
+  logging.
+
+
+  OBJECTIVE: Confirm rsyslog is down; Resolve and start rsyslog; Verify rsyslog is active. Success means
+  `systemctl is-active rsyslog` returns active.
+
+
+  WHAT TO AVOID: Do not apply broad destructive changes, skip evidence gathering, or fake completion with
+  marker files — the checker validates real system state.'
 initial_state: A RHEL host where the rsyslog service is failed, halting system logging.
 objectives:
 - Confirm rsyslog is down
@@ -19,11 +37,100 @@ objectives:
 - Verify rsyslog is active
 hints:
 - order: 1
-  cost: 10
-  content: systemctl status rsyslog shows failed.
+  cost: 0
+  content: 'Where to look: Start with `systemctl status rsyslog` and `journalctl -u rsyslog -n 50 --no-pager`
+    before changing anything.'
 - order: 2
-  cost: 15
-  content: Fix and systemctl start rsyslog.
+  cost: 25
+  content: 'Diagnostic steps:
+
+    1. Run `systemctl status rsyslog` — note Active/Failed and the last log lines.
+
+    2. Read `journalctl -u rsyslog -n 50` for the root error.
+
+    3. Form a hypothesis about the smallest config or permission fix.'
 - order: 3
-  cost: 20
-  content: rsyslog active.
+  cost: 50
+  content: 'Exact fix + verification:
+
+    1. Apply the minimal fix (config, unit override, or missing directory).
+
+    2. Run `systemctl daemon-reload` if you edited a unit file.
+
+    3. Run `systemctl restart rsyslog` and confirm `systemctl is-active rsyslog` succeeds.
+
+
+    WHY: the grader checks real service state, not marker files.'
+summary: Complete the rhel rsyslog stopped — no system logs rhel linux lab and verify success with the
+  checker
+estimated_minutes: 20
+xp_reward: 100
+prerequisites:
+- Basic rhel linux literacy
+tags:
+- fix
+- hands-on
+- rhel-linux
+linked_tutorial: rhel-linux-fundamentals
+what_you_will_learn:
+- Confirm rsyslog is down
+- Resolve and start rsyslog
+- Verify rsyslog is active
+environment:
+  nodes:
+  - role: primary
+    os: FixitLab RHEL practice host
+    hostname: lab-primary
+    ip: 127.0.0.1
+    specs: local offline simulation
+  pre_installed:
+  - bash
+  - coreutils
+  - journalctl
+  - rhel linux
+  - systemctl
+  credentials:
+  - user: root
+    password: lab123
+tasks:
+- id: task_1
+  title: RHEL rsyslog Stopped — No System Logs
+  description: Restore healthy behavior for RHEL rsyslog Stopped — No System Logs by investigating the
+    failure, applying the smallest safe fix, and validating the outcome.
+  background: 'This rhel linux lab teaches systematic troubleshooting: observe, hypothesize, change, verify.'
+  validation:
+    type: service_active
+    command: systemctl is-active rsyslog
+    expected_status: active
+    error_message: The rsyslog service is not active yet. Check `systemctl status rsyslog` and `journalctl
+      -u rsyslog -n 50`.
+solution:
+  summary: The root cause is an unhealthy `rsyslog` service; repair it and verify active state.
+  files_changed: []
+  commands_run:
+  - systemctl is-active rsyslog
+  reference_docs: rhel-linux-fundamentals
+guided_mode:
+  enabled: true
+  steps:
+  - step: 1
+    title: Inspect current state
+    instruction: Run a read-only diagnostic before changing anything.
+    command: systemctl is-active rsyslog
+    expected_output: Output shows the current failure mode
+    explanation: Evidence-first troubleshooting avoids guessing.
+    next_on: command_success
+  - step: 2
+    title: Apply the minimal fix
+    instruction: Make one reversible change aligned with the objectives.
+    command: '# your fix command here'
+    expected_output: State moves toward the objective
+    explanation: Small changes make rollback easy if the hypothesis was wrong.
+    next_on: command_success
+  - step: 3
+    title: Verify with the grader
+    instruction: Run the same verification the checker uses.
+    command: systemctl is-active rsyslog
+    expected_output: '`systemctl is-active rsyslog` returns active'
+    explanation: The lab passes only when real state is healthy.
+    next_on: command_success

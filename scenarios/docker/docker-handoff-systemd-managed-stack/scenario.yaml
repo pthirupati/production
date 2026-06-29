@@ -1,23 +1,52 @@
-title: "Docker → Linux: Compose Stack Must Run Under systemd"
+title: 'Docker → Linux: Compose Stack Must Run Under systemd'
 slug: docker-handoff-systemd-managed-stack
-technology: Docker & Containers
-category: Service Management
+technology: docker
+category: Build
 difficulty: medium
-description: |
-  CROSS-TECHNOLOGY task (Docker -> Linux/systemd). An app team handed off a
+description: 'CONTEXT: A team operating Docker containers needs you to resolve `Docker → Linux: Compose
+  Stack Must Run Under systemd` during a realistic incident. The business impact is reduced service reliability
+  until the underlying state is repaired.
+
+
+  ENVIRONMENT: You are working in FixitLab''s offline Docker host with docker CLI, images, containers,
+  and compose files. All tools run locally; no paid APIs or external cloud calls are required.
+
+
+  SYMPTOM / STARTING STATE: A Linux host with Docker installed and a compose stack under /opt/app. The
+
+  `appstack` systemd unit that should manage the stack is failed and disabled. CROSS-TECHNOLOGY task (Docker
+  -> Linux/systemd). An app team handed off a
+
   docker-compose stack that they used to start by hand. Operations needs it to be
+
   a managed boot service so it survives reboots and is supervised like any other
+
   daemon. A systemd unit `appstack` was created to run `docker compose up`, but it
+
   is failed and disabled — the unit has the wrong ordering/oneshot semantics so it
+
   exits immediately. Make the containerized stack a healthy, enabled systemd
+
   service.
-initial_state: |
-  A Linux host with Docker installed and a compose stack under /opt/app. The
+
+
+  OBJECTIVE: Confirm the appstack service is failed/disabled and the stack is not supervised; Correct
+  the unit so it manages `docker compose up -d` correctly (ordering after docker, Type/RemainAfterExit);
+  Enable and start appstack; verify the service is active. Success means `systemctl is-active appstack`
+  returns active.
+
+
+  WHAT TO AVOID: Do not apply broad destructive changes, skip evidence gathering, or fake completion with
+  marker files — the checker validates real system state.'
+initial_state: 'A Linux host with Docker installed and a compose stack under /opt/app. The
+
   `appstack` systemd unit that should manage the stack is failed and disabled.
+
+  '
 objectives:
-  - Confirm the appstack service is failed/disabled and the stack is not supervised
-  - Correct the unit so it manages `docker compose up -d` correctly (ordering after docker, Type/RemainAfterExit)
-  - Enable and start appstack; verify the service is active
+- Confirm the appstack service is failed/disabled and the stack is not supervised
+- Correct the unit so it manages `docker compose up -d` correctly (ordering after docker, Type/RemainAfterExit)
+- Enable and start appstack; verify the service is active
 lab_mode: simulation
 simulation_type: generic
 cross_technology: true
@@ -27,12 +56,100 @@ is_free: false
 jira_priority: High
 dual_terminal: false
 hints:
-  - order: 1
-    cost: 10
-    content: "`systemctl status appstack` shows it failed — a `docker compose up` that detaches needs the right Type (oneshot + RemainAfterExit, or a foreground `up`) and `After=docker.service`."
-  - order: 2
-    cost: 15
-    content: "Fix the unit semantics, run `systemctl daemon-reload`, then `systemctl enable --now appstack`."
-  - order: 3
-    cost: 20
-    content: "Verify with `systemctl is-active appstack` — it must report active once the stack is supervised."
+- order: 1
+  cost: 0
+  content: 'Where to look: Start with `systemctl status appstack` and `journalctl -u appstack -n 50 --no-pager`
+    before changing anything.'
+- order: 2
+  cost: 25
+  content: 'Diagnostic steps:
+
+    1. Run `systemctl status appstack` — note Active/Failed and the last log lines.
+
+    2. Read `journalctl -u appstack -n 50` for the root error.
+
+    3. Form a hypothesis about the smallest config or permission fix.'
+- order: 3
+  cost: 50
+  content: 'Exact fix + verification:
+
+    1. Apply the minimal fix (config, unit override, or missing directory).
+
+    2. Run `systemctl daemon-reload` if you edited a unit file.
+
+    3. Run `systemctl restart appstack` and confirm `systemctl is-active appstack` succeeds.
+
+
+    WHY: the grader checks real service state, not marker files.'
+summary: 'Complete the docker → linux: compose stack must run under systemd docker lab and verify success
+  with the checker'
+estimated_minutes: 20
+xp_reward: 100
+prerequisites:
+- Basic docker literacy
+tags:
+- docker
+- fix
+- hands-on
+linked_tutorial: docker-fundamentals
+what_you_will_learn:
+- Confirm the appstack service is failed/disabled and the stack is not supervised
+- Correct the unit so it manages `docker compose up -d` correctly (ordering after docker, Type/RemainAfterExit)
+- Enable and start appstack; verify the service is active
+environment:
+  nodes:
+  - role: primary
+    os: FixitLab Docker host
+    hostname: lab-primary
+    ip: 127.0.0.1
+    specs: local offline simulation
+  pre_installed:
+  - bash
+  - coreutils
+  - docker
+  - docker-compose
+  credentials:
+  - user: root
+    password: lab123
+tasks:
+- id: task_1
+  title: 'Docker → Linux: Compose Stack Must Run Under systemd'
+  description: 'Restore healthy behavior for Docker → Linux: Compose Stack Must Run Under systemd by investigating
+    the failure, applying the smallest safe fix, and validating the outcome.'
+  background: 'This docker lab teaches systematic troubleshooting: observe, hypothesize, change, verify.'
+  validation:
+    type: service_active
+    command: systemctl is-active appstack
+    expected_status: active
+    error_message: The appstack service is not active yet. Check `systemctl status appstack` and `journalctl
+      -u appstack -n 50`.
+solution:
+  summary: The root cause is an unhealthy `appstack` service; repair it and verify active state.
+  files_changed: []
+  commands_run:
+  - systemctl is-active appstack
+  reference_docs: docker-fundamentals
+guided_mode:
+  enabled: true
+  steps:
+  - step: 1
+    title: Inspect current state
+    instruction: Run a read-only diagnostic before changing anything.
+    command: systemctl is-active appstack
+    expected_output: Output shows the current failure mode
+    explanation: Evidence-first troubleshooting avoids guessing.
+    next_on: command_success
+  - step: 2
+    title: Apply the minimal fix
+    instruction: Make one reversible change aligned with the objectives.
+    command: '# your fix command here'
+    expected_output: State moves toward the objective
+    explanation: Small changes make rollback easy if the hypothesis was wrong.
+    next_on: command_success
+  - step: 3
+    title: Verify with the grader
+    instruction: Run the same verification the checker uses.
+    command: systemctl is-active appstack
+    expected_output: '`systemctl is-active appstack` returns active'
+    explanation: The lab passes only when real state is healthy.
+    next_on: command_success

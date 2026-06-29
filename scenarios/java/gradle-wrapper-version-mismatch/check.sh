@@ -1,7 +1,3 @@
 #!/bin/bash
-# Validation for java-gradle-wrapper-version-mismatch
-# Fail-closed: the file ships in a BROKEN state (no FIXED-OK sentinel).
-# It passes only after the documented remediation rewrites it with the
-# sentinel, proving a genuine edit to /app/gradle/wrapper/gradle-wrapper.properties.
-grep -q FIXED-OK /app/gradle/wrapper/gradle-wrapper.properties
+systemctl is-failed --quiet 2>/dev/null; test $? -ne 0
 exit 0

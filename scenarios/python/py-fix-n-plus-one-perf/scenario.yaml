@@ -1,9 +1,26 @@
 title: Fix the Quadratic Membership Check
 slug: py-fix-n-plus-one-perf
-category: Python Development
-description: common_elements(a, b) returns items present in both lists, but it checks `x in b` for every
-  x in a where b is a list — an O(n*m) scan that times out on large inputs. Convert b to a set for O(1)
-  lookups so it scales.
+category: Fix
+description: 'CONTEXT: A team operating Python development needs you to resolve `Fix the Quadratic Membership
+  Check` during a realistic incident. The business impact is reduced service reliability until the underlying
+  state is repaired.
+
+
+  ENVIRONMENT: You are working in FixitLab''s offline Python project workspace with source files, venv,
+  tests, and CLI entrypoints. All tools run locally; no paid APIs or external cloud calls are required.
+
+
+  SYMPTOM / STARTING STATE: common_elements(a, b) returns items present in both lists, but it checks `x
+  in b` for every x in a where b is a list — an O(n*m) scan that times out on large inputs. Convert b
+  to a set for O(1) lookups so it scales.
+
+
+  OBJECTIVE: Recognize the O(n*m) list membership pattern; Use a set for constant-time lookups; Pass the
+  large-input performance test within the timeout. Success means all hidden tests pass.
+
+
+  WHAT TO AVOID: Do not apply broad destructive changes, skip evidence gathering, or fake completion with
+  marker files — the checker validates real system state.'
 difficulty: medium
 scenario_type: fix
 lab_mode: simulation
@@ -21,53 +38,125 @@ objectives:
 initial_state: common_elements(a, b) returns items present in both lists, but it checks `x in b` for every
   x in a where b is a list — an O(n*m) scan that times out on large inputs. Convert b to a set for O(1)
   lookups so it scales.
-solution_explanation: |
-  List membership is linear, so the nested scan is quadratic and times out on big inputs. Pre-building a set of b (and a `seen` set) makes each lookup O(1), so the whole pass is linear.
+solution_explanation: 'List membership is linear, so the nested scan is quadratic and times out on big
+  inputs. Pre-building a set of b (and a `seen` set) makes each lookup O(1), so the whole pass is linear.
+
+  '
 coding_spec:
   language: python
   entrypoint: solution.py
   kind: fix
-  instructions: |
-    Fix common_elements(a, b): return the list of elements of a that also appear in b, in a's order, without duplicates. Make it efficient enough for large inputs.
+  instructions: 'Fix common_elements(a, b): return the list of elements of a that also appear in b, in
+    a''s order, without duplicates. Make it efficient enough for large inputs.
+
     Click Run to try it, then Check Solution to grade against all tests.
+
+    '
   files:
   - path: solution.py
-    content: |
-      def common_elements(a, b):
-          out = []
-          for x in a:
-              if x in b and x not in out:   # x in b is O(len(b)); x not in out is O(len(out))
-                  out.append(x)
-          return out
+    content: "def common_elements(a, b):\n    out = []\n    for x in a:\n        if x in b and x not in\
+      \ out:   # x in b is O(len(b)); x not in out is O(len(out))\n            out.append(x)\n    return\
+      \ out\n"
     readonly: false
   visible_tests:
   - name: basic intersection
-    code: |
-      assert common_elements([1,2,3,4], [2,4,6]) == [2,4]
+    code: 'assert common_elements([1,2,3,4], [2,4,6]) == [2,4]
+
+      '
   - name: no overlap
-    code: |
-      assert common_elements([1,2], [3,4]) == []
+    code: 'assert common_elements([1,2], [3,4]) == []
+
+      '
   hidden_tests:
   - name: preserves a's order and dedupes
-    code: |
-      assert common_elements([3,1,3,2,1], [1,3]) == [3,1]
+    code: 'assert common_elements([3,1,3,2,1], [1,3]) == [3,1]
+
+      '
   - name: large input performance
-    code: |
-      a = list(range(200000))
+    code: 'a = list(range(200000))
+
       b = list(range(100000, 300000))
+
       r = common_elements(a, b)
+
       assert r[0] == 100000 and r[-1] == 199999 and len(r) == 100000
+
+      '
   - name: empty inputs
-    code: |
-      assert common_elements([], [1,2]) == [] and common_elements([1], []) == []
+    code: 'assert common_elements([], [1,2]) == [] and common_elements([1], []) == []
+
+      '
   timeout: 6
 hints:
 - order: 1
-  cost: 10
-  content: With b as a list, `x in b` scans b every time — that's O(len(a) * len(b)).
+  cost: 0
+  content: 'Where to look: Open `solution.py`, read the instructions, and run the visible tests to see
+    which assertion fails first.'
 - order: 2
-  cost: 20
-  content: Convert b to a set once; membership becomes O(1).
+  cost: 25
+  content: 'Diagnostic steps:
+
+    1. Click Run and read the traceback — note line number and actual vs expected values.
+
+    2. Reproduce the failure with the smallest input from a visible test.
+
+    3. Compare your implementation to the bug described in the lab prompt.'
 - order: 3
-  cost: 30
-  content: Also track a `seen` set instead of `x not in out` (which is also linear).
+  cost: 50
+  content: 'Exact fix + verification:
+
+    1. Pass the large-input performance test within the timeout.
+
+    2. Re-run the lab checker (`check.sh` or Check Solution).
+
+    3. Confirm every scenario objective is satisfied.
+
+
+    WHY: the grader validates real state — marker files are ignored.'
+technology: python
+summary: Complete the fix the quadratic membership check python lab and verify success with the checker
+estimated_minutes: 25
+xp_reward: 100
+prerequisites:
+- Basic python literacy
+tags:
+- fix
+- hands-on
+- python
+linked_tutorial: python-fundamentals
+what_you_will_learn:
+- Recognize the O(n*m) list membership pattern
+- Use a set for constant-time lookups
+- Pass the large-input performance test within the timeout
+environment:
+  nodes:
+  - role: primary
+    os: FixitLab Python project workspace
+    hostname: lab-primary
+    ip: 127.0.0.1
+    specs: local offline simulation
+  pre_installed:
+  - bash
+  - coreutils
+  - pip
+  - python
+  - python3
+  credentials:
+  - user: root
+    password: lab123
+tasks:
+- id: task_1
+  title: Fix the Quadratic Membership Check
+  description: Restore healthy behavior for Fix the Quadratic Membership Check by investigating the failure,
+    applying the smallest safe fix, and validating the outcome.
+  background: 'This python lab teaches systematic troubleshooting: observe, hypothesize, change, verify.'
+  validation:
+    type: custom_script
+    script: hidden_tests
+    error_message: One or more hidden tests failed. Read the public test output, fix your solution, and
+      submit again.
+solution:
+  summary: The solution passes all hidden tests by implementing the required behavior in code.
+  files_changed: []
+  commands_run: []
+  reference_docs: python-fundamentals

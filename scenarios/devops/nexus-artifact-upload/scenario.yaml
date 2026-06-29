@@ -1,14 +1,28 @@
 title: Fix Nexus Repository Artifact Upload Permission
 slug: nexus-artifact-upload
-technology: DevOps
-category: Artifact Management
+technology: devops
+category: Fix
 difficulty: medium
 time_limit: 900
 max_score: 100
 infrastructure_type: docker
 jira_priority: Medium
 is_free: false
-description: 'CI/CD pipeline artifact uploads to Nexus Repository Manager are failing with
+description: 'CONTEXT: A team operating DevOps delivery needs you to resolve `Fix Nexus Repository Artifact
+  Upload Permission` during a realistic incident. The business impact is reduced service reliability until
+  the underlying state is repaired.
+
+
+  ENVIRONMENT: You are working in FixitLab''s offline CI/CD lab with git repos, pipelines, artifacts,
+  and runbooks. All tools run locally; no paid APIs or external cloud calls are required.
+
+
+  SYMPTOM / STARTING STATE: Nexus Repository Manager running at http://localhost:8081. The "deploy" user
+
+  exists but only has the nx-anonymous role. The releases repository requires
+
+  nx-repository-write permission. Admin credentials are in /opt/nexus/admin_creds. CI/CD pipeline artifact
+  uploads to Nexus Repository Manager are failing with
 
   HTTP 403 Forbidden. The deploy user account doesn''t have the correct role
 
@@ -16,7 +30,14 @@ description: 'CI/CD pipeline artifact uploads to Nexus Repository Manager are fa
 
   pipeline can upload artifacts.
 
-  '
+
+  OBJECTIVE: Identify the Nexus user missing upload permissions; Assign the nx-repository-write role to
+  the deploy user; Verify artifact upload succeeds after permission fix. Success means `check.sh` exits
+  successfully.
+
+
+  WHAT TO AVOID: Do not apply broad destructive changes, skip evidence gathering, or fake completion with
+  marker files — the checker validates real system state.'
 objectives:
 - Identify the Nexus user missing upload permissions
 - Assign the nx-repository-write role to the deploy user
@@ -30,17 +51,71 @@ initial_state: 'Nexus Repository Manager running at http://localhost:8081. The "
   '
 hints:
 - order: 1
-  cost: 10
-  content: 'Reproduce the 403: `curl -u deploy:deploy123 -X POST http://localhost:8081/repository/releases/
-    -F file=@<artifact>` returns Forbidden — the deploy user lacks write rights.'
+  cost: 0
+  content: 'Where to look: Identify the Nexus user missing upload permissions'
 - order: 2
-  cost: 15
-  content: 'Get admin credentials to manage roles: `cat /opt/nexus/admin_creds`.'
-- order: 3
-  cost: 20
-  content: 'Grant the deploy user a write role via the REST API (or UI): add `nx-repository-write` (or
-    `nx-releases-write`) to the user, e.g. `curl -u admin:<pass> -X PUT http://localhost:8081/service/rest/v1/security/users/deploy
-    ...`.'
-- order: 4
   cost: 25
-  content: Re-test the upload as deploy — it now returns 201/succeeds.
+  content: 'Diagnostic steps:
+
+    1. Assign the nx-repository-write role to the deploy user
+
+    2. Verify artifact upload succeeds after permission fix'
+- order: 3
+  cost: 50
+  content: 'Exact fix + verification:
+
+    1. Verify artifact upload succeeds after permission fix.
+
+    2. Re-run the lab checker (`check.sh` or Check Solution).
+
+    3. Confirm every scenario objective is satisfied.
+
+
+    WHY: the grader validates real state — marker files are ignored.'
+summary: Complete the fix nexus repository artifact upload permission devops lab and verify success with
+  the checker
+estimated_minutes: 15
+xp_reward: 100
+prerequisites:
+- Basic devops literacy
+tags:
+- devops
+- fix
+- hands-on
+linked_tutorial: devops-fundamentals
+what_you_will_learn:
+- Identify the Nexus user missing upload permissions
+- Assign the nx-repository-write role to the deploy user
+- Verify artifact upload succeeds after permission fix
+environment:
+  nodes:
+  - role: primary
+    os: FixitLab CI/CD lab
+    hostname: lab-primary
+    ip: 127.0.0.1
+    specs: local offline simulation
+  pre_installed:
+  - bash
+  - coreutils
+  - devops
+  - journalctl
+  - systemctl
+  credentials:
+  - user: root
+    password: lab123
+tasks:
+- id: task_1
+  title: Fix Nexus Repository Artifact Upload Permission
+  description: Restore healthy behavior for Fix Nexus Repository Artifact Upload Permission by investigating
+    the failure, applying the smallest safe fix, and validating the outcome.
+  background: 'This devops lab teaches systematic troubleshooting: observe, hypothesize, change, verify.'
+  validation:
+    type: custom_script
+    script: check.sh
+    error_message: Validation did not pass. Re-read the objectives and Hint 2 diagnostic steps.
+solution:
+  summary: Identify the misconfiguration affecting this devops lab and apply the minimal fix.
+  files_changed: []
+  commands_run:
+  - bash check.sh
+  reference_docs: devops-fundamentals

@@ -1,7 +1,7 @@
 title: BGP Next-Hop Unreachable Drops Routes
 slug: networking-bgp-nexthop-unreachable
-technology: Networking
-category: Routing / BGP
+technology: networking
+category: Fix
 difficulty: hard
 lab_mode: simulation
 simulation_type: networking
@@ -10,8 +10,27 @@ max_score: 100
 is_free: true
 jira_priority: High
 dual_terminal: false
-description: BGP routes are received but not installed because the advertised next-hop is unreachable
+description: 'CONTEXT: A team operating network operations needs you to resolve `BGP Next-Hop Unreachable
+  Drops Routes` during a realistic incident. The business impact is reduced service reliability until
+  the underlying state is repaired.
+
+
+  ENVIRONMENT: You are working in FixitLab''s offline network lab with interfaces, routing tables, DNS,
+  and firewall rules. All tools run locally; no paid APIs or external cloud calls are required.
+
+
+  SYMPTOM / STARTING STATE: A router that receives BGP prefixes but cannot use them because the next-hop
+  is unreachable. BGP routes are received but not installed because the advertised next-hop is unreachable
   (no IGP route). Fix next-hop reachability/next-hop-self and confirm a healthy session.
+
+
+  OBJECTIVE: Confirm routes are not installed due to unreachable next-hop; Fix next-hop reachability or
+  apply next-hop-self; Verify the session is healthy with usable prefixes. Success means `check.sh` exits
+  successfully.
+
+
+  WHAT TO AVOID: Do not apply broad destructive changes, skip evidence gathering, or fake completion with
+  marker files — the checker validates real system state.'
 initial_state: A router that receives BGP prefixes but cannot use them because the next-hop is unreachable.
 objectives:
 - Confirm routes are not installed due to unreachable next-hop
@@ -19,11 +38,71 @@ objectives:
 - Verify the session is healthy with usable prefixes
 hints:
 - order: 1
-  cost: 10
-  content: show ip bgp summary plus routes show inaccessible next-hop.
+  cost: 0
+  content: 'Where to look: Confirm routes are not installed due to unreachable next-hop'
 - order: 2
-  cost: 15
-  content: Add the IGP route or set next-hop-self; clear the session.
+  cost: 25
+  content: 'Diagnostic steps:
+
+    1. Fix next-hop reachability or apply next-hop-self
+
+    2. Verify the session is healthy with usable prefixes'
 - order: 3
-  cost: 20
-  content: Routes usable, session healthy.
+  cost: 50
+  content: 'Exact fix + verification:
+
+    1. Verify the session is healthy with usable prefixes.
+
+    2. Re-run the lab checker (`check.sh` or Check Solution).
+
+    3. Confirm every scenario objective is satisfied.
+
+
+    WHY: the grader validates real state — marker files are ignored.'
+summary: Complete the bgp next-hop unreachable drops routes networking lab and verify success with the
+  checker
+estimated_minutes: 25
+xp_reward: 100
+prerequisites:
+- Basic networking literacy
+tags:
+- fix
+- hands-on
+- networking
+linked_tutorial: networking-fundamentals
+what_you_will_learn:
+- Confirm routes are not installed due to unreachable next-hop
+- Fix next-hop reachability or apply next-hop-self
+- Verify the session is healthy with usable prefixes
+environment:
+  nodes:
+  - role: primary
+    os: FixitLab network lab
+    hostname: lab-primary
+    ip: 127.0.0.1
+    specs: local offline simulation
+  pre_installed:
+  - bash
+  - coreutils
+  - journalctl
+  - networking
+  - systemctl
+  credentials:
+  - user: root
+    password: lab123
+tasks:
+- id: task_1
+  title: BGP Next-Hop Unreachable Drops Routes
+  description: Restore healthy behavior for BGP Next-Hop Unreachable Drops Routes by investigating the
+    failure, applying the smallest safe fix, and validating the outcome.
+  background: 'This networking lab teaches systematic troubleshooting: observe, hypothesize, change, verify.'
+  validation:
+    type: custom_script
+    script: check.sh
+    error_message: Validation did not pass. Re-read the objectives and Hint 2 diagnostic steps.
+solution:
+  summary: Identify the misconfiguration affecting this networking lab and apply the minimal fix.
+  files_changed: []
+  commands_run:
+  - bash check.sh
+  reference_docs: networking-fundamentals

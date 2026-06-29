@@ -1,39 +1,131 @@
 slug: haproxy-session-stuck
-title: "HAProxy Session Table Full — Increase maxconn to Fix Rejects"
-technology: Networking
-category: Load Balancing
+title: HAProxy Session Table Full — Increase maxconn to Fix Rejects
+technology: networking
+category: Fix
 difficulty: medium
 time_limit: 900
 max_score: 100
 infrastructure_type: docker
 jira_priority: Critical
 is_free: false
-description: |
-  During a traffic spike, HAProxy started rejecting new connections with the error
-  "no server available" even though all backend servers are healthy and have capacity.
-  The HAProxy session table is full because maxconn is set to 200 — far too low for
-  the current traffic volume of ~2000 concurrent connections. Increase maxconn in
-  the global and frontend sections, and increase the per-server connection limit.
-objectives:
-  - Identify that maxconn is exhausted in the HAProxy stats
-  - Increase global maxconn to at least 10000
-  - Increase frontend maxconn to match
-  - Increase per-server maxconn in the backend section
-  - Reload HAProxy and verify it accepts new connections
-initial_state: |
-  HAProxy 2.6. Global maxconn=200. Frontend maxconn=200. Stats show
+description: 'CONTEXT: A team operating network operations needs you to resolve `HAProxy Session Table
+  Full — Increase maxconn to Fix Rejects` during a realistic incident. The business impact is reduced
+  service reliability until the underlying state is repaired.
+
+
+  ENVIRONMENT: You are working in FixitLab''s offline network lab with interfaces, routing tables, DNS,
+  and firewall rules. All tools run locally; no paid APIs or external cloud calls are required.
+
+
+  SYMPTOM / STARTING STATE: HAProxy 2.6. Global maxconn=200. Frontend maxconn=200. Stats show
+
   "MaxConn: 200/200" and "Denied: XXX". New connections get TCP reset.
+
+  Backend servers have capacity — the limit is entirely in HAProxy config. During a traffic spike, HAProxy
+  started rejecting new connections with the error
+
+  "no server available" even though all backend servers are healthy and have capacity.
+
+  The HAProxy session table is full because maxconn is set to 200 — far too low for
+
+  the current traffic volume of ~2000 concurrent connections. Increase maxconn in
+
+  the global and frontend sections, and increase the per-server connection limit.
+
+
+  OBJECTIVE: Identify that maxconn is exhausted in the HAProxy stats; Increase global maxconn to at least
+  10000; Increase frontend maxconn to match. Success means `systemctl is-active --quiet` returns active.
+
+
+  WHAT TO AVOID: Do not apply broad destructive changes, skip evidence gathering, or fake completion with
+  marker files — the checker validates real system state.'
+objectives:
+- Identify that maxconn is exhausted in the HAProxy stats
+- Increase global maxconn to at least 10000
+- Increase frontend maxconn to match
+- Increase per-server maxconn in the backend section
+- Reload HAProxy and verify it accepts new connections
+initial_state: 'HAProxy 2.6. Global maxconn=200. Frontend maxconn=200. Stats show
+
+  "MaxConn: 200/200" and "Denied: XXX". New connections get TCP reset.
+
   Backend servers have capacity — the limit is entirely in HAProxy config.
+
+  '
 hints:
-  - order: 1
-    cost: 10
-    content: "Check current stats: `echo 'show info' | socat /run/haproxy/admin.sock stdio | grep -i maxconn`"
-  - order: 2
-    cost: 15
-    content: "Edit /etc/haproxy/haproxy.cfg — in `global` section: `maxconn 10000`"
-  - order: 3
-    cost: 15
-    content: "In `frontend` section: `maxconn 10000`. In `backend` for each server: `maxconn 3000`"
-  - order: 4
-    cost: 10
-    content: "Reload: `systemctl reload haproxy`. Verify: `echo 'show info' | socat /run/haproxy/admin.sock stdio | grep MaxConn`"
+- order: 1
+  cost: 0
+  content: 'Where to look: Start with `systemctl status --quiet` and `journalctl -u --quiet -n 50 --no-pager`
+    before changing anything.'
+- order: 2
+  cost: 25
+  content: 'Diagnostic steps:
+
+    1. Run `systemctl status --quiet` — note Active/Failed and the last log lines.
+
+    2. Read `journalctl -u --quiet -n 50` for the root error.
+
+    3. Form a hypothesis about the smallest config or permission fix.'
+- order: 3
+  cost: 50
+  content: 'Exact fix + verification:
+
+    1. Apply the minimal fix (config, unit override, or missing directory).
+
+    2. Run `systemctl daemon-reload` if you edited a unit file.
+
+    3. Run `systemctl restart --quiet` and confirm `systemctl is-active --quiet` succeeds.
+
+
+    WHY: the grader checks real service state, not marker files.'
+summary: Complete the haproxy session table full — increase maxconn to fix rejects networking lab and
+  verify success with the checker
+estimated_minutes: 15
+xp_reward: 100
+prerequisites:
+- Basic networking literacy
+tags:
+- fix
+- hands-on
+- networking
+linked_tutorial: networking-fundamentals
+what_you_will_learn:
+- Identify that maxconn is exhausted in the HAProxy stats
+- Increase global maxconn to at least 10000
+- Increase frontend maxconn to match
+- Increase per-server maxconn in the backend section
+- Reload HAProxy and verify it accepts new connections
+environment:
+  nodes:
+  - role: primary
+    os: FixitLab network lab
+    hostname: lab-primary
+    ip: 127.0.0.1
+    specs: local offline simulation
+  pre_installed:
+  - bash
+  - coreutils
+  - journalctl
+  - networking
+  - systemctl
+  credentials:
+  - user: root
+    password: lab123
+tasks:
+- id: task_1
+  title: HAProxy Session Table Full — Increase maxconn to Fix Rejects
+  description: Restore healthy behavior for HAProxy Session Table Full — Increase maxconn to Fix Rejects
+    by investigating the failure, applying the smallest safe fix, and validating the outcome.
+  background: 'This networking lab teaches systematic troubleshooting: observe, hypothesize, change, verify.'
+  validation:
+    type: service_active
+    command: systemctl is-active --quiet
+    expected_status: active
+    error_message: The --quiet service is not active yet. Check `systemctl status --quiet` and `journalctl
+      -u --quiet -n 50`.
+solution:
+  summary: The root cause is an unhealthy `--quiet` service; repair it and verify active state.
+  files_changed: []
+  commands_run:
+  - systemctl is-active --quiet
+  reference_docs: networking-fundamentals

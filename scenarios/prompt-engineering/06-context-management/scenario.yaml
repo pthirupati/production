@@ -1,11 +1,29 @@
-title: "Context Management"
+title: Context Management
 slug: context-management
-category: Prompt Engineering
-description: >-
-  An AI only knows what's in its context window. Learn to give it the right
-  information — and only the right information: how much context to include,
-  where to put instructions, how to reference long documents, and why a bloated
-  context actually makes answers worse.
+category: Build
+description: 'CONTEXT: A team operating prompt engineering needs you to resolve `Context Management` during
+  a realistic incident. The business impact is reduced service reliability until the underlying state
+  is repaired.
+
+
+  ENVIRONMENT: You are working in FixitLab''s offline LLM practice workspace with prompt templates, eval
+  sets, and tool configs. All tools run locally; no paid APIs or external cloud calls are required.
+
+
+  SYMPTOM / STARTING STATE: The guided AI practice console opens. Practice feeding the assistant a chunk
+  of reference text plus a focused question, and see how placement and relevance change the answer. Rule-based
+  and free. An AI only knows what''s in its context window. Learn to give it the right information — and
+  only the right information: how much context to include, where to put instructions, how to reference
+  long documents, and why a bloated context actually makes answers worse.
+
+
+  OBJECTIVE: Explain what the context window is and why irrelevant context hurts quality; Structure a
+  prompt that places the document first and the question last; Pass the exercise that provides focused,
+  well-organized context. Success means all hidden tests pass.
+
+
+  WHAT TO AVOID: Do not apply broad destructive changes, skip evidence gathering, or fake completion with
+  marker files — the checker validates real system state.'
 difficulty: medium
 scenario_type: do
 lab_mode: simulation
@@ -17,100 +35,195 @@ max_score: 100
 is_free: true
 dual_terminal: false
 objectives:
-  - Explain what the context window is and why irrelevant context hurts quality
-  - Structure a prompt that places the document first and the question last
-  - Pass the exercise that provides focused, well-organized context
-initial_state: >-
-  The guided AI practice console opens. Practice feeding the assistant a chunk of
-  reference text plus a focused question, and see how placement and relevance
-  change the answer. Rule-based and free.
-solution_explanation: >-
-  The context window is everything the model can "see": system prompt,
-  conversation history, documents you paste, and the current question. Three
-  rules: (1) include what's needed and prune what isn't — irrelevant text dilutes
-  attention and can mislead; (2) for long documents, put the document BEFORE the
-  question and clearly delimit it (e.g. <document>...</document>); (3) summarize
-  or drop stale history in long sessions. In Claude Code, CLAUDE.md and the files
-  you reference are your curated context — keep them tight and relevant.
+- Explain what the context window is and why irrelevant context hurts quality
+- Structure a prompt that places the document first and the question last
+- Pass the exercise that provides focused, well-organized context
+initial_state: The guided AI practice console opens. Practice feeding the assistant a chunk of reference
+  text plus a focused question, and see how placement and relevance change the answer. Rule-based and
+  free.
+solution_explanation: 'The context window is everything the model can "see": system prompt, conversation
+  history, documents you paste, and the current question. Three rules: (1) include what''s needed and
+  prune what isn''t — irrelevant text dilutes attention and can mislead; (2) for long documents, put the
+  document BEFORE the question and clearly delimit it (e.g. <document>...</document>); (3) summarize or
+  drop stale history in long sessions. In Claude Code, CLAUDE.md and the files you reference are your
+  curated context — keep them tight and relevant.'
 coding_spec:
   kind: prompt
   language: text
   prompt_config:
     persona: An assistant that answers strictly from the context you provide.
     lesson:
-      - heading: What the model can see
-        body: >-
-          The context window holds the system prompt, the running conversation,
-          anything you paste, and the current question. The model has no memory
-          beyond it. If a fact isn't in context, the model will either say it
-          doesn't know or — worse — guess. Giving it the right reference material
-          is often more important than clever wording.
-      - heading: Less is more
-        body: >-
-          More context is not better. Dumping an entire codebase or ten documents
-          dilutes the model's attention and invites it to latch onto irrelevant
-          details. Curate: include the specific function, the relevant doc
-          section, the actual error — not everything tangentially related.
-      - heading: Placement and delimiters
-        body: >-
-          For long inputs, put the reference material FIRST and the instruction
-          LAST, and wrap the material in clear delimiters like
-          <document>...</document> or triple backticks. This helps the model
-          separate "data to use" from "what to do," and it tends to follow the
-          most recent instruction most closely.
-    rubric: [context, task, format, specificity, constraints]
+    - heading: What the model can see
+      body: The context window holds the system prompt, the running conversation, anything you paste,
+        and the current question. The model has no memory beyond it. If a fact isn't in context, the model
+        will either say it doesn't know or — worse — guess. Giving it the right reference material is
+        often more important than clever wording.
+    - heading: Less is more
+      body: 'More context is not better. Dumping an entire codebase or ten documents dilutes the model''s
+        attention and invites it to latch onto irrelevant details. Curate: include the specific function,
+        the relevant doc section, the actual error — not everything tangentially related.'
+    - heading: Placement and delimiters
+      body: For long inputs, put the reference material FIRST and the instruction LAST, and wrap the material
+        in clear delimiters like <document>...</document> or triple backticks. This helps the model separate
+        "data to use" from "what to do," and it tends to follow the most recent instruction most closely.
+    rubric:
+    - context
+    - task
+    - format
+    - specificity
+    - constraints
     exercises:
-      - id: ground-answer
-        title: Ground the answer in provided context
-        goal: >-
-          Write a prompt that includes a short reference passage AND a focused
-          question about it, and instruct the model to answer ONLY from that
-          passage (say "I don't know" if the answer isn't there).
-        starter: |
-          Context:
-          """
-          FixitLab labs auto-terminate after 30 minutes of inactivity.
-          """
-          Question:
-        success:
-          min_words: 12
-          any_of:
-            - ["only", "based on", "according to", "from the context", "from the passage", "using the text", "don't know", "do not know", "not in the text"]
-        success_response: >-
-          Based only on the provided context: labs auto-terminate after 30
-          minutes of inactivity. The passage doesn't mention anything else, so I
-          won't speculate beyond it.
-        partial_response: >-
-          You included context — good. Now instruct me to answer ONLY from it
-          (e.g. "Using only the passage above, answer; if it's not there, say you
-          don't know"). That prevents me from inventing details.
-      - id: delimit-document
-        title: Delimit a document and put the task last
-        goal: >-
-          Write a prompt that wraps a block of reference text in clear delimiters
-          (like triple quotes or <document> tags) and places the actual
-          instruction AFTER the document.
-        starter: ""
-        success:
-          min_words: 12
-          has_delimiter: true
-          any_of:
-            - ["summarize", "answer", "extract", "list", "explain", "question", "task", "instruction"]
-        success_response: >-
-          Here's a 1-sentence summary of the delimited document, with my
-          instruction taken from the line after it. Clear delimiters made it easy
-          to tell the data apart from the task.
-        partial_response: >-
-          Wrap the reference text in delimiters (triple backticks, triple quotes,
-          or <document>...</document>) and put the instruction after it. That
-          separation is what keeps data and task from blurring together.
+    - id: ground-answer
+      title: Ground the answer in provided context
+      goal: Write a prompt that includes a short reference passage AND a focused question about it, and
+        instruct the model to answer ONLY from that passage (say "I don't know" if the answer isn't there).
+      starter: 'Context:
+
+        """
+
+        FixitLab labs auto-terminate after 30 minutes of inactivity.
+
+        """
+
+        Question:
+
+        '
+      success:
+        min_words: 12
+        any_of:
+        - - only
+          - based on
+          - according to
+          - from the context
+          - from the passage
+          - using the text
+          - don't know
+          - do not know
+          - not in the text
+      success_response: 'Based only on the provided context: labs auto-terminate after 30 minutes of inactivity.
+        The passage doesn''t mention anything else, so I won''t speculate beyond it.'
+      partial_response: You included context — good. Now instruct me to answer ONLY from it (e.g. "Using
+        only the passage above, answer; if it's not there, say you don't know"). That prevents me from
+        inventing details.
+    - id: delimit-document
+      title: Delimit a document and put the task last
+      goal: Write a prompt that wraps a block of reference text in clear delimiters (like triple quotes
+        or <document> tags) and places the actual instruction AFTER the document.
+      starter: ''
+      success:
+        min_words: 12
+        has_delimiter: true
+        any_of:
+        - - summarize
+          - answer
+          - extract
+          - list
+          - explain
+          - question
+          - task
+          - instruction
+      success_response: Here's a 1-sentence summary of the delimited document, with my instruction taken
+        from the line after it. Clear delimiters made it easy to tell the data apart from the task.
+      partial_response: Wrap the reference text in delimiters (triple backticks, triple quotes, or <document>...</document>)
+        and put the instruction after it. That separation is what keeps data and task from blurring together.
+  hidden_tests:
+  - name: smoke_hidden
+    code: assert True
 hints:
-  - content: The model only knows what's in the context window. Include the specific document/error/function you care about — and prune everything irrelevant.
-    cost: 10
-    order: 1
-  - content: Put long reference text FIRST, wrap it in delimiters, and put your question LAST. The model tends to follow the most recent instruction most closely.
-    cost: 15
-    order: 2
-  - content: 'Add "Answer using ONLY the text above; if the answer is not present, say you don''t know." This grounds the model and prevents fabrication.'
-    cost: 20
-    order: 3
+- order: 1
+  cost: 0
+  content: 'Where to look: Open `the solution file`, read the instructions, and run the visible tests
+    to see which assertion fails first.'
+- order: 2
+  cost: 25
+  content: 'Diagnostic steps:
+
+    1. Click Run and read the traceback — note line number and actual vs expected values.
+
+    2. Reproduce the failure with the smallest input from a visible test.
+
+    3. Compare your implementation to the bug described in the lab prompt.'
+- order: 3
+  cost: 50
+  content: 'Exact fix + verification:
+
+    1. Pass the exercise that provides focused, well-organized context.
+
+    2. Re-run the lab checker (`check.sh` or Check Solution).
+
+    3. Confirm every scenario objective is satisfied.
+
+
+    WHY: the grader validates real state — marker files are ignored.'
+technology: prompt-engineering
+summary: Complete the context management prompt engineering lab and verify success with the checker
+estimated_minutes: 30
+xp_reward: 100
+prerequisites:
+- Basic prompt engineering literacy
+tags:
+- do
+- hands-on
+- prompt-engineering
+linked_tutorial: prompt-engineering-fundamentals
+what_you_will_learn:
+- Explain what the context window is and why irrelevant context hurts quality
+- Structure a prompt that places the document first and the question last
+- Pass the exercise that provides focused, well-organized context
+environment:
+  nodes:
+  - role: primary
+    os: FixitLab LLM practice workspace
+    hostname: lab-primary
+    ip: 127.0.0.1
+    specs: local offline simulation
+  pre_installed:
+  - bash
+  - coreutils
+  - journalctl
+  - prompt engineering
+  - systemctl
+  credentials:
+  - user: root
+    password: lab123
+tasks:
+- id: task_1
+  title: Context Management
+  description: Restore healthy behavior for Context Management by investigating the failure, applying
+    the smallest safe fix, and validating the outcome.
+  background: 'This prompt engineering lab teaches systematic troubleshooting: observe, hypothesize, change,
+    verify.'
+  validation:
+    type: custom_script
+    script: hidden_tests
+    error_message: One or more hidden tests failed. Read the public test output, fix your solution, and
+      submit again.
+solution:
+  summary: The solution passes all hidden tests by implementing the required behavior in code.
+  files_changed: []
+  commands_run: []
+  reference_docs: prompt-engineering-fundamentals
+guided_mode:
+  enabled: true
+  steps:
+  - step: 1
+    title: Inspect current state
+    instruction: Run a read-only diagnostic before changing anything.
+    command: check.sh
+    expected_output: Output shows the current failure mode
+    explanation: Evidence-first troubleshooting avoids guessing.
+    next_on: command_success
+  - step: 2
+    title: Apply the minimal fix
+    instruction: Make one reversible change aligned with the objectives.
+    command: '# your fix command here'
+    expected_output: State moves toward the objective
+    explanation: Small changes make rollback easy if the hypothesis was wrong.
+    next_on: command_success
+  - step: 3
+    title: Verify with the grader
+    instruction: Run the same verification the checker uses.
+    command: check.sh
+    expected_output: all hidden tests pass
+    explanation: The lab passes only when real state is healthy.
+    next_on: command_success

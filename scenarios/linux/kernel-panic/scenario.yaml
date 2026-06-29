@@ -1,23 +1,52 @@
-category: Linux Administration
-description: 'The kernel panics on boot with "VFS: Unable to mount root fs" because it cannot mount the
-  root filesystem — typically a wrong root device/UUID in the boot entry or fstab, or an initramfs missing
-  the storage driver. Correct the root reference (and/or rebuild the initramfs) so the kernel mounts root
-  and boots.'
+category: Fix
+description: 'CONTEXT: A team operating Linux administration needs you to resolve `Kernel Panic on Boot`
+  during a realistic incident. The business impact is reduced service reliability until the underlying
+  state is repaired.
+
+
+  ENVIRONMENT: You are working in FixitLab''s offline Linux practice server with terminal and config files
+  under /etc and /var. All tools run locally; no paid APIs or external cloud calls are required.
+
+
+  SYMPTOM / STARTING STATE: Simulated RHEL 9 server. Boot ends in a kernel panic: "VFS: Unable to mount
+  root fs on unknown-block". The root device can''t be found/mounted as currently configured. The kernel
+  panics on boot with "VFS: Unable to mount root fs" because it cannot mount the root filesystem — typically
+  a wrong root device/UUID in the boot entry or fstab, or an initramfs missing the storage driver. Correct
+  the root reference (and/or rebuild the initramfs) so the kernel mounts root and boots.
+
+
+  OBJECTIVE: Read the panic and identify that root cannot be mounted; Find the wrong root UUID/device
+  or missing initramfs driver; Fix the root reference / rebuild initramfs so the system boots. Success
+  means `check.sh` exits successfully.
+
+
+  WHAT TO AVOID: Do not apply broad destructive changes, skip evidence gathering, or fake completion with
+  marker files — the checker validates real system state.'
 difficulty: hard
 dual_terminal: false
 hints:
 - order: 1
-  cost: 10
-  content: 'From rescue media, compare the real root device against what''s configured: `blkid` vs the
-    `root=` in the GRUB entry and the root line in /etc/fstab. A UUID mismatch causes the VFS panic.'
+  cost: 0
+  content: 'Where to look: Read the panic and identify that root cannot be mounted'
 - order: 2
-  cost: 15
-  content: 'If the device is right but the driver is missing from initramfs, that also yields this panic.
-    Decide which: wrong identifier vs missing module.'
+  cost: 25
+  content: 'Diagnostic steps:
+
+    1. Find the wrong root UUID/device or missing initramfs driver
+
+    2. Fix the root reference / rebuild initramfs so the system boots'
 - order: 3
-  cost: 20
-  content: Fix the UUID in /etc/fstab and the GRUB entry (then `grub2-mkconfig -o /boot/grub2/grub.cfg`),
-    and/or rebuild initramfs with `dracut -f`. Reboot — the kernel mounts root and boots cleanly.
+  cost: 50
+  content: 'Exact fix + verification:
+
+    1. Fix the root reference / rebuild initramfs so the system boots.
+
+    2. Re-run the lab checker (`check.sh` or Check Solution).
+
+    3. Confirm every scenario objective is satisfied.
+
+
+    WHY: the grader validates real state — marker files are ignored.'
 initial_state: 'Simulated RHEL 9 server. Boot ends in a kernel panic: "VFS: Unable to mount root fs on
   unknown-block". The root device can''t be found/mounted as currently configured.'
 is_free: false
@@ -33,3 +62,50 @@ simulation_type: rhel
 slug: sim-rhel-kernel-panic
 time_limit: 900
 title: Kernel Panic on Boot
+technology: linux
+summary: Complete the kernel panic on boot linux lab and verify success with the checker
+estimated_minutes: 15
+xp_reward: 100
+prerequisites:
+- Basic linux literacy
+tags:
+- fix
+- hands-on
+- linux
+linked_tutorial: linux-fundamentals
+what_you_will_learn:
+- Read the panic and identify that root cannot be mounted
+- Find the wrong root UUID/device or missing initramfs driver
+- Fix the root reference / rebuild initramfs so the system boots
+environment:
+  nodes:
+  - role: primary
+    os: FixitLab Linux practice server
+    hostname: lab-primary
+    ip: 127.0.0.1
+    specs: local offline simulation
+  pre_installed:
+  - bash
+  - coreutils
+  - journalctl
+  - linux
+  - systemctl
+  credentials:
+  - user: root
+    password: lab123
+tasks:
+- id: task_1
+  title: Kernel Panic on Boot
+  description: Restore healthy behavior for Kernel Panic on Boot by investigating the failure, applying
+    the smallest safe fix, and validating the outcome.
+  background: 'This linux lab teaches systematic troubleshooting: observe, hypothesize, change, verify.'
+  validation:
+    type: custom_script
+    script: check.sh
+    error_message: Validation did not pass. Re-read the objectives and Hint 2 diagnostic steps.
+solution:
+  summary: Identify the misconfiguration affecting this linux lab and apply the minimal fix.
+  files_changed: []
+  commands_run:
+  - bash check.sh
+  reference_docs: linux-fundamentals

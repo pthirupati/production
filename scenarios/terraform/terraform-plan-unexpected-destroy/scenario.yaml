@@ -1,7 +1,7 @@
 title: Terraform Plan Shows Unexpected Resource Destruction
 slug: terraform-plan-unexpected-destroy
-technology: Terraform
-category: State / Plan
+technology: terraform
+category: Fix
 difficulty: hard
 lab_mode: simulation
 simulation_type: terraform
@@ -10,9 +10,29 @@ max_score: 100
 is_free: true
 jira_priority: High
 dual_terminal: false
-description: A terraform plan unexpectedly proposes destroying a production RDS instance because a resource
-  was renamed in code without a state move. Investigate the plan, use terraform state mv (or moved blocks)
-  to align state with the new addresses, and confirm the plan no longer destroys data.
+description: 'CONTEXT: A team operating Terraform IaC needs you to resolve `Terraform Plan Shows Unexpected
+  Resource Destruction` during a realistic incident. The business impact is reduced service reliability
+  until the underlying state is repaired.
+
+
+  ENVIRONMENT: You are working in FixitLab''s offline Terraform workspace with HCL files, state, and plan/apply
+  workflow. All tools run locally; no paid APIs or external cloud calls are required.
+
+
+  SYMPTOM / STARTING STATE: A Terraform config where a resource block was renamed; terraform plan now
+  wants to destroy and recreate a stateful resource. A terraform plan unexpectedly proposes destroying
+  a production RDS instance because a resource was renamed in code without a state move. Investigate the
+  plan, use terraform state mv (or moved blocks) to align state with the new addresses, and confirm the
+  plan no longer destroys data.
+
+
+  OBJECTIVE: Read the plan and identify which addressed resource is being destroyed/recreated; Use terraform
+  state mv or a moved block to realign state without recreation; Re-run terraform plan and confirm no
+  destroy of the stateful resource. Success means `check.sh` exits successfully.
+
+
+  WHAT TO AVOID: Do not apply broad destructive changes, skip evidence gathering, or fake completion with
+  marker files — the checker validates real system state.'
 initial_state: A Terraform config where a resource block was renamed; terraform plan now wants to destroy
   and recreate a stateful resource.
 objectives:
@@ -21,11 +41,69 @@ objectives:
 - Re-run terraform plan and confirm no destroy of the stateful resource
 hints:
 - order: 1
-  cost: 10
-  content: terraform plan shows '-/+ destroy then create' on the RDS resource.
+  cost: 0
+  content: 'Where to look: Read the plan and identify which addressed resource is being destroyed/recreated'
 - order: 2
-  cost: 15
-  content: terraform state mv <old.addr> <new.addr> (or add a moved block).
+  cost: 25
+  content: 'Diagnostic steps:
+
+    1. Use terraform state mv or a moved block to realign state without recreation
+
+    2. Re-run terraform plan and confirm no destroy of the stateful resource'
 - order: 3
-  cost: 20
-  content: Re-plan; the stateful resource shows no changes.
+  cost: 50
+  content: 'Exact fix + verification:
+
+    1. Re-run terraform plan and confirm no destroy of the stateful resource.
+
+    2. Re-run the lab checker (`check.sh` or Check Solution).
+
+    3. Confirm every scenario objective is satisfied.
+
+
+    WHY: the grader validates real state — marker files are ignored.'
+summary: Complete the terraform plan shows unexpected resource destruction terraform lab and verify success
+  with the checker
+estimated_minutes: 25
+xp_reward: 100
+prerequisites:
+- Basic terraform literacy
+tags:
+- fix
+- hands-on
+- terraform
+linked_tutorial: terraform-fundamentals
+what_you_will_learn:
+- Read the plan and identify which addressed resource is being destroyed/recreated
+- Use terraform state mv or a moved block to realign state without recreation
+- Re-run terraform plan and confirm no destroy of the stateful resource
+environment:
+  nodes:
+  - role: primary
+    os: FixitLab Terraform workspace
+    hostname: lab-primary
+    ip: 127.0.0.1
+    specs: local offline simulation
+  pre_installed:
+  - bash
+  - coreutils
+  - terraform
+  credentials:
+  - user: root
+    password: lab123
+tasks:
+- id: task_1
+  title: Terraform Plan Shows Unexpected Resource Destruction
+  description: Restore healthy behavior for Terraform Plan Shows Unexpected Resource Destruction by investigating
+    the failure, applying the smallest safe fix, and validating the outcome.
+  background: 'This terraform lab teaches systematic troubleshooting: observe, hypothesize, change, verify.'
+  validation:
+    type: custom_script
+    script: check.sh
+    error_message: Validation did not pass. Re-read the objectives and Hint 2 diagnostic steps.
+solution:
+  summary: Identify the misconfiguration affecting this terraform lab and apply the minimal fix.
+  files_changed: []
+  commands_run:
+  - bash check.sh
+  reference_docs: terraform-fundamentals

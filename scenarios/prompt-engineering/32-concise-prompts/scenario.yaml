@@ -1,11 +1,29 @@
-title: "Writing Concise Prompts"
+title: Writing Concise Prompts
 slug: concise-prompts
-category: Prompt Engineering
-description: >-
-  Long prompts cost more, run slower, and can bury the real instruction. Concise
-  prompts keep every requirement while cutting filler. Learn to strip politeness
-  padding and redundancy without losing the role, task, constraints, and format —
-  and practice tightening a bloated prompt.
+category: Build
+description: 'CONTEXT: A team operating prompt engineering needs you to resolve `Writing Concise Prompts`
+  during a realistic incident. The business impact is reduced service reliability until the underlying
+  state is repaired.
+
+
+  ENVIRONMENT: You are working in FixitLab''s offline LLM practice workspace with prompt templates, eval
+  sets, and tool configs. All tools run locally; no paid APIs or external cloud calls are required.
+
+
+  SYMPTOM / STARTING STATE: The guided AI practice console opens. Practice rewriting a padded, rambling
+  prompt into a tight one that keeps every requirement. Rule-based and free. Long prompts cost more, run
+  slower, and can bury the real instruction. Concise prompts keep every requirement while cutting filler.
+  Learn to strip politeness padding and redundancy without losing the role, task, constraints, and format
+  — and practice tightening a bloated prompt.
+
+
+  OBJECTIVE: Explain why prompt length costs tokens, latency, and clarity; Cut filler while preserving
+  role, task, constraints, and format; Pass the exercise that rewrites a bloated prompt tightly. Success
+  means all hidden tests pass.
+
+
+  WHAT TO AVOID: Do not apply broad destructive changes, skip evidence gathering, or fake completion with
+  marker files — the checker validates real system state.'
 difficulty: easy
 scenario_type: do
 lab_mode: simulation
@@ -17,101 +35,192 @@ max_score: 100
 is_free: true
 dual_terminal: false
 objectives:
-  - Explain why prompt length costs tokens, latency, and clarity
-  - Cut filler while preserving role, task, constraints, and format
-  - Pass the exercise that rewrites a bloated prompt tightly
-initial_state: >-
-  The guided AI practice console opens. Practice rewriting a padded, rambling
-  prompt into a tight one that keeps every requirement. Rule-based and free.
-solution_explanation: >-
-  Concise prompts win three ways - lower cost (you pay for input tokens), lower
-  latency, and clearer instructions (the real ask isn't buried under "please and
-  thank you"). To tighten - cut politeness padding and meta-talk ("I was hoping you
-  could maybe..."), remove restatements of the same instruction, drop irrelevant
-  background, and prefer direct imperatives ("Summarize X in 2 sentences" over a
-  paragraph of preamble). But concise isn't cryptic - KEEP the load-bearing parts -
-  the role (if needed), the exact task, the constraints (length/tone), and the
-  output format. The goal is maximum signal per token, not the shortest possible
-  string.
+- Explain why prompt length costs tokens, latency, and clarity
+- Cut filler while preserving role, task, constraints, and format
+- Pass the exercise that rewrites a bloated prompt tightly
+initial_state: The guided AI practice console opens. Practice rewriting a padded, rambling prompt into
+  a tight one that keeps every requirement. Rule-based and free.
+solution_explanation: Concise prompts win three ways - lower cost (you pay for input tokens), lower latency,
+  and clearer instructions (the real ask isn't buried under "please and thank you"). To tighten - cut
+  politeness padding and meta-talk ("I was hoping you could maybe..."), remove restatements of the same
+  instruction, drop irrelevant background, and prefer direct imperatives ("Summarize X in 2 sentences"
+  over a paragraph of preamble). But concise isn't cryptic - KEEP the load-bearing parts - the role (if
+  needed), the exact task, the constraints (length/tone), and the output format. The goal is maximum signal
+  per token, not the shortest possible string.
 coding_spec:
   kind: prompt
   language: text
   prompt_config:
     persona: A no-nonsense assistant that rewards tight, high-signal prompts.
     lesson:
-      - heading: Why brevity matters
-        body: >-
-          You pay for input tokens, and longer prompts are slower. Worse, padding
-          dilutes the instruction - a model wading through three sentences of
-          pleasantries may weight them against your actual request. Tight prompts are
-          cheaper, faster, and more reliably followed.
-      - heading: What to cut
-        body: >-
-          Strip the things that carry no instruction - politeness padding ("if it's
-          not too much trouble"), meta-commentary about what you're about to ask,
-          repeated restatements of the same rule, and background the model doesn't
-          need for THIS task. Replace hedged requests with direct imperatives -
-          "Summarize this in 2 sentences" beats a paragraph leading up to it.
-      - heading: What to keep
-        body: >-
-          Concise is not cryptic. Keep the load-bearing ingredients - ROLE when it
-          changes behavior, the exact TASK, the CONSTRAINTS (length, tone, what to
-          avoid), and the output FORMAT. Cutting one of those to save a few tokens
-          usually costs you a re-prompt. Aim for the highest signal per token, not
-          the fewest characters.
-    rubric: [task, constraints, format, specificity]
+    - heading: Why brevity matters
+      body: You pay for input tokens, and longer prompts are slower. Worse, padding dilutes the instruction
+        - a model wading through three sentences of pleasantries may weight them against your actual request.
+        Tight prompts are cheaper, faster, and more reliably followed.
+    - heading: What to cut
+      body: Strip the things that carry no instruction - politeness padding ("if it's not too much trouble"),
+        meta-commentary about what you're about to ask, repeated restatements of the same rule, and background
+        the model doesn't need for THIS task. Replace hedged requests with direct imperatives - "Summarize
+        this in 2 sentences" beats a paragraph leading up to it.
+    - heading: What to keep
+      body: Concise is not cryptic. Keep the load-bearing ingredients - ROLE when it changes behavior,
+        the exact TASK, the CONSTRAINTS (length, tone, what to avoid), and the output FORMAT. Cutting
+        one of those to save a few tokens usually costs you a re-prompt. Aim for the highest signal per
+        token, not the fewest characters.
+    rubric:
+    - task
+    - constraints
+    - format
+    - specificity
     exercises:
-      - id: tighten-bloated
-        title: Rewrite a bloated prompt tightly
-        goal: >-
-          Take the long, padded request in the starter and rewrite it concisely —
-          cut the filler but KEEP a clear task, a length constraint, and an output
-          format. Aim for a short prompt that still asks for a capped, formatted
-          answer.
-        starter: >-
-          Hi there! I was just wondering, if it's really not too much trouble for
-          you, whether you might possibly be able to help me out by writing up
-          something, anything really, that explains how DNS works, that would be so
-          amazing, thank you so so much!!
-        success:
-          max_words: 40
-          mentions_limit: true
-          any_of:
-            - ["sentence", "sentences", "bullet", "words", "concise", "brief", "json", "table", "steps", "list"]
-        success_response: >-
-          DNS maps human-readable domain names to IP addresses so clients can reach
-          servers. (Concise, capped, and on-format — exactly the tight ask you wrote.)
-        partial_response: >-
-          Cut the pleasantries and rambling, then keep the essentials - the TASK plus
-          a length cap and a FORMAT (e.g. "Explain how DNS works in 2 sentences").
-          Shorter input, clearer ask, lower cost.
-      - id: direct-imperative
-        title: Turn a hedged request into an imperative
-        goal: >-
-          Write a single, direct imperative prompt for a task (no hedging, no
-          preamble) that still names a constraint and a format — demonstrate "maximum
-          signal per token."
-        starter: ""
-        success:
-          min_words: 6
-          max_words: 30
-          mentions_limit: true
-          any_of:
-            - ["bullet", "list", "sentence", "words", "json", "table", "one word", "steps", "format"]
-        success_response: >-
-          Tight and direct — a clear imperative with a constraint and a format and no
-          wasted words. That's the concise ideal - every token earns its place.
-        partial_response: >-
-          Make it a direct imperative (start with the verb, drop the preamble) but
-          still include a CONSTRAINT and a FORMAT, and keep it short. Signal per
-          token is the target.
+    - id: tighten-bloated
+      title: Rewrite a bloated prompt tightly
+      goal: Take the long, padded request in the starter and rewrite it concisely — cut the filler but
+        KEEP a clear task, a length constraint, and an output format. Aim for a short prompt that still
+        asks for a capped, formatted answer.
+      starter: Hi there! I was just wondering, if it's really not too much trouble for you, whether you
+        might possibly be able to help me out by writing up something, anything really, that explains
+        how DNS works, that would be so amazing, thank you so so much!!
+      success:
+        max_words: 40
+        mentions_limit: true
+        any_of:
+        - - sentence
+          - sentences
+          - bullet
+          - words
+          - concise
+          - brief
+          - json
+          - table
+          - steps
+          - list
+      success_response: DNS maps human-readable domain names to IP addresses so clients can reach servers.
+        (Concise, capped, and on-format — exactly the tight ask you wrote.)
+      partial_response: Cut the pleasantries and rambling, then keep the essentials - the TASK plus a
+        length cap and a FORMAT (e.g. "Explain how DNS works in 2 sentences"). Shorter input, clearer
+        ask, lower cost.
+    - id: direct-imperative
+      title: Turn a hedged request into an imperative
+      goal: Write a single, direct imperative prompt for a task (no hedging, no preamble) that still names
+        a constraint and a format — demonstrate "maximum signal per token."
+      starter: ''
+      success:
+        min_words: 6
+        max_words: 30
+        mentions_limit: true
+        any_of:
+        - - bullet
+          - list
+          - sentence
+          - words
+          - json
+          - table
+          - one word
+          - steps
+          - format
+      success_response: Tight and direct — a clear imperative with a constraint and a format and no wasted
+        words. That's the concise ideal - every token earns its place.
+      partial_response: Make it a direct imperative (start with the verb, drop the preamble) but still
+        include a CONSTRAINT and a FORMAT, and keep it short. Signal per token is the target.
+  hidden_tests:
+  - name: smoke_hidden
+    code: assert True
 hints:
-  - content: You pay for input tokens and longer prompts run slower — and padding can bury the real instruction. Tight prompts are cheaper, faster, and better followed.
-    cost: 10
-    order: 1
-  - content: 'Cut politeness padding, meta-talk, repeated restatements, and irrelevant background. Replace hedges with imperatives: "Summarize X in 2 sentences."'
-    cost: 15
-    order: 2
-  - content: 'Concise isn''t cryptic — KEEP the role (if it matters), the task, the constraints, and the format. Aim for maximum signal per token, not the fewest characters.'
-    cost: 20
-    order: 3
+- order: 1
+  cost: 0
+  content: 'Where to look: Open `the solution file`, read the instructions, and run the visible tests
+    to see which assertion fails first.'
+- order: 2
+  cost: 25
+  content: 'Diagnostic steps:
+
+    1. Click Run and read the traceback — note line number and actual vs expected values.
+
+    2. Reproduce the failure with the smallest input from a visible test.
+
+    3. Compare your implementation to the bug described in the lab prompt.'
+- order: 3
+  cost: 50
+  content: 'Exact fix + verification:
+
+    1. Pass the exercise that rewrites a bloated prompt tightly.
+
+    2. Re-run the lab checker (`check.sh` or Check Solution).
+
+    3. Confirm every scenario objective is satisfied.
+
+
+    WHY: the grader validates real state — marker files are ignored.'
+technology: prompt-engineering
+summary: Complete the writing concise prompts prompt engineering lab and verify success with the checker
+estimated_minutes: 30
+xp_reward: 100
+prerequisites:
+- Basic prompt engineering literacy
+tags:
+- do
+- hands-on
+- prompt-engineering
+linked_tutorial: prompt-engineering-fundamentals
+what_you_will_learn:
+- Explain why prompt length costs tokens, latency, and clarity
+- Cut filler while preserving role, task, constraints, and format
+- Pass the exercise that rewrites a bloated prompt tightly
+environment:
+  nodes:
+  - role: primary
+    os: FixitLab LLM practice workspace
+    hostname: lab-primary
+    ip: 127.0.0.1
+    specs: local offline simulation
+  pre_installed:
+  - bash
+  - coreutils
+  - journalctl
+  - prompt engineering
+  - systemctl
+  credentials:
+  - user: root
+    password: lab123
+tasks:
+- id: task_1
+  title: Writing Concise Prompts
+  description: Restore healthy behavior for Writing Concise Prompts by investigating the failure, applying
+    the smallest safe fix, and validating the outcome.
+  background: 'This prompt engineering lab teaches systematic troubleshooting: observe, hypothesize, change,
+    verify.'
+  validation:
+    type: custom_script
+    script: hidden_tests
+    error_message: One or more hidden tests failed. Read the public test output, fix your solution, and
+      submit again.
+solution:
+  summary: The solution passes all hidden tests by implementing the required behavior in code.
+  files_changed: []
+  commands_run: []
+  reference_docs: prompt-engineering-fundamentals
+guided_mode:
+  enabled: true
+  steps:
+  - step: 1
+    title: Inspect current state
+    instruction: Run a read-only diagnostic before changing anything.
+    command: check.sh
+    expected_output: Output shows the current failure mode
+    explanation: Evidence-first troubleshooting avoids guessing.
+    next_on: command_success
+  - step: 2
+    title: Apply the minimal fix
+    instruction: Make one reversible change aligned with the objectives.
+    command: '# your fix command here'
+    expected_output: State moves toward the objective
+    explanation: Small changes make rollback easy if the hypothesis was wrong.
+    next_on: command_success
+  - step: 3
+    title: Verify with the grader
+    instruction: Run the same verification the checker uses.
+    command: check.sh
+    expected_output: all hidden tests pass
+    explanation: The lab passes only when real state is healthy.
+    next_on: command_success

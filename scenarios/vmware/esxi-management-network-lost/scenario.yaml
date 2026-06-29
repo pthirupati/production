@@ -1,8 +1,7 @@
----
 slug: esxi-management-network-lost
-title: "ESXi Management Network Lost After NIC Team Configuration Change"
-technology: VMware
-category: Networking
+title: ESXi Management Network Lost After NIC Team Configuration
+technology: vmware
+category: Fix
 difficulty: hard
 time_limit: 1800
 max_score: 100
@@ -11,36 +10,124 @@ simulation_type: vmware
 infrastructure_type: simulation
 jira_priority: Critical
 is_free: false
-description: |
-  ESXi host esxi-03 is unreachable after a network team reconfigured the NIC
-  teaming policy on vSwitch0. The management vmkernel (vmk0) lost connectivity
-  when the active uplink (vmnic0) was moved to the unused list and only vmnic1
-  (which has no physical cable connected) was left as active. The host shows as
-  "Not Responding" in vCenter. Physical console access is available via iDRAC/ILO.
-objectives:
-  - Connect to the ESXi host via physical console (iDRAC/ILO/DCUI)
-  - Access the Direct Console User Interface (DCUI) to restore network settings
-  - Move vmnic0 back to active in the management network NIC team
-  - Verify vCenter shows the host as Connected
-initial_state: |
-  VMware vCenter simulation. esxi-03 shows "Not Responding" in vCenter.
+description: 'CONTEXT: A team operating VMware vSphere needs you to resolve `ESXi Management Network Lost
+  After NIC Team Configuration` during a realistic incident. The business impact is reduced service reliability
+  until the underlying state is repaired.
+
+
+  ENVIRONMENT: You are working in FixitLab''s offline vSphere lab with VMs, datastores, vCenter, and ESXi
+  tasks. All tools run locally; no paid APIs or external cloud calls are required.
+
+
+  SYMPTOM / STARTING STATE: VMware vCenter simulation. esxi-03 shows "Not Responding" in vCenter.
+
   iDRAC console access available at: idrac-03.mgmt.local (admin/password).
+
   On ESXi: vmnic0 is physically connected but in unused uplinks list.
+
+  vmnic1 is listed as active but has no physical cable connected. ESXi host esxi-03 is unreachable after
+  a network team reconfigured the NIC
+
+  teaming policy on vSwitch0. The management vmkernel (vmk0) lost connectivity
+
+  when the active uplink (vmnic0) was moved to the unused list and only vmnic1
+
+  (which has no physical cable connected) was left as active. The host shows as
+
+  "Not Responding" in vCenter. Physical console access is available via iDRAC/ILO.
+
+
+  OBJECTIVE: Connect to the ESXi host via physical console (iDRAC/ILO/DCUI); Access the Direct Console
+  User Interface (DCUI) to restore network settings; Move vmnic0 back to active in the management network
+  NIC team. Success means `check.sh` exits successfully.
+
+
+  WHAT TO AVOID: Do not apply broad destructive changes, skip evidence gathering, or fake completion with
+  marker files — the checker validates real system state.'
+objectives:
+- Connect to the ESXi host via physical console (iDRAC/ILO/DCUI)
+- Access the Direct Console User Interface (DCUI) to restore network settings
+- Move vmnic0 back to active in the management network NIC team
+- Verify vCenter shows the host as Connected
+initial_state: 'VMware vCenter simulation. esxi-03 shows "Not Responding" in vCenter.
+
+  iDRAC console access available at: idrac-03.mgmt.local (admin/password).
+
+  On ESXi: vmnic0 is physically connected but in unused uplinks list.
+
   vmnic1 is listed as active but has no physical cable connected.
+
+  '
 hints:
-  - order: 1
-    cost: 10
-    content: "Connect via DCUI: in the iDRAC/ILO console, you will see the ESXi
-      Direct Console User Interface. Press F2 to enter configuration.
-      Navigate to: Network Adapters → Configure Management Network → Network Adapters."
-  - order: 2
-    cost: 15
-    content: "In the DCUI Network Adapters screen, you can see vmnic0 and vmnic1.
-      Use space bar to select vmnic0 and deselect vmnic1.
-      Navigate to OK and press Enter. Confirm 'Apply changes and restart management network?'"
-  - order: 3
-    cost: 20
-    content: "After restoring management network via DCUI, the host should become
-      reachable within 30-60 seconds. In vCenter, wait for the host to reconnect
-      automatically. Then verify the vSwitch0 NIC teaming configuration from
-      vCenter GUI to ensure vmnic0 is active and vmnic1 is standby or also active."
+- order: 1
+  cost: 0
+  content: 'Where to look: Connect to the ESXi host via physical console (iDRAC/ILO/DCUI)'
+- order: 2
+  cost: 25
+  content: 'Diagnostic steps:
+
+    1. Access the Direct Console User Interface (DCUI) to restore network settings
+
+    2. Move vmnic0 back to active in the management network NIC team
+
+    3. Verify vCenter shows the host as Connected'
+- order: 3
+  cost: 50
+  content: 'Exact fix + verification:
+
+    1. Verify vCenter shows the host as Connected.
+
+    2. Re-run the lab checker (`check.sh` or Check Solution).
+
+    3. Confirm every scenario objective is satisfied.
+
+
+    WHY: the grader validates real state — marker files are ignored.'
+summary: Complete the esxi management network lost after nic team configuration vmware lab and verify
+  success with the checker
+estimated_minutes: 30
+xp_reward: 100
+prerequisites:
+- Basic vmware literacy
+tags:
+- fix
+- hands-on
+- vmware
+linked_tutorial: vmware-fundamentals
+what_you_will_learn:
+- Connect to the ESXi host via physical console (iDRAC/ILO/DCUI)
+- Access the Direct Console User Interface (DCUI) to restore network settings
+- Move vmnic0 back to active in the management network NIC team
+- Verify vCenter shows the host as Connected
+environment:
+  nodes:
+  - role: primary
+    os: FixitLab vSphere lab
+    hostname: lab-primary
+    ip: 127.0.0.1
+    specs: local offline simulation
+  pre_installed:
+  - bash
+  - coreutils
+  - journalctl
+  - systemctl
+  - vmware
+  credentials:
+  - user: root
+    password: lab123
+tasks:
+- id: task_1
+  title: ESXi Management Network Lost After NIC Team Configuration
+  description: Restore healthy behavior for ESXi Management Network Lost After NIC Team Configuration
+    by investigating the failure, applying the smallest safe fix, and validating the outcome.
+  background: 'This vmware lab teaches systematic troubleshooting: observe, hypothesize, change, verify.'
+  validation:
+    type: custom_script
+    script: check.sh
+    error_message: Validation did not pass. Re-read the objectives and Hint 2 diagnostic steps.
+solution:
+  summary: Identify the misconfiguration affecting this vmware lab and apply the minimal fix.
+  files_changed: []
+  commands_run:
+  - bash check.sh
+  reference_docs: vmware-fundamentals

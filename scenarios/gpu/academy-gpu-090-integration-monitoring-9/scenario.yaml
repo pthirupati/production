@@ -1,7 +1,7 @@
-title: 'GPU & NVIDIA: Monitoring — Integration Lab'
+title: Monitoring — Integration Lab
 slug: academy-gpu-090-integration-monitoring-9
-technology: GPU & NVIDIA
-category: Cross-Technology
+technology: gpu
+category: Project
 difficulty: hard
 scenario_type: do
 lab_mode: simulation
@@ -11,42 +11,128 @@ max_score: 100
 is_free: false
 infrastructure_type: docker
 jira_priority: Medium
-description: GPU host lab. `nvidia-smi` reports the GPU unhealthy — ML/GPU workloads cannot start. Load
-  the driver / restore GPU health, then verify with `nvidia-smi`.
+description: 'CONTEXT: A team operating GPU operations needs you to resolve `gpu: Monitoring — Integration
+  Lab` during a realistic incident. The business impact is reduced service reliability until the underlying
+  state is repaired.
+
+
+  ENVIRONMENT: You are working in FixitLab''s offline GPU node with nvidia-smi, drivers, CUDA, and container
+  toolkit. All tools run locally; no paid APIs or external cloud calls are required.
+
+
+  SYMPTOM / STARTING STATE: Two systems are deployed but not fully wired together for Monitoring. Downstream
+  consumers are waiting on this integration path. Integration lab: connect Monitoring with an adjacent
+  platform in the gpu stack. Validate authentication, data handoff, and failure behavior for how monitoring
+  fits into GPU operations.
+
+
+  OBJECTIVE: Monitoring is connected to the adjacent system successfully; Handoff points are authenticated
+  and observable; End-to-end workflow completes without manual intervention. Success means `nvidia-smi`
+  includes `NVIDIA-SMI`.
+
+
+  WHAT TO AVOID: Do not apply broad destructive changes, skip evidence gathering, or fake completion with
+  marker files — the checker validates real system state.'
 objectives:
-- GPU reports healthy in nvidia-smi
-- '`nvidia-smi` reports a healthy GPU'
-initial_state: The NVIDIA driver/GPU is not healthy (`nvidia-smi` fails).
+- Monitoring is connected to the adjacent system successfully
+- Handoff points are authenticated and observable
+- End-to-end workflow completes without manual intervention
+initial_state: Two systems are deployed but not fully wired together for Monitoring. Downstream consumers
+  are waiting on this integration path.
 hints:
 - order: 1
-  cost: 10
-  content: 'Orient yourself before changing anything:
-
-    1. Inspect the current state — the relevant nvidia-smi, drivers, CUDA, and container toolkit for monitoring.
-
-    2. Write down what looks normal versus wrong or missing for Monitoring.
-
-    3. Recall the core idea: how monitoring fits into GPU operations. Form one hypothesis before you act.'
+  cost: 0
+  content: 'Where to look: Run `docker ps -a` and `docker logs <container>` for the failing container.'
 - order: 2
-  cost: 15
-  content: 'Plan your approach (still no spoilers):
-
-    1. Confirm the exact gap between current and desired state for Monitoring.
-
-    2. Decide the single smallest change that moves you toward the objective.
-
-    3. Capture evidence (command output / status) before the change so you can prove it worked afterward.'
-- order: 3
   cost: 25
-  content: 'Guided walkthrough:
+  content: 'Diagnostic steps:
 
-    1. Re-check the current state — the relevant nvidia-smi, drivers, CUDA, and container toolkit for
-    monitoring.
+    1. `docker ps -a` — note Exited status and exit code.
 
-    2. Configure credentials and networking, then drive one happy-path transaction end to end across both
-    systems.
+    2. `docker logs <name>` for the startup error.
 
-    3. Verify the result — Monitoring behaves correctly under normal and failure checks.
+    3. Inspect the Dockerfile or `docker run` flags if the image is wrong.'
+- order: 3
+  cost: 50
+  content: 'Exact fix + verification:
 
-    4. Click Check Solution once `nvidia-smi` reports a healthy GPU.'
+    1. Fix image, port mapping, volume, or env configuration.
+
+    2. `docker start <name>` or re-run with corrected flags.
+
+    3. Confirm `nvidia-smi` shows the container Up.
+
+
+    WHY: the checker validates the container is actually running.'
 cross_technology: true
+summary: Complete the monitoring — integration lab gpu lab and verify success with the checker
+estimated_minutes: 20
+xp_reward: 100
+prerequisites:
+- Basic gpu literacy
+tags:
+- do
+- gpu
+- hands-on
+linked_tutorial: gpu-fundamentals
+what_you_will_learn:
+- Monitoring is connected to the adjacent system successfully
+- Handoff points are authenticated and observable
+- End-to-end workflow completes without manual intervention
+environment:
+  nodes:
+  - role: primary
+    os: FixitLab GPU node
+    hostname: lab-primary
+    ip: 127.0.0.1
+    specs: local offline simulation
+  pre_installed:
+  - bash
+  - coreutils
+  - gpu
+  - journalctl
+  - systemctl
+  credentials:
+  - user: root
+    password: lab123
+tasks:
+- id: task_1
+  title: Monitoring — Integration Lab
+  description: Restore healthy behavior for Monitoring — Integration Lab by investigating the failure,
+    applying the smallest safe fix, and validating the outcome.
+  background: 'This gpu lab teaches systematic troubleshooting: observe, hypothesize, change, verify.'
+  validation:
+    type: command_output
+    command: nvidia-smi
+    expected_output: NVIDIA-SMI
+    error_message: GPU health check still fails. Verify driver and device visibility.
+solution:
+  summary: Identify the misconfiguration affecting this gpu lab and apply the minimal fix.
+  files_changed: []
+  commands_run:
+  - nvidia-smi
+  reference_docs: gpu-fundamentals
+guided_mode:
+  enabled: true
+  steps:
+  - step: 1
+    title: Inspect current state
+    instruction: Run a read-only diagnostic before changing anything.
+    command: nvidia-smi
+    expected_output: Output shows the current failure mode
+    explanation: Evidence-first troubleshooting avoids guessing.
+    next_on: command_success
+  - step: 2
+    title: Apply the minimal fix
+    instruction: Make one reversible change aligned with the objectives.
+    command: '# your fix command here'
+    expected_output: State moves toward the objective
+    explanation: Small changes make rollback easy if the hypothesis was wrong.
+    next_on: command_success
+  - step: 3
+    title: Verify with the grader
+    instruction: Run the same verification the checker uses.
+    command: nvidia-smi
+    expected_output: '`nvidia-smi` includes `NVIDIA-SMI`'
+    explanation: The lab passes only when real state is healthy.
+    next_on: command_success

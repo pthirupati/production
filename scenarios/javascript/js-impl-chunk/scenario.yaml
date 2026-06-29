@@ -1,8 +1,24 @@
 title: Implement chunk
 slug: js-impl-chunk
-category: JavaScript Development
-description: 'Implement chunk(arr, size): split arr into consecutive sub-arrays of length size (last may
-  be shorter). Do not mutate the input. The stub is empty so tests fail.'
+category: Build
+description: 'CONTEXT: A team operating JavaScript needs you to resolve `Implement chunk` during a realistic
+  incident. The business impact is reduced service reliability until the underlying state is repaired.
+
+
+  ENVIRONMENT: You are working in FixitLab''s offline JavaScript practice project with modules, browser
+  console, and Node tooling. All tools run locally; no paid APIs or external cloud calls are required.
+
+
+  SYMPTOM / STARTING STATE: Implement chunk(arr, size): split arr into consecutive sub-arrays of length
+  size (last may be shorter). Do not mutate the input. The stub is empty so tests fail.
+
+
+  OBJECTIVE: Walk the array in steps of size; Slice each window into a sub-array; Handle a short final
+  chunk and empty input. Success means all hidden tests pass.
+
+
+  WHAT TO AVOID: Do not apply broad destructive changes, skip evidence gathering, or fake completion with
+  marker files — the checker validates real system state.'
 difficulty: easy
 scenario_type: do
 lab_mode: simulation
@@ -19,53 +35,149 @@ objectives:
 - Handle a short final chunk and empty input
 initial_state: 'Implement chunk(arr, size): split arr into consecutive sub-arrays of length size (last
   may be shorter). Do not mutate the input. The stub is empty so tests fail.'
-solution_explanation: |
-  Iterating in steps of size and slicing [i, i+size) builds non-overlapping chunks; slice handles the short final chunk and never mutates the input.
+solution_explanation: 'Iterating in steps of size and slicing [i, i+size) builds non-overlapping chunks;
+  slice handles the short final chunk and never mutates the input.
+
+  '
 coding_spec:
   language: javascript
   entrypoint: solution.js
   kind: impl
-  instructions: |
-    Implement chunk(arr, size) -> array of sub-arrays.
-      chunk([1,2,3,4,5], 2) -> [[1,2],[3,4],[5]]
-    Click Run to try it, then Check Solution to grade against all tests.
+  instructions: "Implement chunk(arr, size) -> array of sub-arrays.\n  chunk([1,2,3,4,5], 2) -> [[1,2],[3,4],[5]]\n\
+    Click Run to try it, then Check Solution to grade against all tests.\n"
   files:
   - path: solution.js
-    content: |
-      function chunk(arr, size) {
-        // TODO: return arr split into chunks of length size
-      }
+    content: "function chunk(arr, size) {\n  // TODO: return arr split into chunks of length size\n}\n"
     readonly: false
   visible_tests:
   - name: uneven
-    code: |
-      assert(JSON.stringify(chunk([1,2,3,4,5], 2)) === JSON.stringify([[1,2],[3,4],[5]]), JSON.stringify(chunk([1,2,3,4,5], 2)));
+    code: 'assert(JSON.stringify(chunk([1,2,3,4,5], 2)) === JSON.stringify([[1,2],[3,4],[5]]), JSON.stringify(chunk([1,2,3,4,5],
+      2)));
+
+      '
   - name: even
-    code: |
-      assert(JSON.stringify(chunk([1,2,3,4], 2)) === JSON.stringify([[1,2],[3,4]]), JSON.stringify(chunk([1,2,3,4], 2)));
+    code: 'assert(JSON.stringify(chunk([1,2,3,4], 2)) === JSON.stringify([[1,2],[3,4]]), JSON.stringify(chunk([1,2,3,4],
+      2)));
+
+      '
   hidden_tests:
   - name: size three
-    code: |
-      assert(JSON.stringify(chunk([1,2,3,4,5,6,7], 3)) === JSON.stringify([[1,2,3],[4,5,6],[7]]), JSON.stringify(chunk([1,2,3,4,5,6,7], 3)));
+    code: 'assert(JSON.stringify(chunk([1,2,3,4,5,6,7], 3)) === JSON.stringify([[1,2,3],[4,5,6],[7]]),
+      JSON.stringify(chunk([1,2,3,4,5,6,7], 3)));
+
+      '
   - name: size larger than array
-    code: |
-      assert(JSON.stringify(chunk([1,2], 5)) === JSON.stringify([[1,2]]), JSON.stringify(chunk([1,2], 5)));
+    code: 'assert(JSON.stringify(chunk([1,2], 5)) === JSON.stringify([[1,2]]), JSON.stringify(chunk([1,2],
+      5)));
+
+      '
   - name: empty
-    code: |
-      assert(JSON.stringify(chunk([], 3)) === JSON.stringify([]), JSON.stringify(chunk([], 3)));
+    code: 'assert(JSON.stringify(chunk([], 3)) === JSON.stringify([]), JSON.stringify(chunk([], 3)));
+
+      '
   - name: does not mutate
-    code: |
-      const src = [1,2,3,4];
+    code: 'const src = [1,2,3,4];
+
       chunk(src, 2);
+
       assert(JSON.stringify(src) === JSON.stringify([1,2,3,4]));
+
+      '
   timeout: 8
 hints:
 - order: 1
-  cost: 10
-  content: Step an index i from 0 by `size` each iteration.
+  cost: 0
+  content: 'Where to look: Open `solution.js`, read the instructions, and run the visible tests to see
+    which assertion fails first.'
 - order: 2
-  cost: 20
-  content: slice(i, i + size) copies one chunk without mutating the source.
+  cost: 25
+  content: 'Diagnostic steps:
+
+    1. Click Run and read the traceback — note line number and actual vs expected values.
+
+    2. Reproduce the failure with the smallest input from a visible test.
+
+    3. Compare your implementation to the bug described in the lab prompt.'
 - order: 3
-  cost: 30
-  content: Push each slice into the output array.
+  cost: 50
+  content: 'Exact fix + verification:
+
+    1. Handle a short final chunk and empty input.
+
+    2. Re-run the lab checker (`check.sh` or Check Solution).
+
+    3. Confirm every scenario objective is satisfied.
+
+
+    WHY: the grader validates real state — marker files are ignored.'
+technology: javascript
+summary: Complete the implement chunk javascript lab and verify success with the checker
+estimated_minutes: 25
+xp_reward: 100
+prerequisites:
+- Basic javascript literacy
+tags:
+- do
+- hands-on
+- javascript
+linked_tutorial: javascript-fundamentals
+what_you_will_learn:
+- Walk the array in steps of size
+- Slice each window into a sub-array
+- Handle a short final chunk and empty input
+environment:
+  nodes:
+  - role: primary
+    os: FixitLab JavaScript practice project
+    hostname: lab-primary
+    ip: 127.0.0.1
+    specs: local offline simulation
+  pre_installed:
+  - bash
+  - coreutils
+  - javascript
+  - journalctl
+  - systemctl
+  credentials:
+  - user: root
+    password: lab123
+tasks:
+- id: task_1
+  title: Implement chunk
+  description: Restore healthy behavior for Implement chunk by investigating the failure, applying the
+    smallest safe fix, and validating the outcome.
+  background: 'This javascript lab teaches systematic troubleshooting: observe, hypothesize, change, verify.'
+  validation:
+    type: custom_script
+    script: hidden_tests
+    error_message: One or more hidden tests failed. Read the public test output, fix your solution, and
+      submit again.
+solution:
+  summary: The solution passes all hidden tests by implementing the required behavior in code.
+  files_changed: []
+  commands_run: []
+  reference_docs: javascript-fundamentals
+guided_mode:
+  enabled: true
+  steps:
+  - step: 1
+    title: Inspect current state
+    instruction: Run a read-only diagnostic before changing anything.
+    command: check.sh
+    expected_output: Output shows the current failure mode
+    explanation: Evidence-first troubleshooting avoids guessing.
+    next_on: command_success
+  - step: 2
+    title: Apply the minimal fix
+    instruction: Make one reversible change aligned with the objectives.
+    command: '# your fix command here'
+    expected_output: State moves toward the objective
+    explanation: Small changes make rollback easy if the hypothesis was wrong.
+    next_on: command_success
+  - step: 3
+    title: Verify with the grader
+    instruction: Run the same verification the checker uses.
+    command: check.sh
+    expected_output: all hidden tests pass
+    explanation: The lab passes only when real state is healthy.
+    next_on: command_success

@@ -2,8 +2,8 @@ title: SSH Key Auth Fails — Bad .ssh Permissions
 slug: ssh-key-permissions
 lab_mode: simulation
 simulation_type: generic
-technology: Linux
-category: SSH / Security
+technology: linux
+category: Fix
 difficulty: easy
 time_limit: 600
 max_score: 100
@@ -11,9 +11,29 @@ infrastructure_type: docker
 docker_privileged: false
 jira_priority: Medium
 topics_covered: Q42 key auth — chmod 700 ~/.ssh 600 authorized_keys
-description: Key-based SSH for user 'dev' is rejected and falls back to a password (or fails) because
-  the permissions on ~/.ssh and authorized_keys are too open. OpenSSH ignores keys when the .ssh directory
-  or key files are group/world-accessible (StrictModes). Tighten the permissions so the key is accepted.
+description: 'CONTEXT: A team operating Linux administration needs you to resolve `SSH Key Auth Fails
+  — Bad .ssh Permissions` during a realistic incident. The business impact is reduced service reliability
+  until the underlying state is repaired.
+
+
+  ENVIRONMENT: You are working in FixitLab''s offline Linux practice server with terminal and config files
+  under /etc and /var. All tools run locally; no paid APIs or external cloud calls are required.
+
+
+  SYMPTOM / STARTING STATE: Linux server where user dev''s ~/.ssh (and/or authorized_keys) has overly
+  permissive modes, so sshd refuses to use the key for authentication. Key-based SSH for user ''dev''
+  is rejected and falls back to a password (or fails) because the permissions on ~/.ssh and authorized_keys
+  are too open. OpenSSH ignores keys when the .ssh directory or key files are group/world-accessible (StrictModes).
+  Tighten the permissions so the key is accepted.
+
+
+  OBJECTIVE: Confirm key auth is rejected due to permissive ~/.ssh permissions; Set correct, restrictive
+  permissions on ~/.ssh and authorized_keys; Verify dev can authenticate with the key. Success means `check.sh`
+  exits successfully.
+
+
+  WHAT TO AVOID: Do not apply broad destructive changes, skip evidence gathering, or fake completion with
+  marker files — the checker validates real system state.'
 objectives:
 - Confirm key auth is rejected due to permissive ~/.ssh permissions
 - Set correct, restrictive permissions on ~/.ssh and authorized_keys
@@ -22,13 +42,71 @@ initial_state: Linux server where user dev's ~/.ssh (and/or authorized_keys) has
   so sshd refuses to use the key for authentication.
 hints:
 - order: 1
-  cost: 10
-  content: 'sshd logs "Authentication refused: bad ownership or modes". Check: `ls -ld ~dev/.ssh` and
-    `ls -l ~dev/.ssh/authorized_keys` (too open).'
+  cost: 0
+  content: 'Where to look: Confirm key auth is rejected due to permissive ~/.ssh permissions'
 - order: 2
-  cost: 15
-  content: 'Fix them: `chmod 700 ~dev/.ssh && chmod 600 ~dev/.ssh/authorized_keys` and ensure they''re
-    owned by dev (`chown -R dev:dev ~dev/.ssh`).'
+  cost: 25
+  content: 'Diagnostic steps:
+
+    1. Set correct, restrictive permissions on ~/.ssh and authorized_keys
+
+    2. Verify dev can authenticate with the key'
 - order: 3
-  cost: 20
-  content: Verify key login now works (`ssh dev@<host>` authenticates with the key, no password prompt).
+  cost: 50
+  content: 'Exact fix + verification:
+
+    1. Verify dev can authenticate with the key.
+
+    2. Re-run the lab checker (`check.sh` or Check Solution).
+
+    3. Confirm every scenario objective is satisfied.
+
+
+    WHY: the grader validates real state — marker files are ignored.'
+summary: Complete the ssh key auth fails — bad  ssh permissions linux lab and verify success with the
+  checker
+estimated_minutes: 10
+xp_reward: 100
+prerequisites:
+- Basic linux literacy
+tags:
+- fix
+- hands-on
+- linux
+linked_tutorial: linux-fundamentals
+what_you_will_learn:
+- Confirm key auth is rejected due to permissive ~/.ssh permissions
+- Set correct, restrictive permissions on ~/.ssh and authorized_keys
+- Verify dev can authenticate with the key
+environment:
+  nodes:
+  - role: primary
+    os: FixitLab Linux practice server
+    hostname: lab-primary
+    ip: 127.0.0.1
+    specs: local offline simulation
+  pre_installed:
+  - bash
+  - coreutils
+  - journalctl
+  - linux
+  - systemctl
+  credentials:
+  - user: root
+    password: lab123
+tasks:
+- id: task_1
+  title: SSH Key Auth Fails — Bad .ssh Permissions
+  description: Restore healthy behavior for SSH Key Auth Fails — Bad .ssh Permissions by investigating
+    the failure, applying the smallest safe fix, and validating the outcome.
+  background: 'This linux lab teaches systematic troubleshooting: observe, hypothesize, change, verify.'
+  validation:
+    type: custom_script
+    script: check.sh
+    error_message: Validation did not pass. Re-read the objectives and Hint 2 diagnostic steps.
+solution:
+  summary: Identify the misconfiguration affecting this linux lab and apply the minimal fix.
+  files_changed: []
+  commands_run:
+  - bash check.sh
+  reference_docs: linux-fundamentals

@@ -1,9 +1,26 @@
 title: Fix the Operator Precedence in describe
 slug: js-fix-ternary-precedence
-category: JavaScript Development
-description: 'describe(n) should return a string like ''positive: 5'' / ''non-positive: -2'', but the
-  string concatenation and ternary are mixed without parentheses, so ''+'' binds before ''?:'' and the
-  label is wrong. Fix the precedence with parentheses so the ternary chooses the label.'
+category: Fix
+description: 'CONTEXT: A team operating JavaScript needs you to resolve `Fix the Operator Precedence in
+  describe` during a realistic incident. The business impact is reduced service reliability until the
+  underlying state is repaired.
+
+
+  ENVIRONMENT: You are working in FixitLab''s offline JavaScript practice project with modules, browser
+  console, and Node tooling. All tools run locally; no paid APIs or external cloud calls are required.
+
+
+  SYMPTOM / STARTING STATE: describe(n) should return a string like ''positive: 5'' / ''non-positive:
+  -2'', but the string concatenation and ternary are mixed without parentheses, so ''+'' binds before
+  ''?:'' and the label is wrong. Fix the precedence with parentheses so the ternary chooses the label.
+
+
+  OBJECTIVE: See the wrong label produced by precedence; Parenthesize the ternary so it evaluates first;
+  Return the correctly labelled string. Success means all hidden tests pass.
+
+
+  WHAT TO AVOID: Do not apply broad destructive changes, skip evidence gathering, or fake completion with
+  marker files — the checker validates real system state.'
 difficulty: medium
 scenario_type: fix
 lab_mode: simulation
@@ -21,52 +38,121 @@ objectives:
 initial_state: 'describe(n) should return a string like ''positive: 5'' / ''non-positive: -2'', but the
   string concatenation and ternary are mixed without parentheses, so ''+'' binds before ''?:'' and the
   label is wrong. Fix the precedence with parentheses so the ternary chooses the label.'
-solution_explanation: |
-  Because + binds tighter than ?:, the original concatenated first and fed a truthy string into the condition. Parenthesizing the ternary makes it select the label, which is then concatenated with n.
+solution_explanation: 'Because + binds tighter than ?:, the original concatenated first and fed a truthy
+  string into the condition. Parenthesizing the ternary makes it select the label, which is then concatenated
+  with n.
+
+  '
 coding_spec:
   language: javascript
   entrypoint: solution.js
   kind: fix
-  instructions: |
-    Fix describe(n): return 'positive: <n>' when n > 0, otherwise 'non-positive: <n>'.
-      describe(5) -> 'positive: 5'; describe(-2) -> 'non-positive: -2'
-    Click Run to try it, then Check Solution to grade against all tests.
+  instructions: "Fix describe(n): return 'positive: <n>' when n > 0, otherwise 'non-positive: <n>'.\n\
+    \  describe(5) -> 'positive: 5'; describe(-2) -> 'non-positive: -2'\nClick Run to try it, then Check\
+    \ Solution to grade against all tests.\n"
   files:
   - path: solution.js
-    content: |
-      function describe(n) {
-        // '+' binds tighter than '?:', so the ternary never picks the label
-        return 'label: ' + n > 0 ? 'positive: ' + n : 'non-positive: ' + n;
-      }
+    content: "function describe(n) {\n  // '+' binds tighter than '?:', so the ternary never picks the\
+      \ label\n  return 'label: ' + n > 0 ? 'positive: ' + n : 'non-positive: ' + n;\n}\n"
     readonly: false
   visible_tests:
   - name: positive
-    code: |
-      assert(describe(5) === 'positive: 5', describe(5));
+    code: 'assert(describe(5) === ''positive: 5'', describe(5));
+
+      '
   - name: negative
-    code: |
-      assert(describe(-2) === 'non-positive: -2', describe(-2));
+    code: 'assert(describe(-2) === ''non-positive: -2'', describe(-2));
+
+      '
   hidden_tests:
   - name: zero is non-positive
-    code: |
-      assert(describe(0) === 'non-positive: 0', describe(0));
+    code: 'assert(describe(0) === ''non-positive: 0'', describe(0));
+
+      '
   - name: large positive
-    code: |
-      assert(describe(100) === 'positive: 100');
+    code: 'assert(describe(100) === ''positive: 100'');
+
+      '
   - name: no stray label text
-    code: |
-      assert(describe(3).indexOf('label') === -1, describe(3));
+    code: 'assert(describe(3).indexOf(''label'') === -1, describe(3));
+
+      '
   - name: one
-    code: |
-      assert(describe(1) === 'positive: 1');
+    code: 'assert(describe(1) === ''positive: 1'');
+
+      '
   timeout: 8
 hints:
 - order: 1
-  cost: 10
-  content: 'describe(5) returns the wrong string because ''label: '' + n is evaluated before the ?: .'
+  cost: 0
+  content: 'Where to look: Open `solution.js`, read the instructions, and run the visible tests to see
+    which assertion fails first.'
 - order: 2
-  cost: 20
-  content: In JS, + has higher precedence than the conditional operator ?:.
+  cost: 25
+  content: 'Diagnostic steps:
+
+    1. Click Run and read the traceback — note line number and actual vs expected values.
+
+    2. Reproduce the failure with the smallest input from a visible test.
+
+    3. Compare your implementation to the bug described in the lab prompt.'
 - order: 3
-  cost: 30
-  content: 'Wrap the ternary in parentheses: (n > 0 ? ''positive: '' : ''non-positive: '') + n.'
+  cost: 50
+  content: 'Exact fix + verification:
+
+    1. Return the correctly labelled string.
+
+    2. Re-run the lab checker (`check.sh` or Check Solution).
+
+    3. Confirm every scenario objective is satisfied.
+
+
+    WHY: the grader validates real state — marker files are ignored.'
+technology: javascript
+summary: Complete the fix the operator precedence in describe javascript lab and verify success with the
+  checker
+estimated_minutes: 25
+xp_reward: 100
+prerequisites:
+- Basic javascript literacy
+tags:
+- fix
+- hands-on
+- javascript
+linked_tutorial: javascript-fundamentals
+what_you_will_learn:
+- See the wrong label produced by precedence
+- Parenthesize the ternary so it evaluates first
+- Return the correctly labelled string
+environment:
+  nodes:
+  - role: primary
+    os: FixitLab JavaScript practice project
+    hostname: lab-primary
+    ip: 127.0.0.1
+    specs: local offline simulation
+  pre_installed:
+  - bash
+  - coreutils
+  - javascript
+  - journalctl
+  - systemctl
+  credentials:
+  - user: root
+    password: lab123
+tasks:
+- id: task_1
+  title: Fix the Operator Precedence in describe
+  description: Restore healthy behavior for Fix the Operator Precedence in describe by investigating the
+    failure, applying the smallest safe fix, and validating the outcome.
+  background: 'This javascript lab teaches systematic troubleshooting: observe, hypothesize, change, verify.'
+  validation:
+    type: custom_script
+    script: hidden_tests
+    error_message: One or more hidden tests failed. Read the public test output, fix your solution, and
+      submit again.
+solution:
+  summary: The solution passes all hidden tests by implementing the required behavior in code.
+  files_changed: []
+  commands_run: []
+  reference_docs: javascript-fundamentals

@@ -1,8 +1,26 @@
 title: Fix the Fibonacci Base Case
 slug: py-fix-fibonacci-base-case
-category: Python Development
-description: 'fib(n) returns the n-th Fibonacci number (0-indexed: 0,1,1,2,3,5,...), but the base cases
-  are wrong so the whole sequence is shifted/incorrect. Fix the base cases so fib(0)=0 and fib(1)=1.'
+category: Fix
+description: 'CONTEXT: A team operating Python development needs you to resolve `Fix the Fibonacci Base
+  Case` during a realistic incident. The business impact is reduced service reliability until the underlying
+  state is repaired.
+
+
+  ENVIRONMENT: You are working in FixitLab''s offline Python project workspace with source files, venv,
+  tests, and CLI entrypoints. All tools run locally; no paid APIs or external cloud calls are required.
+
+
+  SYMPTOM / STARTING STATE: fib(n) returns the n-th Fibonacci number (0-indexed: 0,1,1,2,3,5,...), but
+  the base cases are wrong so the whole sequence is shifted/incorrect. Fix the base cases so fib(0)=0
+  and fib(1)=1.
+
+
+  OBJECTIVE: Check fib(0) and fib(1) against the definition; Correct the base-case return values; Verify
+  the recursive/iterative sequence is right. Success means all hidden tests pass.
+
+
+  WHAT TO AVOID: Do not apply broad destructive changes, skip evidence gathering, or fake completion with
+  marker files — the checker validates real system state.'
 difficulty: easy
 scenario_type: fix
 lab_mode: simulation
@@ -19,57 +37,118 @@ objectives:
 - Verify the recursive/iterative sequence is right
 initial_state: 'fib(n) returns the n-th Fibonacci number (0-indexed: 0,1,1,2,3,5,...), but the base cases
   are wrong so the whole sequence is shifted/incorrect. Fix the base cases so fib(0)=0 and fib(1)=1.'
-solution_explanation: |
-  fib(0) must be 0. The base case returned 1, shifting the indexing. Correcting it to return 0 fixes the whole sequence.
+solution_explanation: 'fib(0) must be 0. The base case returned 1, shifting the indexing. Correcting it
+  to return 0 fixes the whole sequence.
+
+  '
 coding_spec:
   language: python
   entrypoint: solution.py
   kind: fix
-  instructions: |
-    Fix fib(n) so the 0-indexed sequence is 0, 1, 1, 2, 3, 5, 8, ...
-      fib(0)=0, fib(1)=1, fib(6)=8
-    Click Run to try it, then Check Solution to grade against all tests.
+  instructions: "Fix fib(n) so the 0-indexed sequence is 0, 1, 1, 2, 3, 5, 8, ...\n  fib(0)=0, fib(1)=1,\
+    \ fib(6)=8\nClick Run to try it, then Check Solution to grade against all tests.\n"
   files:
   - path: solution.py
-    content: |
-      def fib(n):
-          if n == 0:
-              return 1
-          if n == 1:
-              return 1
-          a, b = 0, 1
-          for _ in range(n - 1):
-              a, b = b, a + b
-          return b
+    content: "def fib(n):\n    if n == 0:\n        return 1\n    if n == 1:\n        return 1\n    a,\
+      \ b = 0, 1\n    for _ in range(n - 1):\n        a, b = b, a + b\n    return b\n"
     readonly: false
   visible_tests:
   - name: fib(0)
-    code: |
-      assert fib(0) == 0, fib(0)
+    code: 'assert fib(0) == 0, fib(0)
+
+      '
   - name: fib(1)
-    code: |
-      assert fib(1) == 1, fib(1)
+    code: 'assert fib(1) == 1, fib(1)
+
+      '
   hidden_tests:
   - name: fib(2)
-    code: |
-      assert fib(2) == 1, fib(2)
+    code: 'assert fib(2) == 1, fib(2)
+
+      '
   - name: fib(6)
-    code: |
-      assert fib(6) == 8, fib(6)
+    code: 'assert fib(6) == 8, fib(6)
+
+      '
   - name: fib(10)
-    code: |
-      assert fib(10) == 55, fib(10)
+    code: 'assert fib(10) == 55, fib(10)
+
+      '
   - name: sequence prefix
-    code: |
-      assert [fib(i) for i in range(7)] == [0, 1, 1, 2, 3, 5, 8]
+    code: 'assert [fib(i) for i in range(7)] == [0, 1, 1, 2, 3, 5, 8]
+
+      '
   timeout: 8
 hints:
 - order: 1
-  cost: 10
-  content: fib(0) returns 1, but by definition it should be 0.
+  cost: 0
+  content: 'Where to look: Open `solution.py`, read the instructions, and run the visible tests to see
+    which assertion fails first.'
 - order: 2
-  cost: 20
-  content: Only the base case for n == 0 is wrong.
+  cost: 25
+  content: 'Diagnostic steps:
+
+    1. Click Run and read the traceback — note line number and actual vs expected values.
+
+    2. Reproduce the failure with the smallest input from a visible test.
+
+    3. Compare your implementation to the bug described in the lab prompt.'
 - order: 3
-  cost: 30
-  content: 'Make `if n == 0: return 0`. The iterative part is already correct.'
+  cost: 50
+  content: 'Exact fix + verification:
+
+    1. Verify the recursive/iterative sequence is right.
+
+    2. Re-run the lab checker (`check.sh` or Check Solution).
+
+    3. Confirm every scenario objective is satisfied.
+
+
+    WHY: the grader validates real state — marker files are ignored.'
+technology: python
+summary: Complete the fix the fibonacci base case python lab and verify success with the checker
+estimated_minutes: 25
+xp_reward: 100
+prerequisites:
+- Basic python literacy
+tags:
+- fix
+- hands-on
+- python
+linked_tutorial: python-fundamentals
+what_you_will_learn:
+- Check fib(0) and fib(1) against the definition
+- Correct the base-case return values
+- Verify the recursive/iterative sequence is right
+environment:
+  nodes:
+  - role: primary
+    os: FixitLab Python project workspace
+    hostname: lab-primary
+    ip: 127.0.0.1
+    specs: local offline simulation
+  pre_installed:
+  - bash
+  - coreutils
+  - pip
+  - python
+  - python3
+  credentials:
+  - user: root
+    password: lab123
+tasks:
+- id: task_1
+  title: Fix the Fibonacci Base Case
+  description: Restore healthy behavior for Fix the Fibonacci Base Case by investigating the failure,
+    applying the smallest safe fix, and validating the outcome.
+  background: 'This python lab teaches systematic troubleshooting: observe, hypothesize, change, verify.'
+  validation:
+    type: custom_script
+    script: hidden_tests
+    error_message: One or more hidden tests failed. Read the public test output, fix your solution, and
+      submit again.
+solution:
+  summary: The solution passes all hidden tests by implementing the required behavior in code.
+  files_changed: []
+  commands_run: []
+  reference_docs: python-fundamentals

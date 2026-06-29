@@ -1,7 +1,7 @@
-title: 'GPU & NVIDIA: Cuda Toolkit — Build From Scratch'
+title: Cuda Toolkit — Build Lab
 slug: academy-gpu-052-build-cuda-6
-technology: GPU & NVIDIA
-category: Build Lab
+technology: gpu
+category: Build
 difficulty: medium
 scenario_type: do
 lab_mode: simulation
@@ -11,15 +11,38 @@ max_score: 100
 is_free: false
 infrastructure_type: docker
 jira_priority: Low
-description: GPU host lab. `nvidia-smi` reports the GPU unhealthy — ML/GPU workloads cannot start. Load
-  the driver / restore GPU health, then verify with `nvidia-smi`.
+description: 'CONTEXT: A team operating GPU operations needs you to resolve `gpu: Cuda Toolkit — Build
+  From Scratch` during a realistic incident. The business impact is reduced service reliability until
+  the underlying state is repaired.
+
+
+  ENVIRONMENT: You are working in FixitLab''s offline GPU node with nvidia-smi, drivers, CUDA, and container
+  toolkit. All tools run locally; no paid APIs or external cloud calls are required.
+
+
+  SYMPTOM / STARTING STATE: The GPU node is ready but CUDA toolkit is not configured yet. Required tools
+  may already be installed; your job is to create the configuration and bring the capability online. Build
+  CUDA toolkit from scratch in this gpu lab. You start from a minimal environment and must produce a working
+  configuration that demonstrates toolkit/runtime versions and compatibility. Plan, implement, then prove
+  it works.
+
+
+  OBJECTIVE: A working CUDA toolkit setup must exist by the end of this lab; Configuration should follow
+  team conventions and be easy to audit; The result should pass validation without manual cleanup. Success
+  means `nvidia-smi` includes `NVIDIA-SMI`.
+
+
+  WHAT TO AVOID: Do not apply broad destructive changes, skip evidence gathering, or fake completion with
+  marker files — the checker validates real system state.'
 objectives:
-- GPU reports healthy in nvidia-smi
-- '`nvidia-smi` reports a healthy GPU'
-initial_state: The NVIDIA driver/GPU is not healthy (`nvidia-smi` fails).
+- A working CUDA toolkit setup must exist by the end of this lab
+- Configuration should follow team conventions and be easy to audit
+- The result should pass validation without manual cleanup
+initial_state: The GPU node is ready but CUDA toolkit is not configured yet. Required tools may already
+  be installed; your job is to create the configuration and bring the capability online.
 hints:
 - order: 1
-  cost: 10
+  cost: 0
   content: 'Orient yourself before changing anything:
 
     1. Inspect the current state — `nvcc --version` and `nvidia-smi`.
@@ -29,17 +52,17 @@ hints:
     3. Recall the core idea: toolkit/runtime versions and compatibility. Form one hypothesis before you
     act.'
 - order: 2
-  cost: 15
-  content: 'Plan your approach (still no spoilers):
-
-    1. Confirm the exact gap between current and desired state for CUDA toolkit.
-
-    2. Decide the single smallest change that moves you toward the objective.
-
-    3. Capture evidence (command output / status) before the change so you can prove it worked afterward.'
-- order: 3
   cost: 25
-  content: 'Guided walkthrough:
+  content: 'Diagnostic steps:
+
+    1. `docker ps -a` — note Exited status and exit code.
+
+    2. `docker logs <name>` for the startup error.
+
+    3. Inspect the Dockerfile or `docker run` flags if the image is wrong.'
+- order: 3
+  cost: 50
+  content: 'Exact fix + verification:
 
     1. Re-check the current state — `nvcc --version` and `nvidia-smi`.
 
@@ -48,4 +71,75 @@ hints:
 
     3. Verify the result — a sample CUDA workload runs.
 
-    4. Click Check Solution once `nvidia-smi` reports a healthy GPU.'
+    4. Click Check Solution once the objective is met (graded on real state, not a marker file).'
+summary: Complete the cuda toolkit — build lab gpu lab and verify success with the checker
+estimated_minutes: 15
+xp_reward: 100
+prerequisites:
+- Basic gpu literacy
+tags:
+- do
+- gpu
+- hands-on
+linked_tutorial: gpu-fundamentals
+what_you_will_learn:
+- A working CUDA toolkit setup must exist by the end of this lab
+- Configuration should follow team conventions and be easy to audit
+- The result should pass validation without manual cleanup
+environment:
+  nodes:
+  - role: primary
+    os: FixitLab GPU node
+    hostname: lab-primary
+    ip: 127.0.0.1
+    specs: local offline simulation
+  pre_installed:
+  - bash
+  - coreutils
+  - gpu
+  - journalctl
+  - systemctl
+  credentials:
+  - user: root
+    password: lab123
+tasks:
+- id: task_1
+  title: Cuda Toolkit — Build Lab
+  description: Restore healthy behavior for Cuda Toolkit — Build Lab by investigating the failure, applying
+    the smallest safe fix, and validating the outcome.
+  background: 'This gpu lab teaches systematic troubleshooting: observe, hypothesize, change, verify.'
+  validation:
+    type: command_output
+    command: nvidia-smi
+    expected_output: NVIDIA-SMI
+    error_message: GPU health check still fails. Verify driver and device visibility.
+solution:
+  summary: Identify the misconfiguration affecting this gpu lab and apply the minimal fix.
+  files_changed: []
+  commands_run:
+  - nvidia-smi
+  reference_docs: gpu-fundamentals
+guided_mode:
+  enabled: true
+  steps:
+  - step: 1
+    title: Inspect current state
+    instruction: Run a read-only diagnostic before changing anything.
+    command: nvidia-smi
+    expected_output: Output shows the current failure mode
+    explanation: Evidence-first troubleshooting avoids guessing.
+    next_on: command_success
+  - step: 2
+    title: Apply the minimal fix
+    instruction: Make one reversible change aligned with the objectives.
+    command: '# your fix command here'
+    expected_output: State moves toward the objective
+    explanation: Small changes make rollback easy if the hypothesis was wrong.
+    next_on: command_success
+  - step: 3
+    title: Verify with the grader
+    instruction: Run the same verification the checker uses.
+    command: nvidia-smi
+    expected_output: '`nvidia-smi` includes `NVIDIA-SMI`'
+    explanation: The lab passes only when real state is healthy.
+    next_on: command_success

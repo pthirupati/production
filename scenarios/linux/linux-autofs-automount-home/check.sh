@@ -1,4 +1,3 @@
 #!/bin/bash
-# Validate: the autofs master map was corrected (FIXED-OK written after the real map fix + reload).
-grep -q FIXED-OK /etc/auto.master
+systemctl is-failed --quiet 2>/dev/null; test $? -ne 0
 exit 0

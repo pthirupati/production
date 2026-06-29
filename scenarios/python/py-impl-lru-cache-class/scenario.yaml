@@ -1,9 +1,26 @@
 title: Implement an LRU Cache
 slug: py-impl-lru-cache-class
-category: Python Development
-description: Implement an LRUCache(capacity) with get(key) and put(key, value). get returns the value
-  or -1 if absent and marks the key most-recently-used. put inserts/updates and evicts the least-recently-used
+category: Build
+description: 'CONTEXT: A team operating Python development needs you to resolve `Implement an LRU Cache`
+  during a realistic incident. The business impact is reduced service reliability until the underlying
+  state is repaired.
+
+
+  ENVIRONMENT: You are working in FixitLab''s offline Python project workspace with source files, venv,
+  tests, and CLI entrypoints. All tools run locally; no paid APIs or external cloud calls are required.
+
+
+  SYMPTOM / STARTING STATE: Implement an LRUCache(capacity) with get(key) and put(key, value). get returns
+  the value or -1 if absent and marks the key most-recently-used. put inserts/updates and evicts the least-recently-used
   key when capacity is exceeded. The stub is empty so the tests fail.
+
+
+  OBJECTIVE: Track recency of access for keys; Evict the least-recently-used entry on overflow; Make get/put
+  update recency correctly. Success means all hidden tests pass.
+
+
+  WHAT TO AVOID: Do not apply broad destructive changes, skip evidence gathering, or fake completion with
+  marker files — the checker validates real system state.'
 difficulty: hard
 scenario_type: do
 lab_mode: simulation
@@ -21,78 +38,189 @@ objectives:
 initial_state: Implement an LRUCache(capacity) with get(key) and put(key, value). get returns the value
   or -1 if absent and marks the key most-recently-used. put inserts/updates and evicts the least-recently-used
   key when capacity is exceeded. The stub is empty so the tests fail.
-solution_explanation: |
-  An OrderedDict maintains insertion/use order. Moving a key to the end on access marks it most-recent; popitem(last=False) evicts the LRU entry.
+solution_explanation: 'An OrderedDict maintains insertion/use order. Moving a key to the end on access
+  marks it most-recent; popitem(last=False) evicts the LRU entry.
+
+  '
 coding_spec:
   language: python
   entrypoint: solution.py
   kind: impl
-  instructions: |
-    Implement class LRUCache(capacity) with get(key)->value or -1, and put(key, value). On overflow evict the least-recently-used key. Both get and put count as 'use'.
+  instructions: 'Implement class LRUCache(capacity) with get(key)->value or -1, and put(key, value). On
+    overflow evict the least-recently-used key. Both get and put count as ''use''.
+
     Click Run to try it, then Check Solution to grade against all tests.
+
+    '
   files:
   - path: solution.py
-    content: |
-      class LRUCache:
-          def __init__(self, capacity):
-              # TODO
-              pass
-          def get(self, key):
-              # TODO
-              pass
-          def put(self, key, value):
-              # TODO
-              pass
+    content: "class LRUCache:\n    def __init__(self, capacity):\n        # TODO\n        pass\n    def\
+      \ get(self, key):\n        # TODO\n        pass\n    def put(self, key, value):\n        # TODO\n\
+      \        pass\n"
     readonly: false
   visible_tests:
   - name: basic get/put
-    code: |
-      c = LRUCache(2)
+    code: 'c = LRUCache(2)
+
       c.put(1, 1)
+
       c.put(2, 2)
+
       assert c.get(1) == 1
+
+      '
   - name: miss returns -1
-    code: |
-      c = LRUCache(2)
+    code: 'c = LRUCache(2)
+
       assert c.get(99) == -1
+
+      '
   hidden_tests:
   - name: evicts least recently used
-    code: |
-      c = LRUCache(2)
+    code: 'c = LRUCache(2)
+
       c.put(1, 1)
+
       c.put(2, 2)
+
       c.put(3, 3)
+
       assert c.get(1) == -1 and c.get(2) == 2 and c.get(3) == 3
+
+      '
   - name: get refreshes recency
-    code: |
-      c = LRUCache(2)
+    code: 'c = LRUCache(2)
+
       c.put(1, 1)
+
       c.put(2, 2)
+
       c.get(1)
+
       c.put(3, 3)
+
       assert c.get(2) == -1 and c.get(1) == 1 and c.get(3) == 3
+
+      '
   - name: update existing keeps it fresh
-    code: |
-      c = LRUCache(2)
+    code: 'c = LRUCache(2)
+
       c.put(1, 1)
+
       c.put(2, 2)
+
       c.put(1, 10)
+
       c.put(3, 3)
+
       assert c.get(2) == -1 and c.get(1) == 10
+
+      '
   - name: capacity one
-    code: |
-      c = LRUCache(1)
+    code: 'c = LRUCache(1)
+
       c.put(1, 1)
+
       c.put(2, 2)
+
       assert c.get(1) == -1 and c.get(2) == 2
+
+      '
   timeout: 8
 hints:
 - order: 1
-  cost: 10
-  content: You need to know which key was used least recently — order matters.
+  cost: 0
+  content: 'Where to look: Open `solution.py`, read the instructions, and run the visible tests to see
+    which assertion fails first.'
 - order: 2
-  cost: 20
-  content: collections.OrderedDict supports move_to_end and popitem(last=False).
+  cost: 25
+  content: 'Diagnostic steps:
+
+    1. Click Run and read the traceback — note line number and actual vs expected values.
+
+    2. Reproduce the failure with the smallest input from a visible test.
+
+    3. Compare your implementation to the bug described in the lab prompt.'
 - order: 3
-  cost: 30
-  content: On get/put, move the key to the end; after put, if over capacity pop the first item.
+  cost: 50
+  content: 'Exact fix + verification:
+
+    1. Make get/put update recency correctly.
+
+    2. Re-run the lab checker (`check.sh` or Check Solution).
+
+    3. Confirm every scenario objective is satisfied.
+
+
+    WHY: the grader validates real state — marker files are ignored.'
+technology: python
+summary: Complete the implement an lru cache python lab and verify success with the checker
+estimated_minutes: 25
+xp_reward: 100
+prerequisites:
+- Basic python literacy
+tags:
+- do
+- hands-on
+- python
+linked_tutorial: python-fundamentals
+what_you_will_learn:
+- Track recency of access for keys
+- Evict the least-recently-used entry on overflow
+- Make get/put update recency correctly
+environment:
+  nodes:
+  - role: primary
+    os: FixitLab Python project workspace
+    hostname: lab-primary
+    ip: 127.0.0.1
+    specs: local offline simulation
+  pre_installed:
+  - bash
+  - coreutils
+  - pip
+  - python
+  - python3
+  credentials:
+  - user: root
+    password: lab123
+tasks:
+- id: task_1
+  title: Implement an LRU Cache
+  description: Restore healthy behavior for Implement an LRU Cache by investigating the failure, applying
+    the smallest safe fix, and validating the outcome.
+  background: 'This python lab teaches systematic troubleshooting: observe, hypothesize, change, verify.'
+  validation:
+    type: custom_script
+    script: hidden_tests
+    error_message: One or more hidden tests failed. Read the public test output, fix your solution, and
+      submit again.
+solution:
+  summary: The solution passes all hidden tests by implementing the required behavior in code.
+  files_changed: []
+  commands_run: []
+  reference_docs: python-fundamentals
+guided_mode:
+  enabled: true
+  steps:
+  - step: 1
+    title: Inspect current state
+    instruction: Run a read-only diagnostic before changing anything.
+    command: check.sh
+    expected_output: Output shows the current failure mode
+    explanation: Evidence-first troubleshooting avoids guessing.
+    next_on: command_success
+  - step: 2
+    title: Apply the minimal fix
+    instruction: Make one reversible change aligned with the objectives.
+    command: '# your fix command here'
+    expected_output: State moves toward the objective
+    explanation: Small changes make rollback easy if the hypothesis was wrong.
+    next_on: command_success
+  - step: 3
+    title: Verify with the grader
+    instruction: Run the same verification the checker uses.
+    command: check.sh
+    expected_output: all hidden tests pass
+    explanation: The lab passes only when real state is healthy.
+    next_on: command_success

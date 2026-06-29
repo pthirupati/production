@@ -1,11 +1,29 @@
 title: Debug mysql networking (lab 46)
 slug: mysql-lab-46
 technology: mysql
-category: Mysql
-description: 'Hands-on mysql scenario: debug networking in a simulated environment.
-  This MySQL scenario focuses on mysql: Debug mysql networking (lab 46). Read the
-  environment, form a hypothesis, apply a minimal fix, and verify behavior before
-  closing the ticket.'
+category: Fix
+description: 'CONTEXT: A team operating MySQL needs you to resolve `Debug mysql networking (lab 46)` during
+  a realistic incident. The business impact is reduced service reliability until the underlying state
+  is repaired.
+
+
+  ENVIRONMENT: You are working in FixitLab''s offline MySQL instance with mysql client, InnoDB, grants,
+  and slow query log. All tools run locally; no paid APIs or external cloud calls are required.
+
+
+  SYMPTOM / STARTING STATE: Hands-on mysql scenario: debug networking in a simulated environment. Hands-on
+  mysql scenario: debug networking in a simulated environment. This MySQL scenario focuses on mysql: Debug
+  mysql networking (lab 46). Read the environment, form a hypothesis, apply a minimal fix, and verify
+  behavior before closing the ticket.
+
+
+  OBJECTIVE: Understand the current failure mode affecting Debug mysql networking (lab 46); Restore expected
+  service behavior with a minimal, documented change; Verify the fix holds under a realistic smoke test.
+  Success means all hidden tests pass.
+
+
+  WHAT TO AVOID: Do not apply broad destructive changes, skip evidence gathering, or fake completion with
+  marker files — the checker validates real system state.'
 difficulty: medium
 scenario_type: fix
 lab_mode: simulation
@@ -23,14 +41,29 @@ objectives:
 initial_state: 'Hands-on mysql scenario: debug networking in a simulated environment.'
 hints:
 - order: 1
-  cost: 10
-  content: Read the scenario objective and inspect logs or config in the terminal.
+  cost: 0
+  content: 'Where to look: Run `systemctl status mysqld` and tail `/var/log/mysqld.log`.'
 - order: 2
-  cost: 20
-  content: 'Apply the minimal fix, then mark completion: echo FIXED-OK > /tmp/scenario-fixed'
+  cost: 25
+  content: 'Diagnostic steps:
+
+    1. Read the error log for InnoDB or permission failures.
+
+    2. Check disk space with `df -h`.
+
+    3. Verify `my.cnf` for bad paths or bind-address.'
 - order: 3
-  cost: 20
-  content: Re-run the failing check or user workflow to confirm the incident is resolved.
+  cost: 50
+  content: 'Exact fix + verification:
+
+    1. Fix config or ownership under `/var/lib/mysql`.
+
+    2. `systemctl restart mysqld`.
+
+    3. Confirm `systemctl is-active mysqld` returns active.
+
+
+    WHY: MySQL often fails silently until you read the error log.'
 coding_spec:
   language: python
   entrypoint: solution.py
@@ -43,5 +76,53 @@ coding_spec:
   visible_tests:
   - name: placeholder
     code: assert callable(solution)
-  hidden_tests: []
+  hidden_tests:
+  - name: placeholder_hidden
+    code: assert callable(solution)
   timeout: 8
+summary: Complete the debug mysql networking (lab 46) mysql lab and verify success with the checker
+estimated_minutes: 20
+xp_reward: 100
+prerequisites:
+- Basic mysql literacy
+tags:
+- fix
+- hands-on
+- mysql
+linked_tutorial: mysql-fundamentals
+what_you_will_learn:
+- Understand the current failure mode affecting Debug mysql networking (lab 46)
+- Restore expected service behavior with a minimal, documented change
+- Verify the fix holds under a realistic smoke test
+environment:
+  nodes:
+  - role: primary
+    os: FixitLab MySQL instance
+    hostname: lab-primary
+    ip: 127.0.0.1
+    specs: local offline simulation
+  pre_installed:
+  - bash
+  - coreutils
+  - journalctl
+  - mysql
+  - systemctl
+  credentials:
+  - user: root
+    password: lab123
+tasks:
+- id: task_1
+  title: Debug mysql networking (lab 46)
+  description: Restore healthy behavior for Debug mysql networking (lab 46) by investigating the failure,
+    applying the smallest safe fix, and validating the outcome.
+  background: 'This mysql lab teaches systematic troubleshooting: observe, hypothesize, change, verify.'
+  validation:
+    type: custom_script
+    script: hidden_tests
+    error_message: One or more hidden tests failed. Read the public test output, fix your solution, and
+      submit again.
+solution:
+  summary: The solution passes all hidden tests by implementing the required behavior in code.
+  files_changed: []
+  commands_run: []
+  reference_docs: mysql-fundamentals

@@ -1,7 +1,7 @@
 slug: ds-dashboard-revenue-by-region
-title: "Build a Revenue-by-Region Bar Chart"
-technology: Data Science & Analytics
-category: Dashboards
+title: Build a Revenue-by-Region Bar Chart
+technology: data-science
+category: Fix
 difficulty: easy
 lab_mode: simulation
 simulation_type: data-dashboard
@@ -11,31 +11,125 @@ max_score: 100
 infrastructure_type: docker
 jira_priority: Medium
 is_free: true
-description: |
-  The sales team needs a quick view of how each region is performing. You have a
+description: 'CONTEXT: A team operating data science needs you to resolve `Build a Revenue-by-Region Bar
+  Chart` during a realistic incident. The business impact is reduced service reliability until the underlying
+  state is repaired.
+
+
+  ENVIRONMENT: You are working in FixitLab''s offline notebook lab with pandas/notebook workflows, joins,
+  and charts. All tools run locally; no paid APIs or external cloud calls are required.
+
+
+  SYMPTOM / STARTING STATE: A fresh dashboard with no dimension, measure, aggregation, or chart selected.
+
+  The regional_sales dataset has 8 rows across four regions (North, South, East,
+
+  West). North should total 2000, South 800, East 2000, West 1100 when revenue is
+
+  summed per region. The sales team needs a quick view of how each region is performing. You have a
+
   regional_sales dataset (one row per transaction, with region, product, channel,
+
   revenue and units columns). Using the dashboard builder, produce a bar chart
+
   that shows total revenue for every region.
 
+
   Pick the right dimension (the column to group by), the right measure (the
+
   numeric column to aggregate), the correct aggregation, and the correct chart
+
   type. The dashboard is graded on the configuration AND the computed numbers.
+
+
+  OBJECTIVE: Set the dimension (group-by) to ''region''; Set the measure to ''revenue'' and the aggregation
+  to ''sum''; Set the chart type to ''bar'' so the totals render as bars per region. Success means `check.sh`
+  exits successfully.
+
+
+  WHAT TO AVOID: Do not apply broad destructive changes, skip evidence gathering, or fake completion with
+  marker files — the checker validates real system state.'
 objectives:
-  - Set the dimension (group-by) to 'region'
-  - Set the measure to 'revenue' and the aggregation to 'sum'
-  - Set the chart type to 'bar' so the totals render as bars per region
-initial_state: |
-  A fresh dashboard with no dimension, measure, aggregation, or chart selected.
+- Set the dimension (group-by) to 'region'
+- Set the measure to 'revenue' and the aggregation to 'sum'
+- Set the chart type to 'bar' so the totals render as bars per region
+initial_state: 'A fresh dashboard with no dimension, measure, aggregation, or chart selected.
+
   The regional_sales dataset has 8 rows across four regions (North, South, East,
+
   West). North should total 2000, South 800, East 2000, West 1100 when revenue is
+
   summed per region.
+
+  '
 hints:
-  - order: 1
-    cost: 10
-    content: "Group-by first: set the dimension to 'region'. The dimension is the categorical column whose distinct values become the bars on the x-axis."
-  - order: 2
-    cost: 15
-    content: "Choose what to measure: set the measure to 'revenue' and the aggregation to 'sum' so each region's bar equals the total of its revenue rows."
-  - order: 3
-    cost: 20
-    content: "Finally set the chart type to 'bar'. A table also shows the numbers, but the goal explicitly asks for a bar chart, so the chart type must be 'bar' to pass."
+- order: 1
+  cost: 0
+  content: 'Where to look: Set the dimension (group-by) to ''region'''
+- order: 2
+  cost: 25
+  content: 'Diagnostic steps:
+
+    1. Set the measure to ''revenue'' and the aggregation to ''sum''
+
+    2. Set the chart type to ''bar'' so the totals render as bars per region'
+- order: 3
+  cost: 50
+  content: 'Exact fix + verification:
+
+    1. Set the chart type to ''bar'' so the totals render as bars per region.
+
+    2. Re-run the lab checker (`check.sh` or Check Solution).
+
+    3. Confirm every scenario objective is satisfied.
+
+
+    WHY: the grader validates real state — marker files are ignored.'
+summary: Complete the build a revenue-by-region bar chart data science lab and verify success with the
+  checker
+estimated_minutes: 15
+xp_reward: 100
+prerequisites:
+- Basic data science literacy
+tags:
+- data-science
+- fix
+- hands-on
+linked_tutorial: data-science-fundamentals
+what_you_will_learn:
+- Set the dimension (group-by) to 'region'
+- Set the measure to 'revenue' and the aggregation to 'sum'
+- Set the chart type to 'bar' so the totals render as bars per region
+environment:
+  nodes:
+  - role: primary
+    os: FixitLab notebook lab
+    hostname: lab-primary
+    ip: 127.0.0.1
+    specs: local offline simulation
+  pre_installed:
+  - bash
+  - coreutils
+  - data science
+  - pip
+  - python3
+  credentials:
+  - user: root
+    password: lab123
+tasks:
+- id: task_1
+  title: Build a Revenue-by-Region Bar Chart
+  description: Restore healthy behavior for Build a Revenue-by-Region Bar Chart by investigating the failure,
+    applying the smallest safe fix, and validating the outcome.
+  background: 'This data science lab teaches systematic troubleshooting: observe, hypothesize, change,
+    verify.'
+  validation:
+    type: custom_script
+    script: check.sh
+    error_message: Validation did not pass. Re-read the objectives and Hint 2 diagnostic steps.
+solution:
+  summary: Identify the misconfiguration affecting this data science lab and apply the minimal fix.
+  files_changed: []
+  commands_run:
+  - bash check.sh
+  reference_docs: data-science-fundamentals

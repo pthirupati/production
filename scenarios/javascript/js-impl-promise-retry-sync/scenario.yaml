@@ -1,9 +1,26 @@
 title: Implement pick (Object Subset)
 slug: js-impl-promise-retry-sync
-category: JavaScript Development
-description: 'Implement pick(obj, keys): return a NEW object containing only the entries of obj whose
-  key is in the keys array. Keys not present in obj are skipped. The original object is not mutated. The
-  stub is empty so tests fail.'
+category: Build
+description: 'CONTEXT: A team operating JavaScript needs you to resolve `Implement pick (Object Subset)`
+  during a realistic incident. The business impact is reduced service reliability until the underlying
+  state is repaired.
+
+
+  ENVIRONMENT: You are working in FixitLab''s offline JavaScript practice project with modules, browser
+  console, and Node tooling. All tools run locally; no paid APIs or external cloud calls are required.
+
+
+  SYMPTOM / STARTING STATE: Implement pick(obj, keys): return a NEW object containing only the entries
+  of obj whose key is in the keys array. Keys not present in obj are skipped. The original object is not
+  mutated. The stub is empty so tests fail.
+
+
+  OBJECTIVE: Copy only the requested keys; Skip keys absent from the source; Return a new object without
+  mutating the input. Success means all hidden tests pass.
+
+
+  WHAT TO AVOID: Do not apply broad destructive changes, skip evidence gathering, or fake completion with
+  marker files — the checker validates real system state.'
 difficulty: easy
 scenario_type: do
 lab_mode: simulation
@@ -21,53 +38,150 @@ objectives:
 initial_state: 'Implement pick(obj, keys): return a NEW object containing only the entries of obj whose
   key is in the keys array. Keys not present in obj are skipped. The original object is not mutated. The
   stub is empty so tests fail.'
-solution_explanation: |
-  Iterating the requested keys and copying only those present (via hasOwnProperty, so falsy values are retained) yields the subset without mutating the source.
+solution_explanation: 'Iterating the requested keys and copying only those present (via hasOwnProperty,
+  so falsy values are retained) yields the subset without mutating the source.
+
+  '
 coding_spec:
   language: javascript
   entrypoint: solution.js
   kind: impl
-  instructions: |
-    Implement pick(obj, keys) -> new object with only those keys that exist in obj.
-      pick({a:1,b:2,c:3}, ['a','c']) -> {a:1, c:3}
-    Click Run to try it, then Check Solution to grade against all tests.
+  instructions: "Implement pick(obj, keys) -> new object with only those keys that exist in obj.\n  pick({a:1,b:2,c:3},\
+    \ ['a','c']) -> {a:1, c:3}\nClick Run to try it, then Check Solution to grade against all tests.\n"
   files:
   - path: solution.js
-    content: |
-      function pick(obj, keys) {
-        // TODO: return a new object with only the selected keys
-      }
+    content: "function pick(obj, keys) {\n  // TODO: return a new object with only the selected keys\n\
+      }\n"
     readonly: false
   visible_tests:
   - name: subset
-    code: |
-      assert(JSON.stringify(pick({a:1,b:2,c:3}, ['a','c'])) === JSON.stringify({a:1,c:3}), JSON.stringify(pick({a:1,b:2,c:3}, ['a','c'])));
+    code: 'assert(JSON.stringify(pick({a:1,b:2,c:3}, [''a'',''c''])) === JSON.stringify({a:1,c:3}), JSON.stringify(pick({a:1,b:2,c:3},
+      [''a'',''c''])));
+
+      '
   - name: empty keys
-    code: |
-      assert(JSON.stringify(pick({a:1}, [])) === JSON.stringify({}), JSON.stringify(pick({a:1}, [])));
+    code: 'assert(JSON.stringify(pick({a:1}, [])) === JSON.stringify({}), JSON.stringify(pick({a:1}, [])));
+
+      '
   hidden_tests:
   - name: missing key skipped
-    code: |
-      assert(JSON.stringify(pick({a:1}, ['a','z'])) === JSON.stringify({a:1}), JSON.stringify(pick({a:1}, ['a','z'])));
+    code: 'assert(JSON.stringify(pick({a:1}, [''a'',''z''])) === JSON.stringify({a:1}), JSON.stringify(pick({a:1},
+      [''a'',''z''])));
+
+      '
   - name: all keys
-    code: |
-      assert(JSON.stringify(pick({x:1,y:2}, ['x','y'])) === JSON.stringify({x:1,y:2}), JSON.stringify(pick({x:1,y:2}, ['x','y'])));
+    code: 'assert(JSON.stringify(pick({x:1,y:2}, [''x'',''y''])) === JSON.stringify({x:1,y:2}), JSON.stringify(pick({x:1,y:2},
+      [''x'',''y''])));
+
+      '
   - name: does not mutate source
-    code: |
-      const src = {a:1,b:2};
-      pick(src, ['a']);
+    code: 'const src = {a:1,b:2};
+
+      pick(src, [''a'']);
+
       assert(JSON.stringify(src) === JSON.stringify({a:1,b:2}));
+
+      '
   - name: falsy values kept
-    code: |
-      assert(JSON.stringify(pick({a:0, b:false, c:1}, ['a','b'])) === JSON.stringify({a:0, b:false}), JSON.stringify(pick({a:0, b:false, c:1}, ['a','b'])));
+    code: 'assert(JSON.stringify(pick({a:0, b:false, c:1}, [''a'',''b''])) === JSON.stringify({a:0, b:false}),
+      JSON.stringify(pick({a:0, b:false, c:1}, [''a'',''b''])));
+
+      '
   timeout: 8
 hints:
 - order: 1
-  cost: 10
-  content: Iterate over the keys array, not the object.
+  cost: 0
+  content: 'Where to look: Open `solution.js`, read the instructions, and run the visible tests to see
+    which assertion fails first.'
 - order: 2
-  cost: 20
-  content: Use hasOwnProperty to copy only keys that actually exist on obj.
+  cost: 25
+  content: 'Diagnostic steps:
+
+    1. Click Run and read the traceback — note line number and actual vs expected values.
+
+    2. Reproduce the failure with the smallest input from a visible test.
+
+    3. Compare your implementation to the bug described in the lab prompt.'
 - order: 3
-  cost: 30
-  content: Build into a fresh object so the source isn't mutated; keep falsy values like 0/false.
+  cost: 50
+  content: 'Exact fix + verification:
+
+    1. Return a new object without mutating the input.
+
+    2. Re-run the lab checker (`check.sh` or Check Solution).
+
+    3. Confirm every scenario objective is satisfied.
+
+
+    WHY: the grader validates real state — marker files are ignored.'
+technology: javascript
+summary: Complete the implement pick (object subset) javascript lab and verify success with the checker
+estimated_minutes: 25
+xp_reward: 100
+prerequisites:
+- Basic javascript literacy
+tags:
+- do
+- hands-on
+- javascript
+linked_tutorial: javascript-fundamentals
+what_you_will_learn:
+- Copy only the requested keys
+- Skip keys absent from the source
+- Return a new object without mutating the input
+environment:
+  nodes:
+  - role: primary
+    os: FixitLab JavaScript practice project
+    hostname: lab-primary
+    ip: 127.0.0.1
+    specs: local offline simulation
+  pre_installed:
+  - bash
+  - coreutils
+  - javascript
+  - journalctl
+  - systemctl
+  credentials:
+  - user: root
+    password: lab123
+tasks:
+- id: task_1
+  title: Implement pick (Object Subset)
+  description: Restore healthy behavior for Implement pick (Object Subset) by investigating the failure,
+    applying the smallest safe fix, and validating the outcome.
+  background: 'This javascript lab teaches systematic troubleshooting: observe, hypothesize, change, verify.'
+  validation:
+    type: custom_script
+    script: hidden_tests
+    error_message: One or more hidden tests failed. Read the public test output, fix your solution, and
+      submit again.
+solution:
+  summary: The solution passes all hidden tests by implementing the required behavior in code.
+  files_changed: []
+  commands_run: []
+  reference_docs: javascript-fundamentals
+guided_mode:
+  enabled: true
+  steps:
+  - step: 1
+    title: Inspect current state
+    instruction: Run a read-only diagnostic before changing anything.
+    command: check.sh
+    expected_output: Output shows the current failure mode
+    explanation: Evidence-first troubleshooting avoids guessing.
+    next_on: command_success
+  - step: 2
+    title: Apply the minimal fix
+    instruction: Make one reversible change aligned with the objectives.
+    command: '# your fix command here'
+    expected_output: State moves toward the objective
+    explanation: Small changes make rollback easy if the hypothesis was wrong.
+    next_on: command_success
+  - step: 3
+    title: Verify with the grader
+    instruction: Run the same verification the checker uses.
+    command: check.sh
+    expected_output: all hidden tests pass
+    explanation: The lab passes only when real state is healthy.
+    next_on: command_success

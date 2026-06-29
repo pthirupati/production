@@ -1,42 +1,139 @@
 title: New User Cannot Login — Existing Users Unaffected
 slug: linux-user-login-fail
 difficulty: medium
-category: Linux Administration
-description: |
-  A new user account 'appuser' was created by the ops team but the user reports being
+category: Fix
+description: 'CONTEXT: A team operating Linux administration needs you to resolve `New User Cannot Login
+  — Existing Users Unaffected` during a realistic incident. The business impact is reduced service reliability
+  until the underlying state is repaired.
+
+
+  ENVIRONMENT: You are working in FixitLab''s offline Linux practice server with terminal and config files
+  under /etc and /var. All tools run locally; no paid APIs or external cloud calls are required.
+
+
+  SYMPTOM / STARTING STATE: Simulated RHEL 9 server. The user ''appuser'' exists in /etc/passwd. Attempting
+  to
+
+  switch to the user with su - appuser fails. SSH login as appuser is also rejected.
+
+  Other users like ''admin'' and ''root'' can log in without issue.
+
+  The account was created with: useradd -m appuser but no password was set. A new user account ''appuser''
+  was created by the ops team but the user reports being
+
   unable to log in. SSH returns "Permission denied" immediately and console login also
+
   fails. All existing users can log in normally. There are multiple possible causes:
+
   a locked password, an invalid shell, a missing home directory, or pam_nologin being
+
   active. Each must be checked systematically.
 
-initial_state: |
-  Simulated RHEL 9 server. The user 'appuser' exists in /etc/passwd. Attempting to
+
+  OBJECTIVE: Check /etc/shadow for appuser — the password field will show !! indicating locked; Set a
+  password with passwd appuser to unlock the account; Verify the shell in /etc/passwd is not /sbin/nologin
+  or /bin/false. Success means `check.sh` exits successfully.
+
+
+  WHAT TO AVOID: Do not apply broad destructive changes, skip evidence gathering, or fake completion with
+  marker files — the checker validates real system state.'
+initial_state: 'Simulated RHEL 9 server. The user ''appuser'' exists in /etc/passwd. Attempting to
+
   switch to the user with su - appuser fails. SSH login as appuser is also rejected.
-  Other users like 'admin' and 'root' can log in without issue.
+
+  Other users like ''admin'' and ''root'' can log in without issue.
+
   The account was created with: useradd -m appuser but no password was set.
 
+  '
 objectives:
-  - Check /etc/shadow for appuser — the password field will show !! indicating locked
-  - Set a password with passwd appuser to unlock the account
-  - Verify the shell in /etc/passwd is not /sbin/nologin or /bin/false
-  - Check that the home directory /home/appuser exists with correct ownership
-  - Confirm /etc/nologin does not exist (if it does, remove it as it blocks all non-root logins)
-  - Verify login succeeds with su - appuser
+- Check /etc/shadow for appuser — the password field will show !! indicating locked
+- Set a password with passwd appuser to unlock the account
+- Verify the shell in /etc/passwd is not /sbin/nologin or /bin/false
+- Check that the home directory /home/appuser exists with correct ownership
+- Confirm /etc/nologin does not exist (if it does, remove it as it blocks all non-root logins)
+- Verify login succeeds with su - appuser
 lab_mode: simulation
 simulation_type: generic
 time_limit: 900
 max_score: 100
 is_free: false
 hints:
-  - content: 'Check: grep appuser /etc/shadow — if the password field starts with !! the account has no password set and is locked. Run passwd appuser to set one.'
-    cost: 10
-    order: 1
-  - content: 'Check the shell: grep appuser /etc/passwd — last field should be /bin/bash or /bin/sh, not /sbin/nologin. Change with: usermod -s /bin/bash appuser'
-    cost: 15
-    order: 2
-  - content: 'Check if /etc/nologin exists: ls /etc/nologin. If present, it blocks all non-root logins system-wide. Remove it if login lock was unintended: rm /etc/nologin'
-    cost: 20
-    order: 3
+- order: 1
+  cost: 0
+  content: 'Where to look: Check /etc/shadow for appuser — the password field will show !! indicating
+    locked'
+- order: 2
+  cost: 25
+  content: 'Diagnostic steps:
+
+    1. Set a password with passwd appuser to unlock the account
+
+    2. Verify the shell in /etc/passwd is not /sbin/nologin or /bin/false
+
+    3. Check that the home directory /home/appuser exists with correct ownership'
+- order: 3
+  cost: 50
+  content: 'Exact fix + verification:
+
+    1. Confirm /etc/nologin does not exist (if it does, remove it as it blocks all non-root logins).
+
+    2. Re-run the lab checker (`check.sh` or Check Solution).
+
+    3. Confirm every scenario objective is satisfied.
+
+
+    WHY: the grader validates real state — marker files are ignored.'
 requires_companion_hosts: false
 dual_terminal: false
 jira_priority: Medium
+technology: linux
+summary: Complete the new user cannot login — existing users unaffected linux lab and verify success with
+  the checker
+estimated_minutes: 15
+xp_reward: 100
+prerequisites:
+- Basic linux literacy
+tags:
+- fix
+- hands-on
+- linux
+linked_tutorial: linux-fundamentals
+what_you_will_learn:
+- Check /etc/shadow for appuser — the password field will show !! indicating locked
+- Set a password with passwd appuser to unlock the account
+- Verify the shell in /etc/passwd is not /sbin/nologin or /bin/false
+- Check that the home directory /home/appuser exists with correct ownership
+- Confirm /etc/nologin does not exist (if it does, remove it as it blocks all non-root logins)
+environment:
+  nodes:
+  - role: primary
+    os: FixitLab Linux practice server
+    hostname: lab-primary
+    ip: 127.0.0.1
+    specs: local offline simulation
+  pre_installed:
+  - bash
+  - coreutils
+  - journalctl
+  - linux
+  - systemctl
+  credentials:
+  - user: root
+    password: lab123
+tasks:
+- id: task_1
+  title: New User Cannot Login — Existing Users Unaffected
+  description: Restore healthy behavior for New User Cannot Login — Existing Users Unaffected by investigating
+    the failure, applying the smallest safe fix, and validating the outcome.
+  background: 'This linux lab teaches systematic troubleshooting: observe, hypothesize, change, verify.'
+  validation:
+    type: custom_script
+    script: check.sh
+    error_message: Validation did not pass. Re-read the objectives and Hint 2 diagnostic steps.
+solution:
+  summary: Identify the misconfiguration affecting this linux lab and apply the minimal fix.
+  files_changed: []
+  commands_run:
+  - bash check.sh
+  reference_docs: linux-fundamentals

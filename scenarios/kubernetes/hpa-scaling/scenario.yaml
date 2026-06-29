@@ -1,11 +1,31 @@
 title: HPA Not Scaling Under Load
 slug: k8s-hpa-scaling
-category: Kubernetes
+category: Fix
 difficulty: medium
-description: A HorizontalPodAutoscaler is not adding replicas even though the workload is under load.
-  The HPA shows targets as <unknown> because the metrics-server isn't returning pod metrics, or the Deployment's
-  containers have no CPU resource requests for the HPA to compute utilization against. Restore metrics
-  so the HPA can scale.
+description: 'CONTEXT: A team operating Kubernetes needs you to resolve `HPA Not Scaling Under Load` during
+  a realistic incident. The business impact is reduced service reliability until the underlying state
+  is repaired.
+
+
+  ENVIRONMENT: You are working in FixitLab''s offline Kubernetes cluster with kubectl, manifests, and
+  cluster resources. All tools run locally; no paid APIs or external cloud calls are required.
+
+
+  SYMPTOM / STARTING STATE: Simulated Kubernetes cluster with an HPA targeting a Deployment. The HPA''s
+  TARGETS column shows <unknown>/50% and replica count stays at the minimum despite sustained CPU load.
+  A HorizontalPodAutoscaler is not adding replicas even though the workload is under load. The HPA shows
+  targets as <unknown> because the metrics-server isn''t returning pod metrics, or the Deployment''s containers
+  have no CPU resource requests for the HPA to compute utilization against. Restore metrics so the HPA
+  can scale.
+
+
+  OBJECTIVE: Inspect the HPA and see why current utilization is <unknown>; Verify metrics-server availability
+  and that pods declare CPU requests; Restore metrics/requests so the HPA scales the Deployment up under
+  load. Success means `kubectl get pods` shows every pod Running.
+
+
+  WHAT TO AVOID: Do not apply broad destructive changes, skip evidence gathering, or fake completion with
+  marker files — the checker validates real system state.'
 lab_mode: simulation
 simulation_type: kubernetes
 time_limit: 900
@@ -17,18 +37,78 @@ objectives:
 - Restore metrics/requests so the HPA scales the Deployment up under load
 hints:
 - order: 1
-  cost: 10
-  content: '`kubectl get hpa` shows TARGETS as <unknown>/50%. Describe it: `kubectl describe hpa <name>`
-    — "unable to fetch metrics" or "missing request for cpu" tells you the cause.'
+  cost: 0
+  content: 'Where to look: Run `kubectl get pods -A` and `kubectl describe pod <name>` for any pod not
+    in Running state.'
 - order: 2
-  cost: 15
-  content: 'Check metrics: `kubectl top pods` should return CPU. If it errors, metrics-server is unhealthy.
-    If it works, the Deployment is likely missing resources.requests.cpu, which the HPA needs to compute
-    a percentage.'
+  cost: 25
+  content: 'Diagnostic steps:
+
+    1. `kubectl get pods` — note CrashLoopBackOff, ImagePullBackOff, or Pending.
+
+    2. `kubectl describe pod <name>` — read Events at the bottom.
+
+    3. `kubectl logs <name> [--previous]` if the container restarted.'
 - order: 3
-  cost: 20
-  content: 'Add CPU requests so the HPA can compute utilization: `kubectl set resources deployment/<name>
-    --requests=cpu=100m`. Once metrics flow and requests exist, the HPA scales out; watch with `kubectl
-    get hpa -w`.'
+  cost: 50
+  content: 'Exact fix + verification:
+
+    1. Fix the root cause (image name, env var, volume mount, or probe).
+
+    2. `kubectl apply -f` the corrected manifest or delete the pod to recreate.
+
+    3. Confirm `kubectl get pods` shows every pod Running.
+
+
+    WHY: Kubernetes only reports healthy when the workload actually runs.'
 initial_state: Simulated Kubernetes cluster with an HPA targeting a Deployment. The HPA's TARGETS column
   shows <unknown>/50% and replica count stays at the minimum despite sustained CPU load.
+technology: kubernetes
+summary: Complete the hpa not scaling under load kubernetes lab and verify success with the checker
+estimated_minutes: 15
+xp_reward: 100
+prerequisites:
+- Basic kubernetes literacy
+tags:
+- fix
+- hands-on
+- kubernetes
+linked_tutorial: kubernetes-fundamentals
+what_you_will_learn:
+- Inspect the HPA and see why current utilization is <unknown>
+- Verify metrics-server availability and that pods declare CPU requests
+- Restore metrics/requests so the HPA scales the Deployment up under load
+environment:
+  nodes:
+  - role: primary
+    os: FixitLab Kubernetes cluster
+    hostname: lab-primary
+    ip: 127.0.0.1
+    specs: local offline simulation
+  pre_installed:
+  - bash
+  - coreutils
+  - helm
+  - kubectl
+  - kubernetes
+  credentials:
+  - user: root
+    password: lab123
+tasks:
+- id: task_1
+  title: HPA Not Scaling Under Load
+  description: Restore healthy behavior for HPA Not Scaling Under Load by investigating the failure, applying
+    the smallest safe fix, and validating the outcome.
+  background: 'This kubernetes lab teaches systematic troubleshooting: observe, hypothesize, change, verify.'
+  validation:
+    type: k8s_resource_state
+    resource_kind: Pod
+    resource_name: all
+    namespace: default
+    expected_state: Running
+    error_message: One or more pods are not Running. Use kubectl describe pod and kubectl logs.
+solution:
+  summary: Identify the misconfiguration affecting this kubernetes lab and apply the minimal fix.
+  files_changed: []
+  commands_run: []
+  reference_docs: kubernetes-fundamentals

@@ -1,11 +1,30 @@
-title: "Agentic Workflows: Plan, Act, Verify"
+title: 'Agentic Workflows: Plan, Act, Verify'
 slug: agentic-workflows
-category: Prompt Engineering
-description: >-
-  An agent is a model that runs a loop — plan, take an action with a tool,
-  observe the result, and repeat until a goal is met. Learn when an agentic loop
-  is the right tool (and when a single call or a fixed workflow is better), and
-  how to prompt one so it stays on task and knows when to stop.
+category: Build
+description: 'CONTEXT: A team operating prompt engineering needs you to resolve `Agentic Workflows: Plan,
+  Act, Verify` during a realistic incident. The business impact is reduced service reliability until the
+  underlying state is repaired.
+
+
+  ENVIRONMENT: You are working in FixitLab''s offline LLM practice workspace with prompt templates, eval
+  sets, and tool configs. All tools run locally; no paid APIs or external cloud calls are required.
+
+
+  SYMPTOM / STARTING STATE: The guided AI practice console opens with two graded exercises on agentic
+  workflows. Write an agent instruction with a goal and a stop condition, then justify when an agent beats
+  a simpler approach. Rule-based and free — strong answers pass, vague ones fail. An agent is a model
+  that runs a loop — plan, take an action with a tool, observe the result, and repeat until a goal is
+  met. Learn when an agentic loop is the right tool (and when a single call or a fixed workflow is better),
+  and how to prompt one so it stays on task and knows when to stop.
+
+
+  OBJECTIVE: Decide between a single call, a fixed workflow, and an open-ended agent loop; Prompt an agent
+  with a clear goal, a stopping condition, and a verification step; Pass both graded exercises (the simulator
+  re-checks your prompt server-side). Success means all hidden tests pass.
+
+
+  WHAT TO AVOID: Do not apply broad destructive changes, skip evidence gathering, or fake completion with
+  marker files — the checker validates real system state.'
 difficulty: hard
 scenario_type: do
 lab_mode: simulation
@@ -17,104 +36,211 @@ max_score: 100
 is_free: true
 dual_terminal: false
 objectives:
-  - Decide between a single call, a fixed workflow, and an open-ended agent loop
-  - Prompt an agent with a clear goal, a stopping condition, and a verification step
-  - Pass both graded exercises (the simulator re-checks your prompt server-side)
-initial_state: >-
-  The guided AI practice console opens with two graded exercises on agentic
-  workflows. Write an agent instruction with a goal and a stop condition, then
-  justify when an agent beats a simpler approach. Rule-based and free — strong
-  answers pass, vague ones fail.
-solution_explanation: >-
-  Start simple and escalate. A SINGLE CALL handles classification, extraction, or
-  Q&A. A FIXED WORKFLOW (you orchestrate the steps in code) handles multi-step
-  pipelines where the path is known. Reach for an AGENT — a model-driven loop —
-  only when the task is open-ended and hard to fully specify up front, the
-  outcome justifies the extra cost and latency, and errors are recoverable
-  (tests, review, rollback). A good agent prompt states the GOAL clearly up front
-  (give the full task in one well-specified instruction), grants the tools it
-  needs, defines a STOPPING CONDITION ("stop when the tests pass and you've
-  summarized the change"), and builds in VERIFICATION (have it check its own work
-  before declaring done). Without an explicit stop and a verify step, agents loop
-  forever or quit early.
+- Decide between a single call, a fixed workflow, and an open-ended agent loop
+- Prompt an agent with a clear goal, a stopping condition, and a verification step
+- Pass both graded exercises (the simulator re-checks your prompt server-side)
+initial_state: The guided AI practice console opens with two graded exercises on agentic workflows. Write
+  an agent instruction with a goal and a stop condition, then justify when an agent beats a simpler approach.
+  Rule-based and free — strong answers pass, vague ones fail.
+solution_explanation: Start simple and escalate. A SINGLE CALL handles classification, extraction, or
+  Q&A. A FIXED WORKFLOW (you orchestrate the steps in code) handles multi-step pipelines where the path
+  is known. Reach for an AGENT — a model-driven loop — only when the task is open-ended and hard to fully
+  specify up front, the outcome justifies the extra cost and latency, and errors are recoverable (tests,
+  review, rollback). A good agent prompt states the GOAL clearly up front (give the full task in one well-specified
+  instruction), grants the tools it needs, defines a STOPPING CONDITION ("stop when the tests pass and
+  you've summarized the change"), and builds in VERIFICATION (have it check its own work before declaring
+  done). Without an explicit stop and a verify step, agents loop forever or quit early.
 coding_spec:
   kind: prompt
   language: text
   prompt_config:
-    persona: An autonomous assistant that plans, calls tools, observes results, and iterates toward a goal.
+    persona: An autonomous assistant that plans, calls tools, observes results, and iterates toward a
+      goal.
     lesson:
-      - heading: Should this even be an agent?
-        body: >-
-          Most tasks aren't agents. Use a single call for one-shot work
-          (summarize, classify, extract). Use a fixed, code-orchestrated workflow
-          when the steps are known in advance — it's cheaper and more predictable.
-          Reserve an open-ended agent loop for tasks that are genuinely
-          multi-step, hard to specify fully, worth the cost, and recoverable when
-          they go wrong.
-      - heading: Goal up front, then let it run
-        body: >-
-          Agents do best when you state the full goal and constraints in one clear
-          instruction at the start, rather than dribbling context across many
-          turns. "Migrate this module to the new API; keep tests green; don't
-          change public behavior." A well-specified goal up front yields more
-          efficient, more coherent runs than vague step-by-step nudging.
-      - heading: Stopping conditions and self-verification
-        body: >-
-          Two things keep a loop healthy. A STOPPING CONDITION tells the agent
-          when it's done — "stop when all tests pass and you've written a one-line
-          summary." A VERIFICATION step makes it check its own work before
-          claiming success — re-run the tests, diff the output against the
-          requirement. Without these, agents either spin endlessly or declare
-          victory too soon.
-    rubric: [task, reasoning, constraints, specificity]
+    - heading: Should this even be an agent?
+      body: Most tasks aren't agents. Use a single call for one-shot work (summarize, classify, extract).
+        Use a fixed, code-orchestrated workflow when the steps are known in advance — it's cheaper and
+        more predictable. Reserve an open-ended agent loop for tasks that are genuinely multi-step, hard
+        to specify fully, worth the cost, and recoverable when they go wrong.
+    - heading: Goal up front, then let it run
+      body: Agents do best when you state the full goal and constraints in one clear instruction at the
+        start, rather than dribbling context across many turns. "Migrate this module to the new API; keep
+        tests green; don't change public behavior." A well-specified goal up front yields more efficient,
+        more coherent runs than vague step-by-step nudging.
+    - heading: Stopping conditions and self-verification
+      body: Two things keep a loop healthy. A STOPPING CONDITION tells the agent when it's done — "stop
+        when all tests pass and you've written a one-line summary." A VERIFICATION step makes it check
+        its own work before claiming success — re-run the tests, diff the output against the requirement.
+        Without these, agents either spin endlessly or declare victory too soon.
+    rubric:
+    - task
+    - reasoning
+    - constraints
+    - specificity
     exercises:
-      - id: agent-goal-and-stop
-        title: "Graded: an agent instruction with a stop condition"
-        goal: >-
-          Write an instruction for an agent that states a clear goal, lets it use
-          tools/act in a loop, and defines an explicit stopping condition or a
-          step where it verifies its own work before finishing.
-        starter: "Fix the failing build."
-        success:
-          min_words: 14
-          must_contain_all:
-            - ["stop", "until", "done", "finish", "complete", "verify", "check"]
-          any_of:
-            - ["goal", "task", "tool", "act", "action", "step", "loop", "iterate", "then", "tests pass", "re-run", "confirm"]
-        success_response: >-
-          Goal: make the build pass. Run the tests, fix what fails, and repeat.
-          Stop when all tests pass; before finishing, re-run the full suite to
-          verify, then give a one-line summary.
-        partial_response: >-
-          You set a goal — now add a stopping condition and a verification step.
-          Tell the agent when it's done ("stop when tests pass") and to confirm by
-          re-running before declaring success. Otherwise it loops or quits early.
-      - id: when-agent-vs-workflow
-        title: "Graded: agent vs simpler approach"
-        goal: >-
-          Explain when an open-ended agent loop is the right choice versus a
-          single call or a fixed workflow — touch on at least one tradeoff
-          (open-ended vs known steps, cost/latency, or recoverability of errors).
-        starter: ""
-        success:
-          min_words: 16
-          any_of:
-            - ["open-ended", "open ended", "multi-step", "multistep", "hard to specify", "single call", "fixed workflow", "workflow", "known steps", "cost", "latency", "recoverable", "rollback", "overkill", "tradeoff", "trade-off"]
-        success_response: >-
-          Use an agent only when the task is open-ended and hard to script, the
-          payoff justifies extra cost and latency, and mistakes are recoverable.
-          For known steps, a fixed workflow is cheaper and more predictable.
-        partial_response: >-
-          Name a real tradeoff. Agents fit open-ended, hard-to-specify tasks where
-          errors are recoverable and the cost is worth it; a single call or a
-          fixed code workflow is cheaper and more predictable for known steps.
+    - id: agent-goal-and-stop
+      title: 'Graded: an agent instruction with a stop condition'
+      goal: Write an instruction for an agent that states a clear goal, lets it use tools/act in a loop,
+        and defines an explicit stopping condition or a step where it verifies its own work before finishing.
+      starter: Fix the failing build.
+      success:
+        min_words: 14
+        must_contain_all:
+        - - stop
+          - until
+          - done
+          - finish
+          - complete
+          - verify
+          - check
+        any_of:
+        - - goal
+          - task
+          - tool
+          - act
+          - action
+          - step
+          - loop
+          - iterate
+          - then
+          - tests pass
+          - re-run
+          - confirm
+      success_response: 'Goal: make the build pass. Run the tests, fix what fails, and repeat. Stop when
+        all tests pass; before finishing, re-run the full suite to verify, then give a one-line summary.'
+      partial_response: You set a goal — now add a stopping condition and a verification step. Tell the
+        agent when it's done ("stop when tests pass") and to confirm by re-running before declaring success.
+        Otherwise it loops or quits early.
+    - id: when-agent-vs-workflow
+      title: 'Graded: agent vs simpler approach'
+      goal: Explain when an open-ended agent loop is the right choice versus a single call or a fixed
+        workflow — touch on at least one tradeoff (open-ended vs known steps, cost/latency, or recoverability
+        of errors).
+      starter: ''
+      success:
+        min_words: 16
+        any_of:
+        - - open-ended
+          - open ended
+          - multi-step
+          - multistep
+          - hard to specify
+          - single call
+          - fixed workflow
+          - workflow
+          - known steps
+          - cost
+          - latency
+          - recoverable
+          - rollback
+          - overkill
+          - tradeoff
+          - trade-off
+      success_response: Use an agent only when the task is open-ended and hard to script, the payoff justifies
+        extra cost and latency, and mistakes are recoverable. For known steps, a fixed workflow is cheaper
+        and more predictable.
+      partial_response: Name a real tradeoff. Agents fit open-ended, hard-to-specify tasks where errors
+        are recoverable and the cost is worth it; a single call or a fixed code workflow is cheaper and
+        more predictable for known steps.
+  hidden_tests:
+  - name: smoke_hidden
+    code: assert True
 hints:
-  - content: Start simple. Single call for one-shot tasks, a fixed code workflow for known steps, an agent loop only for open-ended, recoverable, worth-it tasks.
-    cost: 10
-    order: 1
-  - content: Give the agent the full goal and constraints up front, then let it run — that beats dribbling context over many turns.
-    cost: 15
-    order: 2
-  - content: 'Always include a stop condition and a verify step: "Repeat until all tests pass; before finishing, re-run the suite to confirm, then summarize." Without them, agents loop forever or quit too soon.'
-    cost: 20
-    order: 3
+- order: 1
+  cost: 0
+  content: 'Where to look: Open `the solution file`, read the instructions, and run the visible tests
+    to see which assertion fails first.'
+- order: 2
+  cost: 25
+  content: 'Diagnostic steps:
+
+    1. Click Run and read the traceback — note line number and actual vs expected values.
+
+    2. Reproduce the failure with the smallest input from a visible test.
+
+    3. Compare your implementation to the bug described in the lab prompt.'
+- order: 3
+  cost: 50
+  content: 'Exact fix + verification:
+
+    1. Pass both graded exercises (the simulator re-checks your prompt server-side).
+
+    2. Re-run the lab checker (`check.sh` or Check Solution).
+
+    3. Confirm every scenario objective is satisfied.
+
+
+    WHY: the grader validates real state — marker files are ignored.'
+technology: prompt-engineering
+summary: 'Complete the agentic workflows: plan, act, verify prompt engineering lab and verify success
+  with the checker'
+estimated_minutes: 30
+xp_reward: 100
+prerequisites:
+- Basic prompt engineering literacy
+tags:
+- do
+- hands-on
+- prompt-engineering
+linked_tutorial: prompt-engineering-fundamentals
+what_you_will_learn:
+- Decide between a single call, a fixed workflow, and an open-ended agent loop
+- Prompt an agent with a clear goal, a stopping condition, and a verification step
+- Pass both graded exercises (the simulator re-checks your prompt server-side)
+environment:
+  nodes:
+  - role: primary
+    os: FixitLab LLM practice workspace
+    hostname: lab-primary
+    ip: 127.0.0.1
+    specs: local offline simulation
+  pre_installed:
+  - bash
+  - coreutils
+  - journalctl
+  - prompt engineering
+  - systemctl
+  credentials:
+  - user: root
+    password: lab123
+tasks:
+- id: task_1
+  title: 'Agentic Workflows: Plan, Act, Verify'
+  description: 'Restore healthy behavior for Agentic Workflows: Plan, Act, Verify by investigating the
+    failure, applying the smallest safe fix, and validating the outcome.'
+  background: 'This prompt engineering lab teaches systematic troubleshooting: observe, hypothesize, change,
+    verify.'
+  validation:
+    type: custom_script
+    script: hidden_tests
+    error_message: One or more hidden tests failed. Read the public test output, fix your solution, and
+      submit again.
+solution:
+  summary: The solution passes all hidden tests by implementing the required behavior in code.
+  files_changed: []
+  commands_run: []
+  reference_docs: prompt-engineering-fundamentals
+guided_mode:
+  enabled: true
+  steps:
+  - step: 1
+    title: Inspect current state
+    instruction: Run a read-only diagnostic before changing anything.
+    command: check.sh
+    expected_output: Output shows the current failure mode
+    explanation: Evidence-first troubleshooting avoids guessing.
+    next_on: command_success
+  - step: 2
+    title: Apply the minimal fix
+    instruction: Make one reversible change aligned with the objectives.
+    command: '# your fix command here'
+    expected_output: State moves toward the objective
+    explanation: Small changes make rollback easy if the hypothesis was wrong.
+    next_on: command_success
+  - step: 3
+    title: Verify with the grader
+    instruction: Run the same verification the checker uses.
+    command: check.sh
+    expected_output: all hidden tests pass
+    explanation: The lab passes only when real state is healthy.
+    next_on: command_success

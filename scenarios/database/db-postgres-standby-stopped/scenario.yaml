@@ -1,7 +1,7 @@
 title: PostgreSQL Standby Not Streaming
 slug: db-postgres-standby-stopped
-technology: Database
-category: Replication
+technology: database
+category: Fix
 difficulty: hard
 lab_mode: simulation
 simulation_type: generic
@@ -10,7 +10,26 @@ max_score: 100
 is_free: true
 jira_priority: High
 dual_terminal: false
-description: A PostgreSQL streaming standby stopped replaying WAL and is diverging from the primary.
+description: 'CONTEXT: A team operating database administration needs you to resolve `PostgreSQL Standby
+  Not Streaming` during a realistic incident. The business impact is reduced service reliability until
+  the underlying state is repaired.
+
+
+  ENVIRONMENT: You are working in FixitLab''s offline database server with SQL client, schemas, backups,
+  and performance views. All tools run locally; no paid APIs or external cloud calls are required.
+
+
+  SYMPTOM / STARTING STATE: A PostgreSQL standby whose replication has halted. A PostgreSQL streaming
+  standby stopped replaying WAL and is diverging from the primary.
+
+
+  OBJECTIVE: Confirm postgresql is down (pg_stat_replication shows the standby disconnected); Resolve
+  the cause and start postgresql; Verify postgresql is active. Success means `systemctl is-active postgresql`
+  returns active.
+
+
+  WHAT TO AVOID: Do not apply broad destructive changes, skip evidence gathering, or fake completion with
+  marker files — the checker validates real system state.'
 initial_state: A PostgreSQL standby whose replication has halted.
 objectives:
 - Confirm postgresql is down (pg_stat_replication shows the standby disconnected)
@@ -18,11 +37,75 @@ objectives:
 - Verify postgresql is active
 hints:
 - order: 1
-  cost: 10
-  content: pg_stat_replication shows the standby disconnected
+  cost: 0
+  content: 'Where to look: Start with `systemctl status postgresql` and `journalctl -u postgresql -n 50
+    --no-pager` before changing anything.'
 - order: 2
-  cost: 15
-  content: 'Fix the cause and run: systemctl start postgresql.'
+  cost: 25
+  content: 'Diagnostic steps:
+
+    1. Run `systemctl status postgresql` — note Active/Failed and the last log lines.
+
+    2. Read `journalctl -u postgresql -n 50` for the root error.
+
+    3. Form a hypothesis about the smallest config or permission fix.'
 - order: 3
-  cost: 20
-  content: systemctl is-active postgresql returns active.
+  cost: 50
+  content: 'Exact fix + verification:
+
+    1. Apply the minimal fix (config, unit override, or missing directory).
+
+    2. Run `systemctl daemon-reload` if you edited a unit file.
+
+    3. Run `systemctl restart postgresql` and confirm `systemctl is-active postgresql` succeeds.
+
+
+    WHY: the grader checks real service state, not marker files.'
+summary: Complete the postgresql standby not streaming database lab and verify success with the checker
+estimated_minutes: 20
+xp_reward: 100
+prerequisites:
+- Basic database literacy
+tags:
+- database
+- fix
+- hands-on
+linked_tutorial: database-fundamentals
+what_you_will_learn:
+- Confirm postgresql is down (pg_stat_replication shows the standby disconnected)
+- Resolve the cause and start postgresql
+- Verify postgresql is active
+environment:
+  nodes:
+  - role: primary
+    os: FixitLab database server
+    hostname: lab-primary
+    ip: 127.0.0.1
+    specs: local offline simulation
+  pre_installed:
+  - bash
+  - coreutils
+  - database
+  - journalctl
+  - systemctl
+  credentials:
+  - user: root
+    password: lab123
+tasks:
+- id: task_1
+  title: PostgreSQL Standby Not Streaming
+  description: Restore healthy behavior for PostgreSQL Standby Not Streaming by investigating the failure,
+    applying the smallest safe fix, and validating the outcome.
+  background: 'This database lab teaches systematic troubleshooting: observe, hypothesize, change, verify.'
+  validation:
+    type: service_active
+    command: systemctl is-active postgresql
+    expected_status: active
+    error_message: The postgresql service is not active yet. Check `systemctl status postgresql` and `journalctl
+      -u postgresql -n 50`.
+solution:
+  summary: The root cause is an unhealthy `postgresql` service; repair it and verify active state.
+  files_changed: []
+  commands_run:
+  - systemctl is-active postgresql
+  reference_docs: database-fundamentals

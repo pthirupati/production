@@ -1,40 +1,136 @@
 title: SELinux Blocking Service from Binding to Non-Standard Port
 slug: linux-selinux-blocking
 difficulty: medium
-category: Linux Administration
-description: |
-  nginx has been configured to listen on port 8080 instead of the default port 80, but
-  the service fails to start. SELinux in Enforcing mode is preventing nginx from binding
-  to port 8080 because it is not in the list of allowed HTTP ports. The correct fix is
-  to add the port to SELinux's http_port_t type using semanage rather than disabling SELinux.
+category: Fix
+description: 'CONTEXT: A team operating Linux administration needs you to resolve `SELinux Blocking Service
+  from Binding to Non-Standard Port` during a realistic incident. The business impact is reduced service
+  reliability until the underlying state is repaired.
 
-initial_state: |
-  Simulated RHEL 9 server with SELinux in Enforcing mode. nginx is configured to listen
+
+  ENVIRONMENT: You are working in FixitLab''s offline Linux practice server with terminal and config files
+  under /etc and /var. All tools run locally; no paid APIs or external cloud calls are required.
+
+
+  SYMPTOM / STARTING STATE: Simulated RHEL 9 server with SELinux in Enforcing mode. nginx is configured
+  to listen
+
   on port 8080 in /etc/nginx/nginx.conf. Running systemctl start nginx fails with:
+
   "nginx: [emerg] bind() to 0.0.0.0:8080 failed (13: Permission denied)"
+
+  journalctl -u nginx shows the service failing immediately on start. nginx has been configured to listen
+  on port 8080 instead of the default port 80, but
+
+  the service fails to start. SELinux in Enforcing mode is preventing nginx from binding
+
+  to port 8080 because it is not in the list of allowed HTTP ports. The correct fix is
+
+  to add the port to SELinux''s http_port_t type using semanage rather than disabling SELinux.
+
+
+  OBJECTIVE: Check SELinux status with sestatus and confirm Enforcing mode; Inspect /var/log/audit/audit.log
+  or run ausearch -c nginx for AVC denied messages; Identify port 8080 is not in the http_port_t SELinux
+  type. Success means `check.sh` exits successfully.
+
+
+  WHAT TO AVOID: Do not apply broad destructive changes, skip evidence gathering, or fake completion with
+  marker files — the checker validates real system state.'
+initial_state: 'Simulated RHEL 9 server with SELinux in Enforcing mode. nginx is configured to listen
+
+  on port 8080 in /etc/nginx/nginx.conf. Running systemctl start nginx fails with:
+
+  "nginx: [emerg] bind() to 0.0.0.0:8080 failed (13: Permission denied)"
+
   journalctl -u nginx shows the service failing immediately on start.
 
+  '
 objectives:
-  - Check SELinux status with sestatus and confirm Enforcing mode
-  - Inspect /var/log/audit/audit.log or run ausearch -c nginx for AVC denied messages
-  - Identify port 8080 is not in the http_port_t SELinux type
-  - Add the port with semanage port -a -t http_port_t -p tcp 8080
-  - Start nginx with systemctl start nginx and verify it is running
+- Check SELinux status with sestatus and confirm Enforcing mode
+- Inspect /var/log/audit/audit.log or run ausearch -c nginx for AVC denied messages
+- Identify port 8080 is not in the http_port_t SELinux type
+- Add the port with semanage port -a -t http_port_t -p tcp 8080
+- Start nginx with systemctl start nginx and verify it is running
 lab_mode: simulation
 simulation_type: generic
 time_limit: 900
 max_score: 100
 is_free: false
 hints:
-  - content: 'Run: ausearch -c nginx --raw | audit2allow -M nginx_port to see the SELinux denial. The audit log will show type=AVC denied for name_bind on port 8080.'
-    cost: 10
-    order: 1
-  - content: 'Add the port to SELinux policy: semanage port -a -t http_port_t -p tcp 8080. Verify with semanage port -l | grep http_port_t before starting nginx.'
-    cost: 20
-    order: 2
-  - content: 'If semanage is not available, install policycoreutils-python-utils: yum install -y policycoreutils-python-utils'
-    cost: 15
-    order: 3
+- order: 1
+  cost: 0
+  content: 'Where to look: Test the config to get the exact file and line: `nginx -t`. It prints the offending
+    directive (e.g. unknown directive "listn").'
+- order: 2
+  cost: 25
+  content: 'Diagnostic steps:
+
+    1. Run `nginx -t` and note the file path and line number in the error.
+
+    2. Open that file (often `/etc/nginx/nginx.conf` or under `/etc/nginx/conf.d/`).
+
+    3. Compare the bad directive to the nginx docs — typos like `listn` should be `listen`.'
+- order: 3
+  cost: 50
+  content: 'Exact fix + verification:
+
+    1. Correct the typo on the reported line and save the file.
+
+    2. Re-run `nginx -t` until it reports syntax is ok.
+
+    3. Run `systemctl enable --now nginx`, then `curl -I http://localhost` (expect HTTP 200).
+
+
+    WHY: systemd will not start nginx until `nginx -t` passes.'
 requires_companion_hosts: false
 dual_terminal: false
 jira_priority: Medium
+technology: linux
+summary: Complete the selinux blocking service from binding to non-standard port linux lab and verify
+  success with the checker
+estimated_minutes: 15
+xp_reward: 100
+prerequisites:
+- Basic linux literacy
+tags:
+- fix
+- hands-on
+- linux
+linked_tutorial: linux-fundamentals
+what_you_will_learn:
+- Check SELinux status with sestatus and confirm Enforcing mode
+- Inspect /var/log/audit/audit.log or run ausearch -c nginx for AVC denied messages
+- Identify port 8080 is not in the http_port_t SELinux type
+- Add the port with semanage port -a -t http_port_t -p tcp 8080
+- Start nginx with systemctl start nginx and verify it is running
+environment:
+  nodes:
+  - role: primary
+    os: FixitLab Linux practice server
+    hostname: lab-primary
+    ip: 127.0.0.1
+    specs: local offline simulation
+  pre_installed:
+  - bash
+  - coreutils
+  - journalctl
+  - linux
+  - systemctl
+  credentials:
+  - user: root
+    password: lab123
+tasks:
+- id: task_1
+  title: SELinux Blocking Service from Binding to Non-Standard Port
+  description: Restore healthy behavior for SELinux Blocking Service from Binding to Non-Standard Port
+    by investigating the failure, applying the smallest safe fix, and validating the outcome.
+  background: 'This linux lab teaches systematic troubleshooting: observe, hypothesize, change, verify.'
+  validation:
+    type: custom_script
+    script: check.sh
+    error_message: Validation did not pass. Re-read the objectives and Hint 2 diagnostic steps.
+solution:
+  summary: Identify the misconfiguration affecting this linux lab and apply the minimal fix.
+  files_changed: []
+  commands_run:
+  - bash check.sh
+  reference_docs: linux-fundamentals

@@ -1,7 +1,7 @@
 title: Exploit SUID Binary for Root Access
 slug: suid-privilege-escalation
-technology: Security
-category: Privilege Escalation
+technology: security
+category: Hack
 difficulty: hard
 scenario_type: hack
 time_limit: 1200
@@ -10,9 +10,28 @@ infrastructure_type: docker
 lab_mode: docker
 jira_priority: High
 is_free: false
-description: 'CTF-style privilege-escalation lab: a misconfigured SUID binary on the system can be abused
-  to read files as root. Enumerate SUID binaries, identify the exploitable one and how it can be coerced
-  into reading arbitrary files, and use it to retrieve the protected flag at /root/flag.txt.'
+description: 'CONTEXT: A team operating security hardening needs you to resolve `Exploit SUID Binary for
+  Root Access` during a realistic incident. The business impact is reduced service reliability until the
+  underlying state is repaired.
+
+
+  ENVIRONMENT: You are working in FixitLab''s offline hardening lab with SSH, firewall, TLS, audit logs,
+  and IAM settings. All tools run locally; no paid APIs or external cloud calls are required.
+
+
+  SYMPTOM / STARTING STATE: Linux system with an over-privileged custom SUID binary (e.g. /usr/local/bin/readflag)
+  that can read root-owned files; the goal is to read /root/flag.txt via it. CTF-style privilege-escalation
+  lab: a misconfigured SUID binary on the system can be abused to read files as root. Enumerate SUID binaries,
+  identify the exploitable one and how it can be coerced into reading arbitrary files, and use it to retrieve
+  the protected flag at /root/flag.txt.
+
+
+  OBJECTIVE: Enumerate the system''s SUID binaries; Identify the misconfigured SUID binary and how to
+  abuse it; Use it to read /root/flag.txt and capture the flag. Success means `check.sh` exits successfully.
+
+
+  WHAT TO AVOID: Do not apply broad destructive changes, skip evidence gathering, or fake completion with
+  marker files — the checker validates real system state.'
 objectives:
 - Enumerate the system's SUID binaries
 - Identify the misconfigured SUID binary and how to abuse it
@@ -21,14 +40,70 @@ initial_state: Linux system with an over-privileged custom SUID binary (e.g. /us
   that can read root-owned files; the goal is to read /root/flag.txt via it.
 hints:
 - order: 1
-  cost: 10
-  content: 'List SUID binaries: `find / -perm -4000 -type f 2>/dev/null`. One of them is a custom, non-standard
-    binary that shouldn''t be SUID-root.'
+  cost: 0
+  content: 'Where to look: Enumerate the system''s SUID binaries'
 - order: 2
-  cost: 15
-  content: Inspect the suspect (e.g. `/usr/local/bin/readflag`) — `strings`/`ltrace` it. Because it runs
-    as root and reads a path you control, it can be coerced into reading any file.
+  cost: 25
+  content: 'Diagnostic steps:
+
+    1. Identify the misconfigured SUID binary and how to abuse it
+
+    2. Use it to read /root/flag.txt and capture the flag'
 - order: 3
-  cost: 20
-  content: 'Invoke it against the protected file: e.g. `/usr/local/bin/readflag /root/flag.txt` (or the
-    argument form it expects) to print the flag. Submit the FIXITLAB{...} value.'
+  cost: 50
+  content: 'Exact fix + verification:
+
+    1. Use it to read /root/flag.txt and capture the flag.
+
+    2. Re-run the lab checker (`check.sh` or Check Solution).
+
+    3. Confirm every scenario objective is satisfied.
+
+
+    WHY: the grader validates real state — marker files are ignored.'
+summary: Complete the exploit suid binary for root access security lab and verify success with the checker
+estimated_minutes: 20
+xp_reward: 100
+prerequisites:
+- Basic security literacy
+tags:
+- hack
+- hands-on
+- security
+linked_tutorial: security-fundamentals
+what_you_will_learn:
+- Enumerate the system's SUID binaries
+- Identify the misconfigured SUID binary and how to abuse it
+- Use it to read /root/flag.txt and capture the flag
+environment:
+  nodes:
+  - role: primary
+    os: FixitLab hardening lab
+    hostname: lab-primary
+    ip: 127.0.0.1
+    specs: local offline simulation
+  pre_installed:
+  - bash
+  - coreutils
+  - journalctl
+  - security
+  - systemctl
+  credentials:
+  - user: root
+    password: lab123
+tasks:
+- id: task_1
+  title: Exploit SUID Binary for Root Access
+  description: Restore healthy behavior for Exploit SUID Binary for Root Access by investigating the failure,
+    applying the smallest safe fix, and validating the outcome.
+  background: 'This security lab teaches systematic troubleshooting: observe, hypothesize, change, verify.'
+  validation:
+    type: custom_script
+    script: check.sh
+    error_message: Validation did not pass. Re-read the objectives and Hint 2 diagnostic steps.
+solution:
+  summary: Identify the misconfiguration affecting this security lab and apply the minimal fix.
+  files_changed: []
+  commands_run:
+  - bash check.sh
+  reference_docs: security-fundamentals

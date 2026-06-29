@@ -1,7 +1,7 @@
-title: 'Java Development: Rest Apis — Backup and Recovery'
+title: Rest Apis — Backup Lab
 slug: academy-java-069-backup-rest-api-7
-technology: Java Development
-category: Backup & Recovery
+technology: java
+category: Fix
 difficulty: medium
 scenario_type: do
 lab_mode: simulation
@@ -11,44 +11,126 @@ max_score: 100
 is_free: false
 infrastructure_type: docker
 jira_priority: Medium
-description: Service operations lab. The `nginx` systemd unit is **failed/inactive** on this host — a
-  realistic fault for Backup and Recovery workflows that depend on it. Diagnose with `systemctl status
-  nginx` and journal logs, apply the smallest reliable fix, then verify with `systemctl is-active nginx`.
+description: 'CONTEXT: A team operating Java applications needs you to resolve `java: Rest Apis — Backup
+  and Recovery` during a realistic incident. The business impact is reduced service reliability until
+  the underlying state is repaired.
+
+
+  ENVIRONMENT: You are working in FixitLab''s offline Java project with Maven/Gradle, JVM logs, and Spring
+  configuration. All tools run locally; no paid APIs or external cloud calls are required.
+
+
+  SYMPTOM / STARTING STATE: Backup jobs exist but reliability is uncertain for REST APIs. Leadership wants
+  proof that restore works — not just that scripts exit zero. Backup and recovery drill for REST APIs.
+  Ensure backups run on schedule, retention is correct, and you can restore controllers, status codes,
+  and validation within the lab RTO.
+
+
+  OBJECTIVE: Backup coverage for REST APIs is complete and restorable; Retention and encryption meet the
+  stated policy; A restore drill proves data integrity. Success means `systemctl is-active nginx` returns
+  active.
+
+
+  WHAT TO AVOID: Do not apply broad destructive changes, skip evidence gathering, or fake completion with
+  marker files — the checker validates real system state.'
 objectives:
-- The `nginx` service is active (running)
-- '`systemctl is-active nginx` returns active'
-- The fix survives a status re-check (no marker files)
-initial_state: The `nginx` service is not running (`systemctl is-active nginx` → inactive/failed). Dependent
-  Backup and Recovery tasks cannot succeed until the unit is healthy again.
+- Backup coverage for REST APIs is complete and restorable
+- Retention and encryption meet the stated policy
+- A restore drill proves data integrity
+initial_state: Backup jobs exist but reliability is uncertain for REST APIs. Leadership wants proof that
+  restore works — not just that scripts exit zero.
 hints:
 - order: 1
-  cost: 10
-  content: 'Orient yourself before changing anything:
-
-    1. Inspect the current state — controller mappings and responses.
-
-    2. Write down what looks normal versus wrong or missing for REST APIs.
-
-    3. Recall the core idea: controllers, status codes, and validation. Form one hypothesis before you
-    act.'
+  cost: 0
+  content: 'Where to look: Backup coverage for REST APIs is complete and restorable'
 - order: 2
-  cost: 15
-  content: 'Plan your approach (still no spoilers):
-
-    1. Confirm the exact gap between current and desired state for REST APIs.
-
-    2. Decide the single smallest change that moves you toward the objective.
-
-    3. Capture evidence (command output / status) before the change so you can prove it worked afterward.'
-- order: 3
   cost: 25
-  content: 'Guided walkthrough:
+  content: 'Diagnostic steps:
 
-    1. Re-check the current state — controller mappings and responses.
+    1. Retention and encryption meet the stated policy
 
-    2. Repair or run the backup job, then perform a controlled restore into a scratch location to prove
-    it works.
+    2. A restore drill proves data integrity'
+- order: 3
+  cost: 50
+  content: 'Exact fix + verification:
 
-    3. Verify the result — endpoints behave per the API contract.
+    1. A restore drill proves data integrity.
 
-    4. Click Check Solution once `systemctl is-active nginx` returns active.'
+    2. Re-run the lab checker (`check.sh` or Check Solution).
+
+    3. Confirm every scenario objective is satisfied.
+
+
+    WHY: the grader validates real state — marker files are ignored.'
+summary: Complete the rest apis — backup lab java lab and verify success with the checker
+estimated_minutes: 20
+xp_reward: 100
+prerequisites:
+- Basic java literacy
+tags:
+- do
+- hands-on
+- java
+linked_tutorial: java-fundamentals
+what_you_will_learn:
+- Backup coverage for REST APIs is complete and restorable
+- Retention and encryption meet the stated policy
+- A restore drill proves data integrity
+environment:
+  nodes:
+  - role: primary
+    os: FixitLab Java project
+    hostname: lab-primary
+    ip: 127.0.0.1
+    specs: local offline simulation
+  pre_installed:
+  - bash
+  - coreutils
+  - java
+  - journalctl
+  - systemctl
+  credentials:
+  - user: root
+    password: lab123
+tasks:
+- id: task_1
+  title: Rest Apis — Backup Lab
+  description: Restore healthy behavior for Rest Apis — Backup Lab by investigating the failure, applying
+    the smallest safe fix, and validating the outcome.
+  background: 'This java lab teaches systematic troubleshooting: observe, hypothesize, change, verify.'
+  validation:
+    type: service_active
+    command: systemctl is-active nginx
+    expected_status: active
+    error_message: The nginx service is not active yet. Check `systemctl status nginx` and `journalctl
+      -u nginx -n 50`.
+solution:
+  summary: The root cause is an unhealthy `nginx` service; repair it and verify active state.
+  files_changed: []
+  commands_run:
+  - systemctl is-active nginx
+  reference_docs: java-fundamentals
+guided_mode:
+  enabled: true
+  steps:
+  - step: 1
+    title: Inspect current state
+    instruction: Run a read-only diagnostic before changing anything.
+    command: systemctl is-active nginx
+    expected_output: Output shows the current failure mode
+    explanation: Evidence-first troubleshooting avoids guessing.
+    next_on: command_success
+  - step: 2
+    title: Apply the minimal fix
+    instruction: Make one reversible change aligned with the objectives.
+    command: '# your fix command here'
+    expected_output: State moves toward the objective
+    explanation: Small changes make rollback easy if the hypothesis was wrong.
+    next_on: command_success
+  - step: 3
+    title: Verify with the grader
+    instruction: Run the same verification the checker uses.
+    command: systemctl is-active nginx
+    expected_output: '`systemctl is-active nginx` returns active'
+    explanation: The lab passes only when real state is healthy.
+    next_on: command_success

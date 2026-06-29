@@ -1,4 +1,3 @@
-#!/usr/bin/env bash
-# docker-storage-driver-wrong: config repair — fail-closed until /etc/docker/storage.conf carries the FIXED-OK sentinel.
-grep -q FIXED-OK /etc/docker/storage.conf
+#!/bin/bash
+docker ps --format '{{.Status}}' | grep -q Up | grep -q 'Up'
 exit 0

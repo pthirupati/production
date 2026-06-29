@@ -1,9 +1,26 @@
 title: 'Refactor: Correct and Simplify squares_of_evens'
 slug: py-review-replace-loop-with-comprehension
-category: Python Development
-description: 'squares_of_evens(nums) is meant to return the squares of only the EVEN numbers, but the
-  verbose loop has a bug: it squares every number and filters nothing. Refactor it (a comprehension is
-  cleanest) so it returns the squares of the even values only, in order.'
+category: Fix
+description: 'CONTEXT: A team operating Python development needs you to resolve `Refactor: Correct and
+  Simplify squares_of_evens` during a realistic incident. The business impact is reduced service reliability
+  until the underlying state is repaired.
+
+
+  ENVIRONMENT: You are working in FixitLab''s offline Python project workspace with source files, venv,
+  tests, and CLI entrypoints. All tools run locally; no paid APIs or external cloud calls are required.
+
+
+  SYMPTOM / STARTING STATE: squares_of_evens(nums) is meant to return the squares of only the EVEN numbers,
+  but the verbose loop has a bug: it squares every number and filters nothing. Refactor it (a comprehension
+  is cleanest) so it returns the squares of the even values only, in order.
+
+
+  OBJECTIVE: Notice odd numbers are wrongly included; Filter to even numbers before squaring; Return the
+  squares in input order. Success means all hidden tests pass.
+
+
+  WHAT TO AVOID: Do not apply broad destructive changes, skip evidence gathering, or fake completion with
+  marker files — the checker validates real system state.'
 difficulty: easy
 scenario_type: fix
 lab_mode: simulation
@@ -21,53 +38,119 @@ objectives:
 initial_state: 'squares_of_evens(nums) is meant to return the squares of only the EVEN numbers, but the
   verbose loop has a bug: it squares every number and filters nothing. Refactor it (a comprehension is
   cleanest) so it returns the squares of the even values only, in order.'
-solution_explanation: |
-  The loop squared everything with no filter. A guarded comprehension keeps only even numbers and is also clearer.
+solution_explanation: 'The loop squared everything with no filter. A guarded comprehension keeps only
+  even numbers and is also clearer.
+
+  '
 coding_spec:
   language: python
   entrypoint: solution.py
   kind: review
-  instructions: |
-    Fix squares_of_evens(nums): return [n*n for the even n], preserving order.
-      squares_of_evens([1,2,3,4]) -> [4, 16]
-    Click Run to try it, then Check Solution to grade against all tests.
+  instructions: "Fix squares_of_evens(nums): return [n*n for the even n], preserving order.\n  squares_of_evens([1,2,3,4])\
+    \ -> [4, 16]\nClick Run to try it, then Check Solution to grade against all tests.\n"
   files:
   - path: solution.py
-    content: |
-      def squares_of_evens(nums):
-          out = []
-          for n in nums:
-              out.append(n * n)   # bug: never filters to evens
-          return out
+    content: "def squares_of_evens(nums):\n    out = []\n    for n in nums:\n        out.append(n * n)\
+      \   # bug: never filters to evens\n    return out\n"
     readonly: false
   visible_tests:
   - name: basic
-    code: |
-      assert squares_of_evens([1, 2, 3, 4]) == [4, 16]
+    code: 'assert squares_of_evens([1, 2, 3, 4]) == [4, 16]
+
+      '
   - name: no evens
-    code: |
-      assert squares_of_evens([1, 3, 5]) == []
+    code: 'assert squares_of_evens([1, 3, 5]) == []
+
+      '
   hidden_tests:
   - name: all evens
-    code: |
-      assert squares_of_evens([2, 4, 6]) == [4, 16, 36]
+    code: 'assert squares_of_evens([2, 4, 6]) == [4, 16, 36]
+
+      '
   - name: includes zero
-    code: |
-      assert squares_of_evens([0, 1, 2]) == [0, 4]
+    code: 'assert squares_of_evens([0, 1, 2]) == [0, 4]
+
+      '
   - name: negatives
-    code: |
-      assert squares_of_evens([-2, -3, -4]) == [4, 16]
+    code: 'assert squares_of_evens([-2, -3, -4]) == [4, 16]
+
+      '
   - name: empty
-    code: |
-      assert squares_of_evens([]) == []
+    code: 'assert squares_of_evens([]) == []
+
+      '
   timeout: 8
 hints:
 - order: 1
-  cost: 10
-  content: squares_of_evens([1,2,3]) returns [1,4,9] — odds shouldn't be there.
+  cost: 0
+  content: 'Where to look: Open `solution.py`, read the instructions, and run the visible tests to see
+    which assertion fails first.'
 - order: 2
-  cost: 20
-  content: Square a number only when it's even (n % 2 == 0).
+  cost: 25
+  content: 'Diagnostic steps:
+
+    1. Click Run and read the traceback — note line number and actual vs expected values.
+
+    2. Reproduce the failure with the smallest input from a visible test.
+
+    3. Compare your implementation to the bug described in the lab prompt.'
 - order: 3
-  cost: 30
-  content: 'Use a comprehension: [n*n for n in nums if n % 2 == 0].'
+  cost: 50
+  content: 'Exact fix + verification:
+
+    1. Return the squares in input order.
+
+    2. Re-run the lab checker (`check.sh` or Check Solution).
+
+    3. Confirm every scenario objective is satisfied.
+
+
+    WHY: the grader validates real state — marker files are ignored.'
+technology: python
+summary: 'Complete the refactor: correct and simplify squares_of_evens python lab and verify success with
+  the checker'
+estimated_minutes: 25
+xp_reward: 100
+prerequisites:
+- Basic python literacy
+tags:
+- fix
+- hands-on
+- python
+linked_tutorial: python-fundamentals
+what_you_will_learn:
+- Notice odd numbers are wrongly included
+- Filter to even numbers before squaring
+- Return the squares in input order
+environment:
+  nodes:
+  - role: primary
+    os: FixitLab Python project workspace
+    hostname: lab-primary
+    ip: 127.0.0.1
+    specs: local offline simulation
+  pre_installed:
+  - bash
+  - coreutils
+  - pip
+  - python
+  - python3
+  credentials:
+  - user: root
+    password: lab123
+tasks:
+- id: task_1
+  title: 'Refactor: Correct and Simplify squares_of_evens'
+  description: 'Restore healthy behavior for Refactor: Correct and Simplify squares_of_evens by investigating
+    the failure, applying the smallest safe fix, and validating the outcome.'
+  background: 'This python lab teaches systematic troubleshooting: observe, hypothesize, change, verify.'
+  validation:
+    type: custom_script
+    script: hidden_tests
+    error_message: One or more hidden tests failed. Read the public test output, fix your solution, and
+      submit again.
+solution:
+  summary: The solution passes all hidden tests by implementing the required behavior in code.
+  files_changed: []
+  commands_run: []
+  reference_docs: python-fundamentals

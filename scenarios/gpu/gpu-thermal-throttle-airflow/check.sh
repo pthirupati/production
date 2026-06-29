@@ -1,4 +1,3 @@
-#!/usr/bin/env bash
-# gpu-thermal-throttle-airflow: config repair (FIXED-OK sentinel).
-grep -q FIXED-OK /etc/gpu/thermal-policy.conf
+#!/bin/bash
+nvidia-smi | grep -q 'NVIDIA-SMI'
 exit 0

@@ -2,8 +2,8 @@ title: TCP Wrappers hosts.deny Blocks SSH
 slug: hosts-deny-blocks-ssh
 lab_mode: simulation
 simulation_type: generic
-technology: Linux
-category: Security / SSH
+technology: linux
+category: Fix
 difficulty: hard
 time_limit: 1200
 max_score: 100
@@ -11,10 +11,28 @@ infrastructure_type: docker
 docker_privileged: false
 jira_priority: Medium
 topics_covered: Q39 hosts.allow/deny — sshd tcp wrappers
-description: 'Every SSH connection is refused immediately because TCP Wrappers is configured to deny sshd:
-  /etc/hosts.deny contains a blanket `sshd: ALL` (with nothing allowing it back in hosts.allow). This
-  blocks connections before authentication. Adjust the TCP Wrappers rules so legitimate SSH is permitted
-  again.'
+description: 'CONTEXT: A team operating Linux administration needs you to resolve `TCP Wrappers hosts.deny
+  Blocks SSH` during a realistic incident. The business impact is reduced service reliability until the
+  underlying state is repaired.
+
+
+  ENVIRONMENT: You are working in FixitLab''s offline Linux practice server with terminal and config files
+  under /etc and /var. All tools run locally; no paid APIs or external cloud calls are required.
+
+
+  SYMPTOM / STARTING STATE: Linux server where /etc/hosts.deny blocks sshd for all hosts via TCP Wrappers,
+  so SSH connections are refused outright. Every SSH connection is refused immediately because TCP Wrappers
+  is configured to deny sshd: /etc/hosts.deny contains a blanket `sshd: ALL` (with nothing allowing it
+  back in hosts.allow). This blocks connections before authentication. Adjust the TCP Wrappers rules so
+  legitimate SSH is permitted again.
+
+
+  OBJECTIVE: Identify that hosts.deny/hosts.allow is blocking sshd; Adjust the TCP Wrappers rules to permit
+  SSH; Validate sshd config and verify SSH connections succeed. Success means `check.sh` exits successfully.
+
+
+  WHAT TO AVOID: Do not apply broad destructive changes, skip evidence gathering, or fake completion with
+  marker files — the checker validates real system state.'
 objectives:
 - Identify that hosts.deny/hosts.allow is blocking sshd
 - Adjust the TCP Wrappers rules to permit SSH
@@ -23,13 +41,72 @@ initial_state: Linux server where /etc/hosts.deny blocks sshd for all hosts via 
   are refused outright.
 hints:
 - order: 1
-  cost: 10
-  content: 'Connections drop instantly (not an auth failure). Check TCP Wrappers: `cat /etc/hosts.deny
-    /etc/hosts.allow` — hosts.deny has `sshd: ALL`.'
+  cost: 0
+  content: 'Where to look: Run `systemctl status sshd` and `ss -tlnp | grep :22` on the target host.'
 - order: 2
-  cost: 15
-  content: 'Either remove the `sshd: ALL` line from /etc/hosts.deny, or add a permit in /etc/hosts.allow
-    (e.g. `sshd: ALL` or `sshd: 10.0.0.0/24`). hosts.allow is evaluated first.'
+  cost: 25
+  content: 'Diagnostic steps:
+
+    1. Confirm sshd is active and listening on port 22.
+
+    2. Check `firewall-cmd` or iptables for blocked port 22.
+
+    3. Read `/var/log/secure` for auth or config errors.'
 - order: 3
-  cost: 20
-  content: Validate sshd is otherwise healthy (`sshd -t`) and test a connection — SSH now succeeds.
+  cost: 50
+  content: 'Exact fix + verification:
+
+    1. Fix sshd_config, firewall, or socket unit as needed.
+
+    2. `systemctl restart sshd`.
+
+    3. `ssh -o BatchMode=yes user@localhost echo ok` succeeds.
+
+
+    WHY: SSH failures are usually service, firewall, or config — not credentials alone.'
+summary: Complete the tcp wrappers hosts deny blocks ssh linux lab and verify success with the checker
+estimated_minutes: 20
+xp_reward: 100
+prerequisites:
+- Basic linux literacy
+tags:
+- fix
+- hands-on
+- linux
+linked_tutorial: linux-fundamentals
+what_you_will_learn:
+- Identify that hosts.deny/hosts.allow is blocking sshd
+- Adjust the TCP Wrappers rules to permit SSH
+- Validate sshd config and verify SSH connections succeed
+environment:
+  nodes:
+  - role: primary
+    os: FixitLab Linux practice server
+    hostname: lab-primary
+    ip: 127.0.0.1
+    specs: local offline simulation
+  pre_installed:
+  - bash
+  - coreutils
+  - journalctl
+  - linux
+  - systemctl
+  credentials:
+  - user: root
+    password: lab123
+tasks:
+- id: task_1
+  title: TCP Wrappers hosts.deny Blocks SSH
+  description: Restore healthy behavior for TCP Wrappers hosts.deny Blocks SSH by investigating the failure,
+    applying the smallest safe fix, and validating the outcome.
+  background: 'This linux lab teaches systematic troubleshooting: observe, hypothesize, change, verify.'
+  validation:
+    type: custom_script
+    script: check.sh
+    error_message: Validation did not pass. Re-read the objectives and Hint 2 diagnostic steps.
+solution:
+  summary: Identify the misconfiguration affecting this linux lab and apply the minimal fix.
+  files_changed: []
+  commands_run:
+  - bash check.sh
+  reference_docs: linux-fundamentals

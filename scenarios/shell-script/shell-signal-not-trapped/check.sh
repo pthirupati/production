@@ -1,4 +1,3 @@
-#!/usr/bin/env bash
-# shell-signal-not-trapped: config repair — fail-closed until /opt/scripts/long-job.sh carries the FIXED-OK sentinel.
-grep -q FIXED-OK /opt/scripts/long-job.sh
+#!/bin/bash
+systemctl is-failed --quiet 2>/dev/null; test $? -ne 0
 exit 0

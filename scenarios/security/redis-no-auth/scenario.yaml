@@ -1,38 +1,122 @@
 slug: redis-no-auth
-title: "Redis No Auth on 0.0.0.0 — Add requirepass and Restrict Binding"
-technology: Security
-category: Database Security
+title: Redis No Auth on 0.0.0.0 - Add requirepass and Restrict
+technology: security
+category: Fix
 difficulty: easy
 time_limit: 600
 max_score: 100
 infrastructure_type: docker
 jira_priority: Critical
 is_free: false
-description: |
-  Redis is running without authentication and listening on all network interfaces
+description: 'CONTEXT: A team operating security hardening needs you to resolve `Redis No Auth on 0.0.0.0
+  - Add requirepass and Restrict` during a realistic incident. The business impact is reduced service
+  reliability until the underlying state is repaired.
+
+
+  ENVIRONMENT: You are working in FixitLab''s offline hardening lab with SSH, firewall, TLS, audit logs,
+  and IAM settings. All tools run locally; no paid APIs or external cloud calls are required.
+
+
+  SYMPTOM / STARTING STATE: Ubuntu 22.04 with Redis. redis.conf has `bind 0.0.0.0` and no `requirepass`.
+
+  `redis-cli -h localhost ping` returns PONG without any auth. Exposed to internet. Redis is running without
+  authentication and listening on all network interfaces
+
   (0.0.0.0:6379). This is a known critical misconfiguration that has led to
+
   thousands of data breaches and ransomware infections. An unauthenticated attacker
+
   can read all cached data, overwrite it, or even write SSH keys to /root/.ssh/
-  using Redis's CONFIG SET dir command. Add a strong password requirement and
+
+  using Redis''s CONFIG SET dir command. Add a strong password requirement and
+
   restrict Redis to only listen on localhost.
+
+
+  OBJECTIVE: Verify Redis is listening on 0.0.0.0 without authentication; Add requirepass with a strong
+  password to /etc/redis/redis.conf; Change bind to 127.0.0.1. Success means `check.sh` exits successfully.
+
+
+  WHAT TO AVOID: Do not apply broad destructive changes, skip evidence gathering, or fake completion with
+  marker files — the checker validates real system state.'
 objectives:
-  - Verify Redis is listening on 0.0.0.0 without authentication
-  - Add requirepass with a strong password to /etc/redis/redis.conf
-  - Change bind to 127.0.0.1
-  - Restart Redis and verify unauthenticated access is rejected
-initial_state: |
-  Ubuntu 22.04 with Redis. redis.conf has `bind 0.0.0.0` and no `requirepass`.
+- Verify Redis is listening on 0.0.0.0 without authentication
+- Add requirepass with a strong password to /etc/redis/redis.conf
+- Change bind to 127.0.0.1
+- Restart Redis and verify unauthenticated access is rejected
+initial_state: 'Ubuntu 22.04 with Redis. redis.conf has `bind 0.0.0.0` and no `requirepass`.
+
   `redis-cli -h localhost ping` returns PONG without any auth. Exposed to internet.
+
+  '
 hints:
-  - order: 1
-    cost: 10
-    content: "Verify: `redis-cli ping` returns PONG without auth. `ss -tlnp | grep 6379` shows 0.0.0.0."
-  - order: 2
-    cost: 10
-    content: "Edit /etc/redis/redis.conf — set `bind 127.0.0.1` (remove 0.0.0.0)"
-  - order: 3
-    cost: 10
-    content: "Add auth: set `requirepass <strong-random-password>` in redis.conf"
-  - order: 4
-    cost: 10
-    content: "Restart: `systemctl restart redis`. Verify: `redis-cli ping` should return (error) NOAUTH."
+- order: 1
+  cost: 0
+  content: 'Where to look: Verify Redis is listening on 0.0.0.0 without authentication'
+- order: 2
+  cost: 25
+  content: 'Diagnostic steps:
+
+    1. Add requirepass with a strong password to /etc/redis/redis.conf
+
+    2. Restart Redis and verify unauthenticated access is rejected'
+- order: 3
+  cost: 50
+  content: 'Exact fix + verification:
+
+    1. Restart Redis and verify unauthenticated access is rejected.
+
+    2. Re-run the lab checker (`check.sh` or Check Solution).
+
+    3. Confirm every scenario objective is satisfied.
+
+
+    WHY: the grader validates real state — marker files are ignored.'
+summary: Complete the redis no auth on 0 0 0 0 - add requirepass and restrict security lab and verify
+  success with the checker
+estimated_minutes: 10
+xp_reward: 100
+prerequisites:
+- Basic security literacy
+tags:
+- fix
+- hands-on
+- security
+linked_tutorial: security-fundamentals
+what_you_will_learn:
+- Verify Redis is listening on 0.0.0.0 without authentication
+- Add requirepass with a strong password to /etc/redis/redis.conf
+- Change bind to 127.0.0.1
+- Restart Redis and verify unauthenticated access is rejected
+environment:
+  nodes:
+  - role: primary
+    os: FixitLab hardening lab
+    hostname: lab-primary
+    ip: 127.0.0.1
+    specs: local offline simulation
+  pre_installed:
+  - bash
+  - coreutils
+  - journalctl
+  - security
+  - systemctl
+  credentials:
+  - user: root
+    password: lab123
+tasks:
+- id: task_1
+  title: Redis No Auth on 0.0.0.0 - Add requirepass and Restrict
+  description: Restore healthy behavior for Redis No Auth on 0.0.0.0 - Add requirepass and Restrict by
+    investigating the failure, applying the smallest safe fix, and validating the outcome.
+  background: 'This security lab teaches systematic troubleshooting: observe, hypothesize, change, verify.'
+  validation:
+    type: custom_script
+    script: check.sh
+    error_message: Validation did not pass. Re-read the objectives and Hint 2 diagnostic steps.
+solution:
+  summary: Identify the misconfiguration affecting this security lab and apply the minimal fix.
+  files_changed: []
+  commands_run:
+  - bash check.sh
+  reference_docs: security-fundamentals

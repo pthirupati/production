@@ -1,19 +1,39 @@
 title: DNS Resolution Failure
 slug: dns-resolution-broken
-technology: Networking
-category: DNS
+technology: networking
+category: Fix
 difficulty: medium
 time_limit: 900
 max_score: 100
 infrastructure_type: docker
 jira_priority: High
-description: 'Applications on the server cannot resolve hostnames. curl and
+description: 'CONTEXT: A team operating network operations needs you to resolve `DNS Resolution Failure`
+  during a realistic incident. The business impact is reduced service reliability until the underlying
+  state is repaired.
+
+
+  ENVIRONMENT: You are working in FixitLab''s offline network lab with interfaces, routing tables, DNS,
+  and firewall rules. All tools run locally; no paid APIs or external cloud calls are required.
+
+
+  SYMPTOM / STARTING STATE: You have shell access to a Linux server where DNS resolution is broken.
+
+  nslookup and dig commands fail or return no results. Applications on the server cannot resolve hostnames.
+  curl and
 
   apt fail with "Temporary failure in name resolution". The
 
   resolver configuration was changed during a migration. Fix DNS
 
-  so the server can resolve external hostnames again.'
+  so the server can resolve external hostnames again.
+
+
+  OBJECTIVE: Diagnose why DNS resolution is failing; DNS lookups succeed for required hostnames; Verify
+  hostname resolution works (e.g., ping google.com). Success means `check.sh` exits successfully.
+
+
+  WHAT TO AVOID: Do not apply broad destructive changes, skip evidence gathering, or fake completion with
+  marker files — the checker validates real system state.'
 objectives:
 - Diagnose why DNS resolution is failing
 - DNS lookups succeed for required hostnames
@@ -25,18 +45,70 @@ initial_state: 'You have shell access to a Linux server where DNS resolution is 
   '
 hints:
 - order: 1
-  cost: 10
-  content: 'Confirm it''s resolution, not connectivity: `getent hosts google.com` fails with "Temporary
-    failure in name resolution". Inspect `/etc/resolv.conf`.'
+  cost: 0
+  content: 'Where to look: Diagnose why DNS resolution is failing'
 - order: 2
-  cost: 15
-  content: 'Check the resolver stack: `resolvectl status` (or `systemd-resolve --status`) shows whether
-    systemd-resolved has a usable upstream.'
-- order: 3
-  cost: 20
-  content: 'Fix it: add a valid `nameserver 8.8.8.8` to /etc/resolv.conf, or repair systemd-resolved''s
-    DNS= setting and restart it.'
-- order: 4
   cost: 25
-  content: 'Verify resolution works end to end: `getent hosts google.com` returns an address and `curl
-    -sI https://example.com` connects — DNS is restored.'
+  content: 'Diagnostic steps:
+
+    1. DNS lookups succeed for required hostnames
+
+    2. Verify hostname resolution works (e.g., ping google.com)'
+- order: 3
+  cost: 50
+  content: 'Exact fix + verification:
+
+    1. Verify hostname resolution works (e.g., ping google.com).
+
+    2. Re-run the lab checker (`check.sh` or Check Solution).
+
+    3. Confirm every scenario objective is satisfied.
+
+
+    WHY: the grader validates real state — marker files are ignored.'
+summary: Complete the dns resolution failure networking lab and verify success with the checker
+estimated_minutes: 15
+xp_reward: 100
+prerequisites:
+- Basic networking literacy
+tags:
+- fix
+- hands-on
+- networking
+linked_tutorial: networking-fundamentals
+what_you_will_learn:
+- Diagnose why DNS resolution is failing
+- DNS lookups succeed for required hostnames
+- Verify hostname resolution works (e.g., ping google.com)
+environment:
+  nodes:
+  - role: primary
+    os: FixitLab network lab
+    hostname: lab-primary
+    ip: 127.0.0.1
+    specs: local offline simulation
+  pre_installed:
+  - bash
+  - coreutils
+  - journalctl
+  - networking
+  - systemctl
+  credentials:
+  - user: root
+    password: lab123
+tasks:
+- id: task_1
+  title: DNS Resolution Failure
+  description: Restore healthy behavior for DNS Resolution Failure by investigating the failure, applying
+    the smallest safe fix, and validating the outcome.
+  background: 'This networking lab teaches systematic troubleshooting: observe, hypothesize, change, verify.'
+  validation:
+    type: custom_script
+    script: check.sh
+    error_message: Validation did not pass. Re-read the objectives and Hint 2 diagnostic steps.
+solution:
+  summary: Identify the misconfiguration affecting this networking lab and apply the minimal fix.
+  files_changed: []
+  commands_run:
+  - bash check.sh
+  reference_docs: networking-fundamentals

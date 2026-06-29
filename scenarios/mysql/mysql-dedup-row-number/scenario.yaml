@@ -1,10 +1,28 @@
 title: Keep Only the Latest Event Per User (and Index It)
 slug: mysql-dedup-row-number
 technology: mysql
-category: MySQL
-description: An events table records many rows per user over time, and a "current status" view should
-  keep only the most recent event per user. Implement the dedup with ROW_NUMBER(), and add the index
-  that lets a single-user lookup use a SEARCH on the index instead of a full table SCAN.
+category: Build
+description: 'CONTEXT: A team operating MySQL needs you to resolve `Keep Only the Latest Event Per User
+  (and Index It)` during a realistic incident. The business impact is reduced service reliability until
+  the underlying state is repaired.
+
+
+  ENVIRONMENT: You are working in FixitLab''s offline MySQL instance with mysql client, InnoDB, grants,
+  and slow query log. All tools run locally; no paid APIs or external cloud calls are required.
+
+
+  SYMPTOM / STARTING STATE: An events table records many rows per user over time, and a "current status"
+  view should keep only the most recent event per user. Implement the dedup with ROW_NUMBER(), and add
+  the index that lets a single-user lookup use a SEARCH on the index instead of a full table SCAN.
+
+
+  OBJECTIVE: Rank each user''s events newest-first with ROW_NUMBER() in a CTE; Keep only rank 1 to get
+  one current row per user; Break ties deterministically when two events share a timestamp. Success means
+  all hidden tests pass.
+
+
+  WHAT TO AVOID: Do not apply broad destructive changes, skip evidence gathering, or fake completion with
+  marker files — the checker validates real system state.'
 difficulty: hard
 scenario_type: do
 lab_mode: simulation
@@ -21,134 +39,179 @@ objectives:
 - Break ties deterministically when two events share a timestamp
 - Add a (user_id, ts) index so a single-user lookup uses an index SEARCH, not a full SCAN
 initial_state: An events table records many rows per user over time, and a "current status" view should
-  keep only the most recent event per user. Implement the dedup with ROW_NUMBER(), and add the index
-  that lets a single-user lookup use a SEARCH on the index instead of a full table SCAN.
-solution_explanation: |
-  ROW_NUMBER() OVER (PARTITION BY user_id ORDER BY ts DESC, id DESC) numbers each user's events with
+  keep only the most recent event per user. Implement the dedup with ROW_NUMBER(), and add the index that
+  lets a single-user lookup use a SEARCH on the index instead of a full table SCAN.
+solution_explanation: 'ROW_NUMBER() OVER (PARTITION BY user_id ORDER BY ts DESC, id DESC) numbers each
+  user''s events with
+
   the newest as 1; wrapping it in a CTE and filtering WHERE rn = 1 yields exactly one current row per
-  user. Adding id DESC to the window's ORDER BY makes ties (two events sharing a timestamp)
+
+  user. Adding id DESC to the window''s ORDER BY makes ties (two events sharing a timestamp)
+
   deterministic — the later-inserted row wins. Separately, a composite index on (user_id, ts) lets the
-  planner satisfy a "give me this user's events newest-first" lookup with an index SEARCH (a B-tree
+
+  planner satisfy a "give me this user''s events newest-first" lookup with an index SEARCH (a B-tree
+
   seek to the user, then an ordered range) instead of reading and sorting the whole table — the
+
   difference between an O(log n) seek and an O(n) full scan as the table grows.
+
+  '
 coding_spec:
   language: python
   entrypoint: solution.py
   kind: implement
-  instructions: |
-    Implement solution(conn) so it:
-      1) Creates an index named idx_events_user_ts on events(user_id, ts) if it does not exist, so a
-         per-user newest-first lookup can use an index SEARCH instead of a full table SCAN.
-      2) Returns one row (user_id, status, ts) per user — the user's MOST RECENT event — ordered by
-         user_id. When two events share the same ts, the one with the larger id wins.
-    Use ROW_NUMBER() in a CTE to rank and keep only the newest per user.
-    Click Run to try it, then Check Solution to grade against all tests.
+  instructions: "Implement solution(conn) so it:\n  1) Creates an index named idx_events_user_ts on events(user_id,\
+    \ ts) if it does not exist, so a\n     per-user newest-first lookup can use an index SEARCH instead\
+    \ of a full table SCAN.\n  2) Returns one row (user_id, status, ts) per user — the user's MOST RECENT\
+    \ event — ordered by\n     user_id. When two events share the same ts, the one with the larger id\
+    \ wins.\nUse ROW_NUMBER() in a CTE to rank and keep only the newest per user.\nClick Run to try it,\
+    \ then Check Solution to grade against all tests.\n"
   files:
   - path: solution.py
-    content: |
-      import sqlite3
-
-      def solution(conn):
-          # TODO (1): create a composite index so a single-user, newest-first
-          # lookup uses an index SEARCH instead of a full table SCAN:
-          #   CREATE INDEX IF NOT EXISTS idx_events_user_ts ON events(user_id, ts)
-          #
-          # TODO (2): rank each user's events newest-first with ROW_NUMBER() in a
-          # CTE (PARTITION BY user_id ORDER BY ts DESC, id DESC), then keep rn = 1.
-          # Return (user_id, status, ts) ordered by user_id.
-          #
-          # This stub returns every event (no dedup) and creates no index, so it
-          # is intentionally wrong.
-          return conn.execute(
-              "SELECT user_id, status, ts FROM events ORDER BY user_id"
-          ).fetchall()
+    content: "import sqlite3\n\ndef solution(conn):\n    # TODO (1): create a composite index so a single-user,\
+      \ newest-first\n    # lookup uses an index SEARCH instead of a full table SCAN:\n    #   CREATE\
+      \ INDEX IF NOT EXISTS idx_events_user_ts ON events(user_id, ts)\n    #\n    # TODO (2): rank each\
+      \ user's events newest-first with ROW_NUMBER() in a\n    # CTE (PARTITION BY user_id ORDER BY ts\
+      \ DESC, id DESC), then keep rn = 1.\n    # Return (user_id, status, ts) ordered by user_id.\n  \
+      \  #\n    # This stub returns every event (no dedup) and creates no index, so it\n    # is intentionally\
+      \ wrong.\n    return conn.execute(\n        \"SELECT user_id, status, ts FROM events ORDER BY user_id\"\
+      \n    ).fetchall()\n"
     readonly: false
   visible_tests:
   - name: keeps the newest event per user
-    code: |
-      import sqlite3
-      conn = sqlite3.connect(':memory:')
-      conn.executescript(
-          "CREATE TABLE events (id INTEGER PRIMARY KEY, user_id INTEGER, status TEXT, ts TEXT);"
-          "INSERT INTO events (id, user_id, status, ts) VALUES "
-          "(1,1,'signup','2024-01-01'),(2,1,'active','2024-02-01'),(3,1,'churned','2024-03-01'),"
-          "(4,2,'signup','2024-01-15'),(5,2,'active','2024-02-15'),(6,3,'signup','2024-01-20');"
-      )
-      assert solution(conn) == [
-          (1,'churned','2024-03-01'),
-          (2,'active','2024-02-15'),
-          (3,'signup','2024-01-20'),
-      ], solution(conn)
+    code: "import sqlite3\nconn = sqlite3.connect(':memory:')\nconn.executescript(\n    \"CREATE TABLE\
+      \ events (id INTEGER PRIMARY KEY, user_id INTEGER, status TEXT, ts TEXT);\"\n    \"INSERT INTO events\
+      \ (id, user_id, status, ts) VALUES \"\n    \"(1,1,'signup','2024-01-01'),(2,1,'active','2024-02-01'),(3,1,'churned','2024-03-01'),\"\
+      \n    \"(4,2,'signup','2024-01-15'),(5,2,'active','2024-02-15'),(6,3,'signup','2024-01-20');\"\n\
+      )\nassert solution(conn) == [\n    (1,'churned','2024-03-01'),\n    (2,'active','2024-02-15'),\n\
+      \    (3,'signup','2024-01-20'),\n], solution(conn)\n"
   - name: exactly one row per user
-    code: |
-      import sqlite3
-      conn = sqlite3.connect(':memory:')
-      conn.executescript(
-          "CREATE TABLE events (id INTEGER PRIMARY KEY, user_id INTEGER, status TEXT, ts TEXT);"
-          "INSERT INTO events (id, user_id, status, ts) VALUES "
-          "(1,1,'signup','2024-01-01'),(2,1,'active','2024-02-01'),(3,1,'churned','2024-03-01'),"
-          "(4,2,'signup','2024-01-15'),(5,2,'active','2024-02-15'),(6,3,'signup','2024-01-20');"
-      )
-      ids = [r[0] for r in solution(conn)]
-      assert ids == [1, 2, 3], ids
-      assert len(ids) == len(set(ids)), ids
+    code: "import sqlite3\nconn = sqlite3.connect(':memory:')\nconn.executescript(\n    \"CREATE TABLE\
+      \ events (id INTEGER PRIMARY KEY, user_id INTEGER, status TEXT, ts TEXT);\"\n    \"INSERT INTO events\
+      \ (id, user_id, status, ts) VALUES \"\n    \"(1,1,'signup','2024-01-01'),(2,1,'active','2024-02-01'),(3,1,'churned','2024-03-01'),\"\
+      \n    \"(4,2,'signup','2024-01-15'),(5,2,'active','2024-02-15'),(6,3,'signup','2024-01-20');\"\n\
+      )\nids = [r[0] for r in solution(conn)]\nassert ids == [1, 2, 3], ids\nassert len(ids) == len(set(ids)),\
+      \ ids\n"
   hidden_tests:
   - name: creates the composite index
-    code: |
-      import sqlite3
-      conn = sqlite3.connect(':memory:')
-      conn.executescript(
-          "CREATE TABLE events (id INTEGER PRIMARY KEY, user_id INTEGER, status TEXT, ts TEXT);"
-          "INSERT INTO events (id, user_id, status, ts) VALUES (1,1,'a','2024-01-01');"
-      )
-      solution(conn)
-      names = [r[0] for r in conn.execute(
-          "SELECT name FROM sqlite_master WHERE type='index' AND tbl_name='events' AND sql IS NOT NULL"
-      ).fetchall()]
-      assert 'idx_events_user_ts' in names, names
+    code: "import sqlite3\nconn = sqlite3.connect(':memory:')\nconn.executescript(\n    \"CREATE TABLE\
+      \ events (id INTEGER PRIMARY KEY, user_id INTEGER, status TEXT, ts TEXT);\"\n    \"INSERT INTO events\
+      \ (id, user_id, status, ts) VALUES (1,1,'a','2024-01-01');\"\n)\nsolution(conn)\nnames = [r[0] for\
+      \ r in conn.execute(\n    \"SELECT name FROM sqlite_master WHERE type='index' AND tbl_name='events'\
+      \ AND sql IS NOT NULL\"\n).fetchall()]\nassert 'idx_events_user_ts' in names, names\n"
   - name: per-user lookup uses an index SEARCH not a full SCAN
-    code: |
-      import sqlite3
-      conn = sqlite3.connect(':memory:')
-      conn.executescript(
-          "CREATE TABLE events (id INTEGER PRIMARY KEY, user_id INTEGER, status TEXT, ts TEXT);"
-          "INSERT INTO events (id, user_id, status, ts) VALUES "
-          "(1,1,'a','2024-01-01'),(2,1,'b','2024-02-01'),(3,2,'c','2024-01-15');"
-      )
-      solution(conn)
-      plan = conn.execute(
-          "EXPLAIN QUERY PLAN SELECT status, ts FROM events WHERE user_id = 1 ORDER BY ts DESC"
-      ).fetchall()
-      detail = ' '.join(str(p[-1]) for p in plan)
-      assert 'idx_events_user_ts' in detail, detail
-      assert 'SCAN events' not in detail, detail
+    code: "import sqlite3\nconn = sqlite3.connect(':memory:')\nconn.executescript(\n    \"CREATE TABLE\
+      \ events (id INTEGER PRIMARY KEY, user_id INTEGER, status TEXT, ts TEXT);\"\n    \"INSERT INTO events\
+      \ (id, user_id, status, ts) VALUES \"\n    \"(1,1,'a','2024-01-01'),(2,1,'b','2024-02-01'),(3,2,'c','2024-01-15');\"\
+      \n)\nsolution(conn)\nplan = conn.execute(\n    \"EXPLAIN QUERY PLAN SELECT status, ts FROM events\
+      \ WHERE user_id = 1 ORDER BY ts DESC\"\n).fetchall()\ndetail = ' '.join(str(p[-1]) for p in plan)\n\
+      assert 'idx_events_user_ts' in detail, detail\nassert 'SCAN events' not in detail, detail\n"
   - name: ties on timestamp broken by larger id
-    code: |
-      import sqlite3
-      conn = sqlite3.connect(':memory:')
-      conn.executescript(
-          "CREATE TABLE events (id INTEGER PRIMARY KEY, user_id INTEGER, status TEXT, ts TEXT);"
-          "INSERT INTO events (id, user_id, status, ts) VALUES "
-          "(1,5,'old','2024-01-01'),(2,5,'new','2024-01-01');"
-      )
-      assert solution(conn) == [(5,'new','2024-01-01')], solution(conn)
+    code: "import sqlite3\nconn = sqlite3.connect(':memory:')\nconn.executescript(\n    \"CREATE TABLE\
+      \ events (id INTEGER PRIMARY KEY, user_id INTEGER, status TEXT, ts TEXT);\"\n    \"INSERT INTO events\
+      \ (id, user_id, status, ts) VALUES \"\n    \"(1,5,'old','2024-01-01'),(2,5,'new','2024-01-01');\"\
+      \n)\nassert solution(conn) == [(5,'new','2024-01-01')], solution(conn)\n"
   - name: single event passes through
-    code: |
-      import sqlite3
-      conn = sqlite3.connect(':memory:')
-      conn.executescript(
-          "CREATE TABLE events (id INTEGER PRIMARY KEY, user_id INTEGER, status TEXT, ts TEXT);"
-          "INSERT INTO events (id, user_id, status, ts) VALUES (1,9,'only','2024-06-01');"
-      )
-      assert solution(conn) == [(9,'only','2024-06-01')], solution(conn)
+    code: "import sqlite3\nconn = sqlite3.connect(':memory:')\nconn.executescript(\n    \"CREATE TABLE\
+      \ events (id INTEGER PRIMARY KEY, user_id INTEGER, status TEXT, ts TEXT);\"\n    \"INSERT INTO events\
+      \ (id, user_id, status, ts) VALUES (1,9,'only','2024-06-01');\"\n)\nassert solution(conn) == [(9,'only','2024-06-01')],\
+      \ solution(conn)\n"
   timeout: 8
 hints:
 - order: 1
-  cost: 15
-  content: ROW_NUMBER() OVER (PARTITION BY user_id ORDER BY ts DESC) gives each user's newest event the number 1. Filter to rn = 1 in an outer query (a CTE is the clean way).
+  cost: 0
+  content: 'Where to look: Run `systemctl status mysqld` and tail `/var/log/mysqld.log`.'
 - order: 2
   cost: 25
-  content: Two events can share a ts. Add id DESC to the window's ORDER BY so the tie is broken deterministically and the later row wins.
+  content: 'Diagnostic steps:
+
+    1. Read the error log for InnoDB or permission failures.
+
+    2. Check disk space with `df -h`.
+
+    3. Verify `my.cnf` for bad paths or bind-address.'
 - order: 3
-  cost: 35
-  content: 'Run CREATE INDEX IF NOT EXISTS idx_events_user_ts ON events(user_id, ts) first. With it, a WHERE user_id = ? ... ORDER BY ts query becomes an index SEARCH (a seek + ordered range) instead of a full table SCAN.'
+  cost: 50
+  content: 'Exact fix + verification:
+
+    1. Fix config or ownership under `/var/lib/mysql`.
+
+    2. `systemctl restart mysqld`.
+
+    3. Confirm `systemctl is-active mysqld` returns active.
+
+
+    WHY: MySQL often fails silently until you read the error log.'
+summary: Complete the keep only the latest event per user (and index it) mysql lab and verify success
+  with the checker
+estimated_minutes: 30
+xp_reward: 100
+prerequisites:
+- Basic mysql literacy
+tags:
+- do
+- hands-on
+- mysql
+linked_tutorial: mysql-fundamentals
+what_you_will_learn:
+- Rank each user's events newest-first with ROW_NUMBER() in a CTE
+- Keep only rank 1 to get one current row per user
+- Break ties deterministically when two events share a timestamp
+- Add a (user_id, ts) index so a single-user lookup uses an index SEARCH, not a full SCAN
+environment:
+  nodes:
+  - role: primary
+    os: FixitLab MySQL instance
+    hostname: lab-primary
+    ip: 127.0.0.1
+    specs: local offline simulation
+  pre_installed:
+  - bash
+  - coreutils
+  - journalctl
+  - mysql
+  - systemctl
+  credentials:
+  - user: root
+    password: lab123
+tasks:
+- id: task_1
+  title: Keep Only the Latest Event Per User (and Index It)
+  description: Restore healthy behavior for Keep Only the Latest Event Per User (and Index It) by investigating
+    the failure, applying the smallest safe fix, and validating the outcome.
+  background: 'This mysql lab teaches systematic troubleshooting: observe, hypothesize, change, verify.'
+  validation:
+    type: custom_script
+    script: hidden_tests
+    error_message: One or more hidden tests failed. Read the public test output, fix your solution, and
+      submit again.
+solution:
+  summary: The solution passes all hidden tests by implementing the required behavior in code.
+  files_changed: []
+  commands_run: []
+  reference_docs: mysql-fundamentals
+guided_mode:
+  enabled: true
+  steps:
+  - step: 1
+    title: Inspect current state
+    instruction: Run a read-only diagnostic before changing anything.
+    command: check.sh
+    expected_output: Output shows the current failure mode
+    explanation: Evidence-first troubleshooting avoids guessing.
+    next_on: command_success
+  - step: 2
+    title: Apply the minimal fix
+    instruction: Make one reversible change aligned with the objectives.
+    command: '# your fix command here'
+    expected_output: State moves toward the objective
+    explanation: Small changes make rollback easy if the hypothesis was wrong.
+    next_on: command_success
+  - step: 3
+    title: Verify with the grader
+    instruction: Run the same verification the checker uses.
+    command: check.sh
+    expected_output: all hidden tests pass
+    explanation: The lab passes only when real state is healthy.
+    next_on: command_success

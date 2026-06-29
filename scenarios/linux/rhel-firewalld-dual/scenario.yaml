@@ -1,7 +1,7 @@
 title: 'RHEL Simulation: Firewall Blocks HTTP (Dual Terminal)'
 slug: sim-rhel-firewalld-dual
-technology: Linux Administration
-category: Linux Administration
+technology: linux
+category: Fix
 difficulty: easy
 time_limit: 900
 max_score: 100
@@ -11,10 +11,29 @@ dual_terminal: true
 infrastructure_type: docker
 jira_priority: Low
 is_free: false
-description: nginx is serving on the database/web server (10.0.0.10) but firewalld is blocking inbound
-  port 80, so remote clients can't reach it. Using the dual-terminal lab, confirm from the SSH client
-  that the request is refused, open HTTP through firewalld on the server console, then verify the remote
-  request succeeds.
+description: 'CONTEXT: A team operating Linux administration needs you to resolve `RHEL Simulation: Firewall
+  Blocks HTTP (Dual Terminal)` during a realistic incident. The business impact is reduced service reliability
+  until the underlying state is repaired.
+
+
+  ENVIRONMENT: You are working in FixitLab''s offline Linux practice server with terminal and config files
+  under /etc and /var. All tools run locally; no paid APIs or external cloud calls are required.
+
+
+  SYMPTOM / STARTING STATE: Dual-terminal lab. primary (10.0.0.10): nginx is active but firewalld blocks
+  port 80. ssh_client: used to `curl http://10.0.0.10` to test connectivity from outside. nginx is serving
+  on the database/web server (10.0.0.10) but firewalld is blocking inbound port 80, so remote clients
+  can''t reach it. Using the dual-terminal lab, confirm from the SSH client that the request is refused,
+  open HTTP through firewalld on the server console, then verify the remote request succeeds.
+
+
+  OBJECTIVE: From the SSH client, confirm curl to the server is refused while the port is blocked; Allow
+  HTTP through firewalld on the server console; Verify the remote curl now returns 200. Success means
+  `check.sh` exits successfully.
+
+
+  WHAT TO AVOID: Do not apply broad destructive changes, skip evidence gathering, or fake completion with
+  marker files — the checker validates real system state.'
 objectives:
 - From the SSH client, confirm curl to the server is refused while the port is blocked
 - Allow HTTP through firewalld on the server console
@@ -23,14 +42,74 @@ initial_state: 'Dual-terminal lab. primary (10.0.0.10): nginx is active but fire
   ssh_client: used to `curl http://10.0.0.10` to test connectivity from outside.'
 hints:
 - order: 1
-  cost: 10
-  content: 'SSH Client pane: `curl -v http://10.0.0.10/` — expect connection refused/timeout because port
-    80 is blocked.'
+  cost: 0
+  content: 'Where to look: Test the config to get the exact file and line: `nginx -t`. It prints the offending
+    directive (e.g. unknown directive "listn").'
 - order: 2
-  cost: 15
-  content: 'Server console: inspect and open it — `firewall-cmd --list-all`, then `firewall-cmd --permanent
-    --add-service=http && firewall-cmd --reload`.'
+  cost: 25
+  content: 'Diagnostic steps:
+
+    1. Run `nginx -t` and note the file path and line number in the error.
+
+    2. Open that file (often `/etc/nginx/nginx.conf` or under `/etc/nginx/conf.d/`).
+
+    3. Compare the bad directive to the nginx docs — typos like `listn` should be `listen`.'
 - order: 3
-  cost: 20
-  content: Back in the SSH Client, retry `curl http://10.0.0.10/` — it now returns the nginx HTML (HTTP
-    200).
+  cost: 50
+  content: 'Exact fix + verification:
+
+    1. Correct the typo on the reported line and save the file.
+
+    2. Re-run `nginx -t` until it reports syntax is ok.
+
+    3. Run `systemctl enable --now nginx`, then `curl -I http://localhost` (expect HTTP 200).
+
+
+    WHY: systemd will not start nginx until `nginx -t` passes.'
+summary: 'Complete the rhel simulation: firewall blocks http (dual terminal) linux lab and verify success
+  with the checker'
+estimated_minutes: 15
+xp_reward: 100
+prerequisites:
+- Basic linux literacy
+tags:
+- fix
+- hands-on
+- linux
+linked_tutorial: linux-fundamentals
+what_you_will_learn:
+- From the SSH client, confirm curl to the server is refused while the port is blocked
+- Allow HTTP through firewalld on the server console
+- Verify the remote curl now returns 200
+environment:
+  nodes:
+  - role: primary
+    os: FixitLab Linux practice server
+    hostname: lab-primary
+    ip: 127.0.0.1
+    specs: local offline simulation
+  pre_installed:
+  - bash
+  - coreutils
+  - journalctl
+  - linux
+  - systemctl
+  credentials:
+  - user: root
+    password: lab123
+tasks:
+- id: task_1
+  title: 'RHEL Simulation: Firewall Blocks HTTP (Dual Terminal)'
+  description: 'Restore healthy behavior for RHEL Simulation: Firewall Blocks HTTP (Dual Terminal) by
+    investigating the failure, applying the smallest safe fix, and validating the outcome.'
+  background: 'This linux lab teaches systematic troubleshooting: observe, hypothesize, change, verify.'
+  validation:
+    type: custom_script
+    script: check.sh
+    error_message: Validation did not pass. Re-read the objectives and Hint 2 diagnostic steps.
+solution:
+  summary: Identify the misconfiguration affecting this linux lab and apply the minimal fix.
+  files_changed: []
+  commands_run:
+  - bash check.sh
+  reference_docs: linux-fundamentals

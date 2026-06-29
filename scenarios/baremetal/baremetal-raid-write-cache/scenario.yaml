@@ -1,7 +1,7 @@
 title: RAID Write Cache Disabled (BBU Failed)
 slug: baremetal-raid-write-cache
-technology: Bare Metal
-category: RAID
+technology: baremetal
+category: Fix
 difficulty: medium
 lab_mode: simulation
 simulation_type: baremetal
@@ -10,7 +10,25 @@ max_score: 100
 is_free: true
 jira_priority: High
 dual_terminal: false
-description: Write performance collapsed because the controller disabled write cache after a BBU failure.
+description: 'CONTEXT: A team operating bare metal operations needs you to resolve `RAID Write Cache Disabled
+  (BBU Failed)` during a realistic incident. The business impact is reduced service reliability until
+  the underlying state is repaired.
+
+
+  ENVIRONMENT: You are working in FixitLab''s offline physical server lab with IPMI, RAID, BIOS, and out-of-band
+  console. All tools run locally; no paid APIs or external cloud calls are required.
+
+
+  SYMPTOM / STARTING STATE: A server whose RAID write cache is off due to BBU state. Write performance
+  collapsed because the controller disabled write cache after a BBU failure.
+
+
+  OBJECTIVE: Confirm the issue: Write IOPS dropped sharply; Apply the documented fix in /etc/raid/cache-policy.cfg;
+  Verify the configuration is corrected. Success means `check.sh` exits successfully.
+
+
+  WHAT TO AVOID: Do not apply broad destructive changes, skip evidence gathering, or fake completion with
+  marker files — the checker validates real system state.'
 initial_state: A server whose RAID write cache is off due to BBU state.
 objectives:
 - 'Confirm the issue: Write IOPS dropped sharply'
@@ -18,11 +36,71 @@ objectives:
 - Verify the configuration is corrected
 hints:
 - order: 1
-  cost: 10
-  content: Write IOPS dropped sharply
+  cost: 0
+  content: 'Where to look: Confirm the issue: Write IOPS dropped sharply'
 - order: 2
-  cost: 15
-  content: Restore BBU/cache policy safely.
+  cost: 25
+  content: 'Diagnostic steps:
+
+    1. Apply the documented fix in /etc/raid/cache-policy.cfg
+
+    2. Verify the configuration is corrected'
 - order: 3
-  cost: 20
-  content: /etc/raid/cache-policy.cfg carries the corrected configuration.
+  cost: 50
+  content: 'Exact fix + verification:
+
+    1. Verify the configuration is corrected.
+
+    2. Re-run the lab checker (`check.sh` or Check Solution).
+
+    3. Confirm every scenario objective is satisfied.
+
+
+    WHY: the grader validates real state — marker files are ignored.'
+summary: Complete the raid write cache disabled (bbu failed) baremetal lab and verify success with the
+  checker
+estimated_minutes: 20
+xp_reward: 100
+prerequisites:
+- Basic baremetal literacy
+tags:
+- baremetal
+- fix
+- hands-on
+linked_tutorial: baremetal-fundamentals
+what_you_will_learn:
+- 'Confirm the issue: Write IOPS dropped sharply'
+- Apply the documented fix in /etc/raid/cache-policy.cfg
+- Verify the configuration is corrected
+environment:
+  nodes:
+  - role: primary
+    os: FixitLab physical server lab
+    hostname: lab-primary
+    ip: 127.0.0.1
+    specs: local offline simulation
+  pre_installed:
+  - baremetal
+  - bash
+  - coreutils
+  - journalctl
+  - systemctl
+  credentials:
+  - user: root
+    password: lab123
+tasks:
+- id: task_1
+  title: RAID Write Cache Disabled (BBU Failed)
+  description: Restore healthy behavior for RAID Write Cache Disabled (BBU Failed) by investigating the
+    failure, applying the smallest safe fix, and validating the outcome.
+  background: 'This baremetal lab teaches systematic troubleshooting: observe, hypothesize, change, verify.'
+  validation:
+    type: custom_script
+    script: check.sh
+    error_message: Validation did not pass. Re-read the objectives and Hint 2 diagnostic steps.
+solution:
+  summary: Identify the misconfiguration affecting this baremetal lab and apply the minimal fix.
+  files_changed: []
+  commands_run:
+  - bash check.sh
+  reference_docs: baremetal-fundamentals

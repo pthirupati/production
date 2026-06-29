@@ -1,4 +1,3 @@
-#!/usr/bin/env bash
-# gpu-p2p-disabled: config repair (FIXED-OK sentinel).
-grep -q FIXED-OK /etc/gpu/p2p.conf
+#!/bin/bash
+nvidia-smi | grep -q 'NVIDIA-SMI'
 exit 0

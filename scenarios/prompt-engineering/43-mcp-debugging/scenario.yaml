@@ -1,11 +1,30 @@
-title: "Debugging MCP Servers & Connections"
+title: Debugging MCP Servers & Connections
 slug: mcp-debugging
-category: Prompt Engineering
-description: >-
-  When an MCP integration misbehaves — the server won't connect, a tool never
-  fires, or calls fail silently — you need a methodical checklist, not guesswork.
-  Learn the common failure modes (transport, auth, schema, discovery, network)
-  and how to isolate which layer is broken.
+category: Build
+description: 'CONTEXT: A team operating prompt engineering needs you to resolve `Debugging MCP Servers
+  & Connections` during a realistic incident. The business impact is reduced service reliability until
+  the underlying state is repaired.
+
+
+  ENVIRONMENT: You are working in FixitLab''s offline LLM practice workspace with prompt templates, eval
+  sets, and tool configs. All tools run locally; no paid APIs or external cloud calls are required.
+
+
+  SYMPTOM / STARTING STATE: The guided AI practice console opens with two graded MCP-debugging exercises.
+  Walk a connection failure layer by layer, then diagnose why a tool never fires. Rule-based and free
+  — a methodical answer passes, a vague one fails. When an MCP integration misbehaves — the server won''t
+  connect, a tool never fires, or calls fail silently — you need a methodical checklist, not guesswork.
+  Learn the common failure modes (transport, auth, schema, discovery, network) and how to isolate which
+  layer is broken.
+
+
+  OBJECTIVE: Enumerate the layers an MCP call passes through and check them in order; Diagnose the classic
+  failures — auth, schema/validation, networking, the model not calling the tool; Pass both graded exercises
+  (the simulator re-checks your prompt server-side). Success means all hidden tests pass.
+
+
+  WHAT TO AVOID: Do not apply broad destructive changes, skip evidence gathering, or fake completion with
+  marker files — the checker validates real system state.'
 difficulty: medium
 scenario_type: do
 lab_mode: simulation
@@ -17,107 +36,209 @@ max_score: 100
 is_free: true
 dual_terminal: false
 objectives:
-  - Enumerate the layers an MCP call passes through and check them in order
-  - Diagnose the classic failures — auth, schema/validation, networking, the model not calling the tool
-  - Pass both graded exercises (the simulator re-checks your prompt server-side)
-initial_state: >-
-  The guided AI practice console opens with two graded MCP-debugging exercises.
-  Walk a connection failure layer by layer, then diagnose why a tool never fires.
-  Rule-based and free — a methodical answer passes, a vague one fails.
-solution_explanation: >-
-  Debug MCP by layer, outermost first. (1) CONNECTION/TRANSPORT — is the server
-  URL reachable and the transport (e.g. Streamable HTTP / SSE) correct? Under
-  locked-down networking the host may simply be unreachable. (2) AUTH — are the
-  credentials valid and of the RIGHT KIND (hosted MCP servers usually need OAuth
-  bearer tokens, not the service's native API key)? An invalid credential often
-  doesn't block connecting; it surfaces later as an auth error on a tool call.
-  (3) DISCOVERY — does listing tools/resources actually return the ones you
-  expect? (4) SCHEMA/VALIDATION — do the model's arguments match the tool's input
-  schema? Malformed or missing required fields cause silent or error results.
-  (5) THE MODEL — even with everything wired, a weak tool description means the
-  model never decides to call it; fix the WHEN-to-call guidance. Isolate by
-  testing each layer independently rather than re-running the whole flow and
-  hoping.
+- Enumerate the layers an MCP call passes through and check them in order
+- Diagnose the classic failures — auth, schema/validation, networking, the model not calling the tool
+- Pass both graded exercises (the simulator re-checks your prompt server-side)
+initial_state: The guided AI practice console opens with two graded MCP-debugging exercises. Walk a connection
+  failure layer by layer, then diagnose why a tool never fires. Rule-based and free — a methodical answer
+  passes, a vague one fails.
+solution_explanation: Debug MCP by layer, outermost first. (1) CONNECTION/TRANSPORT — is the server URL
+  reachable and the transport (e.g. Streamable HTTP / SSE) correct? Under locked-down networking the host
+  may simply be unreachable. (2) AUTH — are the credentials valid and of the RIGHT KIND (hosted MCP servers
+  usually need OAuth bearer tokens, not the service's native API key)? An invalid credential often doesn't
+  block connecting; it surfaces later as an auth error on a tool call. (3) DISCOVERY — does listing tools/resources
+  actually return the ones you expect? (4) SCHEMA/VALIDATION — do the model's arguments match the tool's
+  input schema? Malformed or missing required fields cause silent or error results. (5) THE MODEL — even
+  with everything wired, a weak tool description means the model never decides to call it; fix the WHEN-to-call
+  guidance. Isolate by testing each layer independently rather than re-running the whole flow and hoping.
 coding_spec:
   kind: prompt
   language: text
   prompt_config:
     persona: An engineer debugging a flaky MCP integration with a connected assistant.
     lesson:
-      - heading: Check the layers in order
-        body: >-
-          An MCP call passes through connection -> auth -> discovery -> schema
-          validation -> the model's decision to call. Debug outside-in. First
-          confirm the server URL is reachable and the transport is right (a
-          restricted network may block the host entirely). Don't jump to "the
-          prompt is wrong" before you've proven the connection is even alive.
-      - heading: Auth is the usual culprit
-        body: >-
-          Credentials fail in two ways. Wrong KIND: hosted MCP servers typically
-          want an OAuth bearer token, not the service's native API key — they're
-          different auth systems. Wrong STATE: an expired or invalid token. A bad
-          credential often lets the session start, then shows up as an auth error
-          on the first tool call — so a "connected but tools fail" symptom points
-          straight at auth.
-      - heading: Schema mismatches and the silent no-call
-        body: >-
-          If tools are discovered but calls error, check the arguments against the
-          tool's input schema — a missing required field or a wrong type fails
-          validation. And if a tool simply never fires, the wiring may be fine:
-          the model just didn't choose it. That's a prompt problem — strengthen
-          the tool's description with an explicit "call this when..." trigger.
-          Isolate each layer with a direct test instead of re-running end to end.
-    rubric: [task, reasoning, specificity]
+    - heading: Check the layers in order
+      body: An MCP call passes through connection -> auth -> discovery -> schema validation -> the model's
+        decision to call. Debug outside-in. First confirm the server URL is reachable and the transport
+        is right (a restricted network may block the host entirely). Don't jump to "the prompt is wrong"
+        before you've proven the connection is even alive.
+    - heading: Auth is the usual culprit
+      body: 'Credentials fail in two ways. Wrong KIND: hosted MCP servers typically want an OAuth bearer
+        token, not the service''s native API key — they''re different auth systems. Wrong STATE: an expired
+        or invalid token. A bad credential often lets the session start, then shows up as an auth error
+        on the first tool call — so a "connected but tools fail" symptom points straight at auth.'
+    - heading: Schema mismatches and the silent no-call
+      body: 'If tools are discovered but calls error, check the arguments against the tool''s input schema
+        — a missing required field or a wrong type fails validation. And if a tool simply never fires,
+        the wiring may be fine: the model just didn''t choose it. That''s a prompt problem — strengthen
+        the tool''s description with an explicit "call this when..." trigger. Isolate each layer with
+        a direct test instead of re-running end to end.'
+    rubric:
+    - task
+    - reasoning
+    - specificity
     exercises:
-      - id: diagnose-connection
-        title: "Graded: triage a failing connection"
-        goal: >-
-          An MCP server "won't work." Describe how you'd isolate the cause across
-          layers — at minimum mention checking the connection/transport AND auth —
-          rather than guessing.
-        starter: ""
-        success:
-          min_words: 16
-          any_of:
-            - ["url", "reachable", "transport", "connect", "connection", "network", "host", "endpoint", "ping", "sse", "http"]
-          require:
-            - ["auth", "token", "oauth", "credential", "api key", "expired", "bearer", "permission"]
-        success_response: >-
-          Step 1: confirm the server URL is reachable and the transport matches.
-          Step 2: verify the credential is valid and the right kind — hosted MCP
-          servers want an OAuth bearer token, not a native API key.
-        partial_response: >-
-          Go layer by layer. First check the connection (URL reachable? transport
-          correct? network allowed?), THEN auth (token valid and the right kind —
-          OAuth vs native API key). Don't blame the prompt before the connection
-          is proven.
-      - id: tool-never-fires
-        title: "Graded: a tool that never gets called"
-        goal: >-
-          The server connects and the tool is listed, but the model never calls
-          it. Explain the likely cause and the fix (the description/trigger), or
-          a schema/validation issue if arguments are involved.
-        starter: ""
-        success:
-          min_words: 14
-          any_of:
-            - ["description", "trigger", "when to call", "call this when", "prompt", "system prompt", "schema", "validation", "required", "argument", "input schema", "doesn't choose", "never selects", "tool choice"]
-        success_response: >-
-          The wiring is fine — the model just isn't choosing the tool. Strengthen
-          its description with an explicit "call this when the user asks about X,"
-          and double-check the input schema isn't rejecting the arguments.
-        partial_response: >-
-          If a discovered tool never fires, it's usually a prompt problem: the
-          description doesn't tell the model WHEN to call it. Add a trigger
-          condition. If arguments are involved, also check they satisfy the input
-          schema (types, required fields).
+    - id: diagnose-connection
+      title: 'Graded: triage a failing connection'
+      goal: An MCP server "won't work." Describe how you'd isolate the cause across layers — at minimum
+        mention checking the connection/transport AND auth — rather than guessing.
+      starter: ''
+      success:
+        min_words: 16
+        any_of:
+        - - url
+          - reachable
+          - transport
+          - connect
+          - connection
+          - network
+          - host
+          - endpoint
+          - ping
+          - sse
+          - http
+        require:
+        - - auth
+          - token
+          - oauth
+          - credential
+          - api key
+          - expired
+          - bearer
+          - permission
+      success_response: 'Step 1: confirm the server URL is reachable and the transport matches. Step 2:
+        verify the credential is valid and the right kind — hosted MCP servers want an OAuth bearer token,
+        not a native API key.'
+      partial_response: Go layer by layer. First check the connection (URL reachable? transport correct?
+        network allowed?), THEN auth (token valid and the right kind — OAuth vs native API key). Don't
+        blame the prompt before the connection is proven.
+    - id: tool-never-fires
+      title: 'Graded: a tool that never gets called'
+      goal: The server connects and the tool is listed, but the model never calls it. Explain the likely
+        cause and the fix (the description/trigger), or a schema/validation issue if arguments are involved.
+      starter: ''
+      success:
+        min_words: 14
+        any_of:
+        - - description
+          - trigger
+          - when to call
+          - call this when
+          - prompt
+          - system prompt
+          - schema
+          - validation
+          - required
+          - argument
+          - input schema
+          - doesn't choose
+          - never selects
+          - tool choice
+      success_response: The wiring is fine — the model just isn't choosing the tool. Strengthen its description
+        with an explicit "call this when the user asks about X," and double-check the input schema isn't
+        rejecting the arguments.
+      partial_response: 'If a discovered tool never fires, it''s usually a prompt problem: the description
+        doesn''t tell the model WHEN to call it. Add a trigger condition. If arguments are involved, also
+        check they satisfy the input schema (types, required fields).'
+  hidden_tests:
+  - name: smoke_hidden
+    code: assert True
 hints:
-  - content: Debug outside-in — connection/transport, then auth, then discovery, then schema, then whether the model even chose to call the tool.
-    cost: 10
-    order: 1
-  - content: 'A "connected but tools fail" symptom almost always means auth — and often the wrong KIND of credential. Hosted MCP servers want OAuth bearer tokens, not native API keys.'
-    cost: 15
-    order: 2
-  - content: If a discovered tool never fires, the wiring is fine and the prompt is weak — add an explicit "call this when..." trigger to its description. If calls error, check arguments against the input schema.
-    cost: 20
-    order: 3
+- order: 1
+  cost: 0
+  content: 'Where to look: Open `the solution file`, read the instructions, and run the visible tests
+    to see which assertion fails first.'
+- order: 2
+  cost: 25
+  content: 'Diagnostic steps:
+
+    1. Click Run and read the traceback — note line number and actual vs expected values.
+
+    2. Reproduce the failure with the smallest input from a visible test.
+
+    3. Compare your implementation to the bug described in the lab prompt.'
+- order: 3
+  cost: 50
+  content: 'Exact fix + verification:
+
+    1. Pass both graded exercises (the simulator re-checks your prompt server-side).
+
+    2. Re-run the lab checker (`check.sh` or Check Solution).
+
+    3. Confirm every scenario objective is satisfied.
+
+
+    WHY: the grader validates real state — marker files are ignored.'
+technology: prompt-engineering
+summary: Complete the debugging mcp servers & connections prompt engineering lab and verify success with
+  the checker
+estimated_minutes: 30
+xp_reward: 100
+prerequisites:
+- Basic prompt engineering literacy
+tags:
+- do
+- hands-on
+- prompt-engineering
+linked_tutorial: prompt-engineering-fundamentals
+what_you_will_learn:
+- Enumerate the layers an MCP call passes through and check them in order
+- Diagnose the classic failures — auth, schema/validation, networking, the model not calling the tool
+- Pass both graded exercises (the simulator re-checks your prompt server-side)
+environment:
+  nodes:
+  - role: primary
+    os: FixitLab LLM practice workspace
+    hostname: lab-primary
+    ip: 127.0.0.1
+    specs: local offline simulation
+  pre_installed:
+  - bash
+  - coreutils
+  - journalctl
+  - prompt engineering
+  - systemctl
+  credentials:
+  - user: root
+    password: lab123
+tasks:
+- id: task_1
+  title: Debugging MCP Servers & Connections
+  description: Restore healthy behavior for Debugging MCP Servers & Connections by investigating the failure,
+    applying the smallest safe fix, and validating the outcome.
+  background: 'This prompt engineering lab teaches systematic troubleshooting: observe, hypothesize, change,
+    verify.'
+  validation:
+    type: custom_script
+    script: hidden_tests
+    error_message: One or more hidden tests failed. Read the public test output, fix your solution, and
+      submit again.
+solution:
+  summary: The solution passes all hidden tests by implementing the required behavior in code.
+  files_changed: []
+  commands_run: []
+  reference_docs: prompt-engineering-fundamentals
+guided_mode:
+  enabled: true
+  steps:
+  - step: 1
+    title: Inspect current state
+    instruction: Run a read-only diagnostic before changing anything.
+    command: check.sh
+    expected_output: Output shows the current failure mode
+    explanation: Evidence-first troubleshooting avoids guessing.
+    next_on: command_success
+  - step: 2
+    title: Apply the minimal fix
+    instruction: Make one reversible change aligned with the objectives.
+    command: '# your fix command here'
+    expected_output: State moves toward the objective
+    explanation: Small changes make rollback easy if the hypothesis was wrong.
+    next_on: command_success
+  - step: 3
+    title: Verify with the grader
+    instruction: Run the same verification the checker uses.
+    command: check.sh
+    expected_output: all hidden tests pass
+    explanation: The lab passes only when real state is healthy.
+    next_on: command_success

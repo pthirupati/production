@@ -1,7 +1,7 @@
-title: 'Kubernetes: Configmaps — Production Readiness'
+title: Configmaps — Production Lab
 slug: academy-kubernetes-085-production-configmaps-9
-technology: Kubernetes
-category: Production
+technology: kubernetes
+category: Project
 difficulty: medium
 scenario_type: fix
 lab_mode: simulation
@@ -11,17 +11,37 @@ max_score: 100
 is_free: false
 infrastructure_type: docker
 jira_priority: Medium
-description: Kubernetes operations lab. One or more pods are **not Running** — workloads for Production
-  Readiness cannot serve traffic. Inspect with `kubectl get pods`, read `kubectl describe pod` events,
-  fix the root cause, and confirm all pods Running.
+description: 'CONTEXT: A team operating Kubernetes needs you to resolve `kubernetes: Configmaps — Production
+  Readiness` during a realistic incident. The business impact is reduced service reliability until the
+  underlying state is repaired.
+
+
+  ENVIRONMENT: You are working in FixitLab''s offline Kubernetes cluster with kubectl, manifests, and
+  cluster resources. All tools run locally; no paid APIs or external cloud calls are required.
+
+
+  SYMPTOM / STARTING STATE: A feature fix works in dev, but ConfigMaps is not production ready — missing
+  guardrails, runbooks, or capacity checks. Production readiness for ConfigMaps. Harden, document, and
+  validate key/value config, mounted files, envFrom, and rollout after config changes so the change is
+  safe to run during a maintenance window.
+
+
+  OBJECTIVE: Day-2 ConfigMaps work completes safely in this environment; Changes are verified with before/after
+  checks; The system remains stable for dependent teams. Success means `kubectl get pods` shows every
+  pod Running.
+
+
+  WHAT TO AVOID: Do not apply broad destructive changes, skip evidence gathering, or fake completion with
+  marker files — the checker validates real system state.'
 objectives:
-- All pods in the default namespace are Running
-- '`kubectl get pods` shows every pod Running'
-- The deployment survives `kubectl get pods` re-check
-initial_state: The cluster is up but at least one pod is CrashLoopBackOff or Pending.
+- Day-2 ConfigMaps work completes safely in this environment
+- Changes are verified with before/after checks
+- The system remains stable for dependent teams
+initial_state: A feature fix works in dev, but ConfigMaps is not production ready — missing guardrails,
+  runbooks, or capacity checks.
 hints:
 - order: 1
-  cost: 10
+  cost: 0
   content: 'Orient yourself before changing anything:
 
     1. Inspect the current state — `kubectl get cm`, mounted paths in pods, and `kubectl describe pod`.
@@ -31,17 +51,17 @@ hints:
     3. Recall the core idea: key/value config, mounted files, envFrom, and rollout after config changes.
     Form one hypothesis before you act.'
 - order: 2
-  cost: 15
-  content: 'Plan your approach (still no spoilers):
-
-    1. Confirm the exact gap between current and desired state for ConfigMaps.
-
-    2. Decide the single smallest change that moves you toward the objective.
-
-    3. Capture evidence (command output / status) before the change so you can prove it worked afterward.'
-- order: 3
   cost: 25
-  content: 'Guided walkthrough:
+  content: 'Diagnostic steps:
+
+    1. `kubectl get pods` — note CrashLoopBackOff, ImagePullBackOff, or Pending.
+
+    2. `kubectl describe pod <name>` — read Events at the bottom.
+
+    3. `kubectl logs <name> [--previous]` if the container restarted.'
+- order: 3
+  cost: 50
+  content: 'Exact fix + verification:
 
     1. Re-check the current state — `kubectl get cm`, mounted paths in pods, and `kubectl describe pod`.
 
@@ -50,4 +70,76 @@ hints:
 
     3. Verify the result — pods see updated config after rollout and apps start cleanly.
 
-    4. Click Check Solution once `kubectl get pods` shows every pod Running.'
+    4. Click Check Solution once the objective is met (graded on real state, not a marker file).'
+summary: Complete the configmaps — production lab kubernetes lab and verify success with the checker
+estimated_minutes: 20
+xp_reward: 100
+prerequisites:
+- Basic kubernetes literacy
+tags:
+- fix
+- hands-on
+- kubernetes
+linked_tutorial: kubernetes-fundamentals
+what_you_will_learn:
+- Day-2 ConfigMaps work completes safely in this environment
+- Changes are verified with before/after checks
+- The system remains stable for dependent teams
+environment:
+  nodes:
+  - role: primary
+    os: FixitLab Kubernetes cluster
+    hostname: lab-primary
+    ip: 127.0.0.1
+    specs: local offline simulation
+  pre_installed:
+  - bash
+  - coreutils
+  - helm
+  - kubectl
+  - kubernetes
+  credentials:
+  - user: root
+    password: lab123
+tasks:
+- id: task_1
+  title: Configmaps — Production Lab
+  description: Restore healthy behavior for Configmaps — Production Lab by investigating the failure,
+    applying the smallest safe fix, and validating the outcome.
+  background: 'This kubernetes lab teaches systematic troubleshooting: observe, hypothesize, change, verify.'
+  validation:
+    type: k8s_resource_state
+    resource_kind: Pod
+    resource_name: all
+    namespace: default
+    expected_state: Running
+    error_message: One or more pods are not Running. Use kubectl describe pod and kubectl logs.
+solution:
+  summary: Identify the misconfiguration affecting this kubernetes lab and apply the minimal fix.
+  files_changed: []
+  commands_run: []
+  reference_docs: kubernetes-fundamentals
+guided_mode:
+  enabled: true
+  steps:
+  - step: 1
+    title: Inspect current state
+    instruction: Run a read-only diagnostic before changing anything.
+    command: check.sh
+    expected_output: Output shows the current failure mode
+    explanation: Evidence-first troubleshooting avoids guessing.
+    next_on: command_success
+  - step: 2
+    title: Apply the minimal fix
+    instruction: Make one reversible change aligned with the objectives.
+    command: '# your fix command here'
+    expected_output: State moves toward the objective
+    explanation: Small changes make rollback easy if the hypothesis was wrong.
+    next_on: command_success
+  - step: 3
+    title: Verify with the grader
+    instruction: Run the same verification the checker uses.
+    command: check.sh
+    expected_output: '`kubectl get pods` shows every pod Running'
+    explanation: The lab passes only when real state is healthy.
+    next_on: command_success

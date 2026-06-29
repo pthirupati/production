@@ -1,7 +1,7 @@
 title: 'RHEL Simulation: GPU Fallen Off Bus'
 slug: sim-rhel-gpu-fallen-off
-technology: Linux Administration
-category: GPU / NVIDIA
+technology: linux
+category: Fix
 difficulty: hard
 time_limit: 1200
 max_score: 100
@@ -10,10 +10,29 @@ simulation_type: gpu
 infrastructure_type: docker
 jira_priority: High
 is_free: false
-description: On a RHEL GPU node, nvidia-smi fails because the GPU has fallen off the PCIe bus — the driver
-  was loaded but the device stopped responding (an Xid/NVRM bus error). Use kernel logs to confirm the
-  cause, then reload the NVIDIA kernel module (or reset the device) to bring the GPU back so nvidia-smi
-  enumerates it again.
+description: 'CONTEXT: A team operating Linux administration needs you to resolve `RHEL Simulation: GPU
+  Fallen Off Bus` during a realistic incident. The business impact is reduced service reliability until
+  the underlying state is repaired.
+
+
+  ENVIRONMENT: You are working in FixitLab''s offline Linux practice server with terminal and config files
+  under /etc and /var. All tools run locally; no paid APIs or external cloud calls are required.
+
+
+  SYMPTOM / STARTING STATE: Simulated RHEL GPU node. The NVIDIA driver is loaded, but the GPU has fallen
+  off the bus, so `nvidia-smi` errors and CUDA workloads can''t run. On a RHEL GPU node, nvidia-smi fails
+  because the GPU has fallen off the PCIe bus — the driver was loaded but the device stopped responding
+  (an Xid/NVRM bus error). Use kernel logs to confirm the cause, then reload the NVIDIA kernel module
+  (or reset the device) to bring the GPU back so nvidia-smi enumerates it again.
+
+
+  OBJECTIVE: Confirm the GPU failure with nvidia-smi; Inspect dmesg for NVRM/Xid bus errors; Reload the
+  nvidia kernel module (or reset) and verify nvidia-smi lists the GPU. Success means `nvidia-smi` includes
+  `NVIDIA-SMI`.
+
+
+  WHAT TO AVOID: Do not apply broad destructive changes, skip evidence gathering, or fake completion with
+  marker files — the checker validates real system state.'
 objectives:
 - Confirm the GPU failure with nvidia-smi
 - Inspect dmesg for NVRM/Xid bus errors
@@ -22,14 +41,73 @@ initial_state: Simulated RHEL GPU node. The NVIDIA driver is loaded, but the GPU
   so `nvidia-smi` errors and CUDA workloads can't run.
 hints:
 - order: 1
-  cost: 10
-  content: 'Confirm and gather evidence: `nvidia-smi` fails; check the kernel log for the bus drop: `dmesg
-    | grep -i nvrm` (look for an Xid error and "fallen off the bus").'
+  cost: 0
+  content: 'Where to look: Run `nvidia-smi` and `dmesg | grep -i nvidia` for driver visibility.'
 - order: 2
-  cost: 20
-  content: 'Stop any GPU users, then reload the driver stack: `rmmod nvidia_uvm nvidia_drm nvidia_modeset
-    nvidia` followed by `modprobe nvidia`.'
+  cost: 25
+  content: 'Diagnostic steps:
+
+    1. Check if the GPU appears in `lspci | grep -i nvidia`.
+
+    2. Verify the correct driver module is loaded (`lsmod | grep nvidia`).
+
+    3. Look for Xid errors or fallen-off-bus messages in dmesg.'
 - order: 3
-  cost: 30
-  content: Re-run `nvidia-smi` — the GPU is enumerated again. If a reload isn't enough, a device reset
-    (`nvidia-smi --gpu-reset`) or a reboot clears a hard bus fault.
+  cost: 50
+  content: 'Exact fix + verification:
+
+    1. Reload driver, rebind PCI, or fix persistence mode per the scenario.
+
+    2. Re-run `nvidia-smi`.
+
+    3. Confirm GPU name and memory report without errors.
+
+
+    WHY: workloads need the driver to see the device.'
+summary: 'Complete the rhel simulation: gpu fallen off bus linux lab and verify success with the checker'
+estimated_minutes: 20
+xp_reward: 100
+prerequisites:
+- Basic linux literacy
+tags:
+- fix
+- hands-on
+- linux
+linked_tutorial: linux-fundamentals
+what_you_will_learn:
+- Confirm the GPU failure with nvidia-smi
+- Inspect dmesg for NVRM/Xid bus errors
+- Reload the nvidia kernel module (or reset) and verify nvidia-smi lists the GPU
+environment:
+  nodes:
+  - role: primary
+    os: FixitLab Linux practice server
+    hostname: lab-primary
+    ip: 127.0.0.1
+    specs: local offline simulation
+  pre_installed:
+  - bash
+  - coreutils
+  - journalctl
+  - linux
+  - systemctl
+  credentials:
+  - user: root
+    password: lab123
+tasks:
+- id: task_1
+  title: 'RHEL Simulation: GPU Fallen Off Bus'
+  description: 'Restore healthy behavior for RHEL Simulation: GPU Fallen Off Bus by investigating the
+    failure, applying the smallest safe fix, and validating the outcome.'
+  background: 'This linux lab teaches systematic troubleshooting: observe, hypothesize, change, verify.'
+  validation:
+    type: command_output
+    command: nvidia-smi
+    expected_output: NVIDIA-SMI
+    error_message: GPU health check still fails. Verify driver and device visibility.
+solution:
+  summary: Identify the misconfiguration affecting this linux lab and apply the minimal fix.
+  files_changed: []
+  commands_run:
+  - nvidia-smi
+  reference_docs: linux-fundamentals

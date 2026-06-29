@@ -1,7 +1,7 @@
 title: AWS Lambda Hitting Concurrency Limit
 slug: aws-lambda-concurrency-throttle
-technology: Terraform
-category: Lambda
+technology: terraform
+category: Fix
 difficulty: medium
 lab_mode: simulation
 simulation_type: terraform
@@ -10,8 +10,26 @@ max_score: 100
 is_free: true
 jira_priority: High
 dual_terminal: false
-description: A Lambda function is being throttled because reserved concurrency is set too low for the
-  traffic. Raise reserved/ provisioned concurrency appropriately and confirm throttles stop.
+description: 'CONTEXT: A team operating Terraform IaC needs you to resolve `AWS Lambda Hitting Concurrency
+  Limit` during a realistic incident. The business impact is reduced service reliability until the underlying
+  state is repaired.
+
+
+  ENVIRONMENT: You are working in FixitLab''s offline Terraform workspace with HCL files, state, and plan/apply
+  workflow. All tools run locally; no paid APIs or external cloud calls are required.
+
+
+  SYMPTOM / STARTING STATE: An AWS Lambda function whose reserved concurrency is far below demand, causing
+  Throttles and 429s. A Lambda function is being throttled because reserved concurrency is set too low
+  for the traffic. Raise reserved/ provisioned concurrency appropriately and confirm throttles stop.
+
+
+  OBJECTIVE: Confirm the function is throttling on concurrency; Adjust reserved/provisioned concurrency
+  and apply; Verify throttle metrics drop to zero. Success means `check.sh` exits successfully.
+
+
+  WHAT TO AVOID: Do not apply broad destructive changes, skip evidence gathering, or fake completion with
+  marker files — the checker validates real system state.'
 initial_state: An AWS Lambda function whose reserved concurrency is far below demand, causing Throttles
   and 429s.
 objectives:
@@ -20,11 +38,68 @@ objectives:
 - Verify throttle metrics drop to zero
 hints:
 - order: 1
-  cost: 10
-  content: CloudWatch Throttles > 0 for the function.
+  cost: 0
+  content: 'Where to look: Confirm the function is throttling on concurrency'
 - order: 2
-  cost: 15
-  content: Raise reserved_concurrent_executions and apply.
+  cost: 25
+  content: 'Diagnostic steps:
+
+    1. Adjust reserved/provisioned concurrency and apply
+
+    2. Verify throttle metrics drop to zero'
 - order: 3
-  cost: 20
-  content: Throttles return to 0.
+  cost: 50
+  content: 'Exact fix + verification:
+
+    1. Verify throttle metrics drop to zero.
+
+    2. Re-run the lab checker (`check.sh` or Check Solution).
+
+    3. Confirm every scenario objective is satisfied.
+
+
+    WHY: the grader validates real state — marker files are ignored.'
+summary: Complete the aws lambda hitting concurrency limit terraform lab and verify success with the checker
+estimated_minutes: 25
+xp_reward: 100
+prerequisites:
+- Basic terraform literacy
+tags:
+- fix
+- hands-on
+- terraform
+linked_tutorial: terraform-fundamentals
+what_you_will_learn:
+- Confirm the function is throttling on concurrency
+- Adjust reserved/provisioned concurrency and apply
+- Verify throttle metrics drop to zero
+environment:
+  nodes:
+  - role: primary
+    os: FixitLab Terraform workspace
+    hostname: lab-primary
+    ip: 127.0.0.1
+    specs: local offline simulation
+  pre_installed:
+  - bash
+  - coreutils
+  - terraform
+  credentials:
+  - user: root
+    password: lab123
+tasks:
+- id: task_1
+  title: AWS Lambda Hitting Concurrency Limit
+  description: Restore healthy behavior for AWS Lambda Hitting Concurrency Limit by investigating the
+    failure, applying the smallest safe fix, and validating the outcome.
+  background: 'This terraform lab teaches systematic troubleshooting: observe, hypothesize, change, verify.'
+  validation:
+    type: custom_script
+    script: check.sh
+    error_message: Validation did not pass. Re-read the objectives and Hint 2 diagnostic steps.
+solution:
+  summary: Identify the misconfiguration affecting this terraform lab and apply the minimal fix.
+  files_changed: []
+  commands_run:
+  - bash check.sh
+  reference_docs: terraform-fundamentals

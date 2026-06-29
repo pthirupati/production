@@ -1,10 +1,27 @@
 title: Fix parseInt Radix in toBase10
 slug: js-fix-parseint-radix
-category: JavaScript Development
-description: 'toBase10(str) parses a decimal numeric string, but it calls parseInt(str) without a radix.
-  For inputs with leading zeros this is fragile, and the intent is explicit base-10 parsing. Also it returns
-  NaN silently for bad input where it should throw. Fix: always pass radix 10 and throw a RangeError on
-  non-numeric input.'
+category: Fix
+description: 'CONTEXT: A team operating JavaScript needs you to resolve `Fix parseInt Radix in toBase10`
+  during a realistic incident. The business impact is reduced service reliability until the underlying
+  state is repaired.
+
+
+  ENVIRONMENT: You are working in FixitLab''s offline JavaScript practice project with modules, browser
+  console, and Node tooling. All tools run locally; no paid APIs or external cloud calls are required.
+
+
+  SYMPTOM / STARTING STATE: toBase10(str) parses a decimal numeric string, but it calls parseInt(str)
+  without a radix. For inputs with leading zeros this is fragile, and the intent is explicit base-10 parsing.
+  Also it returns NaN silently for bad input where it should throw. Fix: always pass radix 10 and throw
+  a RangeError on non-numeric input.
+
+
+  OBJECTIVE: Always specify radix 10 to parseInt; Parse leading-zero strings as decimal (not octal-ish);
+  Throw on input that does not parse. Success means all hidden tests pass.
+
+
+  WHAT TO AVOID: Do not apply broad destructive changes, skip evidence gathering, or fake completion with
+  marker files — the checker validates real system state.'
 difficulty: easy
 scenario_type: fix
 lab_mode: simulation
@@ -23,53 +40,123 @@ initial_state: 'toBase10(str) parses a decimal numeric string, but it calls pars
   For inputs with leading zeros this is fragile, and the intent is explicit base-10 parsing. Also it returns
   NaN silently for bad input where it should throw. Fix: always pass radix 10 and throw a RangeError on
   non-numeric input.'
-solution_explanation: |
-  Specifying radix 10 makes parsing unambiguous, and checking for NaN turns silent bad input into an explicit RangeError.
+solution_explanation: 'Specifying radix 10 makes parsing unambiguous, and checking for NaN turns silent
+  bad input into an explicit RangeError.
+
+  '
 coding_spec:
   language: javascript
   entrypoint: solution.js
   kind: fix
-  instructions: |
-    Fix toBase10(str): return the base-10 integer value. Use radix 10 explicitly. If the result is NaN, throw a RangeError('not a number').
-      toBase10('010') -> 10, toBase10('42') -> 42
-    Click Run to try it, then Check Solution to grade against all tests.
+  instructions: "Fix toBase10(str): return the base-10 integer value. Use radix 10 explicitly. If the\
+    \ result is NaN, throw a RangeError('not a number').\n  toBase10('010') -> 10, toBase10('42') -> 42\n\
+    Click Run to try it, then Check Solution to grade against all tests.\n"
   files:
   - path: solution.js
-    content: |
-      function toBase10(str) {
-        return parseInt(str); // no radix; returns NaN silently on bad input
-      }
+    content: "function toBase10(str) {\n  return parseInt(str); // no radix; returns NaN silently on bad\
+      \ input\n}\n"
     readonly: false
   visible_tests:
   - name: plain number
-    code: |
-      assert(toBase10('42') === 42);
+    code: 'assert(toBase10(''42'') === 42);
+
+      '
   - name: leading zeros decimal
-    code: |
-      assert(toBase10('010') === 10, toBase10('010'));
+    code: 'assert(toBase10(''010'') === 10, toBase10(''010''));
+
+      '
   hidden_tests:
   - name: negative
-    code: |
-      assert(toBase10('-7') === -7);
+    code: 'assert(toBase10(''-7'') === -7);
+
+      '
   - name: trailing text parses prefix
-    code: |
-      assert(toBase10('15px') === 15);
+    code: 'assert(toBase10(''15px'') === 15);
+
+      '
   - name: throws on non-numeric
-    code: |
-      let threw = false;
-      try { toBase10('abc'); } catch (e) { threw = e instanceof RangeError; }
-      assert(threw, 'should throw RangeError');
+    code: 'let threw = false;
+
+      try { toBase10(''abc''); } catch (e) { threw = e instanceof RangeError; }
+
+      assert(threw, ''should throw RangeError'');
+
+      '
   - name: zero
-    code: |
-      assert(toBase10('0') === 0);
+    code: 'assert(toBase10(''0'') === 0);
+
+      '
   timeout: 8
 hints:
 - order: 1
-  cost: 10
-  content: parseInt without a radix is ambiguous and returns NaN quietly for 'abc'.
+  cost: 0
+  content: 'Where to look: Open `solution.js`, read the instructions, and run the visible tests to see
+    which assertion fails first.'
 - order: 2
-  cost: 20
-  content: 'Always pass 10 as the second argument: parseInt(str, 10).'
+  cost: 25
+  content: 'Diagnostic steps:
+
+    1. Click Run and read the traceback — note line number and actual vs expected values.
+
+    2. Reproduce the failure with the smallest input from a visible test.
+
+    3. Compare your implementation to the bug described in the lab prompt.'
 - order: 3
-  cost: 30
-  content: After parsing, if Number.isNaN(n) throw new RangeError('not a number').
+  cost: 50
+  content: 'Exact fix + verification:
+
+    1. Throw on input that does not parse.
+
+    2. Re-run the lab checker (`check.sh` or Check Solution).
+
+    3. Confirm every scenario objective is satisfied.
+
+
+    WHY: the grader validates real state — marker files are ignored.'
+technology: javascript
+summary: Complete the fix parseint radix in tobase10 javascript lab and verify success with the checker
+estimated_minutes: 25
+xp_reward: 100
+prerequisites:
+- Basic javascript literacy
+tags:
+- fix
+- hands-on
+- javascript
+linked_tutorial: javascript-fundamentals
+what_you_will_learn:
+- Always specify radix 10 to parseInt
+- Parse leading-zero strings as decimal (not octal-ish)
+- Throw on input that does not parse
+environment:
+  nodes:
+  - role: primary
+    os: FixitLab JavaScript practice project
+    hostname: lab-primary
+    ip: 127.0.0.1
+    specs: local offline simulation
+  pre_installed:
+  - bash
+  - coreutils
+  - javascript
+  - journalctl
+  - systemctl
+  credentials:
+  - user: root
+    password: lab123
+tasks:
+- id: task_1
+  title: Fix parseInt Radix in toBase10
+  description: Restore healthy behavior for Fix parseInt Radix in toBase10 by investigating the failure,
+    applying the smallest safe fix, and validating the outcome.
+  background: 'This javascript lab teaches systematic troubleshooting: observe, hypothesize, change, verify.'
+  validation:
+    type: custom_script
+    script: hidden_tests
+    error_message: One or more hidden tests failed. Read the public test output, fix your solution, and
+      submit again.
+solution:
+  summary: The solution passes all hidden tests by implementing the required behavior in code.
+  files_changed: []
+  commands_run: []
+  reference_docs: javascript-fundamentals

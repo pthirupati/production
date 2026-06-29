@@ -1,11 +1,26 @@
-title: "Context Pruning in Long Sessions"
+title: Context Pruning in Long Sessions
 slug: context-pruning
-category: Prompt Engineering
-description: >-
-  In long conversations and agent runs, the context window fills with stale turns,
-  old tool output, and dead ends — raising cost and degrading focus. Learn to prune
-  and compress context: summarize old history, drop irrelevant material, and keep
-  only what the current step needs.
+category: Build
+description: 'CONTEXT: A team operating prompt engineering needs you to resolve `Context Pruning in Long
+  Sessions` during a realistic incident. The business impact is reduced service reliability until the
+  underlying state is repaired.
+
+
+  ENVIRONMENT: You are working in FixitLab''s offline LLM practice workspace with prompt templates, eval
+  sets, and tool configs. All tools run locally; no paid APIs or external cloud calls are required.
+
+
+  SYMPTOM / STARTING STATE: The guided AI practice console opens. Practice compressing a long history
+  into a tight running summary so the model keeps only what matters. Rule-based and free.
+
+
+  OBJECTIVE: Explain why a bloated context raises cost and hurts quality ("context rot"); Apply pruning
+  strategies — summarize history, drop stale/irrelevant content; Write a prompt that compresses prior
+  context into a compact running summary. Success means all hidden tests pass.
+
+
+  WHAT TO AVOID: Do not apply broad destructive changes, skip evidence gathering, or fake completion with
+  marker files — the checker validates real system state.'
 difficulty: medium
 scenario_type: do
 lab_mode: simulation
@@ -17,23 +32,19 @@ max_score: 100
 is_free: true
 dual_terminal: false
 objectives:
-  - Explain why a bloated context raises cost and hurts quality ("context rot")
-  - Apply pruning strategies — summarize history, drop stale/irrelevant content
-  - Write a prompt that compresses prior context into a compact running summary
-initial_state: >-
-  The guided AI practice console opens. Practice compressing a long history into a
-  tight running summary so the model keeps only what matters. Rule-based and free.
-solution_explanation: >-
-  Every token in context costs money and competes for the model's attention. In
-  long chats and agent loops the window fills with old turns, verbose tool outputs,
-  and abandoned attempts - raising cost and causing "context rot," where the signal
-  you care about gets buried and the model drifts. Pruning strategies - (1)
-  SUMMARIZE older history into a compact running summary and drop the raw turns; (2)
-  REMOVE stale or irrelevant material (closed sub-tasks, superseded plans, huge
-  pasted blobs you've already used); (3) KEEP only what the current step needs - the
-  goal, the active sub-task, the most recent relevant facts; (4) re-inject key
-  constraints near the end so they stay salient. In Claude Code this maps to
-  /compact and keeping a tight CLAUDE.md. Prune deliberately rather than letting
+- Explain why a bloated context raises cost and hurts quality ("context rot")
+- Apply pruning strategies — summarize history, drop stale/irrelevant content
+- Write a prompt that compresses prior context into a compact running summary
+initial_state: The guided AI practice console opens. Practice compressing a long history into a tight
+  running summary so the model keeps only what matters. Rule-based and free.
+solution_explanation: Every token in context costs money and competes for the model's attention. In long
+  chats and agent loops the window fills with old turns, verbose tool outputs, and abandoned attempts
+  - raising cost and causing "context rot," where the signal you care about gets buried and the model
+  drifts. Pruning strategies - (1) SUMMARIZE older history into a compact running summary and drop the
+  raw turns; (2) REMOVE stale or irrelevant material (closed sub-tasks, superseded plans, huge pasted
+  blobs you've already used); (3) KEEP only what the current step needs - the goal, the active sub-task,
+  the most recent relevant facts; (4) re-inject key constraints near the end so they stay salient. In
+  Claude Code this maps to /compact and keeping a tight CLAUDE.md. Prune deliberately rather than letting
   context grow unbounded.
 coding_spec:
   kind: prompt
@@ -41,78 +52,175 @@ coding_spec:
   prompt_config:
     persona: An assistant that keeps a tight, relevant working context.
     lesson:
-      - heading: Why a fat context hurts
-        body: >-
-          Bigger context isn't better. Beyond the direct token cost, a window
-          crammed with old turns, long tool dumps, and dead-end attempts buries the
-          relevant signal - models can lose track of the goal and latch onto stale
-          details. This "context rot" is why a focused, pruned context often
-          outperforms a giant one.
-      - heading: Pruning strategies
-        body: >-
-          Three moves. SUMMARIZE - compress earlier history into a short running
-          summary ("Decisions so far: ...; Open task: ...") and discard the raw
-          turns. DROP - remove material that's no longer relevant - resolved
-          sub-tasks, superseded plans, big blobs you've already extracted what you
-          need from. KEEP-FOCUSED - retain only the goal, the active sub-task, and
-          the most recent pertinent facts. Re-state critical constraints near the end
-          so they stay salient.
-      - heading: In practice
-        body: >-
-          Long agent runs need this most - tool outputs pile up fast. Periodically
-          replace history with a summary, evict completed-step detail, and carry
-          forward a compact state object. In Claude Code, /compact summarizes the
-          conversation and a lean CLAUDE.md keeps durable context small. The
-          discipline - decide what to KEEP rather than letting context accrete by
-          default.
-    rubric: [context, task, constraints, specificity]
+    - heading: Why a fat context hurts
+      body: Bigger context isn't better. Beyond the direct token cost, a window crammed with old turns,
+        long tool dumps, and dead-end attempts buries the relevant signal - models can lose track of the
+        goal and latch onto stale details. This "context rot" is why a focused, pruned context often outperforms
+        a giant one.
+    - heading: Pruning strategies
+      body: 'Three moves. SUMMARIZE - compress earlier history into a short running summary ("Decisions
+        so far: ...; Open task: ...") and discard the raw turns. DROP - remove material that''s no longer
+        relevant - resolved sub-tasks, superseded plans, big blobs you''ve already extracted what you
+        need from. KEEP-FOCUSED - retain only the goal, the active sub-task, and the most recent pertinent
+        facts. Re-state critical constraints near the end so they stay salient.'
+    - heading: In practice
+      body: Long agent runs need this most - tool outputs pile up fast. Periodically replace history with
+        a summary, evict completed-step detail, and carry forward a compact state object. In Claude Code,
+        /compact summarizes the conversation and a lean CLAUDE.md keeps durable context small. The discipline
+        - decide what to KEEP rather than letting context accrete by default.
+    rubric:
+    - context
+    - task
+    - constraints
+    - specificity
     exercises:
-      - id: summarize-history
-        title: Compress history into a running summary
-        goal: >-
-          Write a prompt that instructs the model to compress a long prior
-          conversation into a COMPACT running summary — capturing key decisions and
-          the open task — so the raw turns can be dropped. Cap the summary length.
-        starter: ""
-        success:
-          min_words: 14
-          any_of:
-            - ["summarize", "summary", "compress", "condense", "running summary", "key points", "key decisions", "recap", "distill"]
-          mentions_limit: true
-        success_response: >-
-          Good — a capped running summary lets you discard the raw turns while
-          keeping the decisions and the open task. That's how you hold a long session
-          in a small, focused context.
-        partial_response: >-
-          Ask the model to COMPRESS the history into a short running summary (key
-          decisions + the open task) and CAP its length so it stays compact. The
-          length limit is what keeps the summary from re-bloating.
-      - id: keep-relevant
-        title: Keep only what the current step needs
-        goal: >-
-          Write an instruction that tells the model (or agent) to KEEP only the
-          context relevant to the CURRENT step and DROP stale/irrelevant material —
-          make the keep-vs-drop rule explicit.
-        starter: ""
-        success:
-          min_words: 12
-          any_of:
-            - ["keep only", "only the", "relevant", "drop", "discard", "remove", "ignore", "prune", "exclude", "stale", "irrelevant", "no longer"]
-        success_response: >-
-          That's the right discipline — retaining only what the current step needs
-          and dropping stale material keeps both cost down and the model focused on
-          the active task.
-        partial_response: >-
-          State the keep-vs-drop rule explicitly - KEEP only what's relevant to the
-          current step, DROP stale or resolved material. Deciding what to keep beats
-          letting context grow unbounded.
+    - id: summarize-history
+      title: Compress history into a running summary
+      goal: Write a prompt that instructs the model to compress a long prior conversation into a COMPACT
+        running summary — capturing key decisions and the open task — so the raw turns can be dropped.
+        Cap the summary length.
+      starter: ''
+      success:
+        min_words: 14
+        any_of:
+        - - summarize
+          - summary
+          - compress
+          - condense
+          - running summary
+          - key points
+          - key decisions
+          - recap
+          - distill
+        mentions_limit: true
+      success_response: Good — a capped running summary lets you discard the raw turns while keeping the
+        decisions and the open task. That's how you hold a long session in a small, focused context.
+      partial_response: Ask the model to COMPRESS the history into a short running summary (key decisions
+        + the open task) and CAP its length so it stays compact. The length limit is what keeps the summary
+        from re-bloating.
+    - id: keep-relevant
+      title: Keep only what the current step needs
+      goal: Write an instruction that tells the model (or agent) to KEEP only the context relevant to
+        the CURRENT step and DROP stale/irrelevant material — make the keep-vs-drop rule explicit.
+      starter: ''
+      success:
+        min_words: 12
+        any_of:
+        - - keep only
+          - only the
+          - relevant
+          - drop
+          - discard
+          - remove
+          - ignore
+          - prune
+          - exclude
+          - stale
+          - irrelevant
+          - no longer
+      success_response: That's the right discipline — retaining only what the current step needs and dropping
+        stale material keeps both cost down and the model focused on the active task.
+      partial_response: State the keep-vs-drop rule explicitly - KEEP only what's relevant to the current
+        step, DROP stale or resolved material. Deciding what to keep beats letting context grow unbounded.
+  hidden_tests:
+  - name: smoke_hidden
+    code: assert True
 hints:
-  - content: Every token costs money and competes for attention. In long sessions, old turns, tool dumps, and dead ends cause "context rot" — pruning often beats a giant context.
-    cost: 10
-    order: 1
-  - content: 'Three moves: summarize old history into a compact running summary (and drop raw turns), remove stale/irrelevant material, and keep only what the current step needs.'
-    cost: 15
-    order: 2
-  - content: 'In Claude Code this is /compact plus a lean CLAUDE.md. Carry forward a small state object and re-state critical constraints near the end so they stay salient.'
-    cost: 20
-    order: 3
+- order: 1
+  cost: 0
+  content: 'Where to look: Open `the solution file`, read the instructions, and run the visible tests
+    to see which assertion fails first.'
+- order: 2
+  cost: 25
+  content: 'Diagnostic steps:
+
+    1. Click Run and read the traceback — note line number and actual vs expected values.
+
+    2. Reproduce the failure with the smallest input from a visible test.
+
+    3. Compare your implementation to the bug described in the lab prompt.'
+- order: 3
+  cost: 50
+  content: 'Exact fix + verification:
+
+    1. Write a prompt that compresses prior context into a compact running summary.
+
+    2. Re-run the lab checker (`check.sh` or Check Solution).
+
+    3. Confirm every scenario objective is satisfied.
+
+
+    WHY: the grader validates real state — marker files are ignored.'
+technology: prompt-engineering
+summary: Complete the context pruning in long sessions prompt engineering lab and verify success with
+  the checker
+estimated_minutes: 30
+xp_reward: 100
+prerequisites:
+- Basic prompt engineering literacy
+tags:
+- do
+- hands-on
+- prompt-engineering
+linked_tutorial: prompt-engineering-fundamentals
+what_you_will_learn:
+- Explain why a bloated context raises cost and hurts quality ("context rot")
+- Apply pruning strategies — summarize history, drop stale/irrelevant content
+- Write a prompt that compresses prior context into a compact running summary
+environment:
+  nodes:
+  - role: primary
+    os: FixitLab LLM practice workspace
+    hostname: lab-primary
+    ip: 127.0.0.1
+    specs: local offline simulation
+  pre_installed:
+  - bash
+  - coreutils
+  - journalctl
+  - prompt engineering
+  - systemctl
+  credentials:
+  - user: root
+    password: lab123
+tasks:
+- id: task_1
+  title: Context Pruning in Long Sessions
+  description: Restore healthy behavior for Context Pruning in Long Sessions by investigating the failure,
+    applying the smallest safe fix, and validating the outcome.
+  background: 'This prompt engineering lab teaches systematic troubleshooting: observe, hypothesize, change,
+    verify.'
+  validation:
+    type: custom_script
+    script: hidden_tests
+    error_message: One or more hidden tests failed. Read the public test output, fix your solution, and
+      submit again.
+solution:
+  summary: The solution passes all hidden tests by implementing the required behavior in code.
+  files_changed: []
+  commands_run: []
+  reference_docs: prompt-engineering-fundamentals
+guided_mode:
+  enabled: true
+  steps:
+  - step: 1
+    title: Inspect current state
+    instruction: Run a read-only diagnostic before changing anything.
+    command: check.sh
+    expected_output: Output shows the current failure mode
+    explanation: Evidence-first troubleshooting avoids guessing.
+    next_on: command_success
+  - step: 2
+    title: Apply the minimal fix
+    instruction: Make one reversible change aligned with the objectives.
+    command: '# your fix command here'
+    expected_output: State moves toward the objective
+    explanation: Small changes make rollback easy if the hypothesis was wrong.
+    next_on: command_success
+  - step: 3
+    title: Verify with the grader
+    instruction: Run the same verification the checker uses.
+    command: check.sh
+    expected_output: all hidden tests pass
+    explanation: The lab passes only when real state is healthy.
+    next_on: command_success

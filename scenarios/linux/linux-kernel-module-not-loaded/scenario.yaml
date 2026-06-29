@@ -1,37 +1,128 @@
 title: Required Kernel Module Not Loaded at Boot
 slug: linux-kernel-module-not-loaded
 difficulty: easy
-category: Linux Administration
-description: |
-  A Kubernetes node preflight check fails because the br_netfilter kernel module is not
+category: Fix
+description: 'CONTEXT: A team operating Linux administration needs you to resolve `Required Kernel Module
+  Not Loaded at Boot` during a realistic incident. The business impact is reduced service reliability
+  until the underlying state is repaired.
+
+
+  ENVIRONMENT: You are working in FixitLab''s offline Linux practice server with terminal and config files
+  under /etc and /var. All tools run locally; no paid APIs or external cloud calls are required.
+
+
+  SYMPTOM / STARTING STATE: Simulated RHEL 9 server being prepared as a Kubernetes node. lsmod | grep
+  br_netfilter
+
+  returns nothing, and there is no /etc/modules-load.d drop-in to load it at boot. kubeadm
+
+  preflight fails with: "br_netfilter module is not loaded". A Kubernetes node preflight check fails because
+  the br_netfilter kernel module is not
+
   loaded, so bridged pod traffic cannot be filtered by iptables. Loading the module by
+
   hand is not enough — it must be configured to load automatically on every boot by
+
   creating a drop-in under /etc/modules-load.d. You must make the module load persistent.
 
-initial_state: |
-  Simulated RHEL 9 server being prepared as a Kubernetes node. lsmod | grep br_netfilter
+
+  OBJECTIVE: Load the module immediately with modprobe br_netfilter; Make it persistent by creating /etc/modules-load.d/k8s.conf
+  containing br_netfilter; Confirm the drop-in exists so systemd-modules-load loads it on next boot. Success
+  means `check.sh` exits successfully.
+
+
+  WHAT TO AVOID: Do not apply broad destructive changes, skip evidence gathering, or fake completion with
+  marker files — the checker validates real system state.'
+initial_state: 'Simulated RHEL 9 server being prepared as a Kubernetes node. lsmod | grep br_netfilter
+
   returns nothing, and there is no /etc/modules-load.d drop-in to load it at boot. kubeadm
+
   preflight fails with: "br_netfilter module is not loaded".
 
+  '
 objectives:
-  - Load the module immediately with modprobe br_netfilter
-  - Make it persistent by creating /etc/modules-load.d/k8s.conf containing br_netfilter
-  - Confirm the drop-in exists so systemd-modules-load loads it on next boot
+- Load the module immediately with modprobe br_netfilter
+- Make it persistent by creating /etc/modules-load.d/k8s.conf containing br_netfilter
+- Confirm the drop-in exists so systemd-modules-load loads it on next boot
 lab_mode: simulation
 simulation_type: generic
 time_limit: 600
 max_score: 100
 is_free: false
 hints:
-  - content: 'Load it now with modprobe br_netfilter, but that is lost on reboot.'
-    cost: 10
-    order: 1
-  - content: 'Persist it: echo "br_netfilter" > /etc/modules-load.d/k8s.conf. Files there are read by systemd-modules-load.service at boot — one module name per line.'
-    cost: 15
-    order: 2
-  - content: 'The validator checks the persistent drop-in, so the /etc/modules-load.d entry is what proves the fix.'
-    cost: 15
-    order: 3
+- order: 1
+  cost: 0
+  content: 'Where to look: Run `kubectl get pods -A` and `kubectl describe pod <name>` for any pod not
+    in Running state.'
+- order: 2
+  cost: 25
+  content: 'Diagnostic steps:
+
+    1. `kubectl get pods` — note CrashLoopBackOff, ImagePullBackOff, or Pending.
+
+    2. `kubectl describe pod <name>` — read Events at the bottom.
+
+    3. `kubectl logs <name> [--previous]` if the container restarted.'
+- order: 3
+  cost: 50
+  content: 'Exact fix + verification:
+
+    1. Fix the root cause (image name, env var, volume mount, or probe).
+
+    2. `kubectl apply -f` the corrected manifest or delete the pod to recreate.
+
+    3. Confirm `kubectl get pods` shows every pod Running.
+
+
+    WHY: Kubernetes only reports healthy when the workload actually runs.'
 requires_companion_hosts: false
 dual_terminal: false
 jira_priority: Medium
+technology: linux
+summary: Complete the required kernel module not loaded at boot linux lab and verify success with the
+  checker
+estimated_minutes: 10
+xp_reward: 100
+prerequisites:
+- Basic linux literacy
+tags:
+- fix
+- hands-on
+- linux
+linked_tutorial: linux-fundamentals
+what_you_will_learn:
+- Load the module immediately with modprobe br_netfilter
+- Make it persistent by creating /etc/modules-load.d/k8s.conf containing br_netfilter
+- Confirm the drop-in exists so systemd-modules-load loads it on next boot
+environment:
+  nodes:
+  - role: primary
+    os: FixitLab Linux practice server
+    hostname: lab-primary
+    ip: 127.0.0.1
+    specs: local offline simulation
+  pre_installed:
+  - bash
+  - coreutils
+  - journalctl
+  - linux
+  - systemctl
+  credentials:
+  - user: root
+    password: lab123
+tasks:
+- id: task_1
+  title: Required Kernel Module Not Loaded at Boot
+  description: Restore healthy behavior for Required Kernel Module Not Loaded at Boot by investigating
+    the failure, applying the smallest safe fix, and validating the outcome.
+  background: 'This linux lab teaches systematic troubleshooting: observe, hypothesize, change, verify.'
+  validation:
+    type: custom_script
+    script: check.sh
+    error_message: Validation did not pass. Re-read the objectives and Hint 2 diagnostic steps.
+solution:
+  summary: Identify the misconfiguration affecting this linux lab and apply the minimal fix.
+  files_changed: []
+  commands_run:
+  - bash check.sh
+  reference_docs: linux-fundamentals

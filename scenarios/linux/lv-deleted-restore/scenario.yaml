@@ -1,42 +1,138 @@
-title: Restore Accidentally Deleted Logical Volume Using LVM Archive
+title: Restore Accidentally Deleted Logical Volume Using LVM
 slug: linux-lv-deleted-restore
 difficulty: hard
-category: Linux Administration
-description: |
-  An operator accidentally ran lvremove on the wrong logical volume, deleting lv_data
+category: Fix
+description: 'CONTEXT: A team operating Linux administration needs you to resolve `Restore Accidentally
+  Deleted Logical Volume Using LVM` during a realistic incident. The business impact is reduced service
+  reliability until the underlying state is repaired.
+
+
+  ENVIRONMENT: You are working in FixitLab''s offline Linux practice server with terminal and config files
+  under /etc and /var. All tools run locally; no paid APIs or external cloud calls are required.
+
+
+  SYMPTOM / STARTING STATE: Simulated RHEL 9 server. The volume group vg_prod exists but lvs shows lv_data
+  is
+
+  missing. The physical extents containing the data are still intact but unallocated.
+
+  Applications using /data are down. /etc/lvm/archive/ contains timestamped backup files
+
+  of the VG metadata from before the accidental deletion. An operator accidentally ran lvremove on the
+  wrong logical volume, deleting lv_data
+
   from vg_prod while intending to remove a different volume. The data on the underlying
+
   physical extents has not been overwritten — LVM keeps configuration archives in
+
   /etc/lvm/archive/ that allow metadata to be restored. The LV metadata must be restored
+
   from the archive before any new LV is created in its place.
 
-initial_state: |
-  Simulated RHEL 9 server. The volume group vg_prod exists but lvs shows lv_data is
+
+  OBJECTIVE: List available LVM archives with ls -ltr /etc/lvm/archive/; Identify the most recent archive
+  file for vg_prod before the deletion occurred; Restore the LV metadata with vgcfgrestore -f /etc/lvm/archive/vg_prod_<timestamp>.vg
+  vg_prod. Success means `check.sh` exits successfully.
+
+
+  WHAT TO AVOID: Do not apply broad destructive changes, skip evidence gathering, or fake completion with
+  marker files — the checker validates real system state.'
+initial_state: 'Simulated RHEL 9 server. The volume group vg_prod exists but lvs shows lv_data is
+
   missing. The physical extents containing the data are still intact but unallocated.
+
   Applications using /data are down. /etc/lvm/archive/ contains timestamped backup files
+
   of the VG metadata from before the accidental deletion.
 
+  '
 objectives:
-  - List available LVM archives with ls -ltr /etc/lvm/archive/
-  - Identify the most recent archive file for vg_prod before the deletion occurred
-  - Restore the LV metadata with vgcfgrestore -f /etc/lvm/archive/vg_prod_<timestamp>.vg vg_prod
-  - Activate the restored logical volume with lvchange -ay vg_prod/lv_data
-  - Mount the logical volume and verify data is intact
-  - Review the data and confirm no corruption with application-level checks
+- List available LVM archives with ls -ltr /etc/lvm/archive/
+- Identify the most recent archive file for vg_prod before the deletion occurred
+- Restore the LV metadata with vgcfgrestore -f /etc/lvm/archive/vg_prod_<timestamp>.vg vg_prod
+- Activate the restored logical volume with lvchange -ay vg_prod/lv_data
+- Mount the logical volume and verify data is intact
+- Review the data and confirm no corruption with application-level checks
 lab_mode: simulation
 simulation_type: generic
 time_limit: 1200
 max_score: 100
 is_free: false
 hints:
-  - content: 'Check /etc/lvm/archive/ — LVM automatically backs up VG metadata here before any change. Pick the timestamp just before the lvremove was run.'
-    cost: 10
-    order: 1
-  - content: 'Restore with: vgcfgrestore -f /etc/lvm/archive/vg_prod_<timestamp>.vg vg_prod. This restores LV metadata only — the actual data on disk is untouched.'
-    cost: 25
-    order: 2
-  - content: 'After vgcfgrestore, activate with lvchange -ay /dev/vg_prod/lv_data. Then mount and run fsck if needed before trusting the data. Do NOT run mkfs on the restored LV.'
-    cost: 20
-    order: 3
+- order: 1
+  cost: 0
+  content: 'Where to look: List available LVM archives with ls -ltr /etc/lvm/archive/'
+- order: 2
+  cost: 25
+  content: 'Diagnostic steps:
+
+    1. Identify the most recent archive file for vg_prod before the deletion occurred
+
+    2. Restore the LV metadata with vgcfgrestore -f /etc/lvm/archive/vg_prod_<timestamp>.vg vg_prod
+
+    3. Activate the restored logical volume with lvchange -ay vg_prod/lv_data'
+- order: 3
+  cost: 50
+  content: 'Exact fix + verification:
+
+    1. Mount the logical volume and verify data is intact.
+
+    2. Re-run the lab checker (`check.sh` or Check Solution).
+
+    3. Confirm every scenario objective is satisfied.
+
+
+    WHY: the grader validates real state — marker files are ignored.'
 requires_companion_hosts: false
 dual_terminal: false
 jira_priority: Medium
+technology: linux
+summary: Complete the restore accidentally deleted logical volume using lvm linux lab and verify success
+  with the checker
+estimated_minutes: 20
+xp_reward: 100
+prerequisites:
+- Basic linux literacy
+tags:
+- fix
+- hands-on
+- linux
+linked_tutorial: linux-fundamentals
+what_you_will_learn:
+- List available LVM archives with ls -ltr /etc/lvm/archive/
+- Identify the most recent archive file for vg_prod before the deletion occurred
+- Restore the LV metadata with vgcfgrestore -f /etc/lvm/archive/vg_prod_<timestamp>.vg vg_prod
+- Activate the restored logical volume with lvchange -ay vg_prod/lv_data
+- Mount the logical volume and verify data is intact
+environment:
+  nodes:
+  - role: primary
+    os: FixitLab Linux practice server
+    hostname: lab-primary
+    ip: 127.0.0.1
+    specs: local offline simulation
+  pre_installed:
+  - bash
+  - coreutils
+  - journalctl
+  - linux
+  - systemctl
+  credentials:
+  - user: root
+    password: lab123
+tasks:
+- id: task_1
+  title: Restore Accidentally Deleted Logical Volume Using LVM
+  description: Restore healthy behavior for Restore Accidentally Deleted Logical Volume Using LVM by investigating
+    the failure, applying the smallest safe fix, and validating the outcome.
+  background: 'This linux lab teaches systematic troubleshooting: observe, hypothesize, change, verify.'
+  validation:
+    type: custom_script
+    script: check.sh
+    error_message: Validation did not pass. Re-read the objectives and Hint 2 diagnostic steps.
+solution:
+  summary: Identify the misconfiguration affecting this linux lab and apply the minimal fix.
+  files_changed: []
+  commands_run:
+  - bash check.sh
+  reference_docs: linux-fundamentals

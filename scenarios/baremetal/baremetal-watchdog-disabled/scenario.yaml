@@ -1,7 +1,7 @@
 title: Hardware Watchdog Not Enabled
 slug: baremetal-watchdog-disabled
-technology: Bare Metal
-category: Reliability
+technology: baremetal
+category: Build
 difficulty: easy
 lab_mode: simulation
 simulation_type: baremetal
@@ -10,7 +10,25 @@ max_score: 100
 is_free: true
 jira_priority: High
 dual_terminal: false
-description: A hung host won't auto-recover because the hardware watchdog is disabled.
+description: 'CONTEXT: A team operating bare metal operations needs you to resolve `Hardware Watchdog
+  Not Enabled` during a realistic incident. The business impact is reduced service reliability until the
+  underlying state is repaired.
+
+
+  ENVIRONMENT: You are working in FixitLab''s offline physical server lab with IPMI, RAID, BIOS, and out-of-band
+  console. All tools run locally; no paid APIs or external cloud calls are required.
+
+
+  SYMPTOM / STARTING STATE: A server with the BMC watchdog turned off. A hung host won''t auto-recover
+  because the hardware watchdog is disabled.
+
+
+  OBJECTIVE: Confirm the issue: No auto-recovery on hang; Apply the documented fix in /etc/bmc/watchdog.cfg;
+  Verify the configuration is corrected. Success means `check.sh` exits successfully.
+
+
+  WHAT TO AVOID: Do not apply broad destructive changes, skip evidence gathering, or fake completion with
+  marker files — the checker validates real system state.'
 initial_state: A server with the BMC watchdog turned off.
 objectives:
 - 'Confirm the issue: No auto-recovery on hang'
@@ -18,11 +36,94 @@ objectives:
 - Verify the configuration is corrected
 hints:
 - order: 1
-  cost: 10
-  content: No auto-recovery on hang
+  cost: 0
+  content: 'Where to look: Confirm the issue: No auto-recovery on hang'
 - order: 2
-  cost: 15
-  content: Enable and configure the watchdog.
+  cost: 25
+  content: 'Diagnostic steps:
+
+    1. Apply the documented fix in /etc/bmc/watchdog.cfg
+
+    2. Verify the configuration is corrected'
 - order: 3
-  cost: 20
-  content: /etc/bmc/watchdog.cfg carries the corrected configuration.
+  cost: 50
+  content: 'Exact fix + verification:
+
+    1. Verify the configuration is corrected.
+
+    2. Re-run the lab checker (`check.sh` or Check Solution).
+
+    3. Confirm every scenario objective is satisfied.
+
+
+    WHY: the grader validates real state — marker files are ignored.'
+summary: Complete the hardware watchdog not enabled baremetal lab and verify success with the checker
+estimated_minutes: 20
+xp_reward: 100
+prerequisites:
+- Basic baremetal literacy
+tags:
+- baremetal
+- fix
+- hands-on
+linked_tutorial: baremetal-fundamentals
+what_you_will_learn:
+- 'Confirm the issue: No auto-recovery on hang'
+- Apply the documented fix in /etc/bmc/watchdog.cfg
+- Verify the configuration is corrected
+environment:
+  nodes:
+  - role: primary
+    os: FixitLab physical server lab
+    hostname: lab-primary
+    ip: 127.0.0.1
+    specs: local offline simulation
+  pre_installed:
+  - baremetal
+  - bash
+  - coreutils
+  - journalctl
+  - systemctl
+  credentials:
+  - user: root
+    password: lab123
+tasks:
+- id: task_1
+  title: Hardware Watchdog Not Enabled
+  description: Restore healthy behavior for Hardware Watchdog Not Enabled by investigating the failure,
+    applying the smallest safe fix, and validating the outcome.
+  background: 'This baremetal lab teaches systematic troubleshooting: observe, hypothesize, change, verify.'
+  validation:
+    type: custom_script
+    script: check.sh
+    error_message: Validation did not pass. Re-read the objectives and Hint 2 diagnostic steps.
+solution:
+  summary: Identify the misconfiguration affecting this baremetal lab and apply the minimal fix.
+  files_changed: []
+  commands_run:
+  - bash check.sh
+  reference_docs: baremetal-fundamentals
+guided_mode:
+  enabled: true
+  steps:
+  - step: 1
+    title: Inspect current state
+    instruction: Run a read-only diagnostic before changing anything.
+    command: check.sh
+    expected_output: Output shows the current failure mode
+    explanation: Evidence-first troubleshooting avoids guessing.
+    next_on: command_success
+  - step: 2
+    title: Apply the minimal fix
+    instruction: Make one reversible change aligned with the objectives.
+    command: '# your fix command here'
+    expected_output: State moves toward the objective
+    explanation: Small changes make rollback easy if the hypothesis was wrong.
+    next_on: command_success
+  - step: 3
+    title: Verify with the grader
+    instruction: Run the same verification the checker uses.
+    command: check.sh
+    expected_output: '`check.sh` exits successfully'
+    explanation: The lab passes only when real state is healthy.
+    next_on: command_success

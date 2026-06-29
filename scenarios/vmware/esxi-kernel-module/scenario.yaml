@@ -1,9 +1,28 @@
 title: Guest Kernel Module Missing
 slug: vmware-guest-kernel-module
-category: VMware vSphere
-description: Networking on the guest web-prod-01 is degraded because a required kernel module (nf_conntrack)
-  isn't loaded, so connection tracking / NAT-dependent traffic misbehaves. The fix is inside the guest,
-  via the VM console. Load the module, verify it, and make it load on boot so the problem doesn't recur.
+category: Fix
+description: 'CONTEXT: A team operating VMware vSphere needs you to resolve `Guest Kernel Module Missing`
+  during a realistic incident. The business impact is reduced service reliability until the underlying
+  state is repaired.
+
+
+  ENVIRONMENT: You are working in FixitLab''s offline vSphere lab with VMs, datastores, vCenter, and ESXi
+  tasks. All tools run locally; no paid APIs or external cloud calls are required.
+
+
+  SYMPTOM / STARTING STATE: vCenter guest web-prod-01 where the nf_conntrack kernel module is not loaded,
+  degrading connectivity. The fix is performed from the VM''s console. Networking on the guest web-prod-01
+  is degraded because a required kernel module (nf_conntrack) isn''t loaded, so connection tracking /
+  NAT-dependent traffic misbehaves. The fix is inside the guest, via the VM console. Load the module,
+  verify it, and make it load on boot so the problem doesn''t recur.
+
+
+  OBJECTIVE: Open the console on web-prod-01 and confirm the module is missing; Load nf_conntrack and
+  verify with lsmod; Persist the module so it loads on boot. Success means `check.sh` exits successfully.
+
+
+  WHAT TO AVOID: Do not apply broad destructive changes, skip evidence gathering, or fake completion with
+  marker files — the checker validates real system state.'
 difficulty: medium
 lab_mode: simulation
 simulation_type: vmware
@@ -19,14 +38,71 @@ initial_state: vCenter guest web-prod-01 where the nf_conntrack kernel module is
   connectivity. The fix is performed from the VM's console.
 hints:
 - order: 1
-  cost: 10
-  content: 'Open the web console for web-prod-01. Check whether the module is loaded: `lsmod | grep nf_conntrack`
-    (empty).'
+  cost: 0
+  content: 'Where to look: Open the console on web-prod-01 and confirm the module is missing'
 - order: 2
-  cost: 15
-  content: 'Load it now: `modprobe nf_conntrack`, then confirm `lsmod | grep nf_conntrack` shows it and
-    connectivity recovers.'
+  cost: 25
+  content: 'Diagnostic steps:
+
+    1. Load nf_conntrack and verify with lsmod
+
+    2. Persist the module so it loads on boot'
 - order: 3
-  cost: 20
-  content: 'Make it persistent: add `nf_conntrack` to /etc/modules-load.d/ (e.g. echo it into /etc/modules-load.d/conntrack.conf)
-    so it loads automatically on the next boot.'
+  cost: 50
+  content: 'Exact fix + verification:
+
+    1. Persist the module so it loads on boot.
+
+    2. Re-run the lab checker (`check.sh` or Check Solution).
+
+    3. Confirm every scenario objective is satisfied.
+
+
+    WHY: the grader validates real state — marker files are ignored.'
+technology: vmware
+summary: Complete the guest kernel module missing vmware lab and verify success with the checker
+estimated_minutes: 15
+xp_reward: 100
+prerequisites:
+- Basic vmware literacy
+tags:
+- fix
+- hands-on
+- vmware
+linked_tutorial: vmware-fundamentals
+what_you_will_learn:
+- Open the console on web-prod-01 and confirm the module is missing
+- Load nf_conntrack and verify with lsmod
+- Persist the module so it loads on boot
+environment:
+  nodes:
+  - role: primary
+    os: FixitLab vSphere lab
+    hostname: lab-primary
+    ip: 127.0.0.1
+    specs: local offline simulation
+  pre_installed:
+  - bash
+  - coreutils
+  - journalctl
+  - systemctl
+  - vmware
+  credentials:
+  - user: root
+    password: lab123
+tasks:
+- id: task_1
+  title: Guest Kernel Module Missing
+  description: Restore healthy behavior for Guest Kernel Module Missing by investigating the failure,
+    applying the smallest safe fix, and validating the outcome.
+  background: 'This vmware lab teaches systematic troubleshooting: observe, hypothesize, change, verify.'
+  validation:
+    type: custom_script
+    script: check.sh
+    error_message: Validation did not pass. Re-read the objectives and Hint 2 diagnostic steps.
+solution:
+  summary: Identify the misconfiguration affecting this vmware lab and apply the minimal fix.
+  files_changed: []
+  commands_run:
+  - bash check.sh
+  reference_docs: vmware-fundamentals

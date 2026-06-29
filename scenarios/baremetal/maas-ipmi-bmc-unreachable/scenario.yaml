@@ -1,7 +1,7 @@
 slug: maas-ipmi-bmc-unreachable
 title: MAAS IPMI BMC Unreachable
-technology: Bare Metal
-category: MAAS
+technology: baremetal
+category: Fix
 difficulty: medium
 scenario_type: fix
 time_limit: 1200
@@ -10,21 +10,98 @@ lab_mode: simulation
 simulation_type: baremetal
 infrastructure_type: simulation
 is_free: false
-description: >-
-  MAAS cannot power-manage gpu-node-02 because the BMC is unreachable. Restore IPMI
-  connectivity and commission the machine.
+description: 'CONTEXT: A team operating bare metal operations needs you to resolve `MAAS IPMI BMC Unreachable`
+  during a realistic incident. The business impact is reduced service reliability until the underlying
+  state is repaired.
+
+
+  ENVIRONMENT: You are working in FixitLab''s offline physical server lab with IPMI, RAID, BIOS, and out-of-band
+  console. All tools run locally; no paid APIs or external cloud calls are required.
+
+
+  SYMPTOM / STARTING STATE: BMC unreachable on gpu-node-02; commissioning failed. MAAS cannot power-manage
+  gpu-node-02 because the BMC is unreachable. Restore IPMI connectivity and commission the machine.
+
+
+  OBJECTIVE: Open Bare Metal console; Restore BMC / IPMI reachability; Commission the failed GPU node.
+  Success means `check.sh` exits successfully.
+
+
+  WHAT TO AVOID: Do not apply broad destructive changes, skip evidence gathering, or fake completion with
+  marker files — the checker validates real system state.'
 objectives:
-  - Open Bare Metal console
-  - Restore BMC / IPMI reachability
-  - Commission the failed GPU node
+- Open Bare Metal console
+- Restore BMC / IPMI reachability
+- Commission the failed GPU node
 initial_state: BMC unreachable on gpu-node-02; commissioning failed.
 hints:
-  - order: 1
-    cost: 10
-    content: "**IPMI** tab shows BMC unreachable — use **IPMI power on / restore BMC**."
-  - order: 2
-    cost: 15
-    content: "**MAAS** tab → **Commission** gpu-node-02."
-  - order: 3
-    cost: 20
-    content: "**Deploy** when status is Ready, then **Check**."
+- order: 1
+  cost: 0
+  content: 'Where to look: Run `nvidia-smi` and `dmesg | grep -i nvidia` for driver visibility.'
+- order: 2
+  cost: 25
+  content: 'Diagnostic steps:
+
+    1. Check if the GPU appears in `lspci | grep -i nvidia`.
+
+    2. Verify the correct driver module is loaded (`lsmod | grep nvidia`).
+
+    3. Look for Xid errors or fallen-off-bus messages in dmesg.'
+- order: 3
+  cost: 50
+  content: 'Exact fix + verification:
+
+    1. Reload driver, rebind PCI, or fix persistence mode per the scenario.
+
+    2. Re-run `nvidia-smi`.
+
+    3. Confirm GPU name and memory report without errors.
+
+
+    WHY: workloads need the driver to see the device.'
+summary: Complete the maas ipmi bmc unreachable baremetal lab and verify success with the checker
+estimated_minutes: 20
+xp_reward: 100
+prerequisites:
+- Basic baremetal literacy
+tags:
+- baremetal
+- fix
+- hands-on
+linked_tutorial: baremetal-fundamentals
+what_you_will_learn:
+- Open Bare Metal console
+- Restore BMC / IPMI reachability
+- Commission the failed GPU node
+environment:
+  nodes:
+  - role: primary
+    os: FixitLab physical server lab
+    hostname: lab-primary
+    ip: 127.0.0.1
+    specs: local offline simulation
+  pre_installed:
+  - baremetal
+  - bash
+  - coreutils
+  - journalctl
+  - systemctl
+  credentials:
+  - user: root
+    password: lab123
+tasks:
+- id: task_1
+  title: MAAS IPMI BMC Unreachable
+  description: Restore healthy behavior for MAAS IPMI BMC Unreachable by investigating the failure, applying
+    the smallest safe fix, and validating the outcome.
+  background: 'This baremetal lab teaches systematic troubleshooting: observe, hypothesize, change, verify.'
+  validation:
+    type: custom_script
+    script: check.sh
+    error_message: Validation did not pass. Re-read the objectives and Hint 2 diagnostic steps.
+solution:
+  summary: Identify the misconfiguration affecting this baremetal lab and apply the minimal fix.
+  files_changed: []
+  commands_run:
+  - bash check.sh
+  reference_docs: baremetal-fundamentals

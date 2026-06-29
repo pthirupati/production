@@ -1,9 +1,26 @@
 title: 'Refactor: Validate the Shipping Calculator'
 slug: js-review-guard-clause-validate
-category: JavaScript Development
-description: 'shippingCost(weight) returns a cost based on weight, but it has no validation: negative
-  weights produce negative costs, and zero should be free. Refactor with guard clauses: weight < 0 throws
-  a RangeError; weight === 0 returns 0; otherwise base 5 + 2 per kg. The tests pin these rules.'
+category: Fix
+description: 'CONTEXT: A team operating JavaScript needs you to resolve `Refactor: Validate the Shipping
+  Calculator` during a realistic incident. The business impact is reduced service reliability until the
+  underlying state is repaired.
+
+
+  ENVIRONMENT: You are working in FixitLab''s offline JavaScript practice project with modules, browser
+  console, and Node tooling. All tools run locally; no paid APIs or external cloud calls are required.
+
+
+  SYMPTOM / STARTING STATE: shippingCost(weight) returns a cost based on weight, but it has no validation:
+  negative weights produce negative costs, and zero should be free. Refactor with guard clauses: weight
+  < 0 throws a RangeError; weight === 0 returns 0; otherwise base 5 + 2 per kg. The tests pin these rules.
+
+
+  OBJECTIVE: Reject negative weights with a guard clause; Return 0 for zero weight; Compute the documented
+  cost otherwise. Success means all hidden tests pass.
+
+
+  WHAT TO AVOID: Do not apply broad destructive changes, skip evidence gathering, or fake completion with
+  marker files — the checker validates real system state.'
 difficulty: medium
 scenario_type: fix
 lab_mode: simulation
@@ -21,50 +38,120 @@ objectives:
 initial_state: 'shippingCost(weight) returns a cost based on weight, but it has no validation: negative
   weights produce negative costs, and zero should be free. Refactor with guard clauses: weight < 0 throws
   a RangeError; weight === 0 returns 0; otherwise base 5 + 2 per kg. The tests pin these rules.'
-solution_explanation: |
-  Guard clauses make the edge cases explicit: negatives are rejected and zero is free, leaving the formula for the normal path.
+solution_explanation: 'Guard clauses make the edge cases explicit: negatives are rejected and zero is
+  free, leaving the formula for the normal path.
+
+  '
 coding_spec:
   language: javascript
   entrypoint: solution.js
   kind: review
-  instructions: |
-    Refactor shippingCost(weight): if weight < 0 throw RangeError; if weight === 0 return 0; else return 5 + 2 * weight.
-      shippingCost(3) -> 11
-    Click Run to try it, then Check Solution to grade against all tests.
+  instructions: "Refactor shippingCost(weight): if weight < 0 throw RangeError; if weight === 0 return\
+    \ 0; else return 5 + 2 * weight.\n  shippingCost(3) -> 11\nClick Run to try it, then Check Solution\
+    \ to grade against all tests.\n"
   files:
   - path: solution.js
-    content: |
-      function shippingCost(weight) {
-        return 5 + 2 * weight; // no validation; negative -> negative cost; 0 not free
-      }
+    content: "function shippingCost(weight) {\n  return 5 + 2 * weight; // no validation; negative ->\
+      \ negative cost; 0 not free\n}\n"
     readonly: false
   visible_tests:
   - name: normal weight
-    code: |
-      assert(shippingCost(3) === 11);
+    code: 'assert(shippingCost(3) === 11);
+
+      '
   - name: zero is free
-    code: |
-      assert(shippingCost(0) === 0, shippingCost(0));
+    code: 'assert(shippingCost(0) === 0, shippingCost(0));
+
+      '
   hidden_tests:
   - name: negative throws
-    code: |
-      let threw = false;
+    code: 'let threw = false;
+
       try { shippingCost(-1); } catch (e) { threw = e instanceof RangeError; }
-      assert(threw, 'should throw RangeError on negative');
+
+      assert(threw, ''should throw RangeError on negative'');
+
+      '
   - name: one kg
-    code: |
-      assert(shippingCost(1) === 7);
+    code: 'assert(shippingCost(1) === 7);
+
+      '
   - name: large weight
-    code: |
-      assert(shippingCost(10) === 25);
+    code: 'assert(shippingCost(10) === 25);
+
+      '
   timeout: 8
 hints:
 - order: 1
-  cost: 10
-  content: shippingCost(-1) returns 3, and shippingCost(0) returns 5 — both wrong.
+  cost: 0
+  content: 'Where to look: Open `solution.js`, read the instructions, and run the visible tests to see
+    which assertion fails first.'
 - order: 2
-  cost: 20
-  content: Add guard clauses at the top for the negative and zero cases.
+  cost: 25
+  content: 'Diagnostic steps:
+
+    1. Click Run and read the traceback — note line number and actual vs expected values.
+
+    2. Reproduce the failure with the smallest input from a visible test.
+
+    3. Compare your implementation to the bug described in the lab prompt.'
 - order: 3
-  cost: 30
-  content: Throw RangeError for < 0, return 0 for === 0, else 5 + 2 * weight.
+  cost: 50
+  content: 'Exact fix + verification:
+
+    1. Compute the documented cost otherwise.
+
+    2. Re-run the lab checker (`check.sh` or Check Solution).
+
+    3. Confirm every scenario objective is satisfied.
+
+
+    WHY: the grader validates real state — marker files are ignored.'
+technology: javascript
+summary: 'Complete the refactor: validate the shipping calculator javascript lab and verify success with
+  the checker'
+estimated_minutes: 25
+xp_reward: 100
+prerequisites:
+- Basic javascript literacy
+tags:
+- fix
+- hands-on
+- javascript
+linked_tutorial: javascript-fundamentals
+what_you_will_learn:
+- Reject negative weights with a guard clause
+- Return 0 for zero weight
+- Compute the documented cost otherwise
+environment:
+  nodes:
+  - role: primary
+    os: FixitLab JavaScript practice project
+    hostname: lab-primary
+    ip: 127.0.0.1
+    specs: local offline simulation
+  pre_installed:
+  - bash
+  - coreutils
+  - javascript
+  - journalctl
+  - systemctl
+  credentials:
+  - user: root
+    password: lab123
+tasks:
+- id: task_1
+  title: 'Refactor: Validate the Shipping Calculator'
+  description: 'Restore healthy behavior for Refactor: Validate the Shipping Calculator by investigating
+    the failure, applying the smallest safe fix, and validating the outcome.'
+  background: 'This javascript lab teaches systematic troubleshooting: observe, hypothesize, change, verify.'
+  validation:
+    type: custom_script
+    script: hidden_tests
+    error_message: One or more hidden tests failed. Read the public test output, fix your solution, and
+      submit again.
+solution:
+  summary: The solution passes all hidden tests by implementing the required behavior in code.
+  files_changed: []
+  commands_run: []
+  reference_docs: javascript-fundamentals

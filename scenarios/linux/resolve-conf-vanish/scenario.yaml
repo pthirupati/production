@@ -1,42 +1,141 @@
 title: /etc/resolv.conf Reverts After Reboot — DNS Lost
 slug: linux-resolve-conf-vanish
 difficulty: medium
-category: Linux Administration
-description: |
-  DNS resolution works fine until the server is rebooted, at which point /etc/resolv.conf
+category: Fix
+description: 'CONTEXT: A team operating Linux administration needs you to resolve `/etc/resolv.conf Reverts
+  After Reboot — DNS Lost` during a realistic incident. The business impact is reduced service reliability
+  until the underlying state is repaired.
+
+
+  ENVIRONMENT: You are working in FixitLab''s offline Linux practice server with terminal and config files
+  under /etc and /var. All tools run locally; no paid APIs or external cloud calls are required.
+
+
+  SYMPTOM / STARTING STATE: Simulated RHEL 9 server. /etc/resolv.conf currently contains:
+
+  nameserver 8.8.8.8
+
+  nameserver 8.8.4.4
+
+  DNS resolution works now but a previous reboot cleared these entries. NetworkManager
+
+  is running and manages the primary network connection "System eth0". DNS resolution works fine until
+  the server is rebooted, at which point /etc/resolv.conf
+
   is overwritten by NetworkManager and the manually added nameserver entries are gone.
+
   This is because NetworkManager manages /etc/resolv.conf by default and overwrites any
+
   manual edits. The correct fix is to configure DNS through NetworkManager rather than
+
   editing /etc/resolv.conf directly.
 
-initial_state: |
-  Simulated RHEL 9 server. /etc/resolv.conf currently contains:
+
+  OBJECTIVE: Confirm NetworkManager is managing the connection with nmcli con show; {''Set DNS persistently
+  using nmcli'': ''nmcli con mod "System eth0" ipv4.dns "8.8.8.8 8.8.4.4"''}; Disable NetworkManager from
+  overwriting resolv.conf with PEERDNS=no in the ifcfg file. Success means `check.sh` exits successfully.
+
+
+  WHAT TO AVOID: Do not apply broad destructive changes, skip evidence gathering, or fake completion with
+  marker files — the checker validates real system state.'
+initial_state: 'Simulated RHEL 9 server. /etc/resolv.conf currently contains:
+
   nameserver 8.8.8.8
+
   nameserver 8.8.4.4
+
   DNS resolution works now but a previous reboot cleared these entries. NetworkManager
+
   is running and manages the primary network connection "System eth0".
 
+  '
 objectives:
-  - Confirm NetworkManager is managing the connection with nmcli con show
-  - Set DNS persistently using nmcli: nmcli con mod "System eth0" ipv4.dns "8.8.8.8 8.8.4.4"
-  - Disable NetworkManager from overwriting resolv.conf with PEERDNS=no in the ifcfg file
-  - Apply changes with nmcli con up "System eth0"
-  - Reboot and verify /etc/resolv.conf still contains the correct nameservers
+- Confirm NetworkManager is managing the connection with nmcli con show
+- Set DNS persistently using nmcli: nmcli con mod "System eth0" ipv4.dns "8.8.8.8 8.8.4.4"
+- Disable NetworkManager from overwriting resolv.conf with PEERDNS=no in the ifcfg file
+- Apply changes with nmcli con up "System eth0"
+- Reboot and verify /etc/resolv.conf still contains the correct nameservers
 lab_mode: simulation
 simulation_type: generic
 time_limit: 900
 max_score: 100
 is_free: false
 hints:
-  - content: 'Use nmcli instead of editing /etc/resolv.conf: nmcli con mod "System eth0" ipv4.dns "8.8.8.8 8.8.4.4" && nmcli con up "System eth0". This persists across reboots.'
-    cost: 10
-    order: 1
-  - content: 'To prevent NetworkManager from overwriting DNS settings received from DHCP, add PEERDNS=no to /etc/sysconfig/network-scripts/ifcfg-eth0. Then reload the connection.'
-    cost: 20
-    order: 2
-  - content: 'Verify DNS is set in the connection: nmcli con show "System eth0" | grep DNS. The ipv4.dns field should show your configured nameservers.'
-    cost: 15
-    order: 3
+- order: 1
+  cost: 0
+  content: 'Where to look: Run `cat /etc/resolv.conf` and test with `dig example.com` or `getent hosts
+    example.com`.'
+- order: 2
+  cost: 25
+  content: 'Diagnostic steps:
+
+    1. Note the configured nameserver IP in resolv.conf.
+
+    2. `ping` or `nc -zv` the nameserver — is it reachable?
+
+    3. Check if NetworkManager or systemd-resolved overwrites the file.'
+- order: 3
+  cost: 50
+  content: 'Exact fix + verification:
+
+    1. Reboot and verify /etc/resolv.conf still contains the correct nameservers.
+
+    2. Re-run the lab checker (`check.sh` or Check Solution).
+
+    3. Confirm every scenario objective is satisfied.
+
+
+    WHY: the grader validates real state — marker files are ignored.'
 requires_companion_hosts: false
 dual_terminal: false
 jira_priority: Medium
+technology: linux
+summary: Complete the /etc/resolv conf reverts after reboot — dns lost linux lab and verify success with
+  the checker
+estimated_minutes: 15
+xp_reward: 100
+prerequisites:
+- Basic linux literacy
+tags:
+- fix
+- hands-on
+- linux
+linked_tutorial: linux-fundamentals
+what_you_will_learn:
+- Confirm NetworkManager is managing the connection with nmcli con show
+- '{''Set DNS persistently using nmcli'': ''nmcli con mod "System eth0" ipv4.dns "8.8.8.8 8.8.4.4"''}'
+- Disable NetworkManager from overwriting resolv.conf with PEERDNS=no in the ifcfg file
+- Apply changes with nmcli con up "System eth0"
+- Reboot and verify /etc/resolv.conf still contains the correct nameservers
+environment:
+  nodes:
+  - role: primary
+    os: FixitLab Linux practice server
+    hostname: lab-primary
+    ip: 127.0.0.1
+    specs: local offline simulation
+  pre_installed:
+  - bash
+  - coreutils
+  - journalctl
+  - linux
+  - systemctl
+  credentials:
+  - user: root
+    password: lab123
+tasks:
+- id: task_1
+  title: /etc/resolv.conf Reverts After Reboot — DNS Lost
+  description: Restore healthy behavior for /etc/resolv.conf Reverts After Reboot — DNS Lost by investigating
+    the failure, applying the smallest safe fix, and validating the outcome.
+  background: 'This linux lab teaches systematic troubleshooting: observe, hypothesize, change, verify.'
+  validation:
+    type: custom_script
+    script: check.sh
+    error_message: Validation did not pass. Re-read the objectives and Hint 2 diagnostic steps.
+solution:
+  summary: Identify the misconfiguration affecting this linux lab and apply the minimal fix.
+  files_changed: []
+  commands_run:
+  - bash check.sh
+  reference_docs: linux-fundamentals

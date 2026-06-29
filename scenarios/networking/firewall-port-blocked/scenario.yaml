@@ -1,15 +1,34 @@
 title: Firewall Blocking Web Port
 slug: firewall-port-blocked
-technology: Networking
-category: Firewall
+technology: networking
+category: Fix
 difficulty: medium
 time_limit: 900
 max_score: 100
 infrastructure_type: docker
 jira_priority: High
-description: nginx is running and serving locally, but external users can't reach the site on port 80
-  because an iptables rule in the INPUT chain is dropping inbound HTTP. The DROP rule shadows the web
-  traffic before it ever reaches nginx. Find and remove the blocking rule so port 80 is reachable again.
+description: 'CONTEXT: A team operating network operations needs you to resolve `Firewall Blocking Web
+  Port` during a realistic incident. The business impact is reduced service reliability until the underlying
+  state is repaired.
+
+
+  ENVIRONMENT: You are working in FixitLab''s offline network lab with interfaces, routing tables, DNS,
+  and firewall rules. All tools run locally; no paid APIs or external cloud calls are required.
+
+
+  SYMPTOM / STARTING STATE: Linux server where nginx listens on port 80 but an iptables INPUT rule drops
+  inbound dpt:80 traffic, so remote clients can''t load the site. nginx is running and serving locally,
+  but external users can''t reach the site on port 80 because an iptables rule in the INPUT chain is dropping
+  inbound HTTP. The DROP rule shadows the web traffic before it ever reaches nginx. Find and remove the
+  blocking rule so port 80 is reachable again.
+
+
+  OBJECTIVE: Confirm nginx is up locally but port 80 is blocked from outside; Find the iptables DROP rule
+  for port 80; Remove the rule and verify HTTP is reachable. Success means `check.sh` exits successfully.
+
+
+  WHAT TO AVOID: Do not apply broad destructive changes, skip evidence gathering, or fake completion with
+  marker files — the checker validates real system state.'
 objectives:
 - Confirm nginx is up locally but port 80 is blocked from outside
 - Find the iptables DROP rule for port 80
@@ -18,14 +37,73 @@ initial_state: Linux server where nginx listens on port 80 but an iptables INPUT
   traffic, so remote clients can't load the site.
 hints:
 - order: 1
-  cost: 10
-  content: 'Local curl works, remote doesn''t. List the firewall with line numbers: `iptables -L INPUT
-    -n --line-numbers` and find the DROP rule matching dpt:80.'
+  cost: 0
+  content: 'Where to look: Test the config to get the exact file and line: `nginx -t`. It prints the offending
+    directive (e.g. unknown directive "listn").'
 - order: 2
-  cost: 15
-  content: 'Delete that specific rule by its line number: `iptables -D INPUT <line>` (the line number
-    from the previous command).'
+  cost: 25
+  content: 'Diagnostic steps:
+
+    1. Run `nginx -t` and note the file path and line number in the error.
+
+    2. Open that file (often `/etc/nginx/nginx.conf` or under `/etc/nginx/conf.d/`).
+
+    3. Compare the bad directive to the nginx docs — typos like `listn` should be `listen`.'
 - order: 3
-  cost: 20
-  content: Confirm nginx is listening (`ss -tlnp | grep :80`) and the rule is gone; a request to the server's
-    IP on port 80 now returns the page. Persist the ruleset so it survives reboot.
+  cost: 50
+  content: 'Exact fix + verification:
+
+    1. Correct the typo on the reported line and save the file.
+
+    2. Re-run `nginx -t` until it reports syntax is ok.
+
+    3. Run `systemctl enable --now nginx`, then `curl -I http://localhost` (expect HTTP 200).
+
+
+    WHY: systemd will not start nginx until `nginx -t` passes.'
+summary: Complete the firewall blocking web port networking lab and verify success with the checker
+estimated_minutes: 15
+xp_reward: 100
+prerequisites:
+- Basic networking literacy
+tags:
+- fix
+- hands-on
+- networking
+linked_tutorial: networking-fundamentals
+what_you_will_learn:
+- Confirm nginx is up locally but port 80 is blocked from outside
+- Find the iptables DROP rule for port 80
+- Remove the rule and verify HTTP is reachable
+environment:
+  nodes:
+  - role: primary
+    os: FixitLab network lab
+    hostname: lab-primary
+    ip: 127.0.0.1
+    specs: local offline simulation
+  pre_installed:
+  - bash
+  - coreutils
+  - journalctl
+  - networking
+  - systemctl
+  credentials:
+  - user: root
+    password: lab123
+tasks:
+- id: task_1
+  title: Firewall Blocking Web Port
+  description: Restore healthy behavior for Firewall Blocking Web Port by investigating the failure, applying
+    the smallest safe fix, and validating the outcome.
+  background: 'This networking lab teaches systematic troubleshooting: observe, hypothesize, change, verify.'
+  validation:
+    type: custom_script
+    script: check.sh
+    error_message: Validation did not pass. Re-read the objectives and Hint 2 diagnostic steps.
+solution:
+  summary: Identify the misconfiguration affecting this networking lab and apply the minimal fix.
+  files_changed: []
+  commands_run:
+  - bash check.sh
+  reference_docs: networking-fundamentals

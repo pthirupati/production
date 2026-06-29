@@ -1,9 +1,26 @@
 title: Fix the Running Total (Prefix Sums)
 slug: py-fix-running-total-accumulate
-category: Python Development
-description: running_total(nums) should return a list of cumulative sums (prefix sums), but it resets
-  the accumulator each iteration so it just echoes the inputs. Fix it so each element is the sum of all
-  elements up to that index.
+category: Fix
+description: 'CONTEXT: A team operating Python development needs you to resolve `Fix the Running Total
+  (Prefix Sums)` during a realistic incident. The business impact is reduced service reliability until
+  the underlying state is repaired.
+
+
+  ENVIRONMENT: You are working in FixitLab''s offline Python project workspace with source files, venv,
+  tests, and CLI entrypoints. All tools run locally; no paid APIs or external cloud calls are required.
+
+
+  SYMPTOM / STARTING STATE: running_total(nums) should return a list of cumulative sums (prefix sums),
+  but it resets the accumulator each iteration so it just echoes the inputs. Fix it so each element is
+  the sum of all elements up to that index.
+
+
+  OBJECTIVE: See the output equals the input (no accumulation); Keep a persistent running sum; Emit the
+  cumulative value at each step. Success means all hidden tests pass.
+
+
+  WHAT TO AVOID: Do not apply broad destructive changes, skip evidence gathering, or fake completion with
+  marker files — the checker validates real system state.'
 difficulty: easy
 scenario_type: fix
 lab_mode: simulation
@@ -21,55 +38,118 @@ objectives:
 initial_state: running_total(nums) should return a list of cumulative sums (prefix sums), but it resets
   the accumulator each iteration so it just echoes the inputs. Fix it so each element is the sum of all
   elements up to that index.
-solution_explanation: |
-  Re-initializing total inside the loop discards prior sums. Initializing it once before the loop accumulates correctly.
+solution_explanation: 'Re-initializing total inside the loop discards prior sums. Initializing it once
+  before the loop accumulates correctly.
+
+  '
 coding_spec:
   language: python
   entrypoint: solution.py
   kind: fix
-  instructions: |
-    Fix running_total(nums): return cumulative sums.
-      running_total([1,2,3,4]) -> [1,3,6,10]
-    Click Run to try it, then Check Solution to grade against all tests.
+  instructions: "Fix running_total(nums): return cumulative sums.\n  running_total([1,2,3,4]) -> [1,3,6,10]\n\
+    Click Run to try it, then Check Solution to grade against all tests.\n"
   files:
   - path: solution.py
-    content: |
-      def running_total(nums):
-          out = []
-          for n in nums:
-              total = 0        # bug: reset every iteration
-              total += n
-              out.append(total)
-          return out
+    content: "def running_total(nums):\n    out = []\n    for n in nums:\n        total = 0        # bug:\
+      \ reset every iteration\n        total += n\n        out.append(total)\n    return out\n"
     readonly: false
   visible_tests:
   - name: basic
-    code: |
-      assert running_total([1,2,3,4]) == [1,3,6,10]
+    code: 'assert running_total([1,2,3,4]) == [1,3,6,10]
+
+      '
   - name: single
-    code: |
-      assert running_total([5]) == [5]
+    code: 'assert running_total([5]) == [5]
+
+      '
   hidden_tests:
   - name: with negatives
-    code: |
-      assert running_total([1,-1,2,-2]) == [1,0,2,0]
+    code: 'assert running_total([1,-1,2,-2]) == [1,0,2,0]
+
+      '
   - name: empty
-    code: |
-      assert running_total([]) == []
+    code: 'assert running_total([]) == []
+
+      '
   - name: zeros
-    code: |
-      assert running_total([0,0,0]) == [0,0,0]
+    code: 'assert running_total([0,0,0]) == [0,0,0]
+
+      '
   - name: longer
-    code: |
-      assert running_total([2,2,2,2,2]) == [2,4,6,8,10]
+    code: 'assert running_total([2,2,2,2,2]) == [2,4,6,8,10]
+
+      '
   timeout: 8
 hints:
 - order: 1
-  cost: 10
-  content: running_total([1,2,3]) returns [1,2,3] — it isn't accumulating.
+  cost: 0
+  content: 'Where to look: Open `solution.py`, read the instructions, and run the visible tests to see
+    which assertion fails first.'
 - order: 2
-  cost: 20
-  content: The `total = 0` line is inside the loop, so it resets every step.
+  cost: 25
+  content: 'Diagnostic steps:
+
+    1. Click Run and read the traceback — note line number and actual vs expected values.
+
+    2. Reproduce the failure with the smallest input from a visible test.
+
+    3. Compare your implementation to the bug described in the lab prompt.'
 - order: 3
-  cost: 30
-  content: Move the accumulator initialization OUTSIDE the loop.
+  cost: 50
+  content: 'Exact fix + verification:
+
+    1. Emit the cumulative value at each step.
+
+    2. Re-run the lab checker (`check.sh` or Check Solution).
+
+    3. Confirm every scenario objective is satisfied.
+
+
+    WHY: the grader validates real state — marker files are ignored.'
+technology: python
+summary: Complete the fix the running total (prefix sums) python lab and verify success with the checker
+estimated_minutes: 25
+xp_reward: 100
+prerequisites:
+- Basic python literacy
+tags:
+- fix
+- hands-on
+- python
+linked_tutorial: python-fundamentals
+what_you_will_learn:
+- See the output equals the input (no accumulation)
+- Keep a persistent running sum
+- Emit the cumulative value at each step
+environment:
+  nodes:
+  - role: primary
+    os: FixitLab Python project workspace
+    hostname: lab-primary
+    ip: 127.0.0.1
+    specs: local offline simulation
+  pre_installed:
+  - bash
+  - coreutils
+  - pip
+  - python
+  - python3
+  credentials:
+  - user: root
+    password: lab123
+tasks:
+- id: task_1
+  title: Fix the Running Total (Prefix Sums)
+  description: Restore healthy behavior for Fix the Running Total (Prefix Sums) by investigating the failure,
+    applying the smallest safe fix, and validating the outcome.
+  background: 'This python lab teaches systematic troubleshooting: observe, hypothesize, change, verify.'
+  validation:
+    type: custom_script
+    script: hidden_tests
+    error_message: One or more hidden tests failed. Read the public test output, fix your solution, and
+      submit again.
+solution:
+  summary: The solution passes all hidden tests by implementing the required behavior in code.
+  files_changed: []
+  commands_run: []
+  reference_docs: python-fundamentals

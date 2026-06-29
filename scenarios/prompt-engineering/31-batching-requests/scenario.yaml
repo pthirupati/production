@@ -1,11 +1,29 @@
-title: "Batching Requests to Cut Cost"
+title: Batching Requests to Cut Cost
 slug: batching-requests
-category: Prompt Engineering
-description: >-
-  Calling a model once per item wastes tokens and time on repeated overhead.
-  Batching processes many items in a single request. Learn to write a batch prompt
-  that returns one clearly-labeled result per item, keep outputs parseable, and
-  know when batching is the wrong tool.
+category: Build
+description: 'CONTEXT: A team operating prompt engineering needs you to resolve `Batching Requests to
+  Cut Cost` during a realistic incident. The business impact is reduced service reliability until the
+  underlying state is repaired.
+
+
+  ENVIRONMENT: You are working in FixitLab''s offline LLM practice workspace with prompt templates, eval
+  sets, and tool configs. All tools run locally; no paid APIs or external cloud calls are required.
+
+
+  SYMPTOM / STARTING STATE: The guided AI practice console opens. Practice turning many one-off calls
+  into a single batched request that returns one labeled answer per item. Rule-based and free. Calling
+  a model once per item wastes tokens and time on repeated overhead. Batching processes many items in
+  a single request. Learn to write a batch prompt that returns one clearly-labeled result per item, keep
+  outputs parseable, and know when batching is the wrong tool.
+
+
+  OBJECTIVE: Explain how batching saves overhead tokens and latency vs N separate calls; Write a batch
+  prompt that returns one labeled output per input; Recognize the limits of batching (size, cross-item
+  bleed, error isolation). Success means all hidden tests pass.
+
+
+  WHAT TO AVOID: Do not apply broad destructive changes, skip evidence gathering, or fake completion with
+  marker files — the checker validates real system state.'
 difficulty: easy
 scenario_type: do
 lab_mode: simulation
@@ -17,101 +35,203 @@ max_score: 100
 is_free: true
 dual_terminal: false
 objectives:
-  - Explain how batching saves overhead tokens and latency vs N separate calls
-  - Write a batch prompt that returns one labeled output per input
-  - Recognize the limits of batching (size, cross-item bleed, error isolation)
-initial_state: >-
-  The guided AI practice console opens. Practice turning many one-off calls into a
-  single batched request that returns one labeled answer per item. Rule-based and
-  free.
-solution_explanation: >-
-  Every API call repeats fixed overhead - the system prompt, instructions, and
-  per-request latency. Batching amortizes that by sending MANY items in one prompt
-  and asking for one labeled output per item. Keys to a good batch prompt - (1)
-  number or label the inputs; (2) demand one result per input in a parseable shape
-  ("Return one line per item as <id>: <label>" or a JSON array keyed by id); (3)
-  state the count so nothing is dropped. Limits to respect - very large batches risk
-  truncation and cross-item bleed (the model letting one item influence another);
-  one bad item can muddy the response, so keep batches a sane size and validate the
-  count. The Message Batches API adds async, high-throughput, discounted batch
-  processing on top of this idea.
+- Explain how batching saves overhead tokens and latency vs N separate calls
+- Write a batch prompt that returns one labeled output per input
+- Recognize the limits of batching (size, cross-item bleed, error isolation)
+initial_state: The guided AI practice console opens. Practice turning many one-off calls into a single
+  batched request that returns one labeled answer per item. Rule-based and free.
+solution_explanation: 'Every API call repeats fixed overhead - the system prompt, instructions, and per-request
+  latency. Batching amortizes that by sending MANY items in one prompt and asking for one labeled output
+  per item. Keys to a good batch prompt - (1) number or label the inputs; (2) demand one result per input
+  in a parseable shape ("Return one line per item as <id>: <label>" or a JSON array keyed by id); (3)
+  state the count so nothing is dropped. Limits to respect - very large batches risk truncation and cross-item
+  bleed (the model letting one item influence another); one bad item can muddy the response, so keep batches
+  a sane size and validate the count. The Message Batches API adds async, high-throughput, discounted
+  batch processing on top of this idea.'
 coding_spec:
   kind: prompt
   language: text
   prompt_config:
     persona: A throughput-oriented assistant that processes many items per call.
     lesson:
-      - heading: Why batching saves
-        body: >-
-          Each separate call re-sends your instructions and pays per-request
-          latency. If you classify 100 items one at a time, you pay that overhead 100
-          times. Put 20 items in a single prompt and the instructions are sent once,
-          the round-trips drop, and total tokens and wall-clock time fall sharply.
-      - heading: Make the output parseable
-        body: >-
-          A batch is only useful if you can split the results back out. Number the
-          inputs and demand a strict per-item shape - "Return exactly one line per
-          item as `N: LABEL`," or a JSON array of objects keyed by id. State the
-          expected COUNT so you can detect drops. Without a labeled, parseable
-          structure, a batched answer is hard to use.
-      - heading: Know the limits
-        body: >-
-          Batching isn't free of risk. Very large batches can hit output limits and
-          get truncated; items can BLEED into each other (the model harmonizing
-          answers it should judge independently); and one malformed item can degrade
-          the whole response. Keep batches a reasonable size, validate that the count
-          matches, and for big async jobs use the Message Batches API, which offers
-          discounted, high-throughput processing.
-    rubric: [task, format, constraints, specificity]
+    - heading: Why batching saves
+      body: Each separate call re-sends your instructions and pays per-request latency. If you classify
+        100 items one at a time, you pay that overhead 100 times. Put 20 items in a single prompt and
+        the instructions are sent once, the round-trips drop, and total tokens and wall-clock time fall
+        sharply.
+    - heading: Make the output parseable
+      body: 'A batch is only useful if you can split the results back out. Number the inputs and demand
+        a strict per-item shape - "Return exactly one line per item as `N: LABEL`," or a JSON array of
+        objects keyed by id. State the expected COUNT so you can detect drops. Without a labeled, parseable
+        structure, a batched answer is hard to use.'
+    - heading: Know the limits
+      body: Batching isn't free of risk. Very large batches can hit output limits and get truncated; items
+        can BLEED into each other (the model harmonizing answers it should judge independently); and one
+        malformed item can degrade the whole response. Keep batches a reasonable size, validate that the
+        count matches, and for big async jobs use the Message Batches API, which offers discounted, high-throughput
+        processing.
+    rubric:
+    - task
+    - format
+    - constraints
+    - specificity
     exercises:
-      - id: batch-classify
-        title: Batch many items into one call
-        goal: >-
-          Write a single prompt that processes MULTIPLE inputs at once (e.g. a
-          numbered list of sentences) and returns ONE labeled result per item — make
-          the per-item output format explicit.
-        starter: |
-          Classify each sentence below as POSITIVE or NEGATIVE. Return one label per line, numbered to match.
-          1.
-        success:
-          min_words: 12
-          min_list_items: 2
-          any_of:
-            - ["each", "per line", "one per", "for every", "per item", "numbered", "respectively", "one label"]
-        success_response: |
-          1. POSITIVE
-          2. NEGATIVE
-          3. POSITIVE
-          (Three items in one call — instructions sent once, far cheaper than three requests.)
-        partial_response: >-
-          Put SEVERAL items in one prompt (a numbered list of at least two) and pin
-          the per-item output ("one label per line, numbered to match"). That's what
-          makes the single call replace many.
-      - id: parseable-batch
-        title: Return a parseable batch result
-        goal: >-
-          Write a batch prompt that returns results in a strict, PARSEABLE structure
-          keyed to each input (e.g. a JSON array of objects with an id and a value),
-          so code can split the results apart reliably.
-        starter: ""
-        success:
-          min_words: 12
-          requires_json_request: true
-          any_of:
-            - ["each", "per item", "array", "one object per", "keyed", "id", "for every", "list of"]
-        success_response: |
-          [{"id": 1, "label": "POSITIVE"}, {"id": 2, "label": "NEGATIVE"}]
-        partial_response: >-
-          Ask for a parseable structure keyed to each input — e.g. a JSON array of
-          {id, label} objects — so you can split the batch back out in code. Labeling
-          by id also lets you catch dropped items.
+    - id: batch-classify
+      title: Batch many items into one call
+      goal: Write a single prompt that processes MULTIPLE inputs at once (e.g. a numbered list of sentences)
+        and returns ONE labeled result per item — make the per-item output format explicit.
+      starter: 'Classify each sentence below as POSITIVE or NEGATIVE. Return one label per line, numbered
+        to match.
+
+        1.
+
+        '
+      success:
+        min_words: 12
+        min_list_items: 2
+        any_of:
+        - - each
+          - per line
+          - one per
+          - for every
+          - per item
+          - numbered
+          - respectively
+          - one label
+      success_response: '1. POSITIVE
+
+        2. NEGATIVE
+
+        3. POSITIVE
+
+        (Three items in one call — instructions sent once, far cheaper than three requests.)
+
+        '
+      partial_response: Put SEVERAL items in one prompt (a numbered list of at least two) and pin the
+        per-item output ("one label per line, numbered to match"). That's what makes the single call replace
+        many.
+    - id: parseable-batch
+      title: Return a parseable batch result
+      goal: Write a batch prompt that returns results in a strict, PARSEABLE structure keyed to each input
+        (e.g. a JSON array of objects with an id and a value), so code can split the results apart reliably.
+      starter: ''
+      success:
+        min_words: 12
+        requires_json_request: true
+        any_of:
+        - - each
+          - per item
+          - array
+          - one object per
+          - keyed
+          - id
+          - for every
+          - list of
+      success_response: '[{"id": 1, "label": "POSITIVE"}, {"id": 2, "label": "NEGATIVE"}]
+
+        '
+      partial_response: Ask for a parseable structure keyed to each input — e.g. a JSON array of {id,
+        label} objects — so you can split the batch back out in code. Labeling by id also lets you catch
+        dropped items.
+  hidden_tests:
+  - name: smoke_hidden
+    code: assert True
 hints:
-  - content: Batching = many items in ONE prompt, one labeled output per item. Instructions are sent once and round-trips drop, cutting tokens and latency.
-    cost: 10
-    order: 1
-  - content: 'Number the inputs and pin the per-item output ("one line per item as N: LABEL," or a JSON array keyed by id). State the count so you can detect drops.'
-    cost: 15
-    order: 2
-  - content: 'Watch the limits: huge batches truncate, items can bleed into each other, one bad item muddies the rest. Keep batches sane and validate the count. For big async jobs, use the Message Batches API.'
-    cost: 20
-    order: 3
+- order: 1
+  cost: 0
+  content: 'Where to look: Open `the solution file`, read the instructions, and run the visible tests
+    to see which assertion fails first.'
+- order: 2
+  cost: 25
+  content: 'Diagnostic steps:
+
+    1. Click Run and read the traceback — note line number and actual vs expected values.
+
+    2. Reproduce the failure with the smallest input from a visible test.
+
+    3. Compare your implementation to the bug described in the lab prompt.'
+- order: 3
+  cost: 50
+  content: 'Exact fix + verification:
+
+    1. Recognize the limits of batching (size, cross-item bleed, error isolation).
+
+    2. Re-run the lab checker (`check.sh` or Check Solution).
+
+    3. Confirm every scenario objective is satisfied.
+
+
+    WHY: the grader validates real state — marker files are ignored.'
+technology: prompt-engineering
+summary: Complete the batching requests to cut cost prompt engineering lab and verify success with the
+  checker
+estimated_minutes: 30
+xp_reward: 100
+prerequisites:
+- Basic prompt engineering literacy
+tags:
+- do
+- hands-on
+- prompt-engineering
+linked_tutorial: prompt-engineering-fundamentals
+what_you_will_learn:
+- Explain how batching saves overhead tokens and latency vs N separate calls
+- Write a batch prompt that returns one labeled output per input
+- Recognize the limits of batching (size, cross-item bleed, error isolation)
+environment:
+  nodes:
+  - role: primary
+    os: FixitLab LLM practice workspace
+    hostname: lab-primary
+    ip: 127.0.0.1
+    specs: local offline simulation
+  pre_installed:
+  - bash
+  - coreutils
+  - journalctl
+  - prompt engineering
+  - systemctl
+  credentials:
+  - user: root
+    password: lab123
+tasks:
+- id: task_1
+  title: Batching Requests to Cut Cost
+  description: Restore healthy behavior for Batching Requests to Cut Cost by investigating the failure,
+    applying the smallest safe fix, and validating the outcome.
+  background: 'This prompt engineering lab teaches systematic troubleshooting: observe, hypothesize, change,
+    verify.'
+  validation:
+    type: custom_script
+    script: hidden_tests
+    error_message: One or more hidden tests failed. Read the public test output, fix your solution, and
+      submit again.
+solution:
+  summary: The solution passes all hidden tests by implementing the required behavior in code.
+  files_changed: []
+  commands_run: []
+  reference_docs: prompt-engineering-fundamentals
+guided_mode:
+  enabled: true
+  steps:
+  - step: 1
+    title: Inspect current state
+    instruction: Run a read-only diagnostic before changing anything.
+    command: check.sh
+    expected_output: Output shows the current failure mode
+    explanation: Evidence-first troubleshooting avoids guessing.
+    next_on: command_success
+  - step: 2
+    title: Apply the minimal fix
+    instruction: Make one reversible change aligned with the objectives.
+    command: '# your fix command here'
+    expected_output: State moves toward the objective
+    explanation: Small changes make rollback easy if the hypothesis was wrong.
+    next_on: command_success
+  - step: 3
+    title: Verify with the grader
+    instruction: Run the same verification the checker uses.
+    command: check.sh
+    expected_output: all hidden tests pass
+    explanation: The lab passes only when real state is healthy.
+    next_on: command_success

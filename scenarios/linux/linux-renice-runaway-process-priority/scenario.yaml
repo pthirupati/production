@@ -1,44 +1,137 @@
-title: 'Tame a Runaway Process with renice and a Limit'
+title: Tame a Runaway Process with renice and a Limit
 slug: linux-renice-runaway-process-priority
 difficulty: easy
-category: 'Linux Administration'
+category: Fix
 technology: linux
-description: |
-  A batch analytics process is hogging CPU and starving interactive work because it runs at
-  the default priority. Operations policy is to keep this workload at a low CPU priority
-  (high nice value) and to capture that policy so future launches inherit it. Renice the
-  running process to a low priority and record the policy (e.g. a wrapper/limits drop-in)
-  so it is reproducible. Record the remediation.
-initial_state: |
-  Simulated RHEL 9 server. top shows the analytics process at nice 0 consuming most CPU.
+description: 'CONTEXT: A team operating Linux administration needs you to resolve `Tame a Runaway Process
+  with renice and a Limit` during a realistic incident. The business impact is reduced service reliability
+  until the underlying state is repaired.
+
+
+  ENVIRONMENT: You are working in FixitLab''s offline Linux practice server with terminal and config files
+  under /etc and /var. All tools run locally; no paid APIs or external cloud calls are required.
+
+
+  SYMPTOM / STARTING STATE: Simulated RHEL 9 server. top shows the analytics process at nice 0 consuming
+  most CPU.
+
   There is no policy file pinning it to a lower priority, so every restart reverts to nice
+
+  0 and re-starves the box. A batch analytics process is hogging CPU and starving interactive work because
+  it runs at
+
+  the default priority. Operations policy is to keep this workload at a low CPU priority
+
+  (high nice value) and to capture that policy so future launches inherit it. Renice the
+
+  running process to a low priority and record the policy (e.g. a wrapper/limits drop-in)
+
+  so it is reproducible. Record the remediation.
+
+
+  OBJECTIVE: Identify the offending PID with top / ps -eo pid,ni,comm; {''Renice it to a low priority'':
+  ''renice +15 -p <pid> (higher nice = lower priority)''}; Confirm the new nice value with ps -o ni. Success
+  means `check.sh` exits successfully.
+
+
+  WHAT TO AVOID: Do not apply broad destructive changes, skip evidence gathering, or fake completion with
+  marker files — the checker validates real system state.'
+initial_state: 'Simulated RHEL 9 server. top shows the analytics process at nice 0 consuming most CPU.
+
+  There is no policy file pinning it to a lower priority, so every restart reverts to nice
+
   0 and re-starves the box.
+
+  '
 objectives:
-  - Identify the offending PID with top / ps -eo pid,ni,comm
-  - Renice it to a low priority: renice +15 -p <pid> (higher nice = lower priority)
-  - Confirm the new nice value with ps -o ni
-  - Capture the policy so future runs start at the lower priority and record it
+- Identify the offending PID with top / ps -eo pid,ni,comm
+- Renice it to a low priority: renice +15 -p <pid> (higher nice = lower priority)
+- Confirm the new nice value with ps -o ni
+- Capture the policy so future runs start at the lower priority and record it
 lab_mode: simulation
 simulation_type: generic
 time_limit: 900
 max_score: 100
 is_free: false
 topics_covered:
-  - nice
-  - renice
-  - priority
-  - cpu
-  - limits
+- nice
+- renice
+- priority
+- cpu
+- limits
 hints:
-  - content: 'ps -eo pid,ni,comm shows the analytics process at nice 0. Higher nice value = lower CPU priority; you want to raise its nice.'
-    cost: 10
-    order: 1
-  - content: 'Renice the running process: renice +15 -p <pid> (only root can lower the nice number; raising it is always allowed). Verify with ps -o ni -p <pid>.'
-    cost: 15
-    order: 2
-  - content: 'So it sticks across restarts, pin the policy in a drop-in/wrapper (e.g. nice -n 15 in the launcher, or a /etc/security/limits.d entry) and save it.'
-    cost: 15
-    order: 3
+- order: 1
+  cost: 0
+  content: 'Where to look: Identify the offending PID with top / ps -eo pid,ni,comm'
+- order: 2
+  cost: 25
+  content: 'Diagnostic steps:
+
+    1. {''Renice it to a low priority'': ''renice +15 -p <pid> (higher nice = lower priority)''}
+
+    2. Confirm the new nice value with ps -o ni
+
+    3. Capture the policy so future runs start at the lower priority and record it'
+- order: 3
+  cost: 50
+  content: 'Exact fix + verification:
+
+    1. Capture the policy so future runs start at the lower priority and record it.
+
+    2. Re-run the lab checker (`check.sh` or Check Solution).
+
+    3. Confirm every scenario objective is satisfied.
+
+
+    WHY: the grader validates real state — marker files are ignored.'
 requires_companion_hosts: false
 dual_terminal: false
 jira_priority: Medium
+summary: Complete the tame a runaway process with renice and a limit linux lab and verify success with
+  the checker
+estimated_minutes: 15
+xp_reward: 100
+prerequisites:
+- Basic linux literacy
+tags:
+- fix
+- hands-on
+- linux
+linked_tutorial: linux-fundamentals
+what_you_will_learn:
+- Identify the offending PID with top / ps -eo pid,ni,comm
+- '{''Renice it to a low priority'': ''renice +15 -p <pid> (higher nice = lower priority)''}'
+- Confirm the new nice value with ps -o ni
+- Capture the policy so future runs start at the lower priority and record it
+environment:
+  nodes:
+  - role: primary
+    os: FixitLab Linux practice server
+    hostname: lab-primary
+    ip: 127.0.0.1
+    specs: local offline simulation
+  pre_installed:
+  - bash
+  - coreutils
+  - journalctl
+  - linux
+  - systemctl
+  credentials:
+  - user: root
+    password: lab123
+tasks:
+- id: task_1
+  title: Tame a Runaway Process with renice and a Limit
+  description: Restore healthy behavior for Tame a Runaway Process with renice and a Limit by investigating
+    the failure, applying the smallest safe fix, and validating the outcome.
+  background: 'This linux lab teaches systematic troubleshooting: observe, hypothesize, change, verify.'
+  validation:
+    type: custom_script
+    script: check.sh
+    error_message: Validation did not pass. Re-read the objectives and Hint 2 diagnostic steps.
+solution:
+  summary: Identify the misconfiguration affecting this linux lab and apply the minimal fix.
+  files_changed: []
+  commands_run:
+  - bash check.sh
+  reference_docs: linux-fundamentals

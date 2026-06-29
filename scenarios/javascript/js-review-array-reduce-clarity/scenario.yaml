@@ -1,9 +1,26 @@
 title: 'Refactor: Fix countBy Aggregation'
 slug: js-review-array-reduce-clarity
-category: JavaScript Development
-description: countBy(items, keyFn) should return an object mapping each key to the NUMBER of items with
-  that key, but it stores the last item instead of a count. Refactor it to accumulate counts. The tests
-  pin the count contract.
+category: Fix
+description: 'CONTEXT: A team operating JavaScript needs you to resolve `Refactor: Fix countBy Aggregation`
+  during a realistic incident. The business impact is reduced service reliability until the underlying
+  state is repaired.
+
+
+  ENVIRONMENT: You are working in FixitLab''s offline JavaScript practice project with modules, browser
+  console, and Node tooling. All tools run locally; no paid APIs or external cloud calls are required.
+
+
+  SYMPTOM / STARTING STATE: countBy(items, keyFn) should return an object mapping each key to the NUMBER
+  of items with that key, but it stores the last item instead of a count. Refactor it to accumulate counts.
+  The tests pin the count contract.
+
+
+  OBJECTIVE: See values are items, not counts; Increment a numeric counter per key; Return the correct
+  frequency object. Success means all hidden tests pass.
+
+
+  WHAT TO AVOID: Do not apply broad destructive changes, skip evidence gathering, or fake completion with
+  marker files — the checker validates real system state.'
 difficulty: medium
 scenario_type: fix
 lab_mode: simulation
@@ -21,53 +38,121 @@ objectives:
 initial_state: countBy(items, keyFn) should return an object mapping each key to the NUMBER of items with
   that key, but it stores the last item instead of a count. Refactor it to accumulate counts. The tests
   pin the count contract.
-solution_explanation: |
-  Assigning the item overwrites with a value, not a tally. Initializing to 0 and incrementing accumulates the count per key.
+solution_explanation: 'Assigning the item overwrites with a value, not a tally. Initializing to 0 and
+  incrementing accumulates the count per key.
+
+  '
 coding_spec:
   language: javascript
   entrypoint: solution.js
   kind: review
-  instructions: |
-    Fix countBy(items, keyFn): return { key: count }.
-      countBy([1,2,3,4], n => n % 2 ? 'odd' : 'even') -> {odd:2, even:2}
-    Click Run to try it, then Check Solution to grade against all tests.
+  instructions: "Fix countBy(items, keyFn): return { key: count }.\n  countBy([1,2,3,4], n => n % 2 ?\
+    \ 'odd' : 'even') -> {odd:2, even:2}\nClick Run to try it, then Check Solution to grade against all\
+    \ tests.\n"
   files:
   - path: solution.js
-    content: |
-      function countBy(items, keyFn) {
-        const out = {};
-        for (const item of items) {
-          out[keyFn(item)] = item; // bug: stores the item, not a count
-        }
-        return out;
-      }
+    content: "function countBy(items, keyFn) {\n  const out = {};\n  for (const item of items) {\n   \
+      \ out[keyFn(item)] = item; // bug: stores the item, not a count\n  }\n  return out;\n}\n"
     readonly: false
   visible_tests:
   - name: odd/even counts
-    code: |
-      assert(JSON.stringify(countBy([1,2,3,4], n => n % 2 ? 'odd' : 'even')) === JSON.stringify({odd:2, even:2}), JSON.stringify(countBy([1,2,3,4], n => n % 2 ? 'odd' : 'even')));
+    code: 'assert(JSON.stringify(countBy([1,2,3,4], n => n % 2 ? ''odd'' : ''even'')) === JSON.stringify({odd:2,
+      even:2}), JSON.stringify(countBy([1,2,3,4], n => n % 2 ? ''odd'' : ''even'')));
+
+      '
   - name: single key
-    code: |
-      assert(JSON.stringify(countBy([2,4,6], () => 'all')) === JSON.stringify({all:3}), JSON.stringify(countBy([2,4,6], () => 'all')));
+    code: 'assert(JSON.stringify(countBy([2,4,6], () => ''all'')) === JSON.stringify({all:3}), JSON.stringify(countBy([2,4,6],
+      () => ''all'')));
+
+      '
   hidden_tests:
   - name: by length
-    code: |
-      assert(JSON.stringify(countBy(['a','bb','cc'], s => s.length)) === JSON.stringify({1:1, 2:2}), JSON.stringify(countBy(['a','bb','cc'], s => s.length)));
+    code: 'assert(JSON.stringify(countBy([''a'',''bb'',''cc''], s => s.length)) === JSON.stringify({1:1,
+      2:2}), JSON.stringify(countBy([''a'',''bb'',''cc''], s => s.length)));
+
+      '
   - name: empty
-    code: |
-      assert(JSON.stringify(countBy([], () => 'x')) === JSON.stringify({}), JSON.stringify(countBy([], () => 'x')));
+    code: 'assert(JSON.stringify(countBy([], () => ''x'')) === JSON.stringify({}), JSON.stringify(countBy([],
+      () => ''x'')));
+
+      '
   - name: values are numbers
-    code: |
-      const r = countBy([1,1,1], () => 'k');
-      assert(r.k === 3 && typeof r.k === 'number');
+    code: 'const r = countBy([1,1,1], () => ''k'');
+
+      assert(r.k === 3 && typeof r.k === ''number'');
+
+      '
   timeout: 8
 hints:
 - order: 1
-  cost: 10
-  content: 'countBy([1,3], () => ''odd'') returns {odd: 3} — it stored the item, not a count.'
+  cost: 0
+  content: 'Where to look: Open `solution.js`, read the instructions, and run the visible tests to see
+    which assertion fails first.'
 - order: 2
-  cost: 20
-  content: Each key should map to a running integer count.
+  cost: 25
+  content: 'Diagnostic steps:
+
+    1. Click Run and read the traceback — note line number and actual vs expected values.
+
+    2. Reproduce the failure with the smallest input from a visible test.
+
+    3. Compare your implementation to the bug described in the lab prompt.'
 - order: 3
-  cost: 30
-  content: Use out[key] = (out[key] || 0) + 1.
+  cost: 50
+  content: 'Exact fix + verification:
+
+    1. Return the correct frequency object.
+
+    2. Re-run the lab checker (`check.sh` or Check Solution).
+
+    3. Confirm every scenario objective is satisfied.
+
+
+    WHY: the grader validates real state — marker files are ignored.'
+technology: javascript
+summary: 'Complete the refactor: fix countby aggregation javascript lab and verify success with the checker'
+estimated_minutes: 25
+xp_reward: 100
+prerequisites:
+- Basic javascript literacy
+tags:
+- fix
+- hands-on
+- javascript
+linked_tutorial: javascript-fundamentals
+what_you_will_learn:
+- See values are items, not counts
+- Increment a numeric counter per key
+- Return the correct frequency object
+environment:
+  nodes:
+  - role: primary
+    os: FixitLab JavaScript practice project
+    hostname: lab-primary
+    ip: 127.0.0.1
+    specs: local offline simulation
+  pre_installed:
+  - bash
+  - coreutils
+  - javascript
+  - journalctl
+  - systemctl
+  credentials:
+  - user: root
+    password: lab123
+tasks:
+- id: task_1
+  title: 'Refactor: Fix countBy Aggregation'
+  description: 'Restore healthy behavior for Refactor: Fix countBy Aggregation by investigating the failure,
+    applying the smallest safe fix, and validating the outcome.'
+  background: 'This javascript lab teaches systematic troubleshooting: observe, hypothesize, change, verify.'
+  validation:
+    type: custom_script
+    script: hidden_tests
+    error_message: One or more hidden tests failed. Read the public test output, fix your solution, and
+      submit again.
+solution:
+  summary: The solution passes all hidden tests by implementing the required behavior in code.
+  files_changed: []
+  commands_run: []
+  reference_docs: javascript-fundamentals

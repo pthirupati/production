@@ -1,9 +1,28 @@
 title: VM Guest Powered Off
 slug: vmware-guest-powered-off
-category: VMware vSphere
-description: A production web VM (web-prod-01) is powered off, so the service it hosts is down. The ESXi
-  hosts are healthy and connected — the VM simply needs to be investigated and powered back on. Use the
-  vCenter simulator (reached from the Jira ticket) to find the powered-off VM and restore service.
+category: Fix
+description: 'CONTEXT: A team operating VMware vSphere needs you to resolve `VM Guest Powered Off` during
+  a realistic incident. The business impact is reduced service reliability until the underlying state
+  is repaired.
+
+
+  ENVIRONMENT: You are working in FixitLab''s offline vSphere lab with VMs, datastores, vCenter, and ESXi
+  tasks. All tools run locally; no paid APIs or external cloud calls are required.
+
+
+  SYMPTOM / STARTING STATE: vCenter shows web-prod-01 powered off while the ESXi hosts are connected and
+  healthy; the production service is down until the VM is started. A production web VM (web-prod-01) is
+  powered off, so the service it hosts is down. The ESXi hosts are healthy and connected — the VM simply
+  needs to be investigated and powered back on. Use the vCenter simulator (reached from the Jira ticket)
+  to find the powered-off VM and restore service.
+
+
+  OBJECTIVE: Open the vCenter simulator from the Jira ticket; Identify the powered-off VM (web-prod-01);
+  Power on the VM and verify it returns to service. Success means `check.sh` exits successfully.
+
+
+  WHAT TO AVOID: Do not apply broad destructive changes, skip evidence gathering, or fake completion with
+  marker files — the checker validates real system state.'
 difficulty: medium
 lab_mode: simulation
 simulation_type: vmware
@@ -20,14 +39,71 @@ initial_state: vCenter shows web-prod-01 powered off while the ESXi hosts are co
   production service is down until the VM is started.
 hints:
 - order: 1
-  cost: 10
-  content: Open the vCenter Simulator from the Jira ticket and check VM power state in the inventory tree
-    — web-prod-01 shows powered off (gray icon).
+  cost: 0
+  content: 'Where to look: Open the vCenter simulator from the Jira ticket'
 - order: 2
-  cost: 15
-  content: 'Select web-prod-01 and power it on: VM Actions -> Power -> Power On (or the Power On button
-    in the VM panel).'
+  cost: 25
+  content: 'Diagnostic steps:
+
+    1. Identify the powered-off VM (web-prod-01)
+
+    2. Power on the VM and verify it returns to service'
 - order: 3
-  cost: 20
-  content: Watch it boot to powered-on/green and confirm the guest is up (console or the VM summary) so
-    the web service is restored.
+  cost: 50
+  content: 'Exact fix + verification:
+
+    1. Power on the VM and verify it returns to service.
+
+    2. Re-run the lab checker (`check.sh` or Check Solution).
+
+    3. Confirm every scenario objective is satisfied.
+
+
+    WHY: the grader validates real state — marker files are ignored.'
+technology: vmware
+summary: Complete the vm guest powered off vmware lab and verify success with the checker
+estimated_minutes: 15
+xp_reward: 100
+prerequisites:
+- Basic vmware literacy
+tags:
+- fix
+- hands-on
+- vmware
+linked_tutorial: vmware-fundamentals
+what_you_will_learn:
+- Open the vCenter simulator from the Jira ticket
+- Identify the powered-off VM (web-prod-01)
+- Power on the VM and verify it returns to service
+environment:
+  nodes:
+  - role: primary
+    os: FixitLab vSphere lab
+    hostname: lab-primary
+    ip: 127.0.0.1
+    specs: local offline simulation
+  pre_installed:
+  - bash
+  - coreutils
+  - journalctl
+  - systemctl
+  - vmware
+  credentials:
+  - user: root
+    password: lab123
+tasks:
+- id: task_1
+  title: VM Guest Powered Off
+  description: Restore healthy behavior for VM Guest Powered Off by investigating the failure, applying
+    the smallest safe fix, and validating the outcome.
+  background: 'This vmware lab teaches systematic troubleshooting: observe, hypothesize, change, verify.'
+  validation:
+    type: custom_script
+    script: check.sh
+    error_message: Validation did not pass. Re-read the objectives and Hint 2 diagnostic steps.
+solution:
+  summary: Identify the misconfiguration affecting this vmware lab and apply the minimal fix.
+  files_changed: []
+  commands_run:
+  - bash check.sh
+  reference_docs: vmware-fundamentals

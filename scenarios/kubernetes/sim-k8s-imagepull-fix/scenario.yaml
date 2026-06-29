@@ -1,7 +1,7 @@
 title: Deployment ImagePullBackOff
 slug: sim-k8s-imagepull-fix
-technology: Kubernetes
-category: Workloads
+technology: kubernetes
+category: Fix
 difficulty: medium
 lab_mode: simulation
 simulation_type: kubernetes
@@ -9,9 +9,29 @@ time_limit: 900
 max_score: 100
 jira_priority: Medium
 is_free: false
-description: The api deployment's pods are stuck in ImagePullBackOff because the deployment references
-  a bad image tag (api:missing-tag) that does not exist in the registry. Every pull fails, so the pods
-  never start. Repoint the deployment to the correct, existing tag and confirm the pods reach Running.
+description: 'CONTEXT: A team operating Kubernetes needs you to resolve `Deployment ImagePullBackOff`
+  during a realistic incident. The business impact is reduced service reliability until the underlying
+  state is repaired.
+
+
+  ENVIRONMENT: You are working in FixitLab''s offline Kubernetes cluster with kubectl, manifests, and
+  cluster resources. All tools run locally; no paid APIs or external cloud calls are required.
+
+
+  SYMPTOM / STARTING STATE: Simulated Kubernetes cluster. The api deployment uses image api:missing-tag,
+  which the registry does not have. Pods report ErrImagePull then ImagePullBackOff. The api deployment''s
+  pods are stuck in ImagePullBackOff because the deployment references a bad image tag (api:missing-tag)
+  that does not exist in the registry. Every pull fails, so the pods never start. Repoint the deployment
+  to the correct, existing tag and confirm the pods reach Running.
+
+
+  OBJECTIVE: Describe a failing api pod and confirm the bad image tag; Set the api deployment to a valid
+  image (api:v1); Verify the api pods reach Running state. Success means `kubectl get pods` shows every
+  pod Running.
+
+
+  WHAT TO AVOID: Do not apply broad destructive changes, skip evidence gathering, or fake completion with
+  marker files — the checker validates real system state.'
 objectives:
 - Describe a failing api pod and confirm the bad image tag
 - Set the api deployment to a valid image (api:v1)
@@ -20,14 +40,75 @@ initial_state: Simulated Kubernetes cluster. The api deployment uses image api:m
   registry does not have. Pods report ErrImagePull then ImagePullBackOff.
 hints:
 - order: 1
-  cost: 10
-  content: '`kubectl describe pod <api-pod>` Events show "Failed to pull image api:missing-tag". The deployment
-    is pinned to a tag that doesn''t exist.'
+  cost: 0
+  content: 'Where to look: Run `kubectl get pods -A` and `kubectl describe pod <name>` for any pod not
+    in Running state.'
 - order: 2
-  cost: 15
-  content: 'Confirm the requested image: `kubectl get deploy api -o jsonpath=''{.spec.template.spec.containers[0].image}''`
-    → api:missing-tag. The working tag is api:v1.'
+  cost: 25
+  content: 'Diagnostic steps:
+
+    1. `kubectl get pods` — note CrashLoopBackOff, ImagePullBackOff, or Pending.
+
+    2. `kubectl describe pod <name>` — read Events at the bottom.
+
+    3. `kubectl logs <name> [--previous]` if the container restarted.'
 - order: 3
-  cost: 20
-  content: 'Fix and roll out: `kubectl set image deployment/api api=api:v1` then `kubectl rollout status
-    deployment/api`. Pods pull api:v1 and reach Running.'
+  cost: 50
+  content: 'Exact fix + verification:
+
+    1. Fix the root cause (image name, env var, volume mount, or probe).
+
+    2. `kubectl apply -f` the corrected manifest or delete the pod to recreate.
+
+    3. Confirm `kubectl get pods` shows every pod Running.
+
+
+    WHY: Kubernetes only reports healthy when the workload actually runs.'
+summary: Complete the deployment imagepullbackoff kubernetes lab and verify success with the checker
+estimated_minutes: 15
+xp_reward: 100
+prerequisites:
+- Basic kubernetes literacy
+tags:
+- fix
+- hands-on
+- kubernetes
+linked_tutorial: kubernetes-fundamentals
+what_you_will_learn:
+- Describe a failing api pod and confirm the bad image tag
+- Set the api deployment to a valid image (api:v1)
+- Verify the api pods reach Running state
+environment:
+  nodes:
+  - role: primary
+    os: FixitLab Kubernetes cluster
+    hostname: lab-primary
+    ip: 127.0.0.1
+    specs: local offline simulation
+  pre_installed:
+  - bash
+  - coreutils
+  - helm
+  - kubectl
+  - kubernetes
+  credentials:
+  - user: root
+    password: lab123
+tasks:
+- id: task_1
+  title: Deployment ImagePullBackOff
+  description: Restore healthy behavior for Deployment ImagePullBackOff by investigating the failure,
+    applying the smallest safe fix, and validating the outcome.
+  background: 'This kubernetes lab teaches systematic troubleshooting: observe, hypothesize, change, verify.'
+  validation:
+    type: k8s_resource_state
+    resource_kind: Pod
+    resource_name: all
+    namespace: default
+    expected_state: Running
+    error_message: One or more pods are not Running. Use kubectl describe pod and kubectl logs.
+solution:
+  summary: Identify the misconfiguration affecting this kubernetes lab and apply the minimal fix.
+  files_changed: []
+  commands_run: []
+  reference_docs: kubernetes-fundamentals

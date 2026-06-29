@@ -1,30 +1,68 @@
-title: HPA Wants More Pods but the Cluster is Out of Nodes — Add a Worker VM in VMware
+title: HPA Wants More Pods but the Cluster is Out of Nodes - Add a
 slug: k8s-hpa-needs-new-node-vmware
-category: Kubernetes
+category: Fix
 difficulty: hard
-description: |
-  The `web` Deployment is under sustained load. Its HorizontalPodAutoscaler has
+description: 'CONTEXT: A team operating Kubernetes needs you to resolve `HPA Wants More Pods but the Cluster
+  is Out of Nodes - Add a` during a realistic incident. The business impact is reduced service reliability
+  until the underlying state is repaired.
+
+
+  ENVIRONMENT: You are working in FixitLab''s offline Kubernetes cluster with kubectl, manifests, and
+  cluster resources. All tools run locally; no paid APIs or external cloud calls are required.
+
+
+  SYMPTOM / STARTING STATE: A Kubernetes cluster with one control-plane and one worker (worker-1). The
+  `web`
+
+  Deployment''s HPA targets 4 replicas under load but only 2 are Running; the other
+
+  2 are Pending (Insufficient cpu). A second worker VM, `k8s-worker-2`, exists in
+
+  the VMware inventory but is powered off, so node worker-2 has not joined. The `web` Deployment is under
+  sustained load. Its HorizontalPodAutoscaler has
+
   decided it needs 4 replicas, but two of the pods are stuck Pending with
+
   FailedScheduling "Insufficient cpu" — the single worker node (worker-1) is full.
+
   This cluster runs ON VMware: each Kubernetes node is a VMware VM. You cannot fix
+
   this from kubectl alone — there is genuinely no room to schedule the pods.
 
+
   This is a CROSS-TECHNOLOGY task. Open the VMware simulator for this lab (toolbar
+
   -> Open VMware), power on the spare worker-node VM `k8s-worker-2` (it is in the
+
   inventory, powered off). It joins the cluster as node `worker-2` and the Pending
+
   pods schedule onto it. Then confirm from the terminal that the HPA is satisfied
+
   and all pods are Running across both nodes.
-initial_state: |
-  A Kubernetes cluster with one control-plane and one worker (worker-1). The `web`
-  Deployment's HPA targets 4 replicas under load but only 2 are Running; the other
+
+
+  OBJECTIVE: Inspect the Pending pods and the HPA (kubectl get pods, kubectl describe hpa web); Confirm
+  the cluster is out of schedulable capacity (kubectl get nodes shows one worker); Open the VMware simulator
+  and power on the worker-node VM k8s-worker-2. Success means `kubectl get pods` shows every pod Running.
+
+
+  WHAT TO AVOID: Do not apply broad destructive changes, skip evidence gathering, or fake completion with
+  marker files — the checker validates real system state.'
+initial_state: 'A Kubernetes cluster with one control-plane and one worker (worker-1). The `web`
+
+  Deployment''s HPA targets 4 replicas under load but only 2 are Running; the other
+
   2 are Pending (Insufficient cpu). A second worker VM, `k8s-worker-2`, exists in
+
   the VMware inventory but is powered off, so node worker-2 has not joined.
+
+  '
 objectives:
-  - Inspect the Pending pods and the HPA (kubectl get pods, kubectl describe hpa web)
-  - Confirm the cluster is out of schedulable capacity (kubectl get nodes shows one worker)
-  - Open the VMware simulator and power on the worker-node VM k8s-worker-2
-  - Confirm worker-2 is Ready (kubectl get nodes) and the Pending pods schedule
-  - Verify the HPA is satisfied and all web pods are Running (kubectl get hpa, kubectl get pods)
+- Inspect the Pending pods and the HPA (kubectl get pods, kubectl describe hpa web)
+- Confirm the cluster is out of schedulable capacity (kubectl get nodes shows one worker)
+- Open the VMware simulator and power on the worker-node VM k8s-worker-2
+- Confirm worker-2 is Ready (kubectl get nodes) and the Pending pods schedule
+- Verify the HPA is satisfied and all web pods are Running (kubectl get hpa, kubectl get pods)
 lab_mode: simulation
 simulation_type: kubernetes
 cross_technology: true
@@ -35,13 +73,81 @@ is_free: false
 jira_priority: High
 dual_terminal: false
 hints:
-  - order: 1
-    cost: 10
-    content: '`kubectl get pods` shows web pods Pending. `kubectl describe pod <pending-pod>` says FailedScheduling: Insufficient cpu. `kubectl get nodes` shows only worker-1 — the cluster is out of capacity, so this is not a YAML fix.'
-  - order: 2
-    cost: 15
-    content: 'These Kubernetes nodes are VMware VMs. The HPA cannot place pods because there is no second worker. Open the VMware simulator (toolbar -> Open VMware) and look in the inventory for k8s-worker-2 — it is powered off.'
-  - order: 3
-    cost: 20
-    content: 'In the VMware simulator, select k8s-worker-2 and Power On (VM Actions -> Power -> Power On). It joins as node worker-2. Back in the terminal, `kubectl get nodes` shows worker-2 Ready and the Pending pods become Running. Verify with `kubectl get hpa` (REPLICAS reaches the desired count) and `kubectl get pods`.'
+- order: 1
+  cost: 0
+  content: 'Where to look: Run `kubectl get pods -A` and `kubectl describe pod <name>` for any pod not
+    in Running state.'
+- order: 2
+  cost: 25
+  content: 'Diagnostic steps:
+
+    1. `kubectl get pods` — note CrashLoopBackOff, ImagePullBackOff, or Pending.
+
+    2. `kubectl describe pod <name>` — read Events at the bottom.
+
+    3. `kubectl logs <name> [--previous]` if the container restarted.'
+- order: 3
+  cost: 50
+  content: 'Exact fix + verification:
+
+    1. Fix the root cause (image name, env var, volume mount, or probe).
+
+    2. `kubectl apply -f` the corrected manifest or delete the pod to recreate.
+
+    3. Confirm `kubectl get pods` shows every pod Running.
+
+
+    WHY: Kubernetes only reports healthy when the workload actually runs.'
 requires_companion_hosts: false
+technology: kubernetes
+summary: Complete the hpa wants more pods but the cluster is out of nodes - add a kubernetes lab and verify
+  success with the checker
+estimated_minutes: 20
+xp_reward: 100
+prerequisites:
+- Basic kubernetes literacy
+tags:
+- fix
+- hands-on
+- kubernetes
+linked_tutorial: kubernetes-fundamentals
+what_you_will_learn:
+- Inspect the Pending pods and the HPA (kubectl get pods, kubectl describe hpa web)
+- Confirm the cluster is out of schedulable capacity (kubectl get nodes shows one worker)
+- Open the VMware simulator and power on the worker-node VM k8s-worker-2
+- Confirm worker-2 is Ready (kubectl get nodes) and the Pending pods schedule
+- Verify the HPA is satisfied and all web pods are Running (kubectl get hpa, kubectl get pods)
+environment:
+  nodes:
+  - role: primary
+    os: FixitLab Kubernetes cluster
+    hostname: lab-primary
+    ip: 127.0.0.1
+    specs: local offline simulation
+  pre_installed:
+  - bash
+  - coreutils
+  - helm
+  - kubectl
+  - kubernetes
+  credentials:
+  - user: root
+    password: lab123
+tasks:
+- id: task_1
+  title: HPA Wants More Pods but the Cluster is Out of Nodes - Add a
+  description: Restore healthy behavior for HPA Wants More Pods but the Cluster is Out of Nodes - Add
+    a by investigating the failure, applying the smallest safe fix, and validating the outcome.
+  background: 'This kubernetes lab teaches systematic troubleshooting: observe, hypothesize, change, verify.'
+  validation:
+    type: k8s_resource_state
+    resource_kind: Pod
+    resource_name: all
+    namespace: default
+    expected_state: Running
+    error_message: One or more pods are not Running. Use kubectl describe pod and kubectl logs.
+solution:
+  summary: Identify the misconfiguration affecting this kubernetes lab and apply the minimal fix.
+  files_changed: []
+  commands_run: []
+  reference_docs: kubernetes-fundamentals

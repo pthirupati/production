@@ -1,8 +1,25 @@
 title: Implement a Stack Class
 slug: py-impl-stack-class
-category: Python Development
-description: Implement a Stack class with push(x), pop(), peek(), is_empty(), and __len__. pop/peek on
-  an empty stack should raise IndexError. The stub is empty so the tests fail.
+category: Build
+description: 'CONTEXT: A team operating Python development needs you to resolve `Implement a Stack Class`
+  during a realistic incident. The business impact is reduced service reliability until the underlying
+  state is repaired.
+
+
+  ENVIRONMENT: You are working in FixitLab''s offline Python project workspace with source files, venv,
+  tests, and CLI entrypoints. All tools run locally; no paid APIs or external cloud calls are required.
+
+
+  SYMPTOM / STARTING STATE: Implement a Stack class with push(x), pop(), peek(), is_empty(), and __len__.
+  pop/peek on an empty stack should raise IndexError. The stub is empty so the tests fail.
+
+
+  OBJECTIVE: Back the stack with a list; Implement LIFO push/pop/peek; Raise IndexError on empty pop/peek
+  and support len(). Success means all hidden tests pass.
+
+
+  WHAT TO AVOID: Do not apply broad destructive changes, skip evidence gathering, or fake completion with
+  marker files — the checker validates real system state.'
 difficulty: easy
 scenario_type: do
 lab_mode: simulation
@@ -19,75 +36,154 @@ objectives:
 - Raise IndexError on empty pop/peek and support len()
 initial_state: Implement a Stack class with push(x), pop(), peek(), is_empty(), and __len__. pop/peek
   on an empty stack should raise IndexError. The stub is empty so the tests fail.
-solution_explanation: |
-  A list models a stack: append/pop at the end give LIFO. Guarding the empty case raises IndexError, and __len__ exposes the size.
+solution_explanation: 'A list models a stack: append/pop at the end give LIFO. Guarding the empty case
+  raises IndexError, and __len__ exposes the size.
+
+  '
 coding_spec:
   language: python
   entrypoint: solution.py
   kind: impl
-  instructions: |
-    Implement class Stack with: push(x), pop() -> last item, peek() -> last item without removing, is_empty() -> bool, and len(stack). pop/peek on empty must raise IndexError.
+  instructions: 'Implement class Stack with: push(x), pop() -> last item, peek() -> last item without
+    removing, is_empty() -> bool, and len(stack). pop/peek on empty must raise IndexError.
+
     Click Run to try it, then Check Solution to grade against all tests.
+
+    '
   files:
   - path: solution.py
-    content: |
-      class Stack:
-          # TODO: implement push, pop, peek, is_empty, __len__
-          pass
+    content: "class Stack:\n    # TODO: implement push, pop, peek, is_empty, __len__\n    pass\n"
     readonly: false
   visible_tests:
   - name: push and pop
-    code: |
-      s = Stack()
+    code: 's = Stack()
+
       s.push(1)
+
       s.push(2)
+
       assert s.pop() == 2 and s.pop() == 1
+
+      '
   - name: starts empty
-    code: |
-      s = Stack()
+    code: 's = Stack()
+
       assert s.is_empty() and len(s) == 0
+
+      '
   hidden_tests:
   - name: peek does not remove
-    code: |
-      s = Stack()
+    code: 's = Stack()
+
       s.push(7)
+
       assert s.peek() == 7 and len(s) == 1
+
+      '
   - name: len tracks size
-    code: |
-      s = Stack()
-      for i in range(3):
-          s.push(i)
-      assert len(s) == 3
+    code: "s = Stack()\nfor i in range(3):\n    s.push(i)\nassert len(s) == 3\n"
   - name: pop empty raises
-    code: |
-      s = Stack()
-      try:
-          s.pop()
-          assert False, 'expected IndexError'
-      except IndexError:
-          pass
+    code: "s = Stack()\ntry:\n    s.pop()\n    assert False, 'expected IndexError'\nexcept IndexError:\n\
+      \    pass\n"
   - name: peek empty raises
-    code: |
-      s = Stack()
-      try:
-          s.peek()
-          assert False
-      except IndexError:
-          pass
+    code: "s = Stack()\ntry:\n    s.peek()\n    assert False\nexcept IndexError:\n    pass\n"
   - name: LIFO order
-    code: |
-      s = Stack()
-      for x in [1,2,3]:
-          s.push(x)
-      assert [s.pop(), s.pop(), s.pop()] == [3,2,1]
+    code: "s = Stack()\nfor x in [1,2,3]:\n    s.push(x)\nassert [s.pop(), s.pop(), s.pop()] == [3,2,1]\n"
   timeout: 8
 hints:
 - order: 1
-  cost: 10
-  content: Use a Python list as the backing store; the end of the list is the top.
+  cost: 0
+  content: 'Where to look: Open `solution.py`, read the instructions, and run the visible tests to see
+    which assertion fails first.'
 - order: 2
-  cost: 20
-  content: push -> append, pop -> list.pop(), peek -> items[-1].
+  cost: 25
+  content: 'Diagnostic steps:
+
+    1. Click Run and read the traceback — note line number and actual vs expected values.
+
+    2. Reproduce the failure with the smallest input from a visible test.
+
+    3. Compare your implementation to the bug described in the lab prompt.'
 - order: 3
-  cost: 30
-  content: Guard pop/peek when empty and raise IndexError; define __len__ to return the size.
+  cost: 50
+  content: 'Exact fix + verification:
+
+    1. Raise IndexError on empty pop/peek and support len().
+
+    2. Re-run the lab checker (`check.sh` or Check Solution).
+
+    3. Confirm every scenario objective is satisfied.
+
+
+    WHY: the grader validates real state — marker files are ignored.'
+technology: python
+summary: Complete the implement a stack class python lab and verify success with the checker
+estimated_minutes: 25
+xp_reward: 100
+prerequisites:
+- Basic python literacy
+tags:
+- do
+- hands-on
+- python
+linked_tutorial: python-fundamentals
+what_you_will_learn:
+- Back the stack with a list
+- Implement LIFO push/pop/peek
+- Raise IndexError on empty pop/peek and support len()
+environment:
+  nodes:
+  - role: primary
+    os: FixitLab Python project workspace
+    hostname: lab-primary
+    ip: 127.0.0.1
+    specs: local offline simulation
+  pre_installed:
+  - bash
+  - coreutils
+  - pip
+  - python
+  - python3
+  credentials:
+  - user: root
+    password: lab123
+tasks:
+- id: task_1
+  title: Implement a Stack Class
+  description: Restore healthy behavior for Implement a Stack Class by investigating the failure, applying
+    the smallest safe fix, and validating the outcome.
+  background: 'This python lab teaches systematic troubleshooting: observe, hypothesize, change, verify.'
+  validation:
+    type: custom_script
+    script: hidden_tests
+    error_message: One or more hidden tests failed. Read the public test output, fix your solution, and
+      submit again.
+solution:
+  summary: The solution passes all hidden tests by implementing the required behavior in code.
+  files_changed: []
+  commands_run: []
+  reference_docs: python-fundamentals
+guided_mode:
+  enabled: true
+  steps:
+  - step: 1
+    title: Inspect current state
+    instruction: Run a read-only diagnostic before changing anything.
+    command: check.sh
+    expected_output: Output shows the current failure mode
+    explanation: Evidence-first troubleshooting avoids guessing.
+    next_on: command_success
+  - step: 2
+    title: Apply the minimal fix
+    instruction: Make one reversible change aligned with the objectives.
+    command: '# your fix command here'
+    expected_output: State moves toward the objective
+    explanation: Small changes make rollback easy if the hypothesis was wrong.
+    next_on: command_success
+  - step: 3
+    title: Verify with the grader
+    instruction: Run the same verification the checker uses.
+    command: check.sh
+    expected_output: all hidden tests pass
+    explanation: The lab passes only when real state is healthy.
+    next_on: command_success

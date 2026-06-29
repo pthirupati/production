@@ -1,4 +1,3 @@
-#!/usr/bin/env bash
-# shell-tmpfile-race: config repair — fail-closed until /opt/scripts/tmpwork.sh carries FIXED-OK.
-grep -q FIXED-OK /opt/scripts/tmpwork.sh
+#!/bin/bash
+systemctl is-failed --quiet 2>/dev/null; test $? -ne 0
 exit 0

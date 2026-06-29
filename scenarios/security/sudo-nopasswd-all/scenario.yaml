@@ -1,14 +1,28 @@
 slug: sudo-nopasswd-all
 title: Sudo NOPASSWD ALL Found — Restrict the User's Access
-technology: Security
-category: Privilege Escalation
+technology: security
+category: Build
 difficulty: medium
 time_limit: 900
 max_score: 100
 infrastructure_type: docker
 jira_priority: Critical
 is_free: false
-description: 'During a routine access review, a user account ''deploy'' was found with
+description: 'CONTEXT: A team operating security hardening needs you to resolve `Sudo NOPASSWD ALL Found
+  — Restrict the User''s Access` during a realistic incident. The business impact is reduced service reliability
+  until the underlying state is repaired.
+
+
+  ENVIRONMENT: You are working in FixitLab''s offline hardening lab with SSH, firewall, TLS, audit logs,
+  and IAM settings. All tools run locally; no paid APIs or external cloud calls are required.
+
+
+  SYMPTOM / STARTING STATE: Ubuntu 22.04. /etc/sudoers.d/deploy contains: `deploy ALL=(ALL) NOPASSWD:
+  ALL`
+
+  The deploy user only needs to restart nginx and the app service. Any other
+
+  sudo command should be denied. During a routine access review, a user account ''deploy'' was found with
 
   NOPASSWD: ALL in the sudoers configuration. This deployment service account
 
@@ -18,7 +32,14 @@ description: 'During a routine access review, a user account ''deploy'' was foun
 
   Restrict the sudo grant to only the specific commands needed.
 
-  '
+
+  OBJECTIVE: {''Identify the overly broad NOPASSWD'': "ALL grant for the ''deploy'' user"}; Modify the
+  sudoers entry to restrict to specific commands only; {''Grant'': ''sudo /usr/bin/systemctl restart nginx,
+  sudo /usr/bin/systemctl restart app''}. Success means `check.sh` exits successfully.
+
+
+  WHAT TO AVOID: Do not apply broad destructive changes, skip evidence gathering, or fake completion with
+  marker files — the checker validates real system state.'
 objectives:
 - Identify the overly broad NOPASSWD: ALL grant for the 'deploy' user
 - Modify the sudoers entry to restrict to specific commands only
@@ -33,17 +54,98 @@ initial_state: 'Ubuntu 22.04. /etc/sudoers.d/deploy contains: `deploy ALL=(ALL) 
   '
 hints:
 - order: 1
-  cost: 10
-  content: 'Audit the account: `sudo -l -U deploy` shows `NOPASSWD: ALL` — full passwordless root for
-    a service account that only needs a couple of commands.'
+  cost: 0
+  content: 'Where to look: {''Identify the overly broad NOPASSWD'': "ALL grant for the ''deploy'' user"}'
 - order: 2
-  cost: 15
-  content: Edit safely with `visudo -f /etc/sudoers.d/deploy` (never edit sudoers with a plain editor).
-- order: 3
-  cost: 20
-  content: 'Replace the blanket rule with a scoped one, e.g. `deploy ALL=(ALL) NOPASSWD: /usr/bin/systemctl
-    restart nginx, /usr/bin/systemctl status nginx`.'
-- order: 4
   cost: 25
-  content: 'Verify: `visudo -c` reports the files are OK and `sudo -l -U deploy` now lists only those
-    two commands (no ALL).'
+  content: 'Diagnostic steps:
+
+    1. Modify the sudoers entry to restrict to specific commands only
+
+    2. {''Grant'': ''sudo /usr/bin/systemctl restart nginx, sudo /usr/bin/systemctl restart app''}
+
+    3. Verify the deploy user cannot run arbitrary commands as root'
+- order: 3
+  cost: 50
+  content: 'Exact fix + verification:
+
+    1. Verify the deploy user cannot run arbitrary commands as root.
+
+    2. Re-run the lab checker (`check.sh` or Check Solution).
+
+    3. Confirm every scenario objective is satisfied.
+
+
+    WHY: the grader validates real state — marker files are ignored.'
+summary: Complete the sudo nopasswd all found — restrict the user's access security lab and verify success
+  with the checker
+estimated_minutes: 15
+xp_reward: 100
+prerequisites:
+- Basic security literacy
+tags:
+- fix
+- hands-on
+- security
+linked_tutorial: security-fundamentals
+what_you_will_learn:
+- '{''Identify the overly broad NOPASSWD'': "ALL grant for the ''deploy'' user"}'
+- Modify the sudoers entry to restrict to specific commands only
+- '{''Grant'': ''sudo /usr/bin/systemctl restart nginx, sudo /usr/bin/systemctl restart app''}'
+- Verify the deploy user cannot run arbitrary commands as root
+environment:
+  nodes:
+  - role: primary
+    os: FixitLab hardening lab
+    hostname: lab-primary
+    ip: 127.0.0.1
+    specs: local offline simulation
+  pre_installed:
+  - bash
+  - coreutils
+  - journalctl
+  - security
+  - systemctl
+  credentials:
+  - user: root
+    password: lab123
+tasks:
+- id: task_1
+  title: Sudo NOPASSWD ALL Found — Restrict the User's Access
+  description: Restore healthy behavior for Sudo NOPASSWD ALL Found — Restrict the User's Access by investigating
+    the failure, applying the smallest safe fix, and validating the outcome.
+  background: 'This security lab teaches systematic troubleshooting: observe, hypothesize, change, verify.'
+  validation:
+    type: custom_script
+    script: check.sh
+    error_message: Validation did not pass. Re-read the objectives and Hint 2 diagnostic steps.
+solution:
+  summary: Identify the misconfiguration affecting this security lab and apply the minimal fix.
+  files_changed: []
+  commands_run:
+  - bash check.sh
+  reference_docs: security-fundamentals
+guided_mode:
+  enabled: true
+  steps:
+  - step: 1
+    title: Inspect current state
+    instruction: Run a read-only diagnostic before changing anything.
+    command: check.sh
+    expected_output: Output shows the current failure mode
+    explanation: Evidence-first troubleshooting avoids guessing.
+    next_on: command_success
+  - step: 2
+    title: Apply the minimal fix
+    instruction: Make one reversible change aligned with the objectives.
+    command: '# your fix command here'
+    expected_output: State moves toward the objective
+    explanation: Small changes make rollback easy if the hypothesis was wrong.
+    next_on: command_success
+  - step: 3
+    title: Verify with the grader
+    instruction: Run the same verification the checker uses.
+    command: check.sh
+    expected_output: '`check.sh` exits successfully'
+    explanation: The lab passes only when real state is healthy.
+    next_on: command_success

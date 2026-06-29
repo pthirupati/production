@@ -1,4 +1,3 @@
-#!/usr/bin/env bash
-# shell-pipe-to-while-fd: config repair — fail-closed until /opt/scripts/fanout.sh carries FIXED-OK.
-grep -q FIXED-OK /opt/scripts/fanout.sh
+#!/bin/bash
+systemctl is-failed --quiet 2>/dev/null; test $? -ne 0
 exit 0

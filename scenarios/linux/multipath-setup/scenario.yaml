@@ -1,42 +1,137 @@
 title: Configure Device Multipath for SAN LUN
 slug: linux-multipath-setup
 difficulty: hard
-category: Linux Administration
-description: |
-  A SAN LUN is presenting to this server through two separate FC/iSCSI paths, appearing
+category: Fix
+description: 'CONTEXT: A team operating Linux administration needs you to resolve `Configure Device Multipath
+  for SAN LUN` during a realistic incident. The business impact is reduced service reliability until the
+  underlying state is repaired.
+
+
+  ENVIRONMENT: You are working in FixitLab''s offline Linux practice server with terminal and config files
+  under /etc and /var. All tools run locally; no paid APIs or external cloud calls are required.
+
+
+  SYMPTOM / STARTING STATE: Simulated RHEL 9 server. lsblk shows /dev/sdb and /dev/sdc, both with identical
+  size
+
+  (the same SAN LUN seen through two HBA paths). The device-mapper-multipath package
+
+  is not installed. Writing to both /dev/sdb and /dev/sdc without multipath risks
+
+  data corruption from split writes. A SAN LUN is presenting to this server through two separate FC/iSCSI
+  paths, appearing
+
   as both /dev/sdb and /dev/sdc. Without multipath, the operating system treats these
+
   as two separate disks, which leads to data corruption if both are written to. Device
+
   mapper multipath must be configured to present both paths as a single logical device
+
   with automatic failover.
 
-initial_state: |
-  Simulated RHEL 9 server. lsblk shows /dev/sdb and /dev/sdc, both with identical size
+
+  OBJECTIVE: Install device-mapper-multipath with yum install -y device-mapper-multipath; Generate a default
+  multipath config with mpathconf --enable --with_multipathd y; Get the LUN WWID with /sbin/scsi_id --whitelisted
+  --device=/dev/sdb. Success means `check.sh` exits successfully.
+
+
+  WHAT TO AVOID: Do not apply broad destructive changes, skip evidence gathering, or fake completion with
+  marker files — the checker validates real system state.'
+initial_state: 'Simulated RHEL 9 server. lsblk shows /dev/sdb and /dev/sdc, both with identical size
+
   (the same SAN LUN seen through two HBA paths). The device-mapper-multipath package
+
   is not installed. Writing to both /dev/sdb and /dev/sdc without multipath risks
+
   data corruption from split writes.
 
+  '
 objectives:
-  - Install device-mapper-multipath with yum install -y device-mapper-multipath
-  - Generate a default multipath config with mpathconf --enable --with_multipathd y
-  - Get the LUN WWID with /sbin/scsi_id --whitelisted --device=/dev/sdb
-  - Add a blacklist exception for the WWID in /etc/multipath.conf
-  - Start multipathd with systemctl enable --now multipathd
-  - Verify the multipath device with multipath -ll (should show mpatha with two paths)
+- Install device-mapper-multipath with yum install -y device-mapper-multipath
+- Generate a default multipath config with mpathconf --enable --with_multipathd y
+- Get the LUN WWID with /sbin/scsi_id --whitelisted --device=/dev/sdb
+- Add a blacklist exception for the WWID in /etc/multipath.conf
+- Start multipathd with systemctl enable --now multipathd
+- Verify the multipath device with multipath -ll (should show mpatha with two paths)
 lab_mode: simulation
 simulation_type: generic
 time_limit: 1800
 max_score: 100
 is_free: false
 hints:
-  - content: 'Run mpathconf --enable --with_multipathd y to create a working /etc/multipath.conf with defaults. This also enables and starts multipathd in one step.'
-    cost: 10
-    order: 1
-  - content: 'Get the WWID: /sbin/scsi_id -g -u -d /dev/sdb. Add a multipaths section to /etc/multipath.conf referencing this WWID to give the device a friendly alias.'
-    cost: 25
-    order: 2
-  - content: 'Verify with multipath -ll — each path should show: H:C:T:L format, ready state, and the path priority. The output shows the device map name (e.g., mpatha) and both paths underneath.'
-    cost: 20
-    order: 3
+- order: 1
+  cost: 0
+  content: 'Where to look: Run `df -h` and `du -xh /var /tmp /home | sort -h | tail -20` for large paths.'
+- order: 2
+  cost: 25
+  content: 'Diagnostic steps:
+
+    1. Find which mount is 100% — often `/` or `/var`.
+
+    2. `journalctl --disk-usage` and old logs under `/var/log`.
+
+    3. Look for core dumps, temp files, or oversized application data.'
+- order: 3
+  cost: 50
+  content: 'Exact fix + verification:
+
+    1. Remove or rotate the largest safe files (logs, caches, old packages).
+
+    2. `df -h` should show free space on the affected mount.
+
+    3. Retry the command that failed with ''No space left on device''.
+
+
+    WHY: many services fail cryptically when disk is full.'
 requires_companion_hosts: false
 dual_terminal: false
 jira_priority: Medium
+technology: linux
+summary: Complete the configure device multipath for san lun linux lab and verify success with the checker
+estimated_minutes: 30
+xp_reward: 100
+prerequisites:
+- Basic linux literacy
+tags:
+- fix
+- hands-on
+- linux
+linked_tutorial: linux-fundamentals
+what_you_will_learn:
+- Install device-mapper-multipath with yum install -y device-mapper-multipath
+- Generate a default multipath config with mpathconf --enable --with_multipathd y
+- Get the LUN WWID with /sbin/scsi_id --whitelisted --device=/dev/sdb
+- Add a blacklist exception for the WWID in /etc/multipath.conf
+- Start multipathd with systemctl enable --now multipathd
+environment:
+  nodes:
+  - role: primary
+    os: FixitLab Linux practice server
+    hostname: lab-primary
+    ip: 127.0.0.1
+    specs: local offline simulation
+  pre_installed:
+  - bash
+  - coreutils
+  - journalctl
+  - linux
+  - systemctl
+  credentials:
+  - user: root
+    password: lab123
+tasks:
+- id: task_1
+  title: Configure Device Multipath for SAN LUN
+  description: Restore healthy behavior for Configure Device Multipath for SAN LUN by investigating the
+    failure, applying the smallest safe fix, and validating the outcome.
+  background: 'This linux lab teaches systematic troubleshooting: observe, hypothesize, change, verify.'
+  validation:
+    type: custom_script
+    script: check.sh
+    error_message: Validation did not pass. Re-read the objectives and Hint 2 diagnostic steps.
+solution:
+  summary: Identify the misconfiguration affecting this linux lab and apply the minimal fix.
+  files_changed: []
+  commands_run:
+  - bash check.sh
+  reference_docs: linux-fundamentals

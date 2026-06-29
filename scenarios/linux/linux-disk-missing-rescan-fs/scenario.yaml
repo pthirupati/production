@@ -1,39 +1,131 @@
 title: New Disk Not Visible — Rescan, Format, and Mount
 slug: linux-disk-missing-rescan-fs
 difficulty: medium
-category: Linux Administration
-description: |
-  A new 20G disk was hot-added to the VM at the hypervisor, but the Linux guest has
+category: Fix
+description: 'CONTEXT: A team operating Linux administration needs you to resolve `New Disk Not Visible
+  — Rescan, Format, and Mount` during a realistic incident. The business impact is reduced service reliability
+  until the underlying state is repaired.
+
+
+  ENVIRONMENT: You are working in FixitLab''s offline Linux practice server with terminal and config files
+  under /etc and /var. All tools run locally; no paid APIs or external cloud calls are required.
+
+
+  SYMPTOM / STARTING STATE: Simulated RHEL 9 server. The storage team confirms a 20G LUN is presented
+  to this
+
+  host, but lsblk shows only sda and sdb — /dev/sdc is missing because the kernel has
+
+  not rescanned the SCSI bus. /data exists as an empty unmounted directory. A new 20G disk was hot-added
+  to the VM at the hypervisor, but the Linux guest has
+
   not noticed it — lsblk does not show /dev/sdc. You must trigger a SCSI bus rescan so
+
   the kernel discovers the device, then partition/format it with a filesystem, mount it
+
   at /data, and add it to /etc/fstab so the mount survives a reboot.
 
-initial_state: |
-  Simulated RHEL 9 server. The storage team confirms a 20G LUN is presented to this
+
+  OBJECTIVE: Rescan the SCSI host so the kernel sees the new disk (echo "- - -" > /sys/class/scsi_host/host0/scan);
+  Confirm /dev/sdc now appears in lsblk; Create a filesystem on the disk with mkfs.xfs /dev/sdc (or mkfs.ext4).
+  Success means `check.sh` exits successfully.
+
+
+  WHAT TO AVOID: Do not apply broad destructive changes, skip evidence gathering, or fake completion with
+  marker files — the checker validates real system state.'
+initial_state: 'Simulated RHEL 9 server. The storage team confirms a 20G LUN is presented to this
+
   host, but lsblk shows only sda and sdb — /dev/sdc is missing because the kernel has
+
   not rescanned the SCSI bus. /data exists as an empty unmounted directory.
 
+  '
 objectives:
-  - Rescan the SCSI host so the kernel sees the new disk (echo "- - -" > /sys/class/scsi_host/host0/scan)
-  - Confirm /dev/sdc now appears in lsblk
-  - Create a filesystem on the disk with mkfs.xfs /dev/sdc (or mkfs.ext4)
-  - Mount it at /data and confirm with df -h and mount
-  - Persist it in /etc/fstab so it remounts on reboot
+- Rescan the SCSI host so the kernel sees the new disk (echo "- - -" > /sys/class/scsi_host/host0/scan)
+- Confirm /dev/sdc now appears in lsblk
+- Create a filesystem on the disk with mkfs.xfs /dev/sdc (or mkfs.ext4)
+- Mount it at /data and confirm with df -h and mount
+- Persist it in /etc/fstab so it remounts on reboot
 lab_mode: simulation
 simulation_type: generic
 time_limit: 900
 max_score: 100
 is_free: false
 hints:
-  - content: 'The disk exists at the hypervisor but the kernel has not scanned for it. Force a rescan: echo "- - -" > /sys/class/scsi_host/host0/scan then run lsblk.'
-    cost: 10
-    order: 1
-  - content: 'Once /dev/sdc appears: mkfs.xfs /dev/sdc, then mkdir -p /data && mount /dev/sdc /data. Verify with blkid and df -h.'
-    cost: 20
-    order: 2
-  - content: 'Make it permanent by adding a line to /etc/fstab, e.g. /dev/sdc /data xfs defaults 0 0.'
-    cost: 15
-    order: 3
+- order: 1
+  cost: 0
+  content: 'Where to look: Run `df -h` and `du -xh /var /tmp /home | sort -h | tail -20` for large paths.'
+- order: 2
+  cost: 25
+  content: 'Diagnostic steps:
+
+    1. Find which mount is 100% — often `/` or `/var`.
+
+    2. `journalctl --disk-usage` and old logs under `/var/log`.
+
+    3. Look for core dumps, temp files, or oversized application data.'
+- order: 3
+  cost: 50
+  content: 'Exact fix + verification:
+
+    1. Remove or rotate the largest safe files (logs, caches, old packages).
+
+    2. `df -h` should show free space on the affected mount.
+
+    3. Retry the command that failed with ''No space left on device''.
+
+
+    WHY: many services fail cryptically when disk is full.'
 requires_companion_hosts: false
 dual_terminal: false
 jira_priority: Medium
+technology: linux
+summary: Complete the new disk not visible — rescan, format, and mount linux lab and verify success with
+  the checker
+estimated_minutes: 15
+xp_reward: 100
+prerequisites:
+- Basic linux literacy
+tags:
+- fix
+- hands-on
+- linux
+linked_tutorial: linux-fundamentals
+what_you_will_learn:
+- Rescan the SCSI host so the kernel sees the new disk (echo "- - -" > /sys/class/scsi_host/host0/scan)
+- Confirm /dev/sdc now appears in lsblk
+- Create a filesystem on the disk with mkfs.xfs /dev/sdc (or mkfs.ext4)
+- Mount it at /data and confirm with df -h and mount
+- Persist it in /etc/fstab so it remounts on reboot
+environment:
+  nodes:
+  - role: primary
+    os: FixitLab Linux practice server
+    hostname: lab-primary
+    ip: 127.0.0.1
+    specs: local offline simulation
+  pre_installed:
+  - bash
+  - coreutils
+  - journalctl
+  - linux
+  - systemctl
+  credentials:
+  - user: root
+    password: lab123
+tasks:
+- id: task_1
+  title: New Disk Not Visible — Rescan, Format, and Mount
+  description: Restore healthy behavior for New Disk Not Visible — Rescan, Format, and Mount by investigating
+    the failure, applying the smallest safe fix, and validating the outcome.
+  background: 'This linux lab teaches systematic troubleshooting: observe, hypothesize, change, verify.'
+  validation:
+    type: custom_script
+    script: check.sh
+    error_message: Validation did not pass. Re-read the objectives and Hint 2 diagnostic steps.
+solution:
+  summary: Identify the misconfiguration affecting this linux lab and apply the minimal fix.
+  files_changed: []
+  commands_run:
+  - bash check.sh
+  reference_docs: linux-fundamentals

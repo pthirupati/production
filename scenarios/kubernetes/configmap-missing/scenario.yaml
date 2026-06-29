@@ -1,11 +1,30 @@
 title: 'Pod Fails: Missing ConfigMap'
 slug: sim-k8s-configmap-missing
-category: Kubernetes
+category: Fix
 difficulty: easy
-description: A pod in the default namespace is stuck in CreateContainerConfigError. The deployment mounts
-  environment variables from a ConfigMap named app-config that does not exist in the namespace, so the
-  kubelet cannot start the container. Recreate the missing ConfigMap with the expected keys so the pod
-  can start.
+description: 'CONTEXT: A team operating Kubernetes needs you to resolve `Pod Fails: Missing ConfigMap`
+  during a realistic incident. The business impact is reduced service reliability until the underlying
+  state is repaired.
+
+
+  ENVIRONMENT: You are working in FixitLab''s offline Kubernetes cluster with kubectl, manifests, and
+  cluster resources. All tools run locally; no paid APIs or external cloud calls are required.
+
+
+  SYMPTOM / STARTING STATE: Simulated Kubernetes cluster. A deployment references configMapRef name app-config,
+  but that ConfigMap was never created. Pods report CreateContainerConfigError and never reach Running.
+  A pod in the default namespace is stuck in CreateContainerConfigError. The deployment mounts environment
+  variables from a ConfigMap named app-config that does not exist in the namespace, so the kubelet cannot
+  start the container. Recreate the missing ConfigMap with the expected keys so the pod can start.
+
+
+  OBJECTIVE: Identify the pod stuck in CreateContainerConfigError and the ConfigMap it expects; Create
+  the app-config ConfigMap with the required keys; Confirm the pod reaches Running after the ConfigMap
+  exists. Success means `kubectl get pods` shows every pod Running.
+
+
+  WHAT TO AVOID: Do not apply broad destructive changes, skip evidence gathering, or fake completion with
+  marker files — the checker validates real system state.'
 initial_state: Simulated Kubernetes cluster. A deployment references configMapRef name app-config, but
   that ConfigMap was never created. Pods report CreateContainerConfigError and never reach Running.
 lab_mode: simulation
@@ -22,15 +41,76 @@ objectives:
 - Confirm the pod reaches Running after the ConfigMap exists
 hints:
 - order: 1
-  cost: 10
-  content: Start with `kubectl get pods` then `kubectl describe pod <pod>`. The Events show "configmap
-    \"app-config\" not found" — the deployment's envFrom references it.
+  cost: 0
+  content: 'Where to look: Run `kubectl get pods -A` and `kubectl describe pod <name>` for any pod not
+    in Running state.'
 - order: 2
-  cost: 15
-  content: 'List ConfigMaps with `kubectl get configmap`. app-config is absent. Check the deployment spec:
-    `kubectl get deploy <name> -o yaml | grep -A3 configMapRef` to see which keys the container reads
-    (e.g. APP_ENV, LOG_LEVEL).'
+  cost: 25
+  content: 'Diagnostic steps:
+
+    1. `kubectl get pods` — note CrashLoopBackOff, ImagePullBackOff, or Pending.
+
+    2. `kubectl describe pod <name>` — read Events at the bottom.
+
+    3. `kubectl logs <name> [--previous]` if the container restarted.'
 - order: 3
-  cost: 20
-  content: 'Create it: `kubectl create configmap app-config --from-literal=APP_ENV=production --from-literal=LOG_LEVEL=info`.
-    The kubelet retries automatically and the pod transitions to Running within ~30s.'
+  cost: 50
+  content: 'Exact fix + verification:
+
+    1. Fix the root cause (image name, env var, volume mount, or probe).
+
+    2. `kubectl apply -f` the corrected manifest or delete the pod to recreate.
+
+    3. Confirm `kubectl get pods` shows every pod Running.
+
+
+    WHY: Kubernetes only reports healthy when the workload actually runs.'
+technology: kubernetes
+summary: 'Complete the pod fails: missing configmap kubernetes lab and verify success with the checker'
+estimated_minutes: 15
+xp_reward: 100
+prerequisites:
+- Basic kubernetes literacy
+tags:
+- fix
+- hands-on
+- kubernetes
+linked_tutorial: kubernetes-fundamentals
+what_you_will_learn:
+- Identify the pod stuck in CreateContainerConfigError and the ConfigMap it expects
+- Create the app-config ConfigMap with the required keys
+- Confirm the pod reaches Running after the ConfigMap exists
+environment:
+  nodes:
+  - role: primary
+    os: FixitLab Kubernetes cluster
+    hostname: lab-primary
+    ip: 127.0.0.1
+    specs: local offline simulation
+  pre_installed:
+  - bash
+  - coreutils
+  - helm
+  - kubectl
+  - kubernetes
+  credentials:
+  - user: root
+    password: lab123
+tasks:
+- id: task_1
+  title: 'Pod Fails: Missing ConfigMap'
+  description: 'Restore healthy behavior for Pod Fails: Missing ConfigMap by investigating the failure,
+    applying the smallest safe fix, and validating the outcome.'
+  background: 'This kubernetes lab teaches systematic troubleshooting: observe, hypothesize, change, verify.'
+  validation:
+    type: k8s_resource_state
+    resource_kind: Pod
+    resource_name: all
+    namespace: default
+    expected_state: Running
+    error_message: One or more pods are not Running. Use kubectl describe pod and kubectl logs.
+solution:
+  summary: Identify the misconfiguration affecting this kubernetes lab and apply the minimal fix.
+  files_changed: []
+  commands_run: []
+  reference_docs: kubernetes-fundamentals

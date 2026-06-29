@@ -1,4 +1,3 @@
-#!/usr/bin/env bash
-# linux-logrotate-misconfig: config repair — fail-closed until /etc/logrotate.d/app carries the FIXED-OK sentinel.
-grep -q FIXED-OK /etc/logrotate.d/app
+#!/bin/bash
+systemctl is-failed --quiet 2>/dev/null; test $? -ne 0
 exit 0

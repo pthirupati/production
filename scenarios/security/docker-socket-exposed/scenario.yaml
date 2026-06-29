@@ -1,39 +1,156 @@
 slug: docker-socket-exposed
-title: "Docker Socket Exposed Without Auth — Fix Daemon Config"
-technology: Security
-category: Container Security
+title: Docker Socket Exposed Without Auth — Fix Daemon Config
+technology: security
+category: Build
 difficulty: hard
 time_limit: 1200
 max_score: 100
 infrastructure_type: docker
 jira_priority: Critical
 is_free: false
-description: |
-  The Docker daemon is configured to listen on a TCP socket (tcp://0.0.0.0:2375)
-  without TLS authentication, in addition to the default Unix socket. This exposes
-  the Docker API to anyone who can reach the server — effectively giving them
-  root access (since containers can mount the host filesystem). Disable the TCP
-  listener, ensure Docker only listens on the Unix socket, and verify no
-  unauthorized containers were launched.
-objectives:
-  - Identify the TCP listener in /etc/docker/daemon.json or systemd override
-  - Remove the tcp://0.0.0.0:2375 listener from Docker configuration
-  - Restart Docker and verify the TCP port is no longer open
-  - Audit running containers for any launched via the exposed API
-initial_state: |
-  Ubuntu 22.04 with Docker. /etc/docker/daemon.json contains:
+description: 'CONTEXT: A team operating security hardening needs you to resolve `Docker Socket Exposed
+  Without Auth — Fix Daemon Config` during a realistic incident. The business impact is reduced service
+  reliability until the underlying state is repaired.
+
+
+  ENVIRONMENT: You are working in FixitLab''s offline hardening lab with SSH, firewall, TLS, audit logs,
+  and IAM settings. All tools run locally; no paid APIs or external cloud calls are required.
+
+
+  SYMPTOM / STARTING STATE: Ubuntu 22.04 with Docker. /etc/docker/daemon.json contains:
+
   {"hosts": ["unix:///var/run/docker.sock", "tcp://0.0.0.0:2375"]}.
+
+  `docker -H tcp://localhost:2375 ps` works without authentication. The Docker daemon is configured to
+  listen on a TCP socket (tcp://0.0.0.0:2375)
+
+  without TLS authentication, in addition to the default Unix socket. This exposes
+
+  the Docker API to anyone who can reach the server — effectively giving them
+
+  root access (since containers can mount the host filesystem). Disable the TCP
+
+  listener, ensure Docker only listens on the Unix socket, and verify no
+
+  unauthorized containers were launched.
+
+
+  OBJECTIVE: Identify the TCP listener in /etc/docker/daemon.json or systemd override; Remove the tcp://0.0.0.0:2375
+  listener from Docker configuration; Restart Docker and verify the TCP port is no longer open. Success
+  means `systemctl is-active --quiet` returns active.
+
+
+  WHAT TO AVOID: Do not apply broad destructive changes, skip evidence gathering, or fake completion with
+  marker files — the checker validates real system state.'
+objectives:
+- Identify the TCP listener in /etc/docker/daemon.json or systemd override
+- Remove the tcp://0.0.0.0:2375 listener from Docker configuration
+- Restart Docker and verify the TCP port is no longer open
+- Audit running containers for any launched via the exposed API
+initial_state: 'Ubuntu 22.04 with Docker. /etc/docker/daemon.json contains:
+
+  {"hosts": ["unix:///var/run/docker.sock", "tcp://0.0.0.0:2375"]}.
+
   `docker -H tcp://localhost:2375 ps` works without authentication.
+
+  '
 hints:
-  - order: 1
-    cost: 10
-    content: "Verify exposure: `curl http://localhost:2375/version` — returns Docker info without any auth."
-  - order: 2
-    cost: 15
-    content: "Edit /etc/docker/daemon.json — remove the tcp:// entry, keeping only `unix:///var/run/docker.sock`"
-  - order: 3
-    cost: 15
-    content: "Also check systemd override: `cat /etc/systemd/system/docker.service.d/override.conf`"
-  - order: 4
-    cost: 10
-    content: "Reload and restart: `systemctl daemon-reload && systemctl restart docker`. Verify: `ss -tlnp | grep 2375` should be empty."
+- order: 1
+  cost: 0
+  content: 'Where to look: Start with `systemctl status --quiet` and `journalctl -u --quiet -n 50 --no-pager`
+    before changing anything.'
+- order: 2
+  cost: 25
+  content: 'Diagnostic steps:
+
+    1. Run `systemctl status --quiet` — note Active/Failed and the last log lines.
+
+    2. Read `journalctl -u --quiet -n 50` for the root error.
+
+    3. Form a hypothesis about the smallest config or permission fix.'
+- order: 3
+  cost: 50
+  content: 'Exact fix + verification:
+
+    1. Apply the minimal fix (config, unit override, or missing directory).
+
+    2. Run `systemctl daemon-reload` if you edited a unit file.
+
+    3. Run `systemctl restart --quiet` and confirm `systemctl is-active --quiet` succeeds.
+
+
+    WHY: the grader checks real service state, not marker files.'
+summary: Complete the docker socket exposed without auth — fix daemon config security lab and verify success
+  with the checker
+estimated_minutes: 20
+xp_reward: 100
+prerequisites:
+- Basic security literacy
+tags:
+- fix
+- hands-on
+- security
+linked_tutorial: security-fundamentals
+what_you_will_learn:
+- Identify the TCP listener in /etc/docker/daemon.json or systemd override
+- Remove the tcp://0.0.0.0:2375 listener from Docker configuration
+- Restart Docker and verify the TCP port is no longer open
+- Audit running containers for any launched via the exposed API
+environment:
+  nodes:
+  - role: primary
+    os: FixitLab hardening lab
+    hostname: lab-primary
+    ip: 127.0.0.1
+    specs: local offline simulation
+  pre_installed:
+  - bash
+  - coreutils
+  - journalctl
+  - security
+  - systemctl
+  credentials:
+  - user: root
+    password: lab123
+tasks:
+- id: task_1
+  title: Docker Socket Exposed Without Auth — Fix Daemon Config
+  description: Restore healthy behavior for Docker Socket Exposed Without Auth — Fix Daemon Config by
+    investigating the failure, applying the smallest safe fix, and validating the outcome.
+  background: 'This security lab teaches systematic troubleshooting: observe, hypothesize, change, verify.'
+  validation:
+    type: service_active
+    command: systemctl is-active --quiet
+    expected_status: active
+    error_message: The --quiet service is not active yet. Check `systemctl status --quiet` and `journalctl
+      -u --quiet -n 50`.
+solution:
+  summary: The root cause is an unhealthy `--quiet` service; repair it and verify active state.
+  files_changed: []
+  commands_run:
+  - systemctl is-active --quiet
+  reference_docs: security-fundamentals
+guided_mode:
+  enabled: true
+  steps:
+  - step: 1
+    title: Inspect current state
+    instruction: Run a read-only diagnostic before changing anything.
+    command: systemctl is-active --quiet
+    expected_output: Output shows the current failure mode
+    explanation: Evidence-first troubleshooting avoids guessing.
+    next_on: command_success
+  - step: 2
+    title: Apply the minimal fix
+    instruction: Make one reversible change aligned with the objectives.
+    command: '# your fix command here'
+    expected_output: State moves toward the objective
+    explanation: Small changes make rollback easy if the hypothesis was wrong.
+    next_on: command_success
+  - step: 3
+    title: Verify with the grader
+    instruction: Run the same verification the checker uses.
+    command: systemctl is-active --quiet
+    expected_output: '`systemctl is-active --quiet` returns active'
+    explanation: The lab passes only when real state is healthy.
+    next_on: command_success

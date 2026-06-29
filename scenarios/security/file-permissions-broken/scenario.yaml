@@ -1,16 +1,34 @@
 title: Fix Insecure File Permissions
 slug: file-permissions-broken
-technology: Security
-category: Permissions
+technology: security
+category: Fix
 difficulty: easy
 time_limit: 600
 max_score: 100
 infrastructure_type: docker
 jira_priority: Medium
-description: 'A security audit flagged application secrets as world-readable: /opt/app/config.env (which
-  holds credentials) is readable by every user, and its ownership is wrong. Secrets files must be owned
-  by the service account and readable only by it (mode 600). Restore correct ownership and permissions
-  so the secrets are no longer exposed.'
+description: 'CONTEXT: A team operating security hardening needs you to resolve `Fix Insecure File Permissions`
+  during a realistic incident. The business impact is reduced service reliability until the underlying
+  state is repaired.
+
+
+  ENVIRONMENT: You are working in FixitLab''s offline hardening lab with SSH, firewall, TLS, audit logs,
+  and IAM settings. All tools run locally; no paid APIs or external cloud calls are required.
+
+
+  SYMPTOM / STARTING STATE: Linux server where /opt/app/config.env is world-readable and not owned by
+  appuser, exposing application secrets to any local user. A security audit flagged application secrets
+  as world-readable: /opt/app/config.env (which holds credentials) is readable by every user, and its
+  ownership is wrong. Secrets files must be owned by the service account and readable only by it (mode
+  600). Restore correct ownership and permissions so the secrets are no longer exposed.
+
+
+  OBJECTIVE: Confirm /opt/app/config.env is world-readable / wrongly owned; Set ownership to appuser;
+  Set mode 600 so only the owner can read it, and verify. Success means `check.sh` exits successfully.
+
+
+  WHAT TO AVOID: Do not apply broad destructive changes, skip evidence gathering, or fake completion with
+  marker files — the checker validates real system state.'
 objectives:
 - Confirm /opt/app/config.env is world-readable / wrongly owned
 - Set ownership to appuser
@@ -19,13 +37,68 @@ initial_state: Linux server where /opt/app/config.env is world-readable and not 
   application secrets to any local user.
 hints:
 - order: 1
-  cost: 10
-  content: 'Inspect it: `ls -la /opt/app/config.env` — it''s group/world-readable and not owned by appuser,
-    so any user can read the secrets.'
+  cost: 0
+  content: 'Where to look: Confirm /opt/app/config.env is world-readable / wrongly owned'
 - order: 2
-  cost: 15
-  content: 'Fix ownership and permissions: `chown appuser /opt/app/config.env && chmod 600 /opt/app/config.env`.'
+  cost: 25
+  content: 'Diagnostic steps:
+
+    1. Set mode 600 so only the owner can read it, and verify'
 - order: 3
-  cost: 20
-  content: 'Verify: `ls -la /opt/app/config.env` shows `-rw------- appuser`, and another user can no longer
-    read it. Audit for siblings: `find /opt/app -perm -o+r -name ''*.env''`.'
+  cost: 50
+  content: 'Exact fix + verification:
+
+    1. Set mode 600 so only the owner can read it, and verify.
+
+    2. Re-run the lab checker (`check.sh` or Check Solution).
+
+    3. Confirm every scenario objective is satisfied.
+
+
+    WHY: the grader validates real state — marker files are ignored.'
+summary: Complete the fix insecure file permissions security lab and verify success with the checker
+estimated_minutes: 10
+xp_reward: 100
+prerequisites:
+- Basic security literacy
+tags:
+- fix
+- hands-on
+- security
+linked_tutorial: security-fundamentals
+what_you_will_learn:
+- Confirm /opt/app/config.env is world-readable / wrongly owned
+- Set ownership to appuser
+- Set mode 600 so only the owner can read it, and verify
+environment:
+  nodes:
+  - role: primary
+    os: FixitLab hardening lab
+    hostname: lab-primary
+    ip: 127.0.0.1
+    specs: local offline simulation
+  pre_installed:
+  - bash
+  - coreutils
+  - journalctl
+  - security
+  - systemctl
+  credentials:
+  - user: root
+    password: lab123
+tasks:
+- id: task_1
+  title: Fix Insecure File Permissions
+  description: Restore healthy behavior for Fix Insecure File Permissions by investigating the failure,
+    applying the smallest safe fix, and validating the outcome.
+  background: 'This security lab teaches systematic troubleshooting: observe, hypothesize, change, verify.'
+  validation:
+    type: custom_script
+    script: check.sh
+    error_message: Validation did not pass. Re-read the objectives and Hint 2 diagnostic steps.
+solution:
+  summary: Identify the misconfiguration affecting this security lab and apply the minimal fix.
+  files_changed: []
+  commands_run:
+  - bash check.sh
+  reference_docs: security-fundamentals

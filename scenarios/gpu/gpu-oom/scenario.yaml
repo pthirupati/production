@@ -1,11 +1,30 @@
 title: GPU Out of Memory Error
 slug: sim-gpu-oom
-category: GPU & NVIDIA
+category: Fix
 difficulty: medium
-description: A GPU job crashes with "CUDA out of memory". The model/batch is trying to allocate more GPU
-  memory than the device has free — often because of an oversized batch size or leftover memory held by
-  zombie processes. Identify what's consuming VRAM, free it or reduce the footprint, and get the job running
-  within the GPU's memory.
+description: 'CONTEXT: A team operating GPU operations needs you to resolve `GPU Out of Memory Error`
+  during a realistic incident. The business impact is reduced service reliability until the underlying
+  state is repaired.
+
+
+  ENVIRONMENT: You are working in FixitLab''s offline GPU node with nvidia-smi, drivers, CUDA, and container
+  toolkit. All tools run locally; no paid APIs or external cloud calls are required.
+
+
+  SYMPTOM / STARTING STATE: Linux host with an NVIDIA GPU. A training/inference job aborts with "CUDA
+  out of memory: Tried to allocate ...". GPU memory is exhausted, possibly by stale processes. A GPU job
+  crashes with "CUDA out of memory". The model/batch is trying to allocate more GPU memory than the device
+  has free — often because of an oversized batch size or leftover memory held by zombie processes. Identify
+  what''s consuming VRAM, free it or reduce the footprint, and get the job running within the GPU''s memory.
+
+
+  OBJECTIVE: Confirm GPU memory is exhausted and see what''s holding it; Free leftover/zombie GPU memory
+  or reduce the job''s footprint; Run the job within the available GPU memory. Success means `check.sh`
+  exits successfully.
+
+
+  WHAT TO AVOID: Do not apply broad destructive changes, skip evidence gathering, or fake completion with
+  marker files — the checker validates real system state.'
 initial_state: 'Linux host with an NVIDIA GPU. A training/inference job aborts with "CUDA out of memory:
   Tried to allocate ...". GPU memory is exhausted, possibly by stale processes.'
 lab_mode: simulation
@@ -22,15 +41,74 @@ objectives:
 - Run the job within the available GPU memory
 hints:
 - order: 1
-  cost: 10
-  content: 'Check usage and which PIDs hold memory: `nvidia-smi`. The Processes table lists each PID and
-    its memory; near-100% Memory-Usage confirms the OOM.'
+  cost: 0
+  content: 'Where to look: Run `docker ps -a` and `docker logs <container>` for the failing container.'
 - order: 2
-  cost: 15
-  content: 'Reclaim memory from stale jobs: kill orphaned processes shown in nvidia-smi (`kill -9 <pid>`).
-    If memory stays pinned, it''s leaked by a crashed process and needs cleanup.'
+  cost: 25
+  content: 'Diagnostic steps:
+
+    1. `docker ps -a` — note Exited status and exit code.
+
+    2. `docker logs <name>` for the startup error.
+
+    3. Inspect the Dockerfile or `docker run` flags if the image is wrong.'
 - order: 3
-  cost: 20
-  content: If a single job legitimately needs less, lower the batch size or enable gradient checkpointing
-    / mixed precision. Re-run and confirm steady-state memory in `nvidia-smi -l 1` stays under the device
-    limit.
+  cost: 50
+  content: 'Exact fix + verification:
+
+    1. Fix image, port mapping, volume, or env configuration.
+
+    2. `docker start <name>` or re-run with corrected flags.
+
+    3. Confirm `nvidia-smi` shows the container Up.
+
+
+    WHY: the checker validates the container is actually running.'
+technology: gpu
+summary: Complete the gpu out of memory error gpu lab and verify success with the checker
+estimated_minutes: 15
+xp_reward: 100
+prerequisites:
+- Basic gpu literacy
+tags:
+- fix
+- gpu
+- hands-on
+linked_tutorial: gpu-fundamentals
+what_you_will_learn:
+- Confirm GPU memory is exhausted and see what's holding it
+- Free leftover/zombie GPU memory or reduce the job's footprint
+- Run the job within the available GPU memory
+environment:
+  nodes:
+  - role: primary
+    os: FixitLab GPU node
+    hostname: lab-primary
+    ip: 127.0.0.1
+    specs: local offline simulation
+  pre_installed:
+  - bash
+  - coreutils
+  - gpu
+  - journalctl
+  - systemctl
+  credentials:
+  - user: root
+    password: lab123
+tasks:
+- id: task_1
+  title: GPU Out of Memory Error
+  description: Restore healthy behavior for GPU Out of Memory Error by investigating the failure, applying
+    the smallest safe fix, and validating the outcome.
+  background: 'This gpu lab teaches systematic troubleshooting: observe, hypothesize, change, verify.'
+  validation:
+    type: command_output
+    command: nvidia-smi
+    expected_output: NVIDIA-SMI
+    error_message: GPU health check still fails. Verify driver and device visibility.
+solution:
+  summary: Identify the misconfiguration affecting this gpu lab and apply the minimal fix.
+  files_changed: []
+  commands_run:
+  - nvidia-smi
+  reference_docs: gpu-fundamentals

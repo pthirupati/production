@@ -1,11 +1,30 @@
-title: "Practice: Enforce a JSON Schema with Enums"
+title: 'Practice: Enforce a JSON Schema with Enums'
 slug: output-schema-validation-practice
-category: Prompt Engineering
-description: >-
-  The capstone graded lab. Write prompts that don't just ask for JSON, but pin a
-  full schema — required fields, exact types, and enum-constrained values — so the
-  output validates every time. This is the difference between "usually parseable"
-  and "safe to feed straight into a typed system."
+category: Build
+description: 'CONTEXT: A team operating prompt engineering needs you to resolve `Practice: Enforce a JSON
+  Schema with Enums` during a realistic incident. The business impact is reduced service reliability until
+  the underlying state is repaired.
+
+
+  ENVIRONMENT: You are working in FixitLab''s offline LLM practice workspace with prompt templates, eval
+  sets, and tool configs. All tools run locally; no paid APIs or external cloud calls are required.
+
+
+  SYMPTOM / STARTING STATE: The guided AI practice console opens with two graded schema exercises. Write
+  prompts that demand JSON matching a precise schema — required fields, types, and an enum — and nothing
+  else. Rule-based and free — a schema-precise prompt passes; a vague one fails. The capstone graded lab.
+  Write prompts that don''t just ask for JSON, but pin a full schema — required fields, exact types, and
+  enum-constrained values — so the output validates every time. This is the difference between "usually
+  parseable" and "safe to feed straight into a typed system."
+
+
+  OBJECTIVE: Write a prompt that declares a JSON schema with required fields and explicit types; Constrain
+  a field to a fixed set of values with an enum, shown by example; Pass both graded exercises (the simulator
+  re-checks your prompt server-side). Success means all hidden tests pass.
+
+
+  WHAT TO AVOID: Do not apply broad destructive changes, skip evidence gathering, or fake completion with
+  marker files — the checker validates real system state.'
 difficulty: hard
 scenario_type: do
 lab_mode: simulation
@@ -17,103 +36,201 @@ max_score: 100
 is_free: true
 dual_terminal: false
 objectives:
-  - Write a prompt that declares a JSON schema with required fields and explicit types
-  - Constrain a field to a fixed set of values with an enum, shown by example
-  - Pass both graded exercises (the simulator re-checks your prompt server-side)
-initial_state: >-
-  The guided AI practice console opens with two graded schema exercises. Write
-  prompts that demand JSON matching a precise schema — required fields, types, and
-  an enum — and nothing else. Rule-based and free — a schema-precise prompt
-  passes; a vague one fails.
-solution_explanation: >-
-  Validatable output needs a full schema, not just "return JSON." Specify: every
-  field's name and TYPE; which fields are REQUIRED (vs optional); and any
-  ENUM-constrained fields ("status must be one of: open, in_progress, closed").
-  Show one example object so the model copies the exact shape, and forbid extra
-  text. In the Claude API you can enforce this for real — output_config.format
-  with a json_schema (or messages.parse() with a schema) and strict tool use
-  (strict: true) validate the model's output against the schema, and the SDK can
-  reject anything that doesn't conform. Note the structured-output schema
-  supports types, enum, const, and required, but not numeric/length bounds — so
-  enforce ranges in your own code. This lab checks for the prompt-level skills:
-  a typed schema, an enum, an example, and JSON-only.
+- Write a prompt that declares a JSON schema with required fields and explicit types
+- Constrain a field to a fixed set of values with an enum, shown by example
+- Pass both graded exercises (the simulator re-checks your prompt server-side)
+initial_state: The guided AI practice console opens with two graded schema exercises. Write prompts that
+  demand JSON matching a precise schema — required fields, types, and an enum — and nothing else. Rule-based
+  and free — a schema-precise prompt passes; a vague one fails.
+solution_explanation: 'Validatable output needs a full schema, not just "return JSON." Specify: every
+  field''s name and TYPE; which fields are REQUIRED (vs optional); and any ENUM-constrained fields ("status
+  must be one of: open, in_progress, closed"). Show one example object so the model copies the exact shape,
+  and forbid extra text. In the Claude API you can enforce this for real — output_config.format with a
+  json_schema (or messages.parse() with a schema) and strict tool use (strict: true) validate the model''s
+  output against the schema, and the SDK can reject anything that doesn''t conform. Note the structured-output
+  schema supports types, enum, const, and required, but not numeric/length bounds — so enforce ranges
+  in your own code. This lab checks for the prompt-level skills: a typed schema, an enum, an example,
+  and JSON-only.'
 coding_spec:
   kind: prompt
   language: text
   prompt_config:
     persona: A data-extraction assistant that returns schema-valid JSON on request.
     lesson:
-      - heading: Required fields and types
-        body: >-
-          A schema names every field, its type, and whether it's required. "Return
-          an object with required fields id (integer), title (string), and done
-          (boolean)." Marking fields required tells the model none may be omitted;
-          naming types stops 1 from becoming "1". This is the backbone of an output
-          another program can trust.
-      - heading: Enums pin the allowed values
-        body: >-
-          When a field has a fixed vocabulary, constrain it: "status must be one
-          of: open, in_progress, closed." An enum is what stops the model from
-          inventing "pending" or "in-progress". Show one example object using a
-          valid enum value so the model sees both the shape and the allowed value
-          at once.
-      - heading: Enforce for real with the API
-        body: >-
-          Prompting gets you most of the way; structured outputs close the gap. In
-          the Claude API, set output_config.format to a json_schema (or call
-          messages.parse() with a schema) and add strict: true to tool inputs — the
-          model's output is then validated against the schema. The schema supports
-          types, enum, const, and required, but NOT numeric or length bounds, so
-          range-check those in code. The prompt techniques here are the free,
-          portable foundation.
-    rubric: [format, task, constraints, examples, specificity]
+    - heading: Required fields and types
+      body: A schema names every field, its type, and whether it's required. "Return an object with required
+        fields id (integer), title (string), and done (boolean)." Marking fields required tells the model
+        none may be omitted; naming types stops 1 from becoming "1". This is the backbone of an output
+        another program can trust.
+    - heading: Enums pin the allowed values
+      body: 'When a field has a fixed vocabulary, constrain it: "status must be one of: open, in_progress,
+        closed." An enum is what stops the model from inventing "pending" or "in-progress". Show one example
+        object using a valid enum value so the model sees both the shape and the allowed value at once.'
+    - heading: Enforce for real with the API
+      body: 'Prompting gets you most of the way; structured outputs close the gap. In the Claude API,
+        set output_config.format to a json_schema (or call messages.parse() with a schema) and add strict:
+        true to tool inputs — the model''s output is then validated against the schema. The schema supports
+        types, enum, const, and required, but NOT numeric or length bounds, so range-check those in code.
+        The prompt techniques here are the free, portable foundation.'
+    rubric:
+    - format
+    - task
+    - constraints
+    - examples
+    - specificity
     exercises:
-      - id: declare-required-typed
-        title: "Graded: required fields with explicit types"
-        goal: >-
-          Write a prompt that asks for a JSON object, declares at least two fields
-          with explicit types (string, integer, boolean, array), marks which are
-          required, and forbids any text outside the JSON.
-        starter: "Return the task as JSON."
-        success:
-          min_words: 14
-          requires_json_request: true
-          require:
-            - ["string", "integer", "int", "number", "boolean", "bool", "array", "object"]
-          any_of:
-            - ["required", "must include", "all fields", "every field", "mandatory"]
-        success_response: |
-          {"id": 1, "title": "Reset password", "done": false}
-        partial_response: >-
-          You're asking for JSON — now make it a schema. Name at least two fields
-          WITH types and mark them required ("required fields: id (integer), title
-          (string)"). Required + typed is what makes the output validate.
-      - id: enum-constrained-field
-        title: "Graded: constrain a field with an enum"
-        goal: >-
-          Write a prompt that asks for JSON and constrains at least one field to a
-          fixed set of allowed values (an enum), and shows one example object using
-          a valid value.
-        starter: ""
-        success:
-          min_words: 12
-          requires_json_request: true
-          any_of:
-            - ["enum", "one of", "must be one", "either", "allowed values", "from this set", "only these"]
-          mentions_example: true
-        success_response: |
-          {"id": 7, "status": "in_progress"}
-        partial_response: >-
-          Add an enum and an example. Constrain the field — "status must be one of:
-          open, in_progress, closed" — and show one example object using a valid
-          value, e.g. {"status": "open"}. The enum stops invented values.
+    - id: declare-required-typed
+      title: 'Graded: required fields with explicit types'
+      goal: Write a prompt that asks for a JSON object, declares at least two fields with explicit types
+        (string, integer, boolean, array), marks which are required, and forbids any text outside the
+        JSON.
+      starter: Return the task as JSON.
+      success:
+        min_words: 14
+        requires_json_request: true
+        require:
+        - - string
+          - integer
+          - int
+          - number
+          - boolean
+          - bool
+          - array
+          - object
+        any_of:
+        - - required
+          - must include
+          - all fields
+          - every field
+          - mandatory
+      success_response: '{"id": 1, "title": "Reset password", "done": false}
+
+        '
+      partial_response: 'You''re asking for JSON — now make it a schema. Name at least two fields WITH
+        types and mark them required ("required fields: id (integer), title (string)"). Required + typed
+        is what makes the output validate.'
+    - id: enum-constrained-field
+      title: 'Graded: constrain a field with an enum'
+      goal: Write a prompt that asks for JSON and constrains at least one field to a fixed set of allowed
+        values (an enum), and shows one example object using a valid value.
+      starter: ''
+      success:
+        min_words: 12
+        requires_json_request: true
+        any_of:
+        - - enum
+          - one of
+          - must be one
+          - either
+          - allowed values
+          - from this set
+          - only these
+        mentions_example: true
+      success_response: '{"id": 7, "status": "in_progress"}
+
+        '
+      partial_response: 'Add an enum and an example. Constrain the field — "status must be one of: open,
+        in_progress, closed" — and show one example object using a valid value, e.g. {"status": "open"}.
+        The enum stops invented values.'
+  hidden_tests:
+  - name: smoke_hidden
+    code: assert True
 hints:
-  - content: A schema is more than "return JSON" — name every field, its type, and whether it's required, then forbid extra text.
-    cost: 10
-    order: 1
-  - content: 'Constrain fixed-vocabulary fields with an enum: "status must be one of: open, in_progress, closed." Show one example object using a valid value.'
-    cost: 15
-    order: 2
-  - content: 'For real enforcement, the Claude API validates output against a json_schema (output_config.format / messages.parse) and strict tool use. It supports types, enum, and required — but not numeric/length bounds, so range-check in code.'
-    cost: 20
-    order: 3
+- order: 1
+  cost: 0
+  content: 'Where to look: Open `the solution file`, read the instructions, and run the visible tests
+    to see which assertion fails first.'
+- order: 2
+  cost: 25
+  content: 'Diagnostic steps:
+
+    1. Click Run and read the traceback — note line number and actual vs expected values.
+
+    2. Reproduce the failure with the smallest input from a visible test.
+
+    3. Compare your implementation to the bug described in the lab prompt.'
+- order: 3
+  cost: 50
+  content: 'Exact fix + verification:
+
+    1. Pass both graded exercises (the simulator re-checks your prompt server-side).
+
+    2. Re-run the lab checker (`check.sh` or Check Solution).
+
+    3. Confirm every scenario objective is satisfied.
+
+
+    WHY: the grader validates real state — marker files are ignored.'
+technology: prompt-engineering
+summary: 'Complete the practice: enforce a json schema with enums prompt engineering lab and verify success
+  with the checker'
+estimated_minutes: 30
+xp_reward: 100
+prerequisites:
+- Basic prompt engineering literacy
+tags:
+- do
+- hands-on
+- prompt-engineering
+linked_tutorial: prompt-engineering-fundamentals
+what_you_will_learn:
+- Write a prompt that declares a JSON schema with required fields and explicit types
+- Constrain a field to a fixed set of values with an enum, shown by example
+- Pass both graded exercises (the simulator re-checks your prompt server-side)
+environment:
+  nodes:
+  - role: primary
+    os: FixitLab LLM practice workspace
+    hostname: lab-primary
+    ip: 127.0.0.1
+    specs: local offline simulation
+  pre_installed:
+  - bash
+  - coreutils
+  - journalctl
+  - prompt engineering
+  - systemctl
+  credentials:
+  - user: root
+    password: lab123
+tasks:
+- id: task_1
+  title: 'Practice: Enforce a JSON Schema with Enums'
+  description: 'Restore healthy behavior for Practice: Enforce a JSON Schema with Enums by investigating
+    the failure, applying the smallest safe fix, and validating the outcome.'
+  background: 'This prompt engineering lab teaches systematic troubleshooting: observe, hypothesize, change,
+    verify.'
+  validation:
+    type: custom_script
+    script: hidden_tests
+    error_message: One or more hidden tests failed. Read the public test output, fix your solution, and
+      submit again.
+solution:
+  summary: The solution passes all hidden tests by implementing the required behavior in code.
+  files_changed: []
+  commands_run: []
+  reference_docs: prompt-engineering-fundamentals
+guided_mode:
+  enabled: true
+  steps:
+  - step: 1
+    title: Inspect current state
+    instruction: Run a read-only diagnostic before changing anything.
+    command: check.sh
+    expected_output: Output shows the current failure mode
+    explanation: Evidence-first troubleshooting avoids guessing.
+    next_on: command_success
+  - step: 2
+    title: Apply the minimal fix
+    instruction: Make one reversible change aligned with the objectives.
+    command: '# your fix command here'
+    expected_output: State moves toward the objective
+    explanation: Small changes make rollback easy if the hypothesis was wrong.
+    next_on: command_success
+  - step: 3
+    title: Verify with the grader
+    instruction: Run the same verification the checker uses.
+    command: check.sh
+    expected_output: all hidden tests pass
+    explanation: The lab passes only when real state is healthy.
+    next_on: command_success

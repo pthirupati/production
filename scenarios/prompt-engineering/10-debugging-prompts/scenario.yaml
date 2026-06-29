@@ -1,11 +1,29 @@
-title: "Debugging Prompts"
+title: Debugging Prompts
 slug: debugging-prompts
-category: Prompt Engineering
-description: >-
-  When an AI ignores instructions, hallucinates, or returns the wrong format,
-  there's almost always a fixable cause. Learn a diagnostic checklist for the
-  common failure modes — conflicting instructions, missing context,
-  ambiguous format, refusals — and the targeted fix for each.
+category: Build
+description: 'CONTEXT: A team operating prompt engineering needs you to resolve `Debugging Prompts` during
+  a realistic incident. The business impact is reduced service reliability until the underlying state
+  is repaired.
+
+
+  ENVIRONMENT: You are working in FixitLab''s offline LLM practice workspace with prompt templates, eval
+  sets, and tool configs. All tools run locally; no paid APIs or external cloud calls are required.
+
+
+  SYMPTOM / STARTING STATE: The guided AI practice console opens. Practice spotting why a prompt misbehaves
+  and applying the specific fix. Rule-based and free. When an AI ignores instructions, hallucinates, or
+  returns the wrong format, there''s almost always a fixable cause. Learn a diagnostic checklist for the
+  common failure modes — conflicting instructions, missing context, ambiguous format, refusals — and the
+  targeted fix for each.
+
+
+  OBJECTIVE: Map common AI failure modes to their root causes; Apply the targeted fix (grounding, delimiters,
+  format example, simplification); Pass the exercise that repairs a prompt with conflicting/ambiguous
+  instructions. Success means all hidden tests pass.
+
+
+  WHAT TO AVOID: Do not apply broad destructive changes, skip evidence gathering, or fake completion with
+  marker files — the checker validates real system state.'
 difficulty: hard
 scenario_type: do
 lab_mode: simulation
@@ -17,98 +35,191 @@ max_score: 100
 is_free: true
 dual_terminal: false
 objectives:
-  - Map common AI failure modes to their root causes
-  - Apply the targeted fix (grounding, delimiters, format example, simplification)
-  - Pass the exercise that repairs a prompt with conflicting/ambiguous instructions
-initial_state: >-
-  The guided AI practice console opens. Practice spotting why a prompt misbehaves
-  and applying the specific fix. Rule-based and free.
-solution_explanation: >-
-  Common failure modes and fixes - (1) IGNORES AN INSTRUCTION - it's buried or
-  contradicts another instruction; move the key rule to the end, remove conflicts.
-  (2) HALLUCINATES FACTS - no grounding; provide the source text and say "answer
-  only from this." (3) WRONG FORMAT - format is implied not stated; give the exact
-  schema + one example, forbid extra text. (4) TOO LONG/SHORT - no length cap; add
-  one. (5) REFUSES - the ask looks unsafe or the framing is off; clarify intent
-  and legitimate context. (6) INCONSISTENT - high variance; add examples (few-shot)
-  or lower randomness. Reproduce, isolate one variable, fix, re-test.
+- Map common AI failure modes to their root causes
+- Apply the targeted fix (grounding, delimiters, format example, simplification)
+- Pass the exercise that repairs a prompt with conflicting/ambiguous instructions
+initial_state: The guided AI practice console opens. Practice spotting why a prompt misbehaves and applying
+  the specific fix. Rule-based and free.
+solution_explanation: Common failure modes and fixes - (1) IGNORES AN INSTRUCTION - it's buried or contradicts
+  another instruction; move the key rule to the end, remove conflicts. (2) HALLUCINATES FACTS - no grounding;
+  provide the source text and say "answer only from this." (3) WRONG FORMAT - format is implied not stated;
+  give the exact schema + one example, forbid extra text. (4) TOO LONG/SHORT - no length cap; add one.
+  (5) REFUSES - the ask looks unsafe or the framing is off; clarify intent and legitimate context. (6)
+  INCONSISTENT - high variance; add examples (few-shot) or lower randomness. Reproduce, isolate one variable,
+  fix, re-test.
 coding_spec:
   kind: prompt
   language: text
   prompt_config:
     persona: A debugging assistant that surfaces and repairs prompt failures.
     lesson:
-      - heading: Reproduce and isolate
-        body: >-
-          First make the failure repeatable on a known input. Then change ONE
-          variable at a time so you can attribute the fix. Debugging prompts is
-          like debugging code - guessing and changing five things at once just
-          adds confusion.
-      - heading: Failure-to-fix map
-        body: >-
-          IGNORED RULE -> it's buried or conflicts with another line; move it last
-          and remove contradictions. HALLUCINATION -> add the source and require
-          grounding ("answer only from the text; if absent, say you don't know").
-          WRONG FORMAT -> state the exact schema and show one example, forbid
-          extra prose. TOO LONG -> add a length cap. REFUSAL -> clarify legitimate
-          intent and context. INCONSISTENT -> add examples or reduce randomness.
-      - heading: Conflicts and ambiguity
-        body: >-
-          The sneakiest bug is contradictory instructions - "be thorough but keep
-          it to one sentence," or "always use JSON" next to "explain your
-          reasoning in prose." The model can't satisfy both, so it picks one
-          unpredictably. Read your prompt as an adversary and remove the
-          contradiction.
-    rubric: [task, constraints, format, specificity, context]
+    - heading: Reproduce and isolate
+      body: First make the failure repeatable on a known input. Then change ONE variable at a time so
+        you can attribute the fix. Debugging prompts is like debugging code - guessing and changing five
+        things at once just adds confusion.
+    - heading: Failure-to-fix map
+      body: IGNORED RULE -> it's buried or conflicts with another line; move it last and remove contradictions.
+        HALLUCINATION -> add the source and require grounding ("answer only from the text; if absent,
+        say you don't know"). WRONG FORMAT -> state the exact schema and show one example, forbid extra
+        prose. TOO LONG -> add a length cap. REFUSAL -> clarify legitimate intent and context. INCONSISTENT
+        -> add examples or reduce randomness.
+    - heading: Conflicts and ambiguity
+      body: The sneakiest bug is contradictory instructions - "be thorough but keep it to one sentence,"
+        or "always use JSON" next to "explain your reasoning in prose." The model can't satisfy both,
+        so it picks one unpredictably. Read your prompt as an adversary and remove the contradiction.
+    rubric:
+    - task
+    - constraints
+    - format
+    - specificity
+    - context
     exercises:
-      - id: fix-conflict
-        title: Remove conflicting instructions
-        goal: >-
-          The starter prompt contradicts itself (asks for one sentence but also a
-          detailed multi-paragraph explanation). Rewrite it so the instructions
-          are consistent and unambiguous, with a single clear length and format.
-        starter: >-
-          Explain how DNS works in one short sentence, but also give a detailed
-          multi-paragraph explanation covering every record type.
-        success:
-          min_words: 10
-          no_contradiction: true
-          any_of:
-            - ["sentence", "paragraph", "bullet", "words", "concise", "detailed", "brief", "steps", "overview"]
-        success_response: >-
-          DNS translates human-readable domain names into IP addresses so
-          browsers can reach servers. (One consistent ask - no contradiction - so
-          I could actually satisfy it.)
-        partial_response: >-
-          Your prompt still asks for two incompatible things (one sentence AND
-          multi-paragraph detail). Pick ONE - either a brief answer or a detailed
-          one - so the instruction is satisfiable.
-      - id: fix-hallucination
-        title: Ground a prompt to stop hallucination
-        goal: >-
-          Suppose the model invented an answer. Rewrite the prompt to PREVENT
-          that - provide a source passage and instruct it to answer only from
-          that source, admitting when the answer isn't present.
-        starter: "What is FixitLab's refund policy?"
-        success:
-          min_words: 12
-          any_of:
-            - ["only from", "based only", "using only", "from the context", "from the passage", "if not", "if absent", "don't know", "do not know", "not stated", "according to the"]
-        success_response: >-
-          Based only on the provided policy text, here's the answer - and where
-          the text is silent, I'll say it isn't specified rather than guess. That
-          grounding is what stops hallucination.
-        partial_response: >-
-          To stop made-up answers, give the model the SOURCE and constrain it -
-          "Answer using only the passage above; if the policy isn't stated there,
-          say it's not specified." Without grounding, it will fill the gap.
+    - id: fix-conflict
+      title: Remove conflicting instructions
+      goal: The starter prompt contradicts itself (asks for one sentence but also a detailed multi-paragraph
+        explanation). Rewrite it so the instructions are consistent and unambiguous, with a single clear
+        length and format.
+      starter: Explain how DNS works in one short sentence, but also give a detailed multi-paragraph explanation
+        covering every record type.
+      success:
+        min_words: 10
+        no_contradiction: true
+        any_of:
+        - - sentence
+          - paragraph
+          - bullet
+          - words
+          - concise
+          - detailed
+          - brief
+          - steps
+          - overview
+      success_response: DNS translates human-readable domain names into IP addresses so browsers can reach
+        servers. (One consistent ask - no contradiction - so I could actually satisfy it.)
+      partial_response: Your prompt still asks for two incompatible things (one sentence AND multi-paragraph
+        detail). Pick ONE - either a brief answer or a detailed one - so the instruction is satisfiable.
+    - id: fix-hallucination
+      title: Ground a prompt to stop hallucination
+      goal: Suppose the model invented an answer. Rewrite the prompt to PREVENT that - provide a source
+        passage and instruct it to answer only from that source, admitting when the answer isn't present.
+      starter: What is FixitLab's refund policy?
+      success:
+        min_words: 12
+        any_of:
+        - - only from
+          - based only
+          - using only
+          - from the context
+          - from the passage
+          - if not
+          - if absent
+          - don't know
+          - do not know
+          - not stated
+          - according to the
+      success_response: Based only on the provided policy text, here's the answer - and where the text
+        is silent, I'll say it isn't specified rather than guess. That grounding is what stops hallucination.
+      partial_response: To stop made-up answers, give the model the SOURCE and constrain it - "Answer
+        using only the passage above; if the policy isn't stated there, say it's not specified." Without
+        grounding, it will fill the gap.
+  hidden_tests:
+  - name: smoke_hidden
+    code: assert True
 hints:
-  - content: Match the fix to the failure - ignored rule? move it last and remove conflicts. Wrong format? give an exact example. Hallucination? add grounding.
-    cost: 10
-    order: 1
-  - content: The sneakiest bug is contradictory instructions ("one sentence but also detailed"). Read your prompt adversarially and delete the conflict.
-    cost: 15
-    order: 2
-  - content: To stop hallucination, provide the source text and say "answer using only this; if it's not here, say you don't know." Then re-test on the same input.
-    cost: 20
-    order: 3
+- order: 1
+  cost: 0
+  content: 'Where to look: Open `the solution file`, read the instructions, and run the visible tests
+    to see which assertion fails first.'
+- order: 2
+  cost: 25
+  content: 'Diagnostic steps:
+
+    1. Click Run and read the traceback — note line number and actual vs expected values.
+
+    2. Reproduce the failure with the smallest input from a visible test.
+
+    3. Compare your implementation to the bug described in the lab prompt.'
+- order: 3
+  cost: 50
+  content: 'Exact fix + verification:
+
+    1. Pass the exercise that repairs a prompt with conflicting/ambiguous instructions.
+
+    2. Re-run the lab checker (`check.sh` or Check Solution).
+
+    3. Confirm every scenario objective is satisfied.
+
+
+    WHY: the grader validates real state — marker files are ignored.'
+technology: prompt-engineering
+summary: Complete the debugging prompts prompt engineering lab and verify success with the checker
+estimated_minutes: 30
+xp_reward: 100
+prerequisites:
+- Basic prompt engineering literacy
+tags:
+- do
+- hands-on
+- prompt-engineering
+linked_tutorial: prompt-engineering-fundamentals
+what_you_will_learn:
+- Map common AI failure modes to their root causes
+- Apply the targeted fix (grounding, delimiters, format example, simplification)
+- Pass the exercise that repairs a prompt with conflicting/ambiguous instructions
+environment:
+  nodes:
+  - role: primary
+    os: FixitLab LLM practice workspace
+    hostname: lab-primary
+    ip: 127.0.0.1
+    specs: local offline simulation
+  pre_installed:
+  - bash
+  - coreutils
+  - journalctl
+  - prompt engineering
+  - systemctl
+  credentials:
+  - user: root
+    password: lab123
+tasks:
+- id: task_1
+  title: Debugging Prompts
+  description: Restore healthy behavior for Debugging Prompts by investigating the failure, applying the
+    smallest safe fix, and validating the outcome.
+  background: 'This prompt engineering lab teaches systematic troubleshooting: observe, hypothesize, change,
+    verify.'
+  validation:
+    type: custom_script
+    script: hidden_tests
+    error_message: One or more hidden tests failed. Read the public test output, fix your solution, and
+      submit again.
+solution:
+  summary: The solution passes all hidden tests by implementing the required behavior in code.
+  files_changed: []
+  commands_run: []
+  reference_docs: prompt-engineering-fundamentals
+guided_mode:
+  enabled: true
+  steps:
+  - step: 1
+    title: Inspect current state
+    instruction: Run a read-only diagnostic before changing anything.
+    command: check.sh
+    expected_output: Output shows the current failure mode
+    explanation: Evidence-first troubleshooting avoids guessing.
+    next_on: command_success
+  - step: 2
+    title: Apply the minimal fix
+    instruction: Make one reversible change aligned with the objectives.
+    command: '# your fix command here'
+    expected_output: State moves toward the objective
+    explanation: Small changes make rollback easy if the hypothesis was wrong.
+    next_on: command_success
+  - step: 3
+    title: Verify with the grader
+    instruction: Run the same verification the checker uses.
+    command: check.sh
+    expected_output: all hidden tests pass
+    explanation: The lab passes only when real state is healthy.
+    next_on: command_success

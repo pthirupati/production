@@ -1,43 +1,143 @@
 title: Configure HugePages for Oracle Database
 slug: linux-hugepages-configure
 difficulty: medium
-category: Linux Administration
-description: |
-  An Oracle database instance requires 512 HugePages (2MB each = 1GB total) to be
+category: Fix
+description: 'CONTEXT: A team operating Linux administration needs you to resolve `Configure HugePages
+  for Oracle Database` during a realistic incident. The business impact is reduced service reliability
+  until the underlying state is repaired.
+
+
+  ENVIRONMENT: You are working in FixitLab''s offline Linux practice server with terminal and config files
+  under /etc and /var. All tools run locally; no paid APIs or external cloud calls are required.
+
+
+  SYMPTOM / STARTING STATE: Simulated RHEL 9 server running Oracle Database 19c. The database is failing
+  to allocate
+
+  shared memory from HugePages. cat /proc/meminfo | grep Huge shows:
+
+  HugePages_Total: 0
+
+  HugePages_Free:  0
+
+  Hugepagesize:    2048 kB
+
+  The database alert log shows: "ORA-27102: out of memory" during startup. An Oracle database instance
+  requires 512 HugePages (2MB each = 1GB total) to be
+
   pre-allocated for the SGA (System Global Area). Without HugePages, Oracle must manage
+
   thousands of 4KB TLB entries which degrades performance significantly. HugePages must
+
   be configured in the kernel and verified before the database startup scripts are updated.
 
-initial_state: |
-  Simulated RHEL 9 server running Oracle Database 19c. The database is failing to allocate
+
+  OBJECTIVE: Check current HugePage status with cat /proc/meminfo | grep -i huge; Set vm.nr_hugepages=512
+  in /etc/sysctl.conf; Apply immediately with sysctl -p and verify vm.nr_hugepages is 512. Success means
+  `check.sh` exits successfully.
+
+
+  WHAT TO AVOID: Do not apply broad destructive changes, skip evidence gathering, or fake completion with
+  marker files — the checker validates real system state.'
+initial_state: 'Simulated RHEL 9 server running Oracle Database 19c. The database is failing to allocate
+
   shared memory from HugePages. cat /proc/meminfo | grep Huge shows:
+
   HugePages_Total: 0
+
   HugePages_Free:  0
+
   Hugepagesize:    2048 kB
+
   The database alert log shows: "ORA-27102: out of memory" during startup.
 
+  '
 objectives:
-  - Check current HugePage status with cat /proc/meminfo | grep -i huge
-  - Set vm.nr_hugepages=512 in /etc/sysctl.conf
-  - Apply immediately with sysctl -p and verify vm.nr_hugepages is 512
-  - Confirm allocation with cat /proc/meminfo | grep HugePages_Total showing 512
-  - Add the oracle user to the hugepages group or set vm.hugetlb_shm_group in sysctl.conf
-  - Verify HugePages_Free is 512 before starting Oracle
+- Check current HugePage status with cat /proc/meminfo | grep -i huge
+- Set vm.nr_hugepages=512 in /etc/sysctl.conf
+- Apply immediately with sysctl -p and verify vm.nr_hugepages is 512
+- Confirm allocation with cat /proc/meminfo | grep HugePages_Total showing 512
+- Add the oracle user to the hugepages group or set vm.hugetlb_shm_group in sysctl.conf
+- Verify HugePages_Free is 512 before starting Oracle
 lab_mode: simulation
 simulation_type: generic
 time_limit: 900
 max_score: 100
 is_free: false
 hints:
-  - content: 'Add to /etc/sysctl.conf: vm.nr_hugepages = 512. Then run sysctl -p to apply. Check /proc/meminfo | grep Huge to verify the pages were allocated.'
-    cost: 10
-    order: 1
-  - content: 'If HugePages_Total is 512 but HugePages_Free is 0 after setting, the system may not have enough contiguous memory. Try setting the value and rebooting — hugepages are best allocated at boot time.'
-    cost: 20
-    order: 2
-  - content: 'For Oracle, also set: kernel.shmmax and kernel.shmall to cover the SGA size, and add the oracle user GID to vm.hugetlb_shm_group in sysctl.conf.'
-    cost: 15
-    order: 3
+- order: 1
+  cost: 0
+  content: 'Where to look: Check current HugePage status with cat /proc/meminfo | grep -i huge'
+- order: 2
+  cost: 25
+  content: 'Diagnostic steps:
+
+    1. Set vm.nr_hugepages=512 in /etc/sysctl.conf
+
+    2. Apply immediately with sysctl -p and verify vm.nr_hugepages is 512
+
+    3. Confirm allocation with cat /proc/meminfo | grep HugePages_Total showing 512'
+- order: 3
+  cost: 50
+  content: 'Exact fix + verification:
+
+    1. Add the oracle user to the hugepages group or set vm.hugetlb_shm_group in sysctl.conf.
+
+    2. Re-run the lab checker (`check.sh` or Check Solution).
+
+    3. Confirm every scenario objective is satisfied.
+
+
+    WHY: the grader validates real state — marker files are ignored.'
 requires_companion_hosts: false
 dual_terminal: false
 jira_priority: Medium
+technology: linux
+summary: Complete the configure hugepages for oracle database linux lab and verify success with the checker
+estimated_minutes: 15
+xp_reward: 100
+prerequisites:
+- Basic linux literacy
+tags:
+- fix
+- hands-on
+- linux
+linked_tutorial: linux-fundamentals
+what_you_will_learn:
+- Check current HugePage status with cat /proc/meminfo | grep -i huge
+- Set vm.nr_hugepages=512 in /etc/sysctl.conf
+- Apply immediately with sysctl -p and verify vm.nr_hugepages is 512
+- Confirm allocation with cat /proc/meminfo | grep HugePages_Total showing 512
+- Add the oracle user to the hugepages group or set vm.hugetlb_shm_group in sysctl.conf
+environment:
+  nodes:
+  - role: primary
+    os: FixitLab Linux practice server
+    hostname: lab-primary
+    ip: 127.0.0.1
+    specs: local offline simulation
+  pre_installed:
+  - bash
+  - coreutils
+  - journalctl
+  - linux
+  - systemctl
+  credentials:
+  - user: root
+    password: lab123
+tasks:
+- id: task_1
+  title: Configure HugePages for Oracle Database
+  description: Restore healthy behavior for Configure HugePages for Oracle Database by investigating the
+    failure, applying the smallest safe fix, and validating the outcome.
+  background: 'This linux lab teaches systematic troubleshooting: observe, hypothesize, change, verify.'
+  validation:
+    type: custom_script
+    script: check.sh
+    error_message: Validation did not pass. Re-read the objectives and Hint 2 diagnostic steps.
+solution:
+  summary: Identify the misconfiguration affecting this linux lab and apply the minimal fix.
+  files_changed: []
+  commands_run:
+  - bash check.sh
+  reference_docs: linux-fundamentals

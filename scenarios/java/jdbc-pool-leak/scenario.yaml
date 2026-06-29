@@ -1,8 +1,7 @@
----
 slug: java-jdbc-pool-leak
-title: "JDBC Connection Leak Exhausts the Pool"
-technology: Java
-category: "Spring Boot"
+title: JDBC Connection Leak Exhausts the Pool
+technology: java
+category: Fix
 difficulty: hard
 time_limit: 1200
 max_score: 100
@@ -11,22 +10,107 @@ simulation_type: java
 infrastructure_type: simulation
 jira_priority: High
 is_free: false
-description: |
-  Over hours the connection pool drains to zero and the app hangs acquiring connections. A DAO opens a JDBC Connection/Statement/ResultSet but only closes them on the happy path, so any exception leaks a connection permanently. Make resource handling leak-proof with try-with-resources so connections always return to the pool.
+description: 'CONTEXT: A team operating Java applications needs you to resolve `JDBC Connection Leak Exhausts
+  the Pool` during a realistic incident. The business impact is reduced service reliability until the
+  underlying state is repaired.
+
+
+  ENVIRONMENT: You are working in FixitLab''s offline Java project with Maven/Gradle, JVM logs, and Spring
+  configuration. All tools run locally; no paid APIs or external cloud calls are required.
+
+
+  SYMPTOM / STARTING STATE: ReportDao at /app/src/main/java/com/example/repo/ReportDao.java closes JDBC
+  resources only on success, leaking a connection on every error. Over hours the connection pool drains
+  to zero and the app hangs acquiring connections. A DAO opens a JDBC Connection/Statement/ResultSet but
+  only closes them on the happy path, so any exception leaks a connection permanently. Make resource handling
+  leak-proof with try-with-resources so connections always return to the pool.
+
+
+  OBJECTIVE: Observe the pool''s active count climb and never recover; Find the DAO path that leaks connections
+  on exceptions; Convert to try-with-resources so resources always close. Success means `check.sh` exits
+  successfully.
+
+
+  WHAT TO AVOID: Do not apply broad destructive changes, skip evidence gathering, or fake completion with
+  marker files — the checker validates real system state.'
 objectives:
-  - "Observe the pool's active count climb and never recover"
-  - "Find the DAO path that leaks connections on exceptions"
-  - "Convert to try-with-resources so resources always close"
-  - "Verify active connections return to baseline after load"
-initial_state: |
-  ReportDao at /app/src/main/java/com/example/repo/ReportDao.java closes JDBC resources only on success, leaking a connection on every error.
+- Observe the pool's active count climb and never recover
+- Find the DAO path that leaks connections on exceptions
+- Convert to try-with-resources so resources always close
+- Verify active connections return to baseline after load
+initial_state: 'ReportDao at /app/src/main/java/com/example/repo/ReportDao.java closes JDBC resources
+  only on success, leaking a connection on every error.
+
+  '
 hints:
-  - order: 1
-    cost: 10
-    content: "Hikari active count only rises — connections are borrowed and never returned."
-  - order: 2
-    cost: 15
-    content: "A close() in the happy path leaks on exceptions; wrap in try-with-resources."
-  - order: 3
-    cost: 20
-    content: "try (Connection c = ds.getConnection(); Statement s = ...) closes even on throw."
+- order: 1
+  cost: 0
+  content: 'Where to look: Observe the pool''s active count climb and never recover'
+- order: 2
+  cost: 25
+  content: 'Diagnostic steps:
+
+    1. Find the DAO path that leaks connections on exceptions
+
+    2. Convert to try-with-resources so resources always close
+
+    3. Verify active connections return to baseline after load'
+- order: 3
+  cost: 50
+  content: 'Exact fix + verification:
+
+    1. Verify active connections return to baseline after load.
+
+    2. Re-run the lab checker (`check.sh` or Check Solution).
+
+    3. Confirm every scenario objective is satisfied.
+
+
+    WHY: the grader validates real state — marker files are ignored.'
+summary: Complete the jdbc connection leak exhausts the pool java lab and verify success with the checker
+estimated_minutes: 20
+xp_reward: 100
+prerequisites:
+- Basic java literacy
+tags:
+- fix
+- hands-on
+- java
+linked_tutorial: java-fundamentals
+what_you_will_learn:
+- Observe the pool's active count climb and never recover
+- Find the DAO path that leaks connections on exceptions
+- Convert to try-with-resources so resources always close
+- Verify active connections return to baseline after load
+environment:
+  nodes:
+  - role: primary
+    os: FixitLab Java project
+    hostname: lab-primary
+    ip: 127.0.0.1
+    specs: local offline simulation
+  pre_installed:
+  - bash
+  - coreutils
+  - java
+  - journalctl
+  - systemctl
+  credentials:
+  - user: root
+    password: lab123
+tasks:
+- id: task_1
+  title: JDBC Connection Leak Exhausts the Pool
+  description: Restore healthy behavior for JDBC Connection Leak Exhausts the Pool by investigating the
+    failure, applying the smallest safe fix, and validating the outcome.
+  background: 'This java lab teaches systematic troubleshooting: observe, hypothesize, change, verify.'
+  validation:
+    type: custom_script
+    script: check.sh
+    error_message: Validation did not pass. Re-read the objectives and Hint 2 diagnostic steps.
+solution:
+  summary: Identify the misconfiguration affecting this java lab and apply the minimal fix.
+  files_changed: []
+  commands_run:
+  - bash check.sh
+  reference_docs: java-fundamentals

@@ -1,9 +1,26 @@
 title: Fix the Mutable Default Argument Bug
 slug: py-fix-mutable-default-arg
-category: Python Development
-description: append_item(item, bucket=[]) uses a mutable default list, so the SAME list is shared across
-  calls and items leak between unrelated calls. Fix it using the standard None sentinel idiom so each
-  call starts fresh unless a bucket is explicitly passed.
+category: Fix
+description: 'CONTEXT: A team operating Python development needs you to resolve `Fix the Mutable Default
+  Argument Bug` during a realistic incident. The business impact is reduced service reliability until
+  the underlying state is repaired.
+
+
+  ENVIRONMENT: You are working in FixitLab''s offline Python project workspace with source files, venv,
+  tests, and CLI entrypoints. All tools run locally; no paid APIs or external cloud calls are required.
+
+
+  SYMPTOM / STARTING STATE: append_item(item, bucket=[]) uses a mutable default list, so the SAME list
+  is shared across calls and items leak between unrelated calls. Fix it using the standard None sentinel
+  idiom so each call starts fresh unless a bucket is explicitly passed.
+
+
+  OBJECTIVE: Show that two separate calls share state; Replace the mutable default with a None sentinel;
+  Confirm calls are independent but explicit buckets still work. Success means all hidden tests pass.
+
+
+  WHAT TO AVOID: Do not apply broad destructive changes, skip evidence gathering, or fake completion with
+  marker files — the checker validates real system state.'
 difficulty: medium
 scenario_type: fix
 lab_mode: simulation
@@ -21,54 +38,126 @@ objectives:
 initial_state: append_item(item, bucket=[]) uses a mutable default list, so the SAME list is shared across
   calls and items leak between unrelated calls. Fix it using the standard None sentinel idiom so each
   call starts fresh unless a bucket is explicitly passed.
-solution_explanation: |
-  Default arguments are evaluated once when the function is defined, so a default list is shared across every call. The None-sentinel pattern allocates a new list per call while still honoring an explicit argument.
+solution_explanation: 'Default arguments are evaluated once when the function is defined, so a default
+  list is shared across every call. The None-sentinel pattern allocates a new list per call while still
+  honoring an explicit argument.
+
+  '
 coding_spec:
   language: python
   entrypoint: solution.py
   kind: fix
-  instructions: |
-    Fix append_item so a fresh list is used when no bucket is given. Calling it twice with no bucket must NOT accumulate across calls.
+  instructions: 'Fix append_item so a fresh list is used when no bucket is given. Calling it twice with
+    no bucket must NOT accumulate across calls.
+
     Click Run to try it, then Check Solution to grade against all tests.
+
+    '
   files:
   - path: solution.py
-    content: |
-      def append_item(item, bucket=[]):
-          bucket.append(item)
-          return bucket
+    content: "def append_item(item, bucket=[]):\n    bucket.append(item)\n    return bucket\n"
     readonly: false
   visible_tests:
   - name: appends to fresh list
-    code: |
-      assert append_item(1) == [1]
+    code: 'assert append_item(1) == [1]
+
+      '
   - name: explicit bucket used
-    code: |
-      b = [0]
+    code: 'b = [0]
+
       assert append_item(5, b) == [0, 5]
+
       assert b == [0, 5]
+
+      '
   hidden_tests:
   - name: calls are independent
-    code: |
-      assert append_item(1) == [1]
+    code: 'assert append_item(1) == [1]
+
       assert append_item(2) == [2]
+
+      '
   - name: repeated default calls do not accumulate
-    code: |
-      for _ in range(3):
-          r = append_item('x')
-          assert r == ['x'], r
+    code: "for _ in range(3):\n    r = append_item('x')\n    assert r == ['x'], r\n"
   - name: distinct list objects
-    code: |
-      a = append_item('a')
-      b = append_item('b')
+    code: 'a = append_item(''a'')
+
+      b = append_item(''b'')
+
       assert a is not b
+
+      '
   timeout: 8
 hints:
 - order: 1
-  cost: 10
-  content: Call append_item(1) then append_item(2). The second returns [1, 2] — the default list persisted.
+  cost: 0
+  content: 'Where to look: Open `solution.py`, read the instructions, and run the visible tests to see
+    which assertion fails first.'
 - order: 2
-  cost: 20
-  content: Default argument values are created ONCE at definition time; a default list is shared.
+  cost: 25
+  content: 'Diagnostic steps:
+
+    1. Click Run and read the traceback — note line number and actual vs expected values.
+
+    2. Reproduce the failure with the smallest input from a visible test.
+
+    3. Compare your implementation to the bug described in the lab prompt.'
 - order: 3
-  cost: 30
-  content: 'Use `bucket=None`, then inside: `if bucket is None: bucket = []`.'
+  cost: 50
+  content: 'Exact fix + verification:
+
+    1. Confirm calls are independent but explicit buckets still work.
+
+    2. Re-run the lab checker (`check.sh` or Check Solution).
+
+    3. Confirm every scenario objective is satisfied.
+
+
+    WHY: the grader validates real state — marker files are ignored.'
+technology: python
+summary: Complete the fix the mutable default argument bug python lab and verify success with the checker
+estimated_minutes: 25
+xp_reward: 100
+prerequisites:
+- Basic python literacy
+tags:
+- fix
+- hands-on
+- python
+linked_tutorial: python-fundamentals
+what_you_will_learn:
+- Show that two separate calls share state
+- Replace the mutable default with a None sentinel
+- Confirm calls are independent but explicit buckets still work
+environment:
+  nodes:
+  - role: primary
+    os: FixitLab Python project workspace
+    hostname: lab-primary
+    ip: 127.0.0.1
+    specs: local offline simulation
+  pre_installed:
+  - bash
+  - coreutils
+  - pip
+  - python
+  - python3
+  credentials:
+  - user: root
+    password: lab123
+tasks:
+- id: task_1
+  title: Fix the Mutable Default Argument Bug
+  description: Restore healthy behavior for Fix the Mutable Default Argument Bug by investigating the
+    failure, applying the smallest safe fix, and validating the outcome.
+  background: 'This python lab teaches systematic troubleshooting: observe, hypothesize, change, verify.'
+  validation:
+    type: custom_script
+    script: hidden_tests
+    error_message: One or more hidden tests failed. Read the public test output, fix your solution, and
+      submit again.
+solution:
+  summary: The solution passes all hidden tests by implementing the required behavior in code.
+  files_changed: []
+  commands_run: []
+  reference_docs: python-fundamentals

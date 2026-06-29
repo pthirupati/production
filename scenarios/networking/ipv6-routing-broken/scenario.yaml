@@ -1,38 +1,130 @@
 slug: ipv6-routing-broken
-title: "IPv6 Routing Broken — Fix Router Advertisement Config"
-technology: Networking
-category: IPv6
+title: IPv6 Routing Broken — Fix Router Advertisement Config
+technology: networking
+category: Fix
 difficulty: medium
 time_limit: 900
 max_score: 100
 infrastructure_type: docker
 jira_priority: Medium
 is_free: false
-description: |
-  IPv6 hosts on the LAN are not receiving Router Advertisements (RA) and therefore
-  cannot autoconfigure their default gateway via SLAAC. The radvd daemon is installed
-  but misconfigured — the AdvSendAdvert flag is off and the prefix advertisement is
-  missing the autoconfiguration flags. IPv6 connectivity to the internet is broken
-  for all hosts on the segment.
-objectives:
-  - Identify that radvd is not sending Router Advertisements
-  - Fix the radvd.conf to enable AdvSendAdvert and autoconfiguration flags
-  - Restart radvd and verify hosts receive RA and a global IPv6 address
-  - Confirm IPv6 default route is installed on a test host
-initial_state: |
-  Ubuntu 22.04 with radvd installed. /etc/radvd.conf has AdvSendAdvert off and
+description: 'CONTEXT: A team operating network operations needs you to resolve `IPv6 Routing Broken —
+  Fix Router Advertisement Config` during a realistic incident. The business impact is reduced service
+  reliability until the underlying state is repaired.
+
+
+  ENVIRONMENT: You are working in FixitLab''s offline network lab with interfaces, routing tables, DNS,
+  and firewall rules. All tools run locally; no paid APIs or external cloud calls are required.
+
+
+  SYMPTOM / STARTING STATE: Ubuntu 22.04 with radvd installed. /etc/radvd.conf has AdvSendAdvert off and
+
   AdvAutonomous off on the prefix block. IPv6 forwarding is enabled. Hosts on
+
+  the LAN have link-local addresses but no global addresses and no default route. IPv6 hosts on the LAN
+  are not receiving Router Advertisements (RA) and therefore
+
+  cannot autoconfigure their default gateway via SLAAC. The radvd daemon is installed
+
+  but misconfigured — the AdvSendAdvert flag is off and the prefix advertisement is
+
+  missing the autoconfiguration flags. IPv6 connectivity to the internet is broken
+
+  for all hosts on the segment.
+
+
+  OBJECTIVE: Identify that radvd is not sending Router Advertisements; Fix the radvd.conf to enable AdvSendAdvert
+  and autoconfiguration flags; Restart radvd and verify hosts receive RA and a global IPv6 address. Success
+  means `systemctl is-active --quiet` returns active.
+
+
+  WHAT TO AVOID: Do not apply broad destructive changes, skip evidence gathering, or fake completion with
+  marker files — the checker validates real system state.'
+objectives:
+- Identify that radvd is not sending Router Advertisements
+- Fix the radvd.conf to enable AdvSendAdvert and autoconfiguration flags
+- Restart radvd and verify hosts receive RA and a global IPv6 address
+- Confirm IPv6 default route is installed on a test host
+initial_state: 'Ubuntu 22.04 with radvd installed. /etc/radvd.conf has AdvSendAdvert off and
+
+  AdvAutonomous off on the prefix block. IPv6 forwarding is enabled. Hosts on
+
   the LAN have link-local addresses but no global addresses and no default route.
+
+  '
 hints:
-  - order: 1
-    cost: 10
-    content: "Check `systemctl status radvd` and inspect `/etc/radvd.conf`."
-  - order: 2
-    cost: 15
-    content: "Set `AdvSendAdvert on;` in the interface block and `AdvAutonomous on;` in the prefix block."
-  - order: 3
-    cost: 15
-    content: "Restart radvd: `systemctl restart radvd`. Verify with `radvdump` or `tcpdump -i eth1 icmp6`."
-  - order: 4
-    cost: 20
-    content: "On a host, run `ip -6 addr show` — you should see a /64 global address. Check `ip -6 route` for default via."
+- order: 1
+  cost: 0
+  content: 'Where to look: Start with `systemctl status --quiet` and `journalctl -u --quiet -n 50 --no-pager`
+    before changing anything.'
+- order: 2
+  cost: 25
+  content: 'Diagnostic steps:
+
+    1. Run `systemctl status --quiet` — note Active/Failed and the last log lines.
+
+    2. Read `journalctl -u --quiet -n 50` for the root error.
+
+    3. Form a hypothesis about the smallest config or permission fix.'
+- order: 3
+  cost: 50
+  content: 'Exact fix + verification:
+
+    1. Apply the minimal fix (config, unit override, or missing directory).
+
+    2. Run `systemctl daemon-reload` if you edited a unit file.
+
+    3. Run `systemctl restart --quiet` and confirm `systemctl is-active --quiet` succeeds.
+
+
+    WHY: the grader checks real service state, not marker files.'
+summary: Complete the ipv6 routing broken — fix router advertisement config networking lab and verify
+  success with the checker
+estimated_minutes: 15
+xp_reward: 100
+prerequisites:
+- Basic networking literacy
+tags:
+- fix
+- hands-on
+- networking
+linked_tutorial: networking-fundamentals
+what_you_will_learn:
+- Identify that radvd is not sending Router Advertisements
+- Fix the radvd.conf to enable AdvSendAdvert and autoconfiguration flags
+- Restart radvd and verify hosts receive RA and a global IPv6 address
+- Confirm IPv6 default route is installed on a test host
+environment:
+  nodes:
+  - role: primary
+    os: FixitLab network lab
+    hostname: lab-primary
+    ip: 127.0.0.1
+    specs: local offline simulation
+  pre_installed:
+  - bash
+  - coreutils
+  - journalctl
+  - networking
+  - systemctl
+  credentials:
+  - user: root
+    password: lab123
+tasks:
+- id: task_1
+  title: IPv6 Routing Broken — Fix Router Advertisement Config
+  description: Restore healthy behavior for IPv6 Routing Broken — Fix Router Advertisement Config by investigating
+    the failure, applying the smallest safe fix, and validating the outcome.
+  background: 'This networking lab teaches systematic troubleshooting: observe, hypothesize, change, verify.'
+  validation:
+    type: service_active
+    command: systemctl is-active --quiet
+    expected_status: active
+    error_message: The --quiet service is not active yet. Check `systemctl status --quiet` and `journalctl
+      -u --quiet -n 50`.
+solution:
+  summary: The root cause is an unhealthy `--quiet` service; repair it and verify active state.
+  files_changed: []
+  commands_run:
+  - systemctl is-active --quiet
+  reference_docs: networking-fundamentals

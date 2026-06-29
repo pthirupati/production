@@ -1,9 +1,26 @@
 title: Implement Valid Parentheses
 slug: py-impl-valid-parentheses
-category: Python Development
-description: 'Implement is_balanced(s): return True if every bracket in s — (), [], {} — is correctly
-  opened and closed in the right order, False otherwise. Other characters are ignored. The stub is empty
-  so tests fail.'
+category: Build
+description: 'CONTEXT: A team operating Python development needs you to resolve `Implement Valid Parentheses`
+  during a realistic incident. The business impact is reduced service reliability until the underlying
+  state is repaired.
+
+
+  ENVIRONMENT: You are working in FixitLab''s offline Python project workspace with source files, venv,
+  tests, and CLI entrypoints. All tools run locally; no paid APIs or external cloud calls are required.
+
+
+  SYMPTOM / STARTING STATE: Implement is_balanced(s): return True if every bracket in s — (), [], {} —
+  is correctly opened and closed in the right order, False otherwise. Other characters are ignored. The
+  stub is empty so tests fail.
+
+
+  OBJECTIVE: Use a stack to match opening brackets; Verify each closer matches the most recent opener;
+  Ensure nothing is left unclosed. Success means all hidden tests pass.
+
+
+  WHAT TO AVOID: Do not apply broad destructive changes, skip evidence gathering, or fake completion with
+  marker files — the checker validates real system state.'
 difficulty: medium
 scenario_type: do
 lab_mode: simulation
@@ -21,54 +38,146 @@ objectives:
 initial_state: 'Implement is_balanced(s): return True if every bracket in s — (), [], {} — is correctly
   opened and closed in the right order, False otherwise. Other characters are ignored. The stub is empty
   so tests fail.'
-solution_explanation: |
-  A stack records open brackets; each closer must match the most recent opener (LIFO), and a non-empty stack at the end means something is unclosed.
+solution_explanation: 'A stack records open brackets; each closer must match the most recent opener (LIFO),
+  and a non-empty stack at the end means something is unclosed.
+
+  '
 coding_spec:
   language: python
   entrypoint: solution.py
   kind: impl
-  instructions: |
-    Implement is_balanced(s) -> bool for the brackets (), [], {} (ignore other chars).
-      is_balanced('([]{})') -> True, is_balanced('(]') -> False
-    Click Run to try it, then Check Solution to grade against all tests.
+  instructions: "Implement is_balanced(s) -> bool for the brackets (), [], {} (ignore other chars).\n\
+    \  is_balanced('([]{})') -> True, is_balanced('(]') -> False\nClick Run to try it, then Check Solution\
+    \ to grade against all tests.\n"
   files:
   - path: solution.py
-    content: |
-      def is_balanced(s):
-          # TODO: return True iff brackets are balanced
-          pass
+    content: "def is_balanced(s):\n    # TODO: return True iff brackets are balanced\n    pass\n"
     readonly: false
   visible_tests:
   - name: balanced mixed
-    code: |
-      assert is_balanced('([]{})') is True
+    code: 'assert is_balanced(''([]{})'') is True
+
+      '
   - name: mismatch
-    code: |
-      assert is_balanced('(]') is False
+    code: 'assert is_balanced(''(]'') is False
+
+      '
   hidden_tests:
   - name: empty is balanced
-    code: |
-      assert is_balanced('') is True
+    code: 'assert is_balanced('''') is True
+
+      '
   - name: unclosed
-    code: |
-      assert is_balanced('(((') is False
+    code: 'assert is_balanced(''((('') is False
+
+      '
   - name: extra close
-    code: |
-      assert is_balanced('())') is False
+    code: 'assert is_balanced(''())'') is False
+
+      '
   - name: ignores other chars
-    code: |
-      assert is_balanced('a(b)c[d]') is True
+    code: 'assert is_balanced(''a(b)c[d]'') is True
+
+      '
   - name: wrong nesting
-    code: |
-      assert is_balanced('([)]') is False
+    code: 'assert is_balanced(''([)]'') is False
+
+      '
   timeout: 8
 hints:
 - order: 1
-  cost: 10
-  content: Push every opening bracket onto a stack.
+  cost: 0
+  content: 'Where to look: Open `solution.py`, read the instructions, and run the visible tests to see
+    which assertion fails first.'
 - order: 2
-  cost: 20
-  content: On a closing bracket, the top of the stack must be its matching opener.
+  cost: 25
+  content: 'Diagnostic steps:
+
+    1. Click Run and read the traceback — note line number and actual vs expected values.
+
+    2. Reproduce the failure with the smallest input from a visible test.
+
+    3. Compare your implementation to the bug described in the lab prompt.'
 - order: 3
-  cost: 30
-  content: At the end the stack must be empty; an empty stack on a closer means invalid.
+  cost: 50
+  content: 'Exact fix + verification:
+
+    1. Ensure nothing is left unclosed.
+
+    2. Re-run the lab checker (`check.sh` or Check Solution).
+
+    3. Confirm every scenario objective is satisfied.
+
+
+    WHY: the grader validates real state — marker files are ignored.'
+technology: python
+summary: Complete the implement valid parentheses python lab and verify success with the checker
+estimated_minutes: 25
+xp_reward: 100
+prerequisites:
+- Basic python literacy
+tags:
+- do
+- hands-on
+- python
+linked_tutorial: python-fundamentals
+what_you_will_learn:
+- Use a stack to match opening brackets
+- Verify each closer matches the most recent opener
+- Ensure nothing is left unclosed
+environment:
+  nodes:
+  - role: primary
+    os: FixitLab Python project workspace
+    hostname: lab-primary
+    ip: 127.0.0.1
+    specs: local offline simulation
+  pre_installed:
+  - bash
+  - coreutils
+  - pip
+  - python
+  - python3
+  credentials:
+  - user: root
+    password: lab123
+tasks:
+- id: task_1
+  title: Implement Valid Parentheses
+  description: Restore healthy behavior for Implement Valid Parentheses by investigating the failure,
+    applying the smallest safe fix, and validating the outcome.
+  background: 'This python lab teaches systematic troubleshooting: observe, hypothesize, change, verify.'
+  validation:
+    type: custom_script
+    script: hidden_tests
+    error_message: One or more hidden tests failed. Read the public test output, fix your solution, and
+      submit again.
+solution:
+  summary: The solution passes all hidden tests by implementing the required behavior in code.
+  files_changed: []
+  commands_run: []
+  reference_docs: python-fundamentals
+guided_mode:
+  enabled: true
+  steps:
+  - step: 1
+    title: Inspect current state
+    instruction: Run a read-only diagnostic before changing anything.
+    command: check.sh
+    expected_output: Output shows the current failure mode
+    explanation: Evidence-first troubleshooting avoids guessing.
+    next_on: command_success
+  - step: 2
+    title: Apply the minimal fix
+    instruction: Make one reversible change aligned with the objectives.
+    command: '# your fix command here'
+    expected_output: State moves toward the objective
+    explanation: Small changes make rollback easy if the hypothesis was wrong.
+    next_on: command_success
+  - step: 3
+    title: Verify with the grader
+    instruction: Run the same verification the checker uses.
+    command: check.sh
+    expected_output: all hidden tests pass
+    explanation: The lab passes only when real state is healthy.
+    next_on: command_success

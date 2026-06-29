@@ -1,11 +1,29 @@
 title: Harden ai-ml replication (lab 50)
 slug: ai-ml-lab-50
 technology: ai-ml
-category: Ai Ml
-description: 'Hands-on ai-ml scenario: harden replication in a simulated environment.
-  This AI/ML workflows scenario focuses on ai ml: Harden ai-ml replication (lab 50).
-  Read the environment, form a hypothesis, apply a minimal fix, and verify behavior
-  before closing the ticket.'
+category: Fix
+description: 'CONTEXT: A team operating AI/ML workflows needs you to resolve `Harden ai-ml replication
+  (lab 50)` during a realistic incident. The business impact is reduced service reliability until the
+  underlying state is repaired.
+
+
+  ENVIRONMENT: You are working in FixitLab''s offline ML practice workspace with datasets, training scripts,
+  metrics, and model artifacts. All tools run locally; no paid APIs or external cloud calls are required.
+
+
+  SYMPTOM / STARTING STATE: Hands-on ai-ml scenario: harden replication in a simulated environment. Hands-on
+  ai-ml scenario: harden replication in a simulated environment. This AI/ML workflows scenario focuses
+  on ai ml: Harden ai-ml replication (lab 50). Read the environment, form a hypothesis, apply a minimal
+  fix, and verify behavior before closing the ticket.
+
+
+  OBJECTIVE: Understand the current failure mode affecting Harden ai-ml replication (lab 50); Restore
+  expected service behavior with a minimal, documented change; Verify the fix holds under a realistic
+  smoke test. Success means all hidden tests pass.
+
+
+  WHAT TO AVOID: Do not apply broad destructive changes, skip evidence gathering, or fake completion with
+  marker files — the checker validates real system state.'
 difficulty: hard
 scenario_type: fix
 lab_mode: simulation
@@ -23,14 +41,30 @@ objectives:
 initial_state: 'Hands-on ai-ml scenario: harden replication in a simulated environment.'
 hints:
 - order: 1
-  cost: 10
-  content: Read the scenario objective and inspect logs or config in the terminal.
+  cost: 0
+  content: 'Where to look: Open `solution.py`, read the instructions, and run the visible tests to see
+    which assertion fails first.'
 - order: 2
-  cost: 20
-  content: 'Apply the minimal fix, then mark completion: echo FIXED-OK > /tmp/scenario-fixed'
+  cost: 25
+  content: 'Diagnostic steps:
+
+    1. Click Run and read the traceback — note line number and actual vs expected values.
+
+    2. Reproduce the failure with the smallest input from a visible test.
+
+    3. Compare your implementation to the bug described in the lab prompt.'
 - order: 3
-  cost: 20
-  content: Re-run the failing check or user workflow to confirm the incident is resolved.
+  cost: 50
+  content: 'Exact fix + verification:
+
+    1. Verify the fix holds under a realistic smoke test.
+
+    2. Re-run the lab checker (`check.sh` or Check Solution).
+
+    3. Confirm every scenario objective is satisfied.
+
+
+    WHY: the grader validates real state — marker files are ignored.'
 coding_spec:
   language: python
   entrypoint: solution.py
@@ -43,5 +77,53 @@ coding_spec:
   visible_tests:
   - name: placeholder
     code: assert callable(solution)
-  hidden_tests: []
+  hidden_tests:
+  - name: placeholder_hidden
+    code: assert callable(solution)
   timeout: 8
+summary: Complete the harden ai-ml replication (lab 50) ai ml lab and verify success with the checker
+estimated_minutes: 20
+xp_reward: 100
+prerequisites:
+- Basic ai ml literacy
+tags:
+- ai-ml
+- fix
+- hands-on
+linked_tutorial: ai-ml-fundamentals
+what_you_will_learn:
+- Understand the current failure mode affecting Harden ai-ml replication (lab 50)
+- Restore expected service behavior with a minimal, documented change
+- Verify the fix holds under a realistic smoke test
+environment:
+  nodes:
+  - role: primary
+    os: FixitLab ML practice workspace
+    hostname: lab-primary
+    ip: 127.0.0.1
+    specs: local offline simulation
+  pre_installed:
+  - ai ml
+  - bash
+  - coreutils
+  - pip
+  - python3
+  credentials:
+  - user: root
+    password: lab123
+tasks:
+- id: task_1
+  title: Harden ai-ml replication (lab 50)
+  description: Restore healthy behavior for Harden ai-ml replication (lab 50) by investigating the failure,
+    applying the smallest safe fix, and validating the outcome.
+  background: 'This ai ml lab teaches systematic troubleshooting: observe, hypothesize, change, verify.'
+  validation:
+    type: custom_script
+    script: hidden_tests
+    error_message: One or more hidden tests failed. Read the public test output, fix your solution, and
+      submit again.
+solution:
+  summary: The solution passes all hidden tests by implementing the required behavior in code.
+  files_changed: []
+  commands_run: []
+  reference_docs: ai-ml-fundamentals

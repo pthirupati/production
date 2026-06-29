@@ -1,9 +1,29 @@
 title: Detect the web server software and version
 slug: nmap-service-version-detection
-category: Nmap Network Scanning
-description: A vulnerability report needs the exact HTTP server product and version running on web01
-  (10.10.10.10) port 80. A plain port scan only says "http" — use Nmap service/version detection to
-  read the actual banner.
+category: Fix
+description: 'CONTEXT: A team operating network scanning needs you to resolve `Detect the web server software
+  and version` during a realistic incident. The business impact is reduced service reliability until the
+  underlying state is repaired.
+
+
+  ENVIRONMENT: You are working in FixitLab''s offline scanning lab with nmap CLI, targets, and scan output.
+  All tools run locally; no paid APIs or external cloud calls are required.
+
+
+  SYMPTOM / STARTING STATE: web01:80 is known to be open but its service is reported only as the generic
+  "http". A version-detection scan is required to reveal the underlying server product and version. A
+  vulnerability report needs the exact HTTP server product and version running on web01 (10.10.10.10)
+  port 80. A plain port scan only says "http" — use Nmap service/version detection to read the actual
+  banner.
+
+
+  OBJECTIVE: Open the Nmap simulator from the lab toolbar (Open Nmap); Run service/version detection against
+  web01 port 80 (nmap -sV -p 80 10.10.10.10); Identify the HTTP server software (nginx) and its version.
+  Success means `check.sh` exits successfully.
+
+
+  WHAT TO AVOID: Do not apply broad destructive changes, skip evidence gathering, or fake completion with
+  marker files — the checker validates real system state.'
 difficulty: medium
 lab_mode: simulation
 simulation_type: nmap
@@ -21,14 +41,75 @@ initial_state: web01:80 is known to be open but its service is reported only as 
   version-detection scan is required to reveal the underlying server product and version.
 hints:
 - order: 1
-  cost: 10
-  content: A normal scan only maps a port to a default service name. Add the -sV flag to perform
-    service/version detection (banner grabbing), e.g. nmap -sV -p 80 10.10.10.10.
+  cost: 0
+  content: 'Where to look: Test the config to get the exact file and line: `nginx -t`. It prints the offending
+    directive (e.g. unknown directive "listn").'
 - order: 2
-  cost: 15
-  content: Combine -sV with -p 80 to target just the HTTP port for a fast, focused result. The
-    Discovered Hosts panel will then show the product and version next to the port.
+  cost: 25
+  content: 'Diagnostic steps:
+
+    1. Run `nginx -t` and note the file path and line number in the error.
+
+    2. Open that file (often `/etc/nginx/nginx.conf` or under `/etc/nginx/conf.d/`).
+
+    3. Compare the bad directive to the nginx docs — typos like `listn` should be `listen`.'
 - order: 3
-  cost: 20
-  content: The goal is met when port 80 on web01 reports a concrete web-server version string (the
-    product is nginx). A plain scan without -sV will not satisfy this.
+  cost: 50
+  content: 'Exact fix + verification:
+
+    1. Correct the typo on the reported line and save the file.
+
+    2. Re-run `nginx -t` until it reports syntax is ok.
+
+    3. Run `systemctl enable --now nginx`, then `curl -I http://localhost` (expect HTTP 200).
+
+
+    WHY: systemd will not start nginx until `nginx -t` passes.'
+summary: Complete the detect the web server software and version nmap lab and verify success with the
+  checker
+estimated_minutes: 15
+xp_reward: 100
+prerequisites:
+- Basic nmap literacy
+tags:
+- fix
+- hands-on
+- nmap
+linked_tutorial: nmap-fundamentals
+what_you_will_learn:
+- Open the Nmap simulator from the lab toolbar (Open Nmap)
+- Run service/version detection against web01 port 80 (nmap -sV -p 80 10.10.10.10)
+- Identify the HTTP server software (nginx) and its version
+environment:
+  nodes:
+  - role: primary
+    os: FixitLab scanning lab
+    hostname: lab-primary
+    ip: 127.0.0.1
+    specs: local offline simulation
+  pre_installed:
+  - bash
+  - coreutils
+  - journalctl
+  - nmap
+  - systemctl
+  credentials:
+  - user: root
+    password: lab123
+tasks:
+- id: task_1
+  title: Detect the web server software and version
+  description: Restore healthy behavior for Detect the web server software and version by investigating
+    the failure, applying the smallest safe fix, and validating the outcome.
+  background: 'This nmap lab teaches systematic troubleshooting: observe, hypothesize, change, verify.'
+  validation:
+    type: http_response
+    url: http://localhost
+    expected_code: 200
+    error_message: nginx is not healthy. Run nginx -t, fix config, and start the service.
+solution:
+  summary: Identify the misconfiguration affecting this nmap lab and apply the minimal fix.
+  files_changed: []
+  commands_run:
+  - bash check.sh
+  reference_docs: nmap-fundamentals

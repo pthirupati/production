@@ -2,8 +2,8 @@ title: Swap Disabled — Memory Pressure
 slug: swap-disabled
 lab_mode: simulation
 simulation_type: generic
-technology: Linux
-category: Memory
+technology: linux
+category: Fix
 difficulty: easy
 time_limit: 600
 max_score: 100
@@ -11,9 +11,27 @@ infrastructure_type: docker
 docker_privileged: true
 jira_priority: Medium
 topics_covered: Q147-Q148 swap — swapon, /etc/fstab
-description: OOM kills are occurring because, although a swap file already exists on disk, it isn't activated
-  — `swapon --show` shows no active swap. The kernel has no overflow space under memory pressure. Activate
-  the existing swap file and make it persist across reboots.
+description: 'CONTEXT: A team operating Linux administration needs you to resolve `Swap Disabled — Memory
+  Pressure` during a realistic incident. The business impact is reduced service reliability until the
+  underlying state is repaired.
+
+
+  ENVIRONMENT: You are working in FixitLab''s offline Linux practice server with terminal and config files
+  under /etc and /var. All tools run locally; no paid APIs or external cloud calls are required.
+
+
+  SYMPTOM / STARTING STATE: Linux server where a swap file exists but is not enabled (swapon --show empty),
+  so the system OOM-kills under load. OOM kills are occurring because, although a swap file already exists
+  on disk, it isn''t activated — `swapon --show` shows no active swap. The kernel has no overflow space
+  under memory pressure. Activate the existing swap file and make it persist across reboots.
+
+
+  OBJECTIVE: Confirm no swap is active despite the swap file existing; Activate the existing swap file;
+  Persist swap activation in fstab. Success means `check.sh` exits successfully.
+
+
+  WHAT TO AVOID: Do not apply broad destructive changes, skip evidence gathering, or fake completion with
+  marker files — the checker validates real system state.'
 objectives:
 - Confirm no swap is active despite the swap file existing
 - Activate the existing swap file
@@ -22,14 +40,72 @@ initial_state: Linux server where a swap file exists but is not enabled (swapon 
   system OOM-kills under load.
 hints:
 - order: 1
-  cost: 10
-  content: 'Check current swap: `free -h` (Swap: 0) and `swapon --show` (empty), while the file exists
-    (`ls -l /swapfile`).'
+  cost: 0
+  content: 'Where to look: Run `df -h` and `du -xh /var /tmp /home | sort -h | tail -20` for large paths.'
 - order: 2
-  cost: 15
-  content: 'Activate it: `swapon /swapfile` (if it complains, re-run `mkswap /swapfile` first and ensure
-    mode 600).'
+  cost: 25
+  content: 'Diagnostic steps:
+
+    1. Find which mount is 100% — often `/` or `/var`.
+
+    2. `journalctl --disk-usage` and old logs under `/var/log`.
+
+    3. Look for core dumps, temp files, or oversized application data.'
 - order: 3
-  cost: 20
-  content: Verify with `swapon --show` / `free -h`, then ensure `/swapfile none swap sw 0 0` is in /etc/fstab
-    so it survives reboot.
+  cost: 50
+  content: 'Exact fix + verification:
+
+    1. Remove or rotate the largest safe files (logs, caches, old packages).
+
+    2. `df -h` should show free space on the affected mount.
+
+    3. Retry the command that failed with ''No space left on device''.
+
+
+    WHY: many services fail cryptically when disk is full.'
+summary: Complete the swap disabled — memory pressure linux lab and verify success with the checker
+estimated_minutes: 10
+xp_reward: 100
+prerequisites:
+- Basic linux literacy
+tags:
+- fix
+- hands-on
+- linux
+linked_tutorial: linux-fundamentals
+what_you_will_learn:
+- Confirm no swap is active despite the swap file existing
+- Activate the existing swap file
+- Persist swap activation in fstab
+environment:
+  nodes:
+  - role: primary
+    os: FixitLab Linux practice server
+    hostname: lab-primary
+    ip: 127.0.0.1
+    specs: local offline simulation
+  pre_installed:
+  - bash
+  - coreutils
+  - journalctl
+  - linux
+  - systemctl
+  credentials:
+  - user: root
+    password: lab123
+tasks:
+- id: task_1
+  title: Swap Disabled — Memory Pressure
+  description: Restore healthy behavior for Swap Disabled — Memory Pressure by investigating the failure,
+    applying the smallest safe fix, and validating the outcome.
+  background: 'This linux lab teaches systematic troubleshooting: observe, hypothesize, change, verify.'
+  validation:
+    type: custom_script
+    script: check.sh
+    error_message: Validation did not pass. Re-read the objectives and Hint 2 diagnostic steps.
+solution:
+  summary: Identify the misconfiguration affecting this linux lab and apply the minimal fix.
+  files_changed: []
+  commands_run:
+  - bash check.sh
+  reference_docs: linux-fundamentals

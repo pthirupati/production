@@ -1,11 +1,32 @@
 title: Fix the Stale-Closure Counter Updater
 slug: react-fix-stale-closure-updater
 technology: react
-category: React Development
-description: A custom hook batches several setState calls in one tick. Its applyUpdates(state, updates)
-  helper models how React resolves a queue of updates. The buggy version computes every update from
-  the SAME captured starting value (a stale closure), so three "+1" updates only add 1 instead of 3.
-  Fix it to thread the running value through the queue the way functional updaters do.
+category: Fix
+description: 'CONTEXT: A team operating React frontends needs you to resolve `Fix the Stale-Closure Counter
+  Updater` during a realistic incident. The business impact is reduced service reliability until the underlying
+  state is repaired.
+
+
+  ENVIRONMENT: You are working in FixitLab''s offline React application with components, hooks, router,
+  and build output. All tools run locally; no paid APIs or external cloud calls are required.
+
+
+  SYMPTOM / STARTING STATE: A custom hook batches setState calls in one tick via applyUpdates(state, updates).
+  The buggy version computes every update from the same captured starting value (a stale closure), so
+  three "+1" updates only add 1. Fix it to thread the running value through the queue. A custom hook batches
+  several setState calls in one tick. Its applyUpdates(state, updates) helper models how React resolves
+  a queue of updates. The buggy version computes every update from the SAME captured starting value (a
+  stale closure), so three "+1" updates only add 1 instead of 3. Fix it to thread the running value through
+  the queue the way functional updaters do.
+
+
+  OBJECTIVE: See why several updates in one tick collapse into one when each reads the captured value;
+  Thread the accumulator so each update sees the result of the previous one; Support both plain-value
+  updates and functional (prev => next) updates. Success means all hidden tests pass.
+
+
+  WHAT TO AVOID: Do not apply broad destructive changes, skip evidence gathering, or fake completion with
+  marker files — the checker validates real system state.'
 difficulty: medium
 scenario_type: fix
 lab_mode: simulation
@@ -20,89 +41,165 @@ objectives:
 - See why several updates in one tick collapse into one when each reads the captured value
 - Thread the accumulator so each update sees the result of the previous one
 - Support both plain-value updates and functional (prev => next) updates
-initial_state: A custom hook batches setState calls in one tick via applyUpdates(state, updates).
-  The buggy version computes every update from the same captured starting value (a stale closure),
-  so three "+1" updates only add 1. Fix it to thread the running value through the queue.
-solution_explanation: |
-  This is the classic React stale-closure trap. When you call setCount(count + 1) three times in one
+initial_state: A custom hook batches setState calls in one tick via applyUpdates(state, updates). The
+  buggy version computes every update from the same captured starting value (a stale closure), so three
+  "+1" updates only add 1. Fix it to thread the running value through the queue.
+solution_explanation: 'This is the classic React stale-closure trap. When you call setCount(count + 1)
+  three times in one
+
   event handler, all three close over the SAME `count` from that render, so they all compute the same
+
   value and the last one wins — you get +1, not +3. The fix React gives you is the functional updater:
+
   setCount(c => c + 1), where each update receives the latest pending value. applyUpdates models the
+
   queue: it must reduce over the updates, feeding the result of each step into the next. The buggy code
+
   resolves every update against the original `state` (the captured value). The fix is a reduce where the
+
   accumulator (`acc`) is the running value: a function update calls update(acc); a plain-value update
+
   replaces acc. That way [+1, +1, +1] correctly threads 0 -> 1 -> 2 -> 3.
+
+  '
 coding_spec:
   language: javascript
   entrypoint: solution.js
   kind: fix
-  instructions: |
-    Fix applyUpdates(state, updates) so it resolves a queue of setState-style updates in order,
-    each one seeing the result of the previous (no stale closure):
-      - updates is an array; each entry is either a plain value (replace) or a function
-        (prev) => next (functional updater).
-      - Process them left to right, threading the running value through. The result of the
-        last update is the final state. An empty updates array returns `state` unchanged.
-    Example: applyUpdates(0, [c => c + 1, c => c + 1, c => c + 1]) must be 3, not 1.
-    Click Run to try it, then Check Solution to grade against all tests.
+  instructions: "Fix applyUpdates(state, updates) so it resolves a queue of setState-style updates in\
+    \ order,\neach one seeing the result of the previous (no stale closure):\n  - updates is an array;\
+    \ each entry is either a plain value (replace) or a function\n    (prev) => next (functional updater).\n\
+    \  - Process them left to right, threading the running value through. The result of the\n    last\
+    \ update is the final state. An empty updates array returns `state` unchanged.\nExample: applyUpdates(0,\
+    \ [c => c + 1, c => c + 1, c => c + 1]) must be 3, not 1.\nClick Run to try it, then Check Solution\
+    \ to grade against all tests.\n"
   files:
   - path: solution.js
-    content: |
-      function applyUpdates(state, updates) {
-        // BUG: every update is resolved against the SAME captured `state`,
-        // so batched functional updates all see the stale starting value.
-        let result = state;
-        for (const update of updates) {
-          if (typeof update === 'function') {
-            result = update(state);   // <-- always reads the original state
-          } else {
-            result = update;
-          }
-        }
-        return result;
-      }
+    content: "function applyUpdates(state, updates) {\n  // BUG: every update is resolved against the\
+      \ SAME captured `state`,\n  // so batched functional updates all see the stale starting value.\n\
+      \  let result = state;\n  for (const update of updates) {\n    if (typeof update === 'function')\
+      \ {\n      result = update(state);   // <-- always reads the original state\n    } else {\n    \
+      \  result = update;\n    }\n  }\n  return result;\n}\n"
     readonly: false
   visible_tests:
   - name: three increments add up to three
-    code: |
-      const inc = (c) => c + 1;
+    code: 'const inc = (c) => c + 1;
+
       assert(applyUpdates(0, [inc, inc, inc]) === 3, applyUpdates(0, [inc, inc, inc]));
+
+      '
   - name: single functional update works
-    code: |
-      assert(applyUpdates(5, [(c) => c * 2]) === 10, applyUpdates(5, [(c) => c * 2]));
+    code: 'assert(applyUpdates(5, [(c) => c * 2]) === 10, applyUpdates(5, [(c) => c * 2]));
+
+      '
   hidden_tests:
   - name: empty queue returns the original state
-    code: |
-      assert(applyUpdates(7, []) === 7, applyUpdates(7, []));
+    code: 'assert(applyUpdates(7, []) === 7, applyUpdates(7, []));
+
+      '
   - name: plain value replaces the running value
-    code: |
-      assert(applyUpdates(0, [10, (c) => c + 5]) === 15, applyUpdates(0, [10, (c) => c + 5]));
+    code: 'assert(applyUpdates(0, [10, (c) => c + 5]) === 15, applyUpdates(0, [10, (c) => c + 5]));
+
+      '
   - name: a later plain value overrides earlier updates
-    code: |
-      const inc = (c) => c + 1;
+    code: 'const inc = (c) => c + 1;
+
       assert(applyUpdates(0, [inc, inc, 100, inc]) === 101, applyUpdates(0, [inc, inc, 100, inc]));
+
+      '
   - name: functional updaters thread through plain values
-    code: |
-      assert(applyUpdates(1, [(c) => c + 1, 5, (c) => c * 3]) === 15, applyUpdates(1, [(c) => c + 1, 5, (c) => c * 3]));
+    code: 'assert(applyUpdates(1, [(c) => c + 1, 5, (c) => c * 3]) === 15, applyUpdates(1, [(c) => c +
+      1, 5, (c) => c * 3]));
+
+      '
   - name: works on non-numeric state too
-    code: |
-      const out = applyUpdates({ n: 0 }, [(s) => ({ n: s.n + 1 }), (s) => ({ n: s.n + 1 })]);
+    code: 'const out = applyUpdates({ n: 0 }, [(s) => ({ n: s.n + 1 }), (s) => ({ n: s.n + 1 })]);
+
       assert(out.n === 2, JSON.stringify(out));
+
+      '
   - name: does not call functional updaters with the stale state
-    code: |
-      const seen = [];
+    code: 'const seen = [];
+
       const tap = (c) => { seen.push(c); return c + 1; };
+
       const final = applyUpdates(0, [tap, tap, tap]);
-      assert(seen.join(',') === '0,1,2', 'updaters saw stale values: ' + seen.join(','));
+
+      assert(seen.join('','') === ''0,1,2'', ''updaters saw stale values: '' + seen.join('',''));
+
       assert(final === 3, final);
+
+      '
   timeout: 8
 hints:
 - order: 1
-  cost: 10
-  content: Each functional update calls update(state) — the SAME state every time — so [inc, inc, inc] computes 1 three times. The running value never feeds forward.
+  cost: 0
+  content: 'Where to look: Open `solution.js`, read the instructions, and run the visible tests to see
+    which assertion fails first.'
 - order: 2
-  cost: 20
-  content: Keep an accumulator that starts at `state` and is updated each iteration. A function update should be called with the accumulator, not the original state.
+  cost: 25
+  content: 'Diagnostic steps:
+
+    1. Click Run and read the traceback — note line number and actual vs expected values.
+
+    2. Reproduce the failure with the smallest input from a visible test.
+
+    3. Compare your implementation to the bug described in the lab prompt.'
 - order: 3
-  cost: 30
-  content: "Change result = update(state) to result = update(result), or rewrite as updates.reduce((acc, u) => (typeof u === 'function' ? u(acc) : u), state)."
+  cost: 50
+  content: 'Exact fix + verification:
+
+    1. Support both plain-value updates and functional (prev => next) updates.
+
+    2. Re-run the lab checker (`check.sh` or Check Solution).
+
+    3. Confirm every scenario objective is satisfied.
+
+
+    WHY: the grader validates real state — marker files are ignored.'
+summary: Complete the fix the stale-closure counter updater react lab and verify success with the checker
+estimated_minutes: 25
+xp_reward: 100
+prerequisites:
+- Basic react literacy
+tags:
+- fix
+- hands-on
+- react
+linked_tutorial: react-fundamentals
+what_you_will_learn:
+- See why several updates in one tick collapse into one when each reads the captured value
+- Thread the accumulator so each update sees the result of the previous one
+- Support both plain-value updates and functional (prev => next) updates
+environment:
+  nodes:
+  - role: primary
+    os: FixitLab React application
+    hostname: lab-primary
+    ip: 127.0.0.1
+    specs: local offline simulation
+  pre_installed:
+  - bash
+  - coreutils
+  - journalctl
+  - react
+  - systemctl
+  credentials:
+  - user: root
+    password: lab123
+tasks:
+- id: task_1
+  title: Fix the Stale-Closure Counter Updater
+  description: Restore healthy behavior for Fix the Stale-Closure Counter Updater by investigating the
+    failure, applying the smallest safe fix, and validating the outcome.
+  background: 'This react lab teaches systematic troubleshooting: observe, hypothesize, change, verify.'
+  validation:
+    type: custom_script
+    script: hidden_tests
+    error_message: One or more hidden tests failed. Read the public test output, fix your solution, and
+      submit again.
+solution:
+  summary: The solution passes all hidden tests by implementing the required behavior in code.
+  files_changed: []
+  commands_run: []
+  reference_docs: react-fundamentals

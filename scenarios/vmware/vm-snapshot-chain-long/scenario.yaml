@@ -1,8 +1,7 @@
----
 slug: vm-snapshot-chain-long
-title: "32-Deep Snapshot Chain Causing Severe VM Performance Degradation"
-technology: VMware
-category: Storage
+title: 32-Deep Snapshot Chain Causing Severe VM Performance
+technology: vmware
+category: Fix
 difficulty: hard
 time_limit: 1500
 max_score: 100
@@ -11,35 +10,121 @@ simulation_type: vmware
 infrastructure_type: simulation
 jira_priority: Critical
 is_free: false
-description: |
-  VM "legacy-app-01" has accumulated 32 snapshots over 18 months. Every read and
+description: 'CONTEXT: A team operating VMware vSphere needs you to resolve `32-Deep Snapshot Chain Causing
+  Severe VM Performance` during a realistic incident. The business impact is reduced service reliability
+  until the underlying state is repaired.
+
+
+  ENVIRONMENT: You are working in FixitLab''s offline vSphere lab with VMs, datastores, vCenter, and ESXi
+  tasks. All tools run locally; no paid APIs or external cloud calls are required.
+
+
+  SYMPTOM / STARTING STATE: VMware vCenter simulation. legacy-app-01 on datastore2. 32 snapshots, total
+  180 GB.
+
+  VM''s disk read: 2 MB/s (normal: 800 MB/s). Consolidation estimated: 45-60 minutes.
+
+  Datastore2 has 250 GB free (consolidation will temporarily need additional space). VM "legacy-app-01"
+  has accumulated 32 snapshots over 18 months. Every read and
+
   write operation must traverse the entire snapshot chain, causing I/O latency 40x
-  higher than normal. The VM's disk read throughput is 2 MB/s instead of the usual
+
+  higher than normal. The VM''s disk read throughput is 2 MB/s instead of the usual
+
   800 MB/s. VMware recommends keeping no more than 3 snapshots. Engineers must
+
   consolidate the snapshot chain during a maintenance window.
+
+
+  OBJECTIVE: View the full snapshot chain and total snapshot size in Snapshot Manager; Schedule a maintenance
+  window due to the consolidation time required; Delete all snapshots to consolidate the chain into the
+  base disk. Success means `check.sh` exits successfully.
+
+
+  WHAT TO AVOID: Do not apply broad destructive changes, skip evidence gathering, or fake completion with
+  marker files — the checker validates real system state.'
 objectives:
-  - View the full snapshot chain and total snapshot size in Snapshot Manager
-  - Schedule a maintenance window due to the consolidation time required
-  - Delete all snapshots to consolidate the chain into the base disk
-  - Monitor the consolidation progress and verify I/O performance improves
-initial_state: |
-  VMware vCenter simulation. legacy-app-01 on datastore2. 32 snapshots, total 180 GB.
-  VM's disk read: 2 MB/s (normal: 800 MB/s). Consolidation estimated: 45-60 minutes.
+- View the full snapshot chain and total snapshot size in Snapshot Manager
+- Schedule a maintenance window due to the consolidation time required
+- Delete all snapshots to consolidate the chain into the base disk
+- Monitor the consolidation progress and verify I/O performance improves
+initial_state: 'VMware vCenter simulation. legacy-app-01 on datastore2. 32 snapshots, total 180 GB.
+
+  VM''s disk read: 2 MB/s (normal: 800 MB/s). Consolidation estimated: 45-60 minutes.
+
   Datastore2 has 250 GB free (consolidation will temporarily need additional space).
+
+  '
 hints:
-  - order: 1
-    cost: 10
-    content: "Right-click legacy-app-01 → Snapshots → Manage Snapshots.
-      Count the snapshots and note total size. Warn stakeholders: consolidation
-      will cause temporary performance degradation during the merge process."
-  - order: 2
-    cost: 15
-    content: "To delete all snapshots: in Snapshot Manager, click 'Delete All'.
-      VMware will begin merging delta VMDKs from the oldest to newest.
-      This is I/O intensive — do this during off-hours. Monitor Recent Tasks for progress."
-  - order: 3
-    cost: 20
-    content: "If 'Delete All' fails due to a locked file: check for vmware.log errors.
-      Try consolidation via: right-click VM → Snapshot → Consolidate.
-      If still failing, use vmkfstools on the ESXi host to manually commit the chain.
-      After completion, verify in VM properties that 0 snapshots remain and I/O normalizes."
+- order: 1
+  cost: 0
+  content: 'Where to look: Run `df -h` and `du -xh /var /tmp /home | sort -h | tail -20` for large paths.'
+- order: 2
+  cost: 25
+  content: 'Diagnostic steps:
+
+    1. Find which mount is 100% — often `/` or `/var`.
+
+    2. `journalctl --disk-usage` and old logs under `/var/log`.
+
+    3. Look for core dumps, temp files, or oversized application data.'
+- order: 3
+  cost: 50
+  content: 'Exact fix + verification:
+
+    1. Remove or rotate the largest safe files (logs, caches, old packages).
+
+    2. `df -h` should show free space on the affected mount.
+
+    3. Retry the command that failed with ''No space left on device''.
+
+
+    WHY: many services fail cryptically when disk is full.'
+summary: Complete the 32-deep snapshot chain causing severe vm performance vmware lab and verify success
+  with the checker
+estimated_minutes: 25
+xp_reward: 100
+prerequisites:
+- Basic vmware literacy
+tags:
+- fix
+- hands-on
+- vmware
+linked_tutorial: vmware-fundamentals
+what_you_will_learn:
+- View the full snapshot chain and total snapshot size in Snapshot Manager
+- Schedule a maintenance window due to the consolidation time required
+- Delete all snapshots to consolidate the chain into the base disk
+- Monitor the consolidation progress and verify I/O performance improves
+environment:
+  nodes:
+  - role: primary
+    os: FixitLab vSphere lab
+    hostname: lab-primary
+    ip: 127.0.0.1
+    specs: local offline simulation
+  pre_installed:
+  - bash
+  - coreutils
+  - journalctl
+  - systemctl
+  - vmware
+  credentials:
+  - user: root
+    password: lab123
+tasks:
+- id: task_1
+  title: 32-Deep Snapshot Chain Causing Severe VM Performance
+  description: Restore healthy behavior for 32-Deep Snapshot Chain Causing Severe VM Performance by investigating
+    the failure, applying the smallest safe fix, and validating the outcome.
+  background: 'This vmware lab teaches systematic troubleshooting: observe, hypothesize, change, verify.'
+  validation:
+    type: custom_script
+    script: check.sh
+    error_message: Validation did not pass. Re-read the objectives and Hint 2 diagnostic steps.
+solution:
+  summary: Identify the misconfiguration affecting this vmware lab and apply the minimal fix.
+  files_changed: []
+  commands_run:
+  - bash check.sh
+  reference_docs: vmware-fundamentals

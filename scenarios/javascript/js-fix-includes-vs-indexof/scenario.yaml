@@ -1,9 +1,26 @@
 title: Fix the Truthiness Bug with indexOf
 slug: js-fix-includes-vs-indexof
-category: JavaScript Development
-description: hasValue(arr, x) should return whether x is in the array, but it returns `arr.indexOf(x)`
+category: Fix
+description: 'CONTEXT: A team operating JavaScript needs you to resolve `Fix the Truthiness Bug with indexOf`
+  during a realistic incident. The business impact is reduced service reliability until the underlying
+  state is repaired.
+
+
+  ENVIRONMENT: You are working in FixitLab''s offline JavaScript practice project with modules, browser
+  console, and Node tooling. All tools run locally; no paid APIs or external cloud calls are required.
+
+
+  SYMPTOM / STARTING STATE: hasValue(arr, x) should return whether x is in the array, but it returns `arr.indexOf(x)`
   (a number) and treats it as a boolean — and index 0 is falsy, so a match at position 0 wrongly reports
   false. Fix it to return a real boolean.
+
+
+  OBJECTIVE: See a match at index 0 report false; Compare indexOf against -1, or use includes; Return
+  a strict boolean. Success means all hidden tests pass.
+
+
+  WHAT TO AVOID: Do not apply broad destructive changes, skip evidence gathering, or fake completion with
+  marker files — the checker validates real system state.'
 difficulty: easy
 scenario_type: fix
 lab_mode: simulation
@@ -21,51 +38,118 @@ objectives:
 initial_state: hasValue(arr, x) should return whether x is in the array, but it returns `arr.indexOf(x)`
   (a number) and treats it as a boolean — and index 0 is falsy, so a match at position 0 wrongly reports
   false. Fix it to return a real boolean.
-solution_explanation: |
-  Coercing the index to boolean misreads a valid index of 0 as false. Comparing against -1 (or using includes) returns correct membership.
+solution_explanation: 'Coercing the index to boolean misreads a valid index of 0 as false. Comparing against
+  -1 (or using includes) returns correct membership.
+
+  '
 coding_spec:
   language: javascript
   entrypoint: solution.js
   kind: fix
-  instructions: |
-    Fix hasValue(arr, x) to return true/false for membership.
-      hasValue([5, 6], 5) -> true (even though it's at index 0)
-    Click Run to try it, then Check Solution to grade against all tests.
+  instructions: "Fix hasValue(arr, x) to return true/false for membership.\n  hasValue([5, 6], 5) -> true\
+    \ (even though it's at index 0)\nClick Run to try it, then Check Solution to grade against all tests.\n"
   files:
   - path: solution.js
-    content: |
-      function hasValue(arr, x) {
-        return Boolean(arr.indexOf(x)); // index 0 is falsy -> wrong
-      }
+    content: "function hasValue(arr, x) {\n  return Boolean(arr.indexOf(x)); // index 0 is falsy -> wrong\n\
+      }\n"
     readonly: false
   visible_tests:
   - name: present at index 0
-    code: |
-      assert(hasValue([5, 6], 5) === true, 'index 0 match');
+    code: 'assert(hasValue([5, 6], 5) === true, ''index 0 match'');
+
+      '
   - name: absent
-    code: |
-      assert(hasValue([1, 2], 9) === false);
+    code: 'assert(hasValue([1, 2], 9) === false);
+
+      '
   hidden_tests:
   - name: present later
-    code: |
-      assert(hasValue([1, 2, 3], 3) === true);
+    code: 'assert(hasValue([1, 2, 3], 3) === true);
+
+      '
   - name: empty array
-    code: |
-      assert(hasValue([], 1) === false);
+    code: 'assert(hasValue([], 1) === false);
+
+      '
   - name: returns boolean
-    code: |
-      assert(hasValue([1], 1) === true && hasValue([1], 2) === false);
+    code: 'assert(hasValue([1], 1) === true && hasValue([1], 2) === false);
+
+      '
   - name: strings
-    code: |
-      assert(hasValue(['a', 'b'], 'a') === true);
+    code: 'assert(hasValue([''a'', ''b''], ''a'') === true);
+
+      '
   timeout: 8
 hints:
 - order: 1
-  cost: 10
-  content: hasValue([5,6], 5) returns false because indexOf is 0, which is falsy.
+  cost: 0
+  content: 'Where to look: Open `solution.js`, read the instructions, and run the visible tests to see
+    which assertion fails first.'
 - order: 2
-  cost: 20
-  content: indexOf returns -1 when absent, and a real index (possibly 0) when present.
+  cost: 25
+  content: 'Diagnostic steps:
+
+    1. Click Run and read the traceback — note line number and actual vs expected values.
+
+    2. Reproduce the failure with the smallest input from a visible test.
+
+    3. Compare your implementation to the bug described in the lab prompt.'
 - order: 3
-  cost: 30
-  content: Return arr.indexOf(x) !== -1 (or arr.includes(x)).
+  cost: 50
+  content: 'Exact fix + verification:
+
+    1. Compare indexOf against -1, or use includes.
+
+    2. Re-run the lab checker (`check.sh` or Check Solution).
+
+    3. Confirm every scenario objective is satisfied.
+
+
+    WHY: the grader validates real state — marker files are ignored.'
+technology: javascript
+summary: Complete the fix the truthiness bug with indexof javascript lab and verify success with the checker
+estimated_minutes: 25
+xp_reward: 100
+prerequisites:
+- Basic javascript literacy
+tags:
+- fix
+- hands-on
+- javascript
+linked_tutorial: javascript-fundamentals
+what_you_will_learn:
+- See a match at index 0 report false
+- Compare indexOf against -1, or use includes
+- Return a strict boolean
+environment:
+  nodes:
+  - role: primary
+    os: FixitLab JavaScript practice project
+    hostname: lab-primary
+    ip: 127.0.0.1
+    specs: local offline simulation
+  pre_installed:
+  - bash
+  - coreutils
+  - javascript
+  - journalctl
+  - systemctl
+  credentials:
+  - user: root
+    password: lab123
+tasks:
+- id: task_1
+  title: Fix the Truthiness Bug with indexOf
+  description: Restore healthy behavior for Fix the Truthiness Bug with indexOf by investigating the failure,
+    applying the smallest safe fix, and validating the outcome.
+  background: 'This javascript lab teaches systematic troubleshooting: observe, hypothesize, change, verify.'
+  validation:
+    type: custom_script
+    script: hidden_tests
+    error_message: One or more hidden tests failed. Read the public test output, fix your solution, and
+      submit again.
+solution:
+  summary: The solution passes all hidden tests by implementing the required behavior in code.
+  files_changed: []
+  commands_run: []
+  reference_docs: javascript-fundamentals

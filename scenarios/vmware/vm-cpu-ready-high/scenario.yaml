@@ -1,8 +1,7 @@
----
 slug: vm-cpu-ready-high
-title: "High VM CPU Ready Time — Application Performance Degraded"
-technology: VMware
-category: Performance
+title: High VM CPU Ready Time — Application Performance Degraded
+technology: vmware
+category: Fix
 difficulty: medium
 time_limit: 1200
 max_score: 100
@@ -11,35 +10,120 @@ simulation_type: vmware
 infrastructure_type: simulation
 jira_priority: High
 is_free: false
-description: |
-  A critical application VM "db-prod-01" is experiencing high CPU ready time (over
-  20%), meaning the VM is waiting for physical CPU time that is not available. The
-  ESXi host esxi-01.lab.local is overcommitted with 32 vCPUs across VMs on a host
-  that has only 16 physical CPU threads. Engineers must use vSphere performance
-  charts to diagnose the CPU ready issue and migrate the VM to a less loaded host.
-objectives:
-  - View CPU ready time for db-prod-01 in vSphere performance charts
-  - Identify the host-level CPU utilization and overcommitment ratio
-  - Use vMotion to migrate db-prod-01 to esxi-02.lab.local
-  - Verify CPU ready time drops below 5% after migration
-initial_state: |
-  VMware vCenter simulation. db-prod-01 on esxi-01 showing 22% CPU ready.
+description: 'CONTEXT: A team operating VMware vSphere needs you to resolve `High VM CPU Ready Time —
+  Application Performance Degraded` during a realistic incident. The business impact is reduced service
+  reliability until the underlying state is repaired.
+
+
+  ENVIRONMENT: You are working in FixitLab''s offline vSphere lab with VMs, datastores, vCenter, and ESXi
+  tasks. All tools run locally; no paid APIs or external cloud calls are required.
+
+
+  SYMPTOM / STARTING STATE: VMware vCenter simulation. db-prod-01 on esxi-01 showing 22% CPU ready.
+
   esxi-01: 16 pCPU threads, 32 vCPUs allocated across all VMs (2:1 overcommit).
+
+  esxi-02: 16 pCPU threads, 12 vCPUs allocated (0.75:1 — capacity available). A critical application VM
+  "db-prod-01" is experiencing high CPU ready time (over
+
+  20%), meaning the VM is waiting for physical CPU time that is not available. The
+
+  ESXi host esxi-01.lab.local is overcommitted with 32 vCPUs across VMs on a host
+
+  that has only 16 physical CPU threads. Engineers must use vSphere performance
+
+  charts to diagnose the CPU ready issue and migrate the VM to a less loaded host.
+
+
+  OBJECTIVE: View CPU ready time for db-prod-01 in vSphere performance charts; Identify the host-level
+  CPU utilization and overcommitment ratio; Use vMotion to migrate db-prod-01 to esxi-02.lab.local. Success
+  means `check.sh` exits successfully.
+
+
+  WHAT TO AVOID: Do not apply broad destructive changes, skip evidence gathering, or fake completion with
+  marker files — the checker validates real system state.'
+objectives:
+- View CPU ready time for db-prod-01 in vSphere performance charts
+- Identify the host-level CPU utilization and overcommitment ratio
+- Use vMotion to migrate db-prod-01 to esxi-02.lab.local
+- Verify CPU ready time drops below 5% after migration
+initial_state: 'VMware vCenter simulation. db-prod-01 on esxi-01 showing 22% CPU ready.
+
+  esxi-01: 16 pCPU threads, 32 vCPUs allocated across all VMs (2:1 overcommit).
+
   esxi-02: 16 pCPU threads, 12 vCPUs allocated (0.75:1 — capacity available).
+
+  '
 hints:
-  - order: 1
-    cost: 10
-    content: "In vSphere Client, select db-prod-01 → Monitor → Performance → Advanced
-      Select CPU as metric, then add 'CPU Ready' counter. Change interval to 'Real-time'
-      to see current ready values."
-  - order: 2
-    cost: 15
-    content: "To check host overcommitment: select esxi-01 → Summary tab → look at
-      vCPU to pCPU ratio. Also check: Monitor → Performance → CPU → Usage in MHz
-      to see how saturated the physical CPUs are."
-  - order: 3
-    cost: 20
-    content: "Migrate with vMotion: right-click db-prod-01 → Migrate → Change compute
-      resource only → select esxi-02.lab.local as destination. Schedule during low
-      traffic. After migration, verify CPU ready drops on the performance chart
-      (allow 5 minutes for chart data to populate)."
+- order: 1
+  cost: 0
+  content: 'Where to look: View CPU ready time for db-prod-01 in vSphere performance charts'
+- order: 2
+  cost: 25
+  content: 'Diagnostic steps:
+
+    1. Identify the host-level CPU utilization and overcommitment ratio
+
+    2. Use vMotion to migrate db-prod-01 to esxi-02.lab.local
+
+    3. Verify CPU ready time drops below 5% after migration'
+- order: 3
+  cost: 50
+  content: 'Exact fix + verification:
+
+    1. Verify CPU ready time drops below 5% after migration.
+
+    2. Re-run the lab checker (`check.sh` or Check Solution).
+
+    3. Confirm every scenario objective is satisfied.
+
+
+    WHY: the grader validates real state — marker files are ignored.'
+summary: Complete the high vm cpu ready time — application performance degraded vmware lab and verify
+  success with the checker
+estimated_minutes: 20
+xp_reward: 100
+prerequisites:
+- Basic vmware literacy
+tags:
+- fix
+- hands-on
+- vmware
+linked_tutorial: vmware-fundamentals
+what_you_will_learn:
+- View CPU ready time for db-prod-01 in vSphere performance charts
+- Identify the host-level CPU utilization and overcommitment ratio
+- Use vMotion to migrate db-prod-01 to esxi-02.lab.local
+- Verify CPU ready time drops below 5% after migration
+environment:
+  nodes:
+  - role: primary
+    os: FixitLab vSphere lab
+    hostname: lab-primary
+    ip: 127.0.0.1
+    specs: local offline simulation
+  pre_installed:
+  - bash
+  - coreutils
+  - journalctl
+  - systemctl
+  - vmware
+  credentials:
+  - user: root
+    password: lab123
+tasks:
+- id: task_1
+  title: High VM CPU Ready Time — Application Performance Degraded
+  description: Restore healthy behavior for High VM CPU Ready Time — Application Performance Degraded
+    by investigating the failure, applying the smallest safe fix, and validating the outcome.
+  background: 'This vmware lab teaches systematic troubleshooting: observe, hypothesize, change, verify.'
+  validation:
+    type: custom_script
+    script: check.sh
+    error_message: Validation did not pass. Re-read the objectives and Hint 2 diagnostic steps.
+solution:
+  summary: Identify the misconfiguration affecting this vmware lab and apply the minimal fix.
+  files_changed: []
+  commands_run:
+  - bash check.sh
+  reference_docs: vmware-fundamentals

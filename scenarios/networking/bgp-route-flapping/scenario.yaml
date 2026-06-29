@@ -1,39 +1,129 @@
 slug: bgp-route-flapping
-title: "BGP Route Flapping — Fix Keepalive Timers"
-technology: Networking
-category: Routing
+title: BGP Route Flapping — Fix Keepalive Timers
+technology: networking
+category: Fix
 difficulty: hard
 time_limit: 1200
 max_score: 100
 infrastructure_type: docker
 jira_priority: Critical
 is_free: false
-description: |
-  A BGP peer session between two routers is oscillating — the peer repeatedly
-  transitions between Established and Idle states every 30–60 seconds, causing
-  route flapping and instability for all prefixes learned from that peer.
-  Analysis shows the holdtime timer is set too low relative to the keepalive
-  interval, and the link has intermittent latency spikes. Fix the BGP timer
-  configuration so the session remains stable under normal link conditions.
-objectives:
-  - Identify the BGP peer session that is flapping
-  - Diagnose the timer mismatch (keepalive vs holdtime)
-  - Set appropriate keepalive (10s) and holdtime (30s) timers
-  - Confirm the BGP session reaches and holds Established state
-initial_state: |
-  FRRouting (vtysh) configured with two BGP peers. One peer has keepalive=3s
+description: 'CONTEXT: A team operating network operations needs you to resolve `BGP Route Flapping —
+  Fix Keepalive Timers` during a realistic incident. The business impact is reduced service reliability
+  until the underlying state is repaired.
+
+
+  ENVIRONMENT: You are working in FixitLab''s offline network lab with interfaces, routing tables, DNS,
+  and firewall rules. All tools run locally; no paid APIs or external cloud calls are required.
+
+
+  SYMPTOM / STARTING STATE: FRRouting (vtysh) configured with two BGP peers. One peer has keepalive=3s
+
   and holdtime=9s — too aggressive for this link. Link latency spikes above
+
+  3s are causing the holdtime to expire and the session to reset. A BGP peer session between two routers
+  is oscillating — the peer repeatedly
+
+  transitions between Established and Idle states every 30–60 seconds, causing
+
+  route flapping and instability for all prefixes learned from that peer.
+
+  Analysis shows the holdtime timer is set too low relative to the keepalive
+
+  interval, and the link has intermittent latency spikes. Fix the BGP timer
+
+  configuration so the session remains stable under normal link conditions.
+
+
+  OBJECTIVE: Identify the BGP peer session that is flapping; Diagnose the timer mismatch (keepalive vs
+  holdtime); Set appropriate keepalive (10s) and holdtime (30s) timers. Success means `check.sh` exits
+  successfully.
+
+
+  WHAT TO AVOID: Do not apply broad destructive changes, skip evidence gathering, or fake completion with
+  marker files — the checker validates real system state.'
+objectives:
+- Identify the BGP peer session that is flapping
+- Diagnose the timer mismatch (keepalive vs holdtime)
+- Set appropriate keepalive (10s) and holdtime (30s) timers
+- Confirm the BGP session reaches and holds Established state
+initial_state: 'FRRouting (vtysh) configured with two BGP peers. One peer has keepalive=3s
+
+  and holdtime=9s — too aggressive for this link. Link latency spikes above
+
   3s are causing the holdtime to expire and the session to reset.
+
+  '
 hints:
-  - order: 1
-    cost: 10
-    content: "Run `vtysh -c 'show bgp summary'` to see peer state and flap count."
-  - order: 2
-    cost: 20
-    content: "Enter config mode: `vtysh` → `conf t` → `router bgp <ASN>` → `neighbor <peer-ip> timers 10 30`"
-  - order: 3
-    cost: 15
-    content: "The standard recommendation is keepalive = holdtime/3. Use 10s keepalive and 30s holdtime."
-  - order: 4
-    cost: 15
-    content: "Save with `write memory` and verify with `show bgp neighbors <peer-ip>` — look for 'BGP state = Established'."
+- order: 1
+  cost: 0
+  content: 'Where to look: Identify the BGP peer session that is flapping'
+- order: 2
+  cost: 25
+  content: 'Diagnostic steps:
+
+    1. Diagnose the timer mismatch (keepalive vs holdtime)
+
+    2. Set appropriate keepalive (10s) and holdtime (30s) timers
+
+    3. Confirm the BGP session reaches and holds Established state'
+- order: 3
+  cost: 50
+  content: 'Exact fix + verification:
+
+    1. Confirm the BGP session reaches and holds Established state.
+
+    2. Re-run the lab checker (`check.sh` or Check Solution).
+
+    3. Confirm every scenario objective is satisfied.
+
+
+    WHY: the grader validates real state — marker files are ignored.'
+summary: Complete the bgp route flapping — fix keepalive timers networking lab and verify success with
+  the checker
+estimated_minutes: 20
+xp_reward: 100
+prerequisites:
+- Basic networking literacy
+tags:
+- fix
+- hands-on
+- networking
+linked_tutorial: networking-fundamentals
+what_you_will_learn:
+- Identify the BGP peer session that is flapping
+- Diagnose the timer mismatch (keepalive vs holdtime)
+- Set appropriate keepalive (10s) and holdtime (30s) timers
+- Confirm the BGP session reaches and holds Established state
+environment:
+  nodes:
+  - role: primary
+    os: FixitLab network lab
+    hostname: lab-primary
+    ip: 127.0.0.1
+    specs: local offline simulation
+  pre_installed:
+  - bash
+  - coreutils
+  - journalctl
+  - networking
+  - systemctl
+  credentials:
+  - user: root
+    password: lab123
+tasks:
+- id: task_1
+  title: BGP Route Flapping — Fix Keepalive Timers
+  description: Restore healthy behavior for BGP Route Flapping — Fix Keepalive Timers by investigating
+    the failure, applying the smallest safe fix, and validating the outcome.
+  background: 'This networking lab teaches systematic troubleshooting: observe, hypothesize, change, verify.'
+  validation:
+    type: custom_script
+    script: check.sh
+    error_message: Validation did not pass. Re-read the objectives and Hint 2 diagnostic steps.
+solution:
+  summary: Identify the misconfiguration affecting this networking lab and apply the minimal fix.
+  files_changed: []
+  commands_run:
+  - bash check.sh
+  reference_docs: networking-fundamentals

@@ -1,37 +1,127 @@
-title: "OSSEC False Positive — Tune Rules to Reduce Alert Noise"
+title: OSSEC False Positive — Tune Rules to Reduce Alert Noise
 slug: ossec-false-positive
-technology: Security
-category: Intrusion Detection
+technology: security
+category: Fix
 difficulty: medium
 time_limit: 900
 max_score: 100
 infrastructure_type: docker
 jira_priority: Medium
 is_free: false
-description: |
-  The OSSEC HIDS installation is generating hundreds of level-10 alerts per day
-  for a known-good deployment script that runs every 15 minutes via cron. The
-  script legitimately modifies /etc/hosts and /etc/resolv.conf as part of
-  service discovery. Create a local rule to suppress these specific false
-  positives while keeping all other file integrity alerts active.
-objectives:
-  - Identify the specific OSSEC rule IDs generating the false positive alerts in /var/ossec/logs/alerts/alerts.log
-  - Create a local rule override in /var/ossec/rules/local_rules.xml to suppress the false positive
-  - Restart OSSEC and verify that the false positive alerts no longer appear while other alerts still fire
-initial_state: |
-  CentOS server running OSSEC 3.6 with file integrity monitoring enabled. The
+description: 'CONTEXT: A team operating security hardening needs you to resolve `OSSEC False Positive
+  — Tune Rules to Reduce Alert Noise` during a realistic incident. The business impact is reduced service
+  reliability until the underlying state is repaired.
+
+
+  ENVIRONMENT: You are working in FixitLab''s offline hardening lab with SSH, firewall, TLS, audit logs,
+  and IAM settings. All tools run locally; no paid APIs or external cloud calls are required.
+
+
+  SYMPTOM / STARTING STATE: CentOS server running OSSEC 3.6 with file integrity monitoring enabled. The
+
   deployment script /usr/local/bin/svc-discovery.sh runs every 15 minutes and
+
+  legitimately modifies /etc/hosts. OSSEC is generating rule 550 alerts for this. The OSSEC HIDS installation
+  is generating hundreds of level-10 alerts per day
+
+  for a known-good deployment script that runs every 15 minutes via cron. The
+
+  script legitimately modifies /etc/hosts and /etc/resolv.conf as part of
+
+  service discovery. Create a local rule to suppress these specific false
+
+  positives while keeping all other file integrity alerts active.
+
+
+  OBJECTIVE: Identify the specific OSSEC rule IDs generating the false positive alerts in /var/ossec/logs/alerts/alerts.log;
+  Create a local rule override in /var/ossec/rules/local_rules.xml to suppress the false positive; Restart
+  OSSEC and verify that the false positive alerts no longer appear while other alerts still fire. Success
+  means `check.sh` exits successfully.
+
+
+  WHAT TO AVOID: Do not apply broad destructive changes, skip evidence gathering, or fake completion with
+  marker files — the checker validates real system state.'
+objectives:
+- Identify the specific OSSEC rule IDs generating the false positive alerts in /var/ossec/logs/alerts/alerts.log
+- Create a local rule override in /var/ossec/rules/local_rules.xml to suppress the false positive
+- Restart OSSEC and verify that the false positive alerts no longer appear while other alerts still fire
+initial_state: 'CentOS server running OSSEC 3.6 with file integrity monitoring enabled. The
+
+  deployment script /usr/local/bin/svc-discovery.sh runs every 15 minutes and
+
   legitimately modifies /etc/hosts. OSSEC is generating rule 550 alerts for this.
+
+  '
 hints:
-  - order: 1
-    cost: 10
-    content: 'Find the rule: `grep -A5 ''svc-discovery\|etc/hosts'' /var/ossec/logs/alerts/alerts.log | grep ''Rule:''` to identify the rule ID (likely 550 or 554).'
-  - order: 2
-    cost: 15
-    content: "In /var/ossec/rules/local_rules.xml add a rule: `<rule id='100001' level='0'><if_sid>550</if_sid><match>/etc/hosts</match><description>FP: svc-discovery modifying /etc/hosts</description></rule>`"
-  - order: 3
-    cost: 20
-    content: "Reload OSSEC: `/var/ossec/bin/ossec-control reload` and monitor the alert log: `tail -f /var/ossec/logs/alerts/alerts.log` to confirm suppression."
-  - order: 4
-    cost: 25
-    content: "Test that other alerts still fire: `touch /etc/passwd` then check that the rule 550 alert for /etc/passwd still appears in the alert log."
+- order: 1
+  cost: 0
+  content: 'Where to look: Identify the specific OSSEC rule IDs generating the false positive alerts in
+    /var/ossec/logs/alerts/alerts.log'
+- order: 2
+  cost: 25
+  content: 'Diagnostic steps:
+
+    1. Create a local rule override in /var/ossec/rules/local_rules.xml to suppress the false positive
+
+    2. Restart OSSEC and verify that the false positive alerts no longer appear while other alerts still
+    fire'
+- order: 3
+  cost: 50
+  content: 'Exact fix + verification:
+
+    1. Restart OSSEC and verify that the false positive alerts no longer appear while other alerts still
+    fire.
+
+    2. Re-run the lab checker (`check.sh` or Check Solution).
+
+    3. Confirm every scenario objective is satisfied.
+
+
+    WHY: the grader validates real state — marker files are ignored.'
+summary: Complete the ossec false positive — tune rules to reduce alert noise security lab and verify
+  success with the checker
+estimated_minutes: 15
+xp_reward: 100
+prerequisites:
+- Basic security literacy
+tags:
+- fix
+- hands-on
+- security
+linked_tutorial: security-fundamentals
+what_you_will_learn:
+- Identify the specific OSSEC rule IDs generating the false positive alerts in /var/ossec/logs/alerts/alerts.log
+- Create a local rule override in /var/ossec/rules/local_rules.xml to suppress the false positive
+- Restart OSSEC and verify that the false positive alerts no longer appear while other alerts still fire
+environment:
+  nodes:
+  - role: primary
+    os: FixitLab hardening lab
+    hostname: lab-primary
+    ip: 127.0.0.1
+    specs: local offline simulation
+  pre_installed:
+  - bash
+  - coreutils
+  - journalctl
+  - security
+  - systemctl
+  credentials:
+  - user: root
+    password: lab123
+tasks:
+- id: task_1
+  title: OSSEC False Positive — Tune Rules to Reduce Alert Noise
+  description: Restore healthy behavior for OSSEC False Positive — Tune Rules to Reduce Alert Noise by
+    investigating the failure, applying the smallest safe fix, and validating the outcome.
+  background: 'This security lab teaches systematic troubleshooting: observe, hypothesize, change, verify.'
+  validation:
+    type: custom_script
+    script: check.sh
+    error_message: Validation did not pass. Re-read the objectives and Hint 2 diagnostic steps.
+solution:
+  summary: Identify the misconfiguration affecting this security lab and apply the minimal fix.
+  files_changed: []
+  commands_run:
+  - bash check.sh
+  reference_docs: security-fundamentals

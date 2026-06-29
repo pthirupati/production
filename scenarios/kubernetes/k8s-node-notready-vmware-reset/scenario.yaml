@@ -1,30 +1,66 @@
 title: Worker Node NotReady — Reset its VM in VMware to Recover
 slug: k8s-node-notready-vmware-reset
-category: Kubernetes
+category: Fix
 difficulty: medium
-description: |
-  Node `worker-1` has gone NotReady and a `payments` pod scheduled to it is stuck
-  Pending — the kubelet has stopped reporting because the node's VM is hung (no
+description: 'CONTEXT: A team operating Kubernetes needs you to resolve `Worker Node NotReady — Reset
+  its VM in VMware to Recover` during a realistic incident. The business impact is reduced service reliability
+  until the underlying state is repaired.
+
+
+  ENVIRONMENT: You are working in FixitLab''s offline Kubernetes cluster with kubectl, manifests, and
+  cluster resources. All tools run locally; no paid APIs or external cloud calls are required.
+
+
+  SYMPTOM / STARTING STATE: A Kubernetes cluster whose worker-1 node is NotReady because its VMware VM
+
+  (k8s-worker-1) is hung. A payments pod is Pending (the node has a not-ready taint).
+
+  A healthy k8s-worker-2 is also present. Only a VMware reset of k8s-worker-1
+
+  recovers the node. Node `worker-1` has gone NotReady and a `payments` pod scheduled to it is stuck
+
+  Pending — the kubelet has stopped reporting because the node''s VM is hung (no
+
   guest heartbeat). This Kubernetes cluster runs ON VMware: each node is a VMware
+
   VM, so a wedged node is a wedged VM. You cannot recover a hung node with kubectl;
+
   uncordon/delete will not bring back a dead kubelet.
 
+
   This is a CROSS-TECHNOLOGY task. Open the VMware simulator (toolbar -> Open VMware),
+
   select the node VM `k8s-worker-1`, and perform a hard Reset (VM Actions -> Power ->
+
   Reset). When the VM reboots, the kubelet re-registers, the node returns to Ready,
+
   and the Pending pod reschedules. Confirm from the terminal that worker-1 is Ready
+
   and all pods are Running.
-initial_state: |
-  A Kubernetes cluster whose worker-1 node is NotReady because its VMware VM
+
+
+  OBJECTIVE: Confirm worker-1 is NotReady (kubectl get nodes) and a pod is Pending (kubectl get pods);
+  Recognise the node VM is hung — kubectl cannot revive a dead kubelet; Open the VMware simulator and
+  Reset the node VM k8s-worker-1 (Power -> Reset). Success means `kubectl get pods` shows every pod Running.
+
+
+  WHAT TO AVOID: Do not apply broad destructive changes, skip evidence gathering, or fake completion with
+  marker files — the checker validates real system state.'
+initial_state: 'A Kubernetes cluster whose worker-1 node is NotReady because its VMware VM
+
   (k8s-worker-1) is hung. A payments pod is Pending (the node has a not-ready taint).
+
   A healthy k8s-worker-2 is also present. Only a VMware reset of k8s-worker-1
+
   recovers the node.
+
+  '
 objectives:
-  - Confirm worker-1 is NotReady (kubectl get nodes) and a pod is Pending (kubectl get pods)
-  - Recognise the node VM is hung — kubectl cannot revive a dead kubelet
-  - Open the VMware simulator and Reset the node VM k8s-worker-1 (Power -> Reset)
-  - Confirm worker-1 returns to Ready (kubectl get nodes)
-  - Verify the stranded pod reschedules and all pods are Running (kubectl get pods)
+- Confirm worker-1 is NotReady (kubectl get nodes) and a pod is Pending (kubectl get pods)
+- Recognise the node VM is hung — kubectl cannot revive a dead kubelet
+- Open the VMware simulator and Reset the node VM k8s-worker-1 (Power -> Reset)
+- Confirm worker-1 returns to Ready (kubectl get nodes)
+- Verify the stranded pod reschedules and all pods are Running (kubectl get pods)
 lab_mode: simulation
 simulation_type: kubernetes
 cross_technology: true
@@ -35,13 +71,81 @@ is_free: false
 jira_priority: Critical
 dual_terminal: false
 hints:
-  - order: 1
-    cost: 10
-    content: '`kubectl get nodes` shows worker-1 NotReady; `kubectl describe node worker-1` shows the kubelet has stopped posting status. A NotReady node means a stranded pod (`kubectl get pods` shows Pending). This is a node-down problem, not a workload bug.'
-  - order: 2
-    cost: 15
-    content: 'These nodes are VMware VMs. A hung kubelet usually means the VM itself is wedged. Open the VMware simulator (toolbar -> Open VMware) and find k8s-worker-1 — its guest heartbeat is lost (VM hung).'
-  - order: 3
-    cost: 20
-    content: 'In the VMware simulator select k8s-worker-1 and Reset it (VM Actions -> Power -> Reset / Restart). After it reboots the kubelet re-registers; in the terminal `kubectl get nodes` shows worker-1 Ready again and `kubectl get pods` shows the pod rescheduled and Running.'
+- order: 1
+  cost: 0
+  content: 'Where to look: Run `kubectl get pods -A` and `kubectl describe pod <name>` for any pod not
+    in Running state.'
+- order: 2
+  cost: 25
+  content: 'Diagnostic steps:
+
+    1. `kubectl get pods` — note CrashLoopBackOff, ImagePullBackOff, or Pending.
+
+    2. `kubectl describe pod <name>` — read Events at the bottom.
+
+    3. `kubectl logs <name> [--previous]` if the container restarted.'
+- order: 3
+  cost: 50
+  content: 'Exact fix + verification:
+
+    1. Fix the root cause (image name, env var, volume mount, or probe).
+
+    2. `kubectl apply -f` the corrected manifest or delete the pod to recreate.
+
+    3. Confirm `kubectl get pods` shows every pod Running.
+
+
+    WHY: Kubernetes only reports healthy when the workload actually runs.'
 requires_companion_hosts: false
+technology: kubernetes
+summary: Complete the worker node notready — reset its vm in vmware to recover kubernetes lab and verify
+  success with the checker
+estimated_minutes: 15
+xp_reward: 100
+prerequisites:
+- Basic kubernetes literacy
+tags:
+- fix
+- hands-on
+- kubernetes
+linked_tutorial: kubernetes-fundamentals
+what_you_will_learn:
+- Confirm worker-1 is NotReady (kubectl get nodes) and a pod is Pending (kubectl get pods)
+- Recognise the node VM is hung — kubectl cannot revive a dead kubelet
+- Open the VMware simulator and Reset the node VM k8s-worker-1 (Power -> Reset)
+- Confirm worker-1 returns to Ready (kubectl get nodes)
+- Verify the stranded pod reschedules and all pods are Running (kubectl get pods)
+environment:
+  nodes:
+  - role: primary
+    os: FixitLab Kubernetes cluster
+    hostname: lab-primary
+    ip: 127.0.0.1
+    specs: local offline simulation
+  pre_installed:
+  - bash
+  - coreutils
+  - helm
+  - kubectl
+  - kubernetes
+  credentials:
+  - user: root
+    password: lab123
+tasks:
+- id: task_1
+  title: Worker Node NotReady — Reset its VM in VMware to Recover
+  description: Restore healthy behavior for Worker Node NotReady — Reset its VM in VMware to Recover by
+    investigating the failure, applying the smallest safe fix, and validating the outcome.
+  background: 'This kubernetes lab teaches systematic troubleshooting: observe, hypothesize, change, verify.'
+  validation:
+    type: k8s_resource_state
+    resource_kind: Pod
+    resource_name: all
+    namespace: default
+    expected_state: Running
+    error_message: One or more pods are not Running. Use kubectl describe pod and kubectl logs.
+solution:
+  summary: Identify the misconfiguration affecting this kubernetes lab and apply the minimal fix.
+  files_changed: []
+  commands_run: []
+  reference_docs: kubernetes-fundamentals

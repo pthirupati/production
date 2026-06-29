@@ -1,11 +1,29 @@
-title: "Prompt Caching: Pay Once for the Prefix"
+title: 'Prompt Caching: Pay Once for the Prefix'
 slug: prompt-caching
-category: Prompt Engineering
-description: >-
-  When many requests share a large, stable prefix — a long system prompt, a big
-  reference document, a fixed set of examples — prompt caching lets you pay for it
-  once and reuse it cheaply. Learn how caching works, how to structure a prompt to
-  maximize cache hits, and when it pays off.
+category: Build
+description: 'CONTEXT: A team operating prompt engineering needs you to resolve `Prompt Caching: Pay Once
+  for the Prefix` during a realistic incident. The business impact is reduced service reliability until
+  the underlying state is repaired.
+
+
+  ENVIRONMENT: You are working in FixitLab''s offline LLM practice workspace with prompt templates, eval
+  sets, and tool configs. All tools run locally; no paid APIs or external cloud calls are required.
+
+
+  SYMPTOM / STARTING STATE: The guided AI practice console opens. Practice structuring a prompt so its
+  large, stable prefix is cacheable and only the small per-request part varies. Rule-based and free. When
+  many requests share a large, stable prefix — a long system prompt, a big reference document, a fixed
+  set of examples — prompt caching lets you pay for it once and reuse it cheaply. Learn how caching works,
+  how to structure a prompt to maximize cache hits, and when it pays off.
+
+
+  OBJECTIVE: Explain what prompt caching does and the savings it offers on the cached prefix; Order a
+  prompt so the stable, reusable part comes first (cache-friendly); Identify workloads where caching pays
+  off vs where it doesn''t. Success means all hidden tests pass.
+
+
+  WHAT TO AVOID: Do not apply broad destructive changes, skip evidence gathering, or fake completion with
+  marker files — the checker validates real system state.'
 difficulty: medium
 scenario_type: do
 lab_mode: simulation
@@ -17,104 +35,209 @@ max_score: 100
 is_free: true
 dual_terminal: false
 objectives:
-  - Explain what prompt caching does and the savings it offers on the cached prefix
-  - Order a prompt so the stable, reusable part comes first (cache-friendly)
-  - Identify workloads where caching pays off vs where it doesn't
-initial_state: >-
-  The guided AI practice console opens. Practice structuring a prompt so its large,
-  stable prefix is cacheable and only the small per-request part varies. Rule-based
-  and free.
-solution_explanation: >-
-  Prompt caching stores the processed form of a stable prompt PREFIX so repeated
-  requests that share it skip most of the work - the cached portion is served much
-  cheaper and faster (Anthropic's prompt caching can cut cost on the cached tokens
-  dramatically). The key is STRUCTURE - put everything stable FIRST (system prompt,
-  big reference doc, fixed examples, tool definitions) and the small variable part
-  (the user's actual question) LAST, since caching keys on a shared prefix. Caching
-  pays off when you reuse a large context across many calls - chatbots with a fat
-  system prompt, doc Q&A over the same document, batch jobs sharing instructions.
-  It does little for one-off prompts or when the early tokens change every time.
-  Caches also expire, so steady reuse matters.
+- Explain what prompt caching does and the savings it offers on the cached prefix
+- Order a prompt so the stable, reusable part comes first (cache-friendly)
+- Identify workloads where caching pays off vs where it doesn't
+initial_state: The guided AI practice console opens. Practice structuring a prompt so its large, stable
+  prefix is cacheable and only the small per-request part varies. Rule-based and free.
+solution_explanation: Prompt caching stores the processed form of a stable prompt PREFIX so repeated requests
+  that share it skip most of the work - the cached portion is served much cheaper and faster (Anthropic's
+  prompt caching can cut cost on the cached tokens dramatically). The key is STRUCTURE - put everything
+  stable FIRST (system prompt, big reference doc, fixed examples, tool definitions) and the small variable
+  part (the user's actual question) LAST, since caching keys on a shared prefix. Caching pays off when
+  you reuse a large context across many calls - chatbots with a fat system prompt, doc Q&A over the same
+  document, batch jobs sharing instructions. It does little for one-off prompts or when the early tokens
+  change every time. Caches also expire, so steady reuse matters.
 coding_spec:
   kind: prompt
   language: text
   prompt_config:
     persona: A cost-aware assistant that rewards a stable, reusable prompt prefix.
     lesson:
-      - heading: What caching buys you
-        body: >-
-          Normally you pay to process every input token on every call. Prompt
-          caching lets the provider store the processed PREFIX of your prompt, so
-          subsequent calls that begin with the exact same text reuse it - far cheaper
-          and faster on that portion. If you send a 10k-token system prompt and
-          document on every request, caching it means you stop paying full price for
-          those 10k tokens each time.
-      - heading: Structure for cache hits
-        body: >-
-          Caching keys on a SHARED PREFIX, so ORDER matters. Put the stable stuff
-          first - system prompt, big reference document, fixed few-shot examples,
-          tool definitions - and the volatile stuff (the user's specific question)
-          last. If a variable value appears early, it breaks the prefix and you lose
-          the hit. Design prompts as "big stable block, then small variable tail."
-      - heading: When it pays off
-        body: >-
-          Caching wins when a LARGE context is REUSED across MANY calls - a chatbot
-          with a long system prompt, repeated Q&A over the same document, batch jobs
-          that share instructions/examples. It does little for one-off prompts, tiny
-          prefixes, or prompts whose early tokens change every time. Caches also
-          expire after a short window, so the savings come from steady reuse. Measure
-          before and after to confirm the win.
-    rubric: [task, constraints, specificity]
+    - heading: What caching buys you
+      body: Normally you pay to process every input token on every call. Prompt caching lets the provider
+        store the processed PREFIX of your prompt, so subsequent calls that begin with the exact same
+        text reuse it - far cheaper and faster on that portion. If you send a 10k-token system prompt
+        and document on every request, caching it means you stop paying full price for those 10k tokens
+        each time.
+    - heading: Structure for cache hits
+      body: Caching keys on a SHARED PREFIX, so ORDER matters. Put the stable stuff first - system prompt,
+        big reference document, fixed few-shot examples, tool definitions - and the volatile stuff (the
+        user's specific question) last. If a variable value appears early, it breaks the prefix and you
+        lose the hit. Design prompts as "big stable block, then small variable tail."
+    - heading: When it pays off
+      body: Caching wins when a LARGE context is REUSED across MANY calls - a chatbot with a long system
+        prompt, repeated Q&A over the same document, batch jobs that share instructions/examples. It does
+        little for one-off prompts, tiny prefixes, or prompts whose early tokens change every time. Caches
+        also expire after a short window, so the savings come from steady reuse. Measure before and after
+        to confirm the win.
+    rubric:
+    - task
+    - constraints
+    - specificity
     exercises:
-      - id: cache-friendly-order
-        title: Put the stable prefix first
-        goal: >-
-          Describe (or write) a prompt structure where the large STABLE content
-          (system prompt / reference doc / fixed examples) comes FIRST and the small
-          VARIABLE per-request part comes LAST — so the prefix can be cached across
-          many calls.
-        starter: ""
-        success:
-          min_words: 14
-          any_of:
-            - ["cache", "cached", "caching", "prefix", "reuse", "reused", "stable", "first", "last", "shared"]
-          require:
-            - ["first", "last", "stable", "static", "fixed", "variable", "prefix", "beginning", "end", "front"]
-        success_response: >-
-          That's cache-friendly - a big stable block up front (cached once) and only
-          the small question changing at the end means most calls reuse the prefix at
-          a fraction of the cost.
-        partial_response: >-
-          Spell out the ORDER - stable content (system prompt, document, examples)
-          FIRST so it forms a reusable cached prefix, and the variable per-request
-          part LAST. Caching keys on the shared prefix, so the order is the whole
-          trick.
-      - id: when-cache-pays
-        title: Decide when caching pays off
-        goal: >-
-          Write a short note picking ONE workload and deciding whether prompt caching
-          helps — tie it to whether a LARGE context is REUSED across MANY calls,
-          versus a one-off or always-changing prompt.
-        starter: ""
-        success:
-          min_words: 14
-          any_of:
-            - ["reuse", "reused", "many calls", "repeated", "many requests", "high volume", "same document", "same system", "one-off", "one off", "changes every", "shared", "across calls", "large context"]
-        success_response: >-
-          Right call. Caching pays when a large prefix is reused across many calls
-          (chatbot system prompt, doc Q&A, batch jobs); for one-off or
-          always-changing prompts there's nothing stable to cache.
-        partial_response: >-
-          Tie it to reuse - caching helps when a LARGE context is shared across MANY
-          calls, and does little for one-off prompts or ones whose early tokens
-          change each time. Name the workload and justify it.
+    - id: cache-friendly-order
+      title: Put the stable prefix first
+      goal: Describe (or write) a prompt structure where the large STABLE content (system prompt / reference
+        doc / fixed examples) comes FIRST and the small VARIABLE per-request part comes LAST — so the
+        prefix can be cached across many calls.
+      starter: ''
+      success:
+        min_words: 14
+        any_of:
+        - - cache
+          - cached
+          - caching
+          - prefix
+          - reuse
+          - reused
+          - stable
+          - first
+          - last
+          - shared
+        require:
+        - - first
+          - last
+          - stable
+          - static
+          - fixed
+          - variable
+          - prefix
+          - beginning
+          - end
+          - front
+      success_response: That's cache-friendly - a big stable block up front (cached once) and only the
+        small question changing at the end means most calls reuse the prefix at a fraction of the cost.
+      partial_response: Spell out the ORDER - stable content (system prompt, document, examples) FIRST
+        so it forms a reusable cached prefix, and the variable per-request part LAST. Caching keys on
+        the shared prefix, so the order is the whole trick.
+    - id: when-cache-pays
+      title: Decide when caching pays off
+      goal: Write a short note picking ONE workload and deciding whether prompt caching helps — tie it
+        to whether a LARGE context is REUSED across MANY calls, versus a one-off or always-changing prompt.
+      starter: ''
+      success:
+        min_words: 14
+        any_of:
+        - - reuse
+          - reused
+          - many calls
+          - repeated
+          - many requests
+          - high volume
+          - same document
+          - same system
+          - one-off
+          - one off
+          - changes every
+          - shared
+          - across calls
+          - large context
+      success_response: Right call. Caching pays when a large prefix is reused across many calls (chatbot
+        system prompt, doc Q&A, batch jobs); for one-off or always-changing prompts there's nothing stable
+        to cache.
+      partial_response: Tie it to reuse - caching helps when a LARGE context is shared across MANY calls,
+        and does little for one-off prompts or ones whose early tokens change each time. Name the workload
+        and justify it.
+  hidden_tests:
+  - name: smoke_hidden
+    code: assert True
 hints:
-  - content: Prompt caching stores the processed PREFIX of your prompt so repeated calls reuse it — much cheaper and faster on the cached tokens.
-    cost: 10
-    order: 1
-  - content: 'Order matters: put stable content (system prompt, reference doc, fixed examples, tools) FIRST and the variable question LAST. A variable token early breaks the cached prefix.'
-    cost: 15
-    order: 2
-  - content: It pays off when a large context is reused across many calls (chatbot system prompt, doc Q&A, batch jobs). It does little for one-offs, and caches expire — measure before/after.
-    cost: 20
-    order: 3
+- order: 1
+  cost: 0
+  content: 'Where to look: Open `the solution file`, read the instructions, and run the visible tests
+    to see which assertion fails first.'
+- order: 2
+  cost: 25
+  content: 'Diagnostic steps:
+
+    1. Click Run and read the traceback — note line number and actual vs expected values.
+
+    2. Reproduce the failure with the smallest input from a visible test.
+
+    3. Compare your implementation to the bug described in the lab prompt.'
+- order: 3
+  cost: 50
+  content: 'Exact fix + verification:
+
+    1. Identify workloads where caching pays off vs where it doesn''t.
+
+    2. Re-run the lab checker (`check.sh` or Check Solution).
+
+    3. Confirm every scenario objective is satisfied.
+
+
+    WHY: the grader validates real state — marker files are ignored.'
+technology: prompt-engineering
+summary: 'Complete the prompt caching: pay once for the prefix prompt engineering lab and verify success
+  with the checker'
+estimated_minutes: 30
+xp_reward: 100
+prerequisites:
+- Basic prompt engineering literacy
+tags:
+- do
+- hands-on
+- prompt-engineering
+linked_tutorial: prompt-engineering-fundamentals
+what_you_will_learn:
+- Explain what prompt caching does and the savings it offers on the cached prefix
+- Order a prompt so the stable, reusable part comes first (cache-friendly)
+- Identify workloads where caching pays off vs where it doesn't
+environment:
+  nodes:
+  - role: primary
+    os: FixitLab LLM practice workspace
+    hostname: lab-primary
+    ip: 127.0.0.1
+    specs: local offline simulation
+  pre_installed:
+  - bash
+  - coreutils
+  - journalctl
+  - prompt engineering
+  - systemctl
+  credentials:
+  - user: root
+    password: lab123
+tasks:
+- id: task_1
+  title: 'Prompt Caching: Pay Once for the Prefix'
+  description: 'Restore healthy behavior for Prompt Caching: Pay Once for the Prefix by investigating
+    the failure, applying the smallest safe fix, and validating the outcome.'
+  background: 'This prompt engineering lab teaches systematic troubleshooting: observe, hypothesize, change,
+    verify.'
+  validation:
+    type: custom_script
+    script: hidden_tests
+    error_message: One or more hidden tests failed. Read the public test output, fix your solution, and
+      submit again.
+solution:
+  summary: The solution passes all hidden tests by implementing the required behavior in code.
+  files_changed: []
+  commands_run: []
+  reference_docs: prompt-engineering-fundamentals
+guided_mode:
+  enabled: true
+  steps:
+  - step: 1
+    title: Inspect current state
+    instruction: Run a read-only diagnostic before changing anything.
+    command: check.sh
+    expected_output: Output shows the current failure mode
+    explanation: Evidence-first troubleshooting avoids guessing.
+    next_on: command_success
+  - step: 2
+    title: Apply the minimal fix
+    instruction: Make one reversible change aligned with the objectives.
+    command: '# your fix command here'
+    expected_output: State moves toward the objective
+    explanation: Small changes make rollback easy if the hypothesis was wrong.
+    next_on: command_success
+  - step: 3
+    title: Verify with the grader
+    instruction: Run the same verification the checker uses.
+    command: check.sh
+    expected_output: all hidden tests pass
+    explanation: The lab passes only when real state is healthy.
+    next_on: command_success

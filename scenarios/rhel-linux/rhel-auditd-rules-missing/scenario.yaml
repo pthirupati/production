@@ -1,7 +1,7 @@
 title: RHEL Audit Rules Not Loaded
 slug: rhel-auditd-rules-missing
-technology: RHEL Linux
-category: Security
+technology: rhel-linux
+category: Fix
 difficulty: hard
 lab_mode: simulation
 simulation_type: generic
@@ -10,7 +10,25 @@ max_score: 100
 is_free: true
 jira_priority: High
 dual_terminal: false
-description: Required audit events aren't captured because audit rules are missing.
+description: 'CONTEXT: A team operating Red Hat Enterprise Linux needs you to resolve `RHEL Audit Rules
+  Not Loaded` during a realistic incident. The business impact is reduced service reliability until the
+  underlying state is repaired.
+
+
+  ENVIRONMENT: You are working in FixitLab''s offline RHEL practice host with dnf, subscription-manager,
+  firewalld, and SELinux. All tools run locally; no paid APIs or external cloud calls are required.
+
+
+  SYMPTOM / STARTING STATE: A RHEL host missing required audit rules. Required audit events aren''t captured
+  because audit rules are missing.
+
+
+  OBJECTIVE: Confirm the issue: auditctl -l shows no rules; Apply the documented fix in /etc/audit/rules.d/audit.rules;
+  Verify the configuration is corrected. Success means `check.sh` exits successfully.
+
+
+  WHAT TO AVOID: Do not apply broad destructive changes, skip evidence gathering, or fake completion with
+  marker files — the checker validates real system state.'
 initial_state: A RHEL host missing required audit rules.
 objectives:
 - 'Confirm the issue: auditctl -l shows no rules'
@@ -18,11 +36,73 @@ objectives:
 - Verify the configuration is corrected
 hints:
 - order: 1
-  cost: 10
-  content: auditctl -l shows no rules
+  cost: 0
+  content: 'Where to look: Run `firewall-cmd --state` and `firewall-cmd --list-all` for active zones.'
 - order: 2
-  cost: 15
-  content: Add the required audit rules.
+  cost: 25
+  content: 'Diagnostic steps:
+
+    1. Identify which zone is active and which ports/services are allowed.
+
+    2. Compare to the port the scenario expects (often 80/tcp or 443/tcp).
+
+    3. Check if the service is bound but blocked externally.'
 - order: 3
-  cost: 20
-  content: /etc/audit/rules.d/audit.rules carries the corrected configuration.
+  cost: 50
+  content: 'Exact fix + verification:
+
+    1. `firewall-cmd --permanent --add-service=http` (or the needed port).
+
+    2. `firewall-cmd --reload`.
+
+    3. Confirm `firewall-cmd --list-ports` includes the required port.
+
+
+    WHY: a running service behind a closed firewall still fails health checks.'
+summary: Complete the rhel audit rules not loaded rhel linux lab and verify success with the checker
+estimated_minutes: 20
+xp_reward: 100
+prerequisites:
+- Basic rhel linux literacy
+tags:
+- fix
+- hands-on
+- rhel-linux
+linked_tutorial: rhel-linux-fundamentals
+what_you_will_learn:
+- 'Confirm the issue: auditctl -l shows no rules'
+- Apply the documented fix in /etc/audit/rules.d/audit.rules
+- Verify the configuration is corrected
+environment:
+  nodes:
+  - role: primary
+    os: FixitLab RHEL practice host
+    hostname: lab-primary
+    ip: 127.0.0.1
+    specs: local offline simulation
+  pre_installed:
+  - bash
+  - coreutils
+  - journalctl
+  - rhel linux
+  - systemctl
+  credentials:
+  - user: root
+    password: lab123
+tasks:
+- id: task_1
+  title: RHEL Audit Rules Not Loaded
+  description: Restore healthy behavior for RHEL Audit Rules Not Loaded by investigating the failure,
+    applying the smallest safe fix, and validating the outcome.
+  background: 'This rhel linux lab teaches systematic troubleshooting: observe, hypothesize, change, verify.'
+  validation:
+    type: command_output
+    command: firewall-cmd --list-ports
+    expected_output: 80/tcp
+    error_message: HTTP is still blocked by firewalld. Allow the service and reload.
+solution:
+  summary: Identify the misconfiguration affecting this rhel linux lab and apply the minimal fix.
+  files_changed: []
+  commands_run:
+  - firewall-cmd --list-ports
+  reference_docs: rhel-linux-fundamentals

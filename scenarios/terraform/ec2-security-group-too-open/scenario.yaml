@@ -1,11 +1,31 @@
 title: EC2 Security Group Allows Unrestricted SSH
 slug: aws-ec2-sg-too-open
 difficulty: easy
-category: AWS
-description: An EC2 security group has an inbound rule allowing SSH (port 22) from 0.0.0.0/0, exposing
-  the instance to brute-force attempts from the entire internet. This violates least-privilege network
-  access. Replace the open rule with a tightly-scoped CIDR so only trusted networks can reach SSH, without
-  locking out legitimate administrators.
+category: Fix
+description: 'CONTEXT: A team operating Terraform IaC needs you to resolve `EC2 Security Group Allows
+  Unrestricted SSH` during a realistic incident. The business impact is reduced service reliability until
+  the underlying state is repaired.
+
+
+  ENVIRONMENT: You are working in FixitLab''s offline Terraform workspace with HCL files, state, and plan/apply
+  workflow. All tools run locally; no paid APIs or external cloud calls are required.
+
+
+  SYMPTOM / STARTING STATE: Simulated AWS environment with an EC2 instance and a security group that has
+  a permissive inbound rule: port 22 open to all IPv4 addresses. This violates least-privilege network
+  access principles. An EC2 security group has an inbound rule allowing SSH (port 22) from 0.0.0.0/0,
+  exposing the instance to brute-force attempts from the entire internet. This violates least-privilege
+  network access. Replace the open rule with a tightly-scoped CIDR so only trusted networks can reach
+  SSH, without locking out legitimate administrators.
+
+
+  OBJECTIVE: Identify the security group with the 0.0.0.0/0 SSH rule using the AWS CLI; Revoke the world-open
+  SSH ingress rule; Re-authorize SSH from a specific trusted CIDR and verify the rule is scoped. Success
+  means `check.sh` exits successfully.
+
+
+  WHAT TO AVOID: Do not apply broad destructive changes, skip evidence gathering, or fake completion with
+  marker files — the checker validates real system state.'
 initial_state: 'Simulated AWS environment with an EC2 instance and a security group that has a permissive
   inbound rule: port 22 open to all IPv4 addresses. This violates least-privilege network access principles.'
 objectives:
@@ -18,18 +38,76 @@ time_limit: 1200
 max_score: 100
 is_free: true
 hints:
-- content: 'Run: aws ec2 describe-security-groups --filters Name=ip-permission.to-port,Values=22 to find
-    groups with SSH open.'
-  cost: 10
-  order: 1
-- content: Use aws ec2 revoke-security-group-ingress to remove the 0.0.0.0/0 rule, then aws ec2 authorize-security-group-ingress
-    to add the restricted CIDR.
-  cost: 15
-  order: 2
-- content: Replace with a specific CIDR like 203.0.113.0/24 (your office IP range). Never use 0.0.0.0/0
-    for SSH in production.
-  cost: 20
-  order: 3
+- order: 1
+  cost: 0
+  content: 'Where to look: Run `systemctl status sshd` and `ss -tlnp | grep :22` on the target host.'
+- order: 2
+  cost: 25
+  content: 'Diagnostic steps:
+
+    1. Confirm sshd is active and listening on port 22.
+
+    2. Check `firewall-cmd` or iptables for blocked port 22.
+
+    3. Read `/var/log/secure` for auth or config errors.'
+- order: 3
+  cost: 50
+  content: 'Exact fix + verification:
+
+    1. Fix sshd_config, firewall, or socket unit as needed.
+
+    2. `systemctl restart sshd`.
+
+    3. `ssh -o BatchMode=yes user@localhost echo ok` succeeds.
+
+
+    WHY: SSH failures are usually service, firewall, or config — not credentials alone.'
 requires_companion_hosts: false
 dual_terminal: false
 jira_priority: High
+technology: terraform
+summary: Complete the ec2 security group allows unrestricted ssh terraform lab and verify success with
+  the checker
+estimated_minutes: 20
+xp_reward: 100
+prerequisites:
+- Basic terraform literacy
+tags:
+- fix
+- hands-on
+- terraform
+linked_tutorial: terraform-fundamentals
+what_you_will_learn:
+- Identify the security group with the 0.0.0.0/0 SSH rule using the AWS CLI
+- Revoke the world-open SSH ingress rule
+- Re-authorize SSH from a specific trusted CIDR and verify the rule is scoped
+environment:
+  nodes:
+  - role: primary
+    os: FixitLab Terraform workspace
+    hostname: lab-primary
+    ip: 127.0.0.1
+    specs: local offline simulation
+  pre_installed:
+  - bash
+  - coreutils
+  - terraform
+  credentials:
+  - user: root
+    password: lab123
+tasks:
+- id: task_1
+  title: EC2 Security Group Allows Unrestricted SSH
+  description: Restore healthy behavior for EC2 Security Group Allows Unrestricted SSH by investigating
+    the failure, applying the smallest safe fix, and validating the outcome.
+  background: 'This terraform lab teaches systematic troubleshooting: observe, hypothesize, change, verify.'
+  validation:
+    type: custom_script
+    script: check.sh
+    error_message: Validation did not pass. Re-read the objectives and Hint 2 diagnostic steps.
+solution:
+  summary: Identify the misconfiguration affecting this terraform lab and apply the minimal fix.
+  files_changed: []
+  commands_run:
+  - bash check.sh
+  reference_docs: terraform-fundamentals

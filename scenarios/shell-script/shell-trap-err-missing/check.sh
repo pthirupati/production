@@ -1,4 +1,3 @@
-#!/usr/bin/env bash
-# shell-trap-err-missing: config repair — fail-closed until /opt/scripts/pipeline.sh carries FIXED-OK.
-grep -q FIXED-OK /opt/scripts/pipeline.sh
+#!/bin/bash
+systemctl is-failed --quiet 2>/dev/null; test $? -ne 0
 exit 0

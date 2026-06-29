@@ -1,28 +1,64 @@
-title: Scale-Out Blocked — Add a Worker VM in VMware to Fit the Pods
+title: Scale-Out Blocked - Add a Worker VM in VMware to Fit the
 slug: k8s-scale-out-add-vmware-node
-category: Kubernetes
+category: Fix
 difficulty: medium
-description: |
-  The `api` Deployment was scaled to 4 replicas to handle a traffic spike, but two
+description: 'CONTEXT: A team operating Kubernetes needs you to resolve `Scale-Out Blocked - Add a Worker
+  VM in VMware to Fit the` during a realistic incident. The business impact is reduced service reliability
+  until the underlying state is repaired.
+
+
+  ENVIRONMENT: You are working in FixitLab''s offline Kubernetes cluster with kubectl, manifests, and
+  cluster resources. All tools run locally; no paid APIs or external cloud calls are required.
+
+
+  SYMPTOM / STARTING STATE: A Kubernetes cluster with one control-plane and one worker (worker-1). The
+  `api`
+
+  Deployment is set to 4 replicas; 2 are Running on worker-1 and 2 are Pending
+
+  (Insufficient cpu/memory). The replacement worker VM `k8s-worker-2` exists in the
+
+  VMware inventory but is powered off, so node worker-2 has not joined. The `api` Deployment was scaled
+  to 4 replicas to handle a traffic spike, but two
+
   pods are stuck Pending with FailedScheduling — the only worker node (worker-1) has
+
   no free CPU/memory. This Kubernetes cluster runs ON VMware: each node is a VMware
+
   VM, so adding capacity means adding a node VM, not editing a manifest.
 
+
   This is a CROSS-TECHNOLOGY task. Open the VMware simulator (toolbar -> Open VMware)
+
   and power on the spare worker VM `k8s-worker-2`. Once it joins as node worker-2,
+
   the Pending api pods schedule onto it. Confirm from the terminal that every api
+
   pod is Running across the two worker nodes.
-initial_state: |
-  A Kubernetes cluster with one control-plane and one worker (worker-1). The `api`
+
+
+  OBJECTIVE: Confirm 2 api pods are Pending due to FailedScheduling (kubectl get pods, kubectl describe
+  pod); Confirm the cluster has only one worker node (kubectl get nodes); Open the VMware simulator and
+  power on the worker-node VM k8s-worker-2. Success means `kubectl get pods` shows every pod Running.
+
+
+  WHAT TO AVOID: Do not apply broad destructive changes, skip evidence gathering, or fake completion with
+  marker files — the checker validates real system state.'
+initial_state: 'A Kubernetes cluster with one control-plane and one worker (worker-1). The `api`
+
   Deployment is set to 4 replicas; 2 are Running on worker-1 and 2 are Pending
+
   (Insufficient cpu/memory). The replacement worker VM `k8s-worker-2` exists in the
+
   VMware inventory but is powered off, so node worker-2 has not joined.
+
+  '
 objectives:
-  - Confirm 2 api pods are Pending due to FailedScheduling (kubectl get pods, kubectl describe pod)
-  - Confirm the cluster has only one worker node (kubectl get nodes)
-  - Open the VMware simulator and power on the worker-node VM k8s-worker-2
-  - Confirm worker-2 is Ready and the Pending pods schedule onto it
-  - Verify all api pods are Running (kubectl get pods -o wide)
+- Confirm 2 api pods are Pending due to FailedScheduling (kubectl get pods, kubectl describe pod)
+- Confirm the cluster has only one worker node (kubectl get nodes)
+- Open the VMware simulator and power on the worker-node VM k8s-worker-2
+- Confirm worker-2 is Ready and the Pending pods schedule onto it
+- Verify all api pods are Running (kubectl get pods -o wide)
 lab_mode: simulation
 simulation_type: kubernetes
 cross_technology: true
@@ -33,13 +69,81 @@ is_free: false
 jira_priority: High
 dual_terminal: false
 hints:
-  - order: 1
-    cost: 10
-    content: '`kubectl get pods` shows 2 api pods Pending. `kubectl describe pod <pending>` reports FailedScheduling: Insufficient cpu/memory. `kubectl get nodes` shows only worker-1 — there is no node with room.'
-  - order: 2
-    cost: 15
-    content: 'The nodes are VMware VMs. Adding replicas cannot help when no node can host them. Open the VMware simulator (toolbar -> Open VMware); the spare node VM k8s-worker-2 is in the inventory, powered off.'
-  - order: 3
-    cost: 20
-    content: 'Power on k8s-worker-2 in the VMware simulator (VM Actions -> Power -> Power On). It joins as node worker-2. In the terminal, `kubectl get nodes` shows worker-2 Ready and `kubectl get pods -o wide` shows the formerly-Pending pods now Running on worker-2.'
+- order: 1
+  cost: 0
+  content: 'Where to look: Run `kubectl get pods -A` and `kubectl describe pod <name>` for any pod not
+    in Running state.'
+- order: 2
+  cost: 25
+  content: 'Diagnostic steps:
+
+    1. `kubectl get pods` — note CrashLoopBackOff, ImagePullBackOff, or Pending.
+
+    2. `kubectl describe pod <name>` — read Events at the bottom.
+
+    3. `kubectl logs <name> [--previous]` if the container restarted.'
+- order: 3
+  cost: 50
+  content: 'Exact fix + verification:
+
+    1. Fix the root cause (image name, env var, volume mount, or probe).
+
+    2. `kubectl apply -f` the corrected manifest or delete the pod to recreate.
+
+    3. Confirm `kubectl get pods` shows every pod Running.
+
+
+    WHY: Kubernetes only reports healthy when the workload actually runs.'
 requires_companion_hosts: false
+technology: kubernetes
+summary: Complete the scale-out blocked - add a worker vm in vmware to fit the kubernetes lab and verify
+  success with the checker
+estimated_minutes: 20
+xp_reward: 100
+prerequisites:
+- Basic kubernetes literacy
+tags:
+- fix
+- hands-on
+- kubernetes
+linked_tutorial: kubernetes-fundamentals
+what_you_will_learn:
+- Confirm 2 api pods are Pending due to FailedScheduling (kubectl get pods, kubectl describe pod)
+- Confirm the cluster has only one worker node (kubectl get nodes)
+- Open the VMware simulator and power on the worker-node VM k8s-worker-2
+- Confirm worker-2 is Ready and the Pending pods schedule onto it
+- Verify all api pods are Running (kubectl get pods -o wide)
+environment:
+  nodes:
+  - role: primary
+    os: FixitLab Kubernetes cluster
+    hostname: lab-primary
+    ip: 127.0.0.1
+    specs: local offline simulation
+  pre_installed:
+  - bash
+  - coreutils
+  - helm
+  - kubectl
+  - kubernetes
+  credentials:
+  - user: root
+    password: lab123
+tasks:
+- id: task_1
+  title: Scale-Out Blocked - Add a Worker VM in VMware to Fit the
+  description: Restore healthy behavior for Scale-Out Blocked - Add a Worker VM in VMware to Fit the by
+    investigating the failure, applying the smallest safe fix, and validating the outcome.
+  background: 'This kubernetes lab teaches systematic troubleshooting: observe, hypothesize, change, verify.'
+  validation:
+    type: k8s_resource_state
+    resource_kind: Pod
+    resource_name: all
+    namespace: default
+    expected_state: Running
+    error_message: One or more pods are not Running. Use kubectl describe pod and kubectl logs.
+solution:
+  summary: Identify the misconfiguration affecting this kubernetes lab and apply the minimal fix.
+  files_changed: []
+  commands_run: []
+  reference_docs: kubernetes-fundamentals

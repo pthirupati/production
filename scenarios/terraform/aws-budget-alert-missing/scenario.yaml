@@ -1,11 +1,31 @@
 title: AWS Budget Alert Not Firing
 slug: aws-budget-alert-missing
 difficulty: easy
-category: AWS
-description: An AWS Budgets alert is configured but never sends a notification when the monthly cost threshold
-  is exceeded. The budget itself exists, but its notification is missing a valid subscriber (or the threshold
-  type is wrong), so no email is delivered when actual spend crosses the limit. Repair the notification
-  so cost alerts are actually sent.
+category: Fix
+description: 'CONTEXT: A team operating Terraform IaC needs you to resolve `AWS Budget Alert Not Firing`
+  during a realistic incident. The business impact is reduced service reliability until the underlying
+  state is repaired.
+
+
+  ENVIRONMENT: You are working in FixitLab''s offline Terraform workspace with HCL files, state, and plan/apply
+  workflow. All tools run locally; no paid APIs or external cloud calls are required.
+
+
+  SYMPTOM / STARTING STATE: Simulated AWS environment with a cost budget defined. The notification configuration
+  is missing or has an incorrect threshold type, preventing alerts from being delivered when costs exceed
+  the budget. An AWS Budgets alert is configured but never sends a notification when the monthly cost
+  threshold is exceeded. The budget itself exists, but its notification is missing a valid subscriber
+  (or the threshold type is wrong), so no email is delivered when actual spend crosses the limit. Repair
+  the notification so cost alerts are actually sent.
+
+
+  OBJECTIVE: Inspect the AWS Budget and its notification/subscriber configuration; Identify the missing/broken
+  subscriber or wrong threshold type; Add a valid email subscriber so an alert fires when spend exceeds
+  the threshold. Success means `check.sh` exits successfully.
+
+
+  WHAT TO AVOID: Do not apply broad destructive changes, skip evidence gathering, or fake completion with
+  marker files — the checker validates real system state.'
 initial_state: Simulated AWS environment with a cost budget defined. The notification configuration is
   missing or has an incorrect threshold type, preventing alerts from being delivered when costs exceed
   the budget.
@@ -19,18 +39,73 @@ time_limit: 1200
 max_score: 100
 is_free: true
 hints:
-- content: 'Run: aws budgets describe-budget --account-id <id> --budget-name <name> to inspect the budget
-    and its notifications.'
-  cost: 10
-  order: 1
-- content: Check that the notification has a SUBSCRIBER of type EMAIL and that the threshold type is PERCENTAGE
-    or ABSOLUTE_VALUE.
-  cost: 15
-  order: 2
-- content: Use aws budgets create-notification or update-budget to add the missing email subscriber to
-    the notification.
-  cost: 20
-  order: 3
+- order: 1
+  cost: 0
+  content: 'Where to look: Inspect the AWS Budget and its notification/subscriber configuration'
+- order: 2
+  cost: 25
+  content: 'Diagnostic steps:
+
+    1. Identify the missing/broken subscriber or wrong threshold type
+
+    2. Add a valid email subscriber so an alert fires when spend exceeds the threshold'
+- order: 3
+  cost: 50
+  content: 'Exact fix + verification:
+
+    1. Add a valid email subscriber so an alert fires when spend exceeds the threshold.
+
+    2. Re-run the lab checker (`check.sh` or Check Solution).
+
+    3. Confirm every scenario objective is satisfied.
+
+
+    WHY: the grader validates real state — marker files are ignored.'
 requires_companion_hosts: false
 dual_terminal: false
 jira_priority: Low
+technology: terraform
+summary: Complete the aws budget alert not firing terraform lab and verify success with the checker
+estimated_minutes: 20
+xp_reward: 100
+prerequisites:
+- Basic terraform literacy
+tags:
+- fix
+- hands-on
+- terraform
+linked_tutorial: terraform-fundamentals
+what_you_will_learn:
+- Inspect the AWS Budget and its notification/subscriber configuration
+- Identify the missing/broken subscriber or wrong threshold type
+- Add a valid email subscriber so an alert fires when spend exceeds the threshold
+environment:
+  nodes:
+  - role: primary
+    os: FixitLab Terraform workspace
+    hostname: lab-primary
+    ip: 127.0.0.1
+    specs: local offline simulation
+  pre_installed:
+  - bash
+  - coreutils
+  - terraform
+  credentials:
+  - user: root
+    password: lab123
+tasks:
+- id: task_1
+  title: AWS Budget Alert Not Firing
+  description: Restore healthy behavior for AWS Budget Alert Not Firing by investigating the failure,
+    applying the smallest safe fix, and validating the outcome.
+  background: 'This terraform lab teaches systematic troubleshooting: observe, hypothesize, change, verify.'
+  validation:
+    type: custom_script
+    script: check.sh
+    error_message: Validation did not pass. Re-read the objectives and Hint 2 diagnostic steps.
+solution:
+  summary: Identify the misconfiguration affecting this terraform lab and apply the minimal fix.
+  files_changed: []
+  commands_run:
+  - bash check.sh
+  reference_docs: terraform-fundamentals

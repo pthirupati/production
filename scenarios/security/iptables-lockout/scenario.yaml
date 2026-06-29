@@ -1,37 +1,125 @@
-title: "iptables Lockout — Recover and Fix Firewall Rules"
+title: iptables Lockout — Recover and Fix Firewall Rules
 slug: iptables-lockout
-technology: Security
-category: Hardening
+technology: security
+category: Fix
 difficulty: medium
 time_limit: 900
 max_score: 100
 infrastructure_type: docker
 jira_priority: High
 is_free: false
-description: |
-  A junior admin accidentally applied an iptables INPUT policy of DROP without
-  saving a recovery rule, locking out all remote access to the server. You have
-  console access. Recover the server by flushing the broken rules, restoring
-  connectivity for SSH on port 22, and then building a correct iptables ruleset
-  that allows SSH, HTTP, and HTTPS while dropping everything else.
-objectives:
-  - Flush the current broken iptables rules and set default policies to ACCEPT to restore access
-  - Build a proper ruleset allowing established connections, SSH (22), HTTP (80), and HTTPS (443)
-  - Save the rules to /etc/iptables/rules.v4 so they persist after reboot
-initial_state: |
-  Ubuntu server with iptables INPUT chain policy set to DROP and no ACCEPT rules.
+description: 'CONTEXT: A team operating security hardening needs you to resolve `iptables Lockout — Recover
+  and Fix Firewall Rules` during a realistic incident. The business impact is reduced service reliability
+  until the underlying state is repaired.
+
+
+  ENVIRONMENT: You are working in FixitLab''s offline hardening lab with SSH, firewall, TLS, audit logs,
+  and IAM settings. All tools run locally; no paid APIs or external cloud calls are required.
+
+
+  SYMPTOM / STARTING STATE: Ubuntu server with iptables INPUT chain policy set to DROP and no ACCEPT rules.
+
   Console access is available. iptables-persistent package is installed.
+
+  The server should allow SSH, HTTP, and HTTPS inbound traffic. A junior admin accidentally applied an
+  iptables INPUT policy of DROP without
+
+  saving a recovery rule, locking out all remote access to the server. You have
+
+  console access. Recover the server by flushing the broken rules, restoring
+
+  connectivity for SSH on port 22, and then building a correct iptables ruleset
+
+  that allows SSH, HTTP, and HTTPS while dropping everything else.
+
+
+  OBJECTIVE: Flush the current broken iptables rules and set default policies to ACCEPT to restore access;
+  Build a proper ruleset allowing established connections, SSH (22), HTTP (80), and HTTPS (443); Save
+  the rules to /etc/iptables/rules.v4 so they persist after reboot. Success means `check.sh` exits successfully.
+
+
+  WHAT TO AVOID: Do not apply broad destructive changes, skip evidence gathering, or fake completion with
+  marker files — the checker validates real system state.'
+objectives:
+- Flush the current broken iptables rules and set default policies to ACCEPT to restore access
+- Build a proper ruleset allowing established connections, SSH (22), HTTP (80), and HTTPS (443)
+- Save the rules to /etc/iptables/rules.v4 so they persist after reboot
+initial_state: 'Ubuntu server with iptables INPUT chain policy set to DROP and no ACCEPT rules.
+
+  Console access is available. iptables-persistent package is installed.
+
   The server should allow SSH, HTTP, and HTTPS inbound traffic.
+
+  '
 hints:
-  - order: 1
-    cost: 10
-    content: "Recover immediately: `iptables -P INPUT ACCEPT && iptables -F` to flush all rules and restore connectivity."
-  - order: 2
-    cost: 15
-    content: "Build the correct ruleset: allow loopback (`-A INPUT -i lo -j ACCEPT`), established (`-A INPUT -m state --state ESTABLISHED,RELATED -j ACCEPT`), then ports 22, 80, 443."
-  - order: 3
-    cost: 20
-    content: "Add port rules: `iptables -A INPUT -p tcp --dport 22 -j ACCEPT; iptables -A INPUT -p tcp --dport 80 -j ACCEPT; iptables -A INPUT -p tcp --dport 443 -j ACCEPT` then `iptables -P INPUT DROP`."
-  - order: 4
-    cost: 25
-    content: "Save rules: `iptables-save > /etc/iptables/rules.v4` and verify with `iptables -L INPUT -n -v --line-numbers`."
+- order: 1
+  cost: 0
+  content: 'Where to look: Run `systemctl status sshd` and `ss -tlnp | grep :22` on the target host.'
+- order: 2
+  cost: 25
+  content: 'Diagnostic steps:
+
+    1. Confirm sshd is active and listening on port 22.
+
+    2. Check `firewall-cmd` or iptables for blocked port 22.
+
+    3. Read `/var/log/secure` for auth or config errors.'
+- order: 3
+  cost: 50
+  content: 'Exact fix + verification:
+
+    1. Fix sshd_config, firewall, or socket unit as needed.
+
+    2. `systemctl restart sshd`.
+
+    3. `ssh -o BatchMode=yes user@localhost echo ok` succeeds.
+
+
+    WHY: SSH failures are usually service, firewall, or config — not credentials alone.'
+summary: Complete the iptables lockout — recover and fix firewall rules security lab and verify success
+  with the checker
+estimated_minutes: 15
+xp_reward: 100
+prerequisites:
+- Basic security literacy
+tags:
+- fix
+- hands-on
+- security
+linked_tutorial: security-fundamentals
+what_you_will_learn:
+- Flush the current broken iptables rules and set default policies to ACCEPT to restore access
+- Build a proper ruleset allowing established connections, SSH (22), HTTP (80), and HTTPS (443)
+- Save the rules to /etc/iptables/rules.v4 so they persist after reboot
+environment:
+  nodes:
+  - role: primary
+    os: FixitLab hardening lab
+    hostname: lab-primary
+    ip: 127.0.0.1
+    specs: local offline simulation
+  pre_installed:
+  - bash
+  - coreutils
+  - journalctl
+  - security
+  - systemctl
+  credentials:
+  - user: root
+    password: lab123
+tasks:
+- id: task_1
+  title: iptables Lockout — Recover and Fix Firewall Rules
+  description: Restore healthy behavior for iptables Lockout — Recover and Fix Firewall Rules by investigating
+    the failure, applying the smallest safe fix, and validating the outcome.
+  background: 'This security lab teaches systematic troubleshooting: observe, hypothesize, change, verify.'
+  validation:
+    type: custom_script
+    script: check.sh
+    error_message: Validation did not pass. Re-read the objectives and Hint 2 diagnostic steps.
+solution:
+  summary: Identify the misconfiguration affecting this security lab and apply the minimal fix.
+  files_changed: []
+  commands_run:
+  - bash check.sh
+  reference_docs: security-fundamentals

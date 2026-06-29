@@ -1,22 +1,55 @@
-category: Kubernetes
-description: 'A Service is not ready: requests to it fail because its backing pods are not passing readiness
-  checks, so Kubernetes keeps them out of the Service''s endpoints. Either the pods are unhealthy or the
-  readiness probe is misconfigured. Get the pods Ready so the Service receives endpoints and serves traffic.'
+category: Fix
+description: 'CONTEXT: A team operating Kubernetes needs you to resolve `Kubernetes Service Not Ready`
+  during a realistic incident. The business impact is reduced service reliability until the underlying
+  state is repaired.
+
+
+  ENVIRONMENT: You are working in FixitLab''s offline Kubernetes cluster with kubectl, manifests, and
+  cluster resources. All tools run locally; no paid APIs or external cloud calls are required.
+
+
+  SYMPTOM / STARTING STATE: Simulated Kubernetes cluster. A Service has zero ready endpoints because its
+  pods fail their readiness probe (wrong path/port or the app isn''t actually serving). A Service is not
+  ready: requests to it fail because its backing pods are not passing readiness checks, so Kubernetes
+  keeps them out of the Service''s endpoints. Either the pods are unhealthy or the readiness probe is
+  misconfigured. Get the pods Ready so the Service receives endpoints and serves traffic.
+
+
+  OBJECTIVE: Confirm the Service has no ready endpoints; Determine why the backing pods are not Ready
+  (probe vs app health); Fix the pods/probe so endpoints populate and the Service responds. Success means
+  `kubectl get pods` shows every pod Running.
+
+
+  WHAT TO AVOID: Do not apply broad destructive changes, skip evidence gathering, or fake completion with
+  marker files — the checker validates real system state.'
 difficulty: hard
 dual_terminal: false
 hints:
 - order: 1
-  cost: 10
-  content: '`kubectl get endpoints <svc>` is empty while pods exist. `kubectl get pods` shows them 0/1
-    READY — they''re failing readiness.'
+  cost: 0
+  content: 'Where to look: Run `kubectl get pods -A` and `kubectl describe pod <name>` for any pod not
+    in Running state.'
 - order: 2
-  cost: 15
-  content: 'Describe a pod: `kubectl describe pod <pod>` and read the Readiness probe and its failures
-    (e.g. probing :8080/healthz but the app serves :80/). Check `kubectl logs <pod>`.'
+  cost: 25
+  content: 'Diagnostic steps:
+
+    1. `kubectl get pods` — note CrashLoopBackOff, ImagePullBackOff, or Pending.
+
+    2. `kubectl describe pod <name>` — read Events at the bottom.
+
+    3. `kubectl logs <name> [--previous]` if the container restarted.'
 - order: 3
-  cost: 20
-  content: Correct the readiness probe path/port in the deployment (`kubectl edit deploy <name>`) to match
-    the app, or fix the app. Once pods report 1/1 Ready, `kubectl get endpoints <svc>` fills in.
+  cost: 50
+  content: 'Exact fix + verification:
+
+    1. Fix the root cause (image name, env var, volume mount, or probe).
+
+    2. `kubectl apply -f` the corrected manifest or delete the pod to recreate.
+
+    3. Confirm `kubectl get pods` shows every pod Running.
+
+
+    WHY: Kubernetes only reports healthy when the workload actually runs.'
 initial_state: Simulated Kubernetes cluster. A Service has zero ready endpoints because its pods fail
   their readiness probe (wrong path/port or the app isn't actually serving).
 is_free: false
@@ -32,3 +65,52 @@ simulation_type: kubernetes
 slug: sim-k8s-service-not-ready
 time_limit: 900
 title: Kubernetes Service Not Ready
+technology: kubernetes
+summary: Complete the kubernetes service not ready kubernetes lab and verify success with the checker
+estimated_minutes: 15
+xp_reward: 100
+prerequisites:
+- Basic kubernetes literacy
+tags:
+- fix
+- hands-on
+- kubernetes
+linked_tutorial: kubernetes-fundamentals
+what_you_will_learn:
+- Confirm the Service has no ready endpoints
+- Determine why the backing pods are not Ready (probe vs app health)
+- Fix the pods/probe so endpoints populate and the Service responds
+environment:
+  nodes:
+  - role: primary
+    os: FixitLab Kubernetes cluster
+    hostname: lab-primary
+    ip: 127.0.0.1
+    specs: local offline simulation
+  pre_installed:
+  - bash
+  - coreutils
+  - helm
+  - kubectl
+  - kubernetes
+  credentials:
+  - user: root
+    password: lab123
+tasks:
+- id: task_1
+  title: Kubernetes Service Not Ready
+  description: Restore healthy behavior for Kubernetes Service Not Ready by investigating the failure,
+    applying the smallest safe fix, and validating the outcome.
+  background: 'This kubernetes lab teaches systematic troubleshooting: observe, hypothesize, change, verify.'
+  validation:
+    type: k8s_resource_state
+    resource_kind: Pod
+    resource_name: all
+    namespace: default
+    expected_state: Running
+    error_message: One or more pods are not Running. Use kubectl describe pod and kubectl logs.
+solution:
+  summary: Identify the misconfiguration affecting this kubernetes lab and apply the minimal fix.
+  files_changed: []
+  commands_run: []
+  reference_docs: kubernetes-fundamentals

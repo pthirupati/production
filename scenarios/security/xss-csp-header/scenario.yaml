@@ -1,37 +1,125 @@
-title: "XSS and CSP Header — Add Content Security Policy to Prevent Script Injection"
+title: XSS and CSP Header - Add Content Security Policy to Prevent
 slug: xss-csp-header
-technology: Security
-category: Web Security
+technology: security
+category: Fix
 difficulty: medium
 time_limit: 900
 max_score: 100
 infrastructure_type: docker
 jira_priority: High
 is_free: false
-description: |
-  A penetration test has identified a reflected cross-site scripting (XSS)
-  vulnerability in the search parameter of a web application. While the
-  underlying code fix is pending, you must add a Content Security Policy header
-  via nginx to block inline script execution and restrict resource loading to
-  same-origin only. Also add X-Frame-Options and X-Content-Type-Options headers.
-objectives:
-  - Add a Content-Security-Policy header to /etc/nginx/conf.d/app.conf restricting script-src to 'self'
-  - Add X-Frame-Options DENY and X-Content-Type-Options nosniff headers
-  - Reload nginx and verify all three security headers are present using curl
-initial_state: |
-  Ubuntu server running nginx as a reverse proxy for a Flask web app on port 5000.
+description: 'CONTEXT: A team operating security hardening needs you to resolve `XSS and CSP Header -
+  Add Content Security Policy to Prevent` during a realistic incident. The business impact is reduced
+  service reliability until the underlying state is repaired.
+
+
+  ENVIRONMENT: You are working in FixitLab''s offline hardening lab with SSH, firewall, TLS, audit logs,
+  and IAM settings. All tools run locally; no paid APIs or external cloud calls are required.
+
+
+  SYMPTOM / STARTING STATE: Ubuntu server running nginx as a reverse proxy for a Flask web app on port
+  5000.
+
   The nginx config at /etc/nginx/conf.d/app.conf has no security headers configured.
+
+  curl is available for testing. The app is reachable at http://localhost/. A penetration test has identified
+  a reflected cross-site scripting (XSS)
+
+  vulnerability in the search parameter of a web application. While the
+
+  underlying code fix is pending, you must add a Content Security Policy header
+
+  via nginx to block inline script execution and restrict resource loading to
+
+  same-origin only. Also add X-Frame-Options and X-Content-Type-Options headers.
+
+
+  OBJECTIVE: Add a Content-Security-Policy header to /etc/nginx/conf.d/app.conf restricting script-src
+  to ''self''; Add X-Frame-Options DENY and X-Content-Type-Options nosniff headers; Reload nginx and verify
+  all three security headers are present using curl. Success means `check.sh` exits successfully.
+
+
+  WHAT TO AVOID: Do not apply broad destructive changes, skip evidence gathering, or fake completion with
+  marker files — the checker validates real system state.'
+objectives:
+- Add a Content-Security-Policy header to /etc/nginx/conf.d/app.conf restricting script-src to 'self'
+- Add X-Frame-Options DENY and X-Content-Type-Options nosniff headers
+- Reload nginx and verify all three security headers are present using curl
+initial_state: 'Ubuntu server running nginx as a reverse proxy for a Flask web app on port 5000.
+
+  The nginx config at /etc/nginx/conf.d/app.conf has no security headers configured.
+
   curl is available for testing. The app is reachable at http://localhost/.
+
+  '
 hints:
-  - order: 1
-    cost: 10
-    content: "Check current headers: `curl -I http://localhost/` — confirm no CSP, X-Frame-Options, or X-Content-Type-Options headers are present."
-  - order: 2
-    cost: 15
-    content: "Add to the server block in /etc/nginx/conf.d/app.conf: `add_header Content-Security-Policy \"default-src 'self'; script-src 'self'; object-src 'none';\" always;`"
-  - order: 3
-    cost: 20
-    content: "Also add: `add_header X-Frame-Options \"DENY\" always;` and `add_header X-Content-Type-Options \"nosniff\" always;` then run `nginx -t && systemctl reload nginx`."
-  - order: 4
-    cost: 25
-    content: "Verify all headers: `curl -I http://localhost/ | grep -E 'Content-Security-Policy|X-Frame-Options|X-Content-Type-Options'` — all three should appear in the response."
+- order: 1
+  cost: 0
+  content: 'Where to look: Add a Content-Security-Policy header to /etc/nginx/conf.d/app.conf restricting
+    script-src to ''self'''
+- order: 2
+  cost: 25
+  content: 'Diagnostic steps:
+
+    1. Add X-Frame-Options DENY and X-Content-Type-Options nosniff headers
+
+    2. Reload nginx and verify all three security headers are present using curl'
+- order: 3
+  cost: 50
+  content: 'Exact fix + verification:
+
+    1. Reload nginx and verify all three security headers are present using curl.
+
+    2. Re-run the lab checker (`check.sh` or Check Solution).
+
+    3. Confirm every scenario objective is satisfied.
+
+
+    WHY: the grader validates real state — marker files are ignored.'
+summary: Complete the xss and csp header - add content security policy to prevent security lab and verify
+  success with the checker
+estimated_minutes: 15
+xp_reward: 100
+prerequisites:
+- Basic security literacy
+tags:
+- fix
+- hands-on
+- security
+linked_tutorial: security-fundamentals
+what_you_will_learn:
+- Add a Content-Security-Policy header to /etc/nginx/conf.d/app.conf restricting script-src to 'self'
+- Add X-Frame-Options DENY and X-Content-Type-Options nosniff headers
+- Reload nginx and verify all three security headers are present using curl
+environment:
+  nodes:
+  - role: primary
+    os: FixitLab hardening lab
+    hostname: lab-primary
+    ip: 127.0.0.1
+    specs: local offline simulation
+  pre_installed:
+  - bash
+  - coreutils
+  - journalctl
+  - security
+  - systemctl
+  credentials:
+  - user: root
+    password: lab123
+tasks:
+- id: task_1
+  title: XSS and CSP Header - Add Content Security Policy to Prevent
+  description: Restore healthy behavior for XSS and CSP Header - Add Content Security Policy to Prevent
+    by investigating the failure, applying the smallest safe fix, and validating the outcome.
+  background: 'This security lab teaches systematic troubleshooting: observe, hypothesize, change, verify.'
+  validation:
+    type: custom_script
+    script: check.sh
+    error_message: Validation did not pass. Re-read the objectives and Hint 2 diagnostic steps.
+solution:
+  summary: Identify the misconfiguration affecting this security lab and apply the minimal fix.
+  files_changed: []
+  commands_run:
+  - bash check.sh
+  reference_docs: security-fundamentals

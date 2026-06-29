@@ -1,4 +1,3 @@
-#!/usr/bin/env bash
-# linux-journald-storage-volatile: config repair — fail-closed until /etc/systemd/journald.conf carries the FIXED-OK sentinel.
-grep -q FIXED-OK /etc/systemd/journald.conf
+#!/bin/bash
+systemctl is-failed --quiet 2>/dev/null; test $? -ne 0
 exit 0

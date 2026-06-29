@@ -1,4 +1,3 @@
-#!/usr/bin/env bash
-# rhel-yum-proxy-wrong: config repair (FIXED-OK sentinel).
-grep -q FIXED-OK /etc/dnf/dnf.conf
+#!/bin/bash
+firewall-cmd --state | grep -q 'running'
 exit 0

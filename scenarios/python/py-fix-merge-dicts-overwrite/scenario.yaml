@@ -1,9 +1,26 @@
 title: Fix merge_dicts Precedence
 slug: py-fix-merge-dicts-overwrite
-category: Python Development
-description: 'merge_dicts(a, b) should return a new dict where keys from b OVERRIDE keys from a, but the
-  merge order is reversed so a wins instead. Also it mutates `a` in place. Fix both: b takes precedence
-  and inputs are not mutated.'
+category: Fix
+description: 'CONTEXT: A team operating Python development needs you to resolve `Fix merge_dicts Precedence`
+  during a realistic incident. The business impact is reduced service reliability until the underlying
+  state is repaired.
+
+
+  ENVIRONMENT: You are working in FixitLab''s offline Python project workspace with source files, venv,
+  tests, and CLI entrypoints. All tools run locally; no paid APIs or external cloud calls are required.
+
+
+  SYMPTOM / STARTING STATE: merge_dicts(a, b) should return a new dict where keys from b OVERRIDE keys
+  from a, but the merge order is reversed so a wins instead. Also it mutates `a` in place. Fix both: b
+  takes precedence and inputs are not mutated.
+
+
+  OBJECTIVE: Show b''s values do not win and that a is mutated; Build a new dict without touching the
+  inputs; Apply b after a so b overrides. Success means all hidden tests pass.
+
+
+  WHAT TO AVOID: Do not apply broad destructive changes, skip evidence gathering, or fake completion with
+  marker files — the checker validates real system state.'
 difficulty: easy
 scenario_type: fix
 lab_mode: simulation
@@ -21,58 +38,131 @@ objectives:
 initial_state: 'merge_dicts(a, b) should return a new dict where keys from b OVERRIDE keys from a, but
   the merge order is reversed so a wins instead. Also it mutates `a` in place. Fix both: b takes precedence
   and inputs are not mutated.'
-solution_explanation: |
-  Copying a into a new dict and updating with b means b overrides on conflicts and neither input is mutated.
+solution_explanation: 'Copying a into a new dict and updating with b means b overrides on conflicts and
+  neither input is mutated.
+
+  '
 coding_spec:
   language: python
   entrypoint: solution.py
   kind: fix
-  instructions: |
-    Fix merge_dicts(a, b): return a NEW dict with all keys from both, where b's value wins on conflicts. Do not mutate a or b.
-      merge_dicts({'x':1,'y':2}, {'y':9}) -> {'x':1, 'y':9}
-    Click Run to try it, then Check Solution to grade against all tests.
+  instructions: "Fix merge_dicts(a, b): return a NEW dict with all keys from both, where b's value wins\
+    \ on conflicts. Do not mutate a or b.\n  merge_dicts({'x':1,'y':2}, {'y':9}) -> {'x':1, 'y':9}\nClick\
+    \ Run to try it, then Check Solution to grade against all tests.\n"
   files:
   - path: solution.py
-    content: |
-      def merge_dicts(a, b):
-          a.update(b)        # mutates a
-          a.update(a)        # bug: re-applies a over b; and still mutates
-          return a
+    content: "def merge_dicts(a, b):\n    a.update(b)        # mutates a\n    a.update(a)        # bug:\
+      \ re-applies a over b; and still mutates\n    return a\n"
     readonly: false
   visible_tests:
   - name: b overrides
-    code: |
-      assert merge_dicts({'x':1,'y':2}, {'y':9}) == {'x':1,'y':9}
+    code: 'assert merge_dicts({''x'':1,''y'':2}, {''y'':9}) == {''x'':1,''y'':9}
+
+      '
   - name: disjoint keys
-    code: |
-      assert merge_dicts({'a':1}, {'b':2}) == {'a':1,'b':2}
+    code: 'assert merge_dicts({''a'':1}, {''b'':2}) == {''a'':1,''b'':2}
+
+      '
   hidden_tests:
   - name: does not mutate a
-    code: |
-      a = {'k': 1}
-      merge_dicts(a, {'k': 2})
-      assert a == {'k': 1}, a
+    code: 'a = {''k'': 1}
+
+      merge_dicts(a, {''k'': 2})
+
+      assert a == {''k'': 1}, a
+
+      '
   - name: does not mutate b
-    code: |
-      b = {'k': 2}
-      merge_dicts({'k': 1}, b)
-      assert b == {'k': 2}
+    code: 'b = {''k'': 2}
+
+      merge_dicts({''k'': 1}, b)
+
+      assert b == {''k'': 2}
+
+      '
   - name: b wins on multiple conflicts
-    code: |
-      assert merge_dicts({'a':1,'b':1}, {'a':2,'b':2}) == {'a':2,'b':2}
+    code: 'assert merge_dicts({''a'':1,''b'':1}, {''a'':2,''b'':2}) == {''a'':2,''b'':2}
+
+      '
   - name: empty b returns copy of a
-    code: |
-      a = {'a': 1}
+    code: 'a = {''a'': 1}
+
       r = merge_dicts(a, {})
-      assert r == {'a':1} and r is not a
+
+      assert r == {''a'':1} and r is not a
+
+      '
   timeout: 8
 hints:
 - order: 1
-  cost: 10
-  content: merge_dicts({'y':2}, {'y':9}) returns y=2 — a wins, and the original a is changed.
+  cost: 0
+  content: 'Where to look: Open `solution.py`, read the instructions, and run the visible tests to see
+    which assertion fails first.'
 - order: 2
-  cost: 20
-  content: Make a copy of a first, then update it with b so b takes precedence.
+  cost: 25
+  content: 'Diagnostic steps:
+
+    1. Click Run and read the traceback — note line number and actual vs expected values.
+
+    2. Reproduce the failure with the smallest input from a visible test.
+
+    3. Compare your implementation to the bug described in the lab prompt.'
 - order: 3
-  cost: 30
-  content: Return `out = dict(a); out.update(b); return out`.
+  cost: 50
+  content: 'Exact fix + verification:
+
+    1. Apply b after a so b overrides.
+
+    2. Re-run the lab checker (`check.sh` or Check Solution).
+
+    3. Confirm every scenario objective is satisfied.
+
+
+    WHY: the grader validates real state — marker files are ignored.'
+technology: python
+summary: Complete the fix merge_dicts precedence python lab and verify success with the checker
+estimated_minutes: 25
+xp_reward: 100
+prerequisites:
+- Basic python literacy
+tags:
+- fix
+- hands-on
+- python
+linked_tutorial: python-fundamentals
+what_you_will_learn:
+- Show b's values do not win and that a is mutated
+- Build a new dict without touching the inputs
+- Apply b after a so b overrides
+environment:
+  nodes:
+  - role: primary
+    os: FixitLab Python project workspace
+    hostname: lab-primary
+    ip: 127.0.0.1
+    specs: local offline simulation
+  pre_installed:
+  - bash
+  - coreutils
+  - pip
+  - python
+  - python3
+  credentials:
+  - user: root
+    password: lab123
+tasks:
+- id: task_1
+  title: Fix merge_dicts Precedence
+  description: Restore healthy behavior for Fix merge_dicts Precedence by investigating the failure, applying
+    the smallest safe fix, and validating the outcome.
+  background: 'This python lab teaches systematic troubleshooting: observe, hypothesize, change, verify.'
+  validation:
+    type: custom_script
+    script: hidden_tests
+    error_message: One or more hidden tests failed. Read the public test output, fix your solution, and
+      submit again.
+solution:
+  summary: The solution passes all hidden tests by implementing the required behavior in code.
+  files_changed: []
+  commands_run: []
+  reference_docs: python-fundamentals

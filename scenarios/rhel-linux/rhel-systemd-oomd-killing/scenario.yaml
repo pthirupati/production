@@ -1,7 +1,7 @@
 title: RHEL systemd-oomd Killing Wrong Service
 slug: rhel-systemd-oomd-killing
-technology: RHEL Linux
-category: Reliability
+technology: rhel-linux
+category: Fix
 difficulty: hard
 lab_mode: simulation
 simulation_type: generic
@@ -10,7 +10,25 @@ max_score: 100
 is_free: true
 jira_priority: High
 dual_terminal: false
-description: An important service is killed under pressure because oomd policy is misconfigured.
+description: 'CONTEXT: A team operating Red Hat Enterprise Linux needs you to resolve `RHEL systemd-oomd
+  Killing Wrong Service` during a realistic incident. The business impact is reduced service reliability
+  until the underlying state is repaired.
+
+
+  ENVIRONMENT: You are working in FixitLab''s offline RHEL practice host with dnf, subscription-manager,
+  firewalld, and SELinux. All tools run locally; no paid APIs or external cloud calls are required.
+
+
+  SYMPTOM / STARTING STATE: A RHEL host where systemd-oomd targets the wrong workload. An important service
+  is killed under pressure because oomd policy is misconfigured.
+
+
+  OBJECTIVE: Confirm the issue: Critical service OOM-killed; Apply the documented fix in /etc/systemd/oomd.conf;
+  Verify the configuration is corrected. Success means `check.sh` exits successfully.
+
+
+  WHAT TO AVOID: Do not apply broad destructive changes, skip evidence gathering, or fake completion with
+  marker files — the checker validates real system state.'
 initial_state: A RHEL host where systemd-oomd targets the wrong workload.
 objectives:
 - 'Confirm the issue: Critical service OOM-killed'
@@ -18,11 +36,74 @@ objectives:
 - Verify the configuration is corrected
 hints:
 - order: 1
-  cost: 10
-  content: Critical service OOM-killed
+  cost: 0
+  content: 'Where to look: Run `firewall-cmd --state` and `firewall-cmd --list-all` for active zones.'
 - order: 2
-  cost: 15
-  content: Tune oomd policy/limits.
+  cost: 25
+  content: 'Diagnostic steps:
+
+    1. Identify which zone is active and which ports/services are allowed.
+
+    2. Compare to the port the scenario expects (often 80/tcp or 443/tcp).
+
+    3. Check if the service is bound but blocked externally.'
 - order: 3
-  cost: 20
-  content: /etc/systemd/oomd.conf carries the corrected configuration.
+  cost: 50
+  content: 'Exact fix + verification:
+
+    1. `firewall-cmd --permanent --add-service=http` (or the needed port).
+
+    2. `firewall-cmd --reload`.
+
+    3. Confirm `firewall-cmd --list-ports` includes the required port.
+
+
+    WHY: a running service behind a closed firewall still fails health checks.'
+summary: Complete the rhel systemd-oomd killing wrong service rhel linux lab and verify success with the
+  checker
+estimated_minutes: 20
+xp_reward: 100
+prerequisites:
+- Basic rhel linux literacy
+tags:
+- fix
+- hands-on
+- rhel-linux
+linked_tutorial: rhel-linux-fundamentals
+what_you_will_learn:
+- 'Confirm the issue: Critical service OOM-killed'
+- Apply the documented fix in /etc/systemd/oomd.conf
+- Verify the configuration is corrected
+environment:
+  nodes:
+  - role: primary
+    os: FixitLab RHEL practice host
+    hostname: lab-primary
+    ip: 127.0.0.1
+    specs: local offline simulation
+  pre_installed:
+  - bash
+  - coreutils
+  - journalctl
+  - rhel linux
+  - systemctl
+  credentials:
+  - user: root
+    password: lab123
+tasks:
+- id: task_1
+  title: RHEL systemd-oomd Killing Wrong Service
+  description: Restore healthy behavior for RHEL systemd-oomd Killing Wrong Service by investigating the
+    failure, applying the smallest safe fix, and validating the outcome.
+  background: 'This rhel linux lab teaches systematic troubleshooting: observe, hypothesize, change, verify.'
+  validation:
+    type: command_output
+    command: firewall-cmd --list-ports
+    expected_output: 80/tcp
+    error_message: HTTP is still blocked by firewalld. Allow the service and reload.
+solution:
+  summary: Identify the misconfiguration affecting this rhel linux lab and apply the minimal fix.
+  files_changed: []
+  commands_run:
+  - firewall-cmd --list-ports
+  reference_docs: rhel-linux-fundamentals

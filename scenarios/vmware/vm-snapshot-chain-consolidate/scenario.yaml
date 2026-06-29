@@ -1,8 +1,26 @@
 title: Long Snapshot Chain Eating Datastore
 slug: vm-snapshot-chain-consolidate
-category: VMware vSphere
-description: web-prod-01 has a long snapshot chain consuming datastore space and degrading I/O. Consolidate/delete
-  snapshots and confirm the chain is short.
+category: Fix
+description: 'CONTEXT: A team operating VMware vSphere needs you to resolve `Long Snapshot Chain Eating
+  Datastore` during a realistic incident. The business impact is reduced service reliability until the
+  underlying state is repaired.
+
+
+  ENVIRONMENT: You are working in FixitLab''s offline vSphere lab with VMs, datastores, vCenter, and ESXi
+  tasks. All tools run locally; no paid APIs or external cloud calls are required.
+
+
+  SYMPTOM / STARTING STATE: vCenter shows web-prod-01 with a long snapshot chain. web-prod-01 has a long
+  snapshot chain consuming datastore space and degrading I/O. Consolidate/delete snapshots and confirm
+  the chain is short.
+
+
+  OBJECTIVE: Confirm web-prod-01 has too many snapshots; Consolidate or delete the snapshot chain; Verify
+  the snapshot chain is reduced. Success means `check.sh` exits successfully.
+
+
+  WHAT TO AVOID: Do not apply broad destructive changes, skip evidence gathering, or fake completion with
+  marker files — the checker validates real system state.'
 difficulty: medium
 lab_mode: simulation
 simulation_type: vmware
@@ -18,11 +36,71 @@ objectives:
 initial_state: vCenter shows web-prod-01 with a long snapshot chain.
 hints:
 - order: 1
-  cost: 10
-  content: 'In the vCenter simulator, locate the issue: confirm web-prod-01 has too many snapshots.'
+  cost: 0
+  content: 'Where to look: Confirm web-prod-01 has too many snapshots'
 - order: 2
-  cost: 15
-  content: 'Apply the remediation in the GUI: consolidate or delete the snapshot chain.'
+  cost: 25
+  content: 'Diagnostic steps:
+
+    1. Consolidate or delete the snapshot chain
+
+    2. Verify the snapshot chain is reduced'
 - order: 3
-  cost: 20
-  content: 'Confirm resolution: verify the snapshot chain is reduced.'
+  cost: 50
+  content: 'Exact fix + verification:
+
+    1. Verify the snapshot chain is reduced.
+
+    2. Re-run the lab checker (`check.sh` or Check Solution).
+
+    3. Confirm every scenario objective is satisfied.
+
+
+    WHY: the grader validates real state — marker files are ignored.'
+technology: vmware
+summary: Complete the long snapshot chain eating datastore vmware lab and verify success with the checker
+estimated_minutes: 15
+xp_reward: 100
+prerequisites:
+- Basic vmware literacy
+tags:
+- fix
+- hands-on
+- vmware
+linked_tutorial: vmware-fundamentals
+what_you_will_learn:
+- Confirm web-prod-01 has too many snapshots
+- Consolidate or delete the snapshot chain
+- Verify the snapshot chain is reduced
+environment:
+  nodes:
+  - role: primary
+    os: FixitLab vSphere lab
+    hostname: lab-primary
+    ip: 127.0.0.1
+    specs: local offline simulation
+  pre_installed:
+  - bash
+  - coreutils
+  - journalctl
+  - systemctl
+  - vmware
+  credentials:
+  - user: root
+    password: lab123
+tasks:
+- id: task_1
+  title: Long Snapshot Chain Eating Datastore
+  description: Restore healthy behavior for Long Snapshot Chain Eating Datastore by investigating the
+    failure, applying the smallest safe fix, and validating the outcome.
+  background: 'This vmware lab teaches systematic troubleshooting: observe, hypothesize, change, verify.'
+  validation:
+    type: custom_script
+    script: check.sh
+    error_message: Validation did not pass. Re-read the objectives and Hint 2 diagnostic steps.
+solution:
+  summary: Identify the misconfiguration affecting this vmware lab and apply the minimal fix.
+  files_changed: []
+  commands_run:
+  - bash check.sh
+  reference_docs: vmware-fundamentals

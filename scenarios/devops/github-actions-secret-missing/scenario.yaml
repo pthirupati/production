@@ -1,14 +1,28 @@
 title: Add Missing GitHub Actions Secret
 slug: github-actions-secret-missing
-technology: DevOps
-category: CI/CD
+technology: devops
+category: Fix
 difficulty: easy
 time_limit: 600
 max_score: 100
 infrastructure_type: docker
 jira_priority: Medium
 is_free: false
-description: 'A GitHub Actions workflow is failing because it references a secret DEPLOY_KEY
+description: 'CONTEXT: A team operating DevOps delivery needs you to resolve `Add Missing GitHub Actions
+  Secret` during a realistic incident. The business impact is reduced service reliability until the underlying
+  state is repaired.
+
+
+  ENVIRONMENT: You are working in FixitLab''s offline CI/CD lab with git repos, pipelines, artifacts,
+  and runbooks. All tools run locally; no paid APIs or external cloud calls are required.
+
+
+  SYMPTOM / STARTING STATE: A GitHub repository with a workflow at .github/workflows/deploy.yml that references
+
+  ${{ secrets.DEPLOY_KEY }} but the secret has not been configured. The deploy key
+
+  value is stored at /opt/deploy/deploy_key.pem on this server. A GitHub Actions workflow is failing because
+  it references a secret DEPLOY_KEY
 
   that has not been added to the repository. The deploy step exits with an error
 
@@ -16,7 +30,14 @@ description: 'A GitHub Actions workflow is failing because it references a secre
 
   workflow can complete successfully.
 
-  '
+
+  OBJECTIVE: Identify the missing secret referenced in the workflow file; Add the DEPLOY_KEY secret to
+  the repository secrets; Verify the workflow can access the secret without errors. Success means `check.sh`
+  exits successfully.
+
+
+  WHAT TO AVOID: Do not apply broad destructive changes, skip evidence gathering, or fake completion with
+  marker files — the checker validates real system state.'
 objectives:
 - Identify the missing secret referenced in the workflow file
 - Add the DEPLOY_KEY secret to the repository secrets
@@ -30,18 +51,70 @@ initial_state: 'A GitHub repository with a workflow at .github/workflows/deploy.
   '
 hints:
 - order: 1
-  cost: 10
-  content: 'Read the workflow to find the referenced secret: `cat .github/workflows/deploy.yml` — the
-    deploy step uses `${{ secrets.DEPLOY_KEY }}`.'
+  cost: 0
+  content: 'Where to look: Identify the missing secret referenced in the workflow file'
 - order: 2
-  cost: 15
-  content: That secret hasn't been added to the repo, so it resolves empty and the step fails — it must
-    be created in repository (or environment) secrets.
-- order: 3
-  cost: 20
-  content: 'Add it with the gh CLI: `gh secret set DEPLOY_KEY < /opt/deploy/deploy_key.pem` (or via Settings
-    > Secrets and variables > Actions).'
-- order: 4
   cost: 25
-  content: Verify it exists (`gh secret list` shows DEPLOY_KEY) and re-run the workflow — the deploy step
-    now has the key and succeeds.
+  content: 'Diagnostic steps:
+
+    1. Add the DEPLOY_KEY secret to the repository secrets
+
+    2. Verify the workflow can access the secret without errors'
+- order: 3
+  cost: 50
+  content: 'Exact fix + verification:
+
+    1. Verify the workflow can access the secret without errors.
+
+    2. Re-run the lab checker (`check.sh` or Check Solution).
+
+    3. Confirm every scenario objective is satisfied.
+
+
+    WHY: the grader validates real state — marker files are ignored.'
+summary: Complete the add missing github actions secret devops lab and verify success with the checker
+estimated_minutes: 10
+xp_reward: 100
+prerequisites:
+- Basic devops literacy
+tags:
+- devops
+- fix
+- hands-on
+linked_tutorial: devops-fundamentals
+what_you_will_learn:
+- Identify the missing secret referenced in the workflow file
+- Add the DEPLOY_KEY secret to the repository secrets
+- Verify the workflow can access the secret without errors
+environment:
+  nodes:
+  - role: primary
+    os: FixitLab CI/CD lab
+    hostname: lab-primary
+    ip: 127.0.0.1
+    specs: local offline simulation
+  pre_installed:
+  - bash
+  - coreutils
+  - devops
+  - journalctl
+  - systemctl
+  credentials:
+  - user: root
+    password: lab123
+tasks:
+- id: task_1
+  title: Add Missing GitHub Actions Secret
+  description: Restore healthy behavior for Add Missing GitHub Actions Secret by investigating the failure,
+    applying the smallest safe fix, and validating the outcome.
+  background: 'This devops lab teaches systematic troubleshooting: observe, hypothesize, change, verify.'
+  validation:
+    type: custom_script
+    script: check.sh
+    error_message: Validation did not pass. Re-read the objectives and Hint 2 diagnostic steps.
+solution:
+  summary: Identify the misconfiguration affecting this devops lab and apply the minimal fix.
+  files_changed: []
+  commands_run:
+  - bash check.sh
+  reference_docs: devops-fundamentals

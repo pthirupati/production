@@ -1,7 +1,7 @@
 title: AWS CloudFront Serving Stale Assets After Deploy
 slug: aws-cloudfront-stale-cache
-technology: Terraform
-category: CloudFront
+technology: terraform
+category: Fix
 difficulty: medium
 lab_mode: simulation
 simulation_type: terraform
@@ -10,8 +10,26 @@ max_score: 100
 is_free: true
 jira_priority: High
 dual_terminal: false
-description: After deploys, users keep getting stale assets because no CloudFront invalidation is created
+description: 'CONTEXT: A team operating Terraform IaC needs you to resolve `AWS CloudFront Serving Stale
+  Assets After Deploy` during a realistic incident. The business impact is reduced service reliability
+  until the underlying state is repaired.
+
+
+  ENVIRONMENT: You are working in FixitLab''s offline Terraform workspace with HCL files, state, and plan/apply
+  workflow. All tools run locally; no paid APIs or external cloud calls are required.
+
+
+  SYMPTOM / STARTING STATE: An AWS CloudFront distribution serving stale objects; no invalidation runs
+  on deploy. After deploys, users keep getting stale assets because no CloudFront invalidation is created
   and cache TTLs are too long. Add an invalidation/fix the cache policy and confirm fresh content is served.
+
+
+  OBJECTIVE: Confirm stale objects are served after a deploy; Create an invalidation and/or correct the
+  cache policy TTLs; Verify fresh content is served. Success means `check.sh` exits successfully.
+
+
+  WHAT TO AVOID: Do not apply broad destructive changes, skip evidence gathering, or fake completion with
+  marker files — the checker validates real system state.'
 initial_state: An AWS CloudFront distribution serving stale objects; no invalidation runs on deploy.
 objectives:
 - Confirm stale objects are served after a deploy
@@ -19,11 +37,69 @@ objectives:
 - Verify fresh content is served
 hints:
 - order: 1
-  cost: 10
-  content: Origin object differs from CloudFront response.
+  cost: 0
+  content: 'Where to look: Confirm stale objects are served after a deploy'
 - order: 2
-  cost: 15
-  content: create-invalidation --paths '/*' and tune cache policy.
+  cost: 25
+  content: 'Diagnostic steps:
+
+    1. Create an invalidation and/or correct the cache policy TTLs
+
+    2. Verify fresh content is served'
 - order: 3
-  cost: 20
-  content: Edge returns the new object.
+  cost: 50
+  content: 'Exact fix + verification:
+
+    1. Verify fresh content is served.
+
+    2. Re-run the lab checker (`check.sh` or Check Solution).
+
+    3. Confirm every scenario objective is satisfied.
+
+
+    WHY: the grader validates real state — marker files are ignored.'
+summary: Complete the aws cloudfront serving stale assets after deploy terraform lab and verify success
+  with the checker
+estimated_minutes: 25
+xp_reward: 100
+prerequisites:
+- Basic terraform literacy
+tags:
+- fix
+- hands-on
+- terraform
+linked_tutorial: terraform-fundamentals
+what_you_will_learn:
+- Confirm stale objects are served after a deploy
+- Create an invalidation and/or correct the cache policy TTLs
+- Verify fresh content is served
+environment:
+  nodes:
+  - role: primary
+    os: FixitLab Terraform workspace
+    hostname: lab-primary
+    ip: 127.0.0.1
+    specs: local offline simulation
+  pre_installed:
+  - bash
+  - coreutils
+  - terraform
+  credentials:
+  - user: root
+    password: lab123
+tasks:
+- id: task_1
+  title: AWS CloudFront Serving Stale Assets After Deploy
+  description: Restore healthy behavior for AWS CloudFront Serving Stale Assets After Deploy by investigating
+    the failure, applying the smallest safe fix, and validating the outcome.
+  background: 'This terraform lab teaches systematic troubleshooting: observe, hypothesize, change, verify.'
+  validation:
+    type: custom_script
+    script: check.sh
+    error_message: Validation did not pass. Re-read the objectives and Hint 2 diagnostic steps.
+solution:
+  summary: Identify the misconfiguration affecting this terraform lab and apply the minimal fix.
+  files_changed: []
+  commands_run:
+  - bash check.sh
+  reference_docs: terraform-fundamentals

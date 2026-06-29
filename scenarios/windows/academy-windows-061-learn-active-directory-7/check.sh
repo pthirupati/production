@@ -1,3 +1,3 @@
-#!/usr/bin/env bash
-# Validated by the dedicated simulation engine (real state checks).
+#!/bin/bash
+systemctl is-failed --quiet 2>/dev/null; test $? -ne 0
 exit 0

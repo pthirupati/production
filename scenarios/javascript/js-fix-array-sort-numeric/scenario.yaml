@@ -1,9 +1,26 @@
 title: Fix the Numeric Sort (Lexicographic Bug)
 slug: js-fix-array-sort-numeric
-category: JavaScript Development
-description: sortNumbers(nums) should return the array sorted in ascending NUMERIC order, but it calls
-  .sort() with no comparator, so JS sorts by string, putting 10 before 2. Provide a numeric comparator.
-  Also, return a new array (don't mutate the input).
+category: Fix
+description: 'CONTEXT: A team operating JavaScript needs you to resolve `Fix the Numeric Sort (Lexicographic
+  Bug)` during a realistic incident. The business impact is reduced service reliability until the underlying
+  state is repaired.
+
+
+  ENVIRONMENT: You are working in FixitLab''s offline JavaScript practice project with modules, browser
+  console, and Node tooling. All tools run locally; no paid APIs or external cloud calls are required.
+
+
+  SYMPTOM / STARTING STATE: sortNumbers(nums) should return the array sorted in ascending NUMERIC order,
+  but it calls .sort() with no comparator, so JS sorts by string, putting 10 before 2. Provide a numeric
+  comparator. Also, return a new array (don''t mutate the input).
+
+
+  OBJECTIVE: See the lexicographic ordering bug (10 before 2); Provide an (a, b) => a - b comparator;
+  Return a sorted copy without mutating input. Success means all hidden tests pass.
+
+
+  WHAT TO AVOID: Do not apply broad destructive changes, skip evidence gathering, or fake completion with
+  marker files — the checker validates real system state.'
 difficulty: easy
 scenario_type: fix
 lab_mode: simulation
@@ -21,53 +38,128 @@ objectives:
 initial_state: sortNumbers(nums) should return the array sorted in ascending NUMERIC order, but it calls
   .sort() with no comparator, so JS sorts by string, putting 10 before 2. Provide a numeric comparator.
   Also, return a new array (don't mutate the input).
-solution_explanation: |
-  Default sort compares string representations. A numeric comparator orders by value, and spreading into a new array avoids mutating the input.
+solution_explanation: 'Default sort compares string representations. A numeric comparator orders by value,
+  and spreading into a new array avoids mutating the input.
+
+  '
 coding_spec:
   language: javascript
   entrypoint: solution.js
   kind: fix
-  instructions: |
-    Fix sortNumbers(nums) to sort ascending numerically and return a NEW array (do not mutate the input).
-      sortNumbers([10, 2, 1]) -> [1, 2, 10]
-    Click Run to try it, then Check Solution to grade against all tests.
+  instructions: "Fix sortNumbers(nums) to sort ascending numerically and return a NEW array (do not mutate\
+    \ the input).\n  sortNumbers([10, 2, 1]) -> [1, 2, 10]\nClick Run to try it, then Check Solution to\
+    \ grade against all tests.\n"
   files:
   - path: solution.js
-    content: |
-      function sortNumbers(nums) {
-        return nums.sort(); // lexicographic AND mutates input
-      }
+    content: "function sortNumbers(nums) {\n  return nums.sort(); // lexicographic AND mutates input\n\
+      }\n"
     readonly: false
   visible_tests:
   - name: numeric order
-    code: |
-      assert(JSON.stringify(sortNumbers([10, 2, 1])) === JSON.stringify([1, 2, 10]), JSON.stringify(sortNumbers([10, 2, 1])));
+    code: 'assert(JSON.stringify(sortNumbers([10, 2, 1])) === JSON.stringify([1, 2, 10]), JSON.stringify(sortNumbers([10,
+      2, 1])));
+
+      '
   - name: already sorted
-    code: |
-      assert(JSON.stringify(sortNumbers([1, 2, 3])) === JSON.stringify([1, 2, 3]), JSON.stringify(sortNumbers([1, 2, 3])));
+    code: 'assert(JSON.stringify(sortNumbers([1, 2, 3])) === JSON.stringify([1, 2, 3]), JSON.stringify(sortNumbers([1,
+      2, 3])));
+
+      '
   hidden_tests:
   - name: multi-digit
-    code: |
-      assert(JSON.stringify(sortNumbers([100, 25, 9, 1000])) === JSON.stringify([9, 25, 100, 1000]), JSON.stringify(sortNumbers([100, 25, 9, 1000])));
+    code: 'assert(JSON.stringify(sortNumbers([100, 25, 9, 1000])) === JSON.stringify([9, 25, 100, 1000]),
+      JSON.stringify(sortNumbers([100, 25, 9, 1000])));
+
+      '
   - name: negatives
-    code: |
-      assert(JSON.stringify(sortNumbers([3, -1, -10, 2])) === JSON.stringify([-10, -1, 2, 3]), JSON.stringify(sortNumbers([3, -1, -10, 2])));
+    code: 'assert(JSON.stringify(sortNumbers([3, -1, -10, 2])) === JSON.stringify([-10, -1, 2, 3]), JSON.stringify(sortNumbers([3,
+      -1, -10, 2])));
+
+      '
   - name: does not mutate input
-    code: |
-      const src = [3, 1, 2];
+    code: 'const src = [3, 1, 2];
+
       sortNumbers(src);
-      assert(JSON.stringify(src) === JSON.stringify([3, 1, 2]), 'input mutated');
+
+      assert(JSON.stringify(src) === JSON.stringify([3, 1, 2]), ''input mutated'');
+
+      '
   - name: empty
-    code: |
-      assert(JSON.stringify(sortNumbers([])) === JSON.stringify([]), JSON.stringify(sortNumbers([])));
+    code: 'assert(JSON.stringify(sortNumbers([])) === JSON.stringify([]), JSON.stringify(sortNumbers([])));
+
+      '
   timeout: 8
 hints:
 - order: 1
-  cost: 10
-  content: sortNumbers([10, 2, 1]) gives [1, 10, 2] — string comparison, not numeric.
+  cost: 0
+  content: 'Where to look: Open `solution.js`, read the instructions, and run the visible tests to see
+    which assertion fails first.'
 - order: 2
-  cost: 20
-  content: Pass a comparator (a, b) => a - b to sort.
+  cost: 25
+  content: 'Diagnostic steps:
+
+    1. Click Run and read the traceback — note line number and actual vs expected values.
+
+    2. Reproduce the failure with the smallest input from a visible test.
+
+    3. Compare your implementation to the bug described in the lab prompt.'
 - order: 3
-  cost: 30
-  content: Also copy first with [...nums] so the caller's array isn't sorted in place.
+  cost: 50
+  content: 'Exact fix + verification:
+
+    1. Return a sorted copy without mutating input.
+
+    2. Re-run the lab checker (`check.sh` or Check Solution).
+
+    3. Confirm every scenario objective is satisfied.
+
+
+    WHY: the grader validates real state — marker files are ignored.'
+technology: javascript
+summary: Complete the fix the numeric sort (lexicographic bug) javascript lab and verify success with
+  the checker
+estimated_minutes: 25
+xp_reward: 100
+prerequisites:
+- Basic javascript literacy
+tags:
+- fix
+- hands-on
+- javascript
+linked_tutorial: javascript-fundamentals
+what_you_will_learn:
+- See the lexicographic ordering bug (10 before 2)
+- Provide an (a, b) => a - b comparator
+- Return a sorted copy without mutating input
+environment:
+  nodes:
+  - role: primary
+    os: FixitLab JavaScript practice project
+    hostname: lab-primary
+    ip: 127.0.0.1
+    specs: local offline simulation
+  pre_installed:
+  - bash
+  - coreutils
+  - javascript
+  - journalctl
+  - systemctl
+  credentials:
+  - user: root
+    password: lab123
+tasks:
+- id: task_1
+  title: Fix the Numeric Sort (Lexicographic Bug)
+  description: Restore healthy behavior for Fix the Numeric Sort (Lexicographic Bug) by investigating
+    the failure, applying the smallest safe fix, and validating the outcome.
+  background: 'This javascript lab teaches systematic troubleshooting: observe, hypothesize, change, verify.'
+  validation:
+    type: custom_script
+    script: hidden_tests
+    error_message: One or more hidden tests failed. Read the public test output, fix your solution, and
+      submit again.
+solution:
+  summary: The solution passes all hidden tests by implementing the required behavior in code.
+  files_changed: []
+  commands_run: []
+  reference_docs: javascript-fundamentals

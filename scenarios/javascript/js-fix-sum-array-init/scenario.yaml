@@ -1,9 +1,26 @@
 title: Fix sumArray Accumulator Start
 slug: js-fix-sum-array-init
-category: JavaScript Development
-description: sumArray(nums) should add up all the numbers, but reduce is called without an initial value,
-  so on an EMPTY array it throws 'Reduce of empty array with no initial value'. Provide the initial accumulator
-  so empty returns 0 and totals stay correct.
+category: Fix
+description: 'CONTEXT: A team operating JavaScript needs you to resolve `Fix sumArray Accumulator Start`
+  during a realistic incident. The business impact is reduced service reliability until the underlying
+  state is repaired.
+
+
+  ENVIRONMENT: You are working in FixitLab''s offline JavaScript practice project with modules, browser
+  console, and Node tooling. All tools run locally; no paid APIs or external cloud calls are required.
+
+
+  SYMPTOM / STARTING STATE: sumArray(nums) should add up all the numbers, but reduce is called without
+  an initial value, so on an EMPTY array it throws ''Reduce of empty array with no initial value''. Provide
+  the initial accumulator so empty returns 0 and totals stay correct.
+
+
+  OBJECTIVE: Reproduce the empty-array reduce error; Pass 0 as the reduce initial value; Return correct
+  sums including the empty case. Success means all hidden tests pass.
+
+
+  WHAT TO AVOID: Do not apply broad destructive changes, skip evidence gathering, or fake completion with
+  marker files — the checker validates real system state.'
 difficulty: easy
 scenario_type: fix
 lab_mode: simulation
@@ -21,50 +38,121 @@ objectives:
 initial_state: sumArray(nums) should add up all the numbers, but reduce is called without an initial value,
   so on an EMPTY array it throws 'Reduce of empty array with no initial value'. Provide the initial accumulator
   so empty returns 0 and totals stay correct.
-solution_explanation: |
-  Without an initial value, reduce on an empty array throws. Seeding the accumulator with 0 makes empty return 0 and keeps sums correct.
+solution_explanation: 'Without an initial value, reduce on an empty array throws. Seeding the accumulator
+  with 0 makes empty return 0 and keeps sums correct.
+
+  '
 coding_spec:
   language: javascript
   entrypoint: solution.js
   kind: fix
-  instructions: |
-    Fix sumArray(nums) to return the sum of the array, and 0 for an empty array.
+  instructions: 'Fix sumArray(nums) to return the sum of the array, and 0 for an empty array.
+
     Click Run to try it, then Check Solution to grade against all tests.
+
+    '
   files:
   - path: solution.js
-    content: |
-      function sumArray(nums) {
-        return nums.reduce((acc, n) => acc + n); // no initial value
-      }
+    content: "function sumArray(nums) {\n  return nums.reduce((acc, n) => acc + n); // no initial value\n\
+      }\n"
     readonly: false
   visible_tests:
   - name: basic sum
-    code: |
-      assert(sumArray([1, 2, 3]) === 6);
+    code: 'assert(sumArray([1, 2, 3]) === 6);
+
+      '
   - name: empty is zero
-    code: |
-      assert(sumArray([]) === 0, 'empty should be 0');
+    code: 'assert(sumArray([]) === 0, ''empty should be 0'');
+
+      '
   hidden_tests:
   - name: single element
-    code: |
-      assert(sumArray([7]) === 7);
+    code: 'assert(sumArray([7]) === 7);
+
+      '
   - name: negatives
-    code: |
-      assert(sumArray([-1, -2, 3]) === 0);
+    code: 'assert(sumArray([-1, -2, 3]) === 0);
+
+      '
   - name: empty does not throw
-    code: |
-      assert(sumArray([]) === 0);
+    code: 'assert(sumArray([]) === 0);
+
+      '
   - name: floats
-    code: |
-      assert(Math.abs(sumArray([0.1, 0.2]) - 0.3) < 1e-9);
+    code: 'assert(Math.abs(sumArray([0.1, 0.2]) - 0.3) < 1e-9);
+
+      '
   timeout: 8
 hints:
 - order: 1
-  cost: 10
-  content: sumArray([]) throws because reduce has no seed value to return.
+  cost: 0
+  content: 'Where to look: Open `solution.js`, read the instructions, and run the visible tests to see
+    which assertion fails first.'
 - order: 2
-  cost: 20
-  content: reduce(fn, initialValue) — supply the initial accumulator.
+  cost: 25
+  content: 'Diagnostic steps:
+
+    1. Click Run and read the traceback — note line number and actual vs expected values.
+
+    2. Reproduce the failure with the smallest input from a visible test.
+
+    3. Compare your implementation to the bug described in the lab prompt.'
 - order: 3
-  cost: 30
-  content: Pass 0 as the second argument to reduce.
+  cost: 50
+  content: 'Exact fix + verification:
+
+    1. Return correct sums including the empty case.
+
+    2. Re-run the lab checker (`check.sh` or Check Solution).
+
+    3. Confirm every scenario objective is satisfied.
+
+
+    WHY: the grader validates real state — marker files are ignored.'
+technology: javascript
+summary: Complete the fix sumarray accumulator start javascript lab and verify success with the checker
+estimated_minutes: 25
+xp_reward: 100
+prerequisites:
+- Basic javascript literacy
+tags:
+- fix
+- hands-on
+- javascript
+linked_tutorial: javascript-fundamentals
+what_you_will_learn:
+- Reproduce the empty-array reduce error
+- Pass 0 as the reduce initial value
+- Return correct sums including the empty case
+environment:
+  nodes:
+  - role: primary
+    os: FixitLab JavaScript practice project
+    hostname: lab-primary
+    ip: 127.0.0.1
+    specs: local offline simulation
+  pre_installed:
+  - bash
+  - coreutils
+  - javascript
+  - journalctl
+  - systemctl
+  credentials:
+  - user: root
+    password: lab123
+tasks:
+- id: task_1
+  title: Fix sumArray Accumulator Start
+  description: Restore healthy behavior for Fix sumArray Accumulator Start by investigating the failure,
+    applying the smallest safe fix, and validating the outcome.
+  background: 'This javascript lab teaches systematic troubleshooting: observe, hypothesize, change, verify.'
+  validation:
+    type: custom_script
+    script: hidden_tests
+    error_message: One or more hidden tests failed. Read the public test output, fix your solution, and
+      submit again.
+solution:
+  summary: The solution passes all hidden tests by implementing the required behavior in code.
+  files_changed: []
+  commands_run: []
+  reference_docs: javascript-fundamentals

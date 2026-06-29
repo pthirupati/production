@@ -1,37 +1,125 @@
-title: "Snort IDS Alert — Investigate and Tune Intrusion Detection Rules"
+title: Snort IDS Alert - Investigate and Tune Intrusion Detection
 slug: snort-ids-alert
-technology: Security
-category: Intrusion Detection
+technology: security
+category: Fix
 difficulty: medium
 time_limit: 900
 max_score: 100
 infrastructure_type: docker
 jira_priority: High
 is_free: false
-description: |
-  Snort is generating a flood of alerts for rule SID 1000001 which detects
-  potential SQL injection attempts. Review the pcap evidence and Snort alert log
-  to determine if these are true positive attacks or false positives from a
-  legitimate web application scanner. Write a new Snort rule to more precisely
-  detect the real attack pattern while suppressing the scanner noise.
-objectives:
-  - Review /var/log/snort/alert to identify the pattern of SID 1000001 alerts
-  - Analyze the source IPs and payloads to distinguish scanner traffic from real attacks
-  - Write a refined Snort rule to /etc/snort/rules/local.rules that targets only the malicious pattern
-initial_state: |
-  Ubuntu server running Snort 2.9 in IDS mode on interface eth0. Alert log is
+description: 'CONTEXT: A team operating security hardening needs you to resolve `Snort IDS Alert - Investigate
+  and Tune Intrusion Detection` during a realistic incident. The business impact is reduced service reliability
+  until the underlying state is repaired.
+
+
+  ENVIRONMENT: You are working in FixitLab''s offline hardening lab with SSH, firewall, TLS, audit logs,
+  and IAM settings. All tools run locally; no paid APIs or external cloud calls are required.
+
+
+  SYMPTOM / STARTING STATE: Ubuntu server running Snort 2.9 in IDS mode on interface eth0. Alert log is
+
   at /var/log/snort/alert. A pcap capture of the suspicious traffic is at
+
+  /opt/evidence/suspicious.pcap. snort is configured with /etc/snort/snort.conf. Snort is generating a
+  flood of alerts for rule SID 1000001 which detects
+
+  potential SQL injection attempts. Review the pcap evidence and Snort alert log
+
+  to determine if these are true positive attacks or false positives from a
+
+  legitimate web application scanner. Write a new Snort rule to more precisely
+
+  detect the real attack pattern while suppressing the scanner noise.
+
+
+  OBJECTIVE: Review /var/log/snort/alert to identify the pattern of SID 1000001 alerts; Analyze the source
+  IPs and payloads to distinguish scanner traffic from real attacks; Write a refined Snort rule to /etc/snort/rules/local.rules
+  that targets only the malicious pattern. Success means `check.sh` exits successfully.
+
+
+  WHAT TO AVOID: Do not apply broad destructive changes, skip evidence gathering, or fake completion with
+  marker files — the checker validates real system state.'
+objectives:
+- Review /var/log/snort/alert to identify the pattern of SID 1000001 alerts
+- Analyze the source IPs and payloads to distinguish scanner traffic from real attacks
+- Write a refined Snort rule to /etc/snort/rules/local.rules that targets only the malicious pattern
+initial_state: 'Ubuntu server running Snort 2.9 in IDS mode on interface eth0. Alert log is
+
+  at /var/log/snort/alert. A pcap capture of the suspicious traffic is at
+
   /opt/evidence/suspicious.pcap. snort is configured with /etc/snort/snort.conf.
+
+  '
 hints:
-  - order: 1
-    cost: 10
-    content: "Review alerts: `tail -100 /var/log/snort/alert` and look for source IPs. Use `sort -u` to identify unique sources and `uniq -c` to count frequency."
-  - order: 2
-    cost: 15
-    content: 'Inspect the pcap: `tcpdump -r /opt/evidence/suspicious.pcap -A | grep -i ''union\|select\|insert\|drop table''` to see the actual SQL injection payloads.'
-  - order: 3
-    cost: 20
-    content: "Write a more specific rule in /etc/snort/rules/local.rules: `alert tcp any any -> $HTTP_SERVERS 80 (msg:\"SQL Injection UNION SELECT\"; content:\"UNION SELECT\"; nocase; sid:1000002; rev:1;)`"
-  - order: 4
-    cost: 25
-    content: "Test the rule: `snort -T -c /etc/snort/snort.conf` to validate syntax, then reload: `systemctl reload snort` and verify it matches the pcap: `snort -r /opt/evidence/suspicious.pcap -c /etc/snort/snort.conf -A console`."
+- order: 1
+  cost: 0
+  content: 'Where to look: Load the capture in Wireshark and apply a display filter matching the symptom.'
+- order: 2
+  cost: 25
+  content: 'Diagnostic steps:
+
+    1. Note protocol, source/dest IP, and TCP flags on failing packets.
+
+    2. Follow TCP stream or export objects if HTTP/DNS is involved.
+
+    3. Compare timing (retransmissions, RST, TLS alerts) to the lab question.'
+- order: 3
+  cost: 50
+  content: 'Exact fix + verification:
+
+    1. Apply the filter or analysis steps the objectives describe.
+
+    2. Document the answer (host, port, flag, or root cause).
+
+    3. Submit via Check Solution in the Wireshark simulator.
+
+
+    WHY: packet labs grade your analysis, not arbitrary shell markers.'
+summary: Complete the snort ids alert - investigate and tune intrusion detection security lab and verify
+  success with the checker
+estimated_minutes: 15
+xp_reward: 100
+prerequisites:
+- Basic security literacy
+tags:
+- fix
+- hands-on
+- security
+linked_tutorial: security-fundamentals
+what_you_will_learn:
+- Review /var/log/snort/alert to identify the pattern of SID 1000001 alerts
+- Analyze the source IPs and payloads to distinguish scanner traffic from real attacks
+- Write a refined Snort rule to /etc/snort/rules/local.rules that targets only the malicious pattern
+environment:
+  nodes:
+  - role: primary
+    os: FixitLab hardening lab
+    hostname: lab-primary
+    ip: 127.0.0.1
+    specs: local offline simulation
+  pre_installed:
+  - bash
+  - coreutils
+  - journalctl
+  - security
+  - systemctl
+  credentials:
+  - user: root
+    password: lab123
+tasks:
+- id: task_1
+  title: Snort IDS Alert - Investigate and Tune Intrusion Detection
+  description: Restore healthy behavior for Snort IDS Alert - Investigate and Tune Intrusion Detection
+    by investigating the failure, applying the smallest safe fix, and validating the outcome.
+  background: 'This security lab teaches systematic troubleshooting: observe, hypothesize, change, verify.'
+  validation:
+    type: custom_script
+    script: check.sh
+    error_message: Validation did not pass. Re-read the objectives and Hint 2 diagnostic steps.
+solution:
+  summary: Identify the misconfiguration affecting this security lab and apply the minimal fix.
+  files_changed: []
+  commands_run:
+  - bash check.sh
+  reference_docs: security-fundamentals

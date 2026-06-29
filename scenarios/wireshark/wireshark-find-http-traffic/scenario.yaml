@@ -1,9 +1,28 @@
 title: Capture and find the HTTP traffic
 slug: wireshark-find-http-traffic
-category: Wireshark Packet Analysis
-description: A mixed capture (DNS, HTTP, TLS, SSH) is open in the in-app Wireshark simulator. Apply a display
-  filter that isolates only the HTTP packets so you can confirm the web request to example.com was made,
-  then run Check Solution.
+category: Fix
+description: 'CONTEXT: A team operating packet analysis needs you to resolve `Capture and find the HTTP
+  traffic` during a realistic incident. The business impact is reduced service reliability until the underlying
+  state is repaired.
+
+
+  ENVIRONMENT: You are working in FixitLab''s offline capture lab with pcap files, display filters, and
+  protocol decode. All tools run locally; no paid APIs or external cloud calls are required.
+
+
+  SYMPTOM / STARTING STATE: The capture contains DNS, HTTP, TLS and SSH packets with no display filter
+  applied, so all protocols are interleaved in the packet list. A mixed capture (DNS, HTTP, TLS, SSH)
+  is open in the in-app Wireshark simulator. Apply a display filter that isolates only the HTTP packets
+  so you can confirm the web request to example.com was made, then run Check Solution.
+
+
+  OBJECTIVE: Open the Wireshark simulator from the lab toolbar (toolbar -> Open Wireshark); Inspect the
+  packet list — note the mix of DNS, HTTP, TLS and SSH protocols; Apply a display filter so the packet
+  list shows ONLY HTTP packets. Success means `check.sh` exits successfully.
+
+
+  WHAT TO AVOID: Do not apply broad destructive changes, skip evidence gathering, or fake completion with
+  marker files — the checker validates real system state.'
 difficulty: easy
 lab_mode: simulation
 simulation_type: wireshark
@@ -18,18 +37,77 @@ objectives:
 - Inspect the packet list — note the mix of DNS, HTTP, TLS and SSH protocols
 - Apply a display filter so the packet list shows ONLY HTTP packets
 - Run Check Solution to confirm the HTTP request to example.com is isolated
-initial_state: The capture contains DNS, HTTP, TLS and SSH packets with no display filter applied, so all
-  protocols are interleaved in the packet list.
+initial_state: The capture contains DNS, HTTP, TLS and SSH packets with no display filter applied, so
+  all protocols are interleaved in the packet list.
 hints:
 - order: 1
-  cost: 5
-  content: In the Display Filter bar you type Wireshark display syntax (not BPF). The simplest way to show
-    only one application protocol is to type its name.
+  cost: 0
+  content: 'Where to look: Load the capture in Wireshark and apply a display filter matching the symptom.'
 - order: 2
-  cost: 10
-  content: Type http into the display filter bar and apply it. The list should collapse to just the HTTP
-    request/response packets.
+  cost: 25
+  content: 'Diagnostic steps:
+
+    1. Note protocol, source/dest IP, and TCP flags on failing packets.
+
+    2. Follow TCP stream or export objects if HTTP/DNS is involved.
+
+    3. Compare timing (retransmissions, RST, TLS alerts) to the lab question.'
 - order: 3
-  cost: 15
-  content: After applying the http display filter, only the GET /index.html and HTTP/1.1 200 OK packets should
-    remain. Then run Check Solution.
+  cost: 50
+  content: 'Exact fix + verification:
+
+    1. Apply the filter or analysis steps the objectives describe.
+
+    2. Document the answer (host, port, flag, or root cause).
+
+    3. Submit via Check Solution in the Wireshark simulator.
+
+
+    WHY: packet labs grade your analysis, not arbitrary shell markers.'
+summary: Complete the capture and find the http traffic wireshark lab and verify success with the checker
+estimated_minutes: 15
+xp_reward: 100
+prerequisites:
+- Basic wireshark literacy
+tags:
+- fix
+- hands-on
+- wireshark
+linked_tutorial: wireshark-fundamentals
+what_you_will_learn:
+- Open the Wireshark simulator from the lab toolbar (toolbar -> Open Wireshark)
+- Inspect the packet list — note the mix of DNS, HTTP, TLS and SSH protocols
+- Apply a display filter so the packet list shows ONLY HTTP packets
+- Run Check Solution to confirm the HTTP request to example.com is isolated
+environment:
+  nodes:
+  - role: primary
+    os: FixitLab capture lab
+    hostname: lab-primary
+    ip: 127.0.0.1
+    specs: local offline simulation
+  pre_installed:
+  - bash
+  - coreutils
+  - journalctl
+  - systemctl
+  - wireshark
+  credentials:
+  - user: root
+    password: lab123
+tasks:
+- id: task_1
+  title: Capture and find the HTTP traffic
+  description: Restore healthy behavior for Capture and find the HTTP traffic by investigating the failure,
+    applying the smallest safe fix, and validating the outcome.
+  background: 'This wireshark lab teaches systematic troubleshooting: observe, hypothesize, change, verify.'
+  validation:
+    type: custom_script
+    script: check.sh
+    error_message: Validation did not pass. Re-read the objectives and Hint 2 diagnostic steps.
+solution:
+  summary: Identify the misconfiguration affecting this wireshark lab and apply the minimal fix.
+  files_changed: []
+  commands_run:
+  - bash check.sh
+  reference_docs: wireshark-fundamentals

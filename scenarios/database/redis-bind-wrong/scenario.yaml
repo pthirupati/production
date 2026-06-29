@@ -1,16 +1,36 @@
 title: Redis Bind Address Misconfigured
 slug: redis-bind-wrong
-technology: Database
-category: Redis
+technology: database
+category: Fix
 difficulty: easy
 time_limit: 600
 max_score: 100
 infrastructure_type: docker
 jira_priority: Medium
-description: Redis fails to start after its bind address was changed to an IP that doesn't exist on the
-  host, so the daemon can't bind its listening socket and exits. With Redis down, every client connection
-  is refused. Correct the bind directive so Redis listens on a valid address (localhost), restart it,
-  and confirm it answers.
+description: 'CONTEXT: A team operating database administration needs you to resolve `Redis Bind Address
+  Misconfigured` during a realistic incident. The business impact is reduced service reliability until
+  the underlying state is repaired.
+
+
+  ENVIRONMENT: You are working in FixitLab''s offline database server with SQL client, schemas, backups,
+  and performance views. All tools run locally; no paid APIs or external cloud calls are required.
+
+
+  SYMPTOM / STARTING STATE: Linux host where /etc/redis/redis.conf has `bind 10.255.255.1` — an address
+  not present on the machine. The redis-server service fails to start because it cannot bind that IP.
+  Redis fails to start after its bind address was changed to an IP that doesn''t exist on the host, so
+  the daemon can''t bind its listening socket and exits. With Redis down, every client connection is refused.
+  Correct the bind directive so Redis listens on a valid address (localhost), restart it, and confirm
+  it answers.
+
+
+  OBJECTIVE: Confirm Redis won''t start and that the bind address is invalid; Set the bind directive to
+  a valid address (127.0.0.1); Restart Redis and verify it responds to PING. Success means `check.sh`
+  exits successfully.
+
+
+  WHAT TO AVOID: Do not apply broad destructive changes, skip evidence gathering, or fake completion with
+  marker files — the checker validates real system state.'
 objectives:
 - Confirm Redis won't start and that the bind address is invalid
 - Set the bind directive to a valid address (127.0.0.1)
@@ -19,13 +39,70 @@ initial_state: Linux host where /etc/redis/redis.conf has `bind 10.255.255.1` �
   on the machine. The redis-server service fails to start because it cannot bind that IP.
 hints:
 - order: 1
-  cost: 10
-  content: 'Check why it failed: `systemctl status redis-server` / `journalctl -u redis-server` shows
-    a "Cannot bind" / "Cannot assign requested address" error from the bad IP in /etc/redis/redis.conf.'
+  cost: 0
+  content: 'Where to look: Confirm Redis won''t start and that the bind address is invalid'
 - order: 2
-  cost: 15
-  content: Edit /etc/redis/redis.conf and set `bind 127.0.0.1` (an address that exists on the host). Keep
-    it on localhost unless remote access is explicitly required.
+  cost: 25
+  content: 'Diagnostic steps:
+
+    1. Set the bind directive to a valid address (127.0.0.1)
+
+    2. Restart Redis and verify it responds to PING'
 - order: 3
-  cost: 20
-  content: 'Restart and verify: `systemctl restart redis-server`, then `redis-cli ping` returns PONG.'
+  cost: 50
+  content: 'Exact fix + verification:
+
+    1. Restart Redis and verify it responds to PING.
+
+    2. Re-run the lab checker (`check.sh` or Check Solution).
+
+    3. Confirm every scenario objective is satisfied.
+
+
+    WHY: the grader validates real state — marker files are ignored.'
+summary: Complete the redis bind address misconfigured database lab and verify success with the checker
+estimated_minutes: 10
+xp_reward: 100
+prerequisites:
+- Basic database literacy
+tags:
+- database
+- fix
+- hands-on
+linked_tutorial: database-fundamentals
+what_you_will_learn:
+- Confirm Redis won't start and that the bind address is invalid
+- Set the bind directive to a valid address (127.0.0.1)
+- Restart Redis and verify it responds to PING
+environment:
+  nodes:
+  - role: primary
+    os: FixitLab database server
+    hostname: lab-primary
+    ip: 127.0.0.1
+    specs: local offline simulation
+  pre_installed:
+  - bash
+  - coreutils
+  - database
+  - journalctl
+  - systemctl
+  credentials:
+  - user: root
+    password: lab123
+tasks:
+- id: task_1
+  title: Redis Bind Address Misconfigured
+  description: Restore healthy behavior for Redis Bind Address Misconfigured by investigating the failure,
+    applying the smallest safe fix, and validating the outcome.
+  background: 'This database lab teaches systematic troubleshooting: observe, hypothesize, change, verify.'
+  validation:
+    type: custom_script
+    script: check.sh
+    error_message: Validation did not pass. Re-read the objectives and Hint 2 diagnostic steps.
+solution:
+  summary: Identify the misconfiguration affecting this database lab and apply the minimal fix.
+  files_changed: []
+  commands_run:
+  - bash check.sh
+  reference_docs: database-fundamentals

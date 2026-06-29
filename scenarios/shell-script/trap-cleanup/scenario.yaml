@@ -1,13 +1,30 @@
 title: Script Leaves Temp Files on Exit
 slug: shell-trap-cleanup
 difficulty: medium
-category: Shell Scripting
-description: 'A data-processing script creates temporary files in /tmp during execution but fails to clean
-  them up when it exits — especially when killed with SIGINT or SIGTERM. Over time, gigabytes of temp
-  data accumulate. The script must be refactored to use a trap handler that cleans up on all exit paths
-  including signals.
+category: Fix
+description: 'CONTEXT: A team operating shell scripting needs you to resolve `Script Leaves Temp Files
+  on Exit` during a realistic incident. The business impact is reduced service reliability until the underlying
+  state is repaired.
 
-  '
+
+  ENVIRONMENT: You are working in FixitLab''s offline bash practice environment with scripts, cron, logs,
+  and shellcheck. All tools run locally; no paid APIs or external cloud calls are required.
+
+
+  SYMPTOM / STARTING STATE: Simulated RHEL 9 server. /tmp is filling with files named proc_*.tmp left
+  behind by process.sh. Killing the script mid-run always leaves orphaned files. A data-processing script
+  creates temporary files in /tmp during execution but fails to clean them up when it exits — especially
+  when killed with SIGINT or SIGTERM. Over time, gigabytes of temp data accumulate. The script must be
+  refactored to use a trap handler that cleans up on all exit paths including signals.
+
+
+  OBJECTIVE: Identify the missing trap statement in the script; Add a cleanup function and trap it on
+  EXIT, INT, and TERM signals; Confirm that temp files are removed whether the script exits normally or
+  is killed. Success means `check.sh` exits successfully.
+
+
+  WHAT TO AVOID: Do not apply broad destructive changes, skip evidence gathering, or fake completion with
+  marker files — the checker validates real system state.'
 initial_state: 'Simulated RHEL 9 server. /tmp is filling with files named proc_*.tmp left behind by process.sh.
   Killing the script mid-run always leaves orphaned files.
 
@@ -23,18 +40,75 @@ max_score: 100
 is_free: false
 hints:
 - order: 1
-  cost: 10
-  content: 'Reproduce the leak: run process.sh, kill it mid-run, and see orphaned `proc_*.tmp` files left
-    in /tmp. The script has no trap to clean up on exit.'
+  cost: 0
+  content: 'Where to look: Identify the missing trap statement in the script'
 - order: 2
-  cost: 15
-  content: 'Add a cleanup function and register it for all exit paths: `trap cleanup EXIT INT TERM`. Storing
-    temp paths in a variable at creation time lets cleanup know exactly what to remove.'
+  cost: 25
+  content: 'Diagnostic steps:
+
+    1. Add a cleanup function and trap it on EXIT, INT, and TERM signals
+
+    2. Confirm that temp files are removed whether the script exits normally or is killed'
 - order: 3
-  cost: 20
-  content: 'Implement `cleanup() { rm -f "$TMPFILE"; }` (or use `mktemp` and track the names), then `trap
-    cleanup EXIT INT TERM`. Re-test: whether the script finishes or is killed with Ctrl-C/SIGTERM, /tmp
-    is left clean.'
+  cost: 50
+  content: 'Exact fix + verification:
+
+    1. Confirm that temp files are removed whether the script exits normally or is killed.
+
+    2. Re-run the lab checker (`check.sh` or Check Solution).
+
+    3. Confirm every scenario objective is satisfied.
+
+
+    WHY: the grader validates real state — marker files are ignored.'
 requires_companion_hosts: false
 dual_terminal: false
 jira_priority: Medium
+technology: shell-script
+summary: Complete the script leaves temp files on exit shell script lab and verify success with the checker
+estimated_minutes: 15
+xp_reward: 100
+prerequisites:
+- Basic shell script literacy
+tags:
+- fix
+- hands-on
+- shell-script
+linked_tutorial: shell-script-fundamentals
+what_you_will_learn:
+- Identify the missing trap statement in the script
+- Add a cleanup function and trap it on EXIT, INT, and TERM signals
+- Confirm that temp files are removed whether the script exits normally or is killed
+environment:
+  nodes:
+  - role: primary
+    os: FixitLab bash practice environment
+    hostname: lab-primary
+    ip: 127.0.0.1
+    specs: local offline simulation
+  pre_installed:
+  - bash
+  - coreutils
+  - journalctl
+  - shell script
+  - systemctl
+  credentials:
+  - user: root
+    password: lab123
+tasks:
+- id: task_1
+  title: Script Leaves Temp Files on Exit
+  description: Restore healthy behavior for Script Leaves Temp Files on Exit by investigating the failure,
+    applying the smallest safe fix, and validating the outcome.
+  background: 'This shell script lab teaches systematic troubleshooting: observe, hypothesize, change,
+    verify.'
+  validation:
+    type: custom_script
+    script: check.sh
+    error_message: Validation did not pass. Re-read the objectives and Hint 2 diagnostic steps.
+solution:
+  summary: Identify the misconfiguration affecting this shell script lab and apply the minimal fix.
+  files_changed: []
+  commands_run:
+  - bash check.sh
+  reference_docs: shell-script-fundamentals

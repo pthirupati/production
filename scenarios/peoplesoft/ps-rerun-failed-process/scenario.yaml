@@ -1,12 +1,30 @@
 title: Rerun a Failed Process Scheduler Job
 slug: ps-rerun-failed-process
-category: Process Scheduler
-description: >-
-  A nightly batch in your PeopleSoft HCM environment failed. The GL_JOURNAL_POST
-  Application Engine run (instance 1009) ended in Error in Process Monitor, so
-  the General Ledger journals were never posted. Open the PeopleSoft Internet
-  Architecture (PIA) simulator, find the failed run in Process Monitor, and rerun
-  it from the Process Scheduler so it completes Successfully.
+category: Fix
+description: 'CONTEXT: A team operating PeopleSoft administration needs you to resolve `Rerun a Failed
+  Process Scheduler Job` during a realistic incident. The business impact is reduced service reliability
+  until the underlying state is repaired.
+
+
+  ENVIRONMENT: You are working in FixitLab''s offline PeopleSoft app server lab with PIA, Process Scheduler,
+  Integration Broker, and app server logs. All tools run locally; no paid APIs or external cloud calls
+  are required.
+
+
+  SYMPTOM / STARTING STATE: A PeopleSoft HCM 9.2 environment whose GL_JOURNAL_POST batch run (instance
+  1009) is sitting in Error in Process Monitor. A nightly batch in your PeopleSoft HCM environment failed.
+  The GL_JOURNAL_POST Application Engine run (instance 1009) ended in Error in Process Monitor, so the
+  General Ledger journals were never posted. Open the PeopleSoft Internet Architecture (PIA) simulator,
+  find the failed run in Process Monitor, and rerun it from the Process Scheduler so it completes Successfully.
+
+
+  OBJECTIVE: Open the PeopleSoft (PIA) simulator from the lab toolbar; Navigate to PeopleTools > Process
+  Scheduler > Process Monitor; Find the GL_JOURNAL_POST run (instance 1009) that ended in Error. Success
+  means `check.sh` exits successfully.
+
+
+  WHAT TO AVOID: Do not apply broad destructive changes, skip evidence gathering, or fake completion with
+  marker files — the checker validates real system state.'
 difficulty: easy
 lab_mode: simulation
 simulation_type: peoplesoft
@@ -21,23 +39,78 @@ objectives:
 - Navigate to PeopleTools > Process Scheduler > Process Monitor
 - Find the GL_JOURNAL_POST run (instance 1009) that ended in Error
 - Rerun the process so its Run Status shows Success
-initial_state: >-
-  A PeopleSoft HCM 9.2 environment whose GL_JOURNAL_POST batch run (instance
-  1009) is sitting in Error in Process Monitor.
+initial_state: A PeopleSoft HCM 9.2 environment whose GL_JOURNAL_POST batch run (instance 1009) is sitting
+  in Error in Process Monitor.
 hints:
 - order: 1
-  cost: 10
-  content: >-
-    Open the PeopleSoft simulator and go to Process Monitor. A run with Run
-    Status = Error has not posted its output; the Distribution Status will read
-    N/A.
+  cost: 0
+  content: 'Where to look: Open the PeopleSoft (PIA) simulator from the lab toolbar'
 - order: 2
-  cost: 15
-  content: >-
-    In PeopleSoft you do not edit a failed run in place — you restart/rerun it.
-    Use the Rerun action on instance 1009 (rerun_process with instance 1009).
+  cost: 25
+  content: 'Diagnostic steps:
+
+    1. Navigate to PeopleTools > Process Scheduler > Process Monitor
+
+    2. Find the GL_JOURNAL_POST run (instance 1009) that ended in Error
+
+    3. Rerun the process so its Run Status shows Success'
 - order: 3
-  cost: 20
-  content: >-
-    After rerunning, refresh Process Monitor. The run's status should change
-    from Error to Success and Distribution Status to Posted.
+  cost: 50
+  content: 'Exact fix + verification:
+
+    1. Rerun the process so its Run Status shows Success.
+
+    2. Re-run the lab checker (`check.sh` or Check Solution).
+
+    3. Confirm every scenario objective is satisfied.
+
+
+    WHY: the grader validates real state — marker files are ignored.'
+summary: Complete the rerun a failed process scheduler job peoplesoft lab and verify success with the
+  checker
+estimated_minutes: 15
+xp_reward: 100
+prerequisites:
+- Basic peoplesoft literacy
+tags:
+- fix
+- hands-on
+- peoplesoft
+linked_tutorial: peoplesoft-fundamentals
+what_you_will_learn:
+- Open the PeopleSoft (PIA) simulator from the lab toolbar
+- Navigate to PeopleTools > Process Scheduler > Process Monitor
+- Find the GL_JOURNAL_POST run (instance 1009) that ended in Error
+- Rerun the process so its Run Status shows Success
+environment:
+  nodes:
+  - role: primary
+    os: FixitLab PeopleSoft app server lab
+    hostname: lab-primary
+    ip: 127.0.0.1
+    specs: local offline simulation
+  pre_installed:
+  - bash
+  - coreutils
+  - journalctl
+  - peoplesoft
+  - systemctl
+  credentials:
+  - user: root
+    password: lab123
+tasks:
+- id: task_1
+  title: Rerun a Failed Process Scheduler Job
+  description: Restore healthy behavior for Rerun a Failed Process Scheduler Job by investigating the
+    failure, applying the smallest safe fix, and validating the outcome.
+  background: 'This peoplesoft lab teaches systematic troubleshooting: observe, hypothesize, change, verify.'
+  validation:
+    type: custom_script
+    script: check.sh
+    error_message: Validation did not pass. Re-read the objectives and Hint 2 diagnostic steps.
+solution:
+  summary: Identify the misconfiguration affecting this peoplesoft lab and apply the minimal fix.
+  files_changed: []
+  commands_run:
+  - bash check.sh
+  reference_docs: peoplesoft-fundamentals

@@ -1,8 +1,7 @@
----
 slug: java-gradle-test-task-skipped
-title: "Gradle 'test' Task Skipped — JUnit Platform Not Wired"
-technology: Java
-category: "Gradle Build"
+title: Gradle 'test' Task Skipped — JUnit Platform Not Wired
+technology: java
+category: Fix
 difficulty: medium
 time_limit: 900
 max_score: 100
@@ -11,22 +10,108 @@ simulation_type: java
 infrastructure_type: simulation
 jira_priority: High
 is_free: false
-description: |
-  The Gradle build is green but the test task is NO-SOURCE / skipped, so no JUnit tests ever run and regressions ship. The build never calls useJUnitPlatform() and the junit-jupiter test dependencies are missing, so Gradle finds nothing to execute. Wire the test task to the JUnit 5 platform so the suite actually runs.
+description: 'CONTEXT: A team operating Java applications needs you to resolve `Gradle ''test'' Task Skipped
+  — JUnit Platform Not Wired` during a realistic incident. The business impact is reduced service reliability
+  until the underlying state is repaired.
+
+
+  ENVIRONMENT: You are working in FixitLab''s offline Java project with Maven/Gradle, JVM logs, and Spring
+  configuration. All tools run locally; no paid APIs or external cloud calls are required.
+
+
+  SYMPTOM / STARTING STATE: build.gradle at /app/ never calls useJUnitPlatform() and lacks junit-jupiter;
+  ./gradlew test reports NO-SOURCE and runs nothing. The Gradle build is green but the test task is NO-SOURCE
+  / skipped, so no JUnit tests ever run and regressions ship. The build never calls useJUnitPlatform()
+  and the junit-jupiter test dependencies are missing, so Gradle finds nothing to execute. Wire the test
+  task to the JUnit 5 platform so the suite actually runs.
+
+
+  OBJECTIVE: Confirm the test task is skipped / runs zero tests; Add test { useJUnitPlatform() } to the
+  build; Add the junit-jupiter testImplementation/testRuntimeOnly dependencies. Success means `check.sh`
+  exits successfully.
+
+
+  WHAT TO AVOID: Do not apply broad destructive changes, skip evidence gathering, or fake completion with
+  marker files — the checker validates real system state.'
 objectives:
-  - "Confirm the test task is skipped / runs zero tests"
-  - "Add test { useJUnitPlatform() } to the build"
-  - "Add the junit-jupiter testImplementation/testRuntimeOnly dependencies"
-  - "Verify the real test count executes on ./gradlew test"
-initial_state: |
-  build.gradle at /app/ never calls useJUnitPlatform() and lacks junit-jupiter; ./gradlew test reports NO-SOURCE and runs nothing.
+- Confirm the test task is skipped / runs zero tests
+- Add test { useJUnitPlatform() } to the build
+- Add the junit-jupiter testImplementation/testRuntimeOnly dependencies
+- Verify the real test count executes on ./gradlew test
+initial_state: 'build.gradle at /app/ never calls useJUnitPlatform() and lacks junit-jupiter; ./gradlew
+  test reports NO-SOURCE and runs nothing.
+
+  '
 hints:
-  - order: 1
-    cost: 10
-    content: "./gradlew test --info shows the test task as NO-SOURCE — it found no tests to run."
-  - order: 2
-    cost: 15
-    content: "Add a test { useJUnitPlatform() } block so Gradle uses the JUnit 5 engine."
-  - order: 3
-    cost: 20
-    content: "Add junit-jupiter (api + engine) test dependencies, then re-run ./gradlew test."
+- order: 1
+  cost: 0
+  content: 'Where to look: Confirm the test task is skipped / runs zero tests'
+- order: 2
+  cost: 25
+  content: 'Diagnostic steps:
+
+    1. Add test { useJUnitPlatform() } to the build
+
+    2. Add the junit-jupiter testImplementation/testRuntimeOnly dependencies
+
+    3. Verify the real test count executes on ./gradlew test'
+- order: 3
+  cost: 50
+  content: 'Exact fix + verification:
+
+    1. Verify the real test count executes on ./gradlew test.
+
+    2. Re-run the lab checker (`check.sh` or Check Solution).
+
+    3. Confirm every scenario objective is satisfied.
+
+
+    WHY: the grader validates real state — marker files are ignored.'
+summary: Complete the gradle 'test' task skipped — junit platform not wired java lab and verify success
+  with the checker
+estimated_minutes: 15
+xp_reward: 100
+prerequisites:
+- Basic java literacy
+tags:
+- fix
+- hands-on
+- java
+linked_tutorial: java-fundamentals
+what_you_will_learn:
+- Confirm the test task is skipped / runs zero tests
+- Add test { useJUnitPlatform() } to the build
+- Add the junit-jupiter testImplementation/testRuntimeOnly dependencies
+- Verify the real test count executes on ./gradlew test
+environment:
+  nodes:
+  - role: primary
+    os: FixitLab Java project
+    hostname: lab-primary
+    ip: 127.0.0.1
+    specs: local offline simulation
+  pre_installed:
+  - bash
+  - coreutils
+  - java
+  - journalctl
+  - systemctl
+  credentials:
+  - user: root
+    password: lab123
+tasks:
+- id: task_1
+  title: Gradle 'test' Task Skipped — JUnit Platform Not Wired
+  description: Restore healthy behavior for Gradle 'test' Task Skipped — JUnit Platform Not Wired by investigating
+    the failure, applying the smallest safe fix, and validating the outcome.
+  background: 'This java lab teaches systematic troubleshooting: observe, hypothesize, change, verify.'
+  validation:
+    type: custom_script
+    script: check.sh
+    error_message: Validation did not pass. Re-read the objectives and Hint 2 diagnostic steps.
+solution:
+  summary: Identify the misconfiguration affecting this java lab and apply the minimal fix.
+  files_changed: []
+  commands_run:
+  - bash check.sh
+  reference_docs: java-fundamentals

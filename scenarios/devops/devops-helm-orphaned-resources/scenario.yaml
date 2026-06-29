@@ -1,7 +1,7 @@
 title: Helm Chart Upgrade Left Orphaned Resources
 slug: devops-helm-orphaned-resources
-technology: DevOps
-category: Helm
+technology: devops
+category: Fix
 difficulty: hard
 lab_mode: simulation
 simulation_type: generic
@@ -10,9 +10,27 @@ max_score: 100
 is_free: true
 jira_priority: High
 dual_terminal: false
-description: After a botched helm upgrade, orphaned resources from a renamed template block conflict with
-  new ones and the release is unhealthy. Reconcile by rolling back to a deployed revision and cleaning
-  up.
+description: 'CONTEXT: A team operating DevOps delivery needs you to resolve `Helm Chart Upgrade Left
+  Orphaned Resources` during a realistic incident. The business impact is reduced service reliability
+  until the underlying state is repaired.
+
+
+  ENVIRONMENT: You are working in FixitLab''s offline CI/CD lab with git repos, pipelines, artifacts,
+  and runbooks. All tools run locally; no paid APIs or external cloud calls are required.
+
+
+  SYMPTOM / STARTING STATE: A Kubernetes helm release whose upgrade renamed templates, leaving orphaned
+  objects and a non-deployed status. After a botched helm upgrade, orphaned resources from a renamed template
+  block conflict with new ones and the release is unhealthy. Reconcile by rolling back to a deployed revision
+  and cleaning up.
+
+
+  OBJECTIVE: Confirm the release is not in a deployed state; Roll back to a clean deployed revision; Verify
+  helm history shows deployed. Success means `check.sh` exits successfully.
+
+
+  WHAT TO AVOID: Do not apply broad destructive changes, skip evidence gathering, or fake completion with
+  marker files — the checker validates real system state.'
 initial_state: A Kubernetes helm release whose upgrade renamed templates, leaving orphaned objects and
   a non-deployed status.
 objectives:
@@ -21,11 +39,71 @@ objectives:
 - Verify helm history shows deployed
 hints:
 - order: 1
-  cost: 10
-  content: helm history shows the release is not deployed.
+  cost: 0
+  content: 'Where to look: Confirm the release is not in a deployed state'
 - order: 2
-  cost: 15
-  content: helm rollback to the last good revision.
+  cost: 25
+  content: 'Diagnostic steps:
+
+    1. Roll back to a clean deployed revision
+
+    2. Verify helm history shows deployed'
 - order: 3
-  cost: 20
-  content: Release deployed.
+  cost: 50
+  content: 'Exact fix + verification:
+
+    1. Verify helm history shows deployed.
+
+    2. Re-run the lab checker (`check.sh` or Check Solution).
+
+    3. Confirm every scenario objective is satisfied.
+
+
+    WHY: the grader validates real state — marker files are ignored.'
+summary: Complete the helm chart upgrade left orphaned resources devops lab and verify success with the
+  checker
+estimated_minutes: 25
+xp_reward: 100
+prerequisites:
+- Basic devops literacy
+tags:
+- devops
+- fix
+- hands-on
+linked_tutorial: devops-fundamentals
+what_you_will_learn:
+- Confirm the release is not in a deployed state
+- Roll back to a clean deployed revision
+- Verify helm history shows deployed
+environment:
+  nodes:
+  - role: primary
+    os: FixitLab CI/CD lab
+    hostname: lab-primary
+    ip: 127.0.0.1
+    specs: local offline simulation
+  pre_installed:
+  - bash
+  - coreutils
+  - devops
+  - journalctl
+  - systemctl
+  credentials:
+  - user: root
+    password: lab123
+tasks:
+- id: task_1
+  title: Helm Chart Upgrade Left Orphaned Resources
+  description: Restore healthy behavior for Helm Chart Upgrade Left Orphaned Resources by investigating
+    the failure, applying the smallest safe fix, and validating the outcome.
+  background: 'This devops lab teaches systematic troubleshooting: observe, hypothesize, change, verify.'
+  validation:
+    type: custom_script
+    script: check.sh
+    error_message: Validation did not pass. Re-read the objectives and Hint 2 diagnostic steps.
+solution:
+  summary: Identify the misconfiguration affecting this devops lab and apply the minimal fix.
+  files_changed: []
+  commands_run:
+  - bash check.sh
+  reference_docs: devops-fundamentals

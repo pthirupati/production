@@ -1,7 +1,7 @@
-title: 'Terraform & IaC: Policy As Code — Integration Lab'
+title: Policy As Code — Integration Lab
 slug: academy-terraform-010-integration-policy
-technology: Terraform & IaC
-category: Cross-Technology
+technology: terraform
+category: Project
 difficulty: hard
 scenario_type: do
 lab_mode: simulation
@@ -11,9 +11,28 @@ max_score: 100
 is_free: false
 infrastructure_type: docker
 jira_priority: Medium
-description: 'Integration lab: connect policy as code with an adjacent platform in the Terraform & IaC
-  stack. Validate authentication, data handoff, and failure behavior for guardrails, validation, and sentinel/OPA
-  checks.'
+description: 'CONTEXT: A team operating Terraform IaC needs you to resolve `terraform: Policy As Code
+  — Integration Lab` during a realistic incident. The business impact is reduced service reliability until
+  the underlying state is repaired.
+
+
+  ENVIRONMENT: You are working in FixitLab''s offline Terraform workspace with HCL files, state, and plan/apply
+  workflow. All tools run locally; no paid APIs or external cloud calls are required.
+
+
+  SYMPTOM / STARTING STATE: Two systems are deployed but not fully wired together for policy as code.
+  Downstream consumers are waiting on this integration path. Integration lab: connect policy as code with
+  an adjacent platform in the terraform stack. Validate authentication, data handoff, and failure behavior
+  for guardrails, validation, and sentinel/OPA checks.
+
+
+  OBJECTIVE: policy as code is connected to the adjacent system successfully; Handoff points are authenticated
+  and observable; End-to-end workflow completes without manual intervention. Success means `terraform
+  validate` includes `Success`.
+
+
+  WHAT TO AVOID: Do not apply broad destructive changes, skip evidence gathering, or fake completion with
+  marker files — the checker validates real system state.'
 objectives:
 - policy as code is connected to the adjacent system successfully
 - Handoff points are authenticated and observable
@@ -22,35 +41,97 @@ initial_state: Two systems are deployed but not fully wired together for policy 
   are waiting on this integration path.
 hints:
 - order: 1
-  cost: 10
-  content: 'Orient yourself before changing anything:
-
-    1. Inspect the current state — policy files and plan output.
-
-    2. Write down what looks normal versus wrong or missing for policy as code.
-
-    3. Recall the core idea: guardrails, validation, and sentinel/OPA checks. Form one hypothesis before
-    you act.'
+  cost: 0
+  content: 'Where to look: Run `terraform validate` in the module directory for precise error paths.'
 - order: 2
-  cost: 15
-  content: 'Plan your approach (still no spoilers):
-
-    1. Confirm the exact gap between current and desired state for policy as code.
-
-    2. Decide the single smallest change that moves you toward the objective.
-
-    3. Capture evidence (command output / status) before the change so you can prove it worked afterward.'
-- order: 3
   cost: 25
-  content: 'Guided walkthrough:
+  content: 'Diagnostic steps:
 
-    1. Re-check the current state — policy files and plan output.
+    1. `terraform init` if providers are missing.
 
-    2. Configure credentials and networking, then drive one happy-path transaction end to end across both
-    systems.
+    2. `terraform validate` — read file:line references.
 
-    3. Verify the result — violating plans are blocked and compliant ones pass.
+    3. Cross-check variable names and resource blocks against the error.'
+- order: 3
+  cost: 50
+  content: 'Exact fix + verification:
 
-    4. Click Check Solution once `systemctl is-active nginx` returns active.'
+    1. Fix the reported syntax or reference error.
+
+    2. Re-run `terraform validate` until it prints Success.
+
+    3. Optionally `terraform plan` to confirm no new errors.
+
+
+    WHY: validate catches config errors before any apply.'
 cross_technology: true
 vmware_link: true
+summary: Complete the policy as code — integration lab terraform lab and verify success with the checker
+estimated_minutes: 20
+xp_reward: 100
+prerequisites:
+- Basic terraform literacy
+tags:
+- do
+- hands-on
+- terraform
+linked_tutorial: terraform-fundamentals
+what_you_will_learn:
+- policy as code is connected to the adjacent system successfully
+- Handoff points are authenticated and observable
+- End-to-end workflow completes without manual intervention
+environment:
+  nodes:
+  - role: primary
+    os: FixitLab Terraform workspace
+    hostname: lab-primary
+    ip: 127.0.0.1
+    specs: local offline simulation
+  pre_installed:
+  - bash
+  - coreutils
+  - terraform
+  credentials:
+  - user: root
+    password: lab123
+tasks:
+- id: task_1
+  title: Policy As Code — Integration Lab
+  description: Restore healthy behavior for Policy As Code — Integration Lab by investigating the failure,
+    applying the smallest safe fix, and validating the outcome.
+  background: 'This terraform lab teaches systematic troubleshooting: observe, hypothesize, change, verify.'
+  validation:
+    type: command_output
+    command: terraform validate
+    expected_output: Success
+    error_message: Terraform configuration is invalid. Run terraform validate and fix reported errors.
+solution:
+  summary: Identify the misconfiguration affecting this terraform lab and apply the minimal fix.
+  files_changed: []
+  commands_run:
+  - terraform validate
+  reference_docs: terraform-fundamentals
+guided_mode:
+  enabled: true
+  steps:
+  - step: 1
+    title: Inspect current state
+    instruction: Run a read-only diagnostic before changing anything.
+    command: terraform validate
+    expected_output: Output shows the current failure mode
+    explanation: Evidence-first troubleshooting avoids guessing.
+    next_on: command_success
+  - step: 2
+    title: Apply the minimal fix
+    instruction: Make one reversible change aligned with the objectives.
+    command: '# your fix command here'
+    expected_output: State moves toward the objective
+    explanation: Small changes make rollback easy if the hypothesis was wrong.
+    next_on: command_success
+  - step: 3
+    title: Verify with the grader
+    instruction: Run the same verification the checker uses.
+    command: terraform validate
+    expected_output: '`terraform validate` includes `Success`'
+    explanation: The lab passes only when real state is healthy.
+    next_on: command_success

@@ -1,11 +1,31 @@
 title: CPU Thermal Throttling
 slug: sim-bm-thermal
-category: Bare Metal & IPMI
+category: Fix
 difficulty: medium
-description: A bare-metal server is throttling its CPUs due to high temperature, degrading application
-  performance. IPMI temperature sensors are reading near or above their thresholds — typically from failed/spun-down
-  fans, blocked airflow, or a fan policy set too low. Read the sensors, find the overheating cause, and
-  restore proper cooling so the CPU stops throttling.
+description: 'CONTEXT: A team operating bare metal operations needs you to resolve `CPU Thermal Throttling`
+  during a realistic incident. The business impact is reduced service reliability until the underlying
+  state is repaired.
+
+
+  ENVIRONMENT: You are working in FixitLab''s offline physical server lab with IPMI, RAID, BIOS, and out-of-band
+  console. All tools run locally; no paid APIs or external cloud calls are required.
+
+
+  SYMPTOM / STARTING STATE: Simulated bare-metal RHEL host. CPU frequency is being throttled because IPMI
+  temperature sensors are high; fan readings and/or thermal thresholds indicate a cooling problem. A bare-metal
+  server is throttling its CPUs due to high temperature, degrading application performance. IPMI temperature
+  sensors are reading near or above their thresholds — typically from failed/spun-down fans, blocked airflow,
+  or a fan policy set too low. Read the sensors, find the overheating cause, and restore proper cooling
+  so the CPU stops throttling.
+
+
+  OBJECTIVE: Read IPMI temperature and fan sensor values; Identify the cause of overheating (fans, airflow,
+  or fan policy); Restore cooling so the CPUs stop thermal throttling. Success means `check.sh` exits
+  successfully.
+
+
+  WHAT TO AVOID: Do not apply broad destructive changes, skip evidence gathering, or fake completion with
+  marker files — the checker validates real system state.'
 initial_state: Simulated bare-metal RHEL host. CPU frequency is being throttled because IPMI temperature
   sensors are high; fan readings and/or thermal thresholds indicate a cooling problem.
 lab_mode: simulation
@@ -22,15 +42,71 @@ objectives:
 - Restore cooling so the CPUs stop thermal throttling
 hints:
 - order: 1
-  cost: 10
-  content: 'Read the sensors: `ipmitool sensor list | grep -iE ''temp|fan''`. Compare CPU temps against
-    their upper-critical thresholds and check whether any fan reads 0 RPM.'
+  cost: 0
+  content: 'Where to look: Read IPMI temperature and fan sensor values'
 - order: 2
-  cost: 15
-  content: 'Confirm throttling in-band: `grep -i mhz /proc/cpuinfo` (clocks pinned low) or check `turbostat`.
-    A dead fan or a fan profile stuck on "quiet" is the usual culprit.'
+  cost: 25
+  content: 'Diagnostic steps:
+
+    1. Identify the cause of overheating (fans, airflow, or fan policy)
+
+    2. Restore cooling so the CPUs stop thermal throttling'
 - order: 3
-  cost: 20
-  content: 'Restore cooling: set the BMC fan policy higher / replace the failed fan, and clear airflow
-    obstructions. Re-read `ipmitool sensor list` until temps fall below threshold and fans spin up; CPU
-    clocks then return to normal.'
+  cost: 50
+  content: 'Exact fix + verification:
+
+    1. Restore cooling so the CPUs stop thermal throttling.
+
+    2. Re-run the lab checker (`check.sh` or Check Solution).
+
+    3. Confirm every scenario objective is satisfied.
+
+
+    WHY: the grader validates real state — marker files are ignored.'
+technology: baremetal
+summary: Complete the cpu thermal throttling baremetal lab and verify success with the checker
+estimated_minutes: 15
+xp_reward: 100
+prerequisites:
+- Basic baremetal literacy
+tags:
+- baremetal
+- fix
+- hands-on
+linked_tutorial: baremetal-fundamentals
+what_you_will_learn:
+- Read IPMI temperature and fan sensor values
+- Identify the cause of overheating (fans, airflow, or fan policy)
+- Restore cooling so the CPUs stop thermal throttling
+environment:
+  nodes:
+  - role: primary
+    os: FixitLab physical server lab
+    hostname: lab-primary
+    ip: 127.0.0.1
+    specs: local offline simulation
+  pre_installed:
+  - baremetal
+  - bash
+  - coreutils
+  - journalctl
+  - systemctl
+  credentials:
+  - user: root
+    password: lab123
+tasks:
+- id: task_1
+  title: CPU Thermal Throttling
+  description: Restore healthy behavior for CPU Thermal Throttling by investigating the failure, applying
+    the smallest safe fix, and validating the outcome.
+  background: 'This baremetal lab teaches systematic troubleshooting: observe, hypothesize, change, verify.'
+  validation:
+    type: custom_script
+    script: check.sh
+    error_message: Validation did not pass. Re-read the objectives and Hint 2 diagnostic steps.
+solution:
+  summary: Identify the misconfiguration affecting this baremetal lab and apply the minimal fix.
+  files_changed: []
+  commands_run:
+  - bash check.sh
+  reference_docs: baremetal-fundamentals

@@ -1,7 +1,7 @@
-title: 'Linux Administration: Systemd Services — Daily Operations'
+title: Systemd Services — Operate Lab
 slug: academy-linux-033-operate-systemd-services-4
-technology: Linux Administration
-category: Operations
+technology: linux
+category: Build
 difficulty: medium
 scenario_type: do
 lab_mode: simulation
@@ -11,47 +11,135 @@ max_score: 100
 is_free: false
 infrastructure_type: docker
 jira_priority: Medium
-description: Day-2 systemd service operations. The `nginx` unit on this host has entered a failed state,
-  so the web service it provides is down. Investigate it the way you would in production — `systemctl
-  status nginx` and `journalctl -u nginx` — then bring the unit back to an active (running) state. Verify
-  with `systemctl is-active nginx`.
+description: 'CONTEXT: A team operating Linux administration needs you to resolve `linux: Systemd Services
+  — Daily Operations` during a realistic incident. The business impact is reduced service reliability
+  until the underlying state is repaired.
+
+
+  ENVIRONMENT: You are working in FixitLab''s offline Linux practice server with terminal and config files
+  under /etc and /var. All tools run locally; no paid APIs or external cloud calls are required.
+
+
+  SYMPTOM / STARTING STATE: The Linux practice server is healthy enough for scheduled work on systemd
+  services. Complete the maintenance task without unnecessary downtime. Day-2 operations: perform a routine
+  systemd services task safely in linux. Follow change control — inspect, change, verify — while working
+  with unit files, dependencies, restart policies, and journal logging.
+
+
+  OBJECTIVE: Day-2 systemd services work completes safely in this environment; Changes are verified with
+  before/after checks; The system remains stable for dependent teams. Success means `systemctl is-active
+  nginx` returns active.
+
+
+  WHAT TO AVOID: Do not apply broad destructive changes, skip evidence gathering, or fake completion with
+  marker files — the checker validates real system state.'
 objectives:
-- The nginx service is active (running) again
-- The unit is healthy and (ideally) enabled to survive reboot
-- systemctl is-active nginx reports 'active'
-initial_state: The `nginx` service is installed but currently failed/stopped, so the site it serves is
-  unavailable.
+- Day-2 systemd services work completes safely in this environment
+- Changes are verified with before/after checks
+- The system remains stable for dependent teams
+initial_state: The Linux practice server is healthy enough for scheduled work on systemd services. Complete
+  the maintenance task without unnecessary downtime.
 hints:
 - order: 1
-  cost: 10
+  cost: 0
   content: 'Orient yourself before changing anything:
 
-    1. Inspect the current state — `systemctl status nginx` and `journalctl -u nginx` to see why it is
-    not running.
+    1. Inspect the current state — `systemctl status`, `systemctl cat`, and `journalctl -u <service>`.
 
-    2. Write down what looks normal versus wrong or missing.
+    2. Write down what looks normal versus wrong or missing for systemd services.
 
-    3. Form one hypothesis about the root cause before you change anything.'
+    3. Recall the core idea: unit files, dependencies, restart policies, and journal logging. Form one
+    hypothesis before you act.'
 - order: 2
-  cost: 15
-  content: 'Plan your approach (still no spoilers):
+  cost: 25
+  content: 'Diagnostic steps:
 
-    1. Confirm the exact gap between current and desired state.
+    1. Run `nginx -t` and `systemctl status nginx` for config vs service errors.
 
-    2. Decide the single smallest change that moves you toward the objective.
+    2. Open the cited file under `/etc/nginx/`.
 
-    3. Capture command output before the change so you can prove it worked afterward.'
+    3. Compare listen/upstream/proxy directives to the scenario objectives.'
 - order: 3
-  cost: 20
-  content: 'Guided walkthrough:
+  cost: 50
+  content: 'Exact fix + verification:
 
-    1. Re-check the current state — Pre-check the unit: `systemctl status nginx` and `journalctl -u nginx`
-    to see why it is not running.
+    1. Re-check the current state — `systemctl status`, `systemctl cat`, and `journalctl -u <service>`.
 
-    2. Bring it up with the smallest safe action rather than reinstalling — a stopped/failed unit usually
-    just needs to be started.
+    2. Execute the maintenance in small, reversible steps, taking a snapshot or backup first if the change
+    is risky.
 
-    3. Verify the result — Run `sudo systemctl start nginx` (add `sudo systemctl enable nginx` for persistence),
-    confirm `systemctl is-active nginx`, then Check Solution.
+    3. Verify the result — the unit is enabled, active, and logging cleanly.
 
-    4. Click Check Solution once every objective is met.'
+    4. Click Check Solution once the objective is met (graded on real state, not a marker file).'
+summary: Complete the systemd services — operate lab linux lab and verify success with the checker
+estimated_minutes: 20
+xp_reward: 100
+prerequisites:
+- Basic linux literacy
+tags:
+- do
+- hands-on
+- linux
+linked_tutorial: linux-fundamentals
+what_you_will_learn:
+- Day-2 systemd services work completes safely in this environment
+- Changes are verified with before/after checks
+- The system remains stable for dependent teams
+environment:
+  nodes:
+  - role: primary
+    os: FixitLab Linux practice server
+    hostname: lab-primary
+    ip: 127.0.0.1
+    specs: local offline simulation
+  pre_installed:
+  - bash
+  - coreutils
+  - journalctl
+  - linux
+  - systemctl
+  credentials:
+  - user: root
+    password: lab123
+tasks:
+- id: task_1
+  title: Systemd Services — Operate Lab
+  description: Restore healthy behavior for Systemd Services — Operate Lab by investigating the failure,
+    applying the smallest safe fix, and validating the outcome.
+  background: 'This linux lab teaches systematic troubleshooting: observe, hypothesize, change, verify.'
+  validation:
+    type: service_active
+    command: systemctl is-active nginx
+    expected_status: active
+    error_message: The nginx service is not active yet. Check `systemctl status nginx` and `journalctl
+      -u nginx -n 50`.
+solution:
+  summary: The root cause is an unhealthy `nginx` service; repair it and verify active state.
+  files_changed: []
+  commands_run:
+  - systemctl is-active nginx
+  reference_docs: linux-fundamentals
+guided_mode:
+  enabled: true
+  steps:
+  - step: 1
+    title: Inspect current state
+    instruction: Run a read-only diagnostic before changing anything.
+    command: systemctl is-active nginx
+    expected_output: Output shows the current failure mode
+    explanation: Evidence-first troubleshooting avoids guessing.
+    next_on: command_success
+  - step: 2
+    title: Apply the minimal fix
+    instruction: Make one reversible change aligned with the objectives.
+    command: '# your fix command here'
+    expected_output: State moves toward the objective
+    explanation: Small changes make rollback easy if the hypothesis was wrong.
+    next_on: command_success
+  - step: 3
+    title: Verify with the grader
+    instruction: Run the same verification the checker uses.
+    command: systemctl is-active nginx
+    expected_output: '`systemctl is-active nginx` returns active'
+    explanation: The lab passes only when real state is healthy.
+    next_on: command_success

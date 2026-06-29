@@ -1,11 +1,32 @@
 title: Fix the Revenue That Double-Counts on a JOIN
 slug: pg-fix-join-fanout-double-count
 technology: postgresql
-category: PostgreSQL Development
-description: A per-customer revenue report joins `orders` to `order_items` so it can ignore orders with no
-  line items, then does `SUM(orders.amount)`. But joining to a one-to-many child fans each order row out
-  once per item, so an order with 3 items has its amount summed 3 times. The totals are inflated. Restructure
-  the query so each order's amount is counted exactly once while still excluding item-less orders.
+category: Build
+description: 'CONTEXT: A team operating PostgreSQL needs you to resolve `Fix the Revenue That Double-Counts
+  on a JOIN` during a realistic incident. The business impact is reduced service reliability until the
+  underlying state is repaired.
+
+
+  ENVIRONMENT: You are working in FixitLab''s offline PostgreSQL cluster with psql, pg_hba.conf, roles,
+  and WAL. All tools run locally; no paid APIs or external cloud calls are required.
+
+
+  SYMPTOM / STARTING STATE: A per-customer revenue report joins orders to order_items and does SUM(orders.amount),
+  but the one-to-many join fans each order out once per item, multiplying its amount. Restructure so each
+  order is counted once while still excluding orders with no items. A per-customer revenue report joins
+  `orders` to `order_items` so it can ignore orders with no line items, then does `SUM(orders.amount)`.
+  But joining to a one-to-many child fans each order row out once per item, so an order with 3 items has
+  its amount summed 3 times. The totals are inflated. Restructure the query so each order''s amount is
+  counted exactly once while still excluding item-less orders.
+
+
+  OBJECTIVE: {''Recognize a JOIN fan-out'': ''a 1-to-many join multiplies the parent rows''}; See how
+  SUM over fanned-out rows inflates the total; Count each order amount once while still requiring at least
+  one line item. Success means all hidden tests pass.
+
+
+  WHAT TO AVOID: Do not apply broad destructive changes, skip evidence gathering, or fake completion with
+  marker files — the checker validates real system state.'
 difficulty: medium
 scenario_type: fix
 lab_mode: simulation
@@ -20,113 +41,175 @@ objectives:
 - Recognize a JOIN fan-out: a 1-to-many join multiplies the parent rows
 - See how SUM over fanned-out rows inflates the total
 - Count each order amount once while still requiring at least one line item
-initial_state: A per-customer revenue report joins orders to order_items and does SUM(orders.amount), but
-  the one-to-many join fans each order out once per item, multiplying its amount. Restructure so each order
-  is counted once while still excluding orders with no items.
-solution_explanation: |
-  Joining a parent table to a one-to-many child duplicates each parent row once per matching child. When
+initial_state: A per-customer revenue report joins orders to order_items and does SUM(orders.amount),
+  but the one-to-many join fans each order out once per item, multiplying its amount. Restructure so each
+  order is counted once while still excluding orders with no items.
+solution_explanation: 'Joining a parent table to a one-to-many child duplicates each parent row once per
+  matching child. When
+
   you then SUM a parent column, every duplicate is added again — an order with 3 items contributes its
+
   amount 3 times. The clean fix decouples the two concerns: SUM the order amounts directly from `orders`
+
   (one row per order), and express "has at least one line item" as an EXISTS subquery (a semi-join) rather
+
   than a real JOIN, so the membership test never multiplies rows.
+
+  '
 coding_spec:
   language: python
   entrypoint: solution.py
   kind: fix
-  instructions: |
-    Fix solution(conn). It must return (customer_id, total_revenue) for each customer, where total_revenue
-    is the SUM of that customer's order amounts, counting each order exactly once. Only include orders that
+  instructions: 'Fix solution(conn). It must return (customer_id, total_revenue) for each customer, where
+    total_revenue
+
+    is the SUM of that customer''s order amounts, counting each order exactly once. Only include orders
+    that
+
     have at least one row in order_items (orders with no line items are excluded). Order by customer_id.
+
     The conn argument is a fresh sqlite3 connection with `orders(id, customer_id, amount)` and
+
     `order_items(id, order_id, sku)`.
+
     Click Run to try it, then Check Solution to grade against all tests.
+
+    '
   files:
   - path: solution.py
-    content: |
-      import sqlite3
-
-      def solution(conn):
-          # BUG: joining orders to its one-to-many order_items fans each order
-          # out once per item, so SUM(o.amount) counts an order's amount once
-          # per line item instead of once per order.
-          return conn.execute(
-              """
-              SELECT o.customer_id, SUM(o.amount) AS total_revenue
-              FROM orders o
-              JOIN order_items i ON i.order_id = o.id
-              GROUP BY o.customer_id
-              ORDER BY o.customer_id
-              """
-          ).fetchall()
+    content: "import sqlite3\n\ndef solution(conn):\n    # BUG: joining orders to its one-to-many order_items\
+      \ fans each order\n    # out once per item, so SUM(o.amount) counts an order's amount once\n   \
+      \ # per line item instead of once per order.\n    return conn.execute(\n        \"\"\"\n       \
+      \ SELECT o.customer_id, SUM(o.amount) AS total_revenue\n        FROM orders o\n        JOIN order_items\
+      \ i ON i.order_id = o.id\n        GROUP BY o.customer_id\n        ORDER BY o.customer_id\n     \
+      \   \"\"\"\n    ).fetchall()\n"
     readonly: false
   visible_tests:
   - name: amount counted once despite many items
-    code: |
-      import sqlite3
-      conn = sqlite3.connect(':memory:')
-      conn.executescript(
-          "CREATE TABLE orders (id INTEGER PRIMARY KEY, customer_id INTEGER, amount INTEGER);"
-          "CREATE TABLE order_items (id INTEGER PRIMARY KEY, order_id INTEGER, sku TEXT);"
-          "INSERT INTO orders VALUES (1,100,50),(2,100,30),(3,200,80);"
-          "INSERT INTO order_items VALUES (1,1,'a'),(2,1,'b'),(3,1,'c'),(4,2,'d'),(5,3,'e'),(6,3,'f');"
-      )
-      assert solution(conn) == [(100, 80), (200, 80)], solution(conn)
+    code: "import sqlite3\nconn = sqlite3.connect(':memory:')\nconn.executescript(\n    \"CREATE TABLE\
+      \ orders (id INTEGER PRIMARY KEY, customer_id INTEGER, amount INTEGER);\"\n    \"CREATE TABLE order_items\
+      \ (id INTEGER PRIMARY KEY, order_id INTEGER, sku TEXT);\"\n    \"INSERT INTO orders VALUES (1,100,50),(2,100,30),(3,200,80);\"\
+      \n    \"INSERT INTO order_items VALUES (1,1,'a'),(2,1,'b'),(3,1,'c'),(4,2,'d'),(5,3,'e'),(6,3,'f');\"\
+      \n)\nassert solution(conn) == [(100, 80), (200, 80)], solution(conn)\n"
   - name: customer total not inflated
-    code: |
-      import sqlite3
-      conn = sqlite3.connect(':memory:')
-      conn.executescript(
-          "CREATE TABLE orders (id INTEGER PRIMARY KEY, customer_id INTEGER, amount INTEGER);"
-          "CREATE TABLE order_items (id INTEGER PRIMARY KEY, order_id INTEGER, sku TEXT);"
-          "INSERT INTO orders VALUES (1,100,50),(2,100,30),(3,200,80);"
-          "INSERT INTO order_items VALUES (1,1,'a'),(2,1,'b'),(3,1,'c'),(4,2,'d'),(5,3,'e'),(6,3,'f');"
-      )
-      assert dict(solution(conn))[100] == 80, solution(conn)
+    code: "import sqlite3\nconn = sqlite3.connect(':memory:')\nconn.executescript(\n    \"CREATE TABLE\
+      \ orders (id INTEGER PRIMARY KEY, customer_id INTEGER, amount INTEGER);\"\n    \"CREATE TABLE order_items\
+      \ (id INTEGER PRIMARY KEY, order_id INTEGER, sku TEXT);\"\n    \"INSERT INTO orders VALUES (1,100,50),(2,100,30),(3,200,80);\"\
+      \n    \"INSERT INTO order_items VALUES (1,1,'a'),(2,1,'b'),(3,1,'c'),(4,2,'d'),(5,3,'e'),(6,3,'f');\"\
+      \n)\nassert dict(solution(conn))[100] == 80, solution(conn)\n"
   hidden_tests:
   - name: order with no items is excluded
-    code: |
-      import sqlite3
-      conn = sqlite3.connect(':memory:')
-      conn.executescript(
-          "CREATE TABLE orders (id INTEGER PRIMARY KEY, customer_id INTEGER, amount INTEGER);"
-          "CREATE TABLE order_items (id INTEGER PRIMARY KEY, order_id INTEGER, sku TEXT);"
-          "INSERT INTO orders VALUES (1,5,40),(2,5,10);"
-          "INSERT INTO order_items VALUES (1,1,'x'),(2,1,'y');"
-      )
-      assert solution(conn) == [(5, 40)], solution(conn)
+    code: "import sqlite3\nconn = sqlite3.connect(':memory:')\nconn.executescript(\n    \"CREATE TABLE\
+      \ orders (id INTEGER PRIMARY KEY, customer_id INTEGER, amount INTEGER);\"\n    \"CREATE TABLE order_items\
+      \ (id INTEGER PRIMARY KEY, order_id INTEGER, sku TEXT);\"\n    \"INSERT INTO orders VALUES (1,5,40),(2,5,10);\"\
+      \n    \"INSERT INTO order_items VALUES (1,1,'x'),(2,1,'y');\"\n)\nassert solution(conn) == [(5,\
+      \ 40)], solution(conn)\n"
   - name: heavy fan-out still counts once
-    code: |
-      import sqlite3
-      conn = sqlite3.connect(':memory:')
-      conn.executescript(
-          "CREATE TABLE orders (id INTEGER PRIMARY KEY, customer_id INTEGER, amount INTEGER);"
-          "CREATE TABLE order_items (id INTEGER PRIMARY KEY, order_id INTEGER, sku TEXT);"
-          "INSERT INTO orders VALUES (1,7,100);"
-          "INSERT INTO order_items VALUES (1,1,'a'),(2,1,'b'),(3,1,'c'),(4,1,'d'),(5,1,'e');"
-      )
-      assert solution(conn) == [(7, 100)], solution(conn)
+    code: "import sqlite3\nconn = sqlite3.connect(':memory:')\nconn.executescript(\n    \"CREATE TABLE\
+      \ orders (id INTEGER PRIMARY KEY, customer_id INTEGER, amount INTEGER);\"\n    \"CREATE TABLE order_items\
+      \ (id INTEGER PRIMARY KEY, order_id INTEGER, sku TEXT);\"\n    \"INSERT INTO orders VALUES (1,7,100);\"\
+      \n    \"INSERT INTO order_items VALUES (1,1,'a'),(2,1,'b'),(3,1,'c'),(4,1,'d'),(5,1,'e');\"\n)\n\
+      assert solution(conn) == [(7, 100)], solution(conn)\n"
   - name: multiple customers and orders
-    code: |
-      import sqlite3
-      conn = sqlite3.connect(':memory:')
-      conn.executescript(
-          "CREATE TABLE orders (id INTEGER PRIMARY KEY, customer_id INTEGER, amount INTEGER);"
-          "CREATE TABLE order_items (id INTEGER PRIMARY KEY, order_id INTEGER, sku TEXT);"
-          "INSERT INTO orders VALUES (1,1,10),(2,1,20),(3,2,5);"
-          "INSERT INTO order_items VALUES (1,1,'a'),(2,1,'b'),(3,2,'c'),(4,3,'d'),(5,3,'e');"
-      )
-      assert solution(conn) == [(1, 30), (2, 5)], solution(conn)
+    code: "import sqlite3\nconn = sqlite3.connect(':memory:')\nconn.executescript(\n    \"CREATE TABLE\
+      \ orders (id INTEGER PRIMARY KEY, customer_id INTEGER, amount INTEGER);\"\n    \"CREATE TABLE order_items\
+      \ (id INTEGER PRIMARY KEY, order_id INTEGER, sku TEXT);\"\n    \"INSERT INTO orders VALUES (1,1,10),(2,1,20),(3,2,5);\"\
+      \n    \"INSERT INTO order_items VALUES (1,1,'a'),(2,1,'b'),(3,2,'c'),(4,3,'d'),(5,3,'e');\"\n)\n\
+      assert solution(conn) == [(1, 30), (2, 5)], solution(conn)\n"
   timeout: 8
 hints:
 - order: 1
-  cost: 10
-  content: Run the buggy query on an order with several items — its amount appears in the total once per
-    item. The JOIN is duplicating the order row.
+  cost: 0
+  content: 'Where to look: Run `systemctl status postgresql` and `pg_isready` for connection state.'
 - order: 2
-  cost: 20
-  content: You need the order rows themselves (one per order), not the fanned-out join. Aggregate straight
-    from `orders`, and test "has items" without multiplying rows.
+  cost: 25
+  content: 'Diagnostic steps:
+
+    1. Check service status and `/var/log/postgresql/` logs.
+
+    2. Verify `pg_hba.conf` and `postgresql.conf` for listen addresses.
+
+    3. Test with `psql -U postgres -c ''SELECT 1''`.'
 - order: 3
-  cost: 30
-  content: 'SUM amounts from orders alone, and replace the JOIN with `WHERE EXISTS (SELECT 1 FROM
-    order_items i WHERE i.order_id = o.id)`.'
+  cost: 50
+  content: 'Exact fix + verification:
+
+    1. Fix auth rules, data directory permissions, or port conflict.
+
+    2. `systemctl restart postgresql`.
+
+    3. Confirm `pg_isready` reports accepting connections.
+
+
+    WHY: the database must accept connections, not just start.'
+summary: Complete the fix the revenue that double-counts on a join postgresql lab and verify success with
+  the checker
+estimated_minutes: 20
+xp_reward: 100
+prerequisites:
+- Basic postgresql literacy
+tags:
+- fix
+- hands-on
+- postgresql
+linked_tutorial: postgresql-fundamentals
+what_you_will_learn:
+- '{''Recognize a JOIN fan-out'': ''a 1-to-many join multiplies the parent rows''}'
+- See how SUM over fanned-out rows inflates the total
+- Count each order amount once while still requiring at least one line item
+environment:
+  nodes:
+  - role: primary
+    os: FixitLab PostgreSQL cluster
+    hostname: lab-primary
+    ip: 127.0.0.1
+    specs: local offline simulation
+  pre_installed:
+  - bash
+  - coreutils
+  - journalctl
+  - postgresql
+  - systemctl
+  credentials:
+  - user: root
+    password: lab123
+tasks:
+- id: task_1
+  title: Fix the Revenue That Double-Counts on a JOIN
+  description: Restore healthy behavior for Fix the Revenue That Double-Counts on a JOIN by investigating
+    the failure, applying the smallest safe fix, and validating the outcome.
+  background: 'This postgresql lab teaches systematic troubleshooting: observe, hypothesize, change, verify.'
+  validation:
+    type: custom_script
+    script: hidden_tests
+    error_message: One or more hidden tests failed. Read the public test output, fix your solution, and
+      submit again.
+solution:
+  summary: The solution passes all hidden tests by implementing the required behavior in code.
+  files_changed: []
+  commands_run: []
+  reference_docs: postgresql-fundamentals
+guided_mode:
+  enabled: true
+  steps:
+  - step: 1
+    title: Inspect current state
+    instruction: Run a read-only diagnostic before changing anything.
+    command: check.sh
+    expected_output: Output shows the current failure mode
+    explanation: Evidence-first troubleshooting avoids guessing.
+    next_on: command_success
+  - step: 2
+    title: Apply the minimal fix
+    instruction: Make one reversible change aligned with the objectives.
+    command: '# your fix command here'
+    expected_output: State moves toward the objective
+    explanation: Small changes make rollback easy if the hypothesis was wrong.
+    next_on: command_success
+  - step: 3
+    title: Verify with the grader
+    instruction: Run the same verification the checker uses.
+    command: check.sh
+    expected_output: all hidden tests pass
+    explanation: The lab passes only when real state is healthy.
+    next_on: command_success

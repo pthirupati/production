@@ -1,37 +1,123 @@
-title: "LDAP Anonymous Bind — Disable Unauthenticated Directory Access"
+title: LDAP Anonymous Bind - Disable Unauthenticated Directory
 slug: ldap-anonymous-bind
-technology: Security
-category: Hardening
+technology: security
+category: Fix
 difficulty: medium
 time_limit: 900
 max_score: 100
 infrastructure_type: docker
 jira_priority: High
 is_free: false
-description: |
-  An OpenLDAP server on the network is allowing anonymous binds, exposing the
-  full directory tree including employee usernames, email addresses, and
-  department information to any unauthenticated client. Confirm the anonymous
-  bind vulnerability, disable it in the slapd configuration, and verify that
-  unauthenticated queries are now rejected.
-objectives:
-  - Confirm anonymous bind works by querying the LDAP server without credentials
-  - Disable anonymous binds by setting olcDisallows: bind_anon in the cn=config entry
-  - Verify that anonymous ldapsearch now returns an error and requires authentication
-initial_state: |
-  Debian server running OpenLDAP (slapd) with dc=lab,dc=local as the base DN.
+description: 'CONTEXT: A team operating security hardening needs you to resolve `LDAP Anonymous Bind -
+  Disable Unauthenticated Directory` during a realistic incident. The business impact is reduced service
+  reliability until the underlying state is repaired.
+
+
+  ENVIRONMENT: You are working in FixitLab''s offline hardening lab with SSH, firewall, TLS, audit logs,
+  and IAM settings. All tools run locally; no paid APIs or external cloud calls are required.
+
+
+  SYMPTOM / STARTING STATE: Debian server running OpenLDAP (slapd) with dc=lab,dc=local as the base DN.
+
   Anonymous binds are currently allowed by default. ldap-utils is installed.
+
+  The LDAP admin DN is cn=admin,dc=lab,dc=local with password stored in /root/.ldaprc. An OpenLDAP server
+  on the network is allowing anonymous binds, exposing the
+
+  full directory tree including employee usernames, email addresses, and
+
+  department information to any unauthenticated client. Confirm the anonymous
+
+  bind vulnerability, disable it in the slapd configuration, and verify that
+
+  unauthenticated queries are now rejected.
+
+
+  OBJECTIVE: Confirm anonymous bind works by querying the LDAP server without credentials; {''Disable
+  anonymous binds by setting olcDisallows'': ''bind_anon in the cn=config entry''}; Verify that anonymous
+  ldapsearch now returns an error and requires authentication. Success means `check.sh` exits successfully.
+
+
+  WHAT TO AVOID: Do not apply broad destructive changes, skip evidence gathering, or fake completion with
+  marker files — the checker validates real system state.'
+objectives:
+- Confirm anonymous bind works by querying the LDAP server without credentials
+- Disable anonymous binds by setting olcDisallows: bind_anon in the cn=config entry
+- Verify that anonymous ldapsearch now returns an error and requires authentication
+initial_state: 'Debian server running OpenLDAP (slapd) with dc=lab,dc=local as the base DN.
+
+  Anonymous binds are currently allowed by default. ldap-utils is installed.
+
   The LDAP admin DN is cn=admin,dc=lab,dc=local with password stored in /root/.ldaprc.
+
+  '
 hints:
-  - order: 1
-    cost: 10
-    content: "Confirm the vulnerability: `ldapsearch -x -H ldap://localhost -b dc=lab,dc=local '(objectClass=*)' cn mail` — it should return results without credentials."
-  - order: 2
-    cost: 15
-    content: "Create an LDIF to disable anonymous bind: set `olcDisallows: bind_anon` in cn=config using `ldapmodify -Y EXTERNAL -H ldapi:///`."
-  - order: 3
-    cost: 20
-    content: "Apply the change: `ldapmodify -Y EXTERNAL -H ldapi:/// -f /tmp/disable-anon.ldif` where the LDIF modifies cn=config with `add: olcDisallows` / `olcDisallows: bind_anon`."
-  - order: 4
-    cost: 25
-    content: "Verify: `ldapsearch -x -H ldap://localhost -b dc=lab,dc=local` should now return `ldap_bind: Inappropriate authentication (48)` or similar error."
+- order: 1
+  cost: 0
+  content: 'Where to look: Confirm anonymous bind works by querying the LDAP server without credentials'
+- order: 2
+  cost: 25
+  content: 'Diagnostic steps:
+
+    1. {''Disable anonymous binds by setting olcDisallows'': ''bind_anon in the cn=config entry''}
+
+    2. Verify that anonymous ldapsearch now returns an error and requires authentication'
+- order: 3
+  cost: 50
+  content: 'Exact fix + verification:
+
+    1. Verify that anonymous ldapsearch now returns an error and requires authentication.
+
+    2. Re-run the lab checker (`check.sh` or Check Solution).
+
+    3. Confirm every scenario objective is satisfied.
+
+
+    WHY: the grader validates real state — marker files are ignored.'
+summary: Complete the ldap anonymous bind - disable unauthenticated directory security lab and verify
+  success with the checker
+estimated_minutes: 15
+xp_reward: 100
+prerequisites:
+- Basic security literacy
+tags:
+- fix
+- hands-on
+- security
+linked_tutorial: security-fundamentals
+what_you_will_learn:
+- Confirm anonymous bind works by querying the LDAP server without credentials
+- '{''Disable anonymous binds by setting olcDisallows'': ''bind_anon in the cn=config entry''}'
+- Verify that anonymous ldapsearch now returns an error and requires authentication
+environment:
+  nodes:
+  - role: primary
+    os: FixitLab hardening lab
+    hostname: lab-primary
+    ip: 127.0.0.1
+    specs: local offline simulation
+  pre_installed:
+  - bash
+  - coreutils
+  - journalctl
+  - security
+  - systemctl
+  credentials:
+  - user: root
+    password: lab123
+tasks:
+- id: task_1
+  title: LDAP Anonymous Bind - Disable Unauthenticated Directory
+  description: Restore healthy behavior for LDAP Anonymous Bind - Disable Unauthenticated Directory by
+    investigating the failure, applying the smallest safe fix, and validating the outcome.
+  background: 'This security lab teaches systematic troubleshooting: observe, hypothesize, change, verify.'
+  validation:
+    type: custom_script
+    script: check.sh
+    error_message: Validation did not pass. Re-read the objectives and Hint 2 diagnostic steps.
+solution:
+  summary: Identify the misconfiguration affecting this security lab and apply the minimal fix.
+  files_changed: []
+  commands_run:
+  - bash check.sh
+  reference_docs: security-fundamentals

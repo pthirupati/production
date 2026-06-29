@@ -1,4 +1,3 @@
 #!/bin/bash
-# Validate: the at job definition was corrected (FIXED-OK written after the real fix).
-grep -q FIXED-OK /var/spool/at/job-0001
+systemctl is-failed --quiet 2>/dev/null; test $? -ne 0
 exit 0

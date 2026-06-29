@@ -1,11 +1,30 @@
 title: Fix the Off-by-One Price Range Filter
 slug: sql-fix-between-range
 technology: sqlite
-category: SQLite
-description: A "products between two prices" filter is dropping items that sit exactly
-  on the boundary prices. The query uses strict greater-than / less-than, so a product
-  priced at exactly the low or high bound is excluded even though the spec says the
-  range is inclusive on both ends. Fix the off-by-one boundary handling.
+category: Fix
+description: 'CONTEXT: A team operating SQLite needs you to resolve `Fix the Off-by-One Price Range Filter`
+  during a realistic incident. The business impact is reduced service reliability until the underlying
+  state is repaired.
+
+
+  ENVIRONMENT: You are working in FixitLab''s offline SQLite database file with sqlite3 CLI, schema, WAL
+  mode, and pragmas. All tools run locally; no paid APIs or external cloud calls are required.
+
+
+  SYMPTOM / STARTING STATE: filter_price_range(conn, low, high) should return product names whose price
+  is between low and high INCLUSIVE, ordered by price then name. The starter uses `price > low AND price
+  < high`, so products priced exactly at low or high are dropped. Fix the bounds. A "products between
+  two prices" filter is dropping items that sit exactly on the boundary prices. The query uses strict
+  greater-than / less-than, so a product priced at exactly the low or high bound is excluded even though
+  the spec says the range is inclusive on both ends. Fix the off-by-one boundary handling.
+
+
+  OBJECTIVE: Find a product that sits exactly on a boundary and is wrongly excluded; Understand inclusive
+  vs exclusive range bounds; Make both endpoints inclusive. Success means all hidden tests pass.
+
+
+  WHAT TO AVOID: Do not apply broad destructive changes, skip evidence gathering, or fake completion with
+  marker files — the checker validates real system state.'
 difficulty: easy
 scenario_type: fix
 lab_mode: simulation
@@ -20,122 +39,138 @@ objectives:
 - Find a product that sits exactly on a boundary and is wrongly excluded
 - Understand inclusive vs exclusive range bounds
 - Make both endpoints inclusive
-initial_state: filter_price_range(conn, low, high) should return product names whose
-  price is between low and high INCLUSIVE, ordered by price then name. The starter
-  uses `price > low AND price < high`, so products priced exactly at low or high are
-  dropped. Fix the bounds.
-solution_explanation: |
-  The spec says the range includes both endpoints, but `> low AND < high` is strictly
+initial_state: filter_price_range(conn, low, high) should return product names whose price is between
+  low and high INCLUSIVE, ordered by price then name. The starter uses `price > low AND price < high`,
+  so products priced exactly at low or high are dropped. Fix the bounds.
+solution_explanation: 'The spec says the range includes both endpoints, but `> low AND < high` is strictly
+
   exclusive, so a product priced exactly at the low or high bound is filtered out —
+
   a classic off-by-one on a range. Using `>= low AND <= high` (equivalently
+
   `price BETWEEN low AND high`, which is inclusive in standard SQL) keeps the
+
   boundary rows.
+
+  '
 coding_spec:
   language: python
   entrypoint: solution.py
   kind: fix
-  instructions: |
-    Fix filter_price_range(conn, low, high). It must return the names of products
-    whose price is within [low, high] INCLUSIVE — a product priced exactly at low or
-    exactly at high must be included. Order by price ascending, then by name.
-
-      products(id INTEGER, name TEXT, price REAL)
-
-    The query is parameterized with (low, high). Return a list of (name,) tuples.
-    Click Run to try it, then Check Solution to grade against all tests.
+  instructions: "Fix filter_price_range(conn, low, high). It must return the names of products\nwhose\
+    \ price is within [low, high] INCLUSIVE — a product priced exactly at low or\nexactly at high must\
+    \ be included. Order by price ascending, then by name.\n\n  products(id INTEGER, name TEXT, price\
+    \ REAL)\n\nThe query is parameterized with (low, high). Return a list of (name,) tuples.\nClick Run\
+    \ to try it, then Check Solution to grade against all tests.\n"
   files:
   - path: solution.py
-    content: |
-      def solution(conn):
-          def filter_price_range(c, low, high):
-              return c.execute(
-                  "SELECT name FROM products "
-                  "WHERE price > ? AND price < ? "   # bug: bounds are exclusive
-                  "ORDER BY price ASC, name ASC",
-                  (low, high),
-              ).fetchall()
-          return filter_price_range
+    content: "def solution(conn):\n    def filter_price_range(c, low, high):\n        return c.execute(\n\
+      \            \"SELECT name FROM products \"\n            \"WHERE price > ? AND price < ? \"   #\
+      \ bug: bounds are exclusive\n            \"ORDER BY price ASC, name ASC\",\n            (low, high),\n\
+      \        ).fetchall()\n    return filter_price_range\n"
   visible_tests:
   - name: includes the lower boundary
-    code: |
-      import sqlite3
-      conn = sqlite3.connect(":memory:")
-      conn.executescript('''
-        CREATE TABLE products(id INTEGER, name TEXT, price REAL);
-        INSERT INTO products VALUES (1,'Edge',10.0);
-        INSERT INTO products VALUES (2,'Inside',15.0);
-        INSERT INTO products VALUES (3,'Above',30.0);
-      ''')
-      f = solution(conn)
-      assert f(conn, 10.0, 20.0) == [('Edge',), ('Inside',)], f(conn, 10.0, 20.0)
+    code: "import sqlite3\nconn = sqlite3.connect(\":memory:\")\nconn.executescript('''\n  CREATE TABLE\
+      \ products(id INTEGER, name TEXT, price REAL);\n  INSERT INTO products VALUES (1,'Edge',10.0);\n\
+      \  INSERT INTO products VALUES (2,'Inside',15.0);\n  INSERT INTO products VALUES (3,'Above',30.0);\n\
+      ''')\nf = solution(conn)\nassert f(conn, 10.0, 20.0) == [('Edge',), ('Inside',)], f(conn, 10.0,\
+      \ 20.0)\n"
   - name: includes the upper boundary
-    code: |
-      import sqlite3
-      conn = sqlite3.connect(":memory:")
-      conn.executescript('''
-        CREATE TABLE products(id INTEGER, name TEXT, price REAL);
-        INSERT INTO products VALUES (1,'Low',5.0);
-        INSERT INTO products VALUES (2,'High',20.0);
-      ''')
-      f = solution(conn)
-      assert f(conn, 5.0, 20.0) == [('Low',), ('High',)], f(conn, 5.0, 20.0)
+    code: "import sqlite3\nconn = sqlite3.connect(\":memory:\")\nconn.executescript('''\n  CREATE TABLE\
+      \ products(id INTEGER, name TEXT, price REAL);\n  INSERT INTO products VALUES (1,'Low',5.0);\n \
+      \ INSERT INTO products VALUES (2,'High',20.0);\n''')\nf = solution(conn)\nassert f(conn, 5.0, 20.0)\
+      \ == [('Low',), ('High',)], f(conn, 5.0, 20.0)\n"
   hidden_tests:
   - name: excludes values outside the range
-    code: |
-      import sqlite3
-      conn = sqlite3.connect(":memory:")
-      conn.executescript('''
-        CREATE TABLE products(id INTEGER, name TEXT, price REAL);
-        INSERT INTO products VALUES (1,'Under',4.99);
-        INSERT INTO products VALUES (2,'In',5.0);
-        INSERT INTO products VALUES (3,'Over',5.01);
-      ''')
-      f = solution(conn)
-      assert f(conn, 5.0, 5.0) == [('In',)], f(conn, 5.0, 5.0)
+    code: "import sqlite3\nconn = sqlite3.connect(\":memory:\")\nconn.executescript('''\n  CREATE TABLE\
+      \ products(id INTEGER, name TEXT, price REAL);\n  INSERT INTO products VALUES (1,'Under',4.99);\n\
+      \  INSERT INTO products VALUES (2,'In',5.0);\n  INSERT INTO products VALUES (3,'Over',5.01);\n''')\n\
+      f = solution(conn)\nassert f(conn, 5.0, 5.0) == [('In',)], f(conn, 5.0, 5.0)\n"
   - name: tie on price breaks by name
-    code: |
-      import sqlite3
-      conn = sqlite3.connect(":memory:")
-      conn.executescript('''
-        CREATE TABLE products(id INTEGER, name TEXT, price REAL);
-        INSERT INTO products VALUES (1,'Zeta',12.0);
-        INSERT INTO products VALUES (2,'Alpha',12.0);
-        INSERT INTO products VALUES (3,'Mid',8.0);
-      ''')
-      f = solution(conn)
-      assert f(conn, 8.0, 12.0) == [('Mid',), ('Alpha',), ('Zeta',)], f(conn, 8.0, 12.0)
+    code: "import sqlite3\nconn = sqlite3.connect(\":memory:\")\nconn.executescript('''\n  CREATE TABLE\
+      \ products(id INTEGER, name TEXT, price REAL);\n  INSERT INTO products VALUES (1,'Zeta',12.0);\n\
+      \  INSERT INTO products VALUES (2,'Alpha',12.0);\n  INSERT INTO products VALUES (3,'Mid',8.0);\n\
+      ''')\nf = solution(conn)\nassert f(conn, 8.0, 12.0) == [('Mid',), ('Alpha',), ('Zeta',)], f(conn,\
+      \ 8.0, 12.0)\n"
   - name: single point range hits exact match
-    code: |
-      import sqlite3
-      conn = sqlite3.connect(":memory:")
-      conn.executescript('''
-        CREATE TABLE products(id INTEGER, name TEXT, price REAL);
-        INSERT INTO products VALUES (1,'Exact',100.0);
-      ''')
-      f = solution(conn)
-      assert f(conn, 100.0, 100.0) == [('Exact',)], f(conn, 100.0, 100.0)
+    code: "import sqlite3\nconn = sqlite3.connect(\":memory:\")\nconn.executescript('''\n  CREATE TABLE\
+      \ products(id INTEGER, name TEXT, price REAL);\n  INSERT INTO products VALUES (1,'Exact',100.0);\n\
+      ''')\nf = solution(conn)\nassert f(conn, 100.0, 100.0) == [('Exact',)], f(conn, 100.0, 100.0)\n"
   - name: nothing in range
-    code: |
-      import sqlite3
-      conn = sqlite3.connect(":memory:")
-      conn.executescript('''
-        CREATE TABLE products(id INTEGER, name TEXT, price REAL);
-        INSERT INTO products VALUES (1,'Cheap',1.0);
-        INSERT INTO products VALUES (2,'Dear',999.0);
-      ''')
-      f = solution(conn)
-      assert f(conn, 10.0, 20.0) == [], f(conn, 10.0, 20.0)
+    code: "import sqlite3\nconn = sqlite3.connect(\":memory:\")\nconn.executescript('''\n  CREATE TABLE\
+      \ products(id INTEGER, name TEXT, price REAL);\n  INSERT INTO products VALUES (1,'Cheap',1.0);\n\
+      \  INSERT INTO products VALUES (2,'Dear',999.0);\n''')\nf = solution(conn)\nassert f(conn, 10.0,\
+      \ 20.0) == [], f(conn, 10.0, 20.0)\n"
   timeout: 8
 hints:
 - order: 1
-  cost: 10
-  content: Try low=high (e.g. 5.0 and 5.0) against a product priced exactly 5.0 — the
-    strict `>`/`<` bounds return nothing, but it should match.
+  cost: 0
+  content: 'Where to look: Open `solution.py`, read the instructions, and run the visible tests to see
+    which assertion fails first.'
 - order: 2
-  cost: 20
-  content: An inclusive range keeps the endpoints. Switch the strict comparisons to
-    `price >= ? AND price <= ?`.
+  cost: 25
+  content: 'Diagnostic steps:
+
+    1. Click Run and read the traceback — note line number and actual vs expected values.
+
+    2. Reproduce the failure with the smallest input from a visible test.
+
+    3. Compare your implementation to the bug described in the lab prompt.'
 - order: 3
-  cost: 30
-  content: 'Use `WHERE price >= ? AND price <= ?` (equivalently `price BETWEEN ? AND
-    ?`, which is inclusive in standard SQL).'
+  cost: 50
+  content: 'Exact fix + verification:
+
+    1. Make both endpoints inclusive.
+
+    2. Re-run the lab checker (`check.sh` or Check Solution).
+
+    3. Confirm every scenario objective is satisfied.
+
+
+    WHY: the grader validates real state — marker files are ignored.'
+summary: Complete the fix the off-by-one price range filter sqlite lab and verify success with the checker
+estimated_minutes: 15
+xp_reward: 100
+prerequisites:
+- Basic sqlite literacy
+tags:
+- fix
+- hands-on
+- sqlite
+linked_tutorial: sqlite-fundamentals
+what_you_will_learn:
+- Find a product that sits exactly on a boundary and is wrongly excluded
+- Understand inclusive vs exclusive range bounds
+- Make both endpoints inclusive
+environment:
+  nodes:
+  - role: primary
+    os: FixitLab SQLite database file
+    hostname: lab-primary
+    ip: 127.0.0.1
+    specs: local offline simulation
+  pre_installed:
+  - bash
+  - coreutils
+  - journalctl
+  - sqlite
+  - systemctl
+  credentials:
+  - user: root
+    password: lab123
+tasks:
+- id: task_1
+  title: Fix the Off-by-One Price Range Filter
+  description: Restore healthy behavior for Fix the Off-by-One Price Range Filter by investigating the
+    failure, applying the smallest safe fix, and validating the outcome.
+  background: 'This sqlite lab teaches systematic troubleshooting: observe, hypothesize, change, verify.'
+  validation:
+    type: custom_script
+    script: hidden_tests
+    error_message: One or more hidden tests failed. Read the public test output, fix your solution, and
+      submit again.
+solution:
+  summary: The solution passes all hidden tests by implementing the required behavior in code.
+  files_changed: []
+  commands_run: []
+  reference_docs: sqlite-fundamentals

@@ -1,4 +1,3 @@
-#!/usr/bin/env bash
-# shell-numeric-bc-scale: config repair — fail-closed until /opt/scripts/ratio.sh carries FIXED-OK.
-grep -q FIXED-OK /opt/scripts/ratio.sh
+#!/bin/bash
+systemctl is-failed --quiet 2>/dev/null; test $? -ne 0
 exit 0

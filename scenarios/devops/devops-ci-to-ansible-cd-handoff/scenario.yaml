@@ -1,24 +1,57 @@
-title: "CI → Ansible CD: Pipeline Artifact Never Reaches the Release Play"
+title: 'CI → Ansible CD: Pipeline Artifact Never Reaches the Release'
 slug: devops-ci-to-ansible-cd-handoff
-technology: DevOps
-category: CI/CD Handoff
+technology: devops
+category: Build
 difficulty: medium
-description: |
-  CROSS-TECHNOLOGY task (DevOps/CI -> Ansible). The CI job builds an artifact and
-  the deploy stage hands off to an Ansible release play at
-  /home/ansible/cd-playbook.yml. The handoff is broken: the play reads an
-  artifact-version variable from the wrong fact, downloads from a stale artifact
-  URL, and targets a host group the inventory does not define — so the CD stage
-  fails and nothing is deployed. Fix the Ansible release play so the CI artifact is
-  actually rolled out.
-initial_state: |
-  A DevOps control host. /home/ansible/cd-playbook.yml references the wrong
+description: 'CONTEXT: A team operating DevOps delivery needs you to resolve `CI → Ansible CD: Pipeline
+  Artifact Never Reaches the Release` during a realistic incident. The business impact is reduced service
+  reliability until the underlying state is repaired.
+
+
+  ENVIRONMENT: You are working in FixitLab''s offline CI/CD lab with git repos, pipelines, artifacts,
+  and runbooks. All tools run locally; no paid APIs or external cloud calls are required.
+
+
+  SYMPTOM / STARTING STATE: A DevOps control host. /home/ansible/cd-playbook.yml references the wrong
+
   artifact-version variable, a stale artifact URL, and an undefined host group, so
+
+  the CD stage that runs it fails immediately after CI. CROSS-TECHNOLOGY task (DevOps/CI -> Ansible).
+  The CI job builds an artifact and
+
+  the deploy stage hands off to an Ansible release play at
+
+  /home/ansible/cd-playbook.yml. The handoff is broken: the play reads an
+
+  artifact-version variable from the wrong fact, downloads from a stale artifact
+
+  URL, and targets a host group the inventory does not define — so the CD stage
+
+  fails and nothing is deployed. Fix the Ansible release play so the CI artifact is
+
+  actually rolled out.
+
+
+  OBJECTIVE: Trace the failed CD stage to the release play and identify the wrong variable, URL, and host
+  group; Correct /home/ansible/cd-playbook.yml so it consumes the CI artifact version/URL and targets
+  a real group; Confirm the play is corrected so the CI -> Ansible CD handoff completes. Success means
+  `check.sh` exits successfully.
+
+
+  WHAT TO AVOID: Do not apply broad destructive changes, skip evidence gathering, or fake completion with
+  marker files — the checker validates real system state.'
+initial_state: 'A DevOps control host. /home/ansible/cd-playbook.yml references the wrong
+
+  artifact-version variable, a stale artifact URL, and an undefined host group, so
+
   the CD stage that runs it fails immediately after CI.
+
+  '
 objectives:
-  - Trace the failed CD stage to the release play and identify the wrong variable, URL, and host group
-  - Correct /home/ansible/cd-playbook.yml so it consumes the CI artifact version/URL and targets a real group
-  - Confirm the play is corrected so the CI -> Ansible CD handoff completes
+- Trace the failed CD stage to the release play and identify the wrong variable, URL, and host group
+- Correct /home/ansible/cd-playbook.yml so it consumes the CI artifact version/URL and targets a real
+  group
+- Confirm the play is corrected so the CI -> Ansible CD handoff completes
 lab_mode: simulation
 simulation_type: ansible
 cross_technology: true
@@ -28,12 +61,99 @@ is_free: false
 jira_priority: High
 dual_terminal: false
 hints:
-  - order: 1
-    cost: 10
-    content: "The CD stage passes the build version to Ansible — the play must read THAT variable, not a hard-coded/old one, and use the current artifact URL."
-  - order: 2
-    cost: 15
-    content: "Fix the `hosts:` group to one the inventory actually defines, and wire the artifact version/URL from the CI-provided extra-vars."
-  - order: 3
-    cost: 20
-    content: "Once /home/ansible/cd-playbook.yml is corrected, `ansible-playbook cd-playbook.yml -e build_version=...` deploys the artifact."
+- order: 1
+  cost: 0
+  content: 'Where to look: Trace the failed CD stage to the release play and identify the wrong variable,
+    URL, and host group'
+- order: 2
+  cost: 25
+  content: 'Diagnostic steps:
+
+    1. Correct /home/ansible/cd-playbook.yml so it consumes the CI artifact version/URL and targets a
+    real group
+
+    2. Confirm the play is corrected so the CI -> Ansible CD handoff completes'
+- order: 3
+  cost: 50
+  content: 'Exact fix + verification:
+
+    1. Confirm the play is corrected so the CI -> Ansible CD handoff completes.
+
+    2. Re-run the lab checker (`check.sh` or Check Solution).
+
+    3. Confirm every scenario objective is satisfied.
+
+
+    WHY: the grader validates real state — marker files are ignored.'
+summary: 'Complete the ci → ansible cd: pipeline artifact never reaches the release devops lab and verify
+  success with the checker'
+estimated_minutes: 20
+xp_reward: 100
+prerequisites:
+- Basic devops literacy
+tags:
+- devops
+- fix
+- hands-on
+linked_tutorial: devops-fundamentals
+what_you_will_learn:
+- Trace the failed CD stage to the release play and identify the wrong variable, URL, and host group
+- Correct /home/ansible/cd-playbook.yml so it consumes the CI artifact version/URL and targets a real
+  group
+- Confirm the play is corrected so the CI -> Ansible CD handoff completes
+environment:
+  nodes:
+  - role: primary
+    os: FixitLab CI/CD lab
+    hostname: lab-primary
+    ip: 127.0.0.1
+    specs: local offline simulation
+  pre_installed:
+  - bash
+  - coreutils
+  - devops
+  - journalctl
+  - systemctl
+  credentials:
+  - user: root
+    password: lab123
+tasks:
+- id: task_1
+  title: 'CI → Ansible CD: Pipeline Artifact Never Reaches the Release'
+  description: 'Restore healthy behavior for CI → Ansible CD: Pipeline Artifact Never Reaches the Release
+    by investigating the failure, applying the smallest safe fix, and validating the outcome.'
+  background: 'This devops lab teaches systematic troubleshooting: observe, hypothesize, change, verify.'
+  validation:
+    type: custom_script
+    script: check.sh
+    error_message: Validation did not pass. Re-read the objectives and Hint 2 diagnostic steps.
+solution:
+  summary: Identify the misconfiguration affecting this devops lab and apply the minimal fix.
+  files_changed: []
+  commands_run:
+  - bash check.sh
+  reference_docs: devops-fundamentals
+guided_mode:
+  enabled: true
+  steps:
+  - step: 1
+    title: Inspect current state
+    instruction: Run a read-only diagnostic before changing anything.
+    command: check.sh
+    expected_output: Output shows the current failure mode
+    explanation: Evidence-first troubleshooting avoids guessing.
+    next_on: command_success
+  - step: 2
+    title: Apply the minimal fix
+    instruction: Make one reversible change aligned with the objectives.
+    command: '# your fix command here'
+    expected_output: State moves toward the objective
+    explanation: Small changes make rollback easy if the hypothesis was wrong.
+    next_on: command_success
+  - step: 3
+    title: Verify with the grader
+    instruction: Run the same verification the checker uses.
+    command: check.sh
+    expected_output: '`check.sh` exits successfully'
+    explanation: The lab passes only when real state is healthy.
+    next_on: command_success

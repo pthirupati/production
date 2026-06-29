@@ -1,9 +1,28 @@
 title: Discover live hosts on the subnet
 slug: nmap-discover-live-hosts
-category: Nmap Network Scanning
-description: You are dropped onto an unfamiliar 10.10.10.0/24 lab network and asked to map which
-  hosts are actually alive. Open the in-app Nmap simulator and run a host-discovery (ping) sweep
-  to find every responsive host on the subnet.
+category: Fix
+description: 'CONTEXT: A team operating network scanning needs you to resolve `Discover live hosts on
+  the subnet` during a realistic incident. The business impact is reduced service reliability until the
+  underlying state is repaired.
+
+
+  ENVIRONMENT: You are working in FixitLab''s offline scanning lab with nmap CLI, targets, and scan output.
+  All tools run locally; no paid APIs or external cloud calls are required.
+
+
+  SYMPTOM / STARTING STATE: The Nmap console starts with no hosts discovered. The /24 has several live
+  hosts plus unassigned addresses; you must scan to learn which are up. You are dropped onto an unfamiliar
+  10.10.10.0/24 lab network and asked to map which hosts are actually alive. Open the in-app Nmap simulator
+  and run a host-discovery (ping) sweep to find every responsive host on the subnet.
+
+
+  OBJECTIVE: Open the Nmap simulator from the lab toolbar (Open Nmap); Run a host-discovery / ping sweep
+  across 10.10.10.0/24 (nmap -sn 10.10.10.0/24); Discover the live hosts on the network (the gateway,
+  web, database, and Windows app servers). Success means `check.sh` exits successfully.
+
+
+  WHAT TO AVOID: Do not apply broad destructive changes, skip evidence gathering, or fake completion with
+  marker files — the checker validates real system state.'
 difficulty: easy
 lab_mode: simulation
 simulation_type: nmap
@@ -17,18 +36,74 @@ objectives:
 - Open the Nmap simulator from the lab toolbar (Open Nmap)
 - Run a host-discovery / ping sweep across 10.10.10.0/24 (nmap -sn 10.10.10.0/24)
 - Discover the live hosts on the network (the gateway, web, database, and Windows app servers)
-initial_state: The Nmap console starts with no hosts discovered. The /24 has several live hosts plus
-  unassigned addresses; you must scan to learn which are up.
+initial_state: The Nmap console starts with no hosts discovered. The /24 has several live hosts plus unassigned
+  addresses; you must scan to learn which are up.
 hints:
 - order: 1
-  cost: 10
-  content: Open the Nmap simulator (toolbar -> Open Nmap). A ping/host-discovery sweep uses the -sn flag
-    and skips port scanning, e.g. nmap -sn 10.10.10.0/24.
+  cost: 0
+  content: 'Where to look: Open the Nmap simulator from the lab toolbar (Open Nmap)'
 - order: 2
-  cost: 15
-  content: Scan the whole subnet at once with CIDR notation (10.10.10.0/24) rather than one IP at a time.
-    The Discovered Hosts panel updates with each live host that answers.
+  cost: 25
+  content: 'Diagnostic steps:
+
+    1. Run a host-discovery / ping sweep across 10.10.10.0/24 (nmap -sn 10.10.10.0/24)
+
+    2. Discover the live hosts on the network (the gateway, web, database, and Windows app servers)'
 - order: 3
-  cost: 20
-  content: You need the four primary servers responding to ICMP. Some addresses are unassigned (no
-    reply) and a hardened bastion ignores ping — those are not required for this task.
+  cost: 50
+  content: 'Exact fix + verification:
+
+    1. Discover the live hosts on the network (the gateway, web, database, and Windows app servers).
+
+    2. Re-run the lab checker (`check.sh` or Check Solution).
+
+    3. Confirm every scenario objective is satisfied.
+
+
+    WHY: the grader validates real state — marker files are ignored.'
+summary: Complete the discover live hosts on the subnet nmap lab and verify success with the checker
+estimated_minutes: 15
+xp_reward: 100
+prerequisites:
+- Basic nmap literacy
+tags:
+- fix
+- hands-on
+- nmap
+linked_tutorial: nmap-fundamentals
+what_you_will_learn:
+- Open the Nmap simulator from the lab toolbar (Open Nmap)
+- Run a host-discovery / ping sweep across 10.10.10.0/24 (nmap -sn 10.10.10.0/24)
+- Discover the live hosts on the network (the gateway, web, database, and Windows app servers)
+environment:
+  nodes:
+  - role: primary
+    os: FixitLab scanning lab
+    hostname: lab-primary
+    ip: 127.0.0.1
+    specs: local offline simulation
+  pre_installed:
+  - bash
+  - coreutils
+  - journalctl
+  - nmap
+  - systemctl
+  credentials:
+  - user: root
+    password: lab123
+tasks:
+- id: task_1
+  title: Discover live hosts on the subnet
+  description: Restore healthy behavior for Discover live hosts on the subnet by investigating the failure,
+    applying the smallest safe fix, and validating the outcome.
+  background: 'This nmap lab teaches systematic troubleshooting: observe, hypothesize, change, verify.'
+  validation:
+    type: custom_script
+    script: check.sh
+    error_message: Validation did not pass. Re-read the objectives and Hint 2 diagnostic steps.
+solution:
+  summary: Identify the misconfiguration affecting this nmap lab and apply the minimal fix.
+  files_changed: []
+  commands_run:
+  - bash check.sh
+  reference_docs: nmap-fundamentals

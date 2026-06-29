@@ -1,10 +1,31 @@
 title: Inner-Join Two Datasets on a Key
 slug: ds-join-datasets-by-key
 technology: data-science
-category: Data Science & Analytics
-description: A report enriches order rows with the customer's city by joining two lists on customer_id,
-  but the starter uses a nested scan that keeps the FIRST customer match it finds and never stops, so
-  orders get attached to the wrong city when ids repeat or are missing. Build a correct keyed join.
+category: Fix
+description: 'CONTEXT: A team operating data science needs you to resolve `Inner-Join Two Datasets on
+  a Key` during a realistic incident. The business impact is reduced service reliability until the underlying
+  state is repaired.
+
+
+  ENVIRONMENT: You are working in FixitLab''s offline notebook lab with pandas/notebook workflows, joins,
+  and charts. All tools run locally; no paid APIs or external cloud calls are required.
+
+
+  SYMPTOM / STARTING STATE: A report enriches order rows with the customer''s city by joining two lists
+  on customer_id, but the starter''s nested scan grabs the wrong customer (it does not match the id correctly)
+  and emits orders even when no customer matches. Build an inner join keyed on customer_id. A report enriches
+  order rows with the customer''s city by joining two lists on customer_id, but the starter uses a nested
+  scan that keeps the FIRST customer match it finds and never stops, so orders get attached to the wrong
+  city when ids repeat or are missing. Build a correct keyed join.
+
+
+  OBJECTIVE: Index one dataset by its key for O(1) lookup; {''Inner-join'': ''emit a row only when the
+  key exists on both sides''}; Carry the right fields from each side into the joined row. Success means
+  all hidden tests pass.
+
+
+  WHAT TO AVOID: Do not apply broad destructive changes, skip evidence gathering, or fake completion with
+  marker files — the checker validates real system state.'
 difficulty: medium
 scenario_type: fix
 lab_mode: simulation
@@ -22,76 +43,137 @@ objectives:
 initial_state: A report enriches order rows with the customer's city by joining two lists on customer_id,
   but the starter's nested scan grabs the wrong customer (it does not match the id correctly) and emits
   orders even when no customer matches. Build an inner join keyed on customer_id.
-solution_explanation: |
-  Build a dict mapping customer_id -> city first, then iterate orders and look each id up. Emit a joined
+solution_explanation: 'Build a dict mapping customer_id -> city first, then iterate orders and look each
+  id up. Emit a joined
+
   row {"order_id", "city"} ONLY when the id is present in the customer index (inner join). The starter
+
   matched on the wrong condition and emitted unmatched orders, attaching wrong or missing cities.
+
+  '
 coding_spec:
   language: python
   entrypoint: solution.py
   kind: fix
-  instructions: |
-    Fix solution(orders, customers): orders is a list of {"order_id", "customer_id"}; customers is a list
-    of {"customer_id", "city"}. Return a list of {"order_id", "city"} for every order whose customer_id
-    matches a customer (INNER join), preserving the order of `orders`. Drop orders with no matching customer.
-      orders=[{"order_id":1,"customer_id":7}], customers=[{"customer_id":7,"city":"NYC"}]
-        -> [{"order_id":1,"city":"NYC"}]
-    Click Run to try it, then Check Solution to grade against all tests.
+  instructions: "Fix solution(orders, customers): orders is a list of {\"order_id\", \"customer_id\"};\
+    \ customers is a list\nof {\"customer_id\", \"city\"}. Return a list of {\"order_id\", \"city\"} for\
+    \ every order whose customer_id\nmatches a customer (INNER join), preserving the order of `orders`.\
+    \ Drop orders with no matching customer.\n  orders=[{\"order_id\":1,\"customer_id\":7}], customers=[{\"\
+    customer_id\":7,\"city\":\"NYC\"}]\n    -> [{\"order_id\":1,\"city\":\"NYC\"}]\nClick Run to try it,\
+    \ then Check Solution to grade against all tests.\n"
   files:
   - path: solution.py
-    content: |
-      def solution(orders, customers):
-          out = []
-          for o in orders:
-              city = None
-              for c in customers:
-                  # BUG: this matches on the wrong field and never breaks, so the
-                  # LAST customer wins and orders with no match still get emitted.
-                  if c["customer_id"] or True:
-                      city = c["city"]
-              out.append({"order_id": o["order_id"], "city": city})
-          return out
+    content: "def solution(orders, customers):\n    out = []\n    for o in orders:\n        city = None\n\
+      \        for c in customers:\n            # BUG: this matches on the wrong field and never breaks,\
+      \ so the\n            # LAST customer wins and orders with no match still get emitted.\n       \
+      \     if c[\"customer_id\"] or True:\n                city = c[\"city\"]\n        out.append({\"\
+      order_id\": o[\"order_id\"], \"city\": city})\n    return out\n"
     readonly: false
   visible_tests:
   - name: joins matching ids
-    code: |
-      orders = [{"order_id": 1, "customer_id": 7}, {"order_id": 2, "customer_id": 8}]
-      customers = [{"customer_id": 7, "city": "NYC"}, {"customer_id": 8, "city": "LA"}]
-      assert solution(orders, customers) == [
-          {"order_id": 1, "city": "NYC"}, {"order_id": 2, "city": "LA"}], solution(orders, customers)
+    code: "orders = [{\"order_id\": 1, \"customer_id\": 7}, {\"order_id\": 2, \"customer_id\": 8}]\ncustomers\
+      \ = [{\"customer_id\": 7, \"city\": \"NYC\"}, {\"customer_id\": 8, \"city\": \"LA\"}]\nassert solution(orders,\
+      \ customers) == [\n    {\"order_id\": 1, \"city\": \"NYC\"}, {\"order_id\": 2, \"city\": \"LA\"\
+      }], solution(orders, customers)\n"
   - name: drops unmatched order
-    code: |
-      orders = [{"order_id": 1, "customer_id": 7}, {"order_id": 2, "customer_id": 99}]
+    code: 'orders = [{"order_id": 1, "customer_id": 7}, {"order_id": 2, "customer_id": 99}]
+
       customers = [{"customer_id": 7, "city": "NYC"}]
+
       assert solution(orders, customers) == [{"order_id": 1, "city": "NYC"}], solution(orders, customers)
+
+      '
   hidden_tests:
   - name: preserves order of orders
-    code: |
-      orders = [{"order_id": 3, "customer_id": 2}, {"order_id": 1, "customer_id": 1}]
-      customers = [{"customer_id": 1, "city": "A"}, {"customer_id": 2, "city": "B"}]
-      assert solution(orders, customers) == [
-          {"order_id": 3, "city": "B"}, {"order_id": 1, "city": "A"}], solution(orders, customers)
+    code: "orders = [{\"order_id\": 3, \"customer_id\": 2}, {\"order_id\": 1, \"customer_id\": 1}]\ncustomers\
+      \ = [{\"customer_id\": 1, \"city\": \"A\"}, {\"customer_id\": 2, \"city\": \"B\"}]\nassert solution(orders,\
+      \ customers) == [\n    {\"order_id\": 3, \"city\": \"B\"}, {\"order_id\": 1, \"city\": \"A\"}],\
+      \ solution(orders, customers)\n"
   - name: many orders share one customer
-    code: |
-      orders = [{"order_id": 1, "customer_id": 5}, {"order_id": 2, "customer_id": 5}]
-      customers = [{"customer_id": 5, "city": "SF"}]
-      assert solution(orders, customers) == [
-          {"order_id": 1, "city": "SF"}, {"order_id": 2, "city": "SF"}], solution(orders, customers)
+    code: "orders = [{\"order_id\": 1, \"customer_id\": 5}, {\"order_id\": 2, \"customer_id\": 5}]\ncustomers\
+      \ = [{\"customer_id\": 5, \"city\": \"SF\"}]\nassert solution(orders, customers) == [\n    {\"order_id\"\
+      : 1, \"city\": \"SF\"}, {\"order_id\": 2, \"city\": \"SF\"}], solution(orders, customers)\n"
   - name: no customers yields empty
-    code: |
-      orders = [{"order_id": 1, "customer_id": 7}]
+    code: 'orders = [{"order_id": 1, "customer_id": 7}]
+
       assert solution(orders, []) == [], solution(orders, [])
+
+      '
   - name: empty orders yields empty
-    code: |
-      assert solution([], [{"customer_id": 1, "city": "A"}]) == [], "expected empty"
+    code: 'assert solution([], [{"customer_id": 1, "city": "A"}]) == [], "expected empty"
+
+      '
   timeout: 8
 hints:
 - order: 1
-  cost: 10
-  content: The inner loop's condition is always true and it never breaks, so every order grabs the last customer's city even when its id does not match.
+  cost: 0
+  content: 'Where to look: Open `solution.py`, read the instructions, and run the visible tests to see
+    which assertion fails first.'
 - order: 2
-  cost: 20
-  content: 'Index customers once into a dict mapping customer_id to city. Then each order is a single lookup — and you can tell when there is no match.'
+  cost: 25
+  content: 'Diagnostic steps:
+
+    1. Click Run and read the traceback — note line number and actual vs expected values.
+
+    2. Reproduce the failure with the smallest input from a visible test.
+
+    3. Compare your implementation to the bug described in the lab prompt.'
 - order: 3
-  cost: 30
-  content: 'by_id = {c["customer_id"]: c["city"] for c in customers}; emit {"order_id": o["order_id"], "city": by_id[cid]} only when cid in by_id.'
+  cost: 50
+  content: 'Exact fix + verification:
+
+    1. Carry the right fields from each side into the joined row.
+
+    2. Re-run the lab checker (`check.sh` or Check Solution).
+
+    3. Confirm every scenario objective is satisfied.
+
+
+    WHY: the grader validates real state — marker files are ignored.'
+summary: Complete the inner-join two datasets on a key data science lab and verify success with the checker
+estimated_minutes: 20
+xp_reward: 100
+prerequisites:
+- Basic data science literacy
+tags:
+- data-science
+- fix
+- hands-on
+linked_tutorial: data-science-fundamentals
+what_you_will_learn:
+- Index one dataset by its key for O(1) lookup
+- '{''Inner-join'': ''emit a row only when the key exists on both sides''}'
+- Carry the right fields from each side into the joined row
+environment:
+  nodes:
+  - role: primary
+    os: FixitLab notebook lab
+    hostname: lab-primary
+    ip: 127.0.0.1
+    specs: local offline simulation
+  pre_installed:
+  - bash
+  - coreutils
+  - data science
+  - pip
+  - python3
+  credentials:
+  - user: root
+    password: lab123
+tasks:
+- id: task_1
+  title: Inner-Join Two Datasets on a Key
+  description: Restore healthy behavior for Inner-Join Two Datasets on a Key by investigating the failure,
+    applying the smallest safe fix, and validating the outcome.
+  background: 'This data science lab teaches systematic troubleshooting: observe, hypothesize, change,
+    verify.'
+  validation:
+    type: custom_script
+    script: hidden_tests
+    error_message: One or more hidden tests failed. Read the public test output, fix your solution, and
+      submit again.
+solution:
+  summary: The solution passes all hidden tests by implementing the required behavior in code.
+  files_changed: []
+  commands_run: []
+  reference_docs: data-science-fundamentals

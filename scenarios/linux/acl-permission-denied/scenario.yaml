@@ -2,8 +2,8 @@ title: ACL Required for Shared Directory
 slug: acl-permission-denied
 lab_mode: simulation
 simulation_type: generic
-technology: Linux
-category: Permissions / ACL
+technology: linux
+category: Fix
 difficulty: medium
 time_limit: 900
 max_score: 100
@@ -11,9 +11,28 @@ infrastructure_type: docker
 docker_privileged: false
 jira_priority: Medium
 topics_covered: Q19 ACL — setfacl -m u:user:rx
-description: User alice gets "Permission denied" on /srv/shared even though she appears to be in the right
-  group. The directory relies on POSIX ACLs, and the specific ACL entry granting alice access is missing
-  (the standard group bits aren't enough). Grant the correct ACL and confirm alice can access the directory.
+description: 'CONTEXT: A team operating Linux administration needs you to resolve `ACL Required for Shared
+  Directory` during a realistic incident. The business impact is reduced service reliability until the
+  underlying state is repaired.
+
+
+  ENVIRONMENT: You are working in FixitLab''s offline Linux practice server with terminal and config files
+  under /etc and /var. All tools run locally; no paid APIs or external cloud calls are required.
+
+
+  SYMPTOM / STARTING STATE: Linux server with /srv/shared protected by POSIX ACLs. alice cannot read/write
+  it because no ACL entry grants her access, despite nominal group membership. User alice gets "Permission
+  denied" on /srv/shared even though she appears to be in the right group. The directory relies on POSIX
+  ACLs, and the specific ACL entry granting alice access is missing (the standard group bits aren''t enough).
+  Grant the correct ACL and confirm alice can access the directory.
+
+
+  OBJECTIVE: Inspect the directory''s ACLs and confirm alice has no granting entry; Add an ACL entry granting
+  alice access; Verify alice can access /srv/shared. Success means `check.sh` exits successfully.
+
+
+  WHAT TO AVOID: Do not apply broad destructive changes, skip evidence gathering, or fake completion with
+  marker files — the checker validates real system state.'
 objectives:
 - Inspect the directory's ACLs and confirm alice has no granting entry
 - Add an ACL entry granting alice access
@@ -22,14 +41,70 @@ initial_state: Linux server with /srv/shared protected by POSIX ACLs. alice cann
   no ACL entry grants her access, despite nominal group membership.
 hints:
 - order: 1
-  cost: 10
-  content: 'Inspect the ACLs: `getfacl /srv/shared`. There''s no `user:alice` entry, and the group/other
-    bits don''t grant her access.'
+  cost: 0
+  content: 'Where to look: Inspect the directory''s ACLs and confirm alice has no granting entry'
 - order: 2
-  cost: 15
-  content: 'Grant her an explicit ACL: `setfacl -m u:alice:rwx /srv/shared` (add `-R` and a default ACL
-    `-d -m u:alice:rwx` if she needs access to existing/new contents).'
+  cost: 25
+  content: 'Diagnostic steps:
+
+    1. Add an ACL entry granting alice access
+
+    2. Verify alice can access /srv/shared'
 - order: 3
-  cost: 20
-  content: 'Verify: `getfacl /srv/shared` shows `user:alice:rwx`, and acting as alice (`sudo -u alice
-    touch /srv/shared/test`) now succeeds.'
+  cost: 50
+  content: 'Exact fix + verification:
+
+    1. Verify alice can access /srv/shared.
+
+    2. Re-run the lab checker (`check.sh` or Check Solution).
+
+    3. Confirm every scenario objective is satisfied.
+
+
+    WHY: the grader validates real state — marker files are ignored.'
+summary: Complete the acl required for shared directory linux lab and verify success with the checker
+estimated_minutes: 15
+xp_reward: 100
+prerequisites:
+- Basic linux literacy
+tags:
+- fix
+- hands-on
+- linux
+linked_tutorial: linux-fundamentals
+what_you_will_learn:
+- Inspect the directory's ACLs and confirm alice has no granting entry
+- Add an ACL entry granting alice access
+- Verify alice can access /srv/shared
+environment:
+  nodes:
+  - role: primary
+    os: FixitLab Linux practice server
+    hostname: lab-primary
+    ip: 127.0.0.1
+    specs: local offline simulation
+  pre_installed:
+  - bash
+  - coreutils
+  - journalctl
+  - linux
+  - systemctl
+  credentials:
+  - user: root
+    password: lab123
+tasks:
+- id: task_1
+  title: ACL Required for Shared Directory
+  description: Restore healthy behavior for ACL Required for Shared Directory by investigating the failure,
+    applying the smallest safe fix, and validating the outcome.
+  background: 'This linux lab teaches systematic troubleshooting: observe, hypothesize, change, verify.'
+  validation:
+    type: custom_script
+    script: check.sh
+    error_message: Validation did not pass. Re-read the objectives and Hint 2 diagnostic steps.
+solution:
+  summary: Identify the misconfiguration affecting this linux lab and apply the minimal fix.
+  files_changed: []
+  commands_run:
+  - bash check.sh
+  reference_docs: linux-fundamentals

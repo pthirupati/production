@@ -1,9 +1,26 @@
 title: 'Log Analysis: Fix the Maximum Call Stack Error'
 slug: js-logfix-maximum-call-stack
-category: JavaScript Development
-description: 'The log shows `RangeError: Maximum call stack size exceeded` from countdown() because it
-  recurses without ever hitting a base case (it decrements but never stops at 0). Add the base case so
-  it terminates and returns the list of values from n down to 1.'
+category: Fix
+description: 'CONTEXT: A team operating JavaScript needs you to resolve `Log Analysis: Fix the Maximum
+  Call Stack Error` during a realistic incident. The business impact is reduced service reliability until
+  the underlying state is repaired.
+
+
+  ENVIRONMENT: You are working in FixitLab''s offline JavaScript practice project with modules, browser
+  console, and Node tooling. All tools run locally; no paid APIs or external cloud calls are required.
+
+
+  SYMPTOM / STARTING STATE: The log shows `RangeError: Maximum call stack size exceeded` from countdown()
+  because it recurses without ever hitting a base case (it decrements but never stops at 0). Add the base
+  case so it terminates and returns the list of values from n down to 1.
+
+
+  OBJECTIVE: Read the stack-overflow error and find the missing base case; Stop recursion at n <= 0; Return
+  the countdown array. Success means all hidden tests pass.
+
+
+  WHAT TO AVOID: Do not apply broad destructive changes, skip evidence gathering, or fake completion with
+  marker files — the checker validates real system state.'
 difficulty: medium
 scenario_type: fix
 lab_mode: simulation
@@ -21,57 +38,124 @@ objectives:
 initial_state: 'The log shows `RangeError: Maximum call stack size exceeded` from countdown() because
   it recurses without ever hitting a base case (it decrements but never stops at 0). Add the base case
   so it terminates and returns the list of values from n down to 1.'
-solution_explanation: |
-  Without a base case the recursion descends forever. Returning [] for n <= 0 terminates it and builds the countdown array.
+solution_explanation: 'Without a base case the recursion descends forever. Returning [] for n <= 0 terminates
+  it and builds the countdown array.
+
+  '
 coding_spec:
   language: javascript
   entrypoint: solution.js
   kind: logfix
-  instructions: |
-    Fix countdown(n): return [n, n-1, ..., 1] (empty for n <= 0). The log shows infinite recursion.
-      countdown(3) -> [3, 2, 1]
-    Click Run to try it, then Check Solution to grade against all tests.
+  instructions: "Fix countdown(n): return [n, n-1, ..., 1] (empty for n <= 0). The log shows infinite\
+    \ recursion.\n  countdown(3) -> [3, 2, 1]\nClick Run to try it, then Check Solution to grade against\
+    \ all tests.\n"
   files:
   - path: solution.js
-    content: |
-      // Production log:
-      //   RangeError: Maximum call stack size exceeded
-      //     at countdown (count.js:2)
-
-      function countdown(n) {
-        return [n, ...countdown(n - 1)]; // never stops
-      }
+    content: "// Production log:\n//   RangeError: Maximum call stack size exceeded\n//     at countdown\
+      \ (count.js:2)\n\nfunction countdown(n) {\n  return [n, ...countdown(n - 1)]; // never stops\n}\n"
     readonly: false
   visible_tests:
   - name: countdown 3
-    code: |
-      assert(JSON.stringify(countdown(3)) === JSON.stringify([3, 2, 1]), JSON.stringify(countdown(3)));
+    code: 'assert(JSON.stringify(countdown(3)) === JSON.stringify([3, 2, 1]), JSON.stringify(countdown(3)));
+
+      '
   - name: countdown 1
-    code: |
-      assert(JSON.stringify(countdown(1)) === JSON.stringify([1]), JSON.stringify(countdown(1)));
+    code: 'assert(JSON.stringify(countdown(1)) === JSON.stringify([1]), JSON.stringify(countdown(1)));
+
+      '
   hidden_tests:
   - name: countdown 0 empty
-    code: |
-      assert(JSON.stringify(countdown(0)) === JSON.stringify([]), JSON.stringify(countdown(0)));
+    code: 'assert(JSON.stringify(countdown(0)) === JSON.stringify([]), JSON.stringify(countdown(0)));
+
+      '
   - name: countdown 5
-    code: |
-      assert(JSON.stringify(countdown(5)) === JSON.stringify([5, 4, 3, 2, 1]), JSON.stringify(countdown(5)));
+    code: 'assert(JSON.stringify(countdown(5)) === JSON.stringify([5, 4, 3, 2, 1]), JSON.stringify(countdown(5)));
+
+      '
   - name: negative empty
-    code: |
-      assert(JSON.stringify(countdown(-2)) === JSON.stringify([]), JSON.stringify(countdown(-2)));
+    code: 'assert(JSON.stringify(countdown(-2)) === JSON.stringify([]), JSON.stringify(countdown(-2)));
+
+      '
   - name: does not overflow
-    code: |
-      let ok = true;
+    code: 'let ok = true;
+
       try { countdown(4); } catch (e) { ok = false; }
+
       assert(ok);
+
+      '
   timeout: 8
 hints:
 - order: 1
-  cost: 10
-  content: The log shows recursion that never terminates — no base case.
+  cost: 0
+  content: 'Where to look: Open `solution.js`, read the instructions, and run the visible tests to see
+    which assertion fails first.'
 - order: 2
-  cost: 20
-  content: Recursion must stop when n reaches 0 (or below).
+  cost: 25
+  content: 'Diagnostic steps:
+
+    1. Click Run and read the traceback — note line number and actual vs expected values.
+
+    2. Reproduce the failure with the smallest input from a visible test.
+
+    3. Compare your implementation to the bug described in the lab prompt.'
 - order: 3
-  cost: 30
-  content: Add `if (n <= 0) return [];` before the recursive spread.
+  cost: 50
+  content: 'Exact fix + verification:
+
+    1. Return the countdown array.
+
+    2. Re-run the lab checker (`check.sh` or Check Solution).
+
+    3. Confirm every scenario objective is satisfied.
+
+
+    WHY: the grader validates real state — marker files are ignored.'
+technology: javascript
+summary: 'Complete the log analysis: fix the maximum call stack error javascript lab and verify success
+  with the checker'
+estimated_minutes: 25
+xp_reward: 100
+prerequisites:
+- Basic javascript literacy
+tags:
+- fix
+- hands-on
+- javascript
+linked_tutorial: javascript-fundamentals
+what_you_will_learn:
+- Read the stack-overflow error and find the missing base case
+- Stop recursion at n <= 0
+- Return the countdown array
+environment:
+  nodes:
+  - role: primary
+    os: FixitLab JavaScript practice project
+    hostname: lab-primary
+    ip: 127.0.0.1
+    specs: local offline simulation
+  pre_installed:
+  - bash
+  - coreutils
+  - javascript
+  - journalctl
+  - systemctl
+  credentials:
+  - user: root
+    password: lab123
+tasks:
+- id: task_1
+  title: 'Log Analysis: Fix the Maximum Call Stack Error'
+  description: 'Restore healthy behavior for Log Analysis: Fix the Maximum Call Stack Error by investigating
+    the failure, applying the smallest safe fix, and validating the outcome.'
+  background: 'This javascript lab teaches systematic troubleshooting: observe, hypothesize, change, verify.'
+  validation:
+    type: custom_script
+    script: hidden_tests
+    error_message: One or more hidden tests failed. Read the public test output, fix your solution, and
+      submit again.
+solution:
+  summary: The solution passes all hidden tests by implementing the required behavior in code.
+  files_changed: []
+  commands_run: []
+  reference_docs: javascript-fundamentals

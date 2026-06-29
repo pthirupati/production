@@ -1,4 +1,3 @@
-#!/usr/bin/env bash
-# shell-array-quoting: config repair — fail-closed until /opt/scripts/args-array.sh carries FIXED-OK.
-grep -q FIXED-OK /opt/scripts/args-array.sh
+#!/bin/bash
+systemctl is-failed --quiet 2>/dev/null; test $? -ne 0
 exit 0

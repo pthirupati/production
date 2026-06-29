@@ -1,39 +1,116 @@
 title: IIS Website Not Starting
 slug: win-iis-not-starting
 difficulty: easy
-category: Windows Server
-description: 'An IIS website is failing to start due to a port binding conflict or
-  application pool crash. Users are unable to access the web application. You must
-  identify the conflicting service or the application pool error, resolve the port
-  conflict or reconfigure the app pool, and get the site running again.'
-initial_state: 'Windows Server 2022 with IIS (Internet Information Services) installed.
-  One or more websites are stopped and fail to start. The application pool may be
-  stopped or crashed. Another process may be bound to port 80 or 443, preventing
-  IIS from binding to those ports.'
+category: Fix
+description: 'CONTEXT: A team operating Windows Server needs you to resolve `IIS Website Not Starting`
+  during a realistic incident. The business impact is reduced service reliability until the underlying
+  state is repaired.
+
+
+  ENVIRONMENT: You are working in FixitLab''s offline Windows Server host with PowerShell, Server Manager,
+  and AD tools. All tools run locally; no paid APIs or external cloud calls are required.
+
+
+  SYMPTOM / STARTING STATE: Windows Server 2022 with IIS (Internet Information Services) installed. One
+  or more websites are stopped and fail to start. The application pool may be stopped or crashed. Another
+  process may be bound to port 80 or 443, preventing IIS from binding to those ports. An IIS website is
+  failing to start due to a port binding conflict or application pool crash. Users are unable to access
+  the web application. You must identify the conflicting service or the application pool error, resolve
+  the port conflict or reconfigure the app pool, and get the site running again.
+
+
+  OBJECTIVE: Identify why the IIS website cannot start (port conflict or app pool failure); Resolve the
+  binding conflict or fix the application pool configuration; Verify the website starts and responds to
+  HTTP requests. Success means `check.sh` exits successfully.
+
+
+  WHAT TO AVOID: Do not apply broad destructive changes, skip evidence gathering, or fake completion with
+  marker files — the checker validates real system state.'
+initial_state: Windows Server 2022 with IIS (Internet Information Services) installed. One or more websites
+  are stopped and fail to start. The application pool may be stopped or crashed. Another process may be
+  bound to port 80 or 443, preventing IIS from binding to those ports.
 objectives:
-  - Identify why the IIS website cannot start (port conflict or app pool failure)
-  - Resolve the binding conflict or fix the application pool configuration
-  - Verify the website starts and responds to HTTP requests
+- Identify why the IIS website cannot start (port conflict or app pool failure)
+- Resolve the binding conflict or fix the application pool configuration
+- Verify the website starts and responds to HTTP requests
 lab_mode: simulation
 simulation_type: windows
 time_limit: 1200
 max_score: 100
 is_free: true
 hints:
-  - content: 'Check IIS site and app pool state: Get-Website | Select Name, State,
-      PhysicalPath and Get-WebConfiguration system.applicationHost/applicationPools/add
-      | Select name, state'
-    cost: 10
-    order: 1
-  - content: 'Find port conflicts: netstat -ano | findstr :80 then tasklist /fi "PID
-      eq <PID>" to identify the process holding the port. Stop or reconfigure it.'
-    cost: 15
-    order: 2
-  - content: 'Restart app pool and site: Start-WebAppPool -Name "DefaultAppPool"
-      then Start-Website -Name "Default Web Site". Check Windows Event Log for IIS
-      errors: Get-EventLog -LogName Application -Source *IIS* -Newest 10'
-    cost: 20
-    order: 3
+- order: 1
+  cost: 0
+  content: 'Where to look: Open Event Viewer (System/Application) and the relevant Services mmc or Server
+    Manager role status.'
+- order: 2
+  cost: 25
+  content: 'Diagnostic steps:
+
+    1. Note the service state and dependency chain in services.msc.
+
+    2. Read the most recent error in Event Viewer for the failing component.
+
+    3. Use PowerShell (`Get-Service`, `Get-WinEvent`) for scripted evidence.'
+- order: 3
+  cost: 50
+  content: 'Exact fix + verification:
+
+    1. Apply the minimal fix (service start, GPO, binding, or permission).
+
+    2. Re-test the failing operation.
+
+    3. Confirm Check Solution passes.
+
+
+    WHY: Windows labs grade real role/service state.'
 requires_companion_hosts: false
 dual_terminal: false
 jira_priority: High
+technology: windows
+summary: Complete the iis website not starting windows lab and verify success with the checker
+estimated_minutes: 20
+xp_reward: 100
+prerequisites:
+- Basic windows literacy
+tags:
+- fix
+- hands-on
+- windows
+linked_tutorial: windows-fundamentals
+what_you_will_learn:
+- Identify why the IIS website cannot start (port conflict or app pool failure)
+- Resolve the binding conflict or fix the application pool configuration
+- Verify the website starts and responds to HTTP requests
+environment:
+  nodes:
+  - role: primary
+    os: FixitLab Windows Server host
+    hostname: lab-primary
+    ip: 127.0.0.1
+    specs: local offline simulation
+  pre_installed:
+  - bash
+  - coreutils
+  - journalctl
+  - systemctl
+  - windows
+  credentials:
+  - user: root
+    password: lab123
+tasks:
+- id: task_1
+  title: IIS Website Not Starting
+  description: Restore healthy behavior for IIS Website Not Starting by investigating the failure, applying
+    the smallest safe fix, and validating the outcome.
+  background: 'This windows lab teaches systematic troubleshooting: observe, hypothesize, change, verify.'
+  validation:
+    type: custom_script
+    script: check.sh
+    error_message: Validation did not pass. Re-read the objectives and Hint 2 diagnostic steps.
+solution:
+  summary: Identify the misconfiguration affecting this windows lab and apply the minimal fix.
+  files_changed: []
+  commands_run:
+  - bash check.sh
+  reference_docs: windows-fundamentals

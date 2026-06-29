@@ -1,12 +1,31 @@
 title: Grant a User the Role to Access a Component
 slug: ps-grant-role-component-access
-category: Security
-description: >-
-  A finance user, FINUSER, has raised a ticket: they cannot open the Voucher
-  Entry component in Accounts Payable — PeopleSoft returns "You are not
-  authorized to access this component." Their account holds only the Financials
-  Analyst role. Open the PIA simulator and grant FINUSER the role that carries
-  the FIN_AP_VOUCHER permission so they can enter vouchers.
+category: Fix
+description: 'CONTEXT: A team operating PeopleSoft administration needs you to resolve `Grant a User the
+  Role to Access a Component` during a realistic incident. The business impact is reduced service reliability
+  until the underlying state is repaired.
+
+
+  ENVIRONMENT: You are working in FixitLab''s offline PeopleSoft app server lab with PIA, Process Scheduler,
+  Integration Broker, and app server logs. All tools run locally; no paid APIs or external cloud calls
+  are required.
+
+
+  SYMPTOM / STARTING STATE: A PeopleSoft HCM/Financials environment where FINUSER holds only FIN_ANALYST
+  and is missing the AP_PROCESSOR role needed to open Voucher Entry. A finance user, FINUSER, has raised
+  a ticket: they cannot open the Voucher Entry component in Accounts Payable — PeopleSoft returns "You
+  are not authorized to access this component." Their account holds only the Financials Analyst role.
+  Open the PIA simulator and grant FINUSER the role that carries the FIN_AP_VOUCHER permission so they
+  can enter vouchers.
+
+
+  OBJECTIVE: Open the PeopleSoft (PIA) simulator from the lab toolbar; Navigate to PeopleTools > Security
+  > User Profiles for FINUSER; Identify which role grants the FIN_AP_VOUCHER permission for Voucher Entry.
+  Success means `check.sh` exits successfully.
+
+
+  WHAT TO AVOID: Do not apply broad destructive changes, skip evidence gathering, or fake completion with
+  marker files — the checker validates real system state.'
 difficulty: easy
 lab_mode: simulation
 simulation_type: peoplesoft
@@ -21,23 +40,78 @@ objectives:
 - Navigate to PeopleTools > Security > User Profiles for FINUSER
 - Identify which role grants the FIN_AP_VOUCHER permission for Voucher Entry
 - Assign the Accounts Payable Processor role to FINUSER
-initial_state: >-
-  A PeopleSoft HCM/Financials environment where FINUSER holds only FIN_ANALYST
-  and is missing the AP_PROCESSOR role needed to open Voucher Entry.
+initial_state: A PeopleSoft HCM/Financials environment where FINUSER holds only FIN_ANALYST and is missing
+  the AP_PROCESSOR role needed to open Voucher Entry.
 hints:
 - order: 1
-  cost: 10
-  content: >-
-    Component access in PeopleSoft is granted through roles, which point at
-    permission lists, which list the components/permissions. Find a role whose
-    permission list grants FIN_AP_VOUCHER.
+  cost: 0
+  content: 'Where to look: Open the PeopleSoft (PIA) simulator from the lab toolbar'
 - order: 2
-  cost: 15
-  content: >-
-    The AP_PROCESSOR role carries the EPAP1000 permission list (FIN_AP_VOUCHER).
-    On the User Profiles > Roles tab, add that role to FINUSER (assign_role).
+  cost: 25
+  content: 'Diagnostic steps:
+
+    1. Navigate to PeopleTools > Security > User Profiles for FINUSER
+
+    2. Identify which role grants the FIN_AP_VOUCHER permission for Voucher Entry
+
+    3. Assign the Accounts Payable Processor role to FINUSER'
 - order: 3
-  cost: 20
-  content: >-
-    After assigning AP_PROCESSOR to FINUSER, the Voucher Entry component should
-    become accessible — the access map for FINUSER unlocks it.
+  cost: 50
+  content: 'Exact fix + verification:
+
+    1. Assign the Accounts Payable Processor role to FINUSER.
+
+    2. Re-run the lab checker (`check.sh` or Check Solution).
+
+    3. Confirm every scenario objective is satisfied.
+
+
+    WHY: the grader validates real state — marker files are ignored.'
+summary: Complete the grant a user the role to access a component peoplesoft lab and verify success with
+  the checker
+estimated_minutes: 20
+xp_reward: 100
+prerequisites:
+- Basic peoplesoft literacy
+tags:
+- fix
+- hands-on
+- peoplesoft
+linked_tutorial: peoplesoft-fundamentals
+what_you_will_learn:
+- Open the PeopleSoft (PIA) simulator from the lab toolbar
+- Navigate to PeopleTools > Security > User Profiles for FINUSER
+- Identify which role grants the FIN_AP_VOUCHER permission for Voucher Entry
+- Assign the Accounts Payable Processor role to FINUSER
+environment:
+  nodes:
+  - role: primary
+    os: FixitLab PeopleSoft app server lab
+    hostname: lab-primary
+    ip: 127.0.0.1
+    specs: local offline simulation
+  pre_installed:
+  - bash
+  - coreutils
+  - journalctl
+  - peoplesoft
+  - systemctl
+  credentials:
+  - user: root
+    password: lab123
+tasks:
+- id: task_1
+  title: Grant a User the Role to Access a Component
+  description: Restore healthy behavior for Grant a User the Role to Access a Component by investigating
+    the failure, applying the smallest safe fix, and validating the outcome.
+  background: 'This peoplesoft lab teaches systematic troubleshooting: observe, hypothesize, change, verify.'
+  validation:
+    type: custom_script
+    script: check.sh
+    error_message: Validation did not pass. Re-read the objectives and Hint 2 diagnostic steps.
+solution:
+  summary: Identify the misconfiguration affecting this peoplesoft lab and apply the minimal fix.
+  files_changed: []
+  commands_run:
+  - bash check.sh
+  reference_docs: peoplesoft-fundamentals

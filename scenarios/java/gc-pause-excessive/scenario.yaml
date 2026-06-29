@@ -1,8 +1,7 @@
----
 slug: gc-pause-excessive
-title: "Excessive GC Pauses Causing Request Latency Spikes"
-technology: Java
-category: "JVM Performance"
+title: Excessive GC Pauses Causing Request Latency Spikes
+technology: java
+category: Fix
 difficulty: hard
 time_limit: 1200
 max_score: 100
@@ -11,22 +10,108 @@ simulation_type: java
 infrastructure_type: simulation
 jira_priority: High
 is_free: false
-description: |
-  A service shows multi-second p99 latency spikes that correlate with full GC pauses. The JVM is running the throughput (Parallel) collector with an undersized heap, so stop-the-world full collections stall every request. Switch to a low-pause collector (G1/ZGC) and right-size the heap to flatten the pause profile.
+description: 'CONTEXT: A team operating Java applications needs you to resolve `Excessive GC Pauses Causing
+  Request Latency Spikes` during a realistic incident. The business impact is reduced service reliability
+  until the underlying state is repaired.
+
+
+  ENVIRONMENT: You are working in FixitLab''s offline Java project with Maven/Gradle, JVM logs, and Spring
+  configuration. All tools run locally; no paid APIs or external cloud calls are required.
+
+
+  SYMPTOM / STARTING STATE: JVM flags at /app/jvm.options select -XX:+UseParallelGC with -Xmx512m; GC
+  logs show frequent multi-second Full GC pauses under load. A service shows multi-second p99 latency
+  spikes that correlate with full GC pauses. The JVM is running the throughput (Parallel) collector with
+  an undersized heap, so stop-the-world full collections stall every request. Switch to a low-pause collector
+  (G1/ZGC) and right-size the heap to flatten the pause profile.
+
+
+  OBJECTIVE: Enable GC logging and confirm long stop-the-world full GC pauses; Select a low-pause collector
+  appropriate for the heap size; Set a sane max heap and a pause-time goal in jvm.options. Success means
+  `check.sh` exits successfully.
+
+
+  WHAT TO AVOID: Do not apply broad destructive changes, skip evidence gathering, or fake completion with
+  marker files — the checker validates real system state.'
 objectives:
-  - "Enable GC logging and confirm long stop-the-world full GC pauses"
-  - "Select a low-pause collector appropriate for the heap size"
-  - "Set a sane max heap and a pause-time goal in jvm.options"
-  - "Verify p99 latency no longer correlates with GC pauses"
-initial_state: |
-  JVM flags at /app/jvm.options select -XX:+UseParallelGC with -Xmx512m; GC logs show frequent multi-second Full GC pauses under load.
+- Enable GC logging and confirm long stop-the-world full GC pauses
+- Select a low-pause collector appropriate for the heap size
+- Set a sane max heap and a pause-time goal in jvm.options
+- Verify p99 latency no longer correlates with GC pauses
+initial_state: 'JVM flags at /app/jvm.options select -XX:+UseParallelGC with -Xmx512m; GC logs show frequent
+  multi-second Full GC pauses under load.
+
+  '
 hints:
-  - order: 1
-    cost: 10
-    content: "Add -Xlog:gc*:file=gc.log and look for long 'Pause Full' events."
-  - order: 2
-    cost: 15
-    content: "Use -XX:+UseG1GC with -XX:MaxGCPauseMillis=200 for a low-pause profile."
-  - order: 3
-    cost: 20
-    content: "Right-size the heap (e.g. -Xms2g -Xmx2g) so the collector is not thrashing."
+- order: 1
+  cost: 0
+  content: 'Where to look: Enable GC logging and confirm long stop-the-world full GC pauses'
+- order: 2
+  cost: 25
+  content: 'Diagnostic steps:
+
+    1. Select a low-pause collector appropriate for the heap size
+
+    2. Set a sane max heap and a pause-time goal in jvm.options
+
+    3. Verify p99 latency no longer correlates with GC pauses'
+- order: 3
+  cost: 50
+  content: 'Exact fix + verification:
+
+    1. Verify p99 latency no longer correlates with GC pauses.
+
+    2. Re-run the lab checker (`check.sh` or Check Solution).
+
+    3. Confirm every scenario objective is satisfied.
+
+
+    WHY: the grader validates real state — marker files are ignored.'
+summary: Complete the excessive gc pauses causing request latency spikes java lab and verify success with
+  the checker
+estimated_minutes: 20
+xp_reward: 100
+prerequisites:
+- Basic java literacy
+tags:
+- fix
+- hands-on
+- java
+linked_tutorial: java-fundamentals
+what_you_will_learn:
+- Enable GC logging and confirm long stop-the-world full GC pauses
+- Select a low-pause collector appropriate for the heap size
+- Set a sane max heap and a pause-time goal in jvm.options
+- Verify p99 latency no longer correlates with GC pauses
+environment:
+  nodes:
+  - role: primary
+    os: FixitLab Java project
+    hostname: lab-primary
+    ip: 127.0.0.1
+    specs: local offline simulation
+  pre_installed:
+  - bash
+  - coreutils
+  - java
+  - journalctl
+  - systemctl
+  credentials:
+  - user: root
+    password: lab123
+tasks:
+- id: task_1
+  title: Excessive GC Pauses Causing Request Latency Spikes
+  description: Restore healthy behavior for Excessive GC Pauses Causing Request Latency Spikes by investigating
+    the failure, applying the smallest safe fix, and validating the outcome.
+  background: 'This java lab teaches systematic troubleshooting: observe, hypothesize, change, verify.'
+  validation:
+    type: custom_script
+    script: check.sh
+    error_message: Validation did not pass. Re-read the objectives and Hint 2 diagnostic steps.
+solution:
+  summary: Identify the misconfiguration affecting this java lab and apply the minimal fix.
+  files_changed: []
+  commands_run:
+  - bash check.sh
+  reference_docs: java-fundamentals

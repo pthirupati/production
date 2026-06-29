@@ -1,16 +1,36 @@
 slug: ssl-cert-expired
 title: SSL Certificate Expired — Replace nginx TLS Certificate
-technology: Networking
-category: TLS/SSL
+technology: networking
+category: Fix
 difficulty: medium
 time_limit: 900
 max_score: 100
 infrastructure_type: docker
 jira_priority: Critical
 is_free: false
-description: HTTPS endpoints are failing certificate validation because the nginx TLS certificate is expired
-  (or expires within a day). Browsers and clients reject the connection. Generate/install a valid certificate,
-  point nginx at it, and reload so secure connections work again with a non-expired certificate.
+description: 'CONTEXT: A team operating network operations needs you to resolve `SSL Certificate Expired
+  — Replace nginx TLS Certificate` during a realistic incident. The business impact is reduced service
+  reliability until the underlying state is repaired.
+
+
+  ENVIRONMENT: You are working in FixitLab''s offline network lab with interfaces, routing tables, DNS,
+  and firewall rules. All tools run locally; no paid APIs or external cloud calls are required.
+
+
+  SYMPTOM / STARTING STATE: Linux server running nginx with an expired (or about-to-expire) TLS certificate
+  at /etc/nginx/ssl/cert.pem, causing HTTPS validation failures. HTTPS endpoints are failing certificate
+  validation because the nginx TLS certificate is expired (or expires within a day). Browsers and clients
+  reject the connection. Generate/install a valid certificate, point nginx at it, and reload so secure
+  connections work again with a non-expired certificate.
+
+
+  OBJECTIVE: Confirm the current certificate''s expiry; Generate/install a new valid certificate and key;
+  Reload nginx and verify HTTPS serves a non-expired certificate. Success means `systemctl is-active --quiet`
+  returns active.
+
+
+  WHAT TO AVOID: Do not apply broad destructive changes, skip evidence gathering, or fake completion with
+  marker files — the checker validates real system state.'
 objectives:
 - Confirm the current certificate's expiry
 - Generate/install a new valid certificate and key
@@ -19,15 +39,73 @@ initial_state: Linux server running nginx with an expired (or about-to-expire) T
   causing HTTPS validation failures.
 hints:
 - order: 1
-  cost: 10
-  content: 'Check the dates: `openssl x509 -in /etc/nginx/ssl/cert.pem -noout -dates` — notAfter is in
-    the past (or imminent).'
+  cost: 0
+  content: 'Where to look: Confirm the current certificate''s expiry'
 - order: 2
-  cost: 15
-  content: 'Issue a replacement (self-signed here; in prod use your CA/ACME): `openssl req -x509 -newkey
-    rsa:2048 -nodes -keyout /etc/nginx/ssl/key.pem -out /etc/nginx/ssl/cert.pem -days 365 -subj ''/CN=<host>''`.'
+  cost: 25
+  content: 'Diagnostic steps:
+
+    1. Generate/install a new valid certificate and key
+
+    2. Reload nginx and verify HTTPS serves a non-expired certificate'
 - order: 3
-  cost: 20
-  content: 'Make sure nginx points at the new cert/key, validate and reload: `nginx -t && systemctl reload
-    nginx`. Verify: `echo | openssl s_client -connect localhost:443 2>/dev/null | openssl x509 -noout
-    -dates` shows a future notAfter.'
+  cost: 50
+  content: 'Exact fix + verification:
+
+    1. Reload nginx and verify HTTPS serves a non-expired certificate.
+
+    2. Re-run the lab checker (`check.sh` or Check Solution).
+
+    3. Confirm every scenario objective is satisfied.
+
+
+    WHY: the grader validates real state — marker files are ignored.'
+summary: Complete the ssl certificate expired — replace nginx tls certificate networking lab and verify
+  success with the checker
+estimated_minutes: 15
+xp_reward: 100
+prerequisites:
+- Basic networking literacy
+tags:
+- fix
+- hands-on
+- networking
+linked_tutorial: networking-fundamentals
+what_you_will_learn:
+- Confirm the current certificate's expiry
+- Generate/install a new valid certificate and key
+- Reload nginx and verify HTTPS serves a non-expired certificate
+environment:
+  nodes:
+  - role: primary
+    os: FixitLab network lab
+    hostname: lab-primary
+    ip: 127.0.0.1
+    specs: local offline simulation
+  pre_installed:
+  - bash
+  - coreutils
+  - journalctl
+  - networking
+  - systemctl
+  credentials:
+  - user: root
+    password: lab123
+tasks:
+- id: task_1
+  title: SSL Certificate Expired — Replace nginx TLS Certificate
+  description: Restore healthy behavior for SSL Certificate Expired — Replace nginx TLS Certificate by
+    investigating the failure, applying the smallest safe fix, and validating the outcome.
+  background: 'This networking lab teaches systematic troubleshooting: observe, hypothesize, change, verify.'
+  validation:
+    type: service_active
+    command: systemctl is-active --quiet
+    expected_status: active
+    error_message: The --quiet service is not active yet. Check `systemctl status --quiet` and `journalctl
+      -u --quiet -n 50`.
+solution:
+  summary: The root cause is an unhealthy `--quiet` service; repair it and verify active state.
+  files_changed: []
+  commands_run:
+  - systemctl is-active --quiet
+  reference_docs: networking-fundamentals

@@ -1,9 +1,26 @@
 title: Fix dedupe to Preserve Order
 slug: py-fix-dedupe-preserve-order
-category: Python Development
-description: dedupe(items) should remove duplicates while preserving first-seen order, but it returns
-  list(set(items)), which loses order and is non-deterministic. Fix it to keep the original order of first
-  appearance.
+category: Fix
+description: 'CONTEXT: A team operating Python development needs you to resolve `Fix dedupe to Preserve
+  Order` during a realistic incident. The business impact is reduced service reliability until the underlying
+  state is repaired.
+
+
+  ENVIRONMENT: You are working in FixitLab''s offline Python project workspace with source files, venv,
+  tests, and CLI entrypoints. All tools run locally; no paid APIs or external cloud calls are required.
+
+
+  SYMPTOM / STARTING STATE: dedupe(items) should remove duplicates while preserving first-seen order,
+  but it returns list(set(items)), which loses order and is non-deterministic. Fix it to keep the original
+  order of first appearance.
+
+
+  OBJECTIVE: See that the output order is wrong/unstable; Track seen items while iterating in order; Return
+  uniques in first-seen order. Success means all hidden tests pass.
+
+
+  WHAT TO AVOID: Do not apply broad destructive changes, skip evidence gathering, or fake completion with
+  marker files — the checker validates real system state.'
 difficulty: easy
 scenario_type: fix
 lab_mode: simulation
@@ -21,50 +38,118 @@ objectives:
 initial_state: dedupe(items) should remove duplicates while preserving first-seen order, but it returns
   list(set(items)), which loses order and is non-deterministic. Fix it to keep the original order of first
   appearance.
-solution_explanation: |
-  A set has no order. Iterating in sequence while tracking a `seen` set preserves first-appearance order deterministically.
+solution_explanation: 'A set has no order. Iterating in sequence while tracking a `seen` set preserves
+  first-appearance order deterministically.
+
+  '
 coding_spec:
   language: python
   entrypoint: solution.py
   kind: fix
-  instructions: |
-    Fix dedupe(items) so duplicates are removed but the order of first appearance is preserved.
-      dedupe([3, 1, 3, 2, 1]) -> [3, 1, 2]
-    Click Run to try it, then Check Solution to grade against all tests.
+  instructions: "Fix dedupe(items) so duplicates are removed but the order of first appearance is preserved.\n\
+    \  dedupe([3, 1, 3, 2, 1]) -> [3, 1, 2]\nClick Run to try it, then Check Solution to grade against\
+    \ all tests.\n"
   files:
   - path: solution.py
-    content: |
-      def dedupe(items):
-          return list(set(items))
+    content: "def dedupe(items):\n    return list(set(items))\n"
     readonly: false
   visible_tests:
   - name: preserves order
-    code: |
-      assert dedupe([3, 1, 3, 2, 1]) == [3, 1, 2]
+    code: 'assert dedupe([3, 1, 3, 2, 1]) == [3, 1, 2]
+
+      '
   - name: already unique
-    code: |
-      assert dedupe([1, 2, 3]) == [1, 2, 3]
+    code: 'assert dedupe([1, 2, 3]) == [1, 2, 3]
+
+      '
   hidden_tests:
   - name: strings keep order
-    code: |
-      assert dedupe(['b', 'a', 'b', 'c']) == ['b', 'a', 'c']
+    code: 'assert dedupe([''b'', ''a'', ''b'', ''c'']) == [''b'', ''a'', ''c'']
+
+      '
   - name: empty
-    code: |
-      assert dedupe([]) == []
+    code: 'assert dedupe([]) == []
+
+      '
   - name: all same
-    code: |
-      assert dedupe([5, 5, 5]) == [5]
+    code: 'assert dedupe([5, 5, 5]) == [5]
+
+      '
   - name: order is exact
-    code: |
-      assert dedupe([10, 20, 10, 30, 20, 40]) == [10, 20, 30, 40]
+    code: 'assert dedupe([10, 20, 10, 30, 20, 40]) == [10, 20, 30, 40]
+
+      '
   timeout: 8
 hints:
 - order: 1
-  cost: 10
-  content: list(set(...)) discards ordering — dedupe([3,1,3,2,1]) may not start with 3.
+  cost: 0
+  content: 'Where to look: Open `solution.py`, read the instructions, and run the visible tests to see
+    which assertion fails first.'
 - order: 2
-  cost: 20
-  content: Iterate in order and remember which items you've already emitted.
+  cost: 25
+  content: 'Diagnostic steps:
+
+    1. Click Run and read the traceback — note line number and actual vs expected values.
+
+    2. Reproduce the failure with the smallest input from a visible test.
+
+    3. Compare your implementation to the bug described in the lab prompt.'
 - order: 3
-  cost: 30
-  content: Keep a `seen` set and append to an output list only the first time you see each item.
+  cost: 50
+  content: 'Exact fix + verification:
+
+    1. Return uniques in first-seen order.
+
+    2. Re-run the lab checker (`check.sh` or Check Solution).
+
+    3. Confirm every scenario objective is satisfied.
+
+
+    WHY: the grader validates real state — marker files are ignored.'
+technology: python
+summary: Complete the fix dedupe to preserve order python lab and verify success with the checker
+estimated_minutes: 25
+xp_reward: 100
+prerequisites:
+- Basic python literacy
+tags:
+- fix
+- hands-on
+- python
+linked_tutorial: python-fundamentals
+what_you_will_learn:
+- See that the output order is wrong/unstable
+- Track seen items while iterating in order
+- Return uniques in first-seen order
+environment:
+  nodes:
+  - role: primary
+    os: FixitLab Python project workspace
+    hostname: lab-primary
+    ip: 127.0.0.1
+    specs: local offline simulation
+  pre_installed:
+  - bash
+  - coreutils
+  - pip
+  - python
+  - python3
+  credentials:
+  - user: root
+    password: lab123
+tasks:
+- id: task_1
+  title: Fix dedupe to Preserve Order
+  description: Restore healthy behavior for Fix dedupe to Preserve Order by investigating the failure,
+    applying the smallest safe fix, and validating the outcome.
+  background: 'This python lab teaches systematic troubleshooting: observe, hypothesize, change, verify.'
+  validation:
+    type: custom_script
+    script: hidden_tests
+    error_message: One or more hidden tests failed. Read the public test output, fix your solution, and
+      submit again.
+solution:
+  summary: The solution passes all hidden tests by implementing the required behavior in code.
+  files_changed: []
+  commands_run: []
+  reference_docs: python-fundamentals

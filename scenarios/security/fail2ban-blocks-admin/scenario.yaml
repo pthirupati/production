@@ -1,11 +1,29 @@
 title: fail2ban Blocks Admin SSH
 slug: security-fail2ban-blocks-admin
-category: Security
+category: Harden
 difficulty: medium
-description: After a burst of failed logins from the admin's own network, fail2ban banned the admin's
-  IP and now legitimate SSH from that subnet is blocked. The immediate need is to unban the admin IP and
-  then whitelist the admin subnet (ignoreip) so this doesn't recur, while keeping protection against real
-  attackers.
+description: 'CONTEXT: A team operating security hardening needs you to resolve `fail2ban Blocks Admin
+  SSH` during a realistic incident. The business impact is reduced service reliability until the underlying
+  state is repaired.
+
+
+  ENVIRONMENT: You are working in FixitLab''s offline hardening lab with SSH, firewall, TLS, audit logs,
+  and IAM settings. All tools run locally; no paid APIs or external cloud calls are required.
+
+
+  SYMPTOM / STARTING STATE: Linux server where fail2ban''s sshd jail has banned the administrator''s IP,
+  blocking legitimate SSH; the admin subnet is not in the ignore list. After a burst of failed logins
+  from the admin''s own network, fail2ban banned the admin''s IP and now legitimate SSH from that subnet
+  is blocked. The immediate need is to unban the admin IP and then whitelist the admin subnet (ignoreip)
+  so this doesn''t recur, while keeping protection against real attackers.
+
+
+  OBJECTIVE: Confirm the admin IP is banned in the sshd jail; Unban the admin IP to restore access; Whitelist
+  the admin subnet (ignoreip) so it isn''t banned again. Success means `check.sh` exits successfully.
+
+
+  WHAT TO AVOID: Do not apply broad destructive changes, skip evidence gathering, or fake completion with
+  marker files — the checker validates real system state.'
 lab_mode: simulation
 simulation_type: rhel
 time_limit: 900
@@ -17,17 +35,73 @@ objectives:
 - Whitelist the admin subnet (ignoreip) so it isn't banned again
 hints:
 - order: 1
-  cost: 10
-  content: 'Check who''s banned: `fail2ban-client status sshd` lists the banned IPs (the admin''s IP is
-    among them).'
+  cost: 0
+  content: 'Where to look: Confirm the admin IP is banned in the sshd jail'
 - order: 2
-  cost: 15
-  content: 'Unban it immediately: `fail2ban-client set sshd unbanip <ADMIN_IP>` to restore SSH from that
-    address.'
+  cost: 25
+  content: 'Diagnostic steps:
+
+    1. Unban the admin IP to restore access
+
+    2. Whitelist the admin subnet (ignoreip) so it isn''t banned again'
 - order: 3
-  cost: 20
-  content: 'Prevent recurrence: add the admin subnet to `ignoreip` in /etc/fail2ban/jail.local (e.g. `ignoreip
-    = 127.0.0.1/8 <admin-subnet>`), then `systemctl restart fail2ban` and confirm the admin can SSH while
-    real attackers still get banned.'
+  cost: 50
+  content: 'Exact fix + verification:
+
+    1. Whitelist the admin subnet (ignoreip) so it isn''t banned again.
+
+    2. Re-run the lab checker (`check.sh` or Check Solution).
+
+    3. Confirm every scenario objective is satisfied.
+
+
+    WHY: the grader validates real state — marker files are ignored.'
 initial_state: Linux server where fail2ban's sshd jail has banned the administrator's IP, blocking legitimate
   SSH; the admin subnet is not in the ignore list.
+technology: security
+summary: Complete the fail2ban blocks admin ssh security lab and verify success with the checker
+estimated_minutes: 15
+xp_reward: 100
+prerequisites:
+- Basic security literacy
+tags:
+- fix
+- hands-on
+- security
+linked_tutorial: security-fundamentals
+what_you_will_learn:
+- Confirm the admin IP is banned in the sshd jail
+- Unban the admin IP to restore access
+- Whitelist the admin subnet (ignoreip) so it isn't banned again
+environment:
+  nodes:
+  - role: primary
+    os: FixitLab hardening lab
+    hostname: lab-primary
+    ip: 127.0.0.1
+    specs: local offline simulation
+  pre_installed:
+  - bash
+  - coreutils
+  - journalctl
+  - security
+  - systemctl
+  credentials:
+  - user: root
+    password: lab123
+tasks:
+- id: task_1
+  title: fail2ban Blocks Admin SSH
+  description: Restore healthy behavior for fail2ban Blocks Admin SSH by investigating the failure, applying
+    the smallest safe fix, and validating the outcome.
+  background: 'This security lab teaches systematic troubleshooting: observe, hypothesize, change, verify.'
+  validation:
+    type: custom_script
+    script: check.sh
+    error_message: Validation did not pass. Re-read the objectives and Hint 2 diagnostic steps.
+solution:
+  summary: Identify the misconfiguration affecting this security lab and apply the minimal fix.
+  files_changed: []
+  commands_run:
+  - bash check.sh
+  reference_docs: security-fundamentals

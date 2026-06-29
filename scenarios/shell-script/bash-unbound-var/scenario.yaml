@@ -1,23 +1,52 @@
-category: Shell Scripting
-description: A backup script (/opt/scripts/backup.sh) aborts immediately under strict mode because it
-  references a variable that was never set. With `set -u` active, expanding an unset variable is a fatal
-  error, so the backup never runs. Find the unbound variable, give it a safe value or default, and get
-  the script to complete.
+category: Fix
+description: 'CONTEXT: A team operating shell scripting needs you to resolve `Bash Unbound Variable` during
+  a realistic incident. The business impact is reduced service reliability until the underlying state
+  is repaired.
+
+
+  ENVIRONMENT: You are working in FixitLab''s offline bash practice environment with scripts, cron, logs,
+  and shellcheck. All tools run locally; no paid APIs or external cloud calls are required.
+
+
+  SYMPTOM / STARTING STATE: Simulated RHEL host. Running `bash /opt/scripts/backup.sh` exits early with
+  a "<VAR>: unbound variable" error (the script uses set -u) before any backup is produced. A backup script
+  (/opt/scripts/backup.sh) aborts immediately under strict mode because it references a variable that
+  was never set. With `set -u` active, expanding an unset variable is a fatal error, so the backup never
+  runs. Find the unbound variable, give it a safe value or default, and get the script to complete.
+
+
+  OBJECTIVE: Run the script and identify which variable is unbound; Set the variable or provide a default
+  expansion; Confirm the script runs to completion and produces the backup. Success means `check.sh` exits
+  successfully.
+
+
+  WHAT TO AVOID: Do not apply broad destructive changes, skip evidence gathering, or fake completion with
+  marker files — the checker validates real system state.'
 difficulty: easy
 dual_terminal: false
 hints:
 - order: 1
-  cost: 10
-  content: 'Run it and read the error: `bash /opt/scripts/backup.sh` prints "<VARNAME>: unbound variable"
-    with the line number. Trace execution with `bash -x /opt/scripts/backup.sh`.'
+  cost: 0
+  content: 'Where to look: Run the script and identify which variable is unbound'
 - order: 2
-  cost: 15
-  content: 'The script has `set -u`, so any unset variable is fatal. Either assign the variable before
-    use or use a default expansion: `"${VARNAME:-/default/path}"`.'
+  cost: 25
+  content: 'Diagnostic steps:
+
+    1. Set the variable or provide a default expansion
+
+    2. Confirm the script runs to completion and produces the backup'
 - order: 3
-  cost: 20
-  content: Fix the offending reference (e.g. set BACKUP_DIR or use `${BACKUP_DIR:-/var/backups}`), then
-    re-run the script — it completes and writes the backup. Confirm the output file exists.
+  cost: 50
+  content: 'Exact fix + verification:
+
+    1. Confirm the script runs to completion and produces the backup.
+
+    2. Re-run the lab checker (`check.sh` or Check Solution).
+
+    3. Confirm every scenario objective is satisfied.
+
+
+    WHY: the grader validates real state — marker files are ignored.'
 initial_state: 'Simulated RHEL host. Running `bash /opt/scripts/backup.sh` exits early with a "<VAR>:
   unbound variable" error (the script uses set -u) before any backup is produced.'
 is_free: false
@@ -33,3 +62,51 @@ simulation_type: rhel
 slug: sim-bash-unbound-var
 time_limit: 900
 title: Bash Unbound Variable
+technology: shell-script
+summary: Complete the bash unbound variable shell script lab and verify success with the checker
+estimated_minutes: 15
+xp_reward: 100
+prerequisites:
+- Basic shell script literacy
+tags:
+- fix
+- hands-on
+- shell-script
+linked_tutorial: shell-script-fundamentals
+what_you_will_learn:
+- Run the script and identify which variable is unbound
+- Set the variable or provide a default expansion
+- Confirm the script runs to completion and produces the backup
+environment:
+  nodes:
+  - role: primary
+    os: FixitLab bash practice environment
+    hostname: lab-primary
+    ip: 127.0.0.1
+    specs: local offline simulation
+  pre_installed:
+  - bash
+  - coreutils
+  - journalctl
+  - shell script
+  - systemctl
+  credentials:
+  - user: root
+    password: lab123
+tasks:
+- id: task_1
+  title: Bash Unbound Variable
+  description: Restore healthy behavior for Bash Unbound Variable by investigating the failure, applying
+    the smallest safe fix, and validating the outcome.
+  background: 'This shell script lab teaches systematic troubleshooting: observe, hypothesize, change,
+    verify.'
+  validation:
+    type: custom_script
+    script: check.sh
+    error_message: Validation did not pass. Re-read the objectives and Hint 2 diagnostic steps.
+solution:
+  summary: Identify the misconfiguration affecting this shell script lab and apply the minimal fix.
+  files_changed: []
+  commands_run:
+  - bash check.sh
+  reference_docs: shell-script-fundamentals

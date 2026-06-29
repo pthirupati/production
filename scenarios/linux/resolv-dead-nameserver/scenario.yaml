@@ -2,8 +2,8 @@ title: DNS Resolution Broken — Dead nameserver
 slug: resolv-dead-nameserver
 lab_mode: simulation
 simulation_type: generic
-technology: Linux
-category: Networking / DNS
+technology: linux
+category: Fix
 difficulty: hard
 time_limit: 900
 max_score: 100
@@ -11,10 +11,29 @@ infrastructure_type: docker
 docker_privileged: false
 jira_priority: Medium
 topics_covered: Q95 resolv.conf — fix nameserver, getent hosts
-description: DNS lookups for the internal host app.fixitlab.local fail because /etc/resolv.conf points
-  at a dead nameserver (192.0.2.1) while a working local resolver (dnsmasq on 127.0.0.1) is already running
-  and authoritative for the internal zone. Point the resolver at the live local DNS so internal names
-  resolve.
+description: 'CONTEXT: A team operating Linux administration needs you to resolve `DNS Resolution Broken
+  — Dead nameserver` during a realistic incident. The business impact is reduced service reliability until
+  the underlying state is repaired.
+
+
+  ENVIRONMENT: You are working in FixitLab''s offline Linux practice server with terminal and config files
+  under /etc and /var. All tools run locally; no paid APIs or external cloud calls are required.
+
+
+  SYMPTOM / STARTING STATE: Linux server where /etc/resolv.conf lists a dead nameserver (192.0.2.1); a
+  functioning local dnsmasq on 127.0.0.1 already serves app.fixitlab.local. DNS lookups for the internal
+  host app.fixitlab.local fail because /etc/resolv.conf points at a dead nameserver (192.0.2.1) while
+  a working local resolver (dnsmasq on 127.0.0.1) is already running and authoritative for the internal
+  zone. Point the resolver at the live local DNS so internal names resolve.
+
+
+  OBJECTIVE: Confirm internal-name resolution fails and the configured nameserver is dead; Point resolv.conf
+  at the working local resolver (127.0.0.1); Verify internal hostname resolution succeeds. Success means
+  `check.sh` exits successfully.
+
+
+  WHAT TO AVOID: Do not apply broad destructive changes, skip evidence gathering, or fake completion with
+  marker files — the checker validates real system state.'
 objectives:
 - Confirm internal-name resolution fails and the configured nameserver is dead
 - Point resolv.conf at the working local resolver (127.0.0.1)
@@ -23,14 +42,73 @@ initial_state: Linux server where /etc/resolv.conf lists a dead nameserver (192.
   local dnsmasq on 127.0.0.1 already serves app.fixitlab.local.
 hints:
 - order: 1
-  cost: 10
-  content: 'Reproduce: `getent hosts app.fixitlab.local` fails. Check the resolver: `cat /etc/resolv.conf`
-    lists 192.0.2.1, which is unreachable (dnsmasq on 127.0.0.1 is up).'
+  cost: 0
+  content: 'Where to look: Run `cat /etc/resolv.conf` and test with `dig example.com` or `getent hosts
+    example.com`.'
 - order: 2
-  cost: 15
-  content: Set `nameserver 127.0.0.1` in /etc/resolv.conf (remove the dead one). On systems managing resolv.conf,
-    make it stick via the resolver config rather than a transient edit.
+  cost: 25
+  content: 'Diagnostic steps:
+
+    1. Note the configured nameserver IP in resolv.conf.
+
+    2. `ping` or `nc -zv` the nameserver — is it reachable?
+
+    3. Check if NetworkManager or systemd-resolved overwrites the file.'
 - order: 3
-  cost: 20
-  content: 'Verify: `getent hosts app.fixitlab.local` (or `dig @127.0.0.1 app.fixitlab.local`) now returns
-    the address.'
+  cost: 50
+  content: 'Exact fix + verification:
+
+    1. Verify internal hostname resolution succeeds.
+
+    2. Re-run the lab checker (`check.sh` or Check Solution).
+
+    3. Confirm every scenario objective is satisfied.
+
+
+    WHY: the grader validates real state — marker files are ignored.'
+summary: Complete the dns resolution broken — dead nameserver linux lab and verify success with the checker
+estimated_minutes: 15
+xp_reward: 100
+prerequisites:
+- Basic linux literacy
+tags:
+- fix
+- hands-on
+- linux
+linked_tutorial: linux-fundamentals
+what_you_will_learn:
+- Confirm internal-name resolution fails and the configured nameserver is dead
+- Point resolv.conf at the working local resolver (127.0.0.1)
+- Verify internal hostname resolution succeeds
+environment:
+  nodes:
+  - role: primary
+    os: FixitLab Linux practice server
+    hostname: lab-primary
+    ip: 127.0.0.1
+    specs: local offline simulation
+  pre_installed:
+  - bash
+  - coreutils
+  - journalctl
+  - linux
+  - systemctl
+  credentials:
+  - user: root
+    password: lab123
+tasks:
+- id: task_1
+  title: DNS Resolution Broken — Dead nameserver
+  description: Restore healthy behavior for DNS Resolution Broken — Dead nameserver by investigating the
+    failure, applying the smallest safe fix, and validating the outcome.
+  background: 'This linux lab teaches systematic troubleshooting: observe, hypothesize, change, verify.'
+  validation:
+    type: custom_script
+    script: check.sh
+    error_message: Validation did not pass. Re-read the objectives and Hint 2 diagnostic steps.
+solution:
+  summary: Identify the misconfiguration affecting this linux lab and apply the minimal fix.
+  files_changed: []
+  commands_run:
+  - bash check.sh
+  reference_docs: linux-fundamentals

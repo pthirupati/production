@@ -1,9 +1,26 @@
 title: Fix the Grade Boundary Logic
 slug: py-fix-grade-boundaries
-category: Python Development
-description: letter_grade(score) maps a 0-100 score to A/B/C/D/F, but the boundary comparisons use `>`
-  instead of `>=`, so exact cutoffs (90, 80, 70, 60) fall into the wrong bucket. Fix the boundaries so
-  90 is an A, 80 a B, and so on.
+category: Fix
+description: 'CONTEXT: A team operating Python development needs you to resolve `Fix the Grade Boundary
+  Logic` during a realistic incident. The business impact is reduced service reliability until the underlying
+  state is repaired.
+
+
+  ENVIRONMENT: You are working in FixitLab''s offline Python project workspace with source files, venv,
+  tests, and CLI entrypoints. All tools run locally; no paid APIs or external cloud calls are required.
+
+
+  SYMPTOM / STARTING STATE: letter_grade(score) maps a 0-100 score to A/B/C/D/F, but the boundary comparisons
+  use `>` instead of `>=`, so exact cutoffs (90, 80, 70, 60) fall into the wrong bucket. Fix the boundaries
+  so 90 is an A, 80 a B, and so on.
+
+
+  OBJECTIVE: Test the exact cutoff scores; Use >= at each threshold; Return the correct letter for every
+  score. Success means all hidden tests pass.
+
+
+  WHAT TO AVOID: Do not apply broad destructive changes, skip evidence gathering, or fake completion with
+  marker files — the checker validates real system state.'
 difficulty: easy
 scenario_type: fix
 lab_mode: simulation
@@ -21,60 +38,127 @@ objectives:
 initial_state: letter_grade(score) maps a 0-100 score to A/B/C/D/F, but the boundary comparisons use `>`
   instead of `>=`, so exact cutoffs (90, 80, 70, 60) fall into the wrong bucket. Fix the boundaries so
   90 is an A, 80 a B, and so on.
-solution_explanation: |
-  Strict `>` excludes the exact cutoff value, bumping boundary scores down a grade. Using `>=` makes each threshold inclusive.
+solution_explanation: 'Strict `>` excludes the exact cutoff value, bumping boundary scores down a grade.
+  Using `>=` makes each threshold inclusive.
+
+  '
 coding_spec:
   language: python
   entrypoint: solution.py
   kind: fix
-  instructions: |
-    Fix letter_grade(score): 90+ -> 'A', 80+ -> 'B', 70+ -> 'C', 60+ -> 'D', else 'F'. Cutoffs are INCLUSIVE.
+  instructions: 'Fix letter_grade(score): 90+ -> ''A'', 80+ -> ''B'', 70+ -> ''C'', 60+ -> ''D'', else
+    ''F''. Cutoffs are INCLUSIVE.
+
     Click Run to try it, then Check Solution to grade against all tests.
+
+    '
   files:
   - path: solution.py
-    content: |
-      def letter_grade(score):
-          if score > 90:
-              return 'A'
-          elif score > 80:
-              return 'B'
-          elif score > 70:
-              return 'C'
-          elif score > 60:
-              return 'D'
-          return 'F'
+    content: "def letter_grade(score):\n    if score > 90:\n        return 'A'\n    elif score > 80:\n\
+      \        return 'B'\n    elif score > 70:\n        return 'C'\n    elif score > 60:\n        return\
+      \ 'D'\n    return 'F'\n"
     readonly: false
   visible_tests:
   - name: clear A
-    code: |
-      assert letter_grade(95) == 'A'
+    code: 'assert letter_grade(95) == ''A''
+
+      '
   - name: exact 90 is A
-    code: |
-      assert letter_grade(90) == 'A', letter_grade(90)
+    code: 'assert letter_grade(90) == ''A'', letter_grade(90)
+
+      '
   hidden_tests:
   - name: exact 80 is B
-    code: |
-      assert letter_grade(80) == 'B', letter_grade(80)
+    code: 'assert letter_grade(80) == ''B'', letter_grade(80)
+
+      '
   - name: exact 70 is C
-    code: |
-      assert letter_grade(70) == 'C'
+    code: 'assert letter_grade(70) == ''C''
+
+      '
   - name: exact 60 is D
-    code: |
-      assert letter_grade(60) == 'D'
+    code: 'assert letter_grade(60) == ''D''
+
+      '
   - name: fail
-    code: |
-      assert letter_grade(59) == 'F'
+    code: 'assert letter_grade(59) == ''F''
+
+      '
   - name: mid B
-    code: |
-      assert letter_grade(85) == 'B'
+    code: 'assert letter_grade(85) == ''B''
+
+      '
   timeout: 8
 hints:
 - order: 1
-  cost: 10
-  content: letter_grade(90) returns 'B', but 90 should be an 'A'.
+  cost: 0
+  content: 'Where to look: Open `solution.py`, read the instructions, and run the visible tests to see
+    which assertion fails first.'
 - order: 2
-  cost: 20
-  content: '`score > 90` excludes exactly 90. The cutoffs are inclusive.'
+  cost: 25
+  content: 'Diagnostic steps:
+
+    1. Click Run and read the traceback — note line number and actual vs expected values.
+
+    2. Reproduce the failure with the smallest input from a visible test.
+
+    3. Compare your implementation to the bug described in the lab prompt.'
 - order: 3
-  cost: 30
-  content: Use >= at every threshold.
+  cost: 50
+  content: 'Exact fix + verification:
+
+    1. Return the correct letter for every score.
+
+    2. Re-run the lab checker (`check.sh` or Check Solution).
+
+    3. Confirm every scenario objective is satisfied.
+
+
+    WHY: the grader validates real state — marker files are ignored.'
+technology: python
+summary: Complete the fix the grade boundary logic python lab and verify success with the checker
+estimated_minutes: 25
+xp_reward: 100
+prerequisites:
+- Basic python literacy
+tags:
+- fix
+- hands-on
+- python
+linked_tutorial: python-fundamentals
+what_you_will_learn:
+- Test the exact cutoff scores
+- Use >= at each threshold
+- Return the correct letter for every score
+environment:
+  nodes:
+  - role: primary
+    os: FixitLab Python project workspace
+    hostname: lab-primary
+    ip: 127.0.0.1
+    specs: local offline simulation
+  pre_installed:
+  - bash
+  - coreutils
+  - pip
+  - python
+  - python3
+  credentials:
+  - user: root
+    password: lab123
+tasks:
+- id: task_1
+  title: Fix the Grade Boundary Logic
+  description: Restore healthy behavior for Fix the Grade Boundary Logic by investigating the failure,
+    applying the smallest safe fix, and validating the outcome.
+  background: 'This python lab teaches systematic troubleshooting: observe, hypothesize, change, verify.'
+  validation:
+    type: custom_script
+    script: hidden_tests
+    error_message: One or more hidden tests failed. Read the public test output, fix your solution, and
+      submit again.
+solution:
+  summary: The solution passes all hidden tests by implementing the required behavior in code.
+  files_changed: []
+  commands_run: []
+  reference_docs: python-fundamentals

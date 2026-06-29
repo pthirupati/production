@@ -1,42 +1,138 @@
 title: Network Slow and Large Transfers Failing — MTU Mismatch
 slug: linux-network-slow-mtu
 difficulty: medium
-category: Linux Administration
-description: |
-  Small network packets like SSH keystrokes work fine but large file transfers are either
+category: Fix
+description: 'CONTEXT: A team operating Linux administration needs you to resolve `Network Slow and Large
+  Transfers Failing — MTU Mismatch` during a realistic incident. The business impact is reduced service
+  reliability until the underlying state is repaired.
+
+
+  ENVIRONMENT: You are working in FixitLab''s offline Linux practice server with terminal and config files
+  under /etc and /var. All tools run locally; no paid APIs or external cloud calls are required.
+
+
+  SYMPTOM / STARTING STATE: Simulated RHEL 9 server connected through a VPN. SSH sessions are responsive
+  but scp
+
+  and rsync transfers stall after a few kilobytes. ping -c 3 8.8.8.8 succeeds but
+
+  ping -M do -s 1472 8.8.8.8 (a 1500-byte packet with DF bit) returns "Message too long".
+
+  The interface eth0 shows MTU 1500 with ip link show. Small network packets like SSH keystrokes work
+  fine but large file transfers are either
+
   failing entirely or running at a fraction of expected speed. This is a classic symptom
+
   of an MTU mismatch — the interface MTU is set higher than the network path supports,
+
   causing packet fragmentation or silent drops. The path MTU must be discovered and the
+
   interface MTU must be adjusted accordingly.
 
-initial_state: |
-  Simulated RHEL 9 server connected through a VPN. SSH sessions are responsive but scp
+
+  OBJECTIVE: Test path MTU with ping -M do -s 1472 <target> and decrease packet size until pings succeed;
+  Calculate correct MTU (payload size that succeeds + 28 bytes for IP/ICMP headers); Check current MTU
+  with ip link show eth0. Success means `check.sh` exits successfully.
+
+
+  WHAT TO AVOID: Do not apply broad destructive changes, skip evidence gathering, or fake completion with
+  marker files — the checker validates real system state.'
+initial_state: 'Simulated RHEL 9 server connected through a VPN. SSH sessions are responsive but scp
+
   and rsync transfers stall after a few kilobytes. ping -c 3 8.8.8.8 succeeds but
+
   ping -M do -s 1472 8.8.8.8 (a 1500-byte packet with DF bit) returns "Message too long".
+
   The interface eth0 shows MTU 1500 with ip link show.
 
+  '
 objectives:
-  - Test path MTU with ping -M do -s 1472 <target> and decrease packet size until pings succeed
-  - Calculate correct MTU (payload size that succeeds + 28 bytes for IP/ICMP headers)
-  - Check current MTU with ip link show eth0
-  - Set the correct MTU: ip link set dev eth0 mtu 1450 (or appropriate value found)
-  - Make the MTU change persistent in /etc/sysconfig/network-scripts/ifcfg-eth0 with MTU=1450
-  - Verify large scp transfer works after MTU adjustment
+- Test path MTU with ping -M do -s 1472 <target> and decrease packet size until pings succeed
+- Calculate correct MTU (payload size that succeeds + 28 bytes for IP/ICMP headers)
+- Check current MTU with ip link show eth0
+- Set the correct MTU: ip link set dev eth0 mtu 1450 (or appropriate value found)
+- Make the MTU change persistent in /etc/sysconfig/network-scripts/ifcfg-eth0 with MTU=1450
+- Verify large scp transfer works after MTU adjustment
 lab_mode: simulation
 simulation_type: generic
 time_limit: 900
 max_score: 100
 is_free: false
 hints:
-  - content: 'Binary search for the correct MTU: try ping -M do -s 1400 target, then increase or decrease. Add 28 (IP+ICMP header) to the working payload size to get the actual MTU.'
-    cost: 10
-    order: 1
-  - content: 'Set MTU immediately: ip link set dev eth0 mtu 1450. To persist across reboots, add MTU=1450 to /etc/sysconfig/network-scripts/ifcfg-eth0 and run nmcli con reload.'
-    cost: 20
-    order: 2
-  - content: 'Common MTU values: 1500 (standard Ethernet), 1492 (PPPoE), 1450 (many VPN tunnels), 9000 (jumbo frames). The VPN overhead determines how much to reduce from the standard 1500.'
-    cost: 15
-    order: 3
+- order: 1
+  cost: 0
+  content: 'Where to look: Run `systemctl status sshd` and `ss -tlnp | grep :22` on the target host.'
+- order: 2
+  cost: 25
+  content: 'Diagnostic steps:
+
+    1. Confirm sshd is active and listening on port 22.
+
+    2. Check `firewall-cmd` or iptables for blocked port 22.
+
+    3. Read `/var/log/secure` for auth or config errors.'
+- order: 3
+  cost: 50
+  content: 'Exact fix + verification:
+
+    1. Fix sshd_config, firewall, or socket unit as needed.
+
+    2. `systemctl restart sshd`.
+
+    3. `ssh -o BatchMode=yes user@localhost echo ok` succeeds.
+
+
+    WHY: SSH failures are usually service, firewall, or config — not credentials alone.'
 requires_companion_hosts: false
 dual_terminal: false
 jira_priority: Medium
+technology: linux
+summary: Complete the network slow and large transfers failing — mtu mismatch linux lab and verify success
+  with the checker
+estimated_minutes: 15
+xp_reward: 100
+prerequisites:
+- Basic linux literacy
+tags:
+- fix
+- hands-on
+- linux
+linked_tutorial: linux-fundamentals
+what_you_will_learn:
+- Test path MTU with ping -M do -s 1472 <target> and decrease packet size until pings succeed
+- Calculate correct MTU (payload size that succeeds + 28 bytes for IP/ICMP headers)
+- Check current MTU with ip link show eth0
+- '{''Set the correct MTU'': ''ip link set dev eth0 mtu 1450 (or appropriate value found)''}'
+- Make the MTU change persistent in /etc/sysconfig/network-scripts/ifcfg-eth0 with MTU=1450
+environment:
+  nodes:
+  - role: primary
+    os: FixitLab Linux practice server
+    hostname: lab-primary
+    ip: 127.0.0.1
+    specs: local offline simulation
+  pre_installed:
+  - bash
+  - coreutils
+  - journalctl
+  - linux
+  - systemctl
+  credentials:
+  - user: root
+    password: lab123
+tasks:
+- id: task_1
+  title: Network Slow and Large Transfers Failing — MTU Mismatch
+  description: Restore healthy behavior for Network Slow and Large Transfers Failing — MTU Mismatch by
+    investigating the failure, applying the smallest safe fix, and validating the outcome.
+  background: 'This linux lab teaches systematic troubleshooting: observe, hypothesize, change, verify.'
+  validation:
+    type: custom_script
+    script: check.sh
+    error_message: Validation did not pass. Re-read the objectives and Hint 2 diagnostic steps.
+solution:
+  summary: Identify the misconfiguration affecting this linux lab and apply the minimal fix.
+  files_changed: []
+  commands_run:
+  - bash check.sh
+  reference_docs: linux-fundamentals

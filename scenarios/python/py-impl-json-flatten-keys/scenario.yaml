@@ -1,9 +1,26 @@
 title: Implement Nested Dict Flattening
 slug: py-impl-json-flatten-keys
-category: Python Development
-description: 'Implement flatten_dict(d): flatten a nested dict into a single-level dict whose keys join
-  the path with dots. Values that are dicts recurse; all other values (including lists) are leaves. The
-  stub is empty so tests fail.'
+category: Build
+description: 'CONTEXT: A team operating Python development needs you to resolve `Implement Nested Dict
+  Flattening` during a realistic incident. The business impact is reduced service reliability until the
+  underlying state is repaired.
+
+
+  ENVIRONMENT: You are working in FixitLab''s offline Python project workspace with source files, venv,
+  tests, and CLI entrypoints. All tools run locally; no paid APIs or external cloud calls are required.
+
+
+  SYMPTOM / STARTING STATE: Implement flatten_dict(d): flatten a nested dict into a single-level dict
+  whose keys join the path with dots. Values that are dicts recurse; all other values (including lists)
+  are leaves. The stub is empty so tests fail.
+
+
+  OBJECTIVE: Recurse into nested dictionaries; Join key paths with ''.''; Treat non-dict values as leaves.
+  Success means all hidden tests pass.
+
+
+  WHAT TO AVOID: Do not apply broad destructive changes, skip evidence gathering, or fake completion with
+  marker files — the checker validates real system state.'
 difficulty: hard
 scenario_type: do
 lab_mode: simulation
@@ -21,51 +38,144 @@ objectives:
 initial_state: 'Implement flatten_dict(d): flatten a nested dict into a single-level dict whose keys join
   the path with dots. Values that are dicts recurse; all other values (including lists) are leaves. The
   stub is empty so tests fail.'
-solution_explanation: |
-  Recursing only on dict values and threading a dotted prefix builds the joined key paths; non-dict values (including lists) terminate as leaves.
+solution_explanation: 'Recursing only on dict values and threading a dotted prefix builds the joined key
+  paths; non-dict values (including lists) terminate as leaves.
+
+  '
 coding_spec:
   language: python
   entrypoint: solution.py
   kind: impl
-  instructions: |
-    Implement flatten_dict(d) -> flat dict with dotted keys.
-      flatten_dict({'a': {'b': 1, 'c': {'d': 2}}, 'e': 3}) -> {'a.b': 1, 'a.c.d': 2, 'e': 3}
-    Click Run to try it, then Check Solution to grade against all tests.
+  instructions: "Implement flatten_dict(d) -> flat dict with dotted keys.\n  flatten_dict({'a': {'b':\
+    \ 1, 'c': {'d': 2}}, 'e': 3}) -> {'a.b': 1, 'a.c.d': 2, 'e': 3}\nClick Run to try it, then Check Solution\
+    \ to grade against all tests.\n"
   files:
   - path: solution.py
-    content: |
-      def flatten_dict(d):
-          # TODO: flatten nested dicts into dotted keys
-          pass
+    content: "def flatten_dict(d):\n    # TODO: flatten nested dicts into dotted keys\n    pass\n"
     readonly: false
   visible_tests:
   - name: nested example
-    code: |
-      assert flatten_dict({'a': {'b': 1, 'c': {'d': 2}}, 'e': 3}) == {'a.b': 1, 'a.c.d': 2, 'e': 3}
+    code: 'assert flatten_dict({''a'': {''b'': 1, ''c'': {''d'': 2}}, ''e'': 3}) == {''a.b'': 1, ''a.c.d'':
+      2, ''e'': 3}
+
+      '
   - name: flat already
-    code: |
-      assert flatten_dict({'x': 1, 'y': 2}) == {'x': 1, 'y': 2}
+    code: 'assert flatten_dict({''x'': 1, ''y'': 2}) == {''x'': 1, ''y'': 2}
+
+      '
   hidden_tests:
   - name: deep nesting
-    code: |
-      assert flatten_dict({'a': {'b': {'c': {'d': 9}}}}) == {'a.b.c.d': 9}
+    code: 'assert flatten_dict({''a'': {''b'': {''c'': {''d'': 9}}}}) == {''a.b.c.d'': 9}
+
+      '
   - name: list is a leaf
-    code: |
-      assert flatten_dict({'a': {'b': [1, 2]}}) == {'a.b': [1, 2]}
+    code: 'assert flatten_dict({''a'': {''b'': [1, 2]}}) == {''a.b'': [1, 2]}
+
+      '
   - name: empty dict
-    code: |
-      assert flatten_dict({}) == {}
+    code: 'assert flatten_dict({}) == {}
+
+      '
   - name: mixed leaves and nests
-    code: |
-      assert flatten_dict({'k': 1, 'n': {'a': 2, 'b': {'c': 3}}}) == {'k': 1, 'n.a': 2, 'n.b.c': 3}
+    code: 'assert flatten_dict({''k'': 1, ''n'': {''a'': 2, ''b'': {''c'': 3}}}) == {''k'': 1, ''n.a'':
+      2, ''n.b.c'': 3}
+
+      '
   timeout: 8
 hints:
 - order: 1
-  cost: 10
-  content: Carry a prefix string as you descend into nested dicts.
+  cost: 0
+  content: 'Where to look: Open `solution.py`, read the instructions, and run the visible tests to see
+    which assertion fails first.'
 - order: 2
-  cost: 20
-  content: Only recurse when the value is a dict; everything else is a leaf.
+  cost: 25
+  content: 'Diagnostic steps:
+
+    1. Click Run and read the traceback — note line number and actual vs expected values.
+
+    2. Reproduce the failure with the smallest input from a visible test.
+
+    3. Compare your implementation to the bug described in the lab prompt.'
 - order: 3
-  cost: 30
-  content: Join the prefix and key with '.', and merge recursive results with dict.update.
+  cost: 50
+  content: 'Exact fix + verification:
+
+    1. Treat non-dict values as leaves.
+
+    2. Re-run the lab checker (`check.sh` or Check Solution).
+
+    3. Confirm every scenario objective is satisfied.
+
+
+    WHY: the grader validates real state — marker files are ignored.'
+technology: python
+summary: Complete the implement nested dict flattening python lab and verify success with the checker
+estimated_minutes: 25
+xp_reward: 100
+prerequisites:
+- Basic python literacy
+tags:
+- do
+- hands-on
+- python
+linked_tutorial: python-fundamentals
+what_you_will_learn:
+- Recurse into nested dictionaries
+- Join key paths with '.'
+- Treat non-dict values as leaves
+environment:
+  nodes:
+  - role: primary
+    os: FixitLab Python project workspace
+    hostname: lab-primary
+    ip: 127.0.0.1
+    specs: local offline simulation
+  pre_installed:
+  - bash
+  - coreutils
+  - pip
+  - python
+  - python3
+  credentials:
+  - user: root
+    password: lab123
+tasks:
+- id: task_1
+  title: Implement Nested Dict Flattening
+  description: Restore healthy behavior for Implement Nested Dict Flattening by investigating the failure,
+    applying the smallest safe fix, and validating the outcome.
+  background: 'This python lab teaches systematic troubleshooting: observe, hypothesize, change, verify.'
+  validation:
+    type: custom_script
+    script: hidden_tests
+    error_message: One or more hidden tests failed. Read the public test output, fix your solution, and
+      submit again.
+solution:
+  summary: The solution passes all hidden tests by implementing the required behavior in code.
+  files_changed: []
+  commands_run: []
+  reference_docs: python-fundamentals
+guided_mode:
+  enabled: true
+  steps:
+  - step: 1
+    title: Inspect current state
+    instruction: Run a read-only diagnostic before changing anything.
+    command: check.sh
+    expected_output: Output shows the current failure mode
+    explanation: Evidence-first troubleshooting avoids guessing.
+    next_on: command_success
+  - step: 2
+    title: Apply the minimal fix
+    instruction: Make one reversible change aligned with the objectives.
+    command: '# your fix command here'
+    expected_output: State moves toward the objective
+    explanation: Small changes make rollback easy if the hypothesis was wrong.
+    next_on: command_success
+  - step: 3
+    title: Verify with the grader
+    instruction: Run the same verification the checker uses.
+    command: check.sh
+    expected_output: all hidden tests pass
+    explanation: The lab passes only when real state is healthy.
+    next_on: command_success

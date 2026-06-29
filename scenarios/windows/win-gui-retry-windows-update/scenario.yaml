@@ -1,7 +1,7 @@
 slug: win-gui-retry-windows-update
-title: "Windows GUI: Recover a Failed Cumulative Windows Update"
+title: 'Windows GUI: Recover a Failed Cumulative Windows Update'
 technology: windows
-category: Windows Update
+category: Build
 difficulty: medium
 lab_mode: simulation
 simulation_type: windows-server
@@ -11,28 +11,146 @@ max_score: 100
 is_free: true
 jira_priority: High
 dual_terminal: false
-description: |
-  Patch-compliance alert: this server is missing the January 2025 cumulative
-  update. The update KB5034123 attempted to install but failed with error
-  0x80073712, leaving the server short of critical security fixes. Using the
-  Windows Update panel in the Windows Server simulator, retry the failed update
-  so it installs successfully and the server returns to compliance.
-initial_state: |
-  A domain-joined Windows Server 2022. The Windows Update history shows
+description: 'CONTEXT: A team operating Windows Server needs you to resolve `Windows GUI: Recover a Failed
+  Cumulative Windows Update` during a realistic incident. The business impact is reduced service reliability
+  until the underlying state is repaired.
+
+
+  ENVIRONMENT: You are working in FixitLab''s offline Windows Server host with PowerShell, Server Manager,
+  and AD tools. All tools run locally; no paid APIs or external cloud calls are required.
+
+
+  SYMPTOM / STARTING STATE: A domain-joined Windows Server 2022. The Windows Update history shows
+
   KB5034123 in the Failed state with error 0x80073712. Older updates are
+
   already installed. The learner passes once KB5034123 reaches the Installed
+
+  state. Patch-compliance alert: this server is missing the January 2025 cumulative
+
+  update. The update KB5034123 attempted to install but failed with error
+
+  0x80073712, leaving the server short of critical security fixes. Using the
+
+  Windows Update panel in the Windows Server simulator, retry the failed update
+
+  so it installs successfully and the server returns to compliance.
+
+
+  OBJECTIVE: Open Windows Update and review the update history; Identify the failed update KB5034123 and
+  its error code; Retry the failed update so it installs successfully. Success means `check.sh` exits
+  successfully.
+
+
+  WHAT TO AVOID: Do not apply broad destructive changes, skip evidence gathering, or fake completion with
+  marker files — the checker validates real system state.'
+initial_state: 'A domain-joined Windows Server 2022. The Windows Update history shows
+
+  KB5034123 in the Failed state with error 0x80073712. Older updates are
+
+  already installed. The learner passes once KB5034123 reaches the Installed
+
   state.
+
+  '
 objectives:
-  - Open Windows Update and review the update history
-  - Identify the failed update KB5034123 and its error code
-  - Retry the failed update so it installs successfully
+- Open Windows Update and review the update history
+- Identify the failed update KB5034123 and its error code
+- Retry the failed update so it installs successfully
 hints:
-  - order: 1
-    cost: 10
-    content: "Open Windows Update and look at the failed entry KB5034123 (error 0x80073712)."
-  - order: 2
-    cost: 15
-    content: "A transient component-store error usually clears on a retry — use Retry on the failed update."
-  - order: 3
-    cost: 20
-    content: "Retry KB5034123 until its status flips from Failed to Installed."
+- order: 1
+  cost: 0
+  content: 'Where to look: Open Event Viewer (System/Application) and the relevant Services mmc or Server
+    Manager role status.'
+- order: 2
+  cost: 25
+  content: 'Diagnostic steps:
+
+    1. Note the service state and dependency chain in services.msc.
+
+    2. Read the most recent error in Event Viewer for the failing component.
+
+    3. Use PowerShell (`Get-Service`, `Get-WinEvent`) for scripted evidence.'
+- order: 3
+  cost: 50
+  content: 'Exact fix + verification:
+
+    1. Apply the minimal fix (service start, GPO, binding, or permission).
+
+    2. Re-test the failing operation.
+
+    3. Confirm Check Solution passes.
+
+
+    WHY: Windows labs grade real role/service state.'
+summary: 'Complete the windows gui: recover a failed cumulative windows update windows lab and verify
+  success with the checker'
+estimated_minutes: 15
+xp_reward: 100
+prerequisites:
+- Basic windows literacy
+tags:
+- fix
+- hands-on
+- windows
+linked_tutorial: windows-fundamentals
+what_you_will_learn:
+- Open Windows Update and review the update history
+- Identify the failed update KB5034123 and its error code
+- Retry the failed update so it installs successfully
+environment:
+  nodes:
+  - role: primary
+    os: FixitLab Windows Server host
+    hostname: lab-primary
+    ip: 127.0.0.1
+    specs: local offline simulation
+  pre_installed:
+  - bash
+  - coreutils
+  - journalctl
+  - systemctl
+  - windows
+  credentials:
+  - user: root
+    password: lab123
+tasks:
+- id: task_1
+  title: 'Windows GUI: Recover a Failed Cumulative Windows Update'
+  description: 'Restore healthy behavior for Windows GUI: Recover a Failed Cumulative Windows Update by
+    investigating the failure, applying the smallest safe fix, and validating the outcome.'
+  background: 'This windows lab teaches systematic troubleshooting: observe, hypothesize, change, verify.'
+  validation:
+    type: custom_script
+    script: check.sh
+    error_message: Validation did not pass. Re-read the objectives and Hint 2 diagnostic steps.
+solution:
+  summary: Identify the misconfiguration affecting this windows lab and apply the minimal fix.
+  files_changed: []
+  commands_run:
+  - bash check.sh
+  reference_docs: windows-fundamentals
+guided_mode:
+  enabled: true
+  steps:
+  - step: 1
+    title: Inspect current state
+    instruction: Run a read-only diagnostic before changing anything.
+    command: check.sh
+    expected_output: Output shows the current failure mode
+    explanation: Evidence-first troubleshooting avoids guessing.
+    next_on: command_success
+  - step: 2
+    title: Apply the minimal fix
+    instruction: Make one reversible change aligned with the objectives.
+    command: '# your fix command here'
+    expected_output: State moves toward the objective
+    explanation: Small changes make rollback easy if the hypothesis was wrong.
+    next_on: command_success
+  - step: 3
+    title: Verify with the grader
+    instruction: Run the same verification the checker uses.
+    command: check.sh
+    expected_output: '`check.sh` exits successfully'
+    explanation: The lab passes only when real state is healthy.
+    next_on: command_success

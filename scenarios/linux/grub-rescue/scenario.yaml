@@ -1,22 +1,52 @@
-category: Linux Administration
-description: The system boots into the limited `grub rescue>` prompt instead of the OS because the GRUB
-  bootloader can't find its configuration/modules (a damaged install or a moved /boot). You must locate
-  the boot partition, load the OS, and reinstall GRUB so the machine boots normally again.
+category: Fix
+description: 'CONTEXT: A team operating Linux administration needs you to resolve `GRUB Rescue Mode` during
+  a realistic incident. The business impact is reduced service reliability until the underlying state
+  is repaired.
+
+
+  ENVIRONMENT: You are working in FixitLab''s offline Linux practice server with terminal and config files
+  under /etc and /var. All tools run locally; no paid APIs or external cloud calls are required.
+
+
+  SYMPTOM / STARTING STATE: Simulated RHEL 9 server that drops to the `grub rescue>` prompt at boot. GRUB
+  cannot load its normal configuration, so the OS does not start. The system boots into the limited `grub
+  rescue>` prompt instead of the OS because the GRUB bootloader can''t find its configuration/modules
+  (a damaged install or a moved /boot). You must locate the boot partition, load the OS, and reinstall
+  GRUB so the machine boots normally again.
+
+
+  OBJECTIVE: Identify the boot/root partition from the grub rescue prompt; Boot into the OS (or a rescue
+  environment); Reinstall GRUB and regenerate its config so the system boots normally. Success means `check.sh`
+  exits successfully.
+
+
+  WHAT TO AVOID: Do not apply broad destructive changes, skip evidence gathering, or fake completion with
+  marker files — the checker validates real system state.'
 difficulty: hard
 dual_terminal: false
 hints:
 - order: 1
-  cost: 10
-  content: 'At `grub rescue>`, find the partitions: `ls` lists devices like (hd0,gpt2). Locate the one
-    with /boot (e.g. `ls (hd0,gpt1)/`) to identify boot vs root.'
+  cost: 0
+  content: 'Where to look: Identify the boot/root partition from the grub rescue prompt'
 - order: 2
-  cost: 15
-  content: 'Set prefix/root to the boot partition and load the normal module to reach a real menu: `set
-    prefix=(hd0,gpt1)/grub2`, `set root=(hd0,gpt1)`, `insmod normal`, `normal` — then boot the OS.'
+  cost: 25
+  content: 'Diagnostic steps:
+
+    1. Boot into the OS (or a rescue environment)
+
+    2. Reinstall GRUB and regenerate its config so the system boots normally'
 - order: 3
-  cost: 20
-  content: 'Once booted (or in chroot from rescue media), reinstall and rebuild: `grub2-install /dev/sda`
-    and `grub2-mkconfig -o /boot/grub2/grub.cfg`. Reboot and confirm it comes up normally.'
+  cost: 50
+  content: 'Exact fix + verification:
+
+    1. Reinstall GRUB and regenerate its config so the system boots normally.
+
+    2. Re-run the lab checker (`check.sh` or Check Solution).
+
+    3. Confirm every scenario objective is satisfied.
+
+
+    WHY: the grader validates real state — marker files are ignored.'
 initial_state: Simulated RHEL 9 server that drops to the `grub rescue>` prompt at boot. GRUB cannot load
   its normal configuration, so the OS does not start.
 is_free: false
@@ -32,3 +62,50 @@ simulation_type: rhel
 slug: sim-rhel-grub-rescue
 time_limit: 900
 title: GRUB Rescue Mode
+technology: linux
+summary: Complete the grub rescue mode linux lab and verify success with the checker
+estimated_minutes: 15
+xp_reward: 100
+prerequisites:
+- Basic linux literacy
+tags:
+- fix
+- hands-on
+- linux
+linked_tutorial: linux-fundamentals
+what_you_will_learn:
+- Identify the boot/root partition from the grub rescue prompt
+- Boot into the OS (or a rescue environment)
+- Reinstall GRUB and regenerate its config so the system boots normally
+environment:
+  nodes:
+  - role: primary
+    os: FixitLab Linux practice server
+    hostname: lab-primary
+    ip: 127.0.0.1
+    specs: local offline simulation
+  pre_installed:
+  - bash
+  - coreutils
+  - journalctl
+  - linux
+  - systemctl
+  credentials:
+  - user: root
+    password: lab123
+tasks:
+- id: task_1
+  title: GRUB Rescue Mode
+  description: Restore healthy behavior for GRUB Rescue Mode by investigating the failure, applying the
+    smallest safe fix, and validating the outcome.
+  background: 'This linux lab teaches systematic troubleshooting: observe, hypothesize, change, verify.'
+  validation:
+    type: custom_script
+    script: check.sh
+    error_message: Validation did not pass. Re-read the objectives and Hint 2 diagnostic steps.
+solution:
+  summary: Identify the misconfiguration affecting this linux lab and apply the minimal fix.
+  files_changed: []
+  commands_run:
+  - bash check.sh
+  reference_docs: linux-fundamentals

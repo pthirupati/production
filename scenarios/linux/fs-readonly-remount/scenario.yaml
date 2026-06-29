@@ -2,8 +2,8 @@ title: Filesystem Stuck Read-Only
 slug: fs-readonly-remount
 lab_mode: simulation
 simulation_type: generic
-technology: Linux
-category: Storage
+technology: linux
+category: Build
 difficulty: medium
 time_limit: 900
 max_score: 100
@@ -11,10 +11,28 @@ infrastructure_type: docker
 docker_privileged: true
 jira_priority: Medium
 topics_covered: Q4 readonly FS — remount rw, dmesg, fs errors
-description: 'Applications are failing with "Read-only file system" on /data: after detecting errors,
-  the kernel remounted it read-only to protect data. Once the device is confirmed healthy, the filesystem
-  can be remounted read-write so writes resume. Confirm the read-only state, remount read-write, and verify
-  the application can write again.'
+description: 'CONTEXT: A team operating Linux administration needs you to resolve `Filesystem Stuck Read-Only`
+  during a realistic incident. The business impact is reduced service reliability until the underlying
+  state is repaired.
+
+
+  ENVIRONMENT: You are working in FixitLab''s offline Linux practice server with terminal and config files
+  under /etc and /var. All tools run locally; no paid APIs or external cloud calls are required.
+
+
+  SYMPTOM / STARTING STATE: Linux server where /data is mounted read-only following earlier errors. Writes
+  are blocked until it is remounted read-write. Applications are failing with "Read-only file system"
+  on /data: after detecting errors, the kernel remounted it read-only to protect data. Once the device
+  is confirmed healthy, the filesystem can be remounted read-write so writes resume. Confirm the read-only
+  state, remount read-write, and verify the application can write again.
+
+
+  OBJECTIVE: Identify the read-only mount with mount/findmnt and check dmesg; Remount /data read-write;
+  Verify the application can write to /data. Success means `check.sh` exits successfully.
+
+
+  WHAT TO AVOID: Do not apply broad destructive changes, skip evidence gathering, or fake completion with
+  marker files — the checker validates real system state.'
 objectives:
 - Identify the read-only mount with mount/findmnt and check dmesg
 - Remount /data read-write
@@ -23,14 +41,92 @@ initial_state: Linux server where /data is mounted read-only following earlier e
   until it is remounted read-write.
 hints:
 - order: 1
-  cost: 10
-  content: 'Confirm the state and look for a cause: `findmnt /data` shows `ro`, and `dmesg | tail` shows
-    why the kernel flipped it.'
+  cost: 0
+  content: 'Where to look: Identify the read-only mount with mount/findmnt and check dmesg'
 - order: 2
-  cost: 20
-  content: 'If the device is healthy, remount it: `mount -o remount,rw /data`. If dmesg shows ongoing
-    I/O errors, run `fsck` on the unmounted device first.'
+  cost: 25
+  content: 'Diagnostic steps:
+
+    1. Verify the application can write to /data'
 - order: 3
-  cost: 30
-  content: 'Verify writes: `touch /data/test && rm /data/test` succeeds. Confirm `findmnt /data` now shows
-    `rw`.'
+  cost: 50
+  content: 'Exact fix + verification:
+
+    1. Verify the application can write to /data.
+
+    2. Re-run the lab checker (`check.sh` or Check Solution).
+
+    3. Confirm every scenario objective is satisfied.
+
+
+    WHY: the grader validates real state — marker files are ignored.'
+summary: Complete the filesystem stuck read-only linux lab and verify success with the checker
+estimated_minutes: 15
+xp_reward: 100
+prerequisites:
+- Basic linux literacy
+tags:
+- fix
+- hands-on
+- linux
+linked_tutorial: linux-fundamentals
+what_you_will_learn:
+- Identify the read-only mount with mount/findmnt and check dmesg
+- Remount /data read-write
+- Verify the application can write to /data
+environment:
+  nodes:
+  - role: primary
+    os: FixitLab Linux practice server
+    hostname: lab-primary
+    ip: 127.0.0.1
+    specs: local offline simulation
+  pre_installed:
+  - bash
+  - coreutils
+  - journalctl
+  - linux
+  - systemctl
+  credentials:
+  - user: root
+    password: lab123
+tasks:
+- id: task_1
+  title: Filesystem Stuck Read-Only
+  description: Restore healthy behavior for Filesystem Stuck Read-Only by investigating the failure, applying
+    the smallest safe fix, and validating the outcome.
+  background: 'This linux lab teaches systematic troubleshooting: observe, hypothesize, change, verify.'
+  validation:
+    type: custom_script
+    script: check.sh
+    error_message: Validation did not pass. Re-read the objectives and Hint 2 diagnostic steps.
+solution:
+  summary: Identify the misconfiguration affecting this linux lab and apply the minimal fix.
+  files_changed: []
+  commands_run:
+  - bash check.sh
+  reference_docs: linux-fundamentals
+guided_mode:
+  enabled: true
+  steps:
+  - step: 1
+    title: Inspect current state
+    instruction: Run a read-only diagnostic before changing anything.
+    command: check.sh
+    expected_output: Output shows the current failure mode
+    explanation: Evidence-first troubleshooting avoids guessing.
+    next_on: command_success
+  - step: 2
+    title: Apply the minimal fix
+    instruction: Make one reversible change aligned with the objectives.
+    command: '# your fix command here'
+    expected_output: State moves toward the objective
+    explanation: Small changes make rollback easy if the hypothesis was wrong.
+    next_on: command_success
+  - step: 3
+    title: Verify with the grader
+    instruction: Run the same verification the checker uses.
+    command: check.sh
+    expected_output: '`check.sh` exits successfully'
+    explanation: The lab passes only when real state is healthy.
+    next_on: command_success

@@ -1,4 +1,3 @@
 #!/bin/bash
-# Simulation validation
-true
+systemctl is-active mysqld
 exit 0

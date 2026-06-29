@@ -1,11 +1,30 @@
 title: Deployment Rollout Failed
 slug: k8s-deployment-rollout-failed
-category: Kubernetes
+category: Fix
 difficulty: hard
-description: A deployment rollout is stuck and `kubectl rollout status` never completes. The new ReplicaSet's
-  pods are failing their readiness probe (or crashing on a bad config), so the rollout is paused mid-progress
-  and old pods remain. Diagnose why the new pods are not becoming Ready and either fix the spec or roll
-  back.
+description: 'CONTEXT: A team operating Kubernetes needs you to resolve `Deployment Rollout Failed` during
+  a realistic incident. The business impact is reduced service reliability until the underlying state
+  is repaired.
+
+
+  ENVIRONMENT: You are working in FixitLab''s offline Kubernetes cluster with kubectl, manifests, and
+  cluster resources. All tools run locally; no paid APIs or external cloud calls are required.
+
+
+  SYMPTOM / STARTING STATE: Simulated Kubernetes cluster. A deployment was updated, but the new ReplicaSet''s
+  pods never become Ready, so the rollout is wedged and `kubectl rollout status` hangs. A deployment rollout
+  is stuck and `kubectl rollout status` never completes. The new ReplicaSet''s pods are failing their
+  readiness probe (or crashing on a bad config), so the rollout is paused mid-progress and old pods remain.
+  Diagnose why the new pods are not becoming Ready and either fix the spec or roll back.
+
+
+  OBJECTIVE: Inspect rollout status and the new vs old ReplicaSet; Determine why the new pods fail to
+  become Ready (probe, image, or config); Fix the spec or roll back so the deployment fully progresses.
+  Success means `kubectl get pods` shows every pod Running.
+
+
+  WHAT TO AVOID: Do not apply broad destructive changes, skip evidence gathering, or fake completion with
+  marker files — the checker validates real system state.'
 lab_mode: simulation
 simulation_type: kubernetes
 time_limit: 900
@@ -17,16 +36,78 @@ objectives:
 - Fix the spec or roll back so the deployment fully progresses
 hints:
 - order: 1
-  cost: 10
-  content: '`kubectl rollout status deployment/<name>` hangs. List ReplicaSets with `kubectl get rs` and
-    describe the newest one: `kubectl describe rs <new-rs>` to see why pods aren''t Ready.'
+  cost: 0
+  content: 'Where to look: Run `kubectl get pods -A` and `kubectl describe pod <name>` for any pod not
+    in Running state.'
 - order: 2
-  cost: 15
-  content: 'Describe a new pod and check Events and probe results: `kubectl describe pod <pod>`. Failing
-    readiness probes or a CrashLoop point to the bad change introduced in the update.'
+  cost: 25
+  content: 'Diagnostic steps:
+
+    1. `kubectl get pods` — note CrashLoopBackOff, ImagePullBackOff, or Pending.
+
+    2. `kubectl describe pod <name>` — read Events at the bottom.
+
+    3. `kubectl logs <name> [--previous]` if the container restarted.'
 - order: 3
-  cost: 20
-  content: 'If the new revision is broken, roll back: `kubectl rollout undo deployment/<name>`. If it''s
-    a fixable probe/config issue, `kubectl edit deployment/<name>` and correct it, then re-watch the rollout.'
+  cost: 50
+  content: 'Exact fix + verification:
+
+    1. Fix the root cause (image name, env var, volume mount, or probe).
+
+    2. `kubectl apply -f` the corrected manifest or delete the pod to recreate.
+
+    3. Confirm `kubectl get pods` shows every pod Running.
+
+
+    WHY: Kubernetes only reports healthy when the workload actually runs.'
 initial_state: Simulated Kubernetes cluster. A deployment was updated, but the new ReplicaSet's pods never
   become Ready, so the rollout is wedged and `kubectl rollout status` hangs.
+technology: kubernetes
+summary: Complete the deployment rollout failed kubernetes lab and verify success with the checker
+estimated_minutes: 15
+xp_reward: 100
+prerequisites:
+- Basic kubernetes literacy
+tags:
+- fix
+- hands-on
+- kubernetes
+linked_tutorial: kubernetes-fundamentals
+what_you_will_learn:
+- Inspect rollout status and the new vs old ReplicaSet
+- Determine why the new pods fail to become Ready (probe, image, or config)
+- Fix the spec or roll back so the deployment fully progresses
+environment:
+  nodes:
+  - role: primary
+    os: FixitLab Kubernetes cluster
+    hostname: lab-primary
+    ip: 127.0.0.1
+    specs: local offline simulation
+  pre_installed:
+  - bash
+  - coreutils
+  - helm
+  - kubectl
+  - kubernetes
+  credentials:
+  - user: root
+    password: lab123
+tasks:
+- id: task_1
+  title: Deployment Rollout Failed
+  description: Restore healthy behavior for Deployment Rollout Failed by investigating the failure, applying
+    the smallest safe fix, and validating the outcome.
+  background: 'This kubernetes lab teaches systematic troubleshooting: observe, hypothesize, change, verify.'
+  validation:
+    type: k8s_resource_state
+    resource_kind: Pod
+    resource_name: all
+    namespace: default
+    expected_state: Running
+    error_message: One or more pods are not Running. Use kubectl describe pod and kubectl logs.
+solution:
+  summary: Identify the misconfiguration affecting this kubernetes lab and apply the minimal fix.
+  files_changed: []
+  commands_run: []
+  reference_docs: kubernetes-fundamentals

@@ -1,7 +1,7 @@
 title: Ansible Misclassifies Command Failure
 slug: ansible-failed-when-wrong
-technology: Ansible
-category: Error Handling
+technology: ansible
+category: Fix
 difficulty: medium
 lab_mode: simulation
 simulation_type: generic
@@ -10,7 +10,25 @@ max_score: 100
 is_free: true
 jira_priority: High
 dual_terminal: false
-description: A command that returns non-zero on success is marked failed because failed_when is wrong.
+description: 'CONTEXT: A team operating Ansible automation needs you to resolve `Ansible Misclassifies
+  Command Failure` during a realistic incident. The business impact is reduced service reliability until
+  the underlying state is repaired.
+
+
+  ENVIRONMENT: You are working in FixitLab''s offline Ansible control node with inventory, playbooks,
+  roles, and ansible-playbook. All tools run locally; no paid APIs or external cloud calls are required.
+
+
+  SYMPTOM / STARTING STATE: An Ansible task with an incorrect failed_when. A command that returns non-zero
+  on success is marked failed because failed_when is wrong.
+
+
+  OBJECTIVE: Confirm the issue: Successful command marked failed; Apply the documented fix in /home/ansible/failwhen.yml;
+  Verify the configuration is corrected. Success means `check.sh` exits successfully.
+
+
+  WHAT TO AVOID: Do not apply broad destructive changes, skip evidence gathering, or fake completion with
+  marker files — the checker validates real system state.'
 initial_state: An Ansible task with an incorrect failed_when.
 objectives:
 - 'Confirm the issue: Successful command marked failed'
@@ -18,11 +36,70 @@ objectives:
 - Verify the configuration is corrected
 hints:
 - order: 1
-  cost: 10
-  content: Successful command marked failed
+  cost: 0
+  content: 'Where to look: Confirm the issue: Successful command marked failed'
 - order: 2
-  cost: 15
-  content: Set a correct failed_when expression.
+  cost: 25
+  content: 'Diagnostic steps:
+
+    1. Apply the documented fix in /home/ansible/failwhen.yml
+
+    2. Verify the configuration is corrected'
 - order: 3
-  cost: 20
-  content: /home/ansible/failwhen.yml carries the corrected configuration.
+  cost: 50
+  content: 'Exact fix + verification:
+
+    1. Verify the configuration is corrected.
+
+    2. Re-run the lab checker (`check.sh` or Check Solution).
+
+    3. Confirm every scenario objective is satisfied.
+
+
+    WHY: the grader validates real state — marker files are ignored.'
+summary: Complete the ansible misclassifies command failure ansible lab and verify success with the checker
+estimated_minutes: 20
+xp_reward: 100
+prerequisites:
+- Basic ansible literacy
+tags:
+- ansible
+- fix
+- hands-on
+linked_tutorial: ansible-fundamentals
+what_you_will_learn:
+- 'Confirm the issue: Successful command marked failed'
+- Apply the documented fix in /home/ansible/failwhen.yml
+- Verify the configuration is corrected
+environment:
+  nodes:
+  - role: primary
+    os: FixitLab Ansible control node
+    hostname: lab-primary
+    ip: 127.0.0.1
+    specs: local offline simulation
+  pre_installed:
+  - ansible
+  - ansible-playbook
+  - bash
+  - coreutils
+  credentials:
+  - user: root
+    password: lab123
+tasks:
+- id: task_1
+  title: Ansible Misclassifies Command Failure
+  description: Restore healthy behavior for Ansible Misclassifies Command Failure by investigating the
+    failure, applying the smallest safe fix, and validating the outcome.
+  background: 'This ansible lab teaches systematic troubleshooting: observe, hypothesize, change, verify.'
+  validation:
+    type: command_output
+    command: ansible webservers -m ping
+    expected_output: SUCCESS
+    error_message: Ansible hosts are still unreachable. Verify SSH keys and inventory.
+solution:
+  summary: Identify the misconfiguration affecting this ansible lab and apply the minimal fix.
+  files_changed: []
+  commands_run:
+  - ansible webservers -m ping
+  reference_docs: ansible-fundamentals

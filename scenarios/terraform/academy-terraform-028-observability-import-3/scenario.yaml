@@ -1,7 +1,7 @@
-title: 'Terraform & IaC: Resource Import — Observability Practice'
+title: Resource Import — Observability Lab
 slug: academy-terraform-028-observability-import-3
-technology: Terraform & IaC
-category: Observability
+technology: terraform
+category: Optimize
 difficulty: medium
 scenario_type: do
 lab_mode: simulation
@@ -11,8 +11,28 @@ max_score: 100
 is_free: false
 infrastructure_type: docker
 jira_priority: Medium
-description: 'Observability task: make resource import visible in logs, metrics, or traces. On-call should
-  answer ''what is broken?'' quickly using signals from adopting existing resources into state.'
+description: 'CONTEXT: A team operating Terraform IaC needs you to resolve `terraform: Resource Import
+  — Observability Practice` during a realistic incident. The business impact is reduced service reliability
+  until the underlying state is repaired.
+
+
+  ENVIRONMENT: You are working in FixitLab''s offline Terraform workspace with HCL files, state, and plan/apply
+  workflow. All tools run locally; no paid APIs or external cloud calls are required.
+
+
+  SYMPTOM / STARTING STATE: The system runs, but resource import lacks useful telemetry. Dashboards/alerts
+  are blank or noisy — improve signal quality. Observability task: make resource import visible in logs,
+  metrics, or traces. On-call should answer ''what is broken?'' quickly using signals from adopting existing
+  resources into state.
+
+
+  OBJECTIVE: Day-2 resource import work completes safely in this environment; Changes are verified with
+  before/after checks; The system remains stable for dependent teams. Success means `terraform validate`
+  includes `Success`.
+
+
+  WHAT TO AVOID: Do not apply broad destructive changes, skip evidence gathering, or fake completion with
+  marker files — the checker validates real system state.'
 objectives:
 - Day-2 resource import work completes safely in this environment
 - Changes are verified with before/after checks
@@ -21,7 +41,7 @@ initial_state: The system runs, but resource import lacks useful telemetry. Dash
   or noisy — improve signal quality.
 hints:
 - order: 1
-  cost: 10
+  cost: 0
   content: 'Orient yourself before changing anything:
 
     1. Inspect the current state — `terraform import`, `terraform state show`, and plan diff.
@@ -30,17 +50,17 @@ hints:
 
     3. Recall the core idea: adopting existing resources into state. Form one hypothesis before you act.'
 - order: 2
-  cost: 15
-  content: 'Plan your approach (still no spoilers):
-
-    1. Confirm the exact gap between current and desired state for resource import.
-
-    2. Decide the single smallest change that moves you toward the objective.
-
-    3. Capture evidence (command output / status) before the change so you can prove it worked afterward.'
-- order: 3
   cost: 25
-  content: 'Guided walkthrough:
+  content: 'Diagnostic steps:
+
+    1. `terraform init` if providers are missing.
+
+    2. `terraform validate` — read file:line references.
+
+    3. Cross-check variable names and resource blocks against the error.'
+- order: 3
+  cost: 50
+  content: 'Exact fix + verification:
 
     1. Re-check the current state — `terraform import`, `terraform state show`, and plan diff.
 
@@ -48,4 +68,73 @@ hints:
 
     3. Verify the result — imported resources show no destroy/recreate in plan.
 
-    4. Click Check Solution once `systemctl is-active nginx` returns active.'
+    4. Click Check Solution once the objective is met (graded on real state, not a marker file).'
+summary: Complete the resource import — observability lab terraform lab and verify success with the checker
+estimated_minutes: 20
+xp_reward: 100
+prerequisites:
+- Basic terraform literacy
+tags:
+- do
+- hands-on
+- terraform
+linked_tutorial: terraform-fundamentals
+what_you_will_learn:
+- Day-2 resource import work completes safely in this environment
+- Changes are verified with before/after checks
+- The system remains stable for dependent teams
+environment:
+  nodes:
+  - role: primary
+    os: FixitLab Terraform workspace
+    hostname: lab-primary
+    ip: 127.0.0.1
+    specs: local offline simulation
+  pre_installed:
+  - bash
+  - coreutils
+  - terraform
+  credentials:
+  - user: root
+    password: lab123
+tasks:
+- id: task_1
+  title: Resource Import — Observability Lab
+  description: Restore healthy behavior for Resource Import — Observability Lab by investigating the failure,
+    applying the smallest safe fix, and validating the outcome.
+  background: 'This terraform lab teaches systematic troubleshooting: observe, hypothesize, change, verify.'
+  validation:
+    type: command_output
+    command: terraform validate
+    expected_output: Success
+    error_message: Terraform configuration is invalid. Run terraform validate and fix reported errors.
+solution:
+  summary: Identify the misconfiguration affecting this terraform lab and apply the minimal fix.
+  files_changed: []
+  commands_run:
+  - terraform validate
+  reference_docs: terraform-fundamentals
+guided_mode:
+  enabled: true
+  steps:
+  - step: 1
+    title: Inspect current state
+    instruction: Run a read-only diagnostic before changing anything.
+    command: terraform validate
+    expected_output: Output shows the current failure mode
+    explanation: Evidence-first troubleshooting avoids guessing.
+    next_on: command_success
+  - step: 2
+    title: Apply the minimal fix
+    instruction: Make one reversible change aligned with the objectives.
+    command: '# your fix command here'
+    expected_output: State moves toward the objective
+    explanation: Small changes make rollback easy if the hypothesis was wrong.
+    next_on: command_success
+  - step: 3
+    title: Verify with the grader
+    instruction: Run the same verification the checker uses.
+    command: terraform validate
+    expected_output: '`terraform validate` includes `Success`'
+    explanation: The lab passes only when real state is healthy.
+    next_on: command_success

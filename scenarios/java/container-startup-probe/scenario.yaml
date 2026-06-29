@@ -1,8 +1,7 @@
----
 slug: container-startup-probe
-title: "Spring Boot Pod Killed by an Aggressive Startup Probe"
-technology: Java
-category: "Spring Boot"
+title: Spring Boot Pod Killed by an Aggressive Startup Probe
+technology: java
+category: Fix
 difficulty: medium
 time_limit: 900
 max_score: 100
@@ -11,22 +10,109 @@ simulation_type: java
 infrastructure_type: simulation
 jira_priority: High
 is_free: false
-description: |
-  A Spring Boot service takes ~40s to warm up (Flyway migrations + cache priming), but the Kubernetes startupProbe gives it only 10s before the kubelet kills and restarts the container — a permanent CrashLoopBackOff. Tune the probe to allow the real startup time using the Actuator readiness group.
+description: 'CONTEXT: A team operating Java applications needs you to resolve `Spring Boot Pod Killed
+  by an Aggressive Startup Probe` during a realistic incident. The business impact is reduced service
+  reliability until the underlying state is repaired.
+
+
+  ENVIRONMENT: You are working in FixitLab''s offline Java project with Maven/Gradle, JVM logs, and Spring
+  configuration. All tools run locally; no paid APIs or external cloud calls are required.
+
+
+  SYMPTOM / STARTING STATE: Deployment manifest at /app/k8s/deployment.yaml sets a startupProbe with failureThreshold
+  3 and periodSeconds 3 (~9s) while the app needs ~40s to boot. A Spring Boot service takes ~40s to warm
+  up (Flyway migrations + cache priming), but the Kubernetes startupProbe gives it only 10s before the
+  kubelet kills and restarts the container — a permanent CrashLoopBackOff. Tune the probe to allow the
+  real startup time using the Actuator readiness group.
+
+
+  OBJECTIVE: Read the deployment''s startupProbe and compare its budget to real boot time; Increase failureThreshold/periodSeconds
+  to cover the warm-up window; Point the probe at /actuator/health/readiness. Success means `check.sh`
+  exits successfully.
+
+
+  WHAT TO AVOID: Do not apply broad destructive changes, skip evidence gathering, or fake completion with
+  marker files — the checker validates real system state.'
 objectives:
-  - "Read the deployment's startupProbe and compare its budget to real boot time"
-  - "Increase failureThreshold/periodSeconds to cover the warm-up window"
-  - "Point the probe at /actuator/health/readiness"
-  - "Confirm the pod reaches Ready instead of CrashLoopBackOff"
-initial_state: |
-  Deployment manifest at /app/k8s/deployment.yaml sets a startupProbe with failureThreshold 3 and periodSeconds 3 (~9s) while the app needs ~40s to boot.
+- Read the deployment's startupProbe and compare its budget to real boot time
+- Increase failureThreshold/periodSeconds to cover the warm-up window
+- Point the probe at /actuator/health/readiness
+- Confirm the pod reaches Ready instead of CrashLoopBackOff
+initial_state: 'Deployment manifest at /app/k8s/deployment.yaml sets a startupProbe with failureThreshold
+  3 and periodSeconds 3 (~9s) while the app needs ~40s to boot.
+
+  '
 hints:
-  - order: 1
-    cost: 10
-    content: "kubectl describe pod shows 'Startup probe failed' then Killing — the budget is too small."
-  - order: 2
-    cost: 15
-    content: "Expose readiness: management.endpoint.health.probes.enabled=true and probe /actuator/health/readiness."
-  - order: 3
-    cost: 20
-    content: "Set failureThreshold 30, periodSeconds 5 (150s budget) so a slow boot still passes."
+- order: 1
+  cost: 0
+  content: 'Where to look: Run `kubectl get pods -A` and `kubectl describe pod <name>` for any pod not
+    in Running state.'
+- order: 2
+  cost: 25
+  content: 'Diagnostic steps:
+
+    1. `kubectl get pods` — note CrashLoopBackOff, ImagePullBackOff, or Pending.
+
+    2. `kubectl describe pod <name>` — read Events at the bottom.
+
+    3. `kubectl logs <name> [--previous]` if the container restarted.'
+- order: 3
+  cost: 50
+  content: 'Exact fix + verification:
+
+    1. Fix the root cause (image name, env var, volume mount, or probe).
+
+    2. `kubectl apply -f` the corrected manifest or delete the pod to recreate.
+
+    3. Confirm `kubectl get pods` shows every pod Running.
+
+
+    WHY: Kubernetes only reports healthy when the workload actually runs.'
+summary: Complete the spring boot pod killed by an aggressive startup probe java lab and verify success
+  with the checker
+estimated_minutes: 15
+xp_reward: 100
+prerequisites:
+- Basic java literacy
+tags:
+- fix
+- hands-on
+- java
+linked_tutorial: java-fundamentals
+what_you_will_learn:
+- Read the deployment's startupProbe and compare its budget to real boot time
+- Increase failureThreshold/periodSeconds to cover the warm-up window
+- Point the probe at /actuator/health/readiness
+- Confirm the pod reaches Ready instead of CrashLoopBackOff
+environment:
+  nodes:
+  - role: primary
+    os: FixitLab Java project
+    hostname: lab-primary
+    ip: 127.0.0.1
+    specs: local offline simulation
+  pre_installed:
+  - bash
+  - coreutils
+  - java
+  - journalctl
+  - systemctl
+  credentials:
+  - user: root
+    password: lab123
+tasks:
+- id: task_1
+  title: Spring Boot Pod Killed by an Aggressive Startup Probe
+  description: Restore healthy behavior for Spring Boot Pod Killed by an Aggressive Startup Probe by investigating
+    the failure, applying the smallest safe fix, and validating the outcome.
+  background: 'This java lab teaches systematic troubleshooting: observe, hypothesize, change, verify.'
+  validation:
+    type: custom_script
+    script: check.sh
+    error_message: Validation did not pass. Re-read the objectives and Hint 2 diagnostic steps.
+solution:
+  summary: Identify the misconfiguration affecting this java lab and apply the minimal fix.
+  files_changed: []
+  commands_run:
+  - bash check.sh
+  reference_docs: java-fundamentals

@@ -1,7 +1,7 @@
-title: 'Windows Server: File Shares — Observability Practice'
+title: File Shares — Observability Lab
 slug: academy-windows-068-observability-file-shares-7
-technology: Windows Server
-category: Observability
+technology: windows
+category: Build
 difficulty: medium
 scenario_type: do
 lab_mode: simulation
@@ -11,8 +11,27 @@ max_score: 100
 is_free: false
 infrastructure_type: docker
 jira_priority: Medium
-description: 'Observability task: make file shares visible in logs, metrics, or traces. On-call should
-  answer ''what is broken?'' quickly using signals from SMB shares, share vs NTFS permissions.'
+description: 'CONTEXT: A team operating Windows Server needs you to resolve `windows: File Shares — Observability
+  Practice` during a realistic incident. The business impact is reduced service reliability until the
+  underlying state is repaired.
+
+
+  ENVIRONMENT: You are working in FixitLab''s offline Windows Server host with PowerShell, Server Manager,
+  and AD tools. All tools run locally; no paid APIs or external cloud calls are required.
+
+
+  SYMPTOM / STARTING STATE: The system runs, but file shares lacks useful telemetry. Dashboards/alerts
+  are blank or noisy — improve signal quality. Observability task: make file shares visible in logs, metrics,
+  or traces. On-call should answer ''what is broken?'' quickly using signals from SMB shares, share vs
+  NTFS permissions.
+
+
+  OBJECTIVE: Day-2 file shares work completes safely in this environment; Changes are verified with before/after
+  checks; The system remains stable for dependent teams. Success means `check.sh` exits successfully.
+
+
+  WHAT TO AVOID: Do not apply broad destructive changes, skip evidence gathering, or fake completion with
+  marker files — the checker validates real system state.'
 objectives:
 - Day-2 file shares work completes safely in this environment
 - Changes are verified with before/after checks
@@ -21,7 +40,7 @@ initial_state: The system runs, but file shares lacks useful telemetry. Dashboar
   noisy — improve signal quality.
 hints:
 - order: 1
-  cost: 10
+  cost: 0
   content: 'Orient yourself before changing anything:
 
     1. Inspect the current state — `Get-SmbShare`, share ACLs, and NTFS ACLs.
@@ -30,17 +49,17 @@ hints:
 
     3. Recall the core idea: SMB shares, share vs NTFS permissions. Form one hypothesis before you act.'
 - order: 2
-  cost: 15
-  content: 'Plan your approach (still no spoilers):
-
-    1. Confirm the exact gap between current and desired state for file shares.
-
-    2. Decide the single smallest change that moves you toward the objective.
-
-    3. Capture evidence (command output / status) before the change so you can prove it worked afterward.'
-- order: 3
   cost: 25
-  content: 'Guided walkthrough:
+  content: 'Diagnostic steps:
+
+    1. Note the service state and dependency chain in services.msc.
+
+    2. Read the most recent error in Event Viewer for the failing component.
+
+    3. Use PowerShell (`Get-Service`, `Get-WinEvent`) for scripted evidence.'
+- order: 3
+  cost: 50
+  content: 'Exact fix + verification:
 
     1. Re-check the current state — `Get-SmbShare`, share ACLs, and NTFS ACLs.
 
@@ -48,4 +67,74 @@ hints:
 
     3. Verify the result — effective permissions match the access requirement.
 
-    4. Click Check Solution once `systemctl is-active nginx` returns active.'
+    4. Click Check Solution once the objective is met (graded on real state, not a marker file).'
+summary: Complete the file shares — observability lab windows lab and verify success with the checker
+estimated_minutes: 20
+xp_reward: 100
+prerequisites:
+- Basic windows literacy
+tags:
+- do
+- hands-on
+- windows
+linked_tutorial: windows-fundamentals
+what_you_will_learn:
+- Day-2 file shares work completes safely in this environment
+- Changes are verified with before/after checks
+- The system remains stable for dependent teams
+environment:
+  nodes:
+  - role: primary
+    os: FixitLab Windows Server host
+    hostname: lab-primary
+    ip: 127.0.0.1
+    specs: local offline simulation
+  pre_installed:
+  - bash
+  - coreutils
+  - journalctl
+  - systemctl
+  - windows
+  credentials:
+  - user: root
+    password: lab123
+tasks:
+- id: task_1
+  title: File Shares — Observability Lab
+  description: Restore healthy behavior for File Shares — Observability Lab by investigating the failure,
+    applying the smallest safe fix, and validating the outcome.
+  background: 'This windows lab teaches systematic troubleshooting: observe, hypothesize, change, verify.'
+  validation:
+    type: custom_script
+    script: check.sh
+    error_message: Validation did not pass. Re-read the objectives and Hint 2 diagnostic steps.
+solution:
+  summary: Identify the misconfiguration affecting this windows lab and apply the minimal fix.
+  files_changed: []
+  commands_run:
+  - bash check.sh
+  reference_docs: windows-fundamentals
+guided_mode:
+  enabled: true
+  steps:
+  - step: 1
+    title: Inspect current state
+    instruction: Run a read-only diagnostic before changing anything.
+    command: check.sh
+    expected_output: Output shows the current failure mode
+    explanation: Evidence-first troubleshooting avoids guessing.
+    next_on: command_success
+  - step: 2
+    title: Apply the minimal fix
+    instruction: Make one reversible change aligned with the objectives.
+    command: '# your fix command here'
+    expected_output: State moves toward the objective
+    explanation: Small changes make rollback easy if the hypothesis was wrong.
+    next_on: command_success
+  - step: 3
+    title: Verify with the grader
+    instruction: Run the same verification the checker uses.
+    command: check.sh
+    expected_output: '`check.sh` exits successfully'
+    explanation: The lab passes only when real state is healthy.
+    next_on: command_success

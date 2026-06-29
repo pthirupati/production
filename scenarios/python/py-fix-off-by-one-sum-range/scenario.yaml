@@ -1,9 +1,26 @@
 title: Fix the Off-by-One in sum_range
 slug: py-fix-off-by-one-sum-range
-category: Python Development
-description: sum_range(a, b) should return the sum of all integers from a to b INCLUSIVE, but it drops
-  the final value because of an off-by-one error in the range bounds. Find and fix the boundary so both
-  endpoints are counted.
+category: Fix
+description: 'CONTEXT: A team operating Python development needs you to resolve `Fix the Off-by-One in
+  sum_range` during a realistic incident. The business impact is reduced service reliability until the
+  underlying state is repaired.
+
+
+  ENVIRONMENT: You are working in FixitLab''s offline Python project workspace with source files, venv,
+  tests, and CLI entrypoints. All tools run locally; no paid APIs or external cloud calls are required.
+
+
+  SYMPTOM / STARTING STATE: sum_range(a, b) should return the sum of all integers from a to b INCLUSIVE,
+  but it drops the final value because of an off-by-one error in the range bounds. Find and fix the boundary
+  so both endpoints are counted.
+
+
+  OBJECTIVE: Reproduce the wrong total for a small inclusive range; Locate the off-by-one in the range()
+  upper bound; Make both endpoints inclusive so all tests pass. Success means all hidden tests pass.
+
+
+  WHAT TO AVOID: Do not apply broad destructive changes, skip evidence gathering, or fake completion with
+  marker files — the checker validates real system state.'
 difficulty: easy
 scenario_type: fix
 lab_mode: simulation
@@ -21,53 +38,119 @@ objectives:
 initial_state: sum_range(a, b) should return the sum of all integers from a to b INCLUSIVE, but it drops
   the final value because of an off-by-one error in the range bounds. Find and fix the boundary so both
   endpoints are counted.
-solution_explanation: |
-  range(a, b) is half-open and never yields b, so the upper endpoint was dropped. Using range(a, b + 1) makes the range inclusive on both ends.
+solution_explanation: 'range(a, b) is half-open and never yields b, so the upper endpoint was dropped.
+  Using range(a, b + 1) makes the range inclusive on both ends.
+
+  '
 coding_spec:
   language: python
   entrypoint: solution.py
   kind: fix
-  instructions: |
-    Fix sum_range(a, b) so it returns the sum of every integer from a to b, inclusive of both ends.
-      sum_range(1, 5) -> 15  (1+2+3+4+5)
-    Click Run to try it, then Check Solution to grade against all tests.
+  instructions: "Fix sum_range(a, b) so it returns the sum of every integer from a to b, inclusive of\
+    \ both ends.\n  sum_range(1, 5) -> 15  (1+2+3+4+5)\nClick Run to try it, then Check Solution to grade\
+    \ against all tests.\n"
   files:
   - path: solution.py
-    content: |
-      def sum_range(a, b):
-          total = 0
-          for i in range(a, b):   # bug: excludes b
-              total += i
-          return total
+    content: "def sum_range(a, b):\n    total = 0\n    for i in range(a, b):   # bug: excludes b\n   \
+      \     total += i\n    return total\n"
     readonly: false
   visible_tests:
   - name: 1..5 inclusive
-    code: |
-      assert sum_range(1, 5) == 15, sum_range(1, 5)
+    code: 'assert sum_range(1, 5) == 15, sum_range(1, 5)
+
+      '
   - name: single value
-    code: |
-      assert sum_range(7, 7) == 7, sum_range(7, 7)
+    code: 'assert sum_range(7, 7) == 7, sum_range(7, 7)
+
+      '
   hidden_tests:
   - name: zero to four
-    code: |
-      assert sum_range(0, 4) == 10, sum_range(0, 4)
+    code: 'assert sum_range(0, 4) == 10, sum_range(0, 4)
+
+      '
   - name: includes the endpoint
-    code: |
-      assert sum_range(3, 6) == 18, sum_range(3, 6)
+    code: 'assert sum_range(3, 6) == 18, sum_range(3, 6)
+
+      '
   - name: ten to ten
-    code: |
-      assert sum_range(10, 10) == 10
+    code: 'assert sum_range(10, 10) == 10
+
+      '
   - name: larger range
-    code: |
-      assert sum_range(1, 100) == 5050, sum_range(1, 100)
+    code: 'assert sum_range(1, 100) == 5050, sum_range(1, 100)
+
+      '
   timeout: 8
 hints:
 - order: 1
-  cost: 10
-  content: 'Print sum_range(1, 5): you''ll get 10, not 15 — the last number is missing.'
+  cost: 0
+  content: 'Where to look: Open `solution.py`, read the instructions, and run the visible tests to see
+    which assertion fails first.'
 - order: 2
-  cost: 20
-  content: range(a, b) stops BEFORE b. To include b you need range(a, b + 1).
+  cost: 25
+  content: 'Diagnostic steps:
+
+    1. Click Run and read the traceback — note line number and actual vs expected values.
+
+    2. Reproduce the failure with the smallest input from a visible test.
+
+    3. Compare your implementation to the bug described in the lab prompt.'
 - order: 3
-  cost: 30
-  content: Change the loop to `for i in range(a, b + 1):` and re-run — every case passes.
+  cost: 50
+  content: 'Exact fix + verification:
+
+    1. Make both endpoints inclusive so all tests pass.
+
+    2. Re-run the lab checker (`check.sh` or Check Solution).
+
+    3. Confirm every scenario objective is satisfied.
+
+
+    WHY: the grader validates real state — marker files are ignored.'
+technology: python
+summary: Complete the fix the off-by-one in sum_range python lab and verify success with the checker
+estimated_minutes: 25
+xp_reward: 100
+prerequisites:
+- Basic python literacy
+tags:
+- fix
+- hands-on
+- python
+linked_tutorial: python-fundamentals
+what_you_will_learn:
+- Reproduce the wrong total for a small inclusive range
+- Locate the off-by-one in the range() upper bound
+- Make both endpoints inclusive so all tests pass
+environment:
+  nodes:
+  - role: primary
+    os: FixitLab Python project workspace
+    hostname: lab-primary
+    ip: 127.0.0.1
+    specs: local offline simulation
+  pre_installed:
+  - bash
+  - coreutils
+  - pip
+  - python
+  - python3
+  credentials:
+  - user: root
+    password: lab123
+tasks:
+- id: task_1
+  title: Fix the Off-by-One in sum_range
+  description: Restore healthy behavior for Fix the Off-by-One in sum_range by investigating the failure,
+    applying the smallest safe fix, and validating the outcome.
+  background: 'This python lab teaches systematic troubleshooting: observe, hypothesize, change, verify.'
+  validation:
+    type: custom_script
+    script: hidden_tests
+    error_message: One or more hidden tests failed. Read the public test output, fix your solution, and
+      submit again.
+solution:
+  summary: The solution passes all hidden tests by implementing the required behavior in code.
+  files_changed: []
+  commands_run: []
+  reference_docs: python-fundamentals

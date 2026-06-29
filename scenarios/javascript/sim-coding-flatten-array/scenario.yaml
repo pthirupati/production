@@ -1,7 +1,17 @@
 title: 'Coding: Flatten a Nested Array'
 slug: sim-coding-flatten-array
-category: JavaScript Development
-description: 'Implement flatten(arr) which takes an arbitrarily nested array of numbers and
+category: Build
+description: 'CONTEXT: A team operating JavaScript needs you to resolve `Coding: Flatten a Nested Array`
+  during a realistic incident. The business impact is reduced service reliability until the underlying
+  state is repaired.
+
+
+  ENVIRONMENT: You are working in FixitLab''s offline JavaScript practice project with modules, browser
+  console, and Node tooling. All tools run locally; no paid APIs or external cloud calls are required.
+
+
+  SYMPTOM / STARTING STATE: A browser IDE opens with solution.js containing a stub to implement. Implement
+  flatten(arr) which takes an arbitrarily nested array of numbers and
 
   returns a new, single-level array with all the numbers in their original
 
@@ -9,7 +19,14 @@ description: 'Implement flatten(arr) which takes an arbitrarily nested array of 
 
   Array.prototype.flat(Infinity).
 
-  '
+
+  OBJECTIVE: Implement flatten(arr) for arbitrarily nested arrays; Preserve element order; do not mutate
+  the input; Pass all visible and hidden tests, including deep nesting. Success means all hidden tests
+  pass.
+
+
+  WHAT TO AVOID: Do not apply broad destructive changes, skip evidence gathering, or fake completion with
+  marker files — the checker validates real system state.'
 difficulty: medium
 scenario_type: do
 lab_mode: simulation
@@ -80,16 +97,98 @@ coding_spec:
       '
 hints:
 - order: 1
-  cost: 10
-  content: 'Think recursively: for each element decide whether it''s an array (recurse into it) or a plain
-    value (collect it). Remember not to mutate the input and not to use flat(Infinity).'
+  cost: 0
+  content: 'Where to look: Open `solution.js`, read the instructions, and run the visible tests to see
+    which assertion fails first.'
 - order: 2
-  cost: 20
-  content: 'Use `Array.isArray(el)`: if true, recurse and concat the result; otherwise push el into the
-    output. A reduce works cleanly: `arr.reduce((acc,el)=> acc.concat(Array.isArray(el)? flatten(el):
-    el), [])`.'
+  cost: 25
+  content: 'Diagnostic steps:
+
+    1. Click Run and read the traceback — note line number and actual vs expected values.
+
+    2. Reproduce the failure with the smallest input from a visible test.
+
+    3. Compare your implementation to the bug described in the lab prompt.'
 - order: 3
-  cost: 30
-  content: Make sure deep nesting works (recursion handles any depth) and order is preserved by processing
-    left-to-right. Run the visible and hidden tests — including deeply nested arrays — and confirm all
-    pass.
+  cost: 50
+  content: 'Exact fix + verification:
+
+    1. Pass all visible and hidden tests, including deep nesting.
+
+    2. Re-run the lab checker (`check.sh` or Check Solution).
+
+    3. Confirm every scenario objective is satisfied.
+
+
+    WHY: the grader validates real state — marker files are ignored.'
+technology: javascript
+summary: 'Complete the coding: flatten a nested array javascript lab and verify success with the checker'
+estimated_minutes: 25
+xp_reward: 100
+prerequisites:
+- Basic javascript literacy
+tags:
+- do
+- hands-on
+- javascript
+linked_tutorial: javascript-fundamentals
+what_you_will_learn:
+- Implement flatten(arr) for arbitrarily nested arrays
+- Preserve element order; do not mutate the input
+- Pass all visible and hidden tests, including deep nesting
+environment:
+  nodes:
+  - role: primary
+    os: FixitLab JavaScript practice project
+    hostname: lab-primary
+    ip: 127.0.0.1
+    specs: local offline simulation
+  pre_installed:
+  - bash
+  - coreutils
+  - javascript
+  - journalctl
+  - systemctl
+  credentials:
+  - user: root
+    password: lab123
+tasks:
+- id: task_1
+  title: 'Coding: Flatten a Nested Array'
+  description: 'Restore healthy behavior for Coding: Flatten a Nested Array by investigating the failure,
+    applying the smallest safe fix, and validating the outcome.'
+  background: 'This javascript lab teaches systematic troubleshooting: observe, hypothesize, change, verify.'
+  validation:
+    type: custom_script
+    script: hidden_tests
+    error_message: One or more hidden tests failed. Read the public test output, fix your solution, and
+      submit again.
+solution:
+  summary: The solution passes all hidden tests by implementing the required behavior in code.
+  files_changed: []
+  commands_run: []
+  reference_docs: javascript-fundamentals
+guided_mode:
+  enabled: true
+  steps:
+  - step: 1
+    title: Inspect current state
+    instruction: Run a read-only diagnostic before changing anything.
+    command: check.sh
+    expected_output: Output shows the current failure mode
+    explanation: Evidence-first troubleshooting avoids guessing.
+    next_on: command_success
+  - step: 2
+    title: Apply the minimal fix
+    instruction: Make one reversible change aligned with the objectives.
+    command: '# your fix command here'
+    expected_output: State moves toward the objective
+    explanation: Small changes make rollback easy if the hypothesis was wrong.
+    next_on: command_success
+  - step: 3
+    title: Verify with the grader
+    instruction: Run the same verification the checker uses.
+    command: check.sh
+    expected_output: all hidden tests pass
+    explanation: The lab passes only when real state is healthy.
+    next_on: command_success

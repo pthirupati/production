@@ -1,10 +1,29 @@
 title: ESXi Host Patch Pending Reboot
 slug: vmware-esxi-patch-pending
-category: VMware vSphere
-description: ESXi host esxi-01 has pending security patches and is raising a compliance alarm. Until the
-  updates are staged and installed (and the host is remediated), it remains non-compliant and potentially
-  vulnerable. Use the host's Updates tab to check for and install the pending patches, clearing the compliance
-  alarm.
+category: Fix
+description: 'CONTEXT: A team operating VMware vSphere needs you to resolve `ESXi Host Patch Pending Reboot`
+  during a realistic incident. The business impact is reduced service reliability until the underlying
+  state is repaired.
+
+
+  ENVIRONMENT: You are working in FixitLab''s offline vSphere lab with VMs, datastores, vCenter, and ESXi
+  tasks. All tools run locally; no paid APIs or external cloud calls are required.
+
+
+  SYMPTOM / STARTING STATE: vCenter-managed host esxi-01 reporting 3 pending ESXi patches and an active
+  compliance alarm; updates have not been installed. ESXi host esxi-01 has pending security patches and
+  is raising a compliance alarm. Until the updates are staged and installed (and the host is remediated),
+  it remains non-compliant and potentially vulnerable. Use the host''s Updates tab to check for and install
+  the pending patches, clearing the compliance alarm.
+
+
+  OBJECTIVE: Open esxi-01 -> Updates tab and review the pending patches; Check for updates and install
+  the pending ESXi patches; Confirm the host becomes compliant and the alarm clears. Success means `check.sh`
+  exits successfully.
+
+
+  WHAT TO AVOID: Do not apply broad destructive changes, skip evidence gathering, or fake completion with
+  marker files — the checker validates real system state.'
 difficulty: medium
 lab_mode: simulation
 simulation_type: vmware
@@ -20,13 +39,71 @@ initial_state: vCenter-managed host esxi-01 reporting 3 pending ESXi patches and
   alarm; updates have not been installed.
 hints:
 - order: 1
-  cost: 10
-  content: Select the host esxi-01 -> Updates tab. It lists 3 pending patches and shows the host as non-compliant.
+  cost: 0
+  content: 'Where to look: Open esxi-01 -> Updates tab and review the pending patches'
 - order: 2
-  cost: 15
-  content: Run "Check for Updates", then start the remediation/Install to apply the pending ESXi patches
-    (the host may enter maintenance mode during install).
+  cost: 25
+  content: 'Diagnostic steps:
+
+    1. Check for updates and install the pending ESXi patches
+
+    2. Confirm the host becomes compliant and the alarm clears'
 - order: 3
-  cost: 20
-  content: After installation completes, re-check compliance on the Updates tab — the host shows compliant
-    and the patch/compliance alarm clears.
+  cost: 50
+  content: 'Exact fix + verification:
+
+    1. Confirm the host becomes compliant and the alarm clears.
+
+    2. Re-run the lab checker (`check.sh` or Check Solution).
+
+    3. Confirm every scenario objective is satisfied.
+
+
+    WHY: the grader validates real state — marker files are ignored.'
+technology: vmware
+summary: Complete the esxi host patch pending reboot vmware lab and verify success with the checker
+estimated_minutes: 15
+xp_reward: 100
+prerequisites:
+- Basic vmware literacy
+tags:
+- fix
+- hands-on
+- vmware
+linked_tutorial: vmware-fundamentals
+what_you_will_learn:
+- Open esxi-01 -> Updates tab and review the pending patches
+- Check for updates and install the pending ESXi patches
+- Confirm the host becomes compliant and the alarm clears
+environment:
+  nodes:
+  - role: primary
+    os: FixitLab vSphere lab
+    hostname: lab-primary
+    ip: 127.0.0.1
+    specs: local offline simulation
+  pre_installed:
+  - bash
+  - coreutils
+  - journalctl
+  - systemctl
+  - vmware
+  credentials:
+  - user: root
+    password: lab123
+tasks:
+- id: task_1
+  title: ESXi Host Patch Pending Reboot
+  description: Restore healthy behavior for ESXi Host Patch Pending Reboot by investigating the failure,
+    applying the smallest safe fix, and validating the outcome.
+  background: 'This vmware lab teaches systematic troubleshooting: observe, hypothesize, change, verify.'
+  validation:
+    type: custom_script
+    script: check.sh
+    error_message: Validation did not pass. Re-read the objectives and Hint 2 diagnostic steps.
+solution:
+  summary: Identify the misconfiguration affecting this vmware lab and apply the minimal fix.
+  files_changed: []
+  commands_run:
+  - bash check.sh
+  reference_docs: vmware-fundamentals

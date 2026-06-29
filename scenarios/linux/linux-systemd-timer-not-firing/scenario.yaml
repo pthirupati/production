@@ -1,42 +1,132 @@
-title: 'systemd Timer Not Firing — OnCalendar Misconfigured'
+title: systemd Timer Not Firing — OnCalendar Misconfigured
 slug: linux-systemd-timer-not-firing
 difficulty: medium
-category: 'Linux Administration'
+category: Fix
 technology: linux
-description: |
-  A backup is meant to run nightly via a systemd timer (backup.timer driving
-  backup.service), but it never fires. The timer unit has a malformed OnCalendar
-  expression and is not enabled. Correct the OnCalendar value, enable and start the timer,
-  and verify it shows up in systemctl list-timers. Record the remediation in the unit.
-initial_state: |
-  Simulated RHEL 9 server. /etc/systemd/system/backup.timer has an invalid OnCalendar=
+description: 'CONTEXT: A team operating Linux administration needs you to resolve `systemd Timer Not Firing
+  — OnCalendar Misconfigured` during a realistic incident. The business impact is reduced service reliability
+  until the underlying state is repaired.
+
+
+  ENVIRONMENT: You are working in FixitLab''s offline Linux practice server with terminal and config files
+  under /etc and /var. All tools run locally; no paid APIs or external cloud calls are required.
+
+
+  SYMPTOM / STARTING STATE: Simulated RHEL 9 server. /etc/systemd/system/backup.timer has an invalid OnCalendar=
+
   line and the timer is not enabled, so systemctl list-timers does not list backup.timer
+
+  and the backup never runs. A backup is meant to run nightly via a systemd timer (backup.timer driving
+
+  backup.service), but it never fires. The timer unit has a malformed OnCalendar
+
+  expression and is not enabled. Correct the OnCalendar value, enable and start the timer,
+
+  and verify it shows up in systemctl list-timers. Record the remediation in the unit.
+
+
+  OBJECTIVE: {''Inspect the timer'': ''systemctl cat backup.timer and systemctl list-timers''}; Fix the
+  OnCalendar= expression to a valid calendar event (e.g. *-*-* 02:00:00); Reload systemd and enable --now
+  backup.timer. Success means `check.sh` exits successfully.
+
+
+  WHAT TO AVOID: Do not apply broad destructive changes, skip evidence gathering, or fake completion with
+  marker files — the checker validates real system state.'
+initial_state: 'Simulated RHEL 9 server. /etc/systemd/system/backup.timer has an invalid OnCalendar=
+
+  line and the timer is not enabled, so systemctl list-timers does not list backup.timer
+
   and the backup never runs.
+
+  '
 objectives:
-  - Inspect the timer: systemctl cat backup.timer and systemctl list-timers
-  - Fix the OnCalendar= expression to a valid calendar event (e.g. *-*-* 02:00:00)
-  - Reload systemd and enable --now backup.timer
-  - Confirm it is listed in systemctl list-timers and record the fix
+- Inspect the timer: systemctl cat backup.timer and systemctl list-timers
+- Fix the OnCalendar= expression to a valid calendar event (e.g. *-*-* 02:00:00)
+- Reload systemd and enable --now backup.timer
+- Confirm it is listed in systemctl list-timers and record the fix
 lab_mode: simulation
 simulation_type: generic
 time_limit: 900
 max_score: 100
 is_free: false
 topics_covered:
-  - systemd
-  - timers
-  - OnCalendar
-  - scheduling
+- systemd
+- timers
+- OnCalendar
+- scheduling
 hints:
-  - content: 'systemctl list-timers does not show backup.timer. systemctl status backup.timer / cat backup.timer reveals an invalid OnCalendar= expression.'
-    cost: 10
-    order: 1
-  - content: 'Set a valid calendar event, e.g. OnCalendar=*-*-* 02:00:00 (validate with systemd-analyze calendar ''...''). Then systemctl daemon-reload.'
-    cost: 15
-    order: 2
-  - content: 'Enable and start it: systemctl enable --now backup.timer, then confirm with systemctl list-timers. Save the corrected unit.'
-    cost: 20
-    order: 3
+- order: 1
+  cost: 0
+  content: 'Where to look: {''Inspect the timer'': ''systemctl cat backup.timer and systemctl list-timers''}'
+- order: 2
+  cost: 25
+  content: 'Diagnostic steps:
+
+    1. Fix the OnCalendar= expression to a valid calendar event (e.g. *-*-* 02:00:00)
+
+    2. Reload systemd and enable --now backup.timer
+
+    3. Confirm it is listed in systemctl list-timers and record the fix'
+- order: 3
+  cost: 50
+  content: 'Exact fix + verification:
+
+    1. Confirm it is listed in systemctl list-timers and record the fix.
+
+    2. Re-run the lab checker (`check.sh` or Check Solution).
+
+    3. Confirm every scenario objective is satisfied.
+
+
+    WHY: the grader validates real state — marker files are ignored.'
 requires_companion_hosts: false
 dual_terminal: false
 jira_priority: Medium
+summary: Complete the systemd timer not firing — oncalendar misconfigured linux lab and verify success
+  with the checker
+estimated_minutes: 15
+xp_reward: 100
+prerequisites:
+- Basic linux literacy
+tags:
+- fix
+- hands-on
+- linux
+linked_tutorial: linux-fundamentals
+what_you_will_learn:
+- '{''Inspect the timer'': ''systemctl cat backup.timer and systemctl list-timers''}'
+- Fix the OnCalendar= expression to a valid calendar event (e.g. *-*-* 02:00:00)
+- Reload systemd and enable --now backup.timer
+- Confirm it is listed in systemctl list-timers and record the fix
+environment:
+  nodes:
+  - role: primary
+    os: FixitLab Linux practice server
+    hostname: lab-primary
+    ip: 127.0.0.1
+    specs: local offline simulation
+  pre_installed:
+  - bash
+  - coreutils
+  - journalctl
+  - linux
+  - systemctl
+  credentials:
+  - user: root
+    password: lab123
+tasks:
+- id: task_1
+  title: systemd Timer Not Firing — OnCalendar Misconfigured
+  description: Restore healthy behavior for systemd Timer Not Firing — OnCalendar Misconfigured by investigating
+    the failure, applying the smallest safe fix, and validating the outcome.
+  background: 'This linux lab teaches systematic troubleshooting: observe, hypothesize, change, verify.'
+  validation:
+    type: custom_script
+    script: check.sh
+    error_message: Validation did not pass. Re-read the objectives and Hint 2 diagnostic steps.
+solution:
+  summary: Identify the misconfiguration affecting this linux lab and apply the minimal fix.
+  files_changed: []
+  commands_run:
+  - bash check.sh
+  reference_docs: linux-fundamentals

@@ -1,14 +1,28 @@
 slug: vlan-misconfigured
 title: VLAN Misconfigured — Fix Trunk Port to Pass Traffic
-technology: Networking
-category: Switching
+technology: networking
+category: Fix
 difficulty: medium
 time_limit: 900
 max_score: 100
 infrastructure_type: docker
 jira_priority: High
 is_free: false
-description: 'After a switch port was changed from access to trunk mode, hosts on VLAN 20 and
+description: 'CONTEXT: A team operating network operations needs you to resolve `VLAN Misconfigured —
+  Fix Trunk Port to Pass Traffic` during a realistic incident. The business impact is reduced service
+  reliability until the underlying state is repaired.
+
+
+  ENVIRONMENT: You are working in FixitLab''s offline network lab with interfaces, routing tables, DNS,
+  and firewall rules. All tools run locally; no paid APIs or external cloud calls are required.
+
+
+  SYMPTOM / STARTING STATE: Open vSwitch (OVS) bridge configured. Port eth2 is set as trunk but allowed
+
+  VLAN list is empty. Native VLAN is set to 1 instead of the required 20.
+
+  Hosts on VLAN 20 and 30 cannot communicate. After a switch port was changed from access to trunk mode,
+  hosts on VLAN 20 and
 
   VLAN 30 lost connectivity to each other and to the upstream router. The trunk
 
@@ -18,7 +32,13 @@ description: 'After a switch port was changed from access to trunk mode, hosts o
 
   frames to be dropped.
 
-  '
+
+  OBJECTIVE: Identify the misconfigured trunk port; Add VLAN 20 and VLAN 30 to the allowed VLAN list on
+  the trunk; Correct the native VLAN configuration. Success means `check.sh` exits successfully.
+
+
+  WHAT TO AVOID: Do not apply broad destructive changes, skip evidence gathering, or fake completion with
+  marker files — the checker validates real system state.'
 objectives:
 - Identify the misconfigured trunk port
 - Add VLAN 20 and VLAN 30 to the allowed VLAN list on the trunk
@@ -33,17 +53,74 @@ initial_state: 'Open vSwitch (OVS) bridge configured. Port eth2 is set as trunk 
   '
 hints:
 - order: 1
-  cost: 10
-  content: 'Inspect the bridge/port config: `ovs-vsctl show` — the trunk port isn''t passing VLANs 20
-    and 30 after being switched from access to trunk.'
+  cost: 0
+  content: 'Where to look: Identify the misconfigured trunk port'
 - order: 2
-  cost: 15
-  content: 'Set the trunk to carry the right VLANs: `ovs-vsctl set port eth2 trunks=20,30`.'
-- order: 3
-  cost: 20
-  content: 'Set the native/untagged behavior correctly: `ovs-vsctl set port eth2 vlan_mode=native-untagged
-    tag=20` (match your design).'
-- order: 4
   cost: 25
-  content: Confirm with `ovs-vsctl list port eth2` and test cross-VLAN reachability with `ping` between
-    a VLAN 20 and VLAN 30 host and to the upstream router.
+  content: 'Diagnostic steps:
+
+    1. Add VLAN 20 and VLAN 30 to the allowed VLAN list on the trunk
+
+    2. Correct the native VLAN configuration
+
+    3. Verify inter-VLAN traffic flows through the trunk'
+- order: 3
+  cost: 50
+  content: 'Exact fix + verification:
+
+    1. Verify inter-VLAN traffic flows through the trunk.
+
+    2. Re-run the lab checker (`check.sh` or Check Solution).
+
+    3. Confirm every scenario objective is satisfied.
+
+
+    WHY: the grader validates real state — marker files are ignored.'
+summary: Complete the vlan misconfigured — fix trunk port to pass traffic networking lab and verify success
+  with the checker
+estimated_minutes: 15
+xp_reward: 100
+prerequisites:
+- Basic networking literacy
+tags:
+- fix
+- hands-on
+- networking
+linked_tutorial: networking-fundamentals
+what_you_will_learn:
+- Identify the misconfigured trunk port
+- Add VLAN 20 and VLAN 30 to the allowed VLAN list on the trunk
+- Correct the native VLAN configuration
+- Verify inter-VLAN traffic flows through the trunk
+environment:
+  nodes:
+  - role: primary
+    os: FixitLab network lab
+    hostname: lab-primary
+    ip: 127.0.0.1
+    specs: local offline simulation
+  pre_installed:
+  - bash
+  - coreutils
+  - journalctl
+  - networking
+  - systemctl
+  credentials:
+  - user: root
+    password: lab123
+tasks:
+- id: task_1
+  title: VLAN Misconfigured — Fix Trunk Port to Pass Traffic
+  description: Restore healthy behavior for VLAN Misconfigured — Fix Trunk Port to Pass Traffic by investigating
+    the failure, applying the smallest safe fix, and validating the outcome.
+  background: 'This networking lab teaches systematic troubleshooting: observe, hypothesize, change, verify.'
+  validation:
+    type: custom_script
+    script: check.sh
+    error_message: Validation did not pass. Re-read the objectives and Hint 2 diagnostic steps.
+solution:
+  summary: Identify the misconfiguration affecting this networking lab and apply the minimal fix.
+  files_changed: []
+  commands_run:
+  - bash check.sh
+  reference_docs: networking-fundamentals

@@ -1,11 +1,29 @@
 title: One Gradient-Descent Step by Hand
 slug: aiml-gradient-step
 technology: ai-ml
-category: AI / ML / LLM & Agents
-description: Every neural network ultimately reduces to this single move — predict, measure the error,
-  nudge the weights downhill. Implement the logistic prediction (sigmoid of a linear combination),
-  the binary cross-entropy loss, and a single gradient-descent weight update over a tiny fixed
-  dataset, all in stdlib math. One honest step is the whole of training in miniature.
+category: Build
+description: 'CONTEXT: A team operating AI/ML workflows needs you to resolve `One Gradient-Descent Step
+  by Hand` during a realistic incident. The business impact is reduced service reliability until the underlying
+  state is repaired.
+
+
+  ENVIRONMENT: You are working in FixitLab''s offline ML practice workspace with datasets, training scripts,
+  metrics, and model artifacts. All tools run locally; no paid APIs or external cloud calls are required.
+
+
+  SYMPTOM / STARTING STATE: Every neural network ultimately reduces to this single move — predict, measure
+  the error, nudge the weights downhill. Implement the logistic prediction (sigmoid of a linear combination),
+  the binary cross-entropy loss, and a single gradient-descent weight update over a tiny fixed dataset,
+  all in stdlib math. One honest step is the whole of training in miniature.
+
+
+  OBJECTIVE: Implement a numerically stable sigmoid; Predict with a linear combination plus bias, then
+  apply the sigmoid; Apply one full-batch gradient-descent update to the weights and bias. Success means
+  all hidden tests pass.
+
+
+  WHAT TO AVOID: Do not apply broad destructive changes, skip evidence gathering, or fake completion with
+  marker files — the checker validates real system state.'
 difficulty: hard
 scenario_type: do
 lab_mode: simulation
@@ -21,116 +39,214 @@ objectives:
 - Predict with a linear combination plus bias, then apply the sigmoid
 - Apply one full-batch gradient-descent update to the weights and bias
 initial_state: Every neural network ultimately reduces to this single move — predict, measure the error,
-  nudge the weights downhill. Implement the logistic prediction (sigmoid of a linear combination),
-  the binary cross-entropy loss, and a single gradient-descent weight update over a tiny fixed
-  dataset, all in stdlib math. One honest step is the whole of training in miniature.
-solution_explanation: |
-  sigmoid(z) = 1 / (1 + e^-z), guarded for large-magnitude z so it never overflows. predict computes
+  nudge the weights downhill. Implement the logistic prediction (sigmoid of a linear combination), the
+  binary cross-entropy loss, and a single gradient-descent weight update over a tiny fixed dataset, all
+  in stdlib math. One honest step is the whole of training in miniature.
+solution_explanation: 'sigmoid(z) = 1 / (1 + e^-z), guarded for large-magnitude z so it never overflows.
+  predict computes
+
   the dot product of weights and features plus the bias, then squashes it through the sigmoid.
+
   gradient_step runs one full-batch update: for each example the error is (prediction - label); the
+
   gradient for weight j is the mean over the batch of error * feature_j, and the bias gradient is the
+
   mean error. Each parameter moves against its gradient scaled by the learning rate
+
   (w_j -= lr * grad_j). Because the data, weights, and learning rate are fixed, the updated
+
   parameters are fully deterministic, and the loss after the step is lower than before.
+
+  '
 coding_spec:
   language: python
   entrypoint: solution.py
   kind: impl
-  instructions: |
-    Implement a single logistic-regression training step (import math allowed):
-      sigmoid(z) -> float: 1 / (1 + e^-z), numerically stable for large |z|.
-      predict(weights, bias, features) -> float: sigmoid(dot(weights, features) + bias).
-      gradient_step(weights, bias, data, lr) -> (new_weights, new_bias):
-        data is a list of (features, label) with label in {0, 1}. Do ONE full-batch gradient-descent
-        update. For each example error = predict(...) - label. The gradient for weight j is the mean
-        of error * features[j] over the batch; the bias gradient is the mean error. Update with
-        w_j := w_j - lr * grad_j and b := b - lr * grad_b. Return the new weights as a list and the
-        new bias. Do not mutate the input weights list.
-    Click Run to try it, then Check Solution to grade against all tests.
+  instructions: "Implement a single logistic-regression training step (import math allowed):\n  sigmoid(z)\
+    \ -> float: 1 / (1 + e^-z), numerically stable for large |z|.\n  predict(weights, bias, features)\
+    \ -> float: sigmoid(dot(weights, features) + bias).\n  gradient_step(weights, bias, data, lr) -> (new_weights,\
+    \ new_bias):\n    data is a list of (features, label) with label in {0, 1}. Do ONE full-batch gradient-descent\n\
+    \    update. For each example error = predict(...) - label. The gradient for weight j is the mean\n\
+    \    of error * features[j] over the batch; the bias gradient is the mean error. Update with\n   \
+    \ w_j := w_j - lr * grad_j and b := b - lr * grad_b. Return the new weights as a list and the\n  \
+    \  new bias. Do not mutate the input weights list.\nClick Run to try it, then Check Solution to grade\
+    \ against all tests.\n"
   files:
   - path: solution.py
-    content: |
-      import math
-
-      def sigmoid(z):
-          # TODO: 1 / (1 + e^-z), stable for large |z|.
-          pass
-
-      def predict(weights, bias, features):
-          # TODO: sigmoid(dot(weights, features) + bias).
-          pass
-
-      def gradient_step(weights, bias, data, lr):
-          # TODO: one full-batch gradient-descent update; return (new_weights, new_bias).
-          pass
+    content: "import math\n\ndef sigmoid(z):\n    # TODO: 1 / (1 + e^-z), stable for large |z|.\n    pass\n\
+      \ndef predict(weights, bias, features):\n    # TODO: sigmoid(dot(weights, features) + bias).\n \
+      \   pass\n\ndef gradient_step(weights, bias, data, lr):\n    # TODO: one full-batch gradient-descent\
+      \ update; return (new_weights, new_bias).\n    pass\n"
     readonly: false
   visible_tests:
   - name: sigmoid at zero is 0.5
-    code: |
-      import math
+    code: 'import math
+
       assert math.isclose(sigmoid(0), 0.5, rel_tol=1e-9), sigmoid(0)
+
+      '
   - name: prediction uses weights and bias
-    code: |
-      import math
+    code: 'import math
+
       # weights=[2], bias=0, x=[1] -> sigmoid(2)
-      assert math.isclose(predict([2.0], 0.0, [1.0]), 1 / (1 + math.exp(-2)), rel_tol=1e-9), predict([2.0], 0.0, [1.0])
+
+      assert math.isclose(predict([2.0], 0.0, [1.0]), 1 / (1 + math.exp(-2)), rel_tol=1e-9), predict([2.0],
+      0.0, [1.0])
+
+      '
   hidden_tests:
   - name: sigmoid is stable for large magnitudes
-    code: |
-      import math
+    code: 'import math
+
       assert math.isclose(sigmoid(1000), 1.0, abs_tol=1e-9), sigmoid(1000)
+
       assert math.isclose(sigmoid(-1000), 0.0, abs_tol=1e-9), sigmoid(-1000)
+
+      '
   - name: sigmoid is symmetric
-    code: |
-      import math
+    code: 'import math
+
       assert math.isclose(sigmoid(3) + sigmoid(-3), 1.0, rel_tol=1e-9), (sigmoid(3), sigmoid(-3))
+
+      '
   - name: one gradient step is deterministic and exact
-    code: |
-      import math
+    code: 'import math
+
       # Start at all zeros: every prediction is 0.5, so error = 0.5 - label.
+
       data = [([1.0, 0.0], 1), ([0.0, 1.0], 0)]
+
       w, b = gradient_step([0.0, 0.0], 0.0, data, lr=1.0)
+
       # errors: ex0 = 0.5-1 = -0.5 ; ex1 = 0.5-0 = 0.5
+
       # grad_w0 = mean(-0.5*1, 0.5*0) = -0.25 ; grad_w1 = mean(-0.5*0, 0.5*1) = 0.25
+
       # grad_b  = mean(-0.5, 0.5) = 0.0
+
       assert math.isclose(w[0], 0.25, rel_tol=1e-9), w
+
       assert math.isclose(w[1], -0.25, rel_tol=1e-9), w
+
       assert math.isclose(b, 0.0, abs_tol=1e-9), b
+
+      '
   - name: a step lowers the loss on a separable point
-    code: |
-      def bce(weights, bias, data):
-          import math
-          eps = 1e-12
-          total = 0.0
-          for feats, label in data:
-              p = predict(weights, bias, feats)
-              p = min(max(p, eps), 1 - eps)
-              total += -(label * math.log(p) + (1 - label) * math.log(1 - p))
-          return total / len(data)
-      data = [([2.0], 1), ([-2.0], 0)]
-      w0, b0 = [0.0], 0.0
-      before = bce(w0, b0, data)
-      w1, b1 = gradient_step(w0, b0, data, lr=0.5)
-      after = bce(w1, b1, data)
-      assert after < before, (before, after)
+    code: "def bce(weights, bias, data):\n    import math\n    eps = 1e-12\n    total = 0.0\n    for feats,\
+      \ label in data:\n        p = predict(weights, bias, feats)\n        p = min(max(p, eps), 1 - eps)\n\
+      \        total += -(label * math.log(p) + (1 - label) * math.log(1 - p))\n    return total / len(data)\n\
+      data = [([2.0], 1), ([-2.0], 0)]\nw0, b0 = [0.0], 0.0\nbefore = bce(w0, b0, data)\nw1, b1 = gradient_step(w0,\
+      \ b0, data, lr=0.5)\nafter = bce(w1, b1, data)\nassert after < before, (before, after)\n"
   - name: does not mutate the input weights
-    code: |
-      original = [0.0, 0.0]
+    code: 'original = [0.0, 0.0]
+
       gradient_step(original, 0.0, [([1.0, 1.0], 1)], lr=0.3)
+
       assert original == [0.0, 0.0], original
+
+      '
   - name: returns a list of weights and a scalar bias
-    code: |
-      w, b = gradient_step([0.1, -0.2], 0.05, [([1.0, 2.0], 1)], lr=0.1)
+    code: 'w, b = gradient_step([0.1, -0.2], 0.05, [([1.0, 2.0], 1)], lr=0.1)
+
       assert isinstance(w, list) and len(w) == 2, w
+
       assert isinstance(b, float), b
+
+      '
   timeout: 8
 hints:
 - order: 1
-  cost: 10
-  content: For a stable sigmoid, when z is very negative compute exp(z) / (1 + exp(z)) instead of 1 / (1 + exp(-z)) so exp does not overflow. A simple branch on the sign of z works.
+  cost: 0
+  content: 'Where to look: Open `solution.py`, read the instructions, and run the visible tests to see
+    which assertion fails first.'
 - order: 2
-  cost: 20
-  content: predict is sigmoid(sum(w * x for w, x in zip(weights, features)) + bias). For the step, compute error = predict(...) - label for every example first.
+  cost: 25
+  content: 'Diagnostic steps:
+
+    1. Click Run and read the traceback — note line number and actual vs expected values.
+
+    2. Reproduce the failure with the smallest input from a visible test.
+
+    3. Compare your implementation to the bug described in the lab prompt.'
 - order: 3
-  cost: 30
-  content: 'grad for weight j is the average over the batch of error * features[j]; grad_b is the average error. Then new_w[j] = weights[j] - lr * grad_j and new_b = bias - lr * grad_b. Build a NEW list so you do not mutate the input.'
+  cost: 50
+  content: 'Exact fix + verification:
+
+    1. Apply one full-batch gradient-descent update to the weights and bias.
+
+    2. Re-run the lab checker (`check.sh` or Check Solution).
+
+    3. Confirm every scenario objective is satisfied.
+
+
+    WHY: the grader validates real state — marker files are ignored.'
+summary: Complete the one gradient-descent step by hand ai ml lab and verify success with the checker
+estimated_minutes: 30
+xp_reward: 100
+prerequisites:
+- Basic ai ml literacy
+tags:
+- ai-ml
+- do
+- hands-on
+linked_tutorial: ai-ml-fundamentals
+what_you_will_learn:
+- Implement a numerically stable sigmoid
+- Predict with a linear combination plus bias, then apply the sigmoid
+- Apply one full-batch gradient-descent update to the weights and bias
+environment:
+  nodes:
+  - role: primary
+    os: FixitLab ML practice workspace
+    hostname: lab-primary
+    ip: 127.0.0.1
+    specs: local offline simulation
+  pre_installed:
+  - ai ml
+  - bash
+  - coreutils
+  - pip
+  - python3
+  credentials:
+  - user: root
+    password: lab123
+tasks:
+- id: task_1
+  title: One Gradient-Descent Step by Hand
+  description: Restore healthy behavior for One Gradient-Descent Step by Hand by investigating the failure,
+    applying the smallest safe fix, and validating the outcome.
+  background: 'This ai ml lab teaches systematic troubleshooting: observe, hypothesize, change, verify.'
+  validation:
+    type: custom_script
+    script: hidden_tests
+    error_message: One or more hidden tests failed. Read the public test output, fix your solution, and
+      submit again.
+solution:
+  summary: The solution passes all hidden tests by implementing the required behavior in code.
+  files_changed: []
+  commands_run: []
+  reference_docs: ai-ml-fundamentals
+guided_mode:
+  enabled: true
+  steps:
+  - step: 1
+    title: Inspect current state
+    instruction: Run a read-only diagnostic before changing anything.
+    command: check.sh
+    expected_output: Output shows the current failure mode
+    explanation: Evidence-first troubleshooting avoids guessing.
+    next_on: command_success
+  - step: 2
+    title: Apply the minimal fix
+    instruction: Make one reversible change aligned with the objectives.
+    command: '# your fix command here'
+    expected_output: State moves toward the objective
+    explanation: Small changes make rollback easy if the hypothesis was wrong.
+    next_on: command_success
+  - step: 3
+    title: Verify with the grader
+    instruction: Run the same verification the checker uses.
+    command: check.sh
+    expected_output: all hidden tests pass
+    explanation: The lab passes only when real state is healthy.
+    next_on: command_success

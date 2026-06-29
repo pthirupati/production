@@ -1,9 +1,26 @@
 title: Implement flattenDepth
 slug: js-impl-flatten-deep-depth
-category: JavaScript Development
-description: 'Implement flattenDepth(arr, depth): flatten a nested array by AT MOST `depth` levels (depth
-  defaults to 1). Elements deeper than `depth` stay nested. Do not use Array.prototype.flat, and do not
-  mutate the input. The stub is empty so tests fail.'
+category: Build
+description: 'CONTEXT: A team operating JavaScript needs you to resolve `Implement flattenDepth` during
+  a realistic incident. The business impact is reduced service reliability until the underlying state
+  is repaired.
+
+
+  ENVIRONMENT: You are working in FixitLab''s offline JavaScript practice project with modules, browser
+  console, and Node tooling. All tools run locally; no paid APIs or external cloud calls are required.
+
+
+  SYMPTOM / STARTING STATE: Implement flattenDepth(arr, depth): flatten a nested array by AT MOST `depth`
+  levels (depth defaults to 1). Elements deeper than `depth` stay nested. Do not use Array.prototype.flat,
+  and do not mutate the input. The stub is empty so tests fail.
+
+
+  OBJECTIVE: Flatten exactly `depth` levels, no more; Leave deeper nesting intact; Default depth to 1
+  and avoid flat()/mutation. Success means all hidden tests pass.
+
+
+  WHAT TO AVOID: Do not apply broad destructive changes, skip evidence gathering, or fake completion with
+  marker files — the checker validates real system state.'
 difficulty: medium
 scenario_type: do
 lab_mode: simulation
@@ -21,61 +38,165 @@ objectives:
 initial_state: 'Implement flattenDepth(arr, depth): flatten a nested array by AT MOST `depth` levels (depth
   defaults to 1). Elements deeper than `depth` stay nested. Do not use Array.prototype.flat, and do not
   mutate the input. The stub is empty so tests fail.'
-solution_explanation: |
-  Recursing into array elements only while depth > 0, decrementing depth per level, flattens exactly the requested number of levels and leaves deeper structure untouched without mutating the input.
+solution_explanation: 'Recursing into array elements only while depth > 0, decrementing depth per level,
+  flattens exactly the requested number of levels and leaves deeper structure untouched without mutating
+  the input.
+
+  '
 coding_spec:
   language: javascript
   entrypoint: solution.js
   kind: impl
-  instructions: |
-    Implement flattenDepth(arr, depth=1) -> array flattened up to `depth` levels.
-      flattenDepth([1, [2, [3, [4]]]], 1) -> [1, 2, [3, [4]]]
-      flattenDepth([1, [2, [3, [4]]]], 2) -> [1, 2, 3, [4]]
-    Click Run to try it, then Check Solution to grade against all tests.
+  instructions: "Implement flattenDepth(arr, depth=1) -> array flattened up to `depth` levels.\n  flattenDepth([1,\
+    \ [2, [3, [4]]]], 1) -> [1, 2, [3, [4]]]\n  flattenDepth([1, [2, [3, [4]]]], 2) -> [1, 2, 3, [4]]\n\
+    Click Run to try it, then Check Solution to grade against all tests.\n"
   files:
   - path: solution.js
-    content: |
-      function flattenDepth(arr, depth = 1) {
-        // TODO: flatten up to `depth` levels (no flat(), no mutation)
-      }
+    content: "function flattenDepth(arr, depth = 1) {\n  // TODO: flatten up to `depth` levels (no flat(),\
+      \ no mutation)\n}\n"
     readonly: false
   visible_tests:
   - name: depth one
-    code: |
-      assert(JSON.stringify(flattenDepth([1, [2, [3, [4]]]], 1)) === JSON.stringify([1, 2, [3, [4]]]), JSON.stringify(flattenDepth([1, [2, [3, [4]]]], 1)));
+    code: 'assert(JSON.stringify(flattenDepth([1, [2, [3, [4]]]], 1)) === JSON.stringify([1, 2, [3, [4]]]),
+      JSON.stringify(flattenDepth([1, [2, [3, [4]]]], 1)));
+
+      '
   - name: depth two
-    code: |
-      assert(JSON.stringify(flattenDepth([1, [2, [3, [4]]]], 2)) === JSON.stringify([1, 2, 3, [4]]), JSON.stringify(flattenDepth([1, [2, [3, [4]]]], 2)));
+    code: 'assert(JSON.stringify(flattenDepth([1, [2, [3, [4]]]], 2)) === JSON.stringify([1, 2, 3, [4]]),
+      JSON.stringify(flattenDepth([1, [2, [3, [4]]]], 2)));
+
+      '
   hidden_tests:
   - name: default depth is one
-    code: |
-      assert(JSON.stringify(flattenDepth([1, [2, [3]]])) === JSON.stringify([1, 2, [3]]), JSON.stringify(flattenDepth([1, [2, [3]]])));
+    code: 'assert(JSON.stringify(flattenDepth([1, [2, [3]]])) === JSON.stringify([1, 2, [3]]), JSON.stringify(flattenDepth([1,
+      [2, [3]]])));
+
+      '
   - name: depth zero is unchanged
-    code: |
-      assert(JSON.stringify(flattenDepth([1, [2, [3]]], 0)) === JSON.stringify([1, [2, [3]]]), JSON.stringify(flattenDepth([1, [2, [3]]], 0)));
+    code: 'assert(JSON.stringify(flattenDepth([1, [2, [3]]], 0)) === JSON.stringify([1, [2, [3]]]), JSON.stringify(flattenDepth([1,
+      [2, [3]]], 0)));
+
+      '
   - name: deep enough fully flattens
-    code: |
-      assert(JSON.stringify(flattenDepth([1, [2, [3, [4]]]], 5)) === JSON.stringify([1, 2, 3, 4]), JSON.stringify(flattenDepth([1, [2, [3, [4]]]], 5)));
+    code: 'assert(JSON.stringify(flattenDepth([1, [2, [3, [4]]]], 5)) === JSON.stringify([1, 2, 3, 4]),
+      JSON.stringify(flattenDepth([1, [2, [3, [4]]]], 5)));
+
+      '
   - name: already flat
-    code: |
-      assert(JSON.stringify(flattenDepth([1, 2, 3], 3)) === JSON.stringify([1, 2, 3]), JSON.stringify(flattenDepth([1, 2, 3], 3)));
+    code: 'assert(JSON.stringify(flattenDepth([1, 2, 3], 3)) === JSON.stringify([1, 2, 3]), JSON.stringify(flattenDepth([1,
+      2, 3], 3)));
+
+      '
   - name: does not mutate input
-    code: |
-      const src = [1, [2, [3]]];
+    code: 'const src = [1, [2, [3]]];
+
       const snap = JSON.stringify(src);
+
       flattenDepth(src, 2);
-      assert(JSON.stringify(src) === snap, 'input mutated');
+
+      assert(JSON.stringify(src) === snap, ''input mutated'');
+
+      '
   - name: mixed shapes
-    code: |
-      assert(JSON.stringify(flattenDepth([[1, 2], [3, [4]]], 1)) === JSON.stringify([1, 2, 3, [4]]), JSON.stringify(flattenDepth([[1, 2], [3, [4]]], 1)));
+    code: 'assert(JSON.stringify(flattenDepth([[1, 2], [3, [4]]], 1)) === JSON.stringify([1, 2, 3, [4]]),
+      JSON.stringify(flattenDepth([[1, 2], [3, [4]]], 1)));
+
+      '
   timeout: 8
 hints:
 - order: 1
-  cost: 10
-  content: Walk the array; for an array element, only recurse when depth > 0.
+  cost: 0
+  content: 'Where to look: Open `solution.js`, read the instructions, and run the visible tests to see
+    which assertion fails first.'
 - order: 2
-  cost: 20
-  content: When you recurse, decrement depth so each level is counted once.
+  cost: 25
+  content: 'Diagnostic steps:
+
+    1. Click Run and read the traceback — note line number and actual vs expected values.
+
+    2. Reproduce the failure with the smallest input from a visible test.
+
+    3. Compare your implementation to the bug described in the lab prompt.'
 - order: 3
-  cost: 30
-  content: When depth hits 0, push remaining arrays as-is (don't flatten further).
+  cost: 50
+  content: 'Exact fix + verification:
+
+    1. Default depth to 1 and avoid flat()/mutation.
+
+    2. Re-run the lab checker (`check.sh` or Check Solution).
+
+    3. Confirm every scenario objective is satisfied.
+
+
+    WHY: the grader validates real state — marker files are ignored.'
+technology: javascript
+summary: Complete the implement flattendepth javascript lab and verify success with the checker
+estimated_minutes: 25
+xp_reward: 100
+prerequisites:
+- Basic javascript literacy
+tags:
+- do
+- hands-on
+- javascript
+linked_tutorial: javascript-fundamentals
+what_you_will_learn:
+- Flatten exactly `depth` levels, no more
+- Leave deeper nesting intact
+- Default depth to 1 and avoid flat()/mutation
+environment:
+  nodes:
+  - role: primary
+    os: FixitLab JavaScript practice project
+    hostname: lab-primary
+    ip: 127.0.0.1
+    specs: local offline simulation
+  pre_installed:
+  - bash
+  - coreutils
+  - javascript
+  - journalctl
+  - systemctl
+  credentials:
+  - user: root
+    password: lab123
+tasks:
+- id: task_1
+  title: Implement flattenDepth
+  description: Restore healthy behavior for Implement flattenDepth by investigating the failure, applying
+    the smallest safe fix, and validating the outcome.
+  background: 'This javascript lab teaches systematic troubleshooting: observe, hypothesize, change, verify.'
+  validation:
+    type: custom_script
+    script: hidden_tests
+    error_message: One or more hidden tests failed. Read the public test output, fix your solution, and
+      submit again.
+solution:
+  summary: The solution passes all hidden tests by implementing the required behavior in code.
+  files_changed: []
+  commands_run: []
+  reference_docs: javascript-fundamentals
+guided_mode:
+  enabled: true
+  steps:
+  - step: 1
+    title: Inspect current state
+    instruction: Run a read-only diagnostic before changing anything.
+    command: check.sh
+    expected_output: Output shows the current failure mode
+    explanation: Evidence-first troubleshooting avoids guessing.
+    next_on: command_success
+  - step: 2
+    title: Apply the minimal fix
+    instruction: Make one reversible change aligned with the objectives.
+    command: '# your fix command here'
+    expected_output: State moves toward the objective
+    explanation: Small changes make rollback easy if the hypothesis was wrong.
+    next_on: command_success
+  - step: 3
+    title: Verify with the grader
+    instruction: Run the same verification the checker uses.
+    command: check.sh
+    expected_output: all hidden tests pass
+    explanation: The lab passes only when real state is healthy.
+    next_on: command_success

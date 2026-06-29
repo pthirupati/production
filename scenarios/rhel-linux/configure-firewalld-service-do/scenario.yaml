@@ -1,7 +1,7 @@
 title: Open Firewalld Service Port
 slug: configure-firewalld-service-do
-technology: RHEL Linux
-category: Build Lab
+technology: rhel-linux
+category: Build
 difficulty: easy
 scenario_type: do
 time_limit: 900
@@ -10,9 +10,27 @@ infrastructure_type: docker
 lab_mode: docker
 jira_priority: Low
 is_free: false
-description: 'Build task: serve a web app through firewalld. Starting from a host where the firewall does
-  not allow web traffic, permit the http service permanently, reload firewalld, start nginx, and verify
-  the port is reachable so the site is accessible from clients.'
+description: 'CONTEXT: A team operating Red Hat Enterprise Linux needs you to resolve `Open Firewalld
+  Service Port` during a realistic incident. The business impact is reduced service reliability until
+  the underlying state is repaired.
+
+
+  ENVIRONMENT: You are working in FixitLab''s offline RHEL practice host with dnf, subscription-manager,
+  firewalld, and SELinux. All tools run locally; no paid APIs or external cloud calls are required.
+
+
+  SYMPTOM / STARTING STATE: RHEL host with firewalld active and the http service not yet allowed. nginx
+  may be installed but the firewall blocks inbound web traffic. Build task: serve a web app through firewalld.
+  Starting from a host where the firewall does not allow web traffic, permit the http service permanently,
+  reload firewalld, start nginx, and verify the port is reachable so the site is accessible from clients.
+
+
+  OBJECTIVE: Allow the http service in firewalld permanently; Reload firewalld and start/enable nginx;
+  Verify HTTP traffic is permitted and the site responds. Success means `check.sh` exits successfully.
+
+
+  WHAT TO AVOID: Do not apply broad destructive changes, skip evidence gathering, or fake completion with
+  marker files — the checker validates real system state.'
 objectives:
 - Allow the http service in firewalld permanently
 - Reload firewalld and start/enable nginx
@@ -21,14 +39,97 @@ initial_state: RHEL host with firewalld active and the http service not yet allo
   but the firewall blocks inbound web traffic.
 hints:
 - order: 1
-  cost: 10
-  content: 'Check the current zone: `firewall-cmd --list-all`. http isn''t listed. Add it permanently:
-    `firewall-cmd --permanent --add-service=http`.'
+  cost: 0
+  content: 'Where to look: Run `firewall-cmd --state` and `firewall-cmd --list-all` for active zones.'
 - order: 2
-  cost: 15
-  content: 'Apply the change with `firewall-cmd --reload`, then make sure the web server is up: `systemctl
-    enable --now nginx`.'
+  cost: 25
+  content: 'Diagnostic steps:
+
+    1. Identify which zone is active and which ports/services are allowed.
+
+    2. Compare to the port the scenario expects (often 80/tcp or 443/tcp).
+
+    3. Check if the service is bound but blocked externally.'
 - order: 3
-  cost: 20
-  content: 'Verify the service is now allowed (`firewall-cmd --list-services` shows http) and the site
-    responds: `curl -I http://localhost` returns 200.'
+  cost: 50
+  content: 'Exact fix + verification:
+
+    1. `firewall-cmd --permanent --add-service=http` (or the needed port).
+
+    2. `firewall-cmd --reload`.
+
+    3. Confirm `firewall-cmd --list-ports` includes the required port.
+
+
+    WHY: a running service behind a closed firewall still fails health checks.'
+summary: Complete the open firewalld service port rhel linux lab and verify success with the checker
+estimated_minutes: 15
+xp_reward: 100
+prerequisites:
+- Basic rhel linux literacy
+tags:
+- do
+- hands-on
+- rhel-linux
+linked_tutorial: rhel-linux-fundamentals
+what_you_will_learn:
+- Allow the http service in firewalld permanently
+- Reload firewalld and start/enable nginx
+- Verify HTTP traffic is permitted and the site responds
+environment:
+  nodes:
+  - role: primary
+    os: FixitLab RHEL practice host
+    hostname: lab-primary
+    ip: 127.0.0.1
+    specs: local offline simulation
+  pre_installed:
+  - bash
+  - coreutils
+  - journalctl
+  - rhel linux
+  - systemctl
+  credentials:
+  - user: root
+    password: lab123
+tasks:
+- id: task_1
+  title: Open Firewalld Service Port
+  description: Restore healthy behavior for Open Firewalld Service Port by investigating the failure,
+    applying the smallest safe fix, and validating the outcome.
+  background: 'This rhel linux lab teaches systematic troubleshooting: observe, hypothesize, change, verify.'
+  validation:
+    type: command_output
+    command: firewall-cmd --list-ports
+    expected_output: 80/tcp
+    error_message: HTTP is still blocked by firewalld. Allow the service and reload.
+solution:
+  summary: Identify the misconfiguration affecting this rhel linux lab and apply the minimal fix.
+  files_changed: []
+  commands_run:
+  - firewall-cmd --list-ports
+  reference_docs: rhel-linux-fundamentals
+guided_mode:
+  enabled: true
+  steps:
+  - step: 1
+    title: Inspect current state
+    instruction: Run a read-only diagnostic before changing anything.
+    command: firewall-cmd --list-ports
+    expected_output: Output shows the current failure mode
+    explanation: Evidence-first troubleshooting avoids guessing.
+    next_on: command_success
+  - step: 2
+    title: Apply the minimal fix
+    instruction: Make one reversible change aligned with the objectives.
+    command: '# your fix command here'
+    expected_output: State moves toward the objective
+    explanation: Small changes make rollback easy if the hypothesis was wrong.
+    next_on: command_success
+  - step: 3
+    title: Verify with the grader
+    instruction: Run the same verification the checker uses.
+    command: firewall-cmd --list-ports
+    expected_output: '`firewall-cmd --list-ports` includes `80/tcp`'
+    explanation: The lab passes only when real state is healthy.
+    next_on: command_success

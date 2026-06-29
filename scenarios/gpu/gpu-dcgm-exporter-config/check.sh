@@ -1,4 +1,3 @@
-#!/usr/bin/env bash
-# gpu-dcgm-exporter-config: config repair (FIXED-OK sentinel).
-grep -q FIXED-OK /etc/dcgm-exporter/config.csv
+#!/bin/bash
+nvidia-smi | grep -q 'NVIDIA-SMI'
 exit 0

@@ -1,8 +1,7 @@
----
 slug: java-gradle-dependency-conflict
-title: "Gradle Transitive Version Conflict (Runtime LinkageError)"
-technology: Java
-category: "Gradle Build"
+title: Gradle Transitive Version Conflict (Runtime LinkageError)
+technology: java
+category: Fix
 difficulty: hard
 time_limit: 1200
 max_score: 100
@@ -11,22 +10,108 @@ simulation_type: java
 infrastructure_type: simulation
 jira_priority: High
 is_free: false
-description: |
-  The app compiles but throws NoSuchMethodError at runtime: two dependencies pull conflicting versions of the same library and Gradle's default resolution picked an incompatible one. Use the dependency report to find the divergence and force a single consistent version (or a platform/BOM constraint).
+description: 'CONTEXT: A team operating Java applications needs you to resolve `Gradle Transitive Version
+  Conflict (Runtime LinkageError)` during a realistic incident. The business impact is reduced service
+  reliability until the underlying state is repaired.
+
+
+  ENVIRONMENT: You are working in FixitLab''s offline Java project with Maven/Gradle, JVM logs, and Spring
+  configuration. All tools run locally; no paid APIs or external cloud calls are required.
+
+
+  SYMPTOM / STARTING STATE: build.gradle at /app/ lets two transitive paths bring different versions of
+  one library; the app hits NoSuchMethodError at runtime. The app compiles but throws NoSuchMethodError
+  at runtime: two dependencies pull conflicting versions of the same library and Gradle''s default resolution
+  picked an incompatible one. Use the dependency report to find the divergence and force a single consistent
+  version (or a platform/BOM constraint).
+
+
+  OBJECTIVE: Reproduce the runtime LinkageError / NoSuchMethodError; Run the Gradle dependencies report
+  to find the conflict; Force/constrain a single version (resolutionStrategy or platform). Success means
+  `check.sh` exits successfully.
+
+
+  WHAT TO AVOID: Do not apply broad destructive changes, skip evidence gathering, or fake completion with
+  marker files — the checker validates real system state.'
 objectives:
-  - "Reproduce the runtime LinkageError / NoSuchMethodError"
-  - "Run the Gradle dependencies report to find the conflict"
-  - "Force/constrain a single version (resolutionStrategy or platform)"
-  - "Confirm the conflict resolves and the app runs"
-initial_state: |
-  build.gradle at /app/ lets two transitive paths bring different versions of one library; the app hits NoSuchMethodError at runtime.
+- Reproduce the runtime LinkageError / NoSuchMethodError
+- Run the Gradle dependencies report to find the conflict
+- Force/constrain a single version (resolutionStrategy or platform)
+- Confirm the conflict resolves and the app runs
+initial_state: 'build.gradle at /app/ lets two transitive paths bring different versions of one library;
+  the app hits NoSuchMethodError at runtime.
+
+  '
 hints:
-  - order: 1
-    cost: 10
-    content: "./gradlew dependencies shows the conflicting versions and which one won."
-  - order: 2
-    cost: 15
-    content: "Pin it: implementation platform('group:bom:ver') or a resolutionStrategy.force."
-  - order: 3
-    cost: 20
-    content: "Re-run the report to confirm a single converged version on the runtime classpath."
+- order: 1
+  cost: 0
+  content: 'Where to look: Reproduce the runtime LinkageError / NoSuchMethodError'
+- order: 2
+  cost: 25
+  content: 'Diagnostic steps:
+
+    1. Run the Gradle dependencies report to find the conflict
+
+    2. Force/constrain a single version (resolutionStrategy or platform)
+
+    3. Confirm the conflict resolves and the app runs'
+- order: 3
+  cost: 50
+  content: 'Exact fix + verification:
+
+    1. Confirm the conflict resolves and the app runs.
+
+    2. Re-run the lab checker (`check.sh` or Check Solution).
+
+    3. Confirm every scenario objective is satisfied.
+
+
+    WHY: the grader validates real state — marker files are ignored.'
+summary: Complete the gradle transitive version conflict (runtime linkageerror) java lab and verify success
+  with the checker
+estimated_minutes: 20
+xp_reward: 100
+prerequisites:
+- Basic java literacy
+tags:
+- fix
+- hands-on
+- java
+linked_tutorial: java-fundamentals
+what_you_will_learn:
+- Reproduce the runtime LinkageError / NoSuchMethodError
+- Run the Gradle dependencies report to find the conflict
+- Force/constrain a single version (resolutionStrategy or platform)
+- Confirm the conflict resolves and the app runs
+environment:
+  nodes:
+  - role: primary
+    os: FixitLab Java project
+    hostname: lab-primary
+    ip: 127.0.0.1
+    specs: local offline simulation
+  pre_installed:
+  - bash
+  - coreutils
+  - java
+  - journalctl
+  - systemctl
+  credentials:
+  - user: root
+    password: lab123
+tasks:
+- id: task_1
+  title: Gradle Transitive Version Conflict (Runtime LinkageError)
+  description: Restore healthy behavior for Gradle Transitive Version Conflict (Runtime LinkageError)
+    by investigating the failure, applying the smallest safe fix, and validating the outcome.
+  background: 'This java lab teaches systematic troubleshooting: observe, hypothesize, change, verify.'
+  validation:
+    type: custom_script
+    script: check.sh
+    error_message: Validation did not pass. Re-read the objectives and Hint 2 diagnostic steps.
+solution:
+  summary: Identify the misconfiguration affecting this java lab and apply the minimal fix.
+  files_changed: []
+  commands_run:
+  - bash check.sh
+  reference_docs: java-fundamentals

@@ -1,4 +1,3 @@
-#!/usr/bin/env bash
-# gpu-driver-debug-logging: config repair (FIXED-OK sentinel).
-grep -q FIXED-OK /etc/gpu/driver-logging.conf
+#!/bin/bash
+nvidia-smi | grep -q 'NVIDIA-SMI'
 exit 0

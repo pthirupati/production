@@ -2,8 +2,8 @@ title: Inode Exhaustion on /var/cache
 slug: inode-exhausted
 lab_mode: simulation
 simulation_type: generic
-technology: Linux
-category: Storage
+technology: linux
+category: Fix
 difficulty: hard
 time_limit: 1200
 max_score: 100
@@ -11,10 +11,29 @@ infrastructure_type: docker
 docker_privileged: false
 jira_priority: Medium
 topics_covered: Q8 inodes — df -i, delete tiny files
-description: Files can no longer be created ("No space left on device") even though `df` reports free
-  space, because the inodes on /var/cache are fully consumed by a huge number of small cache files. A
-  filesystem can run out of inodes long before it runs out of blocks. Find the directory hoarding inodes
-  and remove the excess files to recover.
+description: 'CONTEXT: A team operating Linux administration needs you to resolve `Inode Exhaustion on
+  /var/cache` during a realistic incident. The business impact is reduced service reliability until the
+  underlying state is repaired.
+
+
+  ENVIRONMENT: You are working in FixitLab''s offline Linux practice server with terminal and config files
+  under /etc and /var. All tools run locally; no paid APIs or external cloud calls are required.
+
+
+  SYMPTOM / STARTING STATE: Linux server where /var/cache has exhausted its inodes (df -i at 100%) due
+  to a directory full of small files, so new files can''t be created despite free space. Files can no
+  longer be created ("No space left on device") even though `df` reports free space, because the inodes
+  on /var/cache are fully consumed by a huge number of small cache files. A filesystem can run out of
+  inodes long before it runs out of blocks. Find the directory hoarding inodes and remove the excess files
+  to recover.
+
+
+  OBJECTIVE: Confirm inode exhaustion with df -i; Find the directory holding the bulk of the small files;
+  Remove the excess files and verify inodes are recovered. Success means `check.sh` exits successfully.
+
+
+  WHAT TO AVOID: Do not apply broad destructive changes, skip evidence gathering, or fake completion with
+  marker files — the checker validates real system state.'
 objectives:
 - Confirm inode exhaustion with df -i
 - Find the directory holding the bulk of the small files
@@ -23,14 +42,70 @@ initial_state: Linux server where /var/cache has exhausted its inodes (df -i at 
   full of small files, so new files can't be created despite free space.
 hints:
 - order: 1
-  cost: 10
-  content: 'Check inodes, not bytes: `df -i /var/cache` — IUse% is 100%. That''s why creation fails even
-    with free space.'
+  cost: 0
+  content: 'Where to look: Confirm inode exhaustion with df -i'
 - order: 2
-  cost: 15
-  content: 'Find the offending directory: `find /var/cache -xdev -type f | wc -l` and drill into subdirs
-    (e.g. `for d in /var/cache/*; do echo -n "$d "; find "$d" | wc -l; done`).'
+  cost: 25
+  content: 'Diagnostic steps:
+
+    1. Find the directory holding the bulk of the small files
+
+    2. Remove the excess files and verify inodes are recovered'
 - order: 3
-  cost: 20
-  content: 'Remove the stale cache files (verify first): `find /var/cache/app -type f -delete`. Re-check
-    `df -i /var/cache` — IUse% drops and files can be created again.'
+  cost: 50
+  content: 'Exact fix + verification:
+
+    1. Remove the excess files and verify inodes are recovered.
+
+    2. Re-run the lab checker (`check.sh` or Check Solution).
+
+    3. Confirm every scenario objective is satisfied.
+
+
+    WHY: the grader validates real state — marker files are ignored.'
+summary: Complete the inode exhaustion on /var/cache linux lab and verify success with the checker
+estimated_minutes: 20
+xp_reward: 100
+prerequisites:
+- Basic linux literacy
+tags:
+- fix
+- hands-on
+- linux
+linked_tutorial: linux-fundamentals
+what_you_will_learn:
+- Confirm inode exhaustion with df -i
+- Find the directory holding the bulk of the small files
+- Remove the excess files and verify inodes are recovered
+environment:
+  nodes:
+  - role: primary
+    os: FixitLab Linux practice server
+    hostname: lab-primary
+    ip: 127.0.0.1
+    specs: local offline simulation
+  pre_installed:
+  - bash
+  - coreutils
+  - journalctl
+  - linux
+  - systemctl
+  credentials:
+  - user: root
+    password: lab123
+tasks:
+- id: task_1
+  title: Inode Exhaustion on /var/cache
+  description: Restore healthy behavior for Inode Exhaustion on /var/cache by investigating the failure,
+    applying the smallest safe fix, and validating the outcome.
+  background: 'This linux lab teaches systematic troubleshooting: observe, hypothesize, change, verify.'
+  validation:
+    type: custom_script
+    script: check.sh
+    error_message: Validation did not pass. Re-read the objectives and Hint 2 diagnostic steps.
+solution:
+  summary: Identify the misconfiguration affecting this linux lab and apply the minimal fix.
+  files_changed: []
+  commands_run:
+  - bash check.sh
+  reference_docs: linux-fundamentals

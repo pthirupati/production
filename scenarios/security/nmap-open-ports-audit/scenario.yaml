@@ -1,39 +1,129 @@
 slug: nmap-open-ports-audit
-title: "Unexpected Open Ports — Audit and Close Unauthorized Services"
-technology: Security
-category: Network Security
+title: Unexpected Open Ports - Audit and Close Unauthorized
+technology: security
+category: Fix
 difficulty: medium
 time_limit: 900
 max_score: 100
 infrastructure_type: docker
 jira_priority: High
 is_free: false
-description: |
-  A vulnerability scan found unexpected ports open on a production server.
-  In addition to the expected ports (22/SSH, 80/HTTP, 443/HTTPS), nmap reveals
-  ports 6379 (Redis, exposed publicly), 8080 (development HTTP server), and
-  3306 (MySQL, exposed publicly) are open and accessible. These services should
-  only be accessible locally or from specific management hosts. Identify the
-  offending services and restrict their bind addresses.
-objectives:
-  - Run a port scan to identify all listening services
-  - Identify services bound to 0.0.0.0 that should only be on 127.0.0.1
-  - Configure Redis, MySQL, and the dev server to bind only to localhost
-  - Verify the unauthorized ports are no longer reachable from outside
-initial_state: |
-  Ubuntu 22.04. Redis bound to 0.0.0.0:6379. MySQL bound to 0.0.0.0:3306.
+description: 'CONTEXT: A team operating security hardening needs you to resolve `Unexpected Open Ports
+  - Audit and Close Unauthorized` during a realistic incident. The business impact is reduced service
+  reliability until the underlying state is repaired.
+
+
+  ENVIRONMENT: You are working in FixitLab''s offline hardening lab with SSH, firewall, TLS, audit logs,
+  and IAM settings. All tools run locally; no paid APIs or external cloud calls are required.
+
+
+  SYMPTOM / STARTING STATE: Ubuntu 22.04. Redis bound to 0.0.0.0:6379. MySQL bound to 0.0.0.0:3306.
+
   A Python SimpleHTTPServer running on 0.0.0.0:8080. All three are reachable
+
+  from external hosts. Expected services: only 22, 80, 443. A vulnerability scan found unexpected ports
+  open on a production server.
+
+  In addition to the expected ports (22/SSH, 80/HTTP, 443/HTTPS), nmap reveals
+
+  ports 6379 (Redis, exposed publicly), 8080 (development HTTP server), and
+
+  3306 (MySQL, exposed publicly) are open and accessible. These services should
+
+  only be accessible locally or from specific management hosts. Identify the
+
+  offending services and restrict their bind addresses.
+
+
+  OBJECTIVE: Run a port scan to identify all listening services; Identify services bound to 0.0.0.0 that
+  should only be on 127.0.0.1; Configure Redis, MySQL, and the dev server to bind only to localhost. Success
+  means `check.sh` exits successfully.
+
+
+  WHAT TO AVOID: Do not apply broad destructive changes, skip evidence gathering, or fake completion with
+  marker files — the checker validates real system state.'
+objectives:
+- Run a port scan to identify all listening services
+- Identify services bound to 0.0.0.0 that should only be on 127.0.0.1
+- Configure Redis, MySQL, and the dev server to bind only to localhost
+- Verify the unauthorized ports are no longer reachable from outside
+initial_state: 'Ubuntu 22.04. Redis bound to 0.0.0.0:6379. MySQL bound to 0.0.0.0:3306.
+
+  A Python SimpleHTTPServer running on 0.0.0.0:8080. All three are reachable
+
   from external hosts. Expected services: only 22, 80, 443.
+
+  '
 hints:
-  - order: 1
-    cost: 10
-    content: "Scan: `ss -tlnp` or `netstat -tlnp` to see all listening sockets."
-  - order: 2
-    cost: 15
-    content: "Fix Redis: edit /etc/redis/redis.conf — set `bind 127.0.0.1` then `systemctl restart redis`"
-  - order: 3
-    cost: 15
-    content: "Fix MySQL: edit /etc/mysql/mysql.conf.d/mysqld.cnf — set `bind-address = 127.0.0.1` then `systemctl restart mysql`"
-  - order: 4
-    cost: 15
-    content: "Stop dev server: `pkill -f SimpleHTTPServer` or `pkill -f 'python.*8080'`"
+- order: 1
+  cost: 0
+  content: 'Where to look: Run `systemctl status mysqld` and tail `/var/log/mysqld.log`.'
+- order: 2
+  cost: 25
+  content: 'Diagnostic steps:
+
+    1. Read the error log for InnoDB or permission failures.
+
+    2. Check disk space with `df -h`.
+
+    3. Verify `my.cnf` for bad paths or bind-address.'
+- order: 3
+  cost: 50
+  content: 'Exact fix + verification:
+
+    1. Fix config or ownership under `/var/lib/mysql`.
+
+    2. `systemctl restart mysqld`.
+
+    3. Confirm `systemctl is-active mysqld` returns active.
+
+
+    WHY: MySQL often fails silently until you read the error log.'
+summary: Complete the unexpected open ports - audit and close unauthorized security lab and verify success
+  with the checker
+estimated_minutes: 15
+xp_reward: 100
+prerequisites:
+- Basic security literacy
+tags:
+- fix
+- hands-on
+- security
+linked_tutorial: security-fundamentals
+what_you_will_learn:
+- Run a port scan to identify all listening services
+- Identify services bound to 0.0.0.0 that should only be on 127.0.0.1
+- Configure Redis, MySQL, and the dev server to bind only to localhost
+- Verify the unauthorized ports are no longer reachable from outside
+environment:
+  nodes:
+  - role: primary
+    os: FixitLab hardening lab
+    hostname: lab-primary
+    ip: 127.0.0.1
+    specs: local offline simulation
+  pre_installed:
+  - bash
+  - coreutils
+  - journalctl
+  - security
+  - systemctl
+  credentials:
+  - user: root
+    password: lab123
+tasks:
+- id: task_1
+  title: Unexpected Open Ports - Audit and Close Unauthorized
+  description: Restore healthy behavior for Unexpected Open Ports - Audit and Close Unauthorized by investigating
+    the failure, applying the smallest safe fix, and validating the outcome.
+  background: 'This security lab teaches systematic troubleshooting: observe, hypothesize, change, verify.'
+  validation:
+    type: custom_script
+    script: check.sh
+    error_message: Validation did not pass. Re-read the objectives and Hint 2 diagnostic steps.
+solution:
+  summary: Identify the misconfiguration affecting this security lab and apply the minimal fix.
+  files_changed: []
+  commands_run:
+  - bash check.sh
+  reference_docs: security-fundamentals

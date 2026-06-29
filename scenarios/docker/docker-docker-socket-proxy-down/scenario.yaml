@@ -1,7 +1,7 @@
 title: Docker Socket Proxy Down
 slug: docker-docker-socket-proxy-down
-technology: Docker
-category: Security
+technology: docker
+category: Build
 difficulty: medium
 lab_mode: simulation
 simulation_type: generic
@@ -10,7 +10,26 @@ max_score: 100
 is_free: true
 jira_priority: High
 dual_terminal: false
-description: A hardened socket proxy in front of dockerd is down, breaking tooling.
+description: 'CONTEXT: A team operating Docker containers needs you to resolve `Docker Socket Proxy Down`
+  during a realistic incident. The business impact is reduced service reliability until the underlying
+  state is repaired.
+
+
+  ENVIRONMENT: You are working in FixitLab''s offline Docker host with docker CLI, images, containers,
+  and compose files. All tools run locally; no paid APIs or external cloud calls are required.
+
+
+  SYMPTOM / STARTING STATE: A host where the docker-socket-proxy service is failed. A hardened socket
+  proxy in front of dockerd is down, breaking tooling.
+
+
+  OBJECTIVE: Confirm docker-socket-proxy is down (Tools can''t reach the proxied socket); Resolve the
+  cause and start docker-socket-proxy; Verify docker-socket-proxy is active. Success means `systemctl
+  is-active docker-socket-proxy` returns active.
+
+
+  WHAT TO AVOID: Do not apply broad destructive changes, skip evidence gathering, or fake completion with
+  marker files — the checker validates real system state.'
 initial_state: A host where the docker-socket-proxy service is failed.
 objectives:
 - Confirm docker-socket-proxy is down (Tools can't reach the proxied socket)
@@ -18,11 +37,99 @@ objectives:
 - Verify docker-socket-proxy is active
 hints:
 - order: 1
-  cost: 10
-  content: Tools can't reach the proxied socket
+  cost: 0
+  content: 'Where to look: Start with `systemctl status docker-socket-proxy` and `journalctl -u docker-socket-proxy
+    -n 50 --no-pager` before changing anything.'
 - order: 2
-  cost: 15
-  content: 'Fix the cause and run: systemctl start docker-socket-proxy.'
+  cost: 25
+  content: 'Diagnostic steps:
+
+    1. Run `systemctl status docker-socket-proxy` — note Active/Failed and the last log lines.
+
+    2. Read `journalctl -u docker-socket-proxy -n 50` for the root error.
+
+    3. Form a hypothesis about the smallest config or permission fix.'
 - order: 3
-  cost: 20
-  content: systemctl is-active docker-socket-proxy returns active.
+  cost: 50
+  content: 'Exact fix + verification:
+
+    1. Apply the minimal fix (config, unit override, or missing directory).
+
+    2. Run `systemctl daemon-reload` if you edited a unit file.
+
+    3. Run `systemctl restart docker-socket-proxy` and confirm `systemctl is-active docker-socket-proxy`
+    succeeds.
+
+
+    WHY: the grader checks real service state, not marker files.'
+summary: Complete the docker socket proxy down docker lab and verify success with the checker
+estimated_minutes: 20
+xp_reward: 100
+prerequisites:
+- Basic docker literacy
+tags:
+- docker
+- fix
+- hands-on
+linked_tutorial: docker-fundamentals
+what_you_will_learn:
+- Confirm docker-socket-proxy is down (Tools can't reach the proxied socket)
+- Resolve the cause and start docker-socket-proxy
+- Verify docker-socket-proxy is active
+environment:
+  nodes:
+  - role: primary
+    os: FixitLab Docker host
+    hostname: lab-primary
+    ip: 127.0.0.1
+    specs: local offline simulation
+  pre_installed:
+  - bash
+  - coreutils
+  - docker
+  - docker-compose
+  credentials:
+  - user: root
+    password: lab123
+tasks:
+- id: task_1
+  title: Docker Socket Proxy Down
+  description: Restore healthy behavior for Docker Socket Proxy Down by investigating the failure, applying
+    the smallest safe fix, and validating the outcome.
+  background: 'This docker lab teaches systematic troubleshooting: observe, hypothesize, change, verify.'
+  validation:
+    type: service_active
+    command: systemctl is-active docker-socket-proxy
+    expected_status: active
+    error_message: The docker-socket-proxy service is not active yet. Check `systemctl status docker-socket-proxy`
+      and `journalctl -u docker-socket-proxy -n 50`.
+solution:
+  summary: The root cause is an unhealthy `docker-socket-proxy` service; repair it and verify active state.
+  files_changed: []
+  commands_run:
+  - systemctl is-active docker-socket-proxy
+  reference_docs: docker-fundamentals
+guided_mode:
+  enabled: true
+  steps:
+  - step: 1
+    title: Inspect current state
+    instruction: Run a read-only diagnostic before changing anything.
+    command: systemctl is-active docker-socket-proxy
+    expected_output: Output shows the current failure mode
+    explanation: Evidence-first troubleshooting avoids guessing.
+    next_on: command_success
+  - step: 2
+    title: Apply the minimal fix
+    instruction: Make one reversible change aligned with the objectives.
+    command: '# your fix command here'
+    expected_output: State moves toward the objective
+    explanation: Small changes make rollback easy if the hypothesis was wrong.
+    next_on: command_success
+  - step: 3
+    title: Verify with the grader
+    instruction: Run the same verification the checker uses.
+    command: systemctl is-active docker-socket-proxy
+    expected_output: '`systemctl is-active docker-socket-proxy` returns active'
+    explanation: The lab passes only when real state is healthy.
+    next_on: command_success

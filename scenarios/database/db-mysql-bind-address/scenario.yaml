@@ -1,7 +1,7 @@
 title: MySQL Bound to Localhost Only
 slug: db-mysql-bind-address
-technology: Database
-category: MySQL
+technology: database
+category: Fix
 difficulty: easy
 lab_mode: simulation
 simulation_type: generic
@@ -10,8 +10,26 @@ max_score: 100
 is_free: true
 jira_priority: High
 dual_terminal: false
-description: Remote applications can't reach MySQL because bind-address is 127.0.0.1, so it only listens
-  locally. Bind it appropriately and confirm the config is corrected.
+description: 'CONTEXT: A team operating database administration needs you to resolve `MySQL Bound to Localhost
+  Only` during a realistic incident. The business impact is reduced service reliability until the underlying
+  state is repaired.
+
+
+  ENVIRONMENT: You are working in FixitLab''s offline database server with SQL client, schemas, backups,
+  and performance views. All tools run locally; no paid APIs or external cloud calls are required.
+
+
+  SYMPTOM / STARTING STATE: A MySQL host whose my.cnf bind-address restricts it to localhost, blocking
+  remote app connections. Remote applications can''t reach MySQL because bind-address is 127.0.0.1, so
+  it only listens locally. Bind it appropriately and confirm the config is corrected.
+
+
+  OBJECTIVE: Confirm MySQL only listens on localhost; Set an appropriate bind-address; Verify the config
+  is corrected. Success means `check.sh` exits successfully.
+
+
+  WHAT TO AVOID: Do not apply broad destructive changes, skip evidence gathering, or fake completion with
+  marker files — the checker validates real system state.'
 initial_state: A MySQL host whose my.cnf bind-address restricts it to localhost, blocking remote app connections.
 objectives:
 - Confirm MySQL only listens on localhost
@@ -19,11 +37,74 @@ objectives:
 - Verify the config is corrected
 hints:
 - order: 1
-  cost: 10
-  content: ss -ltnp shows 3306 only on 127.0.0.1.
+  cost: 0
+  content: 'Where to look: Run `systemctl status mysqld` and tail `/var/log/mysqld.log`.'
 - order: 2
-  cost: 15
-  content: Set bind-address to the right interface in my.cnf.
+  cost: 25
+  content: 'Diagnostic steps:
+
+    1. Read the error log for InnoDB or permission failures.
+
+    2. Check disk space with `df -h`.
+
+    3. Verify `my.cnf` for bad paths or bind-address.'
 - order: 3
-  cost: 20
-  content: my.cnf carries the corrected bind-address.
+  cost: 50
+  content: 'Exact fix + verification:
+
+    1. Fix config or ownership under `/var/lib/mysql`.
+
+    2. `systemctl restart mysqld`.
+
+    3. Confirm `systemctl is-active mysqld` returns active.
+
+
+    WHY: MySQL often fails silently until you read the error log.'
+summary: Complete the mysql bound to localhost only database lab and verify success with the checker
+estimated_minutes: 20
+xp_reward: 100
+prerequisites:
+- Basic database literacy
+tags:
+- database
+- fix
+- hands-on
+linked_tutorial: database-fundamentals
+what_you_will_learn:
+- Confirm MySQL only listens on localhost
+- Set an appropriate bind-address
+- Verify the config is corrected
+environment:
+  nodes:
+  - role: primary
+    os: FixitLab database server
+    hostname: lab-primary
+    ip: 127.0.0.1
+    specs: local offline simulation
+  pre_installed:
+  - bash
+  - coreutils
+  - database
+  - journalctl
+  - systemctl
+  credentials:
+  - user: root
+    password: lab123
+tasks:
+- id: task_1
+  title: MySQL Bound to Localhost Only
+  description: Restore healthy behavior for MySQL Bound to Localhost Only by investigating the failure,
+    applying the smallest safe fix, and validating the outcome.
+  background: 'This database lab teaches systematic troubleshooting: observe, hypothesize, change, verify.'
+  validation:
+    type: service_active
+    command: systemctl is-active mysqld
+    expected_status: active
+    error_message: The mysqld service is not active yet. Check `systemctl status mysqld` and `journalctl
+      -u mysqld -n 50`.
+solution:
+  summary: Identify the misconfiguration affecting this database lab and apply the minimal fix.
+  files_changed: []
+  commands_run:
+  - systemctl is-active mysqld
+  reference_docs: database-fundamentals

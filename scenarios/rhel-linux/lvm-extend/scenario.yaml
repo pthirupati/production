@@ -1,21 +1,54 @@
-category: rhel-linux
-description: The root filesystem is full and the volume group has no free space, so writes are failing.
-  A new disk must be requested from the @storage team via the Jira ticket; once it's attached, you add
-  it as an LVM physical volume, extend the volume group and root logical volume, and grow the XFS filesystem
-  online to reclaim capacity.
+category: Fix
+description: 'CONTEXT: A team operating Red Hat Enterprise Linux needs you to resolve `Extend LVM Volume
+  Group (Jira storage request)` during a realistic incident. The business impact is reduced service reliability
+  until the underlying state is repaired.
+
+
+  ENVIRONMENT: You are working in FixitLab''s offline RHEL practice host with dnf, subscription-manager,
+  firewalld, and SELinux. All tools run locally; no paid APIs or external cloud calls are required.
+
+
+  SYMPTOM / STARTING STATE: Simulated RHEL 9 server. The ''rhel'' volume group is out of free extents
+  and / is full. A new disk is NOT attached until the @storage team confirms in Jira; after ~30s, /dev/sdb
+  appears and you can extend LVM. The root filesystem is full and the volume group has no free space,
+  so writes are failing. A new disk must be requested from the @storage team via the Jira ticket; once
+  it''s attached, you add it as an LVM physical volume, extend the volume group and root logical volume,
+  and grow the XFS filesystem online to reclaim capacity.
+
+
+  OBJECTIVE: Request a new disk from the @storage team in Jira; Verify the new disk (lsblk/fdisk) and
+  add it: pvcreate, vgextend; Extend the logical volume and grow the XFS filesystem (lvextend + xfs_growfs).
+  Success means `check.sh` exits successfully.
+
+
+  WHAT TO AVOID: Do not apply broad destructive changes, skip evidence gathering, or fake completion with
+  marker files — the checker validates real system state.'
 difficulty: medium
 hints:
 - order: 1
-  cost: 10
-  content: '@storage team please add a 50G disk for LVM extension'
+  cost: 0
+  content: 'Where to look: Run `firewall-cmd --state` and `firewall-cmd --list-all` for active zones.'
 - order: 2
-  cost: 20
-  content: 'After the disk is attached, confirm it: `lsblk` / `fdisk -l` shows /dev/sdb. Add it to LVM:
-    `pvcreate /dev/sdb` then `vgextend rhel /dev/sdb` (verify with `vgs`).'
+  cost: 25
+  content: 'Diagnostic steps:
+
+    1. Identify which zone is active and which ports/services are allowed.
+
+    2. Compare to the port the scenario expects (often 80/tcp or 443/tcp).
+
+    3. Check if the service is bound but blocked externally.'
 - order: 3
-  cost: 30
-  content: 'Grow the volume and filesystem: `lvextend -l +100%FREE /dev/rhel/root` then `xfs_growfs /`
-    (XFS grows online). Confirm with `df -h /` that free space increased.'
+  cost: 50
+  content: 'Exact fix + verification:
+
+    1. `firewall-cmd --permanent --add-service=http` (or the needed port).
+
+    2. `firewall-cmd --reload`.
+
+    3. Confirm `firewall-cmd --list-ports` includes the required port.
+
+
+    WHY: a running service behind a closed firewall still fails health checks.'
 initial_state: Simulated RHEL 9 server. The 'rhel' volume group is out of free extents and / is full.
   A new disk is NOT attached until the @storage team confirms in Jira; after ~30s, /dev/sdb appears and
   you can extend LVM.
@@ -29,3 +62,52 @@ simulation_type: rhel
 slug: sim-rhel-lvm-extend
 time_limit: 900
 title: Extend LVM Volume Group (Jira storage request)
+technology: rhel-linux
+summary: Complete the extend lvm volume group (jira storage request) rhel linux lab and verify success
+  with the checker
+estimated_minutes: 15
+xp_reward: 100
+prerequisites:
+- Basic rhel linux literacy
+tags:
+- fix
+- hands-on
+- rhel-linux
+linked_tutorial: rhel-linux-fundamentals
+what_you_will_learn:
+- Request a new disk from the @storage team in Jira
+- 'Verify the new disk (lsblk/fdisk) and add it: pvcreate, vgextend'
+- Extend the logical volume and grow the XFS filesystem (lvextend + xfs_growfs)
+environment:
+  nodes:
+  - role: primary
+    os: FixitLab RHEL practice host
+    hostname: lab-primary
+    ip: 127.0.0.1
+    specs: local offline simulation
+  pre_installed:
+  - bash
+  - coreutils
+  - journalctl
+  - rhel linux
+  - systemctl
+  credentials:
+  - user: root
+    password: lab123
+tasks:
+- id: task_1
+  title: Extend LVM Volume Group (Jira storage request)
+  description: Restore healthy behavior for Extend LVM Volume Group (Jira storage request) by investigating
+    the failure, applying the smallest safe fix, and validating the outcome.
+  background: 'This rhel linux lab teaches systematic troubleshooting: observe, hypothesize, change, verify.'
+  validation:
+    type: command_output
+    command: firewall-cmd --list-ports
+    expected_output: 80/tcp
+    error_message: HTTP is still blocked by firewalld. Allow the service and reload.
+solution:
+  summary: Identify the misconfiguration affecting this rhel linux lab and apply the minimal fix.
+  files_changed: []
+  commands_run:
+  - firewall-cmd --list-ports
+  reference_docs: rhel-linux-fundamentals

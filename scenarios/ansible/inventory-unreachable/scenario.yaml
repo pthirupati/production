@@ -1,12 +1,30 @@
 title: Hosts Unreachable in Inventory
 slug: ansible-inventory-unreachable
 difficulty: medium
-category: Ansible Automation
-description: 'Ansible reports all hosts as UNREACHABLE when the playbook runs. The inventory file specifies
-  incorrect SSH usernames and a wrong private key path. Additionally, the ansible_host addresses have
-  a typo in one subnet octet. All three must be corrected for Ansible to connect to the managed nodes.
+category: Fix
+description: 'CONTEXT: A team operating Ansible automation needs you to resolve `Hosts Unreachable in
+  Inventory` during a realistic incident. The business impact is reduced service reliability until the
+  underlying state is repaired.
 
-  '
+
+  ENVIRONMENT: You are working in FixitLab''s offline Ansible control node with inventory, playbooks,
+  roles, and ansible-playbook. All tools run locally; no paid APIs or external cloud calls are required.
+
+
+  SYMPTOM / STARTING STATE: Simulated control node with inventory file pointing at three managed hosts.
+  Running ansible all -m ping returns UNREACHABLE for all hosts. Ansible reports all hosts as UNREACHABLE
+  when the playbook runs. The inventory file specifies incorrect SSH usernames and a wrong private key
+  path. Additionally, the ansible_host addresses have a typo in one subnet octet. All three must be corrected
+  for Ansible to connect to the managed nodes.
+
+
+  OBJECTIVE: Run ansible all -m ping -vvv to inspect the exact SSH connection attempt details; Correct
+  the ansible_user, ansible_ssh_private_key_file, and ansible_host values; Confirm all hosts respond to
+  ansible all -m ping with pong. Success means `check.sh` exits successfully.
+
+
+  WHAT TO AVOID: Do not apply broad destructive changes, skip evidence gathering, or fake completion with
+  marker files — the checker validates real system state.'
 initial_state: 'Simulated control node with inventory file pointing at three managed hosts. Running ansible
   all -m ping returns UNREACHABLE for all hosts.
 
@@ -22,17 +40,76 @@ max_score: 100
 is_free: false
 hints:
 - order: 1
-  cost: 10
-  content: Run `ansible all -m ping -vvv` to see the exact SSH command and failure (wrong user, wrong
-    key path, or connection refused to a wrong IP).
+  cost: 0
+  content: 'Where to look: Run `ansible webservers -m ping -vvv` to see SSH and inventory errors.'
 - order: 2
-  cost: 15
-  content: 'Inspect the inventory variables for typos: `ansible_user`, `ansible_ssh_private_key_file`,
-    and `ansible_host`. One host''s ansible_host has a wrong subnet octet.'
+  cost: 25
+  content: 'Diagnostic steps:
+
+    1. Verify `inventory` hostnames resolve and SSH keys work.
+
+    2. Check `ansible.cfg` for remote_user and privilege escalation.
+
+    3. Test manual `ssh user@host` from the control node.'
 - order: 3
-  cost: 20
-  content: Correct ansible_user, fix the key path to the real private key, and fix the typo'd ansible_host
-    octet. Re-run `ansible all -m ping` — every host returns "pong".
+  cost: 50
+  content: 'Exact fix + verification:
+
+    1. Fix inventory, SSH key, or `ansible_user` in group_vars.
+
+    2. Re-run `ansible webservers -m ping`.
+
+    3. Confirm every host returns SUCCESS.
+
+
+    WHY: Ansible cannot manage hosts it cannot reach.'
 requires_companion_hosts: true
 dual_terminal: false
 jira_priority: Medium
+technology: ansible
+summary: Complete the hosts unreachable in inventory ansible lab and verify success with the checker
+estimated_minutes: 15
+xp_reward: 100
+prerequisites:
+- Basic ansible literacy
+tags:
+- ansible
+- fix
+- hands-on
+linked_tutorial: ansible-fundamentals
+what_you_will_learn:
+- Run ansible all -m ping -vvv to inspect the exact SSH connection attempt details
+- Correct the ansible_user, ansible_ssh_private_key_file, and ansible_host values
+- Confirm all hosts respond to ansible all -m ping with pong
+environment:
+  nodes:
+  - role: primary
+    os: FixitLab Ansible control node
+    hostname: lab-primary
+    ip: 127.0.0.1
+    specs: local offline simulation
+  pre_installed:
+  - ansible
+  - ansible-playbook
+  - bash
+  - coreutils
+  credentials:
+  - user: root
+    password: lab123
+tasks:
+- id: task_1
+  title: Hosts Unreachable in Inventory
+  description: Restore healthy behavior for Hosts Unreachable in Inventory by investigating the failure,
+    applying the smallest safe fix, and validating the outcome.
+  background: 'This ansible lab teaches systematic troubleshooting: observe, hypothesize, change, verify.'
+  validation:
+    type: command_output
+    command: ansible webservers -m ping
+    expected_output: SUCCESS
+    error_message: Ansible hosts are still unreachable. Verify SSH keys and inventory.
+solution:
+  summary: Identify the misconfiguration affecting this ansible lab and apply the minimal fix.
+  files_changed: []
+  commands_run:
+  - ansible webservers -m ping
+  reference_docs: ansible-fundamentals

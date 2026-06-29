@@ -1,9 +1,26 @@
 title: Fix the Falsy Default in greet
 slug: js-fix-default-param-falsy
-category: JavaScript Development
-description: greet(name, greeting) defaults greeting to 'Hello' using `greeting || 'Hello'`, but that
-  also overrides a deliberately empty string ''. The intent is to default only when greeting is undefined.
-  Fix it using the nullish-coalescing operator (??) or a default parameter.
+category: Fix
+description: 'CONTEXT: A team operating JavaScript needs you to resolve `Fix the Falsy Default in greet`
+  during a realistic incident. The business impact is reduced service reliability until the underlying
+  state is repaired.
+
+
+  ENVIRONMENT: You are working in FixitLab''s offline JavaScript practice project with modules, browser
+  console, and Node tooling. All tools run locally; no paid APIs or external cloud calls are required.
+
+
+  SYMPTOM / STARTING STATE: greet(name, greeting) defaults greeting to ''Hello'' using `greeting || ''Hello''`,
+  but that also overrides a deliberately empty string ''''. The intent is to default only when greeting
+  is undefined. Fix it using the nullish-coalescing operator (??) or a default parameter.
+
+
+  OBJECTIVE: See an empty-string greeting get replaced; Default only for undefined, not all falsy values;
+  Preserve an explicit empty greeting. Success means all hidden tests pass.
+
+
+  WHAT TO AVOID: Do not apply broad destructive changes, skip evidence gathering, or fake completion with
+  marker files — the checker validates real system state.'
 difficulty: medium
 scenario_type: fix
 lab_mode: simulation
@@ -21,49 +38,115 @@ objectives:
 initial_state: greet(name, greeting) defaults greeting to 'Hello' using `greeting || 'Hello'`, but that
   also overrides a deliberately empty string ''. The intent is to default only when greeting is undefined.
   Fix it using the nullish-coalescing operator (??) or a default parameter.
-solution_explanation: |
-  The || operator replaces every falsy value, including ''. Nullish coalescing (??) defaults only for null/undefined, preserving an empty string.
+solution_explanation: 'The || operator replaces every falsy value, including ''''. Nullish coalescing
+  (??) defaults only for null/undefined, preserving an empty string.
+
+  '
 coding_spec:
   language: javascript
   entrypoint: solution.js
   kind: fix
-  instructions: |
-    Fix greet(name, greeting): return `${greeting} ${name}`. greeting defaults to 'Hello' only when it is undefined; an explicit '' must be kept.
-      greet('Sam') -> 'Hello Sam'; greet('Sam', '') -> ' Sam'
-    Click Run to try it, then Check Solution to grade against all tests.
+  instructions: "Fix greet(name, greeting): return `${greeting} ${name}`. greeting defaults to 'Hello'\
+    \ only when it is undefined; an explicit '' must be kept.\n  greet('Sam') -> 'Hello Sam'; greet('Sam',\
+    \ '') -> ' Sam'\nClick Run to try it, then Check Solution to grade against all tests.\n"
   files:
   - path: solution.js
-    content: |
-      function greet(name, greeting) {
-        greeting = greeting || 'Hello'; // overrides '' too
-        return greeting + ' ' + name;
-      }
+    content: "function greet(name, greeting) {\n  greeting = greeting || 'Hello'; // overrides '' too\n\
+      \  return greeting + ' ' + name;\n}\n"
     readonly: false
   visible_tests:
   - name: default greeting
-    code: |
-      assert(greet('Sam') === 'Hello Sam');
+    code: 'assert(greet(''Sam'') === ''Hello Sam'');
+
+      '
   - name: explicit empty kept
-    code: |
-      assert(greet('Sam', '') === ' Sam', JSON.stringify(greet('Sam', '')));
+    code: 'assert(greet(''Sam'', '''') === '' Sam'', JSON.stringify(greet(''Sam'', '''')));
+
+      '
   hidden_tests:
   - name: custom greeting
-    code: |
-      assert(greet('Sam', 'Hi') === 'Hi Sam');
+    code: 'assert(greet(''Sam'', ''Hi'') === ''Hi Sam'');
+
+      '
   - name: undefined defaults
-    code: |
-      assert(greet('Lee', undefined) === 'Hello Lee');
+    code: 'assert(greet(''Lee'', undefined) === ''Hello Lee'');
+
+      '
   - name: null defaults
-    code: |
-      assert(greet('Lee', null) === 'Hello Lee');
+    code: 'assert(greet(''Lee'', null) === ''Hello Lee'');
+
+      '
   timeout: 8
 hints:
 - order: 1
-  cost: 10
-  content: greet('Sam', '') returns 'Hello Sam', but the empty greeting should be kept.
+  cost: 0
+  content: 'Where to look: Open `solution.js`, read the instructions, and run the visible tests to see
+    which assertion fails first.'
 - order: 2
-  cost: 20
-  content: '|| treats '''' as falsy and replaces it; ?? only replaces null/undefined.'
+  cost: 25
+  content: 'Diagnostic steps:
+
+    1. Click Run and read the traceback — note line number and actual vs expected values.
+
+    2. Reproduce the failure with the smallest input from a visible test.
+
+    3. Compare your implementation to the bug described in the lab prompt.'
 - order: 3
-  cost: 30
-  content: Use greeting ?? 'Hello'.
+  cost: 50
+  content: 'Exact fix + verification:
+
+    1. Preserve an explicit empty greeting.
+
+    2. Re-run the lab checker (`check.sh` or Check Solution).
+
+    3. Confirm every scenario objective is satisfied.
+
+
+    WHY: the grader validates real state — marker files are ignored.'
+technology: javascript
+summary: Complete the fix the falsy default in greet javascript lab and verify success with the checker
+estimated_minutes: 25
+xp_reward: 100
+prerequisites:
+- Basic javascript literacy
+tags:
+- fix
+- hands-on
+- javascript
+linked_tutorial: javascript-fundamentals
+what_you_will_learn:
+- See an empty-string greeting get replaced
+- Default only for undefined, not all falsy values
+- Preserve an explicit empty greeting
+environment:
+  nodes:
+  - role: primary
+    os: FixitLab JavaScript practice project
+    hostname: lab-primary
+    ip: 127.0.0.1
+    specs: local offline simulation
+  pre_installed:
+  - bash
+  - coreutils
+  - javascript
+  - journalctl
+  - systemctl
+  credentials:
+  - user: root
+    password: lab123
+tasks:
+- id: task_1
+  title: Fix the Falsy Default in greet
+  description: Restore healthy behavior for Fix the Falsy Default in greet by investigating the failure,
+    applying the smallest safe fix, and validating the outcome.
+  background: 'This javascript lab teaches systematic troubleshooting: observe, hypothesize, change, verify.'
+  validation:
+    type: custom_script
+    script: hidden_tests
+    error_message: One or more hidden tests failed. Read the public test output, fix your solution, and
+      submit again.
+solution:
+  summary: The solution passes all hidden tests by implementing the required behavior in code.
+  files_changed: []
+  commands_run: []
+  reference_docs: javascript-fundamentals

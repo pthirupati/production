@@ -1,41 +1,137 @@
 title: Application I/O Extremely Slow — Find the Disk Bottleneck
 slug: linux-disk-io-slow
 difficulty: medium
-category: Linux Administration
-description: |
-  An rsync backup job that normally completes in 15 minutes has been running for several
+category: Fix
+description: 'CONTEXT: A team operating Linux administration needs you to resolve `Application I/O Extremely
+  Slow — Find the Disk Bottleneck` during a realistic incident. The business impact is reduced service
+  reliability until the underlying state is repaired.
+
+
+  ENVIRONMENT: You are working in FixitLab''s offline Linux practice server with terminal and config files
+  under /etc and /var. All tools run locally; no paid APIs or external cloud calls are required.
+
+
+  SYMPTOM / STARTING STATE: Simulated RHEL 9 server. An rsync job has been running for 3 hours copying
+  50GB of data.
+
+  The server feels sluggish. Running df -h shows /dev/sda is the target disk. dmesg output
+
+  includes several recent "blk_update_request: I/O error" messages for /dev/sda.
+
+  No RAID status has been checked. An rsync backup job that normally completes in 15 minutes has been
+  running for several
+
   hours and is not progressing at expected speed. The disk may be saturated, showing I/O
+
   errors, or another process may be monopolizing disk bandwidth. System observability tools
+
   must be used to identify the bottleneck and determine the root cause before data
+
   corruption or drive failure occurs.
 
-initial_state: |
-  Simulated RHEL 9 server. An rsync job has been running for 3 hours copying 50GB of data.
+
+  OBJECTIVE: Run iostat -x 2 5 to identify disk utilization and await percentage; Use iotop -o to find
+  which process is consuming the most disk I/O; Check dmesg | grep -i error for disk hardware errors.
+  Success means `check.sh` exits successfully.
+
+
+  WHAT TO AVOID: Do not apply broad destructive changes, skip evidence gathering, or fake completion with
+  marker files — the checker validates real system state.'
+initial_state: 'Simulated RHEL 9 server. An rsync job has been running for 3 hours copying 50GB of data.
+
   The server feels sluggish. Running df -h shows /dev/sda is the target disk. dmesg output
+
   includes several recent "blk_update_request: I/O error" messages for /dev/sda.
+
   No RAID status has been checked.
 
+  '
 objectives:
-  - Run iostat -x 2 5 to identify disk utilization and await percentage
-  - Use iotop -o to find which process is consuming the most disk I/O
-  - Check dmesg | grep -i error for disk hardware errors
-  - Inspect SMART data with smartctl -a /dev/sda for reallocated sectors
-  - If disk shows errors, stop writes immediately and plan data migration
+- Run iostat -x 2 5 to identify disk utilization and await percentage
+- Use iotop -o to find which process is consuming the most disk I/O
+- Check dmesg | grep -i error for disk hardware errors
+- Inspect SMART data with smartctl -a /dev/sda for reallocated sectors
+- If disk shows errors, stop writes immediately and plan data migration
 lab_mode: simulation
 simulation_type: generic
 time_limit: 900
 max_score: 100
 is_free: false
 hints:
-  - content: 'Run iostat -x 2 5 and look at %util column — if it is near 100% the disk is saturated. The await column shows average I/O wait time in milliseconds.'
-    cost: 10
-    order: 1
-  - content: 'Use iotop -o (only active processes) to identify the top disk consumer. Install if needed: yum install iotop. Check dmesg for hardware errors alongside this.'
-    cost: 20
-    order: 2
-  - content: 'Check SMART health: smartctl -H /dev/sda. Look for Reallocated_Sector_Ct and Current_Pending_Sector — non-zero values indicate a failing drive.'
-    cost: 20
-    order: 3
+- order: 1
+  cost: 0
+  content: 'Where to look: Run `df -h` and `du -xh /var /tmp /home | sort -h | tail -20` for large paths.'
+- order: 2
+  cost: 25
+  content: 'Diagnostic steps:
+
+    1. Find which mount is 100% — often `/` or `/var`.
+
+    2. `journalctl --disk-usage` and old logs under `/var/log`.
+
+    3. Look for core dumps, temp files, or oversized application data.'
+- order: 3
+  cost: 50
+  content: 'Exact fix + verification:
+
+    1. Remove or rotate the largest safe files (logs, caches, old packages).
+
+    2. `df -h` should show free space on the affected mount.
+
+    3. Retry the command that failed with ''No space left on device''.
+
+
+    WHY: many services fail cryptically when disk is full.'
 requires_companion_hosts: false
 dual_terminal: false
 jira_priority: Medium
+technology: linux
+summary: Complete the application i/o extremely slow — find the disk bottleneck linux lab and verify success
+  with the checker
+estimated_minutes: 15
+xp_reward: 100
+prerequisites:
+- Basic linux literacy
+tags:
+- fix
+- hands-on
+- linux
+linked_tutorial: linux-fundamentals
+what_you_will_learn:
+- Run iostat -x 2 5 to identify disk utilization and await percentage
+- Use iotop -o to find which process is consuming the most disk I/O
+- Check dmesg | grep -i error for disk hardware errors
+- Inspect SMART data with smartctl -a /dev/sda for reallocated sectors
+- If disk shows errors, stop writes immediately and plan data migration
+environment:
+  nodes:
+  - role: primary
+    os: FixitLab Linux practice server
+    hostname: lab-primary
+    ip: 127.0.0.1
+    specs: local offline simulation
+  pre_installed:
+  - bash
+  - coreutils
+  - journalctl
+  - linux
+  - systemctl
+  credentials:
+  - user: root
+    password: lab123
+tasks:
+- id: task_1
+  title: Application I/O Extremely Slow — Find the Disk Bottleneck
+  description: Restore healthy behavior for Application I/O Extremely Slow — Find the Disk Bottleneck
+    by investigating the failure, applying the smallest safe fix, and validating the outcome.
+  background: 'This linux lab teaches systematic troubleshooting: observe, hypothesize, change, verify.'
+  validation:
+    type: custom_script
+    script: check.sh
+    error_message: Validation did not pass. Re-read the objectives and Hint 2 diagnostic steps.
+solution:
+  summary: Identify the misconfiguration affecting this linux lab and apply the minimal fix.
+  files_changed: []
+  commands_run:
+  - bash check.sh
+  reference_docs: linux-fundamentals

@@ -1,12 +1,34 @@
 title: Implement debounce with an Injected Clock
 slug: nodejs-impl-debounce-deterministic
 technology: nodejs
-category: Node.js Development
-description: 'Implement debounce(fn, waitMs, clock): return a debounced wrapper that delays calling fn
-  until `waitMs` of quiet has passed since the LAST call. To stay deterministic (no real timers), use
-  the injected clock: clock.setTimeout(cb, ms) returns an id, clock.clearTimeout(id) cancels it. Each
-  new call must cancel the pending timer and schedule a fresh one; fn runs with the arguments of the
-  most recent call. The stub does nothing so tests fail.'
+category: Build
+description: 'CONTEXT: A team operating Node.js backends needs you to resolve `Implement debounce with
+  an Injected Clock` during a realistic incident. The business impact is reduced service reliability until
+  the underlying state is repaired.
+
+
+  ENVIRONMENT: You are working in FixitLab''s offline Node.js application with Express routes, middleware,
+  and package.json. All tools run locally; no paid APIs or external cloud calls are required.
+
+
+  SYMPTOM / STARTING STATE: Implement debounce(fn, waitMs, clock): return a debounced wrapper that delays
+  calling fn until `waitMs` of quiet has passed since the LAST call. Use the injected clock (clock.setTimeout/clearTimeout)
+  so the behaviour is deterministic. Each new call cancels the pending timer and schedules a fresh one;
+  fn runs with the arguments of the most recent call. The stub does nothing so tests fail. Implement debounce(fn,
+  waitMs, clock): return a debounced wrapper that delays calling fn until `waitMs` of quiet has passed
+  since the LAST call. To stay deterministic (no real timers), use the injected clock: clock.setTimeout(cb,
+  ms) returns an id, clock.clearTimeout(id) cancels it. Each new call must cancel the pending timer and
+  schedule a fresh one; fn runs with the arguments of the most recent call. The stub does nothing so tests
+  fail.
+
+
+  OBJECTIVE: Schedule fn via clock.setTimeout instead of a real timer; Cancel the previous pending timer
+  on every new call (clearTimeout); Invoke fn once, after quiet, with the latest call''s arguments. Success
+  means all hidden tests pass.
+
+
+  WHAT TO AVOID: Do not apply broad destructive changes, skip evidence gathering, or fake completion with
+  marker files — the checker validates real system state.'
 difficulty: medium
 scenario_type: do
 lab_mode: simulation
@@ -25,121 +47,208 @@ initial_state: 'Implement debounce(fn, waitMs, clock): return a debounced wrappe
   fn until `waitMs` of quiet has passed since the LAST call. Use the injected clock (clock.setTimeout/clearTimeout)
   so the behaviour is deterministic. Each new call cancels the pending timer and schedules a fresh one;
   fn runs with the arguments of the most recent call. The stub does nothing so tests fail.'
-solution_explanation: |
-  Debounce collapses a burst of calls into one trailing invocation. Keep the id of the pending timer; on every call, clearTimeout the old id (so an earlier scheduled run is discarded) and setTimeout a new one for waitMs. Because each call reschedules, fn only fires once the calls stop for waitMs, and it sees the arguments captured by the last call. Using the injected clock instead of the global setTimeout makes the timing fully controllable in tests.
+solution_explanation: 'Debounce collapses a burst of calls into one trailing invocation. Keep the id of
+  the pending timer; on every call, clearTimeout the old id (so an earlier scheduled run is discarded)
+  and setTimeout a new one for waitMs. Because each call reschedules, fn only fires once the calls stop
+  for waitMs, and it sees the arguments captured by the last call. Using the injected clock instead of
+  the global setTimeout makes the timing fully controllable in tests.
+
+  '
 coding_spec:
   language: javascript
   entrypoint: solution.js
   kind: impl
-  instructions: |
-    Implement debounce(fn, waitMs, clock) -> a function. Calling the returned function should:
-      - cancel any pending scheduled run (clock.clearTimeout)
-      - schedule fn to run after waitMs (clock.setTimeout), with THIS call's arguments
-    so that a burst of calls results in exactly one fn invocation, waitMs after the last call.
-    A test driver advances a fake clock; do NOT use the global setTimeout.
-    Click Run to try it, then Check Solution to grade against all tests.
+  instructions: "Implement debounce(fn, waitMs, clock) -> a function. Calling the returned function should:\n\
+    \  - cancel any pending scheduled run (clock.clearTimeout)\n  - schedule fn to run after waitMs (clock.setTimeout),\
+    \ with THIS call's arguments\nso that a burst of calls results in exactly one fn invocation, waitMs\
+    \ after the last call.\nA test driver advances a fake clock; do NOT use the global setTimeout.\nClick\
+    \ Run to try it, then Check Solution to grade against all tests.\n"
   files:
   - path: solution.js
-    content: |
-      function debounce(fn, waitMs, clock) {
-        // TODO: return a function that debounces fn using clock.setTimeout / clock.clearTimeout.
-        // Cancel the previous pending timer on each call, then schedule a fresh one for waitMs.
-        // fn must run with the arguments of the most recent call.
-      }
+    content: "function debounce(fn, waitMs, clock) {\n  // TODO: return a function that debounces fn using\
+      \ clock.setTimeout / clock.clearTimeout.\n  // Cancel the previous pending timer on each call, then\
+      \ schedule a fresh one for waitMs.\n  // fn must run with the arguments of the most recent call.\n\
+      }\n"
     readonly: false
   visible_tests:
   - name: fires once after the last call
-    code: |
-      function makeClock() {
-        let now = 0, seq = 0; const timers = new Map();
-        return {
-          setTimeout(cb, ms) { const id = ++seq; timers.set(id, { at: now + ms, cb }); return id; },
-          clearTimeout(id) { timers.delete(id); },
-          tick(ms) {
-            now += ms;
-            for (const [id, t] of [...timers.entries()].sort((a, b) => a[1].at - b[1].at)) {
-              if (t.at <= now) { timers.delete(id); t.cb(); }
-            }
-          }
-        };
-      }
-      const clock = makeClock();
-      let calls = [];
-      const d = debounce((x) => calls.push(x), 100, clock);
-      d(1); d(2); d(3);
-      clock.tick(99);
-      assert(calls.length === 0, 'should not fire before quiet period: ' + JSON.stringify(calls));
-      clock.tick(1);
-      assert(JSON.stringify(calls) === JSON.stringify([3]), 'expected one call with last arg: ' + JSON.stringify(calls));
+    code: "function makeClock() {\n  let now = 0, seq = 0; const timers = new Map();\n  return {\n   \
+      \ setTimeout(cb, ms) { const id = ++seq; timers.set(id, { at: now + ms, cb }); return id; },\n \
+      \   clearTimeout(id) { timers.delete(id); },\n    tick(ms) {\n      now += ms;\n      for (const\
+      \ [id, t] of [...timers.entries()].sort((a, b) => a[1].at - b[1].at)) {\n        if (t.at <= now)\
+      \ { timers.delete(id); t.cb(); }\n      }\n    }\n  };\n}\nconst clock = makeClock();\nlet calls\
+      \ = [];\nconst d = debounce((x) => calls.push(x), 100, clock);\nd(1); d(2); d(3);\nclock.tick(99);\n\
+      assert(calls.length === 0, 'should not fire before quiet period: ' + JSON.stringify(calls));\nclock.tick(1);\n\
+      assert(JSON.stringify(calls) === JSON.stringify([3]), 'expected one call with last arg: ' + JSON.stringify(calls));\n"
   - name: separate bursts fire separately
-    code: |
-      function makeClock() {
-        let now = 0, seq = 0; const timers = new Map();
-        return {
-          setTimeout(cb, ms) { const id = ++seq; timers.set(id, { at: now + ms, cb }); return id; },
-          clearTimeout(id) { timers.delete(id); },
-          tick(ms) { now += ms; for (const [id, t] of [...timers.entries()].sort((a,b)=>a[1].at-b[1].at)) { if (t.at <= now) { timers.delete(id); t.cb(); } } }
-        };
-      }
-      const clock = makeClock();
-      let calls = [];
-      const d = debounce((x) => calls.push(x), 50, clock);
-      d('a'); clock.tick(50);
-      d('b'); clock.tick(50);
-      assert(JSON.stringify(calls) === JSON.stringify(['a', 'b']), JSON.stringify(calls));
+    code: "function makeClock() {\n  let now = 0, seq = 0; const timers = new Map();\n  return {\n   \
+      \ setTimeout(cb, ms) { const id = ++seq; timers.set(id, { at: now + ms, cb }); return id; },\n \
+      \   clearTimeout(id) { timers.delete(id); },\n    tick(ms) { now += ms; for (const [id, t] of [...timers.entries()].sort((a,b)=>a[1].at-b[1].at))\
+      \ { if (t.at <= now) { timers.delete(id); t.cb(); } } }\n  };\n}\nconst clock = makeClock();\nlet\
+      \ calls = [];\nconst d = debounce((x) => calls.push(x), 50, clock);\nd('a'); clock.tick(50);\nd('b');\
+      \ clock.tick(50);\nassert(JSON.stringify(calls) === JSON.stringify(['a', 'b']), JSON.stringify(calls));\n"
   hidden_tests:
   - name: passes the most recent arguments
-    code: |
-      function makeClock() { let now=0,seq=0; const t=new Map(); return { setTimeout(cb,ms){const id=++seq;t.set(id,{at:now+ms,cb});return id;}, clearTimeout(id){t.delete(id);}, tick(ms){now+=ms;for(const [id,x] of [...t.entries()].sort((a,b)=>a[1].at-b[1].at)){if(x.at<=now){t.delete(id);x.cb();}}} }; }
+    code: 'function makeClock() { let now=0,seq=0; const t=new Map(); return { setTimeout(cb,ms){const
+      id=++seq;t.set(id,{at:now+ms,cb});return id;}, clearTimeout(id){t.delete(id);}, tick(ms){now+=ms;for(const
+      [id,x] of [...t.entries()].sort((a,b)=>a[1].at-b[1].at)){if(x.at<=now){t.delete(id);x.cb();}}} };
+      }
+
       const clock = makeClock();
+
       let seen = null;
+
       const d = debounce((a, b) => { seen = [a, b]; }, 10, clock);
+
       d(1, 2); d(3, 4);
+
       clock.tick(10);
+
       assert(JSON.stringify(seen) === JSON.stringify([3, 4]), JSON.stringify(seen));
+
+      '
   - name: clears the previous pending timer
-    code: |
-      let cleared = 0;
-      let scheduled = 0;
-      const clock = {
-        setTimeout(cb, ms) { scheduled++; return scheduled; },
-        clearTimeout(id) { cleared++; }
-      };
-      const d = debounce(() => {}, 10, clock);
-      d(); d(); d();
-      assert(scheduled === 3, 'should schedule on every call: ' + scheduled);
-      assert(cleared >= 2, 'should clear the pending timer on reschedule, got ' + cleared);
+    code: "let cleared = 0;\nlet scheduled = 0;\nconst clock = {\n  setTimeout(cb, ms) { scheduled++;\
+      \ return scheduled; },\n  clearTimeout(id) { cleared++; }\n};\nconst d = debounce(() => {}, 10,\
+      \ clock);\nd(); d(); d();\nassert(scheduled === 3, 'should schedule on every call: ' + scheduled);\n\
+      assert(cleared >= 2, 'should clear the pending timer on reschedule, got ' + cleared);\n"
   - name: never calls fn if time never advances
-    code: |
-      function makeClock(){let now=0,seq=0;const t=new Map();return {setTimeout(cb,ms){const id=++seq;t.set(id,{at:now+ms,cb});return id;},clearTimeout(id){t.delete(id);},tick(ms){now+=ms;for(const [id,x] of [...t.entries()].sort((a,b)=>a[1].at-b[1].at)){if(x.at<=now){t.delete(id);x.cb();}}}};}
+    code: 'function makeClock(){let now=0,seq=0;const t=new Map();return {setTimeout(cb,ms){const id=++seq;t.set(id,{at:now+ms,cb});return
+      id;},clearTimeout(id){t.delete(id);},tick(ms){now+=ms;for(const [id,x] of [...t.entries()].sort((a,b)=>a[1].at-b[1].at)){if(x.at<=now){t.delete(id);x.cb();}}}};}
+
       const clock = makeClock();
+
       let called = false;
+
       const d = debounce(() => { called = true; }, 100, clock);
+
       d(); d();
-      assert(called === false, 'fn must not run until the clock advances past waitMs');
+
+      assert(called === false, ''fn must not run until the clock advances past waitMs'');
+
+      '
   - name: returns a callable function
-    code: |
-      const clock = { setTimeout() { return 1; }, clearTimeout() {} };
+    code: 'const clock = { setTimeout() { return 1; }, clearTimeout() {} };
+
       const d = debounce(() => {}, 5, clock);
-      assert(typeof d === 'function', 'debounce must return a function');
+
+      assert(typeof d === ''function'', ''debounce must return a function'');
+
+      '
   - name: a single call fires exactly once
-    code: |
-      function makeClock(){let now=0,seq=0;const t=new Map();return {setTimeout(cb,ms){const id=++seq;t.set(id,{at:now+ms,cb});return id;},clearTimeout(id){t.delete(id);},tick(ms){now+=ms;for(const [id,x] of [...t.entries()].sort((a,b)=>a[1].at-b[1].at)){if(x.at<=now){t.delete(id);x.cb();}}}};}
+    code: 'function makeClock(){let now=0,seq=0;const t=new Map();return {setTimeout(cb,ms){const id=++seq;t.set(id,{at:now+ms,cb});return
+      id;},clearTimeout(id){t.delete(id);},tick(ms){now+=ms;for(const [id,x] of [...t.entries()].sort((a,b)=>a[1].at-b[1].at)){if(x.at<=now){t.delete(id);x.cb();}}}};}
+
       const clock = makeClock();
+
       let count = 0;
+
       const d = debounce(() => { count++; }, 30, clock);
+
       d();
+
       clock.tick(30);
+
       clock.tick(30);
-      assert(count === 1, 'expected exactly one call, got ' + count);
+
+      assert(count === 1, ''expected exactly one call, got '' + count);
+
+      '
   timeout: 8
 hints:
 - order: 1
-  cost: 10
-  content: Keep a variable for the pending timer id in the closure, shared across calls.
+  cost: 0
+  content: 'Where to look: Open `solution.js`, read the instructions, and run the visible tests to see
+    which assertion fails first.'
 - order: 2
-  cost: 20
-  content: 'On each call: if an id exists, clock.clearTimeout(it); capture the args; then set a new id = clock.setTimeout(() => fn(...args), waitMs).'
+  cost: 25
+  content: 'Diagnostic steps:
+
+    1. Click Run and read the traceback — note line number and actual vs expected values.
+
+    2. Reproduce the failure with the smallest input from a visible test.
+
+    3. Compare your implementation to the bug described in the lab prompt.'
 - order: 3
-  cost: 30
-  content: Use `return function (...args) { ... }` so each call reschedules from the latest args, and reset the id when the timer fires.
+  cost: 50
+  content: 'Exact fix + verification:
+
+    1. Invoke fn once, after quiet, with the latest call''s arguments.
+
+    2. Re-run the lab checker (`check.sh` or Check Solution).
+
+    3. Confirm every scenario objective is satisfied.
+
+
+    WHY: the grader validates real state — marker files are ignored.'
+summary: Complete the implement debounce with an injected clock nodejs lab and verify success with the
+  checker
+estimated_minutes: 30
+xp_reward: 100
+prerequisites:
+- Basic nodejs literacy
+tags:
+- do
+- hands-on
+- nodejs
+linked_tutorial: nodejs-fundamentals
+what_you_will_learn:
+- Schedule fn via clock.setTimeout instead of a real timer
+- Cancel the previous pending timer on every new call (clearTimeout)
+- Invoke fn once, after quiet, with the latest call's arguments
+environment:
+  nodes:
+  - role: primary
+    os: FixitLab Node.js application
+    hostname: lab-primary
+    ip: 127.0.0.1
+    specs: local offline simulation
+  pre_installed:
+  - bash
+  - coreutils
+  - journalctl
+  - nodejs
+  - systemctl
+  credentials:
+  - user: root
+    password: lab123
+tasks:
+- id: task_1
+  title: Implement debounce with an Injected Clock
+  description: Restore healthy behavior for Implement debounce with an Injected Clock by investigating
+    the failure, applying the smallest safe fix, and validating the outcome.
+  background: 'This nodejs lab teaches systematic troubleshooting: observe, hypothesize, change, verify.'
+  validation:
+    type: custom_script
+    script: hidden_tests
+    error_message: One or more hidden tests failed. Read the public test output, fix your solution, and
+      submit again.
+solution:
+  summary: The solution passes all hidden tests by implementing the required behavior in code.
+  files_changed: []
+  commands_run: []
+  reference_docs: nodejs-fundamentals
+guided_mode:
+  enabled: true
+  steps:
+  - step: 1
+    title: Inspect current state
+    instruction: Run a read-only diagnostic before changing anything.
+    command: check.sh
+    expected_output: Output shows the current failure mode
+    explanation: Evidence-first troubleshooting avoids guessing.
+    next_on: command_success
+  - step: 2
+    title: Apply the minimal fix
+    instruction: Make one reversible change aligned with the objectives.
+    command: '# your fix command here'
+    expected_output: State moves toward the objective
+    explanation: Small changes make rollback easy if the hypothesis was wrong.
+    next_on: command_success
+  - step: 3
+    title: Verify with the grader
+    instruction: Run the same verification the checker uses.
+    command: check.sh
+    expected_output: all hidden tests pass
+    explanation: The lab passes only when real state is healthy.
+    next_on: command_success

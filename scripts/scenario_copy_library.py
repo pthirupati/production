@@ -672,16 +672,16 @@ def _guided_hints(
         f"3. Capture evidence (command output / status) before the change so you can prove it worked afterward."
     )
     tier3 = (
-        f"Guided walkthrough:\n"
+        f"Exact fix + verification:\n"
         f"1. Re-check the current state — {inspect}.\n"
         f"2. {action}.\n"
         f"3. Verify the result — {verify}.\n"
-        f"4. Record completion: add `# FIXED-OK` to `{marker}`, then click Check Solution."
+        f"4. Click Check Solution once the objective is met (graded on real state, not a marker file)."
     )
     return [
-        {"order": 1, "cost": 10, "content": tier1},
-        {"order": 2, "cost": 15, "content": tier2},
-        {"order": 3, "cost": 25, "content": tier3},
+        {"order": 1, "cost": 0, "content": tier1},
+        {"order": 2, "cost": 25, "content": tier2},
+        {"order": 3, "cost": 50, "content": tier3},
     ]
 
 

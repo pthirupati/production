@@ -2,8 +2,8 @@ title: journald Cannot Write — /var/log Full
 slug: journald-var-log-full
 lab_mode: simulation
 simulation_type: generic
-technology: Linux
-category: Logging / Disk
+technology: linux
+category: Fix
 difficulty: hard
 time_limit: 1500
 max_score: 100
@@ -11,10 +11,29 @@ infrastructure_type: docker
 docker_privileged: false
 jira_priority: Medium
 topics_covered: Q6 journal vacuum — journalctl --vacuum-size
-description: Logging has broken because /var/log is full — journalctl and applications that write there
-  fail to record anything. The space is consumed by an oversized systemd journal and/or large application
-  log files. Reclaim space by vacuuming the journal and clearing stale logs, then cap journal growth so
-  it doesn't recur.
+description: 'CONTEXT: A team operating Linux administration needs you to resolve `journald Cannot Write
+  — /var/log Full` during a realistic incident. The business impact is reduced service reliability until
+  the underlying state is repaired.
+
+
+  ENVIRONMENT: You are working in FixitLab''s offline Linux practice server with terminal and config files
+  under /etc and /var. All tools run locally; no paid APIs or external cloud calls are required.
+
+
+  SYMPTOM / STARTING STATE: Linux server where /var/log is at capacity, so journald and apps can''t write
+  logs. A large journal and oversized log files are consuming the space. Logging has broken because /var/log
+  is full — journalctl and applications that write there fail to record anything. The space is consumed
+  by an oversized systemd journal and/or large application log files. Reclaim space by vacuuming the journal
+  and clearing stale logs, then cap journal growth so it doesn''t recur.
+
+
+  OBJECTIVE: Confirm /var/log is full and find the largest consumers; Vacuum the systemd journal and remove
+  stale logs to reclaim space; Cap journal size so it doesn''t fill again. Success means `check.sh` exits
+  successfully.
+
+
+  WHAT TO AVOID: Do not apply broad destructive changes, skip evidence gathering, or fake completion with
+  marker files — the checker validates real system state.'
 objectives:
 - Confirm /var/log is full and find the largest consumers
 - Vacuum the systemd journal and remove stale logs to reclaim space
@@ -23,14 +42,70 @@ initial_state: Linux server where /var/log is at capacity, so journald and apps 
   journal and oversized log files are consuming the space.
 hints:
 - order: 1
-  cost: 10
-  content: 'Confirm and find the big files: `df -h /var/log` (full), then `du -sh /var/log/* | sort -h`
-    and `journalctl --disk-usage`.'
+  cost: 0
+  content: 'Where to look: Confirm /var/log is full and find the largest consumers'
 - order: 2
-  cost: 20
-  content: 'Reclaim space: `journalctl --vacuum-size=50M` (or `--vacuum-time=7d`) and remove/truncate
-    stale app logs (`truncate -s 0 /var/log/big/*.log`).'
+  cost: 25
+  content: 'Diagnostic steps:
+
+    1. Vacuum the systemd journal and remove stale logs to reclaim space
+
+    2. Cap journal size so it doesn''t fill again'
 - order: 3
-  cost: 30
-  content: 'Prevent recurrence: set `SystemMaxUse=200M` in /etc/systemd/journald.conf and `systemctl restart
-    systemd-journald`. Confirm `df -h /var/log` has healthy free space and journalctl writes again.'
+  cost: 50
+  content: 'Exact fix + verification:
+
+    1. Cap journal size so it doesn''t fill again.
+
+    2. Re-run the lab checker (`check.sh` or Check Solution).
+
+    3. Confirm every scenario objective is satisfied.
+
+
+    WHY: the grader validates real state — marker files are ignored.'
+summary: Complete the journald cannot write — /var/log full linux lab and verify success with the checker
+estimated_minutes: 25
+xp_reward: 100
+prerequisites:
+- Basic linux literacy
+tags:
+- fix
+- hands-on
+- linux
+linked_tutorial: linux-fundamentals
+what_you_will_learn:
+- Confirm /var/log is full and find the largest consumers
+- Vacuum the systemd journal and remove stale logs to reclaim space
+- Cap journal size so it doesn't fill again
+environment:
+  nodes:
+  - role: primary
+    os: FixitLab Linux practice server
+    hostname: lab-primary
+    ip: 127.0.0.1
+    specs: local offline simulation
+  pre_installed:
+  - bash
+  - coreutils
+  - journalctl
+  - linux
+  - systemctl
+  credentials:
+  - user: root
+    password: lab123
+tasks:
+- id: task_1
+  title: journald Cannot Write — /var/log Full
+  description: Restore healthy behavior for journald Cannot Write — /var/log Full by investigating the
+    failure, applying the smallest safe fix, and validating the outcome.
+  background: 'This linux lab teaches systematic troubleshooting: observe, hypothesize, change, verify.'
+  validation:
+    type: custom_script
+    script: check.sh
+    error_message: Validation did not pass. Re-read the objectives and Hint 2 diagnostic steps.
+solution:
+  summary: Identify the misconfiguration affecting this linux lab and apply the minimal fix.
+  files_changed: []
+  commands_run:
+  - bash check.sh
+  reference_docs: linux-fundamentals

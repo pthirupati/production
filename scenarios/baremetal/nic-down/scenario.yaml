@@ -1,10 +1,29 @@
 title: NIC Not Coming Up
 slug: sim-bm-nic-down
-category: Bare Metal & IPMI
+category: Build
 difficulty: easy
-description: After a reboot, a bare-metal server's primary network interface (eth0) is administratively
-  DOWN and the host has no network connectivity. Bring the interface up to restore connectivity, then
-  make the change persistent so it survives the next reboot.
+description: 'CONTEXT: A team operating bare metal operations needs you to resolve `NIC Not Coming Up`
+  during a realistic incident. The business impact is reduced service reliability until the underlying
+  state is repaired.
+
+
+  ENVIRONMENT: You are working in FixitLab''s offline physical server lab with IPMI, RAID, BIOS, and out-of-band
+  console. All tools run locally; no paid APIs or external cloud calls are required.
+
+
+  SYMPTOM / STARTING STATE: Simulated bare-metal RHEL host. eth0 is DOWN after a reboot and has no IP/connectivity;
+  the interface needs to be brought up and its configuration made persistent. After a reboot, a bare-metal
+  server''s primary network interface (eth0) is administratively DOWN and the host has no network connectivity.
+  Bring the interface up to restore connectivity, then make the change persistent so it survives the next
+  reboot.
+
+
+  OBJECTIVE: Confirm eth0 is DOWN and has no connectivity; Bring the interface up and restore its IP;
+  Make the configuration persistent across reboots. Success means `check.sh` exits successfully.
+
+
+  WHAT TO AVOID: Do not apply broad destructive changes, skip evidence gathering, or fake completion with
+  marker files — the checker validates real system state.'
 initial_state: Simulated bare-metal RHEL host. eth0 is DOWN after a reboot and has no IP/connectivity;
   the interface needs to be brought up and its configuration made persistent.
 lab_mode: simulation
@@ -21,15 +40,95 @@ objectives:
 - Make the configuration persistent across reboots
 hints:
 - order: 1
-  cost: 10
-  content: 'Check link state: `ip link show eth0` shows state DOWN, and `ip addr` shows no address. Bring
-    it up immediately: `ip link set eth0 up`.'
+  cost: 0
+  content: 'Where to look: Confirm eth0 is DOWN and has no connectivity'
 - order: 2
-  cost: 15
-  content: 'Restore addressing via the network manager rather than ad hoc: on RHEL, `nmcli con up <connection>`
-    (or bring up the ifcfg profile). Confirm with `ip addr show eth0`.'
+  cost: 25
+  content: 'Diagnostic steps:
+
+    1. Bring the interface up and restore its IP
+
+    2. Make the configuration persistent across reboots'
 - order: 3
-  cost: 20
-  content: 'Make it persistent: ensure the connection has `ONBOOT=yes` / autoconnect set (`nmcli con mod
-    <connection> connection.autoconnect yes`). Reboot-test or `nmcli con reload` and verify eth0 comes
-    up with its IP.'
+  cost: 50
+  content: 'Exact fix + verification:
+
+    1. Make the configuration persistent across reboots.
+
+    2. Re-run the lab checker (`check.sh` or Check Solution).
+
+    3. Confirm every scenario objective is satisfied.
+
+
+    WHY: the grader validates real state — marker files are ignored.'
+technology: baremetal
+summary: Complete the nic not coming up baremetal lab and verify success with the checker
+estimated_minutes: 15
+xp_reward: 100
+prerequisites:
+- Basic baremetal literacy
+tags:
+- baremetal
+- fix
+- hands-on
+linked_tutorial: baremetal-fundamentals
+what_you_will_learn:
+- Confirm eth0 is DOWN and has no connectivity
+- Bring the interface up and restore its IP
+- Make the configuration persistent across reboots
+environment:
+  nodes:
+  - role: primary
+    os: FixitLab physical server lab
+    hostname: lab-primary
+    ip: 127.0.0.1
+    specs: local offline simulation
+  pre_installed:
+  - baremetal
+  - bash
+  - coreutils
+  - journalctl
+  - systemctl
+  credentials:
+  - user: root
+    password: lab123
+tasks:
+- id: task_1
+  title: NIC Not Coming Up
+  description: Restore healthy behavior for NIC Not Coming Up by investigating the failure, applying the
+    smallest safe fix, and validating the outcome.
+  background: 'This baremetal lab teaches systematic troubleshooting: observe, hypothesize, change, verify.'
+  validation:
+    type: custom_script
+    script: check.sh
+    error_message: Validation did not pass. Re-read the objectives and Hint 2 diagnostic steps.
+solution:
+  summary: Identify the misconfiguration affecting this baremetal lab and apply the minimal fix.
+  files_changed: []
+  commands_run:
+  - bash check.sh
+  reference_docs: baremetal-fundamentals
+guided_mode:
+  enabled: true
+  steps:
+  - step: 1
+    title: Inspect current state
+    instruction: Run a read-only diagnostic before changing anything.
+    command: check.sh
+    expected_output: Output shows the current failure mode
+    explanation: Evidence-first troubleshooting avoids guessing.
+    next_on: command_success
+  - step: 2
+    title: Apply the minimal fix
+    instruction: Make one reversible change aligned with the objectives.
+    command: '# your fix command here'
+    expected_output: State moves toward the objective
+    explanation: Small changes make rollback easy if the hypothesis was wrong.
+    next_on: command_success
+  - step: 3
+    title: Verify with the grader
+    instruction: Run the same verification the checker uses.
+    command: check.sh
+    expected_output: '`check.sh` exits successfully'
+    explanation: The lab passes only when real state is healthy.
+    next_on: command_success

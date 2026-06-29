@@ -1,7 +1,7 @@
 slug: win-gui-install-server-role
-title: "Windows GUI: Install the DHCP Server Role in Server Manager"
+title: 'Windows GUI: Install the DHCP Server Role in Server Manager'
 technology: windows
-category: Server Manager
+category: Fix
 difficulty: medium
 lab_mode: simulation
 simulation_type: windows-server
@@ -11,28 +11,120 @@ max_score: 100
 is_free: true
 jira_priority: High
 dual_terminal: false
-description: |
-  Network outage: client machines on the LAN are stuck on 169.254.x.x APIPA
-  addresses because they are not getting DHCP leases. This server was meant to
-  be the DHCP server, but the DHCP Server role was never installed after the
-  rebuild. Using Server Manager's Add Roles and Features wizard in the Windows
-  Server simulator, install the DHCP Server role so the service can lease
-  addresses again.
-initial_state: |
-  A domain-joined Windows Server 2022. In Server Manager the DHCP Server role
+description: 'CONTEXT: A team operating Windows Server needs you to resolve `Windows GUI: Install the
+  DHCP Server Role in Server Manager` during a realistic incident. The business impact is reduced service
+  reliability until the underlying state is repaired.
+
+
+  ENVIRONMENT: You are working in FixitLab''s offline Windows Server host with PowerShell, Server Manager,
+  and AD tools. All tools run locally; no paid APIs or external cloud calls are required.
+
+
+  SYMPTOM / STARTING STATE: A domain-joined Windows Server 2022. In Server Manager the DHCP Server role
+
   is listed as available but NOT installed (AD DS, DNS and File Services are
+
+  already installed). The learner passes once the DHCP Server role is installed. Network outage: client
+  machines on the LAN are stuck on 169.254.x.x APIPA
+
+  addresses because they are not getting DHCP leases. This server was meant to
+
+  be the DHCP server, but the DHCP Server role was never installed after the
+
+  rebuild. Using Server Manager''s Add Roles and Features wizard in the Windows
+
+  Server simulator, install the DHCP Server role so the service can lease
+
+  addresses again.
+
+
+  OBJECTIVE: Open Server Manager and start the Add Roles and Features wizard; Locate the DHCP Server role
+  in the role list; Install the DHCP Server role on this server. Success means `check.sh` exits successfully.
+
+
+  WHAT TO AVOID: Do not apply broad destructive changes, skip evidence gathering, or fake completion with
+  marker files — the checker validates real system state.'
+initial_state: 'A domain-joined Windows Server 2022. In Server Manager the DHCP Server role
+
+  is listed as available but NOT installed (AD DS, DNS and File Services are
+
   already installed). The learner passes once the DHCP Server role is installed.
+
+  '
 objectives:
-  - Open Server Manager and start the Add Roles and Features wizard
-  - Locate the DHCP Server role in the role list
-  - Install the DHCP Server role on this server
+- Open Server Manager and start the Add Roles and Features wizard
+- Locate the DHCP Server role in the role list
+- Install the DHCP Server role on this server
 hints:
-  - order: 1
-    cost: 10
-    content: "APIPA (169.254.x.x) addresses mean no DHCP server answered — the role is missing here."
-  - order: 2
-    cost: 15
-    content: "In Server Manager choose Manage, then Add Roles and Features."
-  - order: 3
-    cost: 20
-    content: "Select the DHCP Server role and complete the wizard to install it."
+- order: 1
+  cost: 0
+  content: 'Where to look: Open Event Viewer (System/Application) and the relevant Services mmc or Server
+    Manager role status.'
+- order: 2
+  cost: 25
+  content: 'Diagnostic steps:
+
+    1. Note the service state and dependency chain in services.msc.
+
+    2. Read the most recent error in Event Viewer for the failing component.
+
+    3. Use PowerShell (`Get-Service`, `Get-WinEvent`) for scripted evidence.'
+- order: 3
+  cost: 50
+  content: 'Exact fix + verification:
+
+    1. Apply the minimal fix (service start, GPO, binding, or permission).
+
+    2. Re-test the failing operation.
+
+    3. Confirm Check Solution passes.
+
+
+    WHY: Windows labs grade real role/service state.'
+summary: 'Complete the windows gui: install the dhcp server role in server manager windows lab and verify
+  success with the checker'
+estimated_minutes: 15
+xp_reward: 100
+prerequisites:
+- Basic windows literacy
+tags:
+- fix
+- hands-on
+- windows
+linked_tutorial: windows-fundamentals
+what_you_will_learn:
+- Open Server Manager and start the Add Roles and Features wizard
+- Locate the DHCP Server role in the role list
+- Install the DHCP Server role on this server
+environment:
+  nodes:
+  - role: primary
+    os: FixitLab Windows Server host
+    hostname: lab-primary
+    ip: 127.0.0.1
+    specs: local offline simulation
+  pre_installed:
+  - bash
+  - coreutils
+  - journalctl
+  - systemctl
+  - windows
+  credentials:
+  - user: root
+    password: lab123
+tasks:
+- id: task_1
+  title: 'Windows GUI: Install the DHCP Server Role in Server Manager'
+  description: 'Restore healthy behavior for Windows GUI: Install the DHCP Server Role in Server Manager
+    by investigating the failure, applying the smallest safe fix, and validating the outcome.'
+  background: 'This windows lab teaches systematic troubleshooting: observe, hypothesize, change, verify.'
+  validation:
+    type: custom_script
+    script: check.sh
+    error_message: Validation did not pass. Re-read the objectives and Hint 2 diagnostic steps.
+solution:
+  summary: Identify the misconfiguration affecting this windows lab and apply the minimal fix.
+  files_changed: []
+  commands_run:
+  - bash check.sh
+  reference_docs: windows-fundamentals

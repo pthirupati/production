@@ -1,28 +1,110 @@
 title: CloudFront Origin Misconfigured
 slug: aws-cloudfront-origin-misconfigured
 difficulty: medium
-category: AWS
-description: 'A CloudFront distribution is returning 502 Bad Gateway errors to users. The origin domain name is pointing to an incorrect or non-existent endpoint, causing CloudFront to fail when attempting to fetch content from the origin.'
-initial_state: 'Simulated AWS environment with a CloudFront distribution configured. The origin domain is set to an invalid ALB or S3 endpoint, resulting in 502 errors for all requests through the CDN.'
+category: Fix
+description: 'CONTEXT: A team operating Terraform IaC needs you to resolve `CloudFront Origin Misconfigured`
+  during a realistic incident. The business impact is reduced service reliability until the underlying
+  state is repaired.
+
+
+  ENVIRONMENT: You are working in FixitLab''s offline Terraform workspace with HCL files, state, and plan/apply
+  workflow. All tools run locally; no paid APIs or external cloud calls are required.
+
+
+  SYMPTOM / STARTING STATE: Simulated AWS environment with a CloudFront distribution configured. The origin
+  domain is set to an invalid ALB or S3 endpoint, resulting in 502 errors for all requests through the
+  CDN. A CloudFront distribution is returning 502 Bad Gateway errors to users. The origin domain name
+  is pointing to an incorrect or non-existent endpoint, causing CloudFront to fail when attempting to
+  fetch content from the origin.
+
+
+  OBJECTIVE: Inspect the CloudFront distribution origin configuration and identify the incorrect domain;
+  Update the origin domain name to the correct ALB DNS name or S3 bucket endpoint; Verify the distribution
+  returns 200 responses after the fix. Success means `check.sh` exits successfully.
+
+
+  WHAT TO AVOID: Do not apply broad destructive changes, skip evidence gathering, or fake completion with
+  marker files — the checker validates real system state.'
+initial_state: Simulated AWS environment with a CloudFront distribution configured. The origin domain
+  is set to an invalid ALB or S3 endpoint, resulting in 502 errors for all requests through the CDN.
 objectives:
-  - Inspect the CloudFront distribution origin configuration and identify the incorrect domain
-  - Update the origin domain name to the correct ALB DNS name or S3 bucket endpoint
-  - Verify the distribution returns 200 responses after the fix
+- Inspect the CloudFront distribution origin configuration and identify the incorrect domain
+- Update the origin domain name to the correct ALB DNS name or S3 bucket endpoint
+- Verify the distribution returns 200 responses after the fix
 lab_mode: simulation
 simulation_type: aws
 time_limit: 1800
 max_score: 100
 is_free: false
 hints:
-  - content: 'Run: aws cloudfront get-distribution --id <dist-id> and inspect the Origins.Items[].DomainName field.'
-    cost: 10
-    order: 1
-  - content: 'Compare the origin domain against your ALB DNS name from: aws elbv2 describe-load-balancers --query LoadBalancers[].DNSName'
-    cost: 15
-    order: 2
-  - content: 'Use aws cloudfront update-distribution with the corrected origin domain and increment the CallerReference to apply the change.'
-    cost: 20
-    order: 3
+- order: 1
+  cost: 0
+  content: 'Where to look: Inspect the CloudFront distribution origin configuration and identify the incorrect
+    domain'
+- order: 2
+  cost: 25
+  content: 'Diagnostic steps:
+
+    1. Update the origin domain name to the correct ALB DNS name or S3 bucket endpoint
+
+    2. Verify the distribution returns 200 responses after the fix'
+- order: 3
+  cost: 50
+  content: 'Exact fix + verification:
+
+    1. Verify the distribution returns 200 responses after the fix.
+
+    2. Re-run the lab checker (`check.sh` or Check Solution).
+
+    3. Confirm every scenario objective is satisfied.
+
+
+    WHY: the grader validates real state — marker files are ignored.'
 requires_companion_hosts: false
 dual_terminal: false
 jira_priority: Medium
+technology: terraform
+summary: Complete the cloudfront origin misconfigured terraform lab and verify success with the checker
+estimated_minutes: 30
+xp_reward: 100
+prerequisites:
+- Basic terraform literacy
+tags:
+- fix
+- hands-on
+- terraform
+linked_tutorial: terraform-fundamentals
+what_you_will_learn:
+- Inspect the CloudFront distribution origin configuration and identify the incorrect domain
+- Update the origin domain name to the correct ALB DNS name or S3 bucket endpoint
+- Verify the distribution returns 200 responses after the fix
+environment:
+  nodes:
+  - role: primary
+    os: FixitLab Terraform workspace
+    hostname: lab-primary
+    ip: 127.0.0.1
+    specs: local offline simulation
+  pre_installed:
+  - bash
+  - coreutils
+  - terraform
+  credentials:
+  - user: root
+    password: lab123
+tasks:
+- id: task_1
+  title: CloudFront Origin Misconfigured
+  description: Restore healthy behavior for CloudFront Origin Misconfigured by investigating the failure,
+    applying the smallest safe fix, and validating the outcome.
+  background: 'This terraform lab teaches systematic troubleshooting: observe, hypothesize, change, verify.'
+  validation:
+    type: custom_script
+    script: check.sh
+    error_message: Validation did not pass. Re-read the objectives and Hint 2 diagnostic steps.
+solution:
+  summary: Identify the misconfiguration affecting this terraform lab and apply the minimal fix.
+  files_changed: []
+  commands_run:
+  - bash check.sh
+  reference_docs: terraform-fundamentals

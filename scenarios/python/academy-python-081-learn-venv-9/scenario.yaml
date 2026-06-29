@@ -1,7 +1,7 @@
-title: 'Python Development: Python Virtual Environments — Fundamentals Lab'
+title: Python Virtual Environments — Learn Lab
 slug: academy-python-081-learn-venv-9
-technology: Python Development
-category: Core Skills
+technology: python
+category: Learn
 difficulty: easy
 scenario_type: do
 lab_mode: simulation
@@ -11,18 +11,40 @@ max_score: 100
 is_free: false
 infrastructure_type: docker
 jira_priority: Low
-description: Service operations lab. The `nginx` systemd unit is **failed/inactive** on this host — a
-  realistic fault for Fundamentals Lab workflows that depend on it. Diagnose with `systemctl status nginx`
-  and journal logs, apply the smallest reliable fix, then verify with `systemctl is-active nginx`.
+description: 'CONTEXT: A team operating Python development needs you to resolve `python: Python Virtual
+  Environments — Fundamentals Lab` during a realistic incident. The business impact is reduced service
+  reliability until the underlying state is repaired.
+
+
+  ENVIRONMENT: You are working in FixitLab''s offline Python project workspace with source files, venv,
+  tests, and CLI entrypoints. All tools run locally; no paid APIs or external cloud calls are required.
+
+
+  SYMPTOM / STARTING STATE: The Python project workspace is online with a starter Python virtual environments
+  setup. Some pieces are intentionally incomplete so you can learn how they fit together. Nothing is on
+  fire — focus on observation. This beginner-friendly python lab introduces Python virtual environments.
+  You will explore venv creation, dependency pinning, and interpreter isolation on the Python project
+  workspace. Read the environment first, then follow the guided steps — no prior production experience
+  required.
+
+
+  OBJECTIVE: Understand how Python virtual environments work in this lab environment; Identify the main
+  status and configuration signals for Python virtual environments; Confirm you can read the current state
+  confidently before changing anything. Success means `systemctl is-active nginx` returns active.
+
+
+  WHAT TO AVOID: Do not apply broad destructive changes, skip evidence gathering, or fake completion with
+  marker files — the checker validates real system state.'
 objectives:
-- The `nginx` service is active (running)
-- '`systemctl is-active nginx` returns active'
-- The fix survives a status re-check (no marker files)
-initial_state: The `nginx` service is not running (`systemctl is-active nginx` → inactive/failed). Dependent
-  Fundamentals Lab tasks cannot succeed until the unit is healthy again.
+- Understand how Python virtual environments work in this lab environment
+- Identify the main status and configuration signals for Python virtual environments
+- Confirm you can read the current state confidently before changing anything
+initial_state: The Python project workspace is online with a starter Python virtual environments setup.
+  Some pieces are intentionally incomplete so you can learn how they fit together. Nothing is on fire
+  — focus on observation.
 hints:
 - order: 1
-  cost: 10
+  cost: 0
   content: 'Orient yourself before changing anything:
 
     1. Inspect the current state — `which python`, `pip freeze`, and activation scripts.
@@ -32,17 +54,15 @@ hints:
     3. Recall the core idea: venv creation, dependency pinning, and interpreter isolation. Form one hypothesis
     before you act.'
 - order: 2
-  cost: 15
-  content: 'Plan your approach (still no spoilers):
-
-    1. Confirm the exact gap between current and desired state for Python virtual environments.
-
-    2. Decide the single smallest change that moves you toward the objective.
-
-    3. Capture evidence (command output / status) before the change so you can prove it worked afterward.'
-- order: 3
   cost: 25
-  content: 'Guided walkthrough:
+  content: 'Diagnostic steps:
+
+    1. Identify the main status and configuration signals for Python virtual environments
+
+    2. Confirm you can read the current state confidently before changing anything'
+- order: 3
+  cost: 50
+  content: 'Exact fix + verification:
 
     1. Re-check the current state — `which python`, `pip freeze`, and activation scripts.
 
@@ -51,4 +71,76 @@ hints:
 
     3. Verify the result — the venv activates cleanly and required imports succeed.
 
-    4. Click Check Solution once `systemctl is-active nginx` returns active.'
+    4. Click Check Solution once the objective is met (graded on real state, not a marker file).'
+summary: Complete the python virtual environments — learn lab python lab and verify success with the checker
+estimated_minutes: 15
+xp_reward: 100
+prerequisites:
+- Basic python literacy
+tags:
+- do
+- hands-on
+- python
+linked_tutorial: python-fundamentals
+what_you_will_learn:
+- Understand how Python virtual environments work in this lab environment
+- Identify the main status and configuration signals for Python virtual environments
+- Confirm you can read the current state confidently before changing anything
+environment:
+  nodes:
+  - role: primary
+    os: FixitLab Python project workspace
+    hostname: lab-primary
+    ip: 127.0.0.1
+    specs: local offline simulation
+  pre_installed:
+  - bash
+  - coreutils
+  - pip
+  - python
+  - python3
+  credentials:
+  - user: root
+    password: lab123
+tasks:
+- id: task_1
+  title: Python Virtual Environments — Learn Lab
+  description: Restore healthy behavior for Python Virtual Environments — Learn Lab by investigating the
+    failure, applying the smallest safe fix, and validating the outcome.
+  background: 'This python lab teaches systematic troubleshooting: observe, hypothesize, change, verify.'
+  validation:
+    type: service_active
+    command: systemctl is-active nginx
+    expected_status: active
+    error_message: The nginx service is not active yet. Check `systemctl status nginx` and `journalctl
+      -u nginx -n 50`.
+solution:
+  summary: The root cause is an unhealthy `nginx` service; repair it and verify active state.
+  files_changed: []
+  commands_run:
+  - systemctl is-active nginx
+  reference_docs: python-fundamentals
+guided_mode:
+  enabled: true
+  steps:
+  - step: 1
+    title: Inspect current state
+    instruction: Run a read-only diagnostic before changing anything.
+    command: systemctl is-active nginx
+    expected_output: Output shows the current failure mode
+    explanation: Evidence-first troubleshooting avoids guessing.
+    next_on: command_success
+  - step: 2
+    title: Apply the minimal fix
+    instruction: Make one reversible change aligned with the objectives.
+    command: '# your fix command here'
+    expected_output: State moves toward the objective
+    explanation: Small changes make rollback easy if the hypothesis was wrong.
+    next_on: command_success
+  - step: 3
+    title: Verify with the grader
+    instruction: Run the same verification the checker uses.
+    command: systemctl is-active nginx
+    expected_output: '`systemctl is-active nginx` returns active'
+    explanation: The lab passes only when real state is healthy.
+    next_on: command_success

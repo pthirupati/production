@@ -1,7 +1,7 @@
 slug: win-gui-unlock-ad-user
-title: "Windows GUI: Unlock and Re-enable a Locked AD User"
+title: 'Windows GUI: Unlock and Re-enable a Locked AD User'
 technology: windows
-category: Active Directory
+category: Fix
 difficulty: easy
 lab_mode: simulation
 simulation_type: windows-server
@@ -11,28 +11,120 @@ max_score: 100
 is_free: true
 jira_priority: High
 dual_terminal: false
-description: |
-  Help-desk ticket: John Smith (jsmith) cannot sign in to the domain. His
-  Active Directory account has been locked out after repeated bad-password
-  attempts and was also disabled. Using the Active Directory Users and
-  Computers console in the Windows Server simulator, unlock the account and
-  re-enable it so he can log on again. No terminal required — this is a
-  full GUI lab.
-initial_state: |
-  A domain-joined Windows Server 2022. In Active Directory Users and Computers
+description: 'CONTEXT: A team operating Windows Server needs you to resolve `Windows GUI: Unlock and Re-enable
+  a Locked AD User` during a realistic incident. The business impact is reduced service reliability until
+  the underlying state is repaired.
+
+
+  ENVIRONMENT: You are working in FixitLab''s offline Windows Server host with PowerShell, Server Manager,
+  and AD tools. All tools run locally; no paid APIs or external cloud calls are required.
+
+
+  SYMPTOM / STARTING STATE: A domain-joined Windows Server 2022. In Active Directory Users and Computers
+
   the user jsmith shows as Locked out and Disabled. The account must be both
+
+  unlocked and enabled for the learner to pass. Help-desk ticket: John Smith (jsmith) cannot sign in to
+  the domain. His
+
+  Active Directory account has been locked out after repeated bad-password
+
+  attempts and was also disabled. Using the Active Directory Users and
+
+  Computers console in the Windows Server simulator, unlock the account and
+
+  re-enable it so he can log on again. No terminal required — this is a
+
+  full GUI lab.
+
+
+  OBJECTIVE: Open Active Directory Users and Computers and locate the jsmith account; Unlock the locked-out
+  account; Re-enable the disabled account so the user can sign in. Success means `check.sh` exits successfully.
+
+
+  WHAT TO AVOID: Do not apply broad destructive changes, skip evidence gathering, or fake completion with
+  marker files — the checker validates real system state.'
+initial_state: 'A domain-joined Windows Server 2022. In Active Directory Users and Computers
+
+  the user jsmith shows as Locked out and Disabled. The account must be both
+
   unlocked and enabled for the learner to pass.
+
+  '
 objectives:
-  - Open Active Directory Users and Computers and locate the jsmith account
-  - Unlock the locked-out account
-  - Re-enable the disabled account so the user can sign in
+- Open Active Directory Users and Computers and locate the jsmith account
+- Unlock the locked-out account
+- Re-enable the disabled account so the user can sign in
 hints:
-  - order: 1
-    cost: 10
-    content: "Open Active Directory Users and Computers and find jsmith under the Users OU."
-  - order: 2
-    cost: 15
-    content: "Right-click the account and choose Unlock to clear the lockout."
-  - order: 3
-    cost: 20
-    content: "Right-click again and choose Enable Account so the disabled flag is cleared."
+- order: 1
+  cost: 0
+  content: 'Where to look: Open Event Viewer (System/Application) and the relevant Services mmc or Server
+    Manager role status.'
+- order: 2
+  cost: 25
+  content: 'Diagnostic steps:
+
+    1. Note the service state and dependency chain in services.msc.
+
+    2. Read the most recent error in Event Viewer for the failing component.
+
+    3. Use PowerShell (`Get-Service`, `Get-WinEvent`) for scripted evidence.'
+- order: 3
+  cost: 50
+  content: 'Exact fix + verification:
+
+    1. Apply the minimal fix (service start, GPO, binding, or permission).
+
+    2. Re-test the failing operation.
+
+    3. Confirm Check Solution passes.
+
+
+    WHY: Windows labs grade real role/service state.'
+summary: 'Complete the windows gui: unlock and re-enable a locked ad user windows lab and verify success
+  with the checker'
+estimated_minutes: 10
+xp_reward: 100
+prerequisites:
+- Basic windows literacy
+tags:
+- fix
+- hands-on
+- windows
+linked_tutorial: windows-fundamentals
+what_you_will_learn:
+- Open Active Directory Users and Computers and locate the jsmith account
+- Unlock the locked-out account
+- Re-enable the disabled account so the user can sign in
+environment:
+  nodes:
+  - role: primary
+    os: FixitLab Windows Server host
+    hostname: lab-primary
+    ip: 127.0.0.1
+    specs: local offline simulation
+  pre_installed:
+  - bash
+  - coreutils
+  - journalctl
+  - systemctl
+  - windows
+  credentials:
+  - user: root
+    password: lab123
+tasks:
+- id: task_1
+  title: 'Windows GUI: Unlock and Re-enable a Locked AD User'
+  description: 'Restore healthy behavior for Windows GUI: Unlock and Re-enable a Locked AD User by investigating
+    the failure, applying the smallest safe fix, and validating the outcome.'
+  background: 'This windows lab teaches systematic troubleshooting: observe, hypothesize, change, verify.'
+  validation:
+    type: custom_script
+    script: check.sh
+    error_message: Validation did not pass. Re-read the objectives and Hint 2 diagnostic steps.
+solution:
+  summary: Identify the misconfiguration affecting this windows lab and apply the minimal fix.
+  files_changed: []
+  commands_run:
+  - bash check.sh
+  reference_docs: windows-fundamentals

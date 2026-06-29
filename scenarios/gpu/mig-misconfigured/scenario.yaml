@@ -1,11 +1,31 @@
 title: MIG Partition Misconfigured
 slug: sim-gpu-mig
-category: GPU & NVIDIA
+category: Fix
 difficulty: hard
-description: A workload requesting a MIG GPU instance can't be scheduled or sees the wrong amount of memory
-  because MIG is misconfigured. Either MIG mode isn't enabled, or the GPU instance / compute instance
-  profile created doesn't match what the job requests. Configure the correct MIG layout so the workload
-  gets its slice.
+description: 'CONTEXT: A team operating GPU operations needs you to resolve `MIG Partition Misconfigured`
+  during a realistic incident. The business impact is reduced service reliability until the underlying
+  state is repaired.
+
+
+  ENVIRONMENT: You are working in FixitLab''s offline GPU node with nvidia-smi, drivers, CUDA, and container
+  toolkit. All tools run locally; no paid APIs or external cloud calls are required.
+
+
+  SYMPTOM / STARTING STATE: Host with a MIG-capable NVIDIA GPU (e.g. A100). MIG is either disabled or
+  partitioned into the wrong profile sizes, so the requested MIG instance is unavailable to workloads.
+  A workload requesting a MIG GPU instance can''t be scheduled or sees the wrong amount of memory because
+  MIG is misconfigured. Either MIG mode isn''t enabled, or the GPU instance / compute instance profile
+  created doesn''t match what the job requests. Configure the correct MIG layout so the workload gets
+  its slice.
+
+
+  OBJECTIVE: Inspect current MIG mode and existing GPU/compute instances; Determine the required MIG profile
+  for the workload; Create the correct MIG instances and verify they are available. Success means `check.sh`
+  exits successfully.
+
+
+  WHAT TO AVOID: Do not apply broad destructive changes, skip evidence gathering, or fake completion with
+  marker files — the checker validates real system state.'
 initial_state: Host with a MIG-capable NVIDIA GPU (e.g. A100). MIG is either disabled or partitioned into
   the wrong profile sizes, so the requested MIG instance is unavailable to workloads.
 lab_mode: simulation
@@ -22,15 +42,74 @@ objectives:
 - Create the correct MIG instances and verify they are available
 hints:
 - order: 1
-  cost: 10
-  content: 'Check MIG state: `nvidia-smi --query-gpu=mig.mode.current --format=csv` and `nvidia-smi mig
-    -lgi` (list GPU instances). If MIG is Disabled, that''s why no instances exist.'
+  cost: 0
+  content: 'Where to look: Run `docker ps -a` and `docker logs <container>` for the failing container.'
 - order: 2
-  cost: 15
-  content: 'Enable MIG if needed: `sudo nvidia-smi -mig 1` (may require no running GPU processes / a reset).
-    List available profiles: `nvidia-smi mig -lgip`.'
+  cost: 25
+  content: 'Diagnostic steps:
+
+    1. `docker ps -a` — note Exited status and exit code.
+
+    2. `docker logs <name>` for the startup error.
+
+    3. Inspect the Dockerfile or `docker run` flags if the image is wrong.'
 - order: 3
-  cost: 20
-  content: 'Create the matching instances, e.g. a 3g.20gb GPU instance and its compute instance: `sudo
-    nvidia-smi mig -cgi 3g.20gb -C`. Confirm with `nvidia-smi mig -lgi` that the slice the workload requests
-    now exists.'
+  cost: 50
+  content: 'Exact fix + verification:
+
+    1. Fix image, port mapping, volume, or env configuration.
+
+    2. `docker start <name>` or re-run with corrected flags.
+
+    3. Confirm `nvidia-smi` shows the container Up.
+
+
+    WHY: the checker validates the container is actually running.'
+technology: gpu
+summary: Complete the mig partition misconfigured gpu lab and verify success with the checker
+estimated_minutes: 15
+xp_reward: 100
+prerequisites:
+- Basic gpu literacy
+tags:
+- fix
+- gpu
+- hands-on
+linked_tutorial: gpu-fundamentals
+what_you_will_learn:
+- Inspect current MIG mode and existing GPU/compute instances
+- Determine the required MIG profile for the workload
+- Create the correct MIG instances and verify they are available
+environment:
+  nodes:
+  - role: primary
+    os: FixitLab GPU node
+    hostname: lab-primary
+    ip: 127.0.0.1
+    specs: local offline simulation
+  pre_installed:
+  - bash
+  - coreutils
+  - gpu
+  - journalctl
+  - systemctl
+  credentials:
+  - user: root
+    password: lab123
+tasks:
+- id: task_1
+  title: MIG Partition Misconfigured
+  description: Restore healthy behavior for MIG Partition Misconfigured by investigating the failure,
+    applying the smallest safe fix, and validating the outcome.
+  background: 'This gpu lab teaches systematic troubleshooting: observe, hypothesize, change, verify.'
+  validation:
+    type: command_output
+    command: nvidia-smi
+    expected_output: NVIDIA-SMI
+    error_message: GPU health check still fails. Verify driver and device visibility.
+solution:
+  summary: Identify the misconfiguration affecting this gpu lab and apply the minimal fix.
+  files_changed: []
+  commands_run:
+  - nvidia-smi
+  reference_docs: gpu-fundamentals

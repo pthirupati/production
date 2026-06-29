@@ -1,7 +1,7 @@
 slug: win-gui-start-critical-service
-title: "Windows GUI: Restore a Stopped and Disabled Critical Service"
+title: 'Windows GUI: Restore a Stopped and Disabled Critical Service'
 technology: windows
-category: Services
+category: Fix
 difficulty: medium
 lab_mode: simulation
 simulation_type: windows-server
@@ -11,28 +11,121 @@ max_score: 100
 is_free: true
 jira_priority: High
 dual_terminal: false
-description: |
-  Printing is down across the office. On this print server the Print Spooler
-  (Spooler) service is stopped, and worse, someone set its startup type to
-  Disabled, so it will not come back on its own and would not survive a reboot.
-  Using the Services console in the Windows Server simulator, set Print
-  Spooler's startup type back to Automatic and start the service so printing
-  is restored and stays fixed after a restart.
-initial_state: |
-  A domain-joined Windows Server 2022. In the Services console the Print
+description: 'CONTEXT: A team operating Windows Server needs you to resolve `Windows GUI: Restore a Stopped
+  and Disabled Critical Service` during a realistic incident. The business impact is reduced service reliability
+  until the underlying state is repaired.
+
+
+  ENVIRONMENT: You are working in FixitLab''s offline Windows Server host with PowerShell, Server Manager,
+  and AD tools. All tools run locally; no paid APIs or external cloud calls are required.
+
+
+  SYMPTOM / STARTING STATE: A domain-joined Windows Server 2022. In the Services console the Print
+
   Spooler service shows Status = Stopped and Startup Type = Disabled. The
+
+  learner passes once Spooler is Running AND its startup type is Automatic. Printing is down across the
+  office. On this print server the Print Spooler
+
+  (Spooler) service is stopped, and worse, someone set its startup type to
+
+  Disabled, so it will not come back on its own and would not survive a reboot.
+
+  Using the Services console in the Windows Server simulator, set Print
+
+  Spooler''s startup type back to Automatic and start the service so printing
+
+  is restored and stays fixed after a restart.
+
+
+  OBJECTIVE: Open the Services console and find the Print Spooler service; Change the startup type from
+  Disabled to Automatic; Start the Print Spooler service so printing is restored. Success means `check.sh`
+  exits successfully.
+
+
+  WHAT TO AVOID: Do not apply broad destructive changes, skip evidence gathering, or fake completion with
+  marker files — the checker validates real system state.'
+initial_state: 'A domain-joined Windows Server 2022. In the Services console the Print
+
+  Spooler service shows Status = Stopped and Startup Type = Disabled. The
+
   learner passes once Spooler is Running AND its startup type is Automatic.
+
+  '
 objectives:
-  - Open the Services console and find the Print Spooler service
-  - Change the startup type from Disabled to Automatic
-  - Start the Print Spooler service so printing is restored
+- Open the Services console and find the Print Spooler service
+- Change the startup type from Disabled to Automatic
+- Start the Print Spooler service so printing is restored
 hints:
-  - order: 1
-    cost: 10
-    content: "A Disabled service cannot be started — fix the startup type before starting it."
-  - order: 2
-    cost: 15
-    content: "In Spooler's properties set Startup type to Automatic, then Apply."
-  - order: 3
-    cost: 20
-    content: "With startup set to Automatic, click Start so the service runs and survives a reboot."
+- order: 1
+  cost: 0
+  content: 'Where to look: Open Event Viewer (System/Application) and the relevant Services mmc or Server
+    Manager role status.'
+- order: 2
+  cost: 25
+  content: 'Diagnostic steps:
+
+    1. Note the service state and dependency chain in services.msc.
+
+    2. Read the most recent error in Event Viewer for the failing component.
+
+    3. Use PowerShell (`Get-Service`, `Get-WinEvent`) for scripted evidence.'
+- order: 3
+  cost: 50
+  content: 'Exact fix + verification:
+
+    1. Apply the minimal fix (service start, GPO, binding, or permission).
+
+    2. Re-test the failing operation.
+
+    3. Confirm Check Solution passes.
+
+
+    WHY: Windows labs grade real role/service state.'
+summary: 'Complete the windows gui: restore a stopped and disabled critical service windows lab and verify
+  success with the checker'
+estimated_minutes: 15
+xp_reward: 100
+prerequisites:
+- Basic windows literacy
+tags:
+- fix
+- hands-on
+- windows
+linked_tutorial: windows-fundamentals
+what_you_will_learn:
+- Open the Services console and find the Print Spooler service
+- Change the startup type from Disabled to Automatic
+- Start the Print Spooler service so printing is restored
+environment:
+  nodes:
+  - role: primary
+    os: FixitLab Windows Server host
+    hostname: lab-primary
+    ip: 127.0.0.1
+    specs: local offline simulation
+  pre_installed:
+  - bash
+  - coreutils
+  - journalctl
+  - systemctl
+  - windows
+  credentials:
+  - user: root
+    password: lab123
+tasks:
+- id: task_1
+  title: 'Windows GUI: Restore a Stopped and Disabled Critical Service'
+  description: 'Restore healthy behavior for Windows GUI: Restore a Stopped and Disabled Critical Service
+    by investigating the failure, applying the smallest safe fix, and validating the outcome.'
+  background: 'This windows lab teaches systematic troubleshooting: observe, hypothesize, change, verify.'
+  validation:
+    type: custom_script
+    script: check.sh
+    error_message: Validation did not pass. Re-read the objectives and Hint 2 diagnostic steps.
+solution:
+  summary: Identify the misconfiguration affecting this windows lab and apply the minimal fix.
+  files_changed: []
+  commands_run:
+  - bash check.sh
+  reference_docs: windows-fundamentals

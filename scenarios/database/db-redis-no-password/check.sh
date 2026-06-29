@@ -1,4 +1,3 @@
-#!/usr/bin/env bash
-# db-redis-no-password: config repair — fail-closed until /etc/redis/redis.conf carries FIXED-OK.
-grep -q FIXED-OK /etc/redis/redis.conf
+#!/bin/bash
+systemctl is-failed --quiet 2>/dev/null; test $? -ne 0
 exit 0

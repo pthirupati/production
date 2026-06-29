@@ -1,7 +1,7 @@
 title: Excessive Inline Styles Block Caching
 slug: html-inline-styles
-technology: HTML
-category: Maintainability
+technology: html
+category: Fix
 difficulty: easy
 lab_mode: simulation
 simulation_type: generic
@@ -10,7 +10,25 @@ max_score: 100
 is_free: true
 jira_priority: Medium
 dual_terminal: false
-description: Styles can't be cached or reused because everything is inline.
+description: 'CONTEXT: A team operating HTML and web delivery needs you to resolve `Excessive Inline Styles
+  Block Caching` during a realistic incident. The business impact is reduced service reliability until
+  the underlying state is repaired.
+
+
+  ENVIRONMENT: You are working in FixitLab''s offline web server lab with HTML pages, nginx/apache config,
+  and browser devtools. All tools run locally; no paid APIs or external cloud calls are required.
+
+
+  SYMPTOM / STARTING STATE: A page riddled with inline styles. Styles can''t be cached or reused because
+  everything is inline.
+
+
+  OBJECTIVE: Confirm the issue: Inline styles everywhere; Apply the documented fix in /var/www/html/styled.html;
+  Verify the file is corrected. Success means `check.sh` exits successfully.
+
+
+  WHAT TO AVOID: Do not apply broad destructive changes, skip evidence gathering, or fake completion with
+  marker files — the checker validates real system state.'
 initial_state: A page riddled with inline styles.
 objectives:
 - 'Confirm the issue: Inline styles everywhere'
@@ -18,11 +36,70 @@ objectives:
 - Verify the file is corrected
 hints:
 - order: 1
-  cost: 10
-  content: Inline styles everywhere
+  cost: 0
+  content: 'Where to look: Confirm the issue: Inline styles everywhere'
 - order: 2
-  cost: 15
-  content: Move styles to an external sheet.
+  cost: 25
+  content: 'Diagnostic steps:
+
+    1. Apply the documented fix in /var/www/html/styled.html
+
+    2. Verify the file is corrected'
 - order: 3
-  cost: 20
-  content: /var/www/html/styled.html carries the corrected markup/config.
+  cost: 50
+  content: 'Exact fix + verification:
+
+    1. Verify the file is corrected.
+
+    2. Re-run the lab checker (`check.sh` or Check Solution).
+
+    3. Confirm every scenario objective is satisfied.
+
+
+    WHY: the grader validates real state — marker files are ignored.'
+summary: Complete the excessive inline styles block caching html lab and verify success with the checker
+estimated_minutes: 20
+xp_reward: 100
+prerequisites:
+- Basic html literacy
+tags:
+- fix
+- hands-on
+- html
+linked_tutorial: html-fundamentals
+what_you_will_learn:
+- 'Confirm the issue: Inline styles everywhere'
+- Apply the documented fix in /var/www/html/styled.html
+- Verify the file is corrected
+environment:
+  nodes:
+  - role: primary
+    os: FixitLab web server lab
+    hostname: lab-primary
+    ip: 127.0.0.1
+    specs: local offline simulation
+  pre_installed:
+  - bash
+  - coreutils
+  - html
+  - journalctl
+  - systemctl
+  credentials:
+  - user: root
+    password: lab123
+tasks:
+- id: task_1
+  title: Excessive Inline Styles Block Caching
+  description: Restore healthy behavior for Excessive Inline Styles Block Caching by investigating the
+    failure, applying the smallest safe fix, and validating the outcome.
+  background: 'This html lab teaches systematic troubleshooting: observe, hypothesize, change, verify.'
+  validation:
+    type: custom_script
+    script: check.sh
+    error_message: Validation did not pass. Re-read the objectives and Hint 2 diagnostic steps.
+solution:
+  summary: Identify the misconfiguration affecting this html lab and apply the minimal fix.
+  files_changed: []
+  commands_run:
+  - bash check.sh
+  reference_docs: html-fundamentals

@@ -1,14 +1,28 @@
 title: Fix Grafana Datasource with No Data
 slug: grafana-dashboard-no-data
-technology: DevOps
-category: Monitoring
+technology: devops
+category: Fix
 difficulty: medium
 time_limit: 900
 max_score: 100
 infrastructure_type: docker
 jira_priority: Medium
 is_free: false
-description: 'Grafana dashboards are showing "No data" for all panels. The Prometheus
+description: 'CONTEXT: A team operating DevOps delivery needs you to resolve `Fix Grafana Datasource with
+  No Data` during a realistic incident. The business impact is reduced service reliability until the underlying
+  state is repaired.
+
+
+  ENVIRONMENT: You are working in FixitLab''s offline CI/CD lab with git repos, pipelines, artifacts,
+  and runbooks. All tools run locally; no paid APIs or external cloud calls are required.
+
+
+  SYMPTOM / STARTING STATE: Ubuntu server running Grafana. The Prometheus datasource is configured with
+
+  URL http://old-prometheus:9090 which is unreachable. The correct Prometheus
+
+  URL is http://prometheus:9090. Fix the datasource config. Grafana dashboards are showing "No data" for
+  all panels. The Prometheus
 
   datasource URL in Grafana is misconfigured — it''s pointing to an old
 
@@ -16,7 +30,14 @@ description: 'Grafana dashboards are showing "No data" for all panels. The Prome
 
   can connect to Prometheus and display metrics.
 
-  '
+
+  OBJECTIVE: Identify the misconfigured Prometheus datasource in Grafana; Update the datasource URL to
+  the correct Prometheus endpoint; Verify dashboards display data after the fix. Success means `systemctl
+  is-active grafana-server` returns active.
+
+
+  WHAT TO AVOID: Do not apply broad destructive changes, skip evidence gathering, or fake completion with
+  marker files — the checker validates real system state.'
 objectives:
 - Identify the misconfigured Prometheus datasource in Grafana
 - Update the datasource URL to the correct Prometheus endpoint
@@ -30,17 +51,75 @@ initial_state: 'Ubuntu server running Grafana. The Prometheus datasource is conf
   '
 hints:
 - order: 1
-  cost: 10
-  content: 'Inspect the provisioned datasource: `cat /etc/grafana/provisioning/datasources/prometheus.yml`.
-    "No data" across all panels points at a broken datasource, not the dashboards.'
+  cost: 0
+  content: 'Where to look: Start with `systemctl status grafana-server` and `journalctl -u grafana-server
+    -n 50 --no-pager` before changing anything.'
 - order: 2
-  cost: 15
-  content: The `url:` field points at `http://old-prometheus:9090`, a hostname that no longer resolves/serves.
-- order: 3
-  cost: 20
-  content: 'Change it to the current Prometheus endpoint: `url: http://prometheus:9090` (confirm the target
-    is reachable from the Grafana host first).'
-- order: 4
   cost: 25
-  content: Apply by restarting Grafana (`systemctl restart grafana-server`) or re-provisioning, then use
-    the datasource "Test" button — panels show data again.
+  content: 'Diagnostic steps:
+
+    1. Run `systemctl status grafana-server` — note Active/Failed and the last log lines.
+
+    2. Read `journalctl -u grafana-server -n 50` for the root error.
+
+    3. Form a hypothesis about the smallest config or permission fix.'
+- order: 3
+  cost: 50
+  content: 'Exact fix + verification:
+
+    1. Apply the minimal fix (config, unit override, or missing directory).
+
+    2. Run `systemctl daemon-reload` if you edited a unit file.
+
+    3. Run `systemctl restart grafana-server` and confirm `systemctl is-active grafana-server` succeeds.
+
+
+    WHY: the grader checks real service state, not marker files.'
+summary: Complete the fix grafana datasource with no data devops lab and verify success with the checker
+estimated_minutes: 15
+xp_reward: 100
+prerequisites:
+- Basic devops literacy
+tags:
+- devops
+- fix
+- hands-on
+linked_tutorial: devops-fundamentals
+what_you_will_learn:
+- Identify the misconfigured Prometheus datasource in Grafana
+- Update the datasource URL to the correct Prometheus endpoint
+- Verify dashboards display data after the fix
+environment:
+  nodes:
+  - role: primary
+    os: FixitLab CI/CD lab
+    hostname: lab-primary
+    ip: 127.0.0.1
+    specs: local offline simulation
+  pre_installed:
+  - bash
+  - coreutils
+  - devops
+  - journalctl
+  - systemctl
+  credentials:
+  - user: root
+    password: lab123
+tasks:
+- id: task_1
+  title: Fix Grafana Datasource with No Data
+  description: Restore healthy behavior for Fix Grafana Datasource with No Data by investigating the failure,
+    applying the smallest safe fix, and validating the outcome.
+  background: 'This devops lab teaches systematic troubleshooting: observe, hypothesize, change, verify.'
+  validation:
+    type: service_active
+    command: systemctl is-active grafana-server
+    expected_status: active
+    error_message: The grafana-server service is not active yet. Check `systemctl status grafana-server`
+      and `journalctl -u grafana-server -n 50`.
+solution:
+  summary: The root cause is an unhealthy `grafana-server` service; repair it and verify active state.
+  files_changed: []
+  commands_run:
+  - systemctl is-active grafana-server
+  reference_docs: devops-fundamentals

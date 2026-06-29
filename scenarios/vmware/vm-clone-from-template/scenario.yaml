@@ -1,8 +1,7 @@
----
 slug: vm-clone-from-template
-title: "Clone from Template Failing — Customization Spec Misconfigured"
-technology: VMware
-category: VM Management
+title: Clone from Template Failing - Customization Spec
+technology: vmware
+category: Fix
 difficulty: medium
 time_limit: 1200
 max_score: 100
@@ -11,37 +10,123 @@ simulation_type: vmware
 infrastructure_type: simulation
 jira_priority: Medium
 is_free: false
-description: |
-  Cloning from the Ubuntu 22.04 template using a customization specification
-  "linux-static-ip-spec" is failing after the VM powers on for the first time.
-  The VM gets stuck in an endless reboot loop and the customization agent reports:
-  "Customization failed: Unable to set hostname — hostname string is invalid."
-  The customization spec is using a Windows-style hostname format (NETBIOS) which
-  is incompatible with Linux hostname requirements.
-objectives:
-  - Examine the failed customization spec in vCenter Customization Specifications Manager
-  - Identify the invalid hostname configuration in the Linux spec
-  - Fix the hostname format to be RFC 1123 compliant (lowercase, hyphens only)
-  - Redeploy the clone and verify successful customization and guest OS startup
-initial_state: |
-  VMware vCenter simulation. Template: ubuntu-22-04-template.
+description: 'CONTEXT: A team operating VMware vSphere needs you to resolve `Clone from Template Failing
+  - Customization Spec` during a realistic incident. The business impact is reduced service reliability
+  until the underlying state is repaired.
+
+
+  ENVIRONMENT: You are working in FixitLab''s offline vSphere lab with VMs, datastores, vCenter, and ESXi
+  tasks. All tools run locally; no paid APIs or external cloud calls are required.
+
+
+  SYMPTOM / STARTING STATE: VMware vCenter simulation. Template: ubuntu-22-04-template.
+
   Customization spec: linux-static-ip-spec has hostname set to "APP_SERVER_01" (invalid).
+
+  Linux requires: lowercase letters, numbers, hyphens only (no underscores). Cloning from the Ubuntu 22.04
+  template using a customization specification
+
+  "linux-static-ip-spec" is failing after the VM powers on for the first time.
+
+  The VM gets stuck in an endless reboot loop and the customization agent reports:
+
+  "Customization failed: Unable to set hostname — hostname string is invalid."
+
+  The customization spec is using a Windows-style hostname format (NETBIOS) which
+
+  is incompatible with Linux hostname requirements.
+
+
+  OBJECTIVE: Examine the failed customization spec in vCenter Customization Specifications Manager; Identify
+  the invalid hostname configuration in the Linux spec; Fix the hostname format to be RFC 1123 compliant
+  (lowercase, hyphens only). Success means `check.sh` exits successfully.
+
+
+  WHAT TO AVOID: Do not apply broad destructive changes, skip evidence gathering, or fake completion with
+  marker files — the checker validates real system state.'
+objectives:
+- Examine the failed customization spec in vCenter Customization Specifications Manager
+- Identify the invalid hostname configuration in the Linux spec
+- Fix the hostname format to be RFC 1123 compliant (lowercase, hyphens only)
+- Redeploy the clone and verify successful customization and guest OS startup
+initial_state: 'VMware vCenter simulation. Template: ubuntu-22-04-template.
+
+  Customization spec: linux-static-ip-spec has hostname set to "APP_SERVER_01" (invalid).
+
   Linux requires: lowercase letters, numbers, hyphens only (no underscores).
+
+  '
 hints:
-  - order: 1
-    cost: 10
-    content: "In vCenter: go to Policies and Profiles → VM Customization Specifications.
-      Find 'linux-static-ip-spec' and click Edit. Review the Computer Name field.
-      It shows 'APP_SERVER_01' which uses underscores — invalid for Linux hostnames."
-  - order: 2
-    cost: 15
-    content: "Fix the hostname: change 'APP_SERVER_01' to 'app-server-01' (lowercase,
-      replace underscores with hyphens). Or set it to 'Use the virtual machine name'
-      to dynamically use the VM name as the hostname (ensure VM names are RFC compliant)."
-  - order: 3
-    cost: 20
-    content: "Also verify the other spec settings: IP/gateway/DNS must match the
-      target network segment. After fixing, delete the failed clone VM, then
-      re-clone from the template using the corrected spec.
-      Check /var/log/vmware-imc/toolsDeployPkg.log in the guest OS after boot
-      to confirm customization completed successfully."
+- order: 1
+  cost: 0
+  content: 'Where to look: Examine the failed customization spec in vCenter Customization Specifications
+    Manager'
+- order: 2
+  cost: 25
+  content: 'Diagnostic steps:
+
+    1. Identify the invalid hostname configuration in the Linux spec
+
+    2. Fix the hostname format to be RFC 1123 compliant (lowercase, hyphens only)
+
+    3. Redeploy the clone and verify successful customization and guest OS startup'
+- order: 3
+  cost: 50
+  content: 'Exact fix + verification:
+
+    1. Redeploy the clone and verify successful customization and guest OS startup.
+
+    2. Re-run the lab checker (`check.sh` or Check Solution).
+
+    3. Confirm every scenario objective is satisfied.
+
+
+    WHY: the grader validates real state — marker files are ignored.'
+summary: Complete the clone from template failing - customization spec vmware lab and verify success with
+  the checker
+estimated_minutes: 20
+xp_reward: 100
+prerequisites:
+- Basic vmware literacy
+tags:
+- fix
+- hands-on
+- vmware
+linked_tutorial: vmware-fundamentals
+what_you_will_learn:
+- Examine the failed customization spec in vCenter Customization Specifications Manager
+- Identify the invalid hostname configuration in the Linux spec
+- Fix the hostname format to be RFC 1123 compliant (lowercase, hyphens only)
+- Redeploy the clone and verify successful customization and guest OS startup
+environment:
+  nodes:
+  - role: primary
+    os: FixitLab vSphere lab
+    hostname: lab-primary
+    ip: 127.0.0.1
+    specs: local offline simulation
+  pre_installed:
+  - bash
+  - coreutils
+  - journalctl
+  - systemctl
+  - vmware
+  credentials:
+  - user: root
+    password: lab123
+tasks:
+- id: task_1
+  title: Clone from Template Failing - Customization Spec
+  description: Restore healthy behavior for Clone from Template Failing - Customization Spec by investigating
+    the failure, applying the smallest safe fix, and validating the outcome.
+  background: 'This vmware lab teaches systematic troubleshooting: observe, hypothesize, change, verify.'
+  validation:
+    type: custom_script
+    script: check.sh
+    error_message: Validation did not pass. Re-read the objectives and Hint 2 diagnostic steps.
+solution:
+  summary: Identify the misconfiguration affecting this vmware lab and apply the minimal fix.
+  files_changed: []
+  commands_run:
+  - bash check.sh
+  reference_docs: vmware-fundamentals

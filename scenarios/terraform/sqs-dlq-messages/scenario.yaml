@@ -1,28 +1,111 @@
 title: SQS Dead-Letter Queue Accumulating Messages
 slug: aws-sqs-dlq-messages
 difficulty: medium
-category: AWS
-description: 'An SQS queue is continuously sending messages to its dead-letter queue (DLQ) because the consumer Lambda function is throwing unhandled exceptions and exhausting maxReceiveCount. Diagnose the root cause and fix the processing failure.'
-initial_state: 'Simulated AWS environment with an SQS standard queue, a DLQ, and a Lambda consumer. The Lambda function fails processing due to a missing environment variable or malformed message, causing messages to be retried and eventually moved to the DLQ.'
+category: Fix
+description: 'CONTEXT: A team operating Terraform IaC needs you to resolve `SQS Dead-Letter Queue Accumulating
+  Messages` during a realistic incident. The business impact is reduced service reliability until the
+  underlying state is repaired.
+
+
+  ENVIRONMENT: You are working in FixitLab''s offline Terraform workspace with HCL files, state, and plan/apply
+  workflow. All tools run locally; no paid APIs or external cloud calls are required.
+
+
+  SYMPTOM / STARTING STATE: Simulated AWS environment with an SQS standard queue, a DLQ, and a Lambda
+  consumer. The Lambda function fails processing due to a missing environment variable or malformed message,
+  causing messages to be retried and eventually moved to the DLQ. An SQS queue is continuously sending
+  messages to its dead-letter queue (DLQ) because the consumer Lambda function is throwing unhandled exceptions
+  and exhausting maxReceiveCount. Diagnose the root cause and fix the processing failure.
+
+
+  OBJECTIVE: Inspect the DLQ message bodies to understand why processing is failing; Fix the Lambda function
+  configuration or code that causes the processing exception; Redrive DLQ messages back to the source
+  queue and confirm successful processing. Success means `check.sh` exits successfully.
+
+
+  WHAT TO AVOID: Do not apply broad destructive changes, skip evidence gathering, or fake completion with
+  marker files — the checker validates real system state.'
+initial_state: Simulated AWS environment with an SQS standard queue, a DLQ, and a Lambda consumer. The
+  Lambda function fails processing due to a missing environment variable or malformed message, causing
+  messages to be retried and eventually moved to the DLQ.
 objectives:
-  - Inspect the DLQ message bodies to understand why processing is failing
-  - Fix the Lambda function configuration or code that causes the processing exception
-  - Redrive DLQ messages back to the source queue and confirm successful processing
+- Inspect the DLQ message bodies to understand why processing is failing
+- Fix the Lambda function configuration or code that causes the processing exception
+- Redrive DLQ messages back to the source queue and confirm successful processing
 lab_mode: simulation
 simulation_type: aws
 time_limit: 1800
 max_score: 100
 is_free: false
 hints:
-  - content: 'Run: aws sqs receive-message --queue-url <dlq-url> --attribute-names All to inspect failed message bodies and attributes.'
-    cost: 10
-    order: 1
-  - content: 'Check Lambda CloudWatch Logs for the error traceback. A missing environment variable (KeyError) or JSON parse failure is a common cause.'
-    cost: 15
-    order: 2
-  - content: 'After fixing the Lambda, use SQS dead-letter queue redrive: aws sqs start-message-move-task --source-arn <dlq-arn> --destination-arn <source-queue-arn>'
-    cost: 20
-    order: 3
+- order: 1
+  cost: 0
+  content: 'Where to look: Inspect the DLQ message bodies to understand why processing is failing'
+- order: 2
+  cost: 25
+  content: 'Diagnostic steps:
+
+    1. Fix the Lambda function configuration or code that causes the processing exception
+
+    2. Redrive DLQ messages back to the source queue and confirm successful processing'
+- order: 3
+  cost: 50
+  content: 'Exact fix + verification:
+
+    1. Redrive DLQ messages back to the source queue and confirm successful processing.
+
+    2. Re-run the lab checker (`check.sh` or Check Solution).
+
+    3. Confirm every scenario objective is satisfied.
+
+
+    WHY: the grader validates real state — marker files are ignored.'
 requires_companion_hosts: false
 dual_terminal: false
 jira_priority: High
+technology: terraform
+summary: Complete the sqs dead-letter queue accumulating messages terraform lab and verify success with
+  the checker
+estimated_minutes: 30
+xp_reward: 100
+prerequisites:
+- Basic terraform literacy
+tags:
+- fix
+- hands-on
+- terraform
+linked_tutorial: terraform-fundamentals
+what_you_will_learn:
+- Inspect the DLQ message bodies to understand why processing is failing
+- Fix the Lambda function configuration or code that causes the processing exception
+- Redrive DLQ messages back to the source queue and confirm successful processing
+environment:
+  nodes:
+  - role: primary
+    os: FixitLab Terraform workspace
+    hostname: lab-primary
+    ip: 127.0.0.1
+    specs: local offline simulation
+  pre_installed:
+  - bash
+  - coreutils
+  - terraform
+  credentials:
+  - user: root
+    password: lab123
+tasks:
+- id: task_1
+  title: SQS Dead-Letter Queue Accumulating Messages
+  description: Restore healthy behavior for SQS Dead-Letter Queue Accumulating Messages by investigating
+    the failure, applying the smallest safe fix, and validating the outcome.
+  background: 'This terraform lab teaches systematic troubleshooting: observe, hypothesize, change, verify.'
+  validation:
+    type: custom_script
+    script: check.sh
+    error_message: Validation did not pass. Re-read the objectives and Hint 2 diagnostic steps.
+solution:
+  summary: Identify the misconfiguration affecting this terraform lab and apply the minimal fix.
+  files_changed: []
+  commands_run:
+  - bash check.sh
+  reference_docs: terraform-fundamentals

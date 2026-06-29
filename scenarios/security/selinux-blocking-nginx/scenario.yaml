@@ -1,39 +1,128 @@
 slug: selinux-blocking-nginx
-title: "SELinux Blocking Nginx — Fix the Security Context"
-technology: Security
-category: SELinux
+title: SELinux Blocking Nginx — Fix the Security Context
+technology: security
+category: Fix
 difficulty: medium
 time_limit: 900
 max_score: 100
 infrastructure_type: docker
 jira_priority: High
 is_free: false
-description: |
-  After deploying nginx to serve files from a custom directory /srv/www, nginx
-  starts but returns 403 Forbidden for all requests. SELinux audit logs show
-  AVC denials for nginx trying to read files. The issue is that /srv/www has the
-  wrong SELinux file context — it needs the httpd_sys_content_t type instead of
-  the default_t currently assigned. Fix the SELinux context to allow nginx to
-  serve the files.
-objectives:
-  - Identify SELinux AVC denials in /var/log/audit/audit.log
-  - Check the file context on /srv/www
-  - Apply the correct httpd_sys_content_t context recursively
-  - Verify nginx can serve files from /srv/www
-initial_state: |
-  RHEL/CentOS 8 with SELinux enforcing. nginx configured to serve from /srv/www.
+description: 'CONTEXT: A team operating security hardening needs you to resolve `SELinux Blocking Nginx
+  — Fix the Security Context` during a realistic incident. The business impact is reduced service reliability
+  until the underlying state is repaired.
+
+
+  ENVIRONMENT: You are working in FixitLab''s offline hardening lab with SSH, firewall, TLS, audit logs,
+  and IAM settings. All tools run locally; no paid APIs or external cloud calls are required.
+
+
+  SYMPTOM / STARTING STATE: RHEL/CentOS 8 with SELinux enforcing. nginx configured to serve from /srv/www.
+
   Directory /srv/www has context default_t. nginx returns 403 for all requests.
+
+  AVC denials appear in audit.log for comm="nginx" path="/srv/www". After deploying nginx to serve files
+  from a custom directory /srv/www, nginx
+
+  starts but returns 403 Forbidden for all requests. SELinux audit logs show
+
+  AVC denials for nginx trying to read files. The issue is that /srv/www has the
+
+  wrong SELinux file context — it needs the httpd_sys_content_t type instead of
+
+  the default_t currently assigned. Fix the SELinux context to allow nginx to
+
+  serve the files.
+
+
+  OBJECTIVE: Identify SELinux AVC denials in /var/log/audit/audit.log; Check the file context on /srv/www;
+  Apply the correct httpd_sys_content_t context recursively. Success means `check.sh` exits successfully.
+
+
+  WHAT TO AVOID: Do not apply broad destructive changes, skip evidence gathering, or fake completion with
+  marker files — the checker validates real system state.'
+objectives:
+- Identify SELinux AVC denials in /var/log/audit/audit.log
+- Check the file context on /srv/www
+- Apply the correct httpd_sys_content_t context recursively
+- Verify nginx can serve files from /srv/www
+initial_state: 'RHEL/CentOS 8 with SELinux enforcing. nginx configured to serve from /srv/www.
+
+  Directory /srv/www has context default_t. nginx returns 403 for all requests.
+
   AVC denials appear in audit.log for comm="nginx" path="/srv/www".
+
+  '
 hints:
-  - order: 1
-    cost: 10
-    content: "`ausearch -c nginx --raw | audit2why` shows the denial reason."
-  - order: 2
-    cost: 15
-    content: "Check context: `ls -Z /srv/www` — should show default_t, need httpd_sys_content_t."
-  - order: 3
-    cost: 15
-    content: "Fix context: `semanage fcontext -a -t httpd_sys_content_t '/srv/www(/.*)?'` then `restorecon -Rv /srv/www`"
-  - order: 4
-    cost: 10
-    content: "Verify with `ls -Z /srv/www` and test `curl http://localhost/`."
+- order: 1
+  cost: 0
+  content: 'Where to look: Run `ausearch -m avc -ts recent` or `grep AVC /var/log/audit/audit.log`.'
+- order: 2
+  cost: 25
+  content: 'Diagnostic steps:
+
+    1. Identify which binary/path SELinux denied.
+
+    2. Run `ls -Z` on the affected file and compare context.
+
+    3. Check if a boolean needs toggling: `getsebool -a | grep <service>`.'
+- order: 3
+  cost: 50
+  content: 'Exact fix + verification:
+
+    1. Apply the correct context with `semanage fcontext` + `restorecon`, or set the boolean.
+
+    2. Retry the failing command.
+
+    3. Confirm no new AVC denials and the service works.
+
+
+    WHY: permissive fixes hide denials; targeted policy fixes last.'
+summary: Complete the selinux blocking nginx — fix the security context security lab and verify success
+  with the checker
+estimated_minutes: 15
+xp_reward: 100
+prerequisites:
+- Basic security literacy
+tags:
+- fix
+- hands-on
+- security
+linked_tutorial: security-fundamentals
+what_you_will_learn:
+- Identify SELinux AVC denials in /var/log/audit/audit.log
+- Check the file context on /srv/www
+- Apply the correct httpd_sys_content_t context recursively
+- Verify nginx can serve files from /srv/www
+environment:
+  nodes:
+  - role: primary
+    os: FixitLab hardening lab
+    hostname: lab-primary
+    ip: 127.0.0.1
+    specs: local offline simulation
+  pre_installed:
+  - bash
+  - coreutils
+  - journalctl
+  - security
+  - systemctl
+  credentials:
+  - user: root
+    password: lab123
+tasks:
+- id: task_1
+  title: SELinux Blocking Nginx — Fix the Security Context
+  description: Restore healthy behavior for SELinux Blocking Nginx — Fix the Security Context by investigating
+    the failure, applying the smallest safe fix, and validating the outcome.
+  background: 'This security lab teaches systematic troubleshooting: observe, hypothesize, change, verify.'
+  validation:
+    type: custom_script
+    script: check.sh
+    error_message: Validation did not pass. Re-read the objectives and Hint 2 diagnostic steps.
+solution:
+  summary: Identify the misconfiguration affecting this security lab and apply the minimal fix.
+  files_changed: []
+  commands_run:
+  - bash check.sh
+  reference_docs: security-fundamentals

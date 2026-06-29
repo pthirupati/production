@@ -1,11 +1,33 @@
 title: Fix the misrouting billing-escalation agent
 slug: agent-fix-misrouted-escalation
-category: AI / ML / LLM & Agents
-description: An existing triage agent is supposed to escalate high-priority billing tickets, but it is
-  broken. The "LLM" node is summarising instead of classifying, the condition checks the wrong field,
-  and the escalation is wired to the wrong branch so it calls a logging query instead of paging the
-  billing team. Debug the agent in the Agent Workflow simulator and make the refund ticket escalate
-  correctly. Everything is deterministic and local.
+category: Fix
+description: 'CONTEXT: A team operating AI/ML workflows needs you to resolve `Fix the misrouting billing-escalation
+  agent` during a realistic incident. The business impact is reduced service reliability until the underlying
+  state is repaired.
+
+
+  ENVIRONMENT: You are working in FixitLab''s offline ML practice workspace with datasets, training scripts,
+  metrics, and model artifacts. All tools run locally; no paid APIs or external cloud calls are required.
+
+
+  SYMPTOM / STARTING STATE: The full graph already exists but is wired wrong on three counts — the LLM
+  is in summarize mode, the condition compares sentiment==positive, and the send_notification tool sits
+  on the false branch while a db_query sits on the true branch. The escalation never fires. An existing
+  triage agent is supposed to escalate high-priority billing tickets, but it is broken. The "LLM" node
+  is summarising instead of classifying, the condition checks the wrong field, and the escalation is wired
+  to the wrong branch so it calls a logging query instead of paging the billing team. Debug the agent
+  in the Agent Workflow simulator and make the refund ticket escalate correctly. Everything is deterministic
+  and local.
+
+
+  OBJECTIVE: Open the Agent Workflow simulator and run the broken flow to see what it currently does;
+  Reconfigure the LLM node from summarize mode to classify mode so it produces a category and priority;
+  Fix the Condition node to detect a high-priority ticket (field priority, equals high). Success means
+  `check.sh` exits successfully.
+
+
+  WHAT TO AVOID: Do not apply broad destructive changes, skip evidence gathering, or fake completion with
+  marker files — the checker validates real system state.'
 difficulty: medium
 lab_mode: simulation
 simulation_type: ai-agent
@@ -21,23 +43,83 @@ objectives:
 - Fix the Condition node to detect a high-priority ticket (field priority, equals high)
 - Re-route the escalation so the high-priority (true) branch reaches the send_notification tool, then
   run it so the billing refund ticket is escalated
-initial_state: The full graph already exists but is wired wrong on three counts — the LLM is in
-  summarize mode, the condition compares sentiment==positive, and the send_notification tool sits on the
-  false branch while a db_query sits on the true branch. The escalation never fires.
+initial_state: The full graph already exists but is wired wrong on three counts — the LLM is in summarize
+  mode, the condition compares sentiment==positive, and the send_notification tool sits on the false branch
+  while a db_query sits on the true branch. The escalation never fires.
 hints:
 - order: 1
-  cost: 10
-  content: Open the node config for the LLM ("Classifier") node and change its mode from "summarize" to
-    "classify". Run the workflow and look at the trace — now you get category and priority fields to
-    route on.
+  cost: 0
+  content: 'Where to look: Open the Agent Workflow simulator and run the broken flow to see what it currently
+    does'
 - order: 2
-  cost: 15
-  content: Edit the Condition ("Route") node — it currently checks field "sentiment" equals "positive".
-    Change it to field "priority", op "equals", value "high" so a high-priority ticket takes the true
-    branch.
+  cost: 25
+  content: 'Diagnostic steps:
+
+    1. Reconfigure the LLM node from summarize mode to classify mode so it produces a category and priority
+
+    2. Fix the Condition node to detect a high-priority ticket (field priority, equals high)
+
+    3. Re-route the escalation so the high-priority (true) branch reaches the send_notification tool,
+    then run it so the billing refund ticket is escalated'
 - order: 3
-  cost: 20
-  content: The send_notification ("Escalate") tool is on the false branch and a db_query on the true
-    branch. Disconnect those two edges and reconnect so the condition's TRUE branch goes into the
-    send_notification tool. Run it — the duplicate-charge refund ticket classifies as high-priority
-    billing and the escalation notification fires.
+  cost: 50
+  content: 'Exact fix + verification:
+
+    1. Re-route the escalation so the high-priority (true) branch reaches the send_notification tool,
+    then run it so the billing refund ticket is escalated.
+
+    2. Re-run the lab checker (`check.sh` or Check Solution).
+
+    3. Confirm every scenario objective is satisfied.
+
+
+    WHY: the grader validates real state — marker files are ignored.'
+summary: Complete the fix the misrouting billing-escalation agent ai ml lab and verify success with the
+  checker
+estimated_minutes: 20
+xp_reward: 100
+prerequisites:
+- Basic ai ml literacy
+tags:
+- ai-ml
+- fix
+- hands-on
+linked_tutorial: ai-ml-fundamentals
+what_you_will_learn:
+- Open the Agent Workflow simulator and run the broken flow to see what it currently does
+- Reconfigure the LLM node from summarize mode to classify mode so it produces a category and priority
+- Fix the Condition node to detect a high-priority ticket (field priority, equals high)
+- Re-route the escalation so the high-priority (true) branch reaches the send_notification tool, then
+  run it so the billing refund ticket is escalated
+environment:
+  nodes:
+  - role: primary
+    os: FixitLab ML practice workspace
+    hostname: lab-primary
+    ip: 127.0.0.1
+    specs: local offline simulation
+  pre_installed:
+  - ai ml
+  - bash
+  - coreutils
+  - pip
+  - python3
+  credentials:
+  - user: root
+    password: lab123
+tasks:
+- id: task_1
+  title: Fix the misrouting billing-escalation agent
+  description: Restore healthy behavior for Fix the misrouting billing-escalation agent by investigating
+    the failure, applying the smallest safe fix, and validating the outcome.
+  background: 'This ai ml lab teaches systematic troubleshooting: observe, hypothesize, change, verify.'
+  validation:
+    type: custom_script
+    script: check.sh
+    error_message: Validation did not pass. Re-read the objectives and Hint 2 diagnostic steps.
+solution:
+  summary: Identify the misconfiguration affecting this ai ml lab and apply the minimal fix.
+  files_changed: []
+  commands_run:
+  - bash check.sh
+  reference_docs: ai-ml-fundamentals

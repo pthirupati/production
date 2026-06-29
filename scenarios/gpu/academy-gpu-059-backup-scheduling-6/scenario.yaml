@@ -1,7 +1,7 @@
-title: 'GPU & NVIDIA: Gpu Scheduling — Backup and Recovery'
+title: Gpu Scheduling — Backup Lab
 slug: academy-gpu-059-backup-scheduling-6
-technology: GPU & NVIDIA
-category: Backup & Recovery
+technology: gpu
+category: Fix
 difficulty: medium
 scenario_type: do
 lab_mode: simulation
@@ -11,40 +11,126 @@ max_score: 100
 is_free: false
 infrastructure_type: docker
 jira_priority: Medium
-description: GPU host lab. `nvidia-smi` reports the GPU unhealthy — ML/GPU workloads cannot start. Load
-  the driver / restore GPU health, then verify with `nvidia-smi`.
+description: 'CONTEXT: A team operating GPU operations needs you to resolve `gpu: Gpu Scheduling — Backup
+  and Recovery` during a realistic incident. The business impact is reduced service reliability until
+  the underlying state is repaired.
+
+
+  ENVIRONMENT: You are working in FixitLab''s offline GPU node with nvidia-smi, drivers, CUDA, and container
+  toolkit. All tools run locally; no paid APIs or external cloud calls are required.
+
+
+  SYMPTOM / STARTING STATE: Backup jobs exist but reliability is uncertain for GPU scheduling. Leadership
+  wants proof that restore works — not just that scripts exit zero. Backup and recovery drill for GPU
+  scheduling. Ensure backups run on schedule, retention is correct, and you can restore device plugins
+  and resource requests within the lab RTO.
+
+
+  OBJECTIVE: Backup coverage for GPU scheduling is complete and restorable; Retention and encryption meet
+  the stated policy; A restore drill proves data integrity. Success means `nvidia-smi` includes `NVIDIA-SMI`.
+
+
+  WHAT TO AVOID: Do not apply broad destructive changes, skip evidence gathering, or fake completion with
+  marker files — the checker validates real system state.'
 objectives:
-- GPU reports healthy in nvidia-smi
-- '`nvidia-smi` reports a healthy GPU'
-initial_state: The NVIDIA driver/GPU is not healthy (`nvidia-smi` fails).
+- Backup coverage for GPU scheduling is complete and restorable
+- Retention and encryption meet the stated policy
+- A restore drill proves data integrity
+initial_state: Backup jobs exist but reliability is uncertain for GPU scheduling. Leadership wants proof
+  that restore works — not just that scripts exit zero.
 hints:
 - order: 1
-  cost: 10
-  content: 'Orient yourself before changing anything:
-
-    1. Inspect the current state — node GPU capacity and pod requests.
-
-    2. Write down what looks normal versus wrong or missing for GPU scheduling.
-
-    3. Recall the core idea: device plugins and resource requests. Form one hypothesis before you act.'
+  cost: 0
+  content: 'Where to look: Run `docker ps -a` and `docker logs <container>` for the failing container.'
 - order: 2
-  cost: 15
-  content: 'Plan your approach (still no spoilers):
-
-    1. Confirm the exact gap between current and desired state for GPU scheduling.
-
-    2. Decide the single smallest change that moves you toward the objective.
-
-    3. Capture evidence (command output / status) before the change so you can prove it worked afterward.'
-- order: 3
   cost: 25
-  content: 'Guided walkthrough:
+  content: 'Diagnostic steps:
 
-    1. Re-check the current state — node GPU capacity and pod requests.
+    1. `docker ps -a` — note Exited status and exit code.
 
-    2. Repair or run the backup job, then perform a controlled restore into a scratch location to prove
-    it works.
+    2. `docker logs <name>` for the startup error.
 
-    3. Verify the result — GPU workloads schedule onto GPU nodes.
+    3. Inspect the Dockerfile or `docker run` flags if the image is wrong.'
+- order: 3
+  cost: 50
+  content: 'Exact fix + verification:
 
-    4. Click Check Solution once `nvidia-smi` reports a healthy GPU.'
+    1. Fix image, port mapping, volume, or env configuration.
+
+    2. `docker start <name>` or re-run with corrected flags.
+
+    3. Confirm `nvidia-smi` shows the container Up.
+
+
+    WHY: the checker validates the container is actually running.'
+summary: Complete the gpu scheduling — backup lab gpu lab and verify success with the checker
+estimated_minutes: 20
+xp_reward: 100
+prerequisites:
+- Basic gpu literacy
+tags:
+- do
+- gpu
+- hands-on
+linked_tutorial: gpu-fundamentals
+what_you_will_learn:
+- Backup coverage for GPU scheduling is complete and restorable
+- Retention and encryption meet the stated policy
+- A restore drill proves data integrity
+environment:
+  nodes:
+  - role: primary
+    os: FixitLab GPU node
+    hostname: lab-primary
+    ip: 127.0.0.1
+    specs: local offline simulation
+  pre_installed:
+  - bash
+  - coreutils
+  - gpu
+  - journalctl
+  - systemctl
+  credentials:
+  - user: root
+    password: lab123
+tasks:
+- id: task_1
+  title: Gpu Scheduling — Backup Lab
+  description: Restore healthy behavior for Gpu Scheduling — Backup Lab by investigating the failure,
+    applying the smallest safe fix, and validating the outcome.
+  background: 'This gpu lab teaches systematic troubleshooting: observe, hypothesize, change, verify.'
+  validation:
+    type: command_output
+    command: nvidia-smi
+    expected_output: NVIDIA-SMI
+    error_message: GPU health check still fails. Verify driver and device visibility.
+solution:
+  summary: Identify the misconfiguration affecting this gpu lab and apply the minimal fix.
+  files_changed: []
+  commands_run:
+  - nvidia-smi
+  reference_docs: gpu-fundamentals
+guided_mode:
+  enabled: true
+  steps:
+  - step: 1
+    title: Inspect current state
+    instruction: Run a read-only diagnostic before changing anything.
+    command: nvidia-smi
+    expected_output: Output shows the current failure mode
+    explanation: Evidence-first troubleshooting avoids guessing.
+    next_on: command_success
+  - step: 2
+    title: Apply the minimal fix
+    instruction: Make one reversible change aligned with the objectives.
+    command: '# your fix command here'
+    expected_output: State moves toward the objective
+    explanation: Small changes make rollback easy if the hypothesis was wrong.
+    next_on: command_success
+  - step: 3
+    title: Verify with the grader
+    instruction: Run the same verification the checker uses.
+    command: nvidia-smi
+    expected_output: '`nvidia-smi` includes `NVIDIA-SMI`'
+    explanation: The lab passes only when real state is healthy.
+    next_on: command_success

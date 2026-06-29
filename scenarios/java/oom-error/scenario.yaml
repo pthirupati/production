@@ -1,8 +1,7 @@
----
 slug: sim-java-oom
-title: "Container OOMKilled — JVM Heap Larger Than the cgroup Limit"
-technology: Java
-category: "JVM Performance"
+title: Container OOMKilled — JVM Heap Larger Than the cgroup Limit
+technology: java
+category: Fix
 difficulty: medium
 time_limit: 900
 max_score: 100
@@ -11,22 +10,112 @@ simulation_type: java
 infrastructure_type: simulation
 jira_priority: Critical
 is_free: false
-description: |
-  The pod is OOMKilled (exit 137) even though the JVM never logs an OutOfMemoryError. The JVM is not container-aware and sizes the heap from host memory, so RSS exceeds the container memory limit and the kernel kills it. Make the JVM respect the cgroup limit and leave headroom for non-heap memory.
+description: 'CONTEXT: A team operating Java applications needs you to resolve `Container OOMKilled —
+  JVM Heap Larger Than the cgroup Limit` during a realistic incident. The business impact is reduced service
+  reliability until the underlying state is repaired.
+
+
+  ENVIRONMENT: You are working in FixitLab''s offline Java project with Maven/Gradle, JVM logs, and Spring
+  configuration. All tools run locally; no paid APIs or external cloud calls are required.
+
+
+  SYMPTOM / STARTING STATE: JVM flags at /app/jvm.options pin a large fixed -Xmx ignoring the cgroup limit;
+  the container is OOMKilled with exit 137. The pod is OOMKilled (exit 137) even though the JVM never
+  logs an OutOfMemoryError. The JVM is not container-aware and sizes the heap from host memory, so RSS
+  exceeds the container memory limit and the kernel kills it. Make the JVM respect the cgroup limit and
+  leave headroom for non-heap memory.
+
+
+  OBJECTIVE: Confirm the kill is OOMKilled (137) by the kernel, not a JVM heap OOM; Make the JVM honor
+  the container memory limit; Leave headroom for metaspace/threads/direct buffers (cap heap %). Success
+  means `check.sh` exits successfully.
+
+
+  WHAT TO AVOID: Do not apply broad destructive changes, skip evidence gathering, or fake completion with
+  marker files — the checker validates real system state.'
 objectives:
-  - "Confirm the kill is OOMKilled (137) by the kernel, not a JVM heap OOM"
-  - "Make the JVM honor the container memory limit"
-  - "Leave headroom for metaspace/threads/direct buffers (cap heap %)"
-  - "Verify RSS stays under the limit and the pod stops being killed"
-initial_state: |
-  JVM flags at /app/jvm.options pin a large fixed -Xmx ignoring the cgroup limit; the container is OOMKilled with exit 137.
+- Confirm the kill is OOMKilled (137) by the kernel, not a JVM heap OOM
+- Make the JVM honor the container memory limit
+- Leave headroom for metaspace/threads/direct buffers (cap heap %)
+- Verify RSS stays under the limit and the pod stops being killed
+initial_state: 'JVM flags at /app/jvm.options pin a large fixed -Xmx ignoring the cgroup limit; the container
+  is OOMKilled with exit 137.
+
+  '
 hints:
-  - order: 1
-    cost: 10
-    content: "Pod status OOMKilled / exit 137 with no Java OOM = RSS exceeded the cgroup limit."
-  - order: 2
-    cost: 15
-    content: "Drop the fixed -Xmx and use -XX:MaxRAMPercentage=70 so the heap tracks the limit."
-  - order: 3
-    cost: 20
-    content: "Leave ~25-30% for non-heap; re-test and confirm RSS stays under the limit."
+- order: 1
+  cost: 0
+  content: 'Where to look: Run `kubectl get pods -A` and `kubectl describe pod <name>` for any pod not
+    in Running state.'
+- order: 2
+  cost: 25
+  content: 'Diagnostic steps:
+
+    1. `kubectl get pods` — note CrashLoopBackOff, ImagePullBackOff, or Pending.
+
+    2. `kubectl describe pod <name>` — read Events at the bottom.
+
+    3. `kubectl logs <name> [--previous]` if the container restarted.'
+- order: 3
+  cost: 50
+  content: 'Exact fix + verification:
+
+    1. Fix the root cause (image name, env var, volume mount, or probe).
+
+    2. `kubectl apply -f` the corrected manifest or delete the pod to recreate.
+
+    3. Confirm `kubectl get pods` shows every pod Running.
+
+
+    WHY: Kubernetes only reports healthy when the workload actually runs.'
+summary: Complete the container oomkilled — jvm heap larger than the cgroup limit java lab and verify
+  success with the checker
+estimated_minutes: 15
+xp_reward: 100
+prerequisites:
+- Basic java literacy
+tags:
+- fix
+- hands-on
+- java
+linked_tutorial: java-fundamentals
+what_you_will_learn:
+- Confirm the kill is OOMKilled (137) by the kernel, not a JVM heap OOM
+- Make the JVM honor the container memory limit
+- Leave headroom for metaspace/threads/direct buffers (cap heap %)
+- Verify RSS stays under the limit and the pod stops being killed
+environment:
+  nodes:
+  - role: primary
+    os: FixitLab Java project
+    hostname: lab-primary
+    ip: 127.0.0.1
+    specs: local offline simulation
+  pre_installed:
+  - bash
+  - coreutils
+  - java
+  - journalctl
+  - systemctl
+  credentials:
+  - user: root
+    password: lab123
+tasks:
+- id: task_1
+  title: Container OOMKilled — JVM Heap Larger Than the cgroup Limit
+  description: Restore healthy behavior for Container OOMKilled — JVM Heap Larger Than the cgroup Limit
+    by investigating the failure, applying the smallest safe fix, and validating the outcome.
+  background: 'This java lab teaches systematic troubleshooting: observe, hypothesize, change, verify.'
+  validation:
+    type: k8s_resource_state
+    resource_kind: Pod
+    resource_name: all
+    namespace: default
+    expected_state: Running
+    error_message: One or more pods are not Running. Use kubectl describe pod and kubectl logs.
+solution:
+  summary: Identify the misconfiguration affecting this java lab and apply the minimal fix.
+  files_changed: []
+  commands_run:
+  - bash check.sh
+  reference_docs: java-fundamentals

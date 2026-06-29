@@ -1,39 +1,131 @@
 title: Missing Default Gateway Breaks Outbound Routing
 slug: linux-default-gateway-missing
 difficulty: easy
-category: Networking
-description: |
-  After a network reconfiguration the server can reach hosts on its local subnet but
+category: Fix
+description: 'CONTEXT: A team operating Linux administration needs you to resolve `Missing Default Gateway
+  Breaks Outbound Routing` during a realistic incident. The business impact is reduced service reliability
+  until the underlying state is repaired.
+
+
+  ENVIRONMENT: You are working in FixitLab''s offline Linux practice server with terminal and config files
+  under /etc and /var. All tools run locally; no paid APIs or external cloud calls are required.
+
+
+  SYMPTOM / STARTING STATE: Simulated RHEL 9 server. eth0 is up with 10.0.0.10/24 but the routing table
+  has no
+
+  default route. The persistent network config in /etc/sysconfig/network has no GATEWAY
+
+  line. Outbound connections to the internet time out. After a network reconfiguration the server can
+  reach hosts on its local subnet but
+
   cannot reach anything off-LAN — there is no default route. The interface eth0 has an
+
   address (10.0.0.10/24) but no gateway is configured, so all non-local traffic is
+
   dropped. You must configure the default gateway and persist it so it survives a reboot
+
   (write GATEWAY=10.0.0.1 into the network config).
 
-initial_state: |
-  Simulated RHEL 9 server. eth0 is up with 10.0.0.10/24 but the routing table has no
+
+  OBJECTIVE: Confirm the routing table has no default route; Configure the default gateway (10.0.0.1)
+  for eth0; Persist it so it survives a reboot by adding GATEWAY=10.0.0.1 to /etc/sysconfig/network. Success
+  means `check.sh` exits successfully.
+
+
+  WHAT TO AVOID: Do not apply broad destructive changes, skip evidence gathering, or fake completion with
+  marker files — the checker validates real system state.'
+initial_state: 'Simulated RHEL 9 server. eth0 is up with 10.0.0.10/24 but the routing table has no
+
   default route. The persistent network config in /etc/sysconfig/network has no GATEWAY
+
   line. Outbound connections to the internet time out.
 
+  '
 objectives:
-  - Confirm the routing table has no default route
-  - Configure the default gateway (10.0.0.1) for eth0
-  - Persist it so it survives a reboot by adding GATEWAY=10.0.0.1 to /etc/sysconfig/network
-  - Verify the default route is present
+- Confirm the routing table has no default route
+- Configure the default gateway (10.0.0.1) for eth0
+- Persist it so it survives a reboot by adding GATEWAY=10.0.0.1 to /etc/sysconfig/network
+- Verify the default route is present
 lab_mode: simulation
 simulation_type: generic
 time_limit: 600
 max_score: 100
 is_free: false
 hints:
-  - content: 'Inspect routing with ip route — there is no "default via" line. The gateway for this subnet is 10.0.0.1.'
-    cost: 10
-    order: 1
-  - content: 'Add it at runtime with ip route add default via 10.0.0.1 dev eth0, then make it persistent.'
-    cost: 15
-    order: 2
-  - content: 'Persist by adding a GATEWAY line: echo "GATEWAY=10.0.0.1" >> /etc/sysconfig/network so the route is restored on reboot.'
-    cost: 15
-    order: 3
+- order: 1
+  cost: 0
+  content: 'Where to look: Confirm the routing table has no default route'
+- order: 2
+  cost: 25
+  content: 'Diagnostic steps:
+
+    1. Configure the default gateway (10.0.0.1) for eth0
+
+    2. Persist it so it survives a reboot by adding GATEWAY=10.0.0.1 to /etc/sysconfig/network
+
+    3. Verify the default route is present'
+- order: 3
+  cost: 50
+  content: 'Exact fix + verification:
+
+    1. Verify the default route is present.
+
+    2. Re-run the lab checker (`check.sh` or Check Solution).
+
+    3. Confirm every scenario objective is satisfied.
+
+
+    WHY: the grader validates real state — marker files are ignored.'
 requires_companion_hosts: false
 dual_terminal: false
 jira_priority: High
+technology: linux
+summary: Complete the missing default gateway breaks outbound routing linux lab and verify success with
+  the checker
+estimated_minutes: 10
+xp_reward: 100
+prerequisites:
+- Basic linux literacy
+tags:
+- fix
+- hands-on
+- linux
+linked_tutorial: linux-fundamentals
+what_you_will_learn:
+- Confirm the routing table has no default route
+- Configure the default gateway (10.0.0.1) for eth0
+- Persist it so it survives a reboot by adding GATEWAY=10.0.0.1 to /etc/sysconfig/network
+- Verify the default route is present
+environment:
+  nodes:
+  - role: primary
+    os: FixitLab Linux practice server
+    hostname: lab-primary
+    ip: 127.0.0.1
+    specs: local offline simulation
+  pre_installed:
+  - bash
+  - coreutils
+  - journalctl
+  - linux
+  - systemctl
+  credentials:
+  - user: root
+    password: lab123
+tasks:
+- id: task_1
+  title: Missing Default Gateway Breaks Outbound Routing
+  description: Restore healthy behavior for Missing Default Gateway Breaks Outbound Routing by investigating
+    the failure, applying the smallest safe fix, and validating the outcome.
+  background: 'This linux lab teaches systematic troubleshooting: observe, hypothesize, change, verify.'
+  validation:
+    type: custom_script
+    script: check.sh
+    error_message: Validation did not pass. Re-read the objectives and Hint 2 diagnostic steps.
+solution:
+  summary: Identify the misconfiguration affecting this linux lab and apply the minimal fix.
+  files_changed: []
+  commands_run:
+  - bash check.sh
+  reference_docs: linux-fundamentals

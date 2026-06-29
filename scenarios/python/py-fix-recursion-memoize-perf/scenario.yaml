@@ -1,9 +1,26 @@
 title: Fix the Exponential Recursive Fibonacci
 slug: py-fix-recursion-memoize-perf
-category: Python Development
-description: fib(n) is implemented with naive double recursion, which is exponential and times out for
-  moderate n (e.g. n=40). Add memoization (or convert to iteration) so it computes large n quickly while
-  staying correct.
+category: Fix
+description: 'CONTEXT: A team operating Python development needs you to resolve `Fix the Exponential Recursive
+  Fibonacci` during a realistic incident. The business impact is reduced service reliability until the
+  underlying state is repaired.
+
+
+  ENVIRONMENT: You are working in FixitLab''s offline Python project workspace with source files, venv,
+  tests, and CLI entrypoints. All tools run locally; no paid APIs or external cloud calls are required.
+
+
+  SYMPTOM / STARTING STATE: fib(n) is implemented with naive double recursion, which is exponential and
+  times out for moderate n (e.g. n=40). Add memoization (or convert to iteration) so it computes large
+  n quickly while staying correct.
+
+
+  OBJECTIVE: Recognize the exponential branching of naive recursion; Cache subresults or iterate; Compute
+  fib(40)+ within the timeout. Success means all hidden tests pass.
+
+
+  WHAT TO AVOID: Do not apply broad destructive changes, skip evidence gathering, or fake completion with
+  marker files — the checker validates real system state.'
 difficulty: medium
 scenario_type: fix
 lab_mode: simulation
@@ -21,48 +38,118 @@ objectives:
 initial_state: fib(n) is implemented with naive double recursion, which is exponential and times out for
   moderate n (e.g. n=40). Add memoization (or convert to iteration) so it computes large n quickly while
   staying correct.
-solution_explanation: |
-  Naive recursion recomputes overlapping subproblems, giving O(2^n). Memoizing with lru_cache (or iterating) makes it linear.
+solution_explanation: 'Naive recursion recomputes overlapping subproblems, giving O(2^n). Memoizing with
+  lru_cache (or iterating) makes it linear.
+
+  '
 coding_spec:
   language: python
   entrypoint: solution.py
   kind: fix
-  instructions: |
-    Make fib(n) efficient (0-indexed: 0,1,1,2,3,5,...). It must compute fib(40) and beyond quickly. You may memoize or rewrite iteratively.
+  instructions: 'Make fib(n) efficient (0-indexed: 0,1,1,2,3,5,...). It must compute fib(40) and beyond
+    quickly. You may memoize or rewrite iteratively.
+
     Click Run to try it, then Check Solution to grade against all tests.
+
+    '
   files:
   - path: solution.py
-    content: |
-      def fib(n):
-          if n < 2:
-              return n
-          return fib(n - 1) + fib(n - 2)   # exponential, times out for large n
+    content: "def fib(n):\n    if n < 2:\n        return n\n    return fib(n - 1) + fib(n - 2)   # exponential,\
+      \ times out for large n\n"
     readonly: false
   visible_tests:
   - name: small values
-    code: |
-      assert fib(0) == 0 and fib(1) == 1 and fib(10) == 55
+    code: 'assert fib(0) == 0 and fib(1) == 1 and fib(10) == 55
+
+      '
   - name: fib(20)
-    code: |
-      assert fib(20) == 6765
+    code: 'assert fib(20) == 6765
+
+      '
   hidden_tests:
   - name: fib(40) fast
-    code: |
-      assert fib(40) == 102334155
+    code: 'assert fib(40) == 102334155
+
+      '
   - name: fib(60)
-    code: |
-      assert fib(60) == 1548008755920
+    code: 'assert fib(60) == 1548008755920
+
+      '
   - name: sequence prefix
-    code: |
-      assert [fib(i) for i in range(8)] == [0,1,1,2,3,5,8,13]
+    code: 'assert [fib(i) for i in range(8)] == [0,1,1,2,3,5,8,13]
+
+      '
   timeout: 6
 hints:
 - order: 1
-  cost: 10
-  content: fib(40) recomputes the same subproblems billions of times — it hangs.
+  cost: 0
+  content: 'Where to look: Open `solution.py`, read the instructions, and run the visible tests to see
+    which assertion fails first.'
 - order: 2
-  cost: 20
-  content: Cache results by n so each value is computed once.
+  cost: 25
+  content: 'Diagnostic steps:
+
+    1. Click Run and read the traceback — note line number and actual vs expected values.
+
+    2. Reproduce the failure with the smallest input from a visible test.
+
+    3. Compare your implementation to the bug described in the lab prompt.'
 - order: 3
-  cost: 30
-  content: Add @lru_cache(maxsize=None) above fib, or build it iteratively with a loop.
+  cost: 50
+  content: 'Exact fix + verification:
+
+    1. Compute fib(40)+ within the timeout.
+
+    2. Re-run the lab checker (`check.sh` or Check Solution).
+
+    3. Confirm every scenario objective is satisfied.
+
+
+    WHY: the grader validates real state — marker files are ignored.'
+technology: python
+summary: Complete the fix the exponential recursive fibonacci python lab and verify success with the checker
+estimated_minutes: 25
+xp_reward: 100
+prerequisites:
+- Basic python literacy
+tags:
+- fix
+- hands-on
+- python
+linked_tutorial: python-fundamentals
+what_you_will_learn:
+- Recognize the exponential branching of naive recursion
+- Cache subresults or iterate
+- Compute fib(40)+ within the timeout
+environment:
+  nodes:
+  - role: primary
+    os: FixitLab Python project workspace
+    hostname: lab-primary
+    ip: 127.0.0.1
+    specs: local offline simulation
+  pre_installed:
+  - bash
+  - coreutils
+  - pip
+  - python
+  - python3
+  credentials:
+  - user: root
+    password: lab123
+tasks:
+- id: task_1
+  title: Fix the Exponential Recursive Fibonacci
+  description: Restore healthy behavior for Fix the Exponential Recursive Fibonacci by investigating the
+    failure, applying the smallest safe fix, and validating the outcome.
+  background: 'This python lab teaches systematic troubleshooting: observe, hypothesize, change, verify.'
+  validation:
+    type: custom_script
+    script: hidden_tests
+    error_message: One or more hidden tests failed. Read the public test output, fix your solution, and
+      submit again.
+solution:
+  summary: The solution passes all hidden tests by implementing the required behavior in code.
+  files_changed: []
+  commands_run: []
+  reference_docs: python-fundamentals

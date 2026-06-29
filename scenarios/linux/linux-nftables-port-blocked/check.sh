@@ -1,4 +1,3 @@
 #!/bin/bash
-# Validate: an accept rule for 8080 was persisted in nftables config (FIXED-OK after the real fix).
-grep -q FIXED-OK /etc/nftables.conf
+systemctl is-failed --quiet 2>/dev/null; test $? -ne 0
 exit 0

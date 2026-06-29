@@ -1,25 +1,60 @@
-title: "Terraform → Ansible Handoff: Inventory From State Is Broken"
+title: 'Terraform → Ansible Handoff: Inventory From State Is Broken'
 slug: linux-terraform-output-to-ansible-inventory
-technology: Linux
-category: Infrastructure Automation
+technology: linux
+category: Fix
 difficulty: medium
-description: |
-  CROSS-TECHNOLOGY task (Terraform -> Ansible). Terraform provisioned three web
-  hosts and wrote their private IPs to an output, and a small wrapper renders that
-  output into the Ansible inventory at /home/ansible/inventory/provisioned_hosts.ini.
-  The render broke: the inventory still carries the OLD placeholder addresses and a
-  malformed group header, so `ansible -i provisioned_hosts.ini webservers -m ping`
-  fails and the configuration stage never starts. Reconcile the inventory with the
-  real Terraform output so the provision -> configure handoff works again.
-initial_state: |
-  A Linux automation host. Terraform state lists web-1/web-2/web-3 at
+description: 'CONTEXT: A team operating Linux administration needs you to resolve `Terraform → Ansible
+  Handoff: Inventory From State Is Broken` during a realistic incident. The business impact is reduced
+  service reliability until the underlying state is repaired.
+
+
+  ENVIRONMENT: You are working in FixitLab''s offline Linux practice server with terminal and config files
+  under /etc and /var. All tools run locally; no paid APIs or external cloud calls are required.
+
+
+  SYMPTOM / STARTING STATE: A Linux automation host. Terraform state lists web-1/web-2/web-3 at
+
   10.20.0.11-13, but /home/ansible/inventory/provisioned_hosts.ini is stale and
+
   malformed (placeholder IPs, broken [webservers] header). The Ansible run that
+
+  consumes it cannot reach any host. CROSS-TECHNOLOGY task (Terraform -> Ansible). Terraform provisioned
+  three web
+
+  hosts and wrote their private IPs to an output, and a small wrapper renders that
+
+  output into the Ansible inventory at /home/ansible/inventory/provisioned_hosts.ini.
+
+  The render broke: the inventory still carries the OLD placeholder addresses and a
+
+  malformed group header, so `ansible -i provisioned_hosts.ini webservers -m ping`
+
+  fails and the configuration stage never starts. Reconcile the inventory with the
+
+  real Terraform output so the provision -> configure handoff works again.
+
+
+  OBJECTIVE: Compare the Terraform output (terraform output -json web_private_ips) with the rendered inventory;
+  Correct /home/ansible/inventory/provisioned_hosts.ini so the group + addresses match the real state;
+  Confirm the file is corrected so the Ansible ping handoff would succeed. Success means `check.sh` exits
+  successfully.
+
+
+  WHAT TO AVOID: Do not apply broad destructive changes, skip evidence gathering, or fake completion with
+  marker files — the checker validates real system state.'
+initial_state: 'A Linux automation host. Terraform state lists web-1/web-2/web-3 at
+
+  10.20.0.11-13, but /home/ansible/inventory/provisioned_hosts.ini is stale and
+
+  malformed (placeholder IPs, broken [webservers] header). The Ansible run that
+
   consumes it cannot reach any host.
+
+  '
 objectives:
-  - Compare the Terraform output (terraform output -json web_private_ips) with the rendered inventory
-  - Correct /home/ansible/inventory/provisioned_hosts.ini so the group + addresses match the real state
-  - Confirm the file is corrected so the Ansible ping handoff would succeed
+- Compare the Terraform output (terraform output -json web_private_ips) with the rendered inventory
+- Correct /home/ansible/inventory/provisioned_hosts.ini so the group + addresses match the real state
+- Confirm the file is corrected so the Ansible ping handoff would succeed
 lab_mode: simulation
 simulation_type: generic
 cross_technology: true
@@ -29,12 +64,75 @@ is_free: false
 jira_priority: High
 dual_terminal: false
 hints:
-  - order: 1
-    cost: 10
-    content: "Run `terraform output -json web_private_ips` and diff it against /home/ansible/inventory/provisioned_hosts.ini — the IPs and the [webservers] header are wrong."
-  - order: 2
-    cost: 15
-    content: "Re-render the inventory: one host line per real IP under a valid `[webservers]` header. Validate with `ansible-inventory -i provisioned_hosts.ini --list`."
-  - order: 3
-    cost: 20
-    content: "Once the inventory matches Terraform state, the file is corrected and `ansible webservers -m ping` would reach all three hosts."
+- order: 1
+  cost: 0
+  content: 'Where to look: Run `ansible webservers -m ping -vvv` to see SSH and inventory errors.'
+- order: 2
+  cost: 25
+  content: 'Diagnostic steps:
+
+    1. Verify `inventory` hostnames resolve and SSH keys work.
+
+    2. Check `ansible.cfg` for remote_user and privilege escalation.
+
+    3. Test manual `ssh user@host` from the control node.'
+- order: 3
+  cost: 50
+  content: 'Exact fix + verification:
+
+    1. Fix inventory, SSH key, or `ansible_user` in group_vars.
+
+    2. Re-run `ansible webservers -m ping`.
+
+    3. Confirm every host returns SUCCESS.
+
+
+    WHY: Ansible cannot manage hosts it cannot reach.'
+summary: 'Complete the terraform → ansible handoff: inventory from state is broken linux lab and verify
+  success with the checker'
+estimated_minutes: 20
+xp_reward: 100
+prerequisites:
+- Basic linux literacy
+tags:
+- fix
+- hands-on
+- linux
+linked_tutorial: linux-fundamentals
+what_you_will_learn:
+- Compare the Terraform output (terraform output -json web_private_ips) with the rendered inventory
+- Correct /home/ansible/inventory/provisioned_hosts.ini so the group + addresses match the real state
+- Confirm the file is corrected so the Ansible ping handoff would succeed
+environment:
+  nodes:
+  - role: primary
+    os: FixitLab Linux practice server
+    hostname: lab-primary
+    ip: 127.0.0.1
+    specs: local offline simulation
+  pre_installed:
+  - bash
+  - coreutils
+  - journalctl
+  - linux
+  - systemctl
+  credentials:
+  - user: root
+    password: lab123
+tasks:
+- id: task_1
+  title: 'Terraform → Ansible Handoff: Inventory From State Is Broken'
+  description: 'Restore healthy behavior for Terraform → Ansible Handoff: Inventory From State Is Broken
+    by investigating the failure, applying the smallest safe fix, and validating the outcome.'
+  background: 'This linux lab teaches systematic troubleshooting: observe, hypothesize, change, verify.'
+  validation:
+    type: command_output
+    command: ansible webservers -m ping
+    expected_output: SUCCESS
+    error_message: Ansible hosts are still unreachable. Verify SSH keys and inventory.
+solution:
+  summary: Identify the misconfiguration affecting this linux lab and apply the minimal fix.
+  files_changed: []
+  commands_run:
+  - ansible webservers -m ping
+  reference_docs: linux-fundamentals

@@ -1,11 +1,31 @@
 title: NTP Time Drift Causing Auth Failures
 slug: networking-ntp-drift
 difficulty: medium
-category: Networking
-description: Kerberos authentication and TLS certificate validation are failing across the environment
-  because the system clock has drifted more than five minutes from true time. Time-sensitive protocols
-  reject the skew. Either NTP isn't syncing (service down or UDP 123 blocked) or the source is unreachable.
-  Restore time synchronization so the offset returns to near zero.
+category: Fix
+description: 'CONTEXT: A team operating network operations needs you to resolve `NTP Time Drift Causing
+  Auth Failures` during a realistic incident. The business impact is reduced service reliability until
+  the underlying state is repaired.
+
+
+  ENVIRONMENT: You are working in FixitLab''s offline network lab with interfaces, routing tables, DNS,
+  and firewall rules. All tools run locally; no paid APIs or external cloud calls are required.
+
+
+  SYMPTOM / STARTING STATE: Linux server whose clock has drifted >5 minutes, breaking Kerberos/TLS. NTP
+  (chrony) is not synchronizing — the service is down or UDP 123 is blocked/unreachable. Kerberos authentication
+  and TLS certificate validation are failing across the environment because the system clock has drifted
+  more than five minutes from true time. Time-sensitive protocols reject the skew. Either NTP isn''t syncing
+  (service down or UDP 123 blocked) or the source is unreachable. Restore time synchronization so the
+  offset returns to near zero.
+
+
+  OBJECTIVE: Confirm the clock offset and that NTP isn''t synchronized; Fix the sync path (start chrony
+  / open UDP 123 / set a reachable source); Verify the offset returns to near zero and stays synced. Success
+  means `check.sh` exits successfully.
+
+
+  WHAT TO AVOID: Do not apply broad destructive changes, skip evidence gathering, or fake completion with
+  marker files — the checker validates real system state.'
 initial_state: Linux server whose clock has drifted >5 minutes, breaking Kerberos/TLS. NTP (chrony) is
   not synchronizing — the service is down or UDP 123 is blocked/unreachable.
 objectives:
@@ -19,17 +39,75 @@ max_score: 100
 is_free: false
 hints:
 - order: 1
-  cost: 10
-  content: 'Check the offset and sync state: `timedatectl status` and `chronyc tracking` — the offset
-    is large and ''System clock synchronized: no''.'
+  cost: 0
+  content: 'Where to look: Confirm the clock offset and that NTP isn''t synchronized'
 - order: 2
-  cost: 15
-  content: 'NTP needs UDP 123 outbound and a running daemon: `firewall-cmd --list-all` (allow `ntp` if
-    missing) and `systemctl status chronyd`. Ensure a reachable source in /etc/chrony.conf.'
+  cost: 25
+  content: 'Diagnostic steps:
+
+    1. Fix the sync path (start chrony / open UDP 123 / set a reachable source)
+
+    2. Verify the offset returns to near zero and stays synced'
 - order: 3
-  cost: 20
-  content: 'Start/restart chrony and step the clock: `systemctl restart chronyd && chronyc makestep`.
-    Re-check `chronyc tracking` — offset is near zero and synchronized; Kerberos/TLS recover.'
+  cost: 50
+  content: 'Exact fix + verification:
+
+    1. Verify the offset returns to near zero and stays synced.
+
+    2. Re-run the lab checker (`check.sh` or Check Solution).
+
+    3. Confirm every scenario objective is satisfied.
+
+
+    WHY: the grader validates real state — marker files are ignored.'
 requires_companion_hosts: false
 dual_terminal: false
 jira_priority: Medium
+technology: networking
+summary: Complete the ntp time drift causing auth failures networking lab and verify success with the
+  checker
+estimated_minutes: 15
+xp_reward: 100
+prerequisites:
+- Basic networking literacy
+tags:
+- fix
+- hands-on
+- networking
+linked_tutorial: networking-fundamentals
+what_you_will_learn:
+- Confirm the clock offset and that NTP isn't synchronized
+- Fix the sync path (start chrony / open UDP 123 / set a reachable source)
+- Verify the offset returns to near zero and stays synced
+environment:
+  nodes:
+  - role: primary
+    os: FixitLab network lab
+    hostname: lab-primary
+    ip: 127.0.0.1
+    specs: local offline simulation
+  pre_installed:
+  - bash
+  - coreutils
+  - journalctl
+  - networking
+  - systemctl
+  credentials:
+  - user: root
+    password: lab123
+tasks:
+- id: task_1
+  title: NTP Time Drift Causing Auth Failures
+  description: Restore healthy behavior for NTP Time Drift Causing Auth Failures by investigating the
+    failure, applying the smallest safe fix, and validating the outcome.
+  background: 'This networking lab teaches systematic troubleshooting: observe, hypothesize, change, verify.'
+  validation:
+    type: custom_script
+    script: check.sh
+    error_message: Validation did not pass. Re-read the objectives and Hint 2 diagnostic steps.
+solution:
+  summary: Identify the misconfiguration affecting this networking lab and apply the minimal fix.
+  files_changed: []
+  commands_run:
+  - bash check.sh
+  reference_docs: networking-fundamentals

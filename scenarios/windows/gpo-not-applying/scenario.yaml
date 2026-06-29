@@ -1,38 +1,115 @@
 title: Group Policy Not Applying
 slug: win-gpo-not-applying
 difficulty: medium
-category: Windows Server
-description: 'A Group Policy Object is not applying to computers or users in a target
-  Organizational Unit. Policy settings are not being enforced despite the GPO being
-  linked. The issue may involve a broken GPO link, WMI filter misconfiguration, security
-  filtering, or loopback processing settings.'
-initial_state: 'Windows Server 2022 with Active Directory and Group Policy Management
-  installed. A GPO is linked to an OU but not applying to target objects. GPResult
-  may show the GPO as denied or not applied. WMI filters or security group filters
-  may be incorrectly configured.'
+category: Fix
+description: 'CONTEXT: A team operating Windows Server needs you to resolve `Group Policy Not Applying`
+  during a realistic incident. The business impact is reduced service reliability until the underlying
+  state is repaired.
+
+
+  ENVIRONMENT: You are working in FixitLab''s offline Windows Server host with PowerShell, Server Manager,
+  and AD tools. All tools run locally; no paid APIs or external cloud calls are required.
+
+
+  SYMPTOM / STARTING STATE: Windows Server 2022 with Active Directory and Group Policy Management installed.
+  A GPO is linked to an OU but not applying to target objects. GPResult may show the GPO as denied or
+  not applied. WMI filters or security group filters may be incorrectly configured. A Group Policy Object
+  is not applying to computers or users in a target Organizational Unit. Policy settings are not being
+  enforced despite the GPO being linked. The issue may involve a broken GPO link, WMI filter misconfiguration,
+  security filtering, or loopback processing settings.
+
+
+  OBJECTIVE: Diagnose why the GPO is not applying to the target OU using gpresult and GPMC; Fix the GPO
+  link, security filtering, or WMI filter as appropriate; Confirm the policy applies correctly after running
+  gpupdate. Success means `check.sh` exits successfully.
+
+
+  WHAT TO AVOID: Do not apply broad destructive changes, skip evidence gathering, or fake completion with
+  marker files — the checker validates real system state.'
+initial_state: Windows Server 2022 with Active Directory and Group Policy Management installed. A GPO
+  is linked to an OU but not applying to target objects. GPResult may show the GPO as denied or not applied.
+  WMI filters or security group filters may be incorrectly configured.
 objectives:
-  - Diagnose why the GPO is not applying to the target OU using gpresult and GPMC
-  - Fix the GPO link, security filtering, or WMI filter as appropriate
-  - Confirm the policy applies correctly after running gpupdate
+- Diagnose why the GPO is not applying to the target OU using gpresult and GPMC
+- Fix the GPO link, security filtering, or WMI filter as appropriate
+- Confirm the policy applies correctly after running gpupdate
 lab_mode: simulation
 simulation_type: windows
 time_limit: 1800
 max_score: 100
 is_free: false
 hints:
-  - content: 'Run GP diagnostics: gpresult /h C:\gpresult.html /F then open the HTML
-      report, or gpresult /r /scope computer to see applied and denied GPOs.'
-    cost: 10
-    order: 1
-  - content: 'Check GPO link status in GPMC: Get-GPInheritance -Target "OU=Target,DC=domain,DC=com"
-      and verify the GPO is linked and not blocked or disabled.'
-    cost: 15
-    order: 2
-  - content: 'Fix security filtering: Get-GPPermission -Name "GPOName" -All and
-      add Authenticated Users read access: Set-GPPermission -Name "GPOName" -TargetName
-      "Authenticated Users" -TargetType Group -PermissionLevel GpoRead'
-    cost: 20
-    order: 3
+- order: 1
+  cost: 0
+  content: 'Where to look: Run `nvidia-smi` and `dmesg | grep -i nvidia` for driver visibility.'
+- order: 2
+  cost: 25
+  content: 'Diagnostic steps:
+
+    1. Check if the GPU appears in `lspci | grep -i nvidia`.
+
+    2. Verify the correct driver module is loaded (`lsmod | grep nvidia`).
+
+    3. Look for Xid errors or fallen-off-bus messages in dmesg.'
+- order: 3
+  cost: 50
+  content: 'Exact fix + verification:
+
+    1. Reload driver, rebind PCI, or fix persistence mode per the scenario.
+
+    2. Re-run `nvidia-smi`.
+
+    3. Confirm GPU name and memory report without errors.
+
+
+    WHY: workloads need the driver to see the device.'
 requires_companion_hosts: false
 dual_terminal: false
 jira_priority: Medium
+technology: windows
+summary: Complete the group policy not applying windows lab and verify success with the checker
+estimated_minutes: 30
+xp_reward: 100
+prerequisites:
+- Basic windows literacy
+tags:
+- fix
+- hands-on
+- windows
+linked_tutorial: windows-fundamentals
+what_you_will_learn:
+- Diagnose why the GPO is not applying to the target OU using gpresult and GPMC
+- Fix the GPO link, security filtering, or WMI filter as appropriate
+- Confirm the policy applies correctly after running gpupdate
+environment:
+  nodes:
+  - role: primary
+    os: FixitLab Windows Server host
+    hostname: lab-primary
+    ip: 127.0.0.1
+    specs: local offline simulation
+  pre_installed:
+  - bash
+  - coreutils
+  - journalctl
+  - systemctl
+  - windows
+  credentials:
+  - user: root
+    password: lab123
+tasks:
+- id: task_1
+  title: Group Policy Not Applying
+  description: Restore healthy behavior for Group Policy Not Applying by investigating the failure, applying
+    the smallest safe fix, and validating the outcome.
+  background: 'This windows lab teaches systematic troubleshooting: observe, hypothesize, change, verify.'
+  validation:
+    type: custom_script
+    script: check.sh
+    error_message: Validation did not pass. Re-read the objectives and Hint 2 diagnostic steps.
+solution:
+  summary: Identify the misconfiguration affecting this windows lab and apply the minimal fix.
+  files_changed: []
+  commands_run:
+  - bash check.sh
+  reference_docs: windows-fundamentals

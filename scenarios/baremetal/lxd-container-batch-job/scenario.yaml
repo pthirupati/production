@@ -1,7 +1,7 @@
 slug: lxd-container-batch-job
 title: Start Stopped LXD Inference Container
-technology: Bare Metal
-category: LXD
+technology: baremetal
+category: Fix
 difficulty: easy
 scenario_type: fix
 time_limit: 900
@@ -10,21 +10,99 @@ lab_mode: simulation
 simulation_type: baremetal
 infrastructure_type: simulation
 is_free: false
-description: >-
-  The batch-job LXD container is stopped and blocking the inference pipeline.
-  Start it and verify it receives an IP address.
+description: 'CONTEXT: A team operating bare metal operations needs you to resolve `Start Stopped LXD
+  Inference Container` during a realistic incident. The business impact is reduced service reliability
+  until the underlying state is repaired.
+
+
+  ENVIRONMENT: You are working in FixitLab''s offline physical server lab with IPMI, RAID, BIOS, and out-of-band
+  console. All tools run locally; no paid APIs or external cloud calls are required.
+
+
+  SYMPTOM / STARTING STATE: LXD container batch-job is Stopped with no IPv4 assigned. The batch-job LXD
+  container is stopped and blocking the inference pipeline. Start it and verify it receives an IP address.
+
+
+  OBJECTIVE: Open the Bare Metal console; Navigate to the LXD tab; Start the batch-job container. Success
+  means `check.sh` exits successfully.
+
+
+  WHAT TO AVOID: Do not apply broad destructive changes, skip evidence gathering, or fake completion with
+  marker files — the checker validates real system state.'
 objectives:
-  - Open the Bare Metal console
-  - Navigate to the LXD tab
-  - Start the batch-job container
+- Open the Bare Metal console
+- Navigate to the LXD tab
+- Start the batch-job container
 initial_state: LXD container batch-job is Stopped with no IPv4 assigned.
 hints:
-  - order: 1
-    cost: 10
-    content: Open **Bare Metal** → **LXD** tab → find batch-job.
-  - order: 2
-    cost: 15
-    content: Click **Start** and confirm status Running with an IP.
-  - order: 3
-    cost: 20
-    content: Run **Check** to validate.
+- order: 1
+  cost: 0
+  content: 'Where to look: Run `docker ps -a` and `docker logs <container>` for the failing container.'
+- order: 2
+  cost: 25
+  content: 'Diagnostic steps:
+
+    1. `docker ps -a` — note Exited status and exit code.
+
+    2. `docker logs <name>` for the startup error.
+
+    3. Inspect the Dockerfile or `docker run` flags if the image is wrong.'
+- order: 3
+  cost: 50
+  content: 'Exact fix + verification:
+
+    1. Fix image, port mapping, volume, or env configuration.
+
+    2. `docker start <name>` or re-run with corrected flags.
+
+    3. Confirm `bash check.sh` shows the container Up.
+
+
+    WHY: the checker validates the container is actually running.'
+summary: Complete the start stopped lxd inference container baremetal lab and verify success with the
+  checker
+estimated_minutes: 15
+xp_reward: 100
+prerequisites:
+- Basic baremetal literacy
+tags:
+- baremetal
+- fix
+- hands-on
+linked_tutorial: baremetal-fundamentals
+what_you_will_learn:
+- Open the Bare Metal console
+- Navigate to the LXD tab
+- Start the batch-job container
+environment:
+  nodes:
+  - role: primary
+    os: FixitLab physical server lab
+    hostname: lab-primary
+    ip: 127.0.0.1
+    specs: local offline simulation
+  pre_installed:
+  - baremetal
+  - bash
+  - coreutils
+  - journalctl
+  - systemctl
+  credentials:
+  - user: root
+    password: lab123
+tasks:
+- id: task_1
+  title: Start Stopped LXD Inference Container
+  description: Restore healthy behavior for Start Stopped LXD Inference Container by investigating the
+    failure, applying the smallest safe fix, and validating the outcome.
+  background: 'This baremetal lab teaches systematic troubleshooting: observe, hypothesize, change, verify.'
+  validation:
+    type: custom_script
+    script: check.sh
+    error_message: Validation did not pass. Re-read the objectives and Hint 2 diagnostic steps.
+solution:
+  summary: Identify the misconfiguration affecting this baremetal lab and apply the minimal fix.
+  files_changed: []
+  commands_run:
+  - bash check.sh
+  reference_docs: baremetal-fundamentals

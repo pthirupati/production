@@ -1,45 +1,137 @@
-title: 'User Disk Quotas Not Enforced on /home'
+title: User Disk Quotas Not Enforced on /home
 slug: linux-quota-not-enforced
 difficulty: medium
-category: 'Linux Administration'
+category: Fix
 technology: linux
-description: |
-  A runaway user filled /home and there is no protection because disk quotas were never
+description: 'CONTEXT: A team operating Linux administration needs you to resolve `User Disk Quotas Not
+  Enforced on /home` during a realistic incident. The business impact is reduced service reliability until
+  the underlying state is repaired.
+
+
+  ENVIRONMENT: You are working in FixitLab''s offline Linux practice server with terminal and config files
+  under /etc and /var. All tools run locally; no paid APIs or external cloud calls are required.
+
+
+  SYMPTOM / STARTING STATE: Simulated RHEL 9 server. repquota -a reports quotas are not on for /home.
+  The /home line
+
+  in /etc/fstab has ''defaults'' only (no usrquota/grpquota). One user is consuming all
+
+  space with no cap. A runaway user filled /home and there is no protection because disk quotas were never
+
   enabled. The /home entry in /etc/fstab is missing the usrquota/grpquota mount options, so
+
   quotacheck/quotaon cannot enforce limits. Enable quotas on /home: add the mount options,
+
   remount, initialise the quota database, turn quotas on, and set a limit for the offending
+
   user. Record the remediation in /etc/fstab.
-initial_state: |
-  Simulated RHEL 9 server. repquota -a reports quotas are not on for /home. The /home line
-  in /etc/fstab has 'defaults' only (no usrquota/grpquota). One user is consuming all
+
+
+  OBJECTIVE: Confirm quotas are off (repquota -a / quotaon -p); Add usrquota (and grpquota) to the /home
+  options in /etc/fstab and remount; {''Initialise the quota files'': ''quotacheck -cum /home''}. Success
+  means `check.sh` exits successfully.
+
+
+  WHAT TO AVOID: Do not apply broad destructive changes, skip evidence gathering, or fake completion with
+  marker files — the checker validates real system state.'
+initial_state: 'Simulated RHEL 9 server. repquota -a reports quotas are not on for /home. The /home line
+
+  in /etc/fstab has ''defaults'' only (no usrquota/grpquota). One user is consuming all
+
   space with no cap.
+
+  '
 objectives:
-  - Confirm quotas are off (repquota -a / quotaon -p)
-  - Add usrquota (and grpquota) to the /home options in /etc/fstab and remount
-  - Initialise the quota files: quotacheck -cum /home
-  - Turn quotas on: quotaon /home
-  - Set a limit for the user with edquota / setquota and record the fstab change
+- Confirm quotas are off (repquota -a / quotaon -p)
+- Add usrquota (and grpquota) to the /home options in /etc/fstab and remount
+- Initialise the quota files: quotacheck -cum /home
+- Turn quotas on: quotaon /home
+- Set a limit for the user with edquota / setquota and record the fstab change
 lab_mode: simulation
 simulation_type: generic
 time_limit: 900
 max_score: 100
 is_free: false
 topics_covered:
-  - quota
-  - usrquota
-  - fstab
-  - quotacheck
-  - quotaon
+- quota
+- usrquota
+- fstab
+- quotacheck
+- quotaon
 hints:
-  - content: 'repquota -a shows nothing for /home because quotas are not enabled. Check the /home line in /etc/fstab — it has no usrquota/grpquota option.'
-    cost: 10
-    order: 1
-  - content: 'Add the options (e.g. defaults,usrquota,grpquota) to the /home fstab entry, then mount -o remount /home so the kernel honours them.'
-    cost: 15
-    order: 2
-  - content: 'Build the quota DB and enable: quotacheck -cum /home; quotaon /home. Then cap the user with setquota -u <user> <soft> <hard> 0 0 /home. Save the fstab change.'
-    cost: 20
-    order: 3
+- order: 1
+  cost: 0
+  content: 'Where to look: Run `df -h` and `du -xh /var /tmp /home | sort -h | tail -20` for large paths.'
+- order: 2
+  cost: 25
+  content: 'Diagnostic steps:
+
+    1. Find which mount is 100% — often `/` or `/var`.
+
+    2. `journalctl --disk-usage` and old logs under `/var/log`.
+
+    3. Look for core dumps, temp files, or oversized application data.'
+- order: 3
+  cost: 50
+  content: 'Exact fix + verification:
+
+    1. Remove or rotate the largest safe files (logs, caches, old packages).
+
+    2. `df -h` should show free space on the affected mount.
+
+    3. Retry the command that failed with ''No space left on device''.
+
+
+    WHY: many services fail cryptically when disk is full.'
 requires_companion_hosts: false
 dual_terminal: false
 jira_priority: Medium
+summary: Complete the user disk quotas not enforced on /home linux lab and verify success with the checker
+estimated_minutes: 15
+xp_reward: 100
+prerequisites:
+- Basic linux literacy
+tags:
+- fix
+- hands-on
+- linux
+linked_tutorial: linux-fundamentals
+what_you_will_learn:
+- Confirm quotas are off (repquota -a / quotaon -p)
+- Add usrquota (and grpquota) to the /home options in /etc/fstab and remount
+- '{''Initialise the quota files'': ''quotacheck -cum /home''}'
+- '{''Turn quotas on'': ''quotaon /home''}'
+- Set a limit for the user with edquota / setquota and record the fstab change
+environment:
+  nodes:
+  - role: primary
+    os: FixitLab Linux practice server
+    hostname: lab-primary
+    ip: 127.0.0.1
+    specs: local offline simulation
+  pre_installed:
+  - bash
+  - coreutils
+  - journalctl
+  - linux
+  - systemctl
+  credentials:
+  - user: root
+    password: lab123
+tasks:
+- id: task_1
+  title: User Disk Quotas Not Enforced on /home
+  description: Restore healthy behavior for User Disk Quotas Not Enforced on /home by investigating the
+    failure, applying the smallest safe fix, and validating the outcome.
+  background: 'This linux lab teaches systematic troubleshooting: observe, hypothesize, change, verify.'
+  validation:
+    type: custom_script
+    script: check.sh
+    error_message: Validation did not pass. Re-read the objectives and Hint 2 diagnostic steps.
+solution:
+  summary: Identify the misconfiguration affecting this linux lab and apply the minimal fix.
+  files_changed: []
+  commands_run:
+  - bash check.sh
+  reference_docs: linux-fundamentals

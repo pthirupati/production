@@ -1,8 +1,7 @@
----
 slug: sim-java-deadlock
-title: "JVM Thread Deadlock Between Two Locks"
-technology: Java
-category: "Concurrency"
+title: JVM Thread Deadlock Between Two Locks
+technology: java
+category: Fix
 difficulty: hard
 time_limit: 1200
 max_score: 100
@@ -11,22 +10,107 @@ simulation_type: java
 infrastructure_type: simulation
 jira_priority: High
 is_free: false
-description: |
-  Two worker threads each hold one lock and wait for the other, producing a classic lock-ordering deadlock — throughput drops to zero and a thread dump shows 'Found one Java-level deadlock'. Fix the lock-acquisition order so both threads always take the locks in the same global order.
+description: 'CONTEXT: A team operating Java applications needs you to resolve `JVM Thread Deadlock Between
+  Two Locks` during a realistic incident. The business impact is reduced service reliability until the
+  underlying state is repaired.
+
+
+  ENVIRONMENT: You are working in FixitLab''s offline Java project with Maven/Gradle, JVM logs, and Spring
+  configuration. All tools run locally; no paid APIs or external cloud calls are required.
+
+
+  SYMPTOM / STARTING STATE: Service code at /app/src/main/java/com/example/TransferService.java locks
+  accountA then accountB on one path and accountB then accountA on another. Two worker threads each hold
+  one lock and wait for the other, producing a classic lock-ordering deadlock — throughput drops to zero
+  and a thread dump shows ''Found one Java-level deadlock''. Fix the lock-acquisition order so both threads
+  always take the locks in the same global order.
+
+
+  OBJECTIVE: Capture a thread dump and confirm the deadlock and the two locks involved; Identify the two
+  code paths that acquire the locks in opposite order; Impose a single consistent global lock ordering.
+  Success means `check.sh` exits successfully.
+
+
+  WHAT TO AVOID: Do not apply broad destructive changes, skip evidence gathering, or fake completion with
+  marker files — the checker validates real system state.'
 objectives:
-  - "Capture a thread dump and confirm the deadlock and the two locks involved"
-  - "Identify the two code paths that acquire the locks in opposite order"
-  - "Impose a single consistent global lock ordering"
-  - "Verify a fresh thread dump shows no deadlock and work resumes"
-initial_state: |
-  Service code at /app/src/main/java/com/example/TransferService.java locks accountA then accountB on one path and accountB then accountA on another.
+- Capture a thread dump and confirm the deadlock and the two locks involved
+- Identify the two code paths that acquire the locks in opposite order
+- Impose a single consistent global lock ordering
+- Verify a fresh thread dump shows no deadlock and work resumes
+initial_state: 'Service code at /app/src/main/java/com/example/TransferService.java locks accountA then
+  accountB on one path and accountB then accountA on another.
+
+  '
 hints:
-  - order: 1
-    cost: 10
-    content: "jstack <pid> prints 'Found one Java-level deadlock' and names both threads and locks."
-  - order: 2
-    cost: 15
-    content: "The two methods take the two locks in opposite order — that is the cycle."
-  - order: 3
-    cost: 20
-    content: "Always lock in a fixed order (e.g. by account id) so no cycle can form."
+- order: 1
+  cost: 0
+  content: 'Where to look: Capture a thread dump and confirm the deadlock and the two locks involved'
+- order: 2
+  cost: 25
+  content: 'Diagnostic steps:
+
+    1. Identify the two code paths that acquire the locks in opposite order
+
+    2. Impose a single consistent global lock ordering
+
+    3. Verify a fresh thread dump shows no deadlock and work resumes'
+- order: 3
+  cost: 50
+  content: 'Exact fix + verification:
+
+    1. Verify a fresh thread dump shows no deadlock and work resumes.
+
+    2. Re-run the lab checker (`check.sh` or Check Solution).
+
+    3. Confirm every scenario objective is satisfied.
+
+
+    WHY: the grader validates real state — marker files are ignored.'
+summary: Complete the jvm thread deadlock between two locks java lab and verify success with the checker
+estimated_minutes: 20
+xp_reward: 100
+prerequisites:
+- Basic java literacy
+tags:
+- fix
+- hands-on
+- java
+linked_tutorial: java-fundamentals
+what_you_will_learn:
+- Capture a thread dump and confirm the deadlock and the two locks involved
+- Identify the two code paths that acquire the locks in opposite order
+- Impose a single consistent global lock ordering
+- Verify a fresh thread dump shows no deadlock and work resumes
+environment:
+  nodes:
+  - role: primary
+    os: FixitLab Java project
+    hostname: lab-primary
+    ip: 127.0.0.1
+    specs: local offline simulation
+  pre_installed:
+  - bash
+  - coreutils
+  - java
+  - journalctl
+  - systemctl
+  credentials:
+  - user: root
+    password: lab123
+tasks:
+- id: task_1
+  title: JVM Thread Deadlock Between Two Locks
+  description: Restore healthy behavior for JVM Thread Deadlock Between Two Locks by investigating the
+    failure, applying the smallest safe fix, and validating the outcome.
+  background: 'This java lab teaches systematic troubleshooting: observe, hypothesize, change, verify.'
+  validation:
+    type: custom_script
+    script: check.sh
+    error_message: Validation did not pass. Re-read the objectives and Hint 2 diagnostic steps.
+solution:
+  summary: Identify the misconfiguration affecting this java lab and apply the minimal fix.
+  files_changed: []
+  commands_run:
+  - bash check.sh
+  reference_docs: java-fundamentals

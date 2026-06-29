@@ -1,29 +1,115 @@
 title: Terraform Remote State Corrupted
 slug: terraform-state-backend-corrupt
 difficulty: hard
-category: Terraform
-description: 'The Terraform remote state file in S3 is corrupted — it contains invalid JSON or was partially overwritten. All terraform commands fail with state parsing errors. Recover the state from an S3 versioned backup.'
-initial_state: 'Simulated environment with a Terraform S3 backend where S3 versioning is enabled. The current state file version is corrupted (truncated JSON). Previous valid versions exist in S3 object version history and can be restored.'
+category: Fix
+description: 'CONTEXT: A team operating Terraform IaC needs you to resolve `Terraform Remote State Corrupted`
+  during a realistic incident. The business impact is reduced service reliability until the underlying
+  state is repaired.
+
+
+  ENVIRONMENT: You are working in FixitLab''s offline Terraform workspace with HCL files, state, and plan/apply
+  workflow. All tools run locally; no paid APIs or external cloud calls are required.
+
+
+  SYMPTOM / STARTING STATE: Simulated environment with a Terraform S3 backend where S3 versioning is enabled.
+  The current state file version is corrupted (truncated JSON). Previous valid versions exist in S3 object
+  version history and can be restored. The Terraform remote state file in S3 is corrupted — it contains
+  invalid JSON or was partially overwritten. All terraform commands fail with state parsing errors. Recover
+  the state from an S3 versioned backup.
+
+
+  OBJECTIVE: Identify the corruption by running terraform state list and observing the parse error; List
+  S3 object versions for the state file and identify the last known-good version; Restore the previous
+  version as the current state object in S3. Success means `check.sh` exits successfully.
+
+
+  WHAT TO AVOID: Do not apply broad destructive changes, skip evidence gathering, or fake completion with
+  marker files — the checker validates real system state.'
+initial_state: Simulated environment with a Terraform S3 backend where S3 versioning is enabled. The current
+  state file version is corrupted (truncated JSON). Previous valid versions exist in S3 object version
+  history and can be restored.
 objectives:
-  - Identify the corruption by running terraform state list and observing the parse error
-  - List S3 object versions for the state file and identify the last known-good version
-  - Restore the previous version as the current state object in S3
-  - Run terraform state list to confirm the state is readable again
+- Identify the corruption by running terraform state list and observing the parse error
+- List S3 object versions for the state file and identify the last known-good version
+- Restore the previous version as the current state object in S3
+- Run terraform state list to confirm the state is readable again
 lab_mode: simulation
 simulation_type: terraform
 time_limit: 2400
 max_score: 100
 is_free: false
 hints:
-  - content: 'Run: aws s3api list-object-versions --bucket <bucket> --prefix <state-key> to list all versions of the state file with their VersionIds and timestamps.'
-    cost: 10
-    order: 1
-  - content: 'Download the last known-good version: aws s3api get-object --bucket <bucket> --key <state-key> --version-id <id> terraform.tfstate.bak and validate the JSON.'
-    cost: 20
-    order: 2
-  - content: 'Restore by copying the good version back: aws s3 cp terraform.tfstate.bak s3://<bucket>/<state-key>. Then run terraform state list to confirm recovery.'
-    cost: 25
-    order: 3
+- order: 1
+  cost: 0
+  content: 'Where to look: Identify the corruption by running terraform state list and observing the parse
+    error'
+- order: 2
+  cost: 25
+  content: 'Diagnostic steps:
+
+    1. List S3 object versions for the state file and identify the last known-good version
+
+    2. Restore the previous version as the current state object in S3
+
+    3. Run terraform state list to confirm the state is readable again'
+- order: 3
+  cost: 50
+  content: 'Exact fix + verification:
+
+    1. Run terraform state list to confirm the state is readable again.
+
+    2. Re-run the lab checker (`check.sh` or Check Solution).
+
+    3. Confirm every scenario objective is satisfied.
+
+
+    WHY: the grader validates real state — marker files are ignored.'
 requires_companion_hosts: false
 dual_terminal: false
 jira_priority: Critical
+technology: terraform
+summary: Complete the terraform remote state corrupted terraform lab and verify success with the checker
+estimated_minutes: 40
+xp_reward: 100
+prerequisites:
+- Basic terraform literacy
+tags:
+- fix
+- hands-on
+- terraform
+linked_tutorial: terraform-fundamentals
+what_you_will_learn:
+- Identify the corruption by running terraform state list and observing the parse error
+- List S3 object versions for the state file and identify the last known-good version
+- Restore the previous version as the current state object in S3
+- Run terraform state list to confirm the state is readable again
+environment:
+  nodes:
+  - role: primary
+    os: FixitLab Terraform workspace
+    hostname: lab-primary
+    ip: 127.0.0.1
+    specs: local offline simulation
+  pre_installed:
+  - bash
+  - coreutils
+  - terraform
+  credentials:
+  - user: root
+    password: lab123
+tasks:
+- id: task_1
+  title: Terraform Remote State Corrupted
+  description: Restore healthy behavior for Terraform Remote State Corrupted by investigating the failure,
+    applying the smallest safe fix, and validating the outcome.
+  background: 'This terraform lab teaches systematic troubleshooting: observe, hypothesize, change, verify.'
+  validation:
+    type: custom_script
+    script: check.sh
+    error_message: Validation did not pass. Re-read the objectives and Hint 2 diagnostic steps.
+solution:
+  summary: Identify the misconfiguration affecting this terraform lab and apply the minimal fix.
+  files_changed: []
+  commands_run:
+  - bash check.sh
+  reference_docs: terraform-fundamentals

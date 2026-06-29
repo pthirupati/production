@@ -1,8 +1,7 @@
----
 slug: junit-flaky-test
-title: "Flaky JUnit Test Failing Intermittently in CI"
-technology: Java
-category: "Testing"
+title: Flaky JUnit Test Failing Intermittently in CI
+technology: java
+category: Fix
 difficulty: medium
 time_limit: 900
 max_score: 100
@@ -11,22 +10,108 @@ simulation_type: java
 infrastructure_type: simulation
 jira_priority: Medium
 is_free: false
-description: |
-  A JUnit test passes locally but fails randomly in CI. The flakiness comes from a hidden dependency on test-execution order and wall-clock time (a shared static field plus a Thread.sleep race). Make the test deterministic so it passes reliably regardless of ordering or timing.
+description: 'CONTEXT: A team operating Java applications needs you to resolve `Flaky JUnit Test Failing
+  Intermittently in CI` during a realistic incident. The business impact is reduced service reliability
+  until the underlying state is repaired.
+
+
+  ENVIRONMENT: You are working in FixitLab''s offline Java project with Maven/Gradle, JVM logs, and Spring
+  configuration. All tools run locally; no paid APIs or external cloud calls are required.
+
+
+  SYMPTOM / STARTING STATE: Test at /app/src/test/java/com/example/OrderServiceTest.java shares a static
+  field across tests and sleeps on a timing assumption, so it fails intermittently. A JUnit test passes
+  locally but fails randomly in CI. The flakiness comes from a hidden dependency on test-execution order
+  and wall-clock time (a shared static field plus a Thread.sleep race). Make the test deterministic so
+  it passes reliably regardless of ordering or timing.
+
+
+  OBJECTIVE: Reproduce the intermittent failure and find the non-deterministic dependency; Remove shared
+  mutable state / order coupling between tests; Replace timing races with deterministic synchronization
+  or a fixed clock. Success means `check.sh` exits successfully.
+
+
+  WHAT TO AVOID: Do not apply broad destructive changes, skip evidence gathering, or fake completion with
+  marker files — the checker validates real system state.'
 objectives:
-  - "Reproduce the intermittent failure and find the non-deterministic dependency"
-  - "Remove shared mutable state / order coupling between tests"
-  - "Replace timing races with deterministic synchronization or a fixed clock"
-  - "Run the suite repeatedly and confirm it is stable"
-initial_state: |
-  Test at /app/src/test/java/com/example/OrderServiceTest.java shares a static field across tests and sleeps on a timing assumption, so it fails intermittently.
+- Reproduce the intermittent failure and find the non-deterministic dependency
+- Remove shared mutable state / order coupling between tests
+- Replace timing races with deterministic synchronization or a fixed clock
+- Run the suite repeatedly and confirm it is stable
+initial_state: 'Test at /app/src/test/java/com/example/OrderServiceTest.java shares a static field across
+  tests and sleeps on a timing assumption, so it fails intermittently.
+
+  '
 hints:
-  - order: 1
-    cost: 10
-    content: "Run the test many times / in random order to surface the flake."
-  - order: 2
-    cost: 15
-    content: "Reset shared static state in @BeforeEach and stop relying on test order."
-  - order: 3
-    cost: 20
-    content: "Replace Thread.sleep with awaitility/latch or inject a fixed Clock for time."
+- order: 1
+  cost: 0
+  content: 'Where to look: Reproduce the intermittent failure and find the non-deterministic dependency'
+- order: 2
+  cost: 25
+  content: 'Diagnostic steps:
+
+    1. Remove shared mutable state / order coupling between tests
+
+    2. Replace timing races with deterministic synchronization or a fixed clock
+
+    3. Run the suite repeatedly and confirm it is stable'
+- order: 3
+  cost: 50
+  content: 'Exact fix + verification:
+
+    1. Run the suite repeatedly and confirm it is stable.
+
+    2. Re-run the lab checker (`check.sh` or Check Solution).
+
+    3. Confirm every scenario objective is satisfied.
+
+
+    WHY: the grader validates real state — marker files are ignored.'
+summary: Complete the flaky junit test failing intermittently in ci java lab and verify success with the
+  checker
+estimated_minutes: 15
+xp_reward: 100
+prerequisites:
+- Basic java literacy
+tags:
+- fix
+- hands-on
+- java
+linked_tutorial: java-fundamentals
+what_you_will_learn:
+- Reproduce the intermittent failure and find the non-deterministic dependency
+- Remove shared mutable state / order coupling between tests
+- Replace timing races with deterministic synchronization or a fixed clock
+- Run the suite repeatedly and confirm it is stable
+environment:
+  nodes:
+  - role: primary
+    os: FixitLab Java project
+    hostname: lab-primary
+    ip: 127.0.0.1
+    specs: local offline simulation
+  pre_installed:
+  - bash
+  - coreutils
+  - java
+  - journalctl
+  - systemctl
+  credentials:
+  - user: root
+    password: lab123
+tasks:
+- id: task_1
+  title: Flaky JUnit Test Failing Intermittently in CI
+  description: Restore healthy behavior for Flaky JUnit Test Failing Intermittently in CI by investigating
+    the failure, applying the smallest safe fix, and validating the outcome.
+  background: 'This java lab teaches systematic troubleshooting: observe, hypothesize, change, verify.'
+  validation:
+    type: custom_script
+    script: check.sh
+    error_message: Validation did not pass. Re-read the objectives and Hint 2 diagnostic steps.
+solution:
+  summary: Identify the misconfiguration affecting this java lab and apply the minimal fix.
+  files_changed: []
+  commands_run:
+  - bash check.sh
+  reference_docs: java-fundamentals

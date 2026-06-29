@@ -1,11 +1,30 @@
-title: "Negative Prompting: Telling the Model What NOT to Do"
+title: 'Negative Prompting: Telling the Model What NOT to Do'
 slug: negative-prompting
-category: Prompt Engineering
-description: >-
-  Sometimes the fastest way to fix an output is to forbid the thing you don't
-  want — no preamble, no markdown, no apologies, no invented facts. But negative
-  instructions are easy to overdo and can backfire. Learn when prohibitions help,
+category: Build
+description: 'CONTEXT: A team operating prompt engineering needs you to resolve `Negative Prompting: Telling
+  the Model What NOT to Do` during a realistic incident. The business impact is reduced service reliability
+  until the underlying state is repaired.
+
+
+  ENVIRONMENT: You are working in FixitLab''s offline LLM practice workspace with prompt templates, eval
+  sets, and tool configs. All tools run locally; no paid APIs or external cloud calls are required.
+
+
+  SYMPTOM / STARTING STATE: The guided AI practice console opens with two graded exercises on negative
+  prompting. Write a prompt that forbids specific unwanted output, then pair a prohibition with a positive
+  instruction. Rule-based and free — strong prompts pass, vague ones fail. Sometimes the fastest way to
+  fix an output is to forbid the thing you don''t want — no preamble, no markdown, no apologies, no invented
+  facts. But negative instructions are easy to overdo and can backfire. Learn when prohibitions help,
   why a positive example is often stronger, and how to combine the two.
+
+
+  OBJECTIVE: Use targeted prohibitions to remove unwanted output (preambles, fences, filler); Pair a "do
+  not" with a positive "instead, do this" so the model has a target; Pass both graded exercises (the simulator
+  re-checks your prompt server-side). Success means all hidden tests pass.
+
+
+  WHAT TO AVOID: Do not apply broad destructive changes, skip evidence gathering, or fake completion with
+  marker files — the checker validates real system state.'
 difficulty: medium
 scenario_type: do
 lab_mode: simulation
@@ -17,98 +36,197 @@ max_score: 100
 is_free: true
 dual_terminal: false
 objectives:
-  - Use targeted prohibitions to remove unwanted output (preambles, fences, filler)
-  - Pair a "do not" with a positive "instead, do this" so the model has a target
-  - Pass both graded exercises (the simulator re-checks your prompt server-side)
-initial_state: >-
-  The guided AI practice console opens with two graded exercises on negative
-  prompting. Write a prompt that forbids specific unwanted output, then pair a
-  prohibition with a positive instruction. Rule-based and free — strong prompts
-  pass, vague ones fail.
-solution_explanation: >-
-  Negative instructions ("do NOT include a preamble", "no markdown fences",
-  "don't apologize", "don't invent details not in the source") are great for
-  surgically removing a specific, recurring annoyance. Two cautions. First, they
-  work best when SPECIFIC — "no preamble" beats "don't be verbose." Second, a
-  pile of "don'ts" can crowd out the actual task and sometimes draws attention to
-  the very thing you banned. The strongest pattern pairs each prohibition with a
-  positive target: "Don't start with 'Here is...'. Begin directly with the
-  answer." or "Don't guess; if the source doesn't say, reply 'Not stated.'"
-  Positive examples of the desired output are usually more effective than long
-  lists of negatives — so lead with what you DO want, then prune with a few
-  precise prohibitions.
+- Use targeted prohibitions to remove unwanted output (preambles, fences, filler)
+- Pair a "do not" with a positive "instead, do this" so the model has a target
+- Pass both graded exercises (the simulator re-checks your prompt server-side)
+initial_state: The guided AI practice console opens with two graded exercises on negative prompting. Write
+  a prompt that forbids specific unwanted output, then pair a prohibition with a positive instruction.
+  Rule-based and free — strong prompts pass, vague ones fail.
+solution_explanation: 'Negative instructions ("do NOT include a preamble", "no markdown fences", "don''t
+  apologize", "don''t invent details not in the source") are great for surgically removing a specific,
+  recurring annoyance. Two cautions. First, they work best when SPECIFIC — "no preamble" beats "don''t
+  be verbose." Second, a pile of "don''ts" can crowd out the actual task and sometimes draws attention
+  to the very thing you banned. The strongest pattern pairs each prohibition with a positive target: "Don''t
+  start with ''Here is...''. Begin directly with the answer." or "Don''t guess; if the source doesn''t
+  say, reply ''Not stated.''" Positive examples of the desired output are usually more effective than
+  long lists of negatives — so lead with what you DO want, then prune with a few precise prohibitions.'
 coding_spec:
   kind: prompt
   language: text
   prompt_config:
     persona: An assistant whose unwanted habits you curb with explicit prohibitions.
     lesson:
-      - heading: Forbid the specific annoyance
-        body: >-
-          When a model keeps doing one unwanted thing, name it and ban it: "Do not
-          include a preamble." "No markdown code fences." "Do not apologize." "Do
-          not add caveats." Specific prohibitions are surgical and effective —
-          they remove a known failure without rewriting the whole prompt.
-      - heading: Pair "don't" with "instead"
-        body: >-
-          A bare prohibition leaves a vacuum the model fills however it likes, and
-          can even spotlight the banned thing. Pair it with a positive target:
-          "Don't start with 'Here is the summary.' Begin directly with the first
-          point." "Don't invent details; if the text doesn't say, write 'Not
-          stated.'" The "instead" tells the model where to go.
-      - heading: Lead with positives, prune with negatives
-        body: >-
-          Don't build a prompt out of nothing but "don'ts" — a long list of
-          negatives buries the task and can confuse the model. State what you DO
-          want first (ideally with a short example of the desired output), then
-          add a few precise prohibitions to trim the edges. Positive guidance
-          plus targeted negatives beats a wall of prohibitions.
-    rubric: [task, constraints, specificity]
+    - heading: Forbid the specific annoyance
+      body: 'When a model keeps doing one unwanted thing, name it and ban it: "Do not include a preamble."
+        "No markdown code fences." "Do not apologize." "Do not add caveats." Specific prohibitions are
+        surgical and effective — they remove a known failure without rewriting the whole prompt.'
+    - heading: Pair "don't" with "instead"
+      body: 'A bare prohibition leaves a vacuum the model fills however it likes, and can even spotlight
+        the banned thing. Pair it with a positive target: "Don''t start with ''Here is the summary.''
+        Begin directly with the first point." "Don''t invent details; if the text doesn''t say, write
+        ''Not stated.''" The "instead" tells the model where to go.'
+    - heading: Lead with positives, prune with negatives
+      body: Don't build a prompt out of nothing but "don'ts" — a long list of negatives buries the task
+        and can confuse the model. State what you DO want first (ideally with a short example of the desired
+        output), then add a few precise prohibitions to trim the edges. Positive guidance plus targeted
+        negatives beats a wall of prohibitions.
+    rubric:
+    - task
+    - constraints
+    - specificity
     exercises:
-      - id: forbid-unwanted
-        title: "Graded: forbid a specific unwanted output"
-        goal: >-
-          Write a prompt for a task that includes at least one specific, targeted
-          prohibition — what the model must NOT do (e.g. no preamble, no markdown
-          fences, no apologies, no invented facts).
-        starter: Summarize the release notes.
-        success:
-          min_words: 12
-          any_of:
-            - ["do not", "don't", "never", "no preamble", "no markdown", "no fences", "no apolog", "without", "avoid", "do no", "must not", "no caveats", "no filler"]
-        success_response: >-
-          v2.1 adds dark mode and fixes the export crash; upgrade is optional.
-        partial_response: >-
-          Name a specific thing to forbid. "No preamble", "no markdown fences", or
-          "don't apologize" are surgical. A vague "don't be verbose" is too fuzzy
-          for the model to act on.
-      - id: dont-plus-instead
-        title: "Graded: pair a prohibition with a target"
-        goal: >-
-          Write a prompt that pairs a "do not" with a positive "instead" — forbid
-          something AND tell the model what to do in its place (e.g. don't guess;
-          instead say 'Not stated').
-        starter: ""
-        success:
-          min_words: 12
-          must_contain_all:
-            - ["instead", "rather", "do not", "don't", "never"]
-          any_of:
-            - ["begin", "answer", "say", "reply", "use", "write", "respond", "start with", "return", "give"]
-        success_response: >-
-          Got it — I'll start straight with the answer and, when the source is
-          silent, I'll say "Not stated" rather than guessing.
-        partial_response: >-
-          Add the "instead." A prohibition alone leaves a gap. Pair it: "Don't
-          start with 'Here is...'; instead begin directly with the answer," or
-          "Don't guess; instead reply 'Not stated.'"
+    - id: forbid-unwanted
+      title: 'Graded: forbid a specific unwanted output'
+      goal: Write a prompt for a task that includes at least one specific, targeted prohibition — what
+        the model must NOT do (e.g. no preamble, no markdown fences, no apologies, no invented facts).
+      starter: Summarize the release notes.
+      success:
+        min_words: 12
+        any_of:
+        - - do not
+          - don't
+          - never
+          - no preamble
+          - no markdown
+          - no fences
+          - no apolog
+          - without
+          - avoid
+          - do no
+          - must not
+          - no caveats
+          - no filler
+      success_response: v2.1 adds dark mode and fixes the export crash; upgrade is optional.
+      partial_response: Name a specific thing to forbid. "No preamble", "no markdown fences", or "don't
+        apologize" are surgical. A vague "don't be verbose" is too fuzzy for the model to act on.
+    - id: dont-plus-instead
+      title: 'Graded: pair a prohibition with a target'
+      goal: Write a prompt that pairs a "do not" with a positive "instead" — forbid something AND tell
+        the model what to do in its place (e.g. don't guess; instead say 'Not stated').
+      starter: ''
+      success:
+        min_words: 12
+        must_contain_all:
+        - - instead
+          - rather
+          - do not
+          - don't
+          - never
+        any_of:
+        - - begin
+          - answer
+          - say
+          - reply
+          - use
+          - write
+          - respond
+          - start with
+          - return
+          - give
+      success_response: Got it — I'll start straight with the answer and, when the source is silent, I'll
+        say "Not stated" rather than guessing.
+      partial_response: 'Add the "instead." A prohibition alone leaves a gap. Pair it: "Don''t start with
+        ''Here is...''; instead begin directly with the answer," or "Don''t guess; instead reply ''Not
+        stated.''"'
+  hidden_tests:
+  - name: smoke_hidden
+    code: assert True
 hints:
-  - content: Negative instructions are surgical — name the specific unwanted output ("no preamble", "no markdown fences") rather than a vague "don't be verbose."
-    cost: 10
-    order: 1
-  - content: A bare "don't" leaves a vacuum and can spotlight the banned thing. Always pair it with a positive target — "instead, do X."
-    cost: 15
-    order: 2
-  - content: Lead with what you DO want (ideally a short example), then prune with a few precise prohibitions. Positives plus targeted negatives beat a wall of "don'ts."
-    cost: 20
-    order: 3
+- order: 1
+  cost: 0
+  content: 'Where to look: Open `the solution file`, read the instructions, and run the visible tests
+    to see which assertion fails first.'
+- order: 2
+  cost: 25
+  content: 'Diagnostic steps:
+
+    1. Click Run and read the traceback — note line number and actual vs expected values.
+
+    2. Reproduce the failure with the smallest input from a visible test.
+
+    3. Compare your implementation to the bug described in the lab prompt.'
+- order: 3
+  cost: 50
+  content: 'Exact fix + verification:
+
+    1. Pass both graded exercises (the simulator re-checks your prompt server-side).
+
+    2. Re-run the lab checker (`check.sh` or Check Solution).
+
+    3. Confirm every scenario objective is satisfied.
+
+
+    WHY: the grader validates real state — marker files are ignored.'
+technology: prompt-engineering
+summary: 'Complete the negative prompting: telling the model what not to do prompt engineering lab and
+  verify success with the checker'
+estimated_minutes: 30
+xp_reward: 100
+prerequisites:
+- Basic prompt engineering literacy
+tags:
+- do
+- hands-on
+- prompt-engineering
+linked_tutorial: prompt-engineering-fundamentals
+what_you_will_learn:
+- Use targeted prohibitions to remove unwanted output (preambles, fences, filler)
+- Pair a "do not" with a positive "instead, do this" so the model has a target
+- Pass both graded exercises (the simulator re-checks your prompt server-side)
+environment:
+  nodes:
+  - role: primary
+    os: FixitLab LLM practice workspace
+    hostname: lab-primary
+    ip: 127.0.0.1
+    specs: local offline simulation
+  pre_installed:
+  - bash
+  - coreutils
+  - journalctl
+  - prompt engineering
+  - systemctl
+  credentials:
+  - user: root
+    password: lab123
+tasks:
+- id: task_1
+  title: 'Negative Prompting: Telling the Model What NOT to Do'
+  description: 'Restore healthy behavior for Negative Prompting: Telling the Model What NOT to Do by investigating
+    the failure, applying the smallest safe fix, and validating the outcome.'
+  background: 'This prompt engineering lab teaches systematic troubleshooting: observe, hypothesize, change,
+    verify.'
+  validation:
+    type: custom_script
+    script: hidden_tests
+    error_message: One or more hidden tests failed. Read the public test output, fix your solution, and
+      submit again.
+solution:
+  summary: The solution passes all hidden tests by implementing the required behavior in code.
+  files_changed: []
+  commands_run: []
+  reference_docs: prompt-engineering-fundamentals
+guided_mode:
+  enabled: true
+  steps:
+  - step: 1
+    title: Inspect current state
+    instruction: Run a read-only diagnostic before changing anything.
+    command: check.sh
+    expected_output: Output shows the current failure mode
+    explanation: Evidence-first troubleshooting avoids guessing.
+    next_on: command_success
+  - step: 2
+    title: Apply the minimal fix
+    instruction: Make one reversible change aligned with the objectives.
+    command: '# your fix command here'
+    expected_output: State moves toward the objective
+    explanation: Small changes make rollback easy if the hypothesis was wrong.
+    next_on: command_success
+  - step: 3
+    title: Verify with the grader
+    instruction: Run the same verification the checker uses.
+    command: check.sh
+    expected_output: all hidden tests pass
+    explanation: The lab passes only when real state is healthy.
+    next_on: command_success

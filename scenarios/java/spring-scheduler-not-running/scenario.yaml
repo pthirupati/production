@@ -1,8 +1,7 @@
----
 slug: java-spring-scheduler-not-running
-title: "Scheduled Job Never Fires (@Scheduled Not Enabled)"
-technology: Java
-category: "Spring Boot"
+title: Scheduled Job Never Fires (@Scheduled Not Enabled)
+technology: java
+category: Fix
 difficulty: easy
 time_limit: 600
 max_score: 100
@@ -11,22 +10,107 @@ simulation_type: java
 infrastructure_type: simulation
 jira_priority: Medium
 is_free: false
-description: |
-  A nightly cleanup never runs: the @Scheduled method exists but the application never enabled scheduling (@EnableScheduling is missing) and the cron expression is malformed, so the task is silently ignored. Enable scheduling and fix the cron so the job fires on time.
+description: 'CONTEXT: A team operating Java applications needs you to resolve `Scheduled Job Never Fires
+  (@Scheduled Not Enabled)` during a realistic incident. The business impact is reduced service reliability
+  until the underlying state is repaired.
+
+
+  ENVIRONMENT: You are working in FixitLab''s offline Java project with Maven/Gradle, JVM logs, and Spring
+  configuration. All tools run locally; no paid APIs or external cloud calls are required.
+
+
+  SYMPTOM / STARTING STATE: CleanupJob at /app/src/main/java/com/example/jobs/CleanupJob.java has @Scheduled
+  but the app lacks @EnableScheduling and the cron string is invalid. A nightly cleanup never runs: the
+  @Scheduled method exists but the application never enabled scheduling (@EnableScheduling is missing)
+  and the cron expression is malformed, so the task is silently ignored. Enable scheduling and fix the
+  cron so the job fires on time.
+
+
+  OBJECTIVE: Confirm the @Scheduled task never executes; Enable scheduling on a configuration class; Correct
+  the cron expression to the intended schedule. Success means `check.sh` exits successfully.
+
+
+  WHAT TO AVOID: Do not apply broad destructive changes, skip evidence gathering, or fake completion with
+  marker files — the checker validates real system state.'
 objectives:
-  - "Confirm the @Scheduled task never executes"
-  - "Enable scheduling on a configuration class"
-  - "Correct the cron expression to the intended schedule"
-  - "Verify the job fires at the expected time"
-initial_state: |
-  CleanupJob at /app/src/main/java/com/example/jobs/CleanupJob.java has @Scheduled but the app lacks @EnableScheduling and the cron string is invalid.
+- Confirm the @Scheduled task never executes
+- Enable scheduling on a configuration class
+- Correct the cron expression to the intended schedule
+- Verify the job fires at the expected time
+initial_state: 'CleanupJob at /app/src/main/java/com/example/jobs/CleanupJob.java has @Scheduled but the
+  app lacks @EnableScheduling and the cron string is invalid.
+
+  '
 hints:
-  - order: 1
-    cost: 10
-    content: "No 'Scheduled tasks' thread runs — scheduling was never enabled."
-  - order: 2
-    cost: 15
-    content: "Add @EnableScheduling to a @Configuration class."
-  - order: 3
-    cost: 20
-    content: "Fix the 6-field Spring cron (sec min hour dom mon dow) and confirm it triggers."
+- order: 1
+  cost: 0
+  content: 'Where to look: Confirm the @Scheduled task never executes'
+- order: 2
+  cost: 25
+  content: 'Diagnostic steps:
+
+    1. Enable scheduling on a configuration class
+
+    2. Correct the cron expression to the intended schedule
+
+    3. Verify the job fires at the expected time'
+- order: 3
+  cost: 50
+  content: 'Exact fix + verification:
+
+    1. Verify the job fires at the expected time.
+
+    2. Re-run the lab checker (`check.sh` or Check Solution).
+
+    3. Confirm every scenario objective is satisfied.
+
+
+    WHY: the grader validates real state — marker files are ignored.'
+summary: Complete the scheduled job never fires (@scheduled not enabled) java lab and verify success with
+  the checker
+estimated_minutes: 10
+xp_reward: 100
+prerequisites:
+- Basic java literacy
+tags:
+- fix
+- hands-on
+- java
+linked_tutorial: java-fundamentals
+what_you_will_learn:
+- Confirm the @Scheduled task never executes
+- Enable scheduling on a configuration class
+- Correct the cron expression to the intended schedule
+- Verify the job fires at the expected time
+environment:
+  nodes:
+  - role: primary
+    os: FixitLab Java project
+    hostname: lab-primary
+    ip: 127.0.0.1
+    specs: local offline simulation
+  pre_installed:
+  - bash
+  - coreutils
+  - java
+  - journalctl
+  - systemctl
+  credentials:
+  - user: root
+    password: lab123
+tasks:
+- id: task_1
+  title: Scheduled Job Never Fires (@Scheduled Not Enabled)
+  description: Restore healthy behavior for Scheduled Job Never Fires (@Scheduled Not Enabled) by investigating
+    the failure, applying the smallest safe fix, and validating the outcome.
+  background: 'This java lab teaches systematic troubleshooting: observe, hypothesize, change, verify.'
+  validation:
+    type: custom_script
+    script: check.sh
+    error_message: Validation did not pass. Re-read the objectives and Hint 2 diagnostic steps.
+solution:
+  summary: Identify the misconfiguration affecting this java lab and apply the minimal fix.
+  files_changed: []
+  commands_run:
+  - bash check.sh
+  reference_docs: java-fundamentals

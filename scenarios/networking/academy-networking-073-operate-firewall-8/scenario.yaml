@@ -1,7 +1,7 @@
-title: 'Networking: Host Firewall — Daily Operations'
+title: Host Firewall — Operate Lab
 slug: academy-networking-073-operate-firewall-8
-technology: Networking
-category: Operations
+technology: networking
+category: Build
 difficulty: medium
 scenario_type: do
 lab_mode: simulation
@@ -11,18 +11,37 @@ max_score: 100
 is_free: false
 infrastructure_type: docker
 jira_priority: Medium
-description: Service operations lab. The `nginx` systemd unit is **failed/inactive** on this host — a
-  realistic fault for Daily Operations workflows that depend on it. Diagnose with `systemctl status nginx`
-  and journal logs, apply the smallest reliable fix, then verify with `systemctl is-active nginx`.
+description: 'CONTEXT: A team operating network operations needs you to resolve `networking: Host Firewall
+  — Daily Operations` during a realistic incident. The business impact is reduced service reliability
+  until the underlying state is repaired.
+
+
+  ENVIRONMENT: You are working in FixitLab''s offline network lab with interfaces, routing tables, DNS,
+  and firewall rules. All tools run locally; no paid APIs or external cloud calls are required.
+
+
+  SYMPTOM / STARTING STATE: The network lab is healthy enough for scheduled work on host firewall. Complete
+  the maintenance task without unnecessary downtime. Day-2 operations: perform a routine host firewall
+  task safely in networking. Follow change control — inspect, change, verify — while working with allow/deny
+  rules, zones, services, and rule persistence.
+
+
+  OBJECTIVE: Day-2 host firewall work completes safely in this environment; Changes are verified with
+  before/after checks; The system remains stable for dependent teams. Success means `systemctl is-active
+  nginx` returns active.
+
+
+  WHAT TO AVOID: Do not apply broad destructive changes, skip evidence gathering, or fake completion with
+  marker files — the checker validates real system state.'
 objectives:
-- The `nginx` service is active (running)
-- '`systemctl is-active nginx` returns active'
-- The fix survives a status re-check (no marker files)
-initial_state: The `nginx` service is not running (`systemctl is-active nginx` → inactive/failed). Dependent
-  Daily Operations tasks cannot succeed until the unit is healthy again.
+- Day-2 host firewall work completes safely in this environment
+- Changes are verified with before/after checks
+- The system remains stable for dependent teams
+initial_state: The network lab is healthy enough for scheduled work on host firewall. Complete the maintenance
+  task without unnecessary downtime.
 hints:
 - order: 1
-  cost: 10
+  cost: 0
   content: 'Orient yourself before changing anything:
 
     1. Inspect the current state — `firewall-cmd --list-all`, `iptables -S`, `ufw status`, or Windows
@@ -33,17 +52,15 @@ hints:
     3. Recall the core idea: allow/deny rules, zones, services, and rule persistence. Form one hypothesis
     before you act.'
 - order: 2
-  cost: 15
-  content: 'Plan your approach (still no spoilers):
-
-    1. Confirm the exact gap between current and desired state for host firewall.
-
-    2. Decide the single smallest change that moves you toward the objective.
-
-    3. Capture evidence (command output / status) before the change so you can prove it worked afterward.'
-- order: 3
   cost: 25
-  content: 'Guided walkthrough:
+  content: 'Diagnostic steps:
+
+    1. Changes are verified with before/after checks
+
+    2. The system remains stable for dependent teams'
+- order: 3
+  cost: 50
+  content: 'Exact fix + verification:
 
     1. Re-check the current state — `firewall-cmd --list-all`, `iptables -S`, `ufw status`, or Windows
     firewall cmdlets.
@@ -53,4 +70,76 @@ hints:
 
     3. Verify the result — only the intended ports and sources are permitted.
 
-    4. Click Check Solution once `systemctl is-active nginx` returns active.'
+    4. Click Check Solution once the objective is met (graded on real state, not a marker file).'
+summary: Complete the host firewall — operate lab networking lab and verify success with the checker
+estimated_minutes: 20
+xp_reward: 100
+prerequisites:
+- Basic networking literacy
+tags:
+- do
+- hands-on
+- networking
+linked_tutorial: networking-fundamentals
+what_you_will_learn:
+- Day-2 host firewall work completes safely in this environment
+- Changes are verified with before/after checks
+- The system remains stable for dependent teams
+environment:
+  nodes:
+  - role: primary
+    os: FixitLab network lab
+    hostname: lab-primary
+    ip: 127.0.0.1
+    specs: local offline simulation
+  pre_installed:
+  - bash
+  - coreutils
+  - journalctl
+  - networking
+  - systemctl
+  credentials:
+  - user: root
+    password: lab123
+tasks:
+- id: task_1
+  title: Host Firewall — Operate Lab
+  description: Restore healthy behavior for Host Firewall — Operate Lab by investigating the failure,
+    applying the smallest safe fix, and validating the outcome.
+  background: 'This networking lab teaches systematic troubleshooting: observe, hypothesize, change, verify.'
+  validation:
+    type: service_active
+    command: systemctl is-active nginx
+    expected_status: active
+    error_message: The nginx service is not active yet. Check `systemctl status nginx` and `journalctl
+      -u nginx -n 50`.
+solution:
+  summary: The root cause is an unhealthy `nginx` service; repair it and verify active state.
+  files_changed: []
+  commands_run:
+  - systemctl is-active nginx
+  reference_docs: networking-fundamentals
+guided_mode:
+  enabled: true
+  steps:
+  - step: 1
+    title: Inspect current state
+    instruction: Run a read-only diagnostic before changing anything.
+    command: systemctl is-active nginx
+    expected_output: Output shows the current failure mode
+    explanation: Evidence-first troubleshooting avoids guessing.
+    next_on: command_success
+  - step: 2
+    title: Apply the minimal fix
+    instruction: Make one reversible change aligned with the objectives.
+    command: '# your fix command here'
+    expected_output: State moves toward the objective
+    explanation: Small changes make rollback easy if the hypothesis was wrong.
+    next_on: command_success
+  - step: 3
+    title: Verify with the grader
+    instruction: Run the same verification the checker uses.
+    command: systemctl is-active nginx
+    expected_output: '`systemctl is-active nginx` returns active'
+    explanation: The lab passes only when real state is healthy.
+    next_on: command_success

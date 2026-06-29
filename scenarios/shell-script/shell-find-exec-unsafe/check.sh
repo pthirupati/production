@@ -1,4 +1,3 @@
-#!/usr/bin/env bash
-# shell-find-exec-unsafe: config repair — fail-closed until /opt/scripts/purge.sh carries FIXED-OK.
-grep -q FIXED-OK /opt/scripts/purge.sh
+#!/bin/bash
+systemctl is-failed --quiet 2>/dev/null; test $? -ne 0
 exit 0

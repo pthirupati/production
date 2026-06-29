@@ -1,28 +1,113 @@
 title: Terraform Module Using Unpinned Version
 slug: terraform-module-version-pinning
 difficulty: easy
-category: Terraform
-description: 'A Terraform module source is referencing a Git repository or Terraform Registry module without a pinned version, causing inconsistent deployments as the upstream module changes. Pin the module to a specific version or tag.'
-initial_state: 'Simulated Terraform project where a module block uses source without a version constraint, or uses a floating ref like ?ref=main. Different team members get different infrastructure depending on when they run terraform init.'
+category: Fix
+description: 'CONTEXT: A team operating Terraform IaC needs you to resolve `Terraform Module Using Unpinned
+  Version` during a realistic incident. The business impact is reduced service reliability until the underlying
+  state is repaired.
+
+
+  ENVIRONMENT: You are working in FixitLab''s offline Terraform workspace with HCL files, state, and plan/apply
+  workflow. All tools run locally; no paid APIs or external cloud calls are required.
+
+
+  SYMPTOM / STARTING STATE: Simulated Terraform project where a module block uses source without a version
+  constraint, or uses a floating ref like ?ref=main. Different team members get different infrastructure
+  depending on when they run terraform init. A Terraform module source is referencing a Git repository
+  or Terraform Registry module without a pinned version, causing inconsistent deployments as the upstream
+  module changes. Pin the module to a specific version or tag.
+
+
+  OBJECTIVE: Identify the unpinned module source reference in the Terraform configuration; Add a version
+  constraint (Registry module) or a specific Git tag ref to the source; Run terraform init -upgrade to
+  lock the pinned version into .terraform.lock.hcl. Success means `check.sh` exits successfully.
+
+
+  WHAT TO AVOID: Do not apply broad destructive changes, skip evidence gathering, or fake completion with
+  marker files — the checker validates real system state.'
+initial_state: Simulated Terraform project where a module block uses source without a version constraint,
+  or uses a floating ref like ?ref=main. Different team members get different infrastructure depending
+  on when they run terraform init.
 objectives:
-  - Identify the unpinned module source reference in the Terraform configuration
-  - Add a version constraint (Registry module) or a specific Git tag ref to the source
-  - Run terraform init -upgrade to lock the pinned version into .terraform.lock.hcl
+- Identify the unpinned module source reference in the Terraform configuration
+- Add a version constraint (Registry module) or a specific Git tag ref to the source
+- Run terraform init -upgrade to lock the pinned version into .terraform.lock.hcl
 lab_mode: simulation
 simulation_type: terraform
 time_limit: 1200
 max_score: 100
 is_free: true
 hints:
-  - content: 'Look for module blocks in your .tf files. A Registry module should have a version = "x.y.z" argument. A Git source should use ?ref=v1.2.3.'
-    cost: 10
-    order: 1
-  - content: 'Check the Terraform Registry (registry.terraform.io) or the module Git repo for the latest stable release tag to use as the pinned version.'
-    cost: 15
-    order: 2
-  - content: 'After pinning, run: terraform init -upgrade and commit the updated .terraform.lock.hcl so all team members use the same module version.'
-    cost: 20
-    order: 3
+- order: 1
+  cost: 0
+  content: 'Where to look: Run `terraform validate` in the module directory for precise error paths.'
+- order: 2
+  cost: 25
+  content: 'Diagnostic steps:
+
+    1. `terraform init` if providers are missing.
+
+    2. `terraform validate` — read file:line references.
+
+    3. Cross-check variable names and resource blocks against the error.'
+- order: 3
+  cost: 50
+  content: 'Exact fix + verification:
+
+    1. Fix the reported syntax or reference error.
+
+    2. Re-run `terraform validate` until it prints Success.
+
+    3. Optionally `terraform plan` to confirm no new errors.
+
+
+    WHY: validate catches config errors before any apply.'
 requires_companion_hosts: false
 dual_terminal: false
 jira_priority: Low
+technology: terraform
+summary: Complete the terraform module using unpinned version terraform lab and verify success with the
+  checker
+estimated_minutes: 20
+xp_reward: 100
+prerequisites:
+- Basic terraform literacy
+tags:
+- fix
+- hands-on
+- terraform
+linked_tutorial: terraform-fundamentals
+what_you_will_learn:
+- Identify the unpinned module source reference in the Terraform configuration
+- Add a version constraint (Registry module) or a specific Git tag ref to the source
+- Run terraform init -upgrade to lock the pinned version into .terraform.lock.hcl
+environment:
+  nodes:
+  - role: primary
+    os: FixitLab Terraform workspace
+    hostname: lab-primary
+    ip: 127.0.0.1
+    specs: local offline simulation
+  pre_installed:
+  - bash
+  - coreutils
+  - terraform
+  credentials:
+  - user: root
+    password: lab123
+tasks:
+- id: task_1
+  title: Terraform Module Using Unpinned Version
+  description: Restore healthy behavior for Terraform Module Using Unpinned Version by investigating the
+    failure, applying the smallest safe fix, and validating the outcome.
+  background: 'This terraform lab teaches systematic troubleshooting: observe, hypothesize, change, verify.'
+  validation:
+    type: custom_script
+    script: check.sh
+    error_message: Validation did not pass. Re-read the objectives and Hint 2 diagnostic steps.
+solution:
+  summary: Identify the misconfiguration affecting this terraform lab and apply the minimal fix.
+  files_changed: []
+  commands_run:
+  - bash check.sh
+  reference_docs: terraform-fundamentals

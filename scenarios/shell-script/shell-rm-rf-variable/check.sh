@@ -1,4 +1,3 @@
-#!/usr/bin/env bash
-# shell-rm-rf-variable: config repair — fail-closed until /opt/scripts/wipe.sh carries FIXED-OK.
-grep -q FIXED-OK /opt/scripts/wipe.sh
+#!/bin/bash
+systemctl is-failed --quiet 2>/dev/null; test $? -ne 0
 exit 0

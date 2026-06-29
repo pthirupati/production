@@ -1,13 +1,31 @@
 title: Handler Not Triggered After Task
 slug: ansible-handler-not-notified
 difficulty: hard
-category: Ansible Automation
-description: 'A playbook deploys a new nginx configuration file but the nginx service is never reloaded
-  — the handler is defined but never triggered. The notify directive is misspelled (case mismatch), the
-  handler name has a leading space, and the task is marked changed_when: false, preventing the notification.
-  All three issues must be fixed.
+category: Fix
+description: 'CONTEXT: A team operating Ansible automation needs you to resolve `Handler Not Triggered
+  After Task` during a realistic incident. The business impact is reduced service reliability until the
+  underlying state is repaired.
 
-  '
+
+  ENVIRONMENT: You are working in FixitLab''s offline Ansible control node with inventory, playbooks,
+  roles, and ansible-playbook. All tools run locally; no paid APIs or external cloud calls are required.
+
+
+  SYMPTOM / STARTING STATE: Simulated control node. Playbook deploys nginx.conf but after the run the
+  old configuration is still active. No "RUNNING HANDLER" line appears in the output. A playbook deploys
+  a new nginx configuration file but the nginx service is never reloaded — the handler is defined but
+  never triggered. The notify directive is misspelled (case mismatch), the handler name has a leading
+  space, and the task is marked changed_when: false, preventing the notification. All three issues must
+  be fixed.
+
+
+  OBJECTIVE: Inspect the playbook to find why the handler is not being notified; Fix the notify name,
+  handler name formatting, and changed_when setting; Verify the handler runs (nginx reloads) on the next
+  playbook execution. Success means `check.sh` exits successfully.
+
+
+  WHAT TO AVOID: Do not apply broad destructive changes, skip evidence gathering, or fake completion with
+  marker files — the checker validates real system state.'
 initial_state: 'Simulated control node. Playbook deploys nginx.conf but after the run the old configuration
   is still active. No "RUNNING HANDLER" line appears in the output.
 
@@ -23,19 +41,74 @@ max_score: 100
 is_free: false
 hints:
 - order: 1
-  cost: 10
-  content: 'Run the playbook and note there is no "RUNNING HANDLER" line: `ansible-playbook site.yml`.
-    Inspect the handler and the task''s notify string — they must match exactly.'
+  cost: 0
+  content: 'Where to look: Inspect the playbook to find why the handler is not being notified'
 - order: 2
-  cost: 20
-  content: 'Handler names are case-sensitive and whitespace-sensitive: a notify of "reload nginx" won''t
-    match a handler named "Reload nginx" or " reload nginx". Also, `changed_when: false` on the task means
-    it never reports changed, so it never notifies.'
+  cost: 25
+  content: 'Diagnostic steps:
+
+    1. Fix the notify name, handler name formatting, and changed_when setting
+
+    2. Verify the handler runs (nginx reloads) on the next playbook execution'
 - order: 3
-  cost: 30
-  content: 'Fix all three: make the notify string match the handler name exactly, remove the leading space
-    in the handler name, and drop the `changed_when: false` (or set it correctly). Re-run — you now see
-    "RUNNING HANDLER [reload nginx]" and nginx reloads.'
+  cost: 50
+  content: 'Exact fix + verification:
+
+    1. Verify the handler runs (nginx reloads) on the next playbook execution.
+
+    2. Re-run the lab checker (`check.sh` or Check Solution).
+
+    3. Confirm every scenario objective is satisfied.
+
+
+    WHY: the grader validates real state — marker files are ignored.'
 requires_companion_hosts: false
 dual_terminal: false
 jira_priority: High
+technology: ansible
+summary: Complete the handler not triggered after task ansible lab and verify success with the checker
+estimated_minutes: 20
+xp_reward: 100
+prerequisites:
+- Basic ansible literacy
+tags:
+- ansible
+- fix
+- hands-on
+linked_tutorial: ansible-fundamentals
+what_you_will_learn:
+- Inspect the playbook to find why the handler is not being notified
+- Fix the notify name, handler name formatting, and changed_when setting
+- Verify the handler runs (nginx reloads) on the next playbook execution
+environment:
+  nodes:
+  - role: primary
+    os: FixitLab Ansible control node
+    hostname: lab-primary
+    ip: 127.0.0.1
+    specs: local offline simulation
+  pre_installed:
+  - ansible
+  - ansible-playbook
+  - bash
+  - coreutils
+  credentials:
+  - user: root
+    password: lab123
+tasks:
+- id: task_1
+  title: Handler Not Triggered After Task
+  description: Restore healthy behavior for Handler Not Triggered After Task by investigating the failure,
+    applying the smallest safe fix, and validating the outcome.
+  background: 'This ansible lab teaches systematic troubleshooting: observe, hypothesize, change, verify.'
+  validation:
+    type: command_output
+    command: ansible webservers -m ping
+    expected_output: SUCCESS
+    error_message: Ansible hosts are still unreachable. Verify SSH keys and inventory.
+solution:
+  summary: Identify the misconfiguration affecting this ansible lab and apply the minimal fix.
+  files_changed: []
+  commands_run:
+  - ansible webservers -m ping
+  reference_docs: ansible-fundamentals

@@ -1,8 +1,7 @@
----
 slug: actuator-health-failing
-title: "Spring Boot Actuator Health Endpoint Returning DOWN"
-technology: Java
-category: "Spring Boot"
+title: Spring Boot Actuator Health Endpoint Returning DOWN
+technology: java
+category: Fix
 difficulty: medium
 time_limit: 900
 max_score: 100
@@ -11,22 +10,110 @@ simulation_type: java
 infrastructure_type: simulation
 jira_priority: High
 is_free: false
-description: |
-  The Kubernetes liveness probe is failing because GET /actuator/health returns HTTP 503 with status DOWN, so the pod restarts in a loop. A custom health indicator for a decommissioned 'legacyPaymentService' and a misconfigured datasource health check are both forcing the aggregate status to DOWN.
+description: 'CONTEXT: A team operating Java applications needs you to resolve `Spring Boot Actuator Health
+  Endpoint Returning DOWN` during a realistic incident. The business impact is reduced service reliability
+  until the underlying state is repaired.
+
+
+  ENVIRONMENT: You are working in FixitLab''s offline Java project with Maven/Gradle, JVM logs, and Spring
+  configuration. All tools run locally; no paid APIs or external cloud calls are required.
+
+
+  SYMPTOM / STARTING STATE: Spring Boot app on port 8080. GET /actuator/health returns 503 DOWN. Config
+  at /app/src/main/resources/application.yml has a legacyPaymentService health indicator pointing at a
+  retired endpoint. The Kubernetes liveness probe is failing because GET /actuator/health returns HTTP
+  503 with status DOWN, so the pod restarts in a loop. A custom health indicator for a decommissioned
+  ''legacyPaymentService'' and a misconfigured datasource health check are both forcing the aggregate
+  status to DOWN.
+
+
+  OBJECTIVE: Call /actuator/health with show-details to see each component status; Identify which health
+  indicator is forcing the DOWN status; Disable the defunct indicator or repair the datasource health
+  check. Success means `check.sh` exits successfully.
+
+
+  WHAT TO AVOID: Do not apply broad destructive changes, skip evidence gathering, or fake completion with
+  marker files — the checker validates real system state.'
 objectives:
-  - "Call /actuator/health with show-details to see each component status"
-  - "Identify which health indicator is forcing the DOWN status"
-  - "Disable the defunct indicator or repair the datasource health check"
-  - "Confirm /actuator/health returns status UP with HTTP 200"
-initial_state: |
-  Spring Boot app on port 8080. GET /actuator/health returns 503 DOWN. Config at /app/src/main/resources/application.yml has a legacyPaymentService health indicator pointing at a retired endpoint.
+- Call /actuator/health with show-details to see each component status
+- Identify which health indicator is forcing the DOWN status
+- Disable the defunct indicator or repair the datasource health check
+- Confirm /actuator/health returns status UP with HTTP 200
+initial_state: 'Spring Boot app on port 8080. GET /actuator/health returns 503 DOWN. Config at /app/src/main/resources/application.yml
+  has a legacyPaymentService health indicator pointing at a retired endpoint.
+
+  '
 hints:
-  - order: 1
-    cost: 10
-    content: "Enable details: management.endpoint.health.show-details: always, then curl http://localhost:8080/actuator/health | python3 -m json.tool to see the DOWN component."
-  - order: 2
-    cost: 15
-    content: "Disable the dead indicator: management.health.legacyPaymentService.enabled: false, or remove its @Component bean."
-  - order: 3
-    cost: 20
-    content: "Fix spring.datasource.url to the correct DB host, restart, and confirm the aggregate health is UP."
+- order: 1
+  cost: 0
+  content: 'Where to look: Run `kubectl get pods -A` and `kubectl describe pod <name>` for any pod not
+    in Running state.'
+- order: 2
+  cost: 25
+  content: 'Diagnostic steps:
+
+    1. `kubectl get pods` — note CrashLoopBackOff, ImagePullBackOff, or Pending.
+
+    2. `kubectl describe pod <name>` — read Events at the bottom.
+
+    3. `kubectl logs <name> [--previous]` if the container restarted.'
+- order: 3
+  cost: 50
+  content: 'Exact fix + verification:
+
+    1. Fix the root cause (image name, env var, volume mount, or probe).
+
+    2. `kubectl apply -f` the corrected manifest or delete the pod to recreate.
+
+    3. Confirm `kubectl get pods` shows every pod Running.
+
+
+    WHY: Kubernetes only reports healthy when the workload actually runs.'
+summary: Complete the spring boot actuator health endpoint returning down java lab and verify success
+  with the checker
+estimated_minutes: 15
+xp_reward: 100
+prerequisites:
+- Basic java literacy
+tags:
+- fix
+- hands-on
+- java
+linked_tutorial: java-fundamentals
+what_you_will_learn:
+- Call /actuator/health with show-details to see each component status
+- Identify which health indicator is forcing the DOWN status
+- Disable the defunct indicator or repair the datasource health check
+- Confirm /actuator/health returns status UP with HTTP 200
+environment:
+  nodes:
+  - role: primary
+    os: FixitLab Java project
+    hostname: lab-primary
+    ip: 127.0.0.1
+    specs: local offline simulation
+  pre_installed:
+  - bash
+  - coreutils
+  - java
+  - journalctl
+  - systemctl
+  credentials:
+  - user: root
+    password: lab123
+tasks:
+- id: task_1
+  title: Spring Boot Actuator Health Endpoint Returning DOWN
+  description: Restore healthy behavior for Spring Boot Actuator Health Endpoint Returning DOWN by investigating
+    the failure, applying the smallest safe fix, and validating the outcome.
+  background: 'This java lab teaches systematic troubleshooting: observe, hypothesize, change, verify.'
+  validation:
+    type: custom_script
+    script: check.sh
+    error_message: Validation did not pass. Re-read the objectives and Hint 2 diagnostic steps.
+solution:
+  summary: Identify the misconfiguration affecting this java lab and apply the minimal fix.
+  files_changed: []
+  commands_run:
+  - bash check.sh
+  reference_docs: java-fundamentals

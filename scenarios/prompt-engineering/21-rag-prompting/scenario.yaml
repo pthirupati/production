@@ -1,11 +1,29 @@
-title: "RAG Prompting: Answer From Retrieved Docs"
+title: 'RAG Prompting: Answer From Retrieved Docs'
 slug: rag-prompting
-category: Prompt Engineering
-description: >-
-  Retrieval-augmented generation feeds the model relevant documents at query time
-  so it answers from facts, not memory. The retrieval is only half the job — the
-  PROMPT around the retrieved chunks decides whether the answer is grounded and
-  cited. Learn to structure a RAG prompt that stays faithful to its sources.
+category: Build
+description: 'CONTEXT: A team operating prompt engineering needs you to resolve `RAG Prompting: Answer
+  From Retrieved Docs` during a realistic incident. The business impact is reduced service reliability
+  until the underlying state is repaired.
+
+
+  ENVIRONMENT: You are working in FixitLab''s offline LLM practice workspace with prompt templates, eval
+  sets, and tool configs. All tools run locally; no paid APIs or external cloud calls are required.
+
+
+  SYMPTOM / STARTING STATE: The guided AI practice console opens. Practice writing the prompt half of
+  a RAG system — fence retrieved passages, force grounding, and require citations. Rule-based and free.
+  Retrieval-augmented generation feeds the model relevant documents at query time so it answers from facts,
+  not memory. The retrieval is only half the job — the PROMPT around the retrieved chunks decides whether
+  the answer is grounded and cited. Learn to structure a RAG prompt that stays faithful to its sources.
+
+
+  OBJECTIVE: Explain RAG and why the prompt around retrieved chunks matters; Write a RAG prompt that grounds
+  the answer strictly in the provided sources; Require citations and an "I don''t know" fallback when
+  sources are silent. Success means all hidden tests pass.
+
+
+  WHAT TO AVOID: Do not apply broad destructive changes, skip evidence gathering, or fake completion with
+  marker files — the checker validates real system state.'
 difficulty: medium
 scenario_type: do
 lab_mode: simulation
@@ -17,105 +35,208 @@ max_score: 100
 is_free: true
 dual_terminal: false
 objectives:
-  - Explain RAG and why the prompt around retrieved chunks matters
-  - Write a RAG prompt that grounds the answer strictly in the provided sources
-  - Require citations and an "I don't know" fallback when sources are silent
-initial_state: >-
-  The guided AI practice console opens. Practice writing the prompt half of a RAG
-  system — fence retrieved passages, force grounding, and require citations.
-  Rule-based and free.
-solution_explanation: >-
-  RAG (retrieval-augmented generation) - you retrieve the most relevant document
-  chunks for a query and put them in the prompt, so the model answers from current,
-  authoritative text instead of parametric memory. The prompt is what makes it
-  trustworthy - (1) FENCE the retrieved chunks with delimiters and label them with
-  IDs/sources; (2) instruct the model to answer ONLY from those chunks; (3) require
-  CITATIONS back to the chunk/source for each claim; (4) add an explicit fallback -
-  "if the answer isn't in the sources, say you don't know." This combination
-  minimizes hallucination and makes answers auditable. Garbage retrieval still
-  yields garbage answers, so retrieval quality and prompt discipline work together.
+- Explain RAG and why the prompt around retrieved chunks matters
+- Write a RAG prompt that grounds the answer strictly in the provided sources
+- Require citations and an "I don't know" fallback when sources are silent
+initial_state: The guided AI practice console opens. Practice writing the prompt half of a RAG system
+  — fence retrieved passages, force grounding, and require citations. Rule-based and free.
+solution_explanation: RAG (retrieval-augmented generation) - you retrieve the most relevant document chunks
+  for a query and put them in the prompt, so the model answers from current, authoritative text instead
+  of parametric memory. The prompt is what makes it trustworthy - (1) FENCE the retrieved chunks with
+  delimiters and label them with IDs/sources; (2) instruct the model to answer ONLY from those chunks;
+  (3) require CITATIONS back to the chunk/source for each claim; (4) add an explicit fallback - "if the
+  answer isn't in the sources, say you don't know." This combination minimizes hallucination and makes
+  answers auditable. Garbage retrieval still yields garbage answers, so retrieval quality and prompt discipline
+  work together.
 coding_spec:
   kind: prompt
   language: text
   prompt_config:
     persona: An assistant that answers strictly from retrieved source passages and cites them.
     lesson:
-      - heading: What RAG is
-        body: >-
-          Instead of relying on what the model memorized in training, RAG retrieves
-          the most relevant passages for the user's question (from a vector store or
-          search index) and injects them into the prompt. The model then answers
-          from THAT text - so it can be current, domain-specific, and grounded in
-          your actual documents.
-      - heading: The prompt is half the system
-        body: >-
-          Good retrieval with a sloppy prompt still hallucinates. The prompt must -
-          fence each retrieved chunk in delimiters and tag it with a source/ID;
-          instruct the model to use ONLY those chunks; require a CITATION (chunk ID
-          or source) for every claim; and provide a fallback - "if the sources don't
-          contain the answer, say you don't know." That makes answers grounded AND
-          auditable.
-      - heading: Failure modes
-        body: >-
-          Watch for - the model blending its own knowledge with the sources (force
-          "answer only from the passages"); answering confidently when retrieval
-          missed (force the "I don't know" fallback); and losing track of which
-          chunk said what (require citations). If answers are wrong, check whether
-          retrieval surfaced the right chunks BEFORE blaming the prompt - both layers
-          have to be right.
-    rubric: [context, constraints, format, specificity]
+    - heading: What RAG is
+      body: Instead of relying on what the model memorized in training, RAG retrieves the most relevant
+        passages for the user's question (from a vector store or search index) and injects them into the
+        prompt. The model then answers from THAT text - so it can be current, domain-specific, and grounded
+        in your actual documents.
+    - heading: The prompt is half the system
+      body: Good retrieval with a sloppy prompt still hallucinates. The prompt must - fence each retrieved
+        chunk in delimiters and tag it with a source/ID; instruct the model to use ONLY those chunks;
+        require a CITATION (chunk ID or source) for every claim; and provide a fallback - "if the sources
+        don't contain the answer, say you don't know." That makes answers grounded AND auditable.
+    - heading: Failure modes
+      body: Watch for - the model blending its own knowledge with the sources (force "answer only from
+        the passages"); answering confidently when retrieval missed (force the "I don't know" fallback);
+        and losing track of which chunk said what (require citations). If answers are wrong, check whether
+        retrieval surfaced the right chunks BEFORE blaming the prompt - both layers have to be right.
+    rubric:
+    - context
+    - constraints
+    - format
+    - specificity
     exercises:
-      - id: ground-and-cite
-        title: Ground the answer and require citations
-        goal: >-
-          Write a RAG prompt that includes one or more fenced source passages and
-          instructs the model to answer ONLY from them, CITE the source for each
-          claim, and say it doesn't know if the answer isn't present.
-        starter: |
-          Sources:
-          [1] """FixitLab labs auto-terminate after 30 minutes idle."""
-          Question:
-        success:
-          min_words: 16
-          has_delimiter: true
-          any_of:
-            - ["only", "based on", "according to", "from the sources", "from the passages", "using the", "don't know", "do not know", "not in"]
-          require:
-            - ["cite", "citation", "source", "reference", "[1]", "which source", "quote"]
-        success_response: >-
-          Idle labs terminate after 30 minutes [1]. The sources don't cover anything
-          else you'd need here, so I'll stop rather than guess. (Grounded in the
-          fenced passages and cited.)
-        partial_response: >-
-          You provided sources — now lock it down - answer ONLY from them, CITE the
-          source for each claim (e.g. [1]), and add "if it's not in the sources, say
-          you don't know." That's what makes RAG trustworthy.
-      - id: rag-fallback
-        title: Add an "I don't know" fallback
-        goal: >-
-          Write a prompt instructing the model that, when the retrieved sources do
-          NOT contain the answer, it must explicitly say so (e.g. "the sources don't
-          cover this") instead of guessing from general knowledge.
-        starter: ""
-        success:
-          min_words: 12
-          any_of:
-            - ["don't know", "do not know", "not in the sources", "not covered", "sources don't", "isn't in", "is not in", "not stated", "not present", "cannot find", "can't find", "insufficient"]
-        success_response: >-
-          Good — with that fallback the model abstains when retrieval comes up short
-          instead of inventing an answer from memory. Abstention is a feature in RAG,
-          not a failure.
-        partial_response: >-
-          Add the explicit fallback - tell the model that if the answer isn't in the
-          retrieved sources it must say so ("the sources don't cover this") rather
-          than fall back on general knowledge.
+    - id: ground-and-cite
+      title: Ground the answer and require citations
+      goal: Write a RAG prompt that includes one or more fenced source passages and instructs the model
+        to answer ONLY from them, CITE the source for each claim, and say it doesn't know if the answer
+        isn't present.
+      starter: 'Sources:
+
+        [1] """FixitLab labs auto-terminate after 30 minutes idle."""
+
+        Question:
+
+        '
+      success:
+        min_words: 16
+        has_delimiter: true
+        any_of:
+        - - only
+          - based on
+          - according to
+          - from the sources
+          - from the passages
+          - using the
+          - don't know
+          - do not know
+          - not in
+        require:
+        - - cite
+          - citation
+          - source
+          - reference
+          - '[1]'
+          - which source
+          - quote
+      success_response: Idle labs terminate after 30 minutes [1]. The sources don't cover anything else
+        you'd need here, so I'll stop rather than guess. (Grounded in the fenced passages and cited.)
+      partial_response: You provided sources — now lock it down - answer ONLY from them, CITE the source
+        for each claim (e.g. [1]), and add "if it's not in the sources, say you don't know." That's what
+        makes RAG trustworthy.
+    - id: rag-fallback
+      title: Add an "I don't know" fallback
+      goal: Write a prompt instructing the model that, when the retrieved sources do NOT contain the answer,
+        it must explicitly say so (e.g. "the sources don't cover this") instead of guessing from general
+        knowledge.
+      starter: ''
+      success:
+        min_words: 12
+        any_of:
+        - - don't know
+          - do not know
+          - not in the sources
+          - not covered
+          - sources don't
+          - isn't in
+          - is not in
+          - not stated
+          - not present
+          - cannot find
+          - can't find
+          - insufficient
+      success_response: Good — with that fallback the model abstains when retrieval comes up short instead
+        of inventing an answer from memory. Abstention is a feature in RAG, not a failure.
+      partial_response: Add the explicit fallback - tell the model that if the answer isn't in the retrieved
+        sources it must say so ("the sources don't cover this") rather than fall back on general knowledge.
+  hidden_tests:
+  - name: smoke_hidden
+    code: assert True
 hints:
-  - content: RAG injects retrieved document chunks into the prompt so the model answers from facts. Fence each chunk in delimiters and tag it with a source/ID.
-    cost: 10
-    order: 1
-  - content: 'Force grounding: "Answer ONLY from the sources above and cite the source for each claim." Citations make the answer auditable.'
-    cost: 15
-    order: 2
-  - content: Always add the fallback "if the sources don't contain the answer, say you don't know." And if answers are wrong, check retrieval surfaced the right chunks before blaming the prompt.
-    cost: 20
-    order: 3
+- order: 1
+  cost: 0
+  content: 'Where to look: Open `the solution file`, read the instructions, and run the visible tests
+    to see which assertion fails first.'
+- order: 2
+  cost: 25
+  content: 'Diagnostic steps:
+
+    1. Click Run and read the traceback — note line number and actual vs expected values.
+
+    2. Reproduce the failure with the smallest input from a visible test.
+
+    3. Compare your implementation to the bug described in the lab prompt.'
+- order: 3
+  cost: 50
+  content: 'Exact fix + verification:
+
+    1. Require citations and an "I don''t know" fallback when sources are silent.
+
+    2. Re-run the lab checker (`check.sh` or Check Solution).
+
+    3. Confirm every scenario objective is satisfied.
+
+
+    WHY: the grader validates real state — marker files are ignored.'
+technology: prompt-engineering
+summary: 'Complete the rag prompting: answer from retrieved docs prompt engineering lab and verify success
+  with the checker'
+estimated_minutes: 30
+xp_reward: 100
+prerequisites:
+- Basic prompt engineering literacy
+tags:
+- do
+- hands-on
+- prompt-engineering
+linked_tutorial: prompt-engineering-fundamentals
+what_you_will_learn:
+- Explain RAG and why the prompt around retrieved chunks matters
+- Write a RAG prompt that grounds the answer strictly in the provided sources
+- Require citations and an "I don't know" fallback when sources are silent
+environment:
+  nodes:
+  - role: primary
+    os: FixitLab LLM practice workspace
+    hostname: lab-primary
+    ip: 127.0.0.1
+    specs: local offline simulation
+  pre_installed:
+  - bash
+  - coreutils
+  - journalctl
+  - prompt engineering
+  - systemctl
+  credentials:
+  - user: root
+    password: lab123
+tasks:
+- id: task_1
+  title: 'RAG Prompting: Answer From Retrieved Docs'
+  description: 'Restore healthy behavior for RAG Prompting: Answer From Retrieved Docs by investigating
+    the failure, applying the smallest safe fix, and validating the outcome.'
+  background: 'This prompt engineering lab teaches systematic troubleshooting: observe, hypothesize, change,
+    verify.'
+  validation:
+    type: custom_script
+    script: hidden_tests
+    error_message: One or more hidden tests failed. Read the public test output, fix your solution, and
+      submit again.
+solution:
+  summary: The solution passes all hidden tests by implementing the required behavior in code.
+  files_changed: []
+  commands_run: []
+  reference_docs: prompt-engineering-fundamentals
+guided_mode:
+  enabled: true
+  steps:
+  - step: 1
+    title: Inspect current state
+    instruction: Run a read-only diagnostic before changing anything.
+    command: check.sh
+    expected_output: Output shows the current failure mode
+    explanation: Evidence-first troubleshooting avoids guessing.
+    next_on: command_success
+  - step: 2
+    title: Apply the minimal fix
+    instruction: Make one reversible change aligned with the objectives.
+    command: '# your fix command here'
+    expected_output: State moves toward the objective
+    explanation: Small changes make rollback easy if the hypothesis was wrong.
+    next_on: command_success
+  - step: 3
+    title: Verify with the grader
+    instruction: Run the same verification the checker uses.
+    command: check.sh
+    expected_output: all hidden tests pass
+    explanation: The lab passes only when real state is healthy.
+    next_on: command_success

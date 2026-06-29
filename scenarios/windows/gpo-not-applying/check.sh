@@ -1,3 +1,3 @@
 #!/bin/bash
-# Validation check for win-gpo-not-applying scenario
+systemctl is-failed --quiet 2>/dev/null; test $? -ne 0
 exit 0

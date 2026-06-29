@@ -1,8 +1,28 @@
 title: Fingerprint the operating system of an unknown host
 slug: nmap-os-fingerprint
-category: Nmap Network Scanning
-description: An unidentified server win-app01 (10.10.10.30) is exposing several services. Asset
-  management needs to know what operating system it runs. Use Nmap OS detection to fingerprint it.
+category: Fix
+description: 'CONTEXT: A team operating network scanning needs you to resolve `Fingerprint the operating
+  system of an unknown host` during a realistic incident. The business impact is reduced service reliability
+  until the underlying state is repaired.
+
+
+  ENVIRONMENT: You are working in FixitLab''s offline scanning lab with nmap CLI, targets, and scan output.
+  All tools run locally; no paid APIs or external cloud calls are required.
+
+
+  SYMPTOM / STARTING STATE: win-app01 (10.10.10.30) responds to scans but its OS is unknown. OS fingerprinting
+  needs raw packets, which require root — an unprivileged -O scan will skip detection. An unidentified
+  server win-app01 (10.10.10.30) is exposing several services. Asset management needs to know what operating
+  system it runs. Use Nmap OS detection to fingerprint it.
+
+
+  OBJECTIVE: Open the Nmap simulator from the lab toolbar (Open Nmap); Run OS detection against win-app01
+  (10.10.10.30) with privileges (sudo nmap -O 10.10.10.30); Identify the host''s operating system family
+  (Windows). Success means `check.sh` exits successfully.
+
+
+  WHAT TO AVOID: Do not apply broad destructive changes, skip evidence gathering, or fake completion with
+  marker files — the checker validates real system state.'
 difficulty: hard
 lab_mode: simulation
 simulation_type: nmap
@@ -20,14 +40,71 @@ initial_state: win-app01 (10.10.10.30) responds to scans but its OS is unknown. 
   raw packets, which require root — an unprivileged -O scan will skip detection.
 hints:
 - order: 1
-  cost: 10
-  content: Nmap OS detection uses the -O flag, e.g. nmap -O 10.10.10.30. It analyses TCP/IP stack
-    behaviour to guess the OS, so it needs at least one open port to probe.
+  cost: 0
+  content: 'Where to look: Open the Nmap simulator from the lab toolbar (Open Nmap)'
 - order: 2
-  cost: 15
-  content: OS fingerprinting crafts raw packets, which require root privileges. Run it with sudo —
-    sudo nmap -O 10.10.10.30 — or nmap will warn that OS detection was skipped.
+  cost: 25
+  content: 'Diagnostic steps:
+
+    1. Run OS detection against win-app01 (10.10.10.30) with privileges (sudo nmap -O 10.10.10.30)
+
+    2. Identify the host''s operating system family (Windows)'
 - order: 3
-  cost: 20
-  content: You can also use -A (aggressive) which enables both -O and -sV. The task completes once the
-    Discovered Hosts panel shows an OS for 10.10.10.30 (it is a Windows server).
+  cost: 50
+  content: 'Exact fix + verification:
+
+    1. Identify the host''s operating system family (Windows).
+
+    2. Re-run the lab checker (`check.sh` or Check Solution).
+
+    3. Confirm every scenario objective is satisfied.
+
+
+    WHY: the grader validates real state — marker files are ignored.'
+summary: Complete the fingerprint the operating system of an unknown host nmap lab and verify success
+  with the checker
+estimated_minutes: 20
+xp_reward: 100
+prerequisites:
+- Basic nmap literacy
+tags:
+- fix
+- hands-on
+- nmap
+linked_tutorial: nmap-fundamentals
+what_you_will_learn:
+- Open the Nmap simulator from the lab toolbar (Open Nmap)
+- Run OS detection against win-app01 (10.10.10.30) with privileges (sudo nmap -O 10.10.10.30)
+- Identify the host's operating system family (Windows)
+environment:
+  nodes:
+  - role: primary
+    os: FixitLab scanning lab
+    hostname: lab-primary
+    ip: 127.0.0.1
+    specs: local offline simulation
+  pre_installed:
+  - bash
+  - coreutils
+  - journalctl
+  - nmap
+  - systemctl
+  credentials:
+  - user: root
+    password: lab123
+tasks:
+- id: task_1
+  title: Fingerprint the operating system of an unknown host
+  description: Restore healthy behavior for Fingerprint the operating system of an unknown host by investigating
+    the failure, applying the smallest safe fix, and validating the outcome.
+  background: 'This nmap lab teaches systematic troubleshooting: observe, hypothesize, change, verify.'
+  validation:
+    type: custom_script
+    script: check.sh
+    error_message: Validation did not pass. Re-read the objectives and Hint 2 diagnostic steps.
+solution:
+  summary: Identify the misconfiguration affecting this nmap lab and apply the minimal fix.
+  files_changed: []
+  commands_run:
+  - bash check.sh
+  reference_docs: nmap-fundamentals

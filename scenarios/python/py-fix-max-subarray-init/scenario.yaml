@@ -1,9 +1,26 @@
 title: Fix max_subarray Initialization (Kadane)
 slug: py-fix-max-subarray-init
-category: Python Development
-description: max_subarray(nums) returns the largest contiguous-sum subarray total using Kadane's algorithm,
-  but it initializes the best sum to 0, so for all-negative inputs it wrongly returns 0 instead of the
-  largest (least negative) element. Fix the initialization.
+category: Fix
+description: 'CONTEXT: A team operating Python development needs you to resolve `Fix max_subarray Initialization
+  (Kadane)` during a realistic incident. The business impact is reduced service reliability until the
+  underlying state is repaired.
+
+
+  ENVIRONMENT: You are working in FixitLab''s offline Python project workspace with source files, venv,
+  tests, and CLI entrypoints. All tools run locally; no paid APIs or external cloud calls are required.
+
+
+  SYMPTOM / STARTING STATE: max_subarray(nums) returns the largest contiguous-sum subarray total using
+  Kadane''s algorithm, but it initializes the best sum to 0, so for all-negative inputs it wrongly returns
+  0 instead of the largest (least negative) element. Fix the initialization.
+
+
+  OBJECTIVE: Find the wrong answer on an all-negative array; Initialize best/current from the first element,
+  not 0; Keep O(n) and pass all tests. Success means all hidden tests pass.
+
+
+  WHAT TO AVOID: Do not apply broad destructive changes, skip evidence gathering, or fake completion with
+  marker files — the checker validates real system state.'
 difficulty: medium
 scenario_type: fix
 lab_mode: simulation
@@ -21,55 +38,120 @@ objectives:
 initial_state: max_subarray(nums) returns the largest contiguous-sum subarray total using Kadane's algorithm,
   but it initializes the best sum to 0, so for all-negative inputs it wrongly returns 0 instead of the
   largest (least negative) element. Fix the initialization.
-solution_explanation: |
-  Seeding best/cur with 0 implicitly allows the empty subarray, giving 0 for all-negative inputs. Seeding from nums[0] makes Kadane correct.
+solution_explanation: 'Seeding best/cur with 0 implicitly allows the empty subarray, giving 0 for all-negative
+  inputs. Seeding from nums[0] makes Kadane correct.
+
+  '
 coding_spec:
   language: python
   entrypoint: solution.py
   kind: fix
-  instructions: |
-    Fix max_subarray(nums) so it returns the maximum contiguous subarray sum, correct even when every number is negative. Assume nums is non-empty.
-      max_subarray([-2,1,-3,4,-1,2,1,-5,4]) -> 6
-    Click Run to try it, then Check Solution to grade against all tests.
+  instructions: "Fix max_subarray(nums) so it returns the maximum contiguous subarray sum, correct even\
+    \ when every number is negative. Assume nums is non-empty.\n  max_subarray([-2,1,-3,4,-1,2,1,-5,4])\
+    \ -> 6\nClick Run to try it, then Check Solution to grade against all tests.\n"
   files:
   - path: solution.py
-    content: |
-      def max_subarray(nums):
-          best = 0
-          cur = 0
-          for x in nums:
-              cur = max(x, cur + x)
-              best = max(best, cur)
-          return best
+    content: "def max_subarray(nums):\n    best = 0\n    cur = 0\n    for x in nums:\n        cur = max(x,\
+      \ cur + x)\n        best = max(best, cur)\n    return best\n"
     readonly: false
   visible_tests:
   - name: classic example
-    code: |
-      assert max_subarray([-2,1,-3,4,-1,2,1,-5,4]) == 6
+    code: 'assert max_subarray([-2,1,-3,4,-1,2,1,-5,4]) == 6
+
+      '
   - name: all positive
-    code: |
-      assert max_subarray([1, 2, 3]) == 6
+    code: 'assert max_subarray([1, 2, 3]) == 6
+
+      '
   hidden_tests:
   - name: all negative
-    code: |
-      assert max_subarray([-3, -1, -2]) == -1, max_subarray([-3, -1, -2])
+    code: 'assert max_subarray([-3, -1, -2]) == -1, max_subarray([-3, -1, -2])
+
+      '
   - name: single negative
-    code: |
-      assert max_subarray([-5]) == -5
+    code: 'assert max_subarray([-5]) == -5
+
+      '
   - name: single positive
-    code: |
-      assert max_subarray([7]) == 7
+    code: 'assert max_subarray([7]) == 7
+
+      '
   - name: mixed ending negative
-    code: |
-      assert max_subarray([5, -2, 3, -10]) == 6
+    code: 'assert max_subarray([5, -2, 3, -10]) == 6
+
+      '
   timeout: 8
 hints:
 - order: 1
-  cost: 10
-  content: max_subarray([-3,-1,-2]) returns 0, but the answer should be -1 (the best single element).
+  cost: 0
+  content: 'Where to look: Open `solution.py`, read the instructions, and run the visible tests to see
+    which assertion fails first.'
 - order: 2
-  cost: 20
-  content: Starting best at 0 means an empty subarray is allowed, which is wrong here.
+  cost: 25
+  content: 'Diagnostic steps:
+
+    1. Click Run and read the traceback — note line number and actual vs expected values.
+
+    2. Reproduce the failure with the smallest input from a visible test.
+
+    3. Compare your implementation to the bug described in the lab prompt.'
 - order: 3
-  cost: 30
-  content: Initialize best = cur = nums[0] and iterate from nums[1:].
+  cost: 50
+  content: 'Exact fix + verification:
+
+    1. Keep O(n) and pass all tests.
+
+    2. Re-run the lab checker (`check.sh` or Check Solution).
+
+    3. Confirm every scenario objective is satisfied.
+
+
+    WHY: the grader validates real state — marker files are ignored.'
+technology: python
+summary: Complete the fix max_subarray initialization (kadane) python lab and verify success with the
+  checker
+estimated_minutes: 25
+xp_reward: 100
+prerequisites:
+- Basic python literacy
+tags:
+- fix
+- hands-on
+- python
+linked_tutorial: python-fundamentals
+what_you_will_learn:
+- Find the wrong answer on an all-negative array
+- Initialize best/current from the first element, not 0
+- Keep O(n) and pass all tests
+environment:
+  nodes:
+  - role: primary
+    os: FixitLab Python project workspace
+    hostname: lab-primary
+    ip: 127.0.0.1
+    specs: local offline simulation
+  pre_installed:
+  - bash
+  - coreutils
+  - pip
+  - python
+  - python3
+  credentials:
+  - user: root
+    password: lab123
+tasks:
+- id: task_1
+  title: Fix max_subarray Initialization (Kadane)
+  description: Restore healthy behavior for Fix max_subarray Initialization (Kadane) by investigating
+    the failure, applying the smallest safe fix, and validating the outcome.
+  background: 'This python lab teaches systematic troubleshooting: observe, hypothesize, change, verify.'
+  validation:
+    type: custom_script
+    script: hidden_tests
+    error_message: One or more hidden tests failed. Read the public test output, fix your solution, and
+      submit again.
+solution:
+  summary: The solution passes all hidden tests by implementing the required behavior in code.
+  files_changed: []
+  commands_run: []
+  reference_docs: python-fundamentals

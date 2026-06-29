@@ -1,7 +1,7 @@
-title: 'Nmap Network Scanning: Nse Scripts — Troubleshooting Drill'
+title: Nse Scripts — Troubleshoot Lab
 slug: academy-nmap-084-troubleshoot-nse-9
-technology: Nmap Network Scanning
-category: Troubleshooting
+technology: nmap
+category: Fix
 difficulty: hard
 scenario_type: fix
 lab_mode: simulation
@@ -11,9 +11,28 @@ max_score: 100
 is_free: false
 infrastructure_type: docker
 jira_priority: Medium
-description: 'Production alert: deeper checks need scripted probes. You are on call for Nmap Network Scanning
-  and must troubleshoot NSE scripts methodically — triage symptoms, isolate root cause, apply the smallest
-  safe fix, and confirm recovery.'
+description: 'CONTEXT: A team operating network scanning needs you to resolve `nmap: Nse Scripts — Troubleshooting
+  Drill` during a realistic incident. The business impact is reduced service reliability until the underlying
+  state is repaired.
+
+
+  ENVIRONMENT: You are working in FixitLab''s offline scanning lab with nmap CLI, targets, and scan output.
+  All tools run locally; no paid APIs or external cloud calls are required.
+
+
+  SYMPTOM / STARTING STATE: The scanning lab is degraded. Deeper checks need scripted probes. Recent changes
+  may exist around NSE scripts, but do not restart blindly — gather evidence first. Production alert:
+  deeper checks need scripted probes. You are on call for nmap and must troubleshoot NSE scripts methodically
+  — triage symptoms, isolate root cause, apply the smallest safe fix, and confirm recovery.
+
+
+  OBJECTIVE: The incident symptom is clear: deeper checks need scripted probes; Root cause is isolated
+  with evidence, not guesswork; Service behavior returns to normal after the fix. Success means `check.sh`
+  exits successfully.
+
+
+  WHAT TO AVOID: Do not apply broad destructive changes, skip evidence gathering, or fake completion with
+  marker files — the checker validates real system state.'
 objectives:
 - 'The incident symptom is clear: deeper checks need scripted probes'
 - Root cause is isolated with evidence, not guesswork
@@ -22,7 +41,7 @@ initial_state: The scanning lab is degraded. Deeper checks need scripted probes.
   around NSE scripts, but do not restart blindly — gather evidence first.
 hints:
 - order: 1
-  cost: 10
+  cost: 0
   content: 'Orient yourself before changing anything:
 
     1. Inspect the current state — `nmap --script` output.
@@ -31,17 +50,15 @@ hints:
 
     3. Recall the core idea: script categories and safe scanning. Form one hypothesis before you act.'
 - order: 2
-  cost: 15
-  content: 'Plan your approach (still no spoilers):
-
-    1. Confirm the exact gap between current and desired state for NSE scripts.
-
-    2. Decide the single smallest change that moves you toward the objective.
-
-    3. Capture evidence (command output / status) before the change so you can prove it worked afterward.'
-- order: 3
   cost: 25
-  content: 'Guided walkthrough:
+  content: 'Diagnostic steps:
+
+    1. Root cause is isolated with evidence, not guesswork
+
+    2. Service behavior returns to normal after the fix'
+- order: 3
+  cost: 50
+  content: 'Exact fix + verification:
 
     1. Re-check the current state — `nmap --script` output.
 
@@ -50,4 +67,74 @@ hints:
 
     3. Verify the result — the right scripts run and report.
 
-    4. Click Check Solution once `systemctl is-active nginx` returns active.'
+    4. Click Check Solution once the objective is met (graded on real state, not a marker file).'
+summary: Complete the nse scripts — troubleshoot lab nmap lab and verify success with the checker
+estimated_minutes: 20
+xp_reward: 100
+prerequisites:
+- Basic nmap literacy
+tags:
+- fix
+- hands-on
+- nmap
+linked_tutorial: nmap-fundamentals
+what_you_will_learn:
+- 'The incident symptom is clear: deeper checks need scripted probes'
+- Root cause is isolated with evidence, not guesswork
+- Service behavior returns to normal after the fix
+environment:
+  nodes:
+  - role: primary
+    os: FixitLab scanning lab
+    hostname: lab-primary
+    ip: 127.0.0.1
+    specs: local offline simulation
+  pre_installed:
+  - bash
+  - coreutils
+  - journalctl
+  - nmap
+  - systemctl
+  credentials:
+  - user: root
+    password: lab123
+tasks:
+- id: task_1
+  title: Nse Scripts — Troubleshoot Lab
+  description: Restore healthy behavior for Nse Scripts — Troubleshoot Lab by investigating the failure,
+    applying the smallest safe fix, and validating the outcome.
+  background: 'This nmap lab teaches systematic troubleshooting: observe, hypothesize, change, verify.'
+  validation:
+    type: custom_script
+    script: check.sh
+    error_message: Validation did not pass. Re-read the objectives and Hint 2 diagnostic steps.
+solution:
+  summary: Identify the misconfiguration affecting this nmap lab and apply the minimal fix.
+  files_changed: []
+  commands_run:
+  - bash check.sh
+  reference_docs: nmap-fundamentals
+guided_mode:
+  enabled: true
+  steps:
+  - step: 1
+    title: Inspect current state
+    instruction: Run a read-only diagnostic before changing anything.
+    command: check.sh
+    expected_output: Output shows the current failure mode
+    explanation: Evidence-first troubleshooting avoids guessing.
+    next_on: command_success
+  - step: 2
+    title: Apply the minimal fix
+    instruction: Make one reversible change aligned with the objectives.
+    command: '# your fix command here'
+    expected_output: State moves toward the objective
+    explanation: Small changes make rollback easy if the hypothesis was wrong.
+    next_on: command_success
+  - step: 3
+    title: Verify with the grader
+    instruction: Run the same verification the checker uses.
+    command: check.sh
+    expected_output: '`check.sh` exits successfully'
+    explanation: The lab passes only when real state is healthy.
+    next_on: command_success

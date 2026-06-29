@@ -1,23 +1,52 @@
-title: "Network ↔ Security: Firewalld Blocks the App Service Port"
+title: 'Network ↔ Security: Firewalld Blocks the App Service Port'
 slug: networking-firewalld-app-reachability
-technology: Networking
-category: Firewall & Reachability
+technology: networking
+category: Fix
 difficulty: medium
-description: |
-  CROSS-TECHNOLOGY task (Networking <-> Security). After a security review tightened
+description: 'CONTEXT: A team operating network operations needs you to resolve `Network ↔ Security: Firewalld
+  Blocks the App Service Port` during a realistic incident. The business impact is reduced service reliability
+  until the underlying state is repaired.
+
+
+  ENVIRONMENT: You are working in FixitLab''s offline network lab with interfaces, routing tables, DNS,
+  and firewall rules. All tools run locally; no paid APIs or external cloud calls are required.
+
+
+  SYMPTOM / STARTING STATE: An api-edge-01 host. /etc/firewalld/services/app8443.xml is malformed (incorrect
+
+  port/protocol, broken XML) and not enabled in any zone, so inbound 8443 is blocked. CROSS-TECHNOLOGY
+  task (Networking <-> Security). After a security review tightened
+
   the host firewall, the app on api-edge-01 became unreachable on its TLS port 8443.
+
   A custom firewalld service was defined at /etc/firewalld/services/app8443.xml to
+
   open it, but the XML is malformed (wrong port/protocol and a broken element) and
+
   was never bound to the active zone — so connections to 8443 are dropped. Fix the
+
   firewall service definition so the app is reachable again without opening the
+
   host wide.
-initial_state: |
-  An api-edge-01 host. /etc/firewalld/services/app8443.xml is malformed (incorrect
+
+
+  OBJECTIVE: Confirm 8443 is blocked and the custom firewalld service XML is malformed; Correct /etc/firewalld/services/app8443.xml
+  (valid port 8443/tcp definition) and bind it to the active zone; Confirm the service definition is corrected
+  so 8443 is reachable. Success means `check.sh` exits successfully.
+
+
+  WHAT TO AVOID: Do not apply broad destructive changes, skip evidence gathering, or fake completion with
+  marker files — the checker validates real system state.'
+initial_state: 'An api-edge-01 host. /etc/firewalld/services/app8443.xml is malformed (incorrect
+
   port/protocol, broken XML) and not enabled in any zone, so inbound 8443 is blocked.
+
+  '
 objectives:
-  - Confirm 8443 is blocked and the custom firewalld service XML is malformed
-  - Correct /etc/firewalld/services/app8443.xml (valid port 8443/tcp definition) and bind it to the active zone
-  - Confirm the service definition is corrected so 8443 is reachable
+- Confirm 8443 is blocked and the custom firewalld service XML is malformed
+- Correct /etc/firewalld/services/app8443.xml (valid port 8443/tcp definition) and bind it to the active
+  zone
+- Confirm the service definition is corrected so 8443 is reachable
 lab_mode: simulation
 simulation_type: generic
 cross_technology: true
@@ -27,12 +56,76 @@ is_free: false
 jira_priority: High
 dual_terminal: false
 hints:
-  - order: 1
-    cost: 10
-    content: "`firewall-cmd --list-all` shows 8443 is not open. The custom service XML at /etc/firewalld/services/app8443.xml is malformed (bad <port> element)."
-  - order: 2
-    cost: 15
-    content: "Fix the XML to a valid `<port protocol=\"tcp\" port=\"8443\"/>` service, reload firewalld, and add the service to the active zone permanently."
-  - order: 3
-    cost: 20
-    content: "Once /etc/firewalld/services/app8443.xml is corrected, the app port is reachable."
+- order: 1
+  cost: 0
+  content: 'Where to look: Run `firewall-cmd --state` and `firewall-cmd --list-all` for active zones.'
+- order: 2
+  cost: 25
+  content: 'Diagnostic steps:
+
+    1. Identify which zone is active and which ports/services are allowed.
+
+    2. Compare to the port the scenario expects (often 80/tcp or 443/tcp).
+
+    3. Check if the service is bound but blocked externally.'
+- order: 3
+  cost: 50
+  content: 'Exact fix + verification:
+
+    1. `firewall-cmd --permanent --add-service=http` (or the needed port).
+
+    2. `firewall-cmd --reload`.
+
+    3. Confirm `firewall-cmd --list-ports` includes the required port.
+
+
+    WHY: a running service behind a closed firewall still fails health checks.'
+summary: 'Complete the network ↔ security: firewalld blocks the app service port networking lab and verify
+  success with the checker'
+estimated_minutes: 20
+xp_reward: 100
+prerequisites:
+- Basic networking literacy
+tags:
+- fix
+- hands-on
+- networking
+linked_tutorial: networking-fundamentals
+what_you_will_learn:
+- Confirm 8443 is blocked and the custom firewalld service XML is malformed
+- Correct /etc/firewalld/services/app8443.xml (valid port 8443/tcp definition) and bind it to the active
+  zone
+- Confirm the service definition is corrected so 8443 is reachable
+environment:
+  nodes:
+  - role: primary
+    os: FixitLab network lab
+    hostname: lab-primary
+    ip: 127.0.0.1
+    specs: local offline simulation
+  pre_installed:
+  - bash
+  - coreutils
+  - journalctl
+  - networking
+  - systemctl
+  credentials:
+  - user: root
+    password: lab123
+tasks:
+- id: task_1
+  title: 'Network ↔ Security: Firewalld Blocks the App Service Port'
+  description: 'Restore healthy behavior for Network ↔ Security: Firewalld Blocks the App Service Port
+    by investigating the failure, applying the smallest safe fix, and validating the outcome.'
+  background: 'This networking lab teaches systematic troubleshooting: observe, hypothesize, change, verify.'
+  validation:
+    type: command_output
+    command: firewall-cmd --list-ports
+    expected_output: 80/tcp
+    error_message: HTTP is still blocked by firewalld. Allow the service and reload.
+solution:
+  summary: Identify the misconfiguration affecting this networking lab and apply the minimal fix.
+  files_changed: []
+  commands_run:
+  - firewall-cmd --list-ports
+  reference_docs: networking-fundamentals

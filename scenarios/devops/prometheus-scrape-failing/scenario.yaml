@@ -1,14 +1,28 @@
 title: Fix Prometheus Scrape Configuration
 slug: prometheus-scrape-failing
-technology: DevOps
-category: Monitoring
+technology: devops
+category: Fix
 difficulty: hard
 time_limit: 1200
 max_score: 100
 infrastructure_type: docker
 jira_priority: High
 is_free: false
-description: 'Prometheus is showing targets as DOWN and metrics are not being scraped.
+description: 'CONTEXT: A team operating DevOps delivery needs you to resolve `Fix Prometheus Scrape Configuration`
+  during a realistic incident. The business impact is reduced service reliability until the underlying
+  state is repaired.
+
+
+  ENVIRONMENT: You are working in FixitLab''s offline CI/CD lab with git repos, pipelines, artifacts,
+  and runbooks. All tools run locally; no paid APIs or external cloud calls are required.
+
+
+  SYMPTOM / STARTING STATE: Ubuntu server running Prometheus at /etc/prometheus/prometheus.yml.
+
+  The myapp service is running on port 8080 but prometheus.yml has port 9090.
+
+  The service label "app: myapp-service" doesn''t match the selector "app: myapp". Prometheus is showing
+  targets as DOWN and metrics are not being scraped.
 
   The scrape config in prometheus.yml points to the wrong port and the
 
@@ -16,7 +30,13 @@ description: 'Prometheus is showing targets as DOWN and metrics are not being sc
 
   and service labels so Prometheus can discover and scrape the targets.
 
-  '
+
+  OBJECTIVE: Identify why Prometheus targets show as DOWN; Fix the scrape configuration in prometheus.yml;
+  Add correct service labels to match the scrape selector. Success means `check.sh` exits successfully.
+
+
+  WHAT TO AVOID: Do not apply broad destructive changes, skip evidence gathering, or fake completion with
+  marker files — the checker validates real system state.'
 objectives:
 - Identify why Prometheus targets show as DOWN
 - Fix the scrape configuration in prometheus.yml
@@ -31,18 +51,74 @@ initial_state: 'Ubuntu server running Prometheus at /etc/prometheus/prometheus.y
   '
 hints:
 - order: 1
-  cost: 10
-  content: 'Inspect the scrape config: `cat /etc/prometheus/prometheus.yml`. In the UI, Status > Targets
-    shows the job DOWN.'
+  cost: 0
+  content: 'Where to look: Open Prometheus → Status → Targets and note which job is DOWN and the last
+    scrape error message.'
 - order: 2
-  cost: 15
-  content: The job's `static_configs` target uses the wrong port (9090 instead of the app's 8080), and
-    the label selector doesn't match the service.
-- order: 3
-  cost: 20
-  content: 'Fix the target port to 8080 and correct the labels/relabel_configs to match `app: myapp` so
-    the target is selected.'
-- order: 4
   cost: 25
-  content: Reload Prometheus (`curl -X POST http://localhost:9090/-/reload`) and confirm the target flips
-    to UP in Status > Targets.
+  content: 'Diagnostic steps:
+
+    1. Check `up` and `scrape_duration_seconds` for the failing target.
+
+    2. Inspect `/etc/prometheus/prometheus.yml` for wrong host, port, or scheme.
+
+    3. `curl` the exporter endpoint from the lab host to test connectivity.'
+- order: 3
+  cost: 50
+  content: 'Exact fix + verification:
+
+    1. Correct the scrape target or relabel rule in prometheus.yml.
+
+    2. Reload or restart Prometheus.
+
+    3. Confirm the target is UP and Check Solution passes.
+
+
+    WHY: Prometheus only collects metrics from correctly configured targets.'
+summary: Complete the fix prometheus scrape configuration devops lab and verify success with the checker
+estimated_minutes: 20
+xp_reward: 100
+prerequisites:
+- Basic devops literacy
+tags:
+- devops
+- fix
+- hands-on
+linked_tutorial: devops-fundamentals
+what_you_will_learn:
+- Identify why Prometheus targets show as DOWN
+- Fix the scrape configuration in prometheus.yml
+- Add correct service labels to match the scrape selector
+- Verify targets show as UP in Prometheus
+environment:
+  nodes:
+  - role: primary
+    os: FixitLab CI/CD lab
+    hostname: lab-primary
+    ip: 127.0.0.1
+    specs: local offline simulation
+  pre_installed:
+  - bash
+  - coreutils
+  - devops
+  - journalctl
+  - systemctl
+  credentials:
+  - user: root
+    password: lab123
+tasks:
+- id: task_1
+  title: Fix Prometheus Scrape Configuration
+  description: Restore healthy behavior for Fix Prometheus Scrape Configuration by investigating the failure,
+    applying the smallest safe fix, and validating the outcome.
+  background: 'This devops lab teaches systematic troubleshooting: observe, hypothesize, change, verify.'
+  validation:
+    type: custom_script
+    script: check.sh
+    error_message: Validation did not pass. Re-read the objectives and Hint 2 diagnostic steps.
+solution:
+  summary: Identify the misconfiguration affecting this devops lab and apply the minimal fix.
+  files_changed: []
+  commands_run:
+  - bash check.sh
+  reference_docs: devops-fundamentals

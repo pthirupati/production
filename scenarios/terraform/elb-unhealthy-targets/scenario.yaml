@@ -1,28 +1,111 @@
 title: ALB Showing All Targets Unhealthy
 slug: aws-elb-unhealthy-targets
 difficulty: medium
-category: AWS
-description: 'An Application Load Balancer reports all registered targets as unhealthy. The health check path does not exist on the application, and the target security group does not allow traffic from the ALB on the service port.'
-initial_state: 'Simulated AWS environment with an ALB and a target group. The health check is configured to ping /healthcheck but the app only serves /health, and the EC2 security group blocks port 8080 from the ALB security group.'
+category: Fix
+description: 'CONTEXT: A team operating Terraform IaC needs you to resolve `ALB Showing All Targets Unhealthy`
+  during a realistic incident. The business impact is reduced service reliability until the underlying
+  state is repaired.
+
+
+  ENVIRONMENT: You are working in FixitLab''s offline Terraform workspace with HCL files, state, and plan/apply
+  workflow. All tools run locally; no paid APIs or external cloud calls are required.
+
+
+  SYMPTOM / STARTING STATE: Simulated AWS environment with an ALB and a target group. The health check
+  is configured to ping /healthcheck but the app only serves /health, and the EC2 security group blocks
+  port 8080 from the ALB security group. An Application Load Balancer reports all registered targets as
+  unhealthy. The health check path does not exist on the application, and the target security group does
+  not allow traffic from the ALB on the service port.
+
+
+  OBJECTIVE: Inspect the target group health check configuration and identify the incorrect path; Fix
+  the health check path to match the application endpoint; Update the EC2 instance security group to allow
+  inbound traffic from the ALB on the correct port. Success means `check.sh` exits successfully.
+
+
+  WHAT TO AVOID: Do not apply broad destructive changes, skip evidence gathering, or fake completion with
+  marker files — the checker validates real system state.'
+initial_state: Simulated AWS environment with an ALB and a target group. The health check is configured
+  to ping /healthcheck but the app only serves /health, and the EC2 security group blocks port 8080 from
+  the ALB security group.
 objectives:
-  - Inspect the target group health check configuration and identify the incorrect path
-  - Fix the health check path to match the application endpoint
-  - Update the EC2 instance security group to allow inbound traffic from the ALB on the correct port
+- Inspect the target group health check configuration and identify the incorrect path
+- Fix the health check path to match the application endpoint
+- Update the EC2 instance security group to allow inbound traffic from the ALB on the correct port
 lab_mode: simulation
 simulation_type: aws
 time_limit: 1800
 max_score: 100
 is_free: false
 hints:
-  - content: 'Run: aws elbv2 describe-target-health --target-group-arn <arn> to see unhealthy reason codes, then check the health check config.'
-    cost: 10
-    order: 1
-  - content: 'Use aws elbv2 modify-target-group to update the HealthCheckPath to the correct endpoint (e.g., /health).'
-    cost: 15
-    order: 2
-  - content: 'Check the EC2 security group: it must allow the ALB security group on the app port. Use aws ec2 authorize-security-group-ingress with the ALB SG as the source.'
-    cost: 20
-    order: 3
+- order: 1
+  cost: 0
+  content: 'Where to look: Inspect the target group health check configuration and identify the incorrect
+    path'
+- order: 2
+  cost: 25
+  content: 'Diagnostic steps:
+
+    1. Fix the health check path to match the application endpoint
+
+    2. Update the EC2 instance security group to allow inbound traffic from the ALB on the correct port'
+- order: 3
+  cost: 50
+  content: 'Exact fix + verification:
+
+    1. Update the EC2 instance security group to allow inbound traffic from the ALB on the correct port.
+
+    2. Re-run the lab checker (`check.sh` or Check Solution).
+
+    3. Confirm every scenario objective is satisfied.
+
+
+    WHY: the grader validates real state — marker files are ignored.'
 requires_companion_hosts: false
 dual_terminal: false
 jira_priority: High
+technology: terraform
+summary: Complete the alb showing all targets unhealthy terraform lab and verify success with the checker
+estimated_minutes: 30
+xp_reward: 100
+prerequisites:
+- Basic terraform literacy
+tags:
+- fix
+- hands-on
+- terraform
+linked_tutorial: terraform-fundamentals
+what_you_will_learn:
+- Inspect the target group health check configuration and identify the incorrect path
+- Fix the health check path to match the application endpoint
+- Update the EC2 instance security group to allow inbound traffic from the ALB on the correct port
+environment:
+  nodes:
+  - role: primary
+    os: FixitLab Terraform workspace
+    hostname: lab-primary
+    ip: 127.0.0.1
+    specs: local offline simulation
+  pre_installed:
+  - bash
+  - coreutils
+  - terraform
+  credentials:
+  - user: root
+    password: lab123
+tasks:
+- id: task_1
+  title: ALB Showing All Targets Unhealthy
+  description: Restore healthy behavior for ALB Showing All Targets Unhealthy by investigating the failure,
+    applying the smallest safe fix, and validating the outcome.
+  background: 'This terraform lab teaches systematic troubleshooting: observe, hypothesize, change, verify.'
+  validation:
+    type: custom_script
+    script: check.sh
+    error_message: Validation did not pass. Re-read the objectives and Hint 2 diagnostic steps.
+solution:
+  summary: Identify the misconfiguration affecting this terraform lab and apply the minimal fix.
+  files_changed: []
+  commands_run:
+  - bash check.sh
+  reference_docs: terraform-fundamentals

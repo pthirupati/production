@@ -1,12 +1,31 @@
 title: Restore a Missing Permission to a Permission List
 slug: ps-add-missing-permission-list
-category: Security
-description: >-
-  After a recent security change, HCM administrators can no longer open the
-  Position Data component — PeopleSoft denies access even though they hold the
-  HCM Administrator role. The HCCPPRM permission list that backs that role lost
-  its HC_POSITION_DATA permission. Open the PIA simulator and add the missing
-  permission back to the HCCPPRM permission list so Position Data opens again.
+category: Fix
+description: 'CONTEXT: A team operating PeopleSoft administration needs you to resolve `Restore a Missing
+  Permission to a Permission List` during a realistic incident. The business impact is reduced service
+  reliability until the underlying state is repaired.
+
+
+  ENVIRONMENT: You are working in FixitLab''s offline PeopleSoft app server lab with PIA, Process Scheduler,
+  Integration Broker, and app server logs. All tools run locally; no paid APIs or external cloud calls
+  are required.
+
+
+  SYMPTOM / STARTING STATE: A PeopleSoft HCM environment where the HCCPPRM permission list is missing
+  the HC_POSITION_DATA permission, blocking the Position Data component. After a recent security change,
+  HCM administrators can no longer open the Position Data component — PeopleSoft denies access even though
+  they hold the HCM Administrator role. The HCCPPRM permission list that backs that role lost its HC_POSITION_DATA
+  permission. Open the PIA simulator and add the missing permission back to the HCCPPRM permission list
+  so Position Data opens again.
+
+
+  OBJECTIVE: Open the PeopleSoft (PIA) simulator from the lab toolbar; Navigate to PeopleTools > Security
+  > Permission Lists and open HCCPPRM; Identify the permission missing for the Position Data component.
+  Success means `check.sh` exits successfully.
+
+
+  WHAT TO AVOID: Do not apply broad destructive changes, skip evidence gathering, or fake completion with
+  marker files — the checker validates real system state.'
 difficulty: medium
 lab_mode: simulation
 simulation_type: peoplesoft
@@ -21,24 +40,78 @@ objectives:
 - Navigate to PeopleTools > Security > Permission Lists and open HCCPPRM
 - Identify the permission missing for the Position Data component
 - Add the HC_POSITION_DATA permission back to the HCCPPRM permission list
-initial_state: >-
-  A PeopleSoft HCM environment where the HCCPPRM permission list is missing the
-  HC_POSITION_DATA permission, blocking the Position Data component.
+initial_state: A PeopleSoft HCM environment where the HCCPPRM permission list is missing the HC_POSITION_DATA
+  permission, blocking the Position Data component.
 hints:
 - order: 1
-  cost: 10
-  content: >-
-    Access is denied because a permission list lost a permission, not because a
-    role is missing. Inspect the HCCPPRM permission list that the HCM
-    Administrator role uses.
+  cost: 0
+  content: 'Where to look: Open the PeopleSoft (PIA) simulator from the lab toolbar'
 - order: 2
-  cost: 15
-  content: >-
-    Position Data requires the HC_POSITION_DATA permission. Add that permission
-    key to the HCCPPRM permission list (add_permission with permission_list
-    HCCPPRM, permission HC_POSITION_DATA).
+  cost: 25
+  content: 'Diagnostic steps:
+
+    1. Navigate to PeopleTools > Security > Permission Lists and open HCCPPRM
+
+    2. Identify the permission missing for the Position Data component
+
+    3. Add the HC_POSITION_DATA permission back to the HCCPPRM permission list'
 - order: 3
-  cost: 20
-  content: >-
-    Once HCCPPRM grants HC_POSITION_DATA again, any role that includes HCCPPRM
-    (HC_ADMIN) regains Position Data access.
+  cost: 50
+  content: 'Exact fix + verification:
+
+    1. Add the HC_POSITION_DATA permission back to the HCCPPRM permission list.
+
+    2. Re-run the lab checker (`check.sh` or Check Solution).
+
+    3. Confirm every scenario objective is satisfied.
+
+
+    WHY: the grader validates real state — marker files are ignored.'
+summary: Complete the restore a missing permission to a permission list peoplesoft lab and verify success
+  with the checker
+estimated_minutes: 20
+xp_reward: 100
+prerequisites:
+- Basic peoplesoft literacy
+tags:
+- fix
+- hands-on
+- peoplesoft
+linked_tutorial: peoplesoft-fundamentals
+what_you_will_learn:
+- Open the PeopleSoft (PIA) simulator from the lab toolbar
+- Navigate to PeopleTools > Security > Permission Lists and open HCCPPRM
+- Identify the permission missing for the Position Data component
+- Add the HC_POSITION_DATA permission back to the HCCPPRM permission list
+environment:
+  nodes:
+  - role: primary
+    os: FixitLab PeopleSoft app server lab
+    hostname: lab-primary
+    ip: 127.0.0.1
+    specs: local offline simulation
+  pre_installed:
+  - bash
+  - coreutils
+  - journalctl
+  - peoplesoft
+  - systemctl
+  credentials:
+  - user: root
+    password: lab123
+tasks:
+- id: task_1
+  title: Restore a Missing Permission to a Permission List
+  description: Restore healthy behavior for Restore a Missing Permission to a Permission List by investigating
+    the failure, applying the smallest safe fix, and validating the outcome.
+  background: 'This peoplesoft lab teaches systematic troubleshooting: observe, hypothesize, change, verify.'
+  validation:
+    type: custom_script
+    script: check.sh
+    error_message: Validation did not pass. Re-read the objectives and Hint 2 diagnostic steps.
+solution:
+  summary: Identify the misconfiguration affecting this peoplesoft lab and apply the minimal fix.
+  files_changed: []
+  commands_run:
+  - bash check.sh
+  reference_docs: peoplesoft-fundamentals

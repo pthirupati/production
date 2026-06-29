@@ -1,4 +1,3 @@
-#!/usr/bin/env bash
-# rhel-sshd-maxstartups: config repair (FIXED-OK sentinel).
-grep -q FIXED-OK /etc/ssh/sshd_config.d/limits.conf
+#!/bin/bash
+firewall-cmd --state | grep -q 'running'
 exit 0

@@ -1,7 +1,7 @@
 title: Terraform Remote State Data Source Empty
 slug: terraform-remote-state-empty
-technology: Terraform
-category: Backends
+technology: terraform
+category: Fix
 difficulty: medium
 lab_mode: simulation
 simulation_type: terraform
@@ -10,8 +10,26 @@ max_score: 100
 is_free: true
 jira_priority: High
 dual_terminal: false
-description: A terraform_remote_state data source returns empty outputs, so dependent resources get null
-  values and apply fails. Fix the backend config/key path and verify outputs resolve.
+description: 'CONTEXT: A team operating Terraform IaC needs you to resolve `Terraform Remote State Data
+  Source Empty` during a realistic incident. The business impact is reduced service reliability until
+  the underlying state is repaired.
+
+
+  ENVIRONMENT: You are working in FixitLab''s offline Terraform workspace with HCL files, state, and plan/apply
+  workflow. All tools run locally; no paid APIs or external cloud calls are required.
+
+
+  SYMPTOM / STARTING STATE: A downstream Terraform config whose terraform_remote_state data source points
+  at the wrong S3 key/workspace. A terraform_remote_state data source returns empty outputs, so dependent
+  resources get null values and apply fails. Fix the backend config/key path and verify outputs resolve.
+
+
+  OBJECTIVE: Identify why the remote_state data source returns empty outputs; Correct the bucket/key/workspace
+  in the data source; Confirm the upstream outputs are populated. Success means `check.sh` exits successfully.
+
+
+  WHAT TO AVOID: Do not apply broad destructive changes, skip evidence gathering, or fake completion with
+  marker files — the checker validates real system state.'
 initial_state: A downstream Terraform config whose terraform_remote_state data source points at the wrong
   S3 key/workspace.
 objectives:
@@ -20,11 +38,69 @@ objectives:
 - Confirm the upstream outputs are populated
 hints:
 - order: 1
-  cost: 10
-  content: Plan errors referencing null from data.terraform_remote_state.*.outputs.
+  cost: 0
+  content: 'Where to look: Identify why the remote_state data source returns empty outputs'
 - order: 2
-  cost: 15
-  content: Fix backend bucket/key/workspace to match the producer.
+  cost: 25
+  content: 'Diagnostic steps:
+
+    1. Correct the bucket/key/workspace in the data source
+
+    2. Confirm the upstream outputs are populated'
 - order: 3
-  cost: 20
-  content: Re-plan; values resolve.
+  cost: 50
+  content: 'Exact fix + verification:
+
+    1. Confirm the upstream outputs are populated.
+
+    2. Re-run the lab checker (`check.sh` or Check Solution).
+
+    3. Confirm every scenario objective is satisfied.
+
+
+    WHY: the grader validates real state — marker files are ignored.'
+summary: Complete the terraform remote state data source empty terraform lab and verify success with the
+  checker
+estimated_minutes: 25
+xp_reward: 100
+prerequisites:
+- Basic terraform literacy
+tags:
+- fix
+- hands-on
+- terraform
+linked_tutorial: terraform-fundamentals
+what_you_will_learn:
+- Identify why the remote_state data source returns empty outputs
+- Correct the bucket/key/workspace in the data source
+- Confirm the upstream outputs are populated
+environment:
+  nodes:
+  - role: primary
+    os: FixitLab Terraform workspace
+    hostname: lab-primary
+    ip: 127.0.0.1
+    specs: local offline simulation
+  pre_installed:
+  - bash
+  - coreutils
+  - terraform
+  credentials:
+  - user: root
+    password: lab123
+tasks:
+- id: task_1
+  title: Terraform Remote State Data Source Empty
+  description: Restore healthy behavior for Terraform Remote State Data Source Empty by investigating
+    the failure, applying the smallest safe fix, and validating the outcome.
+  background: 'This terraform lab teaches systematic troubleshooting: observe, hypothesize, change, verify.'
+  validation:
+    type: custom_script
+    script: check.sh
+    error_message: Validation did not pass. Re-read the objectives and Hint 2 diagnostic steps.
+solution:
+  summary: Identify the misconfiguration affecting this terraform lab and apply the minimal fix.
+  files_changed: []
+  commands_run:
+  - bash check.sh
+  reference_docs: terraform-fundamentals

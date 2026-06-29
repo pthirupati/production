@@ -1,11 +1,29 @@
 title: Count Orders Per Category
 slug: sql-group-by-category-counts
 technology: sqlite
-category: SQLite
-description: The analytics dashboard needs the number of orders in each product
-  category, but only for categories that have at least two orders, sorted from the
-  busiest category down. Write a GROUP BY with a COUNT aggregate and a HAVING filter
-  to power the report.
+category: Build
+description: 'CONTEXT: A team operating SQLite needs you to resolve `Count Orders Per Category` during
+  a realistic incident. The business impact is reduced service reliability until the underlying state
+  is repaired.
+
+
+  ENVIRONMENT: You are working in FixitLab''s offline SQLite database file with sqlite3 CLI, schema, WAL
+  mode, and pragmas. All tools run locally; no paid APIs or external cloud calls are required.
+
+
+  SYMPTOM / STARTING STATE: report_busy_categories(conn) should return (category, order_count) for every
+  category that has 2 or more orders, ordered by count descending then category ascending. The starter
+  returns an empty list — write the grouped query. The analytics dashboard needs the number of orders
+  in each product category, but only for categories that have at least two orders, sorted from the busiest
+  category down. Write a GROUP BY with a COUNT aggregate and a HAVING filter to power the report.
+
+
+  OBJECTIVE: Aggregate rows into one row per group with GROUP BY; Count rows in each group with COUNT(*);
+  Filter whole groups with HAVING (not WHERE). Success means all hidden tests pass.
+
+
+  WHAT TO AVOID: Do not apply broad destructive changes, skip evidence gathering, or fake completion with
+  marker files — the checker validates real system state.'
 difficulty: medium
 scenario_type: do
 lab_mode: simulation
@@ -20,119 +38,167 @@ objectives:
 - Aggregate rows into one row per group with GROUP BY
 - Count rows in each group with COUNT(*)
 - Filter whole groups with HAVING (not WHERE)
-initial_state: report_busy_categories(conn) should return (category, order_count) for
-  every category that has 2 or more orders, ordered by count descending then category
-  ascending. The starter returns an empty list — write the grouped query.
-solution_explanation: |
-  GROUP BY category collapses all rows sharing a category into a single group;
+initial_state: report_busy_categories(conn) should return (category, order_count) for every category that
+  has 2 or more orders, ordered by count descending then category ascending. The starter returns an empty
+  list — write the grouped query.
+solution_explanation: 'GROUP BY category collapses all rows sharing a category into a single group;
+
   COUNT(*) reports how many rows fell into each group. WHERE filters individual rows
+
   BEFORE grouping, so a per-group condition like "at least 2 orders" must use HAVING,
+
   which filters AFTER aggregation. Ordering by the count descending, then category,
+
   gives a stable busiest-first report.
+
+  '
 coding_spec:
   language: python
   entrypoint: solution.py
   kind: implement
-  instructions: |
-    Implement solution(conn): return (category, order_count) for each category that
-    has 2 OR MORE orders. Order by order_count descending, then category ascending.
-
-      orders(id INTEGER, category TEXT, amount REAL)
-
-    Use GROUP BY and a HAVING clause. Return conn.execute(...).fetchall().
-    Click Run to try it, then Check Solution to grade against all tests.
+  instructions: "Implement solution(conn): return (category, order_count) for each category that\nhas\
+    \ 2 OR MORE orders. Order by order_count descending, then category ascending.\n\n  orders(id INTEGER,\
+    \ category TEXT, amount REAL)\n\nUse GROUP BY and a HAVING clause. Return conn.execute(...).fetchall().\n\
+    Click Run to try it, then Check Solution to grade against all tests.\n"
   files:
   - path: solution.py
-    content: |
-      def solution(conn):
-          # TODO: count orders per category, keep only categories with >= 2 orders,
-          # order by count desc then category asc.
-          return conn.execute(
-              "SELECT category, COUNT(*) FROM orders WHERE 0 GROUP BY category"
-          ).fetchall()
+    content: "def solution(conn):\n    # TODO: count orders per category, keep only categories with >=\
+      \ 2 orders,\n    # order by count desc then category asc.\n    return conn.execute(\n        \"\
+      SELECT category, COUNT(*) FROM orders WHERE 0 GROUP BY category\"\n    ).fetchall()\n"
     readonly: false
   visible_tests:
   - name: counts and filters groups
-    code: |
-      import sqlite3
-      conn = sqlite3.connect(":memory:")
-      conn.executescript('''
-        CREATE TABLE orders(id INTEGER, category TEXT, amount REAL);
-        INSERT INTO orders VALUES (1,'books',10);
-        INSERT INTO orders VALUES (2,'books',12);
-        INSERT INTO orders VALUES (3,'books',8);
-        INSERT INTO orders VALUES (4,'toys',5);
-        INSERT INTO orders VALUES (5,'toys',6);
-        INSERT INTO orders VALUES (6,'food',9);
-      ''')
-      assert solution(conn) == [('books',3),('toys',2)], solution(conn)
+    code: "import sqlite3\nconn = sqlite3.connect(\":memory:\")\nconn.executescript('''\n  CREATE TABLE\
+      \ orders(id INTEGER, category TEXT, amount REAL);\n  INSERT INTO orders VALUES (1,'books',10);\n\
+      \  INSERT INTO orders VALUES (2,'books',12);\n  INSERT INTO orders VALUES (3,'books',8);\n  INSERT\
+      \ INTO orders VALUES (4,'toys',5);\n  INSERT INTO orders VALUES (5,'toys',6);\n  INSERT INTO orders\
+      \ VALUES (6,'food',9);\n''')\nassert solution(conn) == [('books',3),('toys',2)], solution(conn)\n"
   - name: single-order categories are excluded
-    code: |
-      import sqlite3
-      conn = sqlite3.connect(":memory:")
-      conn.executescript('''
-        CREATE TABLE orders(id INTEGER, category TEXT, amount REAL);
-        INSERT INTO orders VALUES (1,'a',1);
-        INSERT INTO orders VALUES (2,'b',1);
-        INSERT INTO orders VALUES (3,'c',1);
-      ''')
-      assert solution(conn) == [], solution(conn)
+    code: "import sqlite3\nconn = sqlite3.connect(\":memory:\")\nconn.executescript('''\n  CREATE TABLE\
+      \ orders(id INTEGER, category TEXT, amount REAL);\n  INSERT INTO orders VALUES (1,'a',1);\n  INSERT\
+      \ INTO orders VALUES (2,'b',1);\n  INSERT INTO orders VALUES (3,'c',1);\n''')\nassert solution(conn)\
+      \ == [], solution(conn)\n"
   hidden_tests:
   - name: ties on count break by category ascending
-    code: |
-      import sqlite3
-      conn = sqlite3.connect(":memory:")
-      conn.executescript('''
-        CREATE TABLE orders(id INTEGER, category TEXT, amount REAL);
-        INSERT INTO orders VALUES (1,'zoo',1);
-        INSERT INTO orders VALUES (2,'zoo',1);
-        INSERT INTO orders VALUES (3,'art',1);
-        INSERT INTO orders VALUES (4,'art',1);
-      ''')
-      assert solution(conn) == [('art',2),('zoo',2)], solution(conn)
+    code: "import sqlite3\nconn = sqlite3.connect(\":memory:\")\nconn.executescript('''\n  CREATE TABLE\
+      \ orders(id INTEGER, category TEXT, amount REAL);\n  INSERT INTO orders VALUES (1,'zoo',1);\n  INSERT\
+      \ INTO orders VALUES (2,'zoo',1);\n  INSERT INTO orders VALUES (3,'art',1);\n  INSERT INTO orders\
+      \ VALUES (4,'art',1);\n''')\nassert solution(conn) == [('art',2),('zoo',2)], solution(conn)\n"
   - name: exactly two qualifies, count is accurate
-    code: |
-      import sqlite3
-      conn = sqlite3.connect(":memory:")
-      conn.executescript('''
-        CREATE TABLE orders(id INTEGER, category TEXT, amount REAL);
-        INSERT INTO orders VALUES (1,'x',1);
-        INSERT INTO orders VALUES (2,'x',1);
-        INSERT INTO orders VALUES (3,'y',1);
-        INSERT INTO orders VALUES (4,'y',1);
-        INSERT INTO orders VALUES (5,'y',1);
-        INSERT INTO orders VALUES (6,'y',1);
-      ''')
-      assert solution(conn) == [('y',4),('x',2)], solution(conn)
+    code: "import sqlite3\nconn = sqlite3.connect(\":memory:\")\nconn.executescript('''\n  CREATE TABLE\
+      \ orders(id INTEGER, category TEXT, amount REAL);\n  INSERT INTO orders VALUES (1,'x',1);\n  INSERT\
+      \ INTO orders VALUES (2,'x',1);\n  INSERT INTO orders VALUES (3,'y',1);\n  INSERT INTO orders VALUES\
+      \ (4,'y',1);\n  INSERT INTO orders VALUES (5,'y',1);\n  INSERT INTO orders VALUES (6,'y',1);\n''')\n\
+      assert solution(conn) == [('y',4),('x',2)], solution(conn)\n"
   - name: empty table returns nothing
-    code: |
-      import sqlite3
+    code: 'import sqlite3
+
       conn = sqlite3.connect(":memory:")
-      conn.executescript('CREATE TABLE orders(id INTEGER, category TEXT, amount REAL);')
+
+      conn.executescript(''CREATE TABLE orders(id INTEGER, category TEXT, amount REAL);'')
+
       assert solution(conn) == [], solution(conn)
+
+      '
   - name: filtering happens per group not per row
-    code: |
-      import sqlite3
-      conn = sqlite3.connect(":memory:")
-      conn.executescript('''
-        CREATE TABLE orders(id INTEGER, category TEXT, amount REAL);
-        INSERT INTO orders VALUES (1,'solo',1);
-        INSERT INTO orders VALUES (2,'pair',1);
-        INSERT INTO orders VALUES (3,'pair',1);
-      ''')
-      rows = solution(conn)
-      assert rows == [('pair',2)], rows
+    code: "import sqlite3\nconn = sqlite3.connect(\":memory:\")\nconn.executescript('''\n  CREATE TABLE\
+      \ orders(id INTEGER, category TEXT, amount REAL);\n  INSERT INTO orders VALUES (1,'solo',1);\n \
+      \ INSERT INTO orders VALUES (2,'pair',1);\n  INSERT INTO orders VALUES (3,'pair',1);\n''')\nrows\
+      \ = solution(conn)\nassert rows == [('pair',2)], rows\n"
   timeout: 8
 hints:
 - order: 1
-  cost: 10
-  content: One output row per category means GROUP BY category, and the count of rows
-    in each group is COUNT(*).
+  cost: 0
+  content: 'Where to look: Open `solution.py`, read the instructions, and run the visible tests to see
+    which assertion fails first.'
 - order: 2
-  cost: 20
-  content: '"At least 2 orders" is a condition on the GROUP, not on individual rows,
-    so it belongs in HAVING COUNT(*) >= 2 — not WHERE.'
+  cost: 25
+  content: 'Diagnostic steps:
+
+    1. Click Run and read the traceback — note line number and actual vs expected values.
+
+    2. Reproduce the failure with the smallest input from a visible test.
+
+    3. Compare your implementation to the bug described in the lab prompt.'
 - order: 3
-  cost: 30
-  content: 'Query: SELECT category, COUNT(*) FROM orders GROUP BY category HAVING COUNT(*)
-    >= 2 ORDER BY COUNT(*) DESC, category ASC.'
+  cost: 50
+  content: 'Exact fix + verification:
+
+    1. Filter whole groups with HAVING (not WHERE).
+
+    2. Re-run the lab checker (`check.sh` or Check Solution).
+
+    3. Confirm every scenario objective is satisfied.
+
+
+    WHY: the grader validates real state — marker files are ignored.'
+summary: Complete the count orders per category sqlite lab and verify success with the checker
+estimated_minutes: 20
+xp_reward: 100
+prerequisites:
+- Basic sqlite literacy
+tags:
+- do
+- hands-on
+- sqlite
+linked_tutorial: sqlite-fundamentals
+what_you_will_learn:
+- Aggregate rows into one row per group with GROUP BY
+- Count rows in each group with COUNT(*)
+- Filter whole groups with HAVING (not WHERE)
+environment:
+  nodes:
+  - role: primary
+    os: FixitLab SQLite database file
+    hostname: lab-primary
+    ip: 127.0.0.1
+    specs: local offline simulation
+  pre_installed:
+  - bash
+  - coreutils
+  - journalctl
+  - sqlite
+  - systemctl
+  credentials:
+  - user: root
+    password: lab123
+tasks:
+- id: task_1
+  title: Count Orders Per Category
+  description: Restore healthy behavior for Count Orders Per Category by investigating the failure, applying
+    the smallest safe fix, and validating the outcome.
+  background: 'This sqlite lab teaches systematic troubleshooting: observe, hypothesize, change, verify.'
+  validation:
+    type: custom_script
+    script: hidden_tests
+    error_message: One or more hidden tests failed. Read the public test output, fix your solution, and
+      submit again.
+solution:
+  summary: The solution passes all hidden tests by implementing the required behavior in code.
+  files_changed: []
+  commands_run: []
+  reference_docs: sqlite-fundamentals
+guided_mode:
+  enabled: true
+  steps:
+  - step: 1
+    title: Inspect current state
+    instruction: Run a read-only diagnostic before changing anything.
+    command: check.sh
+    expected_output: Output shows the current failure mode
+    explanation: Evidence-first troubleshooting avoids guessing.
+    next_on: command_success
+  - step: 2
+    title: Apply the minimal fix
+    instruction: Make one reversible change aligned with the objectives.
+    command: '# your fix command here'
+    expected_output: State moves toward the objective
+    explanation: Small changes make rollback easy if the hypothesis was wrong.
+    next_on: command_success
+  - step: 3
+    title: Verify with the grader
+    instruction: Run the same verification the checker uses.
+    command: check.sh
+    expected_output: all hidden tests pass
+    explanation: The lab passes only when real state is healthy.
+    next_on: command_success

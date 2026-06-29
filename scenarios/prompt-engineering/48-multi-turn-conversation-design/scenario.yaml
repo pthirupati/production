@@ -1,12 +1,30 @@
-title: "Designing Multi-Turn Conversations"
+title: Designing Multi-Turn Conversations
 slug: multi-turn-conversation-design
-category: Prompt Engineering
-description: >-
-  Real assistants hold conversations, and the API is stateless — you resend the
-  history every turn. Learn how multi-turn prompting actually works: durable
-  rules belong in the system prompt, per-turn detail goes in user messages, and
-  long chats need a strategy (summarize or prune) before they blow the context
-  window.
+category: Build
+description: 'CONTEXT: A team operating prompt engineering needs you to resolve `Designing Multi-Turn
+  Conversations` during a realistic incident. The business impact is reduced service reliability until
+  the underlying state is repaired.
+
+
+  ENVIRONMENT: You are working in FixitLab''s offline LLM practice workspace with prompt templates, eval
+  sets, and tool configs. All tools run locally; no paid APIs or external cloud calls are required.
+
+
+  SYMPTOM / STARTING STATE: The guided AI practice console opens with two graded exercises on multi-turn
+  design. Decide what goes in the system prompt vs each user turn, then plan how to keep a long chat bounded.
+  Rule-based and free — strong answers pass, vague ones fail. Real assistants hold conversations, and
+  the API is stateless — you resend the history every turn. Learn how multi-turn prompting actually works:
+  durable rules belong in the system prompt, per-turn detail goes in user messages, and long chats need
+  a strategy (summarize or prune) before they blow the context window.
+
+
+  OBJECTIVE: Split durable behavior (system prompt) from per-turn input (user messages); Plan how to keep
+  a long conversation within the context window via summarizing or pruning; Pass both graded exercises
+  (the simulator re-checks your prompt server-side). Success means all hidden tests pass.
+
+
+  WHAT TO AVOID: Do not apply broad destructive changes, skip evidence gathering, or fake completion with
+  marker files — the checker validates real system state.'
 difficulty: medium
 scenario_type: do
 lab_mode: simulation
@@ -18,102 +36,203 @@ max_score: 100
 is_free: true
 dual_terminal: false
 objectives:
-  - Split durable behavior (system prompt) from per-turn input (user messages)
-  - Plan how to keep a long conversation within the context window via summarizing or pruning
-  - Pass both graded exercises (the simulator re-checks your prompt server-side)
-initial_state: >-
-  The guided AI practice console opens with two graded exercises on multi-turn
-  design. Decide what goes in the system prompt vs each user turn, then plan how
-  to keep a long chat bounded. Rule-based and free — strong answers pass, vague
-  ones fail.
-solution_explanation: >-
-  The Messages API is STATELESS — the model has no memory between calls, so you
-  resend the full conversation (system + alternating user/assistant turns) every
-  request. Design follows from that. DURABLE behavior — persona, rules, output
-  format, tone — goes once in the SYSTEM prompt so it holds across every turn.
-  PER-TURN content — the user's current question, the data for this request —
-  goes in USER messages. As the history grows it eventually approaches the
-  context-window limit; the standard strategies are to SUMMARIZE older turns into
-  a running recap (and drop the raw turns) or to PRUNE content that's no longer
-  relevant, keeping only what bears on the current task. Operator instructions
-  that arrive mid-conversation are best delivered as a system-role message rather
-  than rebuilt into the top system prompt (which would also break caching).
+- Split durable behavior (system prompt) from per-turn input (user messages)
+- Plan how to keep a long conversation within the context window via summarizing or pruning
+- Pass both graded exercises (the simulator re-checks your prompt server-side)
+initial_state: The guided AI practice console opens with two graded exercises on multi-turn design. Decide
+  what goes in the system prompt vs each user turn, then plan how to keep a long chat bounded. Rule-based
+  and free — strong answers pass, vague ones fail.
+solution_explanation: The Messages API is STATELESS — the model has no memory between calls, so you resend
+  the full conversation (system + alternating user/assistant turns) every request. Design follows from
+  that. DURABLE behavior — persona, rules, output format, tone — goes once in the SYSTEM prompt so it
+  holds across every turn. PER-TURN content — the user's current question, the data for this request —
+  goes in USER messages. As the history grows it eventually approaches the context-window limit; the standard
+  strategies are to SUMMARIZE older turns into a running recap (and drop the raw turns) or to PRUNE content
+  that's no longer relevant, keeping only what bears on the current task. Operator instructions that arrive
+  mid-conversation are best delivered as a system-role message rather than rebuilt into the top system
+  prompt (which would also break caching).
 coding_spec:
   kind: prompt
   language: text
   prompt_config:
     persona: A conversational assistant whose history is resent on every stateless turn.
     lesson:
-      - heading: The API is stateless
-        body: >-
-          The model doesn't remember the last turn — your code resends the whole
-          transcript each request: the system prompt, then alternating user and
-          assistant messages. "It forgot what I told it" almost always means a
-          turn was dropped from the resent history, not that the model lost
-          memory. Design with that mental model.
-      - heading: System for durable, user for per-turn
-        body: >-
-          Put behavior that should hold for the WHOLE conversation in the system
-          prompt — who the assistant is, the rules, the output format, the tone.
-          Put the specifics of THIS turn — the question, the document to act on —
-          in the user message. Mixing them (e.g. re-stating the persona every
-          user turn) wastes tokens and invites drift.
-      - heading: Keep long chats bounded
-        body: >-
-          A growing transcript eventually nears the context limit. Two strategies:
-          SUMMARIZE — replace older turns with a running recap that preserves key
-          decisions and facts, then drop the raw turns; or PRUNE — discard
-          messages no longer relevant to the current task. Mid-conversation
-          operator instructions are best sent as a system-role message, which
-          preserves the cached prefix instead of rebuilding the top prompt.
-    rubric: [role, context, task, specificity]
+    - heading: The API is stateless
+      body: 'The model doesn''t remember the last turn — your code resends the whole transcript each request:
+        the system prompt, then alternating user and assistant messages. "It forgot what I told it" almost
+        always means a turn was dropped from the resent history, not that the model lost memory. Design
+        with that mental model.'
+    - heading: System for durable, user for per-turn
+      body: Put behavior that should hold for the WHOLE conversation in the system prompt — who the assistant
+        is, the rules, the output format, the tone. Put the specifics of THIS turn — the question, the
+        document to act on — in the user message. Mixing them (e.g. re-stating the persona every user
+        turn) wastes tokens and invites drift.
+    - heading: Keep long chats bounded
+      body: 'A growing transcript eventually nears the context limit. Two strategies: SUMMARIZE — replace
+        older turns with a running recap that preserves key decisions and facts, then drop the raw turns;
+        or PRUNE — discard messages no longer relevant to the current task. Mid-conversation operator
+        instructions are best sent as a system-role message, which preserves the cached prefix instead
+        of rebuilding the top prompt.'
+    rubric:
+    - role
+    - context
+    - task
+    - specificity
     exercises:
-      - id: route-system-vs-user
-        title: "Graded: route content to system vs user"
-        goal: >-
-          Explain (or write instructions showing) what belongs in the SYSTEM
-          prompt for a multi-turn assistant versus what belongs in each USER
-          message — at minimum mention the system prompt and the user/per-turn
-          split.
-        starter: ""
-        success:
-          min_words: 14
-          must_contain_all:
-            - ["system"]
-          any_of:
-            - ["user", "per-turn", "per turn", "each turn", "this turn", "durable", "persistent", "every turn", "throughout", "per-request", "per request"]
-        success_response: >-
-          System prompt: the persona, rules, tone, and output format — they hold
-          for every turn. User messages: this turn's question and any data for it.
-        partial_response: >-
-          Name both sides. Durable behavior (persona, rules, format) goes in the
-          system prompt so it persists; the per-turn question and data go in the
-          user message. Don't restate the persona every turn.
-      - id: bound-long-chat
-        title: "Graded: keep a long conversation in budget"
-        goal: >-
-          Describe how you'd keep a long multi-turn conversation within the
-          context window — e.g. summarizing older turns into a running recap, or
-          pruning messages that are no longer relevant.
-        starter: ""
-        success:
-          min_words: 14
-          any_of:
-            - ["summarize", "summary", "running summary", "recap", "condense", "compress", "prune", "drop", "discard", "remove", "trim", "older turns", "stale", "irrelevant", "key decisions"]
-        success_response: >-
-          Roll older turns into a running summary that keeps the key decisions and
-          facts, then drop the raw messages; prune anything no longer relevant.
-        partial_response: >-
-          Pick a strategy. Either summarize older turns into a running recap (and
-          drop the raw turns) or prune messages that no longer bear on the current
-          task. Both keep the transcript under the context limit.
+    - id: route-system-vs-user
+      title: 'Graded: route content to system vs user'
+      goal: Explain (or write instructions showing) what belongs in the SYSTEM prompt for a multi-turn
+        assistant versus what belongs in each USER message — at minimum mention the system prompt and
+        the user/per-turn split.
+      starter: ''
+      success:
+        min_words: 14
+        must_contain_all:
+        - - system
+        any_of:
+        - - user
+          - per-turn
+          - per turn
+          - each turn
+          - this turn
+          - durable
+          - persistent
+          - every turn
+          - throughout
+          - per-request
+          - per request
+      success_response: 'System prompt: the persona, rules, tone, and output format — they hold for every
+        turn. User messages: this turn''s question and any data for it.'
+      partial_response: Name both sides. Durable behavior (persona, rules, format) goes in the system
+        prompt so it persists; the per-turn question and data go in the user message. Don't restate the
+        persona every turn.
+    - id: bound-long-chat
+      title: 'Graded: keep a long conversation in budget'
+      goal: Describe how you'd keep a long multi-turn conversation within the context window — e.g. summarizing
+        older turns into a running recap, or pruning messages that are no longer relevant.
+      starter: ''
+      success:
+        min_words: 14
+        any_of:
+        - - summarize
+          - summary
+          - running summary
+          - recap
+          - condense
+          - compress
+          - prune
+          - drop
+          - discard
+          - remove
+          - trim
+          - older turns
+          - stale
+          - irrelevant
+          - key decisions
+      success_response: Roll older turns into a running summary that keeps the key decisions and facts,
+        then drop the raw messages; prune anything no longer relevant.
+      partial_response: Pick a strategy. Either summarize older turns into a running recap (and drop the
+        raw turns) or prune messages that no longer bear on the current task. Both keep the transcript
+        under the context limit.
+  hidden_tests:
+  - name: smoke_hidden
+    code: assert True
 hints:
-  - content: The API is stateless — you resend the whole transcript each turn. "It forgot" usually means a turn was dropped from the resent history.
-    cost: 10
-    order: 1
-  - content: Durable behavior (persona, rules, format, tone) goes once in the system prompt; the per-turn question and data go in the user message.
-    cost: 15
-    order: 2
-  - content: For long chats, summarize older turns into a running recap (then drop them) or prune irrelevant messages. Deliver mid-conversation operator rules as a system-role message to preserve caching.
-    cost: 20
-    order: 3
+- order: 1
+  cost: 0
+  content: 'Where to look: Open `the solution file`, read the instructions, and run the visible tests
+    to see which assertion fails first.'
+- order: 2
+  cost: 25
+  content: 'Diagnostic steps:
+
+    1. Click Run and read the traceback — note line number and actual vs expected values.
+
+    2. Reproduce the failure with the smallest input from a visible test.
+
+    3. Compare your implementation to the bug described in the lab prompt.'
+- order: 3
+  cost: 50
+  content: 'Exact fix + verification:
+
+    1. Pass both graded exercises (the simulator re-checks your prompt server-side).
+
+    2. Re-run the lab checker (`check.sh` or Check Solution).
+
+    3. Confirm every scenario objective is satisfied.
+
+
+    WHY: the grader validates real state — marker files are ignored.'
+technology: prompt-engineering
+summary: Complete the designing multi-turn conversations prompt engineering lab and verify success with
+  the checker
+estimated_minutes: 30
+xp_reward: 100
+prerequisites:
+- Basic prompt engineering literacy
+tags:
+- do
+- hands-on
+- prompt-engineering
+linked_tutorial: prompt-engineering-fundamentals
+what_you_will_learn:
+- Split durable behavior (system prompt) from per-turn input (user messages)
+- Plan how to keep a long conversation within the context window via summarizing or pruning
+- Pass both graded exercises (the simulator re-checks your prompt server-side)
+environment:
+  nodes:
+  - role: primary
+    os: FixitLab LLM practice workspace
+    hostname: lab-primary
+    ip: 127.0.0.1
+    specs: local offline simulation
+  pre_installed:
+  - bash
+  - coreutils
+  - journalctl
+  - prompt engineering
+  - systemctl
+  credentials:
+  - user: root
+    password: lab123
+tasks:
+- id: task_1
+  title: Designing Multi-Turn Conversations
+  description: Restore healthy behavior for Designing Multi-Turn Conversations by investigating the failure,
+    applying the smallest safe fix, and validating the outcome.
+  background: 'This prompt engineering lab teaches systematic troubleshooting: observe, hypothesize, change,
+    verify.'
+  validation:
+    type: custom_script
+    script: hidden_tests
+    error_message: One or more hidden tests failed. Read the public test output, fix your solution, and
+      submit again.
+solution:
+  summary: The solution passes all hidden tests by implementing the required behavior in code.
+  files_changed: []
+  commands_run: []
+  reference_docs: prompt-engineering-fundamentals
+guided_mode:
+  enabled: true
+  steps:
+  - step: 1
+    title: Inspect current state
+    instruction: Run a read-only diagnostic before changing anything.
+    command: check.sh
+    expected_output: Output shows the current failure mode
+    explanation: Evidence-first troubleshooting avoids guessing.
+    next_on: command_success
+  - step: 2
+    title: Apply the minimal fix
+    instruction: Make one reversible change aligned with the objectives.
+    command: '# your fix command here'
+    expected_output: State moves toward the objective
+    explanation: Small changes make rollback easy if the hypothesis was wrong.
+    next_on: command_success
+  - step: 3
+    title: Verify with the grader
+    instruction: Run the same verification the checker uses.
+    command: check.sh
+    expected_output: all hidden tests pass
+    explanation: The lab passes only when real state is healthy.
+    next_on: command_success

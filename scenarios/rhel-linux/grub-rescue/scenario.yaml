@@ -1,22 +1,54 @@
-category: RHEL Linux
-description: The system boots into the limited `grub rescue>` prompt instead of the OS because the GRUB
-  bootloader can't find its configuration/modules (a damaged install or a moved /boot). You must locate
-  the boot partition, load the OS, and reinstall GRUB so the machine boots normally again.
+category: Fix
+description: 'CONTEXT: A team operating Red Hat Enterprise Linux needs you to resolve `GRUB Rescue Mode`
+  during a realistic incident. The business impact is reduced service reliability until the underlying
+  state is repaired.
+
+
+  ENVIRONMENT: You are working in FixitLab''s offline RHEL practice host with dnf, subscription-manager,
+  firewalld, and SELinux. All tools run locally; no paid APIs or external cloud calls are required.
+
+
+  SYMPTOM / STARTING STATE: Simulated RHEL 9 server that drops to the `grub rescue>` prompt at boot. GRUB
+  cannot load its normal configuration, so the OS does not start. The system boots into the limited `grub
+  rescue>` prompt instead of the OS because the GRUB bootloader can''t find its configuration/modules
+  (a damaged install or a moved /boot). You must locate the boot partition, load the OS, and reinstall
+  GRUB so the machine boots normally again.
+
+
+  OBJECTIVE: Identify the boot/root partition from the grub rescue prompt; Boot into the OS (or a rescue
+  environment); Reinstall GRUB and regenerate its config so the system boots normally. Success means `check.sh`
+  exits successfully.
+
+
+  WHAT TO AVOID: Do not apply broad destructive changes, skip evidence gathering, or fake completion with
+  marker files — the checker validates real system state.'
 difficulty: hard
 dual_terminal: false
 hints:
 - order: 1
-  cost: 10
-  content: 'At `grub rescue>`, find the partitions: `ls` lists devices like (hd0,gpt2). Locate the one
-    with /boot (e.g. `ls (hd0,gpt1)/`) to identify boot vs root.'
+  cost: 0
+  content: 'Where to look: Run `firewall-cmd --state` and `firewall-cmd --list-all` for active zones.'
 - order: 2
-  cost: 15
-  content: 'Set prefix/root to the boot partition and load the normal module to reach a real menu: `set
-    prefix=(hd0,gpt1)/grub2`, `set root=(hd0,gpt1)`, `insmod normal`, `normal` — then boot the OS.'
+  cost: 25
+  content: 'Diagnostic steps:
+
+    1. Identify which zone is active and which ports/services are allowed.
+
+    2. Compare to the port the scenario expects (often 80/tcp or 443/tcp).
+
+    3. Check if the service is bound but blocked externally.'
 - order: 3
-  cost: 20
-  content: 'Once booted (or in chroot from rescue media), reinstall and rebuild: `grub2-install /dev/sda`
-    and `grub2-mkconfig -o /boot/grub2/grub.cfg`. Reboot and confirm it comes up normally.'
+  cost: 50
+  content: 'Exact fix + verification:
+
+    1. `firewall-cmd --permanent --add-service=http` (or the needed port).
+
+    2. `firewall-cmd --reload`.
+
+    3. Confirm `firewall-cmd --list-ports` includes the required port.
+
+
+    WHY: a running service behind a closed firewall still fails health checks.'
 initial_state: Simulated RHEL 9 server that drops to the `grub rescue>` prompt at boot. GRUB cannot load
   its normal configuration, so the OS does not start.
 is_free: false
@@ -32,3 +64,51 @@ simulation_type: rhel
 slug: sim-rhel-grub-rescue
 time_limit: 900
 title: GRUB Rescue Mode
+technology: rhel-linux
+summary: Complete the grub rescue mode rhel linux lab and verify success with the checker
+estimated_minutes: 15
+xp_reward: 100
+prerequisites:
+- Basic rhel linux literacy
+tags:
+- fix
+- hands-on
+- rhel-linux
+linked_tutorial: rhel-linux-fundamentals
+what_you_will_learn:
+- Identify the boot/root partition from the grub rescue prompt
+- Boot into the OS (or a rescue environment)
+- Reinstall GRUB and regenerate its config so the system boots normally
+environment:
+  nodes:
+  - role: primary
+    os: FixitLab RHEL practice host
+    hostname: lab-primary
+    ip: 127.0.0.1
+    specs: local offline simulation
+  pre_installed:
+  - bash
+  - coreutils
+  - journalctl
+  - rhel linux
+  - systemctl
+  credentials:
+  - user: root
+    password: lab123
+tasks:
+- id: task_1
+  title: GRUB Rescue Mode
+  description: Restore healthy behavior for GRUB Rescue Mode by investigating the failure, applying the
+    smallest safe fix, and validating the outcome.
+  background: 'This rhel linux lab teaches systematic troubleshooting: observe, hypothesize, change, verify.'
+  validation:
+    type: command_output
+    command: firewall-cmd --list-ports
+    expected_output: 80/tcp
+    error_message: HTTP is still blocked by firewalld. Allow the service and reload.
+solution:
+  summary: Identify the misconfiguration affecting this rhel linux lab and apply the minimal fix.
+  files_changed: []
+  commands_run:
+  - firewall-cmd --list-ports
+  reference_docs: rhel-linux-fundamentals

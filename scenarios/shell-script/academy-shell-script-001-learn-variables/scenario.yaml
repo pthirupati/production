@@ -1,7 +1,7 @@
-title: 'Shell Scripting: Terraform Variables — Fundamentals Lab'
+title: Terraform Variables — Learn Lab
 slug: academy-shell-script-001-learn-variables
-technology: Shell Scripting
-category: Core Skills
+technology: shell-script
+category: Learn
 difficulty: easy
 scenario_type: do
 lab_mode: simulation
@@ -11,18 +11,39 @@ max_score: 100
 is_free: true
 infrastructure_type: docker
 jira_priority: Low
-description: Service operations lab. The `crond` systemd unit is **failed/inactive** on this host — a
-  realistic fault for Fundamentals Lab workflows that depend on it. Diagnose with `systemctl status crond`
-  and journal logs, apply the smallest reliable fix, then verify with `systemctl is-active crond`.
+description: 'CONTEXT: A team operating shell scripting needs you to resolve `shell-script: Terraform
+  Variables — Fundamentals Lab` during a realistic incident. The business impact is reduced service reliability
+  until the underlying state is repaired.
+
+
+  ENVIRONMENT: You are working in FixitLab''s offline bash practice environment with scripts, cron, logs,
+  and shellcheck. All tools run locally; no paid APIs or external cloud calls are required.
+
+
+  SYMPTOM / STARTING STATE: The bash practice environment is online with a starter Terraform variables
+  setup. Some pieces are intentionally incomplete so you can learn how they fit together. Nothing is on
+  fire — focus on observation. This beginner-friendly shell-script lab introduces Terraform variables.
+  You will explore input variables, defaults, validation, and tfvars layering on the bash practice environment.
+  Read the environment first, then follow the guided steps — no prior production experience required.
+
+
+  OBJECTIVE: Understand how Terraform variables work in this lab environment; Identify the main status
+  and configuration signals for Terraform variables; Confirm you can read the current state confidently
+  before changing anything. Success means `systemctl is-active crond` returns active.
+
+
+  WHAT TO AVOID: Do not apply broad destructive changes, skip evidence gathering, or fake completion with
+  marker files — the checker validates real system state.'
 objectives:
-- The `crond` service is active (running)
-- '`systemctl is-active crond` returns active'
-- The fix survives a status re-check (no marker files)
-initial_state: The `crond` service is not running (`systemctl is-active crond` → inactive/failed). Dependent
-  Fundamentals Lab tasks cannot succeed until the unit is healthy again.
+- Understand how Terraform variables work in this lab environment
+- Identify the main status and configuration signals for Terraform variables
+- Confirm you can read the current state confidently before changing anything
+initial_state: The bash practice environment is online with a starter Terraform variables setup. Some
+  pieces are intentionally incomplete so you can learn how they fit together. Nothing is on fire — focus
+  on observation.
 hints:
 - order: 1
-  cost: 10
+  cost: 0
   content: 'Orient yourself before changing anything:
 
     1. Inspect the current state — variables.tf, *.tfvars, and `terraform console`.
@@ -32,17 +53,17 @@ hints:
     3. Recall the core idea: input variables, defaults, validation, and tfvars layering. Form one hypothesis
     before you act.'
 - order: 2
-  cost: 15
-  content: 'Plan your approach (still no spoilers):
-
-    1. Confirm the exact gap between current and desired state for Terraform variables.
-
-    2. Decide the single smallest change that moves you toward the objective.
-
-    3. Capture evidence (command output / status) before the change so you can prove it worked afterward.'
-- order: 3
   cost: 25
-  content: 'Guided walkthrough:
+  content: 'Diagnostic steps:
+
+    1. Run `systemctl status crond` — note Active/Failed and the last log lines.
+
+    2. Read `journalctl -u crond -n 50` for the root error.
+
+    3. Form a hypothesis about the smallest config or permission fix.'
+- order: 3
+  cost: 50
+  content: 'Exact fix + verification:
 
     1. Re-check the current state — variables.tf, *.tfvars, and `terraform console`.
 
@@ -51,4 +72,77 @@ hints:
 
     3. Verify the result — the correct tfvars set is used and `terraform validate` passes.
 
-    4. Click Check Solution once `systemctl is-active crond` returns active.'
+    4. Click Check Solution once the objective is met (graded on real state, not a marker file).'
+summary: Complete the terraform variables — learn lab shell script lab and verify success with the checker
+estimated_minutes: 15
+xp_reward: 100
+prerequisites:
+- Basic shell script literacy
+tags:
+- do
+- hands-on
+- shell-script
+linked_tutorial: shell-script-fundamentals
+what_you_will_learn:
+- Understand how Terraform variables work in this lab environment
+- Identify the main status and configuration signals for Terraform variables
+- Confirm you can read the current state confidently before changing anything
+environment:
+  nodes:
+  - role: primary
+    os: FixitLab bash practice environment
+    hostname: lab-primary
+    ip: 127.0.0.1
+    specs: local offline simulation
+  pre_installed:
+  - bash
+  - coreutils
+  - journalctl
+  - shell script
+  - systemctl
+  credentials:
+  - user: root
+    password: lab123
+tasks:
+- id: task_1
+  title: Terraform Variables — Learn Lab
+  description: Restore healthy behavior for Terraform Variables — Learn Lab by investigating the failure,
+    applying the smallest safe fix, and validating the outcome.
+  background: 'This shell script lab teaches systematic troubleshooting: observe, hypothesize, change,
+    verify.'
+  validation:
+    type: service_active
+    command: systemctl is-active crond
+    expected_status: active
+    error_message: The crond service is not active yet. Check `systemctl status crond` and `journalctl
+      -u crond -n 50`.
+solution:
+  summary: The root cause is an unhealthy `crond` service; repair it and verify active state.
+  files_changed: []
+  commands_run:
+  - systemctl is-active crond
+  reference_docs: shell-script-fundamentals
+guided_mode:
+  enabled: true
+  steps:
+  - step: 1
+    title: Inspect current state
+    instruction: Run a read-only diagnostic before changing anything.
+    command: systemctl is-active crond
+    expected_output: Output shows the current failure mode
+    explanation: Evidence-first troubleshooting avoids guessing.
+    next_on: command_success
+  - step: 2
+    title: Apply the minimal fix
+    instruction: Make one reversible change aligned with the objectives.
+    command: '# your fix command here'
+    expected_output: State moves toward the objective
+    explanation: Small changes make rollback easy if the hypothesis was wrong.
+    next_on: command_success
+  - step: 3
+    title: Verify with the grader
+    instruction: Run the same verification the checker uses.
+    command: systemctl is-active crond
+    expected_output: '`systemctl is-active crond` returns active'
+    explanation: The lab passes only when real state is healthy.
+    next_on: command_success

@@ -1,12 +1,33 @@
 title: Fix the Swallowed Error in try/catch
 slug: nodejs-fix-async-await-error-handling
 technology: nodejs
-category: Node.js Development
-description: safeCall(fn) should run fn and ALWAYS return a result object — {ok:true, value} on success
-  or {ok:false, error} (the thrown error's message) on failure — so callers never have to wrap every
-  call in their own try/catch. The current code calls fn() with no try/catch, so when fn throws the error
-  escapes and safeCall throws too instead of returning the error object. Add the try/catch so a throw
-  becomes a value.
+category: Fix
+description: 'CONTEXT: A team operating Node.js backends needs you to resolve `Fix the Swallowed Error
+  in try/catch` during a realistic incident. The business impact is reduced service reliability until
+  the underlying state is repaired.
+
+
+  ENVIRONMENT: You are working in FixitLab''s offline Node.js application with Express routes, middleware,
+  and package.json. All tools run locally; no paid APIs or external cloud calls are required.
+
+
+  SYMPTOM / STARTING STATE: safeCall(fn) should run fn and ALWAYS return a result object — {ok:true, value}
+  on success or {ok:false, error} (the thrown error''s message) on failure. The current code calls fn()
+  with no try/catch, so when fn throws the error escapes and safeCall throws too instead of returning
+  the error object. Add the try/catch so a throw becomes a value. safeCall(fn) should run fn and ALWAYS
+  return a result object — {ok:true, value} on success or {ok:false, error} (the thrown error''s message)
+  on failure — so callers never have to wrap every call in their own try/catch. The current code calls
+  fn() with no try/catch, so when fn throws the error escapes and safeCall throws too instead of returning
+  the error object. Add the try/catch so a throw becomes a value.
+
+
+  OBJECTIVE: See that a throwing fn makes safeCall throw instead of returning an error object; Wrap the
+  call in try/catch so both outcomes become a returned value; Return {ok:true,value} on success and {ok:false,error}
+  on failure. Success means all hidden tests pass.
+
+
+  WHAT TO AVOID: Do not apply broad destructive changes, skip evidence gathering, or fake completion with
+  marker files — the checker validates real system state.'
 difficulty: easy
 scenario_type: fix
 lab_mode: simulation
@@ -25,69 +46,148 @@ initial_state: safeCall(fn) should run fn and ALWAYS return a result object — 
   or {ok:false, error} (the thrown error's message) on failure. The current code calls fn() with no try/catch,
   so when fn throws the error escapes and safeCall throws too instead of returning the error object. Add
   the try/catch so a throw becomes a value.
-solution_explanation: |
-  This is the "Result object" pattern at the heart of robust async/await error handling: instead of letting an exception propagate, you catch it and hand the caller a settled value that says whether it worked. Without a try/catch, a throw from fn() bubbles straight out of safeCall, so every caller would need its own try/catch. Wrapping the call converts a throw into { ok: false, error }, while the happy path returns { ok: true, value }. (In real async code you would mark the function async and `await fn()` inside the same try/catch — the structure is identical.)
+solution_explanation: 'This is the "Result object" pattern at the heart of robust async/await error handling:
+  instead of letting an exception propagate, you catch it and hand the caller a settled value that says
+  whether it worked. Without a try/catch, a throw from fn() bubbles straight out of safeCall, so every
+  caller would need its own try/catch. Wrapping the call converts a throw into { ok: false, error }, while
+  the happy path returns { ok: true, value }. (In real async code you would mark the function async and
+  `await fn()` inside the same try/catch — the structure is identical.)
+
+  '
 coding_spec:
   language: javascript
   entrypoint: solution.js
   kind: fix
-  instructions: |
-    Fix safeCall(fn): it must ALWAYS return a result object (never throw).
-      success: { ok: true,  value: <fn's return value> }
-      failure: { ok: false, error: <thrown error's .message> }
-    The current version has no try/catch, so a throwing fn makes safeCall throw too.
-    Click Run to try it, then Check Solution to grade against all tests.
+  instructions: "Fix safeCall(fn): it must ALWAYS return a result object (never throw).\n  success: {\
+    \ ok: true,  value: <fn's return value> }\n  failure: { ok: false, error: <thrown error's .message>\
+    \ }\nThe current version has no try/catch, so a throwing fn makes safeCall throw too.\nClick Run to\
+    \ try it, then Check Solution to grade against all tests.\n"
   files:
   - path: solution.js
-    content: |
-      function safeCall(fn) {
-        // bug: no try/catch — if fn throws, the error escapes and safeCall throws too,
-        // instead of returning an { ok: false, error } object.
-        const value = fn();
-        return { ok: true, value };
-      }
+    content: "function safeCall(fn) {\n  // bug: no try/catch — if fn throws, the error escapes and safeCall\
+      \ throws too,\n  // instead of returning an { ok: false, error } object.\n  const value = fn();\n\
+      \  return { ok: true, value };\n}\n"
     readonly: false
   visible_tests:
   - name: success wraps the value
-    code: |
-      const r = safeCall(() => 5);
+    code: 'const r = safeCall(() => 5);
+
       assert(JSON.stringify(r) === JSON.stringify({ ok: true, value: 5 }), JSON.stringify(r));
+
+      '
   - name: failure becomes a returned error object
-    code: |
-      const r = safeCall(() => { throw new Error('boom'); });
-      assert(r.ok === false && r.error === 'boom', JSON.stringify(r));
+    code: 'const r = safeCall(() => { throw new Error(''boom''); });
+
+      assert(r.ok === false && r.error === ''boom'', JSON.stringify(r));
+
+      '
   hidden_tests:
   - name: never throws on a throwing fn
-    code: |
-      let threw = false; let r = null;
-      try { r = safeCall(() => { throw new Error('nope'); }); }
+    code: 'let threw = false; let r = null;
+
+      try { r = safeCall(() => { throw new Error(''nope''); }); }
+
       catch (e) { threw = true; }
-      assert(threw === false, 'safeCall must not throw — it must return a result object');
-      assert(r.ok === false, 'expected ok:false, got ' + JSON.stringify(r));
+
+      assert(threw === false, ''safeCall must not throw — it must return a result object'');
+
+      assert(r.ok === false, ''expected ok:false, got '' + JSON.stringify(r));
+
+      '
   - name: preserves object values
-    code: |
-      const r = safeCall(() => ({ a: 1 }));
+    code: 'const r = safeCall(() => ({ a: 1 }));
+
       assert(r.ok === true && r.value.a === 1, JSON.stringify(r));
+
+      '
   - name: error message comes from the thrown error
-    code: |
-      const r = safeCall(() => { throw new Error('disk full'); });
-      assert(r.error === 'disk full', JSON.stringify(r));
+    code: 'const r = safeCall(() => { throw new Error(''disk full''); });
+
+      assert(r.error === ''disk full'', JSON.stringify(r));
+
+      '
   - name: ok flag is a boolean true on success
-    code: |
-      const r = safeCall(() => 1);
+    code: 'const r = safeCall(() => 1);
+
       assert(r.ok === true, JSON.stringify(r));
+
+      '
   - name: falsy return values still succeed
-    code: |
-      const r = safeCall(() => 0);
+    code: 'const r = safeCall(() => 0);
+
       assert(r.ok === true && r.value === 0, JSON.stringify(r));
+
+      '
   timeout: 8
 hints:
 - order: 1
-  cost: 10
-  content: Call safeCall(() => { throw new Error('x'); }) — instead of {ok:false}, the error escapes and safeCall itself throws.
+  cost: 0
+  content: 'Where to look: Open `solution.js`, read the instructions, and run the visible tests to see
+    which assertion fails first.'
 - order: 2
-  cost: 20
-  content: To turn a throw into a value, you must catch it. Wrap fn() in a try/catch.
+  cost: 25
+  content: 'Diagnostic steps:
+
+    1. Click Run and read the traceback — note line number and actual vs expected values.
+
+    2. Reproduce the failure with the smallest input from a visible test.
+
+    3. Compare your implementation to the bug described in the lab prompt.'
 - order: 3
-  cost: 30
-  content: 'try { const value = fn(); return {ok:true, value}; } catch (e) { return {ok:false, error: e.message}; }'
+  cost: 50
+  content: 'Exact fix + verification:
+
+    1. Return {ok:true,value} on success and {ok:false,error} on failure.
+
+    2. Re-run the lab checker (`check.sh` or Check Solution).
+
+    3. Confirm every scenario objective is satisfied.
+
+
+    WHY: the grader validates real state — marker files are ignored.'
+summary: Complete the fix the swallowed error in try/catch nodejs lab and verify success with the checker
+estimated_minutes: 20
+xp_reward: 100
+prerequisites:
+- Basic nodejs literacy
+tags:
+- fix
+- hands-on
+- nodejs
+linked_tutorial: nodejs-fundamentals
+what_you_will_learn:
+- See that a throwing fn makes safeCall throw instead of returning an error object
+- Wrap the call in try/catch so both outcomes become a returned value
+- Return {ok:true,value} on success and {ok:false,error} on failure
+environment:
+  nodes:
+  - role: primary
+    os: FixitLab Node.js application
+    hostname: lab-primary
+    ip: 127.0.0.1
+    specs: local offline simulation
+  pre_installed:
+  - bash
+  - coreutils
+  - journalctl
+  - nodejs
+  - systemctl
+  credentials:
+  - user: root
+    password: lab123
+tasks:
+- id: task_1
+  title: Fix the Swallowed Error in try/catch
+  description: Restore healthy behavior for Fix the Swallowed Error in try/catch by investigating the
+    failure, applying the smallest safe fix, and validating the outcome.
+  background: 'This nodejs lab teaches systematic troubleshooting: observe, hypothesize, change, verify.'
+  validation:
+    type: custom_script
+    script: hidden_tests
+    error_message: One or more hidden tests failed. Read the public test output, fix your solution, and
+      submit again.
+solution:
+  summary: The solution passes all hidden tests by implementing the required behavior in code.
+  files_changed: []
+  commands_run: []
+  reference_docs: nodejs-fundamentals

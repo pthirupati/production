@@ -1,10 +1,31 @@
 title: Monthly Revenue with a Running Total (SQL)
 slug: ds-sql-revenue-by-month
 technology: data-science
-category: Data Science & Analytics
-description: An analytics query should report revenue per calendar month plus a running cumulative total,
-  but the starter forgets to GROUP BY month (so it sums everything into one row) and its window frame is
-  unbounded on the wrong side. Fix the GROUP BY aggregation and the running-total window.
+category: Fix
+description: 'CONTEXT: A team operating data science needs you to resolve `Monthly Revenue with a Running
+  Total (SQL)` during a realistic incident. The business impact is reduced service reliability until the
+  underlying state is repaired.
+
+
+  ENVIRONMENT: You are working in FixitLab''s offline notebook lab with pandas/notebook workflows, joins,
+  and charts. All tools run locally; no paid APIs or external cloud calls are required.
+
+
+  SYMPTOM / STARTING STATE: An analytics query should report revenue per month plus a running cumulative
+  total, but the starter omits GROUP BY (collapsing all sales into one row) and its window frame is wrong.
+  Fix it so each row is (month ''YYYY-MM'', monthly_revenue, running_total) ordered by month ascending,
+  where running_total is the cumulative sum of monthly_revenue through that month. An analytics query
+  should report revenue per calendar month plus a running cumulative total, but the starter forgets to
+  GROUP BY month (so it sums everything into one row) and its window frame is unbounded on the wrong side.
+  Fix the GROUP BY aggregation and the running-total window.
+
+
+  OBJECTIVE: Bucket rows into months with strftime and GROUP BY; Aggregate revenue per month with SUM;
+  Add a cumulative running total with a window function. Success means all hidden tests pass.
+
+
+  WHAT TO AVOID: Do not apply broad destructive changes, skip evidence gathering, or fake completion with
+  marker files — the checker validates real system state.'
 difficulty: hard
 scenario_type: fix
 lab_mode: simulation
@@ -21,109 +42,138 @@ objectives:
 - Add a cumulative running total with a window function
 initial_state: An analytics query should report revenue per month plus a running cumulative total, but
   the starter omits GROUP BY (collapsing all sales into one row) and its window frame is wrong. Fix it
-  so each row is (month 'YYYY-MM', monthly_revenue, running_total) ordered by month ascending, where
-  running_total is the cumulative sum of monthly_revenue through that month.
-solution_explanation: |
-  SELECT the month bucket with strftime('%Y-%m', sold_at), SUM(amount) AS monthly_revenue, GROUP BY that
+  so each row is (month 'YYYY-MM', monthly_revenue, running_total) ordered by month ascending, where running_total
+  is the cumulative sum of monthly_revenue through that month.
+solution_explanation: 'SELECT the month bucket with strftime(''%Y-%m'', sold_at), SUM(amount) AS monthly_revenue,
+  GROUP BY that
+
   bucket, ORDER BY it. The running total is SUM(SUM(amount)) OVER (ORDER BY the month ROWS BETWEEN
+
   UNBOUNDED PRECEDING AND CURRENT ROW) — a window over the grouped aggregate. The starter omitted GROUP
+
   BY (so every sale collapsed into a single row) and used the wrong frame, giving a flat or wrong total.
+
+  '
 coding_spec:
   language: python
   entrypoint: solution.py
   kind: fix
-  instructions: |
-    Fix solution(conn): the `sales` table has columns (id, sold_at TEXT 'YYYY-MM-DD', amount REAL).
-    Return rows of (month, monthly_revenue, running_total) where month is 'YYYY-MM', monthly_revenue is
-    the SUM of amount in that month, and running_total is the cumulative sum of monthly_revenue from the
-    first month through the current one. Order by month ascending.
-      Two Jan sales of 10 and 5, one Feb sale of 20 ->
-        [('2024-01', 15.0, 15.0), ('2024-02', 20.0, 35.0)]
-    Click Run to try it, then Check Solution to grade against all tests.
+  instructions: "Fix solution(conn): the `sales` table has columns (id, sold_at TEXT 'YYYY-MM-DD', amount\
+    \ REAL).\nReturn rows of (month, monthly_revenue, running_total) where month is 'YYYY-MM', monthly_revenue\
+    \ is\nthe SUM of amount in that month, and running_total is the cumulative sum of monthly_revenue\
+    \ from the\nfirst month through the current one. Order by month ascending.\n  Two Jan sales of 10\
+    \ and 5, one Feb sale of 20 ->\n    [('2024-01', 15.0, 15.0), ('2024-02', 20.0, 35.0)]\nClick Run\
+    \ to try it, then Check Solution to grade against all tests.\n"
   files:
   - path: solution.py
-    content: |
-      import sqlite3
-
-      def solution(conn):
-          # BUG: no GROUP BY, so SUM collapses every sale into ONE row; and the
-          # window frame looks at FOLLOWING rows instead of preceding ones.
-          return conn.execute(
-              """
-              SELECT strftime('%Y-%m', sold_at) AS month,
-                     SUM(amount) AS monthly_revenue,
-                     SUM(SUM(amount)) OVER (
-                         ORDER BY strftime('%Y-%m', sold_at)
-                         ROWS BETWEEN CURRENT ROW AND UNBOUNDED FOLLOWING
-                     ) AS running_total
-              FROM sales
-              ORDER BY month
-              """
-          ).fetchall()
+    content: "import sqlite3\n\ndef solution(conn):\n    # BUG: no GROUP BY, so SUM collapses every sale\
+      \ into ONE row; and the\n    # window frame looks at FOLLOWING rows instead of preceding ones.\n\
+      \    return conn.execute(\n        \"\"\"\n        SELECT strftime('%Y-%m', sold_at) AS month,\n\
+      \               SUM(amount) AS monthly_revenue,\n               SUM(SUM(amount)) OVER (\n      \
+      \             ORDER BY strftime('%Y-%m', sold_at)\n                   ROWS BETWEEN CURRENT ROW AND\
+      \ UNBOUNDED FOLLOWING\n               ) AS running_total\n        FROM sales\n        ORDER BY month\n\
+      \        \"\"\"\n    ).fetchall()\n"
     readonly: false
   visible_tests:
   - name: groups by month with running total
-    code: |
-      import sqlite3
-      conn = sqlite3.connect(":memory:")
-      conn.executescript(
-          "CREATE TABLE sales (id INTEGER PRIMARY KEY, sold_at TEXT, amount REAL);"
-          "INSERT INTO sales (sold_at, amount) VALUES "
-          "('2024-01-05', 10.0), ('2024-01-20', 5.0), ('2024-02-10', 20.0);"
-      )
-      assert solution(conn) == [
-          ('2024-01', 15.0, 15.0), ('2024-02', 20.0, 35.0)], solution(conn)
+    code: "import sqlite3\nconn = sqlite3.connect(\":memory:\")\nconn.executescript(\n    \"CREATE TABLE\
+      \ sales (id INTEGER PRIMARY KEY, sold_at TEXT, amount REAL);\"\n    \"INSERT INTO sales (sold_at,\
+      \ amount) VALUES \"\n    \"('2024-01-05', 10.0), ('2024-01-20', 5.0), ('2024-02-10', 20.0);\"\n\
+      )\nassert solution(conn) == [\n    ('2024-01', 15.0, 15.0), ('2024-02', 20.0, 35.0)], solution(conn)\n"
   - name: single month single row
-    code: |
-      import sqlite3
-      conn = sqlite3.connect(":memory:")
-      conn.executescript(
-          "CREATE TABLE sales (id INTEGER PRIMARY KEY, sold_at TEXT, amount REAL);"
-          "INSERT INTO sales (sold_at, amount) VALUES ('2024-03-01', 7.0), ('2024-03-31', 3.0);"
-      )
-      assert solution(conn) == [('2024-03', 10.0, 10.0)], solution(conn)
+    code: "import sqlite3\nconn = sqlite3.connect(\":memory:\")\nconn.executescript(\n    \"CREATE TABLE\
+      \ sales (id INTEGER PRIMARY KEY, sold_at TEXT, amount REAL);\"\n    \"INSERT INTO sales (sold_at,\
+      \ amount) VALUES ('2024-03-01', 7.0), ('2024-03-31', 3.0);\"\n)\nassert solution(conn) == [('2024-03',\
+      \ 10.0, 10.0)], solution(conn)\n"
   hidden_tests:
   - name: running total accumulates across three months
-    code: |
-      import sqlite3
-      conn = sqlite3.connect(":memory:")
-      conn.executescript(
-          "CREATE TABLE sales (id INTEGER PRIMARY KEY, sold_at TEXT, amount REAL);"
-          "INSERT INTO sales (sold_at, amount) VALUES "
-          "('2024-01-01', 100.0), ('2024-02-01', 50.0), ('2024-03-01', 25.0);"
-      )
-      assert solution(conn) == [
-          ('2024-01', 100.0, 100.0),
-          ('2024-02', 50.0, 150.0),
-          ('2024-03', 25.0, 175.0)], solution(conn)
+    code: "import sqlite3\nconn = sqlite3.connect(\":memory:\")\nconn.executescript(\n    \"CREATE TABLE\
+      \ sales (id INTEGER PRIMARY KEY, sold_at TEXT, amount REAL);\"\n    \"INSERT INTO sales (sold_at,\
+      \ amount) VALUES \"\n    \"('2024-01-01', 100.0), ('2024-02-01', 50.0), ('2024-03-01', 25.0);\"\n\
+      )\nassert solution(conn) == [\n    ('2024-01', 100.0, 100.0),\n    ('2024-02', 50.0, 150.0),\n \
+      \   ('2024-03', 25.0, 175.0)], solution(conn)\n"
   - name: months come back in ascending order even if inserted out of order
-    code: |
-      import sqlite3
-      conn = sqlite3.connect(":memory:")
-      conn.executescript(
-          "CREATE TABLE sales (id INTEGER PRIMARY KEY, sold_at TEXT, amount REAL);"
-          "INSERT INTO sales (sold_at, amount) VALUES "
-          "('2024-12-01', 4.0), ('2024-01-01', 1.0), ('2024-06-01', 2.0);"
-      )
-      rows = solution(conn)
-      assert [r[0] for r in rows] == ['2024-01', '2024-06', '2024-12'], rows
-      assert rows[-1][2] == 7.0, rows
+    code: "import sqlite3\nconn = sqlite3.connect(\":memory:\")\nconn.executescript(\n    \"CREATE TABLE\
+      \ sales (id INTEGER PRIMARY KEY, sold_at TEXT, amount REAL);\"\n    \"INSERT INTO sales (sold_at,\
+      \ amount) VALUES \"\n    \"('2024-12-01', 4.0), ('2024-01-01', 1.0), ('2024-06-01', 2.0);\"\n)\n\
+      rows = solution(conn)\nassert [r[0] for r in rows] == ['2024-01', '2024-06', '2024-12'], rows\n\
+      assert rows[-1][2] == 7.0, rows\n"
   - name: empty table yields no rows
-    code: |
-      import sqlite3
-      conn = sqlite3.connect(":memory:")
-      conn.executescript(
-          "CREATE TABLE sales (id INTEGER PRIMARY KEY, sold_at TEXT, amount REAL);"
-      )
-      assert solution(conn) == [], solution(conn)
+    code: "import sqlite3\nconn = sqlite3.connect(\":memory:\")\nconn.executescript(\n    \"CREATE TABLE\
+      \ sales (id INTEGER PRIMARY KEY, sold_at TEXT, amount REAL);\"\n)\nassert solution(conn) == [],\
+      \ solution(conn)\n"
   timeout: 8
 hints:
 - order: 1
-  cost: 10
-  content: Without GROUP BY, SUM(amount) collapses every sale into a single row. You need one row per month bucket.
+  cost: 0
+  content: 'Where to look: Open `solution.py`, read the instructions, and run the visible tests to see
+    which assertion fails first.'
 - order: 2
-  cost: 20
-  content: Bucket with strftime('%Y-%m', sold_at) and GROUP BY it. The running total is a window SUM over those grouped totals, ordered by month.
+  cost: 25
+  content: 'Diagnostic steps:
+
+    1. Click Run and read the traceback — note line number and actual vs expected values.
+
+    2. Reproduce the failure with the smallest input from a visible test.
+
+    3. Compare your implementation to the bug described in the lab prompt.'
 - order: 3
-  cost: 30
-  content: 'Frame the window as ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW so it accumulates earlier months, not following ones.'
+  cost: 50
+  content: 'Exact fix + verification:
+
+    1. Add a cumulative running total with a window function.
+
+    2. Re-run the lab checker (`check.sh` or Check Solution).
+
+    3. Confirm every scenario objective is satisfied.
+
+
+    WHY: the grader validates real state — marker files are ignored.'
+summary: Complete the monthly revenue with a running total (sql) data science lab and verify success with
+  the checker
+estimated_minutes: 25
+xp_reward: 100
+prerequisites:
+- Basic data science literacy
+tags:
+- data-science
+- fix
+- hands-on
+linked_tutorial: data-science-fundamentals
+what_you_will_learn:
+- Bucket rows into months with strftime and GROUP BY
+- Aggregate revenue per month with SUM
+- Add a cumulative running total with a window function
+environment:
+  nodes:
+  - role: primary
+    os: FixitLab notebook lab
+    hostname: lab-primary
+    ip: 127.0.0.1
+    specs: local offline simulation
+  pre_installed:
+  - bash
+  - coreutils
+  - data science
+  - pip
+  - python3
+  credentials:
+  - user: root
+    password: lab123
+tasks:
+- id: task_1
+  title: Monthly Revenue with a Running Total (SQL)
+  description: Restore healthy behavior for Monthly Revenue with a Running Total (SQL) by investigating
+    the failure, applying the smallest safe fix, and validating the outcome.
+  background: 'This data science lab teaches systematic troubleshooting: observe, hypothesize, change,
+    verify.'
+  validation:
+    type: custom_script
+    script: hidden_tests
+    error_message: One or more hidden tests failed. Read the public test output, fix your solution, and
+      submit again.
+solution:
+  summary: The solution passes all hidden tests by implementing the required behavior in code.
+  files_changed: []
+  commands_run: []
+  reference_docs: data-science-fundamentals

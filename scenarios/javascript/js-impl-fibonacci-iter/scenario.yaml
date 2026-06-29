@@ -1,8 +1,25 @@
 title: Implement Fibonacci (Iterative)
 slug: js-impl-fibonacci-iter
-category: JavaScript Development
-description: 'Implement fib(n): the n-th Fibonacci number, 0-indexed (0,1,1,2,3,5,...). It must be efficient
-  (no exponential recursion) so large n is fast. The stub is empty so tests fail.'
+category: Build
+description: 'CONTEXT: A team operating JavaScript needs you to resolve `Implement Fibonacci (Iterative)`
+  during a realistic incident. The business impact is reduced service reliability until the underlying
+  state is repaired.
+
+
+  ENVIRONMENT: You are working in FixitLab''s offline JavaScript practice project with modules, browser
+  console, and Node tooling. All tools run locally; no paid APIs or external cloud calls are required.
+
+
+  SYMPTOM / STARTING STATE: Implement fib(n): the n-th Fibonacci number, 0-indexed (0,1,1,2,3,5,...).
+  It must be efficient (no exponential recursion) so large n is fast. The stub is empty so tests fail.
+
+
+  OBJECTIVE: Return the correct base cases; Iterate to avoid exponential recursion; Compute large n quickly.
+  Success means all hidden tests pass.
+
+
+  WHAT TO AVOID: Do not apply broad destructive changes, skip evidence gathering, or fake completion with
+  marker files — the checker validates real system state.'
 difficulty: easy
 scenario_type: do
 lab_mode: simulation
@@ -19,51 +36,141 @@ objectives:
 - Compute large n quickly
 initial_state: 'Implement fib(n): the n-th Fibonacci number, 0-indexed (0,1,1,2,3,5,...). It must be efficient
   (no exponential recursion) so large n is fast. The stub is empty so tests fail.'
-solution_explanation: |
-  Iterating with two rolling variables computes Fibonacci in O(n) without the exponential blowup of naive recursion.
+solution_explanation: 'Iterating with two rolling variables computes Fibonacci in O(n) without the exponential
+  blowup of naive recursion.
+
+  '
 coding_spec:
   language: javascript
   entrypoint: solution.js
   kind: impl
-  instructions: |
-    Implement fib(n), 0-indexed.
-      fib(0)=0, fib(1)=1, fib(10)=55
-    Click Run to try it, then Check Solution to grade against all tests.
+  instructions: "Implement fib(n), 0-indexed.\n  fib(0)=0, fib(1)=1, fib(10)=55\nClick Run to try it,\
+    \ then Check Solution to grade against all tests.\n"
   files:
   - path: solution.js
-    content: |
-      function fib(n) {
-        // TODO: return the n-th Fibonacci number (0-indexed)
-      }
+    content: "function fib(n) {\n  // TODO: return the n-th Fibonacci number (0-indexed)\n}\n"
     readonly: false
   visible_tests:
   - name: base cases
-    code: |
-      assert(fib(0) === 0 && fib(1) === 1);
+    code: 'assert(fib(0) === 0 && fib(1) === 1);
+
+      '
   - name: fib(10)
-    code: |
-      assert(fib(10) === 55);
+    code: 'assert(fib(10) === 55);
+
+      '
   hidden_tests:
   - name: fib(2)
-    code: |
-      assert(fib(2) === 1);
+    code: 'assert(fib(2) === 1);
+
+      '
   - name: fib(20)
-    code: |
-      assert(fib(20) === 6765);
+    code: 'assert(fib(20) === 6765);
+
+      '
   - name: fib(30) fast
-    code: |
-      assert(fib(30) === 832040);
+    code: 'assert(fib(30) === 832040);
+
+      '
   - name: sequence prefix
-    code: |
-      assert(JSON.stringify([0,1,2,3,4,5,6].map(fib)) === JSON.stringify([0,1,1,2,3,5,8]), JSON.stringify([0,1,2,3,4,5,6].map(fib)));
+    code: 'assert(JSON.stringify([0,1,2,3,4,5,6].map(fib)) === JSON.stringify([0,1,1,2,3,5,8]), JSON.stringify([0,1,2,3,4,5,6].map(fib)));
+
+      '
   timeout: 8
 hints:
 - order: 1
-  cost: 10
-  content: fib(0)=0 and fib(1)=1 are the base cases.
+  cost: 0
+  content: 'Where to look: Open `solution.js`, read the instructions, and run the visible tests to see
+    which assertion fails first.'
 - order: 2
-  cost: 20
-  content: Use a loop with two running values a and b instead of recursion.
+  cost: 25
+  content: 'Diagnostic steps:
+
+    1. Click Run and read the traceback — note line number and actual vs expected values.
+
+    2. Reproduce the failure with the smallest input from a visible test.
+
+    3. Compare your implementation to the bug described in the lab prompt.'
 - order: 3
-  cost: 30
-  content: 'Each step: next = a + b; a = b; b = next.'
+  cost: 50
+  content: 'Exact fix + verification:
+
+    1. Iterate to avoid exponential recursion.
+
+    2. Re-run the lab checker (`check.sh` or Check Solution).
+
+    3. Confirm every scenario objective is satisfied.
+
+
+    WHY: the grader validates real state — marker files are ignored.'
+technology: javascript
+summary: Complete the implement fibonacci (iterative) javascript lab and verify success with the checker
+estimated_minutes: 25
+xp_reward: 100
+prerequisites:
+- Basic javascript literacy
+tags:
+- do
+- hands-on
+- javascript
+linked_tutorial: javascript-fundamentals
+what_you_will_learn:
+- Return the correct base cases
+- Iterate to avoid exponential recursion
+- Compute large n quickly
+environment:
+  nodes:
+  - role: primary
+    os: FixitLab JavaScript practice project
+    hostname: lab-primary
+    ip: 127.0.0.1
+    specs: local offline simulation
+  pre_installed:
+  - bash
+  - coreutils
+  - javascript
+  - journalctl
+  - systemctl
+  credentials:
+  - user: root
+    password: lab123
+tasks:
+- id: task_1
+  title: Implement Fibonacci (Iterative)
+  description: Restore healthy behavior for Implement Fibonacci (Iterative) by investigating the failure,
+    applying the smallest safe fix, and validating the outcome.
+  background: 'This javascript lab teaches systematic troubleshooting: observe, hypothesize, change, verify.'
+  validation:
+    type: custom_script
+    script: hidden_tests
+    error_message: One or more hidden tests failed. Read the public test output, fix your solution, and
+      submit again.
+solution:
+  summary: The solution passes all hidden tests by implementing the required behavior in code.
+  files_changed: []
+  commands_run: []
+  reference_docs: javascript-fundamentals
+guided_mode:
+  enabled: true
+  steps:
+  - step: 1
+    title: Inspect current state
+    instruction: Run a read-only diagnostic before changing anything.
+    command: check.sh
+    expected_output: Output shows the current failure mode
+    explanation: Evidence-first troubleshooting avoids guessing.
+    next_on: command_success
+  - step: 2
+    title: Apply the minimal fix
+    instruction: Make one reversible change aligned with the objectives.
+    command: '# your fix command here'
+    expected_output: State moves toward the objective
+    explanation: Small changes make rollback easy if the hypothesis was wrong.
+    next_on: command_success
+  - step: 3
+    title: Verify with the grader
+    instruction: Run the same verification the checker uses.
+    command: check.sh
+    expected_output: all hidden tests pass
+    explanation: The lab passes only when real state is healthy.
+    next_on: command_success

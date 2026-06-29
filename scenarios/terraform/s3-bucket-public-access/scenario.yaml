@@ -1,28 +1,111 @@
 title: S3 Bucket Publicly Readable
 slug: aws-s3-public-access
 difficulty: easy
-category: AWS
-description: 'An S3 bucket is publicly readable because the Block Public Access settings are disabled and a bucket policy or ACL grants s3:GetObject to everyone. Restrict access by enabling Block Public Access and removing public grants.'
-initial_state: 'Simulated AWS environment with an S3 bucket containing sensitive data. The bucket has BlockPublicAcls and BlockPublicPolicy set to false, and a permissive bucket policy grants s3:GetObject to Principal: "*".'
+category: Fix
+description: 'CONTEXT: A team operating Terraform IaC needs you to resolve `S3 Bucket Publicly Readable`
+  during a realistic incident. The business impact is reduced service reliability until the underlying
+  state is repaired.
+
+
+  ENVIRONMENT: You are working in FixitLab''s offline Terraform workspace with HCL files, state, and plan/apply
+  workflow. All tools run locally; no paid APIs or external cloud calls are required.
+
+
+  SYMPTOM / STARTING STATE: Simulated AWS environment with an S3 bucket containing sensitive data. The
+  bucket has BlockPublicAcls and BlockPublicPolicy set to false, and a permissive bucket policy grants
+  s3:GetObject to Principal: "*". An S3 bucket is publicly readable because the Block Public Access settings
+  are disabled and a bucket policy or ACL grants s3:GetObject to everyone. Restrict access by enabling
+  Block Public Access and removing public grants.
+
+
+  OBJECTIVE: Identify the public S3 bucket using the CLI and review its public access settings and bucket
+  policy; Enable all four Block Public Access settings on the bucket; Remove any bucket policy or ACL
+  entries that grant public read access. Success means `check.sh` exits successfully.
+
+
+  WHAT TO AVOID: Do not apply broad destructive changes, skip evidence gathering, or fake completion with
+  marker files — the checker validates real system state.'
+initial_state: 'Simulated AWS environment with an S3 bucket containing sensitive data. The bucket has
+  BlockPublicAcls and BlockPublicPolicy set to false, and a permissive bucket policy grants s3:GetObject
+  to Principal: "*".'
 objectives:
-  - Identify the public S3 bucket using the CLI and review its public access settings and bucket policy
-  - Enable all four Block Public Access settings on the bucket
-  - Remove any bucket policy or ACL entries that grant public read access
+- Identify the public S3 bucket using the CLI and review its public access settings and bucket policy
+- Enable all four Block Public Access settings on the bucket
+- Remove any bucket policy or ACL entries that grant public read access
 lab_mode: simulation
 simulation_type: aws
 time_limit: 1200
 max_score: 100
 is_free: true
 hints:
-  - content: 'Run: aws s3api get-public-access-block --bucket <name> to see which block settings are disabled.'
-    cost: 10
-    order: 1
-  - content: 'Use aws s3api put-public-access-block with all four block flags set to true: --public-access-block-configuration BlockPublicAcls=true,IgnorePublicAcls=true,BlockPublicPolicy=true,RestrictPublicBuckets=true'
-    cost: 15
-    order: 2
-  - content: 'Remove the public bucket policy with: aws s3api delete-bucket-policy --bucket <name>, or update it to remove the Principal "*" statement.'
-    cost: 20
-    order: 3
+- order: 1
+  cost: 0
+  content: 'Where to look: Identify the public S3 bucket using the CLI and review its public access settings
+    and bucket policy'
+- order: 2
+  cost: 25
+  content: 'Diagnostic steps:
+
+    1. Enable all four Block Public Access settings on the bucket
+
+    2. Remove any bucket policy or ACL entries that grant public read access'
+- order: 3
+  cost: 50
+  content: 'Exact fix + verification:
+
+    1. Remove any bucket policy or ACL entries that grant public read access.
+
+    2. Re-run the lab checker (`check.sh` or Check Solution).
+
+    3. Confirm every scenario objective is satisfied.
+
+
+    WHY: the grader validates real state — marker files are ignored.'
 requires_companion_hosts: false
 dual_terminal: false
 jira_priority: Critical
+technology: terraform
+summary: Complete the s3 bucket publicly readable terraform lab and verify success with the checker
+estimated_minutes: 20
+xp_reward: 100
+prerequisites:
+- Basic terraform literacy
+tags:
+- fix
+- hands-on
+- terraform
+linked_tutorial: terraform-fundamentals
+what_you_will_learn:
+- Identify the public S3 bucket using the CLI and review its public access settings and bucket policy
+- Enable all four Block Public Access settings on the bucket
+- Remove any bucket policy or ACL entries that grant public read access
+environment:
+  nodes:
+  - role: primary
+    os: FixitLab Terraform workspace
+    hostname: lab-primary
+    ip: 127.0.0.1
+    specs: local offline simulation
+  pre_installed:
+  - bash
+  - coreutils
+  - terraform
+  credentials:
+  - user: root
+    password: lab123
+tasks:
+- id: task_1
+  title: S3 Bucket Publicly Readable
+  description: Restore healthy behavior for S3 Bucket Publicly Readable by investigating the failure,
+    applying the smallest safe fix, and validating the outcome.
+  background: 'This terraform lab teaches systematic troubleshooting: observe, hypothesize, change, verify.'
+  validation:
+    type: custom_script
+    script: check.sh
+    error_message: Validation did not pass. Re-read the objectives and Hint 2 diagnostic steps.
+solution:
+  summary: Identify the misconfiguration affecting this terraform lab and apply the minimal fix.
+  files_changed: []
+  commands_run:
+  - bash check.sh
+  reference_docs: terraform-fundamentals

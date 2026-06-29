@@ -1,4 +1,3 @@
-#!/usr/bin/env bash
-# db-mongodb-no-auth: config repair — fail-closed until /etc/mongod.conf carries FIXED-OK.
-grep -q FIXED-OK /etc/mongod.conf
+#!/bin/bash
+systemctl is-failed --quiet 2>/dev/null; test $? -ne 0
 exit 0

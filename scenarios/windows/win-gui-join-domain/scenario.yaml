@@ -1,7 +1,7 @@
 slug: win-gui-join-domain
-title: "Windows GUI: Join a New Server to the Active Directory Domain"
+title: 'Windows GUI: Join a New Server to the Active Directory'
 technology: windows
-category: Domain Services
+category: Build
 difficulty: hard
 lab_mode: simulation
 simulation_type: windows-server
@@ -11,28 +11,145 @@ max_score: 100
 is_free: true
 jira_priority: High
 dual_terminal: false
-description: |
-  Onboarding task: a freshly imaged server (WIN-SRV-NEW01) is still sitting in
-  WORKGROUP. Because it is not a domain member it cannot use domain accounts,
-  receive Group Policy, or talk to the directory (Netlogon is idle). Using the
-  System Properties dialog in the Windows Server simulator, join this server to
-  the corp.fixitlab.local Active Directory domain so it becomes a managed member
-  server.
-initial_state: |
-  A standalone Windows Server 2022 in WORKGROUP (computer name WIN-SRV-NEW01).
+description: 'CONTEXT: A team operating Windows Server needs you to resolve `Windows GUI: Join a New Server
+  to the Active Directory` during a realistic incident. The business impact is reduced service reliability
+  until the underlying state is repaired.
+
+
+  ENVIRONMENT: You are working in FixitLab''s offline Windows Server host with PowerShell, Server Manager,
+  and AD tools. All tools run locally; no paid APIs or external cloud calls are required.
+
+
+  SYMPTOM / STARTING STATE: A standalone Windows Server 2022 in WORKGROUP (computer name WIN-SRV-NEW01).
+
   System Properties shows no domain, and the Netlogon service is stopped. The
+
+  learner passes once the server is joined to the corp.fixitlab.local domain. Onboarding task: a freshly
+  imaged server (WIN-SRV-NEW01) is still sitting in
+
+  WORKGROUP. Because it is not a domain member it cannot use domain accounts,
+
+  receive Group Policy, or talk to the directory (Netlogon is idle). Using the
+
+  System Properties dialog in the Windows Server simulator, join this server to
+
+  the corp.fixitlab.local Active Directory domain so it becomes a managed member
+
+  server.
+
+
+  OBJECTIVE: Open System Properties and review the current workgroup membership; Change the membership
+  from Workgroup to Domain; Join the server to the corp.fixitlab.local domain. Success means `check.sh`
+  exits successfully.
+
+
+  WHAT TO AVOID: Do not apply broad destructive changes, skip evidence gathering, or fake completion with
+  marker files — the checker validates real system state.'
+initial_state: 'A standalone Windows Server 2022 in WORKGROUP (computer name WIN-SRV-NEW01).
+
+  System Properties shows no domain, and the Netlogon service is stopped. The
+
   learner passes once the server is joined to the corp.fixitlab.local domain.
+
+  '
 objectives:
-  - Open System Properties and review the current workgroup membership
-  - Change the membership from Workgroup to Domain
-  - Join the server to the corp.fixitlab.local domain
+- Open System Properties and review the current workgroup membership
+- Change the membership from Workgroup to Domain
+- Join the server to the corp.fixitlab.local domain
 hints:
-  - order: 1
-    cost: 10
-    content: "A WORKGROUP server cannot use domain logons or Group Policy — it must join the domain."
-  - order: 2
-    cost: 15
-    content: "In System Properties choose Change, then select Domain instead of Workgroup."
-  - order: 3
-    cost: 20
-    content: "Enter the domain corp.fixitlab.local and join; Netlogon comes online once joined."
+- order: 1
+  cost: 0
+  content: 'Where to look: Open Event Viewer (System/Application) and the relevant Services mmc or Server
+    Manager role status.'
+- order: 2
+  cost: 25
+  content: 'Diagnostic steps:
+
+    1. Note the service state and dependency chain in services.msc.
+
+    2. Read the most recent error in Event Viewer for the failing component.
+
+    3. Use PowerShell (`Get-Service`, `Get-WinEvent`) for scripted evidence.'
+- order: 3
+  cost: 50
+  content: 'Exact fix + verification:
+
+    1. Apply the minimal fix (service start, GPO, binding, or permission).
+
+    2. Re-test the failing operation.
+
+    3. Confirm Check Solution passes.
+
+
+    WHY: Windows labs grade real role/service state.'
+summary: 'Complete the windows gui: join a new server to the active directory windows lab and verify success
+  with the checker'
+estimated_minutes: 15
+xp_reward: 100
+prerequisites:
+- Basic windows literacy
+tags:
+- fix
+- hands-on
+- windows
+linked_tutorial: windows-fundamentals
+what_you_will_learn:
+- Open System Properties and review the current workgroup membership
+- Change the membership from Workgroup to Domain
+- Join the server to the corp.fixitlab.local domain
+environment:
+  nodes:
+  - role: primary
+    os: FixitLab Windows Server host
+    hostname: lab-primary
+    ip: 127.0.0.1
+    specs: local offline simulation
+  pre_installed:
+  - bash
+  - coreutils
+  - journalctl
+  - systemctl
+  - windows
+  credentials:
+  - user: root
+    password: lab123
+tasks:
+- id: task_1
+  title: 'Windows GUI: Join a New Server to the Active Directory'
+  description: 'Restore healthy behavior for Windows GUI: Join a New Server to the Active Directory by
+    investigating the failure, applying the smallest safe fix, and validating the outcome.'
+  background: 'This windows lab teaches systematic troubleshooting: observe, hypothesize, change, verify.'
+  validation:
+    type: custom_script
+    script: check.sh
+    error_message: Validation did not pass. Re-read the objectives and Hint 2 diagnostic steps.
+solution:
+  summary: Identify the misconfiguration affecting this windows lab and apply the minimal fix.
+  files_changed: []
+  commands_run:
+  - bash check.sh
+  reference_docs: windows-fundamentals
+guided_mode:
+  enabled: true
+  steps:
+  - step: 1
+    title: Inspect current state
+    instruction: Run a read-only diagnostic before changing anything.
+    command: check.sh
+    expected_output: Output shows the current failure mode
+    explanation: Evidence-first troubleshooting avoids guessing.
+    next_on: command_success
+  - step: 2
+    title: Apply the minimal fix
+    instruction: Make one reversible change aligned with the objectives.
+    command: '# your fix command here'
+    expected_output: State moves toward the objective
+    explanation: Small changes make rollback easy if the hypothesis was wrong.
+    next_on: command_success
+  - step: 3
+    title: Verify with the grader
+    instruction: Run the same verification the checker uses.
+    command: check.sh
+    expected_output: '`check.sh` exits successfully'
+    explanation: The lab passes only when real state is healthy.
+    next_on: command_success

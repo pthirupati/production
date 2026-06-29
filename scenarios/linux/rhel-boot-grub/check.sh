@@ -1,4 +1,3 @@
 #!/bin/bash
-# Boot scenario — validation is manual / Jira close
-true
+systemctl is-failed --quiet 2>/dev/null; test $? -ne 0
 exit 0

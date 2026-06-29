@@ -1,8 +1,7 @@
----
 slug: redis-jedis-connection
-title: "Jedis Pool Exhausted — Could Not Get a Connection"
-technology: Java
-category: "Caching"
+title: Jedis Pool Exhausted — Could Not Get a Connection
+technology: java
+category: Fix
 difficulty: medium
 time_limit: 900
 max_score: 100
@@ -11,22 +10,108 @@ simulation_type: java
 infrastructure_type: simulation
 jira_priority: High
 is_free: false
-description: |
-  Under load the app throws 'JedisException: Could not get a resource from the pool'. Connections are borrowed from the Jedis pool but never returned (missing try-with-resources) and the pool max is tiny, so it exhausts. Fix the leak and size the pool so Redis access is reliable under concurrency.
+description: 'CONTEXT: A team operating Java applications needs you to resolve `Jedis Pool Exhausted —
+  Could Not Get a Connection` during a realistic incident. The business impact is reduced service reliability
+  until the underlying state is repaired.
+
+
+  ENVIRONMENT: You are working in FixitLab''s offline Java project with Maven/Gradle, JVM logs, and Spring
+  configuration. All tools run locally; no paid APIs or external cloud calls are required.
+
+
+  SYMPTOM / STARTING STATE: Config at /app/src/main/resources/application.yml sets a max pool of 2 and
+  the code leaks borrowed connections; the pool exhausts under load. Under load the app throws ''JedisException:
+  Could not get a resource from the pool''. Connections are borrowed from the Jedis pool but never returned
+  (missing try-with-resources) and the pool max is tiny, so it exhausts. Fix the leak and size the pool
+  so Redis access is reliable under concurrency.
+
+
+  OBJECTIVE: Reproduce the pool-exhaustion exception under load; Find the code path that borrows but never
+  returns a Jedis resource; Ensure every borrow is returned (try-with-resources/finally). Success means
+  `check.sh` exits successfully.
+
+
+  WHAT TO AVOID: Do not apply broad destructive changes, skip evidence gathering, or fake completion with
+  marker files — the checker validates real system state.'
 objectives:
-  - "Reproduce the pool-exhaustion exception under load"
-  - "Find the code path that borrows but never returns a Jedis resource"
-  - "Ensure every borrow is returned (try-with-resources/finally)"
-  - "Right-size the pool max and verify no exhaustion under load"
-initial_state: |
-  Config at /app/src/main/resources/application.yml sets a max pool of 2 and the code leaks borrowed connections; the pool exhausts under load.
+- Reproduce the pool-exhaustion exception under load
+- Find the code path that borrows but never returns a Jedis resource
+- Ensure every borrow is returned (try-with-resources/finally)
+- Right-size the pool max and verify no exhaustion under load
+initial_state: 'Config at /app/src/main/resources/application.yml sets a max pool of 2 and the code leaks
+  borrowed connections; the pool exhausts under load.
+
+  '
 hints:
-  - order: 1
-    cost: 10
-    content: "'Could not get a resource from the pool' = leaked connections or an undersized pool."
-  - order: 2
-    cost: 15
-    content: "Wrap jedisPool.getResource() in try-with-resources so it is always returned."
-  - order: 3
-    cost: 20
-    content: "Raise jedis max-active to match concurrency and re-test under load."
+- order: 1
+  cost: 0
+  content: 'Where to look: Reproduce the pool-exhaustion exception under load'
+- order: 2
+  cost: 25
+  content: 'Diagnostic steps:
+
+    1. Find the code path that borrows but never returns a Jedis resource
+
+    2. Ensure every borrow is returned (try-with-resources/finally)
+
+    3. Right-size the pool max and verify no exhaustion under load'
+- order: 3
+  cost: 50
+  content: 'Exact fix + verification:
+
+    1. Right-size the pool max and verify no exhaustion under load.
+
+    2. Re-run the lab checker (`check.sh` or Check Solution).
+
+    3. Confirm every scenario objective is satisfied.
+
+
+    WHY: the grader validates real state — marker files are ignored.'
+summary: Complete the jedis pool exhausted — could not get a connection java lab and verify success with
+  the checker
+estimated_minutes: 15
+xp_reward: 100
+prerequisites:
+- Basic java literacy
+tags:
+- fix
+- hands-on
+- java
+linked_tutorial: java-fundamentals
+what_you_will_learn:
+- Reproduce the pool-exhaustion exception under load
+- Find the code path that borrows but never returns a Jedis resource
+- Ensure every borrow is returned (try-with-resources/finally)
+- Right-size the pool max and verify no exhaustion under load
+environment:
+  nodes:
+  - role: primary
+    os: FixitLab Java project
+    hostname: lab-primary
+    ip: 127.0.0.1
+    specs: local offline simulation
+  pre_installed:
+  - bash
+  - coreutils
+  - java
+  - journalctl
+  - systemctl
+  credentials:
+  - user: root
+    password: lab123
+tasks:
+- id: task_1
+  title: Jedis Pool Exhausted — Could Not Get a Connection
+  description: Restore healthy behavior for Jedis Pool Exhausted — Could Not Get a Connection by investigating
+    the failure, applying the smallest safe fix, and validating the outcome.
+  background: 'This java lab teaches systematic troubleshooting: observe, hypothesize, change, verify.'
+  validation:
+    type: custom_script
+    script: check.sh
+    error_message: Validation did not pass. Re-read the objectives and Hint 2 diagnostic steps.
+solution:
+  summary: Identify the misconfiguration affecting this java lab and apply the minimal fix.
+  files_changed: []
+  commands_run:
+  - bash check.sh
+  reference_docs: java-fundamentals

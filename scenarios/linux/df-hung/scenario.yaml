@@ -1,40 +1,133 @@
 title: df -Th Hangs Indefinitely Due to Stale NFS Mount
 slug: linux-df-hung
 difficulty: medium
-category: Linux Administration
-description: |
-  Running df -Th on the server hangs forever and must be killed with Ctrl-C. This is a
+category: Fix
+description: 'CONTEXT: A team operating Linux administration needs you to resolve `df -Th Hangs Indefinitely
+  Due to Stale NFS Mount` during a realistic incident. The business impact is reduced service reliability
+  until the underlying state is repaired.
+
+
+  ENVIRONMENT: You are working in FixitLab''s offline Linux practice server with terminal and config files
+  under /etc and /var. All tools run locally; no paid APIs or external cloud calls are required.
+
+
+  SYMPTOM / STARTING STATE: Simulated RHEL 9 server. Running df -Th hangs and never returns. The NFS server
+  at
+
+  192.168.1.50 is no longer reachable. /proc/mounts shows /mnt/oldshare as an NFS mount.
+
+  Applications trying to access /mnt/oldshare are blocked in D (uninterruptible sleep) state. Running
+  df -Th on the server hangs forever and must be killed with Ctrl-C. This is a
+
   classic symptom of a stale NFS mount — the NFS server is unreachable but the mount
+
   point is still listed in /proc/mounts. Any command that touches the mount point will
+
   block waiting for the unresponsive NFS server. The stale mount must be force-unmounted
+
   and the fstab entry corrected to prevent recurrence.
 
-initial_state: |
-  Simulated RHEL 9 server. Running df -Th hangs and never returns. The NFS server at
+
+  OBJECTIVE: Identify the stale NFS mount using cat /proc/mounts | grep nfs and findmnt; Check for processes
+  blocked on the stale mount with lsof | grep mnt/oldshare; Force unmount the stale mount with umount
+  -f -l /mnt/oldshare. Success means `check.sh` exits successfully.
+
+
+  WHAT TO AVOID: Do not apply broad destructive changes, skip evidence gathering, or fake completion with
+  marker files — the checker validates real system state.'
+initial_state: 'Simulated RHEL 9 server. Running df -Th hangs and never returns. The NFS server at
+
   192.168.1.50 is no longer reachable. /proc/mounts shows /mnt/oldshare as an NFS mount.
+
   Applications trying to access /mnt/oldshare are blocked in D (uninterruptible sleep) state.
 
+  '
 objectives:
-  - Identify the stale NFS mount using cat /proc/mounts | grep nfs and findmnt
-  - Check for processes blocked on the stale mount with lsof | grep mnt/oldshare
-  - Force unmount the stale mount with umount -f -l /mnt/oldshare
-  - Confirm df -Th now completes normally
-  - Update /etc/fstab to add the _netdev and soft,timeo=30 options or comment out the stale entry
+- Identify the stale NFS mount using cat /proc/mounts | grep nfs and findmnt
+- Check for processes blocked on the stale mount with lsof | grep mnt/oldshare
+- Force unmount the stale mount with umount -f -l /mnt/oldshare
+- Confirm df -Th now completes normally
+- Update /etc/fstab to add the _netdev and soft,timeo=30 options or comment out the stale entry
 lab_mode: simulation
 simulation_type: generic
 time_limit: 900
 max_score: 100
 is_free: false
 hints:
-  - content: 'Use cat /proc/mounts | grep nfs to identify NFS mounts without running df. Never run df or ls on the stale mount point directly as they will block.'
-    cost: 10
-    order: 1
-  - content: 'Force unmount with: umount -f -l /mnt/oldshare. The -f flag forces unmount of an unreachable NFS, -l does a lazy unmount detaching from the namespace immediately.'
-    cost: 20
-    order: 2
-  - content: 'Add the soft and timeo=30 options to the fstab entry so future NFS issues time out instead of hanging: server:/share /mnt/oldshare nfs defaults,_netdev,soft,timeo=30 0 0'
-    cost: 20
-    order: 3
+- order: 1
+  cost: 0
+  content: 'Where to look: Identify the stale NFS mount using cat /proc/mounts | grep nfs and findmnt'
+- order: 2
+  cost: 25
+  content: 'Diagnostic steps:
+
+    1. Check for processes blocked on the stale mount with lsof | grep mnt/oldshare
+
+    2. Force unmount the stale mount with umount -f -l /mnt/oldshare
+
+    3. Confirm df -Th now completes normally'
+- order: 3
+  cost: 50
+  content: 'Exact fix + verification:
+
+    1. Update /etc/fstab to add the _netdev and soft,timeo=30 options or comment out the stale entry.
+
+    2. Re-run the lab checker (`check.sh` or Check Solution).
+
+    3. Confirm every scenario objective is satisfied.
+
+
+    WHY: the grader validates real state — marker files are ignored.'
 requires_companion_hosts: false
 dual_terminal: false
 jira_priority: Medium
+technology: linux
+summary: Complete the df -th hangs indefinitely due to stale nfs mount linux lab and verify success with
+  the checker
+estimated_minutes: 15
+xp_reward: 100
+prerequisites:
+- Basic linux literacy
+tags:
+- fix
+- hands-on
+- linux
+linked_tutorial: linux-fundamentals
+what_you_will_learn:
+- Identify the stale NFS mount using cat /proc/mounts | grep nfs and findmnt
+- Check for processes blocked on the stale mount with lsof | grep mnt/oldshare
+- Force unmount the stale mount with umount -f -l /mnt/oldshare
+- Confirm df -Th now completes normally
+- Update /etc/fstab to add the _netdev and soft,timeo=30 options or comment out the stale entry
+environment:
+  nodes:
+  - role: primary
+    os: FixitLab Linux practice server
+    hostname: lab-primary
+    ip: 127.0.0.1
+    specs: local offline simulation
+  pre_installed:
+  - bash
+  - coreutils
+  - journalctl
+  - linux
+  - systemctl
+  credentials:
+  - user: root
+    password: lab123
+tasks:
+- id: task_1
+  title: df -Th Hangs Indefinitely Due to Stale NFS Mount
+  description: Restore healthy behavior for df -Th Hangs Indefinitely Due to Stale NFS Mount by investigating
+    the failure, applying the smallest safe fix, and validating the outcome.
+  background: 'This linux lab teaches systematic troubleshooting: observe, hypothesize, change, verify.'
+  validation:
+    type: custom_script
+    script: check.sh
+    error_message: Validation did not pass. Re-read the objectives and Hint 2 diagnostic steps.
+solution:
+  summary: Identify the misconfiguration affecting this linux lab and apply the minimal fix.
+  files_changed: []
+  commands_run:
+  - bash check.sh
+  reference_docs: linux-fundamentals

@@ -1,11 +1,28 @@
 title: Cosine Similarity Between Vectors
 slug: aiml-cosine-similarity
 technology: ai-ml
-category: AI / ML / LLM & Agents
-description: Embeddings are compared by the angle between them, not their raw magnitude. Implement
-  cosine_similarity(a, b) from scratch with stdlib math — dot product over the product of norms —
-  so two vectors pointing the same direction score 1.0 regardless of length, and orthogonal vectors
+category: Build
+description: 'CONTEXT: A team operating AI/ML workflows needs you to resolve `Cosine Similarity Between
+  Vectors` during a realistic incident. The business impact is reduced service reliability until the underlying
+  state is repaired.
+
+
+  ENVIRONMENT: You are working in FixitLab''s offline ML practice workspace with datasets, training scripts,
+  metrics, and model artifacts. All tools run locally; no paid APIs or external cloud calls are required.
+
+
+  SYMPTOM / STARTING STATE: Embeddings are compared by the angle between them, not their raw magnitude.
+  Implement cosine_similarity(a, b) from scratch with stdlib math — dot product over the product of norms
+  — so two vectors pointing the same direction score 1.0 regardless of length, and orthogonal vectors
   score 0.0.
+
+
+  OBJECTIVE: Compute the dot product of two equal-length vectors; Divide by the product of the Euclidean
+  norms; Return 0.0 safely when either vector is all zeros. Success means all hidden tests pass.
+
+
+  WHAT TO AVOID: Do not apply broad destructive changes, skip evidence gathering, or fake completion with
+  marker files — the checker validates real system state.'
 difficulty: easy
 scenario_type: do
 lab_mode: simulation
@@ -20,71 +37,182 @@ objectives:
 - Compute the dot product of two equal-length vectors
 - Divide by the product of the Euclidean norms
 - Return 0.0 safely when either vector is all zeros
-initial_state: Embeddings are compared by the angle between them, not their raw magnitude. Implement
-  cosine_similarity(a, b) from scratch with stdlib math — dot product over the product of norms —
-  so two vectors pointing the same direction score 1.0 regardless of length, and orthogonal vectors
-  score 0.0.
-solution_explanation: |
-  Cosine similarity is the dot product of the two vectors divided by the product of their magnitudes:
+initial_state: Embeddings are compared by the angle between them, not their raw magnitude. Implement cosine_similarity(a,
+  b) from scratch with stdlib math — dot product over the product of norms — so two vectors pointing the
+  same direction score 1.0 regardless of length, and orthogonal vectors score 0.0.
+solution_explanation: 'Cosine similarity is the dot product of the two vectors divided by the product
+  of their magnitudes:
+
   sum(ai*bi) / (sqrt(sum(ai^2)) * sqrt(sum(bi^2))). It measures the angle, so a vector and any
+
   positive scaling of it score exactly 1.0. When either vector has zero magnitude the denominator is
+
   0, so we return 0.0 to avoid dividing by zero.
+
+  '
 coding_spec:
   language: python
   entrypoint: solution.py
   kind: impl
-  instructions: |
-    Implement cosine_similarity(a, b) -> float using only the standard library (import math).
+  instructions: 'Implement cosine_similarity(a, b) -> float using only the standard library (import math).
+
     a and b are equal-length lists of numbers. Return the dot product divided by the product of the
+
     two Euclidean norms. If either vector has zero magnitude, return 0.0 (do not divide by zero).
+
     Click Run to try it, then Check Solution to grade against all tests.
+
+    '
   files:
   - path: solution.py
-    content: |
-      import math
-
-      def cosine_similarity(a, b):
-          # TODO: dot(a, b) / (norm(a) * norm(b)); return 0.0 if either norm is 0.
-          pass
+    content: "import math\n\ndef cosine_similarity(a, b):\n    # TODO: dot(a, b) / (norm(a) * norm(b));\
+      \ return 0.0 if either norm is 0.\n    pass\n"
     readonly: false
   visible_tests:
   - name: identical direction scores 1.0
-    code: |
-      import math
-      assert math.isclose(cosine_similarity([1, 0], [1, 0]), 1.0, rel_tol=1e-9), cosine_similarity([1, 0], [1, 0])
+    code: 'import math
+
+      assert math.isclose(cosine_similarity([1, 0], [1, 0]), 1.0, rel_tol=1e-9), cosine_similarity([1,
+      0], [1, 0])
+
+      '
   - name: orthogonal vectors score 0.0
-    code: |
-      import math
-      assert math.isclose(cosine_similarity([1, 0], [0, 1]), 0.0, abs_tol=1e-9), cosine_similarity([1, 0], [0, 1])
+    code: 'import math
+
+      assert math.isclose(cosine_similarity([1, 0], [0, 1]), 0.0, abs_tol=1e-9), cosine_similarity([1,
+      0], [0, 1])
+
+      '
   hidden_tests:
   - name: positive scaling is still 1.0
-    code: |
-      import math
-      assert math.isclose(cosine_similarity([1, 2, 3], [2, 4, 6]), 1.0, rel_tol=1e-9), cosine_similarity([1, 2, 3], [2, 4, 6])
+    code: 'import math
+
+      assert math.isclose(cosine_similarity([1, 2, 3], [2, 4, 6]), 1.0, rel_tol=1e-9), cosine_similarity([1,
+      2, 3], [2, 4, 6])
+
+      '
   - name: opposite direction scores -1.0
-    code: |
-      import math
-      assert math.isclose(cosine_similarity([1, 1], [-1, -1]), -1.0, rel_tol=1e-9), cosine_similarity([1, 1], [-1, -1])
+    code: 'import math
+
+      assert math.isclose(cosine_similarity([1, 1], [-1, -1]), -1.0, rel_tol=1e-9), cosine_similarity([1,
+      1], [-1, -1])
+
+      '
   - name: known angle value
-    code: |
-      import math
+    code: 'import math
+
       # [1,1] vs [1,0]: cos(45deg) = 1/sqrt(2)
-      assert math.isclose(cosine_similarity([1, 1], [1, 0]), 1 / math.sqrt(2), rel_tol=1e-9), cosine_similarity([1, 1], [1, 0])
+
+      assert math.isclose(cosine_similarity([1, 1], [1, 0]), 1 / math.sqrt(2), rel_tol=1e-9), cosine_similarity([1,
+      1], [1, 0])
+
+      '
   - name: zero vector returns 0.0
-    code: |
-      assert cosine_similarity([0, 0, 0], [1, 2, 3]) == 0.0, cosine_similarity([0, 0, 0], [1, 2, 3])
+    code: 'assert cosine_similarity([0, 0, 0], [1, 2, 3]) == 0.0, cosine_similarity([0, 0, 0], [1, 2,
+      3])
+
+      '
   - name: floats supported
-    code: |
-      import math
-      assert math.isclose(cosine_similarity([0.5, 0.5], [0.5, 0.5]), 1.0, rel_tol=1e-9), cosine_similarity([0.5, 0.5], [0.5, 0.5])
+    code: 'import math
+
+      assert math.isclose(cosine_similarity([0.5, 0.5], [0.5, 0.5]), 1.0, rel_tol=1e-9), cosine_similarity([0.5,
+      0.5], [0.5, 0.5])
+
+      '
   timeout: 8
 hints:
 - order: 1
-  cost: 10
-  content: The dot product is sum(x * y for x, y in zip(a, b)). The norm of a vector is math.sqrt(sum(x * x for x in a)).
+  cost: 0
+  content: 'Where to look: Open `solution.py`, read the instructions, and run the visible tests to see
+    which assertion fails first.'
 - order: 2
-  cost: 20
-  content: Cosine similarity = dot / (norm_a * norm_b). Compute the denominator first so you can guard it.
+  cost: 25
+  content: 'Diagnostic steps:
+
+    1. Click Run and read the traceback — note line number and actual vs expected values.
+
+    2. Reproduce the failure with the smallest input from a visible test.
+
+    3. Compare your implementation to the bug described in the lab prompt.'
 - order: 3
-  cost: 30
-  content: 'If norm_a == 0 or norm_b == 0, return 0.0 before dividing — otherwise you get a ZeroDivisionError.'
+  cost: 50
+  content: 'Exact fix + verification:
+
+    1. Return 0.0 safely when either vector is all zeros.
+
+    2. Re-run the lab checker (`check.sh` or Check Solution).
+
+    3. Confirm every scenario objective is satisfied.
+
+
+    WHY: the grader validates real state — marker files are ignored.'
+summary: Complete the cosine similarity between vectors ai ml lab and verify success with the checker
+estimated_minutes: 15
+xp_reward: 100
+prerequisites:
+- Basic ai ml literacy
+tags:
+- ai-ml
+- do
+- hands-on
+linked_tutorial: ai-ml-fundamentals
+what_you_will_learn:
+- Compute the dot product of two equal-length vectors
+- Divide by the product of the Euclidean norms
+- Return 0.0 safely when either vector is all zeros
+environment:
+  nodes:
+  - role: primary
+    os: FixitLab ML practice workspace
+    hostname: lab-primary
+    ip: 127.0.0.1
+    specs: local offline simulation
+  pre_installed:
+  - ai ml
+  - bash
+  - coreutils
+  - pip
+  - python3
+  credentials:
+  - user: root
+    password: lab123
+tasks:
+- id: task_1
+  title: Cosine Similarity Between Vectors
+  description: Restore healthy behavior for Cosine Similarity Between Vectors by investigating the failure,
+    applying the smallest safe fix, and validating the outcome.
+  background: 'This ai ml lab teaches systematic troubleshooting: observe, hypothesize, change, verify.'
+  validation:
+    type: custom_script
+    script: hidden_tests
+    error_message: One or more hidden tests failed. Read the public test output, fix your solution, and
+      submit again.
+solution:
+  summary: The solution passes all hidden tests by implementing the required behavior in code.
+  files_changed: []
+  commands_run: []
+  reference_docs: ai-ml-fundamentals
+guided_mode:
+  enabled: true
+  steps:
+  - step: 1
+    title: Inspect current state
+    instruction: Run a read-only diagnostic before changing anything.
+    command: check.sh
+    expected_output: Output shows the current failure mode
+    explanation: Evidence-first troubleshooting avoids guessing.
+    next_on: command_success
+  - step: 2
+    title: Apply the minimal fix
+    instruction: Make one reversible change aligned with the objectives.
+    command: '# your fix command here'
+    expected_output: State moves toward the objective
+    explanation: Small changes make rollback easy if the hypothesis was wrong.
+    next_on: command_success
+  - step: 3
+    title: Verify with the grader
+    instruction: Run the same verification the checker uses.
+    command: check.sh
+    expected_output: all hidden tests pass
+    explanation: The lab passes only when real state is healthy.
+    next_on: command_success

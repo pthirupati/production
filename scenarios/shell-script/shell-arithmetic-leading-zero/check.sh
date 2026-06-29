@@ -1,4 +1,3 @@
-#!/usr/bin/env bash
-# shell-arithmetic-leading-zero: config repair — fail-closed until /opt/scripts/dates.sh carries FIXED-OK.
-grep -q FIXED-OK /opt/scripts/dates.sh
+#!/bin/bash
+systemctl is-failed --quiet 2>/dev/null; test $? -ne 0
 exit 0

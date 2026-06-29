@@ -1,8 +1,7 @@
----
 slug: java-spring-transaction-rollback
-title: "@Transactional Not Rolling Back on a Checked Exception"
-technology: Java
-category: "Spring Boot"
+title: '@Transactional Not Rolling Back on a Checked Exception'
+technology: java
+category: Fix
 difficulty: hard
 time_limit: 1200
 max_score: 100
@@ -11,22 +10,109 @@ simulation_type: java
 infrastructure_type: simulation
 jira_priority: High
 is_free: false
-description: |
-  A multi-step operation leaves the database half-updated after a failure: @Transactional does not roll back because Spring only rolls back on runtime exceptions by default and the service throws a checked exception (also, the method is called from within the same bean, bypassing the proxy). Make the rollback semantics correct so partial writes never persist.
+description: 'CONTEXT: A team operating Java applications needs you to resolve `@Transactional Not Rolling
+  Back on a Checked Exception` during a realistic incident. The business impact is reduced service reliability
+  until the underlying state is repaired.
+
+
+  ENVIRONMENT: You are working in FixitLab''s offline Java project with Maven/Gradle, JVM logs, and Spring
+  configuration. All tools run locally; no paid APIs or external cloud calls are required.
+
+
+  SYMPTOM / STARTING STATE: PaymentService at /app/src/main/java/com/example/service/PaymentService.java
+  is @Transactional but throws a checked exception and self-invokes, so no rollback occurs. A multi-step
+  operation leaves the database half-updated after a failure: @Transactional does not roll back because
+  Spring only rolls back on runtime exceptions by default and the service throws a checked exception (also,
+  the method is called from within the same bean, bypassing the proxy). Make the rollback semantics correct
+  so partial writes never persist.
+
+
+  OBJECTIVE: Reproduce a partial commit when the operation fails midway; Configure rollback for the checked
+  exception (rollbackFor); Ensure the transactional method is invoked through the proxy. Success means
+  `check.sh` exits successfully.
+
+
+  WHAT TO AVOID: Do not apply broad destructive changes, skip evidence gathering, or fake completion with
+  marker files — the checker validates real system state.'
 objectives:
-  - "Reproduce a partial commit when the operation fails midway"
-  - "Configure rollback for the checked exception (rollbackFor)"
-  - "Ensure the transactional method is invoked through the proxy"
-  - "Verify a failure rolls the whole operation back"
-initial_state: |
-  PaymentService at /app/src/main/java/com/example/service/PaymentService.java is @Transactional but throws a checked exception and self-invokes, so no rollback occurs.
+- Reproduce a partial commit when the operation fails midway
+- Configure rollback for the checked exception (rollbackFor)
+- Ensure the transactional method is invoked through the proxy
+- Verify a failure rolls the whole operation back
+initial_state: 'PaymentService at /app/src/main/java/com/example/service/PaymentService.java is @Transactional
+  but throws a checked exception and self-invokes, so no rollback occurs.
+
+  '
 hints:
-  - order: 1
-    cost: 10
-    content: "By default Spring rolls back only on RuntimeException/Error, not checked exceptions."
-  - order: 2
-    cost: 15
-    content: "Add @Transactional(rollbackFor = Exception.class) (or throw a runtime exception)."
-  - order: 3
-    cost: 20
-    content: "Self-invocation bypasses the proxy — call the @Transactional method from another bean."
+- order: 1
+  cost: 0
+  content: 'Where to look: Reproduce a partial commit when the operation fails midway'
+- order: 2
+  cost: 25
+  content: 'Diagnostic steps:
+
+    1. Configure rollback for the checked exception (rollbackFor)
+
+    2. Ensure the transactional method is invoked through the proxy
+
+    3. Verify a failure rolls the whole operation back'
+- order: 3
+  cost: 50
+  content: 'Exact fix + verification:
+
+    1. Verify a failure rolls the whole operation back.
+
+    2. Re-run the lab checker (`check.sh` or Check Solution).
+
+    3. Confirm every scenario objective is satisfied.
+
+
+    WHY: the grader validates real state — marker files are ignored.'
+summary: Complete the @transactional not rolling back on a checked exception java lab and verify success
+  with the checker
+estimated_minutes: 20
+xp_reward: 100
+prerequisites:
+- Basic java literacy
+tags:
+- fix
+- hands-on
+- java
+linked_tutorial: java-fundamentals
+what_you_will_learn:
+- Reproduce a partial commit when the operation fails midway
+- Configure rollback for the checked exception (rollbackFor)
+- Ensure the transactional method is invoked through the proxy
+- Verify a failure rolls the whole operation back
+environment:
+  nodes:
+  - role: primary
+    os: FixitLab Java project
+    hostname: lab-primary
+    ip: 127.0.0.1
+    specs: local offline simulation
+  pre_installed:
+  - bash
+  - coreutils
+  - java
+  - journalctl
+  - systemctl
+  credentials:
+  - user: root
+    password: lab123
+tasks:
+- id: task_1
+  title: '@Transactional Not Rolling Back on a Checked Exception'
+  description: Restore healthy behavior for @Transactional Not Rolling Back on a Checked Exception by
+    investigating the failure, applying the smallest safe fix, and validating the outcome.
+  background: 'This java lab teaches systematic troubleshooting: observe, hypothesize, change, verify.'
+  validation:
+    type: custom_script
+    script: check.sh
+    error_message: Validation did not pass. Re-read the objectives and Hint 2 diagnostic steps.
+solution:
+  summary: Identify the misconfiguration affecting this java lab and apply the minimal fix.
+  files_changed: []
+  commands_run:
+  - bash check.sh
+  reference_docs: java-fundamentals

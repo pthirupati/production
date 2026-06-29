@@ -1,10 +1,30 @@
 title: Top N Products by Revenue
 slug: ds-top-n-by-metric
 technology: data-science
-category: Data Science & Analytics
-description: A leaderboard helper should return the names of the top N products ranked by revenue,
-  highest first, but the starter sorts ascending and slices the wrong end, so it returns the WORST
-  performers instead of the best. Fix the ranking so the highest-revenue products come back.
+category: Fix
+description: 'CONTEXT: A team operating data science needs you to resolve `Top N Products by Revenue`
+  during a realistic incident. The business impact is reduced service reliability until the underlying
+  state is repaired.
+
+
+  ENVIRONMENT: You are working in FixitLab''s offline notebook lab with pandas/notebook workflows, joins,
+  and charts. All tools run locally; no paid APIs or external cloud calls are required.
+
+
+  SYMPTOM / STARTING STATE: A leaderboard helper should return the names of the top N products ranked
+  by revenue, highest first, but the starter sorts ascending and slices the wrong end, so it returns the
+  WORST performers. Fix the ranking so the highest-revenue products come back, ties broken by name ascending.
+  A leaderboard helper should return the names of the top N products ranked by revenue, highest first,
+  but the starter sorts ascending and slices the wrong end, so it returns the WORST performers instead
+  of the best. Fix the ranking so the highest-revenue products come back.
+
+
+  OBJECTIVE: Sort a list of dicts by a numeric field; Order the result descending (highest first); Return
+  the top N names, breaking ties deterministically. Success means all hidden tests pass.
+
+
+  WHAT TO AVOID: Do not apply broad destructive changes, skip evidence gathering, or fake completion with
+  marker files — the checker validates real system state.'
 difficulty: easy
 scenario_type: fix
 lab_mode: simulation
@@ -19,64 +39,138 @@ objectives:
 - Sort a list of dicts by a numeric field
 - Order the result descending (highest first)
 - Return the top N names, breaking ties deterministically
-initial_state: A leaderboard helper should return the names of the top N products ranked by revenue,
-  highest first, but the starter sorts ascending and slices the wrong end, so it returns the WORST
-  performers. Fix the ranking so the highest-revenue products come back, ties broken by name ascending.
-solution_explanation: |
-  Sorting ascending puts the smallest revenue first; slicing [:n] then returns the lowest performers.
+initial_state: A leaderboard helper should return the names of the top N products ranked by revenue, highest
+  first, but the starter sorts ascending and slices the wrong end, so it returns the WORST performers.
+  Fix the ranking so the highest-revenue products come back, ties broken by name ascending.
+solution_explanation: 'Sorting ascending puts the smallest revenue first; slicing [:n] then returns the
+  lowest performers.
+
   Sort by (-revenue, name) so highest revenue comes first and equal revenues fall back to alphabetical
+
   name order, then take the first n names.
+
+  '
 coding_spec:
   language: python
   entrypoint: solution.py
   kind: fix
-  instructions: |
-    Fix solution(products, n): products is a list of dicts like {"name": "A", "revenue": 30}. Return a
-    list of the n product NAMES with the HIGHEST revenue, highest first. Break ties by name ascending.
-      top([{"name":"A","revenue":1},{"name":"B","revenue":9}], 1) -> ["B"]
-    Click Run to try it, then Check Solution to grade against all tests.
+  instructions: "Fix solution(products, n): products is a list of dicts like {\"name\": \"A\", \"revenue\"\
+    : 30}. Return a\nlist of the n product NAMES with the HIGHEST revenue, highest first. Break ties by\
+    \ name ascending.\n  top([{\"name\":\"A\",\"revenue\":1},{\"name\":\"B\",\"revenue\":9}], 1) -> [\"\
+    B\"]\nClick Run to try it, then Check Solution to grade against all tests.\n"
   files:
   - path: solution.py
-    content: |
-      def solution(products, n):
-          # BUG: sorts ascending (smallest revenue first) and so returns the
-          # WORST performers, not the best.
-          ranked = sorted(products, key=lambda p: p["revenue"])
-          return [p["name"] for p in ranked[:n]]
+    content: "def solution(products, n):\n    # BUG: sorts ascending (smallest revenue first) and so returns\
+      \ the\n    # WORST performers, not the best.\n    ranked = sorted(products, key=lambda p: p[\"revenue\"\
+      ])\n    return [p[\"name\"] for p in ranked[:n]]\n"
     readonly: false
   visible_tests:
   - name: returns highest revenue first
-    code: |
-      data = [{"name":"A","revenue":1},{"name":"B","revenue":9},{"name":"C","revenue":5}]
+    code: 'data = [{"name":"A","revenue":1},{"name":"B","revenue":9},{"name":"C","revenue":5}]
+
       assert solution(data, 2) == ["B", "C"], solution(data, 2)
+
+      '
   - name: single top
-    code: |
-      data = [{"name":"A","revenue":1},{"name":"B","revenue":9}]
+    code: 'data = [{"name":"A","revenue":1},{"name":"B","revenue":9}]
+
       assert solution(data, 1) == ["B"], solution(data, 1)
+
+      '
   hidden_tests:
   - name: ties broken by name ascending
-    code: |
-      data = [{"name":"Zed","revenue":5},{"name":"Abe","revenue":5},{"name":"Mid","revenue":5}]
+    code: 'data = [{"name":"Zed","revenue":5},{"name":"Abe","revenue":5},{"name":"Mid","revenue":5}]
+
       assert solution(data, 2) == ["Abe", "Mid"], solution(data, 2)
+
+      '
   - name: n larger than list returns all sorted
-    code: |
-      data = [{"name":"A","revenue":3},{"name":"B","revenue":7}]
+    code: 'data = [{"name":"A","revenue":3},{"name":"B","revenue":7}]
+
       assert solution(data, 10) == ["B", "A"], solution(data, 10)
+
+      '
   - name: n zero returns empty
-    code: |
-      data = [{"name":"A","revenue":3}]
+    code: 'data = [{"name":"A","revenue":3}]
+
       assert solution(data, 0) == [], solution(data, 0)
+
+      '
   - name: empty products returns empty
-    code: |
-      assert solution([], 3) == [], solution([], 3)
+    code: 'assert solution([], 3) == [], solution([], 3)
+
+      '
   timeout: 8
 hints:
 - order: 1
-  cost: 10
-  content: Run it — the names you get back are the lowest-revenue products. The sort direction is wrong.
+  cost: 0
+  content: 'Where to look: Open `solution.py`, read the instructions, and run the visible tests to see
+    which assertion fails first.'
 - order: 2
-  cost: 20
-  content: To rank highest first, sort by negative revenue, or pass reverse=True. For stable ties, also key on the name.
+  cost: 25
+  content: 'Diagnostic steps:
+
+    1. Click Run and read the traceback — note line number and actual vs expected values.
+
+    2. Reproduce the failure with the smallest input from a visible test.
+
+    3. Compare your implementation to the bug described in the lab prompt.'
 - order: 3
-  cost: 30
-  content: 'Use sorted(products, key=lambda p: (-p["revenue"], p["name"])) then take [:n] of the names.'
+  cost: 50
+  content: 'Exact fix + verification:
+
+    1. Return the top N names, breaking ties deterministically.
+
+    2. Re-run the lab checker (`check.sh` or Check Solution).
+
+    3. Confirm every scenario objective is satisfied.
+
+
+    WHY: the grader validates real state — marker files are ignored.'
+summary: Complete the top n products by revenue data science lab and verify success with the checker
+estimated_minutes: 15
+xp_reward: 100
+prerequisites:
+- Basic data science literacy
+tags:
+- data-science
+- fix
+- hands-on
+linked_tutorial: data-science-fundamentals
+what_you_will_learn:
+- Sort a list of dicts by a numeric field
+- Order the result descending (highest first)
+- Return the top N names, breaking ties deterministically
+environment:
+  nodes:
+  - role: primary
+    os: FixitLab notebook lab
+    hostname: lab-primary
+    ip: 127.0.0.1
+    specs: local offline simulation
+  pre_installed:
+  - bash
+  - coreutils
+  - data science
+  - pip
+  - python3
+  credentials:
+  - user: root
+    password: lab123
+tasks:
+- id: task_1
+  title: Top N Products by Revenue
+  description: Restore healthy behavior for Top N Products by Revenue by investigating the failure, applying
+    the smallest safe fix, and validating the outcome.
+  background: 'This data science lab teaches systematic troubleshooting: observe, hypothesize, change,
+    verify.'
+  validation:
+    type: custom_script
+    script: hidden_tests
+    error_message: One or more hidden tests failed. Read the public test output, fix your solution, and
+      submit again.
+solution:
+  summary: The solution passes all hidden tests by implementing the required behavior in code.
+  files_changed: []
+  commands_run: []
+  reference_docs: data-science-fundamentals

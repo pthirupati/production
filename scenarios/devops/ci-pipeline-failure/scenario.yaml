@@ -1,11 +1,31 @@
 title: CI Pipeline Failure on Deploy Stage
 slug: devops-ci-pipeline-failure
-category: DevOps
+category: Fix
 difficulty: hard
-description: A GitLab CI pipeline fails at the deploy stage. The deploy job can't authenticate to the
-  cluster because its KUBECONFIG is missing/empty, and it references an image tag that doesn't exist,
-  so the rollout never happens. Read the failed job log, fix the pipeline variables, and re-run the deploy
-  to a green pipeline.
+description: 'CONTEXT: A team operating DevOps delivery needs you to resolve `CI Pipeline Failure on Deploy
+  Stage` during a realistic incident. The business impact is reduced service reliability until the underlying
+  state is repaired.
+
+
+  ENVIRONMENT: You are working in FixitLab''s offline CI/CD lab with git repos, pipelines, artifacts,
+  and runbooks. All tools run locally; no paid APIs or external cloud calls are required.
+
+
+  SYMPTOM / STARTING STATE: GitLab CI project whose deploy job fails: KUBECONFIG is not provided to the
+  job and IMAGE_TAG points at a non-existent image, so deployment errors out with unauthorized / image-not-found.
+  A GitLab CI pipeline fails at the deploy stage. The deploy job can''t authenticate to the cluster because
+  its KUBECONFIG is missing/empty, and it references an image tag that doesn''t exist, so the rollout
+  never happens. Read the failed job log, fix the pipeline variables, and re-run the deploy to a green
+  pipeline.
+
+
+  OBJECTIVE: Identify the failing deploy job and its error in the pipeline logs; Fix the KUBECONFIG and
+  IMAGE_TAG variables; Re-run the pipeline and confirm the deploy stage passes. Success means `check.sh`
+  exits successfully.
+
+
+  WHAT TO AVOID: Do not apply broad destructive changes, skip evidence gathering, or fake completion with
+  marker files — the checker validates real system state.'
 lab_mode: simulation
 simulation_type: devops
 time_limit: 1200
@@ -17,16 +37,73 @@ objectives:
 - Re-run the pipeline and confirm the deploy stage passes
 hints:
 - order: 1
-  cost: 10
-  content: Open the failed job log in the pipeline and read the deploy stage error — look for "unauthorized"
-    (bad/empty KUBECONFIG) and/or "image not found" (wrong IMAGE_TAG).
+  cost: 0
+  content: 'Where to look: Identify the failing deploy job and its error in the pipeline logs'
 - order: 2
-  cost: 15
-  content: 'Set the variables correctly: provide a valid KUBECONFIG (as a masked CI/CD variable or file)
-    and set IMAGE_TAG to a tag that actually exists in the registry.'
+  cost: 25
+  content: 'Diagnostic steps:
+
+    1. Fix the KUBECONFIG and IMAGE_TAG variables
+
+    2. Re-run the pipeline and confirm the deploy stage passes'
 - order: 3
-  cost: 20
-  content: Re-run the pipeline (or just the deploy job). With valid credentials and a real image, the
-    deploy succeeds and the pipeline goes green.
+  cost: 50
+  content: 'Exact fix + verification:
+
+    1. Re-run the pipeline and confirm the deploy stage passes.
+
+    2. Re-run the lab checker (`check.sh` or Check Solution).
+
+    3. Confirm every scenario objective is satisfied.
+
+
+    WHY: the grader validates real state — marker files are ignored.'
 initial_state: 'GitLab CI project whose deploy job fails: KUBECONFIG is not provided to the job and IMAGE_TAG
   points at a non-existent image, so deployment errors out with unauthorized / image-not-found.'
+technology: devops
+summary: Complete the ci pipeline failure on deploy stage devops lab and verify success with the checker
+estimated_minutes: 20
+xp_reward: 100
+prerequisites:
+- Basic devops literacy
+tags:
+- devops
+- fix
+- hands-on
+linked_tutorial: devops-fundamentals
+what_you_will_learn:
+- Identify the failing deploy job and its error in the pipeline logs
+- Fix the KUBECONFIG and IMAGE_TAG variables
+- Re-run the pipeline and confirm the deploy stage passes
+environment:
+  nodes:
+  - role: primary
+    os: FixitLab CI/CD lab
+    hostname: lab-primary
+    ip: 127.0.0.1
+    specs: local offline simulation
+  pre_installed:
+  - bash
+  - coreutils
+  - devops
+  - journalctl
+  - systemctl
+  credentials:
+  - user: root
+    password: lab123
+tasks:
+- id: task_1
+  title: CI Pipeline Failure on Deploy Stage
+  description: Restore healthy behavior for CI Pipeline Failure on Deploy Stage by investigating the failure,
+    applying the smallest safe fix, and validating the outcome.
+  background: 'This devops lab teaches systematic troubleshooting: observe, hypothesize, change, verify.'
+  validation:
+    type: custom_script
+    script: check.sh
+    error_message: Validation did not pass. Re-read the objectives and Hint 2 diagnostic steps.
+solution:
+  summary: Identify the misconfiguration affecting this devops lab and apply the minimal fix.
+  files_changed: []
+  commands_run:
+  - bash check.sh
+  reference_docs: devops-fundamentals

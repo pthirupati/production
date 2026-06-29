@@ -1,9 +1,26 @@
 title: 'Log Analysis: Fix the Crash Parsing CSV Numbers'
 slug: py-logfix-valueerror-int-parse
-category: Python Development
-description: 'A batch job crashed with `ValueError: invalid literal for int() with base 10: ''''` in sum_csv_row().
-  The row may contain empty fields and surrounding spaces. Parse only the integer fields, skipping blanks,
-  and return their sum. Read the log and fix the parsing.'
+category: Fix
+description: 'CONTEXT: A team operating Python development needs you to resolve `Log Analysis: Fix the
+  Crash Parsing CSV Numbers` during a realistic incident. The business impact is reduced service reliability
+  until the underlying state is repaired.
+
+
+  ENVIRONMENT: You are working in FixitLab''s offline Python project workspace with source files, venv,
+  tests, and CLI entrypoints. All tools run locally; no paid APIs or external cloud calls are required.
+
+
+  SYMPTOM / STARTING STATE: A batch job crashed with `ValueError: invalid literal for int() with base
+  10: ''''` in sum_csv_row(). The row may contain empty fields and surrounding spaces. Parse only the
+  integer fields, skipping blanks, and return their sum. Read the log and fix the parsing.
+
+
+  OBJECTIVE: Read the ValueError and identify the bad int() call; Skip empty/whitespace fields; Sum the
+  remaining integers robustly. Success means all hidden tests pass.
+
+
+  WHAT TO AVOID: Do not apply broad destructive changes, skip evidence gathering, or fake completion with
+  marker files — the checker validates real system state.'
 difficulty: medium
 scenario_type: fix
 lab_mode: simulation
@@ -21,57 +38,122 @@ objectives:
 initial_state: 'A batch job crashed with `ValueError: invalid literal for int() with base 10: ''''` in
   sum_csv_row(). The row may contain empty fields and surrounding spaces. Parse only the integer fields,
   skipping blanks, and return their sum. Read the log and fix the parsing.'
-solution_explanation: |
-  Empty/whitespace fields can't be parsed. Stripping and skipping blanks before int() makes the sum robust to messy CSV rows.
+solution_explanation: 'Empty/whitespace fields can''t be parsed. Stripping and skipping blanks before
+  int() makes the sum robust to messy CSV rows.
+
+  '
 coding_spec:
   language: python
   entrypoint: solution.py
   kind: logfix
-  instructions: |
-    Fix sum_csv_row(row) where row is a list of strings. Strip each field; skip empty fields; sum the integer values of the rest. The log shows it crashes on an empty field.
-      sum_csv_row(['1', ' 2 ', '', '3']) -> 6
-    Click Run to try it, then Check Solution to grade against all tests.
+  instructions: "Fix sum_csv_row(row) where row is a list of strings. Strip each field; skip empty fields;\
+    \ sum the integer values of the rest. The log shows it crashes on an empty field.\n  sum_csv_row(['1',\
+    \ ' 2 ', '', '3']) -> 6\nClick Run to try it, then Check Solution to grade against all tests.\n"
   files:
   - path: solution.py
-    content: |
-      # Production log:
-      #   ValueError: invalid literal for int() with base 10: ''
-      #     at sum_csv_row -> total += int(field)
-
-      def sum_csv_row(row):
-          total = 0
-          for field in row:
-              total += int(field)   # blank fields raise ValueError
-          return total
+    content: "# Production log:\n#   ValueError: invalid literal for int() with base 10: ''\n#     at\
+      \ sum_csv_row -> total += int(field)\n\ndef sum_csv_row(row):\n    total = 0\n    for field in row:\n\
+      \        total += int(field)   # blank fields raise ValueError\n    return total\n"
     readonly: false
   visible_tests:
   - name: with blanks and spaces
-    code: |
-      assert sum_csv_row(['1', ' 2 ', '', '3']) == 6, sum_csv_row(['1', ' 2 ', '', '3'])
+    code: 'assert sum_csv_row([''1'', '' 2 '', '''', ''3'']) == 6, sum_csv_row([''1'', '' 2 '', '''',
+      ''3''])
+
+      '
   - name: all numbers
-    code: |
-      assert sum_csv_row(['10', '20']) == 30
+    code: 'assert sum_csv_row([''10'', ''20'']) == 30
+
+      '
   hidden_tests:
   - name: only blanks
-    code: |
-      assert sum_csv_row(['', '   ', '']) == 0
+    code: 'assert sum_csv_row(['''', ''   '', '''']) == 0
+
+      '
   - name: negative values
-    code: |
-      assert sum_csv_row(['-5', '5']) == 0
+    code: 'assert sum_csv_row([''-5'', ''5'']) == 0
+
+      '
   - name: single
-    code: |
-      assert sum_csv_row([' 7 ']) == 7
+    code: 'assert sum_csv_row(['' 7 '']) == 7
+
+      '
   - name: empty row
-    code: |
-      assert sum_csv_row([]) == 0
+    code: 'assert sum_csv_row([]) == 0
+
+      '
   timeout: 8
 hints:
 - order: 1
-  cost: 10
-  content: The log shows int('') failing — empty fields aren't numbers.
+  cost: 0
+  content: 'Where to look: Open `solution.py`, read the instructions, and run the visible tests to see
+    which assertion fails first.'
 - order: 2
-  cost: 20
-  content: Strip whitespace and skip fields that become empty.
+  cost: 25
+  content: 'Diagnostic steps:
+
+    1. Click Run and read the traceback — note line number and actual vs expected values.
+
+    2. Reproduce the failure with the smallest input from a visible test.
+
+    3. Compare your implementation to the bug described in the lab prompt.'
 - order: 3
-  cost: 30
-  content: Continue past blank fields, then int(field) the rest.
+  cost: 50
+  content: 'Exact fix + verification:
+
+    1. Sum the remaining integers robustly.
+
+    2. Re-run the lab checker (`check.sh` or Check Solution).
+
+    3. Confirm every scenario objective is satisfied.
+
+
+    WHY: the grader validates real state — marker files are ignored.'
+technology: python
+summary: 'Complete the log analysis: fix the crash parsing csv numbers python lab and verify success with
+  the checker'
+estimated_minutes: 25
+xp_reward: 100
+prerequisites:
+- Basic python literacy
+tags:
+- fix
+- hands-on
+- python
+linked_tutorial: python-fundamentals
+what_you_will_learn:
+- Read the ValueError and identify the bad int() call
+- Skip empty/whitespace fields
+- Sum the remaining integers robustly
+environment:
+  nodes:
+  - role: primary
+    os: FixitLab Python project workspace
+    hostname: lab-primary
+    ip: 127.0.0.1
+    specs: local offline simulation
+  pre_installed:
+  - bash
+  - coreutils
+  - pip
+  - python
+  - python3
+  credentials:
+  - user: root
+    password: lab123
+tasks:
+- id: task_1
+  title: 'Log Analysis: Fix the Crash Parsing CSV Numbers'
+  description: 'Restore healthy behavior for Log Analysis: Fix the Crash Parsing CSV Numbers by investigating
+    the failure, applying the smallest safe fix, and validating the outcome.'
+  background: 'This python lab teaches systematic troubleshooting: observe, hypothesize, change, verify.'
+  validation:
+    type: custom_script
+    script: hidden_tests
+    error_message: One or more hidden tests failed. Read the public test output, fix your solution, and
+      submit again.
+solution:
+  summary: The solution passes all hidden tests by implementing the required behavior in code.
+  files_changed: []
+  commands_run: []
+  reference_docs: python-fundamentals

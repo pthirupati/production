@@ -2,17 +2,36 @@ title: Extend LVM Logical Volume
 slug: lvm-extend
 lab_mode: simulation
 simulation_type: generic
-technology: Linux
-category: Storage / LVM
+technology: linux
+category: Fix
 difficulty: hard
 time_limit: 1200
 max_score: 100
 infrastructure_type: docker
 docker_privileged: true
 jira_priority: High
-description: /data is full and applications report "No space left on device", but `vgs` shows the volume
-  group still has free extents — the logical volume simply hasn't been grown into them yet. Extend the
-  datalv logical volume to use the free space, then grow the XFS filesystem online so /data has room again.
+description: 'CONTEXT: A team operating Linux administration needs you to resolve `Extend LVM Logical
+  Volume` during a realistic incident. The business impact is reduced service reliability until the underlying
+  state is repaired.
+
+
+  ENVIRONMENT: You are working in FixitLab''s offline Linux practice server with terminal and config files
+  under /etc and /var. All tools run locally; no paid APIs or external cloud calls are required.
+
+
+  SYMPTOM / STARTING STATE: Linux server using LVM where /data is full but VG fixitlab has free extents.
+  The datalv LV and its XFS filesystem need to be extended. /data is full and applications report "No
+  space left on device", but `vgs` shows the volume group still has free extents — the logical volume
+  simply hasn''t been grown into them yet. Extend the datalv logical volume to use the free space, then
+  grow the XFS filesystem online so /data has room again.
+
+
+  OBJECTIVE: Confirm free extents exist in the VG while /data is full; Extend the datalv logical volume;
+  Grow the XFS filesystem on /data and verify free space. Success means `check.sh` exits successfully.
+
+
+  WHAT TO AVOID: Do not apply broad destructive changes, skip evidence gathering, or fake completion with
+  marker files — the checker validates real system state.'
 objectives:
 - Confirm free extents exist in the VG while /data is full
 - Extend the datalv logical volume
@@ -21,14 +40,70 @@ initial_state: Linux server using LVM where /data is full but VG fixitlab has fr
   LV and its XFS filesystem need to be extended.
 hints:
 - order: 1
-  cost: 10
-  content: 'See the mismatch: `df -h /data` is 100%, but `vgs`/`lvs` show free extents in VG fixitlab
-    — the LV just needs extending.'
+  cost: 0
+  content: 'Where to look: Confirm free extents exist in the VG while /data is full'
 - order: 2
-  cost: 20
-  content: 'Extend the LV into free space: `lvextend -L +200M /dev/fixitlab/datalv` (or `-l +100%FREE`
-    to use it all).'
+  cost: 25
+  content: 'Diagnostic steps:
+
+    1. Extend the datalv logical volume
+
+    2. Grow the XFS filesystem on /data and verify free space'
 - order: 3
-  cost: 30
-  content: 'Grow the filesystem online: `xfs_growfs /data` (XFS grows mounted). Confirm with `df -h /data`
-    and a test write.'
+  cost: 50
+  content: 'Exact fix + verification:
+
+    1. Grow the XFS filesystem on /data and verify free space.
+
+    2. Re-run the lab checker (`check.sh` or Check Solution).
+
+    3. Confirm every scenario objective is satisfied.
+
+
+    WHY: the grader validates real state — marker files are ignored.'
+summary: Complete the extend lvm logical volume linux lab and verify success with the checker
+estimated_minutes: 20
+xp_reward: 100
+prerequisites:
+- Basic linux literacy
+tags:
+- fix
+- hands-on
+- linux
+linked_tutorial: linux-fundamentals
+what_you_will_learn:
+- Confirm free extents exist in the VG while /data is full
+- Extend the datalv logical volume
+- Grow the XFS filesystem on /data and verify free space
+environment:
+  nodes:
+  - role: primary
+    os: FixitLab Linux practice server
+    hostname: lab-primary
+    ip: 127.0.0.1
+    specs: local offline simulation
+  pre_installed:
+  - bash
+  - coreutils
+  - journalctl
+  - linux
+  - systemctl
+  credentials:
+  - user: root
+    password: lab123
+tasks:
+- id: task_1
+  title: Extend LVM Logical Volume
+  description: Restore healthy behavior for Extend LVM Logical Volume by investigating the failure, applying
+    the smallest safe fix, and validating the outcome.
+  background: 'This linux lab teaches systematic troubleshooting: observe, hypothesize, change, verify.'
+  validation:
+    type: custom_script
+    script: check.sh
+    error_message: Validation did not pass. Re-read the objectives and Hint 2 diagnostic steps.
+solution:
+  summary: Identify the misconfiguration affecting this linux lab and apply the minimal fix.
+  files_changed: []
+  commands_run:
+  - bash check.sh
+  reference_docs: linux-fundamentals

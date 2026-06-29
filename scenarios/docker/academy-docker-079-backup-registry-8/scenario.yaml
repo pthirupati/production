@@ -1,7 +1,7 @@
-title: 'Docker & Containers: Image Registry — Backup and Recovery'
+title: Image Registry — Backup Lab
 slug: academy-docker-079-backup-registry-8
-technology: Docker & Containers
-category: Backup & Recovery
+technology: docker
+category: Build
 difficulty: medium
 scenario_type: do
 lab_mode: simulation
@@ -11,18 +11,37 @@ max_score: 100
 is_free: false
 infrastructure_type: docker
 jira_priority: Medium
-description: Service operations lab. The `docker` systemd unit is **failed/inactive** on this host — a
-  realistic fault for Backup and Recovery workflows that depend on it. Diagnose with `systemctl status
-  docker` and journal logs, apply the smallest reliable fix, then verify with `systemctl is-active docker`.
+description: 'CONTEXT: A team operating Docker containers needs you to resolve `docker: Image Registry
+  — Backup and Recovery` during a realistic incident. The business impact is reduced service reliability
+  until the underlying state is repaired.
+
+
+  ENVIRONMENT: You are working in FixitLab''s offline Docker host with docker CLI, images, containers,
+  and compose files. All tools run locally; no paid APIs or external cloud calls are required.
+
+
+  SYMPTOM / STARTING STATE: Backup jobs exist but reliability is uncertain for image registry. Leadership
+  wants proof that restore works — not just that scripts exit zero. Backup and recovery drill for image
+  registry. Ensure backups run on schedule, retention is correct, and you can restore push/pull auth,
+  tags, and insecure registries within the lab RTO.
+
+
+  OBJECTIVE: Backup coverage for image registry is complete and restorable; Retention and encryption meet
+  the stated policy; A restore drill proves data integrity. Success means `systemctl is-active docker`
+  returns active.
+
+
+  WHAT TO AVOID: Do not apply broad destructive changes, skip evidence gathering, or fake completion with
+  marker files — the checker validates real system state.'
 objectives:
-- The `docker` service is active (running)
-- '`systemctl is-active docker` returns active'
-- The fix survives a status re-check (no marker files)
-initial_state: The `docker` service is not running (`systemctl is-active docker` → inactive/failed). Dependent
-  Backup and Recovery tasks cannot succeed until the unit is healthy again.
+- Backup coverage for image registry is complete and restorable
+- Retention and encryption meet the stated policy
+- A restore drill proves data integrity
+initial_state: Backup jobs exist but reliability is uncertain for image registry. Leadership wants proof
+  that restore works — not just that scripts exit zero.
 hints:
 - order: 1
-  cost: 10
+  cost: 0
   content: 'Orient yourself before changing anything:
 
     1. Inspect the current state — `docker login`, `docker pull`, and daemon.json registry config.
@@ -32,17 +51,17 @@ hints:
     3. Recall the core idea: push/pull auth, tags, and insecure registries. Form one hypothesis before
     you act.'
 - order: 2
-  cost: 15
-  content: 'Plan your approach (still no spoilers):
-
-    1. Confirm the exact gap between current and desired state for image registry.
-
-    2. Decide the single smallest change that moves you toward the objective.
-
-    3. Capture evidence (command output / status) before the change so you can prove it worked afterward.'
-- order: 3
   cost: 25
-  content: 'Guided walkthrough:
+  content: 'Diagnostic steps:
+
+    1. Run `systemctl status docker` — note Active/Failed and the last log lines.
+
+    2. Read `journalctl -u docker -n 50` for the root error.
+
+    3. Form a hypothesis about the smallest config or permission fix.'
+- order: 3
+  cost: 50
+  content: 'Exact fix + verification:
 
     1. Re-check the current state — `docker login`, `docker pull`, and daemon.json registry config.
 
@@ -51,4 +70,75 @@ hints:
 
     3. Verify the result — images push and pull from the intended registry.
 
-    4. Click Check Solution once `systemctl is-active docker` returns active.'
+    4. Click Check Solution once the objective is met (graded on real state, not a marker file).'
+summary: Complete the image registry — backup lab docker lab and verify success with the checker
+estimated_minutes: 20
+xp_reward: 100
+prerequisites:
+- Basic docker literacy
+tags:
+- do
+- docker
+- hands-on
+linked_tutorial: docker-fundamentals
+what_you_will_learn:
+- Backup coverage for image registry is complete and restorable
+- Retention and encryption meet the stated policy
+- A restore drill proves data integrity
+environment:
+  nodes:
+  - role: primary
+    os: FixitLab Docker host
+    hostname: lab-primary
+    ip: 127.0.0.1
+    specs: local offline simulation
+  pre_installed:
+  - bash
+  - coreutils
+  - docker
+  - docker-compose
+  credentials:
+  - user: root
+    password: lab123
+tasks:
+- id: task_1
+  title: Image Registry — Backup Lab
+  description: Restore healthy behavior for Image Registry — Backup Lab by investigating the failure,
+    applying the smallest safe fix, and validating the outcome.
+  background: 'This docker lab teaches systematic troubleshooting: observe, hypothesize, change, verify.'
+  validation:
+    type: service_active
+    command: systemctl is-active docker
+    expected_status: active
+    error_message: The docker service is not active yet. Check `systemctl status docker` and `journalctl
+      -u docker -n 50`.
+solution:
+  summary: The root cause is an unhealthy `docker` service; repair it and verify active state.
+  files_changed: []
+  commands_run:
+  - systemctl is-active docker
+  reference_docs: docker-fundamentals
+guided_mode:
+  enabled: true
+  steps:
+  - step: 1
+    title: Inspect current state
+    instruction: Run a read-only diagnostic before changing anything.
+    command: systemctl is-active docker
+    expected_output: Output shows the current failure mode
+    explanation: Evidence-first troubleshooting avoids guessing.
+    next_on: command_success
+  - step: 2
+    title: Apply the minimal fix
+    instruction: Make one reversible change aligned with the objectives.
+    command: '# your fix command here'
+    expected_output: State moves toward the objective
+    explanation: Small changes make rollback easy if the hypothesis was wrong.
+    next_on: command_success
+  - step: 3
+    title: Verify with the grader
+    instruction: Run the same verification the checker uses.
+    command: systemctl is-active docker
+    expected_output: '`systemctl is-active docker` returns active'
+    explanation: The lab passes only when real state is healthy.
+    next_on: command_success

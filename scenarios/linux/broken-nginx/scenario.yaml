@@ -2,21 +2,44 @@ title: Fix the Broken Nginx Server
 slug: broken-nginx
 lab_mode: simulation
 simulation_type: generic
-technology: Linux
-category: Web Servers
+technology: linux
+category: Fix
 difficulty: easy
 time_limit: 900
 max_score: 100
 infrastructure_type: docker
 jira_priority: Medium
 is_free: true
-description: 'A web server was recently deployed, but it refuses to start.
+description: 'CONTEXT: A team operating Linux administration needs you to resolve `Fix the Broken Nginx
+  Server` during a realistic incident. The business impact is reduced service reliability until the underlying
+  state is repaired.
+
+
+  ENVIRONMENT: You are working in FixitLab''s offline Linux practice server with terminal and config files
+  under /etc and /var. All tools run locally; no paid APIs or external cloud calls are required.
+
+
+  SYMPTOM / STARTING STATE: You have SSH access to an Ubuntu 22.04 server.
+
+  Nginx is installed but fails to start.
+
+  The default site configuration has been modified. A web server was recently deployed, but it refuses
+  to start.
 
   Your mission is to investigate the Nginx configuration, identify
 
   the error, fix it, and ensure the server is running and serving
 
-  the default page on port 80.'
+  the default page on port 80.
+
+
+  OBJECTIVE: Find the error in the nginx configuration with nginx -t; Fix the invalid directive so the
+  config validates; Start nginx and verify http://localhost returns HTTP 200. Success means HTTP 200 from
+  http://localhost.
+
+
+  WHAT TO AVOID: Do not apply broad destructive changes, skip evidence gathering, or fake completion with
+  marker files — the checker validates real system state.'
 objectives:
 - Find the error in the nginx configuration with nginx -t
 - Fix the invalid directive so the config validates
@@ -30,13 +53,73 @@ initial_state: 'You have SSH access to an Ubuntu 22.04 server.
   '
 hints:
 - order: 1
-  cost: 10
-  content: 'Test the config to pinpoint the error: `nginx -t` reports the file and line of the bad directive.'
+  cost: 0
+  content: 'Where to look: Test the config to get the exact file and line: `nginx -t`. It prints the offending
+    directive (e.g. unknown directive "listn").'
 - order: 2
-  cost: 15
-  content: Look at the `listen` directive in /etc/nginx/sites-available/default — it's misspelled (e.g.
-    `listn`).
+  cost: 25
+  content: 'Diagnostic steps:
+
+    1. Run `nginx -t` and note the file path and line number in the error.
+
+    2. Open that file (often `/etc/nginx/nginx.conf` or under `/etc/nginx/conf.d/`).
+
+    3. Compare the bad directive to the nginx docs — typos like `listn` should be `listen`.'
 - order: 3
-  cost: 20
-  content: Fix the typo so `nginx -t` passes, then `systemctl start nginx` and verify with `curl -I http://localhost`
-    (expect HTTP/1.1 200).
+  cost: 50
+  content: 'Exact fix + verification:
+
+    1. Correct the typo on the reported line and save the file.
+
+    2. Re-run `nginx -t` until it reports syntax is ok.
+
+    3. Run `systemctl enable --now nginx`, then `curl -I http://localhost` (expect HTTP 200).
+
+
+    WHY: systemd will not start nginx until `nginx -t` passes.'
+summary: Complete the fix the broken nginx server linux lab and verify success with the checker
+estimated_minutes: 15
+xp_reward: 100
+prerequisites:
+- Basic linux literacy
+tags:
+- fix
+- hands-on
+- linux
+linked_tutorial: linux-fundamentals
+what_you_will_learn:
+- Find the error in the nginx configuration with nginx -t
+- Fix the invalid directive so the config validates
+- Start nginx and verify http://localhost returns HTTP 200
+environment:
+  nodes:
+  - role: primary
+    os: FixitLab Linux practice server
+    hostname: lab-primary
+    ip: 127.0.0.1
+    specs: local offline simulation
+  pre_installed:
+  - bash
+  - coreutils
+  - journalctl
+  - linux
+  - systemctl
+  credentials:
+  - user: root
+    password: lab123
+tasks:
+- id: task_1
+  title: Fix the Broken Nginx Server
+  description: Restore healthy behavior for Fix the Broken Nginx Server by investigating the failure,
+    applying the smallest safe fix, and validating the outcome.
+  background: 'This linux lab teaches systematic troubleshooting: observe, hypothesize, change, verify.'
+  validation:
+    type: http_response
+    url: http://localhost
+    expected_code: 200
+    error_message: nginx is not serving HTTP 200. Run nginx -t, fix config errors, and start nginx.
+solution:
+  summary: Identify the misconfiguration affecting this linux lab and apply the minimal fix.
+  files_changed: []
+  commands_run: []
+  reference_docs: linux-fundamentals

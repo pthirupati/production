@@ -1,44 +1,136 @@
-title: 'Grow a Full LVM Volume Online with lvextend + xfs_growfs'
+title: Grow a Full LVM Volume Online with lvextend + xfs_growfs
 slug: linux-lvm-grow-xfs-growfs-mount
 difficulty: medium
-category: 'Storage / LVM'
+category: Fix
 technology: linux
-description: |
-  The logical volume vgdata/lvdata is mounted at /data and is 100% full, causing writes
-  to fail. The volume group vgdata still has free extents available (a spare PV was added
-  earlier). You must grow the logical volume into that free space and then grow the XFS
-  filesystem ONLINE so /data gains capacity without unmounting. After growing, record the
-  change. Growing the LV alone is not enough — the XFS filesystem must also be expanded.
-initial_state: |
-  Simulated RHEL 9 server. df -h shows /data at 100% on /dev/mapper/vgdata-lvdata. vgs
+description: 'CONTEXT: A team operating Linux administration needs you to resolve `Grow a Full LVM Volume
+  Online with lvextend + xfs_growfs` during a realistic incident. The business impact is reduced service
+  reliability until the underlying state is repaired.
+
+
+  ENVIRONMENT: You are working in FixitLab''s offline Linux practice server with terminal and config files
+  under /etc and /var. All tools run locally; no paid APIs or external cloud calls are required.
+
+
+  SYMPTOM / STARTING STATE: Simulated RHEL 9 server. df -h shows /data at 100% on /dev/mapper/vgdata-lvdata.
+  vgs
+
   shows vgdata has free space. The XFS filesystem on /data has not yet been grown to use
+
+  any new extents. The logical volume vgdata/lvdata is mounted at /data and is 100% full, causing writes
+
+  to fail. The volume group vgdata still has free extents available (a spare PV was added
+
+  earlier). You must grow the logical volume into that free space and then grow the XFS
+
+  filesystem ONLINE so /data gains capacity without unmounting. After growing, record the
+
+  change. Growing the LV alone is not enough — the XFS filesystem must also be expanded.
+
+
+  OBJECTIVE: Confirm the shortage with df -h /data and the free space with vgs; {''Extend the LV into
+  the free extents'': ''lvextend -l +100%FREE /dev/vgdata/lvdata''}; {''Grow the XFS filesystem online'':
+  ''xfs_growfs /data''}. Success means `check.sh` exits successfully.
+
+
+  WHAT TO AVOID: Do not apply broad destructive changes, skip evidence gathering, or fake completion with
+  marker files — the checker validates real system state.'
+initial_state: 'Simulated RHEL 9 server. df -h shows /data at 100% on /dev/mapper/vgdata-lvdata. vgs
+
+  shows vgdata has free space. The XFS filesystem on /data has not yet been grown to use
+
   any new extents.
+
+  '
 objectives:
-  - Confirm the shortage with df -h /data and the free space with vgs
-  - Extend the LV into the free extents: lvextend -l +100%FREE /dev/vgdata/lvdata
-  - Grow the XFS filesystem online: xfs_growfs /data
-  - Confirm /data is larger with df -h and record the remediation
+- Confirm the shortage with df -h /data and the free space with vgs
+- Extend the LV into the free extents: lvextend -l +100%FREE /dev/vgdata/lvdata
+- Grow the XFS filesystem online: xfs_growfs /data
+- Confirm /data is larger with df -h and record the remediation
 lab_mode: simulation
 simulation_type: generic
 time_limit: 900
 max_score: 100
 is_free: false
 topics_covered:
-  - lvm
-  - lvextend
-  - xfs_growfs
-  - resize2fs
-  - grow-filesystem
+- lvm
+- lvextend
+- xfs_growfs
+- resize2fs
+- grow-filesystem
 hints:
-  - content: 'df -h /data shows 100% used. vgs shows vgdata still has free extents — the LV simply has not claimed them yet.'
-    cost: 10
-    order: 1
-  - content: 'Extend the logical volume into all free space: lvextend -l +100%FREE /dev/vgdata/lvdata (or lvextend -L +10G ...). This grows the block device but NOT the filesystem yet.'
-    cost: 15
-    order: 2
-  - content: 'XFS can only grow, never shrink, and is grown by mountpoint while mounted: xfs_growfs /data. Re-check with df -h /data. (For ext4 you would use resize2fs instead.)'
-    cost: 20
-    order: 3
+- order: 1
+  cost: 0
+  content: 'Where to look: Confirm the shortage with df -h /data and the free space with vgs'
+- order: 2
+  cost: 25
+  content: 'Diagnostic steps:
+
+    1. {''Extend the LV into the free extents'': ''lvextend -l +100%FREE /dev/vgdata/lvdata''}
+
+    2. {''Grow the XFS filesystem online'': ''xfs_growfs /data''}
+
+    3. Confirm /data is larger with df -h and record the remediation'
+- order: 3
+  cost: 50
+  content: 'Exact fix + verification:
+
+    1. Confirm /data is larger with df -h and record the remediation.
+
+    2. Re-run the lab checker (`check.sh` or Check Solution).
+
+    3. Confirm every scenario objective is satisfied.
+
+
+    WHY: the grader validates real state — marker files are ignored.'
 requires_companion_hosts: false
 dual_terminal: false
 jira_priority: Medium
+summary: Complete the grow a full lvm volume online with lvextend + xfs_growfs linux lab and verify success
+  with the checker
+estimated_minutes: 15
+xp_reward: 100
+prerequisites:
+- Basic linux literacy
+tags:
+- fix
+- hands-on
+- linux
+linked_tutorial: linux-fundamentals
+what_you_will_learn:
+- Confirm the shortage with df -h /data and the free space with vgs
+- '{''Extend the LV into the free extents'': ''lvextend -l +100%FREE /dev/vgdata/lvdata''}'
+- '{''Grow the XFS filesystem online'': ''xfs_growfs /data''}'
+- Confirm /data is larger with df -h and record the remediation
+environment:
+  nodes:
+  - role: primary
+    os: FixitLab Linux practice server
+    hostname: lab-primary
+    ip: 127.0.0.1
+    specs: local offline simulation
+  pre_installed:
+  - bash
+  - coreutils
+  - journalctl
+  - linux
+  - systemctl
+  credentials:
+  - user: root
+    password: lab123
+tasks:
+- id: task_1
+  title: Grow a Full LVM Volume Online with lvextend + xfs_growfs
+  description: Restore healthy behavior for Grow a Full LVM Volume Online with lvextend + xfs_growfs by
+    investigating the failure, applying the smallest safe fix, and validating the outcome.
+  background: 'This linux lab teaches systematic troubleshooting: observe, hypothesize, change, verify.'
+  validation:
+    type: custom_script
+    script: check.sh
+    error_message: Validation did not pass. Re-read the objectives and Hint 2 diagnostic steps.
+solution:
+  summary: Identify the misconfiguration affecting this linux lab and apply the minimal fix.
+  files_changed: []
+  commands_run:
+  - bash check.sh
+  reference_docs: linux-fundamentals

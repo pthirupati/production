@@ -1,11 +1,29 @@
-title: "Self-Consistency: Sample and Vote"
+title: 'Self-Consistency: Sample and Vote'
 slug: self-consistency
-category: Prompt Engineering
-description: >-
-  On hard reasoning problems a single chain of thought can take a wrong turn.
-  Self-consistency fixes this: generate several independent reasoning paths, then
-  take the majority answer. Learn the technique, when it earns its extra cost, and
+category: Build
+description: 'CONTEXT: A team operating prompt engineering needs you to resolve `Self-Consistency: Sample
+  and Vote` during a realistic incident. The business impact is reduced service reliability until the
+  underlying state is repaired.
+
+
+  ENVIRONMENT: You are working in FixitLab''s offline LLM practice workspace with prompt templates, eval
+  sets, and tool configs. All tools run locally; no paid APIs or external cloud calls are required.
+
+
+  SYMPTOM / STARTING STATE: The guided AI practice console opens. Practice asking the model for several
+  independent solution attempts and a majority-vote answer. Rule-based and free. On hard reasoning problems
+  a single chain of thought can take a wrong turn. Self-consistency fixes this: generate several independent
+  reasoning paths, then take the majority answer. Learn the technique, when it earns its extra cost, and
   how to prompt for it.
+
+
+  OBJECTIVE: Explain self-consistency (sample multiple reasoning paths, then majority-vote); Decide when
+  the accuracy gain is worth the extra calls/cost; Write a prompt that requests multiple independent attempts
+  and a final vote. Success means all hidden tests pass.
+
+
+  WHAT TO AVOID: Do not apply broad destructive changes, skip evidence gathering, or fake completion with
+  marker files — the checker validates real system state.'
 difficulty: hard
 scenario_type: do
 lab_mode: simulation
@@ -17,98 +35,206 @@ max_score: 100
 is_free: true
 dual_terminal: false
 objectives:
-  - Explain self-consistency (sample multiple reasoning paths, then majority-vote)
-  - Decide when the accuracy gain is worth the extra calls/cost
-  - Write a prompt that requests multiple independent attempts and a final vote
-initial_state: >-
-  The guided AI practice console opens. Practice asking the model for several
-  independent solution attempts and a majority-vote answer. Rule-based and free.
-solution_explanation: >-
-  Self-consistency builds on chain-of-thought - instead of trusting one reasoning
-  path, you sample several (with some randomness/temperature), then return the
-  answer that appears most often. The intuition - many independent correct paths
-  tend to converge on the same answer, while wrong paths scatter. It reliably lifts
-  accuracy on arithmetic, logic, and commonsense tasks, at the cost of N times the
-  calls. Use it for high-stakes, verifiable answers; skip it for cheap or
-  open-ended tasks. You can prompt for it in one shot ("produce 3 independent
-  solutions, then the majority answer") or orchestrate N separate calls and vote in
-  code.
+- Explain self-consistency (sample multiple reasoning paths, then majority-vote)
+- Decide when the accuracy gain is worth the extra calls/cost
+- Write a prompt that requests multiple independent attempts and a final vote
+initial_state: The guided AI practice console opens. Practice asking the model for several independent
+  solution attempts and a majority-vote answer. Rule-based and free.
+solution_explanation: Self-consistency builds on chain-of-thought - instead of trusting one reasoning
+  path, you sample several (with some randomness/temperature), then return the answer that appears most
+  often. The intuition - many independent correct paths tend to converge on the same answer, while wrong
+  paths scatter. It reliably lifts accuracy on arithmetic, logic, and commonsense tasks, at the cost of
+  N times the calls. Use it for high-stakes, verifiable answers; skip it for cheap or open-ended tasks.
+  You can prompt for it in one shot ("produce 3 independent solutions, then the majority answer") or orchestrate
+  N separate calls and vote in code.
 coding_spec:
   kind: prompt
   language: text
   prompt_config:
     persona: A reasoning assistant that can produce several independent attempts and vote.
     lesson:
-      - heading: The core idea
-        body: >-
-          A single chain of thought is one sample from the model's distribution -
-          sometimes it slips. Self-consistency samples MANY reasoning paths
-          independently and keeps the most common final answer. Correct reasoning
-          tends to converge; mistakes tend to be idiosyncratic and scatter, so the
-          majority vote washes them out.
-      - heading: When it's worth it
-        body: >-
-          Self-consistency multiplies cost and latency by the number of samples (3,
-          5, sometimes more). Spend that budget when the answer is (a)
-          high-stakes and (b) objectively checkable - a number, a label, a
-          yes/no. For open-ended writing there's no "majority answer," so it
-          doesn't apply. For cheap, low-risk tasks one pass is fine.
-      - heading: How to prompt for it
-        body: >-
-          Two ways. ONE-SHOT - "Solve this 3 different ways, showing each
-          independent line of reasoning, then state the single answer that the
-          majority of your attempts agree on." ORCHESTRATED - make N separate calls
-          (ideally with temperature > 0 for diversity) and tally the final answers
-          in your own code. The orchestrated version gives true independence; the
-          one-shot version is cheaper and often good enough.
-    rubric: [task, reasoning, format, specificity]
+    - heading: The core idea
+      body: A single chain of thought is one sample from the model's distribution - sometimes it slips.
+        Self-consistency samples MANY reasoning paths independently and keeps the most common final answer.
+        Correct reasoning tends to converge; mistakes tend to be idiosyncratic and scatter, so the majority
+        vote washes them out.
+    - heading: When it's worth it
+      body: Self-consistency multiplies cost and latency by the number of samples (3, 5, sometimes more).
+        Spend that budget when the answer is (a) high-stakes and (b) objectively checkable - a number,
+        a label, a yes/no. For open-ended writing there's no "majority answer," so it doesn't apply. For
+        cheap, low-risk tasks one pass is fine.
+    - heading: How to prompt for it
+      body: Two ways. ONE-SHOT - "Solve this 3 different ways, showing each independent line of reasoning,
+        then state the single answer that the majority of your attempts agree on." ORCHESTRATED - make
+        N separate calls (ideally with temperature > 0 for diversity) and tally the final answers in your
+        own code. The orchestrated version gives true independence; the one-shot version is cheaper and
+        often good enough.
+    rubric:
+    - task
+    - reasoning
+    - format
+    - specificity
     exercises:
-      - id: vote-on-answer
-        title: Request multiple attempts and a vote
-        goal: >-
-          Write a prompt for a checkable problem (math/logic) that asks the model to
-          produce SEVERAL independent solution attempts (reason each one
-          separately) and then return the MAJORITY / most common final answer.
-        starter: ""
-        success:
-          min_words: 14
-          any_of:
-            - ["reason", "reasoning", "step by step", "solve", "work through", "attempt", "approach"]
-          require:
-            - ["majority", "most common", "vote", "agree", "consensus", "appears most", "3 times", "multiple times", "several attempts", "independent"]
-        success_response: |
-          Attempt 1 -> 42. Attempt 2 -> 42. Attempt 3 -> 40.
-          Majority answer: 42 (2 of 3 independent attempts agree).
-        partial_response: >-
-          Ask for SEVERAL independent attempts (each with its own reasoning) and
-          then the MAJORITY answer — e.g. "solve it 3 separate ways and give the
-          answer most of them agree on." That voting step is the whole technique.
-      - id: when-to-vote
-        title: Decide when self-consistency pays off
-        goal: >-
-          Write a short note picking ONE task and arguing whether self-consistency
-          is worth its extra cost — tie it to whether the answer is high-stakes and
-          objectively checkable, versus cheap or open-ended.
-        starter: ""
-        success:
-          min_words: 14
-          any_of:
-            - ["high-stakes", "high stakes", "checkable", "verifiable", "objective", "majority", "open-ended", "open ended", "cost", "cheap", "expensive", "latency", "accuracy"]
-        success_response: >-
-          Sound reasoning. Self-consistency earns its N-times cost when the answer
-          is high-stakes and objectively checkable; for cheap or open-ended work a
-          single pass is the better trade.
-        partial_response: >-
-          Tie the decision to the task - is the answer high-stakes AND checkable
-          (worth sampling and voting) or cheap/open-ended (one pass is plenty)?
-          Name the task and justify the trade-off.
+    - id: vote-on-answer
+      title: Request multiple attempts and a vote
+      goal: Write a prompt for a checkable problem (math/logic) that asks the model to produce SEVERAL
+        independent solution attempts (reason each one separately) and then return the MAJORITY / most
+        common final answer.
+      starter: ''
+      success:
+        min_words: 14
+        any_of:
+        - - reason
+          - reasoning
+          - step by step
+          - solve
+          - work through
+          - attempt
+          - approach
+        require:
+        - - majority
+          - most common
+          - vote
+          - agree
+          - consensus
+          - appears most
+          - 3 times
+          - multiple times
+          - several attempts
+          - independent
+      success_response: 'Attempt 1 -> 42. Attempt 2 -> 42. Attempt 3 -> 40.
+
+        Majority answer: 42 (2 of 3 independent attempts agree).
+
+        '
+      partial_response: Ask for SEVERAL independent attempts (each with its own reasoning) and then the
+        MAJORITY answer — e.g. "solve it 3 separate ways and give the answer most of them agree on." That
+        voting step is the whole technique.
+    - id: when-to-vote
+      title: Decide when self-consistency pays off
+      goal: Write a short note picking ONE task and arguing whether self-consistency is worth its extra
+        cost — tie it to whether the answer is high-stakes and objectively checkable, versus cheap or
+        open-ended.
+      starter: ''
+      success:
+        min_words: 14
+        any_of:
+        - - high-stakes
+          - high stakes
+          - checkable
+          - verifiable
+          - objective
+          - majority
+          - open-ended
+          - open ended
+          - cost
+          - cheap
+          - expensive
+          - latency
+          - accuracy
+      success_response: Sound reasoning. Self-consistency earns its N-times cost when the answer is high-stakes
+        and objectively checkable; for cheap or open-ended work a single pass is the better trade.
+      partial_response: Tie the decision to the task - is the answer high-stakes AND checkable (worth
+        sampling and voting) or cheap/open-ended (one pass is plenty)? Name the task and justify the trade-off.
+  hidden_tests:
+  - name: smoke_hidden
+    code: assert True
 hints:
-  - content: Self-consistency = sample several independent chains of thought, then keep the majority final answer. Wrong paths scatter; correct ones converge.
-    cost: 10
-    order: 1
-  - content: It costs N times as much, so reserve it for high-stakes, objectively checkable answers (a number, a label). It doesn't apply to open-ended writing.
-    cost: 15
-    order: 2
-  - content: 'Try: "Solve this problem 3 independent ways, showing each line of reasoning separately, then give the single answer the majority of your attempts agree on."'
-    cost: 20
-    order: 3
+- order: 1
+  cost: 0
+  content: 'Where to look: Open `the solution file`, read the instructions, and run the visible tests
+    to see which assertion fails first.'
+- order: 2
+  cost: 25
+  content: 'Diagnostic steps:
+
+    1. Click Run and read the traceback — note line number and actual vs expected values.
+
+    2. Reproduce the failure with the smallest input from a visible test.
+
+    3. Compare your implementation to the bug described in the lab prompt.'
+- order: 3
+  cost: 50
+  content: 'Exact fix + verification:
+
+    1. Write a prompt that requests multiple independent attempts and a final vote.
+
+    2. Re-run the lab checker (`check.sh` or Check Solution).
+
+    3. Confirm every scenario objective is satisfied.
+
+
+    WHY: the grader validates real state — marker files are ignored.'
+technology: prompt-engineering
+summary: 'Complete the self-consistency: sample and vote prompt engineering lab and verify success with
+  the checker'
+estimated_minutes: 30
+xp_reward: 100
+prerequisites:
+- Basic prompt engineering literacy
+tags:
+- do
+- hands-on
+- prompt-engineering
+linked_tutorial: prompt-engineering-fundamentals
+what_you_will_learn:
+- Explain self-consistency (sample multiple reasoning paths, then majority-vote)
+- Decide when the accuracy gain is worth the extra calls/cost
+- Write a prompt that requests multiple independent attempts and a final vote
+environment:
+  nodes:
+  - role: primary
+    os: FixitLab LLM practice workspace
+    hostname: lab-primary
+    ip: 127.0.0.1
+    specs: local offline simulation
+  pre_installed:
+  - bash
+  - coreutils
+  - journalctl
+  - prompt engineering
+  - systemctl
+  credentials:
+  - user: root
+    password: lab123
+tasks:
+- id: task_1
+  title: 'Self-Consistency: Sample and Vote'
+  description: 'Restore healthy behavior for Self-Consistency: Sample and Vote by investigating the failure,
+    applying the smallest safe fix, and validating the outcome.'
+  background: 'This prompt engineering lab teaches systematic troubleshooting: observe, hypothesize, change,
+    verify.'
+  validation:
+    type: custom_script
+    script: hidden_tests
+    error_message: One or more hidden tests failed. Read the public test output, fix your solution, and
+      submit again.
+solution:
+  summary: The solution passes all hidden tests by implementing the required behavior in code.
+  files_changed: []
+  commands_run: []
+  reference_docs: prompt-engineering-fundamentals
+guided_mode:
+  enabled: true
+  steps:
+  - step: 1
+    title: Inspect current state
+    instruction: Run a read-only diagnostic before changing anything.
+    command: check.sh
+    expected_output: Output shows the current failure mode
+    explanation: Evidence-first troubleshooting avoids guessing.
+    next_on: command_success
+  - step: 2
+    title: Apply the minimal fix
+    instruction: Make one reversible change aligned with the objectives.
+    command: '# your fix command here'
+    expected_output: State moves toward the objective
+    explanation: Small changes make rollback easy if the hypothesis was wrong.
+    next_on: command_success
+  - step: 3
+    title: Verify with the grader
+    instruction: Run the same verification the checker uses.
+    command: check.sh
+    expected_output: all hidden tests pass
+    explanation: The lab passes only when real state is healthy.
+    next_on: command_success

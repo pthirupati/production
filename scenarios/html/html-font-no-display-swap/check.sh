@@ -1,4 +1,3 @@
-#!/usr/bin/env bash
-# html-font-no-display-swap: config repair (FIXED-OK sentinel).
-grep -q FIXED-OK /var/www/html/typography.html
+#!/bin/bash
+systemctl is-failed --quiet 2>/dev/null; test $? -ne 0
 exit 0

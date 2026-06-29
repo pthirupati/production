@@ -1,10 +1,30 @@
 title: Circular Import Error
 slug: sim-python-circular-import
-category: Python Development
+category: Fix
 difficulty: medium
-description: 'A Python application fails to start with "ImportError: cannot import name X from partially
-  initialized module ... (most likely due to a circular import)". Two modules import each other at top
-  level, so neither finishes initializing. Break the cycle so the app imports cleanly.'
+description: 'CONTEXT: A team operating Python development needs you to resolve `Circular Import Error`
+  during a realistic incident. The business impact is reduced service reliability until the underlying
+  state is repaired.
+
+
+  ENVIRONMENT: You are working in FixitLab''s offline Python project workspace with source files, venv,
+  tests, and CLI entrypoints. All tools run locally; no paid APIs or external cloud calls are required.
+
+
+  SYMPTOM / STARTING STATE: Python project. Two modules import each other at module load time, producing
+  an ImportError about a partially initialized module the moment the app is imported/run. A Python application
+  fails to start with "ImportError: cannot import name X from partially initialized module ... (most likely
+  due to a circular import)". Two modules import each other at top level, so neither finishes initializing.
+  Break the cycle so the app imports cleanly.
+
+
+  OBJECTIVE: Reproduce the ImportError and read which modules form the cycle; Locate the mutual top-level
+  imports causing the circular dependency; Break the cycle and confirm the app imports/runs cleanly. Success
+  means `check.sh` exits successfully.
+
+
+  WHAT TO AVOID: Do not apply broad destructive changes, skip evidence gathering, or fake completion with
+  marker files — the checker validates real system state.'
 initial_state: Python project. Two modules import each other at module load time, producing an ImportError
   about a partially initialized module the moment the app is imported/run.
 lab_mode: simulation
@@ -21,14 +41,71 @@ objectives:
 - Break the cycle and confirm the app imports/runs cleanly
 hints:
 - order: 1
-  cost: 10
-  content: Run the entrypoint (`python app.py`) and read the traceback bottom-up — it names both modules
-    and says "partially initialized module ... circular import".
+  cost: 0
+  content: 'Where to look: Reproduce the ImportError and read which modules form the cycle'
 - order: 2
-  cost: 15
-  content: Open the two modules; each has a top-level `from other import ...`. The cycle resolves by removing
-    one side's load-time dependency.
+  cost: 25
+  content: 'Diagnostic steps:
+
+    1. Locate the mutual top-level imports causing the circular dependency
+
+    2. Break the cycle and confirm the app imports/runs cleanly'
 - order: 3
-  cost: 20
-  content: Fix it by moving one import inside the function that uses it (deferred import), or extract
-    the shared symbol into a third module both import. Re-run — the ImportError is gone.
+  cost: 50
+  content: 'Exact fix + verification:
+
+    1. Break the cycle and confirm the app imports/runs cleanly.
+
+    2. Re-run the lab checker (`check.sh` or Check Solution).
+
+    3. Confirm every scenario objective is satisfied.
+
+
+    WHY: the grader validates real state — marker files are ignored.'
+technology: python
+summary: Complete the circular import error python lab and verify success with the checker
+estimated_minutes: 15
+xp_reward: 100
+prerequisites:
+- Basic python literacy
+tags:
+- fix
+- hands-on
+- python
+linked_tutorial: python-fundamentals
+what_you_will_learn:
+- Reproduce the ImportError and read which modules form the cycle
+- Locate the mutual top-level imports causing the circular dependency
+- Break the cycle and confirm the app imports/runs cleanly
+environment:
+  nodes:
+  - role: primary
+    os: FixitLab Python project workspace
+    hostname: lab-primary
+    ip: 127.0.0.1
+    specs: local offline simulation
+  pre_installed:
+  - bash
+  - coreutils
+  - pip
+  - python
+  - python3
+  credentials:
+  - user: root
+    password: lab123
+tasks:
+- id: task_1
+  title: Circular Import Error
+  description: Restore healthy behavior for Circular Import Error by investigating the failure, applying
+    the smallest safe fix, and validating the outcome.
+  background: 'This python lab teaches systematic troubleshooting: observe, hypothesize, change, verify.'
+  validation:
+    type: custom_script
+    script: check.sh
+    error_message: Validation did not pass. Re-read the objectives and Hint 2 diagnostic steps.
+solution:
+  summary: Identify the misconfiguration affecting this python lab and apply the minimal fix.
+  files_changed: []
+  commands_run:
+  - bash check.sh
+  reference_docs: python-fundamentals

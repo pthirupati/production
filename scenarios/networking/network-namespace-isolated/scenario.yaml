@@ -1,39 +1,132 @@
 slug: network-namespace-isolated
-title: "Container Network Namespace Isolated — Fix veth Pair"
-technology: Networking
-category: Network Namespaces
+title: Container Network Namespace Isolated — Fix veth Pair
+technology: networking
+category: Fix
 difficulty: hard
 time_limit: 1200
 max_score: 100
 infrastructure_type: docker
 jira_priority: High
 is_free: false
-description: |
-  A containerized application is running in its own network namespace but cannot
-  communicate with the host or external network. The veth pair that should connect
-  the container's namespace to the host bridge was created but one end is in the
-  wrong namespace and the bridge attachment is missing. The container process is
-  running but all network calls fail with ENETUNREACH.
-objectives:
-  - Identify the misconfigured veth pair and network namespace
-  - Move the correct veth end into the container's network namespace
-  - Attach the host-side veth to the bridge
-  - Configure IP addressing and verify connectivity
-initial_state: |
-  Network namespace `container-ns` exists. veth pair `veth0`/`veth1` created but
+description: 'CONTEXT: A team operating network operations needs you to resolve `Container Network Namespace
+  Isolated — Fix veth Pair` during a realistic incident. The business impact is reduced service reliability
+  until the underlying state is repaired.
+
+
+  ENVIRONMENT: You are working in FixitLab''s offline network lab with interfaces, routing tables, DNS,
+  and firewall rules. All tools run locally; no paid APIs or external cloud calls are required.
+
+
+  SYMPTOM / STARTING STATE: Network namespace `container-ns` exists. veth pair `veth0`/`veth1` created
+  but
+
   both ends are in the root namespace. Bridge `br0` exists. Container process
+
   (pid stored in /var/run/app.pid) is running in container-ns. No IP addresses
+
+  assigned to veth interfaces. A containerized application is running in its own network namespace but
+  cannot
+
+  communicate with the host or external network. The veth pair that should connect
+
+  the container''s namespace to the host bridge was created but one end is in the
+
+  wrong namespace and the bridge attachment is missing. The container process is
+
+  running but all network calls fail with ENETUNREACH.
+
+
+  OBJECTIVE: Identify the misconfigured veth pair and network namespace; Move the correct veth end into
+  the container''s network namespace; Attach the host-side veth to the bridge. Success means `check.sh`
+  exits successfully.
+
+
+  WHAT TO AVOID: Do not apply broad destructive changes, skip evidence gathering, or fake completion with
+  marker files — the checker validates real system state.'
+objectives:
+- Identify the misconfigured veth pair and network namespace
+- Move the correct veth end into the container's network namespace
+- Attach the host-side veth to the bridge
+- Configure IP addressing and verify connectivity
+initial_state: 'Network namespace `container-ns` exists. veth pair `veth0`/`veth1` created but
+
+  both ends are in the root namespace. Bridge `br0` exists. Container process
+
+  (pid stored in /var/run/app.pid) is running in container-ns. No IP addresses
+
   assigned to veth interfaces.
+
+  '
 hints:
-  - order: 1
-    cost: 10
-    content: "`ip netns list` shows existing namespaces. `ip link show` lists all veth interfaces."
-  - order: 2
-    cost: 20
-    content: "Move veth1 into namespace: `ip link set veth1 netns container-ns`"
-  - order: 3
-    cost: 20
-    content: "Attach host side to bridge: `ip link set veth0 master br0 up`"
-  - order: 4
-    cost: 20
-    content: "Configure IP in namespace: `ip netns exec container-ns ip addr add 172.16.0.2/24 dev veth1` and `ip netns exec container-ns ip link set veth1 up`"
+- order: 1
+  cost: 0
+  content: 'Where to look: Run `docker ps -a` and `docker logs <container>` for the failing container.'
+- order: 2
+  cost: 25
+  content: 'Diagnostic steps:
+
+    1. `docker ps -a` — note Exited status and exit code.
+
+    2. `docker logs <name>` for the startup error.
+
+    3. Inspect the Dockerfile or `docker run` flags if the image is wrong.'
+- order: 3
+  cost: 50
+  content: 'Exact fix + verification:
+
+    1. Fix image, port mapping, volume, or env configuration.
+
+    2. `docker start <name>` or re-run with corrected flags.
+
+    3. Confirm `bash check.sh` shows the container Up.
+
+
+    WHY: the checker validates the container is actually running.'
+summary: Complete the container network namespace isolated — fix veth pair networking lab and verify success
+  with the checker
+estimated_minutes: 20
+xp_reward: 100
+prerequisites:
+- Basic networking literacy
+tags:
+- fix
+- hands-on
+- networking
+linked_tutorial: networking-fundamentals
+what_you_will_learn:
+- Identify the misconfigured veth pair and network namespace
+- Move the correct veth end into the container's network namespace
+- Attach the host-side veth to the bridge
+- Configure IP addressing and verify connectivity
+environment:
+  nodes:
+  - role: primary
+    os: FixitLab network lab
+    hostname: lab-primary
+    ip: 127.0.0.1
+    specs: local offline simulation
+  pre_installed:
+  - bash
+  - coreutils
+  - journalctl
+  - networking
+  - systemctl
+  credentials:
+  - user: root
+    password: lab123
+tasks:
+- id: task_1
+  title: Container Network Namespace Isolated — Fix veth Pair
+  description: Restore healthy behavior for Container Network Namespace Isolated — Fix veth Pair by investigating
+    the failure, applying the smallest safe fix, and validating the outcome.
+  background: 'This networking lab teaches systematic troubleshooting: observe, hypothesize, change, verify.'
+  validation:
+    type: custom_script
+    script: check.sh
+    error_message: Validation did not pass. Re-read the objectives and Hint 2 diagnostic steps.
+solution:
+  summary: Identify the misconfiguration affecting this networking lab and apply the minimal fix.
+  files_changed: []
+  commands_run:
+  - bash check.sh
+  reference_docs: networking-fundamentals

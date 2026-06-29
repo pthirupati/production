@@ -1,9 +1,26 @@
 title: Implement the Luhn Checksum
 slug: js-impl-validate-credit-card
-category: JavaScript Development
-description: 'Implement luhnValid(digits): given a string of digits, return true if it passes the Luhn
-  checksum (used for credit-card numbers). The stub is empty so tests fail. Non-digit characters should
-  make it false.'
+category: Build
+description: 'CONTEXT: A team operating JavaScript needs you to resolve `Implement the Luhn Checksum`
+  during a realistic incident. The business impact is reduced service reliability until the underlying
+  state is repaired.
+
+
+  ENVIRONMENT: You are working in FixitLab''s offline JavaScript practice project with modules, browser
+  console, and Node tooling. All tools run locally; no paid APIs or external cloud calls are required.
+
+
+  SYMPTOM / STARTING STATE: Implement luhnValid(digits): given a string of digits, return true if it passes
+  the Luhn checksum (used for credit-card numbers). The stub is empty so tests fail. Non-digit characters
+  should make it false.
+
+
+  OBJECTIVE: Double every second digit from the right; Subtract 9 from doubled values over 9; Return true
+  only when the total is a multiple of 10. Success means all hidden tests pass.
+
+
+  WHAT TO AVOID: Do not apply broad destructive changes, skip evidence gathering, or fake completion with
+  marker files — the checker validates real system state.'
 difficulty: medium
 scenario_type: do
 lab_mode: simulation
@@ -21,51 +38,143 @@ objectives:
 initial_state: 'Implement luhnValid(digits): given a string of digits, return true if it passes the Luhn
   checksum (used for credit-card numbers). The stub is empty so tests fail. Non-digit characters should
   make it false.'
-solution_explanation: |
-  The Luhn algorithm doubles alternate digits from the right (subtracting 9 when over 9) and checks the total modulo 10; non-digit input is rejected.
+solution_explanation: 'The Luhn algorithm doubles alternate digits from the right (subtracting 9 when
+  over 9) and checks the total modulo 10; non-digit input is rejected.
+
+  '
 coding_spec:
   language: javascript
   entrypoint: solution.js
   kind: impl
-  instructions: |
-    Implement luhnValid(digits) -> boolean (Luhn algorithm). Reject strings with any non-digit.
-      luhnValid('4539148803436467') -> true
-    Click Run to try it, then Check Solution to grade against all tests.
+  instructions: "Implement luhnValid(digits) -> boolean (Luhn algorithm). Reject strings with any non-digit.\n\
+    \  luhnValid('4539148803436467') -> true\nClick Run to try it, then Check Solution to grade against\
+    \ all tests.\n"
   files:
   - path: solution.js
-    content: |
-      function luhnValid(digits) {
-        // TODO: return true iff digits passes the Luhn checksum
-      }
+    content: "function luhnValid(digits) {\n  // TODO: return true iff digits passes the Luhn checksum\n\
+      }\n"
     readonly: false
   visible_tests:
   - name: valid number
-    code: |
-      assert(luhnValid('4539148803436467') === true);
+    code: 'assert(luhnValid(''4539148803436467'') === true);
+
+      '
   - name: invalid number
-    code: |
-      assert(luhnValid('1234567812345678') === false);
+    code: 'assert(luhnValid(''1234567812345678'') === false);
+
+      '
   hidden_tests:
   - name: simple valid
-    code: |
-      assert(luhnValid('79927398713') === true);
+    code: 'assert(luhnValid(''79927398713'') === true);
+
+      '
   - name: off by one invalid
-    code: |
-      assert(luhnValid('79927398710') === false);
+    code: 'assert(luhnValid(''79927398710'') === false);
+
+      '
   - name: non-digit rejected
-    code: |
-      assert(luhnValid('1234a') === false);
+    code: 'assert(luhnValid(''1234a'') === false);
+
+      '
   - name: empty rejected
-    code: |
-      assert(luhnValid('') === false);
+    code: 'assert(luhnValid('''') === false);
+
+      '
   timeout: 8
 hints:
 - order: 1
-  cost: 10
-  content: Walk the digits from right to left, doubling every second one.
+  cost: 0
+  content: 'Where to look: Open `solution.js`, read the instructions, and run the visible tests to see
+    which assertion fails first.'
 - order: 2
-  cost: 20
-  content: If a doubled digit exceeds 9, subtract 9.
+  cost: 25
+  content: 'Diagnostic steps:
+
+    1. Click Run and read the traceback — note line number and actual vs expected values.
+
+    2. Reproduce the failure with the smallest input from a visible test.
+
+    3. Compare your implementation to the bug described in the lab prompt.'
 - order: 3
-  cost: 30
-  content: The number is valid iff the summed total is divisible by 10. Reject non-digits first.
+  cost: 50
+  content: 'Exact fix + verification:
+
+    1. Return true only when the total is a multiple of 10.
+
+    2. Re-run the lab checker (`check.sh` or Check Solution).
+
+    3. Confirm every scenario objective is satisfied.
+
+
+    WHY: the grader validates real state — marker files are ignored.'
+technology: javascript
+summary: Complete the implement the luhn checksum javascript lab and verify success with the checker
+estimated_minutes: 25
+xp_reward: 100
+prerequisites:
+- Basic javascript literacy
+tags:
+- do
+- hands-on
+- javascript
+linked_tutorial: javascript-fundamentals
+what_you_will_learn:
+- Double every second digit from the right
+- Subtract 9 from doubled values over 9
+- Return true only when the total is a multiple of 10
+environment:
+  nodes:
+  - role: primary
+    os: FixitLab JavaScript practice project
+    hostname: lab-primary
+    ip: 127.0.0.1
+    specs: local offline simulation
+  pre_installed:
+  - bash
+  - coreutils
+  - javascript
+  - journalctl
+  - systemctl
+  credentials:
+  - user: root
+    password: lab123
+tasks:
+- id: task_1
+  title: Implement the Luhn Checksum
+  description: Restore healthy behavior for Implement the Luhn Checksum by investigating the failure,
+    applying the smallest safe fix, and validating the outcome.
+  background: 'This javascript lab teaches systematic troubleshooting: observe, hypothesize, change, verify.'
+  validation:
+    type: custom_script
+    script: hidden_tests
+    error_message: One or more hidden tests failed. Read the public test output, fix your solution, and
+      submit again.
+solution:
+  summary: The solution passes all hidden tests by implementing the required behavior in code.
+  files_changed: []
+  commands_run: []
+  reference_docs: javascript-fundamentals
+guided_mode:
+  enabled: true
+  steps:
+  - step: 1
+    title: Inspect current state
+    instruction: Run a read-only diagnostic before changing anything.
+    command: check.sh
+    expected_output: Output shows the current failure mode
+    explanation: Evidence-first troubleshooting avoids guessing.
+    next_on: command_success
+  - step: 2
+    title: Apply the minimal fix
+    instruction: Make one reversible change aligned with the objectives.
+    command: '# your fix command here'
+    expected_output: State moves toward the objective
+    explanation: Small changes make rollback easy if the hypothesis was wrong.
+    next_on: command_success
+  - step: 3
+    title: Verify with the grader
+    instruction: Run the same verification the checker uses.
+    command: check.sh
+    expected_output: all hidden tests pass
+    explanation: The lab passes only when real state is healthy.
+    next_on: command_success

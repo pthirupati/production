@@ -1,28 +1,111 @@
 title: Auto Scaling Group Not Triggering
 slug: aws-autoscaling-not-triggering
 difficulty: medium
-category: AWS
-description: 'An Auto Scaling group is not launching new instances despite CPU utilization spiking above the target threshold. The CloudWatch alarm exists but never transitions to ALARM state, leaving the application under-provisioned during peak load.'
-initial_state: 'Simulated AWS environment with an Auto Scaling group, a CloudWatch alarm, and EC2 instances. The alarm metric namespace or dimension is misconfigured, preventing it from detecting high CPU and triggering scale-out.'
+category: Fix
+description: 'CONTEXT: A team operating Terraform IaC needs you to resolve `Auto Scaling Group Not Triggering`
+  during a realistic incident. The business impact is reduced service reliability until the underlying
+  state is repaired.
+
+
+  ENVIRONMENT: You are working in FixitLab''s offline Terraform workspace with HCL files, state, and plan/apply
+  workflow. All tools run locally; no paid APIs or external cloud calls are required.
+
+
+  SYMPTOM / STARTING STATE: Simulated AWS environment with an Auto Scaling group, a CloudWatch alarm,
+  and EC2 instances. The alarm metric namespace or dimension is misconfigured, preventing it from detecting
+  high CPU and triggering scale-out. An Auto Scaling group is not launching new instances despite CPU
+  utilization spiking above the target threshold. The CloudWatch alarm exists but never transitions to
+  ALARM state, leaving the application under-provisioned during peak load.
+
+
+  OBJECTIVE: Inspect the CloudWatch alarm configuration and identify why it never enters ALARM state;
+  Fix the alarm metric namespace, dimension, or threshold so it correctly monitors ASG CPU utilization;
+  Verify the Auto Scaling policy is linked to the corrected alarm. Success means `check.sh` exits successfully.
+
+
+  WHAT TO AVOID: Do not apply broad destructive changes, skip evidence gathering, or fake completion with
+  marker files — the checker validates real system state.'
+initial_state: Simulated AWS environment with an Auto Scaling group, a CloudWatch alarm, and EC2 instances.
+  The alarm metric namespace or dimension is misconfigured, preventing it from detecting high CPU and
+  triggering scale-out.
 objectives:
-  - Inspect the CloudWatch alarm configuration and identify why it never enters ALARM state
-  - Fix the alarm metric namespace, dimension, or threshold so it correctly monitors ASG CPU utilization
-  - Verify the Auto Scaling policy is linked to the corrected alarm
+- Inspect the CloudWatch alarm configuration and identify why it never enters ALARM state
+- Fix the alarm metric namespace, dimension, or threshold so it correctly monitors ASG CPU utilization
+- Verify the Auto Scaling policy is linked to the corrected alarm
 lab_mode: simulation
 simulation_type: aws
 time_limit: 1800
 max_score: 100
 is_free: false
 hints:
-  - content: 'Run: aws cloudwatch describe-alarms --alarm-names <alarm-name> and check the Namespace and Dimensions fields match your ASG.'
-    cost: 10
-    order: 1
-  - content: 'The Namespace for ASG CPU should be AWS/EC2, and the Dimension should be AutoScalingGroupName, not InstanceId.'
-    cost: 15
-    order: 2
-  - content: 'Use aws autoscaling describe-policies to confirm the scaling policy ARN is attached to the corrected alarm.'
-    cost: 20
-    order: 3
+- order: 1
+  cost: 0
+  content: 'Where to look: Inspect the CloudWatch alarm configuration and identify why it never enters
+    ALARM state'
+- order: 2
+  cost: 25
+  content: 'Diagnostic steps:
+
+    1. Fix the alarm metric namespace, dimension, or threshold so it correctly monitors ASG CPU utilization
+
+    2. Verify the Auto Scaling policy is linked to the corrected alarm'
+- order: 3
+  cost: 50
+  content: 'Exact fix + verification:
+
+    1. Verify the Auto Scaling policy is linked to the corrected alarm.
+
+    2. Re-run the lab checker (`check.sh` or Check Solution).
+
+    3. Confirm every scenario objective is satisfied.
+
+
+    WHY: the grader validates real state — marker files are ignored.'
 requires_companion_hosts: false
 dual_terminal: false
 jira_priority: Medium
+technology: terraform
+summary: Complete the auto scaling group not triggering terraform lab and verify success with the checker
+estimated_minutes: 30
+xp_reward: 100
+prerequisites:
+- Basic terraform literacy
+tags:
+- fix
+- hands-on
+- terraform
+linked_tutorial: terraform-fundamentals
+what_you_will_learn:
+- Inspect the CloudWatch alarm configuration and identify why it never enters ALARM state
+- Fix the alarm metric namespace, dimension, or threshold so it correctly monitors ASG CPU utilization
+- Verify the Auto Scaling policy is linked to the corrected alarm
+environment:
+  nodes:
+  - role: primary
+    os: FixitLab Terraform workspace
+    hostname: lab-primary
+    ip: 127.0.0.1
+    specs: local offline simulation
+  pre_installed:
+  - bash
+  - coreutils
+  - terraform
+  credentials:
+  - user: root
+    password: lab123
+tasks:
+- id: task_1
+  title: Auto Scaling Group Not Triggering
+  description: Restore healthy behavior for Auto Scaling Group Not Triggering by investigating the failure,
+    applying the smallest safe fix, and validating the outcome.
+  background: 'This terraform lab teaches systematic troubleshooting: observe, hypothesize, change, verify.'
+  validation:
+    type: custom_script
+    script: check.sh
+    error_message: Validation did not pass. Re-read the objectives and Hint 2 diagnostic steps.
+solution:
+  summary: Identify the misconfiguration affecting this terraform lab and apply the minimal fix.
+  files_changed: []
+  commands_run:
+  - bash check.sh
+  reference_docs: terraform-fundamentals

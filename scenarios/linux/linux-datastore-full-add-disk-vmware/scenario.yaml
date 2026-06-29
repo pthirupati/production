@@ -1,24 +1,55 @@
-title: Datastore Full — Add Capacity in VMware and Extend the Data Volume
+title: Datastore Full - Add Capacity in VMware and Extend the Data
 slug: linux-datastore-full-add-disk-vmware
 difficulty: medium
-category: Linux Administration
-description: |
-  web-prod-01 has run out of space on its data volume (mounted at /data, used by
-  /var/lib/docker), and the underlying datastore has no free room for the existing
-  disk to grow. This is a CROSS-TECHNOLOGY task: add a NEW virtual disk to the VM in
-  the vCenter simulator, rescan the SCSI bus in the terminal so /dev/sdc appears,
-  then add it to the vgdata volume group and extend the lvdata logical volume to
-  reclaim space for the application.
-initial_state: |
-  Simulated RHEL 9 server (web-prod-01), also present in the vCenter simulator. /data
+category: Fix
+description: 'CONTEXT: A team operating Linux administration needs you to resolve `Datastore Full - Add
+  Capacity in VMware and Extend the Data` during a realistic incident. The business impact is reduced
+  service reliability until the underlying state is repaired.
+
+
+  ENVIRONMENT: You are working in FixitLab''s offline Linux practice server with terminal and config files
+  under /etc and /var. All tools run locally; no paid APIs or external cloud calls are required.
+
+
+  SYMPTOM / STARTING STATE: Simulated RHEL 9 server (web-prod-01), also present in the vCenter simulator.
+  /data
+
   is a full XFS filesystem on /dev/mapper/vgdata-lvdata; vgdata has 0 free extents and
+
+  no spare disk is attached. /var/lib/docker lives on /data. web-prod-01 has run out of space on its data
+  volume (mounted at /data, used by
+
+  /var/lib/docker), and the underlying datastore has no free room for the existing
+
+  disk to grow. This is a CROSS-TECHNOLOGY task: add a NEW virtual disk to the VM in
+
+  the vCenter simulator, rescan the SCSI bus in the terminal so /dev/sdc appears,
+
+  then add it to the vgdata volume group and extend the lvdata logical volume to
+
+  reclaim space for the application.
+
+
+  OBJECTIVE: Open the VMware simulator (toolbar link) and add a new Hard Disk to web-prod-01; Rescan the
+  SCSI bus in the terminal so /dev/sdc is discovered; Add the disk to LVM (pvcreate /dev/sdc; vgextend
+  vgdata /dev/sdc). Success means `check.sh` exits successfully.
+
+
+  WHAT TO AVOID: Do not apply broad destructive changes, skip evidence gathering, or fake completion with
+  marker files — the checker validates real system state.'
+initial_state: 'Simulated RHEL 9 server (web-prod-01), also present in the vCenter simulator. /data
+
+  is a full XFS filesystem on /dev/mapper/vgdata-lvdata; vgdata has 0 free extents and
+
   no spare disk is attached. /var/lib/docker lives on /data.
+
+  '
 objectives:
-  - Open the VMware simulator (toolbar link) and add a new Hard Disk to web-prod-01
-  - Rescan the SCSI bus in the terminal so /dev/sdc is discovered
-  - Add the disk to LVM (pvcreate /dev/sdc; vgextend vgdata /dev/sdc)
-  - Extend the data LV and filesystem (lvextend -r -l +100%FREE /dev/vgdata/lvdata)
-  - Verify /data has free space again with df -h
+- Open the VMware simulator (toolbar link) and add a new Hard Disk to web-prod-01
+- Rescan the SCSI bus in the terminal so /dev/sdc is discovered
+- Add the disk to LVM (pvcreate /dev/sdc; vgextend vgdata /dev/sdc)
+- Extend the data LV and filesystem (lvextend -r -l +100%FREE /dev/vgdata/lvdata)
+- Verify /data has free space again with df -h
 lab_mode: simulation
 simulation_type: generic
 cross_technology: true
@@ -27,15 +58,80 @@ time_limit: 1200
 max_score: 100
 is_free: false
 hints:
-  - content: 'The datastore/volume is full and cannot grow in place. Open the VMware simulator (toolbar) and add a Hard Disk to web-prod-01.'
-    cost: 10
-    order: 1
-  - content: 'Reveal the new disk with a SCSI rescan: echo "- - -" > /sys/class/scsi_host/host0/scan (or rescan-scsi-bus.sh), then lsblk.'
-    cost: 15
-    order: 2
-  - content: 'pvcreate /dev/sdc; vgextend vgdata /dev/sdc; then lvextend -r -l +100%FREE /dev/vgdata/lvdata. Confirm with df -h /data.'
-    cost: 20
-    order: 3
+- order: 1
+  cost: 0
+  content: 'Where to look: Run `docker ps -a` and `docker logs <container>` for the failing container.'
+- order: 2
+  cost: 25
+  content: 'Diagnostic steps:
+
+    1. `docker ps -a` — note Exited status and exit code.
+
+    2. `docker logs <name>` for the startup error.
+
+    3. Inspect the Dockerfile or `docker run` flags if the image is wrong.'
+- order: 3
+  cost: 50
+  content: 'Exact fix + verification:
+
+    1. Fix image, port mapping, volume, or env configuration.
+
+    2. `docker start <name>` or re-run with corrected flags.
+
+    3. Confirm `bash check.sh` shows the container Up.
+
+
+    WHY: the checker validates the container is actually running.'
 requires_companion_hosts: false
 dual_terminal: false
 jira_priority: High
+technology: linux
+summary: Complete the datastore full - add capacity in vmware and extend the data linux lab and verify
+  success with the checker
+estimated_minutes: 20
+xp_reward: 100
+prerequisites:
+- Basic linux literacy
+tags:
+- fix
+- hands-on
+- linux
+linked_tutorial: linux-fundamentals
+what_you_will_learn:
+- Open the VMware simulator (toolbar link) and add a new Hard Disk to web-prod-01
+- Rescan the SCSI bus in the terminal so /dev/sdc is discovered
+- Add the disk to LVM (pvcreate /dev/sdc; vgextend vgdata /dev/sdc)
+- Extend the data LV and filesystem (lvextend -r -l +100%FREE /dev/vgdata/lvdata)
+- Verify /data has free space again with df -h
+environment:
+  nodes:
+  - role: primary
+    os: FixitLab Linux practice server
+    hostname: lab-primary
+    ip: 127.0.0.1
+    specs: local offline simulation
+  pre_installed:
+  - bash
+  - coreutils
+  - journalctl
+  - linux
+  - systemctl
+  credentials:
+  - user: root
+    password: lab123
+tasks:
+- id: task_1
+  title: Datastore Full - Add Capacity in VMware and Extend the Data
+  description: Restore healthy behavior for Datastore Full - Add Capacity in VMware and Extend the Data
+    by investigating the failure, applying the smallest safe fix, and validating the outcome.
+  background: 'This linux lab teaches systematic troubleshooting: observe, hypothesize, change, verify.'
+  validation:
+    type: custom_script
+    script: check.sh
+    error_message: Validation did not pass. Re-read the objectives and Hint 2 diagnostic steps.
+solution:
+  summary: Identify the misconfiguration affecting this linux lab and apply the minimal fix.
+  files_changed: []
+  commands_run:
+  - bash check.sh
+  reference_docs: linux-fundamentals

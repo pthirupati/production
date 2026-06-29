@@ -2,8 +2,8 @@ title: Account Locked After Failed Logins
 slug: account-locked-faillock
 lab_mode: simulation
 simulation_type: generic
-technology: Linux
-category: Authentication
+technology: linux
+category: Fix
 difficulty: medium
 time_limit: 900
 max_score: 100
@@ -11,10 +11,30 @@ infrastructure_type: docker
 docker_privileged: true
 jira_priority: Medium
 topics_covered: Q33 faillock — faillock --user --reset
-description: The 'lockeduser' account has been locked out after too many failed login attempts — pam_faillock
-  has tripped its deny threshold (and/or the account was manually locked with passwd -l), so even correct
-  credentials are rejected. Confirm the lock, reset the failed-attempt counter, unlock the account, and
-  verify the user can authenticate again.
+description: 'CONTEXT: A team operating Linux administration needs you to resolve `Account Locked After
+  Failed Logins` during a realistic incident. The business impact is reduced service reliability until
+  the underlying state is repaired.
+
+
+  ENVIRONMENT: You are working in FixitLab''s offline Linux practice server with terminal and config files
+  under /etc and /var. All tools run locally; no paid APIs or external cloud calls are required.
+
+
+  SYMPTOM / STARTING STATE: Linux server with pam_faillock enforced. The ''lockeduser'' account is locked
+  after repeated failed logins; authentication attempts are denied even with the right password. The ''lockeduser''
+  account has been locked out after too many failed login attempts — pam_faillock has tripped its deny
+  threshold (and/or the account was manually locked with passwd -l), so even correct credentials are rejected.
+  Confirm the lock, reset the failed-attempt counter, unlock the account, and verify the user can authenticate
+  again.
+
+
+  OBJECTIVE: Confirm the account is locked (faillock / passwd -S); Reset the failed-login counter and
+  unlock the account; Verify lockeduser can authenticate successfully again. Success means `check.sh`
+  exits successfully.
+
+
+  WHAT TO AVOID: Do not apply broad destructive changes, skip evidence gathering, or fake completion with
+  marker files — the checker validates real system state.'
 objectives:
 - Confirm the account is locked (faillock / passwd -S)
 - Reset the failed-login counter and unlock the account
@@ -23,14 +43,70 @@ initial_state: Linux server with pam_faillock enforced. The 'lockeduser' account
   failed logins; authentication attempts are denied even with the right password.
 hints:
 - order: 1
-  cost: 10
-  content: 'Check the lock state: `faillock --user lockeduser` shows the failed attempts, and `passwd
-    -S lockeduser` shows whether the password is locked (LK).'
+  cost: 0
+  content: 'Where to look: Confirm the account is locked (faillock / passwd -S)'
 - order: 2
-  cost: 15
-  content: 'Reset the faillock counter: `faillock --user lockeduser --reset`. If the password was also
-    locked with passwd -l, unlock it: `passwd -u lockeduser`.'
+  cost: 25
+  content: 'Diagnostic steps:
+
+    1. Reset the failed-login counter and unlock the account
+
+    2. Verify lockeduser can authenticate successfully again'
 - order: 3
-  cost: 20
-  content: 'Verify: `faillock --user lockeduser` now shows 0 failures and `passwd -S lockeduser` shows
-    PS (usable). The user can log in again.'
+  cost: 50
+  content: 'Exact fix + verification:
+
+    1. Verify lockeduser can authenticate successfully again.
+
+    2. Re-run the lab checker (`check.sh` or Check Solution).
+
+    3. Confirm every scenario objective is satisfied.
+
+
+    WHY: the grader validates real state — marker files are ignored.'
+summary: Complete the account locked after failed logins linux lab and verify success with the checker
+estimated_minutes: 15
+xp_reward: 100
+prerequisites:
+- Basic linux literacy
+tags:
+- fix
+- hands-on
+- linux
+linked_tutorial: linux-fundamentals
+what_you_will_learn:
+- Confirm the account is locked (faillock / passwd -S)
+- Reset the failed-login counter and unlock the account
+- Verify lockeduser can authenticate successfully again
+environment:
+  nodes:
+  - role: primary
+    os: FixitLab Linux practice server
+    hostname: lab-primary
+    ip: 127.0.0.1
+    specs: local offline simulation
+  pre_installed:
+  - bash
+  - coreutils
+  - journalctl
+  - linux
+  - systemctl
+  credentials:
+  - user: root
+    password: lab123
+tasks:
+- id: task_1
+  title: Account Locked After Failed Logins
+  description: Restore healthy behavior for Account Locked After Failed Logins by investigating the failure,
+    applying the smallest safe fix, and validating the outcome.
+  background: 'This linux lab teaches systematic troubleshooting: observe, hypothesize, change, verify.'
+  validation:
+    type: custom_script
+    script: check.sh
+    error_message: Validation did not pass. Re-read the objectives and Hint 2 diagnostic steps.
+solution:
+  summary: Identify the misconfiguration affecting this linux lab and apply the minimal fix.
+  files_changed: []
+  commands_run:
+  - bash check.sh
+  reference_docs: linux-fundamentals

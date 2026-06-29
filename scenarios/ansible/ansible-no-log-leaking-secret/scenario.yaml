@@ -1,7 +1,7 @@
 title: Ansible Task Leaking Secret in Output
 slug: ansible-no-log-leaking-secret
-technology: Ansible
-category: Security
+technology: ansible
+category: Fix
 difficulty: medium
 lab_mode: simulation
 simulation_type: generic
@@ -10,8 +10,26 @@ max_score: 100
 is_free: true
 jira_priority: High
 dual_terminal: false
-description: A task prints a secret in the run output because no_log isn't set. Add no_log and confirm
-  the task is corrected.
+description: 'CONTEXT: A team operating Ansible automation needs you to resolve `Ansible Task Leaking
+  Secret in Output` during a realistic incident. The business impact is reduced service reliability until
+  the underlying state is repaired.
+
+
+  ENVIRONMENT: You are working in FixitLab''s offline Ansible control node with inventory, playbooks,
+  roles, and ansible-playbook. All tools run locally; no paid APIs or external cloud calls are required.
+
+
+  SYMPTOM / STARTING STATE: An Ansible task handling a secret without no_log, leaking it into logs. A
+  task prints a secret in the run output because no_log isn''t set. Add no_log and confirm the task is
+  corrected.
+
+
+  OBJECTIVE: Confirm the secret is printed in output; Add no_log: true to the task; Verify the task is
+  corrected. Success means `check.sh` exits successfully.
+
+
+  WHAT TO AVOID: Do not apply broad destructive changes, skip evidence gathering, or fake completion with
+  marker files — the checker validates real system state.'
 initial_state: An Ansible task handling a secret without no_log, leaking it into logs.
 objectives:
 - Confirm the secret is printed in output
@@ -19,11 +37,70 @@ objectives:
 - Verify the task is corrected
 hints:
 - order: 1
-  cost: 10
-  content: The secret appears in stdout.
+  cost: 0
+  content: 'Where to look: Confirm the secret is printed in output'
 - order: 2
-  cost: 15
-  content: 'Set no_log: true on the sensitive task.'
+  cost: 25
+  content: 'Diagnostic steps:
+
+    1. Add no_log: true to the task
+
+    2. Verify the task is corrected'
 - order: 3
-  cost: 20
-  content: Task carries the corrected no_log.
+  cost: 50
+  content: 'Exact fix + verification:
+
+    1. Verify the task is corrected.
+
+    2. Re-run the lab checker (`check.sh` or Check Solution).
+
+    3. Confirm every scenario objective is satisfied.
+
+
+    WHY: the grader validates real state — marker files are ignored.'
+summary: Complete the ansible task leaking secret in output ansible lab and verify success with the checker
+estimated_minutes: 20
+xp_reward: 100
+prerequisites:
+- Basic ansible literacy
+tags:
+- ansible
+- fix
+- hands-on
+linked_tutorial: ansible-fundamentals
+what_you_will_learn:
+- Confirm the secret is printed in output
+- 'Add no_log: true to the task'
+- Verify the task is corrected
+environment:
+  nodes:
+  - role: primary
+    os: FixitLab Ansible control node
+    hostname: lab-primary
+    ip: 127.0.0.1
+    specs: local offline simulation
+  pre_installed:
+  - ansible
+  - ansible-playbook
+  - bash
+  - coreutils
+  credentials:
+  - user: root
+    password: lab123
+tasks:
+- id: task_1
+  title: Ansible Task Leaking Secret in Output
+  description: Restore healthy behavior for Ansible Task Leaking Secret in Output by investigating the
+    failure, applying the smallest safe fix, and validating the outcome.
+  background: 'This ansible lab teaches systematic troubleshooting: observe, hypothesize, change, verify.'
+  validation:
+    type: command_output
+    command: ansible webservers -m ping
+    expected_output: SUCCESS
+    error_message: Ansible hosts are still unreachable. Verify SSH keys and inventory.
+solution:
+  summary: Identify the misconfiguration affecting this ansible lab and apply the minimal fix.
+  files_changed: []
+  commands_run:
+  - ansible webservers -m ping
+  reference_docs: ansible-fundamentals

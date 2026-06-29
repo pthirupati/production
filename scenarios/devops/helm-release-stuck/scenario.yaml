@@ -1,11 +1,31 @@
 title: Helm Release Stuck Pending Upgrade
 slug: devops-helm-release-stuck
-category: DevOps
+category: Fix
 difficulty: medium
-description: A Helm release is stuck in pending-upgrade state after a failed chart/values change, so Helm
-  refuses further operations on it ("another operation is in progress" or it stays pending). The release
-  must be recovered by rolling back to the last good revision or completing the upgrade. Identify the
-  failed revision and restore the release to deployed.
+description: 'CONTEXT: A team operating DevOps delivery needs you to resolve `Helm Release Stuck Pending
+  Upgrade` during a realistic incident. The business impact is reduced service reliability until the underlying
+  state is repaired.
+
+
+  ENVIRONMENT: You are working in FixitLab''s offline CI/CD lab with git repos, pipelines, artifacts,
+  and runbooks. All tools run locally; no paid APIs or external cloud calls are required.
+
+
+  SYMPTOM / STARTING STATE: Kubernetes cluster with Helm. A release is stuck in pending-upgrade after
+  an upgrade failed mid-flight, blocking new upgrades until it''s rolled back or forced to complete. A
+  Helm release is stuck in pending-upgrade state after a failed chart/values change, so Helm refuses further
+  operations on it ("another operation is in progress" or it stays pending). The release must be recovered
+  by rolling back to the last good revision or completing the upgrade. Identify the failed revision and
+  restore the release to deployed.
+
+
+  OBJECTIVE: Run helm history and identify the failed/pending revision; Roll back to the last good revision
+  (or force-complete the upgrade); Verify the release returns to deployed and pods are healthy. Success
+  means `check.sh` exits successfully.
+
+
+  WHAT TO AVOID: Do not apply broad destructive changes, skip evidence gathering, or fake completion with
+  marker files — the checker validates real system state.'
 lab_mode: simulation
 simulation_type: devops
 time_limit: 900
@@ -17,16 +37,76 @@ objectives:
 - Verify the release returns to deployed and pods are healthy
 hints:
 - order: 1
-  cost: 10
-  content: 'Inspect the release: `helm history <release> -n <ns>` and `helm status <release> -n <ns>`
-    — the latest revision is pending-upgrade/failed.'
+  cost: 0
+  content: 'Where to look: Run `kubectl get pods -A` and `kubectl describe pod <name>` for any pod not
+    in Running state.'
 - order: 2
-  cost: 15
-  content: 'Recover by rolling back to the last DEPLOYED revision: `helm rollback <release> <good-rev>
-    -n <ns>` (or re-run `helm upgrade --force` if you mean to complete it).'
+  cost: 25
+  content: 'Diagnostic steps:
+
+    1. `kubectl get pods` — note CrashLoopBackOff, ImagePullBackOff, or Pending.
+
+    2. `kubectl describe pod <name>` — read Events at the bottom.
+
+    3. `kubectl logs <name> [--previous]` if the container restarted.'
 - order: 3
-  cost: 20
-  content: 'Confirm: `helm status <release> -n <ns>` shows STATUS deployed and `kubectl get pods -n <ns>`
-    shows the pods Running.'
+  cost: 50
+  content: 'Exact fix + verification:
+
+    1. Fix the root cause (image name, env var, volume mount, or probe).
+
+    2. `kubectl apply -f` the corrected manifest or delete the pod to recreate.
+
+    3. Confirm `kubectl get pods` shows every pod Running.
+
+
+    WHY: Kubernetes only reports healthy when the workload actually runs.'
 initial_state: Kubernetes cluster with Helm. A release is stuck in pending-upgrade after an upgrade failed
   mid-flight, blocking new upgrades until it's rolled back or forced to complete.
+technology: devops
+summary: Complete the helm release stuck pending upgrade devops lab and verify success with the checker
+estimated_minutes: 15
+xp_reward: 100
+prerequisites:
+- Basic devops literacy
+tags:
+- devops
+- fix
+- hands-on
+linked_tutorial: devops-fundamentals
+what_you_will_learn:
+- Run helm history and identify the failed/pending revision
+- Roll back to the last good revision (or force-complete the upgrade)
+- Verify the release returns to deployed and pods are healthy
+environment:
+  nodes:
+  - role: primary
+    os: FixitLab CI/CD lab
+    hostname: lab-primary
+    ip: 127.0.0.1
+    specs: local offline simulation
+  pre_installed:
+  - bash
+  - coreutils
+  - devops
+  - journalctl
+  - systemctl
+  credentials:
+  - user: root
+    password: lab123
+tasks:
+- id: task_1
+  title: Helm Release Stuck Pending Upgrade
+  description: Restore healthy behavior for Helm Release Stuck Pending Upgrade by investigating the failure,
+    applying the smallest safe fix, and validating the outcome.
+  background: 'This devops lab teaches systematic troubleshooting: observe, hypothesize, change, verify.'
+  validation:
+    type: custom_script
+    script: check.sh
+    error_message: Validation did not pass. Re-read the objectives and Hint 2 diagnostic steps.
+solution:
+  summary: Identify the misconfiguration affecting this devops lab and apply the minimal fix.
+  files_changed: []
+  commands_run:
+  - bash check.sh
+  reference_docs: devops-fundamentals

@@ -1,45 +1,137 @@
-title: 'Add a Swap Partition with fdisk + mkswap + swapon'
+title: Add a Swap Partition with fdisk + mkswap + swapon
 slug: linux-fdisk-swap-partition-mkswap-swapon
 difficulty: medium
-category: 'Storage / Swap'
+category: Fix
 technology: linux
-description: |
-  The server is under memory pressure and the OOM killer has begun terminating processes.
+description: 'CONTEXT: A team operating Linux administration needs you to resolve `Add a Swap Partition
+  with fdisk + mkswap + swapon` during a realistic incident. The business impact is reduced service reliability
+  until the underlying state is repaired.
+
+
+  ENVIRONMENT: You are working in FixitLab''s offline Linux practice server with terminal and config files
+  under /etc and /var. All tools run locally; no paid APIs or external cloud calls are required.
+
+
+  SYMPTOM / STARTING STATE: Simulated RHEL 9 server. swapon --show prints nothing and free -h shows 0B
+  swap.
+
+  /dev/sdc (4G) is present with no partitions. /etc/fstab has no swap entry for it. The server is under
+  memory pressure and the OOM killer has begun terminating processes.
+
   A spare 4G disk /dev/sdc is available. Rather than a swap file, the team wants a
+
   dedicated swap PARTITION. Create a partition on /dev/sdc with fdisk (type Linux swap),
+
   initialise it with mkswap, activate it with swapon, and add it to /etc/fstab so it comes
+
   up on every boot. Activating swap without persisting it, or persisting without
+
   activating, is not acceptable.
-initial_state: |
-  Simulated RHEL 9 server. swapon --show prints nothing and free -h shows 0B swap.
+
+
+  OBJECTIVE: Confirm there is no active swap with swapon --show and free -h; Create a partition with fdisk
+  /dev/sdc (set type 82 / Linux swap); {''Initialise the swap area'': ''mkswap /dev/sdc1''}. Success means
+  `check.sh` exits successfully.
+
+
+  WHAT TO AVOID: Do not apply broad destructive changes, skip evidence gathering, or fake completion with
+  marker files — the checker validates real system state.'
+initial_state: 'Simulated RHEL 9 server. swapon --show prints nothing and free -h shows 0B swap.
+
   /dev/sdc (4G) is present with no partitions. /etc/fstab has no swap entry for it.
+
+  '
 objectives:
-  - Confirm there is no active swap with swapon --show and free -h
-  - Create a partition with fdisk /dev/sdc (set type 82 / Linux swap)
-  - Initialise the swap area: mkswap /dev/sdc1
-  - Activate it now: swapon /dev/sdc1, verify with swapon --show
-  - Persist it in /etc/fstab (/dev/sdc1 none swap sw 0 0)
+- Confirm there is no active swap with swapon --show and free -h
+- Create a partition with fdisk /dev/sdc (set type 82 / Linux swap)
+- Initialise the swap area: mkswap /dev/sdc1
+- Activate it now: swapon /dev/sdc1, verify with swapon --show
+- Persist it in /etc/fstab (/dev/sdc1 none swap sw 0 0)
 lab_mode: simulation
 simulation_type: generic
 time_limit: 900
 max_score: 100
 is_free: false
 topics_covered:
-  - fdisk
-  - swap
-  - mkswap
-  - swapon
-  - fstab
+- fdisk
+- swap
+- mkswap
+- swapon
+- fstab
 hints:
-  - content: 'swapon --show is empty and free -h shows 0 swap. /dev/sdc has no partition yet — create one with fdisk /dev/sdc (n, p, w); optionally set the type to 82 (Linux swap) with t.'
-    cost: 10
-    order: 1
-  - content: 'Turn the new partition into swap and activate it: mkswap /dev/sdc1; swapon /dev/sdc1. Confirm it now appears in swapon --show.'
-    cost: 15
-    order: 2
-  - content: 'Persist across reboots by adding ''/dev/sdc1 none swap sw 0 0'' to /etc/fstab, then test with swapon -a.'
-    cost: 20
-    order: 3
+- order: 1
+  cost: 0
+  content: 'Where to look: Run `df -h` and `du -xh /var /tmp /home | sort -h | tail -20` for large paths.'
+- order: 2
+  cost: 25
+  content: 'Diagnostic steps:
+
+    1. Find which mount is 100% — often `/` or `/var`.
+
+    2. `journalctl --disk-usage` and old logs under `/var/log`.
+
+    3. Look for core dumps, temp files, or oversized application data.'
+- order: 3
+  cost: 50
+  content: 'Exact fix + verification:
+
+    1. Remove or rotate the largest safe files (logs, caches, old packages).
+
+    2. `df -h` should show free space on the affected mount.
+
+    3. Retry the command that failed with ''No space left on device''.
+
+
+    WHY: many services fail cryptically when disk is full.'
 requires_companion_hosts: false
 dual_terminal: false
 jira_priority: Medium
+summary: Complete the add a swap partition with fdisk + mkswap + swapon linux lab and verify success with
+  the checker
+estimated_minutes: 15
+xp_reward: 100
+prerequisites:
+- Basic linux literacy
+tags:
+- fix
+- hands-on
+- linux
+linked_tutorial: linux-fundamentals
+what_you_will_learn:
+- Confirm there is no active swap with swapon --show and free -h
+- Create a partition with fdisk /dev/sdc (set type 82 / Linux swap)
+- '{''Initialise the swap area'': ''mkswap /dev/sdc1''}'
+- '{''Activate it now'': ''swapon /dev/sdc1, verify with swapon --show''}'
+- Persist it in /etc/fstab (/dev/sdc1 none swap sw 0 0)
+environment:
+  nodes:
+  - role: primary
+    os: FixitLab Linux practice server
+    hostname: lab-primary
+    ip: 127.0.0.1
+    specs: local offline simulation
+  pre_installed:
+  - bash
+  - coreutils
+  - journalctl
+  - linux
+  - systemctl
+  credentials:
+  - user: root
+    password: lab123
+tasks:
+- id: task_1
+  title: Add a Swap Partition with fdisk + mkswap + swapon
+  description: Restore healthy behavior for Add a Swap Partition with fdisk + mkswap + swapon by investigating
+    the failure, applying the smallest safe fix, and validating the outcome.
+  background: 'This linux lab teaches systematic troubleshooting: observe, hypothesize, change, verify.'
+  validation:
+    type: custom_script
+    script: check.sh
+    error_message: Validation did not pass. Re-read the objectives and Hint 2 diagnostic steps.
+solution:
+  summary: Identify the misconfiguration affecting this linux lab and apply the minimal fix.
+  files_changed: []
+  commands_run:
+  - bash check.sh
+  reference_docs: linux-fundamentals

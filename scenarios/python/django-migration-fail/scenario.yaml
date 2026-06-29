@@ -1,11 +1,31 @@
 title: Django Migration Failure
 slug: sim-python-django-migration
-category: Python Development
+category: Fix
 difficulty: hard
-description: A Django app fails because the database schema is out of sync with the models — requests
-  error (e.g. "no such column" / "relation does not exist") or Django reports unapplied migrations. A
-  migration was added but never applied, or models changed without a migration. Generate and apply the
-  migrations so the schema matches the models.
+description: 'CONTEXT: A team operating Python development needs you to resolve `Django Migration Failure`
+  during a realistic incident. The business impact is reduced service reliability until the underlying
+  state is repaired.
+
+
+  ENVIRONMENT: You are working in FixitLab''s offline Python project workspace with source files, venv,
+  tests, and CLI entrypoints. All tools run locally; no paid APIs or external cloud calls are required.
+
+
+  SYMPTOM / STARTING STATE: Django project whose database schema doesn''t match the current models. The
+  app raises database errors about missing columns/tables, and `showmigrations` lists unapplied migrations.
+  A Django app fails because the database schema is out of sync with the models — requests error (e.g.
+  "no such column" / "relation does not exist") or Django reports unapplied migrations. A migration was
+  added but never applied, or models changed without a migration. Generate and apply the migrations so
+  the schema matches the models.
+
+
+  OBJECTIVE: Identify the pending or missing migration causing the schema mismatch; Generate any missing
+  migration and apply migrations; Confirm the app runs without database schema errors. Success means `check.sh`
+  exits successfully.
+
+
+  WHAT TO AVOID: Do not apply broad destructive changes, skip evidence gathering, or fake completion with
+  marker files — the checker validates real system state.'
 initial_state: Django project whose database schema doesn't match the current models. The app raises database
   errors about missing columns/tables, and `showmigrations` lists unapplied migrations.
 lab_mode: simulation
@@ -22,14 +42,71 @@ objectives:
 - Confirm the app runs without database schema errors
 hints:
 - order: 1
-  cost: 10
-  content: 'See migration state: `python manage.py showmigrations` — unapplied ones show as [ ]. The runtime
-    error names the missing column/table.'
+  cost: 0
+  content: 'Where to look: Identify the pending or missing migration causing the schema mismatch'
 - order: 2
-  cost: 15
-  content: 'If models changed but no migration exists, create it: `python manage.py makemigrations`. If
-    a migration exists but is unapplied, you just need to migrate.'
+  cost: 25
+  content: 'Diagnostic steps:
+
+    1. Generate any missing migration and apply migrations
+
+    2. Confirm the app runs without database schema errors'
 - order: 3
-  cost: 20
-  content: 'Apply them: `python manage.py migrate`. Re-run the failing request (or `manage.py check`)
-    and confirm the schema errors are gone.'
+  cost: 50
+  content: 'Exact fix + verification:
+
+    1. Confirm the app runs without database schema errors.
+
+    2. Re-run the lab checker (`check.sh` or Check Solution).
+
+    3. Confirm every scenario objective is satisfied.
+
+
+    WHY: the grader validates real state — marker files are ignored.'
+technology: python
+summary: Complete the django migration failure python lab and verify success with the checker
+estimated_minutes: 15
+xp_reward: 100
+prerequisites:
+- Basic python literacy
+tags:
+- fix
+- hands-on
+- python
+linked_tutorial: python-fundamentals
+what_you_will_learn:
+- Identify the pending or missing migration causing the schema mismatch
+- Generate any missing migration and apply migrations
+- Confirm the app runs without database schema errors
+environment:
+  nodes:
+  - role: primary
+    os: FixitLab Python project workspace
+    hostname: lab-primary
+    ip: 127.0.0.1
+    specs: local offline simulation
+  pre_installed:
+  - bash
+  - coreutils
+  - pip
+  - python
+  - python3
+  credentials:
+  - user: root
+    password: lab123
+tasks:
+- id: task_1
+  title: Django Migration Failure
+  description: Restore healthy behavior for Django Migration Failure by investigating the failure, applying
+    the smallest safe fix, and validating the outcome.
+  background: 'This python lab teaches systematic troubleshooting: observe, hypothesize, change, verify.'
+  validation:
+    type: custom_script
+    script: check.sh
+    error_message: Validation did not pass. Re-read the objectives and Hint 2 diagnostic steps.
+solution:
+  summary: Identify the misconfiguration affecting this python lab and apply the minimal fix.
+  files_changed: []
+  commands_run:
+  - bash check.sh
+  reference_docs: python-fundamentals

@@ -2,17 +2,36 @@ title: Password Change Broken
 slug: password-change-broken
 lab_mode: simulation
 simulation_type: generic
-technology: Linux
-category: Authentication
+technology: linux
+category: Fix
 difficulty: medium
 time_limit: 900
 max_score: 100
 infrastructure_type: docker
 jira_priority: Medium
-description: Users can't change their passwords — `passwd` fails — because the PAM password stack was
-  recently edited and now contains an error (a typo in a module name such as pam_unixx.so), and one account
-  may also be locked. A broken /etc/pam.d/common-password breaks passwd for everyone. Fix the PAM typo,
-  unlock the affected account, and confirm password changes work.
+description: 'CONTEXT: A team operating Linux administration needs you to resolve `Password Change Broken`
+  during a realistic incident. The business impact is reduced service reliability until the underlying
+  state is repaired.
+
+
+  ENVIRONMENT: You are working in FixitLab''s offline Linux practice server with terminal and config files
+  under /etc and /var. All tools run locally; no paid APIs or external cloud calls are required.
+
+
+  SYMPTOM / STARTING STATE: Linux server where /etc/pam.d/common-password has a typo in a module name,
+  so passwd fails; the devuser account may also be locked. Users can''t change their passwords — `passwd`
+  fails — because the PAM password stack was recently edited and now contains an error (a typo in a module
+  name such as pam_unixx.so), and one account may also be locked. A broken /etc/pam.d/common-password
+  breaks passwd for everyone. Fix the PAM typo, unlock the affected account, and confirm password changes
+  work.
+
+
+  OBJECTIVE: Diagnose why passwd fails for devuser; Fix the typo in the PAM password configuration; Unlock
+  devuser if locked and successfully change its password. Success means `check.sh` exits successfully.
+
+
+  WHAT TO AVOID: Do not apply broad destructive changes, skip evidence gathering, or fake completion with
+  marker files — the checker validates real system state.'
 objectives:
 - Diagnose why passwd fails for devuser
 - Fix the typo in the PAM password configuration
@@ -21,14 +40,70 @@ initial_state: Linux server where /etc/pam.d/common-password has a typo in a mod
   the devuser account may also be locked.
 hints:
 - order: 1
-  cost: 10
-  content: 'Reproduce and read the error: `passwd devuser`. Then inspect the stack: `cat /etc/pam.d/common-password`
-    for a bad module name.'
+  cost: 0
+  content: 'Where to look: Diagnose why passwd fails for devuser'
 - order: 2
-  cost: 15
-  content: 'Fix the typo — e.g. `pam_unixx.so` → `pam_unix.so`. Check the account isn''t locked: `passwd
-    -S devuser`.'
+  cost: 25
+  content: 'Diagnostic steps:
+
+    1. Fix the typo in the PAM password configuration
+
+    2. Unlock devuser if locked and successfully change its password'
 - order: 3
-  cost: 20
-  content: Unlock if needed (`passwd -u devuser`) and verify a password change succeeds. Be careful editing
-    PAM — keep a root shell open until you've confirmed it works.
+  cost: 50
+  content: 'Exact fix + verification:
+
+    1. Unlock devuser if locked and successfully change its password.
+
+    2. Re-run the lab checker (`check.sh` or Check Solution).
+
+    3. Confirm every scenario objective is satisfied.
+
+
+    WHY: the grader validates real state — marker files are ignored.'
+summary: Complete the password change broken linux lab and verify success with the checker
+estimated_minutes: 15
+xp_reward: 100
+prerequisites:
+- Basic linux literacy
+tags:
+- fix
+- hands-on
+- linux
+linked_tutorial: linux-fundamentals
+what_you_will_learn:
+- Diagnose why passwd fails for devuser
+- Fix the typo in the PAM password configuration
+- Unlock devuser if locked and successfully change its password
+environment:
+  nodes:
+  - role: primary
+    os: FixitLab Linux practice server
+    hostname: lab-primary
+    ip: 127.0.0.1
+    specs: local offline simulation
+  pre_installed:
+  - bash
+  - coreutils
+  - journalctl
+  - linux
+  - systemctl
+  credentials:
+  - user: root
+    password: lab123
+tasks:
+- id: task_1
+  title: Password Change Broken
+  description: Restore healthy behavior for Password Change Broken by investigating the failure, applying
+    the smallest safe fix, and validating the outcome.
+  background: 'This linux lab teaches systematic troubleshooting: observe, hypothesize, change, verify.'
+  validation:
+    type: custom_script
+    script: check.sh
+    error_message: Validation did not pass. Re-read the objectives and Hint 2 diagnostic steps.
+solution:
+  summary: Identify the misconfiguration affecting this linux lab and apply the minimal fix.
+  files_changed: []
+  commands_run:
+  - bash check.sh
+  reference_docs: linux-fundamentals

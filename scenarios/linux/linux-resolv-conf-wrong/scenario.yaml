@@ -1,7 +1,7 @@
 title: Wrong DNS Resolver Breaks Lookups
 slug: linux-resolv-conf-wrong
-technology: Linux
-category: DNS
+technology: linux
+category: Fix
 difficulty: easy
 lab_mode: simulation
 simulation_type: generic
@@ -10,8 +10,26 @@ max_score: 100
 is_free: true
 jira_priority: High
 dual_terminal: false
-description: Name resolution fails because /etc/resolv.conf points at an unreachable DNS server. Set a
-  working resolver and confirm the file is corrected.
+description: 'CONTEXT: A team operating Linux administration needs you to resolve `Wrong DNS Resolver
+  Breaks Lookups` during a realistic incident. The business impact is reduced service reliability until
+  the underlying state is repaired.
+
+
+  ENVIRONMENT: You are working in FixitLab''s offline Linux practice server with terminal and config files
+  under /etc and /var. All tools run locally; no paid APIs or external cloud calls are required.
+
+
+  SYMPTOM / STARTING STATE: A Linux host whose resolv.conf nameserver is wrong/unreachable, breaking DNS.
+  Name resolution fails because /etc/resolv.conf points at an unreachable DNS server. Set a working resolver
+  and confirm the file is corrected.
+
+
+  OBJECTIVE: Confirm DNS lookups fail; Set a working nameserver; Verify resolv.conf is corrected. Success
+  means `check.sh` exits successfully.
+
+
+  WHAT TO AVOID: Do not apply broad destructive changes, skip evidence gathering, or fake completion with
+  marker files — the checker validates real system state.'
 initial_state: A Linux host whose resolv.conf nameserver is wrong/unreachable, breaking DNS.
 objectives:
 - Confirm DNS lookups fail
@@ -19,11 +37,73 @@ objectives:
 - Verify resolv.conf is corrected
 hints:
 - order: 1
-  cost: 10
-  content: getent hosts fails for known names.
+  cost: 0
+  content: 'Where to look: Run `cat /etc/resolv.conf` and test with `dig example.com` or `getent hosts
+    example.com`.'
 - order: 2
-  cost: 15
-  content: Point resolv.conf at a reachable resolver.
+  cost: 25
+  content: 'Diagnostic steps:
+
+    1. Note the configured nameserver IP in resolv.conf.
+
+    2. `ping` or `nc -zv` the nameserver — is it reachable?
+
+    3. Check if NetworkManager or systemd-resolved overwrites the file.'
 - order: 3
-  cost: 20
-  content: resolv.conf carries the corrected nameserver.
+  cost: 50
+  content: 'Exact fix + verification:
+
+    1. Set a working `nameserver` line (e.g. 8.8.8.8 or the lab''s resolver).
+
+    2. Re-run `dig` or `getent hosts` — lookups should succeed.
+
+    3. Confirm `check.sh` passes.
+
+
+    WHY: applications use resolv.conf for every hostname lookup.'
+summary: Complete the wrong dns resolver breaks lookups linux lab and verify success with the checker
+estimated_minutes: 20
+xp_reward: 100
+prerequisites:
+- Basic linux literacy
+tags:
+- fix
+- hands-on
+- linux
+linked_tutorial: linux-fundamentals
+what_you_will_learn:
+- Confirm DNS lookups fail
+- Set a working nameserver
+- Verify resolv.conf is corrected
+environment:
+  nodes:
+  - role: primary
+    os: FixitLab Linux practice server
+    hostname: lab-primary
+    ip: 127.0.0.1
+    specs: local offline simulation
+  pre_installed:
+  - bash
+  - coreutils
+  - journalctl
+  - linux
+  - systemctl
+  credentials:
+  - user: root
+    password: lab123
+tasks:
+- id: task_1
+  title: Wrong DNS Resolver Breaks Lookups
+  description: Restore healthy behavior for Wrong DNS Resolver Breaks Lookups by investigating the failure,
+    applying the smallest safe fix, and validating the outcome.
+  background: 'This linux lab teaches systematic troubleshooting: observe, hypothesize, change, verify.'
+  validation:
+    type: custom_script
+    script: check.sh
+    error_message: Validation did not pass. Re-read the objectives and Hint 2 diagnostic steps.
+solution:
+  summary: Identify the misconfiguration affecting this linux lab and apply the minimal fix.
+  files_changed: []
+  commands_run:
+  - bash check.sh
+  reference_docs: linux-fundamentals

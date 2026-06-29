@@ -1,8 +1,7 @@
----
 slug: java-maven-shade-plugin-manifest
-title: "Shaded Uber-JAR Has No Main-Class Manifest"
-technology: Java
-category: "Maven Build"
+title: Shaded Uber-JAR Has No Main-Class Manifest
+technology: java
+category: Fix
 difficulty: medium
 time_limit: 900
 max_score: 100
@@ -11,22 +10,108 @@ simulation_type: java
 infrastructure_type: simulation
 jira_priority: Medium
 is_free: false
-description: |
-  java -jar app.jar fails with 'no main manifest attribute, in app.jar'. The maven-shade-plugin builds an uber-jar but no ManifestResourceTransformer sets Main-Class, so the JAR is not runnable. Configure the shade transformer (and service-file merging) so the packaged JAR launches.
+description: 'CONTEXT: A team operating Java applications needs you to resolve `Shaded Uber-JAR Has No
+  Main-Class Manifest` during a realistic incident. The business impact is reduced service reliability
+  until the underlying state is repaired.
+
+
+  ENVIRONMENT: You are working in FixitLab''s offline Java project with Maven/Gradle, JVM logs, and Spring
+  configuration. All tools run locally; no paid APIs or external cloud calls are required.
+
+
+  SYMPTOM / STARTING STATE: POM at /app/pom.xml configures maven-shade-plugin without a manifest transformer;
+  the uber-jar has no Main-Class. java -jar app.jar fails with ''no main manifest attribute, in app.jar''.
+  The maven-shade-plugin builds an uber-jar but no ManifestResourceTransformer sets Main-Class, so the
+  JAR is not runnable. Configure the shade transformer (and service-file merging) so the packaged JAR
+  launches.
+
+
+  OBJECTIVE: Reproduce ''no main manifest attribute'' running the JAR; Add the ManifestResourceTransformer
+  with the Main-Class; Merge service files (ServicesResourceTransformer) to avoid SPI breakage. Success
+  means `check.sh` exits successfully.
+
+
+  WHAT TO AVOID: Do not apply broad destructive changes, skip evidence gathering, or fake completion with
+  marker files — the checker validates real system state.'
 objectives:
-  - "Reproduce 'no main manifest attribute' running the JAR"
-  - "Add the ManifestResourceTransformer with the Main-Class"
-  - "Merge service files (ServicesResourceTransformer) to avoid SPI breakage"
-  - "Verify java -jar runs the application"
-initial_state: |
-  POM at /app/pom.xml configures maven-shade-plugin without a manifest transformer; the uber-jar has no Main-Class.
+- Reproduce 'no main manifest attribute' running the JAR
+- Add the ManifestResourceTransformer with the Main-Class
+- Merge service files (ServicesResourceTransformer) to avoid SPI breakage
+- Verify java -jar runs the application
+initial_state: 'POM at /app/pom.xml configures maven-shade-plugin without a manifest transformer; the
+  uber-jar has no Main-Class.
+
+  '
 hints:
-  - order: 1
-    cost: 10
-    content: "unzip -p app.jar META-INF/MANIFEST.MF shows no Main-Class line."
-  - order: 2
-    cost: 15
-    content: "Add ManifestResourceTransformer with <mainClass> in the shade execution."
-  - order: 3
-    cost: 20
-    content: "Also add ServicesResourceTransformer so META-INF/services entries merge correctly."
+- order: 1
+  cost: 0
+  content: 'Where to look: Reproduce ''no main manifest attribute'' running the JAR'
+- order: 2
+  cost: 25
+  content: 'Diagnostic steps:
+
+    1. Add the ManifestResourceTransformer with the Main-Class
+
+    2. Merge service files (ServicesResourceTransformer) to avoid SPI breakage
+
+    3. Verify java -jar runs the application'
+- order: 3
+  cost: 50
+  content: 'Exact fix + verification:
+
+    1. Verify java -jar runs the application.
+
+    2. Re-run the lab checker (`check.sh` or Check Solution).
+
+    3. Confirm every scenario objective is satisfied.
+
+
+    WHY: the grader validates real state — marker files are ignored.'
+summary: Complete the shaded uber-jar has no main-class manifest java lab and verify success with the
+  checker
+estimated_minutes: 15
+xp_reward: 100
+prerequisites:
+- Basic java literacy
+tags:
+- fix
+- hands-on
+- java
+linked_tutorial: java-fundamentals
+what_you_will_learn:
+- Reproduce 'no main manifest attribute' running the JAR
+- Add the ManifestResourceTransformer with the Main-Class
+- Merge service files (ServicesResourceTransformer) to avoid SPI breakage
+- Verify java -jar runs the application
+environment:
+  nodes:
+  - role: primary
+    os: FixitLab Java project
+    hostname: lab-primary
+    ip: 127.0.0.1
+    specs: local offline simulation
+  pre_installed:
+  - bash
+  - coreutils
+  - java
+  - journalctl
+  - systemctl
+  credentials:
+  - user: root
+    password: lab123
+tasks:
+- id: task_1
+  title: Shaded Uber-JAR Has No Main-Class Manifest
+  description: Restore healthy behavior for Shaded Uber-JAR Has No Main-Class Manifest by investigating
+    the failure, applying the smallest safe fix, and validating the outcome.
+  background: 'This java lab teaches systematic troubleshooting: observe, hypothesize, change, verify.'
+  validation:
+    type: custom_script
+    script: check.sh
+    error_message: Validation did not pass. Re-read the objectives and Hint 2 diagnostic steps.
+solution:
+  summary: Identify the misconfiguration affecting this java lab and apply the minimal fix.
+  files_changed: []
+  commands_run:
+  - bash check.sh
+  reference_docs: java-fundamentals

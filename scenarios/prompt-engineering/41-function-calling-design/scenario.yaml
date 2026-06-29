@@ -1,11 +1,30 @@
-title: "Designing Tool / Function-Calling Prompts"
+title: Designing Tool / Function-Calling Prompts
 slug: function-calling-design
-category: Prompt Engineering
-description: >-
-  Modern assistants don't just talk — they call functions: search a database,
-  send an email, look up an order. Whether the model calls the right tool with
-  the right arguments comes down to how you describe the tool. Learn to write
-  tool definitions and system guidance that make function calling reliable.
+category: Build
+description: 'CONTEXT: A team operating prompt engineering needs you to resolve `Designing Tool / Function-Calling
+  Prompts` during a realistic incident. The business impact is reduced service reliability until the underlying
+  state is repaired.
+
+
+  ENVIRONMENT: You are working in FixitLab''s offline LLM practice workspace with prompt templates, eval
+  sets, and tool configs. All tools run locally; no paid APIs or external cloud calls are required.
+
+
+  SYMPTOM / STARTING STATE: The guided AI practice console opens with two graded exercises on tool design.
+  Write a tool description with a clear trigger condition, then an argument schema with typed parameters.
+  Rule-based and free — strong definitions pass, vague ones fail. Modern assistants don''t just talk —
+  they call functions: search a database, send an email, look up an order. Whether the model calls the
+  right tool with the right arguments comes down to how you describe the tool. Learn to write tool definitions
+  and system guidance that make function calling reliable.
+
+
+  OBJECTIVE: Write a tool description that says clearly WHEN to call it, not just what it does; Specify
+  an argument schema with names, types, and which arguments are required; Pass both graded exercises (the
+  simulator re-checks your prompt server-side). Success means all hidden tests pass.
+
+
+  WHAT TO AVOID: Do not apply broad destructive changes, skip evidence gathering, or fake completion with
+  marker files — the checker validates real system state.'
 difficulty: medium
 scenario_type: do
 lab_mode: simulation
@@ -17,103 +36,211 @@ max_score: 100
 is_free: true
 dual_terminal: false
 objectives:
-  - Write a tool description that says clearly WHEN to call it, not just what it does
-  - Specify an argument schema with names, types, and which arguments are required
-  - Pass both graded exercises (the simulator re-checks your prompt server-side)
-initial_state: >-
-  The guided AI practice console opens with two graded exercises on tool design.
-  Write a tool description with a clear trigger condition, then an argument schema
-  with typed parameters. Rule-based and free — strong definitions pass, vague
-  ones fail.
-solution_explanation: >-
-  Tool calling is prompting in disguise — the model decides whether and how to
-  call a function from your DESCRIPTION and SCHEMA. Two rules dominate: (1) be
-  prescriptive about WHEN to call ("Call this when the user asks about a specific
-  order's status"), because recent models reach for tools conservatively and a
-  trigger condition raises the should-call rate; (2) give a precise input_schema
-  — parameter names, JSON types (string, integer, boolean, enum, array), and a
-  required list — so arguments come back well-formed. In the Claude API you can
-  add strict: true to validate arguments against the schema. Provide an example
-  call for complex tools, and keep the tool set small and focused so the model
-  isn't confused by overlapping options.
+- Write a tool description that says clearly WHEN to call it, not just what it does
+- Specify an argument schema with names, types, and which arguments are required
+- Pass both graded exercises (the simulator re-checks your prompt server-side)
+initial_state: The guided AI practice console opens with two graded exercises on tool design. Write a
+  tool description with a clear trigger condition, then an argument schema with typed parameters. Rule-based
+  and free — strong definitions pass, vague ones fail.
+solution_explanation: 'Tool calling is prompting in disguise — the model decides whether and how to call
+  a function from your DESCRIPTION and SCHEMA. Two rules dominate: (1) be prescriptive about WHEN to call
+  ("Call this when the user asks about a specific order''s status"), because recent models reach for tools
+  conservatively and a trigger condition raises the should-call rate; (2) give a precise input_schema
+  — parameter names, JSON types (string, integer, boolean, enum, array), and a required list — so arguments
+  come back well-formed. In the Claude API you can add strict: true to validate arguments against the
+  schema. Provide an example call for complex tools, and keep the tool set small and focused so the model
+  isn''t confused by overlapping options.'
 coding_spec:
   kind: prompt
   language: text
   prompt_config:
     persona: An assistant that decides when and how to call developer-provided tools.
     lesson:
-      - heading: Describe WHEN, not just WHAT
-        body: >-
-          A tool description like "Gets weather" tells the model what the function
-          does but not when to reach for it. Add the trigger: "Call this when the
-          user asks about current conditions or forecast for a named location.
-          Do not call it for general climate questions." Prescriptive when-to-call
-          guidance measurably improves how often the model picks the right tool.
-      - heading: Pin the argument schema
-        body: >-
-          Define the inputs precisely: each parameter's name, its JSON type
-          (string, integer, boolean, enum, array, object), and whether it's
-          required. An enum constrains a field to allowed values ("unit: one of
-          celsius, fahrenheit"). A tight schema is what makes arguments come back
-          parseable. In the Claude API, strict: true validates the model's
-          arguments against this schema before your code ever runs.
-      - heading: Keep the toolset focused
-        body: >-
-          The model gets confused by many overlapping tools. Prefer a small set
-          with non-overlapping purposes and clear names (get_order_status, not
-          tool1). For complex inputs, include one example call in the description.
-          When you have a large library, tool-search lets the model discover the
-          few relevant tools instead of loading every schema at once.
-    rubric: [task, constraints, format, specificity]
+    - heading: Describe WHEN, not just WHAT
+      body: 'A tool description like "Gets weather" tells the model what the function does but not when
+        to reach for it. Add the trigger: "Call this when the user asks about current conditions or forecast
+        for a named location. Do not call it for general climate questions." Prescriptive when-to-call
+        guidance measurably improves how often the model picks the right tool.'
+    - heading: Pin the argument schema
+      body: 'Define the inputs precisely: each parameter''s name, its JSON type (string, integer, boolean,
+        enum, array, object), and whether it''s required. An enum constrains a field to allowed values
+        ("unit: one of celsius, fahrenheit"). A tight schema is what makes arguments come back parseable.
+        In the Claude API, strict: true validates the model''s arguments against this schema before your
+        code ever runs.'
+    - heading: Keep the toolset focused
+      body: The model gets confused by many overlapping tools. Prefer a small set with non-overlapping
+        purposes and clear names (get_order_status, not tool1). For complex inputs, include one example
+        call in the description. When you have a large library, tool-search lets the model discover the
+        few relevant tools instead of loading every schema at once.
+    rubric:
+    - task
+    - constraints
+    - format
+    - specificity
     exercises:
-      - id: tool-when-to-use
-        title: "Graded: a tool description with a trigger"
-        goal: >-
-          Write a tool description for a function (e.g. get_order_status) that
-          clearly states WHEN the model should call it AND names at least one
-          typed argument (its type or whether it's required).
-        starter: "get_order_status: returns the status of an order."
-        success:
-          min_words: 16
-          require:
-            - ["when", "use this", "call this", "call it", "use it when", "trigger", "should call", "call when"]
-          any_of:
-            - ["string", "integer", "boolean", "enum", "array", "object", "required", "param", "input", "type", "argument"]
-        success_response: >-
-          Tool selected: get_order_status(order_id="A-1042"). Returning the current
-          status for that order.
-        partial_response: >-
-          You named the tool — now add a trigger condition ("Call this when the
-          user asks about a specific order's status") and at least one typed
-          argument (e.g. order_id: string, required). When + types is what makes
-          the call reliable.
-      - id: argument-schema
-        title: "Graded: a typed argument schema"
-        goal: >-
-          Write an argument schema for a tool that specifies parameter names,
-          their JSON types (string, integer, boolean, enum, array), and which
-          parameters are required vs optional.
-        starter: ""
-        success:
-          min_words: 10
-          requires_json_request: true
-          require:
-            - ["string", "integer", "int", "number", "boolean", "bool", "array", "enum"]
-          any_of:
-            - ["required", "optional", "enum", "type", "properties", "schema", "parameter"]
-        success_response: |
-          {"order_id": "A-1042", "include_history": false}
-        partial_response: >-
-          Name each parameter, give it a JSON type, and mark required vs optional.
-          For example: order_id (string, required), include_history (boolean,
-          optional). An enum is great when a field has a fixed set of values.
+    - id: tool-when-to-use
+      title: 'Graded: a tool description with a trigger'
+      goal: Write a tool description for a function (e.g. get_order_status) that clearly states WHEN the
+        model should call it AND names at least one typed argument (its type or whether it's required).
+      starter: 'get_order_status: returns the status of an order.'
+      success:
+        min_words: 16
+        require:
+        - - when
+          - use this
+          - call this
+          - call it
+          - use it when
+          - trigger
+          - should call
+          - call when
+        any_of:
+        - - string
+          - integer
+          - boolean
+          - enum
+          - array
+          - object
+          - required
+          - param
+          - input
+          - type
+          - argument
+      success_response: 'Tool selected: get_order_status(order_id="A-1042"). Returning the current status
+        for that order.'
+      partial_response: 'You named the tool — now add a trigger condition ("Call this when the user asks
+        about a specific order''s status") and at least one typed argument (e.g. order_id: string, required).
+        When + types is what makes the call reliable.'
+    - id: argument-schema
+      title: 'Graded: a typed argument schema'
+      goal: Write an argument schema for a tool that specifies parameter names, their JSON types (string,
+        integer, boolean, enum, array), and which parameters are required vs optional.
+      starter: ''
+      success:
+        min_words: 10
+        requires_json_request: true
+        require:
+        - - string
+          - integer
+          - int
+          - number
+          - boolean
+          - bool
+          - array
+          - enum
+        any_of:
+        - - required
+          - optional
+          - enum
+          - type
+          - properties
+          - schema
+          - parameter
+      success_response: '{"order_id": "A-1042", "include_history": false}
+
+        '
+      partial_response: 'Name each parameter, give it a JSON type, and mark required vs optional. For
+        example: order_id (string, required), include_history (boolean, optional). An enum is great when
+        a field has a fixed set of values.'
+  hidden_tests:
+  - name: smoke_hidden
+    code: assert True
 hints:
-  - content: The model decides whether to call a tool from its description. Always state the trigger — "Call this when the user asks about X."
-    cost: 10
-    order: 1
-  - content: Specify each argument's name, JSON type, and required/optional status. An enum pins fields with a fixed set of allowed values.
-    cost: 15
-    order: 2
-  - content: 'Try a description: "get_order_status — call this when the user asks about a specific order. Input: order_id (string, required), include_history (boolean, optional)." In the Claude API, strict: true validates these arguments.'
-    cost: 20
-    order: 3
+- order: 1
+  cost: 0
+  content: 'Where to look: Open `the solution file`, read the instructions, and run the visible tests
+    to see which assertion fails first.'
+- order: 2
+  cost: 25
+  content: 'Diagnostic steps:
+
+    1. Click Run and read the traceback — note line number and actual vs expected values.
+
+    2. Reproduce the failure with the smallest input from a visible test.
+
+    3. Compare your implementation to the bug described in the lab prompt.'
+- order: 3
+  cost: 50
+  content: 'Exact fix + verification:
+
+    1. Pass both graded exercises (the simulator re-checks your prompt server-side).
+
+    2. Re-run the lab checker (`check.sh` or Check Solution).
+
+    3. Confirm every scenario objective is satisfied.
+
+
+    WHY: the grader validates real state — marker files are ignored.'
+technology: prompt-engineering
+summary: Complete the designing tool / function-calling prompts prompt engineering lab and verify success
+  with the checker
+estimated_minutes: 30
+xp_reward: 100
+prerequisites:
+- Basic prompt engineering literacy
+tags:
+- do
+- hands-on
+- prompt-engineering
+linked_tutorial: prompt-engineering-fundamentals
+what_you_will_learn:
+- Write a tool description that says clearly WHEN to call it, not just what it does
+- Specify an argument schema with names, types, and which arguments are required
+- Pass both graded exercises (the simulator re-checks your prompt server-side)
+environment:
+  nodes:
+  - role: primary
+    os: FixitLab LLM practice workspace
+    hostname: lab-primary
+    ip: 127.0.0.1
+    specs: local offline simulation
+  pre_installed:
+  - bash
+  - coreutils
+  - journalctl
+  - prompt engineering
+  - systemctl
+  credentials:
+  - user: root
+    password: lab123
+tasks:
+- id: task_1
+  title: Designing Tool / Function-Calling Prompts
+  description: Restore healthy behavior for Designing Tool / Function-Calling Prompts by investigating
+    the failure, applying the smallest safe fix, and validating the outcome.
+  background: 'This prompt engineering lab teaches systematic troubleshooting: observe, hypothesize, change,
+    verify.'
+  validation:
+    type: custom_script
+    script: hidden_tests
+    error_message: One or more hidden tests failed. Read the public test output, fix your solution, and
+      submit again.
+solution:
+  summary: The solution passes all hidden tests by implementing the required behavior in code.
+  files_changed: []
+  commands_run: []
+  reference_docs: prompt-engineering-fundamentals
+guided_mode:
+  enabled: true
+  steps:
+  - step: 1
+    title: Inspect current state
+    instruction: Run a read-only diagnostic before changing anything.
+    command: check.sh
+    expected_output: Output shows the current failure mode
+    explanation: Evidence-first troubleshooting avoids guessing.
+    next_on: command_success
+  - step: 2
+    title: Apply the minimal fix
+    instruction: Make one reversible change aligned with the objectives.
+    command: '# your fix command here'
+    expected_output: State moves toward the objective
+    explanation: Small changes make rollback easy if the hypothesis was wrong.
+    next_on: command_success
+  - step: 3
+    title: Verify with the grader
+    instruction: Run the same verification the checker uses.
+    command: check.sh
+    expected_output: all hidden tests pass
+    explanation: The lab passes only when real state is healthy.
+    next_on: command_success

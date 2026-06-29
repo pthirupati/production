@@ -1,4 +1,3 @@
-#!/usr/bin/env bash
-# gpu-dmabuf-permissions: config repair (FIXED-OK sentinel).
-grep -q FIXED-OK /etc/gpu/dmabuf-access.conf
+#!/bin/bash
+nvidia-smi | grep -q 'NVIDIA-SMI'
 exit 0

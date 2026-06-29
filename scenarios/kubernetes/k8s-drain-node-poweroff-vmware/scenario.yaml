@@ -1,32 +1,72 @@
-title: Node Maintenance — Drain worker-1, Bring Up a Replacement Node VM in VMware
+title: Node Maintenance - Drain worker-1, Bring Up a Replacement
 slug: k8s-drain-node-poweroff-vmware
-category: Kubernetes
+category: Fix
 difficulty: hard
-description: |
-  Worker node `worker-1` needs to come out of service for hardware maintenance, but
+description: 'CONTEXT: A team operating Kubernetes needs you to resolve `Node Maintenance - Drain worker-1,
+  Bring Up a Replacement` during a realistic incident. The business impact is reduced service reliability
+  until the underlying state is repaired.
+
+
+  ENVIRONMENT: You are working in FixitLab''s offline Kubernetes cluster with kubectl, manifests, and
+  cluster resources. All tools run locally; no paid APIs or external cloud calls are required.
+
+
+  SYMPTOM / STARTING STATE: A Kubernetes cluster with one worker (worker-1) hosting all 3 billing pods.
+  A
+
+  replacement worker VM k8s-worker-2 exists in the VMware inventory, powered off.
+
+  worker-1 must be drained onto a freshly-joined worker-2 before it can be taken
+
+  down for maintenance. Worker node `worker-1` needs to come out of service for hardware maintenance,
+  but
+
   it is the only worker and is running all three `billing` pods. You must move the
+
   workload off it WITHOUT downtime. This Kubernetes cluster runs ON VMware — each
+
   node is a VMware VM — so the maintenance is a two-part, cross-technology job:
+
   bring up a replacement node and drain the old one.
 
+
   Steps: (1) In the VMware simulator (toolbar -> Open VMware) power on the spare
+
   worker VM `k8s-worker-2` so node worker-2 joins. (2) In the terminal, cordon and
+
   drain worker-1 (`kubectl drain worker-1 --ignore-daemonsets`) so its pods evict
+
   and reschedule onto worker-2. The lab passes when worker-1 is drained
+
   (unschedulable, no pods left on it), worker-2 is Ready, and all billing pods are
+
   Running. (In production you would then power off k8s-worker-1 for the hardware
+
   work.)
-initial_state: |
-  A Kubernetes cluster with one worker (worker-1) hosting all 3 billing pods. A
+
+
+  OBJECTIVE: Confirm worker-1 hosts all billing pods (kubectl get pods -o wide); Open the VMware simulator
+  and power on the replacement worker VM k8s-worker-2; Confirm worker-2 is Ready (kubectl get nodes).
+  Success means `kubectl get pods` shows every pod Running.
+
+
+  WHAT TO AVOID: Do not apply broad destructive changes, skip evidence gathering, or fake completion with
+  marker files — the checker validates real system state.'
+initial_state: 'A Kubernetes cluster with one worker (worker-1) hosting all 3 billing pods. A
+
   replacement worker VM k8s-worker-2 exists in the VMware inventory, powered off.
+
   worker-1 must be drained onto a freshly-joined worker-2 before it can be taken
+
   down for maintenance.
+
+  '
 objectives:
-  - Confirm worker-1 hosts all billing pods (kubectl get pods -o wide)
-  - Open the VMware simulator and power on the replacement worker VM k8s-worker-2
-  - Confirm worker-2 is Ready (kubectl get nodes)
-  - Cordon and drain worker-1 so its pods reschedule (kubectl drain worker-1 --ignore-daemonsets)
-  - Verify worker-1 is unschedulable with no pods and all billing pods Running on worker-2
+- Confirm worker-1 hosts all billing pods (kubectl get pods -o wide)
+- Open the VMware simulator and power on the replacement worker VM k8s-worker-2
+- Confirm worker-2 is Ready (kubectl get nodes)
+- Cordon and drain worker-1 so its pods reschedule (kubectl drain worker-1 --ignore-daemonsets)
+- Verify worker-1 is unschedulable with no pods and all billing pods Running on worker-2
 lab_mode: simulation
 simulation_type: kubernetes
 cross_technology: true
@@ -37,13 +77,81 @@ is_free: false
 jira_priority: High
 dual_terminal: false
 hints:
-  - order: 1
-    cost: 10
-    content: 'You cannot drain the only worker — the evicted pods would have nowhere to go. First add capacity. The nodes are VMware VMs, so open the VMware simulator (toolbar -> Open VMware): the replacement VM k8s-worker-2 is powered off.'
-  - order: 2
-    cost: 15
-    content: 'Power on k8s-worker-2 in the VMware simulator (VM Actions -> Power -> Power On). Confirm it joined with `kubectl get nodes` (worker-2 Ready). Now there is somewhere for worker-1''s pods to land.'
-  - order: 3
-    cost: 20
-    content: 'Drain the old node: `kubectl drain worker-1 --ignore-daemonsets --delete-emptydir-data`. It is cordoned (SchedulingDisabled) and its billing pods evict and reschedule onto worker-2. Verify with `kubectl get pods -o wide` (no pods on worker-1, all Running) and `kubectl get nodes` (worker-1 SchedulingDisabled).'
+- order: 1
+  cost: 0
+  content: 'Where to look: Run `kubectl get pods -A` and `kubectl describe pod <name>` for any pod not
+    in Running state.'
+- order: 2
+  cost: 25
+  content: 'Diagnostic steps:
+
+    1. `kubectl get pods` — note CrashLoopBackOff, ImagePullBackOff, or Pending.
+
+    2. `kubectl describe pod <name>` — read Events at the bottom.
+
+    3. `kubectl logs <name> [--previous]` if the container restarted.'
+- order: 3
+  cost: 50
+  content: 'Exact fix + verification:
+
+    1. Fix the root cause (image name, env var, volume mount, or probe).
+
+    2. `kubectl apply -f` the corrected manifest or delete the pod to recreate.
+
+    3. Confirm `kubectl get pods` shows every pod Running.
+
+
+    WHY: Kubernetes only reports healthy when the workload actually runs.'
 requires_companion_hosts: false
+technology: kubernetes
+summary: Complete the node maintenance - drain worker-1, bring up a replacement kubernetes lab and verify
+  success with the checker
+estimated_minutes: 25
+xp_reward: 100
+prerequisites:
+- Basic kubernetes literacy
+tags:
+- fix
+- hands-on
+- kubernetes
+linked_tutorial: kubernetes-fundamentals
+what_you_will_learn:
+- Confirm worker-1 hosts all billing pods (kubectl get pods -o wide)
+- Open the VMware simulator and power on the replacement worker VM k8s-worker-2
+- Confirm worker-2 is Ready (kubectl get nodes)
+- Cordon and drain worker-1 so its pods reschedule (kubectl drain worker-1 --ignore-daemonsets)
+- Verify worker-1 is unschedulable with no pods and all billing pods Running on worker-2
+environment:
+  nodes:
+  - role: primary
+    os: FixitLab Kubernetes cluster
+    hostname: lab-primary
+    ip: 127.0.0.1
+    specs: local offline simulation
+  pre_installed:
+  - bash
+  - coreutils
+  - helm
+  - kubectl
+  - kubernetes
+  credentials:
+  - user: root
+    password: lab123
+tasks:
+- id: task_1
+  title: Node Maintenance - Drain worker-1, Bring Up a Replacement
+  description: Restore healthy behavior for Node Maintenance - Drain worker-1, Bring Up a Replacement
+    by investigating the failure, applying the smallest safe fix, and validating the outcome.
+  background: 'This kubernetes lab teaches systematic troubleshooting: observe, hypothesize, change, verify.'
+  validation:
+    type: k8s_resource_state
+    resource_kind: Pod
+    resource_name: all
+    namespace: default
+    expected_state: Running
+    error_message: One or more pods are not Running. Use kubectl describe pod and kubectl logs.
+solution:
+  summary: Identify the misconfiguration affecting this kubernetes lab and apply the minimal fix.
+  files_changed: []
+  commands_run: []
+  reference_docs: kubernetes-fundamentals

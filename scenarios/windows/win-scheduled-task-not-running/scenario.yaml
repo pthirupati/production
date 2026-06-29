@@ -1,7 +1,7 @@
 title: Windows Scheduled Task Not Running
 slug: win-scheduled-task-not-running
-technology: Windows Server
-category: Automation
+technology: windows
+category: Fix
 difficulty: easy
 lab_mode: simulation
 simulation_type: windows
@@ -10,8 +10,26 @@ max_score: 100
 is_free: true
 jira_priority: High
 dual_terminal: false
-description: A nightly backup scheduled task never runs because its run-as account password expired. Update
-  the credentials and confirm the task runs on schedule.
+description: 'CONTEXT: A team operating Windows Server needs you to resolve `Windows Scheduled Task Not
+  Running` during a realistic incident. The business impact is reduced service reliability until the underlying
+  state is repaired.
+
+
+  ENVIRONMENT: You are working in FixitLab''s offline Windows Server host with PowerShell, Server Manager,
+  and AD tools. All tools run locally; no paid APIs or external cloud calls are required.
+
+
+  SYMPTOM / STARTING STATE: A Windows Server scheduled task that fails to start because the stored run-as
+  credentials are stale. A nightly backup scheduled task never runs because its run-as account password
+  expired. Update the credentials and confirm the task runs on schedule.
+
+
+  OBJECTIVE: Confirm the scheduled task last-run result is a logon failure; Update the task''s run-as
+  credentials; Run the task on demand and verify success. Success means `check.sh` exits successfully.
+
+
+  WHAT TO AVOID: Do not apply broad destructive changes, skip evidence gathering, or fake completion with
+  marker files — the checker validates real system state.'
 initial_state: A Windows Server scheduled task that fails to start because the stored run-as credentials
   are stale.
 objectives:
@@ -20,11 +38,73 @@ objectives:
 - Run the task on demand and verify success
 hints:
 - order: 1
-  cost: 10
-  content: schtasks shows last result 0x4xxxxx logon failure.
+  cost: 0
+  content: 'Where to look: Open Event Viewer (System/Application) and the relevant Services mmc or Server
+    Manager role status.'
 - order: 2
-  cost: 15
-  content: Update the principal password (or use a gMSA).
+  cost: 25
+  content: 'Diagnostic steps:
+
+    1. Note the service state and dependency chain in services.msc.
+
+    2. Read the most recent error in Event Viewer for the failing component.
+
+    3. Use PowerShell (`Get-Service`, `Get-WinEvent`) for scripted evidence.'
 - order: 3
-  cost: 20
-  content: Run on demand; result 0x0.
+  cost: 50
+  content: 'Exact fix + verification:
+
+    1. Apply the minimal fix (service start, GPO, binding, or permission).
+
+    2. Re-test the failing operation.
+
+    3. Confirm Check Solution passes.
+
+
+    WHY: Windows labs grade real role/service state.'
+summary: Complete the windows scheduled task not running windows lab and verify success with the checker
+estimated_minutes: 20
+xp_reward: 100
+prerequisites:
+- Basic windows literacy
+tags:
+- fix
+- hands-on
+- windows
+linked_tutorial: windows-fundamentals
+what_you_will_learn:
+- Confirm the scheduled task last-run result is a logon failure
+- Update the task's run-as credentials
+- Run the task on demand and verify success
+environment:
+  nodes:
+  - role: primary
+    os: FixitLab Windows Server host
+    hostname: lab-primary
+    ip: 127.0.0.1
+    specs: local offline simulation
+  pre_installed:
+  - bash
+  - coreutils
+  - journalctl
+  - systemctl
+  - windows
+  credentials:
+  - user: root
+    password: lab123
+tasks:
+- id: task_1
+  title: Windows Scheduled Task Not Running
+  description: Restore healthy behavior for Windows Scheduled Task Not Running by investigating the failure,
+    applying the smallest safe fix, and validating the outcome.
+  background: 'This windows lab teaches systematic troubleshooting: observe, hypothesize, change, verify.'
+  validation:
+    type: custom_script
+    script: check.sh
+    error_message: Validation did not pass. Re-read the objectives and Hint 2 diagnostic steps.
+solution:
+  summary: Identify the misconfiguration affecting this windows lab and apply the minimal fix.
+  files_changed: []
+  commands_run:
+  - bash check.sh
+  reference_docs: windows-fundamentals

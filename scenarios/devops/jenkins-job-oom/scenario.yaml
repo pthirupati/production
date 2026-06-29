@@ -1,20 +1,40 @@
 title: Fix Jenkins Job Out of Memory
 slug: jenkins-job-oom
-technology: DevOps
-category: CI/CD
+technology: devops
+category: Fix
 difficulty: medium
 time_limit: 900
 max_score: 100
 infrastructure_type: docker
 jira_priority: High
 is_free: false
-description: 'Jenkins build jobs are failing with Java OutOfMemoryError. The Jenkins master JVM
+description: 'CONTEXT: A team operating DevOps delivery needs you to resolve `Fix Jenkins Job Out of Memory`
+  during a realistic incident. The business impact is reduced service reliability until the underlying
+  state is repaired.
+
+
+  ENVIRONMENT: You are working in FixitLab''s offline CI/CD lab with git repos, pipelines, artifacts,
+  and runbooks. All tools run locally; no paid APIs or external cloud calls are required.
+
+
+  SYMPTOM / STARTING STATE: Ubuntu server with Jenkins installed. Build jobs are failing with OutOfMemoryError.
+
+  Jenkins configuration is at /etc/default/jenkins. The JVM is currently configured
+
+  with -Xmx512m which is too small. Jenkins build jobs are failing with Java OutOfMemoryError. The Jenkins
+  master JVM
 
   is running with default heap settings which are too small for the current workload.
 
   You need to increase the JVM heap size in the Jenkins startup configuration.
 
-  '
+
+  OBJECTIVE: Identify the current JVM heap settings for Jenkins; Increase the JVM heap to at least 2GB
+  (-Xmx2g); Restart Jenkins and verify the new settings are active. Success means `check.sh` exits successfully.
+
+
+  WHAT TO AVOID: Do not apply broad destructive changes, skip evidence gathering, or fake completion with
+  marker files — the checker validates real system state.'
 objectives:
 - Identify the current JVM heap settings for Jenkins
 - Increase the JVM heap to at least 2GB (-Xmx2g)
@@ -28,17 +48,70 @@ initial_state: 'Ubuntu server with Jenkins installed. Build jobs are failing wit
   '
 hints:
 - order: 1
-  cost: 10
-  content: 'Confirm the heap and the OOM: build logs show java.lang.OutOfMemoryError; check current args:
-    `grep JAVA_ARGS /etc/default/jenkins`.'
+  cost: 0
+  content: 'Where to look: Identify the current JVM heap settings for Jenkins'
 - order: 2
-  cost: 15
-  content: The JVM max heap is too small (e.g. -Xmx512m) for the workload — it needs raising in the JAVA_ARGS
-    line.
-- order: 3
-  cost: 20
-  content: Edit `/etc/default/jenkins` and change `-Xmx512m` to `-Xmx2g` (at least 2GB) in JAVA_ARGS.
-- order: 4
   cost: 25
-  content: 'Restart and verify: `systemctl restart jenkins`, then confirm the running process uses the
-    new heap (`ps aux | grep -- -Xmx2g`) and builds stop OOMing.'
+  content: 'Diagnostic steps:
+
+    1. Increase the JVM heap to at least 2GB (-Xmx2g)
+
+    2. Restart Jenkins and verify the new settings are active'
+- order: 3
+  cost: 50
+  content: 'Exact fix + verification:
+
+    1. Restart Jenkins and verify the new settings are active.
+
+    2. Re-run the lab checker (`check.sh` or Check Solution).
+
+    3. Confirm every scenario objective is satisfied.
+
+
+    WHY: the grader validates real state — marker files are ignored.'
+summary: Complete the fix jenkins job out of memory devops lab and verify success with the checker
+estimated_minutes: 15
+xp_reward: 100
+prerequisites:
+- Basic devops literacy
+tags:
+- devops
+- fix
+- hands-on
+linked_tutorial: devops-fundamentals
+what_you_will_learn:
+- Identify the current JVM heap settings for Jenkins
+- Increase the JVM heap to at least 2GB (-Xmx2g)
+- Restart Jenkins and verify the new settings are active
+environment:
+  nodes:
+  - role: primary
+    os: FixitLab CI/CD lab
+    hostname: lab-primary
+    ip: 127.0.0.1
+    specs: local offline simulation
+  pre_installed:
+  - bash
+  - coreutils
+  - devops
+  - journalctl
+  - systemctl
+  credentials:
+  - user: root
+    password: lab123
+tasks:
+- id: task_1
+  title: Fix Jenkins Job Out of Memory
+  description: Restore healthy behavior for Fix Jenkins Job Out of Memory by investigating the failure,
+    applying the smallest safe fix, and validating the outcome.
+  background: 'This devops lab teaches systematic troubleshooting: observe, hypothesize, change, verify.'
+  validation:
+    type: custom_script
+    script: check.sh
+    error_message: Validation did not pass. Re-read the objectives and Hint 2 diagnostic steps.
+solution:
+  summary: Identify the misconfiguration affecting this devops lab and apply the minimal fix.
+  files_changed: []
+  commands_run:
+  - bash check.sh
+  reference_docs: devops-fundamentals

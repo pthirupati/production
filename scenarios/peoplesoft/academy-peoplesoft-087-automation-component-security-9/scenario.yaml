@@ -1,7 +1,7 @@
-title: 'Oracle PeopleSoft: Component Security — Automation Practice'
+title: Component Security — Automation Lab
 slug: academy-peoplesoft-087-automation-component-security-9
-technology: Oracle PeopleSoft
-category: Automation
+technology: peoplesoft
+category: Harden
 difficulty: medium
 scenario_type: do
 lab_mode: simulation
@@ -11,8 +11,28 @@ max_score: 100
 is_free: false
 infrastructure_type: docker
 jira_priority: Medium
-description: 'Automation lab: remove toil around component security. Codify repeatable steps for component/menu
-  access by permission and prove the automation is idempotent.'
+description: 'CONTEXT: A team operating PeopleSoft administration needs you to resolve `peoplesoft: Component
+  Security — Automation Practice` during a realistic incident. The business impact is reduced service
+  reliability until the underlying state is repaired.
+
+
+  ENVIRONMENT: You are working in FixitLab''s offline PeopleSoft app server lab with PIA, Process Scheduler,
+  Integration Broker, and app server logs. All tools run locally; no paid APIs or external cloud calls
+  are required.
+
+
+  SYMPTOM / STARTING STATE: Operators still perform manual steps for component security. Automate the
+  boring parts without hiding important safety checks. Automation lab: remove toil around component security.
+  Codify repeatable steps for component/menu access by permission and prove the automation is idempotent.
+
+
+  OBJECTIVE: Day-2 component security work completes safely in this environment; Changes are verified
+  with before/after checks; The system remains stable for dependent teams. Success means `check.sh` exits
+  successfully.
+
+
+  WHAT TO AVOID: Do not apply broad destructive changes, skip evidence gathering, or fake completion with
+  marker files — the checker validates real system state.'
 objectives:
 - Day-2 component security work completes safely in this environment
 - Changes are verified with before/after checks
@@ -21,32 +41,94 @@ initial_state: Operators still perform manual steps for component security. Auto
   without hiding important safety checks.
 hints:
 - order: 1
-  cost: 10
-  content: 'Orient yourself before changing anything:
-
-    1. Inspect the current state — component permissions and menus.
-
-    2. Write down what looks normal versus wrong or missing for component security.
-
-    3. Recall the core idea: component/menu access by permission. Form one hypothesis before you act.'
+  cost: 0
+  content: 'Where to look: Day-2 component security work completes safely in this environment'
 - order: 2
-  cost: 15
-  content: 'Plan your approach (still no spoilers):
-
-    1. Confirm the exact gap between current and desired state for component security.
-
-    2. Decide the single smallest change that moves you toward the objective.
-
-    3. Capture evidence (command output / status) before the change so you can prove it worked afterward.'
-- order: 3
   cost: 25
-  content: 'Guided walkthrough:
+  content: 'Diagnostic steps:
 
-    1. Re-check the current state — component permissions and menus.
+    1. Changes are verified with before/after checks
 
-    2. Implement the automation with dry-run / check mode, then run it twice — the second run must report
-    no changes.
+    2. The system remains stable for dependent teams'
+- order: 3
+  cost: 50
+  content: 'Exact fix + verification:
 
-    3. Verify the result — component access matches policy.
+    1. The system remains stable for dependent teams.
 
-    4. Click Check Solution once `systemctl is-active nginx` returns active.'
+    2. Re-run the lab checker (`check.sh` or Check Solution).
+
+    3. Confirm every scenario objective is satisfied.
+
+
+    WHY: the grader validates real state — marker files are ignored.'
+summary: Complete the component security — automation lab peoplesoft lab and verify success with the checker
+estimated_minutes: 20
+xp_reward: 100
+prerequisites:
+- Basic peoplesoft literacy
+tags:
+- do
+- hands-on
+- peoplesoft
+linked_tutorial: peoplesoft-fundamentals
+what_you_will_learn:
+- Day-2 component security work completes safely in this environment
+- Changes are verified with before/after checks
+- The system remains stable for dependent teams
+environment:
+  nodes:
+  - role: primary
+    os: FixitLab PeopleSoft app server lab
+    hostname: lab-primary
+    ip: 127.0.0.1
+    specs: local offline simulation
+  pre_installed:
+  - bash
+  - coreutils
+  - journalctl
+  - peoplesoft
+  - systemctl
+  credentials:
+  - user: root
+    password: lab123
+tasks:
+- id: task_1
+  title: Component Security — Automation Lab
+  description: Restore healthy behavior for Component Security — Automation Lab by investigating the failure,
+    applying the smallest safe fix, and validating the outcome.
+  background: 'This peoplesoft lab teaches systematic troubleshooting: observe, hypothesize, change, verify.'
+  validation:
+    type: custom_script
+    script: check.sh
+    error_message: Validation did not pass. Re-read the objectives and Hint 2 diagnostic steps.
+solution:
+  summary: Identify the misconfiguration affecting this peoplesoft lab and apply the minimal fix.
+  files_changed: []
+  commands_run:
+  - bash check.sh
+  reference_docs: peoplesoft-fundamentals
+guided_mode:
+  enabled: true
+  steps:
+  - step: 1
+    title: Inspect current state
+    instruction: Run a read-only diagnostic before changing anything.
+    command: check.sh
+    expected_output: Output shows the current failure mode
+    explanation: Evidence-first troubleshooting avoids guessing.
+    next_on: command_success
+  - step: 2
+    title: Apply the minimal fix
+    instruction: Make one reversible change aligned with the objectives.
+    command: '# your fix command here'
+    expected_output: State moves toward the objective
+    explanation: Small changes make rollback easy if the hypothesis was wrong.
+    next_on: command_success
+  - step: 3
+    title: Verify with the grader
+    instruction: Run the same verification the checker uses.
+    command: check.sh
+    expected_output: '`check.sh` exits successfully'
+    explanation: The lab passes only when real state is healthy.
+    next_on: command_success

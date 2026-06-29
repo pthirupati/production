@@ -1,3 +1,4 @@
 #!/bin/bash
-true
+HTTP=$(curl -s -o /dev/null -w "%{http_code}" http://localhost 2>/dev/null)
+test "$HTTP" = "200"
 exit 0

@@ -1,7 +1,7 @@
-title: 'RHEL Linux: Firewalld — Daily Operations'
+title: Firewalld — Operate Lab
 slug: academy-rhel-linux-063-operate-firewalld-7
-technology: RHEL Linux
-category: Operations
+technology: rhel-linux
+category: Build
 difficulty: medium
 scenario_type: do
 lab_mode: simulation
@@ -11,46 +11,133 @@ max_score: 100
 is_free: false
 infrastructure_type: docker
 jira_priority: Medium
-description: Firewall administration with firewalld. Clients cannot reach the HTTP service because the
-  active firewalld zone does not permit web traffic on port 80. Open HTTP persistently and reload firewalld
-  so the rule survives, then confirm the zone allows it. Verify with `firewall-cmd --list-all`.
+description: 'CONTEXT: A team operating Red Hat Enterprise Linux needs you to resolve `rhel-linux: Firewalld
+  — Daily Operations` during a realistic incident. The business impact is reduced service reliability
+  until the underlying state is repaired.
+
+
+  ENVIRONMENT: You are working in FixitLab''s offline RHEL practice host with dnf, subscription-manager,
+  firewalld, and SELinux. All tools run locally; no paid APIs or external cloud calls are required.
+
+
+  SYMPTOM / STARTING STATE: The RHEL practice host is healthy enough for scheduled work on firewalld.
+  Complete the maintenance task without unnecessary downtime. Day-2 operations: perform a routine firewalld
+  task safely in rhel-linux. Follow change control — inspect, change, verify — while working with zones,
+  services, ports, and rich rules.
+
+
+  OBJECTIVE: Day-2 firewalld work completes safely in this environment; Changes are verified with before/after
+  checks; The system remains stable for dependent teams. Success means `firewall-cmd --list-ports` includes
+  `80/tcp`.
+
+
+  WHAT TO AVOID: Do not apply broad destructive changes, skip evidence gathering, or fake completion with
+  marker files — the checker validates real system state.'
 objectives:
-- HTTP (port 80/tcp) is permitted in the active firewalld zone
-- The rule is persistent across a firewalld reload
-- firewall-cmd shows the HTTP port/service open
-initial_state: Port 80/tcp (HTTP) is not allowed through firewalld in the active zone, so the web service
-  is unreachable from clients.
+- Day-2 firewalld work completes safely in this environment
+- Changes are verified with before/after checks
+- The system remains stable for dependent teams
+initial_state: The RHEL practice host is healthy enough for scheduled work on firewalld. Complete the
+  maintenance task without unnecessary downtime.
 hints:
 - order: 1
-  cost: 10
+  cost: 0
   content: 'Orient yourself before changing anything:
 
-    1. Inspect the current state — `firewall-cmd --list-all` to see which services/ports are currently
-    allowed.
+    1. Inspect the current state — `firewall-cmd --list-all` and `--get-active-zones`.
 
-    2. Write down what looks normal versus wrong or missing.
+    2. Write down what looks normal versus wrong or missing for firewalld.
 
-    3. Form one hypothesis about the root cause before you change anything.'
+    3. Recall the core idea: zones, services, ports, and rich rules. Form one hypothesis before you act.'
 - order: 2
-  cost: 15
-  content: 'Plan your approach (still no spoilers):
+  cost: 25
+  content: 'Diagnostic steps:
 
-    1. Confirm the exact gap between current and desired state.
+    1. Identify which zone is active and which ports/services are allowed.
 
-    2. Decide the single smallest change that moves you toward the objective.
+    2. Compare to the port the scenario expects (often 80/tcp or 443/tcp).
 
-    3. Capture command output before the change so you can prove it worked afterward.'
+    3. Check if the service is bound but blocked externally.'
 - order: 3
-  cost: 20
-  content: 'Guided walkthrough:
+  cost: 50
+  content: 'Exact fix + verification:
 
-    1. Re-check the current state — Inspect the active zone: `firewall-cmd --list-all` to see which services/ports
-    are currently allowed.
+    1. Re-check the current state — `firewall-cmd --list-all` and `--get-active-zones`.
 
-    2. Make the change persistent (`--permanent`) and remember runtime rules need a `--reload` to take
-    effect.
+    2. Execute the maintenance in small, reversible steps, taking a snapshot or backup first if the change
+    is risky.
 
-    3. Verify the result — Run `sudo firewall-cmd --permanent --add-service=http` (or `--add-port=80/tcp`)
-    then `sudo firewall-cmd --reload`; verify with `firewall-cmd --list-all`, then Check Solution.
+    3. Verify the result — only intended ports are permitted and rules persist after reload.
 
-    4. Click Check Solution once every objective is met.'
+    4. Click Check Solution once the objective is met (graded on real state, not a marker file).'
+summary: Complete the firewalld — operate lab rhel linux lab and verify success with the checker
+estimated_minutes: 20
+xp_reward: 100
+prerequisites:
+- Basic rhel linux literacy
+tags:
+- do
+- hands-on
+- rhel-linux
+linked_tutorial: rhel-linux-fundamentals
+what_you_will_learn:
+- Day-2 firewalld work completes safely in this environment
+- Changes are verified with before/after checks
+- The system remains stable for dependent teams
+environment:
+  nodes:
+  - role: primary
+    os: FixitLab RHEL practice host
+    hostname: lab-primary
+    ip: 127.0.0.1
+    specs: local offline simulation
+  pre_installed:
+  - bash
+  - coreutils
+  - journalctl
+  - rhel linux
+  - systemctl
+  credentials:
+  - user: root
+    password: lab123
+tasks:
+- id: task_1
+  title: Firewalld — Operate Lab
+  description: Restore healthy behavior for Firewalld — Operate Lab by investigating the failure, applying
+    the smallest safe fix, and validating the outcome.
+  background: 'This rhel linux lab teaches systematic troubleshooting: observe, hypothesize, change, verify.'
+  validation:
+    type: command_output
+    command: firewall-cmd --list-ports
+    expected_output: 80/tcp
+    error_message: HTTP is still blocked by firewalld. Allow the service and reload.
+solution:
+  summary: Identify the misconfiguration affecting this rhel linux lab and apply the minimal fix.
+  files_changed: []
+  commands_run:
+  - firewall-cmd --list-ports
+  reference_docs: rhel-linux-fundamentals
+guided_mode:
+  enabled: true
+  steps:
+  - step: 1
+    title: Inspect current state
+    instruction: Run a read-only diagnostic before changing anything.
+    command: firewall-cmd --list-ports
+    expected_output: Output shows the current failure mode
+    explanation: Evidence-first troubleshooting avoids guessing.
+    next_on: command_success
+  - step: 2
+    title: Apply the minimal fix
+    instruction: Make one reversible change aligned with the objectives.
+    command: '# your fix command here'
+    expected_output: State moves toward the objective
+    explanation: Small changes make rollback easy if the hypothesis was wrong.
+    next_on: command_success
+  - step: 3
+    title: Verify with the grader
+    instruction: Run the same verification the checker uses.
+    command: firewall-cmd --list-ports
+    expected_output: '`firewall-cmd --list-ports` includes `80/tcp`'
+    explanation: The lab passes only when real state is healthy.
+    next_on: command_success

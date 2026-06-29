@@ -1,36 +1,119 @@
 title: Fix Terraform Variable Type Error
 slug: terraform-apply-failed
-technology: DevOps
-category: Infrastructure as Code
+technology: devops
+category: Fix
 difficulty: medium
 time_limit: 900
 max_score: 100
 infrastructure_type: docker
 jira_priority: Medium
 is_free: false
-description: |
-  Terraform plan is failing with a variable type mismatch error. A recent change
-  to variables.tf introduced an incorrect type constraint. The variable
-  "instance_count" is declared as type string but the terraform.tfvars file
-  provides a number. Fix the type declaration so terraform plan succeeds.
-objectives:
-  - Run terraform plan and identify the variable type error
-  - Fix the type constraint in variables.tf
-  - Verify terraform plan completes without errors
-initial_state: |
-  Ubuntu server with Terraform installed. Working directory is /opt/terraform/infra.
+description: 'CONTEXT: A team operating DevOps delivery needs you to resolve `Fix Terraform Variable Type
+  Error` during a realistic incident. The business impact is reduced service reliability until the underlying
+  state is repaired.
+
+
+  ENVIRONMENT: You are working in FixitLab''s offline CI/CD lab with git repos, pipelines, artifacts,
+  and runbooks. All tools run locally; no paid APIs or external cloud calls are required.
+
+
+  SYMPTOM / STARTING STATE: Ubuntu server with Terraform installed. Working directory is /opt/terraform/infra.
+
   The variables.tf file declares instance_count as type string but tfvars provides
+
+  a number value, causing a type mismatch error. Terraform plan is failing with a variable type mismatch
+  error. A recent change
+
+  to variables.tf introduced an incorrect type constraint. The variable
+
+  "instance_count" is declared as type string but the terraform.tfvars file
+
+  provides a number. Fix the type declaration so terraform plan succeeds.
+
+
+  OBJECTIVE: Run terraform plan and identify the variable type error; Fix the type constraint in variables.tf;
+  Verify terraform plan completes without errors. Success means `check.sh` exits successfully.
+
+
+  WHAT TO AVOID: Do not apply broad destructive changes, skip evidence gathering, or fake completion with
+  marker files — the checker validates real system state.'
+objectives:
+- Run terraform plan and identify the variable type error
+- Fix the type constraint in variables.tf
+- Verify terraform plan completes without errors
+initial_state: 'Ubuntu server with Terraform installed. Working directory is /opt/terraform/infra.
+
+  The variables.tf file declares instance_count as type string but tfvars provides
+
   a number value, causing a type mismatch error.
+
+  '
 hints:
-  - order: 1
-    cost: 10
-    content: "Run: cd /opt/terraform/infra && terraform plan to see the error"
-  - order: 2
-    cost: 15
-    content: "Check the variable declaration: cat variables.tf | grep -A5 instance_count"
-  - order: 3
-    cost: 20
-    content: "Check the value provided: cat terraform.tfvars | grep instance_count"
-  - order: 4
-    cost: 25
-    content: "In variables.tf, change 'type = string' to 'type = number' for instance_count"
+- order: 1
+  cost: 0
+  content: 'Where to look: Run terraform plan and identify the variable type error'
+- order: 2
+  cost: 25
+  content: 'Diagnostic steps:
+
+    1. Fix the type constraint in variables.tf
+
+    2. Verify terraform plan completes without errors'
+- order: 3
+  cost: 50
+  content: 'Exact fix + verification:
+
+    1. Verify terraform plan completes without errors.
+
+    2. Re-run the lab checker (`check.sh` or Check Solution).
+
+    3. Confirm every scenario objective is satisfied.
+
+
+    WHY: the grader validates real state — marker files are ignored.'
+summary: Complete the fix terraform variable type error devops lab and verify success with the checker
+estimated_minutes: 15
+xp_reward: 100
+prerequisites:
+- Basic devops literacy
+tags:
+- devops
+- fix
+- hands-on
+linked_tutorial: devops-fundamentals
+what_you_will_learn:
+- Run terraform plan and identify the variable type error
+- Fix the type constraint in variables.tf
+- Verify terraform plan completes without errors
+environment:
+  nodes:
+  - role: primary
+    os: FixitLab CI/CD lab
+    hostname: lab-primary
+    ip: 127.0.0.1
+    specs: local offline simulation
+  pre_installed:
+  - bash
+  - coreutils
+  - devops
+  - journalctl
+  - systemctl
+  credentials:
+  - user: root
+    password: lab123
+tasks:
+- id: task_1
+  title: Fix Terraform Variable Type Error
+  description: Restore healthy behavior for Fix Terraform Variable Type Error by investigating the failure,
+    applying the smallest safe fix, and validating the outcome.
+  background: 'This devops lab teaches systematic troubleshooting: observe, hypothesize, change, verify.'
+  validation:
+    type: custom_script
+    script: check.sh
+    error_message: Validation did not pass. Re-read the objectives and Hint 2 diagnostic steps.
+solution:
+  summary: Identify the misconfiguration affecting this devops lab and apply the minimal fix.
+  files_changed: []
+  commands_run:
+  - bash check.sh
+  reference_docs: devops-fundamentals

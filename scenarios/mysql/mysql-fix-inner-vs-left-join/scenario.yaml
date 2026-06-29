@@ -1,10 +1,28 @@
 title: Fix the Customer Report That Drops Newcomers
 slug: mysql-fix-inner-vs-left-join
 technology: mysql
-category: MySQL
-description: A "total spend per customer" report must list every customer, including those who have
-  not ordered yet (shown as 0). The starter uses an INNER JOIN, which silently drops any customer
+category: Fix
+description: 'CONTEXT: A team operating MySQL needs you to resolve `Fix the Customer Report That Drops
+  Newcomers` during a realistic incident. The business impact is reduced service reliability until the
+  underlying state is repaired.
+
+
+  ENVIRONMENT: You are working in FixitLab''s offline MySQL instance with mysql client, InnoDB, grants,
+  and slow query log. All tools run locally; no paid APIs or external cloud calls are required.
+
+
+  SYMPTOM / STARTING STATE: A "total spend per customer" report must list every customer, including those
+  who have not ordered yet (shown as 0). The starter uses an INNER JOIN, which silently drops any customer
   with no matching orders. Switch to a LEFT JOIN and handle the resulting NULLs.
+
+
+  OBJECTIVE: See how an INNER JOIN hides customers with no orders; Use a LEFT JOIN to keep every customer
+  row; Convert the NULL sum of a zero-order customer to 0 with COALESCE. Success means all hidden tests
+  pass.
+
+
+  WHAT TO AVOID: Do not apply broad destructive changes, skip evidence gathering, or fake completion with
+  marker files — the checker validates real system state.'
 difficulty: medium
 scenario_type: fix
 lab_mode: simulation
@@ -22,102 +40,138 @@ objectives:
 initial_state: A "total spend per customer" report must list every customer, including those who have
   not ordered yet (shown as 0). The starter uses an INNER JOIN, which silently drops any customer with
   no matching orders. Switch to a LEFT JOIN and handle the resulting NULLs.
-solution_explanation: |
-  An INNER JOIN only emits rows where both sides match, so a customer with no orders disappears from
+solution_explanation: 'An INNER JOIN only emits rows where both sides match, so a customer with no orders
+  disappears from
+
   the report entirely — a dangerous silent omission. A LEFT JOIN keeps every customer row and fills
+
   the order columns with NULL when there is no match. SUM over an all-NULL group is itself NULL, so
-  COALESCE(SUM(o.amount), 0) turns a no-order customer's total into 0.
+
+  COALESCE(SUM(o.amount), 0) turns a no-order customer''s total into 0.
+
+  '
 coding_spec:
   language: python
   entrypoint: solution.py
   kind: fix
-  instructions: |
-    Fix solution(conn) so it returns (name, total_spent) for EVERY customer ordered by name.
+  instructions: 'Fix solution(conn) so it returns (name, total_spent) for EVERY customer ordered by name.
+
     Customers with no orders must appear with a total of 0. The starter uses an INNER JOIN and
+
     drops them.
+
     Click Run to try it, then Check Solution to grade against all tests.
+
+    '
   files:
   - path: solution.py
-    content: |
-      import sqlite3
-
-      def solution(conn):
-          # BUG: INNER JOIN drops customers who have no orders. The report must
-          # include every customer, with 0 for those who have not ordered yet.
-          return conn.execute(
-              """
-              SELECT c.name, COALESCE(SUM(o.amount), 0) AS total_spent
-              FROM customers c
-              JOIN orders o ON o.customer_id = c.id
-              GROUP BY c.id, c.name
-              ORDER BY c.name
-              """
-          ).fetchall()
+    content: "import sqlite3\n\ndef solution(conn):\n    # BUG: INNER JOIN drops customers who have no\
+      \ orders. The report must\n    # include every customer, with 0 for those who have not ordered yet.\n\
+      \    return conn.execute(\n        \"\"\"\n        SELECT c.name, COALESCE(SUM(o.amount), 0) AS\
+      \ total_spent\n        FROM customers c\n        JOIN orders o ON o.customer_id = c.id\n       \
+      \ GROUP BY c.id, c.name\n        ORDER BY c.name\n        \"\"\"\n    ).fetchall()\n"
     readonly: false
   visible_tests:
   - name: zero-order customer appears with 0
-    code: |
-      import sqlite3
-      conn = sqlite3.connect(':memory:')
-      conn.executescript(
-          "CREATE TABLE customers (id INTEGER PRIMARY KEY, name TEXT);"
-          "CREATE TABLE orders (id INTEGER PRIMARY KEY, customer_id INTEGER, amount REAL);"
-          "INSERT INTO customers (id, name) VALUES (1,'Ada'),(2,'Bo'),(3,'Cy');"
-          "INSERT INTO orders (id, customer_id, amount) VALUES (10,1,50.0),(11,1,30.0),(12,3,20.0);"
-      )
-      assert solution(conn) == [('Ada', 80.0), ('Bo', 0), ('Cy', 20.0)], solution(conn)
+    code: "import sqlite3\nconn = sqlite3.connect(':memory:')\nconn.executescript(\n    \"CREATE TABLE\
+      \ customers (id INTEGER PRIMARY KEY, name TEXT);\"\n    \"CREATE TABLE orders (id INTEGER PRIMARY\
+      \ KEY, customer_id INTEGER, amount REAL);\"\n    \"INSERT INTO customers (id, name) VALUES (1,'Ada'),(2,'Bo'),(3,'Cy');\"\
+      \n    \"INSERT INTO orders (id, customer_id, amount) VALUES (10,1,50.0),(11,1,30.0),(12,3,20.0);\"\
+      \n)\nassert solution(conn) == [('Ada', 80.0), ('Bo', 0), ('Cy', 20.0)], solution(conn)\n"
   - name: every customer is present
-    code: |
-      import sqlite3
-      conn = sqlite3.connect(':memory:')
-      conn.executescript(
-          "CREATE TABLE customers (id INTEGER PRIMARY KEY, name TEXT);"
-          "CREATE TABLE orders (id INTEGER PRIMARY KEY, customer_id INTEGER, amount REAL);"
-          "INSERT INTO customers (id, name) VALUES (1,'Ada'),(2,'Bo'),(3,'Cy');"
-          "INSERT INTO orders (id, customer_id, amount) VALUES (10,1,50.0),(11,1,30.0),(12,3,20.0);"
-      )
-      assert len(solution(conn)) == 3, solution(conn)
+    code: "import sqlite3\nconn = sqlite3.connect(':memory:')\nconn.executescript(\n    \"CREATE TABLE\
+      \ customers (id INTEGER PRIMARY KEY, name TEXT);\"\n    \"CREATE TABLE orders (id INTEGER PRIMARY\
+      \ KEY, customer_id INTEGER, amount REAL);\"\n    \"INSERT INTO customers (id, name) VALUES (1,'Ada'),(2,'Bo'),(3,'Cy');\"\
+      \n    \"INSERT INTO orders (id, customer_id, amount) VALUES (10,1,50.0),(11,1,30.0),(12,3,20.0);\"\
+      \n)\nassert len(solution(conn)) == 3, solution(conn)\n"
   hidden_tests:
   - name: brand-new customer with no orders
-    code: |
-      import sqlite3
-      conn = sqlite3.connect(':memory:')
-      conn.executescript(
-          "CREATE TABLE customers (id INTEGER PRIMARY KEY, name TEXT);"
-          "CREATE TABLE orders (id INTEGER PRIMARY KEY, customer_id INTEGER, amount REAL);"
-          "INSERT INTO customers (id, name) VALUES (1,'New');"
-      )
-      assert solution(conn) == [('New', 0)], solution(conn)
+    code: "import sqlite3\nconn = sqlite3.connect(':memory:')\nconn.executescript(\n    \"CREATE TABLE\
+      \ customers (id INTEGER PRIMARY KEY, name TEXT);\"\n    \"CREATE TABLE orders (id INTEGER PRIMARY\
+      \ KEY, customer_id INTEGER, amount REAL);\"\n    \"INSERT INTO customers (id, name) VALUES (1,'New');\"\
+      \n)\nassert solution(conn) == [('New', 0)], solution(conn)\n"
   - name: all customers have orders
-    code: |
-      import sqlite3
-      conn = sqlite3.connect(':memory:')
-      conn.executescript(
-          "CREATE TABLE customers (id INTEGER PRIMARY KEY, name TEXT);"
-          "CREATE TABLE orders (id INTEGER PRIMARY KEY, customer_id INTEGER, amount REAL);"
-          "INSERT INTO customers (id, name) VALUES (1,'Ada'),(2,'Bo');"
-          "INSERT INTO orders (id, customer_id, amount) VALUES (10,1,5.0),(11,2,7.0);"
-      )
-      assert solution(conn) == [('Ada', 5.0), ('Bo', 7.0)], solution(conn)
+    code: "import sqlite3\nconn = sqlite3.connect(':memory:')\nconn.executescript(\n    \"CREATE TABLE\
+      \ customers (id INTEGER PRIMARY KEY, name TEXT);\"\n    \"CREATE TABLE orders (id INTEGER PRIMARY\
+      \ KEY, customer_id INTEGER, amount REAL);\"\n    \"INSERT INTO customers (id, name) VALUES (1,'Ada'),(2,'Bo');\"\
+      \n    \"INSERT INTO orders (id, customer_id, amount) VALUES (10,1,5.0),(11,2,7.0);\"\n)\nassert\
+      \ solution(conn) == [('Ada', 5.0), ('Bo', 7.0)], solution(conn)\n"
   - name: multiple orders summed per customer
-    code: |
-      import sqlite3
-      conn = sqlite3.connect(':memory:')
-      conn.executescript(
-          "CREATE TABLE customers (id INTEGER PRIMARY KEY, name TEXT);"
-          "CREATE TABLE orders (id INTEGER PRIMARY KEY, customer_id INTEGER, amount REAL);"
-          "INSERT INTO customers (id, name) VALUES (1,'Big'),(2,'Empty');"
-          "INSERT INTO orders (id, customer_id, amount) VALUES (10,1,1.0),(11,1,2.0),(12,1,3.0);"
-      )
-      assert solution(conn) == [('Big', 6.0), ('Empty', 0)], solution(conn)
+    code: "import sqlite3\nconn = sqlite3.connect(':memory:')\nconn.executescript(\n    \"CREATE TABLE\
+      \ customers (id INTEGER PRIMARY KEY, name TEXT);\"\n    \"CREATE TABLE orders (id INTEGER PRIMARY\
+      \ KEY, customer_id INTEGER, amount REAL);\"\n    \"INSERT INTO customers (id, name) VALUES (1,'Big'),(2,'Empty');\"\
+      \n    \"INSERT INTO orders (id, customer_id, amount) VALUES (10,1,1.0),(11,1,2.0),(12,1,3.0);\"\n\
+      )\nassert solution(conn) == [('Big', 6.0), ('Empty', 0)], solution(conn)\n"
   timeout: 8
 hints:
 - order: 1
-  cost: 10
-  content: Add a customer who has no rows in orders. With the current query they vanish from the result entirely.
+  cost: 0
+  content: 'Where to look: Run `systemctl status mysqld` and tail `/var/log/mysqld.log`.'
 - order: 2
-  cost: 20
-  content: An INNER JOIN keeps only matching pairs. To keep every customer regardless of orders, you need a LEFT JOIN from customers.
+  cost: 25
+  content: 'Diagnostic steps:
+
+    1. Read the error log for InnoDB or permission failures.
+
+    2. Check disk space with `df -h`.
+
+    3. Verify `my.cnf` for bad paths or bind-address.'
 - order: 3
-  cost: 30
-  content: 'Use LEFT JOIN orders o ON o.customer_id = c.id; SUM over no rows is NULL, so keep COALESCE(SUM(o.amount), 0).'
+  cost: 50
+  content: 'Exact fix + verification:
+
+    1. Fix config or ownership under `/var/lib/mysql`.
+
+    2. `systemctl restart mysqld`.
+
+    3. Confirm `systemctl is-active mysqld` returns active.
+
+
+    WHY: MySQL often fails silently until you read the error log.'
+summary: Complete the fix the customer report that drops newcomers mysql lab and verify success with the
+  checker
+estimated_minutes: 20
+xp_reward: 100
+prerequisites:
+- Basic mysql literacy
+tags:
+- fix
+- hands-on
+- mysql
+linked_tutorial: mysql-fundamentals
+what_you_will_learn:
+- See how an INNER JOIN hides customers with no orders
+- Use a LEFT JOIN to keep every customer row
+- Convert the NULL sum of a zero-order customer to 0 with COALESCE
+environment:
+  nodes:
+  - role: primary
+    os: FixitLab MySQL instance
+    hostname: lab-primary
+    ip: 127.0.0.1
+    specs: local offline simulation
+  pre_installed:
+  - bash
+  - coreutils
+  - journalctl
+  - mysql
+  - systemctl
+  credentials:
+  - user: root
+    password: lab123
+tasks:
+- id: task_1
+  title: Fix the Customer Report That Drops Newcomers
+  description: Restore healthy behavior for Fix the Customer Report That Drops Newcomers by investigating
+    the failure, applying the smallest safe fix, and validating the outcome.
+  background: 'This mysql lab teaches systematic troubleshooting: observe, hypothesize, change, verify.'
+  validation:
+    type: custom_script
+    script: hidden_tests
+    error_message: One or more hidden tests failed. Read the public test output, fix your solution, and
+      submit again.
+solution:
+  summary: The solution passes all hidden tests by implementing the required behavior in code.
+  files_changed: []
+  commands_run: []
+  reference_docs: mysql-fundamentals

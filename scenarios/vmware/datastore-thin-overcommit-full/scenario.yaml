@@ -1,8 +1,26 @@
 title: Datastore Full From Thin-Provision Overcommit
 slug: datastore-thin-overcommit-full
-category: VMware vSphere
-description: Thin-provisioned VMs grew and filled datastore-ssd-01, so VMs risk stunning when it hits
-  100%. Reclaim or add capacity until the datastore has healthy free space again.
+category: Fix
+description: 'CONTEXT: A team operating VMware vSphere needs you to resolve `Datastore Full From Thin-Provision
+  Overcommit` during a realistic incident. The business impact is reduced service reliability until the
+  underlying state is repaired.
+
+
+  ENVIRONMENT: You are working in FixitLab''s offline vSphere lab with VMs, datastores, vCenter, and ESXi
+  tasks. All tools run locally; no paid APIs or external cloud calls are required.
+
+
+  SYMPTOM / STARTING STATE: vCenter shows datastore-ssd-01 critically low on free space due to thin-provision
+  growth. Thin-provisioned VMs grew and filled datastore-ssd-01, so VMs risk stunning when it hits 100%.
+  Reclaim or add capacity until the datastore has healthy free space again.
+
+
+  OBJECTIVE: Open the simulator and confirm datastore-ssd-01 is nearly full; Reclaim space (or add capacity)
+  on the datastore; Verify the datastore has at least 50 GB free. Success means `check.sh` exits successfully.
+
+
+  WHAT TO AVOID: Do not apply broad destructive changes, skip evidence gathering, or fake completion with
+  marker files — the checker validates real system state.'
 difficulty: hard
 lab_mode: simulation
 simulation_type: vmware
@@ -18,12 +36,72 @@ objectives:
 initial_state: vCenter shows datastore-ssd-01 critically low on free space due to thin-provision growth.
 hints:
 - order: 1
-  cost: 10
-  content: 'In the vCenter simulator, locate the issue: open the simulator and confirm datastore-ssd-01
-    is nearly full.'
+  cost: 0
+  content: 'Where to look: Open the simulator and confirm datastore-ssd-01 is nearly full'
 - order: 2
-  cost: 15
-  content: 'Apply the remediation in the GUI: reclaim space (or add capacity) on the datastore.'
+  cost: 25
+  content: 'Diagnostic steps:
+
+    1. Reclaim space (or add capacity) on the datastore
+
+    2. Verify the datastore has at least 50 GB free'
 - order: 3
-  cost: 20
-  content: 'Confirm resolution: verify the datastore has at least 50 gb free.'
+  cost: 50
+  content: 'Exact fix + verification:
+
+    1. Verify the datastore has at least 50 GB free.
+
+    2. Re-run the lab checker (`check.sh` or Check Solution).
+
+    3. Confirm every scenario objective is satisfied.
+
+
+    WHY: the grader validates real state — marker files are ignored.'
+technology: vmware
+summary: Complete the datastore full from thin-provision overcommit vmware lab and verify success with
+  the checker
+estimated_minutes: 15
+xp_reward: 100
+prerequisites:
+- Basic vmware literacy
+tags:
+- fix
+- hands-on
+- vmware
+linked_tutorial: vmware-fundamentals
+what_you_will_learn:
+- Open the simulator and confirm datastore-ssd-01 is nearly full
+- Reclaim space (or add capacity) on the datastore
+- Verify the datastore has at least 50 GB free
+environment:
+  nodes:
+  - role: primary
+    os: FixitLab vSphere lab
+    hostname: lab-primary
+    ip: 127.0.0.1
+    specs: local offline simulation
+  pre_installed:
+  - bash
+  - coreutils
+  - journalctl
+  - systemctl
+  - vmware
+  credentials:
+  - user: root
+    password: lab123
+tasks:
+- id: task_1
+  title: Datastore Full From Thin-Provision Overcommit
+  description: Restore healthy behavior for Datastore Full From Thin-Provision Overcommit by investigating
+    the failure, applying the smallest safe fix, and validating the outcome.
+  background: 'This vmware lab teaches systematic troubleshooting: observe, hypothesize, change, verify.'
+  validation:
+    type: custom_script
+    script: check.sh
+    error_message: Validation did not pass. Re-read the objectives and Hint 2 diagnostic steps.
+solution:
+  summary: Identify the misconfiguration affecting this vmware lab and apply the minimal fix.
+  files_changed: []
+  commands_run:
+  - bash check.sh
+  reference_docs: vmware-fundamentals

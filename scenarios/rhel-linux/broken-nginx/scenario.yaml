@@ -1,23 +1,56 @@
-category: RHEL Linux
-description: Nginx is installed but fails to start because of a typo in its configuration (commonly a
-  misspelled directive such as `listn` instead of `listen`). `nginx -t` reports the syntax error and systemd
-  refuses to start the service, so the site is down. Find the bad directive, fix it, start nginx, and
-  confirm port 80 serves.
+category: Fix
+description: 'CONTEXT: A team operating Red Hat Enterprise Linux needs you to resolve `Fix Broken Nginx
+  on RHEL` during a realistic incident. The business impact is reduced service reliability until the underlying
+  state is repaired.
+
+
+  ENVIRONMENT: You are working in FixitLab''s offline RHEL practice host with dnf, subscription-manager,
+  firewalld, and SELinux. All tools run locally; no paid APIs or external cloud calls are required.
+
+
+  SYMPTOM / STARTING STATE: Simulated RHEL 9 server. nginx is installed but the active site config contains
+  a typo, so `systemctl start nginx` fails and `nginx -t` reports a syntax error. The website is unreachable.
+  Nginx is installed but fails to start because of a typo in its configuration (commonly a misspelled
+  directive such as `listn` instead of `listen`). `nginx -t` reports the syntax error and systemd refuses
+  to start the service, so the site is down. Find the bad directive, fix it, start nginx, and confirm
+  port 80 serves.
+
+
+  OBJECTIVE: Run nginx -t to locate the configuration syntax error; Fix the misspelled/invalid directive
+  in the site config; Start and enable nginx, then verify it serves on port 80. Success means HTTP 200
+  from http://localhost.
+
+
+  WHAT TO AVOID: Do not apply broad destructive changes, skip evidence gathering, or fake completion with
+  marker files — the checker validates real system state.'
 difficulty: easy
 dual_terminal: false
 hints:
 - order: 1
-  cost: 10
-  content: 'Test the config to get the exact file and line: `nginx -t`. It prints the offending directive
-    (e.g. unknown directive "listn").'
+  cost: 0
+  content: 'Where to look: Test the config to get the exact file and line: `nginx -t`. It prints the offending
+    directive (e.g. unknown directive "listn").'
 - order: 2
-  cost: 15
-  content: Open the named file (often /etc/nginx/nginx.conf or a file under /etc/nginx/conf.d/ or sites-enabled/)
-    and correct the typo on that line.
+  cost: 25
+  content: 'Diagnostic steps:
+
+    1. Run `nginx -t` and note the file path and line number in the error.
+
+    2. Open that file (often `/etc/nginx/nginx.conf` or under `/etc/nginx/conf.d/`).
+
+    3. Compare the bad directive to the nginx docs — typos like `listn` should be `listen`.'
 - order: 3
-  cost: 20
-  content: Re-run `nginx -t` until it says "syntax is ok / test is successful", then `systemctl enable
-    --now nginx`. Verify with `curl -I http://localhost` (expect HTTP/1.1 200).
+  cost: 50
+  content: 'Exact fix + verification:
+
+    1. Correct the typo on the reported line and save the file.
+
+    2. Re-run `nginx -t` until it reports syntax is ok.
+
+    3. Run `systemctl enable --now nginx`, then `curl -I http://localhost` (expect HTTP 200).
+
+
+    WHY: systemd will not start nginx until `nginx -t` passes.'
 initial_state: Simulated RHEL 9 server. nginx is installed but the active site config contains a typo,
   so `systemctl start nginx` fails and `nginx -t` reports a syntax error. The website is unreachable.
 is_free: false
@@ -33,3 +66,50 @@ simulation_type: generic
 slug: sim-rhel-broken-nginx
 time_limit: 900
 title: Fix Broken Nginx on RHEL
+technology: rhel-linux
+summary: Complete the fix broken nginx on rhel rhel linux lab and verify success with the checker
+estimated_minutes: 15
+xp_reward: 100
+prerequisites:
+- Basic rhel linux literacy
+tags:
+- fix
+- hands-on
+- rhel-linux
+linked_tutorial: rhel-linux-fundamentals
+what_you_will_learn:
+- Run nginx -t to locate the configuration syntax error
+- Fix the misspelled/invalid directive in the site config
+- Start and enable nginx, then verify it serves on port 80
+environment:
+  nodes:
+  - role: primary
+    os: FixitLab RHEL practice host
+    hostname: lab-primary
+    ip: 127.0.0.1
+    specs: local offline simulation
+  pre_installed:
+  - bash
+  - coreutils
+  - journalctl
+  - rhel linux
+  - systemctl
+  credentials:
+  - user: root
+    password: lab123
+tasks:
+- id: task_1
+  title: Fix Broken Nginx on RHEL
+  description: Restore healthy behavior for Fix Broken Nginx on RHEL by investigating the failure, applying
+    the smallest safe fix, and validating the outcome.
+  background: 'This rhel linux lab teaches systematic troubleshooting: observe, hypothesize, change, verify.'
+  validation:
+    type: http_response
+    url: http://localhost
+    expected_code: 200
+    error_message: nginx is not serving HTTP 200. Run nginx -t, fix config errors, and start nginx.
+solution:
+  summary: Identify the misconfiguration affecting this rhel linux lab and apply the minimal fix.
+  files_changed: []
+  commands_run: []
+  reference_docs: rhel-linux-fundamentals

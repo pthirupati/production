@@ -1,28 +1,114 @@
 title: Terraform Plan Shows Unexpected Resource Destruction
 slug: terraform-plan-destroy-protection
 difficulty: medium
-category: Terraform
-description: 'Running terraform plan unexpectedly shows that critical resources (e.g., an RDS instance or S3 bucket) will be destroyed and recreated due to a configuration change. Add lifecycle prevent_destroy to protect the resources and rethink the change strategy.'
-initial_state: 'Simulated Terraform project where a change to a resource argument (e.g., renaming an RDS identifier or changing an immutable attribute) causes Terraform to plan a destroy + create cycle for a stateful resource. The plan output shows "-/+" destroy and recreate.'
+category: Fix
+description: 'CONTEXT: A team operating Terraform IaC needs you to resolve `Terraform Plan Shows Unexpected
+  Resource Destruction` during a realistic incident. The business impact is reduced service reliability
+  until the underlying state is repaired.
+
+
+  ENVIRONMENT: You are working in FixitLab''s offline Terraform workspace with HCL files, state, and plan/apply
+  workflow. All tools run locally; no paid APIs or external cloud calls are required.
+
+
+  SYMPTOM / STARTING STATE: Simulated Terraform project where a change to a resource argument (e.g., renaming
+  an RDS identifier or changing an immutable attribute) causes Terraform to plan a destroy + create cycle
+  for a stateful resource. The plan output shows "-/+" destroy and recreate. Running terraform plan unexpectedly
+  shows that critical resources (e.g., an RDS instance or S3 bucket) will be destroyed and recreated due
+  to a configuration change. Add lifecycle prevent_destroy to protect the resources and rethink the change
+  strategy.
+
+
+  OBJECTIVE: Read the terraform plan output and identify which resources are scheduled for destruction;
+  Add a lifecycle { prevent_destroy = true } block to the critical resource to block accidental deletion;
+  Investigate whether the change can be made in-place or requires a migration strategy instead. Success
+  means `check.sh` exits successfully.
+
+
+  WHAT TO AVOID: Do not apply broad destructive changes, skip evidence gathering, or fake completion with
+  marker files — the checker validates real system state.'
+initial_state: Simulated Terraform project where a change to a resource argument (e.g., renaming an RDS
+  identifier or changing an immutable attribute) causes Terraform to plan a destroy + create cycle for
+  a stateful resource. The plan output shows "-/+" destroy and recreate.
 objectives:
-  - Read the terraform plan output and identify which resources are scheduled for destruction
-  - Add a lifecycle { prevent_destroy = true } block to the critical resource to block accidental deletion
-  - Investigate whether the change can be made in-place or requires a migration strategy instead
+- Read the terraform plan output and identify which resources are scheduled for destruction
+- Add a lifecycle { prevent_destroy = true } block to the critical resource to block accidental deletion
+- Investigate whether the change can be made in-place or requires a migration strategy instead
 lab_mode: simulation
 simulation_type: terraform
 time_limit: 1800
 max_score: 100
 is_free: false
 hints:
-  - content: 'Run: terraform plan and look for lines starting with "-/+" which indicate destroy-then-recreate. Note which resource and which argument forces replacement.'
-    cost: 10
-    order: 1
-  - content: 'Add lifecycle { prevent_destroy = true } inside the resource block. Now terraform plan will error if any action would destroy this resource.'
-    cost: 15
-    order: 2
-  - content: 'For immutable attribute changes (like RDS identifier), consider using terraform state mv or a blue-green migration instead of destroy-recreate.'
-    cost: 20
-    order: 3
+- order: 1
+  cost: 0
+  content: 'Where to look: Read the terraform plan output and identify which resources are scheduled for
+    destruction'
+- order: 2
+  cost: 25
+  content: 'Diagnostic steps:
+
+    1. Add a lifecycle { prevent_destroy = true } block to the critical resource to block accidental deletion
+
+    2. Investigate whether the change can be made in-place or requires a migration strategy instead'
+- order: 3
+  cost: 50
+  content: 'Exact fix + verification:
+
+    1. Investigate whether the change can be made in-place or requires a migration strategy instead.
+
+    2. Re-run the lab checker (`check.sh` or Check Solution).
+
+    3. Confirm every scenario objective is satisfied.
+
+
+    WHY: the grader validates real state — marker files are ignored.'
 requires_companion_hosts: false
 dual_terminal: false
 jira_priority: High
+technology: terraform
+summary: Complete the terraform plan shows unexpected resource destruction terraform lab and verify success
+  with the checker
+estimated_minutes: 30
+xp_reward: 100
+prerequisites:
+- Basic terraform literacy
+tags:
+- fix
+- hands-on
+- terraform
+linked_tutorial: terraform-fundamentals
+what_you_will_learn:
+- Read the terraform plan output and identify which resources are scheduled for destruction
+- Add a lifecycle { prevent_destroy = true } block to the critical resource to block accidental deletion
+- Investigate whether the change can be made in-place or requires a migration strategy instead
+environment:
+  nodes:
+  - role: primary
+    os: FixitLab Terraform workspace
+    hostname: lab-primary
+    ip: 127.0.0.1
+    specs: local offline simulation
+  pre_installed:
+  - bash
+  - coreutils
+  - terraform
+  credentials:
+  - user: root
+    password: lab123
+tasks:
+- id: task_1
+  title: Terraform Plan Shows Unexpected Resource Destruction
+  description: Restore healthy behavior for Terraform Plan Shows Unexpected Resource Destruction by investigating
+    the failure, applying the smallest safe fix, and validating the outcome.
+  background: 'This terraform lab teaches systematic troubleshooting: observe, hypothesize, change, verify.'
+  validation:
+    type: custom_script
+    script: check.sh
+    error_message: Validation did not pass. Re-read the objectives and Hint 2 diagnostic steps.
+solution:
+  summary: Identify the misconfiguration affecting this terraform lab and apply the minimal fix.
+  files_changed: []
+  commands_run:
+  - bash check.sh
+  reference_docs: terraform-fundamentals

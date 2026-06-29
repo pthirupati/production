@@ -1,14 +1,31 @@
 slug: wireguard-tunnel-down
 title: WireGuard VPN Tunnel Down — Fix Peer Config and Routing
-technology: Networking
-category: VPN
+technology: networking
+category: Build
 difficulty: hard
 time_limit: 1200
 max_score: 100
 infrastructure_type: docker
 jira_priority: High
 is_free: false
-description: 'The WireGuard VPN tunnel between the office and a cloud server is down. Remote
+description: 'CONTEXT: A team operating network operations needs you to resolve `WireGuard VPN Tunnel
+  Down — Fix Peer Config and Routing` during a realistic incident. The business impact is reduced service
+  reliability until the underlying state is repaired.
+
+
+  ENVIRONMENT: You are working in FixitLab''s offline network lab with interfaces, routing tables, DNS,
+  and firewall rules. All tools run locally; no paid APIs or external cloud calls are required.
+
+
+  SYMPTOM / STARTING STATE: Ubuntu 22.04 with WireGuard. wg0 interface is configured. Peer public key
+  in
+
+  /etc/wireguard/wg0.conf is stale (old-key-base64). Correct key is in
+
+  /etc/wireguard/new-peer-pubkey.txt. AllowedIPs=10.8.0.0/24 (missing 10.10.0.0/16).
+
+  `wg show` shows no active handshake. Remote VPN subnet is unreachable. The WireGuard VPN tunnel between
+  the office and a cloud server is down. Remote
 
   users cannot reach internal resources. The tunnel interface wg0 is up but the
 
@@ -20,7 +37,14 @@ description: 'The WireGuard VPN tunnel between the office and a cloud server is 
 
   Fix both the peer configuration and add the missing route.
 
-  '
+
+  OBJECTIVE: Identify the stale public key in the WireGuard peer config; Update /etc/wireguard/wg0.conf
+  with the correct peer public key; Add 10.10.0.0/16 to the AllowedIPs for the peer. Success means `check.sh`
+  exits successfully.
+
+
+  WHAT TO AVOID: Do not apply broad destructive changes, skip evidence gathering, or fake completion with
+  marker files — the checker validates real system state.'
 objectives:
 - Identify the stale public key in the WireGuard peer config
 - Update /etc/wireguard/wg0.conf with the correct peer public key
@@ -37,17 +61,98 @@ initial_state: 'Ubuntu 22.04 with WireGuard. wg0 interface is configured. Peer p
   '
 hints:
 - order: 1
-  cost: 10
-  content: 'Check the tunnel: `wg show wg0` — look at "latest handshake" (stale/never) and transfer counters;
-    the peer config is wrong so no handshake completes.'
+  cost: 0
+  content: 'Where to look: Identify the stale public key in the WireGuard peer config'
 - order: 2
-  cost: 15
-  content: 'Fix the peer''s public key: in /etc/wireguard/wg0.conf set `PublicKey` to the value in /etc/wireguard/new-peer-pubkey.'
-- order: 3
-  cost: 20
-  content: 'Correct the routed networks: `AllowedIPs = 10.8.0.0/24, 10.10.0.0/16` so the right subnets
-    traverse the tunnel.'
-- order: 4
   cost: 25
-  content: 'Apply without dropping the link: `wg syncconf wg0 <(wg-quick strip wg0)` (or `wg-quick down
-    wg0 && wg-quick up wg0`), then `wg show` shows a fresh handshake and traffic flows.'
+  content: 'Diagnostic steps:
+
+    1. Update /etc/wireguard/wg0.conf with the correct peer public key
+
+    2. Add 10.10.0.0/16 to the AllowedIPs for the peer
+
+    3. Bring the tunnel back up and verify the handshake succeeds'
+- order: 3
+  cost: 50
+  content: 'Exact fix + verification:
+
+    1. Bring the tunnel back up and verify the handshake succeeds.
+
+    2. Re-run the lab checker (`check.sh` or Check Solution).
+
+    3. Confirm every scenario objective is satisfied.
+
+
+    WHY: the grader validates real state — marker files are ignored.'
+summary: Complete the wireguard vpn tunnel down — fix peer config and routing networking lab and verify
+  success with the checker
+estimated_minutes: 20
+xp_reward: 100
+prerequisites:
+- Basic networking literacy
+tags:
+- fix
+- hands-on
+- networking
+linked_tutorial: networking-fundamentals
+what_you_will_learn:
+- Identify the stale public key in the WireGuard peer config
+- Update /etc/wireguard/wg0.conf with the correct peer public key
+- Add 10.10.0.0/16 to the AllowedIPs for the peer
+- Bring the tunnel back up and verify the handshake succeeds
+environment:
+  nodes:
+  - role: primary
+    os: FixitLab network lab
+    hostname: lab-primary
+    ip: 127.0.0.1
+    specs: local offline simulation
+  pre_installed:
+  - bash
+  - coreutils
+  - journalctl
+  - networking
+  - systemctl
+  credentials:
+  - user: root
+    password: lab123
+tasks:
+- id: task_1
+  title: WireGuard VPN Tunnel Down — Fix Peer Config and Routing
+  description: Restore healthy behavior for WireGuard VPN Tunnel Down — Fix Peer Config and Routing by
+    investigating the failure, applying the smallest safe fix, and validating the outcome.
+  background: 'This networking lab teaches systematic troubleshooting: observe, hypothesize, change, verify.'
+  validation:
+    type: custom_script
+    script: check.sh
+    error_message: Validation did not pass. Re-read the objectives and Hint 2 diagnostic steps.
+solution:
+  summary: Identify the misconfiguration affecting this networking lab and apply the minimal fix.
+  files_changed: []
+  commands_run:
+  - bash check.sh
+  reference_docs: networking-fundamentals
+guided_mode:
+  enabled: true
+  steps:
+  - step: 1
+    title: Inspect current state
+    instruction: Run a read-only diagnostic before changing anything.
+    command: check.sh
+    expected_output: Output shows the current failure mode
+    explanation: Evidence-first troubleshooting avoids guessing.
+    next_on: command_success
+  - step: 2
+    title: Apply the minimal fix
+    instruction: Make one reversible change aligned with the objectives.
+    command: '# your fix command here'
+    expected_output: State moves toward the objective
+    explanation: Small changes make rollback easy if the hypothesis was wrong.
+    next_on: command_success
+  - step: 3
+    title: Verify with the grader
+    instruction: Run the same verification the checker uses.
+    command: check.sh
+    expected_output: '`check.sh` exits successfully'
+    explanation: The lab passes only when real state is healthy.
+    next_on: command_success

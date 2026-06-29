@@ -1,24 +1,54 @@
-category: GPU & NVIDIA
-description: nvidia-smi reports "GPU has fallen off the bus" and the device is no longer usable. The GPU
-  dropped off the PCIe bus — typically from a power/thermal event or a driver fault — so the kernel can
-  no longer communicate with it. Investigate the cause, reset the device or reload the driver, and confirm
-  the GPU returns to the bus.
+category: Fix
+description: 'CONTEXT: A team operating GPU operations needs you to resolve `GPU Fallen Off Bus` during
+  a realistic incident. The business impact is reduced service reliability until the underlying state
+  is repaired.
+
+
+  ENVIRONMENT: You are working in FixitLab''s offline GPU node with nvidia-smi, drivers, CUDA, and container
+  toolkit. All tools run locally; no paid APIs or external cloud calls are required.
+
+
+  SYMPTOM / STARTING STATE: Linux host with NVIDIA GPU. dmesg/nvidia-smi report "GPU has fallen off the
+  bus"; the GPU is unresponsive and CUDA/inference jobs fail. nvidia-smi reports "GPU has fallen off the
+  bus" and the device is no longer usable. The GPU dropped off the PCIe bus — typically from a power/thermal
+  event or a driver fault — so the kernel can no longer communicate with it. Investigate the cause, reset
+  the device or reload the driver, and confirm the GPU returns to the bus.
+
+
+  OBJECTIVE: Confirm the GPU has fallen off the PCIe bus and gather kernel evidence; Identify a likely
+  cause (power, thermal, Xid error) from logs; Reset the device / reload the driver and verify the GPU
+  is back. Success means `check.sh` exits successfully.
+
+
+  WHAT TO AVOID: Do not apply broad destructive changes, skip evidence gathering, or fake completion with
+  marker files — the checker validates real system state.'
 difficulty: hard
 dual_terminal: false
 hints:
 - order: 1
-  cost: 10
-  content: 'Look at the kernel ring buffer: `dmesg | grep -i -E ''nvrm|xid|fallen off''`. An Xid error
-    and "GPU has fallen off the bus" confirm the drop and often hint at the cause.'
+  cost: 0
+  content: 'Where to look: Run `docker ps -a` and `docker logs <container>` for the failing container.'
 - order: 2
-  cost: 15
-  content: 'Check the PCIe link: `lspci | grep -i nvidia` (may show as "rev ff" when off the bus). Review
-    power/thermal history if available; a hard fault usually needs a device reset.'
+  cost: 25
+  content: 'Diagnostic steps:
+
+    1. `docker ps -a` — note Exited status and exit code.
+
+    2. `docker logs <name>` for the startup error.
+
+    3. Inspect the Dockerfile or `docker run` flags if the image is wrong.'
 - order: 3
-  cost: 20
-  content: 'Attempt a reset without rebooting: `nvidia-smi --gpu-reset -i <idx>` (stop GPU processes first).
-    If that''s blocked, reload the driver stack (`sudo rmmod nvidia_uvm nvidia_drm nvidia_modeset nvidia
-    && sudo modprobe nvidia`) or reboot, then confirm with `nvidia-smi`.'
+  cost: 50
+  content: 'Exact fix + verification:
+
+    1. Fix image, port mapping, volume, or env configuration.
+
+    2. `docker start <name>` or re-run with corrected flags.
+
+    3. Confirm `nvidia-smi` shows the container Up.
+
+
+    WHY: the checker validates the container is actually running.'
 initial_state: Linux host with NVIDIA GPU. dmesg/nvidia-smi report "GPU has fallen off the bus"; the GPU
   is unresponsive and CUDA/inference jobs fail.
 is_free: false
@@ -34,3 +64,51 @@ simulation_type: gpu
 slug: sim-gpu-fallen-off
 time_limit: 900
 title: GPU Fallen Off Bus
+technology: gpu
+summary: Complete the gpu fallen off bus gpu lab and verify success with the checker
+estimated_minutes: 15
+xp_reward: 100
+prerequisites:
+- Basic gpu literacy
+tags:
+- fix
+- gpu
+- hands-on
+linked_tutorial: gpu-fundamentals
+what_you_will_learn:
+- Confirm the GPU has fallen off the PCIe bus and gather kernel evidence
+- Identify a likely cause (power, thermal, Xid error) from logs
+- Reset the device / reload the driver and verify the GPU is back
+environment:
+  nodes:
+  - role: primary
+    os: FixitLab GPU node
+    hostname: lab-primary
+    ip: 127.0.0.1
+    specs: local offline simulation
+  pre_installed:
+  - bash
+  - coreutils
+  - gpu
+  - journalctl
+  - systemctl
+  credentials:
+  - user: root
+    password: lab123
+tasks:
+- id: task_1
+  title: GPU Fallen Off Bus
+  description: Restore healthy behavior for GPU Fallen Off Bus by investigating the failure, applying
+    the smallest safe fix, and validating the outcome.
+  background: 'This gpu lab teaches systematic troubleshooting: observe, hypothesize, change, verify.'
+  validation:
+    type: command_output
+    command: nvidia-smi
+    expected_output: NVIDIA-SMI
+    error_message: GPU health check still fails. Verify driver and device visibility.
+solution:
+  summary: Identify the misconfiguration affecting this gpu lab and apply the minimal fix.
+  files_changed: []
+  commands_run:
+  - nvidia-smi
+  reference_docs: gpu-fundamentals

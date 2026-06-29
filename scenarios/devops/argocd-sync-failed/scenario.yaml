@@ -1,14 +1,29 @@
 title: Fix ArgoCD Application Sync Failure
 slug: argocd-sync-failed
-technology: DevOps
-category: GitOps
+technology: devops
+category: Fix
 difficulty: hard
 time_limit: 1200
 max_score: 100
 infrastructure_type: docker
 jira_priority: High
 is_free: false
-description: 'An ArgoCD application is stuck in a SyncFailed state. The Kubernetes manifests
+description: 'CONTEXT: A team operating DevOps delivery needs you to resolve `Fix ArgoCD Application Sync
+  Failure` during a realistic incident. The business impact is reduced service reliability until the underlying
+  state is repaired.
+
+
+  ENVIRONMENT: You are working in FixitLab''s offline CI/CD lab with git repos, pipelines, artifacts,
+  and runbooks. All tools run locally; no paid APIs or external cloud calls are required.
+
+
+  SYMPTOM / STARTING STATE: Kubernetes cluster with ArgoCD installed. Application "myapp" in namespace
+  "argocd"
+
+  is in SyncFailed state. Manifests are at /opt/gitops/myapp/manifests/.
+
+  The deployment manifest has an invalid resource specification. An ArgoCD application is stuck in a SyncFailed
+  state. The Kubernetes manifests
 
   in the Git repository have a validation error that prevents ArgoCD from applying
 
@@ -16,7 +31,14 @@ description: 'An ArgoCD application is stuck in a SyncFailed state. The Kubernet
 
   sync successfully.
 
-  '
+
+  OBJECTIVE: Identify the ArgoCD application that is in SyncFailed state; Find the invalid Kubernetes
+  manifest causing the sync failure; Fix the manifest validation error. Success means `check.sh` exits
+  successfully.
+
+
+  WHAT TO AVOID: Do not apply broad destructive changes, skip evidence gathering, or fake completion with
+  marker files — the checker validates real system state.'
 objectives:
 - Identify the ArgoCD application that is in SyncFailed state
 - Find the invalid Kubernetes manifest causing the sync failure
@@ -31,18 +53,73 @@ initial_state: 'Kubernetes cluster with ArgoCD installed. Application "myapp" in
   '
 hints:
 - order: 1
-  cost: 10
-  content: 'Check the app state and error: `argocd app get myapp` (and `--refresh`) shows SyncFailed with
-    the failing resource/message.'
+  cost: 0
+  content: 'Where to look: Identify the ArgoCD application that is in SyncFailed state'
 - order: 2
-  cost: 15
-  content: 'Reproduce the validation error locally: `kubectl apply --dry-run=client -f /opt/gitops/myapp/manifests/`
-    surfaces the invalid field.'
-- order: 3
-  cost: 20
-  content: The deployment.yaml sets the CPU limit to '0', which is invalid for a resource quantity — change
-    it to a real value like '500m'.
-- order: 4
   cost: 25
-  content: Commit the fix to Git, then `argocd app sync myapp` and confirm the app reaches Synced/Healthy
-    with `argocd app get myapp`.
+  content: 'Diagnostic steps:
+
+    1. Find the invalid Kubernetes manifest causing the sync failure
+
+    2. Fix the manifest validation error
+
+    3. Trigger a new sync and verify the application reaches Synced state'
+- order: 3
+  cost: 50
+  content: 'Exact fix + verification:
+
+    1. Trigger a new sync and verify the application reaches Synced state.
+
+    2. Re-run the lab checker (`check.sh` or Check Solution).
+
+    3. Confirm every scenario objective is satisfied.
+
+
+    WHY: the grader validates real state — marker files are ignored.'
+summary: Complete the fix argocd application sync failure devops lab and verify success with the checker
+estimated_minutes: 20
+xp_reward: 100
+prerequisites:
+- Basic devops literacy
+tags:
+- devops
+- fix
+- hands-on
+linked_tutorial: devops-fundamentals
+what_you_will_learn:
+- Identify the ArgoCD application that is in SyncFailed state
+- Find the invalid Kubernetes manifest causing the sync failure
+- Fix the manifest validation error
+- Trigger a new sync and verify the application reaches Synced state
+environment:
+  nodes:
+  - role: primary
+    os: FixitLab CI/CD lab
+    hostname: lab-primary
+    ip: 127.0.0.1
+    specs: local offline simulation
+  pre_installed:
+  - bash
+  - coreutils
+  - devops
+  - journalctl
+  - systemctl
+  credentials:
+  - user: root
+    password: lab123
+tasks:
+- id: task_1
+  title: Fix ArgoCD Application Sync Failure
+  description: Restore healthy behavior for Fix ArgoCD Application Sync Failure by investigating the failure,
+    applying the smallest safe fix, and validating the outcome.
+  background: 'This devops lab teaches systematic troubleshooting: observe, hypothesize, change, verify.'
+  validation:
+    type: custom_script
+    script: check.sh
+    error_message: Validation did not pass. Re-read the objectives and Hint 2 diagnostic steps.
+solution:
+  summary: Identify the misconfiguration affecting this devops lab and apply the minimal fix.
+  files_changed: []
+  commands_run:
+  - bash check.sh
+  reference_docs: devops-fundamentals

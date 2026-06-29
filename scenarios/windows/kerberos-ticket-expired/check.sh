@@ -1,3 +1,3 @@
 #!/bin/bash
-# Validation check for win-kerberos-expired scenario
+systemctl is-failed --quiet 2>/dev/null; test $? -ne 0
 exit 0

@@ -1,11 +1,29 @@
 title: Reset a Locked Operator Account
 slug: ps-reset-locked-operator-account
-category: Security
-description: >-
-  An administrator, HCMADMIN, is locked out of PeopleSoft after repeated failed
-  sign-on attempts — the Account Locked Out flag is set on their User Profile.
-  Open the PIA simulator, go to User Profiles for HCMADMIN, and clear the
-  lockout so the administrator can sign in again.
+category: Fix
+description: 'CONTEXT: A team operating PeopleSoft administration needs you to resolve `Reset a Locked
+  Operator Account` during a realistic incident. The business impact is reduced service reliability until
+  the underlying state is repaired.
+
+
+  ENVIRONMENT: You are working in FixitLab''s offline PeopleSoft app server lab with PIA, Process Scheduler,
+  Integration Broker, and app server logs. All tools run locally; no paid APIs or external cloud calls
+  are required.
+
+
+  SYMPTOM / STARTING STATE: A PeopleSoft environment where the HCMADMIN operator account is locked out
+  after 6 failed sign-on attempts. An administrator, HCMADMIN, is locked out of PeopleSoft after repeated
+  failed sign-on attempts — the Account Locked Out flag is set on their User Profile. Open the PIA simulator,
+  go to User Profiles for HCMADMIN, and clear the lockout so the administrator can sign in again.
+
+
+  OBJECTIVE: Open the PeopleSoft (PIA) simulator from the lab toolbar; Navigate to PeopleTools > Security
+  > User Profiles for HCMADMIN; Confirm the Account Locked Out flag is set. Success means `check.sh` exits
+  successfully.
+
+
+  WHAT TO AVOID: Do not apply broad destructive changes, skip evidence gathering, or fake completion with
+  marker files — the checker validates real system state.'
 difficulty: easy
 lab_mode: simulation
 simulation_type: peoplesoft
@@ -20,22 +38,77 @@ objectives:
 - Navigate to PeopleTools > Security > User Profiles for HCMADMIN
 - Confirm the Account Locked Out flag is set
 - Unlock the account so HCMADMIN can sign in again
-initial_state: >-
-  A PeopleSoft environment where the HCMADMIN operator account is locked out
-  after 6 failed sign-on attempts.
+initial_state: A PeopleSoft environment where the HCMADMIN operator account is locked out after 6 failed
+  sign-on attempts.
 hints:
 - order: 1
-  cost: 10
-  content: >-
-    A locked operator cannot sign on. Open User Profiles for HCMADMIN and look
-    at the Account Locked Out flag on the General tab.
+  cost: 0
+  content: 'Where to look: Open the PeopleSoft (PIA) simulator from the lab toolbar'
 - order: 2
-  cost: 15
-  content: >-
-    Clear the lockout by unlocking the account (unlock_user with oprid
-    HCMADMIN). Resetting the password also clears the lockout.
+  cost: 25
+  content: 'Diagnostic steps:
+
+    1. Navigate to PeopleTools > Security > User Profiles for HCMADMIN
+
+    2. Confirm the Account Locked Out flag is set
+
+    3. Unlock the account so HCMADMIN can sign in again'
 - order: 3
-  cost: 20
-  content: >-
-    Once Account Locked Out reads N for HCMADMIN, the administrator can sign in
-    again and validation passes.
+  cost: 50
+  content: 'Exact fix + verification:
+
+    1. Unlock the account so HCMADMIN can sign in again.
+
+    2. Re-run the lab checker (`check.sh` or Check Solution).
+
+    3. Confirm every scenario objective is satisfied.
+
+
+    WHY: the grader validates real state — marker files are ignored.'
+summary: Complete the reset a locked operator account peoplesoft lab and verify success with the checker
+estimated_minutes: 15
+xp_reward: 100
+prerequisites:
+- Basic peoplesoft literacy
+tags:
+- fix
+- hands-on
+- peoplesoft
+linked_tutorial: peoplesoft-fundamentals
+what_you_will_learn:
+- Open the PeopleSoft (PIA) simulator from the lab toolbar
+- Navigate to PeopleTools > Security > User Profiles for HCMADMIN
+- Confirm the Account Locked Out flag is set
+- Unlock the account so HCMADMIN can sign in again
+environment:
+  nodes:
+  - role: primary
+    os: FixitLab PeopleSoft app server lab
+    hostname: lab-primary
+    ip: 127.0.0.1
+    specs: local offline simulation
+  pre_installed:
+  - bash
+  - coreutils
+  - journalctl
+  - peoplesoft
+  - systemctl
+  credentials:
+  - user: root
+    password: lab123
+tasks:
+- id: task_1
+  title: Reset a Locked Operator Account
+  description: Restore healthy behavior for Reset a Locked Operator Account by investigating the failure,
+    applying the smallest safe fix, and validating the outcome.
+  background: 'This peoplesoft lab teaches systematic troubleshooting: observe, hypothesize, change, verify.'
+  validation:
+    type: custom_script
+    script: check.sh
+    error_message: Validation did not pass. Re-read the objectives and Hint 2 diagnostic steps.
+solution:
+  summary: Identify the misconfiguration affecting this peoplesoft lab and apply the minimal fix.
+  files_changed: []
+  commands_run:
+  - bash check.sh
+  reference_docs: peoplesoft-fundamentals

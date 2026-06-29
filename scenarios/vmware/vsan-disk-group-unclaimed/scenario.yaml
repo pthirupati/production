@@ -1,8 +1,26 @@
 title: vSAN Disk Group Unclaimed
 slug: vsan-disk-group-unclaimed
-category: VMware vSphere
-description: vSAN capacity is reduced because a host's disks are unclaimed and not contributing to the
-  datastore. Claim the disks and confirm vSAN is healthy.
+category: Fix
+description: 'CONTEXT: A team operating VMware vSphere needs you to resolve `vSAN Disk Group Unclaimed`
+  during a realistic incident. The business impact is reduced service reliability until the underlying
+  state is repaired.
+
+
+  ENVIRONMENT: You are working in FixitLab''s offline vSphere lab with VMs, datastores, vCenter, and ESXi
+  tasks. All tools run locally; no paid APIs or external cloud calls are required.
+
+
+  SYMPTOM / STARTING STATE: vCenter shows unclaimed vSAN disks on a host. vSAN capacity is reduced because
+  a host''s disks are unclaimed and not contributing to the datastore. Claim the disks and confirm vSAN
+  is healthy.
+
+
+  OBJECTIVE: Confirm vSAN disks are unclaimed; Claim the disks into the disk group; Verify all vSAN disks
+  are claimed. Success means `check.sh` exits successfully.
+
+
+  WHAT TO AVOID: Do not apply broad destructive changes, skip evidence gathering, or fake completion with
+  marker files — the checker validates real system state.'
 difficulty: hard
 lab_mode: simulation
 simulation_type: vmware
@@ -18,11 +36,73 @@ objectives:
 initial_state: vCenter shows unclaimed vSAN disks on a host.
 hints:
 - order: 1
-  cost: 10
-  content: 'In the vCenter simulator, locate the issue: confirm vsan disks are unclaimed.'
+  cost: 0
+  content: 'Where to look: Run `df -h` and `du -xh /var /tmp /home | sort -h | tail -20` for large paths.'
 - order: 2
-  cost: 15
-  content: 'Apply the remediation in the GUI: claim the disks into the disk group.'
+  cost: 25
+  content: 'Diagnostic steps:
+
+    1. Find which mount is 100% — often `/` or `/var`.
+
+    2. `journalctl --disk-usage` and old logs under `/var/log`.
+
+    3. Look for core dumps, temp files, or oversized application data.'
 - order: 3
-  cost: 20
-  content: 'Confirm resolution: verify all vsan disks are claimed.'
+  cost: 50
+  content: 'Exact fix + verification:
+
+    1. Remove or rotate the largest safe files (logs, caches, old packages).
+
+    2. `df -h` should show free space on the affected mount.
+
+    3. Retry the command that failed with ''No space left on device''.
+
+
+    WHY: many services fail cryptically when disk is full.'
+technology: vmware
+summary: Complete the vsan disk group unclaimed vmware lab and verify success with the checker
+estimated_minutes: 15
+xp_reward: 100
+prerequisites:
+- Basic vmware literacy
+tags:
+- fix
+- hands-on
+- vmware
+linked_tutorial: vmware-fundamentals
+what_you_will_learn:
+- Confirm vSAN disks are unclaimed
+- Claim the disks into the disk group
+- Verify all vSAN disks are claimed
+environment:
+  nodes:
+  - role: primary
+    os: FixitLab vSphere lab
+    hostname: lab-primary
+    ip: 127.0.0.1
+    specs: local offline simulation
+  pre_installed:
+  - bash
+  - coreutils
+  - journalctl
+  - systemctl
+  - vmware
+  credentials:
+  - user: root
+    password: lab123
+tasks:
+- id: task_1
+  title: vSAN Disk Group Unclaimed
+  description: Restore healthy behavior for vSAN Disk Group Unclaimed by investigating the failure, applying
+    the smallest safe fix, and validating the outcome.
+  background: 'This vmware lab teaches systematic troubleshooting: observe, hypothesize, change, verify.'
+  validation:
+    type: custom_script
+    script: check.sh
+    error_message: Validation did not pass. Re-read the objectives and Hint 2 diagnostic steps.
+solution:
+  summary: Identify the misconfiguration affecting this vmware lab and apply the minimal fix.
+  files_changed: []
+  commands_run:
+  - bash check.sh
+  reference_docs: vmware-fundamentals

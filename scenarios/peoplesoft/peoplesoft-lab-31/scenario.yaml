@@ -1,11 +1,30 @@
 title: Validate peoplesoft scheduling (lab 31)
 slug: peoplesoft-lab-31
 technology: peoplesoft
-category: Peoplesoft
-description: 'Hands-on peoplesoft scenario: validate scheduling in a simulated environment.
-  This PeopleSoft administration scenario focuses on peoplesoft: Validate peoplesoft
-  scheduling (lab 31). Read the environment, form a hypothesis, apply a minimal fix,
-  and verify behavior before closing the ticket.'
+category: Fix
+description: 'CONTEXT: A team operating PeopleSoft administration needs you to resolve `Validate peoplesoft
+  scheduling (lab 31)` during a realistic incident. The business impact is reduced service reliability
+  until the underlying state is repaired.
+
+
+  ENVIRONMENT: You are working in FixitLab''s offline PeopleSoft app server lab with PIA, Process Scheduler,
+  Integration Broker, and app server logs. All tools run locally; no paid APIs or external cloud calls
+  are required.
+
+
+  SYMPTOM / STARTING STATE: Hands-on peoplesoft scenario: validate scheduling in a simulated environment.
+  Hands-on peoplesoft scenario: validate scheduling in a simulated environment. This PeopleSoft administration
+  scenario focuses on peoplesoft: Validate peoplesoft scheduling (lab 31). Read the environment, form
+  a hypothesis, apply a minimal fix, and verify behavior before closing the ticket.
+
+
+  OBJECTIVE: Understand the current failure mode affecting Validate peoplesoft scheduling (lab 31); Restore
+  expected service behavior with a minimal, documented change; Verify the fix holds under a realistic
+  smoke test. Success means `check.sh` exits successfully.
+
+
+  WHAT TO AVOID: Do not apply broad destructive changes, skip evidence gathering, or fake completion with
+  marker files — the checker validates real system state.'
 difficulty: medium
 scenario_type: fix
 lab_mode: simulation
@@ -17,18 +36,78 @@ max_score: 100
 is_free: false
 dual_terminal: false
 objectives:
-- Understand the current failure mode affecting Validate peoplesoft scheduling (lab
-  31)
+- Understand the current failure mode affecting Validate peoplesoft scheduling (lab 31)
 - Restore expected service behavior with a minimal, documented change
 - Verify the fix holds under a realistic smoke test
 initial_state: 'Hands-on peoplesoft scenario: validate scheduling in a simulated environment.'
 hints:
 - order: 1
-  cost: 10
-  content: Read the scenario objective and inspect logs or config in the terminal.
+  cost: 0
+  content: 'Where to look: Understand the current failure mode affecting Validate peoplesoft scheduling
+    (lab 31)'
 - order: 2
-  cost: 20
-  content: 'Apply the minimal fix, then mark completion: echo FIXED-OK > /tmp/scenario-fixed'
+  cost: 25
+  content: 'Diagnostic steps:
+
+    1. Restore expected service behavior with a minimal, documented change
+
+    2. Verify the fix holds under a realistic smoke test'
 - order: 3
-  cost: 20
-  content: Re-run the failing check or user workflow to confirm the incident is resolved.
+  cost: 50
+  content: 'Exact fix + verification:
+
+    1. Verify the fix holds under a realistic smoke test.
+
+    2. Re-run the lab checker (`check.sh` or Check Solution).
+
+    3. Confirm every scenario objective is satisfied.
+
+
+    WHY: the grader validates real state — marker files are ignored.'
+summary: Complete the validate peoplesoft scheduling (lab 31) peoplesoft lab and verify success with the
+  checker
+estimated_minutes: 20
+xp_reward: 100
+prerequisites:
+- Basic peoplesoft literacy
+tags:
+- fix
+- hands-on
+- peoplesoft
+linked_tutorial: peoplesoft-fundamentals
+what_you_will_learn:
+- Understand the current failure mode affecting Validate peoplesoft scheduling (lab 31)
+- Restore expected service behavior with a minimal, documented change
+- Verify the fix holds under a realistic smoke test
+environment:
+  nodes:
+  - role: primary
+    os: FixitLab PeopleSoft app server lab
+    hostname: lab-primary
+    ip: 127.0.0.1
+    specs: local offline simulation
+  pre_installed:
+  - bash
+  - coreutils
+  - journalctl
+  - peoplesoft
+  - systemctl
+  credentials:
+  - user: root
+    password: lab123
+tasks:
+- id: task_1
+  title: Validate peoplesoft scheduling (lab 31)
+  description: Restore healthy behavior for Validate peoplesoft scheduling (lab 31) by investigating the
+    failure, applying the smallest safe fix, and validating the outcome.
+  background: 'This peoplesoft lab teaches systematic troubleshooting: observe, hypothesize, change, verify.'
+  validation:
+    type: custom_script
+    script: check.sh
+    error_message: Validation did not pass. Re-read the objectives and Hint 2 diagnostic steps.
+solution:
+  summary: Identify the misconfiguration affecting this peoplesoft lab and apply the minimal fix.
+  files_changed: []
+  commands_run:
+  - bash check.sh
+  reference_docs: peoplesoft-fundamentals

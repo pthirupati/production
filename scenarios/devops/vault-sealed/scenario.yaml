@@ -1,14 +1,28 @@
 title: Unseal HashiCorp Vault
 slug: vault-sealed
-technology: DevOps
-category: Secrets Management
+technology: devops
+category: Fix
 difficulty: hard
 time_limit: 1200
 max_score: 100
 infrastructure_type: docker
 jira_priority: Critical
 is_free: false
-description: 'HashiCorp Vault is in a sealed state after a server restart. Applications
+description: 'CONTEXT: A team operating DevOps delivery needs you to resolve `Unseal HashiCorp Vault`
+  during a realistic incident. The business impact is reduced service reliability until the underlying
+  state is repaired.
+
+
+  ENVIRONMENT: You are working in FixitLab''s offline CI/CD lab with git repos, pipelines, artifacts,
+  and runbooks. All tools run locally; no paid APIs or external cloud calls are required.
+
+
+  SYMPTOM / STARTING STATE: Ubuntu server running HashiCorp Vault at http://127.0.0.1:8200. Vault is sealed.
+
+  The unseal keys are stored in /opt/vault/unseal_keys.txt (5 keys, need 3 to unseal).
+
+  VAULT_ADDR is set to http://127.0.0.1:8200. HashiCorp Vault is in a sealed state after a server restart.
+  Applications
 
   cannot retrieve secrets and are failing to start. The Vault unseal keys are
 
@@ -16,7 +30,13 @@ description: 'HashiCorp Vault is in a sealed state after a server restart. Appli
 
   secret access for all dependent services.
 
-  '
+
+  OBJECTIVE: Check Vault seal status; Locate the unseal keys; Apply the unseal keys to unseal Vault (requires
+  3 of 5 keys). Success means `check.sh` exits successfully.
+
+
+  WHAT TO AVOID: Do not apply broad destructive changes, skip evidence gathering, or fake completion with
+  marker files — the checker validates real system state.'
 objectives:
 - Check Vault seal status
 - Locate the unseal keys
@@ -31,18 +51,69 @@ initial_state: 'Ubuntu server running HashiCorp Vault at http://127.0.0.1:8200. 
   '
 hints:
 - order: 1
-  cost: 10
-  content: 'Check the seal state: `vault status` reports `Sealed: true`, which is why apps can''t read
-    secrets.'
+  cost: 0
+  content: 'Where to look: Apply the unseal keys to unseal Vault (requires 3 of 5 keys)'
 - order: 2
-  cost: 15
-  content: 'Locate the unseal keys (in this lab): `cat /opt/vault/unseal_keys.txt` — you need a quorum
-    (3 of 5).'
-- order: 3
-  cost: 20
-  content: 'Apply keys one at a time: `vault operator unseal <KEY_1>`, then `<KEY_2>`, then `<KEY_3>`
-    (progress shows 1/3, 2/3, 3/3).'
-- order: 4
   cost: 25
-  content: 'After the third key, confirm: `vault status` shows `Sealed: false` and Vault serves requests
-    again.'
+  content: 'Diagnostic steps:
+
+    1. Verify Vault is unsealed and accepting requests'
+- order: 3
+  cost: 50
+  content: 'Exact fix + verification:
+
+    1. Verify Vault is unsealed and accepting requests.
+
+    2. Re-run the lab checker (`check.sh` or Check Solution).
+
+    3. Confirm every scenario objective is satisfied.
+
+
+    WHY: the grader validates real state — marker files are ignored.'
+summary: Complete the unseal hashicorp vault devops lab and verify success with the checker
+estimated_minutes: 20
+xp_reward: 100
+prerequisites:
+- Basic devops literacy
+tags:
+- devops
+- fix
+- hands-on
+linked_tutorial: devops-fundamentals
+what_you_will_learn:
+- Check Vault seal status
+- Locate the unseal keys
+- Apply the unseal keys to unseal Vault (requires 3 of 5 keys)
+- Verify Vault is unsealed and accepting requests
+environment:
+  nodes:
+  - role: primary
+    os: FixitLab CI/CD lab
+    hostname: lab-primary
+    ip: 127.0.0.1
+    specs: local offline simulation
+  pre_installed:
+  - bash
+  - coreutils
+  - devops
+  - journalctl
+  - systemctl
+  credentials:
+  - user: root
+    password: lab123
+tasks:
+- id: task_1
+  title: Unseal HashiCorp Vault
+  description: Restore healthy behavior for Unseal HashiCorp Vault by investigating the failure, applying
+    the smallest safe fix, and validating the outcome.
+  background: 'This devops lab teaches systematic troubleshooting: observe, hypothesize, change, verify.'
+  validation:
+    type: custom_script
+    script: check.sh
+    error_message: Validation did not pass. Re-read the objectives and Hint 2 diagnostic steps.
+solution:
+  summary: Identify the misconfiguration affecting this devops lab and apply the minimal fix.
+  files_changed: []
+  commands_run:
+  - bash check.sh
+  reference_docs: devops-fundamentals

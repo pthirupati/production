@@ -1,7 +1,7 @@
 title: Ansible Mount Not Persisted
 slug: ansible-mount-fstab-missing
-technology: Ansible
-category: Modules
+technology: ansible
+category: Fix
 difficulty: medium
 lab_mode: simulation
 simulation_type: generic
@@ -10,7 +10,25 @@ max_score: 100
 is_free: true
 jira_priority: High
 dual_terminal: false
-description: A filesystem mounts but doesn't persist because the mount task state is wrong.
+description: 'CONTEXT: A team operating Ansible automation needs you to resolve `Ansible Mount Not Persisted`
+  during a realistic incident. The business impact is reduced service reliability until the underlying
+  state is repaired.
+
+
+  ENVIRONMENT: You are working in FixitLab''s offline Ansible control node with inventory, playbooks,
+  roles, and ansible-playbook. All tools run locally; no paid APIs or external cloud calls are required.
+
+
+  SYMPTOM / STARTING STATE: An Ansible mount task that doesn''t write fstab. A filesystem mounts but doesn''t
+  persist because the mount task state is wrong.
+
+
+  OBJECTIVE: Confirm the issue: Mount lost on reboot; Apply the documented fix in /home/ansible/mount.yml;
+  Verify the configuration is corrected. Success means `check.sh` exits successfully.
+
+
+  WHAT TO AVOID: Do not apply broad destructive changes, skip evidence gathering, or fake completion with
+  marker files — the checker validates real system state.'
 initial_state: An Ansible mount task that doesn't write fstab.
 objectives:
 - 'Confirm the issue: Mount lost on reboot'
@@ -18,11 +36,70 @@ objectives:
 - Verify the configuration is corrected
 hints:
 - order: 1
-  cost: 10
-  content: Mount lost on reboot
+  cost: 0
+  content: 'Where to look: Confirm the issue: Mount lost on reboot'
 - order: 2
-  cost: 15
-  content: 'Use state: mounted (writes fstab).'
+  cost: 25
+  content: 'Diagnostic steps:
+
+    1. Apply the documented fix in /home/ansible/mount.yml
+
+    2. Verify the configuration is corrected'
 - order: 3
-  cost: 20
-  content: /home/ansible/mount.yml carries the corrected configuration.
+  cost: 50
+  content: 'Exact fix + verification:
+
+    1. Verify the configuration is corrected.
+
+    2. Re-run the lab checker (`check.sh` or Check Solution).
+
+    3. Confirm every scenario objective is satisfied.
+
+
+    WHY: the grader validates real state — marker files are ignored.'
+summary: Complete the ansible mount not persisted ansible lab and verify success with the checker
+estimated_minutes: 20
+xp_reward: 100
+prerequisites:
+- Basic ansible literacy
+tags:
+- ansible
+- fix
+- hands-on
+linked_tutorial: ansible-fundamentals
+what_you_will_learn:
+- 'Confirm the issue: Mount lost on reboot'
+- Apply the documented fix in /home/ansible/mount.yml
+- Verify the configuration is corrected
+environment:
+  nodes:
+  - role: primary
+    os: FixitLab Ansible control node
+    hostname: lab-primary
+    ip: 127.0.0.1
+    specs: local offline simulation
+  pre_installed:
+  - ansible
+  - ansible-playbook
+  - bash
+  - coreutils
+  credentials:
+  - user: root
+    password: lab123
+tasks:
+- id: task_1
+  title: Ansible Mount Not Persisted
+  description: Restore healthy behavior for Ansible Mount Not Persisted by investigating the failure,
+    applying the smallest safe fix, and validating the outcome.
+  background: 'This ansible lab teaches systematic troubleshooting: observe, hypothesize, change, verify.'
+  validation:
+    type: command_output
+    command: ansible webservers -m ping
+    expected_output: SUCCESS
+    error_message: Ansible hosts are still unreachable. Verify SSH keys and inventory.
+solution:
+  summary: Identify the misconfiguration affecting this ansible lab and apply the minimal fix.
+  files_changed: []
+  commands_run:
+  - ansible webservers -m ping
+  reference_docs: ansible-fundamentals

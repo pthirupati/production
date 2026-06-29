@@ -1,8 +1,7 @@
----
 slug: vcenter-db-full
-title: "vCenter Database Nearly Full — Performance Alerts and Event Loss"
-technology: VMware
-category: vCenter Management
+title: vCenter Database Nearly Full - Performance Alerts and Event
+technology: vmware
+category: Fix
 difficulty: medium
 time_limit: 1200
 max_score: 100
@@ -11,36 +10,121 @@ simulation_type: vmware
 infrastructure_type: simulation
 jira_priority: High
 is_free: false
-description: |
-  The vCenter Embedded PostgreSQL database is at 92% capacity. vCenter performance
-  charts are not updating, alarms are delayed, and some events are being dropped.
-  The database grew beyond normal due to a misconfigured event retention policy that
-  was set to retain events for 365 days instead of the recommended 30 days. Engineers
-  must archive old events and adjust the database retention settings.
-objectives:
-  - Confirm vCenter database disk usage from the VCSA management UI
-  - Access the embedded PostgreSQL and check database table sizes
-  - Reduce the event and task retention period to reclaim database space
-  - Run a database cleanup to archive old records and verify space is recovered
-initial_state: |
-  VMware vCenter simulation. VCSA at vcenter.lab.local. DB at 92% (18.4 GB / 20 GB).
+description: 'CONTEXT: A team operating VMware vSphere needs you to resolve `vCenter Database Nearly Full
+  - Performance Alerts and Event` during a realistic incident. The business impact is reduced service
+  reliability until the underlying state is repaired.
+
+
+  ENVIRONMENT: You are working in FixitLab''s offline vSphere lab with VMs, datastores, vCenter, and ESXi
+  tasks. All tools run locally; no paid APIs or external cloud calls are required.
+
+
+  SYMPTOM / STARTING STATE: VMware vCenter simulation. VCSA at vcenter.lab.local. DB at 92% (18.4 GB /
+  20 GB).
+
   Event retention: 365 days (misconfigured). Task retention: 365 days.
+
+  Recommended: events 30 days, tasks 30 days. The vCenter Embedded PostgreSQL database is at 92% capacity.
+  vCenter performance
+
+  charts are not updating, alarms are delayed, and some events are being dropped.
+
+  The database grew beyond normal due to a misconfigured event retention policy that
+
+  was set to retain events for 365 days instead of the recommended 30 days. Engineers
+
+  must archive old events and adjust the database retention settings.
+
+
+  OBJECTIVE: Confirm vCenter database disk usage from the VCSA management UI; Access the embedded PostgreSQL
+  and check database table sizes; Reduce the event and task retention period to reclaim database space.
+  Success means `check.sh` exits successfully.
+
+
+  WHAT TO AVOID: Do not apply broad destructive changes, skip evidence gathering, or fake completion with
+  marker files — the checker validates real system state.'
+objectives:
+- Confirm vCenter database disk usage from the VCSA management UI
+- Access the embedded PostgreSQL and check database table sizes
+- Reduce the event and task retention period to reclaim database space
+- Run a database cleanup to archive old records and verify space is recovered
+initial_state: 'VMware vCenter simulation. VCSA at vcenter.lab.local. DB at 92% (18.4 GB / 20 GB).
+
+  Event retention: 365 days (misconfigured). Task retention: 365 days.
+
   Recommended: events 30 days, tasks 30 days.
+
+  '
 hints:
-  - order: 1
-    cost: 10
-    content: "Check VCSA disk usage: log into https://vcenter.lab.local:5480 (appliance management)
-      Navigate to: Monitor → Database and check PostgreSQL usage stats.
-      Also check: VCSA CLI via SSH → df -h to see /storage/db partition usage."
-  - order: 2
-    cost: 15
-    content: "Reduce retention in vCenter: Administration → vCenter Server Settings →
-      Statistics → Change Task and Event retention to 30 days.
-      This schedules old records for cleanup on the next maintenance cycle."
-  - order: 3
-    cost: 20
-    content: "To force immediate cleanup via VCSA CLI:
-      SSH to vcenter.lab.local as root.
-      Run: /usr/lib/vmware-vpx/scripts/cleanup-event-db.sh
-      Or via psql: psql -U vc -d VCDB -c \"DELETE FROM vpx_event WHERE create_time < NOW() - INTERVAL '30 days';\"
-      Monitor DB size after cleanup: df -h /storage/db"
+- order: 1
+  cost: 0
+  content: 'Where to look: Run `systemctl status postgresql` and `pg_isready` for connection state.'
+- order: 2
+  cost: 25
+  content: 'Diagnostic steps:
+
+    1. Check service status and `/var/log/postgresql/` logs.
+
+    2. Verify `pg_hba.conf` and `postgresql.conf` for listen addresses.
+
+    3. Test with `psql -U postgres -c ''SELECT 1''`.'
+- order: 3
+  cost: 50
+  content: 'Exact fix + verification:
+
+    1. Fix auth rules, data directory permissions, or port conflict.
+
+    2. `systemctl restart postgresql`.
+
+    3. Confirm `pg_isready` reports accepting connections.
+
+
+    WHY: the database must accept connections, not just start.'
+summary: Complete the vcenter database nearly full - performance alerts and event vmware lab and verify
+  success with the checker
+estimated_minutes: 20
+xp_reward: 100
+prerequisites:
+- Basic vmware literacy
+tags:
+- fix
+- hands-on
+- vmware
+linked_tutorial: vmware-fundamentals
+what_you_will_learn:
+- Confirm vCenter database disk usage from the VCSA management UI
+- Access the embedded PostgreSQL and check database table sizes
+- Reduce the event and task retention period to reclaim database space
+- Run a database cleanup to archive old records and verify space is recovered
+environment:
+  nodes:
+  - role: primary
+    os: FixitLab vSphere lab
+    hostname: lab-primary
+    ip: 127.0.0.1
+    specs: local offline simulation
+  pre_installed:
+  - bash
+  - coreutils
+  - journalctl
+  - systemctl
+  - vmware
+  credentials:
+  - user: root
+    password: lab123
+tasks:
+- id: task_1
+  title: vCenter Database Nearly Full - Performance Alerts and Event
+  description: Restore healthy behavior for vCenter Database Nearly Full - Performance Alerts and Event
+    by investigating the failure, applying the smallest safe fix, and validating the outcome.
+  background: 'This vmware lab teaches systematic troubleshooting: observe, hypothesize, change, verify.'
+  validation:
+    type: custom_script
+    script: check.sh
+    error_message: Validation did not pass. Re-read the objectives and Hint 2 diagnostic steps.
+solution:
+  summary: Identify the misconfiguration affecting this vmware lab and apply the minimal fix.
+  files_changed: []
+  commands_run:
+  - bash check.sh
+  reference_docs: vmware-fundamentals

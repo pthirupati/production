@@ -1,7 +1,7 @@
-title: 'Python Development: Data Processing — Integration Lab'
+title: Data Processing — Integration Lab
 slug: academy-python-060-integration-data-processing-6
-technology: Python Development
-category: Cross-Technology
+technology: python
+category: Project
 difficulty: hard
 scenario_type: do
 lab_mode: simulation
@@ -11,45 +11,130 @@ max_score: 100
 is_free: false
 infrastructure_type: docker
 jira_priority: Medium
-description: Service operations lab. The `crond` systemd unit is **failed/inactive** on this host — a
-  realistic fault for Integration Lab workflows that depend on it. Diagnose with `systemctl status crond`
-  and journal logs, apply the smallest reliable fix, then verify with `systemctl is-active crond`.
+description: 'CONTEXT: A team operating Python development needs you to resolve `python: Data Processing
+  — Integration Lab` during a realistic incident. The business impact is reduced service reliability until
+  the underlying state is repaired.
+
+
+  ENVIRONMENT: You are working in FixitLab''s offline Python project workspace with source files, venv,
+  tests, and CLI entrypoints. All tools run locally; no paid APIs or external cloud calls are required.
+
+
+  SYMPTOM / STARTING STATE: Two systems are deployed but not fully wired together for data processing.
+  Downstream consumers are waiting on this integration path. Integration lab: connect data processing
+  with an adjacent platform in the python stack. Validate authentication, data handoff, and failure behavior
+  for parsing, transforming, and aggregating data.
+
+
+  OBJECTIVE: data processing is connected to the adjacent system successfully; Handoff points are authenticated
+  and observable; End-to-end workflow completes without manual intervention. Success means `systemctl
+  is-active crond` returns active.
+
+
+  WHAT TO AVOID: Do not apply broad destructive changes, skip evidence gathering, or fake completion with
+  marker files — the checker validates real system state.'
 objectives:
-- The `crond` service is active (running)
-- '`systemctl is-active crond` returns active'
-- The fix survives a status re-check (no marker files)
-initial_state: The `crond` service is not running (`systemctl is-active crond` → inactive/failed). Dependent
-  Integration Lab tasks cannot succeed until the unit is healthy again.
+- data processing is connected to the adjacent system successfully
+- Handoff points are authenticated and observable
+- End-to-end workflow completes without manual intervention
+initial_state: Two systems are deployed but not fully wired together for data processing. Downstream consumers
+  are waiting on this integration path.
 hints:
 - order: 1
-  cost: 10
-  content: 'Orient yourself before changing anything:
-
-    1. Inspect the current state — the transformation pipeline and sample output.
-
-    2. Write down what looks normal versus wrong or missing for data processing.
-
-    3. Recall the core idea: parsing, transforming, and aggregating data. Form one hypothesis before you
-    act.'
+  cost: 0
+  content: 'Where to look: Start with `systemctl status crond` and `journalctl -u crond -n 50 --no-pager`
+    before changing anything.'
 - order: 2
-  cost: 15
-  content: 'Plan your approach (still no spoilers):
-
-    1. Confirm the exact gap between current and desired state for data processing.
-
-    2. Decide the single smallest change that moves you toward the objective.
-
-    3. Capture evidence (command output / status) before the change so you can prove it worked afterward.'
-- order: 3
   cost: 25
-  content: 'Guided walkthrough:
+  content: 'Diagnostic steps:
 
-    1. Re-check the current state — the transformation pipeline and sample output.
+    1. Run `systemctl status crond` — note Active/Failed and the last log lines.
 
-    2. Configure credentials and networking, then drive one happy-path transaction end to end across both
-    systems.
+    2. Read `journalctl -u crond -n 50` for the root error.
 
-    3. Verify the result — processed data matches the expected result.
+    3. Form a hypothesis about the smallest config or permission fix.'
+- order: 3
+  cost: 50
+  content: 'Exact fix + verification:
 
-    4. Click Check Solution once `systemctl is-active crond` returns active.'
+    1. Apply the minimal fix (config, unit override, or missing directory).
+
+    2. Run `systemctl daemon-reload` if you edited a unit file.
+
+    3. Run `systemctl restart crond` and confirm `systemctl is-active crond` succeeds.
+
+
+    WHY: the grader checks real service state, not marker files.'
 cross_technology: true
+summary: Complete the data processing — integration lab python lab and verify success with the checker
+estimated_minutes: 20
+xp_reward: 100
+prerequisites:
+- Basic python literacy
+tags:
+- do
+- hands-on
+- python
+linked_tutorial: python-fundamentals
+what_you_will_learn:
+- data processing is connected to the adjacent system successfully
+- Handoff points are authenticated and observable
+- End-to-end workflow completes without manual intervention
+environment:
+  nodes:
+  - role: primary
+    os: FixitLab Python project workspace
+    hostname: lab-primary
+    ip: 127.0.0.1
+    specs: local offline simulation
+  pre_installed:
+  - bash
+  - coreutils
+  - pip
+  - python
+  - python3
+  credentials:
+  - user: root
+    password: lab123
+tasks:
+- id: task_1
+  title: Data Processing — Integration Lab
+  description: Restore healthy behavior for Data Processing — Integration Lab by investigating the failure,
+    applying the smallest safe fix, and validating the outcome.
+  background: 'This python lab teaches systematic troubleshooting: observe, hypothesize, change, verify.'
+  validation:
+    type: service_active
+    command: systemctl is-active crond
+    expected_status: active
+    error_message: The crond service is not active yet. Check `systemctl status crond` and `journalctl
+      -u crond -n 50`.
+solution:
+  summary: The root cause is an unhealthy `crond` service; repair it and verify active state.
+  files_changed: []
+  commands_run:
+  - systemctl is-active crond
+  reference_docs: python-fundamentals
+guided_mode:
+  enabled: true
+  steps:
+  - step: 1
+    title: Inspect current state
+    instruction: Run a read-only diagnostic before changing anything.
+    command: systemctl is-active crond
+    expected_output: Output shows the current failure mode
+    explanation: Evidence-first troubleshooting avoids guessing.
+    next_on: command_success
+  - step: 2
+    title: Apply the minimal fix
+    instruction: Make one reversible change aligned with the objectives.
+    command: '# your fix command here'
+    expected_output: State moves toward the objective
+    explanation: Small changes make rollback easy if the hypothesis was wrong.
+    next_on: command_success
+  - step: 3
+    title: Verify with the grader
+    instruction: Run the same verification the checker uses.
+    command: systemctl is-active crond
+    expected_output: '`systemctl is-active crond` returns active'
+    explanation: The lab passes only when real state is healthy.
+    next_on: command_success

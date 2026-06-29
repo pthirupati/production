@@ -1,38 +1,130 @@
 slug: fail2ban-not-running
-title: "fail2ban Crashed — Fix Config Syntax Error and Restart"
-technology: Security
-category: Intrusion Prevention
+title: fail2ban Crashed — Fix Config Syntax Error and Restart
+technology: security
+category: Fix
 difficulty: easy
 time_limit: 600
 max_score: 100
 infrastructure_type: docker
 jira_priority: High
 is_free: false
-description: |
-  fail2ban crashed and cannot restart due to a configuration syntax error introduced
+description: 'CONTEXT: A team operating security hardening needs you to resolve `fail2ban Crashed — Fix
+  Config Syntax Error and Restart` during a realistic incident. The business impact is reduced service
+  reliability until the underlying state is repaired.
+
+
+  ENVIRONMENT: You are working in FixitLab''s offline hardening lab with SSH, firewall, TLS, audit logs,
+  and IAM settings. All tools run locally; no paid APIs or external cloud calls are required.
+
+
+  SYMPTOM / STARTING STATE: Ubuntu 22.04 with fail2ban. Service is stopped. journalctl shows config parse
+  error
+
+  in /etc/fail2ban/jail.local at line containing ''[action_mw''. The closing bracket is
+
+  missing. Auth.log shows ongoing brute force attempts. fail2ban crashed and cannot restart due to a configuration
+  syntax error introduced
+
   during a recent customization. The journal shows "ERROR: Failed during configuration"
+
   pointing to /etc/fail2ban/jail.local. A custom action was added but contains an
+
   unclosed bracket. While fail2ban is down, brute force attacks against SSH are going
+
   unblocked. Identify and fix the syntax error, then restart fail2ban.
+
+
+  OBJECTIVE: Identify the syntax error in /etc/fail2ban/jail.local; Fix the configuration syntax; Restart
+  fail2ban and verify it starts successfully. Success means `systemctl is-active --quiet` returns active.
+
+
+  WHAT TO AVOID: Do not apply broad destructive changes, skip evidence gathering, or fake completion with
+  marker files — the checker validates real system state.'
 objectives:
-  - Identify the syntax error in /etc/fail2ban/jail.local
-  - Fix the configuration syntax
-  - Restart fail2ban and verify it starts successfully
-  - Confirm the sshd jail is active
-initial_state: |
-  Ubuntu 22.04 with fail2ban. Service is stopped. journalctl shows config parse error
-  in /etc/fail2ban/jail.local at line containing '[action_mw'. The closing bracket is
+- Identify the syntax error in /etc/fail2ban/jail.local
+- Fix the configuration syntax
+- Restart fail2ban and verify it starts successfully
+- Confirm the sshd jail is active
+initial_state: 'Ubuntu 22.04 with fail2ban. Service is stopped. journalctl shows config parse error
+
+  in /etc/fail2ban/jail.local at line containing ''[action_mw''. The closing bracket is
+
   missing. Auth.log shows ongoing brute force attempts.
+
+  '
 hints:
-  - order: 1
-    cost: 10
-    content: "Check the error: `fail2ban-client start 2>&1 | head -20` or `journalctl -u fail2ban -n 30`"
-  - order: 2
-    cost: 10
-    content: "Inspect the file: `cat /etc/fail2ban/jail.local` — look for unclosed brackets or malformed action blocks."
-  - order: 3
-    cost: 15
-    content: "Test config: `fail2ban-client --test` or `python3 -c 'import configparser; c=configparser.ConfigParser(); c.read(\"/etc/fail2ban/jail.local\")'`"
-  - order: 4
-    cost: 10
-    content: "After fixing: `systemctl start fail2ban` and `fail2ban-client status`."
+- order: 1
+  cost: 0
+  content: 'Where to look: Start with `systemctl status --quiet` and `journalctl -u --quiet -n 50 --no-pager`
+    before changing anything.'
+- order: 2
+  cost: 25
+  content: 'Diagnostic steps:
+
+    1. Run `systemctl status --quiet` — note Active/Failed and the last log lines.
+
+    2. Read `journalctl -u --quiet -n 50` for the root error.
+
+    3. Form a hypothesis about the smallest config or permission fix.'
+- order: 3
+  cost: 50
+  content: 'Exact fix + verification:
+
+    1. Apply the minimal fix (config, unit override, or missing directory).
+
+    2. Run `systemctl daemon-reload` if you edited a unit file.
+
+    3. Run `systemctl restart --quiet` and confirm `systemctl is-active --quiet` succeeds.
+
+
+    WHY: the grader checks real service state, not marker files.'
+summary: Complete the fail2ban crashed — fix config syntax error and restart security lab and verify success
+  with the checker
+estimated_minutes: 10
+xp_reward: 100
+prerequisites:
+- Basic security literacy
+tags:
+- fix
+- hands-on
+- security
+linked_tutorial: security-fundamentals
+what_you_will_learn:
+- Identify the syntax error in /etc/fail2ban/jail.local
+- Fix the configuration syntax
+- Restart fail2ban and verify it starts successfully
+- Confirm the sshd jail is active
+environment:
+  nodes:
+  - role: primary
+    os: FixitLab hardening lab
+    hostname: lab-primary
+    ip: 127.0.0.1
+    specs: local offline simulation
+  pre_installed:
+  - bash
+  - coreutils
+  - journalctl
+  - security
+  - systemctl
+  credentials:
+  - user: root
+    password: lab123
+tasks:
+- id: task_1
+  title: fail2ban Crashed — Fix Config Syntax Error and Restart
+  description: Restore healthy behavior for fail2ban Crashed — Fix Config Syntax Error and Restart by
+    investigating the failure, applying the smallest safe fix, and validating the outcome.
+  background: 'This security lab teaches systematic troubleshooting: observe, hypothesize, change, verify.'
+  validation:
+    type: service_active
+    command: systemctl is-active --quiet
+    expected_status: active
+    error_message: The --quiet service is not active yet. Check `systemctl status --quiet` and `journalctl
+      -u --quiet -n 50`.
+solution:
+  summary: The root cause is an unhealthy `--quiet` service; repair it and verify active state.
+  files_changed: []
+  commands_run:
+  - systemctl is-active --quiet
+  reference_docs: security-fundamentals

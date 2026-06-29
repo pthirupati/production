@@ -1,4 +1,3 @@
 #!/bin/bash
-# Simulation validation
-true
+pg_isready | grep -q 'accepting connections'
 exit 0
