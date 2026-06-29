@@ -1,7 +1,7 @@
 title: 'RHEL Simulation: Firewall Blocks HTTP (Dual Terminal)'
 slug: sim-rhel-firewalld-dual
-technology: Simulation
-category: Linux Administration
+technology: simulation
+category: Fix
 difficulty: easy
 time_limit: 900
 max_score: 100
@@ -11,10 +11,28 @@ dual_terminal: true
 infrastructure_type: simulation
 jira_priority: Low
 is_free: false
-description: nginx is serving on the database/web server (10.0.0.10) but firewalld is blocking inbound
-  port 80, so remote clients can't reach it. Using the dual-terminal lab, confirm from the SSH client
-  that the request is refused, open HTTP through firewalld on the server console, then verify the remote
-  request succeeds.
+description: 'CONTEXT: The FixitLab platform team uses this lab to teach how local simulation engines
+  model real operational failures. A learner is asked to restore a rhel firewalld dual workflow after
+  the backing simulation state becomes unhealthy.
+
+
+  ENVIRONMENT: You are working in an offline, RHEL-like FixitLab simulation shell. The host is `sim-primary`,
+  core Linux tools are installed, and the lab checker reads the in-memory service state directly through
+  the local simulation engine.
+
+
+  SYMPTOM / STARTING STATE: Dual-terminal lab. primary (10.0.0.10): nginx is active but firewalld blocks
+  port 80. ssh_client: used to `curl http://10.0.0.10` to test connectivity from outside. Commands that
+  depend on the simulated service cannot reach the expected healthy state.
+
+
+  OBJECTIVE: Restore the service-backed simulation workflow so `firewall-cmd --list-ports` includes `80/tcp`
+  and nginx responds. The fix must be observable through normal system commands and must not depend on
+  a manual completion marker.
+
+
+  WHAT TO AVOID: Do not write marker files, skip the diagnostic step, or make broad unrelated changes;
+  repair only the failing service state needed for this scenario.'
 objectives:
 - From the SSH client, confirm curl to the server is refused while the port is blocked
 - Allow HTTP through firewalld on the server console
@@ -23,14 +41,80 @@ initial_state: 'Dual-terminal lab. primary (10.0.0.10): nginx is active but fire
   ssh_client: used to `curl http://10.0.0.10` to test connectivity from outside.'
 hints:
 - order: 1
-  cost: 10
-  content: 'SSH Client pane: `curl -v http://10.0.0.10/` — expect connection refused/timeout because port
-    80 is blocked.'
+  cost: 0
+  content: 'Where to look: The service can be healthy while the network path is blocked. Check firewalld
+    before changing nginx.'
 - order: 2
-  cost: 15
-  content: 'Server console: inspect and open it — `firewall-cmd --list-all`, then `firewall-cmd --permanent
-    --add-service=http && firewall-cmd --reload`.'
+  cost: 25
+  content: 'Diagnostic steps:
+
+    1. Run `firewall-cmd --list-ports`.
+
+    2. Test HTTP from the client side.
+
+    3. If port 80 is missing, the firewall is the blocker.'
 - order: 3
-  cost: 20
-  content: Back in the SSH Client, retry `curl http://10.0.0.10/` — it now returns the nginx HTML (HTTP
-    200).
+  cost: 50
+  content: 'Exact fix + verification:
+
+    1. Run `sudo firewall-cmd --permanent --add-service=http`.
+
+    2. Run `sudo firewall-cmd --reload`.
+
+    3. Verify with `firewall-cmd --list-ports` includes `80/tcp` and nginx responds.
+
+
+    WHY: the checker validates the actual firewall port state.'
+summary: Diagnose and restore a rhel firewalld dual simulation workflow, then prove the real state is
+  healthy.
+estimated_minutes: 15
+xp_reward: 100
+prerequisites:
+- Basic Linux terminal navigation
+- Reading systemd service status
+tags:
+- real-validation
+- rhel
+- simulation
+- systemd
+linked_tutorial: simulation-labs-fundamentals
+what_you_will_learn:
+- Recognize the unhealthy simulation signal for rhel firewalld dual
+- Use command output and logs to diagnose HTTP firewall access
+- Apply a minimal operational fix without relying on marker files
+- Verify the repaired state with the same command the grader uses
+environment:
+  nodes:
+  - role: primary
+    os: FixitLab RHEL-like simulation
+    hostname: sim-primary
+    ip: 127.0.0.1
+    specs: local in-memory simulation
+  pre_installed:
+  - bash
+  - systemctl
+  - journalctl
+  - coreutils
+  credentials:
+  - user: root
+    password: lab123
+tasks:
+- id: task_1
+  title: 'RHEL Simulation: Firewall Blocks HTTP (Dual Terminal)'
+  description: Restore the rhel firewalld dual simulation workflow by diagnosing the failed service state,
+    applying the smallest safe fix, and proving the service is healthy.
+  background: FixitLab simulation labs model real operating-system state. The checker reads that state
+    directly, so the lab only passes when the system itself is repaired.
+  validation:
+    type: command_output
+    command: firewall-cmd --list-ports
+    expected_output: 80/tcp
+    error_message: Port 80 is still blocked by firewalld. Allow HTTP and reload the firewall.
+solution:
+  summary: The root cause is HTTP being blocked by firewalld; allow the port/service and verify reachability.
+  files_changed: []
+  commands_run:
+  - firewall-cmd --permanent --add-service=http
+  - firewall-cmd --reload
+  - firewall-cmd --list-ports
+  reference_docs: 'linked tutorial: simulation-labs-fundamentals'

@@ -1,7 +1,7 @@
 title: 'RHEL Simulation: Ansible SSH Key Failure'
 slug: sim-rhel-ansible-ssh
-technology: Simulation
-category: Automation
+technology: simulation
+category: Fix
 difficulty: medium
 time_limit: 1200
 max_score: 100
@@ -12,10 +12,29 @@ dual_terminal: true
 infrastructure_type: simulation
 jira_priority: Medium
 is_free: false
-description: The Ansible control node cannot reach managed host web2 over SSH — `ansible webservers -m
-  ping` returns web2 UNREACHABLE with a publickey/permission-denied error, while web1 succeeds. The control
-  node's public key is not installed in web2's authorized_keys. Distribute the key to web2 and confirm
-  all hosts ping.
+description: 'CONTEXT: The FixitLab platform team uses this lab to teach how local simulation engines
+  model real operational failures. A learner is asked to restore a rhel ansible ssh workflow after the
+  backing simulation state becomes unhealthy.
+
+
+  ENVIRONMENT: You are working in an offline, RHEL-like FixitLab simulation shell. The host is `sim-primary`,
+  core Linux tools are installed, and the lab checker reads the in-memory service state directly through
+  the local simulation engine.
+
+
+  SYMPTOM / STARTING STATE: Simulated ansible-control node with inventory at /etc/ansible/hosts. web1
+  is reachable over SSH key auth; web2 rejects publickey authentication because the control node''s key
+  isn''t authorized there. Commands that depend on the simulated service cannot reach the expected healthy
+  state.
+
+
+  OBJECTIVE: Restore the service-backed simulation workflow so `ansible webservers -m ping` returns SUCCESS
+  for every host. The fix must be observable through normal system commands and must not depend on a manual
+  completion marker.
+
+
+  WHAT TO AVOID: Do not write marker files, skip the diagnostic step, or make broad unrelated changes;
+  repair only the failing service state needed for this scenario.'
 objectives:
 - Run the ping and identify that web2 is UNREACHABLE on publickey auth
 - Install the control node's public key into web2's authorized_keys
@@ -25,14 +44,81 @@ initial_state: Simulated ansible-control node with inventory at /etc/ansible/hos
   there.
 hints:
 - order: 1
-  cost: 10
-  content: 'Find the failing host: `ansible webservers -m ping`. web2 returns UNREACHABLE / "Permission
-    denied (publickey)".'
+  cost: 0
+  content: 'Where to look: This is an Ansible reachability problem. Compare the host that works with the
+    host that reports UNREACHABLE.'
 - order: 2
-  cost: 20
-  content: 'The control node''s key isn''t in web2''s authorized_keys. Distribute it: `ssh-copy-id root@web2`
-    (you''ll authenticate once), or append ~/.ssh/id_rsa.pub to web2''s ~/.ssh/authorized_keys.'
+  cost: 25
+  content: 'Diagnostic steps:
+
+    1. Run `ansible webservers -m ping`.
+
+    2. Identify which host fails publickey authentication.
+
+    3. Inspect SSH key authorization for that host before changing inventory.'
 - order: 3
-  cost: 30
-  content: Confirm direct SSH works (`ssh root@web2 hostname`), then re-run `ansible webservers -m ping`
-    — both web1 and web2 now return "pong".
+  cost: 50
+  content: 'Exact fix + verification:
+
+    1. Install the control node public key for the unreachable host.
+
+    2. Re-run `ansible webservers -m ping`.
+
+    3. Verify every host returns SUCCESS.
+
+
+    WHY: the grader checks Ansible reachability, not a marker.'
+summary: Diagnose and restore a rhel ansible ssh simulation workflow, then prove the real state is healthy.
+estimated_minutes: 20
+xp_reward: 100
+prerequisites:
+- Basic Linux terminal navigation
+- Reading systemd service status
+tags:
+- real-validation
+- rhel
+- simulation
+- systemd
+linked_tutorial: simulation-labs-fundamentals
+what_you_will_learn:
+- Recognize the unhealthy simulation signal for rhel ansible ssh
+- Use command output and logs to diagnose Ansible SSH reachability
+- Apply a minimal operational fix without relying on marker files
+- Verify the repaired state with the same command the grader uses
+environment:
+  nodes:
+  - role: primary
+    os: FixitLab RHEL-like simulation
+    hostname: sim-primary
+    ip: 127.0.0.1
+    specs: local in-memory simulation
+  pre_installed:
+  - bash
+  - systemctl
+  - journalctl
+  - coreutils
+  credentials:
+  - user: root
+    password: lab123
+tasks:
+- id: task_1
+  title: 'RHEL Simulation: Ansible SSH Key Failure'
+  description: Restore the rhel ansible ssh simulation workflow by diagnosing the failed service state,
+    applying the smallest safe fix, and proving the service is healthy.
+  background: FixitLab simulation labs model real operating-system state. The checker reads that state
+    directly, so the lab only passes when the system itself is repaired.
+  validation:
+    type: command_output
+    command: ansible webservers -m ping
+    expected_output: SUCCESS
+    error_message: One or more Ansible hosts are still unreachable. Check SSH key authorization for every
+      host.
+solution:
+  summary: The root cause is missing SSH key authorization on one managed host; install the key and verify
+    Ansible ping.
+  files_changed: []
+  commands_run:
+  - ansible webservers -m ping
+  - ssh-copy-id root@web2
+  - ansible webservers -m ping
+  reference_docs: 'linked tutorial: simulation-labs-fundamentals'

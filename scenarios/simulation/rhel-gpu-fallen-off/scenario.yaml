@@ -1,7 +1,7 @@
 title: 'RHEL Simulation: GPU Fallen Off Bus'
 slug: sim-rhel-gpu-fallen-off
-technology: Simulation
-category: GPU / NVIDIA
+technology: simulation
+category: Fix
 difficulty: hard
 time_limit: 1200
 max_score: 100
@@ -10,10 +10,27 @@ simulation_type: gpu
 infrastructure_type: simulation
 jira_priority: High
 is_free: false
-description: On a RHEL GPU node, nvidia-smi fails because the GPU has fallen off the PCIe bus — the driver
-  was loaded but the device stopped responding (an Xid/NVRM bus error). Use kernel logs to confirm the
-  cause, then reload the NVIDIA kernel module (or reset the device) to bring the GPU back so nvidia-smi
-  enumerates it again.
+description: 'CONTEXT: The FixitLab platform team uses this lab to teach how local simulation engines
+  model real operational failures. A learner is asked to restore a rhel gpu fallen off workflow after
+  the backing simulation state becomes unhealthy.
+
+
+  ENVIRONMENT: You are working in an offline, RHEL-like FixitLab simulation shell. The host is `sim-primary`,
+  core Linux tools are installed, and the lab checker reads the in-memory service state directly through
+  the local simulation engine.
+
+
+  SYMPTOM / STARTING STATE: Simulated RHEL GPU node. The NVIDIA driver is loaded, but the GPU has fallen
+  off the bus, so `nvidia-smi` errors and CUDA workloads can''t run. Commands that depend on the simulated
+  service cannot reach the expected healthy state.
+
+
+  OBJECTIVE: Restore the service-backed simulation workflow so `check.sh` exits successfully. The fix
+  must be observable through normal system commands and must not depend on a manual completion marker.
+
+
+  WHAT TO AVOID: Do not write marker files, skip the diagnostic step, or make broad unrelated changes;
+  repair only the failing service state needed for this scenario.'
 objectives:
 - Confirm the GPU failure with nvidia-smi
 - Inspect dmesg for NVRM/Xid bus errors
@@ -22,14 +39,81 @@ initial_state: Simulated RHEL GPU node. The NVIDIA driver is loaded, but the GPU
   so `nvidia-smi` errors and CUDA workloads can't run.
 hints:
 - order: 1
-  cost: 10
-  content: 'Confirm and gather evidence: `nvidia-smi` fails; check the kernel log for the bus drop: `dmesg
-    | grep -i nvrm` (look for an Xid error and "fallen off the bus").'
+  cost: 0
+  content: 'Where to look: Start with the service layer. The workflow depends on `target service`, so
+    first decide whether the service is stopped, failed, or healthy before changing anything.'
 - order: 2
-  cost: 20
-  content: 'Stop any GPU users, then reload the driver stack: `rmmod nvidia_uvm nvidia_drm nvidia_modeset
-    nvidia` followed by `modprobe nvidia`.'
+  cost: 25
+  content: 'Diagnostic steps:
+
+    1. Run `systemctl status target service` and read the Active line.
+
+    2. Run `journalctl -u target service -n 50` and look for the latest startup error.
+
+    3. If the unit is simply inactive or failed without a persistent config error, restart it and re-check.'
 - order: 3
-  cost: 30
-  content: Re-run `nvidia-smi` — the GPU is enumerated again. If a reload isn't enough, a device reset
-    (`nvidia-smi --gpu-reset`) or a reboot clears a hard bus fault.
+  cost: 50
+  content: 'Exact fix + verification:
+
+    1. Run `sudo systemctl start target service`.
+
+    2. If this is a guided fundamentals lab, run `sudo systemctl enable target service` so the state survives
+    a reboot.
+
+    3. Verify with `check.sh` exits successfully.
+
+
+    WHY: the simulation engine validates real service state. A marker file or note is ignored.'
+summary: Diagnose and restore a rhel gpu fallen off simulation workflow, then prove the real state is
+  healthy.
+estimated_minutes: 20
+xp_reward: 100
+prerequisites:
+- Basic Linux terminal navigation
+- Reading systemd service status
+tags:
+- real-validation
+- rhel
+- simulation
+- systemd
+linked_tutorial: simulation-labs-fundamentals
+what_you_will_learn:
+- Recognize the unhealthy simulation signal for rhel gpu fallen off
+- Use command output and logs to diagnose target service
+- Apply a minimal operational fix without relying on marker files
+- Verify the repaired state with the same command the grader uses
+environment:
+  nodes:
+  - role: primary
+    os: FixitLab RHEL-like simulation
+    hostname: sim-primary
+    ip: 127.0.0.1
+    specs: local in-memory simulation
+  pre_installed:
+  - bash
+  - systemctl
+  - journalctl
+  - coreutils
+  credentials:
+  - user: root
+    password: lab123
+tasks:
+- id: task_1
+  title: 'RHEL Simulation: GPU Fallen Off Bus'
+  description: Restore the rhel gpu fallen off simulation workflow by diagnosing the failed service state,
+    applying the smallest safe fix, and proving the service is healthy.
+  background: FixitLab simulation labs model real operating-system state. The checker reads that state
+    directly, so the lab only passes when the system itself is repaired.
+  validation:
+    type: custom_script
+    script: check.sh
+    error_message: The scenario validation script did not pass. Re-check the objective and Hint 2.
+solution:
+  summary: The root cause is an inactive/failed `target service` service; start it and verify active state.
+  files_changed: []
+  commands_run:
+  - systemctl status target service
+  - journalctl -u target service -n 50
+  - systemctl start target service
+  - systemctl is-active target service
+  reference_docs: 'linked tutorial: simulation-labs-fundamentals'

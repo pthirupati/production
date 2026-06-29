@@ -1,7 +1,7 @@
-title: 'Simulation Labs: Lab Authoring — Integration Lab'
+title: Lab Authoring - Integration Lab
 slug: academy-simulation-050-integration-authoring-5
-technology: Simulation Labs
-category: Cross-Technology
+technology: simulation
+category: Project
 difficulty: hard
 scenario_type: do
 lab_mode: simulation
@@ -11,9 +11,28 @@ max_score: 100
 is_free: false
 infrastructure_type: docker
 jira_priority: Medium
-description: Service operations lab. The `crond` systemd unit is **failed/inactive** on this host — a
-  realistic fault for Integration Lab workflows that depend on it. Diagnose with `systemctl status crond`
-  and journal logs, apply the smallest reliable fix, then verify with `systemctl is-active crond`.
+description: 'CONTEXT: The FixitLab platform team uses this lab to teach how local simulation engines
+  model real operational failures. A learner is asked to restore a integration authoring workflow after
+  the backing simulation state becomes unhealthy.
+
+
+  ENVIRONMENT: You are working in an offline, RHEL-like FixitLab simulation shell. The host is `sim-primary`,
+  core Linux tools are installed, and the lab checker reads the in-memory service state directly through
+  the local simulation engine.
+
+
+  SYMPTOM / STARTING STATE: The `crond` service is not running (`systemctl is-active crond` → inactive/failed).
+  Dependent Integration Lab tasks cannot succeed until the unit is healthy again. Commands that depend
+  on the simulated service cannot reach the expected healthy state.
+
+
+  OBJECTIVE: Restore the service-backed simulation workflow so `systemctl is-active crond` returns active.
+  The fix must be observable through normal system commands and must not depend on a manual completion
+  marker.
+
+
+  WHAT TO AVOID: Do not write marker files, skip the diagnostic step, or make broad unrelated changes;
+  repair only the failing service state needed for this scenario.'
 objectives:
 - The `crond` service is active (running)
 - '`systemctl is-active crond` returns active'
@@ -22,33 +41,108 @@ initial_state: The `crond` service is not running (`systemctl is-active crond` �
   Integration Lab tasks cannot succeed until the unit is healthy again.
 hints:
 - order: 1
-  cost: 10
-  content: 'Orient yourself before changing anything:
-
-    1. Inspect the current state — scenario.yaml and the preset/check.
-
-    2. Write down what looks normal versus wrong or missing for lab authoring.
-
-    3. Recall the core idea: scenario YAML, presets, and validation. Form one hypothesis before you act.'
+  cost: 0
+  content: 'Where to look: Start with the service layer. The workflow depends on `crond`, so first decide
+    whether the service is stopped, failed, or healthy before changing anything.'
 - order: 2
-  cost: 15
-  content: 'Plan your approach (still no spoilers):
-
-    1. Confirm the exact gap between current and desired state for lab authoring.
-
-    2. Decide the single smallest change that moves you toward the objective.
-
-    3. Capture evidence (command output / status) before the change so you can prove it worked afterward.'
-- order: 3
   cost: 25
-  content: 'Guided walkthrough:
+  content: 'Diagnostic steps:
 
-    1. Re-check the current state — scenario.yaml and the preset/check.
+    1. Run `systemctl status crond` and read the Active line.
 
-    2. Configure credentials and networking, then drive one happy-path transaction end to end across both
-    systems.
+    2. Run `journalctl -u crond -n 50` and look for the latest startup error.
 
-    3. Verify the result — the authored lab validates correctly.
+    3. If the unit is simply inactive or failed without a persistent config error, restart it and re-check.'
+- order: 3
+  cost: 50
+  content: 'Exact fix + verification:
 
-    4. Click Check Solution once `systemctl is-active crond` returns active.'
+    1. Run `sudo systemctl start crond`.
+
+    2. If this is a guided fundamentals lab, run `sudo systemctl enable crond` so the state survives a
+    reboot.
+
+    3. Verify with `systemctl is-active crond` returns active.
+
+
+    WHY: the simulation engine validates real service state. A marker file or note is ignored.'
 cross_technology: true
+summary: Diagnose and restore a integration authoring simulation workflow, then prove the real state is
+  healthy.
+estimated_minutes: 20
+xp_reward: 100
+prerequisites:
+- Basic Linux terminal navigation
+- Reading systemd service status
+tags:
+- integration
+- real-validation
+- simulation
+- systemd
+linked_tutorial: simulation-labs-fundamentals
+what_you_will_learn:
+- Recognize the unhealthy simulation signal for integration authoring
+- Use command output and logs to diagnose crond
+- Apply a minimal operational fix without relying on marker files
+- Verify the repaired state with the same command the grader uses
+environment:
+  nodes:
+  - role: primary
+    os: FixitLab RHEL-like simulation
+    hostname: sim-primary
+    ip: 127.0.0.1
+    specs: local in-memory simulation
+  pre_installed:
+  - bash
+  - systemctl
+  - journalctl
+  - coreutils
+  credentials:
+  - user: root
+    password: lab123
+tasks:
+- id: task_1
+  title: Lab Authoring - Integration Lab
+  description: Restore the integration authoring simulation workflow by diagnosing the failed service
+    state, applying the smallest safe fix, and proving the service is healthy.
+  background: FixitLab simulation labs model real operating-system state. The checker reads that state
+    directly, so the lab only passes when the system itself is repaired.
+  validation:
+    type: service_active
+    command: systemctl is-active crond
+    expected_status: active
+    error_message: The crond service is not active yet. Check `systemctl status crond` and `journalctl
+      -u crond -n 50` for the remaining blocker.
+solution:
+  summary: The root cause is an inactive/failed `crond` service; start it and verify active state.
+  files_changed: []
+  commands_run:
+  - systemctl status crond
+  - journalctl -u crond -n 50
+  - systemctl start crond
+  - systemctl is-active crond
+  reference_docs: 'linked tutorial: simulation-labs-fundamentals'
+guided_mode:
+  enabled: true
+  steps:
+  - step: 1
+    title: Inspect the failing state
+    instruction: Check whether the backing service for Lab Authoring - Integration Lab is active.
+    command: systemctl status crond
+    expected_output: Healthy output after the fix
+    explanation: The Active line tells you whether the workflow is blocked by service state.
+    next_on: command_success
+  - step: 2
+    title: Gather supporting evidence
+    instruction: Use a second command to confirm the failure mode before changing state.
+    command: journalctl -u crond -n 50
+    expected_output: Output points at the same root cause
+    explanation: A second signal prevents guessing and makes the fix explainable.
+    next_on: command_success
+  - step: 3
+    title: Verify the repaired state
+    instruction: Run the same healthy-state command used by the grader.
+    command: systemctl is-active crond
+    expected_output: '`systemctl is-active crond` returns active'
+    explanation: Validation is based on real service state, not a marker file.
+    next_on: command_success

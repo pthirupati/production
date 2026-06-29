@@ -1,4 +1,3 @@
 #!/bin/bash
-# Boot scenario — validation is manual / Jira close
-true
+grub2-mkconfig -o /boot/grub2/grub.cfg
 exit 0

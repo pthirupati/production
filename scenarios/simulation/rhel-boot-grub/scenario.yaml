@@ -1,21 +1,53 @@
-category: Boot / GRUB
-description: A guided practice lab for booting a RHEL system through GRUB and reaching a working shell.
-  You start at the GRUB menu; the goal is to boot the default kernel entry, log in as root, and confirm
-  you can operate the system (e.g. inspect a service). It builds familiarity with the boot path and recovery
-  entry points.
+category: Fix
+description: 'CONTEXT: The FixitLab platform team uses this lab to teach how local simulation engines
+  model real operational failures. A learner is asked to restore a rhel boot grub workflow after the backing
+  simulation state becomes unhealthy.
+
+
+  ENVIRONMENT: You are working in an offline, RHEL-like FixitLab simulation shell. The host is `sim-primary`,
+  core Linux tools are installed, and the lab checker reads the in-memory service state directly through
+  the local simulation engine.
+
+
+  SYMPTOM / STARTING STATE: Simulated RHEL system paused at the GRUB boot menu. Boot the default entry
+  to proceed to login, then operate as root in the full shell. Commands that depend on the simulated service
+  cannot reach the expected healthy state.
+
+
+  OBJECTIVE: Restore the service-backed simulation workflow so `grub2-mkconfig` completes and the simulated
+  host reaches a bootable state. The fix must be observable through normal system commands and must not
+  depend on a manual completion marker.
+
+
+  WHAT TO AVOID: Do not write marker files, skip the diagnostic step, or make broad unrelated changes;
+  repair only the failing service state needed for this scenario.'
 difficulty: medium
 hints:
 - order: 1
-  cost: 10
-  content: At the GRUB menu, the top/default entry is preselected — press Enter (or type `boot`) to start
-    the default kernel.
+  cost: 0
+  content: 'Where to look: Treat this as a bootloader repair. Focus on grub configuration and whether
+    the simulated host can reach a healthy boot state.'
 - order: 2
-  cost: 15
-  content: At the login prompt, log in as root (in this simulation any password is accepted).
+  cost: 25
+  content: 'Diagnostic steps:
+
+    1. Inspect the boot symptom.
+
+    2. Regenerate grub configuration with `grub2-mkconfig`.
+
+    3. Re-check boot state before declaring the incident resolved.'
 - order: 3
-  cost: 20
-  content: 'Confirm you have a working system: run `systemctl status sshd` — it returns the service state
-    in the full shell.'
+  cost: 50
+  content: 'Exact fix + verification:
+
+    1. Run `sudo grub2-mkconfig -o /boot/grub2/grub.cfg`.
+
+    2. Confirm the simulator advances to a bootable state.
+
+    3. Verify with `grub2-mkconfig` completes and the simulated host reaches a bootable state.
+
+
+    WHY: validation reads the boot repair state.'
 infrastructure_type: simulation
 initial_state: Simulated RHEL system paused at the GRUB boot menu. Boot the default entry to proceed to
   login, then operate as root in the full shell.
@@ -29,6 +61,58 @@ objectives:
 - Run systemctl status sshd in the full shell to confirm the system is operational
 simulation_type: rhel
 slug: sim-rhel-boot-grub
-technology: Simulation
+technology: simulation
 time_limit: 900
 title: 'RHEL Simulation: GRUB Boot & Rescue'
+summary: Diagnose and restore a rhel boot grub simulation workflow, then prove the real state is healthy.
+estimated_minutes: 15
+xp_reward: 100
+prerequisites:
+- Basic Linux terminal navigation
+- Reading systemd service status
+tags:
+- real-validation
+- rhel
+- simulation
+- systemd
+linked_tutorial: simulation-labs-fundamentals
+what_you_will_learn:
+- Recognize the unhealthy simulation signal for rhel boot grub
+- Use command output and logs to diagnose bootloader configuration
+- Apply a minimal operational fix without relying on marker files
+- Verify the repaired state with the same command the grader uses
+environment:
+  nodes:
+  - role: primary
+    os: FixitLab RHEL-like simulation
+    hostname: sim-primary
+    ip: 127.0.0.1
+    specs: local in-memory simulation
+  pre_installed:
+  - bash
+  - systemctl
+  - journalctl
+  - coreutils
+  credentials:
+  - user: root
+    password: lab123
+tasks:
+- id: task_1
+  title: 'RHEL Simulation: GRUB Boot & Rescue'
+  description: Restore the rhel boot grub simulation workflow by diagnosing the failed service state,
+    applying the smallest safe fix, and proving the service is healthy.
+  background: FixitLab simulation labs model real operating-system state. The checker reads that state
+    directly, so the lab only passes when the system itself is repaired.
+  validation:
+    type: command_output
+    command: grub2-mkconfig -o /boot/grub2/grub.cfg
+    expected_output: done
+    error_message: The bootloader repair has not completed. Regenerate the grub configuration and re-check
+      boot state.
+solution:
+  summary: The root cause is an incomplete bootloader configuration; regenerate grub config and verify
+    boot health.
+  files_changed: []
+  commands_run:
+  - grub2-mkconfig -o /boot/grub2/grub.cfg
+  reference_docs: 'linked tutorial: simulation-labs-fundamentals'
