@@ -8,7 +8,8 @@ import { useAuthStore } from '../store/authStore'
 import {
   Clock, CheckCircle2, XCircle, Lightbulb, StopCircle,
   ChevronRight, Trophy, Target, Eye, FileText, AlertTriangle,
-  PanelLeftClose, PanelLeftOpen, Sparkles, Timer, Keyboard, ExternalLink, Terminal, Wand2, Ticket as TicketIcon
+  PanelLeftClose, PanelLeftOpen, Sparkles, Timer, Keyboard, ExternalLink, Terminal, Wand2,
+  Ticket as TicketIcon, Lock, ChevronDown, ChevronUp, ThumbsUp, ThumbsDown
 } from 'lucide-react'
 import toast from 'react-hot-toast'
 import { ConfirmDialog } from '../components/ConfirmModal'
@@ -154,6 +155,125 @@ function buildGuidedSteps(scenario = {}) {
   ]
 }
 
+function hintTitleForOrder(order) {
+  if (order === 1) return 'Hint 1: Where to look'
+  if (order === 2) return 'Hint 2: Step-by-step guide'
+  if (order === 3) return 'Hint 3: Full solution'
+  return `Hint ${order}`
+}
+
+function hintSubtitleForOrder(order) {
+  if (order === 1) return 'Investigation strategy, no spoilers'
+  if (order === 2) return 'Diagnostic steps and reasoning'
+  if (order === 3) return 'Exact fix plus verification'
+  return 'Additional guidance'
+}
+
+function normalizeHintTiers(hints) {
+  if (Array.isArray(hints?.tiers) && hints.tiers.length > 0) return hints.tiers
+  const total = hints?.total_hints || hints?.revealed?.length || 0
+  const revealedByOrder = new Map((hints?.revealed || []).map((h) => [h.order, h]))
+  return Array.from({ length: total }, (_, idx) => {
+    const order = idx + 1
+    const revealed = revealedByOrder.get(order)
+    return {
+      order,
+      label: hintTitleForOrder(order),
+      title: hintSubtitleForOrder(order),
+      content: revealed?.content || '',
+      penalty: revealed?.penalty || (order === 1 ? 0 : order === 2 ? 25 : 50),
+      xp_cost: order === 1 ? 0 : order === 2 ? 25 : 50,
+      revealed: Boolean(revealed),
+      unlocked: order <= ((hints?.hints_used || 0) + 1),
+      locked: order > ((hints?.hints_used || 0) + 1),
+    }
+  })
+}
+
+function HintTierCard({ tier, collapsed, feedback, onCollapse, onReveal, onFeedback }) {
+  const revealed = Boolean(tier.revealed)
+  const locked = Boolean(tier.locked || !tier.unlocked)
+  const xpCost = tier.xp_cost ?? tier.penalty ?? 0
+  return (
+    <div className={`rounded-xl border p-3 transition-all ${
+      revealed
+        ? 'bg-surface-800 border-accent-amber/20'
+        : locked
+          ? 'bg-surface-900/60 border-surface-800 opacity-75'
+          : 'bg-accent-amber/5 border-accent-amber/25'
+    }`}>
+      <div className="flex items-start justify-between gap-3">
+        <div className="flex items-start gap-2 min-w-0">
+          <div className={`mt-0.5 rounded-lg p-1.5 ${revealed ? 'bg-accent-amber/15' : 'bg-surface-800'}`}>
+            {locked ? <Lock size={13} className="text-surface-500" /> : <Lightbulb size={13} className="text-accent-amber" />}
+          </div>
+          <div className="min-w-0">
+            <p className={`text-xs font-semibold ${locked ? 'text-surface-500' : 'text-accent-amber'}`}>
+              {tier.label || hintTitleForOrder(tier.order)}
+            </p>
+            <p className="text-[11px] text-surface-500 mt-0.5">{tier.title || hintSubtitleForOrder(tier.order)}</p>
+          </div>
+        </div>
+        <span className={`shrink-0 text-[10px] rounded-full px-2 py-0.5 border ${
+          xpCost ? 'text-accent-amber border-accent-amber/30 bg-accent-amber/10' : 'text-accent-green border-accent-green/30 bg-accent-green/10'
+        }`}>
+          {xpCost ? `-${xpCost} XP` : 'Free'}
+        </span>
+      </div>
+
+      {revealed ? (
+        <>
+          {!collapsed && (
+            <p className="mt-3 text-sm text-surface-300 leading-relaxed whitespace-pre-wrap">{tier.content}</p>
+          )}
+          <div className="mt-3 flex items-center justify-between gap-2">
+            <button
+              type="button"
+              onClick={() => onCollapse(tier.order)}
+              className="text-[11px] text-surface-500 hover:text-surface-300 flex items-center gap-1"
+            >
+              {collapsed ? <ChevronDown size={12} /> : <ChevronUp size={12} />}
+              {collapsed ? 'Expand' : 'Collapse'}
+            </button>
+            <div className="flex items-center gap-1.5">
+              <span className="text-[10px] text-surface-600">Helpful?</span>
+              <button
+                type="button"
+                onClick={() => onFeedback(tier.order, 'up')}
+                className={`p-1 rounded ${feedback === 'up' ? 'text-accent-green bg-accent-green/10' : 'text-surface-500 hover:text-accent-green'}`}
+                aria-label={`Mark hint ${tier.order} helpful`}
+              >
+                <ThumbsUp size={12} />
+              </button>
+              <button
+                type="button"
+                onClick={() => onFeedback(tier.order, 'down')}
+                className={`p-1 rounded ${feedback === 'down' ? 'text-accent-red bg-accent-red/10' : 'text-surface-500 hover:text-accent-red'}`}
+                aria-label={`Mark hint ${tier.order} not helpful`}
+              >
+                <ThumbsDown size={12} />
+              </button>
+            </div>
+          </div>
+        </>
+      ) : (
+        <button
+          type="button"
+          disabled={locked}
+          onClick={onReveal}
+          className={`mt-3 w-full py-2 rounded-lg text-xs font-semibold transition-all ${
+            locked
+              ? 'bg-surface-800 text-surface-600 cursor-not-allowed'
+              : 'bg-accent-amber/10 text-accent-amber border border-accent-amber/20 hover:bg-accent-amber/20'
+          }`}
+        >
+          {locked ? 'Unlock previous hint first' : `Reveal ${tier.label || hintTitleForOrder(tier.order)}`}
+        </button>
+      )}
+    </div>
+  )
+}
+
 export default function LabRunner() {
   const { sessionId } = useParams()
   const navigate = useNavigate()
@@ -169,8 +289,11 @@ export default function LabRunner() {
   const [isCloudLab, setIsCloudLab] = useState(false)
   const [validating, setValidating] = useState(false)
   const [validationResult, setValidationResult] = useState(null)
-  const [hints, setHints] = useState({ revealed: [], next_available: false, total_hints: 0, hints_used: 0, interview_mode: false })
+  const [hints, setHints] = useState({ revealed: [], tiers: [], next_available: false, total_hints: 0, hints_used: 0, interview_mode: false })
   const [interviewMode, setInterviewMode] = useState(false)
+  const [failedValidationCount, setFailedValidationCount] = useState(0)
+  const [collapsedHints, setCollapsedHints] = useState({})
+  const [hintFeedback, setHintFeedback] = useState({})
   const [sidebarOpen, setSidebarOpen] = useState(false)
   const isMobile = useIsMobile()
   const [sidebarTab, setSidebarTab] = useState('instructions') // instructions | guided | hints | result
@@ -726,6 +849,7 @@ export default function LabRunner() {
       setSidebarTab('result')
       setSidebarOpen(true)
       if (result.passed) {
+        setFailedValidationCount(0)
         toast.success(result.message || `Challenge solved! Score: ${result.score}`, { duration: 6000 })
         stopTimer()
         if (labChannelRef.current) {
@@ -750,23 +874,42 @@ export default function LabRunner() {
           )
         }
       } else {
+        const nextFailures = failedValidationCount + 1
+        setFailedValidationCount(nextFailures)
         toast('Validation failed. Keep trying!', { icon: '🔍', ...TOAST })
+        if (
+          nextFailures >= 3 &&
+          !interviewMode &&
+          !hints.interview_mode &&
+          (hints.hints_used || 0) === 0 &&
+          hints.next_available
+        ) {
+          setSidebarTab('hints')
+          setSidebarOpen(true)
+          toast('Looks like you are stuck — opening Hint 1: where to start looking.', {
+            icon: '💡',
+            duration: 5000,
+            ...TOAST,
+          })
+          handleRevealHint()
+        }
       }
     } catch (err) {
       toast.error(err.response?.data?.error || 'Validation error')
     } finally { setValidating(false) }
   }
 
-  const handleRevealHint = async () => {
+  async function handleRevealHint() {
     try {
       const result = interviewMode || hints.interview_mode
         ? await labApi.revealAiHint(sessionId)
         : await labApi.revealHint(sessionId)
       setHints(prev => ({
         ...prev,
-        revealed: [...prev.revealed, result.hint],
+        revealed: result.tiers ? result.tiers.filter((t) => t.revealed) : [...prev.revealed, result.hint],
+        tiers: result.tiers ?? prev.tiers,
         hints_used: result.hints_used,
-        next_available: result.hints_used < (result.total_hints ?? prev.total_hints),
+        next_available: result.next_available ?? (result.hints_used < (result.total_hints ?? prev.total_hints)),
         total_hints: result.total_hints ?? prev.total_hints,
       }))
     } catch (err) {
@@ -778,6 +921,14 @@ export default function LabRunner() {
         toast.error(err.response?.data?.error || 'No more hints')
       }
     }
+  }
+
+  const toggleHintCollapsed = (order) => {
+    setCollapsedHints(prev => ({ ...prev, [order]: !prev[order] }))
+  }
+
+  const markHintFeedback = (order, value) => {
+    setHintFeedback(prev => ({ ...prev, [order]: prev[order] === value ? '' : value }))
   }
 
   const handleExtendLab = async () => {
@@ -1630,38 +1781,36 @@ export default function LabRunner() {
                       </p>
                     </div>
                   )}
-                  {hints.revealed.length > 0 ? (
+                  {interviewMode ? null : normalizeHintTiers(hints).length > 0 ? (
                     <div className="space-y-3">
-                      {hints.revealed.map((hint) => (
-                        <div key={hint.order} className="bg-surface-800 rounded-lg p-3 border border-accent-amber/10">
-                          <div className="flex items-center gap-2 mb-1.5">
-                            <Lightbulb size={12} className="text-accent-amber" />
-                            <span className="text-xs font-semibold text-accent-amber">Hint {hint.order}</span>
-                            <span className="text-[10px] text-surface-600">(-{hint.penalty} pts)</span>
-                          </div>
-                          <p className="text-sm text-surface-300 leading-relaxed whitespace-pre-wrap">{hint.content}</p>
-                        </div>
+                      <div className="rounded-lg bg-surface-800/60 border border-surface-700 p-3">
+                        <p className="text-xs font-semibold text-white mb-1">Progressive walkthrough</p>
+                        <p className="text-[11px] text-surface-400 leading-relaxed">
+                          Start with investigation, unlock diagnostics second, and reveal the exact fix only when you need it.
+                        </p>
+                      </div>
+                      {normalizeHintTiers(hints).map((tier) => (
+                        <HintTierCard
+                          key={tier.order}
+                          tier={tier}
+                          collapsed={!!collapsedHints[tier.order]}
+                          feedback={hintFeedback[tier.order]}
+                          onCollapse={toggleHintCollapsed}
+                          onFeedback={markHintFeedback}
+                          onReveal={handleRevealHint}
+                        />
                       ))}
                     </div>
                   ) : (
                     <div className="text-center py-8">
                       <Lightbulb size={24} className="mx-auto text-surface-700 mb-2" />
-                      <p className="text-sm text-surface-500">No hints revealed yet</p>
-                      <p className="text-xs text-surface-600 mt-1">Each hint costs points from your score</p>
+                      <p className="text-sm text-surface-500">No hints available yet</p>
+                      <p className="text-xs text-surface-600 mt-1">Use the guided steps and validation output to keep moving.</p>
                     </div>
                   )}
 
-                  {(hints.next_available || interviewMode) && hints.hints_used < (hints.total_hints || 5) && (
-                    <button
-                      onClick={handleRevealHint}
-                      className="w-full py-2.5 rounded-lg text-sm font-medium bg-accent-amber/10 text-accent-amber border border-accent-amber/20 hover:bg-accent-amber/20 transition-all"
-                    >
-                      {interviewMode ? 'Get AI Coaching Hint' : 'Reveal Next Hint'}
-                    </button>
-                  )}
-
                   {!hints.next_available && !interviewMode && hints.total_hints > 0 && (
-                    <p className="text-xs text-surface-600 text-center">All hints revealed</p>
+                    <p className="text-xs text-surface-600 text-center mt-3">All hints revealed</p>
                   )}
 
                   {/* Ask AI coaching hint */}

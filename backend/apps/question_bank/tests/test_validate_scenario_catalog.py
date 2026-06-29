@@ -107,3 +107,68 @@ def test_validate_flags_tmp_marker_on_generic_sim(tmp_path):
     gaps = validate_scenario_file(d / "scenario.yaml")
     assert any("completion sentinel" in g for g in gaps)
 
+
+def test_validate_flags_missing_b1_schema_fields(tmp_path):
+    d = tmp_path / "linux" / "thin-lab"
+    d.mkdir(parents=True)
+    (d / "scenario.yaml").write_text(
+        yaml.dump({
+            "slug": "thin-lab",
+            "title": "Thin lab",
+            "description": "A" * 100,
+            "objectives": ["one", "two"],
+            "hints": [
+                {"order": 1, "content": "Where to look: inspect service state first."},
+                {"order": 2, "content": "Diagnostic steps:\n1. Run systemctl status."},
+                {"order": 3, "content": "Exact fix:\n1. Start the unit."},
+            ],
+        }),
+        encoding="utf-8",
+    )
+    (d / "check.sh").write_text("#!/bin/bash\nsystemctl is-active nginx\n", encoding="utf-8")
+
+    gaps = validate_scenario_file(d / "scenario.yaml")
+
+    assert "missing summary" in gaps
+    assert "missing linked_tutorial" in gaps
+    assert "missing environment.nodes" in gaps
+    assert "missing tasks" in gaps
+    assert any("description missing CONTEXT" in g for g in gaps)
+
+
+def test_fix_stubs_patches_missing_b1_schema_fields(tmp_path):
+    d = tmp_path / "linux" / "thin-lab"
+    d.mkdir(parents=True)
+    scenario_path = d / "scenario.yaml"
+    scenario_path.write_text(
+        yaml.dump({
+            "slug": "thin-lab",
+            "title": "Repair Nginx",
+            "description": "nginx is down",
+            "objectives": ["nginx is active", "status check passes"],
+            "hints": [
+                {"order": 1, "content": "Where to look: inspect service state first."},
+                {"order": 2, "content": "Diagnostic steps:\n1. Run systemctl status nginx."},
+                {"order": 3, "content": "Exact fix:\n1. Start nginx."},
+            ],
+            "time_limit": 900,
+            "max_score": 100,
+        }),
+        encoding="utf-8",
+    )
+    (d / "check.sh").write_text("#!/bin/bash\nsystemctl is-active nginx\n", encoding="utf-8")
+
+    gaps = validate_scenario_file(scenario_path, fix_stubs=True)
+    data = yaml.safe_load(scenario_path.read_text(encoding="utf-8"))
+
+    assert data["summary"].startswith("TODO:")
+    assert data["technology"] == "linux"
+    assert data["estimated_minutes"] == 15
+    assert data["xp_reward"] == 100
+    assert len(data["what_you_will_learn"]) >= 3
+    assert data["environment"]["nodes"][0]["role"] == "primary"
+    assert data["tasks"][0]["validation"]["type"] == "service_active"
+    assert data["solution"]["summary"].startswith("TODO:")
+    assert not any("missing summary" in g for g in gaps)
+    assert not any("missing tasks" in g for g in gaps)
+

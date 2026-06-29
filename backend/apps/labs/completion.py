@@ -17,14 +17,20 @@ logger = logging.getLogger(__name__)
 
 
 def compute_score(session) -> int:
-    """Score == base 100 + time bonus − hint penalty, floored at 10.
+    """Score == base 100 + time bonus − progressive hint penalty, floored at 10.
 
-    Identical formula to the original ValidateLabView so coding scenarios score
-    consistently with every other lab type.
+    Hint UX is tiered: Hint 1 is free, Hint 2 costs 25 XP, Hint 3 costs
+    another 50 XP. Extra coaching hints beyond the structured three tiers keep a
+    modest 10 XP cost each for backwards compatibility with the rule-based AI
+    coaching path.
     """
     duration = session.duration_limit or 1
     time_bonus = max(0, int(session.time_remaining * 100 / duration))
-    hint_penalty = session.hints_used * 10
+    tier_penalties = [0, 25, 50]
+    used = max(0, int(session.hints_used or 0))
+    hint_penalty = sum(tier_penalties[:used])
+    if used > len(tier_penalties):
+        hint_penalty += (used - len(tier_penalties)) * 10
     return max(10, 100 + time_bonus - hint_penalty)
 
 

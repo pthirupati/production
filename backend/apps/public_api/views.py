@@ -1504,33 +1504,72 @@ class LabSessionStatusView(APIView):
 class LabHintsView(APIView):
     permission_classes = [IsAuthenticated]
 
+    TIER_LABELS = {
+        1: ("Hint 1: Where to look", "Investigation strategy"),
+        2: ("Hint 2: Step-by-step guide", "Diagnostic steps"),
+        3: ("Hint 3: Full solution", "Exact fix + verification"),
+    }
+    TIER_XP_COSTS = {1: 0, 2: 25, 3: 50}
+
+    @classmethod
+    def _hint_payload(cls, hint, revealed: bool, unlocked: bool) -> dict:
+        label, title = cls.TIER_LABELS.get(
+            int(hint.order),
+            (f"Hint {hint.order}", "Additional guidance"),
+        )
+        return {
+            "order": hint.order,
+            "label": label,
+            "title": title,
+            "content": hint.content if revealed else "",
+            "penalty": hint.penalty,
+            "xp_cost": cls.TIER_XP_COSTS.get(int(hint.order), hint.penalty),
+            "revealed": revealed,
+            "unlocked": unlocked,
+            "locked": not unlocked,
+        }
+
+    @classmethod
+    def _standard_response(cls, session, hints, *, interview_mode: bool = False) -> dict:
+        total = hints.count()
+        hints_used = min(session.hints_used, total)
+        if interview_mode:
+            return {
+                "revealed": [],
+                "tiers": [],
+                "next_available": False,
+                "total_hints": total,
+                "hints_used": session.hints_used,
+                "interview_mode": True,
+                "ai_hints_available": True,
+                "message": "Interview mode: standard hints are disabled. Use AI coaching hints instead.",
+            }
+        tier_items = [
+            cls._hint_payload(
+                hint,
+                revealed=hint.order <= hints_used,
+                unlocked=hint.order <= hints_used + 1,
+            )
+            for hint in hints
+        ]
+        return {
+            "revealed": [t for t in tier_items if t["revealed"]],
+            "tiers": tier_items,
+            "next_available": total > hints_used,
+            "total_hints": total,
+            "hints_used": hints_used,
+            "interview_mode": False,
+        }
+
     def get(self, request, session_id):
         session = get_object_or_404(LabSession, pk=session_id, user=request.user)
         interview_mode = bool(getattr(session.scenario, "interview_mode", False))
         hints = Hint.objects.filter(scenario=session.scenario, is_active=True).order_by("order")
 
         if interview_mode:
-            return Response({
-                "revealed": [],
-                "next_available": False,
-                "total_hints": hints.count(),
-                "hints_used": session.hints_used,
-                "interview_mode": True,
-                "ai_hints_available": True,
-                "message": "Interview mode: standard hints are disabled. Use AI coaching hints instead.",
-            })
+            return Response(self._standard_response(session, hints, interview_mode=True))
 
-        revealed = hints[:session.hints_used]
-        return Response({
-            "revealed": [
-                {"order": h.order, "content": h.content, "penalty": h.penalty}
-                for h in revealed
-            ],
-            "next_available": hints.count() > session.hints_used,
-            "total_hints": hints.count(),
-            "hints_used": session.hints_used,
-            "interview_mode": False,
-        })
+        return Response(self._standard_response(session, hints))
 
     def post(self, request, session_id):
         session = get_object_or_404(
@@ -1558,10 +1597,13 @@ class LabHintsView(APIView):
         session.hints_used += 1
         session.save()
 
+        payload = self._standard_response(session, hints)
         return Response({
-            "hint": {"order": next_hint.order, "content": next_hint.content, "penalty": next_hint.penalty},
+            "hint": self._hint_payload(next_hint, revealed=True, unlocked=True),
+            "tiers": payload["tiers"],
             "hints_used": session.hints_used,
             "total_hints": hints.count(),
+            "next_available": payload["next_available"],
         })
 
 
