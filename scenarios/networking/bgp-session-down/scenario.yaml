@@ -38,14 +38,17 @@ objectives:
 hints:
 - order: 1
   cost: 0
-  content: 'Where to look: Check the BGP session state and why it isn''t Established'
+  content: 'Where to look: Start with read-only discovery on the network lab. For BGP Session Down Between
+    Routers, inspect interfaces, routing tables, DNS, and firewall rules before changing anything.'
 - order: 2
   cost: 25
   content: 'Diagnostic steps:
 
-    1. Identify the remote-AS or MD5 password mismatch
+    1. Gather evidence with interfaces, routing tables, DNS, and firewall rules.
 
-    2. Correct the configuration and confirm the session reaches Established with routes exchanged'
+    2. Compare current output to the scenario objectives.
+
+    3. Form a single hypothesis about the smallest fix that would restore healthy state.'
 - order: 3
   cost: 50
   content: 'Exact fix + verification:

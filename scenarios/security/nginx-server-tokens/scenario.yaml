@@ -55,16 +55,17 @@ initial_state: 'Ubuntu 22.04 with nginx 1.18.0. `curl -I http://localhost/` show
 hints:
 - order: 1
   cost: 0
-  content: 'Where to look: Verify nginx is exposing version in Server header'
+  content: 'Where to look: Test the config to get the exact file and line: `nginx -t`. It prints the offending
+    directive (e.g. unknown directive "listn").'
 - order: 2
   cost: 25
   content: 'Diagnostic steps:
 
-    1. Disable server_tokens in nginx.conf
+    1. Run `nginx -t` and `systemctl status nginx` for config vs service errors.
 
-    2. Reload nginx and verify the Server header no longer shows the version
+    2. Open the cited file under `/etc/nginx/`.
 
-    3. Verify error pages also no longer show the version'
+    3. Compare listen/upstream/proxy directives to the scenario objectives.'
 - order: 3
   cost: 50
   content: 'Exact fix + verification:

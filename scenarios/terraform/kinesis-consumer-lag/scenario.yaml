@@ -42,15 +42,17 @@ is_free: false
 hints:
 - order: 1
   cost: 0
-  content: 'Where to look: Identify the consumer lag using CloudWatch MillisBehindLatest and GetRecords.IteratorAgeMilliseconds
-    metrics'
+  content: 'Where to look: Start with read-only discovery on the Terraform workspace. For Kinesis Consumer
+    Falling Behind, inspect HCL files, state, and plan/apply workflow before changing anything.'
 - order: 2
   cost: 25
   content: 'Diagnostic steps:
 
-    1. Increase the shard count on the Kinesis stream to meet throughput requirements
+    1. Gather evidence with HCL files, state, and plan/apply workflow.
 
-    2. Optionally increase Lambda concurrency or batch size to improve consumer throughput'
+    2. Compare current output to the scenario objectives.
+
+    3. Form a single hypothesis about the smallest fix that would restore healthy state.'
 - order: 3
   cost: 50
   content: 'Exact fix + verification:

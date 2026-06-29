@@ -39,14 +39,18 @@ is_free: false
 hints:
 - order: 1
   cost: 0
-  content: 'Where to look: Check whether the user is in /etc/cron.deny'
+  content: 'Where to look: Start with read-only discovery on the Linux practice server. For User Cannot
+    Create Cron Jobs — Access Denied, inspect terminal and config files under /etc and /var before changing
+    anything.'
 - order: 2
   cost: 25
   content: 'Diagnostic steps:
 
-    1. Check whether /etc/cron.allow exists and restricts access (it takes precedence)
+    1. Gather evidence with terminal and config files under /etc and /var.
 
-    2. Grant the developer access and verify crontab -l no longer errors'
+    2. Compare current output to the scenario objectives.
+
+    3. Form a single hypothesis about the smallest fix that would restore healthy state.'
 - order: 3
   cost: 50
   content: 'Exact fix + verification:

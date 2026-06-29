@@ -40,15 +40,17 @@ is_free: true
 hints:
 - order: 1
   cost: 0
-  content: 'Where to look: Identify which IAM actions are being denied using the CLI error output or IAM
-    policy simulator'
+  content: 'Where to look: Start with read-only discovery on the Terraform workspace. For AWS CLI AccessDenied
+    Error, inspect HCL files, state, and plan/apply workflow before changing anything.'
 - order: 2
   cost: 25
   content: 'Diagnostic steps:
 
-    1. Attach or create an IAM policy granting the minimum required permissions
+    1. Gather evidence with HCL files, state, and plan/apply workflow.
 
-    2. Confirm the CLI commands succeed after the policy change'
+    2. Compare current output to the scenario objectives.
+
+    3. Form a single hypothesis about the smallest fix that would restore healthy state.'
 - order: 3
   cost: 50
   content: 'Exact fix + verification:

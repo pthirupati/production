@@ -45,16 +45,18 @@ initial_state: A PeopleSoft HCM environment where the HCCPPRM permission list is
 hints:
 - order: 1
   cost: 0
-  content: 'Where to look: Open the PeopleSoft (PIA) simulator from the lab toolbar'
+  content: 'Where to look: Start with read-only discovery on the PeopleSoft app server lab. For Restore
+    a Missing Permission to a Permission List, inspect PIA, Process Scheduler, Integration Broker, and
+    app server logs before changing anything.'
 - order: 2
   cost: 25
   content: 'Diagnostic steps:
 
-    1. Navigate to PeopleTools > Security > Permission Lists and open HCCPPRM
+    1. Gather evidence with PIA, Process Scheduler, Integration Broker, and app server logs.
 
-    2. Identify the permission missing for the Position Data component
+    2. Compare current output to the scenario objectives.
 
-    3. Add the HC_POSITION_DATA permission back to the HCCPPRM permission list'
+    3. Form a single hypothesis about the smallest fix that would restore healthy state.'
 - order: 3
   cost: 50
   content: 'Exact fix + verification:

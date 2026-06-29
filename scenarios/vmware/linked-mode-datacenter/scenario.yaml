@@ -41,14 +41,17 @@ objectives:
 hints:
 - order: 1
   cost: 0
-  content: 'Where to look: Confirm DC-DR / esxi-dr-01 are absent from the shared inventory'
+  content: 'Where to look: Start with read-only discovery on the vSphere lab. For Enhanced Linked Mode
+    — DC-DR Not Visible, inspect VMs, datastores, vCenter, and ESXi tasks before changing anything.'
 - order: 2
   cost: 25
   content: 'Diagnostic steps:
 
-    1. Enable Enhanced Linked Mode to join the vCenter instances
+    1. Gather evidence with VMs, datastores, vCenter, and ESXi tasks.
 
-    2. Verify DC-DR and esxi-dr-01 appear in inventory'
+    2. Compare current output to the scenario objectives.
+
+    3. Form a single hypothesis about the smallest fix that would restore healthy state.'
 - order: 3
   cost: 50
   content: 'Exact fix + verification:

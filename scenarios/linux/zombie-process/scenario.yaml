@@ -40,14 +40,17 @@ initial_state: Linux server pinned at 100% CPU by a runaway process (runaway.sh)
 hints:
 - order: 1
   cost: 0
-  content: 'Where to look: Identify the process consuming excessive CPU'
+  content: 'Where to look: Start with read-only discovery on the Linux practice server. For Kill the Zombie
+    Process, inspect terminal and config files under /etc and /var before changing anything.'
 - order: 2
   cost: 25
   content: 'Diagnostic steps:
 
-    1. Terminate the runaway.sh process
+    1. Gather evidence with terminal and config files under /etc and /var.
 
-    2. Verify CPU usage returns to normal'
+    2. Compare current output to the scenario objectives.
+
+    3. Form a single hypothesis about the smallest fix that would restore healthy state.'
 - order: 3
   cost: 50
   content: 'Exact fix + verification:

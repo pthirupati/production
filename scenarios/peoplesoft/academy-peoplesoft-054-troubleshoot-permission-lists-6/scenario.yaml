@@ -44,14 +44,17 @@ initial_state: The PeopleSoft app server lab is degraded. Users cannot access re
 hints:
 - order: 1
   cost: 0
-  content: 'Where to look: The incident symptom is clear: users cannot access required pages'
+  content: 'Where to look: Start with read-only discovery on the PeopleSoft app server lab. For permission
+    lists, inspect permission list and role security before changing anything.'
 - order: 2
   cost: 25
   content: 'Diagnostic steps:
 
-    1. Root cause is isolated with evidence, not guesswork
+    1. Gather evidence with permission list and role security.
 
-    2. Service behavior returns to normal after the fix'
+    2. Compare current output to the scenario objectives.
+
+    3. Form a single hypothesis about the smallest fix that would restore healthy state.'
 - order: 3
   cost: 50
   content: 'Exact fix + verification:

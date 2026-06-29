@@ -55,16 +55,17 @@ initial_state: 'CentOS server running OSSEC 3.6 with file integrity monitoring e
 hints:
 - order: 1
   cost: 0
-  content: 'Where to look: Identify the specific OSSEC rule IDs generating the false positive alerts in
-    /var/ossec/logs/alerts/alerts.log'
+  content: 'Where to look: Run `cat /etc/resolv.conf` and test with `dig example.com` or `getent hosts
+    example.com`.'
 - order: 2
   cost: 25
   content: 'Diagnostic steps:
 
-    1. Create a local rule override in /var/ossec/rules/local_rules.xml to suppress the false positive
+    1. Note the configured nameserver IP in resolv.conf.
 
-    2. Restart OSSEC and verify that the false positive alerts no longer appear while other alerts still
-    fire'
+    2. `ping` or `nc -zv` the nameserver — is it reachable?
+
+    3. Check if NetworkManager or systemd-resolved overwrites the file.'
 - order: 3
   cost: 50
   content: 'Exact fix + verification:

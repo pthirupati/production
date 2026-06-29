@@ -45,16 +45,18 @@ initial_state: 'Code at /app/src/main/java/com/example/CacheManager.java holds a
 hints:
 - order: 1
   cost: 0
-  content: 'Where to look: Capture a thread dump and see many threads BLOCKED on one monitor'
+  content: 'Where to look: Start with read-only discovery on the Java project. For Thread Pool Starvation
+    From a Synchronized Bottleneck, inspect Maven/Gradle, JVM logs, and Spring configuration before changing
+    anything.'
 - order: 2
   cost: 25
   content: 'Diagnostic steps:
 
-    1. Locate the over-broad synchronized region doing slow work under the lock
+    1. Gather evidence with Maven/Gradle, JVM logs, and Spring configuration.
 
-    2. Move slow I/O out of the lock / use a concurrent cache
+    2. Compare current output to the scenario objectives.
 
-    3. Verify threads are no longer blocked and latency recovers'
+    3. Form a single hypothesis about the smallest fix that would restore healthy state.'
 - order: 3
   cost: 50
   content: 'Exact fix + verification:

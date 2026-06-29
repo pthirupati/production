@@ -41,8 +41,8 @@ initial_state: Operators still perform manual steps for service discovery. Autom
 hints:
 - order: 1
   cost: 0
-  content: 'Where to look: Open Prometheus → Status → Targets and note which job is DOWN and the last
-    scrape error message.'
+  content: 'Where to look: Test the config to get the exact file and line: `nginx -t`. It prints the offending
+    directive (e.g. unknown directive "listn").'
 - order: 2
   cost: 25
   content: 'Diagnostic steps:
@@ -56,14 +56,14 @@ hints:
   cost: 50
   content: 'Exact fix + verification:
 
-    1. Correct the scrape target or relabel rule in prometheus.yml.
+    1. Correct the typo on the reported line and save the file.
 
-    2. Reload or restart Prometheus.
+    2. Re-run `nginx -t` until it reports syntax is ok.
 
-    3. Confirm the target is UP and Check Solution passes.
+    3. Run `systemctl enable --now nginx`, then `curl -I http://localhost` (expect HTTP 200).
 
 
-    WHY: Prometheus only collects metrics from correctly configured targets.'
+    WHY: systemd will not start nginx until `nginx -t` passes.'
 summary: Complete the service discovery — automation lab prometheus lab and verify success with the checker
 estimated_minutes: 20
 xp_reward: 100

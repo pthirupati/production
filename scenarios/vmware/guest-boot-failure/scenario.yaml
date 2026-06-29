@@ -40,14 +40,17 @@ initial_state: vCenter guest web-prod-01 that powers on but lands in the initram
 hints:
 - order: 1
   cost: 0
-  content: 'Where to look: Open the web console and identify why boot drops to the recovery shell'
+  content: 'Where to look: Start with read-only discovery on the vSphere lab. For Guest OS Boot Failure
+    (initramfs), inspect VMs, datastores, vCenter, and ESXi tasks before changing anything.'
 - order: 2
   cost: 25
   content: 'Diagnostic steps:
 
-    1. Repair the root filesystem (or resolve the failing step)
+    1. Gather evidence with VMs, datastores, vCenter, and ESXi tasks.
 
-    2. Complete the boot so the guest reaches normal multi-user state'
+    2. Compare current output to the scenario objectives.
+
+    3. Form a single hypothesis about the smallest fix that would restore healthy state.'
 - order: 3
   cost: 50
   content: 'Exact fix + verification:

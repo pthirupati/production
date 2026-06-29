@@ -59,16 +59,18 @@ is_free: false
 hints:
 - order: 1
   cost: 0
-  content: 'Where to look: Confirm the current limit with ulimit -n (shows 1024)'
+  content: 'Where to look: Start with read-only discovery on the Linux practice server. For Application
+    Fails with Too Many Open Files (EMFILE), inspect terminal and config files under /etc and /var before
+    changing anything.'
 - order: 2
   cost: 25
   content: 'Diagnostic steps:
 
-    1. Check /proc/<pid>/limits for the running process''s actual limits
+    1. Gather evidence with terminal and config files under /etc and /var.
 
-    2. Edit /etc/security/limits.conf to add soft and hard nofile limits for appuser
+    2. Compare current output to the scenario objectives.
 
-    3. {''Set'': ''appuser soft nofile 65536 and appuser hard nofile 65536''}'
+    3. Form a single hypothesis about the smallest fix that would restore healthy state.'
 - order: 3
   cost: 50
   content: 'Exact fix + verification:

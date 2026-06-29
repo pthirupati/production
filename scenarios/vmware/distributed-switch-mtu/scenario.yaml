@@ -56,16 +56,17 @@ initial_state: 'VMware vCenter simulation. DVS "Production-DVS" MTU: 1500.
 hints:
 - order: 1
   cost: 0
-  content: 'Where to look: Verify the current DVS MTU setting in vCenter'
+  content: 'Where to look: Start with read-only discovery on the vSphere lab. For DVS MTU Mismatch — Jumbo
+    Frame Packets Being Dropped, inspect VMs, datastores, vCenter, and ESXi tasks before changing anything.'
 - order: 2
   cost: 25
   content: 'Diagnostic steps:
 
-    1. Check the vmkernel adapters (vmk) MTU settings for NFS and vSAN
+    1. Gather evidence with VMs, datastores, vCenter, and ESXi tasks.
 
-    2. Change the DVS MTU to 9000 (jumbo frames)
+    2. Compare current output to the scenario objectives.
 
-    3. Update vmkernel adapter MTUs to 9000 and verify NFS/vSAN connectivity'
+    3. Form a single hypothesis about the smallest fix that would restore healthy state.'
 - order: 3
   cost: 50
   content: 'Exact fix + verification:

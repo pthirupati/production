@@ -40,15 +40,17 @@ is_free: false
 hints:
 - order: 1
   cost: 0
-  content: 'Where to look: Identify the dangerous iam:PassRole + ec2:RunInstances combination in the IAM
-    policy'
+  content: 'Where to look: Start with read-only discovery on the Terraform workspace. For IAM Privilege
+    Escalation via iam:PassRole, inspect HCL files, state, and plan/apply workflow before changing anything.'
 - order: 2
   cost: 25
   content: 'Diagnostic steps:
 
-    1. Remove or scope down the iam:PassRole permission to restrict it to specific safe roles only
+    1. Gather evidence with HCL files, state, and plan/apply workflow.
 
-    2. Confirm the user can no longer pass arbitrary roles to EC2 instances'
+    2. Compare current output to the scenario objectives.
+
+    3. Form a single hypothesis about the smallest fix that would restore healthy state.'
 - order: 3
   cost: 50
   content: 'Exact fix + verification:

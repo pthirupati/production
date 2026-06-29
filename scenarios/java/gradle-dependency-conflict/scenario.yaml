@@ -45,16 +45,18 @@ initial_state: 'build.gradle at /app/ lets two transitive paths bring different 
 hints:
 - order: 1
   cost: 0
-  content: 'Where to look: Reproduce the runtime LinkageError / NoSuchMethodError'
+  content: 'Where to look: Start with read-only discovery on the Java project. For Gradle Transitive Version
+    Conflict (Runtime LinkageError), inspect Maven/Gradle, JVM logs, and Spring configuration before changing
+    anything.'
 - order: 2
   cost: 25
   content: 'Diagnostic steps:
 
-    1. Run the Gradle dependencies report to find the conflict
+    1. Gather evidence with Maven/Gradle, JVM logs, and Spring configuration.
 
-    2. Force/constrain a single version (resolutionStrategy or platform)
+    2. Compare current output to the scenario objectives.
 
-    3. Confirm the conflict resolves and the app runs'
+    3. Form a single hypothesis about the smallest fix that would restore healthy state.'
 - order: 3
   cost: 50
   content: 'Exact fix + verification:

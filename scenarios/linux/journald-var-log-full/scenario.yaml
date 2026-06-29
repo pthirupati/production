@@ -43,14 +43,17 @@ initial_state: Linux server where /var/log is at capacity, so journald and apps 
 hints:
 - order: 1
   cost: 0
-  content: 'Where to look: Confirm /var/log is full and find the largest consumers'
+  content: 'Where to look: Start with read-only discovery on the Linux practice server. For journald Cannot
+    Write — /var/log Full, inspect terminal and config files under /etc and /var before changing anything.'
 - order: 2
   cost: 25
   content: 'Diagnostic steps:
 
-    1. Vacuum the systemd journal and remove stale logs to reclaim space
+    1. Gather evidence with terminal and config files under /etc and /var.
 
-    2. Cap journal size so it doesn''t fill again'
+    2. Compare current output to the scenario objectives.
+
+    3. Form a single hypothesis about the smallest fix that would restore healthy state.'
 - order: 3
   cost: 50
   content: 'Exact fix + verification:

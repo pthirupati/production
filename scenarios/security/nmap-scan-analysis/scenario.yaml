@@ -54,14 +54,17 @@ initial_state: 'Ubuntu server with multiple services running: sshd (22), nginx (
 hints:
 - order: 1
   cost: 0
-  content: 'Where to look: Run a full nmap TCP scan against localhost and save the output to /tmp/nmap-full.txt'
+  content: 'Where to look: Test the config to get the exact file and line: `nginx -t`. It prints the offending
+    directive (e.g. unknown directive "listn").'
 - order: 2
   cost: 25
   content: 'Diagnostic steps:
 
-    1. Identify all non-essential listening services and stop and disable them with systemctl
+    1. Run `nginx -t` and `systemctl status nginx` for config vs service errors.
 
-    2. Write a summary of removed services and remaining open ports to /tmp/scan-report.txt'
+    2. Open the cited file under `/etc/nginx/`.
+
+    3. Compare listen/upstream/proxy directives to the scenario objectives.'
 - order: 3
   cost: 50
   content: 'Exact fix + verification:

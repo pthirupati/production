@@ -38,12 +38,18 @@ initial_state: Tower cluster with mixed project sync states and a pending patch 
 hints:
 - order: 1
   cost: 0
-  content: 'Where to look: Sync all projects and fix any errors'
+  content: 'Where to look: Start with read-only discovery on the Ansible control node. For Ansible Tower
+    HA and Instance Groups, inspect inventory, playbooks, roles, and ansible-playbook before changing
+    anything.'
 - order: 2
   cost: 25
   content: 'Diagnostic steps:
 
-    1. Launch Patch Linux against Production successfully'
+    1. Gather evidence with inventory, playbooks, roles, and ansible-playbook.
+
+    2. Compare current output to the scenario objectives.
+
+    3. Form a single hypothesis about the smallest fix that would restore healthy state.'
 - order: 3
   cost: 50
   content: 'Exact fix + verification:

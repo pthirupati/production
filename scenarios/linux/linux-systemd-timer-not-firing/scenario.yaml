@@ -57,16 +57,18 @@ topics_covered:
 hints:
 - order: 1
   cost: 0
-  content: 'Where to look: {''Inspect the timer'': ''systemctl cat backup.timer and systemctl list-timers''}'
+  content: 'Where to look: Start with read-only discovery on the Linux practice server. For systemd Timer
+    Not Firing — OnCalendar Misconfigured, inspect terminal and config files under /etc and /var before
+    changing anything.'
 - order: 2
   cost: 25
   content: 'Diagnostic steps:
 
-    1. Fix the OnCalendar= expression to a valid calendar event (e.g. *-*-* 02:00:00)
+    1. Gather evidence with terminal and config files under /etc and /var.
 
-    2. Reload systemd and enable --now backup.timer
+    2. Compare current output to the scenario objectives.
 
-    3. Confirm it is listed in systemctl list-timers and record the fix'
+    3. Form a single hypothesis about the smallest fix that would restore healthy state.'
 - order: 3
   cost: 50
   content: 'Exact fix + verification:

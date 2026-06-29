@@ -42,14 +42,17 @@ initial_state: The physical server lab is degraded. The host fails to network bo
 hints:
 - order: 1
   cost: 0
-  content: 'Where to look: The incident symptom is clear: the host fails to network boot'
+  content: 'Where to look: Start with read-only discovery on the physical server lab. For PXE boot, inspect
+    PXE/DHCP/TFTP config and boot logs before changing anything.'
 - order: 2
   cost: 25
   content: 'Diagnostic steps:
 
-    1. Root cause is isolated with evidence, not guesswork
+    1. Gather evidence with PXE/DHCP/TFTP config and boot logs.
 
-    2. Service behavior returns to normal after the fix'
+    2. Compare current output to the scenario objectives.
+
+    3. Form a single hypothesis about the smallest fix that would restore healthy state.'
 - order: 3
   cost: 50
   content: 'Exact fix + verification:

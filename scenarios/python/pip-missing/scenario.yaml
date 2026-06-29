@@ -26,14 +26,17 @@ dual_terminal: false
 hints:
 - order: 1
   cost: 0
-  content: 'Where to look: Identify the missing module from the traceback'
+  content: 'Where to look: Start with read-only discovery on the Python project workspace. For Missing
+    Python Package, inspect source files, venv, tests, and CLI entrypoints before changing anything.'
 - order: 2
   cost: 25
   content: 'Diagnostic steps:
 
-    1. Install the correct package into the active environment
+    1. Gather evidence with source files, venv, tests, and CLI entrypoints.
 
-    2. Confirm the script imports and runs successfully'
+    2. Compare current output to the scenario objectives.
+
+    3. Form a single hypothesis about the smallest fix that would restore healthy state.'
 - order: 3
   cost: 50
   content: 'Exact fix + verification:

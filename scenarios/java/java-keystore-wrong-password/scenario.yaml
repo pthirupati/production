@@ -44,16 +44,18 @@ initial_state: 'Config at /app/src/main/resources/application.yml sets the wrong
 hints:
 - order: 1
   cost: 0
-  content: 'Where to look: Reproduce the keystore password failure at startup'
+  content: 'Where to look: Start with read-only discovery on the Java project. For TLS Keystore Password
+    Wrong — Server Won''t Start HTTPS, inspect Maven/Gradle, JVM logs, and Spring configuration before
+    changing anything.'
 - order: 2
   cost: 25
   content: 'Diagnostic steps:
 
-    1. Verify the keystore type and the correct passwords
+    1. Gather evidence with Maven/Gradle, JVM logs, and Spring configuration.
 
-    2. Set matching key-store-password / key-password
+    2. Compare current output to the scenario objectives.
 
-    3. Confirm the HTTPS connector starts and serves TLS'
+    3. Form a single hypothesis about the smallest fix that would restore healthy state.'
 - order: 3
   cost: 50
   content: 'Exact fix + verification:

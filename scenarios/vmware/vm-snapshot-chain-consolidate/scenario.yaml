@@ -37,14 +37,17 @@ initial_state: vCenter shows web-prod-01 with a long snapshot chain.
 hints:
 - order: 1
   cost: 0
-  content: 'Where to look: Confirm web-prod-01 has too many snapshots'
+  content: 'Where to look: Start with read-only discovery on the vSphere lab. For Long Snapshot Chain
+    Eating Datastore, inspect VMs, datastores, vCenter, and ESXi tasks before changing anything.'
 - order: 2
   cost: 25
   content: 'Diagnostic steps:
 
-    1. Consolidate or delete the snapshot chain
+    1. Gather evidence with VMs, datastores, vCenter, and ESXi tasks.
 
-    2. Verify the snapshot chain is reduced'
+    2. Compare current output to the scenario objectives.
+
+    3. Form a single hypothesis about the smallest fix that would restore healthy state.'
 - order: 3
   cost: 50
   content: 'Exact fix + verification:

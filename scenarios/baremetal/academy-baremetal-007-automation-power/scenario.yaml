@@ -51,9 +51,11 @@ hints:
   cost: 25
   content: 'Diagnostic steps:
 
-    1. Changes are verified with before/after checks
+    1. Gather evidence with `nvidia-smi -q -d POWER`.
 
-    2. The system remains stable for dependent teams'
+    2. Compare current output to the scenario objectives.
+
+    3. Form a single hypothesis about the smallest fix that would restore healthy state.'
 - order: 3
   cost: 50
   content: 'Exact fix + verification:

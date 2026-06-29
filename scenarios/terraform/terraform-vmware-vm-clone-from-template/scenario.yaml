@@ -61,15 +61,17 @@ dual_terminal: false
 hints:
 - order: 1
   cost: 0
-  content: 'Where to look: Run terraform plan and read which vSphere data-source lookups fail'
+  content: 'Where to look: Start with read-only discovery on the Terraform workspace. For Terraform →
+    VMware: VM Clone Plan Targets the Wrong, inspect `terraform validate` output before changing anything.'
 - order: 2
   cost: 25
   content: 'Diagnostic steps:
 
-    1. Correct /root/iac/vsphere-vm.tf to reference the real datacenter, resource pool, datastore, template,
-    and network
+    1. Gather evidence with `terraform validate` output.
 
-    2. Confirm the config is corrected so the clone would plan and apply against vCenter'
+    2. Compare current output to the scenario objectives.
+
+    3. Form a single hypothesis about the smallest fix that would restore healthy state.'
 - order: 3
   cost: 50
   content: 'Exact fix + verification:

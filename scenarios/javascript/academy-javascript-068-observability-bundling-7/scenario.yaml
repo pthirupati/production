@@ -42,14 +42,17 @@ initial_state: The system runs, but bundling lacks useful telemetry. Dashboards/
 hints:
 - order: 1
   cost: 0
-  content: 'Where to look: Day-2 bundling work completes safely in this environment'
+  content: 'Where to look: Test the config to get the exact file and line: `nginx -t`. It prints the offending
+    directive (e.g. unknown directive "listn").'
 - order: 2
   cost: 25
   content: 'Diagnostic steps:
 
-    1. Changes are verified with before/after checks
+    1. Run `nginx -t` and `systemctl status nginx` for config vs service errors.
 
-    2. The system remains stable for dependent teams'
+    2. Open the cited file under `/etc/nginx/`.
+
+    3. Compare listen/upstream/proxy directives to the scenario objectives.'
 - order: 3
   cost: 50
   content: 'Exact fix + verification:

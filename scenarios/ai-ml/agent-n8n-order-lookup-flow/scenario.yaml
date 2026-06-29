@@ -46,17 +46,18 @@ initial_state: The canvas has a Webhook trigger (carrying a raw JSON body string
 hints:
 - order: 1
   cost: 0
-  content: 'Where to look: Open the Agent Workflow simulator from the lab toolbar'
+  content: 'Where to look: Start with read-only discovery on the ML practice workspace. For Wire an n8n-style
+    order-lookup flow, inspect datasets, training scripts, metrics, and model artifacts before changing
+    anything.'
 - order: 2
   cost: 25
   content: 'Diagnostic steps:
 
-    1. Add a Transform node (op json_parse) to turn the raw webhook body string into structured fields
+    1. Gather evidence with datasets, training scripts, metrics, and model artifacts.
 
-    2. Add an LLM node in extract mode to pull the order id and email out of the message text
+    2. Compare current output to the scenario objectives.
 
-    3. Connect Trigger -> Transform -> LLM -> the existing Order API (http_get) tool -> Output and run
-    it so the order is looked up and its status is returned'
+    3. Form a single hypothesis about the smallest fix that would restore healthy state.'
 - order: 3
   cost: 50
   content: 'Exact fix + verification:

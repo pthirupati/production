@@ -58,16 +58,18 @@ initial_state: 'Ubuntu 22.04 with aide installed. `/usr/sbin/aide --check` repor
 hints:
 - order: 1
   cost: 0
-  content: 'Where to look: Run AIDE check to identify all modified files'
+  content: 'Where to look: Start with read-only discovery on the hardening lab. For File Integrity Alert
+    - Investigate and Restore Modified, inspect SSH, firewall, TLS, audit logs, and IAM settings before
+    changing anything.'
 - order: 2
   cost: 25
   content: 'Diagnostic steps:
 
-    1. Investigate /usr/bin/find and /etc/passwd for suspicious changes
+    1. Gather evidence with SSH, firewall, TLS, audit logs, and IAM settings.
 
-    2. Restore the files from known-good backups in /var/backup/
+    2. Compare current output to the scenario objectives.
 
-    3. Re-initialize the AIDE database after confirming system integrity'
+    3. Form a single hypothesis about the smallest fix that would restore healthy state.'
 - order: 3
   cost: 50
   content: 'Exact fix + verification:

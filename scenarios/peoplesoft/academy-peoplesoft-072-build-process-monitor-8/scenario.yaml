@@ -44,14 +44,17 @@ initial_state: The PeopleSoft app server lab is ready but Process Monitor is not
 hints:
 - order: 1
   cost: 0
-  content: 'Where to look: A working Process Monitor setup must exist by the end of this lab'
+  content: 'Where to look: Start with read-only discovery on the PeopleSoft app server lab. For Process
+    Monitor, inspect Process Monitor and process logs before changing anything.'
 - order: 2
   cost: 25
   content: 'Diagnostic steps:
 
-    1. Configuration should follow team conventions and be easy to audit
+    1. Gather evidence with Process Monitor and process logs.
 
-    2. The result should pass validation without manual cleanup'
+    2. Compare current output to the scenario objectives.
+
+    3. Form a single hypothesis about the smallest fix that would restore healthy state.'
 - order: 3
   cost: 50
   content: 'Exact fix + verification:

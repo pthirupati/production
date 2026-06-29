@@ -43,14 +43,18 @@ initial_state: Linux server where user dev's ~/.ssh (and/or authorized_keys) has
 hints:
 - order: 1
   cost: 0
-  content: 'Where to look: Confirm key auth is rejected due to permissive ~/.ssh permissions'
+  content: 'Where to look: Start with read-only discovery on the Linux practice server. For SSH Key Auth
+    Fails — Bad .ssh Permissions, inspect terminal and config files under /etc and /var before changing
+    anything.'
 - order: 2
   cost: 25
   content: 'Diagnostic steps:
 
-    1. Set correct, restrictive permissions on ~/.ssh and authorized_keys
+    1. Gather evidence with terminal and config files under /etc and /var.
 
-    2. Verify dev can authenticate with the key'
+    2. Compare current output to the scenario objectives.
+
+    3. Form a single hypothesis about the smallest fix that would restore healthy state.'
 - order: 3
   cost: 50
   content: 'Exact fix + verification:

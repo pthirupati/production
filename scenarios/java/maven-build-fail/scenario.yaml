@@ -44,16 +44,18 @@ initial_state: 'Maven POM at /app/pom.xml has an unresolvable dependency / inval
 hints:
 - order: 1
   cost: 0
-  content: 'Where to look: Run mvn package and read the first BUILD FAILURE cause'
+  content: 'Where to look: Start with read-only discovery on the Java project. For Maven Build Failing
+    — Unresolved Dependency / Bad POM, inspect Maven/Gradle, JVM logs, and Spring configuration before
+    changing anything.'
 - order: 2
   cost: 25
   content: 'Diagnostic steps:
 
-    1. Fix the unresolved dependency or invalid POM element
+    1. Gather evidence with Maven/Gradle, JVM logs, and Spring configuration.
 
-    2. Re-run until BUILD SUCCESS
+    2. Compare current output to the scenario objectives.
 
-    3. Confirm the artifact exists under target/'
+    3. Form a single hypothesis about the smallest fix that would restore healthy state.'
 - order: 3
   cost: 50
   content: 'Exact fix + verification:

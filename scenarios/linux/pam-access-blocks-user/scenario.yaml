@@ -42,12 +42,17 @@ initial_state: Linux server using pam_access where /etc/security/access.conf has
 hints:
 - order: 1
   cost: 0
-  content: 'Where to look: Identify the pam_access rule denying opsuser'
+  content: 'Where to look: Start with read-only discovery on the Linux practice server. For PAM access.conf
+    Denies Console Login, inspect terminal and config files under /etc and /var before changing anything.'
 - order: 2
   cost: 25
   content: 'Diagnostic steps:
 
-    1. Correct the access.conf rule (remove the deny or add an allow first)'
+    1. Gather evidence with terminal and config files under /etc and /var.
+
+    2. Compare current output to the scenario objectives.
+
+    3. Form a single hypothesis about the smallest fix that would restore healthy state.'
 - order: 3
   cost: 50
   content: 'Exact fix + verification:

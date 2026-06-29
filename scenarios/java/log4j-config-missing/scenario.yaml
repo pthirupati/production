@@ -44,16 +44,17 @@ initial_state: 'There is no usable /app/src/main/resources/log4j2.xml; Log4j2 wa
 hints:
 - order: 1
   cost: 0
-  content: 'Where to look: Confirm Log4j2 is using its default no-config fallback'
+  content: 'Where to look: Start with read-only discovery on the Java project. For Missing Log4j2 Configuration
+    — App Logs Nothing, inspect Maven/Gradle, JVM logs, and Spring configuration before changing anything.'
 - order: 2
   cost: 25
   content: 'Diagnostic steps:
 
-    1. Add a valid log4j2.xml under src/main/resources
+    1. Gather evidence with Maven/Gradle, JVM logs, and Spring configuration.
 
-    2. Configure an appender and root logger level
+    2. Compare current output to the scenario objectives.
 
-    3. Verify application logs are emitted at the expected level'
+    3. Form a single hypothesis about the smallest fix that would restore healthy state.'
 - order: 3
   cost: 50
   content: 'Exact fix + verification:

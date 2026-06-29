@@ -45,16 +45,17 @@ initial_state: 'Config at /app/src/main/resources/application.yml disables open-
 hints:
 - order: 1
   cost: 0
-  content: 'Where to look: Reproduce the LazyInitializationException on the response path'
+  content: 'Where to look: Start with read-only discovery on the Java project. For LazyInitializationException
+    Outside the Session, inspect Maven/Gradle, JVM logs, and Spring configuration before changing anything.'
 - order: 2
   cost: 25
   content: 'Diagnostic steps:
 
-    1. Identify the lazy association touched after the session closed
+    1. Gather evidence with Maven/Gradle, JVM logs, and Spring configuration.
 
-    2. Load the needed data within the transaction (DTO/JOIN FETCH/@EntityGraph)
+    2. Compare current output to the scenario objectives.
 
-    3. Verify the response serializes without the exception'
+    3. Form a single hypothesis about the smallest fix that would restore healthy state.'
 - order: 3
   cost: 50
   content: 'Exact fix + verification:

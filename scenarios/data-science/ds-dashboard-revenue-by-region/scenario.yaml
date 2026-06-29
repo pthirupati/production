@@ -65,14 +65,17 @@ initial_state: 'A fresh dashboard with no dimension, measure, aggregation, or ch
 hints:
 - order: 1
   cost: 0
-  content: 'Where to look: Set the dimension (group-by) to ''region'''
+  content: 'Where to look: Start with read-only discovery on the notebook lab. For Build a Revenue-by-Region
+    Bar Chart, inspect pandas/notebook workflows, joins, and charts before changing anything.'
 - order: 2
   cost: 25
   content: 'Diagnostic steps:
 
-    1. Set the measure to ''revenue'' and the aggregation to ''sum''
+    1. Gather evidence with pandas/notebook workflows, joins, and charts.
 
-    2. Set the chart type to ''bar'' so the totals render as bars per region'
+    2. Compare current output to the scenario objectives.
+
+    3. Form a single hypothesis about the smallest fix that would restore healthy state.'
 - order: 3
   cost: 50
   content: 'Exact fix + verification:

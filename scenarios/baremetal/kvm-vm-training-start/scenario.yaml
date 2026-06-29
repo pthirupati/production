@@ -37,12 +37,17 @@ initial_state: KVM VM train-vm-2 is shut off.
 hints:
 - order: 1
   cost: 0
-  content: 'Where to look: Open Bare Metal console → KVM tab'
+  content: 'Where to look: Start with read-only discovery on the physical server lab. For Start Shut-Off
+    KVM Training VM, inspect IPMI, RAID, BIOS, and out-of-band console before changing anything.'
 - order: 2
   cost: 25
   content: 'Diagnostic steps:
 
-    1. Verify the VM state is running with an IP'
+    1. Gather evidence with IPMI, RAID, BIOS, and out-of-band console.
+
+    2. Compare current output to the scenario objectives.
+
+    3. Form a single hypothesis about the smallest fix that would restore healthy state.'
 - order: 3
   cost: 50
   content: 'Exact fix + verification:

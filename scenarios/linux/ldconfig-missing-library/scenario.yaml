@@ -44,14 +44,18 @@ initial_state: Linux server where /usr/local/bin/myapp fails to start because /u
 hints:
 - order: 1
   cost: 0
-  content: 'Where to look: Identify the missing shared library at load time'
+  content: 'Where to look: Start with read-only discovery on the Linux practice server. For Application
+    Fails — Shared Library Not Found, inspect terminal and config files under /etc and /var before changing
+    anything.'
 - order: 2
   cost: 25
   content: 'Diagnostic steps:
 
-    1. Restore the library directory to the dynamic linker configuration
+    1. Gather evidence with terminal and config files under /etc and /var.
 
-    2. Refresh the linker cache and verify myapp runs'
+    2. Compare current output to the scenario objectives.
+
+    3. Form a single hypothesis about the smallest fix that would restore healthy state.'
 - order: 3
   cost: 50
   content: 'Exact fix + verification:

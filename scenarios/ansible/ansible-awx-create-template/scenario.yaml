@@ -37,12 +37,18 @@ initial_state: AWX with a synced project but no job template for the new site pl
 hints:
 - order: 1
   cost: 0
-  content: 'Where to look: Create a new job template from the synced project'
+  content: 'Where to look: Start with read-only discovery on the Ansible control node. For Create AWX
+    Job Template from Project, inspect inventory, playbooks, roles, and ansible-playbook before changing
+    anything.'
 - order: 2
   cost: 25
   content: 'Diagnostic steps:
 
-    1. Verify the template appears under Job Templates'
+    1. Gather evidence with inventory, playbooks, roles, and ansible-playbook.
+
+    2. Compare current output to the scenario objectives.
+
+    3. Form a single hypothesis about the smallest fix that would restore healthy state.'
 - order: 3
   cost: 50
   content: 'Exact fix + verification:

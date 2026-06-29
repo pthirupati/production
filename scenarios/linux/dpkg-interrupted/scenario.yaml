@@ -44,15 +44,17 @@ initial_state: Debian/Ubuntu server where a previous apt/dpkg run was interrupte
 hints:
 - order: 1
   cost: 0
-  content: 'Where to look: Confirm apt/dpkg is failing due to interruption/locks (with nothing actually
-    running)'
+  content: 'Where to look: Start with read-only discovery on the Linux practice server. For APT/DPKG Database
+    Interrupted, inspect terminal and config files under /etc and /var before changing anything.'
 - order: 2
   cost: 25
   content: 'Diagnostic steps:
 
-    1. Clear stale locks and finish the interrupted dpkg configuration
+    1. Gather evidence with terminal and config files under /etc and /var.
 
-    2. Verify apt operations work again'
+    2. Compare current output to the scenario objectives.
+
+    3. Form a single hypothesis about the smallest fix that would restore healthy state.'
 - order: 3
   cost: 50
   content: 'Exact fix + verification:

@@ -54,16 +54,18 @@ initial_state: 'Ubuntu 22.04. Interface eth0 has a `tc qdisc add dev eth0 root t
 hints:
 - order: 1
   cost: 0
-  content: 'Where to look: Identify the current tc qdisc configuration on the uplink interface'
+  content: 'Where to look: Start with read-only discovery on the network lab. For Bandwidth Throttle Too
+    Aggressive — Fix tc qdisc Rate Limit, inspect interfaces, routing tables, DNS, and firewall rules
+    before changing anything.'
 - order: 2
   cost: 25
   content: 'Diagnostic steps:
 
-    1. Remove the over-aggressive rate limit
+    1. Gather evidence with interfaces, routing tables, DNS, and firewall rules.
 
-    2. Apply the correct 100Mbit/s rate limit
+    2. Compare current output to the scenario objectives.
 
-    3. Verify throughput with iperf3 or similar tool'
+    3. Form a single hypothesis about the smallest fix that would restore healthy state.'
 - order: 3
   cost: 50
   content: 'Exact fix + verification:

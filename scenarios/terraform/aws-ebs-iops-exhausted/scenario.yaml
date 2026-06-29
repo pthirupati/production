@@ -38,14 +38,17 @@ objectives:
 hints:
 - order: 1
   cost: 0
-  content: 'Where to look: Confirm the gp2 volume burst balance is depleted'
+  content: 'Where to look: Start with read-only discovery on the Terraform workspace. For AWS EBS gp2
+    Volume Exhausted IOPS Credits, inspect HCL files, state, and plan/apply workflow before changing anything.'
 - order: 2
   cost: 25
   content: 'Diagnostic steps:
 
-    1. Migrate to gp3 with adequate provisioned IOPS and apply
+    1. Gather evidence with HCL files, state, and plan/apply workflow.
 
-    2. Verify the volume reports the new type/IOPS'
+    2. Compare current output to the scenario objectives.
+
+    3. Form a single hypothesis about the smallest fix that would restore healthy state.'
 - order: 3
   cost: 50
   content: 'Exact fix + verification:

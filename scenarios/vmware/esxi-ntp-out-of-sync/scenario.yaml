@@ -58,16 +58,18 @@ initial_state: 'VMware vCenter simulation. esxi-02 clock is 8 minutes ahead of U
 hints:
 - order: 1
   cost: 0
-  content: 'Where to look: Check the current time and NTP status on the ESXi host'
+  content: 'Where to look: Start with read-only discovery on the vSphere lab. For ESXi NTP Out of Sync
+    - vCenter Authentication and Log, inspect VMs, datastores, vCenter, and ESXi tasks before changing
+    anything.'
 - order: 2
   cost: 25
   content: 'Diagnostic steps:
 
-    1. Configure the NTP service with reliable NTP servers
+    1. Gather evidence with VMs, datastores, vCenter, and ESXi tasks.
 
-    2. Enable and start the NTP service daemon (ntpd)
+    2. Compare current output to the scenario objectives.
 
-    3. Verify clock synchronization and that the skew is under 1 second'
+    3. Form a single hypothesis about the smallest fix that would restore healthy state.'
 - order: 3
   cost: 50
   content: 'Exact fix + verification:

@@ -45,16 +45,17 @@ initial_state: 'JVM flags at /app/jvm.options leave Metaspace unbounded; repeate
 hints:
 - order: 1
   cost: 0
-  content: 'Where to look: Confirm the OOM is Metaspace (not heap) and that class count keeps rising'
+  content: 'Where to look: Start with read-only discovery on the Java project. For OutOfMemoryError: Metaspace
+    From Classloader Leak, inspect Maven/Gradle, JVM logs, and Spring configuration before changing anything.'
 - order: 2
   cost: 25
   content: 'Diagnostic steps:
 
-    1. Set a Metaspace size cap so the leak is bounded and visible
+    1. Gather evidence with Maven/Gradle, JVM logs, and Spring configuration.
 
-    2. Identify the retained classloaders / static references pinning old classes
+    2. Compare current output to the scenario objectives.
 
-    3. Verify Metaspace stabilizes across redeploys'
+    3. Form a single hypothesis about the smallest fix that would restore healthy state.'
 - order: 3
   cost: 50
   content: 'Exact fix + verification:

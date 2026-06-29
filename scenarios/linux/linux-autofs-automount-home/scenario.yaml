@@ -62,16 +62,18 @@ topics_covered:
 hints:
 - order: 1
   cost: 0
-  content: 'Where to look: {''Reproduce the failure'': ''ls /data/projects/app returns no such file''}'
+  content: 'Where to look: Start with read-only discovery on the Linux practice server. For Fix autofs
+    so On-Demand /data Automounts Work, inspect terminal and config files under /etc and /var before changing
+    anything.'
 - order: 2
   cost: 25
   content: 'Diagnostic steps:
 
-    1. Inspect /etc/auto.master and the referenced map file for the wrong path/syntax
+    1. Gather evidence with terminal and config files under /etc and /var.
 
-    2. Correct the master map to reference the right indirect map (e.g. /data/projects /etc/auto.projects)
+    2. Compare current output to the scenario objectives.
 
-    3. Fix the map entry syntax and reload autofs (systemctl reload autofs)'
+    3. Form a single hypothesis about the smallest fix that would restore healthy state.'
 - order: 3
   cost: 50
   content: 'Exact fix + verification:

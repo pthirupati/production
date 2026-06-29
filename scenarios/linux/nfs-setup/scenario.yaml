@@ -58,16 +58,17 @@ is_free: false
 hints:
 - order: 1
   cost: 0
-  content: 'Where to look: Install nfs-utils with yum install -y nfs-utils'
+  content: 'Where to look: Start with read-only discovery on the Linux practice server. For Set Up NFS
+    Server and Client Mount, inspect terminal and config files under /etc and /var before changing anything.'
 - order: 2
   cost: 25
   content: 'Diagnostic steps:
 
-    1. Configure /etc/exports to export /srv/shared with rw,sync,no_subtree_check options
+    1. Gather evidence with terminal and config files under /etc and /var.
 
-    2. Run exportfs -a and systemctl enable --now nfs-server to start the NFS server
+    2. Compare current output to the scenario objectives.
 
-    3. Mount the NFS share on the client with mount server:/srv/shared /mnt/shared'
+    3. Form a single hypothesis about the smallest fix that would restore healthy state.'
 - order: 3
   cost: 50
   content: 'Exact fix + verification:

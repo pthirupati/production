@@ -66,14 +66,18 @@ initial_state: 'A fresh dashboard with no filter, dimension, measure, aggregatio
 hints:
 - order: 1
   cost: 0
-  content: 'Where to look: Filter the dataset to status = ''completed'' (exclude cancelled orders)'
+  content: 'Where to look: Start with read-only discovery on the notebook lab. For Filter Then Group:
+    Completed Order Value by Category, inspect pandas/notebook workflows, joins, and charts before changing
+    anything.'
 - order: 2
   cost: 25
   content: 'Diagnostic steps:
 
-    1. Group by ''category'' and sum the ''amount'' measure
+    1. Gather evidence with pandas/notebook workflows, joins, and charts.
 
-    2. Render the result as a bar chart'
+    2. Compare current output to the scenario objectives.
+
+    3. Form a single hypothesis about the smallest fix that would restore healthy state.'
 - order: 3
   cost: 50
   content: 'Exact fix + verification:

@@ -52,14 +52,17 @@ is_free: false
 hints:
 - order: 1
   cost: 0
-  content: 'Where to look: Enable forwarding at runtime (sysctl -w net.ipv4.ip_forward=1)'
+  content: 'Where to look: Start with read-only discovery on the Linux practice server. For Enable IP
+    Forwarding via sysctl, inspect terminal and config files under /etc and /var before changing anything.'
 - order: 2
   cost: 25
   content: 'Diagnostic steps:
 
-    1. Persist it by writing net.ipv4.ip_forward = 1 into /etc/sysctl.d/99-ipforward.conf
+    1. Gather evidence with terminal and config files under /etc and /var.
 
-    2. Confirm the persistent setting is present so it survives a reboot'
+    2. Compare current output to the scenario objectives.
+
+    3. Form a single hypothesis about the smallest fix that would restore healthy state.'
 - order: 3
   cost: 50
   content: 'Exact fix + verification:

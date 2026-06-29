@@ -43,14 +43,17 @@ initial_state: The ML practice workspace is ready but feature engineering is not
 hints:
 - order: 1
   cost: 0
-  content: 'Where to look: A working feature engineering setup must exist by the end of this lab'
+  content: 'Where to look: Test the config to get the exact file and line: `nginx -t`. It prints the offending
+    directive (e.g. unknown directive "listn").'
 - order: 2
   cost: 25
   content: 'Diagnostic steps:
 
-    1. Configuration should follow team conventions and be easy to audit
+    1. Run `nginx -t` and `systemctl status nginx` for config vs service errors.
 
-    2. The result should pass validation without manual cleanup'
+    2. Open the cited file under `/etc/nginx/`.
+
+    3. Compare listen/upstream/proxy directives to the scenario objectives.'
 - order: 3
   cost: 50
   content: 'Exact fix + verification:

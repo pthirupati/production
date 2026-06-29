@@ -28,15 +28,18 @@ dual_terminal: false
 hints:
 - order: 1
   cost: 0
-  content: 'Where to look: Request stop/backup from the @backup, @database, and @application teams in
-    Jira before patching'
+  content: 'Where to look: Start with read-only discovery on the Linux practice server. For RHEL System
+    Patching (Jira change window), inspect terminal and config files under /etc and /var before changing
+    anything.'
 - order: 2
   cost: 25
   content: 'Diagnostic steps:
 
-    1. Run precheck, apply dnf update, reboot, and run postcheck in the terminal
+    1. Gather evidence with terminal and config files under /etc and /var.
 
-    2. Fix any mount issue reported after reboot, then start DB/app via Jira'
+    2. Compare current output to the scenario objectives.
+
+    3. Form a single hypothesis about the smallest fix that would restore healthy state.'
 - order: 3
   cost: 50
   content: 'Exact fix + verification:

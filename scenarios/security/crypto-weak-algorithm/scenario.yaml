@@ -56,16 +56,17 @@ initial_state: 'Ubuntu server running an nginx reverse proxy over a Python Flask
 hints:
 - order: 1
   cost: 0
-  content: 'Where to look: Identify the weak MD5 hashing call in /opt/webapp/auth.py and replace it with
-    bcrypt'
+  content: 'Where to look: Test the config to get the exact file and line: `nginx -t`. It prints the offending
+    directive (e.g. unknown directive "listn").'
 - order: 2
   cost: 25
   content: 'Diagnostic steps:
 
-    1. Update /etc/nginx/conf.d/app.conf to set ssl_protocols TLSv1.2 TLSv1.3 and restrict ssl_ciphers
-    to ECDHE+AESGCM
+    1. Run `nginx -t` and `systemctl status nginx` for config vs service errors.
 
-    2. Reload nginx and verify the TLS configuration with openssl s_client'
+    2. Open the cited file under `/etc/nginx/`.
+
+    3. Compare listen/upstream/proxy directives to the scenario objectives.'
 - order: 3
   cost: 50
   content: 'Exact fix + verification:

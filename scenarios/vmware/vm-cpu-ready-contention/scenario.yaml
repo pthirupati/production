@@ -37,14 +37,17 @@ initial_state: vCenter shows web-prod-01 with high CPU ready time.
 hints:
 - order: 1
   cost: 0
-  content: 'Where to look: Confirm web-prod-01 CPU ready time is high'
+  content: 'Where to look: Start with read-only discovery on the vSphere lab. For VM High CPU Ready From
+    Host Contention, inspect VMs, datastores, vCenter, and ESXi tasks before changing anything.'
 - order: 2
   cost: 25
   content: 'Diagnostic steps:
 
-    1. Reduce host CPU contention (migrate/right-size)
+    1. Gather evidence with VMs, datastores, vCenter, and ESXi tasks.
 
-    2. Verify CPU ready time is within target'
+    2. Compare current output to the scenario objectives.
+
+    3. Form a single hypothesis about the smallest fix that would restore healthy state.'
 - order: 3
   cost: 50
   content: 'Exact fix + verification:

@@ -45,16 +45,18 @@ initial_state: 'BeanConfig at /app/src/main/java/com/example/config/BeanConfig.j
 hints:
 - order: 1
   cost: 0
-  content: 'Where to look: Read the startup error and identify the two beans in the cycle'
+  content: 'Where to look: Start with read-only discovery on the Java project. For Spring Circular Bean
+    Dependency Aborts Startup, inspect Maven/Gradle, JVM logs, and Spring configuration before changing
+    anything.'
 - order: 2
   cost: 25
   content: 'Diagnostic steps:
 
-    1. Decide how to break the cycle (extract, @Lazy, or events)
+    1. Gather evidence with Maven/Gradle, JVM logs, and Spring configuration.
 
-    2. Apply the fix so neither bean hard-requires the other at construction
+    2. Compare current output to the scenario objectives.
 
-    3. Confirm the context starts without the cycle error'
+    3. Form a single hypothesis about the smallest fix that would restore healthy state.'
 - order: 3
   cost: 50
   content: 'Exact fix + verification:

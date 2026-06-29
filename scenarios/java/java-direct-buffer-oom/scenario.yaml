@@ -45,16 +45,18 @@ initial_state: 'JVM flags at /app/jvm.options leave direct memory unbounded; an 
 hints:
 - order: 1
   cost: 0
-  content: 'Where to look: Confirm the OOM is ''Direct buffer memory'', not heap'
+  content: 'Where to look: Start with read-only discovery on the Java project. For OutOfMemoryError: Direct
+    Buffer Memory (Off-Heap Leak), inspect Maven/Gradle, JVM logs, and Spring configuration before changing
+    anything.'
 - order: 2
   cost: 25
   content: 'Diagnostic steps:
 
-    1. Set -XX:MaxDirectMemorySize so off-heap usage is bounded
+    1. Gather evidence with Maven/Gradle, JVM logs, and Spring configuration.
 
-    2. Ensure direct buffers are released/pooled correctly
+    2. Compare current output to the scenario objectives.
 
-    3. Verify off-heap memory stabilizes under load'
+    3. Form a single hypothesis about the smallest fix that would restore healthy state.'
 - order: 3
   cost: 50
   content: 'Exact fix + verification:

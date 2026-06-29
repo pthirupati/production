@@ -38,12 +38,17 @@ objectives:
 hints:
 - order: 1
   cost: 0
-  content: 'Where to look: Confirm the issue: The interface MTU is wrong for the path.'
+  content: 'Where to look: Start with read-only discovery on the network lab. For GRE Tunnel MTU Breaking
+    Large Flows, inspect interfaces, routing tables, DNS, and firewall rules before changing anything.'
 - order: 2
   cost: 25
   content: 'Diagnostic steps:
 
-    1. Verify the network is healthy'
+    1. Gather evidence with interfaces, routing tables, DNS, and firewall rules.
+
+    2. Compare current output to the scenario objectives.
+
+    3. Form a single hypothesis about the smallest fix that would restore healthy state.'
 - order: 3
   cost: 50
   content: 'Exact fix + verification:

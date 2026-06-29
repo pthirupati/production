@@ -66,15 +66,18 @@ dual_terminal: false
 hints:
 - order: 1
   cost: 0
-  content: 'Where to look: Confirm the switch side is an LACP trunk with VLAN 30 tagged and compare it
-    to the host bond config'
+  content: 'Where to look: Start with read-only discovery on the network lab. For Linux ↔ Network: Bonded
+    VLAN Trunk Brings Down the App, inspect interfaces, routing tables, DNS, and firewall rules before
+    changing anything.'
 - order: 2
   cost: 25
   content: 'Diagnostic steps:
 
-    1. Correct ifcfg-bond0 to mode 802.3ad and define the tagged bond0.30 VLAN interface on 10.30.0.0/24
+    1. Gather evidence with interfaces, routing tables, DNS, and firewall rules.
 
-    2. Confirm the bonding/VLAN config is corrected so the app subnet comes back up'
+    2. Compare current output to the scenario objectives.
+
+    3. Form a single hypothesis about the smallest fix that would restore healthy state.'
 - order: 3
   cost: 50
   content: 'Exact fix + verification:

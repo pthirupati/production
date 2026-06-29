@@ -55,16 +55,18 @@ initial_state: 'Ubuntu 22.04. /etc/sudoers.d/deploy contains: `deploy ALL=(ALL) 
 hints:
 - order: 1
   cost: 0
-  content: 'Where to look: {''Identify the overly broad NOPASSWD'': "ALL grant for the ''deploy'' user"}'
+  content: 'Where to look: Start with read-only discovery on the hardening lab. For Sudo NOPASSWD ALL
+    Found — Restrict the User''s Access, inspect SSH, firewall, TLS, audit logs, and IAM settings before
+    changing anything.'
 - order: 2
   cost: 25
   content: 'Diagnostic steps:
 
-    1. Modify the sudoers entry to restrict to specific commands only
+    1. Gather evidence with SSH, firewall, TLS, audit logs, and IAM settings.
 
-    2. {''Grant'': ''sudo /usr/bin/systemctl restart nginx, sudo /usr/bin/systemctl restart app''}
+    2. Compare current output to the scenario objectives.
 
-    3. Verify the deploy user cannot run arbitrary commands as root'
+    3. Form a single hypothesis about the smallest fix that would restore healthy state.'
 - order: 3
   cost: 50
   content: 'Exact fix + verification:

@@ -59,16 +59,17 @@ initial_state: 'VMware vCenter simulation. Cluster has no EVC baseline set.
 hints:
 - order: 1
   cost: 0
-  content: 'Where to look: Review the vMotion compatibility error in the Recent Tasks panel'
+  content: 'Where to look: Start with read-only discovery on the vSphere lab. For vMotion Failed — Incompatible
+    CPU Feature Sets Between Hosts, inspect VMs, datastores, vCenter, and ESXi tasks before changing anything.'
 - order: 2
   cost: 25
   content: 'Diagnostic steps:
 
-    1. Check the EVC baseline configured on the cluster
+    1. Gather evidence with VMs, datastores, vCenter, and ESXi tasks.
 
-    2. Enable EVC on the cluster at the Sandy Bridge baseline
+    2. Compare current output to the scenario objectives.
 
-    3. Retry the vMotion migration and verify it succeeds'
+    3. Form a single hypothesis about the smallest fix that would restore healthy state.'
 - order: 3
   cost: 50
   content: 'Exact fix + verification:

@@ -49,14 +49,17 @@ initial_state: 'Ubuntu server with Jenkins installed. The pipeline Jenkinsfile a
 hints:
 - order: 1
   cost: 0
-  content: 'Where to look: Identify the syntax error in the Jenkinsfile'
+  content: 'Where to look: Start with read-only discovery on the CI/CD lab. For Fix the Jenkins Pipeline
+    Syntax Error, inspect git repos, pipelines, artifacts, and runbooks before changing anything.'
 - order: 2
   cost: 25
   content: 'Diagnostic steps:
 
-    1. Fix the Groovy syntax so the pipeline block is valid
+    1. Gather evidence with git repos, pipelines, artifacts, and runbooks.
 
-    2. Verify the pipeline configuration is correct'
+    2. Compare current output to the scenario objectives.
+
+    3. Form a single hypothesis about the smallest fix that would restore healthy state.'
 - order: 3
   cost: 50
   content: 'Exact fix + verification:

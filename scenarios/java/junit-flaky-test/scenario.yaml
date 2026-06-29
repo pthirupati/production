@@ -45,16 +45,17 @@ initial_state: 'Test at /app/src/test/java/com/example/OrderServiceTest.java sha
 hints:
 - order: 1
   cost: 0
-  content: 'Where to look: Reproduce the intermittent failure and find the non-deterministic dependency'
+  content: 'Where to look: Start with read-only discovery on the Java project. For Flaky JUnit Test Failing
+    Intermittently in CI, inspect Maven/Gradle, JVM logs, and Spring configuration before changing anything.'
 - order: 2
   cost: 25
   content: 'Diagnostic steps:
 
-    1. Remove shared mutable state / order coupling between tests
+    1. Gather evidence with Maven/Gradle, JVM logs, and Spring configuration.
 
-    2. Replace timing races with deterministic synchronization or a fixed clock
+    2. Compare current output to the scenario objectives.
 
-    3. Run the suite repeatedly and confirm it is stable'
+    3. Form a single hypothesis about the smallest fix that would restore healthy state.'
 - order: 3
   cost: 50
   content: 'Exact fix + verification:

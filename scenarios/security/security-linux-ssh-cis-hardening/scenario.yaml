@@ -61,16 +61,18 @@ dual_terminal: false
 hints:
 - order: 1
   cost: 0
-  content: 'Where to look: Confirm the SSH config fails the CIS controls (root login, password auth, weak
-    crypto)'
+  content: 'Where to look: Start with read-only discovery on the hardening lab. For Security ↔ Linux:
+    SSH Fails the CIS Hardening Baseline, inspect SSH, firewall, TLS, audit logs, and IAM settings before
+    changing anything.'
 - order: 2
   cost: 25
   content: 'Diagnostic steps:
 
-    1. Harden /etc/ssh/sshd_config.d/50-cis.conf (disable root login + password auth, restrict to strong
-    Ciphers/MACs)
+    1. Gather evidence with SSH, firewall, TLS, audit logs, and IAM settings.
 
-    2. Confirm the hardening drop-in is corrected so the baseline passes and sshd would reload cleanly'
+    2. Compare current output to the scenario objectives.
+
+    3. Form a single hypothesis about the smallest fix that would restore healthy state.'
 - order: 3
   cost: 50
   content: 'Exact fix + verification:

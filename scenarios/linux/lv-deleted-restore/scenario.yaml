@@ -61,16 +61,18 @@ is_free: false
 hints:
 - order: 1
   cost: 0
-  content: 'Where to look: List available LVM archives with ls -ltr /etc/lvm/archive/'
+  content: 'Where to look: Start with read-only discovery on the Linux practice server. For Restore Accidentally
+    Deleted Logical Volume Using LVM, inspect terminal and config files under /etc and /var before changing
+    anything.'
 - order: 2
   cost: 25
   content: 'Diagnostic steps:
 
-    1. Identify the most recent archive file for vg_prod before the deletion occurred
+    1. Gather evidence with terminal and config files under /etc and /var.
 
-    2. Restore the LV metadata with vgcfgrestore -f /etc/lvm/archive/vg_prod_<timestamp>.vg vg_prod
+    2. Compare current output to the scenario objectives.
 
-    3. Activate the restored logical volume with lvchange -ay vg_prod/lv_data'
+    3. Form a single hypothesis about the smallest fix that would restore healthy state.'
 - order: 3
   cost: 50
   content: 'Exact fix + verification:

@@ -53,11 +53,11 @@ hints:
   cost: 25
   content: 'Diagnostic steps:
 
-    1. Note protocol, source/dest IP, and TCP flags on failing packets.
+    1. Note the configured nameserver IP in resolv.conf.
 
-    2. Follow TCP stream or export objects if HTTP/DNS is involved.
+    2. `ping` or `nc -zv` the nameserver — is it reachable?
 
-    3. Compare timing (retransmissions, RST, TLS alerts) to the lab question.'
+    3. Check if NetworkManager or systemd-resolved overwrites the file.'
 - order: 3
   cost: 50
   content: 'Exact fix + verification:

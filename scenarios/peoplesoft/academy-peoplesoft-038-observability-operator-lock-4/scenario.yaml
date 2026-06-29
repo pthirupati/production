@@ -43,14 +43,17 @@ initial_state: The system runs, but operator account lock lacks useful telemetry
 hints:
 - order: 1
   cost: 0
-  content: 'Where to look: Day-2 operator account lock work completes safely in this environment'
+  content: 'Where to look: Start with read-only discovery on the PeopleSoft app server lab. For operator
+    account lock, inspect the user profile lock status before changing anything.'
 - order: 2
   cost: 25
   content: 'Diagnostic steps:
 
-    1. Changes are verified with before/after checks
+    1. Gather evidence with the user profile lock status.
 
-    2. The system remains stable for dependent teams'
+    2. Compare current output to the scenario objectives.
+
+    3. Form a single hypothesis about the smallest fix that would restore healthy state.'
 - order: 3
   cost: 50
   content: 'Exact fix + verification:

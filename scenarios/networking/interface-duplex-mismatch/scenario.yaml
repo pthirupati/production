@@ -55,16 +55,18 @@ initial_state: 'Ubuntu 22.04. `ethtool eth0` shows Speed=1000Mb/s but Duplex=Hal
 hints:
 - order: 1
   cost: 0
-  content: 'Where to look: Identify the duplex setting on the NIC using ethtool'
+  content: 'Where to look: Start with read-only discovery on the network lab. For NIC Duplex Mismatch
+    — Fix Half/Full Duplex Causing Errors, inspect interfaces, routing tables, DNS, and firewall rules
+    before changing anything.'
 - order: 2
   cost: 25
   content: 'Diagnostic steps:
 
-    1. Detect the high collision/error rate caused by the mismatch
+    1. Gather evidence with interfaces, routing tables, DNS, and firewall rules.
 
-    2. Set the interface to full-duplex at the correct speed
+    2. Compare current output to the scenario objectives.
 
-    3. Verify error counters stop incrementing'
+    3. Form a single hypothesis about the smallest fix that would restore healthy state.'
 - order: 3
   cost: 50
   content: 'Exact fix + verification:

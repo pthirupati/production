@@ -38,14 +38,17 @@ objectives:
 hints:
 - order: 1
   cost: 0
-  content: 'Where to look: Confirm the secret is printed in output'
+  content: 'Where to look: Start with read-only discovery on the Ansible control node. For Ansible Task
+    Leaking Secret in Output, inspect `ansible webservers -m ping` output before changing anything.'
 - order: 2
   cost: 25
   content: 'Diagnostic steps:
 
-    1. Add no_log: true to the task
+    1. Gather evidence with `ansible webservers -m ping` output.
 
-    2. Verify the task is corrected'
+    2. Compare current output to the scenario objectives.
+
+    3. Form a single hypothesis about the smallest fix that would restore healthy state.'
 - order: 3
   cost: 50
   content: 'Exact fix + verification:

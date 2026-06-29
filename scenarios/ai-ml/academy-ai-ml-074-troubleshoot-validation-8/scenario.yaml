@@ -42,14 +42,17 @@ initial_state: The ML practice workspace is degraded. Metrics look good but gene
 hints:
 - order: 1
   cost: 0
-  content: 'Where to look: The incident symptom is clear: metrics look good but generalize poorly'
+  content: 'Where to look: Test the config to get the exact file and line: `nginx -t`. It prints the offending
+    directive (e.g. unknown directive "listn").'
 - order: 2
   cost: 25
   content: 'Diagnostic steps:
 
-    1. Root cause is isolated with evidence, not guesswork
+    1. Run `nginx -t` and `systemctl status nginx` for config vs service errors.
 
-    2. Service behavior returns to normal after the fix'
+    2. Open the cited file under `/etc/nginx/`.
+
+    3. Compare listen/upstream/proxy directives to the scenario objectives.'
 - order: 3
   cost: 50
   content: 'Exact fix + verification:

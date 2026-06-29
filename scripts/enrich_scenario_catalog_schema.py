@@ -539,6 +539,40 @@ def _hint_is_rich(content: str) -> bool:
     return len(content) > 60 and "`" in content and not MARKER_RE.search(content)
 
 
+_HINT_PREFIX_RE = re.compile(
+    r"^\s*(where to look:|diagnostic steps:|exact fix[^:]*:)\s*", re.I
+)
+
+
+def _normalize_for_overlap(text: str) -> str:
+    text = _HINT_PREFIX_RE.sub("", str(text).strip())
+    text = re.sub(r"^\d+\.\s*", "", text, flags=re.M)
+    return re.sub(r"[^a-z0-9 ]", " ", text.lower())
+
+
+def _leaks_objective(hint: str, objectives: list[str]) -> bool:
+    """True if an early-tier hint just restates an objective (which names the
+    fix/answer). Such hints aren't guidance — they give the answer away, so the
+    enricher should replace them with methodology-only guidance.
+    """
+    h = _normalize_for_overlap(hint)
+    h_tokens = [t for t in h.split() if len(t) > 2]
+    if len(h_tokens) < 3:
+        return False
+    h_set = set(h_tokens)
+    for obj in objectives:
+        o = _normalize_for_overlap(obj)
+        if not o.strip():
+            continue
+        # Substring match (one fully contains the other) is a strong signal.
+        if h.strip() and (h.strip() in o or o.strip() in h):
+            return True
+        o_set = {t for t in o.split() if len(t) > 2}
+        if o_set and len(h_set & o_set) / len(h_set) >= 0.6:
+            return True
+    return False
+
+
 def _grader_command(validation: dict, data: dict) -> str:
     vtype = validation.get("type")
     if vtype == "http_response":
@@ -1028,6 +1062,25 @@ def _upgrade_hints(data: dict, path: Path, tech_dir: str, verify: str, validatio
             tier2 = specialty["tier2"]
         if not _hint_is_rich(tier3) or PLACEHOLDER_RE.search(tier3):
             tier3 = specialty["tier3"]
+
+    # A guiding hint must not simply restate an objective (objectives name the
+    # fix/answer). When tier-1/tier-2 echo an objective, prefer the specialty
+    # methodology hint, else blank it so the methodology fallback below runs.
+    # Tier-3 is the full-reveal tier, so leaking the fix there is intended.
+    objectives = [str(o) for o in _as_list(data.get("objectives"))]
+
+    def _non_leaking_specialty(key: str) -> str:
+        # Only reuse a specialty hint if it does not itself echo an objective —
+        # _hints_from_learn_bullets derives hints from learn bullets that ARE the
+        # objectives, so that fallback can leak just like the original content.
+        cand = specialty.get(key) if specialty else ""
+        return cand if cand and not _leaks_objective(cand, objectives) else ""
+
+    if objectives:
+        if _leaks_objective(tier1, objectives):
+            tier1 = _non_leaking_specialty("tier1")
+        if _leaks_objective(tier2, objectives):
+            tier2 = _non_leaking_specialty("tier2")
 
     if not (_hint_is_rich(tier1) and HINT_TIER1_RE.search(tier1)):
         if not HINT_TIER1_RE.search(tier1) or len(tier1) < 40:

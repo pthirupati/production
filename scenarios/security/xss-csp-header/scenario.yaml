@@ -55,15 +55,17 @@ initial_state: 'Ubuntu server running nginx as a reverse proxy for a Flask web a
 hints:
 - order: 1
   cost: 0
-  content: 'Where to look: Add a Content-Security-Policy header to /etc/nginx/conf.d/app.conf restricting
-    script-src to ''self'''
+  content: 'Where to look: Test the config to get the exact file and line: `nginx -t`. It prints the offending
+    directive (e.g. unknown directive "listn").'
 - order: 2
   cost: 25
   content: 'Diagnostic steps:
 
-    1. Add X-Frame-Options DENY and X-Content-Type-Options nosniff headers
+    1. Run `nginx -t` and `systemctl status nginx` for config vs service errors.
 
-    2. Reload nginx and verify all three security headers are present using curl'
+    2. Open the cited file under `/etc/nginx/`.
+
+    3. Compare listen/upstream/proxy directives to the scenario objectives.'
 - order: 3
   cost: 50
   content: 'Exact fix + verification:

@@ -26,14 +26,17 @@ dual_terminal: false
 hints:
 - order: 1
   cost: 0
-  content: 'Where to look: Read the SyntaxError''s filename, line number, and caret position'
+  content: 'Where to look: Start with read-only discovery on the Python project workspace. For Fix Python
+    Syntax Error, inspect source files, venv, tests, and CLI entrypoints before changing anything.'
 - order: 2
   cost: 25
   content: 'Diagnostic steps:
 
-    1. Correct the offending syntax
+    1. Gather evidence with source files, venv, tests, and CLI entrypoints.
 
-    2. Confirm the file parses and the program runs'
+    2. Compare current output to the scenario objectives.
+
+    3. Form a single hypothesis about the smallest fix that would restore healthy state.'
 - order: 3
   cost: 50
   content: 'Exact fix + verification:

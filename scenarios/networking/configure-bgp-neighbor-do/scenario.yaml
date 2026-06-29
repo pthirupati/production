@@ -41,14 +41,17 @@ initial_state: Router with no BGP configured. You must bring up a BGP session to
 hints:
 - order: 1
   cost: 0
-  content: 'Where to look: Configure the local BGP process and the neighbor 10.0.0.2 with remote-as 65001'
+  content: 'Where to look: Start with read-only discovery on the network lab. For Configure BGP Neighbor,
+    inspect interfaces, routing tables, DNS, and firewall rules before changing anything.'
 - order: 2
   cost: 25
   content: 'Diagnostic steps:
 
-    1. Advertise the required network into BGP
+    1. Gather evidence with interfaces, routing tables, DNS, and firewall rules.
 
-    2. Verify the session reaches Established and routes are exchanged'
+    2. Compare current output to the scenario objectives.
+
+    3. Form a single hypothesis about the smallest fix that would restore healthy state.'
 - order: 3
   cost: 50
   content: 'Exact fix + verification:

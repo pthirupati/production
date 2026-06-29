@@ -45,16 +45,17 @@ initial_state: 'Config at /app/src/main/resources/application.yml sets exposure 
 hints:
 - order: 1
   cost: 0
-  content: 'Where to look: Enumerate the exposed actuator endpoints and the sensitive ones'
+  content: 'Where to look: Start with read-only discovery on the Java project. For Actuator Endpoints
+    Exposed Without Auth, inspect Maven/Gradle, JVM logs, and Spring configuration before changing anything.'
 - order: 2
   cost: 25
   content: 'Diagnostic steps:
 
-    1. Restrict management.endpoints.web.exposure to the minimum needed
+    1. Gather evidence with Maven/Gradle, JVM logs, and Spring configuration.
 
-    2. Require authentication for sensitive endpoints
+    2. Compare current output to the scenario objectives.
 
-    3. Verify env/heapdump are no longer anonymously reachable'
+    3. Form a single hypothesis about the smallest fix that would restore healthy state.'
 - order: 3
   cost: 50
   content: 'Exact fix + verification:

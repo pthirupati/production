@@ -59,16 +59,18 @@ is_free: false
 hints:
 - order: 1
   cost: 0
-  content: 'Where to look: Generate a PBKDF2 password hash with grub2-mkpasswd-pbkdf2 and save the output'
+  content: 'Where to look: Start with read-only discovery on the Linux practice server. For Set GRUB Password
+    to Prevent Unauthorized Boot Options, inspect terminal and config files under /etc and /var before
+    changing anything.'
 - order: 2
   cost: 25
   content: 'Diagnostic steps:
 
-    1. Edit /etc/grub.d/40_custom to add set superusers="root" and the password_pbkdf2 line
+    1. Gather evidence with terminal and config files under /etc and /var.
 
-    2. Regenerate the GRUB config with grub2-mkconfig -o /boot/grub2/grub.cfg
+    2. Compare current output to the scenario objectives.
 
-    3. Verify the grub.cfg contains the superusers and password entries'
+    3. Form a single hypothesis about the smallest fix that would restore healthy state.'
 - order: 3
   cost: 50
   content: 'Exact fix + verification:

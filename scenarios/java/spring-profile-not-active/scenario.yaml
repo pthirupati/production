@@ -45,16 +45,17 @@ initial_state: 'application.yml at /app/src/main/resources/ does not set spring.
 hints:
 - order: 1
   cost: 0
-  content: 'Where to look: Confirm the app booted with dev/default settings in prod'
+  content: 'Where to look: Start with read-only discovery on the Java project. For Wrong Spring Profile
+    Active in Production, inspect Maven/Gradle, JVM logs, and Spring configuration before changing anything.'
 - order: 2
   cost: 25
   content: 'Diagnostic steps:
 
-    1. Set the active profile to prod (config or env)
+    1. Gather evidence with Maven/Gradle, JVM logs, and Spring configuration.
 
-    2. Ensure application-prod.yml properties override the defaults
+    2. Compare current output to the scenario objectives.
 
-    3. Verify the prod datasource and logging are in effect'
+    3. Form a single hypothesis about the smallest fix that would restore healthy state.'
 - order: 3
   cost: 50
   content: 'Exact fix + verification:

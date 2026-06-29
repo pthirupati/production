@@ -52,16 +52,17 @@ initial_state: 'Ubuntu server with Packer installed. Build template at /opt/pack
 hints:
 - order: 1
   cost: 0
-  content: 'Where to look: Identify the timeout settings in the Packer template'
+  content: 'Where to look: Start with read-only discovery on the CI/CD lab. For Fix Packer Build Timeout
+    Configuration, inspect git repos, pipelines, artifacts, and runbooks before changing anything.'
 - order: 2
   cost: 25
   content: 'Diagnostic steps:
 
-    1. Increase ssh_handshake_attempts and ssh_timeout
+    1. Gather evidence with git repos, pipelines, artifacts, and runbooks.
 
-    2. Optionally increase the provisioner timeout
+    2. Compare current output to the scenario objectives.
 
-    3. Verify the Packer template validates without errors'
+    3. Form a single hypothesis about the smallest fix that would restore healthy state.'
 - order: 3
   cost: 50
   content: 'Exact fix + verification:

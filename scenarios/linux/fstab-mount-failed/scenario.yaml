@@ -41,14 +41,17 @@ initial_state: Linux server post storage-migration where the /etc/fstab line for
 hints:
 - order: 1
   cost: 0
-  content: 'Where to look: Identify the invalid fstab line for /mnt/data'
+  content: 'Where to look: Start with read-only discovery on the Linux practice server. For Fix Broken
+    fstab Entry, inspect terminal and config files under /etc and /var before changing anything.'
 - order: 2
   cost: 25
   content: 'Diagnostic steps:
 
-    1. Correct it to the right UUID/device (or remove it if obsolete)
+    1. Gather evidence with terminal and config files under /etc and /var.
 
-    2. Verify /mnt/data mounts and the data is accessible'
+    2. Compare current output to the scenario objectives.
+
+    3. Form a single hypothesis about the smallest fix that would restore healthy state.'
 - order: 3
   cost: 50
   content: 'Exact fix + verification:

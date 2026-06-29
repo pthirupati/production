@@ -52,14 +52,17 @@ initial_state: 'A GitHub repository with a workflow at .github/workflows/deploy.
 hints:
 - order: 1
   cost: 0
-  content: 'Where to look: Identify the missing secret referenced in the workflow file'
+  content: 'Where to look: Start with read-only discovery on the CI/CD lab. For Add Missing GitHub Actions
+    Secret, inspect git repos, pipelines, artifacts, and runbooks before changing anything.'
 - order: 2
   cost: 25
   content: 'Diagnostic steps:
 
-    1. Add the DEPLOY_KEY secret to the repository secrets
+    1. Gather evidence with git repos, pipelines, artifacts, and runbooks.
 
-    2. Verify the workflow can access the secret without errors'
+    2. Compare current output to the scenario objectives.
+
+    3. Form a single hypothesis about the smallest fix that would restore healthy state.'
 - order: 3
   cost: 50
   content: 'Exact fix + verification:

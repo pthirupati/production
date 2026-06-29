@@ -62,16 +62,18 @@ topics_covered:
 hints:
 - order: 1
   cost: 0
-  content: 'Where to look: Identify the offending PID with top / ps -eo pid,ni,comm'
+  content: 'Where to look: Start with read-only discovery on the Linux practice server. For Tame a Runaway
+    Process with renice and a Limit, inspect terminal and config files under /etc and /var before changing
+    anything.'
 - order: 2
   cost: 25
   content: 'Diagnostic steps:
 
-    1. {''Renice it to a low priority'': ''renice +15 -p <pid> (higher nice = lower priority)''}
+    1. Gather evidence with terminal and config files under /etc and /var.
 
-    2. Confirm the new nice value with ps -o ni
+    2. Compare current output to the scenario objectives.
 
-    3. Capture the policy so future runs start at the lower priority and record it'
+    3. Form a single hypothesis about the smallest fix that would restore healthy state.'
 - order: 3
   cost: 50
   content: 'Exact fix + verification:

@@ -45,16 +45,18 @@ initial_state: 'Config at /app/src/main/resources/application.yml sets a 30s JWT
 hints:
 - order: 1
   cost: 0
-  content: 'Where to look: Reproduce the 401 and confirm the failure is token expiry/validation'
+  content: 'Where to look: Start with read-only discovery on the Java project. For JWT Validation Failing
+    — Clock Skew and Short Expiry, inspect Maven/Gradle, JVM logs, and Spring configuration before changing
+    anything.'
 - order: 2
   cost: 25
   content: 'Diagnostic steps:
 
-    1. Increase the access-token TTL to a sane value
+    1. Gather evidence with Maven/Gradle, JVM logs, and Spring configuration.
 
-    2. Allow a small clock-skew window during validation
+    2. Compare current output to the scenario objectives.
 
-    3. Verify authenticated calls stop failing intermittently'
+    3. Form a single hypothesis about the smallest fix that would restore healthy state.'
 - order: 3
   cost: 50
   content: 'Exact fix + verification:

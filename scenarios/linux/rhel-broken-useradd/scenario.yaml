@@ -43,16 +43,17 @@ initial_state: Simulated RHEL 9 server whose /etc/passwd has a corrupt line (e.g
 hints:
 - order: 1
   cost: 0
-  content: 'Where to look: Identify the malformed passwd entry'
+  content: 'Where to look: Start with read-only discovery on the Linux practice server. For RHEL Simulation:
+    Repair Broken /etc/passwd, inspect terminal and config files under /etc and /var before changing anything.'
 - order: 2
   cost: 25
   content: 'Diagnostic steps:
 
-    1. Remove or fix the corrupt line
+    1. Gather evidence with terminal and config files under /etc and /var.
 
-    2. Run pwck to verify account files
+    2. Compare current output to the scenario objectives.
 
-    3. Create user appuser with useradd -m'
+    3. Form a single hypothesis about the smallest fix that would restore healthy state.'
 - order: 3
   cost: 50
   content: 'Exact fix + verification:

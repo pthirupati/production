@@ -39,14 +39,17 @@ initial_state: Linux server missing a static route for 10.50.0.0/24, so traffic 
 hints:
 - order: 1
   cost: 0
-  content: 'Where to look: Confirm 10.50.0.0/24 is unreachable and the route is missing'
+  content: 'Where to look: Start with read-only discovery on the network lab. For Missing Static Route,
+    inspect interfaces, routing tables, DNS, and firewall rules before changing anything.'
 - order: 2
   cost: 25
   content: 'Diagnostic steps:
 
-    1. Add the static route via the correct gateway
+    1. Gather evidence with interfaces, routing tables, DNS, and firewall rules.
 
-    2. Verify connectivity and persist the route'
+    2. Compare current output to the scenario objectives.
+
+    3. Form a single hypothesis about the smallest fix that would restore healthy state.'
 - order: 3
   cost: 50
   content: 'Exact fix + verification:

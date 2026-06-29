@@ -28,14 +28,17 @@ dual_terminal: false
 hints:
 - order: 1
   cost: 0
-  content: 'Where to look: Run the playbook and identify the exact failed task and host (web2)'
+  content: 'Where to look: Start with read-only discovery on the Ansible control node. For Ansible Playbook
+    Failure, inspect `ansible webservers -m ping` output before changing anything.'
 - order: 2
   cost: 25
   content: 'Diagnostic steps:
 
-    1. Fix the underlying cause on web2 (e.g. the failing service or its config)
+    1. Gather evidence with `ansible webservers -m ping` output.
 
-    2. Re-run the playbook and confirm web2 shows ok/changed with failed=0'
+    2. Compare current output to the scenario objectives.
+
+    3. Form a single hypothesis about the smallest fix that would restore healthy state.'
 - order: 3
   cost: 50
   content: 'Exact fix + verification:

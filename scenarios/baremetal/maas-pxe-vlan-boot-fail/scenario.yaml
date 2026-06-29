@@ -38,14 +38,17 @@ initial_state: PXE discovery fails — wrong VLAN tag on the provisioning fabric
 hints:
 - order: 1
   cost: 0
-  content: 'Where to look: Open Bare Metal console from the lab toolbar'
+  content: 'Where to look: Start with read-only discovery on the physical server lab. For MAAS PXE VLAN
+    Boot Failure, inspect IPMI, RAID, BIOS, and out-of-band console before changing anything.'
 - order: 2
   cost: 25
   content: 'Diagnostic steps:
 
-    1. Fix PXE VLAN configuration in the IPMI/MAAS view
+    1. Gather evidence with IPMI, RAID, BIOS, and out-of-band console.
 
-    2. Verify machines can enter commissioning'
+    2. Compare current output to the scenario objectives.
+
+    3. Form a single hypothesis about the smallest fix that would restore healthy state.'
 - order: 3
   cost: 50
   content: 'Exact fix + verification:

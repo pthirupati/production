@@ -56,15 +56,18 @@ initial_state: 'Ubuntu server post-compromise. /var/log/auth.log has gaps betwee
 hints:
 - order: 1
   cost: 0
-  content: 'Where to look: Use `last` and `lastb` against /var/log/wtmp and /var/log/btmp to find login
-    history the attacker could not erase'
+  content: 'Where to look: Start with read-only discovery on the hardening lab. For Log Tampering — Detect
+    Deleted and Altered Log Entries, inspect SSH, firewall, TLS, audit logs, and IAM settings before changing
+    anything.'
 - order: 2
   cost: 25
   content: 'Diagnostic steps:
 
-    1. Compare auth.log timestamps to syslog and journalctl output to find gaps indicating deleted entries
+    1. Gather evidence with SSH, firewall, TLS, audit logs, and IAM settings.
 
-    2. Write a timeline of the attack to /tmp/incident-timeline.txt with at least 3 timestamped events'
+    2. Compare current output to the scenario objectives.
+
+    3. Form a single hypothesis about the smallest fix that would restore healthy state.'
 - order: 3
   cost: 50
   content: 'Exact fix + verification:

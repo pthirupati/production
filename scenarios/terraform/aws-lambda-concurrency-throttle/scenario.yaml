@@ -39,14 +39,17 @@ objectives:
 hints:
 - order: 1
   cost: 0
-  content: 'Where to look: Confirm the function is throttling on concurrency'
+  content: 'Where to look: Start with read-only discovery on the Terraform workspace. For AWS Lambda Hitting
+    Concurrency Limit, inspect HCL files, state, and plan/apply workflow before changing anything.'
 - order: 2
   cost: 25
   content: 'Diagnostic steps:
 
-    1. Adjust reserved/provisioned concurrency and apply
+    1. Gather evidence with HCL files, state, and plan/apply workflow.
 
-    2. Verify throttle metrics drop to zero'
+    2. Compare current output to the scenario objectives.
+
+    3. Form a single hypothesis about the smallest fix that would restore healthy state.'
 - order: 3
   cost: 50
   content: 'Exact fix + verification:

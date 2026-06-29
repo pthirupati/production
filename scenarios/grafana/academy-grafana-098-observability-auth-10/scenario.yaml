@@ -42,29 +42,29 @@ initial_state: The system runs, but authentication lacks useful telemetry. Dashb
 hints:
 - order: 1
   cost: 0
-  content: 'Where to look: Sign in to Grafana, open the affected dashboard/panel, and check Explore for
-    the datasource health.'
+  content: 'Where to look: Test the config to get the exact file and line: `nginx -t`. It prints the offending
+    directive (e.g. unknown directive "listn").'
 - order: 2
   cost: 25
   content: 'Diagnostic steps:
 
-    1. Settings → Data sources — test the Prometheus/Loki datasource.
+    1. Run `nginx -t` and `systemctl status nginx` for config vs service errors.
 
-    2. Inspect panel query JSON and variable definitions.
+    2. Open the cited file under `/etc/nginx/`.
 
-    3. Check Grafana server logs if provisioning or auth errors appear.'
+    3. Compare listen/upstream/proxy directives to the scenario objectives.'
 - order: 3
   cost: 50
   content: 'Exact fix + verification:
 
-    1. Fix datasource URL, credentials, or panel PromQL/LogQL.
+    1. Correct the typo on the reported line and save the file.
 
-    2. Save the dashboard and refresh the panel.
+    2. Re-run `nginx -t` until it reports syntax is ok.
 
-    3. Confirm data renders and Check Solution passes.
+    3. Run `systemctl enable --now nginx`, then `curl -I http://localhost` (expect HTTP 200).
 
 
-    WHY: Grafana panels fail when queries or datasources are misconfigured.'
+    WHY: systemd will not start nginx until `nginx -t` passes.'
 summary: Complete the authentication — observability lab grafana lab and verify success with the checker
 estimated_minutes: 20
 xp_reward: 100

@@ -41,12 +41,17 @@ initial_state: Simulated HPE DL380 bare-metal host with IPMI tooling available o
 hints:
 - order: 1
   cost: 0
-  content: 'Where to look: Check chassis power status with ipmitool'
+  content: 'Where to look: Start with read-only discovery on the physical server lab. For RHEL Simulation:
+    IPMI Power Control, inspect IPMI, RAID, BIOS, and out-of-band console before changing anything.'
 - order: 2
   cost: 25
   content: 'Diagnostic steps:
 
-    1. Verify power is on after cycle'
+    1. Gather evidence with IPMI, RAID, BIOS, and out-of-band console.
+
+    2. Compare current output to the scenario objectives.
+
+    3. Form a single hypothesis about the smallest fix that would restore healthy state.'
 - order: 3
   cost: 50
   content: 'Exact fix + verification:

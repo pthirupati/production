@@ -61,17 +61,18 @@ is_free: false
 hints:
 - order: 1
   cost: 0
-  content: 'Where to look: Check /etc/shadow for appuser — the password field will show !! indicating
-    locked'
+  content: 'Where to look: Start with read-only discovery on the Linux practice server. For New User Cannot
+    Login — Existing Users Unaffected, inspect terminal and config files under /etc and /var before changing
+    anything.'
 - order: 2
   cost: 25
   content: 'Diagnostic steps:
 
-    1. Set a password with passwd appuser to unlock the account
+    1. Gather evidence with terminal and config files under /etc and /var.
 
-    2. Verify the shell in /etc/passwd is not /sbin/nologin or /bin/false
+    2. Compare current output to the scenario objectives.
 
-    3. Check that the home directory /home/appuser exists with correct ownership'
+    3. Form a single hypothesis about the smallest fix that would restore healthy state.'
 - order: 3
   cost: 50
   content: 'Exact fix + verification:

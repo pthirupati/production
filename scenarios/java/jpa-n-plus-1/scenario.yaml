@@ -45,16 +45,17 @@ initial_state: 'Config at /app/src/main/resources/application.yml has SQL loggin
 hints:
 - order: 1
   cost: 0
-  content: 'Where to look: Enable SQL logging and confirm 1 + N queries per list call'
+  content: 'Where to look: Start with read-only discovery on the Java project. For JPA N+1 Query Storm
+    Hammering the Database, inspect Maven/Gradle, JVM logs, and Spring configuration before changing anything.'
 - order: 2
   cost: 25
   content: 'Diagnostic steps:
 
-    1. Identify the lazily-loaded association causing the per-row queries
+    1. Gather evidence with Maven/Gradle, JVM logs, and Spring configuration.
 
-    2. Use JOIN FETCH or an @EntityGraph to batch the load
+    2. Compare current output to the scenario objectives.
 
-    3. Verify the list endpoint now issues a small constant number of queries'
+    3. Form a single hypothesis about the smallest fix that would restore healthy state.'
 - order: 3
   cost: 50
   content: 'Exact fix + verification:

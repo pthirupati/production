@@ -44,16 +44,18 @@ initial_state: 'CleanupJob at /app/src/main/java/com/example/jobs/CleanupJob.jav
 hints:
 - order: 1
   cost: 0
-  content: 'Where to look: Confirm the @Scheduled task never executes'
+  content: 'Where to look: Start with read-only discovery on the Java project. For Scheduled Job Never
+    Fires (@Scheduled Not Enabled), inspect Maven/Gradle, JVM logs, and Spring configuration before changing
+    anything.'
 - order: 2
   cost: 25
   content: 'Diagnostic steps:
 
-    1. Enable scheduling on a configuration class
+    1. Gather evidence with Maven/Gradle, JVM logs, and Spring configuration.
 
-    2. Correct the cron expression to the intended schedule
+    2. Compare current output to the scenario objectives.
 
-    3. Verify the job fires at the expected time'
+    3. Form a single hypothesis about the smallest fix that would restore healthy state.'
 - order: 3
   cost: 50
   content: 'Exact fix + verification:

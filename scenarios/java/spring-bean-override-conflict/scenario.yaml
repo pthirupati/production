@@ -44,16 +44,17 @@ initial_state: 'Config at /app/src/main/resources/application.yml plus a second 
 hints:
 - order: 1
   cost: 0
-  content: 'Where to look: Read the error and find the two conflicting bean definitions'
+  content: 'Where to look: Start with read-only discovery on the Java project. For Duplicate Bean Definition
+    — Overriding Disabled, inspect Maven/Gradle, JVM logs, and Spring configuration before changing anything.'
 - order: 2
   cost: 25
   content: 'Diagnostic steps:
 
-    1. Decide which bean should win and why
+    1. Gather evidence with Maven/Gradle, JVM logs, and Spring configuration.
 
-    2. Rename/qualify or mark @Primary to disambiguate
+    2. Compare current output to the scenario objectives.
 
-    3. Confirm the context starts with one unambiguous bean'
+    3. Form a single hypothesis about the smallest fix that would restore healthy state.'
 - order: 3
   cost: 50
   content: 'Exact fix + verification:

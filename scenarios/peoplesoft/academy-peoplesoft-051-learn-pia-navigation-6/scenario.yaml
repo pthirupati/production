@@ -45,14 +45,18 @@ initial_state: The PeopleSoft app server lab is online with a starter PeopleSoft
 hints:
 - order: 1
   cost: 0
-  content: 'Where to look: Understand how PeopleSoft PIA navigation work in this lab environment'
+  content: 'Where to look: Start with read-only discovery on the PeopleSoft app server lab. For PeopleSoft
+    PIA navigation, inspect PIA access logs, web server status, and app server domains before changing
+    anything.'
 - order: 2
   cost: 25
   content: 'Diagnostic steps:
 
-    1. Identify the main status and configuration signals for PeopleSoft PIA navigation
+    1. Gather evidence with PIA access logs, web server status, and app server domains.
 
-    2. Confirm you can read the current state confidently before changing anything'
+    2. Compare current output to the scenario objectives.
+
+    3. Form a single hypothesis about the smallest fix that would restore healthy state.'
 - order: 3
   cost: 50
   content: 'Exact fix + verification:

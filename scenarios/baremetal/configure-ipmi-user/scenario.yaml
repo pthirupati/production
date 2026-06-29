@@ -42,14 +42,17 @@ initial_state: Bare-metal host with IPMI tooling available and access to the loc
 hints:
 - order: 1
   cost: 0
-  content: 'Where to look: Create an IPMI user and set its password'
+  content: 'Where to look: Start with read-only discovery on the physical server lab. For Configure IPMI
+    User Access, inspect IPMI, RAID, BIOS, and out-of-band console before changing anything.'
 - order: 2
   cost: 25
   content: 'Diagnostic steps:
 
-    1. Grant the user operator/admin privilege on the LAN channel and enable it
+    1. Gather evidence with IPMI, RAID, BIOS, and out-of-band console.
 
-    2. Verify the user can query chassis power status via ipmitool'
+    2. Compare current output to the scenario objectives.
+
+    3. Form a single hypothesis about the smallest fix that would restore healthy state.'
 - order: 3
   cost: 50
   content: 'Exact fix + verification:

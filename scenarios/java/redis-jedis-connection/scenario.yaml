@@ -45,16 +45,18 @@ initial_state: 'Config at /app/src/main/resources/application.yml sets a max poo
 hints:
 - order: 1
   cost: 0
-  content: 'Where to look: Reproduce the pool-exhaustion exception under load'
+  content: 'Where to look: Start with read-only discovery on the Java project. For Jedis Pool Exhausted
+    — Could Not Get a Connection, inspect Maven/Gradle, JVM logs, and Spring configuration before changing
+    anything.'
 - order: 2
   cost: 25
   content: 'Diagnostic steps:
 
-    1. Find the code path that borrows but never returns a Jedis resource
+    1. Gather evidence with Maven/Gradle, JVM logs, and Spring configuration.
 
-    2. Ensure every borrow is returned (try-with-resources/finally)
+    2. Compare current output to the scenario objectives.
 
-    3. Right-size the pool max and verify no exhaustion under load'
+    3. Form a single hypothesis about the smallest fix that would restore healthy state.'
 - order: 3
   cost: 50
   content: 'Exact fix + verification:

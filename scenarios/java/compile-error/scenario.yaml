@@ -45,16 +45,17 @@ initial_state: 'Java source at /app/src/main/java/com/example/App.java does not 
 hints:
 - order: 1
   cost: 0
-  content: 'Where to look: Run the compile and read the first javac error with its file and line'
+  content: 'Where to look: Start with read-only discovery on the Java project. For javac Compilation Error
+    Blocking the Build, inspect Maven/Gradle, JVM logs, and Spring configuration before changing anything.'
 - order: 2
   cost: 25
   content: 'Diagnostic steps:
 
-    1. Open the offending source file and correct the syntax/type error
+    1. Gather evidence with Maven/Gradle, JVM logs, and Spring configuration.
 
-    2. Recompile until javac reports no errors
+    2. Compare current output to the scenario objectives.
 
-    3. Confirm the .class output is produced'
+    3. Form a single hypothesis about the smallest fix that would restore healthy state.'
 - order: 3
   cost: 50
   content: 'Exact fix + verification:

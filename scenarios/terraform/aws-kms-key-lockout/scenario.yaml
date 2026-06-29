@@ -40,14 +40,17 @@ objectives:
 hints:
 - order: 1
   cost: 0
-  content: 'Where to look: Confirm the key policy is missing the root/admin principal'
+  content: 'Where to look: Start with read-only discovery on the Terraform workspace. For AWS KMS Key
+    Policy Locked Out Admins, inspect HCL files, state, and plan/apply workflow before changing anything.'
 - order: 2
   cost: 25
   content: 'Diagnostic steps:
 
-    1. Restore a safe key policy and apply
+    1. Gather evidence with HCL files, state, and plan/apply workflow.
 
-    2. Verify the key can be administered again'
+    2. Compare current output to the scenario objectives.
+
+    3. Form a single hypothesis about the smallest fix that would restore healthy state.'
 - order: 3
   cost: 50
   content: 'Exact fix + verification:

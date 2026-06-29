@@ -46,16 +46,18 @@ initial_state: 'PaymentService at /app/src/main/java/com/example/service/Payment
 hints:
 - order: 1
   cost: 0
-  content: 'Where to look: Reproduce a partial commit when the operation fails midway'
+  content: 'Where to look: Start with read-only discovery on the Java project. For @Transactional Not
+    Rolling Back on a Checked Exception, inspect Maven/Gradle, JVM logs, and Spring configuration before
+    changing anything.'
 - order: 2
   cost: 25
   content: 'Diagnostic steps:
 
-    1. Configure rollback for the checked exception (rollbackFor)
+    1. Gather evidence with Maven/Gradle, JVM logs, and Spring configuration.
 
-    2. Ensure the transactional method is invoked through the proxy
+    2. Compare current output to the scenario objectives.
 
-    3. Verify a failure rolls the whole operation back'
+    3. Form a single hypothesis about the smallest fix that would restore healthy state.'
 - order: 3
   cost: 50
   content: 'Exact fix + verification:

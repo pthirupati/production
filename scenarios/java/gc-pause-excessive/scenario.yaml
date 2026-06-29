@@ -45,16 +45,18 @@ initial_state: 'JVM flags at /app/jvm.options select -XX:+UseParallelGC with -Xm
 hints:
 - order: 1
   cost: 0
-  content: 'Where to look: Enable GC logging and confirm long stop-the-world full GC pauses'
+  content: 'Where to look: Start with read-only discovery on the Java project. For Excessive GC Pauses
+    Causing Request Latency Spikes, inspect Maven/Gradle, JVM logs, and Spring configuration before changing
+    anything.'
 - order: 2
   cost: 25
   content: 'Diagnostic steps:
 
-    1. Select a low-pause collector appropriate for the heap size
+    1. Gather evidence with Maven/Gradle, JVM logs, and Spring configuration.
 
-    2. Set a sane max heap and a pause-time goal in jvm.options
+    2. Compare current output to the scenario objectives.
 
-    3. Verify p99 latency no longer correlates with GC pauses'
+    3. Form a single hypothesis about the smallest fix that would restore healthy state.'
 - order: 3
   cost: 50
   content: 'Exact fix + verification:

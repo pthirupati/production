@@ -41,14 +41,17 @@ initial_state: Java Maven project where pom.xml needs fixing before it will buil
 hints:
 - order: 1
   cost: 0
-  content: 'Where to look: Run mvn package and identify what the POM is missing or has wrong'
+  content: 'Where to look: Start with read-only discovery on the Java project. For Build Java Maven Project,
+    inspect Maven/Gradle, JVM logs, and Spring configuration before changing anything.'
 - order: 2
   cost: 25
   content: 'Diagnostic steps:
 
-    1. Fix the pom.xml (coordinates, plugins, or dependencies)
+    1. Gather evidence with Maven/Gradle, JVM logs, and Spring configuration.
 
-    2. Build successfully so the artifact is produced under target/'
+    2. Compare current output to the scenario objectives.
+
+    3. Form a single hypothesis about the smallest fix that would restore healthy state.'
 - order: 3
   cost: 50
   content: 'Exact fix + verification:

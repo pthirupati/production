@@ -54,14 +54,18 @@ initial_state: 'Debian server running OpenLDAP (slapd) with dc=lab,dc=local as t
 hints:
 - order: 1
   cost: 0
-  content: 'Where to look: Confirm anonymous bind works by querying the LDAP server without credentials'
+  content: 'Where to look: Start with read-only discovery on the hardening lab. For LDAP Anonymous Bind
+    - Disable Unauthenticated Directory, inspect SSH, firewall, TLS, audit logs, and IAM settings before
+    changing anything.'
 - order: 2
   cost: 25
   content: 'Diagnostic steps:
 
-    1. {''Disable anonymous binds by setting olcDisallows'': ''bind_anon in the cn=config entry''}
+    1. Gather evidence with SSH, firewall, TLS, audit logs, and IAM settings.
 
-    2. Verify that anonymous ldapsearch now returns an error and requires authentication'
+    2. Compare current output to the scenario objectives.
+
+    3. Form a single hypothesis about the smallest fix that would restore healthy state.'
 - order: 3
   cost: 50
   content: 'Exact fix + verification:

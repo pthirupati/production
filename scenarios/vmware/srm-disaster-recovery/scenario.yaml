@@ -41,14 +41,17 @@ objectives:
 hints:
 - order: 1
   cost: 0
-  content: 'Where to look: Ensure the sites are linked, then configure SRM protection groups'
+  content: 'Where to look: Start with read-only discovery on the vSphere lab. For SRM Site Recovery Not
+    Configured, inspect VMs, datastores, vCenter, and ESXi tasks before changing anything.'
 - order: 2
   cost: 25
   content: 'Diagnostic steps:
 
-    1. Create a recovery plan covering the protected VMs
+    1. Gather evidence with VMs, datastores, vCenter, and ESXi tasks.
 
-    2. Run a recovery plan test and confirm it succeeds'
+    2. Compare current output to the scenario objectives.
+
+    3. Form a single hypothesis about the smallest fix that would restore healthy state.'
 - order: 3
   cost: 50
   content: 'Exact fix + verification:

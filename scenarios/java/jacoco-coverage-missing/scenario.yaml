@@ -45,16 +45,18 @@ initial_state: 'Maven POM at /app/pom.xml lacks a working jacoco-maven-plugin bi
 hints:
 - order: 1
   cost: 0
-  content: 'Where to look: Confirm no jacoco.xml is generated after the test phase'
+  content: 'Where to look: Start with read-only discovery on the Java project. For JaCoCo Coverage Report
+    Missing — Build Gate Fails, inspect Maven/Gradle, JVM logs, and Spring configuration before changing
+    anything.'
 - order: 2
   cost: 25
   content: 'Diagnostic steps:
 
-    1. Add/repair the jacoco-maven-plugin with prepare-agent and report executions
+    1. Gather evidence with Maven/Gradle, JVM logs, and Spring configuration.
 
-    2. Bind the executions to the correct lifecycle phases
+    2. Compare current output to the scenario objectives.
 
-    3. Verify target/site/jacoco/jacoco.xml is produced'
+    3. Form a single hypothesis about the smallest fix that would restore healthy state.'
 - order: 3
   cost: 50
   content: 'Exact fix + verification:

@@ -41,28 +41,29 @@ initial_state: Spot NXDOMAIN responses causing app errors.
 hints:
 - order: 1
   cost: 0
-  content: 'Where to look: Load the capture in Wireshark and apply a display filter matching the symptom.'
+  content: 'Where to look: Run `cat /etc/resolv.conf` and test with `dig example.com` or `getent hosts
+    example.com`.'
 - order: 2
   cost: 25
   content: 'Diagnostic steps:
 
-    1. Note protocol, source/dest IP, and TCP flags on failing packets.
+    1. Note the configured nameserver IP in resolv.conf.
 
-    2. Follow TCP stream or export objects if HTTP/DNS is involved.
+    2. `ping` or `nc -zv` the nameserver — is it reachable?
 
-    3. Compare timing (retransmissions, RST, TLS alerts) to the lab question.'
+    3. Check if NetworkManager or systemd-resolved overwrites the file.'
 - order: 3
   cost: 50
   content: 'Exact fix + verification:
 
-    1. Apply the filter or analysis steps the objectives describe.
+    1. Set a working `nameserver` line (e.g. 8.8.8.8 or the lab''s resolver).
 
-    2. Document the answer (host, port, flag, or root cause).
+    2. Re-run `dig` or `getent hosts` — lookups should succeed.
 
-    3. Submit via Check Solution in the Wireshark simulator.
+    3. Confirm `check.sh` passes.
 
 
-    WHY: packet labs grade your analysis, not arbitrary shell markers.'
+    WHY: applications use resolv.conf for every hostname lookup.'
 summary: Complete the find failed dns lookups wireshark lab and verify success with the checker
 estimated_minutes: 20
 xp_reward: 100

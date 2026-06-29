@@ -45,16 +45,18 @@ initial_state: A PeopleSoft HCM/Financials environment where FINUSER holds only 
 hints:
 - order: 1
   cost: 0
-  content: 'Where to look: Open the PeopleSoft (PIA) simulator from the lab toolbar'
+  content: 'Where to look: Start with read-only discovery on the PeopleSoft app server lab. For Grant
+    a User the Role to Access a Component, inspect PIA, Process Scheduler, Integration Broker, and app
+    server logs before changing anything.'
 - order: 2
   cost: 25
   content: 'Diagnostic steps:
 
-    1. Navigate to PeopleTools > Security > User Profiles for FINUSER
+    1. Gather evidence with PIA, Process Scheduler, Integration Broker, and app server logs.
 
-    2. Identify which role grants the FIN_AP_VOUCHER permission for Voucher Entry
+    2. Compare current output to the scenario objectives.
 
-    3. Assign the Accounts Payable Processor role to FINUSER'
+    3. Form a single hypothesis about the smallest fix that would restore healthy state.'
 - order: 3
   cost: 50
   content: 'Exact fix + verification:

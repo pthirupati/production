@@ -55,16 +55,18 @@ topics_covered:
 hints:
 - order: 1
   cost: 0
-  content: 'Where to look: List queued jobs with atq and inspect the job body with at -c <id>'
+  content: 'Where to look: Start with read-only discovery on the Linux practice server. For One-Off at
+    Job Never Runs — atd and Queue, inspect terminal and config files under /etc and /var before changing
+    anything.'
 - order: 2
   cost: 25
   content: 'Diagnostic steps:
 
-    1. Correct the malformed job definition (fix the command/PATH)
+    1. Gather evidence with terminal and config files under /etc and /var.
 
-    2. Enable and start atd so queued jobs actually run
+    2. Compare current output to the scenario objectives.
 
-    3. Record the remediation in the job definition file'
+    3. Form a single hypothesis about the smallest fix that would restore healthy state.'
 - order: 3
   cost: 50
   content: 'Exact fix + verification:

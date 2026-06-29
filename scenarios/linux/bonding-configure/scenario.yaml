@@ -60,17 +60,18 @@ is_free: false
 hints:
 - order: 1
   cost: 0
-  content: 'Where to look: Create /etc/sysconfig/network-scripts/ifcfg-bond0 with BONDING_OPTS="mode=1
-    miimon=100"'
+  content: 'Where to look: Start with read-only discovery on the Linux practice server. For Configure
+    Network Bonding Mode 1 (Active-Backup) for HA, inspect terminal and config files under /etc and /var
+    before changing anything.'
 - order: 2
   cost: 25
   content: 'Diagnostic steps:
 
-    1. Configure ifcfg-eth0 and ifcfg-eth1 as SLAVE with MASTER=bond0
+    1. Gather evidence with terminal and config files under /etc and /var.
 
-    2. Bring up the bond with ifup bond0 and verify with ip link show bond0
+    2. Compare current output to the scenario objectives.
 
-    3. Read /proc/net/bonding/bond0 to confirm active slave and bonding mode'
+    3. Form a single hypothesis about the smallest fix that would restore healthy state.'
 - order: 3
   cost: 50
   content: 'Exact fix + verification:

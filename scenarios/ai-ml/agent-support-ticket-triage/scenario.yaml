@@ -46,17 +46,17 @@ initial_state: The canvas starts with only a Trigger node (an urgent security ti
 hints:
 - order: 1
   cost: 0
-  content: 'Where to look: Open the Agent Workflow simulator from the lab toolbar'
+  content: 'Where to look: Start with read-only discovery on the ML practice workspace. For Build a support-ticket
+    triage agent, inspect datasets, training scripts, metrics, and model artifacts before changing anything.'
 - order: 2
   cost: 25
   content: 'Diagnostic steps:
 
-    1. Add an LLM node in classify mode and feed it the ticket text from the trigger
+    1. Gather evidence with datasets, training scripts, metrics, and model artifacts.
 
-    2. Add a condition node that detects a high-priority ticket and route the true branch to a send_notification
-    tool, then connect the notification to the output
+    2. Compare current output to the scenario objectives.
 
-    3. Run the workflow so the security incident is classified high priority and an escalation is sent'
+    3. Form a single hypothesis about the smallest fix that would restore healthy state.'
 - order: 3
   cost: 50
   content: 'Exact fix + verification:

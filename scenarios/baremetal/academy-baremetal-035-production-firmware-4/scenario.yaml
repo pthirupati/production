@@ -40,14 +40,17 @@ initial_state: A feature fix works in dev, but firmware is not production ready 
 hints:
 - order: 1
   cost: 0
-  content: 'Where to look: Day-2 firmware work completes safely in this environment'
+  content: 'Where to look: Start with read-only discovery on the physical server lab. For firmware, inspect
+    current firmware versions before changing anything.'
 - order: 2
   cost: 25
   content: 'Diagnostic steps:
 
-    1. Changes are verified with before/after checks
+    1. Gather evidence with current firmware versions.
 
-    2. The system remains stable for dependent teams'
+    2. Compare current output to the scenario objectives.
+
+    3. Form a single hypothesis about the smallest fix that would restore healthy state.'
 - order: 3
   cost: 50
   content: 'Exact fix + verification:

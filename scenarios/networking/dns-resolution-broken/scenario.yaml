@@ -46,14 +46,17 @@ initial_state: 'You have shell access to a Linux server where DNS resolution is 
 hints:
 - order: 1
   cost: 0
-  content: 'Where to look: Diagnose why DNS resolution is failing'
+  content: 'Where to look: Run `cat /etc/resolv.conf` and test with `dig example.com` or `getent hosts
+    example.com`.'
 - order: 2
   cost: 25
   content: 'Diagnostic steps:
 
-    1. DNS lookups succeed for required hostnames
+    1. Note the configured nameserver IP in resolv.conf.
 
-    2. Verify hostname resolution works (e.g., ping google.com)'
+    2. `ping` or `nc -zv` the nameserver — is it reachable?
+
+    3. Check if NetworkManager or systemd-resolved overwrites the file.'
 - order: 3
   cost: 50
   content: 'Exact fix + verification:

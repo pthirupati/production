@@ -58,15 +58,18 @@ initial_state: 'Ubuntu server where /etc/sudoers contains: `deploy-svc ALL=(ALL)
 hints:
 - order: 1
   cost: 0
-  content: 'Where to look: Identify the three dangerous sudoers entries using visudo or sudoers syntax
-    analysis'
+  content: 'Where to look: Start with read-only discovery on the hardening lab. For Sudo Misconfiguration
+    — Fix Dangerous sudoers Entries, inspect SSH, firewall, TLS, audit logs, and IAM settings before changing
+    anything.'
 - order: 2
   cost: 25
   content: 'Diagnostic steps:
 
-    1. Restrict the service account (deploy-svc) to only /usr/bin/systemctl restart webapp
+    1. Gather evidence with SSH, firewall, TLS, audit logs, and IAM settings.
 
-    2. Remove the NOPASSWD flag from the shared dev account and fix the NOEXEC bypass'
+    2. Compare current output to the scenario objectives.
+
+    3. Form a single hypothesis about the smallest fix that would restore healthy state.'
 - order: 3
   cost: 50
   content: 'Exact fix + verification:

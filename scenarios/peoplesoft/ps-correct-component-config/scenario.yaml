@@ -45,16 +45,18 @@ initial_state: A PeopleSoft HCM environment where the Position Data component is
 hints:
 - order: 1
   cost: 0
-  content: 'Where to look: Open the PeopleSoft (PIA) simulator from the lab toolbar'
+  content: 'Where to look: Start with read-only discovery on the PeopleSoft app server lab. For Navigate
+    to and Correct a Component Configuration, inspect PIA, Process Scheduler, Integration Broker, and
+    app server logs before changing anything.'
 - order: 2
   cost: 25
   content: 'Diagnostic steps:
 
-    1. Navigate to Workforce Administration > Manage Positions > Position Data
+    1. Gather evidence with PIA, Process Scheduler, Integration Broker, and app server logs.
 
-    2. Review the component configuration that is blocking new positions
+    2. Compare current output to the scenario objectives.
 
-    3. Set auto_create_position to Y and max_head_count to at least 1, then save'
+    3. Form a single hypothesis about the smallest fix that would restore healthy state.'
 - order: 3
   cost: 50
   content: 'Exact fix + verification:

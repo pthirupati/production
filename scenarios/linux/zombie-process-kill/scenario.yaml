@@ -61,16 +61,18 @@ is_free: false
 hints:
 - order: 1
   cost: 0
-  content: 'Where to look: Identify zombie processes with ps aux | awk ''$8 == "Z" { print }'''
+  content: 'Where to look: Start with read-only discovery on the Linux practice server. For Zombie Processes
+    Accumulating — System Becoming Slow, inspect terminal and config files under /etc and /var before
+    changing anything.'
 - order: 2
   cost: 25
   content: 'Diagnostic steps:
 
-    1. Find the parent PID of a zombie with ps -o ppid= -p <zombie_pid>
+    1. Gather evidence with terminal and config files under /etc and /var.
 
-    2. Use pstree -s <ppid> to understand the parent process tree
+    2. Compare current output to the scenario objectives.
 
-    3. Send SIGCHLD to the parent with kill -SIGCHLD <ppid> to trigger wait()'
+    3. Form a single hypothesis about the smallest fix that would restore healthy state.'
 - order: 3
   cost: 50
   content: 'Exact fix + verification:

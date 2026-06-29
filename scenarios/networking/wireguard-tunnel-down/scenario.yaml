@@ -62,16 +62,18 @@ initial_state: 'Ubuntu 22.04 with WireGuard. wg0 interface is configured. Peer p
 hints:
 - order: 1
   cost: 0
-  content: 'Where to look: Identify the stale public key in the WireGuard peer config'
+  content: 'Where to look: Start with read-only discovery on the network lab. For WireGuard VPN Tunnel
+    Down — Fix Peer Config and Routing, inspect interfaces, routing tables, DNS, and firewall rules before
+    changing anything.'
 - order: 2
   cost: 25
   content: 'Diagnostic steps:
 
-    1. Update /etc/wireguard/wg0.conf with the correct peer public key
+    1. Gather evidence with interfaces, routing tables, DNS, and firewall rules.
 
-    2. Add 10.10.0.0/16 to the AllowedIPs for the peer
+    2. Compare current output to the scenario objectives.
 
-    3. Bring the tunnel back up and verify the handshake succeeds'
+    3. Form a single hypothesis about the smallest fix that would restore healthy state.'
 - order: 3
   cost: 50
   content: 'Exact fix + verification:

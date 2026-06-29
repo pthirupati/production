@@ -57,16 +57,17 @@ initial_state: 'Ubuntu 22.04. `iptables -L -n` shows policy ACCEPT on INPUT, FOR
 hints:
 - order: 1
   cost: 0
-  content: 'Where to look: Identify the current default ACCEPT policies on INPUT/FORWARD'
+  content: 'Where to look: Start with read-only discovery on the hardening lab. For iptables Default Policy
+    ACCEPT — Set to DROP, inspect SSH, firewall, TLS, audit logs, and IAM settings before changing anything.'
 - order: 2
   cost: 25
   content: 'Diagnostic steps:
 
-    1. Add explicit ACCEPT rules for SSH (22), HTTP (80), HTTPS (443), and ICMP
+    1. Gather evidence with SSH, firewall, TLS, audit logs, and IAM settings.
 
-    2. Set default policy to DROP for INPUT and FORWARD chains
+    2. Compare current output to the scenario objectives.
 
-    3. Verify the server remains accessible and legitimate traffic flows'
+    3. Form a single hypothesis about the smallest fix that would restore healthy state.'
 - order: 3
   cost: 50
   content: 'Exact fix + verification:

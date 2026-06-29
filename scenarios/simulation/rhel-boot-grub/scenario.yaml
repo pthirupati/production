@@ -25,7 +25,9 @@ difficulty: medium
 hints:
 - order: 1
   cost: 0
-  content: 'Where to look: Boot the default RHEL entry from the GRUB menu'
+  content: 'Where to look: Start with read-only discovery on the simulation sandbox. For RHEL Simulation:
+    GRUB Boot & Rescue, inspect terminal state, validation hooks, and lab authoring markers before changing
+    anything.'
 - order: 2
   cost: 25
   content: 'Diagnostic steps:

@@ -45,16 +45,18 @@ initial_state: 'Config at /app/src/main/resources/application.properties pins se
 hints:
 - order: 1
   cost: 0
-  content: 'Where to look: Confirm the bind failure is a port-in-use conflict'
+  content: 'Where to look: Start with read-only discovery on the Java project. For Spring Boot Port Already
+    in Use — Startup Aborts, inspect Maven/Gradle, JVM logs, and Spring configuration before changing
+    anything.'
 - order: 2
   cost: 25
   content: 'Diagnostic steps:
 
-    1. Identify what holds the port (or choose a free one)
+    1. Gather evidence with Maven/Gradle, JVM logs, and Spring configuration.
 
-    2. Free the port or set server.port to an available value
+    2. Compare current output to the scenario objectives.
 
-    3. Verify the app starts and serves on the chosen port'
+    3. Form a single hypothesis about the smallest fix that would restore healthy state.'
 - order: 3
   cost: 50
   content: 'Exact fix + verification:

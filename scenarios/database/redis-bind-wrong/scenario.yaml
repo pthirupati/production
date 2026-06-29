@@ -40,14 +40,17 @@ initial_state: Linux host where /etc/redis/redis.conf has `bind 10.255.255.1` â€
 hints:
 - order: 1
   cost: 0
-  content: 'Where to look: Confirm Redis won''t start and that the bind address is invalid'
+  content: 'Where to look: Start with read-only discovery on the database server. For Redis Bind Address
+    Misconfigured, inspect SQL client, schemas, backups, and performance views before changing anything.'
 - order: 2
   cost: 25
   content: 'Diagnostic steps:
 
-    1. Set the bind directive to a valid address (127.0.0.1)
+    1. Gather evidence with SQL client, schemas, backups, and performance views.
 
-    2. Restart Redis and verify it responds to PING'
+    2. Compare current output to the scenario objectives.
+
+    3. Form a single hypothesis about the smallest fix that would restore healthy state.'
 - order: 3
   cost: 50
   content: 'Exact fix + verification:

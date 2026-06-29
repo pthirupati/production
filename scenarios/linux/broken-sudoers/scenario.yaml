@@ -40,14 +40,17 @@ initial_state: Linux server where the sudoers configuration has a typo in the de
 hints:
 - order: 1
   cost: 0
-  content: 'Where to look: Diagnose why sudo fails for devops'
+  content: 'Where to look: Start with read-only discovery on the Linux practice server. For Broken sudoers
+    Configuration, inspect terminal and config files under /etc and /var before changing anything.'
 - order: 2
   cost: 25
   content: 'Diagnostic steps:
 
-    1. Fix the sudoers typo safely with visudo
+    1. Gather evidence with terminal and config files under /etc and /var.
 
-    2. Verify devops can run sudo commands again'
+    2. Compare current output to the scenario objectives.
+
+    3. Form a single hypothesis about the smallest fix that would restore healthy state.'
 - order: 3
   cost: 50
   content: 'Exact fix + verification:

@@ -37,14 +37,17 @@ objectives:
 hints:
 - order: 1
   cost: 0
-  content: 'Where to look: Confirm the issue: redis-cli connects without AUTH'
+  content: 'Where to look: Start with read-only discovery on the database server. For Redis Exposed Without
+    Password, inspect SQL client, schemas, backups, and performance views before changing anything.'
 - order: 2
   cost: 25
   content: 'Diagnostic steps:
 
-    1. Apply the documented fix in /etc/redis/redis.conf
+    1. Gather evidence with SQL client, schemas, backups, and performance views.
 
-    2. Verify the configuration is corrected'
+    2. Compare current output to the scenario objectives.
+
+    3. Form a single hypothesis about the smallest fix that would restore healthy state.'
 - order: 3
   cost: 50
   content: 'Exact fix + verification:

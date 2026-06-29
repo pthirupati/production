@@ -49,18 +49,18 @@ initial_state: The full graph already exists but is wired wrong on three counts 
 hints:
 - order: 1
   cost: 0
-  content: 'Where to look: Open the Agent Workflow simulator and run the broken flow to see what it currently
-    does'
+  content: 'Where to look: Start with read-only discovery on the ML practice workspace. For Fix the misrouting
+    billing-escalation agent, inspect datasets, training scripts, metrics, and model artifacts before
+    changing anything.'
 - order: 2
   cost: 25
   content: 'Diagnostic steps:
 
-    1. Reconfigure the LLM node from summarize mode to classify mode so it produces a category and priority
+    1. Gather evidence with datasets, training scripts, metrics, and model artifacts.
 
-    2. Fix the Condition node to detect a high-priority ticket (field priority, equals high)
+    2. Compare current output to the scenario objectives.
 
-    3. Re-route the escalation so the high-priority (true) branch reaches the send_notification tool,
-    then run it so the billing refund ticket is escalated'
+    3. Form a single hypothesis about the smallest fix that would restore healthy state.'
 - order: 3
   cost: 50
   content: 'Exact fix + verification:

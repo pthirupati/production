@@ -41,14 +41,17 @@ is_free: false
 hints:
 - order: 1
   cost: 0
-  content: 'Where to look: Read the error to identify the exact variable name and task that failed'
+  content: 'Where to look: Start with read-only discovery on the Ansible control node. For Variable Not
+    Defined Error, inspect `ansible webservers -m ping` output before changing anything.'
 - order: 2
   cost: 25
   content: 'Diagnostic steps:
 
-    1. Fix the variable reference in the task and add the missing host_vars entry
+    1. Gather evidence with `ansible webservers -m ping` output.
 
-    2. Run the playbook again and confirm it completes without variable errors'
+    2. Compare current output to the scenario objectives.
+
+    3. Form a single hypothesis about the smallest fix that would restore healthy state.'
 - order: 3
   cost: 50
   content: 'Exact fix + verification:

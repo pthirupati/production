@@ -59,16 +59,17 @@ initial_state: 'VMware vCenter simulation. 3-host cluster: esxi-01 (active), esx
 hints:
 - order: 1
   cost: 0
-  content: 'Where to look: Review the cluster HA configuration and current admission control policy'
+  content: 'Where to look: Start with read-only discovery on the vSphere lab. For HA Admission Control
+    Blocking VM Power-On, inspect VMs, datastores, vCenter, and ESXi tasks before changing anything.'
 - order: 2
   cost: 25
   content: 'Diagnostic steps:
 
-    1. Understand why power-on is being rejected given current host count
+    1. Gather evidence with VMs, datastores, vCenter, and ESXi tasks.
 
-    2. Adjust the admission control policy to "1 host failure" to match current capacity
+    2. Compare current output to the scenario objectives.
 
-    3. Successfully power on analytics-01 and verify HA is still protecting the cluster'
+    3. Form a single hypothesis about the smallest fix that would restore healthy state.'
 - order: 3
   cost: 50
   content: 'Exact fix + verification:

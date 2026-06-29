@@ -45,16 +45,17 @@ initial_state: 'Service code at /app/src/main/java/com/example/TransferService.j
 hints:
 - order: 1
   cost: 0
-  content: 'Where to look: Capture a thread dump and confirm the deadlock and the two locks involved'
+  content: 'Where to look: Start with read-only discovery on the Java project. For JVM Thread Deadlock
+    Between Two Locks, inspect Maven/Gradle, JVM logs, and Spring configuration before changing anything.'
 - order: 2
   cost: 25
   content: 'Diagnostic steps:
 
-    1. Identify the two code paths that acquire the locks in opposite order
+    1. Gather evidence with Maven/Gradle, JVM logs, and Spring configuration.
 
-    2. Impose a single consistent global lock ordering
+    2. Compare current output to the scenario objectives.
 
-    3. Verify a fresh thread dump shows no deadlock and work resumes'
+    3. Form a single hypothesis about the smallest fix that would restore healthy state.'
 - order: 3
   cost: 50
   content: 'Exact fix + verification:

@@ -44,14 +44,17 @@ initial_state: Linux server with pam_faillock enforced. The 'lockeduser' account
 hints:
 - order: 1
   cost: 0
-  content: 'Where to look: Confirm the account is locked (faillock / passwd -S)'
+  content: 'Where to look: Start with read-only discovery on the Linux practice server. For Account Locked
+    After Failed Logins, inspect terminal and config files under /etc and /var before changing anything.'
 - order: 2
   cost: 25
   content: 'Diagnostic steps:
 
-    1. Reset the failed-login counter and unlock the account
+    1. Gather evidence with terminal and config files under /etc and /var.
 
-    2. Verify lockeduser can authenticate successfully again'
+    2. Compare current output to the scenario objectives.
+
+    3. Form a single hypothesis about the smallest fix that would restore healthy state.'
 - order: 3
   cost: 50
   content: 'Exact fix + verification:

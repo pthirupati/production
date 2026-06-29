@@ -43,14 +43,17 @@ initial_state: 'Linux server where useradd fails and user management is broken: 
 hints:
 - order: 1
   cost: 0
-  content: 'Where to look: Investigate why useradd is failing (read its exact error)'
+  content: 'Where to look: Start with read-only discovery on the Linux practice server. For Fix Broken
+    User Creation, inspect terminal and config files under /etc and /var before changing anything.'
 - order: 2
   cost: 25
   content: 'Diagnostic steps:
 
-    1. Repair the corrupted passwd/group line and restore correct file permissions
+    1. Gather evidence with terminal and config files under /etc and /var.
 
-    2. Create the devops user with a home directory and verify login with su - devops'
+    2. Compare current output to the scenario objectives.
+
+    3. Form a single hypothesis about the smallest fix that would restore healthy state.'
 - order: 3
   cost: 50
   content: 'Exact fix + verification:

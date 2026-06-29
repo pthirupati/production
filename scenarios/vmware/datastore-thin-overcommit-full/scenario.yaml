@@ -37,14 +37,17 @@ initial_state: vCenter shows datastore-ssd-01 critically low on free space due t
 hints:
 - order: 1
   cost: 0
-  content: 'Where to look: Open the simulator and confirm datastore-ssd-01 is nearly full'
+  content: 'Where to look: Start with read-only discovery on the vSphere lab. For Datastore Full From
+    Thin-Provision Overcommit, inspect VMs, datastores, vCenter, and ESXi tasks before changing anything.'
 - order: 2
   cost: 25
   content: 'Diagnostic steps:
 
-    1. Reclaim space (or add capacity) on the datastore
+    1. Gather evidence with VMs, datastores, vCenter, and ESXi tasks.
 
-    2. Verify the datastore has at least 50 GB free'
+    2. Compare current output to the scenario objectives.
+
+    3. Form a single hypothesis about the smallest fix that would restore healthy state.'
 - order: 3
   cost: 50
   content: 'Exact fix + verification:

@@ -37,14 +37,17 @@ objectives:
 hints:
 - order: 1
   cost: 0
-  content: 'Where to look: Confirm the issue: Successful command marked failed'
+  content: 'Where to look: Start with read-only discovery on the Ansible control node. For Ansible Misclassifies
+    Command Failure, inspect `ansible webservers -m ping` output before changing anything.'
 - order: 2
   cost: 25
   content: 'Diagnostic steps:
 
-    1. Apply the documented fix in /home/ansible/failwhen.yml
+    1. Gather evidence with `ansible webservers -m ping` output.
 
-    2. Verify the configuration is corrected'
+    2. Compare current output to the scenario objectives.
+
+    3. Form a single hypothesis about the smallest fix that would restore healthy state.'
 - order: 3
   cost: 50
   content: 'Exact fix + verification:

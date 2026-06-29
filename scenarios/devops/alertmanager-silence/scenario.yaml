@@ -58,16 +58,17 @@ initial_state: 'Ubuntu server running Alertmanager. Config at /etc/alertmanager/
 hints:
 - order: 1
   cost: 0
-  content: 'Where to look: Inspect the Alertmanager routing configuration'
+  content: 'Where to look: Start with read-only discovery on the CI/CD lab. For Fix Alertmanager Routing
+    for Wrong Severity, inspect git repos, pipelines, artifacts, and runbooks before changing anything.'
 - order: 2
   cost: 25
   content: 'Diagnostic steps:
 
-    1. Identify why critical alerts are misrouted to the warning receiver
+    1. Gather evidence with git repos, pipelines, artifacts, and runbooks.
 
-    2. Fix the route matchers/ordering in alertmanager.yml
+    2. Compare current output to the scenario objectives.
 
-    3. Verify critical alerts route to the correct receiver'
+    3. Form a single hypothesis about the smallest fix that would restore healthy state.'
 - order: 3
   cost: 50
   content: 'Exact fix + verification:

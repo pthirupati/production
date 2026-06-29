@@ -52,9 +52,11 @@ hints:
   cost: 25
   content: 'Diagnostic steps:
 
-    1. Retention and encryption meet the stated policy
+    1. Gather evidence with `nmap -O` output.
 
-    2. A restore drill proves data integrity'
+    2. Compare current output to the scenario objectives.
+
+    3. Form a single hypothesis about the smallest fix that would restore healthy state.'
 - order: 3
   cost: 50
   content: 'Exact fix + verification:

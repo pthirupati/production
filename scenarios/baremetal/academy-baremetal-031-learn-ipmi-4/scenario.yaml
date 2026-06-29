@@ -55,9 +55,11 @@ hints:
   cost: 25
   content: 'Diagnostic steps:
 
-    1. Identify the main status and configuration signals for IPMI/BMC
+    1. Gather evidence with `ipmitool` sensor/power and BMC console.
 
-    2. Confirm you can read the current state confidently before changing anything'
+    2. Compare current output to the scenario objectives.
+
+    3. Form a single hypothesis about the smallest fix that would restore healthy state.'
 - order: 3
   cost: 50
   content: 'Exact fix + verification:

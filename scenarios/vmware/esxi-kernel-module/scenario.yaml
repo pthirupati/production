@@ -39,14 +39,17 @@ initial_state: vCenter guest web-prod-01 where the nf_conntrack kernel module is
 hints:
 - order: 1
   cost: 0
-  content: 'Where to look: Open the console on web-prod-01 and confirm the module is missing'
+  content: 'Where to look: Start with read-only discovery on the vSphere lab. For Guest Kernel Module
+    Missing, inspect VMs, datastores, vCenter, and ESXi tasks before changing anything.'
 - order: 2
   cost: 25
   content: 'Diagnostic steps:
 
-    1. Load nf_conntrack and verify with lsmod
+    1. Gather evidence with VMs, datastores, vCenter, and ESXi tasks.
 
-    2. Persist the module so it loads on boot'
+    2. Compare current output to the scenario objectives.
+
+    3. Form a single hypothesis about the smallest fix that would restore healthy state.'
 - order: 3
   cost: 50
   content: 'Exact fix + verification:

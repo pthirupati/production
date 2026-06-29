@@ -59,17 +59,17 @@ initial_state: 'VMware vCenter simulation. Template: ubuntu-22-04-template.
 hints:
 - order: 1
   cost: 0
-  content: 'Where to look: Examine the failed customization spec in vCenter Customization Specifications
-    Manager'
+  content: 'Where to look: Start with read-only discovery on the vSphere lab. For Clone from Template
+    Failing - Customization Spec, inspect VMs, datastores, vCenter, and ESXi tasks before changing anything.'
 - order: 2
   cost: 25
   content: 'Diagnostic steps:
 
-    1. Identify the invalid hostname configuration in the Linux spec
+    1. Gather evidence with VMs, datastores, vCenter, and ESXi tasks.
 
-    2. Fix the hostname format to be RFC 1123 compliant (lowercase, hyphens only)
+    2. Compare current output to the scenario objectives.
 
-    3. Redeploy the clone and verify successful customization and guest OS startup'
+    3. Form a single hypothesis about the smallest fix that would restore healthy state.'
 - order: 3
   cost: 50
   content: 'Exact fix + verification:

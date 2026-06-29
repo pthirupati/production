@@ -57,16 +57,18 @@ initial_state: 'VMware vCenter simulation. 8 VMs showing "VMware Tools: Outdated
 hints:
 - order: 1
   cost: 0
-  content: 'Where to look: Identify all VMs with outdated VMware Tools using vCenter inventory'
+  content: 'Where to look: Start with read-only discovery on the vSphere lab. For VMware Tools Outdated
+    - VM Performance and Management, inspect VMs, datastores, vCenter, and ESXi tasks before changing
+    anything.'
 - order: 2
   cost: 25
   content: 'Diagnostic steps:
 
-    1. Update VMware Tools on a Windows VM using the automatic upgrade mechanism
+    1. Gather evidence with VMs, datastores, vCenter, and ESXi tasks.
 
-    2. Update VMware Tools on a Linux VM using open-vm-tools package manager
+    2. Compare current output to the scenario objectives.
 
-    3. {''Verify all target VMs show "VMware Tools'': ''OK (Current)" status''}'
+    3. Form a single hypothesis about the smallest fix that would restore healthy state.'
 - order: 3
   cost: 50
   content: 'Exact fix + verification:

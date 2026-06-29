@@ -54,16 +54,18 @@ initial_state: 'Open vSwitch (OVS) bridge configured. Port eth2 is set as trunk 
 hints:
 - order: 1
   cost: 0
-  content: 'Where to look: Identify the misconfigured trunk port'
+  content: 'Where to look: Start with read-only discovery on the network lab. For VLAN Misconfigured —
+    Fix Trunk Port to Pass Traffic, inspect interfaces, routing tables, DNS, and firewall rules before
+    changing anything.'
 - order: 2
   cost: 25
   content: 'Diagnostic steps:
 
-    1. Add VLAN 20 and VLAN 30 to the allowed VLAN list on the trunk
+    1. Gather evidence with interfaces, routing tables, DNS, and firewall rules.
 
-    2. Correct the native VLAN configuration
+    2. Compare current output to the scenario objectives.
 
-    3. Verify inter-VLAN traffic flows through the trunk'
+    3. Form a single hypothesis about the smallest fix that would restore healthy state.'
 - order: 3
   cost: 50
   content: 'Exact fix + verification:

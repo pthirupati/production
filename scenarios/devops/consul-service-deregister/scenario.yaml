@@ -53,16 +53,17 @@ initial_state: 'Ubuntu server running Consul agent. Stale service IDs are:
 hints:
 - order: 1
   cost: 0
-  content: 'Where to look: List Consul services and identify stale registrations'
+  content: 'Where to look: Start with read-only discovery on the CI/CD lab. For Fix Consul Service Deregistration
+    on Pod Deletion, inspect git repos, pipelines, artifacts, and runbooks before changing anything.'
 - order: 2
   cost: 25
   content: 'Diagnostic steps:
 
-    1. Deregister the stale service entries via Consul API
+    1. Gather evidence with git repos, pipelines, artifacts, and runbooks.
 
-    2. Configure enable_tag_override and deregister_critical_service_after
+    2. Compare current output to the scenario objectives.
 
-    3. Verify only healthy, running services appear in Consul'
+    3. Form a single hypothesis about the smallest fix that would restore healthy state.'
 - order: 3
   cost: 50
   content: 'Exact fix + verification:

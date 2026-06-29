@@ -51,14 +51,17 @@ initial_state: 'Ubuntu server with Terraform installed. Working directory is /op
 hints:
 - order: 1
   cost: 0
-  content: 'Where to look: Run terraform plan and identify the variable type error'
+  content: 'Where to look: Start with read-only discovery on the CI/CD lab. For Fix Terraform Variable
+    Type Error, inspect git repos, pipelines, artifacts, and runbooks before changing anything.'
 - order: 2
   cost: 25
   content: 'Diagnostic steps:
 
-    1. Fix the type constraint in variables.tf
+    1. Gather evidence with git repos, pipelines, artifacts, and runbooks.
 
-    2. Verify terraform plan completes without errors'
+    2. Compare current output to the scenario objectives.
+
+    3. Form a single hypothesis about the smallest fix that would restore healthy state.'
 - order: 3
   cost: 50
   content: 'Exact fix + verification:

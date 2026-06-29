@@ -56,15 +56,18 @@ initial_state: 'Ubuntu server with the dataparser binary deployed and running as
 hints:
 - order: 1
   cost: 0
-  content: 'Where to look: Use checksec to identify missing binary protections on /usr/local/bin/dataparser'
+  content: 'Where to look: Start with read-only discovery on the hardening lab. For Buffer Overflow —
+    Detect and Mitigate a Vulnerable Service, inspect SSH, firewall, TLS, audit logs, and IAM settings
+    before changing anything.'
 - order: 2
   cost: 25
   content: 'Diagnostic steps:
 
-    1. Recompile the source at /opt/dataparser/main.c with -fstack-protector-strong, -D_FORTIFY_SOURCE=2,
-    and -z noexecstack
+    1. Gather evidence with SSH, firewall, TLS, audit logs, and IAM settings.
 
-    2. Restart the dataparser service and confirm checksec now reports protections enabled'
+    2. Compare current output to the scenario objectives.
+
+    3. Form a single hypothesis about the smallest fix that would restore healthy state.'
 - order: 3
   cost: 50
   content: 'Exact fix + verification:

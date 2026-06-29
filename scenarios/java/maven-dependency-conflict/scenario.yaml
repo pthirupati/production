@@ -45,16 +45,17 @@ initial_state: 'POM at /app/pom.xml lets two transitive paths bring different ve
 hints:
 - order: 1
   cost: 0
-  content: 'Where to look: Reproduce the runtime LinkageError / NoSuchMethodError'
+  content: 'Where to look: Start with read-only discovery on the Java project. For Maven Dependency Convergence
+    Conflict (Jar Hell), inspect Maven/Gradle, JVM logs, and Spring configuration before changing anything.'
 - order: 2
   cost: 25
   content: 'Diagnostic steps:
 
-    1. Use mvn dependency:tree to locate the conflicting versions
+    1. Gather evidence with Maven/Gradle, JVM logs, and Spring configuration.
 
-    2. Pin one version via dependencyManagement or exclude the bad transitive
+    2. Compare current output to the scenario objectives.
 
-    3. Confirm the conflict is resolved and the app runs'
+    3. Form a single hypothesis about the smallest fix that would restore healthy state.'
 - order: 3
   cost: 50
   content: 'Exact fix + verification:

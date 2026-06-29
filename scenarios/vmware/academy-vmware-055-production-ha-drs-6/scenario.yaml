@@ -40,14 +40,17 @@ initial_state: A feature fix works in dev, but HA and DRS is not production read
 hints:
 - order: 1
   cost: 0
-  content: 'Where to look: Day-2 HA and DRS work completes safely in this environment'
+  content: 'Where to look: Start with read-only discovery on the vSphere lab. For HA and DRS, inspect
+    cluster HA/DRS settings and recommendations before changing anything.'
 - order: 2
   cost: 25
   content: 'Diagnostic steps:
 
-    1. Changes are verified with before/after checks
+    1. Gather evidence with cluster HA/DRS settings and recommendations.
 
-    2. The system remains stable for dependent teams'
+    2. Compare current output to the scenario objectives.
+
+    3. Form a single hypothesis about the smallest fix that would restore healthy state.'
 - order: 3
   cost: 50
   content: 'Exact fix + verification:

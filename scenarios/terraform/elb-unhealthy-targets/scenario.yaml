@@ -40,15 +40,17 @@ is_free: false
 hints:
 - order: 1
   cost: 0
-  content: 'Where to look: Inspect the target group health check configuration and identify the incorrect
-    path'
+  content: 'Where to look: Start with read-only discovery on the Terraform workspace. For ALB Showing
+    All Targets Unhealthy, inspect HCL files, state, and plan/apply workflow before changing anything.'
 - order: 2
   cost: 25
   content: 'Diagnostic steps:
 
-    1. Fix the health check path to match the application endpoint
+    1. Gather evidence with HCL files, state, and plan/apply workflow.
 
-    2. Update the EC2 instance security group to allow inbound traffic from the ALB on the correct port'
+    2. Compare current output to the scenario objectives.
+
+    3. Form a single hypothesis about the smallest fix that would restore healthy state.'
 - order: 3
   cost: 50
   content: 'Exact fix + verification:

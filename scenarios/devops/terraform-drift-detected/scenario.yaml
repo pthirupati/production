@@ -52,16 +52,17 @@ initial_state: 'Ubuntu server with Terraform installed. Working directory is /op
 hints:
 - order: 1
   cost: 0
-  content: 'Where to look: Run terraform plan to detect infrastructure drift'
+  content: 'Where to look: Start with read-only discovery on the CI/CD lab. For Detect and Plan Terraform
+    Infrastructure Drift, inspect git repos, pipelines, artifacts, and runbooks before changing anything.'
 - order: 2
   cost: 25
   content: 'Diagnostic steps:
 
-    1. Identify which resources have drifted from the desired state
+    1. Gather evidence with git repos, pipelines, artifacts, and runbooks.
 
-    2. Apply terraform to reconcile the drift
+    2. Compare current output to the scenario objectives.
 
-    3. Verify terraform plan shows no changes after reconciliation'
+    3. Form a single hypothesis about the smallest fix that would restore healthy state.'
 - order: 3
   cost: 50
   content: 'Exact fix + verification:

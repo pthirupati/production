@@ -61,16 +61,18 @@ initial_state: 'VMware vCenter simulation. esxi-03 shows "Not Responding" in vCe
 hints:
 - order: 1
   cost: 0
-  content: 'Where to look: Connect to the ESXi host via physical console (iDRAC/ILO/DCUI)'
+  content: 'Where to look: Start with read-only discovery on the vSphere lab. For ESXi Management Network
+    Lost After NIC Team Configuration, inspect VMs, datastores, vCenter, and ESXi tasks before changing
+    anything.'
 - order: 2
   cost: 25
   content: 'Diagnostic steps:
 
-    1. Access the Direct Console User Interface (DCUI) to restore network settings
+    1. Gather evidence with VMs, datastores, vCenter, and ESXi tasks.
 
-    2. Move vmnic0 back to active in the management network NIC team
+    2. Compare current output to the scenario objectives.
 
-    3. Verify vCenter shows the host as Connected'
+    3. Form a single hypothesis about the smallest fix that would restore healthy state.'
 - order: 3
   cost: 50
   content: 'Exact fix + verification:

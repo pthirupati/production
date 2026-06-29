@@ -42,14 +42,17 @@ initial_state: Linux server with /srv/shared protected by POSIX ACLs. alice cann
 hints:
 - order: 1
   cost: 0
-  content: 'Where to look: Inspect the directory''s ACLs and confirm alice has no granting entry'
+  content: 'Where to look: Start with read-only discovery on the Linux practice server. For ACL Required
+    for Shared Directory, inspect terminal and config files under /etc and /var before changing anything.'
 - order: 2
   cost: 25
   content: 'Diagnostic steps:
 
-    1. Add an ACL entry granting alice access
+    1. Gather evidence with terminal and config files under /etc and /var.
 
-    2. Verify alice can access /srv/shared'
+    2. Compare current output to the scenario objectives.
+
+    3. Form a single hypothesis about the smallest fix that would restore healthy state.'
 - order: 3
   cost: 50
   content: 'Exact fix + verification:

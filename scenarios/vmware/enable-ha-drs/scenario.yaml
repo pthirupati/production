@@ -39,14 +39,17 @@ initial_state: vCenter cluster Cluster-01 with vSphere HA and DRS turned off; ho
 hints:
 - order: 1
   cost: 0
-  content: 'Where to look: Open the cluster Configure tab and confirm HA and DRS are off'
+  content: 'Where to look: Start with read-only discovery on the vSphere lab. For Enable HA and DRS on
+    Production Cluster, inspect VMs, datastores, vCenter, and ESXi tasks before changing anything.'
 - order: 2
   cost: 25
   content: 'Diagnostic steps:
 
-    1. Enable vSphere HA on Cluster-01
+    1. Gather evidence with VMs, datastores, vCenter, and ESXi tasks.
 
-    2. Enable vSphere DRS and run an initial balancing pass'
+    2. Compare current output to the scenario objectives.
+
+    3. Form a single hypothesis about the smallest fix that would restore healthy state.'
 - order: 3
   cost: 50
   content: 'Exact fix + verification:

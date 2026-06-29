@@ -41,14 +41,17 @@ initial_state: vCenter shows esxi-01.fixitlab.local as disconnected; its VMs are
 hints:
 - order: 1
   cost: 0
-  content: 'Where to look: Open the vCenter simulator from the Jira ticket and find the disconnected host'
+  content: 'Where to look: Start with read-only discovery on the vSphere lab. For ESXi Host Disconnected,
+    inspect VMs, datastores, vCenter, and ESXi tasks before changing anything.'
 - order: 2
   cost: 25
   content: 'Diagnostic steps:
 
-    1. Reconnect esxi-01 to vCenter
+    1. Gather evidence with VMs, datastores, vCenter, and ESXi tasks.
 
-    2. Verify the host and cluster return to a healthy connected state'
+    2. Compare current output to the scenario objectives.
+
+    3. Form a single hypothesis about the smallest fix that would restore healthy state.'
 - order: 3
   cost: 50
   content: 'Exact fix + verification:

@@ -41,14 +41,17 @@ initial_state: win-app01 (10.10.10.30) responds to scans but its OS is unknown. 
 hints:
 - order: 1
   cost: 0
-  content: 'Where to look: Open the Nmap simulator from the lab toolbar (Open Nmap)'
+  content: 'Where to look: Start with read-only discovery on the scanning lab. For Fingerprint the operating
+    system of an unknown host, inspect nmap CLI, targets, and scan output before changing anything.'
 - order: 2
   cost: 25
   content: 'Diagnostic steps:
 
-    1. Run OS detection against win-app01 (10.10.10.30) with privileges (sudo nmap -O 10.10.10.30)
+    1. Gather evidence with nmap CLI, targets, and scan output.
 
-    2. Identify the host''s operating system family (Windows)'
+    2. Compare current output to the scenario objectives.
+
+    3. Form a single hypothesis about the smallest fix that would restore healthy state.'
 - order: 3
   cost: 50
   content: 'Exact fix + verification:

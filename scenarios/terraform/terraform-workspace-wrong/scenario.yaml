@@ -41,16 +41,17 @@ is_free: true
 hints:
 - order: 1
   cost: 0
-  content: 'Where to look: Run terraform workspace show to identify the currently active workspace'
+  content: 'Where to look: Start with read-only discovery on the Terraform workspace. For Terraform Running
+    in Wrong Workspace, inspect HCL files, state, and plan/apply workflow before changing anything.'
 - order: 2
   cost: 25
   content: 'Diagnostic steps:
 
-    1. List available workspaces with terraform workspace list
+    1. Gather evidence with HCL files, state, and plan/apply workflow.
 
-    2. Switch to the staging workspace using terraform workspace select
+    2. Compare current output to the scenario objectives.
 
-    3. Run terraform plan and verify it targets the staging environment'
+    3. Form a single hypothesis about the smallest fix that would restore healthy state.'
 - order: 3
   cost: 50
   content: 'Exact fix + verification:

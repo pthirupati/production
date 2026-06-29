@@ -44,16 +44,18 @@ initial_state: 'Config at /app/src/main/resources/application.yml leaves server.
 hints:
 - order: 1
   cost: 0
-  content: 'Where to look: Confirm the server still negotiates TLSv1.0/1.1'
+  content: 'Where to look: Start with read-only discovery on the Java project. For TLSv1.0/1.1 Still Enabled
+    — Harden the TLS Protocols, inspect Maven/Gradle, JVM logs, and Spring configuration before changing
+    anything.'
 - order: 2
   cost: 25
   content: 'Diagnostic steps:
 
-    1. Pin enabled-protocols to TLSv1.2 and TLSv1.3 only
+    1. Gather evidence with Maven/Gradle, JVM logs, and Spring configuration.
 
-    2. Restrict to strong cipher suites
+    2. Compare current output to the scenario objectives.
 
-    3. Verify a TLSv1.0 handshake is now refused'
+    3. Form a single hypothesis about the smallest fix that would restore healthy state.'
 - order: 3
   cost: 50
   content: 'Exact fix + verification:

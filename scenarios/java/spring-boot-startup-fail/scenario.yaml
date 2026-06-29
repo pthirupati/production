@@ -45,16 +45,18 @@ initial_state: 'Config at /app/src/main/resources/application.yml is missing a r
 hints:
 - order: 1
   cost: 0
-  content: 'Where to look: Read the startup stack trace to the root BeanCreationException'
+  content: 'Where to look: Start with read-only discovery on the Java project. For Spring Boot Fails to
+    Start — Bean Creation Exception, inspect Maven/Gradle, JVM logs, and Spring configuration before changing
+    anything.'
 - order: 2
   cost: 25
   content: 'Diagnostic steps:
 
-    1. Identify the missing property or misconfigured bean
+    1. Gather evidence with Maven/Gradle, JVM logs, and Spring configuration.
 
-    2. Provide the property (or activate the right profile)
+    2. Compare current output to the scenario objectives.
 
-    3. Confirm the context refreshes and the app starts on port 8080'
+    3. Form a single hypothesis about the smallest fix that would restore healthy state.'
 - order: 3
   cost: 50
   content: 'Exact fix + verification:

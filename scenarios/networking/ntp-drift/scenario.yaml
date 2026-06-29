@@ -40,14 +40,17 @@ is_free: false
 hints:
 - order: 1
   cost: 0
-  content: 'Where to look: Confirm the clock offset and that NTP isn''t synchronized'
+  content: 'Where to look: Start with read-only discovery on the network lab. For NTP Time Drift Causing
+    Auth Failures, inspect interfaces, routing tables, DNS, and firewall rules before changing anything.'
 - order: 2
   cost: 25
   content: 'Diagnostic steps:
 
-    1. Fix the sync path (start chrony / open UDP 123 / set a reachable source)
+    1. Gather evidence with interfaces, routing tables, DNS, and firewall rules.
 
-    2. Verify the offset returns to near zero and stays synced'
+    2. Compare current output to the scenario objectives.
+
+    3. Form a single hypothesis about the smallest fix that would restore healthy state.'
 - order: 3
   cost: 50
   content: 'Exact fix + verification:

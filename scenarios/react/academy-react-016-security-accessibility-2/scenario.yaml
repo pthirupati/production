@@ -42,14 +42,17 @@ initial_state: The environment is functional but overly permissive around access
 hints:
 - order: 1
   cost: 0
-  content: 'Where to look: Unsafe defaults related to accessibility are removed or constrained'
+  content: 'Where to look: Test the config to get the exact file and line: `nginx -t`. It prints the offending
+    directive (e.g. unknown directive "listn").'
 - order: 2
   cost: 25
   content: 'Diagnostic steps:
 
-    1. Access follows least privilege and is auditable
+    1. Run `nginx -t` and `systemctl status nginx` for config vs service errors.
 
-    2. Security checks pass without breaking required functionality'
+    2. Open the cited file under `/etc/nginx/`.
+
+    3. Compare listen/upstream/proxy directives to the scenario objectives.'
 - order: 3
   cost: 50
   content: 'Exact fix + verification:

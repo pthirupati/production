@@ -40,14 +40,17 @@ is_free: false
 hints:
 - order: 1
   cost: 0
-  content: 'Where to look: Verify the mount/export and confirm root_squash is the cause'
+  content: 'Where to look: Start with read-only discovery on the Linux practice server. For NFS Mount
+    Shows Permission Denied, inspect terminal and config files under /etc and /var before changing anything.'
 - order: 2
   cost: 25
   content: 'Diagnostic steps:
 
-    1. Add no_root_squash (or appropriate options) to the export
+    1. Gather evidence with terminal and config files under /etc and /var.
 
-    2. Re-export with exportfs -ra and verify access is restored'
+    2. Compare current output to the scenario objectives.
+
+    3. Form a single hypothesis about the smallest fix that would restore healthy state.'
 - order: 3
   cost: 50
   content: 'Exact fix + verification:

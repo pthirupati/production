@@ -45,16 +45,17 @@ initial_state: 'Config at /app/src/main/resources/application.yml points at a tr
 hints:
 - order: 1
   cost: 0
-  content: 'Where to look: Reproduce the handshake failure and confirm it is certificate expiry'
+  content: 'Where to look: Start with read-only discovery on the Java project. For Expired CA in Truststore
+    Breaks Outbound TLS, inspect Maven/Gradle, JVM logs, and Spring configuration before changing anything.'
 - order: 2
   cost: 25
   content: 'Diagnostic steps:
 
-    1. Identify the expired CA/cert in the truststore
+    1. Gather evidence with Maven/Gradle, JVM logs, and Spring configuration.
 
-    2. Import the renewed CA and remove the expired entry
+    2. Compare current output to the scenario objectives.
 
-    3. Verify the outbound TLS handshake succeeds'
+    3. Form a single hypothesis about the smallest fix that would restore healthy state.'
 - order: 3
   cost: 50
   content: 'Exact fix + verification:

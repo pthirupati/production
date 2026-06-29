@@ -41,14 +41,17 @@ objectives:
 hints:
 - order: 1
   cost: 0
-  content: 'Where to look: Confirm RSS grows over time under steady load'
+  content: 'Where to look: Start with read-only discovery on the Python project workspace. For Memory
+    Leak Profiling, inspect source files, venv, tests, and CLI entrypoints before changing anything.'
 - order: 2
   cost: 25
   content: 'Diagnostic steps:
 
-    1. Profile allocations to find the object type/site that accumulates
+    1. Gather evidence with source files, venv, tests, and CLI entrypoints.
 
-    2. Fix the retention so memory usage stabilizes'
+    2. Compare current output to the scenario objectives.
+
+    3. Form a single hypothesis about the smallest fix that would restore healthy state.'
 - order: 3
   cost: 50
   content: 'Exact fix + verification:

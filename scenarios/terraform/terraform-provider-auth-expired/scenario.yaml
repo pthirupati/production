@@ -41,14 +41,17 @@ objectives:
 hints:
 - order: 1
   cost: 0
-  content: 'Where to look: Read the provider auth error from terraform plan'
+  content: 'Where to look: Start with read-only discovery on the Terraform workspace. For Terraform Provider
+    Authentication Expired, inspect HCL files, state, and plan/apply workflow before changing anything.'
 - order: 2
   cost: 25
   content: 'Diagnostic steps:
 
-    1. Refresh the AWS session/credentials or fix the assume_role block
+    1. Gather evidence with HCL files, state, and plan/apply workflow.
 
-    2. Confirm terraform plan authenticates cleanly'
+    2. Compare current output to the scenario objectives.
+
+    3. Form a single hypothesis about the smallest fix that would restore healthy state.'
 - order: 3
   cost: 50
   content: 'Exact fix + verification:

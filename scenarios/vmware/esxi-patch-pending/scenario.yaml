@@ -40,14 +40,17 @@ initial_state: vCenter-managed host esxi-01 reporting 3 pending ESXi patches and
 hints:
 - order: 1
   cost: 0
-  content: 'Where to look: Open esxi-01 -> Updates tab and review the pending patches'
+  content: 'Where to look: Start with read-only discovery on the vSphere lab. For ESXi Host Patch Pending
+    Reboot, inspect VMs, datastores, vCenter, and ESXi tasks before changing anything.'
 - order: 2
   cost: 25
   content: 'Diagnostic steps:
 
-    1. Check for updates and install the pending ESXi patches
+    1. Gather evidence with VMs, datastores, vCenter, and ESXi tasks.
 
-    2. Confirm the host becomes compliant and the alarm clears'
+    2. Compare current output to the scenario objectives.
+
+    3. Form a single hypothesis about the smallest fix that would restore healthy state.'
 - order: 3
   cost: 50
   content: 'Exact fix + verification:

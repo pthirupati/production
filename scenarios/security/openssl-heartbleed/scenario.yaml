@@ -55,15 +55,18 @@ initial_state: 'Ubuntu server running nginx with OpenSSL 1.0.1e compiled in. A H
 hints:
 - order: 1
   cost: 0
-  content: 'Where to look: Confirm the current OpenSSL version is vulnerable using openssl version and
-    a Heartbleed test script'
+  content: 'Where to look: Start with read-only discovery on the hardening lab. For OpenSSL Heartbleed
+    — Verify Vulnerability and Apply Patch, inspect SSH, firewall, TLS, audit logs, and IAM settings before
+    changing anything.'
 - order: 2
   cost: 25
   content: 'Diagnostic steps:
 
-    1. Update the openssl and libssl packages to a patched version using the package manager
+    1. Gather evidence with SSH, firewall, TLS, audit logs, and IAM settings.
 
-    2. Restart nginx and confirm the Heartbleed test script reports the server as not vulnerable'
+    2. Compare current output to the scenario objectives.
+
+    3. Form a single hypothesis about the smallest fix that would restore healthy state.'
 - order: 3
   cost: 50
   content: 'Exact fix + verification:

@@ -56,14 +56,17 @@ initial_state: 'Ubuntu server. Project at /opt/app. sonar-project.properties has
 hints:
 - order: 1
   cost: 0
-  content: 'Where to look: Identify the incorrect coverage report path in sonar-project.properties'
+  content: 'Where to look: Start with read-only discovery on the CI/CD lab. For Fix SonarQube Quality
+    Gate Code Coverage, inspect git repos, pipelines, artifacts, and runbooks before changing anything.'
 - order: 2
   cost: 25
   content: 'Diagnostic steps:
 
-    1. Fix the sonar.coverage.exclusions or sonar.python.coverage.reportPaths
+    1. Gather evidence with git repos, pipelines, artifacts, and runbooks.
 
-    2. Verify SonarQube analysis reports coverage above the quality gate threshold'
+    2. Compare current output to the scenario objectives.
+
+    3. Form a single hypothesis about the smallest fix that would restore healthy state.'
 - order: 3
   cost: 50
   content: 'Exact fix + verification:

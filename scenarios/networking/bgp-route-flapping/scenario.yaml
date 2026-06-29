@@ -57,16 +57,18 @@ initial_state: 'FRRouting (vtysh) configured with two BGP peers. One peer has ke
 hints:
 - order: 1
   cost: 0
-  content: 'Where to look: Identify the BGP peer session that is flapping'
+  content: 'Where to look: Start with read-only discovery on the network lab. For BGP Route Flapping —
+    Fix Keepalive Timers, inspect interfaces, routing tables, DNS, and firewall rules before changing
+    anything.'
 - order: 2
   cost: 25
   content: 'Diagnostic steps:
 
-    1. Diagnose the timer mismatch (keepalive vs holdtime)
+    1. Gather evidence with interfaces, routing tables, DNS, and firewall rules.
 
-    2. Set appropriate keepalive (10s) and holdtime (30s) timers
+    2. Compare current output to the scenario objectives.
 
-    3. Confirm the BGP session reaches and holds Established state'
+    3. Form a single hypothesis about the smallest fix that would restore healthy state.'
 - order: 3
   cost: 50
   content: 'Exact fix + verification:

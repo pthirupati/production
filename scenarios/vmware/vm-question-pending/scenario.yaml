@@ -57,16 +57,18 @@ initial_state: 'VMware vCenter simulation. test-lab-07 shows a question/warning 
 hints:
 - order: 1
   cost: 0
-  content: 'Where to look: Identify the pending question on the VM in vSphere Client'
+  content: 'Where to look: Start with read-only discovery on the vSphere lab. For VM Stuck at Pending
+    Question — Cannot Power On or Operate, inspect VMs, datastores, vCenter, and ESXi tasks before changing
+    anything.'
 - order: 2
   cost: 25
   content: 'Diagnostic steps:
 
-    1. Answer the question appropriately (Yes to keep UUID or No to generate a new one)
+    1. Gather evidence with VMs, datastores, vCenter, and ESXi tasks.
 
-    2. Verify the VM can be powered on after answering the question
+    2. Compare current output to the scenario objectives.
 
-    3. Document why this happens and how to prevent it during VM cloning'
+    3. Form a single hypothesis about the smallest fix that would restore healthy state.'
 - order: 3
   cost: 50
   content: 'Exact fix + verification:

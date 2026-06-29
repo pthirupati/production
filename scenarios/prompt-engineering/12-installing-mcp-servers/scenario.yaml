@@ -140,9 +140,11 @@ hints:
   cost: 25
   content: 'Diagnostic steps:
 
-    1. Name the three MCP transports and when each applies (stdio, SSE, HTTP)
+    1. Click Run and read the traceback — note line number and actual vs expected values.
 
-    2. Write a correct `claude mcp add` command to install a server'
+    2. Reproduce the failure with the smallest input from a visible test.
+
+    3. Compare your implementation to the bug described in the lab prompt.'
 - order: 3
   cost: 50
   content: 'Exact fix + verification:

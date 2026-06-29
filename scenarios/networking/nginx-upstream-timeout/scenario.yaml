@@ -56,16 +56,17 @@ initial_state: 'Ubuntu 22.04 with nginx as a reverse proxy. proxy_read_timeout=3
 hints:
 - order: 1
   cost: 0
-  content: 'Where to look: Identify the proxy_read_timeout setting causing 504 errors'
+  content: 'Where to look: Test the config to get the exact file and line: `nginx -t`. It prints the offending
+    directive (e.g. unknown directive "listn").'
 - order: 2
   cost: 25
   content: 'Diagnostic steps:
 
-    1. Increase proxy_read_timeout to 120 seconds in the nginx config
+    1. Run `nginx -t` and `systemctl status nginx` for config vs service errors.
 
-    2. Also set proxy_connect_timeout and proxy_send_timeout appropriately
+    2. Open the cited file under `/etc/nginx/`.
 
-    3. Reload nginx and verify the endpoint no longer returns 504'
+    3. Compare listen/upstream/proxy directives to the scenario objectives.'
 - order: 3
   cost: 50
   content: 'Exact fix + verification:

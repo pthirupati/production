@@ -54,16 +54,18 @@ initial_state: 'Ubuntu 22.04 router. net.ipv4.ip_forward=0. iptables nat table P
 hints:
 - order: 1
   cost: 0
-  content: 'Where to look: Enable IP forwarding via sysctl'
+  content: 'Where to look: Start with read-only discovery on the network lab. For NAT Masquerade Broken
+    - Fix iptables POSTROUTING After, inspect interfaces, routing tables, DNS, and firewall rules before
+    changing anything.'
 - order: 2
   cost: 25
   content: 'Diagnostic steps:
 
-    1. Restore the iptables MASQUERADE rule in the POSTROUTING chain
+    1. Gather evidence with interfaces, routing tables, DNS, and firewall rules.
 
-    2. Persist the iptables rules so they survive future reboots
+    2. Compare current output to the scenario objectives.
 
-    3. Verify internal hosts can reach external destinations'
+    3. Form a single hypothesis about the smallest fix that would restore healthy state.'
 - order: 3
   cost: 50
   content: 'Exact fix + verification:

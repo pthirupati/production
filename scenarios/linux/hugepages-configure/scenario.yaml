@@ -67,16 +67,18 @@ is_free: false
 hints:
 - order: 1
   cost: 0
-  content: 'Where to look: Check current HugePage status with cat /proc/meminfo | grep -i huge'
+  content: 'Where to look: Start with read-only discovery on the Linux practice server. For Configure
+    HugePages for Oracle Database, inspect terminal and config files under /etc and /var before changing
+    anything.'
 - order: 2
   cost: 25
   content: 'Diagnostic steps:
 
-    1. Set vm.nr_hugepages=512 in /etc/sysctl.conf
+    1. Gather evidence with terminal and config files under /etc and /var.
 
-    2. Apply immediately with sysctl -p and verify vm.nr_hugepages is 512
+    2. Compare current output to the scenario objectives.
 
-    3. Confirm allocation with cat /proc/meminfo | grep HugePages_Total showing 512'
+    3. Form a single hypothesis about the smallest fix that would restore healthy state.'
 - order: 3
   cost: 50
   content: 'Exact fix + verification:

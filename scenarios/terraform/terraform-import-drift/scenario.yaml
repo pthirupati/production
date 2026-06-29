@@ -41,16 +41,17 @@ is_free: false
 hints:
 - order: 1
   cost: 0
-  content: 'Where to look: Identify the existing AWS resource that is absent from Terraform state'
+  content: 'Where to look: Start with read-only discovery on the Terraform workspace. For Terraform Import
+    and Drift Reconciliation, inspect HCL files, state, and plan/apply workflow before changing anything.'
 - order: 2
   cost: 25
   content: 'Diagnostic steps:
 
-    1. Write the matching resource block in the Terraform configuration
+    1. Gather evidence with HCL files, state, and plan/apply workflow.
 
-    2. Run terraform import to bring the resource into state without recreating it
+    2. Compare current output to the scenario objectives.
 
-    3. Run terraform plan to confirm zero drift after import'
+    3. Form a single hypothesis about the smallest fix that would restore healthy state.'
 - order: 3
   cost: 50
   content: 'Exact fix + verification:

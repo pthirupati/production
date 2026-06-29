@@ -46,16 +46,17 @@ initial_state: 'web-prod-01 is poweredOn but guest_hung=true. SSH times out. Jir
 hints:
 - order: 1
   cost: 0
-  content: 'Where to look: Confirm SSH to web-prod-01 fails from the lab SSH drawer'
+  content: 'Where to look: Start with read-only discovery on the vSphere lab. For Hung Linux Guest — SSH
+    Unreachable via VMware, inspect VMs, datastores, vCenter, and ESXi tasks before changing anything.'
 - order: 2
   cost: 25
   content: 'Diagnostic steps:
 
-    1. Open VMware vCenter from the Jira ticket and launch the guest console
+    1. Gather evidence with VMs, datastores, vCenter, and ESXi tasks.
 
-    2. Verify the guest OS is hung (no console response)
+    2. Compare current output to the scenario objectives.
 
-    3. Update the Jira incident with console findings'
+    3. Form a single hypothesis about the smallest fix that would restore healthy state.'
 - order: 3
   cost: 50
   content: 'Exact fix + verification:

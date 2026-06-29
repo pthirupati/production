@@ -45,16 +45,17 @@ initial_state: 'ReportDao at /app/src/main/java/com/example/repo/ReportDao.java 
 hints:
 - order: 1
   cost: 0
-  content: 'Where to look: Observe the pool''s active count climb and never recover'
+  content: 'Where to look: Start with read-only discovery on the Java project. For JDBC Connection Leak
+    Exhausts the Pool, inspect Maven/Gradle, JVM logs, and Spring configuration before changing anything.'
 - order: 2
   cost: 25
   content: 'Diagnostic steps:
 
-    1. Find the DAO path that leaks connections on exceptions
+    1. Gather evidence with Maven/Gradle, JVM logs, and Spring configuration.
 
-    2. Convert to try-with-resources so resources always close
+    2. Compare current output to the scenario objectives.
 
-    3. Verify active connections return to baseline after load'
+    3. Form a single hypothesis about the smallest fix that would restore healthy state.'
 - order: 3
   cost: 50
   content: 'Exact fix + verification:

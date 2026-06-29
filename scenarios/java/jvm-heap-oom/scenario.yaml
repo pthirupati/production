@@ -45,16 +45,17 @@ initial_state: 'JVM flags at /app/jvm.options set -Xmx256m with no heap-dump-on-
 hints:
 - order: 1
   cost: 0
-  content: 'Where to look: Reproduce the OOM and capture a heap dump on OutOfMemoryError'
+  content: 'Where to look: Start with read-only discovery on the Java project. For OutOfMemoryError: Java
+    Heap Space Under Load, inspect Maven/Gradle, JVM logs, and Spring configuration before changing anything.'
 - order: 2
   cost: 25
   content: 'Diagnostic steps:
 
-    1. Identify the dominant retained object set (the leak)
+    1. Gather evidence with Maven/Gradle, JVM logs, and Spring configuration.
 
-    2. Bound the leaking collection / cache so it cannot grow without limit
+    2. Compare current output to the scenario objectives.
 
-    3. Set an appropriate -Xmx and confirm the service is stable under load'
+    3. Form a single hypothesis about the smallest fix that would restore healthy state.'
 - order: 3
   cost: 50
   content: 'Exact fix + verification:

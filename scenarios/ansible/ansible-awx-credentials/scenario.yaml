@@ -38,14 +38,18 @@ initial_state: AWX with Machine credential defined but not linked to the failing
 hints:
 - order: 1
   cost: 0
-  content: 'Where to look: Open AWX Credentials section'
+  content: 'Where to look: Start with read-only discovery on the Ansible control node. For Attach Machine
+    Credential to AWX Template, inspect inventory, playbooks, roles, and ansible-playbook before changing
+    anything.'
 - order: 2
   cost: 25
   content: 'Diagnostic steps:
 
-    1. Attach the Machine credential to the failing template
+    1. Gather evidence with inventory, playbooks, roles, and ansible-playbook.
 
-    2. Validate the template can launch'
+    2. Compare current output to the scenario objectives.
+
+    3. Form a single hypothesis about the smallest fix that would restore healthy state.'
 - order: 3
   cost: 50
   content: 'Exact fix + verification:

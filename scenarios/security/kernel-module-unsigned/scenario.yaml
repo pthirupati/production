@@ -58,16 +58,18 @@ initial_state: 'Ubuntu 22.04. `lsmod | grep hidepid` shows the module loaded. Mo
 hints:
 - order: 1
   cost: 0
-  content: 'Where to look: Use lsmod to identify the unauthorized module'
+  content: 'Where to look: Start with read-only discovery on the hardening lab. For Unsigned Kernel Module
+    Loaded — Identify and Remove It, inspect SSH, firewall, TLS, audit logs, and IAM settings before changing
+    anything.'
 - order: 2
   cost: 25
   content: 'Diagnostic steps:
 
-    1. Unload the module with rmmod
+    1. Gather evidence with SSH, firewall, TLS, audit logs, and IAM settings.
 
-    2. Find and delete the module file
+    2. Compare current output to the scenario objectives.
 
-    3. Check for persistence mechanisms (modprobe.d, systemd services)'
+    3. Form a single hypothesis about the smallest fix that would restore healthy state.'
 - order: 3
   cost: 50
   content: 'Exact fix + verification:

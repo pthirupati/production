@@ -40,14 +40,18 @@ objectives:
 hints:
 - order: 1
   cost: 0
-  content: 'Where to look: Confirm unhealthy instances are not being replaced'
+  content: 'Where to look: Start with read-only discovery on the Terraform workspace. For AWS Auto Scaling
+    Group Not Replacing Unhealthy Instances, inspect HCL files, state, and plan/apply workflow before
+    changing anything.'
 - order: 2
   cost: 25
   content: 'Diagnostic steps:
 
-    1. Set the ASG health_check_type to ELB and apply
+    1. Gather evidence with HCL files, state, and plan/apply workflow.
 
-    2. Verify failing instances are terminated and replaced'
+    2. Compare current output to the scenario objectives.
+
+    3. Form a single hypothesis about the smallest fix that would restore healthy state.'
 - order: 3
   cost: 50
   content: 'Exact fix + verification:

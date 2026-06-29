@@ -43,15 +43,18 @@ initial_state: 'Hands-on peoplesoft scenario: repair clustering in a simulated e
 hints:
 - order: 1
   cost: 0
-  content: 'Where to look: Understand the current failure mode affecting Repair peoplesoft clustering
-    (lab 27)'
+  content: 'Where to look: Start with read-only discovery on the PeopleSoft app server lab. For Repair
+    peoplesoft clustering (lab 27), inspect PIA, Process Scheduler, Integration Broker, and app server
+    logs before changing anything.'
 - order: 2
   cost: 25
   content: 'Diagnostic steps:
 
-    1. Restore expected service behavior with a minimal, documented change
+    1. Gather evidence with PIA, Process Scheduler, Integration Broker, and app server logs.
 
-    2. Verify the fix holds under a realistic smoke test'
+    2. Compare current output to the scenario objectives.
+
+    3. Form a single hypothesis about the smallest fix that would restore healthy state.'
 - order: 3
   cost: 50
   content: 'Exact fix + verification:

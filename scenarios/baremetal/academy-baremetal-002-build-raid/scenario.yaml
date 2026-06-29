@@ -43,14 +43,17 @@ initial_state: The physical server lab is ready but RAID is not configured yet. 
 hints:
 - order: 1
   cost: 0
-  content: 'Where to look: A working RAID setup must exist by the end of this lab'
+  content: 'Where to look: Start with read-only discovery on the physical server lab. For RAID, inspect
+    RAID controller status and array state before changing anything.'
 - order: 2
   cost: 25
   content: 'Diagnostic steps:
 
-    1. Configuration should follow team conventions and be easy to audit
+    1. Gather evidence with RAID controller status and array state.
 
-    2. The result should pass validation without manual cleanup'
+    2. Compare current output to the scenario objectives.
+
+    3. Form a single hypothesis about the smallest fix that would restore healthy state.'
 - order: 3
   cost: 50
   content: 'Exact fix + verification:

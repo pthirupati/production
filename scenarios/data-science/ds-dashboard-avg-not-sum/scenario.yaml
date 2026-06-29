@@ -66,14 +66,17 @@ initial_state: 'The dashboard opens pre-configured with dimension ''subject'', m
 hints:
 - order: 1
   cost: 0
-  content: 'Where to look: Inspect the pre-built dashboard and notice the aggregation is ''sum'''
+  content: 'Where to look: Start with read-only discovery on the notebook lab. For Fix the Wrong Aggregation:
+    Average, Not Sum, inspect pandas/notebook workflows, joins, and charts before changing anything.'
 - order: 2
   cost: 25
   content: 'Diagnostic steps:
 
-    1. Change the aggregation to ''avg'' (average) so each bar is the mean score
+    1. Gather evidence with pandas/notebook workflows, joins, and charts.
 
-    2. Keep dimension ''subject'', measure ''score'', and chart type ''bar'''
+    2. Compare current output to the scenario objectives.
+
+    3. Form a single hypothesis about the smallest fix that would restore healthy state.'
 - order: 3
   cost: 50
   content: 'Exact fix + verification:

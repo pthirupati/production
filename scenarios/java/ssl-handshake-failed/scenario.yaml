@@ -45,16 +45,18 @@ initial_state: 'Config at /app/src/main/resources/application.yml points at a tr
 hints:
 - order: 1
   cost: 0
-  content: 'Where to look: Reproduce the PKIX handshake failure on the outbound call'
+  content: 'Where to look: Start with read-only discovery on the Java project. For SSL Handshake Failure
+    — Untrusted Certificate Chain, inspect Maven/Gradle, JVM logs, and Spring configuration before changing
+    anything.'
 - order: 2
   cost: 25
   content: 'Diagnostic steps:
 
-    1. Identify the missing CA / intermediate in the presented chain
+    1. Gather evidence with Maven/Gradle, JVM logs, and Spring configuration.
 
-    2. Import the CA into a truststore and configure the app to use it
+    2. Compare current output to the scenario objectives.
 
-    3. Verify the HTTPS call succeeds with verification still enabled'
+    3. Form a single hypothesis about the smallest fix that would restore healthy state.'
 - order: 3
   cost: 50
   content: 'Exact fix + verification:

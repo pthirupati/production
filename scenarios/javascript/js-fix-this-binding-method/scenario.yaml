@@ -91,9 +91,11 @@ hints:
   cost: 25
   content: 'Diagnostic steps:
 
-    1. Use an arrow function to preserve `this`
+    1. Click Run and read the traceback — note line number and actual vs expected values.
 
-    2. Add base to each element correctly'
+    2. Reproduce the failure with the smallest input from a visible test.
+
+    3. Compare your implementation to the bug described in the lab prompt.'
 - order: 3
   cost: 50
   content: 'Exact fix + verification:

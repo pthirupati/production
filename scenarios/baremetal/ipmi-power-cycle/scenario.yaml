@@ -27,14 +27,17 @@ dual_terminal: false
 hints:
 - order: 1
   cost: 0
-  content: 'Where to look: Query the current chassis power state via IPMI'
+  content: 'Where to look: Start with read-only discovery on the physical server lab. For IPMI Power Cycle,
+    inspect IPMI, RAID, BIOS, and out-of-band console before changing anything.'
 - order: 2
   cost: 25
   content: 'Diagnostic steps:
 
-    1. Perform a power cycle (or off/on) on the unresponsive host
+    1. Gather evidence with IPMI, RAID, BIOS, and out-of-band console.
 
-    2. Confirm the server powers back on after the cycle'
+    2. Compare current output to the scenario objectives.
+
+    3. Form a single hypothesis about the smallest fix that would restore healthy state.'
 - order: 3
   cost: 50
   content: 'Exact fix + verification:

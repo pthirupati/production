@@ -56,16 +56,18 @@ initial_state: 'Ubuntu 22.04 with libpam-pwquality installed. /etc/security/pwqu
 hints:
 - order: 1
   cost: 0
-  content: 'Where to look: Identify that pam_pwquality is not enforcing complexity'
+  content: 'Where to look: Start with read-only discovery on the hardening lab. For Weak Password Policy
+    — Fix PAM to Enforce Complexity, inspect SSH, firewall, TLS, audit logs, and IAM settings before changing
+    anything.'
 - order: 2
   cost: 25
   content: 'Diagnostic steps:
 
-    1. Configure /etc/security/pwquality.conf with appropriate settings
+    1. Gather evidence with SSH, firewall, TLS, audit logs, and IAM settings.
 
-    2. Set minlen=12, dcredit=-1, ucredit=-1, ocredit=-1, lcredit=-1
+    2. Compare current output to the scenario objectives.
 
-    3. Verify the policy is enforced for new password changes'
+    3. Form a single hypothesis about the smallest fix that would restore healthy state.'
 - order: 3
   cost: 50
   content: 'Exact fix + verification:

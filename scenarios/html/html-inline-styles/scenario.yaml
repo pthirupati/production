@@ -37,14 +37,18 @@ objectives:
 hints:
 - order: 1
   cost: 0
-  content: 'Where to look: Confirm the issue: Inline styles everywhere'
+  content: 'Where to look: Start with read-only discovery on the web server lab. For Excessive Inline
+    Styles Block Caching, inspect HTML pages, nginx/apache config, and browser devtools before changing
+    anything.'
 - order: 2
   cost: 25
   content: 'Diagnostic steps:
 
-    1. Apply the documented fix in /var/www/html/styled.html
+    1. Gather evidence with HTML pages, nginx/apache config, and browser devtools.
 
-    2. Verify the file is corrected'
+    2. Compare current output to the scenario objectives.
+
+    3. Form a single hypothesis about the smallest fix that would restore healthy state.'
 - order: 3
   cost: 50
   content: 'Exact fix + verification:

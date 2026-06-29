@@ -38,14 +38,17 @@ objectives:
 hints:
 - order: 1
   cost: 0
-  content: 'Where to look: Confirm chrony is not synchronized'
+  content: 'Where to look: Start with read-only discovery on the network lab. For NTP Source Unreachable
+    Causing Clock Drift, inspect interfaces, routing tables, DNS, and firewall rules before changing anything.'
 - order: 2
   cost: 25
   content: 'Diagnostic steps:
 
-    1. Restore reachability or select a working NTP source
+    1. Gather evidence with interfaces, routing tables, DNS, and firewall rules.
 
-    2. Verify chronyc tracking shows synchronized'
+    2. Compare current output to the scenario objectives.
+
+    3. Form a single hypothesis about the smallest fix that would restore healthy state.'
 - order: 3
   cost: 50
   content: 'Exact fix + verification:

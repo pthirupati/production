@@ -99,9 +99,11 @@ hints:
   cost: 25
   content: 'Diagnostic steps:
 
-    1. Block calls during the cooldown window
+    1. Click Run and read the traceback — note line number and actual vs expected values.
 
-    2. Re-open after `interval` ms via setTimeout'
+    2. Reproduce the failure with the smallest input from a visible test.
+
+    3. Compare your implementation to the bug described in the lab prompt.'
 - order: 3
   cost: 50
   content: 'Exact fix + verification:

@@ -55,9 +55,11 @@ hints:
   cost: 25
   content: 'Diagnostic steps:
 
-    1. Identify the main status and configuration signals for Git workflow
+    1. Run `nginx -t` and `systemctl status nginx` for config vs service errors.
 
-    2. Confirm you can read the current state confidently before changing anything'
+    2. Open the cited file under `/etc/nginx/`.
+
+    3. Compare listen/upstream/proxy directives to the scenario objectives.'
 - order: 3
   cost: 50
   content: 'Exact fix + verification:

@@ -27,14 +27,18 @@ difficulty: medium
 hints:
 - order: 1
   cost: 0
-  content: 'Where to look: Request the @network team in Jira to add the secondary IP'
+  content: 'Where to look: Start with read-only discovery on the Linux practice server. For Network —
+    Add Secondary NIC IP via Jira, inspect terminal and config files under /etc and /var before changing
+    anything.'
 - order: 2
   cost: 25
   content: 'Diagnostic steps:
 
-    1. Verify the new address with ip addr show dev eth0
+    1. Gather evidence with terminal and config files under /etc and /var.
 
-    2. Confirm the application can bind to the new address (and routing works)'
+    2. Compare current output to the scenario objectives.
+
+    3. Form a single hypothesis about the smallest fix that would restore healthy state.'
 - order: 3
   cost: 50
   content: 'Exact fix + verification:

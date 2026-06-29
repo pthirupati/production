@@ -57,16 +57,18 @@ initial_state: 'VMware vCenter simulation. data-proc-01 Storage vMotion at 73% f
 hints:
 - order: 1
   cost: 0
-  content: 'Where to look: Check the Storage vMotion task status and duration in Recent Tasks'
+  content: 'Where to look: Start with read-only discovery on the vSphere lab. For Storage vMotion Stuck
+    at 73% — Migration Stalled for Hours, inspect VMs, datastores, vCenter, and ESXi tasks before changing
+    anything.'
 - order: 2
   cost: 25
   content: 'Diagnostic steps:
 
-    1. Verify the VM is still running normally despite the stalled migration
+    1. Gather evidence with VMs, datastores, vCenter, and ESXi tasks.
 
-    2. Cancel the Storage vMotion task safely from vCenter
+    2. Compare current output to the scenario objectives.
 
-    3. Plan and retry the migration during a low-I/O maintenance window'
+    3. Form a single hypothesis about the smallest fix that would restore healthy state.'
 - order: 3
   cost: 50
   content: 'Exact fix + verification:

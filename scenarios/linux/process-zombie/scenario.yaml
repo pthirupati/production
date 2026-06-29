@@ -38,14 +38,17 @@ is_free: false
 hints:
 - order: 1
   cost: 0
-  content: 'Where to look: Identify the zombie processes and their parent (PPID)'
+  content: 'Where to look: Start with read-only discovery on the Linux practice server. For Zombie Processes
+    Accumulating, inspect terminal and config files under /etc and /var before changing anything.'
 - order: 2
   cost: 25
   content: 'Diagnostic steps:
 
-    1. Determine why the parent isn''t reaping children
+    1. Gather evidence with terminal and config files under /etc and /var.
 
-    2. Clear the zombies by signaling or restarting the parent'
+    2. Compare current output to the scenario objectives.
+
+    3. Form a single hypothesis about the smallest fix that would restore healthy state.'
 - order: 3
   cost: 50
   content: 'Exact fix + verification:

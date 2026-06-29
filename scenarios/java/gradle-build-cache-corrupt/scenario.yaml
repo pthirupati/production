@@ -45,16 +45,18 @@ initial_state: 'Gradle config at /root/.gradle/gradle.properties enables the bui
 hints:
 - order: 1
   cost: 0
-  content: 'Where to look: Reproduce the cache/lock failure and identify the poisoned cache dir'
+  content: 'Where to look: Start with read-only discovery on the Java project. For Corrupt Gradle Build
+    Cache Failing the Build, inspect Maven/Gradle, JVM logs, and Spring configuration before changing
+    anything.'
 - order: 2
   cost: 25
   content: 'Diagnostic steps:
 
-    1. Stop running daemons and clear the corrupt cache safely
+    1. Gather evidence with Maven/Gradle, JVM logs, and Spring configuration.
 
-    2. Restore a valid build cache configuration in gradle.properties
+    2. Compare current output to the scenario objectives.
 
-    3. Run a clean build that succeeds and re-populates the cache'
+    3. Form a single hypothesis about the smallest fix that would restore healthy state.'
 - order: 3
   cost: 50
   content: 'Exact fix + verification:

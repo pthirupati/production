@@ -63,16 +63,18 @@ dual_terminal: false
 hints:
 - order: 1
   cost: 0
-  content: 'Where to look: Trace the failed CD stage to the release play and identify the wrong variable,
-    URL, and host group'
+  content: 'Where to look: Start with read-only discovery on the CI/CD lab. For CI → Ansible CD: Pipeline
+    Artifact Never Reaches the Release, inspect git repos, pipelines, artifacts, and runbooks before changing
+    anything.'
 - order: 2
   cost: 25
   content: 'Diagnostic steps:
 
-    1. Correct /home/ansible/cd-playbook.yml so it consumes the CI artifact version/URL and targets a
-    real group
+    1. Gather evidence with git repos, pipelines, artifacts, and runbooks.
 
-    2. Confirm the play is corrected so the CI -> Ansible CD handoff completes'
+    2. Compare current output to the scenario objectives.
+
+    3. Form a single hypothesis about the smallest fix that would restore healthy state.'
 - order: 3
   cost: 50
   content: 'Exact fix + verification:

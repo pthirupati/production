@@ -38,14 +38,17 @@ objectives:
 hints:
 - order: 1
   cost: 0
-  content: 'Where to look: Confirm the script fails under cron''s minimal env'
+  content: 'Where to look: Start with read-only discovery on the bash practice environment. For Cron Script
+    Fails on Missing PATH, inspect scripts, cron, logs, and shellcheck before changing anything.'
 - order: 2
   cost: 25
   content: 'Diagnostic steps:
 
-    1. Set an explicit PATH / use absolute paths
+    1. Gather evidence with scripts, cron, logs, and shellcheck.
 
-    2. Verify the script is corrected'
+    2. Compare current output to the scenario objectives.
+
+    3. Form a single hypothesis about the smallest fix that would restore healthy state.'
 - order: 3
   cost: 50
   content: 'Exact fix + verification:

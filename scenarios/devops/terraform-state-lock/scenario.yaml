@@ -50,14 +50,17 @@ initial_state: 'Ubuntu server with Terraform installed. Working directory is /op
 hints:
 - order: 1
   cost: 0
-  content: 'Where to look: Identify the Terraform state lock ID'
+  content: 'Where to look: Start with read-only discovery on the CI/CD lab. For Unlock a Locked Terraform
+    State, inspect git repos, pipelines, artifacts, and runbooks before changing anything.'
 - order: 2
   cost: 25
   content: 'Diagnostic steps:
 
-    1. Force-unlock the Terraform state
+    1. Gather evidence with git repos, pipelines, artifacts, and runbooks.
 
-    2. Verify terraform plan runs without lock errors'
+    2. Compare current output to the scenario objectives.
+
+    3. Form a single hypothesis about the smallest fix that would restore healthy state.'
 - order: 3
   cost: 50
   content: 'Exact fix + verification:

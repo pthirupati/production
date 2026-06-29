@@ -149,9 +149,11 @@ hints:
   cost: 25
   content: 'Diagnostic steps:
 
-    1. Read and understand a minimal Python and TypeScript MCP server
+    1. Click Run and read the traceback — note line number and actual vs expected values.
 
-    2. Write the `claude mcp add` command that registers your local server'
+    2. Reproduce the failure with the smallest input from a visible test.
+
+    3. Compare your implementation to the bug described in the lab prompt.'
 - order: 3
   cost: 50
   content: 'Exact fix + verification:

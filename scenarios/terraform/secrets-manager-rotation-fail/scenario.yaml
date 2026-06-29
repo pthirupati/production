@@ -40,15 +40,17 @@ is_free: false
 hints:
 - order: 1
   cost: 0
-  content: 'Where to look: Check CloudWatch Logs for the rotation Lambda and identify the AccessDenied
-    error'
+  content: 'Where to look: Start with read-only discovery on the Terraform workspace. For Secrets Manager
+    Rotation Lambda Failing, inspect HCL files, state, and plan/apply workflow before changing anything.'
 - order: 2
   cost: 25
   content: 'Diagnostic steps:
 
-    1. Add the missing secretsmanager permissions to the Lambda execution role
+    1. Gather evidence with HCL files, state, and plan/apply workflow.
 
-    2. Trigger a manual rotation and confirm it completes successfully'
+    2. Compare current output to the scenario objectives.
+
+    3. Form a single hypothesis about the smallest fix that would restore healthy state.'
 - order: 3
   cost: 50
   content: 'Exact fix + verification:

@@ -40,14 +40,17 @@ is_free: false
 hints:
 - order: 1
   cost: 0
-  content: 'Where to look: Check cron logs and identify why jobs are not executing'
+  content: 'Where to look: Start with read-only discovery on the Linux practice server. For Cron Jobs
+    Not Executing, inspect terminal and config files under /etc and /var before changing anything.'
 - order: 2
   cost: 25
   content: 'Diagnostic steps:
 
-    1. Fix the PATH, script permissions, and cron access-control issues
+    1. Gather evidence with terminal and config files under /etc and /var.
 
-    2. Confirm the job runs on the next scheduled minute'
+    2. Compare current output to the scenario objectives.
+
+    3. Form a single hypothesis about the smallest fix that would restore healthy state.'
 - order: 3
   cost: 50
   content: 'Exact fix + verification:

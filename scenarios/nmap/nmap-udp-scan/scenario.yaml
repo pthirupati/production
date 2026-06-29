@@ -42,14 +42,17 @@ initial_state: Discover which UDP ports are open on the nameserver.
 hints:
 - order: 1
   cost: 0
-  content: 'Where to look: Understand the current failure mode affecting Scan UDP services on DNS host'
+  content: 'Where to look: Run `cat /etc/resolv.conf` and test with `dig example.com` or `getent hosts
+    example.com`.'
 - order: 2
   cost: 25
   content: 'Diagnostic steps:
 
-    1. Restore expected service behavior with a minimal, documented change
+    1. Note the configured nameserver IP in resolv.conf.
 
-    2. Verify the fix holds under a realistic smoke test'
+    2. `ping` or `nc -zv` the nameserver — is it reachable?
+
+    3. Check if NetworkManager or systemd-resolved overwrites the file.'
 - order: 3
   cost: 50
   content: 'Exact fix + verification:

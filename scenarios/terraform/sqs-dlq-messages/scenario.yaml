@@ -40,14 +40,17 @@ is_free: false
 hints:
 - order: 1
   cost: 0
-  content: 'Where to look: Inspect the DLQ message bodies to understand why processing is failing'
+  content: 'Where to look: Start with read-only discovery on the Terraform workspace. For SQS Dead-Letter
+    Queue Accumulating Messages, inspect HCL files, state, and plan/apply workflow before changing anything.'
 - order: 2
   cost: 25
   content: 'Diagnostic steps:
 
-    1. Fix the Lambda function configuration or code that causes the processing exception
+    1. Gather evidence with HCL files, state, and plan/apply workflow.
 
-    2. Redrive DLQ messages back to the source queue and confirm successful processing'
+    2. Compare current output to the scenario objectives.
+
+    3. Form a single hypothesis about the smallest fix that would restore healthy state.'
 - order: 3
   cost: 50
   content: 'Exact fix + verification:

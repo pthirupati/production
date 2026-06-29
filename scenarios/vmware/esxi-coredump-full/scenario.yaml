@@ -57,16 +57,18 @@ initial_state: 'VMware vCenter simulation. esxi-01 shows coredump partition full
 hints:
 - order: 1
   cost: 0
-  content: 'Where to look: SSH into the ESXi host and list existing coredump files'
+  content: 'Where to look: Start with read-only discovery on the vSphere lab. For ESXi Coredump Partition
+    Full — Host Warning Alarm Active, inspect VMs, datastores, vCenter, and ESXi tasks before changing
+    anything.'
 - order: 2
   cost: 25
   content: 'Diagnostic steps:
 
-    1. Identify and archive any diagnostics not yet sent to VMware Support
+    1. Gather evidence with VMs, datastores, vCenter, and ESXi tasks.
 
-    2. Remove old coredump files to clear the partition
+    2. Compare current output to the scenario objectives.
 
-    3. Verify the alarm clears and the partition has free space'
+    3. Form a single hypothesis about the smallest fix that would restore healthy state.'
 - order: 3
   cost: 50
   content: 'Exact fix + verification:

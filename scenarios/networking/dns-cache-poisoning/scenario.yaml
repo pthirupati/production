@@ -55,14 +55,18 @@ initial_state: 'BIND 9 named daemon running. The hostname `app.internal` is cach
 hints:
 - order: 1
   cost: 0
-  content: 'Where to look: Confirm that named is caching an incorrect IP for the target hostname'
+  content: 'Where to look: Start with read-only discovery on the network lab. For DNS Cache Poisoning
+    — Flush BIND Named Cache, inspect interfaces, routing tables, DNS, and firewall rules before changing
+    anything.'
 - order: 2
   cost: 25
   content: 'Diagnostic steps:
 
-    1. Flush the named cache using rndc
+    1. Gather evidence with interfaces, routing tables, DNS, and firewall rules.
 
-    2. Verify the resolver now returns the correct authoritative answer'
+    2. Compare current output to the scenario objectives.
+
+    3. Form a single hypothesis about the smallest fix that would restore healthy state.'
 - order: 3
   cost: 50
   content: 'Exact fix + verification:

@@ -26,14 +26,17 @@ dual_terminal: false
 hints:
 - order: 1
   cost: 0
-  content: 'Where to look: List libvirt domains and confirm the guest is shut off'
+  content: 'Where to look: Start with read-only discovery on the physical server lab. For VMware Guest
+    Powered Off, inspect IPMI, RAID, BIOS, and out-of-band console before changing anything.'
 - order: 2
   cost: 25
   content: 'Diagnostic steps:
 
-    1. Start the guest domain with virsh
+    1. Gather evidence with IPMI, RAID, BIOS, and out-of-band console.
 
-    2. Verify the domain transitions to the running state'
+    2. Compare current output to the scenario objectives.
+
+    3. Form a single hypothesis about the smallest fix that would restore healthy state.'
 - order: 3
   cost: 50
   content: 'Exact fix + verification:

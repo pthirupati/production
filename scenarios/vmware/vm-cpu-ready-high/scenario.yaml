@@ -57,16 +57,18 @@ initial_state: 'VMware vCenter simulation. db-prod-01 on esxi-01 showing 22% CPU
 hints:
 - order: 1
   cost: 0
-  content: 'Where to look: View CPU ready time for db-prod-01 in vSphere performance charts'
+  content: 'Where to look: Start with read-only discovery on the vSphere lab. For High VM CPU Ready Time
+    — Application Performance Degraded, inspect VMs, datastores, vCenter, and ESXi tasks before changing
+    anything.'
 - order: 2
   cost: 25
   content: 'Diagnostic steps:
 
-    1. Identify the host-level CPU utilization and overcommitment ratio
+    1. Gather evidence with VMs, datastores, vCenter, and ESXi tasks.
 
-    2. Use vMotion to migrate db-prod-01 to esxi-02.lab.local
+    2. Compare current output to the scenario objectives.
 
-    3. Verify CPU ready time drops below 5% after migration'
+    3. Form a single hypothesis about the smallest fix that would restore healthy state.'
 - order: 3
   cost: 50
   content: 'Exact fix + verification:

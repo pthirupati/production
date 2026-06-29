@@ -57,16 +57,18 @@ initial_state: 'Ubuntu 22.04. `sysctl net.ipv4.ip_no_pmtu_disc=1` (PMTUD disable
 hints:
 - order: 1
   cost: 0
-  content: 'Where to look: Diagnose the PMTUD black hole — small packets work, large ones stall'
+  content: 'Where to look: Start with read-only discovery on the network lab. For MTU Black Hole — Fix
+    Path MTU Discovery Settings, inspect interfaces, routing tables, DNS, and firewall rules before changing
+    anything.'
 - order: 2
   cost: 25
   content: 'Diagnostic steps:
 
-    1. Enable PMTUD via sysctl (net.ipv4.ip_no_pmtu_disc=0)
+    1. Gather evidence with interfaces, routing tables, DNS, and firewall rules.
 
-    2. Add iptables rule to allow ICMP type 3 (Destination Unreachable) messages
+    2. Compare current output to the scenario objectives.
 
-    3. Verify large file transfers complete successfully'
+    3. Form a single hypothesis about the smallest fix that would restore healthy state.'
 - order: 3
   cost: 50
   content: 'Exact fix + verification:

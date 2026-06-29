@@ -45,16 +45,18 @@ initial_state: 'RHEL 9 server with a Java app. Dependency JARs are in lib/. The 
 hints:
 - order: 1
   cost: 0
-  content: 'Where to look: Reproduce the ClassNotFoundException and read the missing class name'
+  content: 'Where to look: Start with read-only discovery on the Java project. For ClassNotFoundException
+    - Missing JAR on the Runtime, inspect Maven/Gradle, JVM logs, and Spring configuration before changing
+    anything.'
 - order: 2
   cost: 25
   content: 'Diagnostic steps:
 
-    1. Locate the JAR under lib/ that provides the missing class
+    1. Gather evidence with Maven/Gradle, JVM logs, and Spring configuration.
 
-    2. Add that JAR to the runtime classpath in the launch command
+    2. Compare current output to the scenario objectives.
 
-    3. Run the app so the class resolves and it starts cleanly'
+    3. Form a single hypothesis about the smallest fix that would restore healthy state.'
 - order: 3
   cost: 50
   content: 'Exact fix + verification:

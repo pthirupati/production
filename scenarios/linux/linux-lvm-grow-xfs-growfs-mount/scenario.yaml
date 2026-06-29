@@ -61,16 +61,18 @@ topics_covered:
 hints:
 - order: 1
   cost: 0
-  content: 'Where to look: Confirm the shortage with df -h /data and the free space with vgs'
+  content: 'Where to look: Start with read-only discovery on the Linux practice server. For Grow a Full
+    LVM Volume Online with lvextend + xfs_growfs, inspect terminal and config files under /etc and /var
+    before changing anything.'
 - order: 2
   cost: 25
   content: 'Diagnostic steps:
 
-    1. {''Extend the LV into the free extents'': ''lvextend -l +100%FREE /dev/vgdata/lvdata''}
+    1. Gather evidence with terminal and config files under /etc and /var.
 
-    2. {''Grow the XFS filesystem online'': ''xfs_growfs /data''}
+    2. Compare current output to the scenario objectives.
 
-    3. Confirm /data is larger with df -h and record the remediation'
+    3. Form a single hypothesis about the smallest fix that would restore healthy state.'
 - order: 3
   cost: 50
   content: 'Exact fix + verification:

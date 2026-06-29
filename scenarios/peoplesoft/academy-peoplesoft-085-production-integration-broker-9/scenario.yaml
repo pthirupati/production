@@ -43,14 +43,17 @@ initial_state: A feature fix works in dev, but Integration Broker is not product
 hints:
 - order: 1
   cost: 0
-  content: 'Where to look: Day-2 Integration Broker work completes safely in this environment'
+  content: 'Where to look: Start with read-only discovery on the PeopleSoft app server lab. For Integration
+    Broker, inspect IB monitor and node config before changing anything.'
 - order: 2
   cost: 25
   content: 'Diagnostic steps:
 
-    1. Changes are verified with before/after checks
+    1. Gather evidence with IB monitor and node config.
 
-    2. The system remains stable for dependent teams'
+    2. Compare current output to the scenario objectives.
+
+    3. Form a single hypothesis about the smallest fix that would restore healthy state.'
 - order: 3
   cost: 50
   content: 'Exact fix + verification:

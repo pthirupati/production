@@ -56,16 +56,18 @@ initial_state: 'FRRouting configured with OSPF on two routers. Interface eth1 on
 hints:
 - order: 1
   cost: 0
-  content: 'Where to look: Identify the OSPF neighbor stuck in ExStart state'
+  content: 'Where to look: Start with read-only discovery on the network lab. For OSPF Neighbor Down —
+    Fix MTU Mismatch in ExStart, inspect interfaces, routing tables, DNS, and firewall rules before changing
+    anything.'
 - order: 2
   cost: 25
   content: 'Diagnostic steps:
 
-    1. Determine the interface MTU mismatch between the two routers
+    1. Gather evidence with interfaces, routing tables, DNS, and firewall rules.
 
-    2. Correct the MTU configuration to match on both interfaces
+    2. Compare current output to the scenario objectives.
 
-    3. Confirm OSPF adjacency reaches Full state'
+    3. Form a single hypothesis about the smallest fix that would restore healthy state.'
 - order: 3
   cost: 50
   content: 'Exact fix + verification:

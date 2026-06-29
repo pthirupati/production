@@ -45,16 +45,18 @@ initial_state: 'Config at /app/src/main/resources/application.yml sets server.to
 hints:
 - order: 1
   cost: 0
-  content: 'Where to look: Confirm requests are queuing/timing out, not failing fast'
+  content: 'Where to look: Start with read-only discovery on the Java project. For Tomcat Thread Pool
+    Maxed Out — Requests Queue and Time Out, inspect Maven/Gradle, JVM logs, and Spring configuration
+    before changing anything.'
 - order: 2
   cost: 25
   content: 'Diagnostic steps:
 
-    1. Inspect the Tomcat max-threads and accept-count settings
+    1. Gather evidence with Maven/Gradle, JVM logs, and Spring configuration.
 
-    2. Right-size threads (and queue) for the concurrency
+    2. Compare current output to the scenario objectives.
 
-    3. Verify throughput recovers and timeouts stop'
+    3. Form a single hypothesis about the smallest fix that would restore healthy state.'
 - order: 3
   cost: 50
   content: 'Exact fix + verification:

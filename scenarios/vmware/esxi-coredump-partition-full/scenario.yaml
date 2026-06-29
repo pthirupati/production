@@ -37,14 +37,17 @@ initial_state: vCenter shows the ESXi host's core dump partition full.
 hints:
 - order: 1
   cost: 0
-  content: 'Where to look: Confirm the core dump partition is full'
+  content: 'Where to look: Start with read-only discovery on the vSphere lab. For ESXi Core Dump Partition
+    Full, inspect VMs, datastores, vCenter, and ESXi tasks before changing anything.'
 - order: 2
   cost: 25
   content: 'Diagnostic steps:
 
-    1. Clear or resize the coredump partition
+    1. Gather evidence with VMs, datastores, vCenter, and ESXi tasks.
 
-    2. Verify the coredump alarm is cleared'
+    2. Compare current output to the scenario objectives.
+
+    3. Form a single hypothesis about the smallest fix that would restore healthy state.'
 - order: 3
   cost: 50
   content: 'Exact fix + verification:

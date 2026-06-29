@@ -27,14 +27,17 @@ dual_terminal: false
 hints:
 - order: 1
   cost: 0
-  content: 'Where to look: Recognize the dracut initqueue timeout and that root can''t be assembled'
+  content: 'Where to look: Start with read-only discovery on the Linux practice server. For Initramfs
+    / Dracut Failure, inspect terminal and config files under /etc and /var before changing anything.'
 - order: 2
   cost: 25
   content: 'Diagnostic steps:
 
-    1. Determine the missing module/driver or stale initramfs
+    1. Gather evidence with terminal and config files under /etc and /var.
 
-    2. Regenerate the initramfs so the root device mounts and the system boots'
+    2. Compare current output to the scenario objectives.
+
+    3. Form a single hypothesis about the smallest fix that would restore healthy state.'
 - order: 3
   cost: 50
   content: 'Exact fix + verification:

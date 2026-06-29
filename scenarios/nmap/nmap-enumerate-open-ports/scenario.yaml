@@ -41,14 +41,17 @@ initial_state: web01 (10.10.10.10) is reachable but its open ports are unknown u
 hints:
 - order: 1
   cost: 0
-  content: 'Where to look: Open the Nmap simulator from the lab toolbar (Open Nmap)'
+  content: 'Where to look: Start with read-only discovery on the scanning lab. For Enumerate open ports
+    on the web server, inspect nmap CLI, targets, and scan output before changing anything.'
 - order: 2
   cost: 25
   content: 'Diagnostic steps:
 
-    1. Run a TCP port scan against web01 (10.10.10.10)
+    1. Gather evidence with nmap CLI, targets, and scan output.
 
-    2. Identify all of its open ports — SSH (22), HTTP (80) and HTTPS (443)'
+    2. Compare current output to the scenario objectives.
+
+    3. Form a single hypothesis about the smallest fix that would restore healthy state.'
 - order: 3
   cost: 50
   content: 'Exact fix + verification:

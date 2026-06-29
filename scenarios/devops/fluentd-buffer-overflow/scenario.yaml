@@ -52,16 +52,17 @@ initial_state: 'Ubuntu server running Fluentd. Config at /etc/fluent/fluent.conf
 hints:
 - order: 1
   cost: 0
-  content: 'Where to look: Identify the buffer overflow errors in Fluentd logs'
+  content: 'Where to look: Start with read-only discovery on the CI/CD lab. For Tune Fluentd Buffer to
+    Prevent Overflow, inspect git repos, pipelines, artifacts, and runbooks before changing anything.'
 - order: 2
   cost: 25
   content: 'Diagnostic steps:
 
-    1. Increase the buffer chunk_limit_size and total_limit_size
+    1. Gather evidence with git repos, pipelines, artifacts, and runbooks.
 
-    2. Tune flush_interval and retry settings
+    2. Compare current output to the scenario objectives.
 
-    3. Verify Fluentd processes logs without buffer overflow errors'
+    3. Form a single hypothesis about the smallest fix that would restore healthy state.'
 - order: 3
   cost: 50
   content: 'Exact fix + verification:

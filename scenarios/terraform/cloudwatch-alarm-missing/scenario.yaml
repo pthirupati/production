@@ -42,14 +42,17 @@ is_free: true
 hints:
 - order: 1
   cost: 0
-  content: 'Where to look: Determine why the alarm stays in OK / INSUFFICIENT_DATA'
+  content: 'Where to look: Start with read-only discovery on the Terraform workspace. For CloudWatch Alarm
+    Never Triggers, inspect HCL files, state, and plan/apply workflow before changing anything.'
 - order: 2
   cost: 25
   content: 'Diagnostic steps:
 
-    1. Identify the wrong metric name, threshold, period, or evaluation settings
+    1. Gather evidence with HCL files, state, and plan/apply workflow.
 
-    2. Fix the alarm so it transitions to ALARM when the metric breaches the threshold'
+    2. Compare current output to the scenario objectives.
+
+    3. Form a single hypothesis about the smallest fix that would restore healthy state.'
 - order: 3
   cost: 50
   content: 'Exact fix + verification:

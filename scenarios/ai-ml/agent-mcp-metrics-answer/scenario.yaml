@@ -46,17 +46,18 @@ initial_state: The canvas has a Trigger (an ops question about CPU on web01) con
 hints:
 - order: 1
   cost: 0
-  content: 'Where to look: Open the Agent Workflow simulator and run the flow to see the agent answer
-    without real data'
+  content: 'Where to look: Start with read-only discovery on the ML practice workspace. For Add an MCP
+    tool so the agent can answer a data question, inspect datasets, training scripts, metrics, and model
+    artifacts before changing anything.'
 - order: 2
   cost: 25
   content: 'Diagnostic steps:
 
-    1. Add an MCP tool node configured for server "metrics" and tool "get_cpu"
+    1. Gather evidence with datasets, training scripts, metrics, and model artifacts.
 
-    2. Wire Trigger -> LLM -> MCP tool -> Output so the live CPU metric flows into the final answer
+    2. Compare current output to the scenario objectives.
 
-    3. Run the workflow so the answer includes the real CPU percentage returned by the MCP server'
+    3. Form a single hypothesis about the smallest fix that would restore healthy state.'
 - order: 3
   cost: 50
   content: 'Exact fix + verification:

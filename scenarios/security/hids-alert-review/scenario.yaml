@@ -56,15 +56,18 @@ initial_state: 'CentOS server running OSSEC HIDS in local mode. Alerts have been
 hints:
 - order: 1
   cost: 0
-  content: 'Where to look: Review /var/ossec/logs/alerts/alerts.log for the file modification events'
+  content: 'Where to look: Start with read-only discovery on the hardening lab. For HIDS Alert Review
+    — Investigate OSSEC File Integrity Alerts, inspect SSH, firewall, TLS, audit logs, and IAM settings
+    before changing anything.'
 - order: 2
   cost: 25
   content: 'Diagnostic steps:
 
-    1. Compare current checksums of /etc/passwd and /usr/bin/sudo against OSSEC''s baseline database
+    1. Gather evidence with SSH, firewall, TLS, audit logs, and IAM settings.
 
-    2. Write a one-line finding to /tmp/hids-findings.txt stating whether each change is suspicious or
-    benign'
+    2. Compare current output to the scenario objectives.
+
+    3. Form a single hypothesis about the smallest fix that would restore healthy state.'
 - order: 3
   cost: 50
   content: 'Exact fix + verification:

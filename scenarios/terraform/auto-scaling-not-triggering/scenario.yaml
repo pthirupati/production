@@ -40,15 +40,17 @@ is_free: false
 hints:
 - order: 1
   cost: 0
-  content: 'Where to look: Inspect the CloudWatch alarm configuration and identify why it never enters
-    ALARM state'
+  content: 'Where to look: Start with read-only discovery on the Terraform workspace. For Auto Scaling
+    Group Not Triggering, inspect HCL files, state, and plan/apply workflow before changing anything.'
 - order: 2
   cost: 25
   content: 'Diagnostic steps:
 
-    1. Fix the alarm metric namespace, dimension, or threshold so it correctly monitors ASG CPU utilization
+    1. Gather evidence with HCL files, state, and plan/apply workflow.
 
-    2. Verify the Auto Scaling policy is linked to the corrected alarm'
+    2. Compare current output to the scenario objectives.
+
+    3. Form a single hypothesis about the smallest fix that would restore healthy state.'
 - order: 3
   cost: 50
   content: 'Exact fix + verification:

@@ -42,14 +42,17 @@ initial_state: Backup jobs exist but reliability is uncertain for prompt debuggi
 hints:
 - order: 1
   cost: 0
-  content: 'Where to look: Backup coverage for prompt debugging is complete and restorable'
+  content: 'Where to look: Test the config to get the exact file and line: `nginx -t`. It prints the offending
+    directive (e.g. unknown directive "listn").'
 - order: 2
   cost: 25
   content: 'Diagnostic steps:
 
-    1. Retention and encryption meet the stated policy
+    1. Run `nginx -t` and `systemctl status nginx` for config vs service errors.
 
-    2. A restore drill proves data integrity'
+    2. Open the cited file under `/etc/nginx/`.
+
+    3. Compare listen/upstream/proxy directives to the scenario objectives.'
 - order: 3
   cost: 50
   content: 'Exact fix + verification:

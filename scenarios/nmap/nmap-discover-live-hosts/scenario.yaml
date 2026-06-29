@@ -41,14 +41,17 @@ initial_state: The Nmap console starts with no hosts discovered. The /24 has sev
 hints:
 - order: 1
   cost: 0
-  content: 'Where to look: Open the Nmap simulator from the lab toolbar (Open Nmap)'
+  content: 'Where to look: Start with read-only discovery on the scanning lab. For Discover live hosts
+    on the subnet, inspect nmap CLI, targets, and scan output before changing anything.'
 - order: 2
   cost: 25
   content: 'Diagnostic steps:
 
-    1. Run a host-discovery / ping sweep across 10.10.10.0/24 (nmap -sn 10.10.10.0/24)
+    1. Gather evidence with nmap CLI, targets, and scan output.
 
-    2. Discover the live hosts on the network (the gateway, web, database, and Windows app servers)'
+    2. Compare current output to the scenario objectives.
+
+    3. Form a single hypothesis about the smallest fix that would restore healthy state.'
 - order: 3
   cost: 50
   content: 'Exact fix + verification:

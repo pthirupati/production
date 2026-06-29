@@ -45,11 +45,11 @@ hints:
   cost: 25
   content: 'Diagnostic steps:
 
-    1. Identify which zone is active and which ports/services are allowed.
+    1. Run `nginx -t` and `systemctl status nginx` for config vs service errors.
 
-    2. Compare to the port the scenario expects (often 80/tcp or 443/tcp).
+    2. Open the cited file under `/etc/nginx/`.
 
-    3. Check if the service is bound but blocked externally.'
+    3. Compare listen/upstream/proxy directives to the scenario objectives.'
 - order: 3
   cost: 50
   content: 'Exact fix + verification:
