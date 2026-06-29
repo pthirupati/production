@@ -195,6 +195,7 @@ class Command(BaseCommand):
                     slug=slug,
                     defaults={
                         "title": data["title"],
+                        "subtitle": data.get("subtitle", "") or data.get("summary", ""),
                         "technology": technology,
                         "category": data.get("category", "General"),
                         "difficulty": data.get("difficulty", "easy"),

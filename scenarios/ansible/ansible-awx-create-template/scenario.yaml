@@ -37,18 +37,17 @@ initial_state: AWX with a synced project but no job template for the new site pl
 hints:
 - order: 1
   cost: 0
-  content: 'Where to look: Start with read-only discovery on the Ansible control node. For Create AWX
-    Job Template from Project, inspect inventory, playbooks, roles, and ansible-playbook before changing
-    anything.'
+  content: 'Where to look: Run `ansible-playbook site.yml -vv` (or the scenario playbook) and read the
+    first FAILED task — note host, task name, and error message.'
 - order: 2
   cost: 25
   content: 'Diagnostic steps:
 
-    1. Gather evidence with inventory, playbooks, roles, and ansible-playbook.
+    1. Re-run with `-vvv` on the failing host only (`--limit <host>`).
 
-    2. Compare current output to the scenario objectives.
+    2. Check inventory, SSH connectivity, and `ansible.cfg` privilege settings.
 
-    3. Form a single hypothesis about the smallest fix that would restore healthy state.'
+    3. Compare the failed module output to the scenario objectives.'
 - order: 3
   cost: 50
   content: 'Exact fix + verification:

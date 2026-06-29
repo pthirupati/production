@@ -255,28 +255,23 @@ export default function Tutorials() {
           </div>
         ) : (
           <div className="space-y-5">
-            {filteredCourses.length > 0 && (
+            {filteredCourses.length > 0 ? (
               <div className="space-y-4">
                 <h2 className="text-sm font-semibold text-surface-300 flex items-center gap-2">
-                  <Layers size={16} className="text-accent-purple" /> Zero-to-hero courses
+                  <Layers size={16} className="text-accent-purple" /> Course curriculum
                 </h2>
+                <p className="text-xs text-surface-500 -mt-2">
+                  Expand a course to see every module in order — like TutorialsPoint or JavaPoint. Each module has 20 sections with diagrams, shell commands, code, and quizzes.
+                </p>
                 {filteredCourses.map((course, i) => (
                   <CourseTrack key={course.course_slug} course={course} defaultOpen={i === 0 && !topicParam} />
                 ))}
               </div>
-            )}
-            {filtered.length > 0 && (
-              <>
-                {filteredCourses.length > 0 && (
-                  <h2 className="text-sm font-semibold text-surface-300 flex items-center gap-2 pt-2">
-                    <GraduationCap size={16} className="text-accent-cyan" /> All technology tracks
-                  </h2>
-                )}
-                {filtered.map((track, i) => (
-                  <TechnologyTrack key={track.topic} track={track} defaultOpen={!topicParam || topicParam === track.topic || (filteredCourses.length === 0 && i === 0)} />
-                ))}
-              </>
-            )}
+            ) : filtered.length > 0 ? (
+              filtered.map((track, i) => (
+                <TechnologyTrack key={track.topic} track={track} defaultOpen={!topicParam || topicParam === track.topic || i === 0} />
+              ))
+            ) : null}
           </div>
         )}
       </MarketingPageShell>

@@ -589,6 +589,15 @@ def _grader_command(validation: dict, data: dict) -> str:
     return "bash check.sh"
 
 
+def _validation_mentions_unit(validation: dict, unit: str) -> bool:
+    """True when the grader command actually checks this systemd unit."""
+    cmd = str(validation.get("command", "")).lower()
+    unit_l = unit.lower().replace(".service", "")
+    if validation.get("type") == "service_active":
+        return unit_l in cmd
+    return unit_l in cmd
+
+
 def _specialty_hints(data: dict, validation: dict, tech_dir: str) -> dict[str, str] | None:
     """Command-specific hint tiers inferred from objectives and validation."""
     if data.get("coding_mode"):
@@ -620,6 +629,69 @@ def _specialty_hints(data: dict, validation: dict, tech_dir: str) -> dict[str, s
     )
     low = blob.lower()
     cmd = _grader_command(validation, data)
+    slug_low = str(data.get("slug") or "").lower()
+
+    # Technology-first hints — prevents a stray "nginx" mention in an Ansible
+    # playbook from hijacking hints with nginx -t guidance.
+    if tech_dir == "ansible" or str(validation.get("command") or "").startswith("ansible "):
+        return {
+            "tier1": (
+                "Where to look: Run `ansible-playbook site.yml -vv` (or the scenario playbook) "
+                "and read the first FAILED task — note host, task name, and error message."
+            ),
+            "tier2": (
+                "Diagnostic steps:\n"
+                "1. Re-run with `-vvv` on the failing host only (`--limit <host>`).\n"
+                "2. Check inventory, SSH connectivity, and `ansible.cfg` privilege settings.\n"
+                "3. Compare the failed module output to the scenario objectives."
+            ),
+            "tier3": (
+                "Exact fix + verification:\n"
+                "1. Apply the minimal fix on the failing host (config, service, or variable).\n"
+                "2. Re-run the playbook to a clean PLAY RECAP (failed=0).\n"
+                f"3. Confirm `{cmd}` succeeds.\n\n"
+                "WHY: Ansible labs grade real playbook outcomes, not marker files."
+            ),
+        }
+
+    if tech_dir in ("docker",) or "docker " in cmd:
+        return {
+            "tier1": "Where to look: Run `docker ps -a` and `docker logs <container>` for the failing container.",
+            "tier2": (
+                "Diagnostic steps:\n"
+                "1. Identify the exited/unhealthy container and read its logs.\n"
+                "2. Inspect the image, env vars, and volume mounts (`docker inspect`).\n"
+                "3. Compare container state to the scenario objectives."
+            ),
+            "tier3": (
+                "Exact fix + verification:\n"
+                "1. Fix the Dockerfile, compose file, or runtime config.\n"
+                "2. Rebuild/restart the container.\n"
+                f"3. Confirm `{cmd}` succeeds.\n\n"
+                "WHY: Docker labs grade real container state."
+            ),
+        }
+
+    if tech_dir in ("kubernetes",) or "kubectl" in cmd:
+        return {
+            "tier1": (
+                "Where to look: Run `kubectl get pods -A` and `kubectl describe pod <name>` "
+                "for Events and container state."
+            ),
+            "tier2": (
+                "Diagnostic steps:\n"
+                "1. Check pod phase, restarts, and last State reason.\n"
+                "2. `kubectl logs <pod> --previous` if it crashed.\n"
+                "3. Compare resource spec (probes, limits, mounts) to objectives."
+            ),
+            "tier3": (
+                "Exact fix + verification:\n"
+                "1. Patch the Deployment/Service/ConfigMap with the minimal fix.\n"
+                "2. Wait for rollout (`kubectl rollout status`).\n"
+                f"3. Confirm `{cmd}` succeeds.\n\n"
+                "WHY: Kubernetes labs grade real cluster state."
+            ),
+        }
 
     if "nginx -t" in low or (
         "nginx" in low and any(k in low for k in ("port 80", "syntax", "stream", "proxy", "active", "down"))
@@ -657,25 +729,28 @@ def _specialty_hints(data: dict, validation: dict, tech_dir: str) -> dict[str, s
     match = SERVICE_RE.search(blob)
     if match and "nginx" not in low:
         unit = match.group(1).replace(".service", "")
-        return {
-            "tier1": (
-                f"Where to look: Start with `systemctl status {unit}` and "
-                f"`journalctl -u {unit} -n 50 --no-pager` before changing anything."
-            ),
-            "tier2": (
-                "Diagnostic steps:\n"
-                f"1. Run `systemctl status {unit}` — note Active/Failed and the last log lines.\n"
-                f"2. Read `journalctl -u {unit} -n 50` for the root error.\n"
-                "3. Form a hypothesis about the smallest config or permission fix."
-            ),
-            "tier3": (
-                "Exact fix + verification:\n"
-                "1. Apply the minimal fix (config, unit override, or missing directory).\n"
-                f"2. Run `systemctl daemon-reload` if you edited a unit file.\n"
-                f"3. Run `systemctl restart {unit}` and confirm `{cmd}` succeeds.\n\n"
-                "WHY: the grader checks real service state, not marker files."
-            ),
-        }
+        # Only use service hints when the grader or slug actually targets this unit —
+        # avoids ACL/index labs getting chronyd/mysqld hints from unrelated check scripts.
+        if _validation_mentions_unit(validation, unit) or unit in slug_low:
+            return {
+                "tier1": (
+                    f"Where to look: Start with `systemctl status {unit}` and "
+                    f"`journalctl -u {unit} -n 50 --no-pager` before changing anything."
+                ),
+                "tier2": (
+                    "Diagnostic steps:\n"
+                    f"1. Run `systemctl status {unit}` — note Active/Failed and the last log lines.\n"
+                    f"2. Read `journalctl -u {unit} -n 50` for the root error.\n"
+                    "3. Form a hypothesis about the smallest config or permission fix."
+                ),
+                "tier3": (
+                    "Exact fix + verification:\n"
+                    "1. Apply the minimal fix (config, unit override, or missing directory).\n"
+                    f"2. Run `systemctl daemon-reload` if you edited a unit file.\n"
+                    f"3. Run `systemctl restart {unit}` and confirm `{cmd}` succeeds.\n\n"
+                    "WHY: the grader checks real service state, not marker files."
+                ),
+            }
 
     if (
         "kubectl" in low
@@ -756,7 +831,11 @@ def _specialty_hints(data: dict, validation: dict, tech_dir: str) -> dict[str, s
             ),
         }
 
-    if "mysql" in low or "mysqld" in low:
+    if ("mysql" in low or "mysqld" in low) and (
+        "mysqld" in cmd.lower()
+        or (validation.get("type") == "service_active" and "mysql" in str(validation.get("command", "")).lower())
+        or "mysqld" in slug_low
+    ):
         return {
             "tier1": "Where to look: Run `systemctl status mysqld` and tail `/var/log/mysqld.log`.",
             "tier2": (

@@ -42,11 +42,11 @@ hints:
   cost: 25
   content: 'Diagnostic steps:
 
-    1. Identify which zone is active and which ports/services are allowed.
+    1. Re-run with `-vvv` on the failing host only (`--limit <host>`).
 
-    2. Compare to the port the scenario expects (often 80/tcp or 443/tcp).
+    2. Check inventory, SSH connectivity, and `ansible.cfg` privilege settings.
 
-    3. Check if the service is bound but blocked externally.'
+    3. Compare the failed module output to the scenario objectives.'
 - order: 3
   cost: 50
   content: 'Exact fix + verification:

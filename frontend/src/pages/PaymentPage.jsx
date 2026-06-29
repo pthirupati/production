@@ -173,21 +173,35 @@ export default function PaymentPage() {
     ? `(\u20B9${amountINR} INR)`
     : ''
 
-  const applyCoupon = async () => {
-    if (!couponCode.trim() || !techId) return
+  const applyCoupon = async (codeOverride) => {
+    const code = (codeOverride || couponCode).trim()
+    if (!code || !techId) return false
     setCouponLoading(true)
     setError('')
     try {
-      const result = await subscriptionApi.validateCoupon(parseInt(techId), couponCode.trim())
+      const result = await subscriptionApi.validateCoupon(parseInt(techId), code)
       setAppliedCoupon(result)
+      setCouponCode(result.code || code)
       toast.success(`Coupon ${result.code} applied — save ₹${result.discount_saved}`)
+      return true
     } catch (err) {
       setAppliedCoupon(null)
-      toast.error(err.response?.data?.error || 'Invalid coupon code')
+      if (!codeOverride) {
+        toast.error(err.response?.data?.error || 'Invalid coupon code')
+      }
+      return false
     } finally {
       setCouponLoading(false)
     }
   }
+
+  // Auto-apply coupon from ?coupon= URL param once techId is known
+  useEffect(() => {
+    const urlCoupon = searchParams.get('coupon')
+    if (!urlCoupon || !techId || appliedCoupon || isInterviewProduct || isCertProduct) return
+    applyCoupon(urlCoupon)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [techId, searchParams])
 
   // Load Razorpay SDK
   useEffect(() => {
@@ -365,14 +379,18 @@ export default function PaymentPage() {
       let razorpayKey = razorpayKeyResolved
       let amountPaise = amountNum * 100
 
-      if (!orderId) {
+      const couponToUse = appliedCoupon?.code || ''
+
+      // Pre-created renew/cert orders ignore coupons — always create a fresh order
+      // at checkout when a coupon is applied so the discounted amount is charged.
+      if (appliedCoupon || !orderId) {
         const orderData = isInterviewProduct
           ? await interviewsApi.createRazorpayOrder(interviewPlan)
           : isCertProduct
             ? await certApi.createRazorpayOrder(certSlugParam)
             : await subscriptionApi.createRazorpayOrder(
                 parseInt(techId),
-                appliedCoupon?.code || couponCode.trim() || '',
+                couponToUse,
               )
 
         if (!orderData.order_id && !orderData.demo_mode) {
@@ -383,7 +401,7 @@ export default function PaymentPage() {
 
         orderId = orderData.order_id
         razorpayKey = orderData.razorpay_key_id
-        amountPaise = orderData.amount_paise || amountPaise
+        amountPaise = orderData.amount_paise || (appliedCoupon ? finalAmountINR * 100 : amountPaise)
       }
 
       if (!orderId) {
@@ -1001,7 +1019,7 @@ export default function PaymentPage() {
                 </div>
                 <div className="flex justify-between">
                   <span className="text-surface-400">Amount Paid</span>
-                  <span className="text-accent-green font-bold">{'\u20B9'}{amountINR}</span>
+                  <span className="text-accent-green font-bold">{'\u20B9'}{finalAmountINR || amountINR}</span>
                 </div>
                 {paymentResult?.subscription_id && (
                   <div className="flex justify-between">

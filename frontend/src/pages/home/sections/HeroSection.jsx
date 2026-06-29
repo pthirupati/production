@@ -36,14 +36,18 @@ export default function HeroSection({ technologies, stats = {} }) {
         <div>
           <motion.div className="fx-hero-eyebrow" variants={fadeUp}>
             <span className="fx-pulse-dot" style={{ background: '#56e0b0' }} />
-            Live break-fix labs · AI interviews
+            Production-grade labs · Jira tickets · AI interviews
           </motion.div>
           <motion.h1 className="fx-hero-h1" variants={fadeUp}>
             Break things.<br />
             <span className="fx-hero-gradient-text">Fix them.</span> Get hired.
           </motion.h1>
           <motion.p className="fx-hero-lead" variants={fadeUp}>
-            Practice real incident response on live cloud environments — Linux, Docker, Kubernetes, networking and more. Timed challenges, instant validation, and AI mock interviews that get you job-ready.
+            Train like your whole platform team is on call — isolated break-fix labs across 30+ technologies
+            (Linux, cloud, containers, networking, databases, VMware, Ansible, security, and more).
+            Pick up a Jira incident, SSH into a real environment, fix it under time pressure, and prove it with
+            instant validation. Then sit a voice AI mock interview and earn verifiable certificates — at a
+            fraction of what KodeKloud, LabEx, or interview prep sites charge.
           </motion.p>
           <motion.div className="fx-hero-cta-row" variants={fadeUp}>
             <Link to="/register" data-magnetic className="fx-btn-primary">
@@ -59,12 +63,12 @@ export default function HeroSection({ technologies, stats = {} }) {
               <div className="fx-hero-stat-label">Technologies</div>
             </div>
             <div>
-              <div className="fx-hero-stat-val">{stats.total_scenarios || '360+'}</div>
-              <div className="fx-hero-stat-label">Live scenarios</div>
+              <div className="fx-hero-stat-val">{stats.total_scenarios ? `${stats.total_scenarios}+` : '5,000+'}</div>
+              <div className="fx-hero-stat-label">Hands-on scenarios</div>
             </div>
             <div>
-              <div className="fx-hero-stat-val">{stats.total_users ? `${stats.total_users}+` : '10k+'}</div>
-              <div className="fx-hero-stat-label">Engineers training</div>
+              <div className="fx-hero-stat-val">Per-user isolated</div>
+              <div className="fx-hero-stat-label">Lab sandboxes</div>
             </div>
           </motion.div>
         </div>

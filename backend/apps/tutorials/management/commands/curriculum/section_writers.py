@@ -137,9 +137,25 @@ def _write_notes(topic: str, module: str, level: str, profile: dict) -> str:
     return _enrich("notes", topic, module, level, book)
 
 
+def _topic_diagram_image(topic: str, module: str) -> str:
+    """Inline architecture diagram as mermaid (always renders; no external CDN dependency)."""
+    mod_id = _mermaid_id(module, "mod")
+    return (
+        f"\n\n```mermaid\n"
+        f"flowchart TB\n"
+        f"  subgraph learn [\"{module}\"]\n"
+        f"    A[Concept] --> B[Hands-on]\n"
+        f"    B --> C[Verify]\n"
+        f"  end\n"
+        f"  learn --> D[({topic} track)]\n"
+        f"```\n"
+    )
+
+
 def _write_theory(topic: str, module: str, level: str, profile: dict) -> str:
     tagline = profile.get("tagline", topic)
     concepts = _match_concepts(profile, module)
+    diagram_preview = _topic_diagram_image(topic, module)
     tldr = (
         f"> [!NOTE] **TL;DR** — By the end of this lesson you can explain what **{module}** is, "
         f"why it exists, and how to verify it works. {LEVEL_LABELS.get(level, level)} track."
@@ -161,7 +177,8 @@ def _write_theory(topic: str, module: str, level: str, profile: dict) -> str:
     if profile.get("architecture"):
         body += f"\n\n**Platform context:** {profile['architecture']}"
     body += (
-        "\n\n> [!TIP] Read the diagram in the next section before running any command — "
+        f"\n\n{diagram_preview}"
+        "\n\n> [!TIP] Read the architecture diagram in the next section before running any command — "
         "a clear mental model makes the hands-on lab twice as fast."
     )
     return body

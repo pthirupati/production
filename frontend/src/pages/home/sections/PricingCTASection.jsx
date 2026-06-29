@@ -24,8 +24,9 @@ export default function PricingCTASection() {
             Get started today
           </div>
           <h2 className="fx-home-title text-[clamp(2rem,5vw,52px)] mb-5">Ready to prove your skills?</h2>
-          <p className="fx-home-sub mx-auto mb-10 max-w-[520px]">
-            Free demo always available. Subscribe per technology. Start troubleshooting in under 30 seconds.
+          <p className="fx-home-sub mx-auto mb-10 max-w-[560px]">
+            Free demo always available. Subscribe per technology at prices below KodeKloud and LabEx.
+            Promo codes apply automatically at checkout. Your lab is yours alone — fully isolated from every other user.
           </p>
 
           <div className="flex gap-[14px] justify-center flex-wrap mb-9">
@@ -39,9 +40,9 @@ export default function PricingCTASection() {
 
           <div className="flex justify-center gap-7 flex-wrap text-sm text-white/55">
             {[
-              'Free demo always available',
-              'Live lab in 30 seconds',
-              'Cancel anytime',
+              'Free demo — no card required',
+              'Isolated lab in 30 seconds',
+              'Coupons auto-apply at checkout',
             ].map(text => (
               <span key={text} className="inline-flex items-center gap-[7px]">
                 <CheckCircle2 size={15} className="text-[#56e0b0]" strokeWidth={2.4} />
