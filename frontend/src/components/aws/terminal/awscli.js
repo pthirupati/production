@@ -120,6 +120,18 @@ export function awsCli(argv, store, ctx = {}) {
       store.deleteBucket(name)
       return `remove_bucket: ${name}`
     }
+    if (command === 'cp') {
+      const [src, dest] = rest
+      const s3Target = [src, dest].find((x) => String(x || '').startsWith('s3://'))
+      if (!s3Target) return 'usage: aws s3 cp <LocalPath> <S3Uri> or <S3Uri> <LocalPath>'
+      const [bucketName, ...keyParts] = s3Target.replace('s3://', '').split('/')
+      const key = keyParts.join('/') || String(src || 'upload.bin').split('/').pop()
+      const bucket = store.s3Buckets.find((b) => b.name === bucketName)
+      if (!bucket) return `\nAn error occurred (NoSuchBucket) when calling the PutObject operation: The specified bucket does not exist`
+      if (String(src || '').startsWith('s3://')) return `download: ${src} to ./${key.split('/').pop()}`
+      store.putObject(bucketName, key, 2048)
+      return `upload: ${src} to s3://${bucketName}/${key}`
+    }
     return `aws s3 ${command}: simulated high-level command`
   }
   if (service === 's3api') {
@@ -159,13 +171,71 @@ export function awsCli(argv, store, ctx = {}) {
       if (!bucket) return '\nAn error occurred (NoSuchBucket) when calling the GetBucketVersioning operation: The specified bucket does not exist'
       return bucket.versioning ? j({ Status: 'Enabled' }) : j({})
     }
+    if (command === 'put-bucket-versioning') {
+      if (!bucket) return '\nAn error occurred (NoSuchBucket) when calling the PutBucketVersioning operation: The specified bucket does not exist'
+      const enabled = String(flags['versioning-configuration'] || '').includes('Enabled') || flags.status === 'Enabled'
+      store.updateBucket(flags.bucket, { versioning: enabled })
+      return ''
+    }
+    if (command === 'get-public-access-block') {
+      if (!bucket) return '\nAn error occurred (NoSuchPublicAccessBlockConfiguration) when calling the GetPublicAccessBlock operation: The public access block configuration was not found'
+      const blocked = bucket.publicAccess?.includes('not public')
+      return j({ PublicAccessBlockConfiguration: { BlockPublicAcls: blocked, IgnorePublicAcls: blocked, BlockPublicPolicy: blocked, RestrictPublicBuckets: blocked } })
+    }
+    if (command === 'put-public-access-block') {
+      if (!bucket) return '\nAn error occurred (NoSuchBucket) when calling the PutPublicAccessBlock operation: The specified bucket does not exist'
+      const text = String(flags['public-access-block-configuration'] || '')
+      const blocked = !text || !/false/i.test(text)
+      store.updateBucket(flags.bucket, { publicAccess: blocked ? 'Bucket and objects not public' : 'Objects can be public' })
+      return ''
+    }
+    if (command === 'get-bucket-policy') {
+      if (!bucket) return '\nAn error occurred (NoSuchBucket) when calling the GetBucketPolicy operation: The specified bucket does not exist'
+      if (!bucket.bucketPolicy) return '\nAn error occurred (NoSuchBucketPolicy) when calling the GetBucketPolicy operation: The bucket policy does not exist'
+      return j({ Policy: bucket.bucketPolicy })
+    }
+    if (command === 'put-bucket-policy') {
+      if (!bucket) return '\nAn error occurred (NoSuchBucket) when calling the PutBucketPolicy operation: The specified bucket does not exist'
+      store.updateBucket(flags.bucket, { bucketPolicy: flags.policy || '{"Version":"2012-10-17","Statement":[]}' })
+      return ''
+    }
+    if (command === 'delete-bucket-policy') {
+      if (!bucket) return '\nAn error occurred (NoSuchBucket) when calling the DeleteBucketPolicy operation: The specified bucket does not exist'
+      store.updateBucket(flags.bucket, { bucketPolicy: '' })
+      return ''
+    }
+    if (command === 'get-bucket-cors') {
+      if (!bucket) return '\nAn error occurred (NoSuchBucket) when calling the GetBucketCors operation: The specified bucket does not exist'
+      if (!bucket.cors) return '\nAn error occurred (NoSuchCORSConfiguration) when calling the GetBucketCors operation: The CORS configuration does not exist'
+      return bucket.cors
+    }
+    if (command === 'put-bucket-cors') {
+      if (!bucket) return '\nAn error occurred (NoSuchBucket) when calling the PutBucketCors operation: The specified bucket does not exist'
+      store.updateBucket(flags.bucket, { cors: flags['cors-configuration'] || '[]' })
+      return ''
+    }
     if (command === 'get-bucket-acl') {
       if (!bucket) return '\nAn error occurred (NoSuchBucket) when calling the GetBucketAcl operation: The specified bucket does not exist'
-      return j({ Owner: { DisplayName: store.account.alias, ID: ACCOUNT }, Grants: [{ Grantee: { Type: 'CanonicalUser', ID: ACCOUNT }, Permission: 'FULL_CONTROL' }] })
+      return j({ Owner: { DisplayName: store.account.alias, ID: ACCOUNT }, Grants: [{ Grantee: { Type: 'CanonicalUser', ID: ACCOUNT }, Permission: bucket.acl === 'Public read' ? 'READ' : 'FULL_CONTROL' }] })
     }
     if (command === 'get-bucket-encryption') {
       if (!bucket) return '\nAn error occurred (NoSuchBucket) when calling the GetBucketEncryption operation: The specified bucket does not exist'
       return j({ ServerSideEncryptionConfiguration: { Rules: [{ ApplyServerSideEncryptionByDefault: { SSEAlgorithm: bucket.encryption === 'SSE-KMS' ? 'aws:kms' : 'AES256' }, BucketKeyEnabled: true }] } })
+    }
+    if (command === 'put-bucket-encryption') {
+      if (!bucket) return '\nAn error occurred (NoSuchBucket) when calling the PutBucketEncryption operation: The specified bucket does not exist'
+      const conf = String(flags['server-side-encryption-configuration'] || '')
+      store.updateBucket(flags.bucket, { encryption: conf.includes('aws:kms') ? 'SSE-KMS' : 'SSE-S3' })
+      return ''
+    }
+    if (command === 'get-bucket-website') {
+      if (!bucket || !bucket.website) return '\nAn error occurred (NoSuchWebsiteConfiguration) when calling the GetBucketWebsite operation: The specified bucket does not have a website configuration'
+      return j({ IndexDocument: { Suffix: 'index.html' }, ErrorDocument: { Key: 'error.html' } })
+    }
+    if (command === 'put-bucket-website') {
+      if (!bucket) return '\nAn error occurred (NoSuchBucket) when calling the PutBucketWebsite operation: The specified bucket does not exist'
+      store.updateBucket(flags.bucket, { website: true })
+      return ''
     }
     return `\nAn error occurred (InvalidAction) when calling the ${command} operation: aws s3api ${command} is not yet simulated.`
   }

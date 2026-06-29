@@ -299,9 +299,9 @@ function seedState() {
       { id: newIamRoleId(), name: 'CloudFormationRole', created: '2024-01-05T09:00:00Z', trustedEntity: 'cloudformation.amazonaws.com', policies: ['PowerUserAccess'] },
     ],
     iamPolicies: [
-      { name: 'MyS3BucketPolicy', type: 'Customer managed', attached: 1, created: '2024-01-20T09:00:00Z', description: 'Allows access to a specific S3 bucket' },
-      { name: 'MyEC2Policy', type: 'Customer managed', attached: 0, created: '2024-01-20T09:00:00Z', description: 'EC2 read + start/stop for tagged resources' },
-      { name: 'MyDeveloperPolicy', type: 'Customer managed', attached: 1, created: '2024-01-20T09:00:00Z', description: 'Broad dev access excluding IAM/billing' },
+      { name: 'MyS3BucketPolicy', type: 'Customer managed', attached: 1, created: '2024-01-20T09:00:00Z', description: 'Allows access to a specific S3 bucket', document: { Version: '2012-10-17', Statement: [{ Effect: 'Allow', Action: ['s3:GetObject', 's3:PutObject'], Resource: 'arn:aws:s3:::my-web-assets-demo-123456/*' }] } },
+      { name: 'MyEC2Policy', type: 'Customer managed', attached: 0, created: '2024-01-20T09:00:00Z', description: 'EC2 read + start/stop for tagged resources', document: { Version: '2012-10-17', Statement: [{ Effect: 'Allow', Action: ['ec2:Describe*', 'ec2:StartInstances', 'ec2:StopInstances'], Resource: '*' }] } },
+      { name: 'MyDeveloperPolicy', type: 'Customer managed', attached: 1, created: '2024-01-20T09:00:00Z', description: 'Broad dev access excluding IAM/billing', document: { Version: '2012-10-17', Statement: [{ Effect: 'Allow', NotAction: ['iam:*', 'organizations:*', 'account:*'], Resource: '*' }] } },
     ],
 
     cwAlarms: [
@@ -430,13 +430,31 @@ export const useAwsStore = create(
 
       // ---------- S3 ----------
       createBucket: ({ name, region, versioning, encryption, blockPublic }) => {
-        const bucket = { name, region: region || get().region, created: new Date().toISOString(), versioning: !!versioning, publicAccess: blockPublic ? 'Bucket and objects not public' : 'Objects can be public', encryption: encryption || 'SSE-S3', website: false, objects: [] }
+        const bucket = {
+          name,
+          region: region || get().region,
+          created: new Date().toISOString(),
+          versioning: !!versioning,
+          publicAccess: blockPublic ? 'Bucket and objects not public' : 'Objects can be public',
+          encryption: encryption || 'SSE-S3',
+          website: false,
+          objectOwnership: 'Bucket owner enforced',
+          acl: 'Private',
+          bucketPolicy: '',
+          cors: '',
+          lifecycleRules: [],
+          logging: false,
+          objects: [],
+        }
         set((s) => ({ s3Buckets: [...s.s3Buckets, bucket] }))
         return bucket
       },
       deleteBucket: (name) => set((s) => ({ s3Buckets: s.s3Buckets.filter((b) => b.name !== name) })),
+      updateBucket: (name, patch) => set((s) => ({
+        s3Buckets: s.s3Buckets.map((b) => (b.name === name ? { ...b, ...patch } : b)),
+      })),
       putObject: (bucketName, key, size) => set((s) => ({
-        s3Buckets: s.s3Buckets.map((b) => (b.name === bucketName ? { ...b, objects: [...b.objects.filter((o) => o.key !== key), { key, size: size || 0, modified: new Date().toISOString(), storageClass: 'STANDARD' }] } : b)),
+        s3Buckets: s.s3Buckets.map((b) => (b.name === bucketName ? { ...b, objects: [...b.objects.filter((o) => o.key !== key), { key, size: size || 0, modified: new Date().toISOString(), storageClass: 'STANDARD', etag: `"${Math.random().toString(16).slice(2, 34).padEnd(32, '0')}"` }] } : b)),
       })),
       deleteObject: (bucketName, key) => set((s) => ({
         s3Buckets: s.s3Buckets.map((b) => (b.name === bucketName ? { ...b, objects: b.objects.filter((o) => o.key !== key) } : b)),
@@ -459,6 +477,15 @@ export const useAwsStore = create(
         set((s) => ({ iamRoles: [...s.iamRoles, role] }))
         return role
       },
+      createIamPolicy: ({ name, description, document }) => {
+        const policy = { name, type: 'Customer managed', attached: 0, created: new Date().toISOString(), description, document }
+        set((s) => ({ iamPolicies: [...s.iamPolicies, policy] }))
+        return policy
+      },
+      updateIamPolicy: (name, patch) => set((s) => ({
+        iamPolicies: s.iamPolicies.map((p) => (p.name === name ? { ...p, ...patch } : p)),
+      })),
+      deleteIamPolicy: (name) => set((s) => ({ iamPolicies: s.iamPolicies.filter((p) => p.name !== name) })),
 
       // ---------- Generic services ----------
       createGenericResource: (service, resource, payload) => {

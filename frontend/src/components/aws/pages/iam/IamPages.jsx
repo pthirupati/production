@@ -1,9 +1,20 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useAwsStore } from '../../store/awsStore'
-import { Button, ConfirmDialog, DataTable, IDCopy, Modal, SectionLabel } from '../../ui/primitives'
+import { Badge, Button, ConfirmDialog, DataTable, IDCopy, Modal, SectionLabel } from '../../ui/primitives'
 import { ACCOUNT } from '../../store/awsStore'
 import { BASE } from '../../layout/serviceNav'
+
+const DEFAULT_POLICY = {
+  Version: '2012-10-17',
+  Statement: [
+    {
+      Effect: 'Allow',
+      Action: ['ec2:Describe*', 's3:ListBucket'],
+      Resource: '*',
+    },
+  ],
+}
 
 function Page({ title, action, children }) {
   return (
@@ -139,11 +150,105 @@ export function RoleList() {
 
 export function PolicyList() {
   const policies = useAwsStore((s) => s.iamPolicies)
+  const createIamPolicy = useAwsStore((s) => s.createIamPolicy)
+  const updateIamPolicy = useAwsStore((s) => s.updateIamPolicy)
+  const deleteIamPolicy = useAwsStore((s) => s.deleteIamPolicy)
+  const pushFlash = useAwsStore((s) => s.pushFlash)
+  const [selected, setSelected] = useState([])
+  const [creating, setCreating] = useState(false)
+  const [editing, setEditing] = useState(null)
+  const [deleteTarget, setDeleteTarget] = useState(null)
+  const [name, setName] = useState('')
+  const [description, setDescription] = useState('')
+  const [documentText, setDocumentText] = useState(JSON.stringify(DEFAULT_POLICY, null, 2))
+
   const columns = [
-    { key: 'name', label: 'Policy name' },
+    { key: 'name', label: 'Policy name', render: (r) => <a onClick={() => { setEditing(r); setDocumentText(JSON.stringify(r.document || DEFAULT_POLICY, null, 2)); setDescription(r.description || '') }}>{r.name}</a> },
     { key: 'type', label: 'Type' },
-    { key: 'attached', label: 'Attached entities' },
+    { key: 'attached', label: 'Attached entities', render: (r) => <Badge state={r.attached ? 'running' : 'stopped'}>{r.attached}</Badge> },
     { key: 'description', label: 'Description' },
+    { key: 'arn', label: 'ARN', render: (r) => <IDCopy value={`arn:aws:iam::${ACCOUNT}:policy/${r.name}`} /> },
   ]
-  return <Page title={`Policies (${policies.length})`}><DataTable columns={columns} rows={policies} getRowKey={(r) => r.name} /></Page>
+  const error = name && !/^[\w+=,.@-]{1,128}$/.test(name)
+    ? 'Policy name may contain alphanumeric and + = , . @ - _ characters (max 128).'
+    : policies.some((p) => p.name === name)
+      ? 'Policy already exists.'
+      : ''
+
+  const parseDocument = () => {
+    const parsed = JSON.parse(documentText)
+    if (!parsed.Version || !parsed.Statement) throw new Error('Policy must include Version and Statement')
+    return parsed
+  }
+
+  return (
+    <Page title={`Policies (${policies.length})`} action={
+      <div style={{ display: 'flex', gap: 8 }}>
+        <Button disabled={selected.length !== 1} onClick={() => setDeleteTarget(selected[0])}>Delete</Button>
+        <Button variant="primary" onClick={() => { setCreating(true); setName(''); setDescription(''); setDocumentText(JSON.stringify(DEFAULT_POLICY, null, 2)) }}>Create policy</Button>
+      </div>
+    }>
+      <div className="aws-card" style={{ marginBottom: 12 }}>
+        <SectionLabel>IAM policy authoring</SectionLabel>
+        <div className="aws-hint" style={{ marginTop: 8 }}>
+          Create customer-managed policies, inspect ARNs, and edit JSON documents with AWS-style validation. Attach counts are simulated for users, groups, and roles.
+        </div>
+      </div>
+      <DataTable
+        columns={columns}
+        rows={policies}
+        getRowKey={(r) => r.name}
+        selectable
+        selected={selected}
+        onSelect={setSelected}
+        onRowClick={(r) => { setEditing(r); setDocumentText(JSON.stringify(r.document || DEFAULT_POLICY, null, 2)); setDescription(r.description || '') }}
+        rowActions={(r) => [
+          { label: 'Edit JSON policy', onClick: () => { setEditing(r); setDocumentText(JSON.stringify(r.document || DEFAULT_POLICY, null, 2)); setDescription(r.description || '') } },
+          { label: 'Copy policy ARN', onClick: () => navigator.clipboard?.writeText(`arn:aws:iam::${ACCOUNT}:policy/${r.name}`) },
+          { label: 'Delete', danger: true, onClick: () => setDeleteTarget(r.name) },
+        ]}
+        tableId="iam:policies"
+      />
+      {creating && (
+        <Modal
+          title="Create policy"
+          width={860}
+          onClose={() => setCreating(false)}
+          footer={<><Button onClick={() => setCreating(false)}>Cancel</Button><Button variant="primary" disabled={!name || !!error} onClick={() => { try { const doc = parseDocument(); createIamPolicy({ name, description, document: doc }); pushFlash('success', `Created policy ${name}`); setCreating(false) } catch (e) { pushFlash('error', e.message || 'Policy document must be valid JSON') } }}>Create policy</Button></>}
+        >
+          <label className="aws-label">Policy name</label>
+          <input className={`aws-input ${error ? 'aws-invalid' : ''}`} value={name} onChange={(e) => setName(e.target.value)} placeholder="MyLeastPrivilegePolicy" />
+          {error && <div className="aws-field-error">{error}</div>}
+          <label className="aws-label" style={{ marginTop: 12 }}>Description</label>
+          <input className="aws-input" value={description} onChange={(e) => setDescription(e.target.value)} placeholder="Describe what this policy allows" />
+          <label className="aws-label" style={{ marginTop: 12 }}>Policy document</label>
+          <textarea className="aws-input aws-mono" value={documentText} onChange={(e) => setDocumentText(e.target.value)} style={{ minHeight: 300, lineHeight: 1.5 }} />
+        </Modal>
+      )}
+      {editing && (
+        <Modal
+          title={`Edit policy ${editing.name}`}
+          width={860}
+          onClose={() => setEditing(null)}
+          footer={<><Button onClick={() => setEditing(null)}>Cancel</Button><Button variant="primary" onClick={() => { try { const doc = parseDocument(); updateIamPolicy(editing.name, { description, document: doc }); pushFlash('success', `Updated policy ${editing.name}`); setEditing(null) } catch (e) { pushFlash('error', e.message || 'Policy document must be valid JSON') } }}>Save changes</Button></>}
+        >
+          <div className="aws-kv" style={{ marginBottom: 12 }}><span className="k">Policy ARN</span><IDCopy value={`arn:aws:iam::${ACCOUNT}:policy/${editing.name}`} /></div>
+          <label className="aws-label">Description</label>
+          <input className="aws-input" value={description} onChange={(e) => setDescription(e.target.value)} />
+          <label className="aws-label" style={{ marginTop: 12 }}>Policy document</label>
+          <textarea className="aws-input aws-mono" value={documentText} onChange={(e) => setDocumentText(e.target.value)} style={{ minHeight: 340, lineHeight: 1.5 }} />
+        </Modal>
+      )}
+      {deleteTarget && (
+        <ConfirmDialog
+          title={`Delete policy ${deleteTarget}?`}
+          body="Deleting a customer managed policy removes it from the local IAM simulation. AWS does not allow deleting AWS managed policies; this table contains customer-managed policies."
+          confirmLabel="Delete policy"
+          confirmText={deleteTarget}
+          onCancel={() => setDeleteTarget(null)}
+          onConfirm={() => { deleteIamPolicy(deleteTarget); pushFlash('success', `Deleted policy ${deleteTarget}`); setSelected([]); setDeleteTarget(null) }}
+        />
+      )}
+    </Page>
+  )
 }
