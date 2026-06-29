@@ -5,6 +5,7 @@ import { createWindowsShell } from '../../vmware/windowsShell'
 import { getInstanceType } from '../lib/instanceTypes'
 import { defaultUser } from './vfs'
 import { awsCli } from './awscli'
+import { createTerraform } from './terraformSim'
 import { resolveEc2Workload, WORKLOAD_LABELS } from './ec2Workload'
 
 function guestOsLabel(os) {
@@ -72,6 +73,14 @@ export function createEc2SimShell(instance, opts = {}) {
 
   const sshUser = opts.user || defaultUser(instance.os)
   const linux = createLinuxShell(vm, { user: sshUser })
+  // Terraform engine shares the AWS store, so `terraform apply` here creates
+  // EC2/S3/SG resources that appear in the console — the full IaC → AWS stack.
+  const terraform = createTerraform({
+    store,
+    readFile: linux.readFile?.bind(linux),
+    getCwd: linux.getCwd?.bind(linux),
+    region: instance.region,
+  })
 
   return {
     workload,
@@ -90,6 +99,14 @@ export function createEc2SimShell(instance, opts = {}) {
         const args = tokens.slice(1)
         const result = awsCli(args, store, { region: instance.region })
         result.split('\n').forEach((row) => onWrite(`${row}\r\n`))
+        linux.history.push(line)
+        return
+      }
+
+      // Terraform — operates on the same AWS store (linuxShell has no `terraform`).
+      if (line === 'terraform' || line.startsWith('terraform ')) {
+        const args = line.split(/\s+/).slice(1)
+        writeLines(onWrite, terraform.run(args))
         linux.history.push(line)
         return
       }
