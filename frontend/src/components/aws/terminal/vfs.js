@@ -35,6 +35,7 @@ export function kernelVersion(os) {
 export function defaultUser(os) {
   if (os.startsWith('ubuntu')) return 'ubuntu'
   if (os === 'debian-12') return 'admin'
+  if (os.startsWith('windows')) return 'Administrator'
   return 'ec2-user'
 }
 

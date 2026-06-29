@@ -359,6 +359,7 @@ export const useAwsStore = create(
             monitoring: monitoring ? 'enabled' : 'disabled', rootDevice: '/dev/xvda', rootVolume: rootVol,
             launchTime: new Date().toISOString(), statusChecks: 'initializing', tenancy: 'default',
             architecture: getInstanceType(type).arch,
+            workload: ami.workload || 'linux',
             tags: { ...(name ? { Name: name } : {}), ...(tags || {}) },
           })
           set((s) => ({

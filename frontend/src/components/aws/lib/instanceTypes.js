@@ -76,6 +76,10 @@ export const AMI_CATALOG = [
   { id: 'ami-0e001c9271cf7f3b9', name: 'Ubuntu Server 24.04 LTS', os: 'ubuntu-24.04', platform: 'Ubuntu', arch: 'x86_64', user: 'ubuntu', desc: 'Canonical, Ubuntu, 24.04 LTS, amd64 noble', freeTier: true },
   { id: 'ami-026ebd4cfe2c043b2', name: 'Red Hat Enterprise Linux 9', os: 'rhel-9', platform: 'Red Hat', arch: 'x86_64', user: 'ec2-user', desc: 'RHEL-9 HVM x86_64 Hourly2', freeTier: false },
   { id: 'ami-0150ccaf51ab55a51', name: 'Debian 12 (Bookworm)', os: 'debian-12', platform: 'Debian', arch: 'x86_64', user: 'admin', desc: 'Debian 12 (20240xxx) amd64', freeTier: true },
+  { id: 'ami-eks-worker-al2023', name: 'Amazon EKS Optimized AMI', os: 'amazon-linux-2023', platform: 'Linux/UNIX', arch: 'x86_64', user: 'ec2-user', desc: 'EKS worker node — kubectl, kubelet, containerd', freeTier: false, workload: 'kubernetes' },
+  { id: 'ami-k8s-ubuntu2204', name: 'Ubuntu EKS / Kubernetes worker', os: 'ubuntu-22.04', platform: 'Ubuntu', arch: 'x86_64', user: 'ubuntu', desc: 'Kubernetes worker node on Ubuntu 22.04', freeTier: false, workload: 'kubernetes' },
+  { id: 'ami-win2022-base', name: 'Microsoft Windows Server 2022 Base', os: 'windows-server-2022', platform: 'Windows', arch: 'x86_64', user: 'Administrator', desc: 'Windows Server 2022 Full Locale English Base', freeTier: false, workload: 'windows' },
+  { id: 'ami-win2019-base', name: 'Microsoft Windows Server 2019 Base', os: 'windows-server-2019', platform: 'Windows', arch: 'x86_64', user: 'Administrator', desc: 'Windows Server 2019 Full Locale English Base', freeTier: false, workload: 'windows' },
 ]
 
 export function getAmi(id) {

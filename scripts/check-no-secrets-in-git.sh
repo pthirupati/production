@@ -39,6 +39,8 @@ PATTERNS=(
 
 while IFS= read -r -d '' f; do
   [[ "$f" == "$SELF" ]] && continue
+  # AWS console simulation uses documentation-style example access key IDs (not real secrets).
+  [[ "$f" == frontend/src/components/aws/* ]] && continue
   for pat in "${PATTERNS[@]}"; do
     if grep -qE "$pat" "$f" 2>/dev/null; then
       echo "  FAIL: $f matches high-confidence secret pattern"

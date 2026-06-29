@@ -2,11 +2,13 @@ import { useState } from 'react'
 import { Modal, Tabs, Button, IDCopy } from '../../ui/primitives'
 import AwsTerminal from '../../terminal/AwsTerminal'
 import { defaultUser } from '../../terminal/vfs'
+import { resolveEc2Workload, workloadHint } from '../../terminal/ec2Workload'
 import { publicDns } from '../../lib/ids'
 
 export default function ConnectModal({ instance, onClose }) {
   const [tab, setTab] = useState('eic')
   const [connected, setConnected] = useState(false)
+  const workload = resolveEc2Workload(instance)
   const [user, setUser] = useState(defaultUser(instance.os))
   const dns = instance.publicIp ? publicDns(instance.publicIp, instance.region) : `${instance.privateIp} (private)`
   const sshHost = instance.publicIp ? publicDns(instance.publicIp, instance.region) : instance.privateIp
@@ -17,7 +19,7 @@ export default function ConnectModal({ instance, onClose }) {
     return (
       <div style={{ position: 'fixed', inset: 0, zIndex: 1100, background: '#16191f', display: 'flex', flexDirection: 'column' }}>
         <div style={{ height: 36, background: 'var(--aws-dark-blue)', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0 12px', fontSize: 13 }}>
-          <span>EC2 Instance Connect — {instance.id} — {instance.os} — {user}@{instance.privateIp} — {instance.region} — {instance.az}</span>
+          <span>EC2 Instance Connect — {instance.id} — {workload} — {user}@{instance.privateIp} — {instance.region} — {instance.az}</span>
           <span style={{ display: 'flex', gap: 8 }}>
             <Button onClick={() => setConnected(false)}>Reconnect options</Button>
             <Button variant="danger" onClick={onClose}>Disconnect</Button>
@@ -60,6 +62,7 @@ export default function ConnectModal({ instance, onClose }) {
             <label className="aws-label">User name</label>
             <input className="aws-input" value={user} onChange={(e) => setUser(e.target.value)} />
             <div className="aws-hint">Suggested user for {instance.os}: {defaultUser(instance.os)}. This simulation creates the matching home directory and prompt.</div>
+            <div className="aws-hint" style={{ marginTop: 8 }}><strong>Lab engine:</strong> {workloadHint(workload)}</div>
           </div>
         )}
         {tab === 'ssm' && (

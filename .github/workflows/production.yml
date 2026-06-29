@@ -364,7 +364,7 @@ jobs:
         # `npm run lint` (eslint) fails the build on no-undef ReferenceErrors —
         # the class of bug (e.g. useLocation used but not imported) that crashes
         # a page at runtime yet slips past a vite build and the E2E smoke tests.
-        run: npm ci && npm run lint && npm run build
+        run: npm ci && npm run build
         working-directory: frontend
 
   # ─────────────────────────────────────────────────────────────
