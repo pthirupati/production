@@ -6,6 +6,32 @@ import { useAuthStore } from '../store/authStore'
 
 const WS_NO_RECONNECT = new Set([1000, 4001, 4003, 4004, 4005, 4008, 4500])
 
+// Refresh the in-memory JWT used to authenticate the terminal WebSocket. The
+// socket reads useAuthStore.accessToken at connect time, but (unlike the axios
+// client) it never refreshes on its own — so an expired access token closes the
+// socket with 4001 and the user is stuck. We attempt a single silent refresh
+// (cookie- or body-based) and let the caller reconnect on success.
+async function refreshAuthToken() {
+  try {
+    const { refreshToken, user, setAuth } = useAuthStore.getState()
+    const res = await fetch('/api/auth/refresh/', {
+      method: 'POST',
+      credentials: 'include',
+      headers: { 'Content-Type': 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
+      body: JSON.stringify(refreshToken ? { refresh: refreshToken } : {}),
+    })
+    if (!res.ok) return false
+    const data = await res.json()
+    if (data?.access) {
+      setAuth(user, data.access, data.refresh || refreshToken)
+      return true
+    }
+    return false
+  } catch {
+    return false
+  }
+}
+
 const WS_CLOSE_MESSAGES = {
   4001: '\r\n\x1b[1;31mAuthentication expired — refresh the page to reconnect.\x1b[0m\r\n',
   4003: '\r\n\x1b[1;33mLab is not running yet — wait for provisioning to finish.\x1b[0m\r\n',
@@ -188,6 +214,7 @@ function LabTerminal({
       const shellReadyRef = { current: false }
       const readyFiredRef = { current: false }
       const reconnectMsgShown = { current: false }
+      const authRefreshTriedRef = { current: false }
       const connectingRef = { current: false }
       const connectionStableAtRef = { current: null }
       const pauseUntilVisibleRef = { current: false }
@@ -276,6 +303,7 @@ function LabTerminal({
           prev.onclose = null
           prev.onmessage = null
           if (prev._readyFallback) clearTimeout(prev._readyFallback)
+          if (prev._stableTimer) clearTimeout(prev._stableTimer)
           if (prev.readyState === WebSocket.OPEN || prev.readyState === WebSocket.CONNECTING) {
             prev.close(1000)
           }
@@ -285,9 +313,19 @@ function LabTerminal({
         ws.onopen = () => {
           setStatusText('Connected')
           connectingRef.current = false
-          reconnectAttempts.current = 0
-          reconnectMsgShown.current = false
           shellReadyRef.current = false
+          // Only clear the retry budget once the socket survives a stable
+          // window. Resetting on bare onopen made an open->die-within-8s socket
+          // loop forever at "Reconnecting (1/10)" (the count reset every cycle).
+          // Gating the reset behind a stability timer keeps a flapping
+          // connection bounded so it surfaces the manual "press Enter" retry
+          // instead of an endless silent loop, while a genuinely-recovered
+          // connection still earns a fresh budget for future drops.
+          if (ws._stableTimer) clearTimeout(ws._stableTimer)
+          ws._stableTimer = setTimeout(() => {
+            reconnectAttempts.current = 0
+            reconnectMsgShown.current = false
+          }, 10000)
           const fallbackMs = isSimulation ? 800 : isCloud ? 8000 : 1500
           ws._readyFallback = setTimeout(fireReady, fallbackMs)
         }
@@ -319,7 +357,26 @@ function LabTerminal({
           setStatusText(e.code === 1000 ? 'Closed' : 'Reconnecting')
           connectingRef.current = false
           if (ws._readyFallback) clearTimeout(ws._readyFallback)
+          if (ws._stableTimer) clearTimeout(ws._stableTimer)
           if (disposed || e.code === 1000) return
+          // Auth expired: silently refresh the access token once and reconnect
+          // instead of dead-ending on "refresh the page".
+          if (e.code === 4001 && !authRefreshTriedRef.current) {
+            authRefreshTriedRef.current = true
+            term.write('\r\n\x1b[1;33mSession expired — refreshing credentials...\x1b[0m\r\n')
+            refreshAuthToken().then((ok) => {
+              if (disposed) return
+              if (ok) {
+                reconnectAttempts.current = 0
+                reconnectMsgShown.current = false
+                connectWs()
+              } else {
+                term.write(WS_CLOSE_MESSAGES[4001])
+                bindEnterRetry('\x1b[1;33mPress Enter to retry connection...\x1b[0m\r\n')
+              }
+            })
+            return
+          }
           if (WS_NO_RECONNECT.has(e.code)) {
             term.write(WS_CLOSE_MESSAGES[e.code] || '\r\n\x1b[1;31mConnection closed.\x1b[0m\r\n')
             if (e.code === 4500) {
@@ -423,6 +480,7 @@ function LabTerminal({
         const ws = wsRef.current
         if (ws) {
           if (ws._readyFallback) clearTimeout(ws._readyFallback)
+          if (ws._stableTimer) clearTimeout(ws._stableTimer)
           ws.onclose = null
           ws.close(1000)
         }

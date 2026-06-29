@@ -81,6 +81,7 @@ const RecruiterCompare = lazyWithRetry(() => import('../pages/interviews/Recruit
 const InterviewInvite = lazyWithRetry(() => import('../pages/interviews/InterviewInvite'))
 const AsyncVideoRoom = lazyWithRetry(() => import('../pages/interviews/AsyncVideoRoom'))
 const VMwareSimulator = lazyWithRetry(() => import('../pages/vmware/VMwareSimulator'))
+const AwsConsole = lazyWithRetry(() => import('../components/aws/AwsConsole'))
 const Unsubscribe = lazyWithRetry(() => import('../pages/Unsubscribe'))
 const Changelog = lazyWithRetry(() => import('../pages/Changelog'))
 const Tutorials = lazyWithRetry(() => import('../pages/tutorials/Tutorials'))
@@ -172,6 +173,7 @@ export default function AppRouter() {
         <Route path="/auth/callback/:provider" element={<OAuthCallback />} />
         <Route path="/vmware/:sessionId" element={<ProtectedRoute><VMwareSimulator /></ProtectedRoute>} />
         <Route path="/vmware-sim" element={<ProtectedRoute><VMwareSimulator /></ProtectedRoute>} />
+        <Route path="/aws-sim/*" element={<ProtectedRoute><AwsConsole /></ProtectedRoute>} />
 
         {/* Protected routes */}
         <Route element={<ProtectedRoute><MainLayout /></ProtectedRoute>}>

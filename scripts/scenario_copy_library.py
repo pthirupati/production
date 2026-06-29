@@ -34,6 +34,7 @@ KIND_LABELS = {
 }
 
 TECH_PROFILES: dict[str, dict[str, str]] = {
+    "aws": {"domain": "AWS cloud operations", "env": "AWS practice account", "surface": "AWS CLI, IAM policies, EC2/S3/VPC, security groups, and CloudFormation/Terraform"},
     "linux": {"domain": "Linux administration", "env": "Linux practice server", "surface": "terminal and config files under /etc and /var"},
     "rhel-linux": {"domain": "Red Hat Enterprise Linux", "env": "RHEL practice host", "surface": "dnf, subscription-manager, firewalld, and SELinux"},
     "docker": {"domain": "Docker containers", "env": "Docker host", "surface": "docker CLI, images, containers, and compose files"},

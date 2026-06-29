@@ -1,0 +1,7 @@
+name: AWS Cloud
+slug: aws
+icon: cloud
+color: orange
+order: 34
+is_active: true
+description: "Hands-on AWS labs — EC2, S3, IAM, VPC, security groups, RDS, Lambda, CloudWatch, Auto Scaling, and Route 53."

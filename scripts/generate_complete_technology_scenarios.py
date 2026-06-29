@@ -25,6 +25,7 @@ MIN_NEW_PER_TECH = 40
 SIM_BY_TECH = {
     "ansible": "ansible",
     "ai-ml": "python",
+    "aws": "generic",
     "baremetal": "baremetal",
     "data-science": "python",
     "database": "database",
@@ -73,6 +74,7 @@ GENERIC_TOPICS = [
 KIND_TITLES = {kind: title for kind, title, _summary in GENERIC_TOPICS}
 
 TECH_TOPICS = {
+    "aws": ["ec2", "s3", "iam", "vpc", "security-groups", "rds", "lambda", "cloudwatch", "autoscaling", "route53"],
     "linux": ["users-groups", "permissions-acl", "systemd-services", "journald-logs", "storage-lvm", "networking-firewalld", "selinux", "cron-timers", "package-patching", "boot-recovery"],
     "rhel-linux": ["subscription-repos", "dnf-modules", "firewalld", "selinux-policy", "tuned-profile", "kdump", "auditd", "sssd", "chrony", "systemd-targets"],
     "docker": ["images-layers", "dockerfile", "compose", "volumes", "networks", "healthchecks", "logs", "rootless", "registry", "resource-limits"],

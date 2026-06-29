@@ -11,6 +11,7 @@ from apps.question_bank.models import Technology, Scenario
 from apps.hints.models import Hint
 
 TECH_META = {
+    "aws": {"slug": "aws", "name": "AWS Cloud", "icon": "cloud", "color": "orange", "order": 34},
     "linux": {"slug": "linux", "name": "Linux Administration", "icon": "terminal", "color": "cyan", "order": 5},
     "networking": {"slug": "networking", "name": "Networking", "icon": "globe", "color": "blue", "order": 7},
     "vmware": {"slug": "vmware", "name": "VMware vSphere", "icon": "server", "color": "blue", "order": 8},

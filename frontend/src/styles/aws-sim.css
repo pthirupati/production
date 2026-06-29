@@ -1,0 +1,205 @@
+/*
+ * AWS Cloud Simulation — exact AWS Console design tokens.
+ * Scoped under .aws-sim so it never bleeds into the FixitLab app.
+ */
+.aws-sim {
+  --aws-orange: #ff9900;
+  --aws-orange-hover: #ec7211;
+  --aws-orange-active: #eb5f07;
+  --aws-dark-blue: #232f3e;
+  --aws-darker-blue: #161e2d;
+  --aws-squid-ink: #16191f;
+  --aws-nav-bg: #232f3e;
+  --aws-nav-hover: #37475a;
+  --aws-nav-active: #ff9900;
+  --aws-nav-text: #ffffff;
+  --aws-nav-text-muted: #8b96a5;
+  --aws-sidebar-bg: #ffffff;
+  --aws-sidebar-border: #e9eaea;
+  --aws-sidebar-active-bg: #f1faff;
+  --aws-sidebar-active-border: #0073bb;
+  --aws-sidebar-active-text: #0073bb;
+  --aws-sidebar-hover-bg: #f8f8f8;
+  --aws-page-bg: #f8f8f8;
+  --aws-content-bg: #ffffff;
+  --aws-border: #d5dbdb;
+  --aws-border-light: #e9eaea;
+  --aws-text-primary: #16191f;
+  --aws-text-secondary: #545b64;
+  --aws-text-muted: #879596;
+  --aws-text-link: #0073bb;
+  --aws-text-link-hover: #005b8e;
+  --aws-success: #1d8102;
+  --aws-success-bg: #ebf6e9;
+  --aws-warning: #ff9900;
+  --aws-warning-bg: #fff8ee;
+  --aws-error: #d13212;
+  --aws-error-bg: #fdecea;
+  --aws-info: #0073bb;
+  --aws-info-bg: #f1faff;
+  --aws-table-header-bg: #f2f3f3;
+  --aws-table-row-hover: #f8f8f8;
+  --aws-table-row-selected: #f1faff;
+  --aws-table-border: #e9eaea;
+  --aws-input-border: #aab7b8;
+  --aws-input-focus: #0073bb;
+  --aws-shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.1);
+  --aws-shadow-md: 0 2px 8px rgba(0, 0, 0, 0.15);
+  --aws-shadow-lg: 0 4px 16px rgba(0, 0, 0, 0.2);
+  --aws-radius: 2px;
+  --aws-radius-md: 4px;
+  --aws-font: "Amazon Ember", "Helvetica Neue", Roboto, Arial, sans-serif;
+  --aws-font-mono: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace;
+
+  font-family: var(--aws-font);
+  color: var(--aws-text-primary);
+  background: var(--aws-page-bg);
+  font-size: 14px;
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Dark mode */
+.aws-sim.aws-dark {
+  --aws-page-bg: #0f1b2a;
+  --aws-content-bg: #1a2433;
+  --aws-sidebar-bg: #1a2433;
+  --aws-sidebar-border: #2a3b4d;
+  --aws-sidebar-hover-bg: #233246;
+  --aws-border: #2a3b4d;
+  --aws-border-light: #2a3b4d;
+  --aws-text-primary: #e7ebef;
+  --aws-text-secondary: #aeb9c4;
+  --aws-text-muted: #7d8b99;
+  --aws-table-header-bg: #233246;
+  --aws-table-row-hover: #233246;
+  --aws-table-row-selected: #14304a;
+  --aws-table-border: #2a3b4d;
+}
+
+.aws-sim * { box-sizing: border-box; }
+.aws-sim h1 { font-size: 20px; font-weight: 700; margin: 0; }
+.aws-sim h2 { font-size: 18px; font-weight: 700; margin: 0; }
+.aws-sim h3 { font-size: 16px; font-weight: 700; margin: 0; }
+.aws-sim h4 { font-size: 14px; font-weight: 700; margin: 0; }
+.aws-sim a { color: var(--aws-text-link); text-decoration: none; cursor: pointer; }
+.aws-sim a:hover { text-decoration: underline; color: var(--aws-text-link-hover); }
+
+.aws-section-label {
+  font-size: 12px; font-weight: 700; text-transform: uppercase;
+  letter-spacing: 0.05em; color: var(--aws-text-secondary); margin-bottom: 8px;
+}
+
+/* Buttons */
+.aws-btn {
+  height: 28px; padding: 0 12px; border-radius: var(--aws-radius);
+  font-size: 13px; font-weight: 700; cursor: pointer; display: inline-flex;
+  align-items: center; gap: 6px; border: 1px solid transparent; line-height: 1;
+  transition: background 0.1s, border-color 0.1s; white-space: nowrap;
+}
+.aws-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+.aws-btn-primary { background: var(--aws-orange); color: #fff; border-color: var(--aws-orange-hover); }
+.aws-btn-primary:not(:disabled):hover { background: var(--aws-orange-hover); }
+.aws-btn-primary:not(:disabled):active { background: var(--aws-orange-active); transform: translateY(1px); }
+.aws-btn-secondary { background: var(--aws-content-bg); border-color: #8b96a5; color: var(--aws-text-primary); }
+.aws-btn-secondary:not(:disabled):hover { background: var(--aws-sidebar-hover-bg); border-color: #545b64; }
+.aws-btn-danger { background: #d13212; color: #fff; border-color: #b12708; }
+.aws-btn-danger:not(:disabled):hover { background: #b12708; }
+.aws-btn-link { background: transparent; color: var(--aws-text-link); border: none; padding: 0 4px; }
+.aws-btn-link:hover { text-decoration: underline; }
+
+/* Inputs */
+.aws-input, .aws-select, .aws-textarea {
+  height: 32px; padding: 4px 8px; border: 1px solid var(--aws-input-border);
+  border-radius: var(--aws-radius); font-size: 14px; color: var(--aws-text-primary);
+  background: var(--aws-content-bg); width: 100%; font-family: var(--aws-font);
+}
+.aws-textarea { min-height: 96px; resize: vertical; height: auto; }
+.aws-input:focus, .aws-select:focus, .aws-textarea:focus {
+  outline: none; border-color: var(--aws-input-focus);
+  box-shadow: 0 0 0 2px rgba(0, 115, 187, 0.25);
+}
+.aws-input.aws-invalid { border-color: var(--aws-error); }
+.aws-field-error { color: var(--aws-error); font-size: 12px; margin-top: 4px; }
+.aws-label { font-size: 13px; font-weight: 700; display: block; margin-bottom: 4px; }
+.aws-hint { font-size: 12px; color: var(--aws-text-secondary); margin-top: 2px; }
+
+/* Tables */
+.aws-table { width: 100%; border-collapse: separate; border-spacing: 0; font-size: 14px; }
+.aws-table thead th {
+  background: var(--aws-table-header-bg); height: 36px; font-size: 12px; font-weight: 700;
+  text-transform: uppercase; text-align: left; padding: 0 16px; color: var(--aws-text-secondary);
+  border-bottom: 1px solid var(--aws-table-border); white-space: nowrap; position: sticky; top: 0;
+}
+.aws-table tbody td { height: 40px; padding: 8px 16px; border-bottom: 1px solid var(--aws-table-border); vertical-align: middle; }
+.aws-table tbody tr:hover { background: var(--aws-table-row-hover); }
+.aws-table tbody tr.aws-row-selected { background: var(--aws-table-row-selected); }
+.aws-mono { font-family: var(--aws-font-mono); font-size: 13px; }
+
+/* Badges */
+.aws-badge { height: 22px; padding: 0 8px; border-radius: 11px; font-size: 12px; font-weight: 700;
+  display: inline-flex; align-items: center; gap: 6px; }
+.aws-badge .aws-dot { width: 8px; height: 8px; border-radius: 50%; display: inline-block; }
+.aws-badge-running, .aws-badge-available { background: var(--aws-success-bg); color: var(--aws-success); }
+.aws-badge-running .aws-dot, .aws-badge-available .aws-dot { background: var(--aws-success); }
+.aws-badge-stopped, .aws-badge-failed, .aws-badge-deleting { background: var(--aws-error-bg); color: var(--aws-error); }
+.aws-badge-stopped .aws-dot, .aws-badge-failed .aws-dot, .aws-badge-deleting .aws-dot { background: var(--aws-error); }
+.aws-badge-pending, .aws-badge-stopping, .aws-badge-modifying, .aws-badge-warning { background: var(--aws-warning-bg); color: var(--aws-warning); }
+.aws-badge-pending .aws-dot, .aws-badge-stopping .aws-dot, .aws-badge-creating .aws-dot { animation: aws-pulse 1.2s ease-in-out infinite; }
+.aws-badge-pending .aws-dot, .aws-badge-stopping .aws-dot, .aws-badge-modifying .aws-dot, .aws-badge-warning .aws-dot { background: var(--aws-warning); }
+.aws-badge-terminated { background: var(--aws-sidebar-hover-bg); color: var(--aws-text-muted); }
+.aws-badge-terminated .aws-dot { background: var(--aws-text-muted); }
+.aws-badge-creating { background: var(--aws-info-bg); color: var(--aws-info); }
+.aws-badge-creating .aws-dot { background: var(--aws-info); }
+@keyframes aws-pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.3; } }
+
+/* Cards */
+.aws-card { background: var(--aws-content-bg); border: 1px solid var(--aws-border); border-radius: var(--aws-radius-md); padding: 16px 20px; }
+.aws-card-hover:hover { border-color: #aab7b8; }
+
+/* Flash */
+.aws-flash { display: flex; gap: 12px; align-items: flex-start; padding: 12px 16px; border-radius: var(--aws-radius); border-left: 4px solid; margin-bottom: 12px; }
+.aws-flash-success { background: var(--aws-success-bg); border-color: var(--aws-success); }
+.aws-flash-error { background: var(--aws-error-bg); border-color: var(--aws-error); }
+.aws-flash-warning { background: var(--aws-warning-bg); border-color: var(--aws-warning); }
+.aws-flash-info { background: var(--aws-info-bg); border-color: var(--aws-info); }
+
+/* Tabs */
+.aws-tabs { display: flex; gap: 24px; border-bottom: 1px solid var(--aws-border); }
+.aws-tab { font-size: 14px; padding: 8px 0; color: var(--aws-text-secondary); cursor: pointer; border-bottom: 2px solid transparent; background: none; border-top: none; border-left: none; border-right: none; }
+.aws-tab:hover { color: var(--aws-text-primary); }
+.aws-tab-active { color: var(--aws-text-primary); font-weight: 700; border-bottom-color: var(--aws-orange); }
+
+/* Modal */
+.aws-modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.5); z-index: 1000; display: flex; align-items: flex-start; justify-content: center; padding-top: 6vh; }
+.aws-modal { background: var(--aws-content-bg); border-radius: var(--aws-radius-md); box-shadow: var(--aws-shadow-lg); min-width: 400px; max-width: 860px; width: 100%; max-height: 88vh; overflow-y: auto; }
+.aws-modal-header { padding: 16px 20px; border-bottom: 1px solid var(--aws-border-light); font-size: 18px; font-weight: 700; display: flex; justify-content: space-between; align-items: center; }
+.aws-modal-body { padding: 20px; }
+.aws-modal-footer { padding: 16px 20px; border-top: 1px solid var(--aws-border-light); display: flex; gap: 8px; justify-content: flex-end; }
+
+/* Spinner */
+.aws-spinner { width: 20px; height: 20px; border: 2px solid rgba(255,153,0,0.25); border-top-color: var(--aws-orange); border-radius: 50%; animation: aws-spin 0.7s linear infinite; }
+@keyframes aws-spin { to { transform: rotate(360deg); } }
+
+/* Layout */
+.aws-topnav { height: 48px; background: var(--aws-nav-bg); display: flex; align-items: center; color: var(--aws-nav-text); padding: 0 12px; gap: 12px; position: sticky; top: 0; z-index: 100; }
+.aws-topnav-btn { background: transparent; border: none; color: var(--aws-nav-text); height: 32px; padding: 0 10px; border-radius: var(--aws-radius); display: inline-flex; align-items: center; gap: 6px; cursor: pointer; font-size: 14px; }
+.aws-topnav-btn:hover { background: var(--aws-nav-hover); }
+.aws-leftnav { width: 220px; min-width: 220px; background: var(--aws-sidebar-bg); border-right: 1px solid var(--aws-sidebar-border); overflow-y: auto; }
+.aws-leftnav-item { display: block; padding: 7px 16px; font-size: 14px; color: var(--aws-text-primary); cursor: pointer; border-left: 3px solid transparent; }
+.aws-leftnav-item:hover { background: var(--aws-sidebar-hover-bg); text-decoration: none; }
+.aws-leftnav-item.aws-active { background: var(--aws-sidebar-active-bg); border-left-color: var(--aws-sidebar-active-border); color: var(--aws-sidebar-active-text); font-weight: 700; }
+.aws-leftnav-group { padding: 12px 16px 4px; font-size: 12px; font-weight: 700; color: var(--aws-text-secondary); }
+
+.aws-breadcrumb { height: 36px; display: flex; align-items: center; gap: 8px; font-size: 13px; padding: 0 20px; color: var(--aws-text-muted); }
+.aws-page { padding: 20px; }
+.aws-summary-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 12px; }
+.aws-kv { display: flex; flex-direction: column; gap: 2px; }
+.aws-kv .k { font-size: 12px; color: var(--aws-text-secondary); }
+.aws-kv .v { font-size: 14px; }
+
+.aws-copy-btn { background: none; border: none; cursor: pointer; color: var(--aws-text-muted); padding: 2px; display: inline-flex; }
+.aws-copy-btn:hover { color: var(--aws-text-link); }
+
+/* CloudShell drawer */
+.aws-cloudshell { position: fixed; left: 0; right: 0; bottom: 0; background: #16191f; z-index: 200; border-top: 2px solid var(--aws-orange); }
