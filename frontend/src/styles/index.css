@@ -3929,16 +3929,38 @@ body::after {
 }
 
 .tutorial-page .tutorial-prose {
-  max-width: 68ch;
+  max-width: 100%;
+}
+
+/* Keep a comfortable reading measure for text blocks only, so code, tables,
+   diagrams and callouts can use the full card width and never look squeezed. */
+.tutorial-page .tutorial-prose > p,
+.tutorial-page .tutorial-prose > ul,
+.tutorial-page .tutorial-prose > ol,
+.tutorial-page .tutorial-prose > h3,
+.tutorial-page .tutorial-prose > .tutorial-callout {
+  max-width: 74ch;
 }
 
 .tutorial-page .tutorial-prose p {
   font-family: "Source Serif 4", Georgia, "Times New Roman", serif;
   font-size: 1.0625rem;
-  line-height: 1.85;
+  line-height: 1.8;
   color: var(--tutorial-prose);
   letter-spacing: 0.012em;
   margin: 0;
+  overflow-wrap: anywhere;
+}
+
+/* Media blocks always fill the card width regardless of the text measure. */
+.tutorial-page .tutorial-prose > .tutorial-code-block,
+.tutorial-page .tutorial-prose > .tutorial-shell-block,
+.tutorial-page .tutorial-prose > .tutorial-table-wrap,
+.tutorial-page .tutorial-prose > .tutorial-diagram,
+.tutorial-page .tutorial-prose > .tutorial-image,
+.tutorial-page .tutorial-prose > .tutorial-details {
+  max-width: 100%;
+  width: 100%;
 }
 
 .tutorial-page .tutorial-prose p strong {
@@ -3952,6 +3974,18 @@ body::after {
   border-radius: 1rem;
   padding: 1.5rem 1.75rem;
   transition: border-color 0.2s ease, box-shadow 0.2s ease;
+  overflow: hidden;
+}
+
+@media (max-width: 640px) {
+  .tutorial-page .tutorial-section-card {
+    padding: 1.1rem 1rem;
+    border-radius: 0.75rem;
+  }
+  .tutorial-page .tutorial-prose p {
+    font-size: 1rem;
+    line-height: 1.7;
+  }
 }
 
 .tutorial-page .tutorial-section-card:hover {
@@ -4151,6 +4185,74 @@ body::after {
   color: var(--tutorial-prose);
   font-size: 0.95rem;
   line-height: 1.7;
+  overflow-wrap: anywhere;
+}
+
+/* Lesson images / figures (screenshots, diagrams exported as images). */
+.tutorial-page .tutorial-image {
+  margin: 1.25rem 0;
+  border-radius: 0.75rem;
+  border: 1px solid var(--tutorial-card-border);
+  background: rgb(var(--s-950) / 0.5);
+  overflow: hidden;
+}
+.tutorial-page .tutorial-image img {
+  display: block;
+  width: 100%;
+  height: auto;
+  max-height: 70vh;
+  object-fit: contain;
+  background: rgb(var(--s-950) / 0.6);
+}
+.tutorial-page .tutorial-image figcaption {
+  padding: 0.5rem 0.875rem;
+  font-size: 0.75rem;
+  font-style: italic;
+  color: var(--tutorial-subtle);
+  border-top: 1px solid var(--tutorial-card-border);
+}
+.tutorial-page .tutorial-image .tutorial-image-fallback {
+  padding: 1.25rem;
+  font-size: 0.8rem;
+  color: var(--tutorial-muted);
+  text-align: center;
+}
+.tutorial-page .tutorial-inline-image {
+  display: inline-block;
+  max-width: 100%;
+  height: auto;
+  border-radius: 0.4rem;
+  border: 1px solid var(--tutorial-card-border);
+  vertical-align: middle;
+}
+
+/* Lesson phase group divider — turns 20 flat cards into a structured course. */
+.tutorial-page .tutorial-phase {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  margin: 1.75rem 0 0.25rem;
+  padding: 0 0.25rem;
+}
+.tutorial-page .tutorial-phase:first-child { margin-top: 0; }
+.tutorial-page .tutorial-phase-label {
+  font-family: "DM Sans", Inter, system-ui, sans-serif;
+  font-size: 0.7rem;
+  font-weight: 800;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: rgb(var(--a-cyan));
+  white-space: nowrap;
+}
+.tutorial-page .tutorial-phase-line {
+  flex: 1;
+  height: 1px;
+  background: linear-gradient(90deg, rgb(var(--a-cyan) / 0.4), transparent);
+}
+.tutorial-page .tutorial-phase-hint {
+  font-size: 0.7rem;
+  color: var(--tutorial-subtle);
+  white-space: nowrap;
 }
 
 /* Tables (comparison grids, mappings, signal lists) */
@@ -4188,6 +4290,8 @@ body::after {
   border-bottom: 1px solid var(--tutorial-card-border);
   color: var(--tutorial-prose);
   vertical-align: top;
+  overflow-wrap: anywhere;
+  min-width: 7rem;
 }
 .tutorial-page .tutorial-table th {
   background: rgb(var(--s-800) / 0.5);

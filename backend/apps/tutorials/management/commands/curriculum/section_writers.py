@@ -68,6 +68,39 @@ def _match_concepts(profile: dict, module: str) -> list[str]:
     return matched
 
 
+def _components(profile: dict) -> list[str]:
+    comps = profile.get("engines") or profile.get("components") or []
+    if isinstance(comps, str):
+        comps = [c.strip() for c in comps.split(",") if c.strip()]
+    return [c for c in comps if c][:4]
+
+
+def _mermaid_id(text: str, fallback: str = "node") -> str:
+    """Safe mermaid node id from arbitrary text."""
+    clean = re.sub(r"[^A-Za-z0-9]+", "_", (text or "")).strip("_")
+    return clean or fallback
+
+
+def _arch_diagram(module: str, profile: dict) -> str:
+    """Topic-aware architecture flowchart built from the profile's components."""
+    comps = _components(profile)
+    mod_id = _mermaid_id(module, "app")
+    lines = ["```mermaid", "flowchart LR", "  user([User / Client]) --> edge[Edge / Load Balancer]"]
+    if comps:
+        prev = "edge"
+        for comp in comps:
+            cid = _mermaid_id(comp)
+            lines.append(f"  {prev} --> {cid}[{comp}]")
+            prev = cid
+        lines.append(f"  {prev} --> data[(State / Storage)]")
+    else:
+        lines.append(f"  edge --> {mod_id}[{module}]")
+        lines.append(f"  {mod_id} --> data[(State / Storage)]")
+    lines.append("  data --> obs[[Logs & Metrics]]")
+    lines.append("```")
+    return "\n".join(lines)
+
+
 def _level_note(level: str) -> str:
     return {
         "beginner": "At this level, prioritize understanding vocabulary and safe read-only exploration before making changes.",
@@ -107,12 +140,16 @@ def _write_notes(topic: str, module: str, level: str, profile: dict) -> str:
 def _write_theory(topic: str, module: str, level: str, profile: dict) -> str:
     tagline = profile.get("tagline", topic)
     concepts = _match_concepts(profile, module)
+    tldr = (
+        f"> [!NOTE] **TL;DR** — By the end of this lesson you can explain what **{module}** is, "
+        f"why it exists, and how to verify it works. {LEVEL_LABELS.get(level, level)} track."
+    )
     p1 = (
         f"## Theory\n\n"
-        f"**{module}** is a core lesson in the **{topic}** track ({LEVEL_LABELS.get(level, level)}). "
-        f"{tagline}.\n\n"
-        f"In production, teams rely on this knowledge during design reviews, change windows, and on-call. "
-        f"Understanding *why* a component exists prevents expensive misconfigurations that only surface under load."
+        f"{tldr}\n\n"
+        f"**{module}** is a core lesson in the **{topic}** track. {tagline}.\n\n"
+        f"In production, teams rely on this during design reviews, change windows, and on-call. "
+        f"Understanding *why* a component exists prevents misconfigurations that only surface under load."
     )
     p2 = (
         f"Before touching systems, map stakeholders: who owns the data, who consumes the API, "
@@ -123,6 +160,10 @@ def _write_theory(topic: str, module: str, level: str, profile: dict) -> str:
         body += "\n\n**Key ideas for this module:**\n\n" + "\n\n".join(concepts[:5])
     if profile.get("architecture"):
         body += f"\n\n**Platform context:** {profile['architecture']}"
+    body += (
+        "\n\n> [!TIP] Read the diagram in the next section before running any command — "
+        "a clear mental model makes the hands-on lab twice as fast."
+    )
     return body
 
 
@@ -132,18 +173,14 @@ def _write_architecture(topic: str, module: str, level: str, profile: dict) -> s
     eng = ""
     if engines:
         eng = f"\n\n**Major components:** {', '.join(engines) if isinstance(engines, list) else engines}."
-    diagram = (
-        f"\n\n```mermaid\nflowchart LR\n"
-        f"  user[User / Client] --> edge[Edge / LB]\n"
-        f"  edge --> app[{module}]\n"
-        f"  app --> data[(Data / State)]\n"
-        f"  app --> obs[Logs & Metrics]\n```"
-    )
+    diagram = "\n\n" + _arch_diagram(module, profile)
     return (
         f"## Architecture\n\n"
         f"For **{module}**, draw a one-page diagram before implementing. Label north-south traffic (users → edge → app) "
         f"and east-west traffic (service-to-service). Mark trust boundaries where credentials rotate and where data is encrypted.\n\n"
         f"{arch}{eng}{diagram}\n\n"
+        f"> [!WARNING] Every arrow that crosses a trust boundary (public → private, app → data) needs "
+        f"authentication, encryption in transit, and an audit log. Unmarked arrows are how breaches start.\n\n"
         f"**Failure domains:** identify single points of failure. If one node dies, does the system degrade gracefully "
         f"or halt entirely? Document RTO (how fast you recover) and RPO (how much data you can lose) for stateful parts.\n\n"
         f"**Dependency checklist:** DNS, TLS certificates, identity (SSO/IAM), secrets store, backup target, and "
@@ -158,14 +195,22 @@ def _write_concepts(topic: str, module: str, level: str, profile: dict) -> str:
         f"Idempotency means repeating the same operation yields the same result — critical for automation.\n\n"
         f"**Blast radius:** when {module.lower()} fails, list upstream/downstream services affected within five minutes."
     )
+    table = (
+        "\n\n| Term | What it means | How to verify |\n"
+        "|---|---|---|\n"
+        f"| {module} | Core component in {topic} | Status command returns healthy |\n"
+        "| Control plane | Manages configuration & policy | API/UI responds; no drift |\n"
+        "| Data plane | Serves user/workload traffic | End-to-end synthetic check passes |\n"
+        "| SLO | Target reliability over a window | Error budget not exhausted |"
+    )
     intro = (
         f"## Core concepts\n\n"
         f"Master these terms for **{module}** before labs. You should explain each without notes at "
         f"{LEVEL_LABELS.get(level, level)} depth."
     )
     if items:
-        return intro + "\n\n" + "\n\n".join(items) + extra
-    return intro + extra
+        return intro + "\n\n" + "\n\n".join(items) + table + extra
+    return intro + table + extra
 
 
 def _write_use_cases(topic: str, module: str, level: str, profile: dict) -> str:
@@ -186,8 +231,20 @@ def _write_use_cases(topic: str, module: str, level: str, profile: dict) -> str:
 def _write_labs(topic: str, module: str, level: str, profile: dict, playground: str) -> str:
     cmds = profile.get("commands") or {}
     cmd = next(iter(cmds.values()), f"# Practice {module}\nhelp | head -5")
+    flow = (
+        "\n\n```mermaid\n"
+        "flowchart TD\n"
+        "  A[Read objectives] --> B[Reproduce failure]\n"
+        "  B --> C[Gather evidence]\n"
+        "  C --> D[Apply one fix]\n"
+        "  D --> E{Verify?}\n"
+        "  E -->|No| C\n"
+        "  E -->|Yes| F[Check Solution]\n"
+        "```"
+    )
     return (
         f"## Hands-on labs\n\n"
+        f"> [!TIP] Open the lab in a second tab. Run each command here, then paste the same command in the lab terminal.\n\n"
         f"Complete a FixitLab scenario for **{module}** using the **{topic}** playground (`{playground}`).\n\n"
         f"**Step-by-step:**\n"
         f"1. Read objectives and constraints — note what *must not* change.\n"
@@ -195,8 +252,10 @@ def _write_labs(topic: str, module: str, level: str, profile: dict, playground: 
         f"3. Apply the fix incrementally; one change at a time so you know what worked.\n"
         f"4. Validate with automated checks or peer review checklist.\n"
         f"5. Write a three-line runbook entry: symptom → cause → fix.\n\n"
-        f"Use **Check Solution** when the lab grades terminal or simulator markers.\n\n"
-        f"**Starter commands:**\n```\n{cmd}\n```"
+        f"Use **Check Solution** when the lab grades real state (not marker files).{flow}\n\n"
+        f"**Starter commands:**\n```bash\n{cmd}\n```\n\n"
+        f"> [!GOTCHA] If a command fails with 'permission denied', check whether you need `sudo` "
+        f"or a different user context before changing anything else."
     )
 
 
@@ -224,6 +283,22 @@ def _write_projects(topic: str, module: str, level: str, profile: dict) -> str:
 
 def _write_troubleshooting(topic: str, module: str, level: str, profile: dict) -> str:
     slo = profile.get("slo", "latency, errors, saturation, replication lag")
+    diagram = (
+        "\n\n```mermaid\nflowchart TD\n"
+        "  start([Alert fires]) --> scope{Impact scoped?}\n"
+        "  scope -- no --> gather[Collect logs, metrics, recent changes]\n"
+        "  gather --> scope\n"
+        "  scope -- yes --> recent{Recent deploy/change?}\n"
+        "  recent -- yes --> rollback[Roll back / feature-flag off]\n"
+        "  recent -- no --> deps{Dependency healthy?}\n"
+        "  deps -- no --> fixdep[Restore DNS/TLS/creds/disk]\n"
+        "  deps -- yes --> hypo[Form one hypothesis, test it]\n"
+        "  rollback --> verify{SLO green?}\n"
+        "  fixdep --> verify\n"
+        "  hypo --> verify\n"
+        "  verify -- no --> hypo\n"
+        "  verify -- yes --> done([Recovered + postmortem])\n```"
+    )
     return (
         f"## Troubleshooting\n\n"
         f"When **{module}** misbehaves, use this ordered playbook:\n\n"
@@ -232,8 +307,10 @@ def _write_troubleshooting(topic: str, module: str, level: str, profile: dict) -
         f"3. **Bisect changes** — correlate start time with releases or config drift.\n"
         f"4. **Validate dependencies** — DNS, TLS, credentials, disk, network ACLs.\n"
         f"5. **Mitigate** — rollback, scale, failover, or feature flag.\n"
-        f"6. **Verify recovery** — SLO green, synthetic checks pass, stakeholders notified.\n\n"
-        f"Never restart blindly without capturing logs — you may destroy evidence."
+        f"6. **Verify recovery** — SLO green, synthetic checks pass, stakeholders notified.\n"
+        f"{diagram}\n\n"
+        f"> [!GOTCHA] Never restart blindly without capturing logs first — a restart often clears the "
+        f"very evidence you need for root cause, turning a 10-minute fix into a recurring outage."
     )
 
 

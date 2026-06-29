@@ -45,11 +45,28 @@ const LEVEL_CLASS = {
   enterprise: 'tutorial-level-enterprise',
 }
 
+// Group the lesson's many sections into four readable phases so a long lesson
+// scans like a structured course instead of a flat wall of cards.
+const PHASES = [
+  { label: 'Learn', hint: 'Concepts & architecture', match: ['theory', 'architecture', 'concept', 'use case', 'overview', 'prerequisite'] },
+  { label: 'Practice', hint: 'Hands-on & projects', match: ['lab', 'hands-on', 'simulation', 'project', 'worked example'] },
+  { label: 'Operate', hint: 'Run it in production', match: ['troubleshoot', 'best practice', 'security', 'performance', 'monitor', 'incident', 'root cause', 'rca', 'enterprise', 'production'] },
+  { label: 'Assess', hint: 'Prove mastery', match: ['interview', 'scenario question', 'assessment', 'certification', 'quiz', 'notes', 'takeaway', 'summary', 'cheat'] },
+]
+
+function phaseFor(heading) {
+  const h = (heading || '').toLowerCase()
+  for (let p = 0; p < PHASES.length; p++) {
+    if (PHASES[p].match.some((m) => h.includes(m))) return p
+  }
+  return 0
+}
+
 function formatInline(text) {
   // Tokenize **bold**, `inline code`, and [label](url) so commands/syntax in
   // prose render as real code chips and links instead of raw markdown.
   const tokens = []
-  const regex = /(\*\*[^*]+\*\*|`[^`]+`|\[[^\]]+\]\([^)]+\))/g
+  const regex = /(\*\*[^*]+\*\*|`[^`]+`|!\[[^\]]*\]\([^)]+\)|\[[^\]]+\]\([^)]+\))/g
   let lastIndex = 0
   let key = 0
   let m
@@ -60,6 +77,13 @@ function formatInline(text) {
       tokens.push(<strong key={key++}>{tok.slice(2, -2)}</strong>)
     } else if (tok.startsWith('`')) {
       tokens.push(<code key={key++} className="tutorial-inline-code">{tok.slice(1, -1)}</code>)
+    } else if (tok.startsWith('![')) {
+      const im = /!\[([^\]]*)\]\(([^)]+)\)/.exec(tok)
+      if (im) {
+        tokens.push(
+          <img key={key++} src={im[2]} alt={im[1] || 'illustration'} loading="lazy" className="tutorial-inline-image" />,
+        )
+      }
     } else {
       const lm = /\[([^\]]+)\]\(([^)]+)\)/.exec(tok)
       if (lm) {
@@ -108,6 +132,14 @@ function parseBlocks(text) {
       } else {
         blocks.push({ type: 'code', code: buf.join('\n'), lang })
       }
+      continue
+    }
+
+    // Standalone image: ![alt](url) or ![alt](url "caption")
+    const img = trimmed.match(/^!\[([^\]]*)\]\(\s*(\S+?)(?:\s+"([^"]*)")?\s*\)$/)
+    if (img) {
+      blocks.push({ type: 'image', alt: img[1], src: img[2], caption: img[3] || img[1] })
+      i++
       continue
     }
 
@@ -255,6 +287,26 @@ function ShellBlock({ code, command, output, labSlug }) {
   )
 }
 
+function TutorialImage({ src, alt, caption }) {
+  const [failed, setFailed] = useState(false)
+  if (failed) {
+    return (
+      <figure className="tutorial-image">
+        <div className="tutorial-image-fallback">
+          Image unavailable{alt ? `: ${alt}` : ''}
+        </div>
+        {caption && <figcaption>{formatInline(caption)}</figcaption>}
+      </figure>
+    )
+  }
+  return (
+    <figure className="tutorial-image">
+      <img src={src} alt={alt || caption || 'Tutorial illustration'} loading="lazy" onError={() => setFailed(true)} />
+      {caption && <figcaption>{formatInline(caption)}</figcaption>}
+    </figure>
+  )
+}
+
 function TutorialTable({ header, rows }) {
   const download = () => {
     const esc = (v) => `"${String(v || '').replace(/"/g, '""')}"`
@@ -309,6 +361,8 @@ function Body({ text, labSlug }) {
           }
           case 'mermaid':
             return <TutorialMermaid key={i} chart={b.chart} />
+          case 'image':
+            return <TutorialImage key={i} src={b.src} alt={b.alt} caption={b.caption} />
           case 'callout':
             return (
               <blockquote key={i} className={`tutorial-callout tutorial-callout-${b.variant}`}>
@@ -677,13 +731,15 @@ export default function TutorialDetail() {
                 </h1>
                 <p className="text-lg text-surface-300 leading-relaxed max-w-2xl">{tutorial.summary}</p>
                 <div className="mt-5 p-4 rounded-xl border border-surface-800/80 bg-surface-900/40">
-                  <p className="text-[10px] font-bold uppercase tracking-wider text-accent-cyan mb-2">Course content in this lesson</p>
-                  <p className="text-xs text-surface-400 leading-relaxed">
-                    Theory → Architecture → Concepts → Use cases → Labs → Simulations → Projects →
-                    Troubleshooting → Interview & scenario questions → Assessments → Certification prep →
-                    Enterprise examples → Best practices → Security → Performance → Monitoring →
-                    Real incidents → Root cause analysis → **Notes and key takeaways**
-                  </p>
+                  <p className="text-[10px] font-bold uppercase tracking-wider text-accent-cyan mb-2">How this lesson is structured</p>
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-xs text-surface-400">
+                    {PHASES.map((p) => (
+                      <div key={p.label} className="rounded-lg border border-surface-800/60 bg-surface-950/40 px-2.5 py-2">
+                        <p className="font-semibold text-surface-200">{p.label}</p>
+                        <p className="text-[10px] text-surface-500 mt-0.5">{p.hint}</p>
+                      </div>
+                    ))}
+                  </div>
                 </div>
                 <div className="mt-5 flex flex-wrap items-center gap-4 text-xs text-surface-500">
                   <span className="flex items-center gap-1"><Clock size={13} /> {tutorial.estimated_minutes} min read</span>
@@ -742,9 +798,19 @@ export default function TutorialDetail() {
                 {sections.map((s, i) => {
                   const theme = sectionTheme(s.heading)
                   const done = completedSections.includes(s.order)
+                  const phaseIdx = phaseFor(s.heading)
+                  const prevPhaseIdx = i > 0 ? phaseFor(sections[i - 1].heading) : -1
+                  const showPhase = phaseIdx !== prevPhaseIdx
                   return (
+                    <div key={i} className="contents">
+                      {showPhase && (
+                        <div className="tutorial-phase" aria-hidden="true">
+                          <span className="tutorial-phase-label">{PHASES[phaseIdx].label}</span>
+                          <span className="tutorial-phase-line" />
+                          <span className="tutorial-phase-hint">{PHASES[phaseIdx].hint}</span>
+                        </div>
+                      )}
                     <section
-                      key={i}
                       id={`section-${s.order}`}
                       className={`tutorial-section-card scroll-mt-24 ${theme}`}
                     >
@@ -754,7 +820,7 @@ export default function TutorialDetail() {
                         </span>
                         <div>
                           <h2 className="tutorial-section-title">{s.heading}</h2>
-                          <span className="tutorial-section-badge">{s.heading}</span>
+                          <span className="tutorial-section-badge">{PHASES[phaseIdx].label}</span>
                         </div>
                       </div>
                       <Body text={s.body} labSlug={tutorial.scenario_slug || linkedScenario?.slug} />
@@ -766,6 +832,7 @@ export default function TutorialDetail() {
                         />
                       )}
                     </section>
+                    </div>
                   )
                 })}
               </div>
