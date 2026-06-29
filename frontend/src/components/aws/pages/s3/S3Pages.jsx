@@ -142,7 +142,7 @@ export function BucketDetail() {
     else files.push(o)
   })
   const rows = [
-    ...Array.from(folders).map((f) => ({ type: 'folder', key: f, name: f })),
+    ...Array.from(folders).map((f) => ({ type: 'folder', key: `${prefix}${f}/`, name: f })),
     ...files.map((o) => ({ type: 'file', ...o, name: o.key.slice(prefix.length) })),
   ]
   const totalSize = bucket.objects.reduce((a, o) => a + o.size, 0)
@@ -151,7 +151,7 @@ export function BucketDetail() {
 
   const columns = [
     { key: 'name', label: 'Name', render: (r) => (r.type === 'folder'
-      ? <a onClick={() => setPrefix(`${prefix}${r.name}/`)}><Folder size={14} style={{ display: 'inline', marginRight: 6, color: 'var(--aws-orange)' }} />{r.name}/</a>
+      ? <a onClick={() => setPrefix(r.key)}><Folder size={14} style={{ display: 'inline', marginRight: 6, color: 'var(--aws-orange)' }} />{r.name}/</a>
       : <span><File size={14} style={{ display: 'inline', marginRight: 6, color: 'var(--aws-text-muted)' }} />{r.name}</span>) },
     { key: 'storageClass', label: 'Type', render: (r) => (r.type === 'folder' ? 'Folder' : r.storageClass) },
     { key: 'modified', label: 'Last modified', render: (r) => (r.type === 'folder' ? '—' : new Date(r.modified).toLocaleString()) },
@@ -184,7 +184,7 @@ export function BucketDetail() {
               <DataTable columns={columns} rows={rows} getRowKey={(r) => r.key} selectable selected={selected}
                 onSelect={setSelected}
                 rowActions={(r) => r.type === 'folder' ? [
-                  { label: 'Open folder', onClick: () => setPrefix(`${prefix}${r.name}/`) },
+                  { label: 'Open folder', onClick: () => setPrefix(r.key) },
                 ] : [
                   { label: 'Copy S3 URI', onClick: () => navigator.clipboard?.writeText(`s3://${bucket.name}/${r.key}`) },
                   { label: 'Delete', danger: true, onClick: () => setDeleteObjectsTarget([r.key]) },
@@ -346,7 +346,15 @@ export function BucketDetail() {
           confirmLabel="Delete"
           confirmText={deleteObjectsTarget.length === 1 ? deleteObjectsTarget[0] : String(deleteObjectsTarget.length)}
           onCancel={() => setDeleteObjectsTarget(null)}
-          onConfirm={() => { deleteObjectsTarget.forEach((k) => deleteObject(bucket.name, k)); pushFlash('success', `Deleted ${deleteObjectsTarget.length} object(s)`); setSelected([]); setDeleteObjectsTarget(null) }}
+          onConfirm={() => {
+            deleteObjectsTarget.forEach((k) => {
+              if (k.endsWith('/')) bucket.objects.filter((o) => o.key.startsWith(k)).forEach((o) => deleteObject(bucket.name, o.key))
+              else deleteObject(bucket.name, k)
+            })
+            pushFlash('success', `Deleted ${deleteObjectsTarget.length} selected item(s)`)
+            setSelected([])
+            setDeleteObjectsTarget(null)
+          }}
         />
       )}
       {policyDraft && (
