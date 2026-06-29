@@ -89,13 +89,22 @@ export function JiraRichText({ text, className = '', variant = 'light' }) {
 }
 
 function renderInline(text, inlineCodeClass) {
-  const parts = text.split(/(`[^`]+`)/g)
+  // Split on inline code first, then bold (**…**) so headers/labels emitted as
+  // Markdown render correctly instead of leaking literal ** / `` markers.
+  const parts = text.split(/(`[^`]+`|\*\*[^*]+\*\*)/g)
   return parts.map((part, i) => {
     if (part.startsWith('`') && part.endsWith('`')) {
       return (
         <code key={i} className={inlineCodeClass}>
           {part.slice(1, -1)}
         </code>
+      )
+    }
+    if (part.startsWith('**') && part.endsWith('**') && part.length > 4) {
+      return (
+        <strong key={i} className="font-semibold">
+          {part.slice(2, -2)}
+        </strong>
       )
     }
     return part

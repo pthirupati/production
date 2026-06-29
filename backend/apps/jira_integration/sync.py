@@ -82,38 +82,43 @@ def _build_issue_body(session=None, user=None, scenario=None) -> str:
 
     outcomes = public_objectives(scenario.objectives or [])
     outcome_text = (
-        "\n".join(f"• {o}" for o in outcomes)
+        "\n".join(f"- {o}" for o in outcomes)
         if outcomes
-        else "• Restore normal service for the affected system."
+        else "- Restore normal service for the affected system."
     )
     # Lead with a complete, self-contained incident narrative built from the
     # scenario's (now detailed) description + environment so the ticket reads
     # end-to-end like a real support/ops ticket — no FixitLab plumbing clutter.
+    #
+    # Body is Markdown (## / ### / **bold** / - bullets). Both consumers speak
+    # Markdown: the in-app JiraRichText renderer and the real-Jira ADF converter
+    # in client.py. Wiki markup (h2./*bold*) must NOT be used — it renders as
+    # literal text in both surfaces.
     description = (scenario.description or "").strip()
     initial = (scenario.initial_state or "").strip()
     summary_line = (scenario.subtitle or "").strip() or (description.split(". ")[0] if description else scenario.title)
 
     parts = [
-        f"h2. {scenario.title}",
+        f"## {scenario.title}",
         "",
-        f"*Priority:* {getattr(scenario, 'jira_priority', '') or 'Medium'}    "
-        f"*Technology:* {scenario.technology.name}    "
-        f"*Reported by:* {user.get_full_name() or user.username}",
+        f"**Priority:** {getattr(scenario, 'jira_priority', '') or 'Medium'}  ·  "
+        f"**Technology:** {scenario.technology.name}  ·  "
+        f"**Reported by:** {user.get_full_name() or user.username}",
         "",
-        "h3. Summary",
+        "### Summary",
         summary_line,
         "",
-        "h3. What is happening",
+        "### What is happening",
         description or "The affected system is not behaving as expected.",
     ]
     if initial and initial != description:
-        parts += ["", "h3. Environment & current state", initial]
+        parts += ["", "### Environment & current state", initial]
     parts += [
         "",
-        "h3. What 'resolved' looks like",
+        "### What 'resolved' looks like",
         outcome_text,
         "",
-        "h3. Notes",
+        "### Notes",
         "Investigate from first principles, apply the smallest safe fix, and add a "
         "resolution comment describing the root cause before you close this ticket.",
     ]

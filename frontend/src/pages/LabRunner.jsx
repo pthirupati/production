@@ -1281,6 +1281,13 @@ export default function LabRunner() {
   const showSimVmwareLink = isAwxLab || isMonitoringLab || isWindowsGuiLab || (isTerraformSimLab && explicitVmwareScenario)
   const showTerminalVmwareLink = isVmBackedTerminalLab || (!isCrossTech && !isVmwareLab && explicitVmwareScenario)
   const showCrossTechVmwareLink = isCrossTech
+  // Ansible terminal labs run playbooks from the shell, so the terminal stays
+  // primary (we do NOT make them AWX-primary). But every Ansible lab should be
+  // able to jump into AWX/Tower to run the same job from a controller, so add
+  // an "Open AWX" link alongside the terminal when the lab isn't already an
+  // AWX-primary scenario.
+  const showAwxLink = !isCrossTech && !isAwxLab
+    && (scenario?.technology?.slug === 'ansible' || scenario?.simulation_type === 'ansible')
   const vmwareWorkflowHint = showTerminalVmwareLink || showCrossTechVmwareLink
     ? 'Use vCenter for hypervisor steps, then return here and rescan/reboot.'
     : ''
@@ -2054,18 +2061,17 @@ export default function LabRunner() {
         )}
         {/* Terminal action bar — above xterm */}
         <div className="shrink-0 flex flex-wrap items-center gap-1.5 sm:gap-2 px-2 py-2 bg-surface-900 border-b border-surface-800 text-[10px] sm:text-xs">
-          {(showTerminalVmwareLink || showCrossTechVmwareLink || isVmwareLab || isMonitoringLab || isAwxLab) && (
+          {/* Wayfinding only — the actual tool buttons render as the inline
+              controls below. The journey strip used to ALSO render clickable
+              vCenter/Monitoring/AWX chips, which duplicated those buttons (a
+              VMware button appeared on every VM-backed lab). It now shows just
+              the Terminal indicator + workflow hint so there are no duplicates. */}
+          {(showTerminalVmwareLink || showCrossTechVmwareLink || isVmwareLab || isMonitoringLab || isAwxLab || showAwxLink) && (
             <LabJourneyStrip
               sessionId={sessionId}
               scenarioSlug={scenario?.slug}
               showTerminal
               terminalActive={!isSimPrimaryLab || simTerminalOpen}
-              showVmware={showTerminalVmwareLink || showCrossTechVmwareLink || isVmwareLab}
-              vmwareHref={isVmwareLab ? `/vmware/${sessionId}` : vmwareServerHref}
-              showGrafana={(isMonitoringLab && !isSimPrimaryLab) || (isCrossTechMonitoring && !isCrossTechMonitoringSplit)}
-              onOpenGrafana={() => setShowMonitoringSim(true)}
-              showAwx={isAwxLab && !isSimPrimaryLab}
-              onOpenAwx={() => setShowAwxSim(true)}
               guideText={vmwareWorkflowHint}
               className="mr-1"
             />
@@ -2201,11 +2207,11 @@ export default function LabRunner() {
               <ExternalLink size={12} /> Open PeopleSoft
             </button>
           )}
-          {isAwxLab && (
+          {(isAwxLab || showAwxLink) && (
             <button
               type="button"
               onClick={() => setShowAwxSim(true)}
-              title="Open Ansible AWX / Tower"
+              title="Open Ansible AWX / Tower — run this playbook as a job template from the controller (login: lab_awx / lab_awx@123)"
               className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-md border text-[10px] font-semibold"
               style={{ borderColor: 'rgba(238,0,0,.45)', color: '#ff6b6b', background: 'rgba(238,0,0,.12)' }}
             >
@@ -2616,13 +2622,15 @@ export default function LabRunner() {
         </div>
       )}
 
-      {isAwxLab && !isSimPrimaryLab && showAwxSim && (
-        <AwxSimulator
-          sessionId={sessionId}
-          scenario={scenario}
-          onExit={() => setShowAwxSim(false)}
-          {...simChromeProps}
-        />
+      {(showAwxLink || (isAwxLab && !isSimPrimaryLab)) && showAwxSim && (
+        <div className="fixed inset-0 z-[60]">
+          <AwxSimulator
+            sessionId={sessionId}
+            scenario={scenario}
+            onExit={() => setShowAwxSim(false)}
+            {...simChromeProps}
+          />
+        </div>
       )}
 
       {isBaremetalGuiLab && !isSimPrimaryLab && showBaremetalSim && (

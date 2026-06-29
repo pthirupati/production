@@ -97,7 +97,19 @@ class InterviewEntitlementView(APIView):
     permission_classes = [IsAuthenticated]
 
     def get(self, request):
-        return Response(get_entitlement_payload(request.user))
+        # The Interview hub loads this on mount (in a Promise.all with the
+        # campaign list). A raw 500 here rejects the whole group and surfaces
+        # "Could not load interviews", so degrade gracefully to a safe default.
+        try:
+            return Response(get_entitlement_payload(request.user))
+        except Exception:  # noqa: BLE001
+            import logging
+            logging.getLogger(__name__).exception(
+                "Failed to build interview entitlement for user %s", request.user.pk
+            )
+            return Response(
+                {"active": False, "plan": None, "credits": 0, "rounds_remaining": 0}
+            )
 
 
 class CandidateProfileView(APIView):
@@ -856,7 +868,17 @@ class InterviewRoundDetailView(APIView):
             id=round_id,
             campaign__user=request.user,
         )
-        return Response(InterviewRoundSerializer(round_obj).data)
+        # Serialize defensively: a missing column (unapplied migration) or a bad
+        # data edge would otherwise 500 here, which the client mislabels as
+        # "Round not found". Log the real traceback for diagnosis.
+        try:
+            return Response(InterviewRoundSerializer(round_obj).data)
+        except Exception:  # noqa: BLE001
+            import logging
+            logging.getLogger(__name__).exception(
+                "Failed to serialize interview round %s", round_id
+            )
+            raise
 
 
 class InterviewRoundJoinView(APIView):
