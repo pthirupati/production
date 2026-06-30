@@ -3,10 +3,11 @@
 // VFS for the Instance Connect welcome banner (motd).
 import { createVfs } from './vfs'
 import { createEc2SimShell } from './ec2SimBridge'
+import { createCloudShellShell } from './cloudShellSim'
 import { resolveEc2Workload } from './ec2Workload'
 
 export class Shell {
-  constructor({ instance, store }) {
+  constructor({ instance, store, cloudShell = false }) {
     this.store = store
     this.instance = instance
     this.os = instance.os
@@ -19,11 +20,13 @@ export class Shell {
     this.user = user
     this.home = home
     this._onExit = null
-    this._bridge = createEc2SimShell(instance, {
-      store,
-      user: instance.sshUser,
-      onExit: () => this._onExit?.(),
-    })
+    this._bridge = cloudShell || instance?.id === 'cloudshell'
+      ? createCloudShellShell({ store, region: instance.region || store?.region })
+      : createEc2SimShell(instance, {
+          store,
+          user: instance.sshUser,
+          onExit: () => this._onExit?.(),
+        })
   }
 
   get history() {

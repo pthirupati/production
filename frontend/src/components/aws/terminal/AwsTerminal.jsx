@@ -37,13 +37,16 @@ export default function AwsTerminal({ instance, username, cloudShell = false }) 
     try { fit.fit() } catch { /* container not measured yet */ }
     termRef.current = term
 
-    const shell = new Shell({ instance: inst, store })
+    const shell = new Shell({ instance: inst, store, cloudShell })
     shellRef.current = shell
     const write = (t) => term.write(t)
 
     // Welcome banner
     if (cloudShell) {
       term.writeln('Welcome to AWS CloudShell!')
+      term.writeln('')
+      term.writeln('Type "aws help" for AWS CLI or "terraform -help" for IaC against this simulation.')
+      term.writeln('Starter template: ~/main.tf')
       term.writeln('')
     } else {
       const user = username || defaultUser(inst.os)

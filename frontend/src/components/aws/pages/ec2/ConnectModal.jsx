@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { Modal, Tabs, Button, IDCopy } from '../../ui/primitives'
 import AwsTerminal from '../../terminal/AwsTerminal'
+import Ec2RdpSession from './Ec2RdpSession'
 import { defaultUser } from '../../terminal/vfs'
 import { resolveEc2Workload, workloadHint } from '../../terminal/ec2Workload'
 import { publicDns } from '../../lib/ids'
@@ -17,6 +18,17 @@ export default function ConnectModal({ instance, onClose }) {
   const sshHost = instance.publicIp ? publicDns(instance.publicIp, instance.region) : instance.privateIp
   const sshCommand = `ssh -i "${instance.keyName || 'my-key'}.pem" ${user}@${sshHost}`
   const canConnect = instance.state === 'running'
+  const useRdpDesktop = isWindows && tab === 'rdp'
+
+  if (connected && useRdpDesktop) {
+    return (
+      <Ec2RdpSession
+        instance={instance}
+        onClose={onClose}
+        onReconnect={() => setConnected(false)}
+      />
+    )
+  }
 
   if (connected) {
     return (
@@ -35,7 +47,7 @@ export default function ConnectModal({ instance, onClose }) {
 
   return (
     <Modal title={`Connect to instance ${instance.id}`} onClose={onClose} width={820}
-      footer={<><Button onClick={onClose}>Cancel</Button><Button variant="primary" disabled={!canConnect} onClick={() => setConnected(true)}>{tab === 'ssm' ? 'Start session' : 'Connect'}</Button></>}>
+      footer={<><Button onClick={onClose}>Cancel</Button><Button variant="primary" disabled={!canConnect} onClick={() => setConnected(true)}>{tab === 'ssm' ? 'Start session' : useRdpDesktop ? 'Launch RDP session' : 'Connect'}</Button></>}>
       <Tabs tabs={[
         { key: 'eic', label: 'EC2 Instance Connect' },
         { key: 'ssm', label: 'Session Manager' },
