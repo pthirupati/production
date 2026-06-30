@@ -40,6 +40,25 @@ function PageHeader({ title, action }) {
   )
 }
 
+function createDraftFromConfig(cfg) {
+  const draft = {}
+  cfg.fields
+    .filter((f) => f.key !== 'name' && f.key !== 'status')
+    .forEach((f) => {
+      draft[f.key] = cfg.defaults?.[f.key] ?? ''
+    })
+  return draft
+}
+
+function coerceDraftValue(value, original) {
+  if (typeof original === 'number') {
+    const n = Number(value)
+    return Number.isFinite(n) ? n : original
+  }
+  if (typeof original === 'boolean') return !!value
+  return value
+}
+
 export function GenericServiceHome() {
   const { service } = useParams()
   const navigate = useNavigate()
@@ -96,6 +115,7 @@ export function GenericResourceList() {
   const [creating, setCreating] = useState(false)
   const [deleteTarget, setDeleteTarget] = useState(null)
   const [name, setName] = useState('')
+  const [draft, setDraft] = useState({})
   const [filter, setFilter] = useState('')
 
   const visible = useMemo(() => {
@@ -123,6 +143,24 @@ export function GenericResourceList() {
         ? 'Use 1-128 valid AWS identifier characters.'
         : ''
 
+  const openCreate = () => {
+    setName('')
+    setDraft(createDraftFromConfig(cfg))
+    setCreating(true)
+  }
+
+  const submitCreate = () => {
+    const resolved = Object.fromEntries(
+      Object.entries(draft).map(([key, value]) => [key, coerceDraftValue(value, cfg.defaults?.[key])])
+    )
+    const created = createGenericResource(service, resource, { name, ...cfg.defaults, ...resolved })
+    pushFlash('success', `${cfg.label.replace(/s$/, '')} ${created.name} created`)
+    setCreating(false)
+    setName('')
+    setDraft({})
+    navigate(`${BASE}/${service}/${resource}/${created.id}`)
+  }
+
   return (
     <div>
       <Breadcrumb items={[{ label: serviceCfg.title, onClick: () => navigate(`${BASE}/${service}/home`) }, { label: cfg.label }]} />
@@ -134,7 +172,7 @@ export function GenericResourceList() {
               <Button disabled={!selected.length} icon={Trash2} onClick={() => {
                 setDeleteTarget({ ids: selected, label: `${selected.length} ${cfg.label.toLowerCase()}`, confirmText: String(selected.length) })
               }}>Delete</Button>
-              <Button variant="primary" icon={Plus} onClick={() => setCreating(true)}>{cfg.createLabel}</Button>
+              <Button variant="primary" icon={Plus} onClick={openCreate}>{cfg.createLabel}</Button>
             </div>
           )}
         />
@@ -167,20 +205,35 @@ export function GenericResourceList() {
           footer={(
             <>
               <Button onClick={() => setCreating(false)}>Cancel</Button>
-              <Button variant="primary" disabled={!name || !!validationError} onClick={() => {
-                const created = createGenericResource(service, resource, { name, ...cfg.defaults })
-                pushFlash('success', `${cfg.label.replace(/s$/, '')} ${created.name} created`)
-                setCreating(false)
-                setName('')
-                navigate(`${BASE}/${service}/${resource}/${created.id}`)
-              }}>{cfg.createLabel}</Button>
+              <Button variant="primary" disabled={!name || !!validationError} onClick={submitCreate}>{cfg.createLabel}</Button>
             </>
           )}
         >
-          <label className="aws-label">{cfg.idLabel || 'Name'}</label>
-          <input className={`aws-input ${validationError ? 'aws-invalid' : ''}`} value={name} onChange={(e) => setName(e.target.value)} placeholder={`my-${resource.replace(/s$/, '')}`} />
-          {validationError && <div className="aws-field-error">{validationError}</div>}
-          <div className="aws-hint">The resource will be created in {region} and persisted locally.</div>
+          <div className="aws-card" style={{ marginBottom: 12 }}>
+            <SectionLabel>Basic configuration</SectionLabel>
+            <label className="aws-label" style={{ marginTop: 10 }}>{cfg.idLabel || 'Name'}</label>
+            <input className={`aws-input ${validationError ? 'aws-invalid' : ''}`} value={name} onChange={(e) => setName(e.target.value)} placeholder={`my-${resource.replace(/s$/, '')}`} />
+            {validationError && <div className="aws-field-error">{validationError}</div>}
+            <div className="aws-hint">The resource will be created in {region} and persisted locally.</div>
+          </div>
+          <div className="aws-card">
+            <SectionLabel>Service configuration</SectionLabel>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 12, marginTop: 10 }}>
+              {cfg.fields.filter((f) => f.key !== 'name' && f.key !== 'status').map((f) => (
+                <div key={f.key}>
+                  <label className="aws-label">{f.label}</label>
+                  <input
+                    className="aws-input"
+                    value={draft[f.key] ?? ''}
+                    onChange={(e) => setDraft((d) => ({ ...d, [f.key]: e.target.value }))}
+                  />
+                </div>
+              ))}
+              {cfg.fields.filter((f) => f.key !== 'name' && f.key !== 'status').length === 0 && (
+                <div className="aws-hint">This resource type uses the AWS defaults for its initial configuration.</div>
+              )}
+            </div>
+          </div>
         </Modal>
       )}
       {deleteTarget && (
@@ -208,6 +261,7 @@ export function GenericResourceDetail() {
   const region = useAwsStore((s) => s.region)
   const rows = useAwsStore((s) => s.genericResources?.[service]?.[resource] || [])
   const deleteGenericResource = useAwsStore((s) => s.deleteGenericResource)
+  const updateGenericResource = useAwsStore((s) => s.updateGenericResource)
   const pushFlash = useAwsStore((s) => s.pushFlash)
   const serviceCfg = SERVICE_CONFIGS[service]
   const cfg = getResourceConfig(service, resource)
@@ -218,13 +272,42 @@ export function GenericResourceDetail() {
     return <div className="aws-page"><EmptyState title="Resource not found" action={<Button onClick={() => navigate(`${BASE}/${service}/home`)}>Back to service</Button>} /></div>
   }
 
+  const rowStatus = row.status || 'Active'
+  const normalizedStatus = String(rowStatus).toLowerCase()
+  const canPause = !['disabled', 'stopped', 'inactive'].includes(normalizedStatus)
+  const toggleStatus = () => {
+    const disabled = canPause
+    const next = disabled ? (service === 'rds' ? 'stopped' : 'Disabled') : (service === 'rds' ? 'available' : 'Active')
+    updateGenericResource(service, resource, row.id, { status: next, lastModified: new Date().toISOString() })
+    pushFlash('success', `${row.name} ${disabled ? 'disabled/stopped' : 'enabled/started'}`)
+  }
+
+  const simulateRun = () => {
+    const patch = {
+      lastRun: new Date().toISOString(),
+      status: rowStatus,
+      invocations: (row.invocations || row.executions || row.runs || 0) + 1,
+    }
+    if (service === 'lambda') patch.lastResult = 'Succeeded'
+    if (service === 'states') patch.executions = (row.executions || 0) + 1
+    if (service === 'glue') patch.runs = (row.runs || 0) + 1
+    updateGenericResource(service, resource, row.id, patch)
+    pushFlash('success', `Test action completed for ${row.name}`)
+  }
+
   return (
     <div>
       <Breadcrumb items={[{ label: serviceCfg.title, onClick: () => navigate(`${BASE}/${service}/home`) }, { label: cfg.label, onClick: () => navigate(`${BASE}/${service}/${resource}`) }, { label: row.name }]} />
       <div className="aws-page" style={{ paddingTop: 0 }}>
         <PageHeader
           title={row.name}
-          action={<Button variant="danger" onClick={() => { deleteGenericResource(service, resource, row.id); pushFlash('success', `Deleted ${row.name}`); navigate(`${BASE}/${service}/${resource}`) }}>Delete</Button>}
+          action={(
+            <div style={{ display: 'flex', gap: 8 }}>
+              <Button onClick={simulateRun}>{service === 'lambda' ? 'Test' : service === 'rds' ? 'Reboot' : 'Run action'}</Button>
+              <Button onClick={toggleStatus}>{canPause ? 'Disable / stop' : 'Enable / start'}</Button>
+              <Button variant="danger" onClick={() => { deleteGenericResource(service, resource, row.id); pushFlash('success', `Deleted ${row.name}`); navigate(`${BASE}/${service}/${resource}`) }}>Delete</Button>
+            </div>
+          )}
         />
         <div className="aws-card" style={{ marginBottom: 16 }}>
           <div className="aws-summary-grid">
@@ -234,7 +317,7 @@ export function GenericResourceDetail() {
             <div className="aws-kv"><span className="k">Status</span><span className="v"><Badge state={statusToBadge(row.status)}>{row.status || 'Active'}</Badge></span></div>
           </div>
         </div>
-        <Tabs tabs={[{ key: 'overview', label: 'Overview' }, { key: 'configuration', label: 'Configuration' }, { key: 'monitoring', label: 'Monitoring' }, { key: 'tags', label: 'Tags' }]} active={tab} onChange={setTab} />
+        <Tabs tabs={[{ key: 'overview', label: 'Overview' }, { key: 'configuration', label: 'Configuration' }, { key: 'monitoring', label: 'Monitoring' }, { key: 'activity', label: 'Activity' }, { key: 'integrations', label: 'Integrations' }, { key: 'tags', label: 'Tags' }]} active={tab} onChange={setTab} />
         <div style={{ marginTop: 16 }}>
           {tab === 'overview' && (
             <div className="aws-card">
@@ -250,6 +333,55 @@ export function GenericResourceDetail() {
             <div className="aws-card">
               <SectionLabel>Configuration JSON</SectionLabel>
               <pre className="aws-mono" style={{ background: 'var(--aws-page-bg)', padding: 12, overflowX: 'auto', borderRadius: 4 }}>{JSON.stringify(row, null, 2)}</pre>
+            </div>
+          )}
+          {tab === 'activity' && (
+            <div className="aws-card">
+              <SectionLabel>Recent activity</SectionLabel>
+              <DataTable
+                columns={[
+                  { key: 'time', label: 'Time' },
+                  { key: 'event', label: 'Event' },
+                  { key: 'status', label: 'Status', render: (r) => <Badge state={r.status}>{r.status}</Badge> },
+                  { key: 'source', label: 'Source' },
+                ]}
+                rows={[
+                  { time: row.lastRun ? new Date(row.lastRun).toLocaleString() : 'Just now', event: service === 'lambda' ? 'Test invocation' : 'Describe resource', status: row.lastResult || row.status || 'Succeeded', source: 'FixitLab simulation' },
+                  { time: new Date(row.created).toLocaleString(), event: 'Create resource', status: 'Succeeded', source: 'AWS Console' },
+                ]}
+                getRowKey={(r) => `${r.time}:${r.event}`}
+                tableId={`${service}:${resource}:${row.id}:activity`}
+              />
+            </div>
+          )}
+          {tab === 'integrations' && (
+            <div style={{ display: 'grid', gap: 12 }}>
+              <div className="aws-card">
+                <SectionLabel>CLI and SDK integration</SectionLabel>
+                <div className="aws-hint" style={{ margin: '8px 0 12px' }}>
+                  These commands mirror the shape used by the real AWS CLI and operate against the local simulation where implemented.
+                </div>
+                <pre className="aws-mono" style={{ background: 'var(--aws-page-bg)', padding: 12, overflowX: 'auto', borderRadius: 4, margin: 0 }}>{`aws ${serviceCfg.title.toLowerCase().replace(/[^a-z0-9]+/g, '-')} list-${resource}
+aws ${serviceCfg.title.toLowerCase().replace(/[^a-z0-9]+/g, '-')} describe-${resource.replace(/s$/, '')} --${cfg.idLabel || 'name'} ${row.name}
+terraform import ${service}_${resource.replace(/-/g, '_')}.${row.name.replace(/[^A-Za-z0-9_]/g, '_')} ${row.id}`}</pre>
+              </div>
+              <div className="aws-card">
+                <SectionLabel>Related console workflows</SectionLabel>
+                <DataTable
+                  columns={[
+                    { key: 'workflow', label: 'Workflow' },
+                    { key: 'purpose', label: 'Purpose' },
+                    { key: 'status', label: 'Simulation support', render: (r) => <Badge state={r.status}>{r.status}</Badge> },
+                  ]}
+                  rows={[
+                    { workflow: 'Create / update resource', purpose: 'Exercise resource lifecycle controls from the console', status: 'Supported' },
+                    { workflow: 'Monitor metrics and activity', purpose: 'Inspect realistic CloudWatch-style charts and recent events', status: 'Supported' },
+                    { workflow: 'Terraform import/apply', purpose: 'Use IaC commands from CloudShell or EC2 SSH against the same AWS store', status: 'Supported' },
+                  ]}
+                  getRowKey={(r) => r.workflow}
+                  tableId={`${service}:${resource}:${row.id}:integrations`}
+                />
+              </div>
             </div>
           )}
           {tab === 'monitoring' && (

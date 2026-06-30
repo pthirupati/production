@@ -13,6 +13,32 @@ function KV({ k, children }) {
   return <div className="aws-kv" style={{ marginBottom: 10 }}><span className="k">{k}</span><span className="v">{children}</span></div>
 }
 
+function consoleOutput(instance, ami) {
+  const isWindows = instance.os?.includes('windows')
+  if (isWindows) {
+    return [
+      'Windows Boot Manager',
+      `Booting ${ami?.name || 'Windows Server'} on EC2 Nitro hypervisor`,
+      'UEFI: Secure Boot enabled',
+      'EC2Launch v2: initializing network adapters',
+      `Hostname: ${instance.name || instance.id}`,
+      `Private IPv4: ${instance.privateIp}`,
+      'Cloudbase-Init: user data execution completed',
+      'Windows Server is ready for RDP / PowerShell session',
+    ].join('\n')
+  }
+  return [
+    'Amazon EC2 console output',
+    `Booting ${ami?.name || instance.os} on EC2 Nitro hypervisor`,
+    'cloud-init[boot]: datasource DataSourceEc2Local',
+    `hostname: ip-${instance.privateIp.replace(/\./g, '-')}`,
+    `private-ipv4: ${instance.privateIp}`,
+    instance.publicIp ? `public-ipv4: ${instance.publicIp}` : 'public-ipv4: not assigned',
+    'sshd: Server listening on 0.0.0.0 port 22',
+    'cloud-init[final]: finished at ' + new Date(instance.launchTime).toUTCString(),
+  ].join('\n')
+}
+
 export default function InstanceDetail() {
   const { id } = useParams()
   const navigate = useNavigate()
@@ -33,6 +59,12 @@ export default function InstanceDetail() {
   const ami = getAmi(instance.amiId)
   const sgs = securityGroups.filter((s) => instance.securityGroups.includes(s.id))
   const vols = volumes.filter((v) => v.attachedTo === instance.id)
+  const isWindows = instance.os?.includes('windows')
+  const defaultUser = isWindows ? 'Administrator' : (ami.user || 'ec2-user')
+  const host = instance.publicIp ? publicDns(instance.publicIp, instance.region) : instance.privateIp
+  const sshCommand = `ssh -i "${instance.keyName || 'demo-key-pair'}.pem" ${defaultUser}@${host}`
+  const rdpCommand = `mstsc /v:${host}`
+  const terraformImport = `terraform import aws_instance.${(instance.name || instance.id).replace(/[^A-Za-z0-9_]/g, '_')} ${instance.id}`
 
   const stateAction = (a) => { setStateOpen(false); instanceAction([instance.id], a); pushFlash('success', `${a} requested for ${instance.id}`) }
 
@@ -64,6 +96,7 @@ export default function InstanceDetail() {
           { key: 'storage', label: 'Storage' },
           { key: 'status', label: 'Status checks' },
           { key: 'monitoring', label: 'Monitoring' },
+          { key: 'console', label: 'Console output' },
           { key: 'tags', label: 'Tags' },
         ]} active={tab} onChange={setTab} />
 
@@ -89,6 +122,8 @@ export default function InstanceDetail() {
                 <KV k="Monitoring">{instance.monitoring}</KV>
                 <KV k="Tenancy">{instance.tenancy}</KV>
                 <KV k="Architecture">{instance.architecture}</KV>
+                <KV k="Platform details">{isWindows ? 'Windows Server' : 'Linux/UNIX'}</KV>
+                <KV k="Lab engine">{instance.workload || ami.workload || (isWindows ? 'windows' : 'linux')}</KV>
               </div>
             </div>
           )}
@@ -110,14 +145,33 @@ export default function InstanceDetail() {
           )}
 
           {tab === 'networking' && (
-            <div className="aws-card">
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 16 }}>
-                <KV k="VPC ID"><IDCopy value={instance.vpcId} /></KV>
-                <KV k="Subnet ID"><IDCopy value={instance.subnetId} /></KV>
-                <KV k="Availability Zone">{instance.az}</KV>
-                <KV k="Private IPv4 address"><IDCopy value={instance.privateIp} /></KV>
-                <KV k="Public IPv4 address">{instance.publicIp || '—'}</KV>
-                <KV k="Network performance">{it.net}</KV>
+            <div style={{ display: 'grid', gap: 12 }}>
+              <div className="aws-card">
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 16 }}>
+                  <KV k="VPC ID"><IDCopy value={instance.vpcId} /></KV>
+                  <KV k="Subnet ID"><IDCopy value={instance.subnetId} /></KV>
+                  <KV k="Availability Zone">{instance.az}</KV>
+                  <KV k="Private IPv4 address"><IDCopy value={instance.privateIp} /></KV>
+                  <KV k="Public IPv4 address">{instance.publicIp || '—'}</KV>
+                  <KV k="Network performance">{it.net}</KV>
+                </div>
+              </div>
+              <div className="aws-card">
+                <div className="aws-section-label">Network interface and connection commands</div>
+                <table className="aws-table" style={{ marginTop: 8 }}>
+                  <thead><tr><th>Interface ID</th><th>Private IP</th><th>Public IP / DNS</th><th>Security groups</th></tr></thead>
+                  <tbody>
+                    <tr>
+                      <td><IDCopy value={`eni-${instance.id.replace('i-', '').slice(0, 17)}`} /></td>
+                      <td><IDCopy value={instance.privateIp} /></td>
+                      <td>{instance.publicIp ? <IDCopy value={publicDns(instance.publicIp, instance.region)} /> : 'Private only'}</td>
+                      <td>{sgs.map((sg) => sg.name).join(', ') || '—'}</td>
+                    </tr>
+                  </tbody>
+                </table>
+                <pre className="aws-mono" style={{ marginTop: 12, background: 'var(--aws-page-bg)', borderRadius: 4, padding: 12, overflowX: 'auto' }}>{`${isWindows ? rdpCommand : sshCommand}
+aws ec2 describe-instances --instance-ids ${instance.id}
+${terraformImport}`}</pre>
               </div>
             </div>
           )}
@@ -147,6 +201,24 @@ export default function InstanceDetail() {
               <MetricChart title="Disk Read Ops (Count)" unit="" color="#d13212" base={5} variance={40} />
               <MetricChart title="Disk Write Ops (Count)" unit="" color="#7d3ac1" base={10} variance={60} />
               <MetricChart title="Status Check Failed (Count)" unit="" color="#545b64" base={0} variance={1} />
+            </div>
+          )}
+
+          {tab === 'console' && (
+            <div style={{ display: 'grid', gap: 12 }}>
+              <div className="aws-card">
+                <div className="aws-section-label">Instance console output</div>
+                <div className="aws-hint" style={{ margin: '8px 0 12px' }}>This mirrors the EC2 "Get system log" troubleshooting view used for boot, cloud-init, and Windows EC2Launch issues.</div>
+                <pre className="aws-mono" style={{ background: '#111827', color: '#d1fae5', borderRadius: 4, padding: 14, minHeight: 220, overflowX: 'auto' }}>{consoleOutput(instance, ami)}</pre>
+              </div>
+              <div className="aws-card">
+                <div className="aws-section-label">Full-stack lab path</div>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 12, marginTop: 10 }}>
+                  <KV k="1. Provision">Launch wizard, CloudShell AWS CLI, or Terraform apply</KV>
+                  <KV k="2. Connect">{isWindows ? 'RDP / PowerShell simulation' : 'EC2 Instance Connect / SSH simulation'}</KV>
+                  <KV k="3. Operate">Run Linux, Windows, Kubernetes, Docker, or Terraform commands</KV>
+                </div>
+              </div>
             </div>
           )}
 

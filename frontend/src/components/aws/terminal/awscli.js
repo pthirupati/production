@@ -4,6 +4,7 @@
 // error so the terminal stays believable.
 import { ACCOUNT } from '../store/awsStore'
 import { arn } from '../lib/ids'
+import { SERVICE_CONFIGS } from '../pages/generic/serviceConfigs'
 
 function parseFlags(tokens) {
   const flags = {}
@@ -20,6 +21,101 @@ function parseFlags(tokens) {
 }
 
 const j = (obj) => JSON.stringify(obj, null, 4)
+
+const GENERIC_SERVICE_ALIASES = {
+  lambda: 'lambda',
+  rds: 'rds',
+  dynamodb: 'dynamodb',
+  cloudformation: 'cloudformation',
+  route53: 'route53',
+  sns: 'sns',
+  sqs: 'sqs',
+  secretsmanager: 'secretsmanager',
+  secrets: 'secretsmanager',
+  acm: 'acm',
+  cloudfront: 'cloudfront',
+  eks: 'eks',
+  ecs: 'ecs',
+  ecr: 'ecr',
+  apigateway: 'apigateway',
+  'apigatewayv2': 'apigateway',
+  events: 'eventbridge',
+  eventbridge: 'eventbridge',
+  stepfunctions: 'states',
+  states: 'states',
+  kms: 'kms',
+  cloudtrail: 'cloudtrail',
+  config: 'config',
+  ssm: 'systemsmanager',
+  systemsmanager: 'systemsmanager',
+  wafv2: 'waf',
+  waf: 'waf',
+  cognito: 'cognito',
+  'cognito-idp': 'cognito',
+  elasticache: 'elasticache',
+  redshift: 'redshift',
+  opensearch: 'opensearch',
+  es: 'opensearch',
+  kinesis: 'kinesis',
+  glue: 'glue',
+  athena: 'athena',
+}
+
+const GENERIC_COMMANDS = {
+  lambda: { functions: { list: 'list-functions', describe: 'get-function', create: 'create-function', delete: 'delete-function', nameFlag: 'function-name', response: 'Functions' } },
+  rds: { databases: { list: 'describe-db-instances', describe: 'describe-db-instances', create: 'create-db-instance', delete: 'delete-db-instance', action: 'reboot-db-instance', nameFlag: 'db-instance-identifier', response: 'DBInstances' } },
+  dynamodb: { tables: { list: 'list-tables', describe: 'describe-table', create: 'create-table', delete: 'delete-table', nameFlag: 'table-name', response: 'Tables' } },
+  cloudformation: { stacks: { list: 'list-stacks', describe: 'describe-stacks', create: 'create-stack', delete: 'delete-stack', nameFlag: 'stack-name', response: 'Stacks' } },
+  sns: { topics: { list: 'list-topics', describe: 'get-topic-attributes', create: 'create-topic', delete: 'delete-topic', nameFlag: 'name', response: 'Topics' } },
+  sqs: { queues: { list: 'list-queues', describe: 'get-queue-attributes', create: 'create-queue', delete: 'delete-queue', nameFlag: 'queue-name', response: 'QueueUrls' } },
+  secretsmanager: { secrets: { list: 'list-secrets', describe: 'describe-secret', create: 'create-secret', delete: 'delete-secret', nameFlag: 'name', response: 'SecretList' } },
+  eks: { clusters: { list: 'list-clusters', describe: 'describe-cluster', create: 'create-cluster', delete: 'delete-cluster', nameFlag: 'name', response: 'clusters' } },
+  ecs: { clusters: { list: 'list-clusters', describe: 'describe-clusters', create: 'create-cluster', delete: 'delete-cluster', nameFlag: 'cluster-name', response: 'clusterArns' }, services: { list: 'list-services', describe: 'describe-services', create: 'create-service', delete: 'delete-service', nameFlag: 'service-name', response: 'serviceArns' }, tasks: { list: 'list-tasks', describe: 'describe-tasks', create: 'run-task', delete: 'stop-task', nameFlag: 'family', response: 'taskArns' } },
+  ecr: { repositories: { list: 'describe-repositories', describe: 'describe-repositories', create: 'create-repository', delete: 'delete-repository', nameFlag: 'repository-name', response: 'repositories' } },
+  eventbridge: { rules: { list: 'list-rules', describe: 'describe-rule', create: 'put-rule', delete: 'delete-rule', nameFlag: 'name', response: 'Rules' } },
+  states: { 'state-machines': { list: 'list-state-machines', describe: 'describe-state-machine', create: 'create-state-machine', delete: 'delete-state-machine', nameFlag: 'name', response: 'stateMachines' } },
+  glue: { jobs: { list: 'list-jobs', describe: 'get-job', create: 'create-job', delete: 'delete-job', nameFlag: 'name', response: 'JobNames' }, databases: { list: 'get-databases', describe: 'get-database', create: 'create-database', delete: 'delete-database', nameFlag: 'name', response: 'DatabaseList' } },
+  kinesis: { streams: { list: 'list-streams', describe: 'describe-stream', create: 'create-stream', delete: 'delete-stream', nameFlag: 'stream-name', response: 'StreamNames' } },
+  athena: { workgroups: { list: 'list-work-groups', describe: 'get-work-group', create: 'create-work-group', delete: 'delete-work-group', nameFlag: 'name', response: 'WorkGroups' } },
+}
+
+function genericResourceArn(serviceKey, resourceKey, row, region, cfg) {
+  if (cfg.arnService === 'cloudfront' || cfg.arnService === 'route53') {
+    return `arn:aws:${cfg.arnService}::${ACCOUNT}:${cfg.arnResource(row)}`
+  }
+  return arn(cfg.arnService || serviceKey, region, ACCOUNT, cfg.arnResource ? cfg.arnResource(row) : `${resourceKey}/${row.name}`)
+}
+
+function pickResourceName(flags, spec) {
+  const candidates = [
+    spec.nameFlag,
+    'name',
+    'id',
+    'resource-name',
+    'function-name',
+    'table-name',
+    'queue-name',
+    'topic-name',
+    'cluster-name',
+    'repository-name',
+    'db-instance-identifier',
+    'stack-name',
+  ].filter(Boolean)
+  return candidates.map((k) => flags[k]).find(Boolean)
+}
+
+function rowToGenericCli(serviceKey, resourceKey, row, region, cfg) {
+  return {
+    Name: row.name,
+    Id: row.id,
+    Arn: genericResourceArn(serviceKey, resourceKey, row, region, cfg),
+    Region: row.region || region,
+    Status: row.status || 'Active',
+    Created: row.created,
+    Tags: row.tags || {},
+    ...row,
+  }
+}
 
 export function awsCli(argv, store, ctx = {}) {
   const [service, command, ...rest] = argv
@@ -304,6 +400,74 @@ export function awsCli(argv, store, ctx = {}) {
       return j({ Label: flags['metric-name'] || 'CPUUtilization', Datapoints: Array.from({ length: 12 }, (_, i) => ({ Timestamp: new Date(now - (11 - i) * 300000).toISOString(), Average: Math.round((10 + Math.random() * 40) * 100) / 100, Unit: flags['metric-name']?.includes('Bytes') ? 'Bytes' : 'Percent' })) })
     }
     return `\nAn error occurred (InvalidAction) when calling the ${command} operation: aws cloudwatch ${command} is not yet simulated.`
+  }
+
+  // --- Generic AWS services backed by the console store ---
+  // This covers the broad service catalog (Lambda, RDS, DynamoDB, ECS/EKS,
+  // SQS/SNS, CloudFormation, Glue, Kinesis, etc.) so CloudShell and Terraform
+  // can interact with the same resources rendered by the console pages.
+  const serviceKey = GENERIC_SERVICE_ALIASES[service]
+  const serviceCfg = SERVICE_CONFIGS[serviceKey]
+  if (serviceCfg) {
+    const commandSpecs = GENERIC_COMMANDS[serviceKey] || {}
+    const resourceEntry = Object.entries(commandSpecs).find(([, spec]) => [spec.list, spec.describe, spec.create, spec.delete, spec.action].includes(command))
+      || Object.entries(serviceCfg.resources).find(([resourceKey]) => command === `list-${resourceKey}` || command === `describe-${resourceKey}` || command === `create-${resourceKey}` || command === `delete-${resourceKey}`)
+
+    if (resourceEntry) {
+      const [resourceKey, specMaybe] = resourceEntry
+      const spec = specMaybe.list ? specMaybe : { list: `list-${resourceKey}`, describe: `describe-${resourceKey}`, create: `create-${resourceKey}`, delete: `delete-${resourceKey}`, nameFlag: 'name', response: resourceKey }
+      const cfg = serviceCfg.resources[resourceKey]
+      const rows = (store.genericResources?.[serviceKey]?.[resourceKey] || []).filter((r) => !r.region || r.region === region)
+      const name = pickResourceName(flags, spec)
+
+      if (command === spec.list) {
+        if (serviceKey === 'dynamodb') return j({ TableNames: rows.map((r) => r.name) })
+        if (serviceKey === 'sqs') return j({ QueueUrls: rows.map((r) => `https://sqs.${region}.amazonaws.com/${ACCOUNT}/${r.name}`) })
+        if (serviceKey === 'eks') return j({ clusters: rows.map((r) => r.name) })
+        if (serviceKey === 'ecs') return j({ [spec.response || resourceKey]: rows.map((r) => genericResourceArn(serviceKey, resourceKey, r, region, cfg)) })
+        if (serviceKey === 'glue' && resourceKey === 'jobs') return j({ JobNames: rows.map((r) => r.name) })
+        if (serviceKey === 'kinesis') return j({ StreamNames: rows.map((r) => r.name), HasMoreStreams: false })
+        return j({ [spec.response || resourceKey]: rows.map((r) => rowToGenericCli(serviceKey, resourceKey, r, region, cfg)) })
+      }
+
+      if (command === spec.describe) {
+        const row = rows.find((r) => r.name === name || r.id === name || genericResourceArn(serviceKey, resourceKey, r, region, cfg) === name) || rows[0]
+        if (!row) return `\nAn error occurred (ResourceNotFoundException) when calling the ${command} operation: ${serviceCfg.title} resource not found`
+        const body = rowToGenericCli(serviceKey, resourceKey, row, region, cfg)
+        if (serviceKey === 'lambda') return j({ Configuration: { FunctionName: row.name, FunctionArn: body.Arn, Runtime: row.runtime, Handler: row.handler, MemorySize: row.memory, Timeout: row.timeout, State: row.status }, Code: { RepositoryType: 'S3', Location: 'https://awssim.local/lambda.zip' } })
+        if (serviceKey === 'rds') return j({ DBInstances: [{ DBInstanceIdentifier: row.name, DBInstanceClass: row.class, Engine: row.engine, DBInstanceStatus: row.status, Endpoint: { Address: String(row.endpoint || '').split(':')[0], Port: Number(String(row.endpoint || '5432').split(':')[1] || 5432) }, AllocatedStorage: row.storage, DBInstanceArn: body.Arn }] })
+        if (serviceKey === 'dynamodb') return j({ Table: { TableName: row.name, TableArn: body.Arn, TableStatus: row.status, ItemCount: row.items || 0, KeySchema: [{ AttributeName: 'pk', KeyType: 'HASH' }] } })
+        if (serviceKey === 'eks') return j({ cluster: { name: row.name, arn: body.Arn, status: row.status, version: row.version, endpoint: `https://${row.name}.${region}.eks.amazonaws.com`, platformVersion: 'eks.6' } })
+        return j({ [resourceKey.replace(/-/g, '_')]: body })
+      }
+
+      if (command === spec.create) {
+        const createName = name || flags['queue-name'] || flags['topic-name'] || flags.name
+        if (!createName) return `\nAn error occurred (ValidationException) when calling the ${command} operation: Missing required name parameter`
+        const created = store.createGenericResource(serviceKey, resourceKey, { name: createName, ...cfg.defaults })
+        const body = rowToGenericCli(serviceKey, resourceKey, created, region, cfg)
+        if (serviceKey === 'sqs') return j({ QueueUrl: `https://sqs.${region}.amazonaws.com/${ACCOUNT}/${created.name}` })
+        if (serviceKey === 'sns') return j({ TopicArn: body.Arn })
+        if (serviceKey === 'lambda') return j({ FunctionName: created.name, FunctionArn: body.Arn, Runtime: created.runtime, State: created.status })
+        if (serviceKey === 'dynamodb') return j({ TableDescription: { TableName: created.name, TableArn: body.Arn, TableStatus: created.status } })
+        return j(body)
+      }
+
+      if (command === spec.delete) {
+        const row = rows.find((r) => r.name === name || r.id === name || genericResourceArn(serviceKey, resourceKey, r, region, cfg) === name)
+        if (!row) return `\nAn error occurred (ResourceNotFoundException) when calling the ${command} operation: ${serviceCfg.title} resource not found`
+        store.deleteGenericResource(serviceKey, resourceKey, row.id)
+        if (serviceKey === 'dynamodb') return j({ TableDescription: { TableName: row.name, TableStatus: 'DELETING' } })
+        return ''
+      }
+
+      if (command === spec.action) {
+        const row = rows.find((r) => r.name === name || r.id === name) || rows[0]
+        if (!row) return `\nAn error occurred (ResourceNotFoundException) when calling the ${command} operation: ${serviceCfg.title} resource not found`
+        store.updateGenericResource?.(serviceKey, resourceKey, row.id, { lastRun: new Date().toISOString(), status: row.status || 'Active' })
+        return j({ [resourceKey.replace(/-/g, '_')]: rowToGenericCli(serviceKey, resourceKey, row, region, cfg) })
+      }
+    }
   }
 
   if (service === 'lambda' && command === 'list-functions') {

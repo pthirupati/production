@@ -518,6 +518,15 @@ export const useAwsStore = create(
           },
         },
       })),
+      updateGenericResource: (service, resource, id, patch) => set((s) => ({
+        genericResources: {
+          ...(s.genericResources || {}),
+          [service]: {
+            ...(s.genericResources?.[service] || {}),
+            [resource]: (s.genericResources?.[service]?.[resource] || []).map((x) => (x.id === id ? { ...x, ...patch } : x)),
+          },
+        },
+      })),
     }),
     {
       name: 'fixitlab-aws-sim',
