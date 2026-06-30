@@ -87,8 +87,8 @@ def _build_issue_body(session=None, user=None, scenario=None) -> str:
         else "- Restore normal service for the affected system."
     )
     # Lead with a complete, self-contained incident narrative built from the
-    # scenario's (now detailed) description + environment so the ticket reads
-    # end-to-end like a real support/ops ticket — no FixitLab plumbing clutter.
+    # scenario's description + environment so the ticket reads end-to-end like a
+    # real support/ops ticket — no FixitLab plumbing clutter.
     #
     # Body is Markdown (## / ### / **bold** / - bullets). Both consumers speak
     # Markdown: the in-app JiraRichText renderer and the real-Jira ADF converter
@@ -96,26 +96,52 @@ def _build_issue_body(session=None, user=None, scenario=None) -> str:
     # literal text in both surfaces.
     description = (scenario.description or "").strip()
     initial = (scenario.initial_state or "").strip()
-    summary_line = (scenario.subtitle or "").strip() or (description.split(". ")[0] if description else scenario.title)
+
+    # Many scenario descriptions follow a "CONTEXT: … ENVIRONMENT: … SYMPTOM: …
+    # OBJECTIVE: …" template. Parse those labelled sections out so the ticket can
+    # present them as a clean incident narrative instead of one dense paragraph.
+    sections = _parse_labelled_sections(description)
+    context = sections.get("context")
+    env_text = sections.get("environment") or (initial if initial != description else "")
+    symptom = sections.get("symptom") or sections.get("symptoms")
+    impact_line = sections.get("impact")
+    happening = context or (description if not sections else "")
+    summary_line = (scenario.subtitle or "").strip() or (
+        symptom.split(". ")[0] if symptom else (description.split(". ")[0] if description else scenario.title)
+    )
+
+    priority = getattr(scenario, "jira_priority", "") or "Medium"
+    difficulty = (getattr(scenario, "difficulty", "") or "").title() or "Medium"
+    sla = {"Highest": "1 hour", "High": "4 hours", "Medium": "1 business day", "Low": "3 business days"}.get(priority, "1 business day")
+    reporter = user.get_full_name() or user.username
 
     parts = [
         f"## {scenario.title}",
         "",
-        f"**Priority:** {getattr(scenario, 'jira_priority', '') or 'Medium'}  ·  "
-        f"**Technology:** {scenario.technology.name}  ·  "
-        f"**Reported by:** {user.get_full_name() or user.username}",
+        f"**Type:** Incident  ·  **Priority:** {priority}  ·  **Technology:** {scenario.technology.name}",
+        f"**Reported by:** {reporter}  ·  **Assignee:** You  ·  **Target resolution:** {sla} (SLA)",
         "",
         "### Summary",
         summary_line,
         "",
+        "### Impact",
+        impact_line or "Affected service is degraded or unavailable for its users until the underlying issue is resolved.",
+        "",
         "### What is happening",
-        description or "The affected system is not behaving as expected.",
+        happening or "The affected system is not behaving as expected.",
     ]
-    if initial and initial != description:
-        parts += ["", "### Environment & current state", initial]
+    if symptom:
+        parts += ["", "### Reported symptoms", symptom]
+    if env_text:
+        parts += ["", "### Environment & current state", env_text]
     parts += [
         "",
-        "### What 'resolved' looks like",
+        "### Steps to reproduce",
+        "1. Connect to the affected environment for this lab.",
+        "2. Inspect the relevant service/configuration/logs.",
+        "3. Observe the failure described above.",
+        "",
+        "### Acceptance criteria (definition of done)",
         outcome_text,
         "",
         "### Notes",
@@ -123,6 +149,31 @@ def _build_issue_body(session=None, user=None, scenario=None) -> str:
         "resolution comment describing the root cause before you close this ticket.",
     ]
     return "\n".join(parts)
+
+
+def _parse_labelled_sections(text: str) -> dict:
+    """Split a "LABEL: body LABEL: body …" description into {label: body}.
+
+    Recognises the common scenario template labels (CONTEXT/ENVIRONMENT/SYMPTOM/
+    OBJECTIVE/IMPACT). Returns an empty dict when no labels are present so callers
+    can fall back to treating the whole description as one block.
+    """
+    import re
+
+    if not text:
+        return {}
+    labels = ["CONTEXT", "ENVIRONMENT", "SYMPTOM", "SYMPTOMS", "OBJECTIVE", "OBJECTIVES", "IMPACT", "TASK"]
+    pattern = re.compile(r"\b(" + "|".join(labels) + r")\s*:\s*", re.IGNORECASE)
+    matches = list(pattern.finditer(text))
+    if not matches:
+        return {}
+    out: dict[str, str] = {}
+    for i, m in enumerate(matches):
+        key = m.group(1).lower()
+        start = m.end()
+        end = matches[i + 1].start() if i + 1 < len(matches) else len(text)
+        out[key] = text[start:end].strip()
+    return out
 
 
 def _ticket_response(mapping, enabled=True, **extra):
