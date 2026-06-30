@@ -422,16 +422,28 @@ class RHELOSState:
 
     def sync_passwd_files(self) -> None:
         lines_p = []
-        lines_g = ["root:x:0:"]
         for u in sorted(self.users.values(), key=lambda x: x.uid):
             lines_p.append(f"{u.username}:x:{u.uid}:{u.gid}:{u.gecos}:{u.home}:{u.shell}")
-            gname = u.username if u.uid >= 1000 else None
-            if gname and gname not in self.groups:
+            # Ensure each user has a primary group entry.
+            gname = u.username
+            if gname not in self.groups:
                 self.groups[gname] = [u.gid]
-            if gname:
-                lines_g.append(f"{gname}:x:{u.gid}:")
         self._write_file("/etc/passwd", "\n".join(lines_p) + "\n")
-        self._write_file("/etc/group", "\n".join(lines_g) + "\n")
+
+        # Build /etc/group from the full group table, listing supplementary
+        # member usernames (uid != group's own gid) as real /etc/group does.
+        uid_to_name = {u.uid: u.username for u in self.users.values()}
+        gid_lines = []
+        for gname, gids in self.groups.items():
+            primary_gid = gids[0] if gids else 0
+            members = []
+            for uid in gids[1:] if len(gids) > 1 else []:
+                member_name = uid_to_name.get(uid)
+                if member_name and member_name != gname:
+                    members.append(member_name)
+            gid_lines.append((primary_gid, f"{gname}:x:{primary_gid}:{','.join(members)}"))
+        gid_lines.sort(key=lambda x: x[0])
+        self._write_file("/etc/group", "\n".join(line for _, line in gid_lines) + "\n")
 
     def register_package_service(self, pkg: str) -> list[str]:
         """When a package is installed, register the systemd unit(s) it ships as

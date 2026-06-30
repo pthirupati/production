@@ -179,6 +179,31 @@ export default function CertificationDetail() {
   return (
     <PublicLayout>
       <MarketingPageShell eyebrow={detail.vendor || 'Certification'} title={detail.name} subtitle={detail.description}>
+        {/* Unmistakable exam-in-progress banner so the learner always knows the
+            timed exam is running and how much time is left. */}
+        {exam && !earned && (
+          <div className="sticky top-2 z-30 mb-6 rounded-xl border border-accent-amber/40 bg-accent-amber/10 backdrop-blur px-4 py-3 flex flex-wrap items-center justify-between gap-3 shadow-lg">
+            <div className="flex items-center gap-2.5">
+              <span className="relative flex h-2.5 w-2.5">
+                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-accent-amber opacity-75" />
+                <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-accent-amber" />
+              </span>
+              <span className="text-sm font-semibold text-white">Mock exam in progress</span>
+              <span className="text-xs text-surface-300 hidden sm:inline">
+                Complete the labs below before the timer reaches zero.
+              </span>
+            </div>
+            <div className="flex items-center gap-3">
+              <span className="inline-flex items-center gap-1.5 text-sm font-mono font-semibold text-accent-amber tabular-nums">
+                <Timer size={15} /> {fmt(remaining)}
+              </span>
+              <button onClick={() => submitExam(false)} disabled={busy} className="btn-primary text-xs px-3 py-1.5 disabled:opacity-60">
+                {busy ? 'Submitting…' : 'Submit exam'}
+              </button>
+            </div>
+          </div>
+        )}
+
         <Link
           to="/certifications"
           className="text-sm text-surface-400 hover:text-accent-cyan inline-flex items-center gap-1.5 mb-6"

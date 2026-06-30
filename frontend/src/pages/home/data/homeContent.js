@@ -11,7 +11,7 @@ export const features = [
   { icon: Clock, title: 'Timed Incident Response', desc: 'Race the clock like a real on-call page. Faster solves earn bonus points — the same pressure you face in production.', color: 'amber' },
   { icon: Zap, title: 'Instant Validation', desc: 'Click "Check Solution" and our grader runs inside your environment to verify the fix — no guessing, no marker files.', color: 'cyan' },
   { icon: Bot, title: 'Guided Hints (3 tiers)', desc: 'Free discovery hints → diagnostic steps → full fix reveal. Learn methodology first, answers only when you need them.', color: 'green' },
-  { icon: Award, title: 'Affordable Pricing & Coupons', desc: 'Pay per technology at prices well below KodeKloud or LabEx. Promo codes apply automatically at checkout — teams get seat-based billing too.', color: 'amber' },
+  { icon: Award, title: 'Affordable Pricing & Coupons', desc: 'Pay per technology at prices that keep hands-on practice affordable. Promo codes apply automatically at checkout — teams get seat-based billing too.', color: 'amber' },
 ]
 
 export const scenarioTypes = [
@@ -57,7 +57,7 @@ export const testimonials = [
   { name: 'DevOps Engineer', role: 'SRE · 6 years experience', company: 'Enterprise', initials: 'DE', text: 'FixitLab is the closest thing to real incident response practice. The timed challenges and Jira ticket workflow genuinely simulate production pressure — far better than reading docs or watching videos.' },
   { name: 'Platform Engineer', role: 'Cloud & Kubernetes', company: 'Mid-size SaaS', initials: 'PE', text: 'I use this to prep for interviews. The container labs feel like SSHing into a real broken server at 3am. The AI interview rounds with hands-on lab sections are something no other platform offers.' },
   { name: 'Linux Administrator', role: 'Infrastructure', company: 'Managed services', initials: 'LA', text: 'Finally a platform that teaches the right way — by breaking things and fixing them. The validation engine, guided hints, and per-user isolation mean I can train my whole team without stepping on each other.' },
-  { name: 'Cloud Architect', role: 'Multi-cloud', company: 'Consulting', initials: 'CA', text: '5,000+ scenarios across 30 technologies, certification tracks, and mock interviews — all at a fraction of what KodeKloud or dedicated interview prep costs. The VMware and Ansible simulators are standout features.' },
+  { name: 'Cloud Architect', role: 'Multi-cloud', company: 'Consulting', initials: 'CA', text: '5,000+ scenarios across 30 technologies, certification tracks, and mock interviews — all at a fraction of what dedicated interview prep usually costs. The VMware and Ansible simulators are standout features.' },
 ]
 
 export const interviewBullets = [

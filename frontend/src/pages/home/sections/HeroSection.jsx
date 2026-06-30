@@ -46,8 +46,8 @@ export default function HeroSection({ technologies, stats = {} }) {
             Train like your whole platform team is on call — isolated break-fix labs across 30+ technologies
             (Linux, cloud, containers, networking, databases, VMware, Ansible, security, and more).
             Pick up a Jira incident, SSH into a real environment, fix it under time pressure, and prove it with
-            instant validation. Then sit a voice AI mock interview and earn verifiable certificates — at a
-            fraction of what KodeKloud, LabEx, or interview prep sites charge.
+            instant validation. Then sit a voice AI mock interview and earn verifiable certificates — all at a
+            price that makes serious hands-on practice affordable.
           </motion.p>
           <motion.div className="fx-hero-cta-row" variants={fadeUp}>
             <Link to="/register" data-magnetic className="fx-btn-primary">

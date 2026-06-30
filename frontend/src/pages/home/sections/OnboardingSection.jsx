@@ -3,8 +3,8 @@ import { motion } from 'framer-motion'
 import { ArrowRight, Terminal, BookOpen, Sparkles } from 'lucide-react'
 import { blurIn, fadeUp, staggerContainer, viewportOnce } from '../../../ui/motion'
 
-// Absolute-beginner on-ramp (KodeKloud-style "start here"). Gives newcomers a
-// single, unambiguous first step instead of dropping them into 5,000 scenarios.
+// Absolute-beginner on-ramp ("start here"). Gives newcomers a single,
+// unambiguous first step instead of dropping them into 5,000 scenarios.
 export default function OnboardingSection({ isAuthenticated }) {
   const steps = [
     {

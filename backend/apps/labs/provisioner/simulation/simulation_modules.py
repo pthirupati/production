@@ -149,6 +149,8 @@ def register_modules(engine: "UnifiedSimulationEngine", shell: RHELShell | None 
         _register_networking(engine, sh)
     if "terraform" in modules:
         _register_terraform(engine, sh)
+    if "windows" in modules:
+        _register_windows(engine, sh)
 
 
 def _modules_for_type(sim_type: str) -> set[str]:
@@ -1314,6 +1316,152 @@ def _register_terraform(engine: "UnifiedSimulationEngine", shell: RHELShell) -> 
         ok, _msg = te.validate_terraform_lab(sid, slug)
         shell.state.terraform_fixed = ok
         return res.get("output") or res.get("message") or ""
+
+    shell.register_handler(handler)
+
+
+def _register_windows(engine: "UnifiedSimulationEngine", shell: RHELShell) -> None:
+    """A PowerShell / cmd surface for `simulation_type: windows` terminal labs.
+
+    Without this, Windows scenarios ran a bare Linux shell (PowerShell cmdlets
+    were "command not found") and validation required `state.windows_fixed`,
+    which nothing ever set — so every Windows lab failed "Check Solution" even
+    after a correct fix. This handler simulates the common Windows admin verbs
+    and marks the scenario fixed when the learner runs a real remediation
+    command (start/enable a service, unlock/enable an account, install a role…).
+    """
+    st = shell.state
+    # Seed a small, realistic Windows world the first time.
+    if not hasattr(st, "win_services"):
+        st.win_services = {
+            "Spooler": {"display": "Print Spooler", "status": "Stopped", "startup": "Disabled"},
+            "W3SVC": {"display": "World Wide Web Publishing Service", "status": "Stopped", "startup": "Manual"},
+            "wuauserv": {"display": "Windows Update", "status": "Running", "startup": "Automatic"},
+            "Netlogon": {"display": "Netlogon", "status": "Running", "startup": "Automatic"},
+            "MSSQLSERVER": {"display": "SQL Server (MSSQLSERVER)", "status": "Stopped", "startup": "Manual"},
+        }
+    if not hasattr(st, "win_users"):
+        st.win_users = {
+            "Administrator": {"enabled": True, "locked": False},
+            "svc_app": {"enabled": False, "locked": True},
+        }
+    if not hasattr(st, "win_features"):
+        st.win_features = {"DHCP": False, "DNS": False, "Web-Server": False}
+
+    def _svc_table() -> str:
+        rows = ["Status   Name               DisplayName",
+                "------   ----               -----------"]
+        for name, s in st.win_services.items():
+            rows.append(f"{s['status']:<8} {name:<18} {s['display']}")
+        return "\n".join(rows)
+
+    def handler(parts, line):  # noqa: C901 — single dispatch surface
+        raw = line.strip()
+        low = raw.lower()
+        if not raw:
+            return None
+
+        def mark_fixed():
+            st.windows_fixed = True
+
+        # ---- Service queries ----
+        if low.startswith("get-service") or low in ("sc query", "net start"):
+            return _svc_table()
+
+        # ---- Service remediation: start / restart / set startup ----
+        if low.startswith(("start-service", "restart-service", "set-service")) or \
+           low.startswith("net start ") or low.startswith("sc config") or low.startswith("sc start"):
+            target = None
+            for name in st.win_services:
+                if name.lower() in low:
+                    target = name
+                    break
+            if target:
+                svc = st.win_services[target]
+                if "set-service" in low or "sc config" in low:
+                    if "automatic" in low or "auto" in low:
+                        svc["startup"] = "Automatic"
+                    if "disabled" in low:
+                        svc["startup"] = "Disabled"
+                    if "manual" in low or "demand" in low:
+                        svc["startup"] = "Manual"
+                if low.startswith(("start-service", "restart-service", "net start", "sc start")):
+                    svc["status"] = "Running"
+                mark_fixed()
+                return f"{svc['display']} ({target}) — Status: {svc['status']}, StartupType: {svc['startup']}"
+            return f"Service not found. Run Get-Service to list services."
+
+        if low.startswith("stop-service") or low.startswith("net stop "):
+            for name in st.win_services:
+                if name.lower() in low:
+                    st.win_services[name]["status"] = "Stopped"
+                    return f"{st.win_services[name]['display']} stopped."
+            return "Service not found."
+
+        # ---- Local / AD users ----
+        if low.startswith(("get-localuser", "get-aduser")) or low == "net user":
+            rows = ["Name            Enabled  Locked", "----            -------  ------"]
+            for name, u in st.win_users.items():
+                rows.append(f"{name:<15} {str(u['enabled']):<8} {u['locked']}")
+            return "\n".join(rows)
+
+        if low.startswith(("enable-localuser", "enable-aduser", "unlock-adaccount", "set-localuser", "set-aduser")) or \
+           ("net user" in low and "/active:yes" in low):
+            for name in st.win_users:
+                if name.lower() in low:
+                    if "unlock" in low or "/active:yes" in low or "enable" in low or "-enabled $true" in low:
+                        st.win_users[name]["locked"] = False
+                        st.win_users[name]["enabled"] = True
+                    mark_fixed()
+                    return f"{name}: Enabled={st.win_users[name]['enabled']}, Locked={st.win_users[name]['locked']}"
+            # Allow creating/activating an unknown account too.
+            mark_fixed()
+            return "User account updated."
+
+        # ---- Roles / features ----
+        if low.startswith("get-windowsfeature"):
+            rows = ["Display Name                         Name          Install State",
+                    "------------                         ----          -------------"]
+            label = {"DHCP": "DHCP Server", "DNS": "DNS Server", "Web-Server": "Web Server (IIS)"}
+            for name, installed in st.win_features.items():
+                state_txt = "Installed" if installed else "Available"
+                rows.append(f"{label.get(name, name):<36} {name:<13} {state_txt}")
+            return "\n".join(rows)
+
+        if low.startswith(("install-windowsfeature", "add-windowsfeature")):
+            for name in st.win_features:
+                if name.lower() in low:
+                    st.win_features[name] = True
+                    mark_fixed()
+                    return (f"Success Restart Needed Exit Code      Feature Result\n"
+                            f"------- -------------- ---------      --------------\n"
+                            f"True    No             Success        {{{name}}}")
+            return "Feature not found. Run Get-WindowsFeature to list features."
+
+        # ---- Read-only Windows info commands ----
+        if low in ("ipconfig", "ipconfig /all"):
+            return ("Windows IP Configuration\n\nEthernet adapter Ethernet0:\n"
+                    "   IPv4 Address. . . . . . . . . . . : 10.0.0.20\n"
+                    "   Subnet Mask . . . . . . . . . . . : 255.255.255.0\n"
+                    "   Default Gateway . . . . . . . . . : 10.0.0.1")
+        if low == "hostname":
+            return getattr(st, "hostname", "WIN-SRV-SIM")
+        if low.startswith("systeminfo"):
+            return ("Host Name:                 WIN-SRV-SIM\n"
+                    "OS Name:                   Microsoft Windows Server 2022 Datacenter\n"
+                    "OS Version:                10.0.20348 N/A Build 20348\n"
+                    "System Type:               x64-based PC")
+        if low.startswith("get-eventlog") or low.startswith("get-winevent"):
+            return ("   Index Time          EntryType   Source                 Message\n"
+                    "   ----- ----          ---------   ------                 -------\n"
+                    "    9001 Jun 30 14:02  Error       Service Control Manager The service terminated unexpectedly.")
+        if low.startswith("get-process"):
+            return ("Handles  NPM(K)    PM(K)      WS(K)   CPU(s)     Id ProcessName\n"
+                    "-------  ------    -----      -----   ------     -- -----------\n"
+                    "    412      24    18240      35216     1.23   1044 svchost")
+
+        # Not a Windows command — let the Linux dispatch handle it.
+        return None
 
     shell.register_handler(handler)
 

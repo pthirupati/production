@@ -114,8 +114,10 @@ class RHELShell:
             "hostname": self._cmd_hostname,
             "uname": self._cmd_uname,
             "useradd": self._cmd_useradd,
+            "adduser": self._cmd_useradd,
             "userdel": self._cmd_userdel,
             "usermod": self._cmd_usermod,
+            "groups": self._cmd_groups,
             "passwd": self._cmd_passwd,
             "groupadd": self._cmd_groupadd,
             "systemctl": self._cmd_systemctl,
@@ -648,10 +650,48 @@ class RHELShell:
         return self.state.current_user
 
     def _cmd_id(self, p: list[str]) -> str:
-        u = self.state.users.get(self.state.current_user)
+        # `id [OPTION]... [USER]` — operate on the named user if given, else the
+        # current user. Look the user up in the real user table so a non-existent
+        # name errors instead of silently falling back to the current user.
+        args = [a for a in p[1:] if not a.startswith("-")]
+        target = args[0] if args else self.state.current_user
+        u = self.state.users.get(target)
         if not u:
-            return f"id: '{self.state.current_user}': no such user"
-        return f"uid={u.uid}({u.username}) gid={u.gid}({u.username}) groups={u.gid}({u.username})"
+            self.state.last_exit_code = 1
+            return f"id: '{target}': no such user"
+        # Supplementary groups: any group whose member list includes this uid.
+        supp = []
+        for gname, gids in self.state.groups.items():
+            if gname == u.username:
+                continue
+            if u.uid in gids:
+                supp.append(gname)
+        groups_str = f"{u.gid}({u.username})"
+        for gname in supp:
+            gid = self.state.groups.get(gname, [u.uid])[0]
+            groups_str += f",{gid}({gname})"
+        opts = [a for a in p[1:] if a.startswith("-")]
+        if "-u" in opts:
+            return str(u.uid)
+        if "-g" in opts:
+            return str(u.gid)
+        if "-un" in opts or ("-u" in opts and "-n" in opts):
+            return u.username
+        if "-gn" in opts:
+            return u.username
+        return f"uid={u.uid}({u.username}) gid={u.gid}({u.username}) groups={groups_str}"
+
+    def _cmd_groups(self, p: list[str]) -> str:
+        target = p[1] if len(p) > 1 else self.state.current_user
+        u = self.state.users.get(target)
+        if not u:
+            self.state.last_exit_code = 1
+            return f"groups: '{target}': no such user"
+        names = [u.username]
+        for gname, gids in self.state.groups.items():
+            if gname != u.username and u.uid in gids:
+                names.append(gname)
+        return f"{u.username} : {' '.join(names)}"
 
     def _cmd_hostname(self, p: list[str]) -> str:
         if len(p) > 1 and p[1] in ("-f", "--fqdn"):
@@ -708,13 +748,34 @@ class RHELShell:
             return "usermod: missing user"
         name = p[-1]
         if name not in self.state.users:
+            self.state.last_exit_code = 1
             return f"usermod: user '{name}' does not exist"
+        u = self.state.users[name]
         if "-s" in p:
             idx = p.index("-s")
             if idx + 1 < len(p):
-                self.state.users[name].shell = p[idx + 1]
-        if "-aG" in p:
-            return ""
+                u.shell = p[idx + 1]
+        if "-d" in p:
+            idx = p.index("-d")
+            if idx + 1 < len(p):
+                u.home = p[idx + 1]
+        if "-L" in p:
+            u.locked = True
+        if "-U" in p:
+            u.locked = False
+        # -aG group[,group] — append the user to supplementary groups so `id`
+        # and `groups` reflect the membership.
+        for flag in ("-aG", "-G"):
+            if flag in p:
+                idx = p.index(flag)
+                if idx + 1 < len(p):
+                    for gname in p[idx + 1].split(","):
+                        gname = gname.strip()
+                        if not gname:
+                            continue
+                        gids = self.state.groups.setdefault(gname, [])
+                        if u.uid not in gids:
+                            gids.append(u.uid)
         self.state.sync_passwd_files()
         return ""
 
@@ -1027,10 +1088,29 @@ class RHELShell:
         return "               total        used        free      shared  buff/cache   available\nMem:        16384000     2048000    12000000       64000     2336000    14000000\nSwap:        4194300           0     4194300"
 
     def _cmd_uptime(self, p: list[str]) -> str:
-        up = int(time.time() - self.state.boot_time)
-        h, rem = divmod(up, 3600)
+        now = time.time()
+        up = max(0, int(now - self.state.boot_time))
+        days, rem = divmod(up, 86400)
+        h, rem = divmod(rem, 3600)
         m, _ = divmod(rem, 60)
-        return f" 10:00:00 up {h}:{m:02d},  1 user,  load average: 0.08, 0.04, 0.01"
+        if days > 0:
+            up_str = f"{days} day{'s' if days != 1 else ''}, {h:02d}:{m:02d}"
+        elif h > 0:
+            up_str = f"{h}:{m:02d}"
+        else:
+            up_str = f"{m} min"
+        clock = time.strftime("%H:%M:%S", time.gmtime(now))
+        if "-p" in p:
+            parts = []
+            if days:
+                parts.append(f"{days} day{'s' if days != 1 else ''}")
+            if h:
+                parts.append(f"{h} hour{'s' if h != 1 else ''}")
+            parts.append(f"{m} minute{'s' if m != 1 else ''}")
+            return "up " + ", ".join(parts)
+        if "-s" in p:
+            return time.strftime("%Y-%m-%d %H:%M:%S", time.gmtime(self.state.boot_time))
+        return f" {clock} up {up_str},  1 user,  load average: 0.08, 0.04, 0.01"
 
     def _cmd_date(self, p: list[str]) -> str:
         return "Fri Jun 14 10:00:00 UTC 2026"
@@ -1171,13 +1251,40 @@ class RHELShell:
         return "pwck: no errors"
 
     def _cmd_getent(self, p: list[str]) -> str:
+        # getent <database> [key ...] — `database` is the FIRST argument. With no
+        # key, dump the whole map; with keys, return only matching lines (and
+        # exit 2 if none of the requested keys resolve, like real getent).
         if len(p) < 2:
+            self.state.last_exit_code = 1
+            return "Usage: getent [option]... database [key ...]"
+        database = p[1]
+        keys = p[2:]
+        if database == "passwd":
+            content = self.state.read_file("/etc/passwd") or ""
+        elif database == "group":
+            content = self.state.read_file("/etc/group") or ""
+        elif database in ("hosts", "ahosts"):
+            content = self.state.read_file("/etc/hosts") or ""
+        else:
+            self.state.last_exit_code = 1
+            return f"Unknown database: {database}"
+        lines = [ln for ln in content.splitlines() if ln.strip()]
+        if not keys:
+            return "\n".join(lines)
+        matched = []
+        for key in keys:
+            for ln in lines:
+                name = ln.split(":", 1)[0]
+                # passwd/group: match by name or numeric uid/gid in field 3.
+                fields = ln.split(":")
+                uid = fields[2] if len(fields) > 2 else ""
+                if name == key or uid == key:
+                    matched.append(ln)
+        if not matched:
+            self.state.last_exit_code = 2
             return ""
-        if p[1] == "passwd":
-            return self.state.read_file("/etc/passwd") or ""
-        if p[1] == "group":
-            return self.state.read_file("/etc/group") or ""
-        return ""
+        self.state.last_exit_code = 0
+        return "\n".join(matched)
 
     def _cmd_clear(self, p: list[str]) -> str:
         return "\x1b[2J\x1b[H"

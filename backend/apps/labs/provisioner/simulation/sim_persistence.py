@@ -67,6 +67,10 @@ def snapshot_engine(engine: UnifiedSimulationEngine) -> dict:
         "cwd": st.cwd,
         "uid_counter": st.uid_counter,
         "pid_counter": st.pid_counter,
+        # Persist the boot epoch so `uptime` reflects real elapsed time since the
+        # session started (and survives reboots) instead of resetting to ~1h on
+        # every cross-worker restore.
+        "boot_time": st.boot_time,
         "vfs": st.vfs,
         "users": {k: _user_to_dict(v) for k, v in st.users.items()},
         "groups": st.groups,
@@ -160,6 +164,8 @@ def restore_engine(data: dict) -> UnifiedSimulationEngine | None:
     st.cwd = data.get("cwd", "/root")
     st.uid_counter = data.get("uid_counter", 1000)
     st.pid_counter = data.get("pid_counter", 900)
+    if data.get("boot_time") is not None:
+        st.boot_time = data["boot_time"]
     st.vfs = data.get("vfs", st.vfs)
     st.users = {k: _user_from_dict(v) for k, v in data.get("users", {}).items()}
     st.groups = data.get("groups", st.groups)

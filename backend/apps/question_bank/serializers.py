@@ -30,7 +30,7 @@ class ScenarioListSerializer(serializers.ModelSerializer):
     completion_rate = serializers.IntegerField(read_only=True, required=False)
     is_bookmarked = serializers.BooleanField(read_only=True, required=False, default=False)
     # "What you'll learn" — the first couple of spoiler-free outcome bullets so
-    # cards can preview the skills a learner walks away with (KodeKloud parity).
+    # cards can preview the skills a learner walks away with.
     learn = serializers.SerializerMethodField()
 
     class Meta:

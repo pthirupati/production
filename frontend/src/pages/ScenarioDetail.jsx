@@ -7,6 +7,7 @@ import { jiraApi } from '../api/jira'
 import ScenarioIssueBar from '../components/ScenarioIssueBar'
 import JiraTeamGuide from '../components/JiraTeamGuide'
 import StickyPageToolbar from '../components/StickyPageToolbar'
+import LimitReachedModal from '../components/LimitReachedModal'
 import { useAuthStore } from '../store/authStore'
 import {
   Clock, Target, Lightbulb, Play, CheckCircle2,
@@ -394,19 +395,10 @@ export default function ScenarioDetail() {
         </div>
       </div>
 
-      {/* Banners */}
-      {limitInfo && (
-        <div className="glass-card p-5 border-accent-amber/20 bg-accent-amber/5">
-          <h3 className="text-base font-semibold text-white mb-1">Daily Limit Reached</h3>
-          <p className="text-sm text-surface-400 mb-3">
-            You've used {limitInfo.usage?.labs_today} of {limitInfo.plan?.max_labs_per_day} labs today on the {limitInfo.plan?.name} plan.
-          </p>
-          <Link to="/pricing" className="btn-primary text-sm px-4 py-2 inline-flex items-center gap-1.5">
-            <Zap size={14} /> Upgrade to Pro
-          </Link>
-        </div>
-      )}
+      {/* Daily-limit popup window */}
+      <LimitReachedModal info={limitInfo} onClose={() => setLimitInfo(null)} />
 
+      {/* Banners */}
       {scenario.is_accessible === false && (
         <div className="glass-card p-5 border-accent-purple/20 bg-accent-purple/5">
           <div className="flex items-start gap-3">
