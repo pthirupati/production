@@ -12,10 +12,12 @@ class TutorialCompletenessTest(TestCase):
     def test_enrich_body_adds_required_offline_blocks(self):
         body = enrich_body("Linux", "Linux Basics", "Short lesson.")
         self.assertIn("```mermaid", body)
-        self.assertIn("| Area | What to verify | Why it matters |", body)
+        self.assertIn("| What to check | Command / signal | Why it matters |", body)
         self.assertIn("> [!NOTE]", body)
         self.assertIn("```bash", body)
-        self.assertIn("Overview & why it matters", body)
+        self.assertIn("Hands-on playbook", body)
+        self.assertNotIn("Core concept", body)
+        self.assertNotIn("Check solution", body)
 
     def test_generated_quiz_requires_80_percent(self):
         quiz = build_module_quiz("Linux", "Linux Basics")

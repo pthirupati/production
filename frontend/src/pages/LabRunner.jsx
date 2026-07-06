@@ -40,6 +40,7 @@ import SimLabWizard from '../components/SimLabWizard'
 import LabJourneyStrip from '../components/lab/LabJourneyStrip'
 import useLabShortcuts from '../hooks/useLabShortcuts'
 import { useIsMobile } from '../hooks/useMediaQuery'
+import { parseScenarioSections } from '../components/scenarios/ScenarioNarrative'
 
 function formatLabTime(seconds) {
   const m = Math.floor(seconds / 60)
@@ -129,6 +130,10 @@ function buildGuidedSteps(scenario = {}) {
   const objectives = Array.isArray(scenario.objectives) ? scenario.objectives : []
   const commands = guidedCommandSet(scenario)
   const techName = scenario.technology?.name || 'this technology'
+  const parsed = parseScenarioSections(scenario.description || '')
+  const briefing = parsed
+    ? [parsed.symptom || parsed.symptoms, parsed.environment].filter(Boolean).join('\n\n')
+    : (scenario.initial_state || scenario.description || '')
   const objectiveSteps = objectives.map((objective, i) => ({
     title: `Work objective ${i + 1}`,
     icon: Target,
@@ -144,15 +149,15 @@ function buildGuidedSteps(scenario = {}) {
   }))
   return [
     {
-      title: 'Orient yourself',
+      title: 'Incident briefing',
       icon: Eye,
       accent: 'text-accent-cyan',
-      body: scenario.initial_state || scenario.description || 'Understand the incident, the affected system, and what success should look like.',
+      body: briefing || 'Understand the incident, the affected system, and what success should look like.',
       commands: [],
       actions: [
-        'Read the scenario, symptoms, and objectives from top to bottom.',
+        'Read the Jira ticket and scenario briefing.',
         'Identify whether the work belongs in the terminal, simulator UI, or both.',
-        'Write down the expected healthy state before changing anything.',
+        'Note the expected healthy state before changing anything.',
       ],
       verifyLabel: 'I understand the incident',
     },

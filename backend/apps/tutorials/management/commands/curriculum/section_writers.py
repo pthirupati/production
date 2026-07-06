@@ -139,17 +139,9 @@ def _write_notes(topic: str, module: str, level: str, profile: dict) -> str:
 
 def _topic_diagram_image(topic: str, module: str) -> str:
     """Inline architecture diagram as mermaid (always renders; no external CDN dependency)."""
-    mod_id = _mermaid_id(module, "mod")
-    return (
-        f"\n\n```mermaid\n"
-        f"flowchart TB\n"
-        f"  subgraph learn [\"{module}\"]\n"
-        f"    A[Concept] --> B[Hands-on]\n"
-        f"    B --> C[Verify]\n"
-        f"  end\n"
-        f"  learn --> D[({topic} track)]\n"
-        f"```\n"
-    )
+    from apps.tutorials.tutorial_enrichment import architecture_diagram
+
+    return f"\n\n{architecture_diagram(topic, module=module)}\n"
 
 
 def _write_theory(topic: str, module: str, level: str, profile: dict) -> str:

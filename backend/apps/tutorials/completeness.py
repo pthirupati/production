@@ -14,6 +14,14 @@ from pathlib import Path
 from typing import Iterable
 
 from .quiz_bank import build_module_quiz
+from .tutorial_enrichment import (
+    ENRICHMENT_HEADER,
+    architecture_diagram,
+    practical_summary,
+    reference_table,
+    shell_practice_block,
+    strip_auto_enrichment,
+)
 
 MERMAID_RE = re.compile(r"```mermaid\b", re.I)
 CODE_RE = re.compile(r"```(?!mermaid\b)[a-zA-Z0-9_+-]*\n", re.I)
@@ -193,56 +201,30 @@ def _topic_first_concept(tech: str) -> str:
 
 
 def enrich_body(topic: str, title: str, body: str) -> str:
-    """Append missing rich blocks to authored Markdown, idempotently."""
-    body = body or ""
+    """Append missing rich blocks to authored Markdown, idempotently.
+
+    Strips any prior auto-enrichment (including the legacy generic mermaid) so
+    re-seeding refreshes lessons with topic-specific diagrams and commands.
+    """
+    body = strip_auto_enrichment(body or "")
     additions: list[str] = []
     if not CALLOUT_RE.search(body):
         additions.append(
-            "> [!NOTE] Production operators learn faster when each concept is tied to a command, an expected output, and a validation signal."
+            f"> [!NOTE] **{title or topic}** — study the architecture diagram, run the "
+            "commands below in order, then practice the linked lab."
         )
         additions.append(
-            "> [!TIP] Read the diagram first, run the command second, and only then attempt the linked lab."
+            "> [!TIP] Copy commands into the integrated terminal. Compare output before "
+            "and after each change — that diff is your evidence."
         )
     if not MERMAID_RE.search(body):
-        safe_title = re.sub(r"[^A-Za-z0-9 ]+", "", title or topic).strip() or "Lesson"
-        additions.append(
-            "```mermaid\n"
-            "flowchart LR\n"
-            "  concept[Core concept] --> command[Run command]\n"
-            "  command --> output[Expected output]\n"
-            f"  output --> lab[{safe_title} lab]\n"
-            "  lab --> verify[Check solution]\n"
-            "```"
-        )
+        additions.append(architecture_diagram(topic, title=title))
     if not TABLE_RE.search(body):
-        additions.append(
-            "| Area | What to verify | Why it matters |\n"
-            "|---|---|---|\n"
-            f"| {topic} concept | Command output matches expected state | Confirms the mental model |\n"
-            "| Safety | Change is reversible | Keeps practice production-minded |\n"
-            "| Validation | Lab check passes | Proves hands-on mastery |"
-        )
+        additions.append(reference_table(topic, title))
     if not CODE_RE.search(body):
-        additions.append(
-            "```bash\n"
-            "# Run the lesson's core inspection command, then compare the output\n"
-            "echo \"inspect -> change -> verify\"\n"
-            "echo \"expected: validation signal is green\"\n"
-            "```"
-        )
-    if "overview & why it matters" not in body.lower():
-        additions.append(
-            "### Lesson structure checklist\n\n"
-            "- **Overview & why it matters:** connect the concept to real operations.\n"
-            "- **Prerequisites:** know the basic CLI, files, and safety checks for this technology.\n"
-            "- **Core concept:** understand the component, its inputs, and its outputs.\n"
-            "- **Architecture / flow diagram:** trace request or control flow before changing state.\n"
-            "- **Step-by-step:** inspect, change one thing, verify, and record evidence.\n"
-            "- **Worked example:** repeat the command pattern on a realistic mini-task.\n"
-            "- **Common errors & fixes:** compare symptoms with logs and status output.\n"
-            "- **Best practices:** prefer reversible, observable, least-privilege changes.\n"
-            "- **Summary:** finish with three takeaways and the linked lab."
-        )
+        additions.append(shell_practice_block(topic, title))
+    if "hands-on playbook" not in body.lower():
+        additions.append(practical_summary(topic, title))
     if additions:
-        return body.rstrip() + "\n\n## Cheat-sheet, diagram, and practice\n\n" + "\n\n".join(additions)
+        return body.rstrip() + f"\n\n{ENRICHMENT_HEADER}\n\n" + "\n\n".join(additions)
     return body

@@ -7,6 +7,7 @@ import { jiraApi } from '../api/jira'
 import ScenarioIssueBar from '../components/ScenarioIssueBar'
 import JiraTeamGuide from '../components/JiraTeamGuide'
 import StickyPageToolbar from '../components/StickyPageToolbar'
+import ScenarioNarrative from '../components/scenarios/ScenarioNarrative'
 import LimitReachedModal from '../components/LimitReachedModal'
 import { useAuthStore } from '../store/authStore'
 import {
@@ -432,10 +433,7 @@ export default function ScenarioDetail() {
         </div>
       )}
 
-      <div className="glass-card p-6">
-        <h2 className="text-base font-semibold text-white mb-3">Description</h2>
-        <p className="text-sm text-surface-300 leading-relaxed whitespace-pre-wrap">{scenario.description}</p>
-      </div>
+      <ScenarioNarrative scenario={scenario} />
 
       {scenario.related_tutorials?.length > 0 && (
         <div className="glass-card p-6 border-accent-purple/15">
