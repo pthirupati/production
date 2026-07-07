@@ -165,6 +165,9 @@ class RHELOSState:
             "lo": {"up": True, "addrs": ["127.0.0.1/8"]},
             "eth0": {"up": True, "addrs": ["10.0.0.10/24"]},
         }
+        # Git simulation — repos, branches, commits (lazy; see git_state.py)
+        from .git_state import GitSimState
+        self.git = GitSimState()
         from .lvm_state import LVMState
         from .firewall_state import FirewallState
         self.lvm = LVMState()

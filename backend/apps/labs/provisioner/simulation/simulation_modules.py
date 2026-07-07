@@ -70,6 +70,11 @@ def apply_simulation_context(engine: "UnifiedSimulationEngine") -> None:
             "#!/bin/bash\nset -u\necho ${MISSING_VAR}\n",
         )
 
+    # DevOps / git labs get a real repository with history and a feature branch
+    # so git status/log/branch/merge/push all work against meaningful state.
+    if sim_type == "devops" or "git" in slug or "ci-pipeline" in slug or "devops" in slug:
+        _seed_devops_git_repo(state)
+
     # `sim-rhel-ssh-stop` is graded by `systemctl is-active sshd`; sshd must start
     # stopped or the check passes before the learner restarts it (fail-open).
     if "ssh-stop" in slug:
@@ -769,6 +774,43 @@ def _register_ansible(engine: "UnifiedSimulationEngine", shell: RHELShell) -> No
             return '{"webservers": {"hosts": ["web1", "web2"]}}'
         return f"{line}: OK"
     shell.register_handler(handler)
+
+
+def _seed_devops_git_repo(state) -> None:
+    """Seed /root/app as a working git repo with history + a feature branch."""
+    from .git_state import seed_repo
+
+    if state.git.repos:
+        return
+    app_py = (
+        "from flask import Flask\n\n"
+        "app = Flask(__name__)\n\n\n"
+        "@app.route('/healthz')\n"
+        "def healthz():\n"
+        "    return {'status': 'ok'}\n"
+    )
+    ci_yml = (
+        "stages:\n  - build\n  - test\n  - deploy\n\n"
+        "build:\n  stage: build\n  script:\n    - docker build -t registry.fixitlab.local/platform/app:$CI_COMMIT_SHORT_SHA .\n\n"
+        "test:\n  stage: test\n  script:\n    - python -m pytest tests/ -q\n\n"
+        "deploy:\n  stage: deploy\n  script:\n    - helm upgrade --install webapp charts/webapp\n  only:\n    - main\n"
+    )
+    seed_repo(
+        state.git,
+        state,
+        "/root/app",
+        files={},
+        history=[
+            ("Initial commit", {"README.md": "# platform/app\n\nPayments API service.\n", "app.py": app_py}),
+            ("Add CI pipeline", {".gitlab-ci.yml": ci_yml}),
+            ("Add health endpoint tests", {"tests/test_health.py": "def test_healthz():\n    assert True\n"}),
+        ],
+        branch_commits={
+            "feature/rate-limit": [
+                ("Add rate limiting middleware", {"middleware.py": "RATE_LIMIT = 100  # req/min\n"}),
+            ],
+        },
+    )
 
 
 def _register_baremetal(engine: "UnifiedSimulationEngine", shell: RHELShell) -> None:

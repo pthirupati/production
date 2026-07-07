@@ -128,6 +128,9 @@ def snapshot_engine(engine: UnifiedSimulationEngine) -> dict:
         "terraform_fixed": getattr(st, "terraform_fixed", False),
         "windows_fixed": getattr(st, "windows_fixed", False),
         "network_ifs": st.network_ifs,
+        # Git repos (branches/commits/staging) — must survive cross-worker
+        # restores or `git log`/validation sees an empty repo mid-lab.
+        "git": st.git.to_dict() if getattr(st, "git", None) else None,
         "lvm": {
             "pvs": {k: asdict(v) for k, v in lvm.pvs.items()},
             "vgs": {k: asdict(v) for k, v in lvm.vgs.items()},
@@ -201,6 +204,10 @@ def restore_engine(data: dict) -> UnifiedSimulationEngine | None:
     st.pending_nic_config = data.get("pending_nic_config", "10.0.0.20/24")
     st.network_nic_provisioned = data.get("network_nic_provisioned", True)
     st.network_ifs = data.get("network_ifs", st.network_ifs)
+    git_data = data.get("git")
+    if git_data:
+        from .git_state import GitSimState
+        st.git = GitSimState.from_dict(git_data)
     st.session_id = data.get("session_id", "")
     st.server_hung = data.get("server_hung", False)
     # Restore the block-device model (the preset already seeded a default set in

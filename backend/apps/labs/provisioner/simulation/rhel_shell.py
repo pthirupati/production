@@ -233,6 +233,7 @@ class RHELShell:
             "semanage": self._cmd_semanage,
             "restorecon": self._cmd_restorecon,
             "chcon": self._cmd_chcon,
+            "git": self._cmd_git,
             "virsh": self._cmd_virsh,
             "esxcli": self._cmd_esxcli,
             "vmware-toolbox-cmd": self._cmd_vmware,
@@ -1121,7 +1122,12 @@ class RHELShell:
         binaries = {
             "bash": "/usr/bin/bash", "systemctl": "/usr/bin/systemctl", "nginx": "/usr/sbin/nginx",
             "useradd": "/usr/sbin/useradd", "passwd": "/usr/bin/passwd", "python3": "/usr/bin/python3",
+            "git": "/usr/bin/git", "docker": "/usr/bin/docker", "kubectl": "/usr/local/bin/kubectl",
+            "curl": "/usr/bin/curl", "vi": "/usr/bin/vi", "vim": "/usr/bin/vim", "grep": "/usr/bin/grep",
+            "sed": "/usr/bin/sed", "awk": "/usr/bin/awk", "find": "/usr/bin/find", "tar": "/usr/bin/tar",
         }
+        if p[1] not in binaries:
+            self.state.last_exit_code = 1
         return binaries.get(p[1], f"which: no {p[1]} in ({self.state.env['PATH']})")
 
     def _cmd_env(self, p: list[str]) -> str:
@@ -2381,6 +2387,11 @@ class RHELShell:
             if sel_type:
                 self.state.file_contexts[ap] = f"unconfined_u:object_r:{sel_type}:s0"
         return ""
+
+    def _cmd_git(self, p: list[str]) -> str:
+        from .git_commands import run_git
+        # Re-split from the raw line so quoted args (commit -m "msg") survive.
+        return run_git(self.state, p, " ".join(p))
 
     def _cmd_virsh(self, p: list[str]) -> str:
         if len(p) > 1 and p[1] == "list":
