@@ -23,6 +23,18 @@ def apply_scenario_preset(slug: str, state: RHELOSState) -> None:
         _preset_patching(state)
     elif "boot" in slug or "grub" in slug:
         _preset_boot_issue(state)
+    elif slug.startswith("academy-"):
+        # Any academy lab without an explicit real-state preset gets a broken
+        # config marker so Check Solution stays fail-closed until the learner
+        # applies the documented fix (previously e.g. academy-baremetal-* booted
+        # a fully healthy machine and auto-passed the canonical IPMI check).
+        state._mkdir("/opt/fixitlab/academy")
+        state._write_file(
+            f"/opt/fixitlab/academy/{slug}.conf",
+            f"# broken configuration for {slug}\n"
+            "# complete the lab objective, then apply the documented remediation\n"
+            "# this file needs the documented fix\n",
+        )
 
 
 def _preset_wrong_nginx_root(state: RHELOSState) -> None:
@@ -3336,7 +3348,39 @@ def _preset_rs_db_postgres_effective_cache_size(state: RHELOSState) -> None:
     state._write_file('/var/lib/pgsql/data/postgresql.conf', '# broken configuration for db-postgres-effective-cache-size\n# this file needs the documented fix\n')
 
 
+def _make_broken_config_preset(path: str, slug: str):
+    """Preset factory: plant a broken config file the learner must repair.
+
+    Validation stays fail-closed via the sentinel sweep in validation.py until
+    the file no longer contains "# broken configuration for <slug>".
+    """
+    def _preset(state: RHELOSState) -> None:
+        import os
+        d = os.path.dirname(path)
+        if d:
+            state._mkdir(d)
+        state._write_file(
+            path,
+            f"# broken configuration for {slug}\n# this file needs the documented fix\n",
+        )
+    return _preset
+
+
+# Bare-metal terminal labs (sim-bm-*) — each plants a realistic broken config
+# so Check Solution has a genuine broken state to grade (previously these had
+# no validation at all and could never pass).
+_SIM_BM_PRESETS = {
+    'sim-bm-pxe-fail': _make_broken_config_preset('/etc/dnsmasq.d/pxe-boot.conf', 'sim-bm-pxe-fail'),
+    'sim-bm-disk-smart': _make_broken_config_preset('/etc/smartmontools/smartd.conf', 'sim-bm-disk-smart'),
+    'sim-bm-nic-down': _make_broken_config_preset('/etc/sysconfig/network-scripts/ifcfg-eno1', 'sim-bm-nic-down'),
+    'sim-bm-raid-degraded': _make_broken_config_preset('/etc/mdadm.conf', 'sim-bm-raid-degraded'),
+    'sim-bm-thermal': _make_broken_config_preset('/etc/sysconfig/fan-policy.conf', 'sim-bm-thermal'),
+    'sim-vmware-guest-down': _make_broken_config_preset('/etc/vmware-tools/tools.conf', 'sim-vmware-guest-down'),
+}
+
+
 _PRESETS: dict[str, callable] = {
+    **_SIM_BM_PRESETS,
     'html-img-missing-alt': _preset_rs_html_img_missing_alt,
     'html-table-no-headers': _preset_rs_html_table_no_headers,
     'html-heading-skip': _preset_rs_html_heading_skip,

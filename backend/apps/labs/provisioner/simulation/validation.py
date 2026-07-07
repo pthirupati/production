@@ -204,7 +204,7 @@ def resolve_simulation_validation_script(scenario_slug: str, validation_script: 
         (lambda s: "grub" in s or "mbr" in s or "kernel-panic" in s or "kernel" in s or "boot" in s, CANONICAL_GRUB_CHECK),
         (lambda s: "patch" in s, CANONICAL_PATCHING_CHECK),
         (lambda s: "ssh-stop" in s or "sshd-down" in s, CANONICAL_SSHD_CHECK),
-        (lambda s: "ipmi" in s or "baremetal" in s, CANONICAL_BAREMETAL_CHECK),
+        (lambda s: "ipmi" in s or "baremetal" in s or s.startswith("sim-bm-") or s.startswith("sim-vmware-guest"), CANONICAL_BAREMETAL_CHECK),
     ]
     for pred, canonical in rules:
         try:
@@ -272,6 +272,29 @@ def validate_simulation_state(
         return False, "No validation checks matched this simulation script"
     if failures:
         return False, failures[0]
+
+    # ── Fail-closed sweep for preset-planted broken config files ──
+    # Hundreds of scenario presets plant a file whose content is the sentinel
+    # "# broken configuration for <slug>". Many of those scenarios ship a
+    # check.sh that only probes a coarse health flag (e.g. `nvidia-smi`,
+    # `docker ps`) which is healthy by default — so the lab auto-passed without
+    # any fix. As long as the planted file still carries the sentinel for THIS
+    # scenario, the incident is by definition unresolved: fail with a pointer
+    # to the exact file the learner must repair.
+    slug = (getattr(state, "scenario_slug", "") or "").strip()
+    if slug:
+        sentinel = f"# broken configuration for {slug}"
+        for path, node in state.vfs.items():
+            if not isinstance(node, dict) or node.get("type") != "file":
+                continue
+            content = node.get("content") or ""
+            # FIXED-OK anywhere in the file counts as repaired (marker labs let
+            # the learner append the sentinel fix rather than rewrite the file).
+            if sentinel in content and "FIXED-OK" not in content:
+                return False, (
+                    f"{path} still contains the broken configuration — edit the file "
+                    "and apply the documented fix, then re-run Check Solution"
+                )
     return True, "Simulation validation passed"
 
 

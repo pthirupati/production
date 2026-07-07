@@ -772,6 +772,12 @@ def _register_ansible(engine: "UnifiedSimulationEngine", shell: RHELShell) -> No
 
 
 def _register_baremetal(engine: "UnifiedSimulationEngine", shell: RHELShell) -> None:
+    # IPMI power labs start with the chassis OFF so the learner has to bring it
+    # up (`ipmitool power on`); otherwise the canonical power check auto-passes.
+    slug = (engine.scenario_slug or "").lower()
+    if slug in ("sim-baremetal-ipmi", "sim-rhel-baremetal-ipmi", "maas-ipmi-bmc-unreachable"):
+        engine._power_state = "off"
+
     def handler(parts, line):
         low = line.strip().lower()
         if not (low.startswith("ipmitool") or low.startswith("dmidecode") or low.startswith("esxcli")):
