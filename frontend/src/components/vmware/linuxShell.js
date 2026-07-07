@@ -21,6 +21,8 @@
  *   calls shell.saveFile(path, newContent). On quit-without-save it does nothing.
  */
 
+import { createGitSim } from './gitSim'
+
 const HUMAN_MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
 
 /** Per-VM shared guest state (VFS, packages, disk flags) — all terminal tabs share this. */
@@ -1099,6 +1101,9 @@ export function createLinuxShell(vm, opts = {}) {
     if (expanded.startsWith('~')) expanded = expanded.replace(/^~(?=\/|$)/, env.HOME)
     return normalizePath(cwd.path, expanded)
   }
+
+  // Real stateful git against this guest's VFS (init/clone/commit/branch/merge…).
+  const gitSim = createGitSim({ vfs, cwd, abs, username: sessionUser })
 
   const switchUser = (user) => {
     const uhome = user === 'root' ? '/root' : `/home/${user}`
@@ -2608,9 +2613,9 @@ export function createLinuxShell(vm, opts = {}) {
       else emit(`aws: ${svc}: simulated (${[op, ...pos.slice(2)].filter(Boolean).join(' ') || 'no subcommand'}) in ${region}`)
     }
     else if (lc === 'helm') emit('NAME\tNAMESPACE\tREVISION\tSTATUS\tCHART')
-    else if (['ansible', 'ansible-playbook', 'terraform', 'packer', 'vagrant', 'git'].includes(lc)) {
-      if (lc === 'git' && positional[0] === 'status') emit('On branch main\nnothing to commit, working tree clean')
-      else if (lc === 'terraform' && positional[0] === 'version') emit('Terraform v1.7.4\non linux_amd64')
+    else if (lc === 'git') emit(gitSim.run(work))
+    else if (['ansible', 'ansible-playbook', 'terraform', 'packer', 'vagrant'].includes(lc)) {
+      if (lc === 'terraform' && positional[0] === 'version') emit('Terraform v1.7.4\non linux_amd64')
       else emit(`${lc}: simulated (${positional.join(' ') || 'no args'})`)
     }
 

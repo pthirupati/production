@@ -101,7 +101,7 @@ def _build_issue_body(session=None, user=None, scenario=None) -> str:
     # OBJECTIVE: …" template. Parse those labelled sections out so the ticket can
     # present them as a clean incident narrative instead of one dense paragraph.
     sections = _parse_labelled_sections(description)
-    context = sections.get("context")
+    context = _naturalize_context(sections.get("context"), scenario)
     env_text = sections.get("environment") or (initial if initial != description else "")
     symptom = sections.get("symptom") or sections.get("symptoms")
     impact_line = sections.get("impact")
@@ -149,6 +149,39 @@ def _build_issue_body(session=None, user=None, scenario=None) -> str:
         "resolution comment describing the root cause before you close this ticket.",
     ]
     return "\n".join(parts)
+
+
+def _naturalize_context(context: str | None, scenario) -> str | None:
+    """Rewrite templated academy CONTEXT blocks into natural incident prose.
+
+    Hundreds of generated scenarios share the boilerplate "A team operating X
+    needs you to resolve `tech: Title` during a realistic incident..." which
+    reads like a template, not a ticket. Detect that shape and rebuild it from
+    the scenario's real title/technology so the ticket opens like an incident a
+    colleague actually filed.
+    """
+    if not context:
+        return context
+    import re
+
+    m = re.match(
+        r"A team operating (?P<area>.+?) needs you to resolve\s*`(?P<ref>[^`]+)`",
+        context.strip(),
+        re.IGNORECASE,
+    )
+    if not m:
+        return context
+    area = m.group("area").strip().rstrip(".")
+    tech = scenario.technology.name if getattr(scenario, "technology", None) else area
+    title = (scenario.title or "").replace(" — Learn Lab", "").replace(" — Fundamentals Lab", "").strip()
+    return (
+        f"The {area} team has escalated an issue on one of our {tech} systems: "
+        f"**{title or m.group('ref')}**. The affected environment is not in its expected "
+        f"working state, and the service it supports is degraded until it is repaired. "
+        f"You have been assigned as the on-call engineer for this incident — investigate "
+        f"the current state, identify what is wrong or missing, and bring the system to "
+        f"the expected configuration described in the acceptance criteria below."
+    )
 
 
 def _parse_labelled_sections(text: str) -> dict:
