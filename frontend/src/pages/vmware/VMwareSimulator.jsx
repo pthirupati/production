@@ -1,6 +1,8 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { Link, useParams, useSearchParams } from 'react-router-dom'
+import { Link, useParams, useSearchParams, useNavigate } from 'react-router-dom'
 import { vmwareApi } from '../../api/vmware'
+import { labApi } from '../../api/labs'
+import { registerLabChildTab, subscribeLabSync } from '../../utils/labSync'
 import toast from 'react-hot-toast'
 import VmwareLoginGate, { isVcenterAuthenticated } from '../../components/vmware/VmwareLoginGate'
 import VmwareScenarioActions from '../../components/vmware/VmwareScenarioActions'
@@ -719,6 +721,7 @@ function TaskEventDetailModal({ item, onClose }) {
 
 /* ─── Main component ─────────────────────────────────────────────────── */
 export default function VMwareSimulator() {
+  const navigate = useNavigate()
   const { sessionId: paramSessionId } = useParams()
   const [searchParams] = useSearchParams()
   // Prefer session ID from query param (redirected from LabRunner) over URL segment
@@ -804,6 +807,44 @@ export default function VMwareSimulator() {
   }, [load])
 
   useEffect(() => { load() }, [load])
+
+  // Close this tab when the parent lab stops or the timer expires.
+  useEffect(() => {
+    if (!sessionId) return undefined
+    registerLabChildTab(sessionId, 'vmware-sim')
+    const exitLab = (reason) => {
+      toast(reason === 'expired' ? 'Lab time expired — closing VMware' : 'Lab session ended', { icon: '⏰', duration: 4000 })
+      navigate('/scenarios')
+      setTimeout(() => { try { window.close() } catch { /* popup blocked */ } }, 600)
+    }
+    const unsub = subscribeLabSync(sessionId, (data) => {
+      if (data.type === 'lab_stopped' || data.type === 'lab_force_close') {
+        exitLab(data.reason || 'stopped')
+      }
+    })
+    return unsub
+  }, [sessionId, navigate])
+
+  // Poll server-side lab status — catches expiry when BroadcastChannel is unavailable.
+  useEffect(() => {
+    if (!sessionId) return undefined
+    let cancelled = false
+    const poll = async () => {
+      if (cancelled) return
+      try {
+        const lab = await labApi.getSessionStatus(sessionId)
+        if (cancelled) return
+        if (['TERMINATED', 'EXPIRED', 'FAILED', 'COMPLETED'].includes(lab.status)) {
+          toast(lab.status === 'EXPIRED' ? 'Lab time expired' : 'Lab session ended', { icon: '⏰', duration: 4000 })
+          navigate('/scenarios')
+          setTimeout(() => { try { window.close() } catch { /* */ } }, 600)
+        }
+      } catch { /* ignore */ }
+    }
+    poll()
+    const iv = setInterval(poll, 15000)
+    return () => { cancelled = true; clearInterval(iv) }
+  }, [sessionId, navigate])
 
   useEffect(() => {
     if (activeTab !== 'monitor') return undefined

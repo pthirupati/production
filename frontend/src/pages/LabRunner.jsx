@@ -12,6 +12,7 @@ import {
   Ticket as TicketIcon, Lock, ChevronDown, ChevronUp, ThumbsUp, ThumbsDown
 } from 'lucide-react'
 import toast from 'react-hot-toast'
+import { broadcastLabStopped, closeLabChildTabs } from '../utils/labSync'
 import { ConfirmDialog } from '../components/ConfirmModal'
 import JiraTicketPanel from '../components/JiraTicketPanel'
 import ItsmTicketPanel from '../components/itsm/ItsmTicketPanel'
@@ -407,9 +408,10 @@ export default function LabRunner() {
   const LAB_CLOSE_SECONDS = 10
 
   const cleanupLabResources = useCallback(() => {
+    if (sessionId) closeLabChildTabs(sessionId)
     clearSession()
     stopTimer()
-  }, [clearSession, stopTimer])
+  }, [clearSession, stopTimer, sessionId])
 
   const scheduleLabClose = useCallback((result, slug) => {
     if (closeTimerRef.current) clearTimeout(closeTimerRef.current)
@@ -681,6 +683,7 @@ export default function LabRunner() {
               stopTimer()
 
               // Broadcast to other tabs that this lab expired
+              broadcastLabStopped(sessionId, 'expired')
               if (labChannelRef.current) {
                 labChannelRef.current.postMessage({ type: 'lab_stopped', sessionId, reason: 'expired' })
               }
@@ -901,6 +904,7 @@ export default function LabRunner() {
         setFailedValidationCount(0)
         toast.success(result.message || `Challenge solved! Score: ${result.score}`, { duration: 6000 })
         stopTimer()
+        broadcastLabStopped(sessionId, 'completed', { closingDelayMs: LAB_CLOSE_SECONDS * 1000 })
         if (labChannelRef.current) {
           labChannelRef.current.postMessage({
             type: 'lab_stopped',
@@ -1065,6 +1069,8 @@ export default function LabRunner() {
       clearSession()
       stopTimer()
 
+      broadcastLabStopped(sessionId, 'stopped')
+      closeLabChildTabs(sessionId)
       // Broadcast to other tabs that this lab was stopped
       if (labChannelRef.current) {
         labChannelRef.current.postMessage({ type: 'lab_stopped', sessionId, reason: 'stopped' })
@@ -1465,6 +1471,7 @@ export default function LabRunner() {
     setValidationResult(result)
     setSidebarTab('result')
     stopTimer()
+    broadcastLabStopped(sessionId, 'completed', { closingDelayMs: LAB_CLOSE_SECONDS * 1000 })
     if (labChannelRef.current) {
       labChannelRef.current.postMessage({
         type: 'lab_stopped', sessionId, reason: 'completed',

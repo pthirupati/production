@@ -288,6 +288,9 @@ class SimulationProvisioner:
         return resource_id, f"sim-{slug}"
 
     def _setup_ssh_client_shell(self, engine, entry, hostname: str = "ssh-client") -> RHELShell:
+        cached = entry.get("state", {}).get("ssh_client_shell")
+        if isinstance(cached, RHELShell):
+            return cached
         client_state = engine.state.clone_for_host(hostname)
         if "labuser" not in client_state.users:
             client_state.users["labuser"] = SimUser(
@@ -309,6 +312,7 @@ class SimulationProvisioner:
         shell._host_names = entry["state"].get("hosts", {})
         shell._engine = entry["state"]["engine"]
         register_modules(entry["state"]["engine"], shell)
+        entry.setdefault("state", {})["ssh_client_shell"] = shell
         return shell
 
     def create_exec_stream(self, resource_id, session_key: str = "", host_key: str = "primary"):
@@ -329,7 +333,8 @@ class SimulationProvisioner:
         stream_key = f"{session_key}:{hk}:{uuid.uuid4().hex[:8]}"
 
         if hk == "ssh_client":
-            shell = self._setup_ssh_client_shell(engine, entry)
+            cached = entry.get("state", {}).get("ssh_client_shell")
+            shell = cached if isinstance(cached, RHELShell) else self._setup_ssh_client_shell(engine, entry)
             holder = SimulationStreamHolder(
                 shell.run,
                 prompt=shell.prompt,
