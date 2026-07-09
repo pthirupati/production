@@ -32,6 +32,7 @@ import AwxSimulator from '../components/awx/AwxSimulator'
 import TerraformSimulator from '../components/terraform/TerraformSimulator'
 import CicdPipelineSim from '../components/devops/CicdPipelineSim'
 import { isTerraformLab } from '../utils/iacFlavor'
+import { resetTerraformAwsLabState } from '../utils/terraformAwsBridge'
 import BaremetalSimulator from '../components/baremetal/BaremetalSimulator'
 import { SimWithTerminal } from '../components/sim/shared'
 import SimLabTips from '../components/SimLabTips'
@@ -1056,6 +1057,9 @@ export default function LabRunner() {
   const handleStop = async () => {
     setStopping(true)
     try {
+      if (isTerraformLab(scenario) || /aws/.test(`${scenario?.slug || ''} ${scenario?.technology?.slug || ''}`.toLowerCase())) {
+        resetTerraformAwsLabState()
+      }
       const result = await labApi.stopLab(sessionId)
       clearSession()
       stopTimer()
@@ -2346,6 +2350,17 @@ export default function LabRunner() {
           {isTerraformSimLab && (
             <button
               type="button"
+              onClick={() => setShowAwsSim(true)}
+              title="Open AWS Console — verify EC2/S3/IAM resources created by Terraform apply"
+              className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-md border text-[10px] font-semibold"
+              style={{ borderColor: 'rgba(255,153,0,.5)', color: '#ff9900', background: 'rgba(255,153,0,.12)' }}
+            >
+              <ExternalLink size={12} /> AWS Console
+            </button>
+          )}
+          {isTerraformSimLab && (
+            <button
+              type="button"
               onClick={() => setShowTerraformSim(true)}
               title="Open Terraform + AWS CLI simulator"
               className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-md border text-[10px] font-semibold"
@@ -2802,7 +2817,7 @@ export default function LabRunner() {
         />
       )}
 
-      {isAwsLab && showAwsSim && (
+      {(isAwsLab || isTerraformSimLab) && showAwsSim && (
         <div className="fixed inset-0 z-[100] bg-black flex flex-col">
           <div className="flex items-center justify-between px-3 py-2 bg-surface-900 border-b border-surface-700">
             <span className="text-sm font-semibold text-white">AWS Management Console</span>

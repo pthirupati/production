@@ -313,6 +313,7 @@ function seedState() {
     genericResources: seedGenericResources(),
 
     flash: [], // {id, type, message}
+    labManagedIds: [], // instance/bucket ids created during an active lab session
   }
 }
 
@@ -338,6 +339,24 @@ export const useAwsStore = create(
       setRegion: (region) => set({ region }),
       toggleDarkMode: () => set((s) => ({ darkMode: !s.darkMode })),
       resetSimulation: () => set({ ...seedState() }),
+
+      markLabManaged: (ids) => set((s) => ({
+        labManagedIds: [...new Set([...(s.labManagedIds || []), ...(ids || [])])],
+      })),
+
+      resetLabManaged: () => {
+        const { labManagedIds = [], instances, s3Buckets, securityGroups } = get()
+        if (!labManagedIds.length) return
+        const instIds = labManagedIds.filter((x) => x.startsWith('i-'))
+        const bucketNames = labManagedIds.filter((x) => x.startsWith('bucket:')).map((x) => x.slice(7))
+        const sgNames = labManagedIds.filter((x) => x.startsWith('sg:')).map((x) => x.slice(3))
+        set({
+          instances: instances.filter((i) => !instIds.includes(i.id)),
+          s3Buckets: s3Buckets.filter((b) => !bucketNames.includes(b.name)),
+          securityGroups: securityGroups.filter((sg) => !sgNames.includes(sg.name)),
+          labManagedIds: [],
+        })
+      },
 
       // ---------- EC2 instances ----------
       launchInstances: ({ name, amiId, type, count, keyName, subnetId, securityGroups, volumeSize, volumeType, monitoring, tags }) => {

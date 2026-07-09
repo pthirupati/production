@@ -298,13 +298,13 @@ export function unlockSpeech() {
   } catch { /* non-fatal */ }
 }
 
-async function waitForBrowserVoices(maxMs = 600) {
+async function waitForBrowserVoices(maxMs = 2400) {
   if (!window.speechSynthesis) return
   const start = Date.now()
   while (Date.now() - start < maxMs) {
     if (window.speechSynthesis.getVoices().length) return
     // eslint-disable-next-line no-await-in-loop
-    await new Promise((r) => setTimeout(r, 60))
+    await new Promise((r) => setTimeout(r, 80))
   }
 }
 
@@ -317,10 +317,6 @@ function speakBrowserUtterance(seg, { voice, locale, rate, pitch }) {
       settled = true
       clearTimeout(stuckTimer)
       clearInterval(speakingPoll)
-      // Some browsers (notably Safari and some Chrome builds) play the audio but
-      // never fire `onstart`. If the engine reports it actually spoke/queued the
-      // utterance, count it as started so we don't show a false
-      // "Voice unavailable" toast for audio the candidate could clearly hear.
       if (!started && window.speechSynthesis && (window.speechSynthesis.speaking || window.speechSynthesis.pending)) {
         started = true
       }
@@ -335,10 +331,12 @@ function speakBrowserUtterance(seg, { voice, locale, rate, pitch }) {
     u.onstart = () => { started = true }
     u.onend = done
     u.onerror = done
-    // Poll the engine: if it begins speaking without firing onstart, record it.
     const speakingPoll = setInterval(() => {
       if (window.speechSynthesis?.speaking) started = true
     }, 120)
+    // Chrome/Safari sometimes never fire onstart/onend — allow time proportional to
+    // utterance length so we don't falsely report "voice unavailable".
+    const stuckMs = Math.min(12000, Math.max(1800, 900 + seg.length * 55))
     const stuckTimer = setTimeout(() => {
       if (!started && window.speechSynthesis?.paused) {
         try { window.speechSynthesis.resume() } catch { /* */ }
@@ -346,7 +344,7 @@ function speakBrowserUtterance(seg, { voice, locale, rate, pitch }) {
       } else {
         done()
       }
-    }, 350)
+    }, stuckMs)
     try {
       window.speechSynthesis.resume?.()
       window.speechSynthesis.speak(u)
@@ -506,8 +504,8 @@ export function useInterviewVoice() {
       }
       window.speechSynthesis.onvoiceschanged = refresh
       refresh()
-      const t = setTimeout(refresh, 400)
-      return () => { clearTimeout(t) }
+      const timers = [400, 1200, 2800].map((ms) => setTimeout(refresh, ms))
+      return () => { timers.forEach(clearTimeout) }
     }
   }, [])
 

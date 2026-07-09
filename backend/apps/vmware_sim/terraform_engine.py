@@ -81,6 +81,11 @@ def _save(session_id: str, entry: dict) -> None:
     cache.set(_session_key(str(session_id)), json.dumps(entry, default=str), SESSION_TTL)
 
 
+def clear_session(session_id: str) -> None:
+    """Remove Terraform/AWS CLI lab state when the parent lab session terminates."""
+    cache.delete(_session_key(str(session_id)))
+
+
 def _sync_files_to_sim_shell(session_id: str, files: dict) -> None:
     """Mirror Terraform IDE files into the simulation shell filesystem."""
     try:

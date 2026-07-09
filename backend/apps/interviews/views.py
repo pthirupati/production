@@ -878,7 +878,16 @@ class InterviewRoundDetailView(APIView):
             logging.getLogger(__name__).exception(
                 "Failed to serialize interview round %s", round_id
             )
-            raise
+            return Response(
+                {
+                    "id": str(round_obj.id),
+                    "status": round_obj.status,
+                    "title": round_obj.title or "",
+                    "error": "partial_round_payload",
+                    "messages": [],
+                },
+                status=200,
+            )
 
 
 class InterviewRoundJoinView(APIView):
@@ -941,7 +950,18 @@ class InterviewPracticalLabView(APIView):
         )
         if round_obj.status != "in_progress":
             return Response({"error": "Round must be in progress"}, status=400)
-        result = start_practical_lab(request.user, round_obj)
+        try:
+            result = start_practical_lab(request.user, round_obj)
+        except Exception:  # noqa: BLE001
+            import logging
+            logging.getLogger(__name__).exception("practical lab failed for %s", round_id)
+            return Response(
+                {
+                    "error": "Could not start the lab environment. Try again or open the full lab.",
+                    "code": "PROVISION_FAILED",
+                },
+                status=400,
+            )
         if result.get("error"):
             return Response(result, status=400)
         return Response(result)

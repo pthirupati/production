@@ -587,4 +587,10 @@ class SimulationProvisioner:
         return True
 
     def terminate_lab(self, session):
+        try:
+            from apps.vmware_sim import terraform_engine as te
+
+            te.clear_session(str(session.id))
+        except Exception:  # noqa: BLE001
+            pass
         drop_sim_session(str(session.id))

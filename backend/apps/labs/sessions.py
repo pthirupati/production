@@ -1,4 +1,5 @@
 import logging
+from .infra import lab_infra_type
 from .models import LabSession
 from .provisioner import get_provisioner
 
@@ -8,11 +9,11 @@ logger = logging.getLogger(__name__)
 def start_lab_session(user, scenario):
     """
     Create a lab session and provision infrastructure.
-    Handles Docker, AWS EC2, and DigitalOcean.
+    Handles Docker, AWS EC2, DigitalOcean, and simulation labs.
     Note: The main StartLabView in public_api handles this directly.
     This is a utility function for programmatic use.
     """
-    infra_type = getattr(scenario, "infrastructure_type", "docker") or "docker"
+    infra_type = lab_infra_type(scenario)
 
     session = LabSession.objects.create(
         user=user,
@@ -28,6 +29,8 @@ def start_lab_session(user, scenario):
         if infra_type == "docker":
             session.container_id = resource_id
             session.container_name = resource_name
+        elif infra_type == "simulation":
+            session.instance_id = resource_id
         else:
             session.instance_id = resource_id
 

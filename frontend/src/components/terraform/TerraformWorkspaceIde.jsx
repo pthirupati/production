@@ -3,10 +3,12 @@ import { terraformApi } from '../../api/terraform'
 import toast from 'react-hot-toast'
 import CodeEditor from '../ide/CodeEditor'
 import LabTerminal from '../LabTerminal'
+import AwsTerminal from '../aws/terminal/AwsTerminal'
 import VsCodeWorkbench, { VscFileItem, VscEditorTab, VscPanelTab, VscActivityButton } from '../ide/VsCodeWorkbench'
 import { getIacProfile } from '../../utils/iacFlavor'
+import { syncTerraformApplyToAwsConsole, awsConsoleUrlForResource } from '../../utils/terraformAwsBridge'
 import {
-  FileCode, FolderOpen, Play, Plus, Trash2, AlertTriangle, RefreshCw, Terminal, CloudCog, Files, CheckCircle2, History,
+  FileCode, FolderOpen, Play, Plus, Trash2, AlertTriangle, RefreshCw, Terminal, CloudCog, Files, CheckCircle2, History, ExternalLink,
 } from 'lucide-react'
 import '../../styles/vscode-workbench.css'
 
@@ -23,7 +25,7 @@ export default function TerraformWorkspaceIde({
   const [files, setFiles] = useState({})
   const [activeFile, setActiveFile] = useState('main.tf')
   const [bottomTab, setBottomTab] = useState('output')
-  const [awsCmd, setAwsCmd] = useState('aws sts get-caller-identity')
+  const [lastAwsResource, setLastAwsResource] = useState(null)
   const [output, setOutput] = useState('')
   const [busy, setBusy] = useState(false)
   const [dirty, setDirty] = useState(false)
@@ -79,6 +81,10 @@ export default function TerraformWorkspaceIde({
       } else {
         if (okMsg) toast.success(res?.message || okMsg, { duration: 2000 })
         setOutput(res?.output || res?.plan?.summary || JSON.stringify(res?.plan || res, null, 2) || '')
+        if (action === `${actionPrefix}_apply` || action === 'terraform_apply') {
+          syncTerraformApplyToAwsConsole(res?.state ? { state: res.state } : state)
+          setLastAwsResource({ type: 'instance', id: null })
+        }
       }
       if (res?.state) setState(res.state)
       else onRefresh?.()
@@ -139,13 +145,24 @@ export default function TerraformWorkspaceIde({
     }
     if (bottomTab === 'aws') {
       return (
-        <div className="space-y-2">
-          <div className="flex gap-2">
-            <input value={awsCmd} onChange={(e) => setAwsCmd(e.target.value)}
-              className="flex-1 bg-[var(--vsc-sidebar)] border border-[var(--vsc-border)] rounded px-2 py-1 text-xs font-mono" />
-            <button type="button" onClick={() => run('aws_cli', { command: awsCmd })} disabled={busy} className="vsc-btn" style={{ background: '#ff9900', borderColor: '#ff9900', color: '#111' }}>Run</button>
+        <div className="h-full min-h-[200px] flex flex-col gap-2">
+          <div className="flex items-center justify-between gap-2 shrink-0 px-1">
+            <p className="text-[10px] text-[var(--vsc-muted)]">
+              AWS CloudShell — run <code className="text-orange-300">aws</code> and <code className="text-violet-300">terraform</code> commands in a real terminal. Resources appear in the AWS Console.
+            </p>
+            <a
+              href={awsConsoleUrlForResource(lastAwsResource?.type, lastAwsResource?.id)}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="vsc-btn text-[10px] inline-flex items-center gap-1"
+              style={{ borderColor: '#ff9900', color: '#ff9900' }}
+            >
+              <ExternalLink size={11} /> Open AWS Console
+            </a>
           </div>
-          <pre className="text-xs whitespace-pre-wrap break-words max-h-[200px] overflow-auto font-mono">{output || 'AWS CLI output…'}</pre>
+          <div className="flex-1 min-h-[180px] rounded border border-[var(--vsc-border)] overflow-hidden">
+            <AwsTerminal cloudShell />
+          </div>
         </div>
       )
     }

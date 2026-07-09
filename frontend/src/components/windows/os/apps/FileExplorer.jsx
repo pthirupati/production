@@ -209,7 +209,7 @@ export default function FileExplorer({ win }) {
           ))}
           <div style={{ padding: '8px 10px 4px', fontSize: 11, color: '#888' }}>Network</div>
           {Object.keys(os.vfs.network).map((n) => (
-            <div key={n} className="winos-tree-row" onClick={() => {}}><Network size={13} /> {n.replace(/\\\\/, '').split('\\')[0]}</div>
+            <div key={n} className="winos-tree-row" onClick={() => navigate(n)}><Network size={13} /> {n.replace(/\\\\/, '').split('\\')[0]}</div>
           ))}
         </div>
 

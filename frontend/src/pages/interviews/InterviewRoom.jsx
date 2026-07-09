@@ -1867,23 +1867,32 @@ export default function InterviewRoom() {
           <p className="text-sm font-medium text-white truncate">{round.title}</p>
         </div>
         <div className="flex items-center gap-2 shrink-0">
-          {browserVoices.length > 0 && (
-            <label className="flex items-center gap-1 text-[10px] text-surface-400" title="Change interviewer voice">
-              <Volume2 size={12} className="text-indigo-400" />
-              <select
-                value={selectedVoiceURI}
-                onChange={e => changeVoice(e.target.value)}
-                className="bg-surface-800 border border-surface-700 rounded text-[11px] text-surface-200 py-1 px-1.5 max-w-[140px]"
-              >
-                <option value="">Recommended voice</option>
-                {naturalVoices('en-US').map(v => (
-                  <option key={v.voiceURI} value={v.voiceURI}>
-                    {v.name} ({v.lang})
-                  </option>
-                ))}
-              </select>
-            </label>
-          )}
+          <label className="flex items-center gap-1 text-[10px] text-surface-400" title="Change interviewer voice anytime">
+            <Volume2 size={12} className="text-indigo-400" />
+            <select
+              value={selectedVoiceURI}
+              onChange={e => changeVoice(e.target.value)}
+              className="bg-surface-800 border border-surface-700 rounded text-[11px] text-surface-200 py-1 px-1.5 max-w-[160px]"
+            >
+              <option value="">Recommended voice</option>
+              {(naturalVoices('en-US').length ? naturalVoices('en-US') : browserVoices).map(v => (
+                <option key={v.voiceURI} value={v.voiceURI}>
+                  {v.name} ({v.lang})
+                </option>
+              ))}
+            </select>
+            <button
+              type="button"
+              onClick={() => {
+                unlockSpeech()
+                speak('Voice check — I will use this voice for the rest of the interview.', round?.persona_voice_id)
+              }}
+              className="text-[10px] text-indigo-300 hover:text-white px-1"
+              title="Test voice"
+            >
+              Test
+            </button>
+          </label>
           <span className="text-sm font-mono text-amber-400 flex items-center gap-1">
             <Clock size={14} /> {fmt(timeLeft)}
           </span>
