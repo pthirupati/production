@@ -472,6 +472,18 @@ export default function InterviewRoom() {
     })
   }, [roundId, observerToken, navigate])
 
+  // Prime browser TTS on the first user gesture (Chrome/Safari autoplay policy).
+  useEffect(() => {
+    if (observerMode) return
+    const prime = () => unlockSpeech()
+    window.addEventListener('pointerdown', prime, { once: true, capture: true })
+    window.addEventListener('keydown', prime, { once: true, capture: true })
+    return () => {
+      window.removeEventListener('pointerdown', prime, { capture: true })
+      window.removeEventListener('keydown', prime, { capture: true })
+    }
+  }, [observerMode])
+
   // Admin host: poll transcript while observing.
   useEffect(() => {
     if (!observerMode || !observerTokenRef.current) return
@@ -1052,7 +1064,7 @@ export default function InterviewRoom() {
     if (!started || observerMode || !roundId) return
     const syncHost = async () => {
       try {
-        const data = await interviewsApi.getRound(roundId)
+        const data = await interviewsApi.getRound(roundId, { silent: true })
         const hs = data.host_state || null
         setHostState((prev) => {
           const a = JSON.stringify(prev ?? null)

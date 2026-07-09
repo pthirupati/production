@@ -373,3 +373,45 @@ def practical_summary(topic: str, title: str = "") -> str:
         "4. **Re-run the same commands** and compare output to the baseline.\n"
         "5. **Open the linked lab** and validate your fix under realistic incident pressure."
     )
+
+
+# Illustration assets live in frontend/public/tutorials/illustrations/{key}.svg
+_ILLUSTRATION_KEYS = frozenset({
+    "linux", "kubernetes", "docker", "aws", "terraform", "ansible", "devops",
+    "python", "database", "monitoring", "networking", "security", "windows",
+    "vmware", "shell", "javascript", "react", "java", "html", "nodejs", "gpu", "ai",
+})
+
+
+def topic_illustration(topic: str, title: str = "") -> str:
+    """Markdown hero image for a lesson — maps topic to a static SVG illustration."""
+    key = _topic_key(topic)
+    if key not in _ILLUSTRATION_KEYS:
+        key = "general"
+    label = re.sub(r"[^A-Za-z0-9 _-]", "", (title or topic))[:64] or key.title()
+    return f"![{label} — architecture overview](/tutorials/illustrations/{key}.svg)"
+
+
+def fix_broken_prose(text: str) -> str:
+    """Repair line-wrap hyphenation and glued words from bulk seeding."""
+    if not text:
+        return text
+    # configura- tion → configuration (soft hyphen across lines)
+    text = re.sub(r"(\w)- (\w)", r"\1\2", text)
+    text = re.sub(r"(\w)-\n(\w)", r"\1\2", text)
+    # Common seed typos / missing spaces
+    fixes = (
+        (r"\btutorela\b", "tutorial"),
+        (r"\bmnay\b", "many"),
+        (r"\beperince\b", "experience"),
+        (r"\btechnolpogy\b", "technology"),
+        (r"\bscinario\b", "scenario"),
+        (r"\bceritifate\b", "certificate"),
+        (r"\bconfiguraton\b", "configuration"),
+        (r"\barchitecure\b", "architecture"),
+        (r"\bfrom ero\b", "from zero"),
+        (r"\bsratch\b", "scratch"),
+    )
+    for pat, repl in fixes:
+        text = re.sub(pat, repl, text, flags=re.I)
+    return text

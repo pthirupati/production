@@ -62,6 +62,14 @@ function phaseFor(heading) {
   return 0
 }
 
+function normalizeProse(text) {
+  return (text || '')
+    .replace(/(\w)- (\w)/g, '$1$2')
+    .replace(/(\w)-\n(\w)/g, '$1$2')
+    .replace(/\s+/g, ' ')
+    .trim()
+}
+
 function formatInline(text) {
   // Tokenize **bold**, `inline code`, and [label](url) so commands/syntax in
   // prose render as real code chips and links instead of raw markdown.
@@ -214,7 +222,7 @@ function parseBlocks(text) {
       buf.push(nxt)
       i++
     }
-    blocks.push({ type: 'p', text: buf.join('\n') })
+    blocks.push({ type: 'p', text: normalizeProse(buf.join('\n')) })
   }
   return blocks
 }

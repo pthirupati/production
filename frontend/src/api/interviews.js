@@ -71,8 +71,8 @@ export const interviewsApi = {
   getCampaign(id) {
     return api.get(`/interviews/campaigns/${id}/`).then(r => r.data)
   },
-  getRound(id) {
-    return api.get(`/interviews/rounds/${id}/`).then(r => r.data)
+  getRound(id, { silent = false } = {}) {
+    return api.get(`/interviews/rounds/${id}/`, silent ? { silentError: true } : undefined).then(r => r.data)
   },
   scheduleRound(id, scheduledAt) {
     return api.post(`/interviews/rounds/${id}/schedule/`, { scheduled_at: scheduledAt }).then(r => r.data)

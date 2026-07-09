@@ -4,7 +4,7 @@ from django.core.management.base import BaseCommand
 
 from apps.tutorials.completeness import enrich_body
 from apps.tutorials.models import TutorialSection
-from apps.tutorials.tutorial_enrichment import strip_auto_enrichment
+from apps.tutorials.tutorial_enrichment import strip_auto_enrichment, fix_broken_prose
 
 
 class Command(BaseCommand):
@@ -19,7 +19,7 @@ class Command(BaseCommand):
         for section in TutorialSection.objects.select_related("tutorial").iterator():
             topic = section.tutorial.topic or ""
             title = section.tutorial.title or ""
-            raw = strip_auto_enrichment(section.body or "")
+            raw = fix_broken_prose(strip_auto_enrichment(section.body or ""))
             new_body = enrich_body(topic, title, raw)
             if new_body != (section.body or ""):
                 updated += 1

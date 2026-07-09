@@ -330,20 +330,21 @@ function speakBrowserUtterance(seg, { voice, locale, rate, pitch }) {
     if (voice) u.voice = voice
     u.onstart = () => { started = true }
     u.onend = done
-    u.onerror = done
+    u.onerror = () => { started = started || !!(window.speechSynthesis?.speaking || window.speechSynthesis?.pending); done() }
     const speakingPoll = setInterval(() => {
-      if (window.speechSynthesis?.speaking) started = true
-    }, 120)
-    // Chrome/Safari sometimes never fire onstart/onend — allow time proportional to
-    // utterance length so we don't falsely report "voice unavailable".
-    const stuckMs = Math.min(12000, Math.max(1800, 900 + seg.length * 55))
+      if (window.speechSynthesis?.speaking || window.speechSynthesis?.pending) started = true
+    }, 80)
+    const stuckMs = Math.min(20000, Math.max(2500, 1200 + seg.length * 65))
     const stuckTimer = setTimeout(() => {
       if (!started && window.speechSynthesis?.paused) {
         try { window.speechSynthesis.resume() } catch { /* */ }
         try { window.speechSynthesis.speak(u) } catch { done() }
-      } else {
-        done()
+        return
       }
+      if (window.speechSynthesis?.speaking || window.speechSynthesis?.pending) {
+        started = true
+      }
+      done()
     }, stuckMs)
     try {
       window.speechSynthesis.resume?.()

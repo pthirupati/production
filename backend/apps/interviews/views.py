@@ -29,6 +29,9 @@ from apps.interviews.serializers import (
     InterviewPlanTierSerializer,
     InterviewReportSerializer,
     InterviewRoundSerializer,
+    safe_message_data,
+    safe_report_data,
+    safe_round_data,
 )
 from apps.interviews.services.campaign_builder import create_campaign_rounds
 from apps.interviews.services.entitlements import (
@@ -415,7 +418,24 @@ class InterviewCampaignDetailView(APIView):
             id=campaign_id,
             user=request.user,
         )
-        return Response(InterviewCampaignDetailSerializer(campaign).data)
+        try:
+            return Response(InterviewCampaignDetailSerializer(campaign).data)
+        except Exception:  # noqa: BLE001
+            import logging
+
+            logging.getLogger(__name__).exception(
+                "Failed to serialize interview campaign %s", campaign_id
+            )
+            return Response(
+                {
+                    "id": str(campaign.id),
+                    "title": campaign.title or "",
+                    "status": campaign.status,
+                    "rounds": [safe_round_data(r) for r in campaign.rounds.all()],
+                    "error": "partial_campaign_payload",
+                },
+                status=200,
+            )
 
     def delete(self, request, campaign_id):
         campaign = get_object_or_404(InterviewCampaign, id=campaign_id, user=request.user)
@@ -632,11 +652,11 @@ class InterviewRoundStartView(APIView):
 
                 logging.getLogger(__name__).exception("ask_next_question failed for %s", round_id)
 
-        payload = InterviewRoundSerializer(round_obj).data
+        payload = safe_round_data(round_obj)
         if intro_msg is not None:
-            payload["intro"] = InterviewMessageSerializer(intro_msg).data
+            payload["intro"] = safe_message_data(intro_msg)
         if first_q:
-            payload["first_question"] = InterviewMessageSerializer(first_q).data
+            payload["first_question"] = safe_message_data(first_q)
         try:
             from apps.interviews.services.engine import _speech_hints_for_round
             from apps.interviews.services.persona_style import speech_profile
@@ -705,25 +725,39 @@ class InterviewRoundMessageView(APIView):
         interviewer_reply = result.get("interviewer_reply")
         advanced = bool(next_q) and not is_candidate_question
         correctness = self._correctness_for(score_result, round_obj, is_candidate_question)
-        payload = {
-            "candidate_message": InterviewMessageSerializer(result["candidate_message"]).data,
-            "interviewer_reply": (
-                InterviewMessageSerializer(interviewer_reply).data if interviewer_reply else None
-            ),
-            "score": score_result,
-            "next_question": InterviewMessageSerializer(next_q).data if next_q else None,
-            "coaching": result.get("coaching"),
-            "advanced": advanced,
-            "reply": (interviewer_reply.content if interviewer_reply else result.get("reply") or ""),
-            "correctness": correctness,
-            "input_type": input_type,
-            "host_mode": bool(result.get("host_mode")),
-            "ai_paused": bool(result.get("ai_paused")),
-            "speech_profile": result.get("speech_profile"),
-            "thinking_delay_ms": result.get("thinking_delay_ms"),
-            "candidate_tone": result.get("candidate_tone"),
-        }
-        return Response(payload)
+        try:
+            payload = {
+                "candidate_message": safe_message_data(result.get("candidate_message")),
+                "interviewer_reply": safe_message_data(interviewer_reply),
+                "score": score_result,
+                "next_question": safe_message_data(next_q),
+                "coaching": result.get("coaching"),
+                "advanced": advanced,
+                "reply": (interviewer_reply.content if interviewer_reply else result.get("reply") or ""),
+                "correctness": correctness,
+                "input_type": input_type,
+                "host_mode": bool(result.get("host_mode")),
+                "ai_paused": bool(result.get("ai_paused")),
+                "speech_profile": result.get("speech_profile"),
+                "thinking_delay_ms": result.get("thinking_delay_ms"),
+                "candidate_tone": result.get("candidate_tone"),
+            }
+            return Response(payload)
+        except Exception:  # noqa: BLE001
+            import logging
+
+            logging.getLogger(__name__).exception(
+                "Failed to build message response for round %s", round_id
+            )
+            return Response(
+                {
+                    "error": "Could not process that answer. Please try again.",
+                    "reply": result.get("reply") or "",
+                    "advanced": advanced,
+                    "correctness": correctness,
+                },
+                status=status.HTTP_200_OK,
+            )
 
     @staticmethod
     def _correctness_for(score_result, round_obj, is_candidate_question):
@@ -808,7 +842,7 @@ class InterviewRoundPauseView(APIView):
         if not engine.pause_round(round_obj):
             return Response({"error": "Cannot pause this round"}, status=400)
         round_obj.refresh_from_db()
-        return Response(InterviewRoundSerializer(round_obj).data)
+        return Response(safe_round_data(round_obj))
 
 
 class InterviewRoundResumeView(APIView):
@@ -822,7 +856,7 @@ class InterviewRoundResumeView(APIView):
         )
         engine.resume_round(round_obj)
         round_obj.refresh_from_db()
-        return Response(InterviewRoundSerializer(round_obj).data)
+        return Response(safe_round_data(round_obj))
 
 
 class InterviewRoundEndView(APIView):
@@ -844,16 +878,16 @@ class InterviewRoundEndView(APIView):
             payload = {
                 "passed": round_obj.status == "passed",
                 "reason": "already_ended",
-                "report": InterviewReportSerializer(existing).data if existing else None,
+                "report": safe_report_data(existing),
             }
             return Response(payload)
         data = {
             "passed": result["passed"],
             "reason": result.get("reason"),
-            "report": InterviewReportSerializer(result["report"]).data,
+            "report": safe_report_data(result.get("report")),
         }
         if result.get("next_round"):
-            data["next_round"] = InterviewRoundSerializer(result["next_round"]).data
+            data["next_round"] = safe_round_data(result["next_round"])
         if result.get("closing_remark"):
             data["closing_remark"] = result["closing_remark"]
         return Response(data)
@@ -872,7 +906,7 @@ class InterviewRoundDetailView(APIView):
         # data edge would otherwise 500 here, which the client mislabels as
         # "Round not found". Log the real traceback for diagnosis.
         try:
-            return Response(InterviewRoundSerializer(round_obj).data)
+            return Response(safe_round_data(round_obj))
         except Exception:  # noqa: BLE001
             import logging
             logging.getLogger(__name__).exception(

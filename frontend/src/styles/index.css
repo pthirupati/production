@@ -3949,7 +3949,9 @@ body::after {
   color: var(--tutorial-prose);
   letter-spacing: 0.012em;
   margin: 0;
-  overflow-wrap: anywhere;
+  overflow-wrap: break-word;
+  word-break: normal;
+  hyphens: auto;
 }
 
 /* Media blocks always fill the card width regardless of the text measure. */
@@ -4185,7 +4187,9 @@ body::after {
   color: var(--tutorial-prose);
   font-size: 0.95rem;
   line-height: 1.7;
-  overflow-wrap: anywhere;
+  overflow-wrap: break-word;
+  word-break: normal;
+  hyphens: auto;
 }
 
 /* Lesson images / figures (screenshots, diagrams exported as images). */
@@ -4303,7 +4307,9 @@ body::after {
   border-bottom: 1px solid var(--tutorial-card-border);
   color: var(--tutorial-prose);
   vertical-align: top;
-  overflow-wrap: anywhere;
+  overflow-wrap: break-word;
+  word-break: normal;
+  hyphens: auto;
   min-width: 7rem;
 }
 .tutorial-page .tutorial-table th {

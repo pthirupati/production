@@ -1,5 +1,7 @@
 """Interview API serializers."""
 
+import logging
+
 from rest_framework import serializers
 
 from apps.interviews.models import (
@@ -15,6 +17,58 @@ from apps.interviews.models import (
     InterviewRound,
     InterviewTemplate,
 )
+
+logger = logging.getLogger(__name__)
+
+
+def safe_message_data(msg) -> dict | None:
+    """Serialize one message without letting a single bad row 500 the interview room."""
+    if msg is None:
+        return None
+    try:
+        return InterviewMessageSerializer(msg).data
+    except Exception:  # noqa: BLE001
+        logger.exception("Failed to serialize interview message %s", getattr(msg, "pk", None))
+        created = getattr(msg, "created_at", None)
+        return {
+            "id": str(getattr(msg, "id", "")),
+            "role": getattr(msg, "role", "") or "candidate",
+            "content": (getattr(msg, "content", None) or "")[:8000],
+            "message_type": getattr(msg, "message_type", "text") or "text",
+            "score": getattr(msg, "score", None),
+            "metadata": msg.metadata if isinstance(getattr(msg, "metadata", None), dict) else {},
+            "practical_config": None,
+            "created_at": created.isoformat() if created else None,
+        }
+
+
+def safe_report_data(report) -> dict | None:
+    if report is None:
+        return None
+    try:
+        return InterviewReportSerializer(report).data
+    except Exception:  # noqa: BLE001
+        logger.exception("Failed to serialize interview report %s", getattr(report, "pk", None))
+        return None
+
+
+def safe_round_data(round_obj) -> dict:
+    """Full round payload with per-message isolation — never 500 on one bad message."""
+    try:
+        data = InterviewRoundSerializer(round_obj).data
+    except Exception:  # noqa: BLE001
+        logger.exception("Failed to serialize interview round %s", getattr(round_obj, "id", None))
+        data = {
+            "id": str(round_obj.id),
+            "campaign_id": str(round_obj.campaign_id),
+            "round_number": round_obj.round_number,
+            "round_type": round_obj.round_type,
+            "title": round_obj.title or "",
+            "status": round_obj.status,
+            "messages": [],
+            "report": None,
+        }
+    return data
 
 
 class InterviewPlanTierSerializer(serializers.ModelSerializer):
@@ -98,8 +152,8 @@ class InterviewReportSerializer(serializers.ModelSerializer):
 
 
 class InterviewRoundSerializer(serializers.ModelSerializer):
-    messages = InterviewMessageSerializer(many=True, read_only=True)
-    report = InterviewReportSerializer(read_only=True)
+    messages = serializers.SerializerMethodField()
+    report = serializers.SerializerMethodField()
     is_sample = serializers.BooleanField(source="campaign.is_sample", read_only=True)
     host_state = serializers.SerializerMethodField()
 
@@ -113,6 +167,19 @@ class InterviewRoundSerializer(serializers.ModelSerializer):
             "questions_asked", "difficulty_level", "practical_lab_session_id", "is_sample",
             "mode", "last_practical_submission", "messages", "report", "host_state",
         )
+
+    def get_messages(self, obj):
+        try:
+            qs = obj.messages.all().order_by("created_at")
+        except Exception:  # noqa: BLE001
+            return []
+        return [m for m in (safe_message_data(msg) for msg in qs) if m is not None]
+
+    def get_report(self, obj):
+        try:
+            return safe_report_data(obj.report)
+        except Exception:  # noqa: BLE001
+            return None
 
     def get_host_state(self, obj):
         try:

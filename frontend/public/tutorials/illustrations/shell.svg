@@ -1,0 +1,33 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 420" role="img" aria-label="Shell scripting">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#0f172a"/>
+      <stop offset="100%" stop-color="#1e293b"/>
+    </linearGradient>
+    <linearGradient id="accent" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0%" stop-color="#4ade80"/>
+      <stop offset="100%" stop-color="#22c55e"/>
+    </linearGradient>
+  </defs>
+  <rect width="800" height="420" rx="16" fill="url(#bg)"/>
+  <text x="400" y="52" text-anchor="middle" fill="#e2e8f0" font-family="system-ui,sans-serif" font-size="28" font-weight="700">Shell scripting</text>
+  <text x="400" y="82" text-anchor="middle" fill="#94a3b8" font-family="system-ui,sans-serif" font-size="14">Architecture overview — study before hands-on labs</text>
+  <rect x="80" y="120" width="180" height="90" rx="10" fill="#1e293b" stroke="url(#accent)" stroke-width="2"/>
+  <text x="170" y="158" text-anchor="middle" fill="#cbd5e1" font-family="system-ui,sans-serif" font-size="13" font-weight="600">Control plane</text>
+  <text x="170" y="182" text-anchor="middle" fill="#64748b" font-family="system-ui,sans-serif" font-size="11">config · policy</text>
+  <rect x="310" y="120" width="180" height="90" rx="10" fill="#1e293b" stroke="url(#accent)" stroke-width="2"/>
+  <text x="400" y="158" text-anchor="middle" fill="#cbd5e1" font-family="system-ui,sans-serif" font-size="13" font-weight="600">Runtime</text>
+  <text x="400" y="182" text-anchor="middle" fill="#64748b" font-family="system-ui,sans-serif" font-size="11">services · workloads</text>
+  <rect x="540" y="120" width="180" height="90" rx="10" fill="#1e293b" stroke="url(#accent)" stroke-width="2"/>
+  <text x="630" y="158" text-anchor="middle" fill="#cbd5e1" font-family="system-ui,sans-serif" font-size="13" font-weight="600">Data plane</text>
+  <text x="630" y="182" text-anchor="middle" fill="#64748b" font-family="system-ui,sans-serif" font-size="11">storage · network</text>
+  <path d="M260 165 H310 M490 165 H540" stroke="url(#accent)" stroke-width="2" marker-end="url(#arrow)"/>
+  <rect x="140" y="260" width="520" height="110" rx="12" fill="#0f172a" stroke="#334155" stroke-width="1.5"/>
+  <text x="400" y="295" text-anchor="middle" fill="#94a3b8" font-family="system-ui,sans-serif" font-size="12">Operator workflow</text>
+  <circle cx="200" cy="325" r="8" fill="url(#accent)"/>
+  <text x="220" y="329" fill="#e2e8f0" font-family="system-ui,sans-serif" font-size="12">Inspect baseline</text>
+  <circle cx="360" cy="325" r="8" fill="url(#accent)"/>
+  <text x="380" y="329" fill="#e2e8f0" font-family="system-ui,sans-serif" font-size="12">Apply change</text>
+  <circle cx="520" cy="325" r="8" fill="url(#accent)"/>
+  <text x="540" y="329" fill="#e2e8f0" font-family="system-ui,sans-serif" font-size="12">Verify &amp; document</text>
+</svg>

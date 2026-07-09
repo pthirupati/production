@@ -17,10 +17,12 @@ from .quiz_bank import build_module_quiz
 from .tutorial_enrichment import (
     ENRICHMENT_HEADER,
     architecture_diagram,
+    fix_broken_prose,
     practical_summary,
     reference_table,
     shell_practice_block,
     strip_auto_enrichment,
+    topic_illustration,
 )
 
 MERMAID_RE = re.compile(r"```mermaid\b", re.I)
@@ -28,6 +30,7 @@ CODE_RE = re.compile(r"```(?!mermaid\b)[a-zA-Z0-9_+-]*\n", re.I)
 TABLE_RE = re.compile(r"^\s*\|.+\|\s*$\n^\s*\|?[\s:|-]+\|", re.M)
 CALLOUT_RE = re.compile(r"^\s*>\s*\[!(NOTE|TIP|WARNING|DANGER|GOTCHA)\]", re.I | re.M)
 SHELL_RE = re.compile(r"```(bash|shell|sh)\b", re.I)
+IMAGE_RE = re.compile(r"!\[[^\]]*\]\([^)]+\)")
 
 REQUIRED_SECTION_HINTS = {
     "overview": ("overview", "why it matters", "theory"),
@@ -206,8 +209,10 @@ def enrich_body(topic: str, title: str, body: str) -> str:
     Strips any prior auto-enrichment (including the legacy generic mermaid) so
     re-seeding refreshes lessons with topic-specific diagrams and commands.
     """
-    body = strip_auto_enrichment(body or "")
+    body = fix_broken_prose(strip_auto_enrichment(body or ""))
     additions: list[str] = []
+    if not IMAGE_RE.search(body):
+        additions.append(topic_illustration(topic, title))
     if not CALLOUT_RE.search(body):
         additions.append(
             f"> [!NOTE] **{title or topic}** — study the architecture diagram, run the "
