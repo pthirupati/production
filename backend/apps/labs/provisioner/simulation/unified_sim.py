@@ -193,6 +193,7 @@ class UnifiedSimulationEngine(BaseRHELSimulator):
             extra = ""
             if revealed:
                 extra = f"\r\n\x1b[2m[ OK ] Detected new block device(s): {', '.join(revealed)}\x1b[0m\r\n"
+            self._persist_lab_snapshot()
             return f"\r\n\x1b[1;33mSystem rebooting...\x1b[0m{extra}\r\n"
         self._sync_boot_to_state()
         if self.boot.issue == "patching" and not self.shell.state.patching_done:
@@ -214,7 +215,19 @@ class UnifiedSimulationEngine(BaseRHELSimulator):
         self.boot.grub_shown = True
         if self._stream_holder:
             self._start_grub_countdown(self._stream_holder)
+        self._persist_lab_snapshot()
         return f"\r\n\x1b[1;33mConnection to simulation host closed by remote host.\x1b[0m\r\n{out}"
+
+    def _persist_lab_snapshot(self) -> None:
+        """Flush engine state after reboot so uptime survives worker/server restarts."""
+        sid = getattr(self.shell.state, "session_id", "") or ""
+        if not sid:
+            return
+        try:
+            from .sim_persistence import persist_session_snapshot
+            persist_session_snapshot(sid)
+        except Exception:  # noqa: BLE001
+            pass
 
     def _handle_shell(self, line: str) -> str:
         if self.boot and not self.boot.logged_in and self.boot.phase in (

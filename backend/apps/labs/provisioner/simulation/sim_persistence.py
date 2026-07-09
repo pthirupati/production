@@ -67,9 +67,8 @@ def snapshot_engine(engine: UnifiedSimulationEngine) -> dict:
         "cwd": st.cwd,
         "uid_counter": st.uid_counter,
         "pid_counter": st.pid_counter,
-        # Persist the boot epoch so `uptime` reflects real elapsed time since the
-        # session started (and survives reboots) instead of resetting to ~1h on
-        # every cross-worker restore.
+        # Persist boot_time so `uptime` survives worker restarts / server reboots.
+        # Note: an in-sim `reboot` intentionally resets boot_time to now (uptime → ~0).
         "boot_time": st.boot_time,
         "vfs": st.vfs,
         "users": {k: _user_to_dict(v) for k, v in st.users.items()},

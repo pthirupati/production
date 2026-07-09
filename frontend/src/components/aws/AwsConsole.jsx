@@ -29,7 +29,7 @@ function serviceFromPath(pathname) {
   return null
 }
 
-export default function AwsConsole() {
+export default function AwsConsole({ embedded = false }) {
   const location = useLocation()
   const darkMode = useAwsStore((s) => s.darkMode)
   const flash = useAwsStore((s) => s.flash)
@@ -39,6 +39,10 @@ export default function AwsConsole() {
   const [showShortcuts, setShowShortcuts] = useState(false)
 
   const service = serviceFromPath(location.pathname)
+  const rootClass = `aws-sim ${darkMode ? 'aws-dark' : ''}${embedded ? ' aws-embedded' : ''}`
+  const rootStyle = embedded
+    ? { height: '100%', display: 'flex', flexDirection: 'column', overflow: 'hidden' }
+    : { height: '100vh', display: 'flex', flexDirection: 'column', overflow: 'hidden' }
 
   // Global keyboard shortcuts. Alt+S / "/" focus search (handled in TopNav).
   // Here: "?" toggles the shortcut reference; Escape closes overlays.
@@ -57,11 +61,11 @@ export default function AwsConsole() {
   }, [cloudShellOpen, showShortcuts])
 
   return (
-    <div className={`aws-sim ${darkMode ? 'aws-dark' : ''}`} style={{ height: '100vh', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+    <div className={rootClass} style={rootStyle}>
       <TopNav onToggleSidebar={() => setSidebarOpen((o) => !o)} onToggleCloudShell={() => setCloudShellOpen((o) => !o)} />
-      <div style={{ flex: 1, display: 'flex', overflow: 'hidden' }}>
+      <div className="aws-sim-body">
         {service && sidebarOpen && <LeftNav service={service} />}
-        <div style={{ flex: 1, overflowY: 'auto', paddingBottom: cloudShellOpen ? 340 : 0 }}>
+        <div className="aws-sim-main" style={{ paddingBottom: cloudShellOpen ? 340 : 0 }}>
           {flash.length > 0 && (
             <div style={{ padding: '12px 20px 0' }}><Flash items={flash} onDismiss={dismissFlash} /></div>
           )}

@@ -76,7 +76,7 @@ export default function TopNav({ onToggleSidebar, onToggleCloudShell }) {
           style={{ width: '100%', height: 32, background: '#1b2532', border: '1px solid #37475a', borderRadius: 2, color: '#fff', padding: '0 10px 0 30px', fontSize: 13 }}
         />
         {openMenu === 'search' && results.length > 0 && (
-          <div style={{ position: 'absolute', top: 36, left: 0, right: 0, background: '#fff', borderRadius: 4, boxShadow: 'var(--aws-shadow-lg)', maxHeight: 360, overflowY: 'auto', zIndex: 300 }}>
+          <div className="aws-topnav-dropdown" style={{ position: 'absolute', top: 36, left: 0, right: 0, background: 'var(--aws-content-bg)', borderRadius: 4, boxShadow: 'var(--aws-shadow-lg)', maxHeight: 360, overflowY: 'auto', zIndex: 300, border: '1px solid var(--aws-border)' }}>
             <div style={{ padding: '8px 12px', fontSize: 11, fontWeight: 700, textTransform: 'uppercase', color: 'var(--aws-text-secondary)' }}>Services</div>
             {results.map((s) => (
               <div key={s.key} onClick={() => { setQuery(''); go(s.path) }} style={{ padding: '8px 12px', cursor: 'pointer', color: 'var(--aws-text-primary)' }} onMouseDown={(e) => e.preventDefault()}>
@@ -102,7 +102,7 @@ export default function TopNav({ onToggleSidebar, onToggleCloudShell }) {
             <Globe size={15} /> {regionName(region)} <ChevronDown size={13} />
           </button>
           {openMenu === 'region' && (
-            <div style={{ position: 'absolute', top: 38, right: 0, width: 340, maxHeight: 460, overflowY: 'auto', background: '#fff', borderRadius: 4, boxShadow: 'var(--aws-shadow-lg)', color: 'var(--aws-text-primary)', zIndex: 300 }}>
+            <div className="aws-topnav-dropdown" style={{ position: 'absolute', top: 38, right: 0, width: 340, maxHeight: 460, overflowY: 'auto', background: 'var(--aws-content-bg)', borderRadius: 4, boxShadow: 'var(--aws-shadow-lg)', color: 'var(--aws-text-primary)', zIndex: 300, border: '1px solid var(--aws-border)' }}>
               {REGION_GEO_ORDER.map((geo) => (
                 <div key={geo}>
                   <div style={{ padding: '8px 14px 2px', fontSize: 11, fontWeight: 700, textTransform: 'uppercase', color: 'var(--aws-text-secondary)' }}>{geo}</div>
@@ -124,7 +124,7 @@ export default function TopNav({ onToggleSidebar, onToggleCloudShell }) {
             {account.alias} <ChevronDown size={13} />
           </button>
           {openMenu === 'account' && (
-            <div style={{ position: 'absolute', top: 38, right: 0, width: 280, background: '#fff', borderRadius: 4, boxShadow: 'var(--aws-shadow-lg)', color: 'var(--aws-text-primary)', zIndex: 300, padding: 8 }}>
+            <div className="aws-topnav-dropdown" style={{ position: 'absolute', top: 38, right: 0, width: 280, background: 'var(--aws-content-bg)', borderRadius: 4, boxShadow: 'var(--aws-shadow-lg)', color: 'var(--aws-text-primary)', zIndex: 300, padding: 8, border: '1px solid var(--aws-border)' }}>
               <div style={{ padding: 8, borderBottom: '1px solid var(--aws-border-light)' }}>
                 <div style={{ fontWeight: 700 }}>{account.alias}</div>
                 <div className="aws-mono" style={{ fontSize: 12, color: 'var(--aws-text-secondary)' }}>{account.id}</div>
@@ -142,7 +142,7 @@ export default function TopNav({ onToggleSidebar, onToggleCloudShell }) {
       {/* Services mega-menu */}
       {openMenu === 'services' && (
         <div style={{ position: 'fixed', top: 48, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.4)', zIndex: 250 }} onClick={close}>
-          <div onClick={(e) => e.stopPropagation()} style={{ background: '#fff', maxHeight: '80vh', overflowY: 'auto', padding: 20 }}>
+          <div onClick={(e) => e.stopPropagation()} className="aws-topnav-dropdown" style={{ background: 'var(--aws-content-bg)', maxHeight: '80vh', overflowY: 'auto', padding: 20, borderBottom: '1px solid var(--aws-border)' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
               <h2 style={{ color: 'var(--aws-text-primary)' }}>Services</h2>
               <button className="aws-copy-btn" onClick={close}><X size={18} /></button>

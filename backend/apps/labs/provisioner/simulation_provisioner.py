@@ -150,7 +150,7 @@ def ensure_sim_session(lab_session) -> dict | None:
         return existing
 
     scenario = lab_session.scenario
-    resource_id = lab_session.container_id
+    resource_id = lab_session.container_id or lab_session.instance_id
     if not resource_id or not scenario:
         return None
 

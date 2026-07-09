@@ -31,6 +31,7 @@ import PeopleSoftSimulator from '../components/peoplesoft/PeopleSoftSimulator'
 import AwxSimulator from '../components/awx/AwxSimulator'
 import TerraformSimulator from '../components/terraform/TerraformSimulator'
 import CicdPipelineSim from '../components/devops/CicdPipelineSim'
+import AwsLabOverlay from '../components/aws/AwsLabOverlay'
 import { isTerraformLab } from '../utils/iacFlavor'
 import { resetTerraformAwsLabState } from '../utils/terraformAwsBridge'
 import BaremetalSimulator from '../components/baremetal/BaremetalSimulator'
@@ -2818,17 +2819,22 @@ export default function LabRunner() {
       )}
 
       {(isAwsLab || isTerraformSimLab) && showAwsSim && (
-        <div className="fixed inset-0 z-[100] bg-black flex flex-col">
-          <div className="flex items-center justify-between px-3 py-2 bg-surface-900 border-b border-surface-700">
-            <span className="text-sm font-semibold text-white">AWS Management Console</span>
-            <button type="button" className="btn-secondary text-xs" onClick={() => setShowAwsSim(false)}>Close</button>
-          </div>
-          <iframe src="/aws-sim" title="AWS Console" className="flex-1 w-full border-0 bg-[#232f3e]" />
-        </div>
+        <AwsLabOverlay
+          sessionId={sessionId}
+          scenario={scenario}
+          onExit={() => setShowAwsSim(false)}
+          vmwareHref={showSimVmwareLink ? vmwareServerHref : null}
+          {...simChromeProps}
+        />
       )}
 
       {isDevOpsPipelineLab && showCicdSim && (
-        <CicdPipelineSim scenario={scenario} onExit={() => setShowCicdSim(false)} />
+        <CicdPipelineSim
+          scenario={scenario}
+          onExit={() => setShowCicdSim(false)}
+          vmwareHref={showSimVmwareLink ? vmwareServerHref : null}
+          {...simChromeProps}
+        />
       )}
 
       {showShortcuts && (
