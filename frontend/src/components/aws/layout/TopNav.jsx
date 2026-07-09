@@ -90,7 +90,7 @@ export default function TopNav({ onToggleSidebar, onToggleCloudShell }) {
 
       <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 4 }}>
         <button className="aws-topnav-btn" onClick={onToggleCloudShell} title="CloudShell"><TerminalIcon size={16} /></button>
-        <button className="aws-topnav-btn" title="Alarms" style={{ position: 'relative' }}>
+        <button className="aws-topnav-btn" title="Alarms" style={{ position: 'relative' }} onClick={() => go(`${BASE}/cloudwatch/alarms`)}>
           <Bell size={16} />
           {inAlarm > 0 && <span style={{ position: 'absolute', top: 2, right: 2, background: 'var(--aws-error)', color: '#fff', borderRadius: 8, fontSize: 9, padding: '0 4px' }}>{inAlarm}</span>}
         </button>
@@ -129,14 +129,20 @@ export default function TopNav({ onToggleSidebar, onToggleCloudShell }) {
                 <div style={{ fontWeight: 700 }}>{account.alias}</div>
                 <div className="aws-mono" style={{ fontSize: 12, color: 'var(--aws-text-secondary)' }}>{account.id}</div>
               </div>
-              {['Account', 'Organization', 'Service Quotas', 'Billing Dashboard', 'Security credentials'].map((l) => (
-                <div key={l} style={{ padding: '7px 8px', cursor: 'pointer' }}>{l}</div>
+              {[
+                { label: 'Account', path: `${BASE}/console/home` },
+                { label: 'Organization', path: `${BASE}/organizations/home` },
+                { label: 'Service Quotas', path: `${BASE}/servicequotas/home` },
+                { label: 'Billing Dashboard', path: `${BASE}/billing/home` },
+                { label: 'Security credentials', path: `${BASE}/iam/home` },
+              ].map(({ label, path }) => (
+                <div key={label} onClick={() => go(path)} style={{ padding: '7px 8px', cursor: 'pointer' }}>{label}</div>
               ))}
               <div style={{ borderTop: '1px solid var(--aws-border-light)', padding: '7px 8px', cursor: 'pointer', color: 'var(--aws-text-link)' }}>Sign out</div>
             </div>
           )}
         </div>
-        <button className="aws-topnav-btn" title="Settings"><Settings size={16} /></button>
+        <button className="aws-topnav-btn" title="Settings" onClick={() => go(`${BASE}/billing/home`)}><Settings size={16} /></button>
       </div>
 
       {/* Services mega-menu */}

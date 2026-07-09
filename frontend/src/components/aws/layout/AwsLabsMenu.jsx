@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { GraduationCap, ChevronDown, ArrowRight, ExternalLink, Search } from 'lucide-react'
 import { scenarioApi } from '../../../api/scenarios'
+import { scenarioTagHaystack } from '../../../utils/scenarioTags'
 
 // AWS Labs launcher for the console TopNav.
 //
@@ -39,7 +40,7 @@ export default function AwsLabsMenu() {
   }, [open, loaded])
 
   const filtered = q
-    ? scenarios.filter((s) => `${s.title} ${s.slug} ${(s.tags || []).join(' ')}`.toLowerCase().includes(q.toLowerCase()))
+    ? scenarios.filter((s) => scenarioTagHaystack(s).includes(q.toLowerCase()))
     : scenarios
 
   return (

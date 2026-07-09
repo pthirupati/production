@@ -140,6 +140,41 @@ def _attempts_total(tier) -> int:
     return int(tier.interviews_per_month or 1)
 
 
+def entitlement_fallback_payload() -> dict:
+    """Safe default when entitlement computation fails — matches frontend contract."""
+    platform = get_platform_settings()
+    return {
+        "is_active": False,
+        "platform_enabled": platform.enabled,
+        "expired": False,
+        "subscription_expired": False,
+        "plan": {
+            "code": "free",
+            "name": "Free",
+            "max_rounds": 5,
+            "voice_enabled": True,
+            "practical_enabled": True,
+            "certificate_enabled": False,
+        },
+        "interviews_remaining": 0,
+        "interviews_total": 0,
+        "interviews_used": 0,
+        "days_remaining": None,
+        "billing_period_days": 365,
+        "is_complimentary": False,
+        "is_admin_granted_free": False,
+        "period_start": None,
+        "period_end": None,
+        "uses_paid_apis": False,
+        "voice_engine": platform.voice_engine,
+        "renewal_required": False,
+        "is_subscribed": False,
+        "sample_available": False,
+        "sample_interview_used": False,
+        "sample_duration_minutes": platform.sample_duration_minutes,
+    }
+
+
 def get_entitlement_payload(user) -> dict:
     ent = get_or_create_entitlement(user)
     tier = ent.plan_tier

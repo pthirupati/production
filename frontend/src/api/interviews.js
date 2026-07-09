@@ -162,7 +162,7 @@ export const interviewsApi = {
   },
 
   getSampleInfo() {
-    return api.get('/interviews/sample/').then(r => r.data)
+    return api.get('/interviews/sample/', { silentError: true }).then(r => r.data)
   },
 
   startSampleInterview() {

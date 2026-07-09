@@ -37,6 +37,7 @@ from apps.interviews.services.campaign_builder import create_campaign_rounds
 from apps.interviews.services.entitlements import (
     consume_interview_credit,
     ensure_interview_defaults,
+    entitlement_fallback_payload,
     get_entitlement_payload,
     user_has_interview_access,
 )
@@ -91,9 +92,15 @@ class InterviewPlansView(APIView):
     throttle_classes = [StrictAnonRateThrottle]
 
     def get(self, request):
-        ensure_interview_defaults()
-        tiers = InterviewPlanTier.objects.filter(is_active=True).exclude(code="admin-demo")
-        return Response({"plans": InterviewPlanTierSerializer(tiers, many=True).data})
+        try:
+            ensure_interview_defaults()
+            tiers = InterviewPlanTier.objects.filter(is_active=True).exclude(code="admin-demo")
+            return Response({"plans": InterviewPlanTierSerializer(tiers, many=True).data})
+        except Exception:  # noqa: BLE001
+            import logging
+
+            logging.getLogger(__name__).exception("Failed to list interview plans")
+            return Response({"plans": []})
 
 
 class InterviewEntitlementView(APIView):
@@ -110,9 +117,7 @@ class InterviewEntitlementView(APIView):
             logging.getLogger(__name__).exception(
                 "Failed to build interview entitlement for user %s", request.user.pk
             )
-            return Response(
-                {"active": False, "plan": None, "credits": 0, "rounds_remaining": 0}
-            )
+            return Response(entitlement_fallback_payload())
 
 
 class CandidateProfileView(APIView):
@@ -307,36 +312,71 @@ class InterviewSampleView(APIView):
     def get(self, request):
         from apps.interviews.services.sample_interview import get_or_resume_sample_campaign, sample_available_for_user
 
-        existing = get_or_resume_sample_campaign(request.user)
-        return Response({
-            "sample_available": sample_available_for_user(request.user),
-            "sample_interview_used": get_entitlement_payload(request.user).get("sample_interview_used"),
-            "sample_duration_minutes": get_entitlement_payload(request.user).get("sample_duration_minutes", 10),
-            "active_sample_campaign_id": str(existing.id) if existing else None,
-            "instructions": SAMPLE_INSTRUCTIONS,
-        })
+        try:
+            existing = get_or_resume_sample_campaign(request.user)
+            ent = get_entitlement_payload(request.user)
+            return Response({
+                "sample_available": sample_available_for_user(request.user),
+                "sample_interview_used": ent.get("sample_interview_used"),
+                "sample_duration_minutes": ent.get("sample_duration_minutes", 10),
+                "active_sample_campaign_id": str(existing.id) if existing else None,
+                "instructions": SAMPLE_INSTRUCTIONS,
+            })
+        except Exception:  # noqa: BLE001
+            import logging
+
+            logging.getLogger(__name__).exception(
+                "Failed to load sample interview info for user %s", request.user.pk
+            )
+            return Response({
+                "sample_available": False,
+                "sample_interview_used": False,
+                "sample_duration_minutes": 10,
+                "active_sample_campaign_id": None,
+                "instructions": SAMPLE_INSTRUCTIONS,
+            })
 
     def post(self, request):
         from apps.interviews.services.sample_interview import create_sample_campaign, sample_available_for_user
 
-        if not sample_available_for_user(request.user):
-            ent = get_entitlement_payload(request.user)
-            if ent.get("sample_interview_used"):
-                return Response(
-                    {"error": "Free sample already used. Subscribe for full interviews.", "code": "SAMPLE_USED"},
-                    status=403,
-                )
-            return Response({"error": "Sample not available", "code": "SAMPLE_UNAVAILABLE"}, status=403)
-
         try:
+            if not sample_available_for_user(request.user):
+                ent = get_entitlement_payload(request.user)
+                if ent.get("sample_interview_used"):
+                    return Response(
+                        {"error": "Free sample already used. Subscribe for full interviews.", "code": "SAMPLE_USED"},
+                        status=403,
+                    )
+                return Response({"error": "Sample not available", "code": "SAMPLE_UNAVAILABLE"}, status=403)
+
             campaign = create_sample_campaign(request.user)
         except ValueError as exc:
             return Response({"error": str(exc)}, status=400)
+        except Exception:  # noqa: BLE001
+            import logging
 
-        return Response(
-            InterviewCampaignDetailSerializer(campaign).data,
-            status=status.HTTP_201_CREATED,
-        )
+            logging.getLogger(__name__).exception(
+                "Failed to create sample interview for user %s", request.user.pk
+            )
+            return Response(
+                {"error": "Could not start sample interview. Please try again.", "code": "SAMPLE_START_FAILED"},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            )
+
+        try:
+            payload = InterviewCampaignDetailSerializer(campaign).data
+        except Exception:  # noqa: BLE001
+            import logging
+
+            logging.getLogger(__name__).exception(
+                "Failed to serialize sample campaign %s", getattr(campaign, "id", None)
+            )
+            return Response(
+                {"error": "Sample started but response could not be loaded. Refresh the hub.", "code": "SERIALIZE_FAILED"},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            )
+
+        return Response(payload, status=status.HTTP_201_CREATED)
 
 
 SAMPLE_INSTRUCTIONS = [

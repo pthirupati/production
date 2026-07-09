@@ -44,7 +44,7 @@ import SimLabWizard from '../components/SimLabWizard'
 import LabJourneyStrip from '../components/lab/LabJourneyStrip'
 import useLabShortcuts from '../hooks/useLabShortcuts'
 import { useIsMobile } from '../hooks/useMediaQuery'
-import { parseScenarioSections } from '../components/scenarios/ScenarioNarrative'
+import { scenarioTagHaystack } from '../utils/scenarioTags'
 
 function formatLabTime(seconds) {
   const m = Math.floor(seconds / 60)
@@ -1303,7 +1303,7 @@ export default function LabRunner() {
   // AWX-themed lab opens the AWX simulator, not just the ones slugged "awx".
   // Title/tags are checked (not the long description) to avoid false positives
   // from generic cross-tech copy that merely mentions AWX in passing.
-  const _awxHay = `${scenario?.slug || ''} ${scenario?.title || ''} ${(scenario?.tags || []).join(' ')}`.toLowerCase()
+  const _awxHay = scenarioTagHaystack(scenario)
   const isAwxLab = !isCrossTech && (
     scenario?.simulation_type === 'ansible-awx'
     || /\bawx\b/.test(_awxHay)
