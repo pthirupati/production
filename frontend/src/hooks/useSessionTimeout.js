@@ -49,14 +49,22 @@ export default function useSessionTimeout() {
   }, [accessToken])
 
   async function doRefresh() {
-    if (!refreshToken) {
-      logout()
-      return
-    }
     try {
-      const { data } = await axios.post('/api/auth/refresh/', { refresh: refreshToken })
-      setAuth(user, data.access, data.refresh || refreshToken)
-      warnedRef.current = false
+      const payload = refreshToken ? { refresh: refreshToken } : {}
+      const { data } = await axios.post('/api/auth/refresh/', payload, {
+        withCredentials: true,
+        headers: { 'X-Requested-With': 'XMLHttpRequest' },
+      })
+      if (data?.access) {
+        setAuth(user, data.access, data.refresh || refreshToken)
+        warnedRef.current = false
+        return
+      }
+      if (!refreshToken && useAuthStore.getState().isAuthenticated) {
+        warnedRef.current = false
+        return
+      }
+      throw new Error('no access token')
     } catch {
       toast.error('Session expired — please log in again', { duration: 5000 })
       logout()

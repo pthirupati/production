@@ -90,7 +90,10 @@ def _build_lab_hosts(scenario, resource_id: str, sim_type: str) -> list[dict]:
 
 
 def _attach_ssh_client_host(lab_hosts: list[dict], resource_id: str) -> list[dict]:
-    if len(lab_hosts) < 2:
+    """Append an SSH jump box so learners connect with ssh user@ip (realistic workflow)."""
+    if any(h.get("name") == "ssh_client" for h in lab_hosts):
+        return lab_hosts
+    if not lab_hosts:
         return lab_hosts
     hosts = list(lab_hosts)
     hosts.append({
@@ -105,6 +108,18 @@ def _attach_ssh_client_host(lab_hosts: list[dict], resource_id: str) -> list[dic
         ],
     })
     return hosts
+
+
+def _should_use_ssh_client_default(scenario, sim_type: str) -> bool:
+    """True when the lab should open on the jump box instead of a root shell."""
+    slug = (getattr(scenario, "slug", "") or "").lower()
+    if sim_type in ("vmware", "windows", "coding", "prompt", "monitoring"):
+        return False
+    if any(k in slug for k in ("boot", "grub", "initramfs", "kernel-panic")):
+        return False
+    if "ssh-stop" in slug or "sshd-down" in slug:
+        return False
+    return True
 
 
 def _wire_engine_hosts(engine, entry: dict) -> None:
@@ -170,8 +185,14 @@ def ensure_sim_session(lab_session) -> dict | None:
         engine = UnifiedSimulationEngine(scenario_slug=slug, simulation_type=sim_type)
         _apply_initial_host_state(engine, slug)
     lab_hosts = lab_session.lab_hosts or _build_lab_hosts(scenario, resource_id, sim_type)
-    if len(lab_hosts) >= 2 and not any(h.get("name") == "ssh_client" for h in lab_hosts):
+    if _should_use_ssh_client_default(scenario, sim_type):
         lab_hosts = _attach_ssh_client_host(lab_hosts, resource_id)
+    elif len(lab_hosts) >= 2 and not any(h.get("name") == "ssh_client" for h in lab_hosts):
+        lab_hosts = _attach_ssh_client_host(lab_hosts, resource_id)
+
+    if lab_hosts != (lab_session.lab_hosts or []):
+        lab_session.lab_hosts = lab_hosts
+        lab_session.save(update_fields=["lab_hosts"])
 
     register_sim_session(
         session_id,
@@ -231,13 +252,12 @@ class SimulationProvisioner:
         resource_id = f"sim-{uuid.uuid4().hex[:12]}"
 
         lab_hosts = _build_lab_hosts(scenario, resource_id, sim_type)
+        if _should_use_ssh_client_default(scenario, sim_type):
+            lab_hosts = _attach_ssh_client_host(lab_hosts, resource_id)
+        elif len(lab_hosts) >= 2:
+            lab_hosts = _attach_ssh_client_host(lab_hosts, resource_id)
         lab_session.lab_hosts = lab_hosts
         lab_session.save(update_fields=["lab_hosts"])
-
-        if len(lab_hosts) >= 2:
-            lab_hosts = _attach_ssh_client_host(list(lab_session.lab_hosts or []), resource_id)
-            lab_session.lab_hosts = lab_hosts
-            lab_session.save(update_fields=["lab_hosts"])
 
         register_sim_session(
             str(lab_session.id),

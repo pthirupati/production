@@ -1,9 +1,12 @@
 """
 JWT WebSocket authentication middleware for Django Channels.
 Extracts JWT token from query string: ws://host/ws/terminal/<id>/?token=<jwt>
+Falls back to the httpOnly access_token cookie (same as REST API) when the
+query param is missing — regular users after page reload often have no in-memory JWT.
 """
 import logging
 from urllib.parse import parse_qs
+
 from channels.middleware import BaseMiddleware
 from channels.db import database_sync_to_async
 from django.contrib.auth.models import AnonymousUser
@@ -34,6 +37,21 @@ def _scope_query_string(scope) -> str:
     return ""
 
 
+def _cookie_from_scope(scope, name: str) -> str | None:
+    for header, value in scope.get("headers") or []:
+        if header.lower() != b"cookie":
+            continue
+        try:
+            raw = value.decode("utf-8", errors="replace")
+        except AttributeError:
+            raw = str(value)
+        for part in raw.split(";"):
+            key, _, val = part.strip().partition("=")
+            if key == name and val:
+                return val
+    return None
+
+
 def _coerce_token_str(token_str) -> str:
     if isinstance(token_str, str):
         return token_str
@@ -59,14 +77,17 @@ def get_user_from_token(token_str):
 class JWTAuthMiddleware(BaseMiddleware):
     """
     Custom middleware that authenticates WebSocket connections via JWT
-    token passed in the query string.
+    token passed in the query string or httpOnly access_token cookie.
     """
+
     async def __call__(self, scope, receive, send):
         params = parse_qs(_scope_query_string(scope))
         token_list = params.get("token", [])
-
-        if token_list:
-            scope["user"] = await get_user_from_token(token_list[0])
+        token_str = token_list[0] if token_list else None
+        if not token_str or token_str in ("null", "undefined", ""):
+            token_str = _cookie_from_scope(scope, "access_token")
+        if token_str:
+            scope["user"] = await get_user_from_token(token_str)
         else:
             scope["user"] = AnonymousUser()
 

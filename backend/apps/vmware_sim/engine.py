@@ -1833,6 +1833,15 @@ def apply_action(session_id: str, action: str, payload: dict | None = None) -> d
         new_disk = _make_disk(disk_id, add_gb, ds_id, 0, next_unit, thin=thin)
         disks.append(new_disk)
         vm["disk_gb"] = sum(d.get("capacity_gb", 0) for d in disks)
+        # VMware-only labs: hot-added disks must stay hidden in the guest until SCSI rescan.
+        if vm.get("power") == "poweredOn" and next_unit > 0:
+            vm["guest_disk_hidden"] = True
+            vm["guest_disk_visible"] = False
+            vm.setdefault("guest_pending_disks", []).append({
+                "scsi_unit": next_unit,
+                "capacity_gb": add_gb,
+                "scsi_id": new_disk.get("scsi_id", f"0:{next_unit}"),
+            })
         ds = _find_ds(state, ds_id=ds_id)
         if ds and ds["free_gb"] >= add_gb:
             ds["free_gb"] -= add_gb
@@ -1909,6 +1918,13 @@ def apply_action(session_id: str, action: str, payload: dict | None = None) -> d
         )
         nic["label"] = f"Network adapter {idx}"
         nics.append(nic)
+        if vm.get("power") == "poweredOn" and idx > 1:
+            vm["guest_nic_pending"] = True
+            vm.setdefault("guest_pending_nics", []).append({
+                "label": nic.get("label", f"Network adapter {idx}"),
+                "mac": mac,
+                "name": f"eth{idx - 1}",
+            })
         events.append(_event(f"Added {adapter_type} network adapter on {net.get('name')} to {vm['name']}", "info", vm["name"]))
         tasks.insert(0, _task("Add Network Adapter", vm["name"]))
         nic_msg = ""
@@ -2341,9 +2357,12 @@ def apply_action(session_id: str, action: str, payload: dict | None = None) -> d
             return {"ok": False, "error": "VM not found"}
         vm["guest_disk_rescanned"] = True
         vm["guest_disk_visible"] = True
+        vm["guest_nic_pending"] = False
+        vm.pop("guest_pending_disks", None)
+        vm.pop("guest_pending_nics", None)
         events.append(_event(f"SCSI rescan completed in guest {vm['name']}", "info", vm["name"]))
         _save_session(str(session_id), entry)
-        return {"ok": True, "message": "Guest disk visible after SCSI rescan"}
+        return {"ok": True, "message": "Guest hardware visible after SCSI rescan"}
 
     if action == "guest_format_disk":
         vm = _find_vm(state, payload.get("vm_id"), payload.get("vm_name"))

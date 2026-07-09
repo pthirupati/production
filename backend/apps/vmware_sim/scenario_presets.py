@@ -364,6 +364,19 @@ def apply_vmware_scenario_preset(state: dict, scenario_slug: str) -> None:
         if web:
             web["power"] = "poweredOn"
             web["tools"] = "ok"
+            disks = web.setdefault("disks", [])
+            if not any(d.get("scsi_unit", 0) > 0 for d in disks):
+                disks.append({
+                    "id": f"{web['id']}-disk1-preset",
+                    "label": "Hard disk 2",
+                    "scsi_controller": 0,
+                    "scsi_unit": 1,
+                    "scsi_id": "0:1",
+                    "controller_type": "LSI Logic SAS",
+                    "capacity_gb": 20,
+                    "thin_provisioned": True,
+                    "datastore_id": web.get("datastore_id"),
+                })
             web["guest_disk_hidden"] = True
             web["guest_disk_visible"] = False
             web["guest_disk_mounted"] = False

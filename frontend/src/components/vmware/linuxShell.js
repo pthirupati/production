@@ -57,6 +57,7 @@ function getOrCreateGuestShared(vm) {
       diskRescanned: !vm?.guest_disk_hidden,
       diskFormatted: !!vm?.guest_disk_formatted,
       diskMounted: !!vm?.guest_disk_mounted,
+      nicRescanned: !vm?.guest_nic_pending,
       moduleLoaded: !vm?.kernel_module_missing,
       lvm: createLvmState(diskGb),
       bootEpoch: Date.now() - (14 * 86400 + 3 * 3600 + 22 * 60) * 1000,
@@ -67,6 +68,7 @@ function getOrCreateGuestShared(vm) {
   if (vm?.guest_disk_rescanned || vm?.guest_disk_visible) shared.diskRescanned = true
   if (vm?.guest_disk_formatted) shared.diskFormatted = true
   if (vm?.guest_disk_mounted) shared.diskMounted = true
+  if (vm?.guest_nic_pending === false || (vm?.guest_pending_nics || []).length) shared.nicRescanned = true
   if (vm?.kernel_module_missing === false) shared.moduleLoaded = true
   return shared
 }
@@ -95,6 +97,46 @@ function fmtGb(n, opts = {}) {
 
 function visibleGuestDisk(vm, shared) {
   return !vm?.guest_disk_hidden || shared.diskRescanned
+}
+
+/** Extra hot-added disks (SCSI unit > 0) visible after rescan. */
+function guestExtraDisks(vm, shared) {
+  const pending = vm?.guest_pending_disks || []
+  const fromInventory = (vm?.disks || []).filter((d) => (d.scsi_unit ?? 0) > 0)
+  const merged = pending.length ? pending : fromInventory.map((d) => ({
+    scsi_unit: d.scsi_unit,
+    capacity_gb: d.capacity_gb || 20,
+    scsi_id: d.scsi_id || `0:${d.scsi_unit}`,
+  }))
+  if (!shared.diskRescanned && vm?.guest_disk_hidden) {
+    return []
+  }
+  return merged
+}
+
+function guestExtraNics(vm, shared) {
+  const pending = vm?.guest_pending_nics || []
+  if (!shared.nicRescanned && vm?.guest_nic_pending) return []
+  if (pending.length) return pending
+  const nics = vm?.nics || []
+  if (nics.length <= 1) return []
+  return nics.slice(1).map((n, i) => ({
+    name: `eth${i + 1}`,
+    mac: n.mac || `00:50:56:${(i + 1).toString(16).padStart(2, '0')}:c3:d4`,
+    label: n.label || `Network adapter ${i + 2}`,
+  }))
+}
+
+function triggerGuestRescan(vm, shared) {
+  shared.diskRescanned = true
+  shared.nicRescanned = true
+  if (vm?.guest_disk_hidden) {
+    return { action: 'guest_rescan_scsi', vm_id: vm?.id }
+  }
+  if (vm?.guest_nic_pending) {
+    return { action: 'guest_rescan_scsi', vm_id: vm?.id }
+  }
+  return null
 }
 
 function normalizeDevName(dev = '') {
@@ -1418,13 +1460,21 @@ export function createLinuxShell(vm, opts = {}) {
         emit(sel)
       }
     }
+    else if (lc.endsWith('rescan-scsi-bus.sh') || lc === 'rescan-scsi-bus.sh') {
+      const effect = triggerGuestRescan(vm, shared)
+      if (effect) sideEffect = effect
+      emit([
+        'Rescanning SCSI bus...',
+        '0 host adapters found',
+        'Scanning for new SCSI devices...',
+        'Added scsi device(s)...',
+      ])
+    }
     else if (lc === 'echo') {
       // guest disk rescan side-effect: echo "- - -" > /sys/class/scsi_host/.../scan
       if (line.includes('scsi_host') && line.includes('scan')) {
-        if (vm?.guest_disk_hidden && !shared.diskRescanned) {
-          shared.diskRescanned = true
-          sideEffect = { action: 'guest_rescan_scsi', vm_id: vm?.id }
-        }
+        const effect = triggerGuestRescan(vm, shared)
+        if (effect) sideEffect = effect
         out.push('')
       } else {
         const interpret = has('-e')
@@ -1842,14 +1892,22 @@ export function createLinuxShell(vm, opts = {}) {
     /* =================== networking =================== */
     else if (lc === 'ip') {
       const sub = positional[0]
+      const extraNics = guestExtraNics(vm, shared)
       if (sub === 'addr' || sub === 'a' || sub === 'address' || !sub) {
-        emit([
+        const lines = [
           '1: lo: <LOOPBACK,UP,LOWER_UP> mtu 65536 qdisc noqueue state UNKNOWN group default qlen 1000',
           '    inet 127.0.0.1/8 scope host lo',
           '2: eth0: <BROADCAST,MULTICAST,UP,LOWER_UP> mtu 1500 qdisc fq_codel state UP group default qlen 1000',
           '    link/ether 00:50:56:a1:b2:c3 brd ff:ff:ff:ff:ff:ff',
           `    inet ${ip}/24 brd ${ip.split('.').slice(0, 3).join('.')}.255 scope global noprefixroute eth0`,
-        ])
+        ]
+        extraNics.forEach((nic, i) => {
+          const oct = 20 + i
+          lines.push(`${3 + i}: ${nic.name}: <BROADCAST,MULTICAST,UP,LOWER_UP> mtu 1500 qdisc fq_codel state UP group default qlen 1000`)
+          lines.push(`    link/ether ${nic.mac || '00:50:56:a1:c3:d4'} brd ff:ff:ff:ff:ff:ff`)
+          lines.push(`    inet ${ip.split('.').slice(0, 3).join('.')}.${oct}/24 brd ${ip.split('.').slice(0, 3).join('.')}.255 scope global noprefixroute ${nic.name}`)
+        })
+        emit(lines)
       } else if (sub === 'route' || sub === 'r') {
         emit([`default via ${gw} dev eth0 proto static metric 100`, `${ip.split('.').slice(0, 3).join('.')}.0/24 dev eth0 proto kernel scope link src ${ip}`])
       } else if (sub === 'link') {
@@ -2223,6 +2281,15 @@ export function createLinuxShell(vm, opts = {}) {
 
     /* =================== storage =================== */
     else if (lc === 'lsblk') {
+      const extras = guestExtraDisks(vm, shared)
+      const extraLines = extras.flatMap((d, i) => {
+        const dev = String.fromCharCode(98 + i)
+        const gb = d.capacity_gb || 20
+        return [
+          `sd${dev}      8:${16 + i * 16}   0   ${gb}G  0 disk`,
+          ...(shared.diskFormatted && !lvm.extraPvInVg ? [`└─sd${dev}1   8:${17 + i * 16}   0   ${gb}G  0 part${shared.diskMounted ? ' /data' : ''}`] : []),
+        ]
+      })
       emit([
         'NAME   MAJ:MIN RM  SIZE RO TYPE MOUNTPOINTS',
         `sda      8:0    0   ${diskGb}G  0 disk`,
@@ -2230,11 +2297,12 @@ export function createLinuxShell(vm, opts = {}) {
         `└─sda2   8:2    0  ${diskGb - 1}G  0 part`,
         `  ├─rootvg-root 253:0 0 ${Math.round(lvm.rootLvGb)}G  0 lvm  /`,
         `  └─rootvg-swap 253:1 0  ${lvm.swapGb}G  0 lvm  [SWAP]`,
-        ...(visibleGuestDisk(vm, shared) ? [
+        ...(visibleGuestDisk(vm, shared) && !extras.length ? [
           `sdb      8:16   0   20G  0 disk`,
           ...(lvm.extraPvInVg ? [`└─rootvg-root 253:0 0 ${Math.round(lvm.rootLvGb)}G  0 lvm  /`] : []),
           ...(!lvm.extraPvInVg && shared.diskFormatted ? [`└─sdb1   8:17   0   20G  0 part${shared.diskMounted ? ' /data' : ''}`] : []),
         ] : []),
+        ...extraLines,
         'sr0     11:0    1 1024M  0 rom',
       ])
     }

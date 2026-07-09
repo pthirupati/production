@@ -1106,6 +1106,17 @@ export default function LabRunner() {
   techSlugRef.current = scenario?.technology?.slug || techSlugRef.current
   scenarioSlugRef.current = scenario?.slug || scenarioSlugRef.current
   const labHosts = session?.lab_hosts || []
+
+  // Default to SSH jump box for simulation labs — learners connect with ssh user@ip.
+  useEffect(() => {
+    if (!session || session.status !== 'RUNNING') return
+    if (session.provider !== 'simulation') return
+    const slug = (scenario?.slug || '').toLowerCase()
+    if (['boot', 'grub', 'initramfs', 'kernel-panic'].some((k) => slug.includes(k))) return
+    const hasClient = (session.lab_hosts || []).some((h) => h.name === 'ssh_client')
+    if (hasClient) setTerminalHost('ssh_client')
+  }, [session?.id, session?.status, session?.provider, session?.lab_hosts, scenario?.slug])
+
   const blockedCmds = useMemo(
     () => (Array.isArray(scenario.blocked_commands) ? scenario.blocked_commands : []),
     [scenario.blocked_commands],

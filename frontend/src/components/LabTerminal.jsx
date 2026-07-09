@@ -26,6 +26,8 @@ async function refreshAuthToken() {
       setAuth(user, data.access, data.refresh || refreshToken)
       return true
     }
+    // Cookie-only session: middleware accepts httpOnly cookie even without body token.
+    if (useAuthStore.getState().isAuthenticated) return true
     return false
   } catch {
     return false
@@ -257,8 +259,20 @@ function LabTerminal({
       const buildWsUrl = () => {
         const token = useAuthStore.getState().accessToken
         const protocol = window.location.protocol === 'https:' ? 'wss' : 'ws'
-        const hostQ = hostKey && hostKey !== 'primary' ? `&host=${encodeURIComponent(hostKey)}` : ''
-        return `${protocol}://${window.location.host}/ws/terminal/${sessionId}/?token=${token}${hostQ}`
+        const params = new URLSearchParams()
+        if (token && token !== 'null') params.set('token', token)
+        if (hostKey && hostKey !== 'primary') params.set('host', hostKey)
+        const qs = params.toString()
+        return `${protocol}://${window.location.host}/ws/terminal/${sessionId}/${qs ? `?${qs}` : ''}`
+      }
+
+      const ensureWsAuth = async () => {
+        const token = useAuthStore.getState().accessToken
+        if (token && token !== 'null') return true
+        if (useAuthStore.getState().isAuthenticated) {
+          return refreshAuthToken()
+        }
+        return false
       }
 
       const bindEnterRetry = (message) => {
@@ -286,7 +300,7 @@ function LabTerminal({
         reconnectTimerRef.current = setTimeout(connectWs, delayMs)
       }
 
-      const connectWs = () => {
+      const connectWs = async () => {
         if (disposed || connectingRef.current) return
         if (document.hidden) {
           pauseUntilVisibleRef.current = true
@@ -294,6 +308,14 @@ function LabTerminal({
         }
         pauseUntilVisibleRef.current = false
         connectingRef.current = true
+        if (!(await ensureWsAuth())) {
+          connectingRef.current = false
+          if (!disposed) {
+            term.write('\r\n\x1b[1;33mSign in required — refresh the page or log in again.\x1b[0m\r\n')
+            bindEnterRetry('\x1b[1;33mPress Enter to retry connection...\x1b[0m\r\n')
+          }
+          return
+        }
         if (reconnectTimerRef.current) {
           clearTimeout(reconnectTimerRef.current)
           reconnectTimerRef.current = null
