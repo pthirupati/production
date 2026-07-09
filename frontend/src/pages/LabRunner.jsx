@@ -30,6 +30,7 @@ import WindowsServerSimulator from '../components/windows/WindowsServerSimulator
 import PeopleSoftSimulator from '../components/peoplesoft/PeopleSoftSimulator'
 import AwxSimulator from '../components/awx/AwxSimulator'
 import TerraformSimulator from '../components/terraform/TerraformSimulator'
+import CicdPipelineSim from '../components/devops/CicdPipelineSim'
 import { isTerraformLab } from '../utils/iacFlavor'
 import BaremetalSimulator from '../components/baremetal/BaremetalSimulator'
 import { SimWithTerminal } from '../components/sim/shared'
@@ -379,6 +380,8 @@ export default function LabRunner() {
   const [showPeopleSoftSim, setShowPeopleSoftSim] = useState(false)
   const [showAwxSim, setShowAwxSim] = useState(false)
   const [showTerraformSim, setShowTerraformSim] = useState(false)
+  const [showAwsSim, setShowAwsSim] = useState(false)
+  const [showCicdSim, setShowCicdSim] = useState(false)
   const [simTerminalOpen, setSimTerminalOpen] = useState(false)
   const [showBaremetalSim, setShowBaremetalSim] = useState(false)
   const [mobileInput, setMobileInput] = useState('')
@@ -943,14 +946,26 @@ export default function LabRunner() {
     } finally { setValidating(false) }
   }
 
-  const handleGuidedStepVerify = (idx, total) => {
+  const handleGuidedStepVerify = async (idx, total) => {
     if (idx >= total - 1) {
       handleValidate()
       return
     }
-    setGuidedDone(prev => ({ ...prev, [idx]: true }))
-    setGuidedStep(s => Math.min(total - 1, s + 1))
-    toast.success('Step verified — moving to the next step', { duration: 1800 })
+    setValidating(true)
+    try {
+      const result = await labApi.validateGuidedStep(sessionId, idx)
+      if (result.passed) {
+        setGuidedDone(prev => ({ ...prev, [idx]: true }))
+        setGuidedStep(s => Math.min(total - 1, s + 1))
+        toast.success(result.message || 'Step verified — moving to the next step', { duration: 1800 })
+      } else {
+        toast.error(result.message || result.error || 'Step not verified yet — complete the command in the terminal', { duration: 3500 })
+      }
+    } catch (err) {
+      toast.error(err.response?.data?.message || err.response?.data?.error || 'Step verification failed')
+    } finally {
+      setValidating(false)
+    }
   }
 
   async function handleRevealHint() {
@@ -1284,6 +1299,11 @@ export default function LabRunner() {
     || (scenario?.slug || '').startsWith('aws-')
     || (scenario?.slug || '').startsWith('academy-aws-')
   )
+  const isDevOpsPipelineLab = !isCrossTech && (
+    scenario?.technology?.slug === 'devops'
+    || scenario?.simulation_type === 'devops'
+    || /jenkins|gitlab|pipeline|argocd|flux|helm|sonar|ci-pipeline|cicd/.test((scenario?.slug || '').toLowerCase())
+  )
   const isBaremetalGuiLab = !isCrossTech && (
     scenario?.simulation_type === 'baremetal'
     && /maas|lxd|lxc|kvm|virsh|ipmi|pxe/.test((scenario?.slug || '').toLowerCase())
@@ -1296,7 +1316,7 @@ export default function LabRunner() {
   const simOverlayOpen = !isSimPrimaryLab && (
     showMonitoringSim || showNmapSim || showWiresharkSim
     || showDataDashboardSim || showAgentSim || showWindowsSim || showPeopleSoftSim
-    || showAwxSim || showBaremetalSim || showTerraformSim
+    || showAwxSim || showBaremetalSim || showTerraformSim || showAwsSim || showCicdSim
   )
   const solved = validationResult?.passed
   const expired = validationResult?.expired
@@ -1856,7 +1876,8 @@ export default function LabRunner() {
                       {idx < total - 1 ? (
                         <button
                           onClick={() => handleGuidedStepVerify(idx, total)}
-                          className="flex-1 py-2 rounded-lg text-sm font-semibold bg-accent-cyan/15 text-accent-cyan border border-accent-cyan/25 hover:bg-accent-cyan/25 transition-colors flex items-center justify-center gap-1.5"
+                          disabled={validating}
+                          className="flex-1 py-2 rounded-lg text-sm font-semibold bg-accent-cyan/15 text-accent-cyan border border-accent-cyan/25 hover:bg-accent-cyan/25 transition-colors flex items-center justify-center gap-1.5 disabled:opacity-50"
                         >
                           <CheckCircle2 size={14} />
                           {step.verifyLabel || 'Verify step'}
@@ -2336,12 +2357,23 @@ export default function LabRunner() {
           {isAwsLab && (
             <button
               type="button"
-              onClick={() => window.open('/aws-sim', '_blank', 'noopener')}
+              onClick={() => setShowAwsSim(true)}
               title="Open the AWS Management Console simulator — EC2, S3, IAM, VPC, RDS, Lambda and more"
               className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-md border text-[10px] font-semibold"
               style={{ borderColor: 'rgba(255,153,0,.5)', color: '#ff9900', background: 'rgba(255,153,0,.12)' }}
             >
-              <ExternalLink size={12} /> Open AWS Console
+              <ExternalLink size={12} /> AWS Console
+            </button>
+          )}
+          {isDevOpsPipelineLab && (
+            <button
+              type="button"
+              onClick={() => setShowCicdSim(true)}
+              title="Open CI/CD pipeline simulator — build, test, SonarQube, Argo CD deploy"
+              className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-md border text-[10px] font-semibold"
+              style={{ borderColor: 'rgba(56,189,248,.45)', color: '#38bdf8', background: 'rgba(56,189,248,.12)' }}
+            >
+              <ExternalLink size={12} /> CI/CD Pipeline
             </button>
           )}
           {isBaremetalGuiLab && (
@@ -2768,6 +2800,20 @@ export default function LabRunner() {
           onExit={() => setShowTerraformSim(false)}
           {...simChromeProps}
         />
+      )}
+
+      {isAwsLab && showAwsSim && (
+        <div className="fixed inset-0 z-[100] bg-black flex flex-col">
+          <div className="flex items-center justify-between px-3 py-2 bg-surface-900 border-b border-surface-700">
+            <span className="text-sm font-semibold text-white">AWS Management Console</span>
+            <button type="button" className="btn-secondary text-xs" onClick={() => setShowAwsSim(false)}>Close</button>
+          </div>
+          <iframe src="/aws-sim" title="AWS Console" className="flex-1 w-full border-0 bg-[#232f3e]" />
+        </div>
+      )}
+
+      {isDevOpsPipelineLab && showCicdSim && (
+        <CicdPipelineSim scenario={scenario} onExit={() => setShowCicdSim(false)} />
       )}
 
       {showShortcuts && (

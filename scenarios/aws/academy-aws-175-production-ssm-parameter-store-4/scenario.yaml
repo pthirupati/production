@@ -11,51 +11,54 @@ max_score: 100
 is_free: false
 infrastructure_type: docker
 jira_priority: Medium
-description: 'CONTEXT: A team operating AWS cloud operations needs you to resolve `Ssm Parameter Store
-  — Production Lab` during a realistic incident. The business impact is reduced service reliability until
-  the underlying state is repaired.
+description: 'CONTEXT: A team operating AWS cloud operations needs you to resolve
+  `Ssm Parameter Store — Production Lab` during a realistic incident. The business
+  impact is reduced service reliability until the underlying state is repaired.
 
 
-  ENVIRONMENT: You are working in FixitLab''s offline AWS practice account with AWS CLI, IAM policies,
-  EC2/S3/VPC, security groups, and CloudFormation/Terraform. All tools run locally; no paid APIs or external
-  cloud calls are required.
+  ENVIRONMENT: You are working in FixitLab''s offline AWS practice account with AWS
+  CLI, IAM policies, EC2/S3/VPC, security groups, and CloudFormation/Terraform. All
+  tools run locally; no paid APIs or external cloud calls are required.
 
 
-  SYMPTOM / STARTING STATE: A feature fix works in dev, but Ssm Parameter Store is not production ready
-  — missing guardrails, runbooks, or capacity checks. Production readiness for Ssm Parameter Store. Harden,
-  document, and validate how ssm parameter store fits into AWS cloud operations so the change is safe
-  to run during a maintenance window.
+  SYMPTOM / STARTING STATE: A feature fix works in dev, but Ssm Parameter Store is
+  not production ready — missing guardrails, runbooks, or capacity checks. Production
+  readiness for Ssm Parameter Store. Harden, document, and validate how ssm parameter
+  store fits into AWS cloud operations so the change is safe to run during a maintenance
+  window.
 
 
-  OBJECTIVE: Day-2 Ssm Parameter Store work completes safely in this environment; Changes are verified
-  with before/after checks; The system remains stable for dependent teams. Success means `check.sh` exits
-  successfully.
+  OBJECTIVE: Day-2 Ssm Parameter Store work completes safely in this environment;
+  Changes are verified with before/after checks; The system remains stable for dependent
+  teams. Success means `check.sh` exits successfully.
 
 
-  WHAT TO AVOID: Do not apply broad destructive changes, skip evidence gathering, or fake completion with
-  marker files — the checker validates real system state.'
+  WHAT TO AVOID: Do not apply broad destructive changes, skip evidence gathering,
+  or fake completion with marker files — the checker validates real system state.'
 objectives:
 - Day-2 Ssm Parameter Store work completes safely in this environment
 - Changes are verified with before/after checks
 - The system remains stable for dependent teams
-initial_state: A feature fix works in dev, but Ssm Parameter Store is not production ready — missing guardrails,
-  runbooks, or capacity checks.
+initial_state: A feature fix works in dev, but Ssm Parameter Store is not production
+  ready — missing guardrails, runbooks, or capacity checks.
 hints:
 - order: 1
   cost: 0
-  content: 'Where to look: Start with read-only discovery on the AWS practice account. For Ssm Parameter
-    Store, inspect the relevant AWS CLI, IAM policies, EC2/S3/VPC, security groups, and CloudFormation/Terraform
-    for ssm parameter store before changing anything.'
+  content: 'Where to look: Start with read-only discovery on the AWS practice account.
+    For Ssm Parameter Store, inspect the relevant AWS CLI, IAM policies, EC2/S3/VPC,
+    security groups, and CloudFormation/Terraform for ssm parameter store before changing
+    anything.'
 - order: 2
   cost: 25
   content: 'Diagnostic steps:
 
-    1. Gather evidence with the relevant AWS CLI, IAM policies, EC2/S3/VPC, security groups, and CloudFormation/Terraform
-    for ssm parameter store.
+    1. Gather evidence with the relevant AWS CLI, IAM policies, EC2/S3/VPC, security
+    groups, and CloudFormation/Terraform for ssm parameter store.
 
     2. Compare current output to the scenario objectives.
 
-    3. Form a single hypothesis about the smallest fix that would restore healthy state.'
+    3. Form a single hypothesis about the smallest fix that would restore healthy
+    state.'
 - order: 3
   cost: 50
   content: 'Exact fix + verification:
@@ -68,7 +71,8 @@ hints:
 
 
     WHY: the grader validates real state — marker files are ignored.'
-summary: Complete the ssm parameter store — production lab aws lab and verify success with the checker
+summary: Complete the ssm parameter store — production lab aws lab and verify success
+  with the checker
 estimated_minutes: 20
 xp_reward: 100
 prerequisites:
@@ -77,6 +81,7 @@ tags:
 - aws
 - fix
 - hands-on
+- aws-track:iac
 linked_tutorial: aws-fundamentals
 what_you_will_learn:
 - Day-2 Ssm Parameter Store work completes safely in this environment
@@ -101,15 +106,19 @@ environment:
 tasks:
 - id: task_1
   title: Ssm Parameter Store — Production Lab
-  description: Restore healthy behavior for Ssm Parameter Store — Production Lab by investigating the
-    failure, applying the smallest safe fix, and validating the outcome.
-  background: 'This aws lab teaches systematic troubleshooting: observe, hypothesize, change, verify.'
+  description: Restore healthy behavior for Ssm Parameter Store — Production Lab by
+    investigating the failure, applying the smallest safe fix, and validating the
+    outcome.
+  background: 'This aws lab teaches systematic troubleshooting: observe, hypothesize,
+    change, verify.'
   validation:
     type: custom_script
     script: check.sh
-    error_message: Validation did not pass. Re-read the objectives and Hint 2 diagnostic steps.
+    error_message: Validation did not pass. Re-read the objectives and Hint 2 diagnostic
+      steps.
 solution:
-  summary: Identify the misconfiguration affecting this aws lab and apply the minimal fix.
+  summary: Identify the misconfiguration affecting this aws lab and apply the minimal
+    fix.
   files_changed: []
   commands_run:
   - bash check.sh
@@ -138,3 +147,4 @@ guided_mode:
     expected_output: '`check.sh` exits successfully'
     explanation: The lab passes only when real state is healthy.
     next_on: command_success
+learning_track: iac

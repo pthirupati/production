@@ -8,21 +8,23 @@ max_score: 100
 infrastructure_type: docker
 jira_priority: High
 is_free: false
-description: 'CONTEXT: A team operating DevOps delivery needs you to resolve `Fix Nginx Upstream Health
-  Check Failure` during a realistic incident. The business impact is reduced service reliability until
-  the underlying state is repaired.
+description: 'CONTEXT: A team operating DevOps delivery needs you to resolve `Fix
+  Nginx Upstream Health Check Failure` during a realistic incident. The business impact
+  is reduced service reliability until the underlying state is repaired.
 
 
-  ENVIRONMENT: You are working in FixitLab''s offline CI/CD lab with git repos, pipelines, artifacts,
-  and runbooks. All tools run locally; no paid APIs or external cloud calls are required.
+  ENVIRONMENT: You are working in FixitLab''s offline CI/CD lab with git repos, pipelines,
+  artifacts, and runbooks. All tools run locally; no paid APIs or external cloud calls
+  are required.
 
 
-  SYMPTOM / STARTING STATE: Ubuntu server running Nginx as a reverse proxy. Config at /etc/nginx/nginx.conf.
+  SYMPTOM / STARTING STATE: Ubuntu server running Nginx as a reverse proxy. Config
+  at /etc/nginx/nginx.conf.
 
   Upstream app servers (app1.internal, app2.internal) listen on port 8080 but
 
-  the upstream block specifies port 80. The 502 errors confirm all backends are down. Nginx is reporting
-  all upstream servers as unavailable. Health checks are
+  the upstream block specifies port 80. The 502 errors confirm all backends are down.
+  Nginx is reporting all upstream servers as unavailable. Health checks are
 
   failing because the upstream port is wrong in the nginx.conf — the app
 
@@ -31,12 +33,13 @@ description: 'CONTEXT: A team operating DevOps delivery needs you to resolve `Fi
   Fix the upstream server port so traffic is correctly forwarded.
 
 
-  OBJECTIVE: Identify the misconfigured upstream server port in nginx.conf; Fix the upstream port from
-  80 to 8080; Test the Nginx configuration syntax. Success means `systemctl is-active nginx` returns active.
+  OBJECTIVE: Identify the misconfigured upstream server port in nginx.conf; Fix the
+  upstream port from 80 to 8080; Test the Nginx configuration syntax. Success means
+  `systemctl is-active nginx` returns active.
 
 
-  WHAT TO AVOID: Do not apply broad destructive changes, skip evidence gathering, or fake completion with
-  marker files — the checker validates real system state.'
+  WHAT TO AVOID: Do not apply broad destructive changes, skip evidence gathering,
+  or fake completion with marker files — the checker validates real system state.'
 objectives:
 - Identify the misconfigured upstream server port in nginx.conf
 - Fix the upstream port from 80 to 8080
@@ -52,8 +55,8 @@ initial_state: 'Ubuntu server running Nginx as a reverse proxy. Config at /etc/n
 hints:
 - order: 1
   cost: 0
-  content: 'Where to look: Test the config to get the exact file and line: `nginx -t`. It prints the offending
-    directive (e.g. unknown directive "listn").'
+  content: 'Where to look: Test the config to get the exact file and line: `nginx
+    -t`. It prints the offending directive (e.g. unknown directive "listn").'
 - order: 2
   cost: 25
   content: 'Diagnostic steps:
@@ -62,7 +65,8 @@ hints:
 
     2. Open that file (often `/etc/nginx/nginx.conf` or under `/etc/nginx/conf.d/`).
 
-    3. Compare the bad directive to the nginx docs — typos like `listn` should be `listen`.'
+    3. Compare the bad directive to the nginx docs — typos like `listn` should be
+    `listen`.'
 - order: 3
   cost: 50
   content: 'Exact fix + verification:
@@ -71,11 +75,13 @@ hints:
 
     2. Re-run `nginx -t` until it reports syntax is ok.
 
-    3. Run `systemctl enable --now nginx`, then `curl -I http://localhost` (expect HTTP 200).
+    3. Run `systemctl enable --now nginx`, then `curl -I http://localhost` (expect
+    HTTP 200).
 
 
     WHY: systemd will not start nginx until `nginx -t` passes.'
-summary: Complete the fix nginx upstream health check failure devops lab and verify success with the checker
+summary: Complete the fix nginx upstream health check failure devops lab and verify
+  success with the checker
 estimated_minutes: 15
 xp_reward: 100
 prerequisites:
@@ -109,18 +115,23 @@ environment:
 tasks:
 - id: task_1
   title: Fix Nginx Upstream Health Check Failure
-  description: Restore healthy behavior for Fix Nginx Upstream Health Check Failure by investigating the
-    failure, applying the smallest safe fix, and validating the outcome.
-  background: 'This devops lab teaches systematic troubleshooting: observe, hypothesize, change, verify.'
+  description: Restore healthy behavior for Fix Nginx Upstream Health Check Failure
+    by investigating the failure, applying the smallest safe fix, and validating the
+    outcome.
+  background: 'This devops lab teaches systematic troubleshooting: observe, hypothesize,
+    change, verify.'
   validation:
     type: service_active
     command: systemctl is-active nginx
     expected_status: active
-    error_message: The nginx service is not active yet. Check `systemctl status nginx` and `journalctl
-      -u nginx -n 50`.
+    error_message: The nginx service is not active yet. Check `systemctl status nginx`
+      and `journalctl -u nginx -n 50`.
 solution:
-  summary: The root cause is an unhealthy `nginx` service; repair it and verify active state.
+  summary: The root cause is an unhealthy `nginx` service; repair it and verify active
+    state.
   files_changed: []
   commands_run:
   - systemctl is-active nginx
   reference_docs: devops-fundamentals
+lab_mode: simulation
+simulation_type: devops

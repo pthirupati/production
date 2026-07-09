@@ -8,33 +8,36 @@ max_score: 100
 infrastructure_type: docker
 jira_priority: Medium
 is_free: false
-description: 'CONTEXT: A team operating DevOps delivery needs you to resolve `Fix the Jenkins Pipeline
-  Syntax Error` during a realistic incident. The business impact is reduced service reliability until
-  the underlying state is repaired.
+description: 'CONTEXT: A team operating DevOps delivery needs you to resolve `Fix
+  the Jenkins Pipeline Syntax Error` during a realistic incident. The business impact
+  is reduced service reliability until the underlying state is repaired.
 
 
-  ENVIRONMENT: You are working in FixitLab''s offline CI/CD lab with git repos, pipelines, artifacts,
-  and runbooks. All tools run locally; no paid APIs or external cloud calls are required.
+  ENVIRONMENT: You are working in FixitLab''s offline CI/CD lab with git repos, pipelines,
+  artifacts, and runbooks. All tools run locally; no paid APIs or external cloud calls
+  are required.
 
 
-  SYMPTOM / STARTING STATE: Ubuntu server with Jenkins installed. The pipeline Jenkinsfile at
+  SYMPTOM / STARTING STATE: Ubuntu server with Jenkins installed. The pipeline Jenkinsfile
+  at
 
   /var/jenkins_home/workspace/myapp/Jenkinsfile has a broken Groovy syntax that
 
-  prevents the pipeline from starting. A Jenkins pipeline is failing to start because of a Groovy syntax
-  error in the Jenkinsfile.
+  prevents the pipeline from starting. A Jenkins pipeline is failing to start because
+  of a Groovy syntax error in the Jenkinsfile.
 
   The development team pushed a broken Jenkinsfile and the build is completely blocked.
 
   Your job is to identify and fix the Groovy syntax error so the pipeline can run.
 
 
-  OBJECTIVE: Identify the syntax error in the Jenkinsfile; Fix the Groovy syntax so the pipeline block
-  is valid; Verify the pipeline configuration is correct. Success means `check.sh` exits successfully.
+  OBJECTIVE: Identify the syntax error in the Jenkinsfile; Fix the Groovy syntax so
+  the pipeline block is valid; Verify the pipeline configuration is correct. Success
+  means `check.sh` exits successfully.
 
 
-  WHAT TO AVOID: Do not apply broad destructive changes, skip evidence gathering, or fake completion with
-  marker files — the checker validates real system state.'
+  WHAT TO AVOID: Do not apply broad destructive changes, skip evidence gathering,
+  or fake completion with marker files — the checker validates real system state.'
 objectives:
 - Identify the syntax error in the Jenkinsfile
 - Fix the Groovy syntax so the pipeline block is valid
@@ -49,8 +52,9 @@ initial_state: 'Ubuntu server with Jenkins installed. The pipeline Jenkinsfile a
 hints:
 - order: 1
   cost: 0
-  content: 'Where to look: Start with read-only discovery on the CI/CD lab. For Fix the Jenkins Pipeline
-    Syntax Error, inspect git repos, pipelines, artifacts, and runbooks before changing anything.'
+  content: 'Where to look: Start with read-only discovery on the CI/CD lab. For Fix
+    the Jenkins Pipeline Syntax Error, inspect git repos, pipelines, artifacts, and
+    runbooks before changing anything.'
 - order: 2
   cost: 25
   content: 'Diagnostic steps:
@@ -59,7 +63,8 @@ hints:
 
     2. Compare current output to the scenario objectives.
 
-    3. Form a single hypothesis about the smallest fix that would restore healthy state.'
+    3. Form a single hypothesis about the smallest fix that would restore healthy
+    state.'
 - order: 3
   cost: 50
   content: 'Exact fix + verification:
@@ -72,7 +77,8 @@ hints:
 
 
     WHY: the grader validates real state — marker files are ignored.'
-summary: Complete the fix the jenkins pipeline syntax error devops lab and verify success with the checker
+summary: Complete the fix the jenkins pipeline syntax error devops lab and verify
+  success with the checker
 estimated_minutes: 15
 xp_reward: 100
 prerequisites:
@@ -105,16 +111,22 @@ environment:
 tasks:
 - id: task_1
   title: Fix the Jenkins Pipeline Syntax Error
-  description: Restore healthy behavior for Fix the Jenkins Pipeline Syntax Error by investigating the
-    failure, applying the smallest safe fix, and validating the outcome.
-  background: 'This devops lab teaches systematic troubleshooting: observe, hypothesize, change, verify.'
+  description: Restore healthy behavior for Fix the Jenkins Pipeline Syntax Error
+    by investigating the failure, applying the smallest safe fix, and validating the
+    outcome.
+  background: 'This devops lab teaches systematic troubleshooting: observe, hypothesize,
+    change, verify.'
   validation:
     type: custom_script
     script: check.sh
-    error_message: Validation did not pass. Re-read the objectives and Hint 2 diagnostic steps.
+    error_message: Validation did not pass. Re-read the objectives and Hint 2 diagnostic
+      steps.
 solution:
-  summary: Identify the misconfiguration affecting this devops lab and apply the minimal fix.
+  summary: Identify the misconfiguration affecting this devops lab and apply the minimal
+    fix.
   files_changed: []
   commands_run:
   - bash check.sh
   reference_docs: devops-fundamentals
+lab_mode: simulation
+simulation_type: devops

@@ -11,34 +11,36 @@ max_score: 100
 is_free: false
 infrastructure_type: docker
 jira_priority: Medium
-description: 'CONTEXT: A team operating AWS cloud operations needs you to resolve `Autoscaling — Backup
-  Lab` during a realistic incident. The business impact is reduced service reliability until the underlying
-  state is repaired.
+description: 'CONTEXT: A team operating AWS cloud operations needs you to resolve
+  `Autoscaling — Backup Lab` during a realistic incident. The business impact is reduced
+  service reliability until the underlying state is repaired.
 
 
-  ENVIRONMENT: You are working in FixitLab''s offline AWS practice account with AWS CLI, IAM policies,
-  EC2/S3/VPC, security groups, and CloudFormation/Terraform. All tools run locally; no paid APIs or external
-  cloud calls are required.
+  ENVIRONMENT: You are working in FixitLab''s offline AWS practice account with AWS
+  CLI, IAM policies, EC2/S3/VPC, security groups, and CloudFormation/Terraform. All
+  tools run locally; no paid APIs or external cloud calls are required.
 
 
-  SYMPTOM / STARTING STATE: Backup jobs exist but reliability is uncertain for autoscaling. Leadership
-  wants proof that restore works — not just that scripts exit zero. Backup and recovery drill for autoscaling.
-  Ensure backups run on schedule, retention is correct, and you can restore HPA metrics, min/max replicas,
-  and resource requests within the lab RTO.
+  SYMPTOM / STARTING STATE: Backup jobs exist but reliability is uncertain for autoscaling.
+  Leadership wants proof that restore works — not just that scripts exit zero. Backup
+  and recovery drill for autoscaling. Ensure backups run on schedule, retention is
+  correct, and you can restore HPA metrics, min/max replicas, and resource requests
+  within the lab RTO.
 
 
-  OBJECTIVE: Backup coverage for autoscaling is complete and restorable; Retention and encryption meet
-  the stated policy; A restore drill proves data integrity. Success means `check.sh` exits successfully.
+  OBJECTIVE: Backup coverage for autoscaling is complete and restorable; Retention
+  and encryption meet the stated policy; A restore drill proves data integrity. Success
+  means `check.sh` exits successfully.
 
 
-  WHAT TO AVOID: Do not apply broad destructive changes, skip evidence gathering, or fake completion with
-  marker files — the checker validates real system state.'
+  WHAT TO AVOID: Do not apply broad destructive changes, skip evidence gathering,
+  or fake completion with marker files — the checker validates real system state.'
 objectives:
 - Backup coverage for autoscaling is complete and restorable
 - Retention and encryption meet the stated policy
 - A restore drill proves data integrity
-initial_state: Backup jobs exist but reliability is uncertain for autoscaling. Leadership wants proof
-  that restore works — not just that scripts exit zero.
+initial_state: Backup jobs exist but reliability is uncertain for autoscaling. Leadership
+  wants proof that restore works — not just that scripts exit zero.
 hints:
 - order: 1
   cost: 0
@@ -48,8 +50,8 @@ hints:
 
     2. Write down what looks normal versus wrong or missing for autoscaling.
 
-    3. Recall the core idea: HPA metrics, min/max replicas, and resource requests. Form one hypothesis
-    before you act.'
+    3. Recall the core idea: HPA metrics, min/max replicas, and resource requests.
+    Form one hypothesis before you act.'
 - order: 2
   cost: 25
   content: 'Diagnostic steps:
@@ -58,20 +60,23 @@ hints:
 
     2. Compare current output to the scenario objectives.
 
-    3. Form a single hypothesis about the smallest fix that would restore healthy state.'
+    3. Form a single hypothesis about the smallest fix that would restore healthy
+    state.'
 - order: 3
   cost: 50
   content: 'Exact fix + verification:
 
     1. Re-check the current state — `kubectl get hpa` and `kubectl describe hpa`.
 
-    2. Repair or run the backup job, then perform a controlled restore into a scratch location to prove
-    it works.
+    2. Repair or run the backup job, then perform a controlled restore into a scratch
+    location to prove it works.
 
     3. Verify the result — replicas scale with load between the configured bounds.
 
-    4. Click Check Solution once the objective is met (graded on real state, not a marker file).'
-summary: Complete the autoscaling — backup lab aws lab and verify success with the checker
+    4. Click Check Solution once the objective is met (graded on real state, not a
+    marker file).'
+summary: Complete the autoscaling — backup lab aws lab and verify success with the
+  checker
 estimated_minutes: 20
 xp_reward: 100
 prerequisites:
@@ -80,6 +85,7 @@ tags:
 - aws
 - do
 - hands-on
+- aws-track:troubleshooting
 linked_tutorial: aws-fundamentals
 what_you_will_learn:
 - Backup coverage for autoscaling is complete and restorable
@@ -104,15 +110,18 @@ environment:
 tasks:
 - id: task_1
   title: Autoscaling — Backup Lab
-  description: Restore healthy behavior for Autoscaling — Backup Lab by investigating the failure, applying
-    the smallest safe fix, and validating the outcome.
-  background: 'This aws lab teaches systematic troubleshooting: observe, hypothesize, change, verify.'
+  description: Restore healthy behavior for Autoscaling — Backup Lab by investigating
+    the failure, applying the smallest safe fix, and validating the outcome.
+  background: 'This aws lab teaches systematic troubleshooting: observe, hypothesize,
+    change, verify.'
   validation:
     type: custom_script
     script: check.sh
-    error_message: Validation did not pass. Re-read the objectives and Hint 2 diagnostic steps.
+    error_message: Validation did not pass. Re-read the objectives and Hint 2 diagnostic
+      steps.
 solution:
-  summary: Identify the misconfiguration affecting this aws lab and apply the minimal fix.
+  summary: Identify the misconfiguration affecting this aws lab and apply the minimal
+    fix.
   files_changed: []
   commands_run:
   - bash check.sh
@@ -141,3 +150,4 @@ guided_mode:
     expected_output: '`check.sh` exits successfully'
     explanation: The lab passes only when real state is healthy.
     next_on: command_success
+learning_track: troubleshooting

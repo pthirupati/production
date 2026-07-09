@@ -11,52 +11,55 @@ max_score: 100
 is_free: true
 infrastructure_type: docker
 jira_priority: Low
-description: 'CONTEXT: A team operating AWS cloud operations needs you to resolve `Ec2 — Learn Lab` during
-  a realistic incident. The business impact is reduced service reliability until the underlying state
-  is repaired.
+description: 'CONTEXT: A team operating AWS cloud operations needs you to resolve
+  `Ec2 — Learn Lab` during a realistic incident. The business impact is reduced service
+  reliability until the underlying state is repaired.
 
 
-  ENVIRONMENT: You are working in FixitLab''s offline AWS practice account with AWS CLI, IAM policies,
-  EC2/S3/VPC, security groups, and CloudFormation/Terraform. All tools run locally; no paid APIs or external
-  cloud calls are required.
+  ENVIRONMENT: You are working in FixitLab''s offline AWS practice account with AWS
+  CLI, IAM policies, EC2/S3/VPC, security groups, and CloudFormation/Terraform. All
+  tools run locally; no paid APIs or external cloud calls are required.
 
 
-  SYMPTOM / STARTING STATE: The AWS practice account is online with a starter Ec2 setup. Some pieces are
-  intentionally incomplete so you can learn how they fit together. Nothing is on fire — focus on observation.
-  This beginner-friendly AWS Cloud lab introduces Ec2. You will explore how ec2 fits into AWS cloud operations
-  on the AWS practice account. Read the environment first, then follow the guided steps — no prior production
-  experience required.
+  SYMPTOM / STARTING STATE: The AWS practice account is online with a starter Ec2
+  setup. Some pieces are intentionally incomplete so you can learn how they fit together.
+  Nothing is on fire — focus on observation. This beginner-friendly AWS Cloud lab
+  introduces Ec2. You will explore how ec2 fits into AWS cloud operations on the AWS
+  practice account. Read the environment first, then follow the guided steps — no
+  prior production experience required.
 
 
-  OBJECTIVE: Understand how Ec2 work in this lab environment; Identify the main status and configuration
-  signals for Ec2; Confirm you can read the current state confidently before changing anything. Success
-  means `check.sh` exits successfully.
+  OBJECTIVE: Understand how Ec2 work in this lab environment; Identify the main status
+  and configuration signals for Ec2; Confirm you can read the current state confidently
+  before changing anything. Success means `check.sh` exits successfully.
 
 
-  WHAT TO AVOID: Do not apply broad destructive changes, skip evidence gathering, or fake completion with
-  marker files — the checker validates real system state.'
+  WHAT TO AVOID: Do not apply broad destructive changes, skip evidence gathering,
+  or fake completion with marker files — the checker validates real system state.'
 objectives:
 - Understand how Ec2 work in this lab environment
 - Identify the main status and configuration signals for Ec2
 - Confirm you can read the current state confidently before changing anything
-initial_state: The AWS practice account is online with a starter Ec2 setup. Some pieces are intentionally
-  incomplete so you can learn how they fit together. Nothing is on fire — focus on observation.
+initial_state: The AWS practice account is online with a starter Ec2 setup. Some pieces
+  are intentionally incomplete so you can learn how they fit together. Nothing is
+  on fire — focus on observation.
 hints:
 - order: 1
   cost: 0
-  content: 'Where to look: Start with read-only discovery on the AWS practice account. For Ec2, inspect
-    the relevant AWS CLI, IAM policies, EC2/S3/VPC, security groups, and CloudFormation/Terraform for
-    ec2 before changing anything.'
+  content: 'Where to look: Start with read-only discovery on the AWS practice account.
+    For Ec2, inspect the relevant AWS CLI, IAM policies, EC2/S3/VPC, security groups,
+    and CloudFormation/Terraform for ec2 before changing anything.'
 - order: 2
   cost: 25
   content: 'Diagnostic steps:
 
-    1. Gather evidence with the relevant AWS CLI, IAM policies, EC2/S3/VPC, security groups, and CloudFormation/Terraform
-    for ec2.
+    1. Gather evidence with the relevant AWS CLI, IAM policies, EC2/S3/VPC, security
+    groups, and CloudFormation/Terraform for ec2.
 
     2. Compare current output to the scenario objectives.
 
-    3. Form a single hypothesis about the smallest fix that would restore healthy state.'
+    3. Form a single hypothesis about the smallest fix that would restore healthy
+    state.'
 - order: 3
   cost: 50
   content: 'Exact fix + verification:
@@ -78,6 +81,7 @@ tags:
 - aws
 - do
 - hands-on
+- aws-track:fundamentals
 linked_tutorial: aws-fundamentals
 what_you_will_learn:
 - Understand how Ec2 work in this lab environment
@@ -102,15 +106,18 @@ environment:
 tasks:
 - id: task_1
   title: Ec2 — Learn Lab
-  description: Restore healthy behavior for Ec2 — Learn Lab by investigating the failure, applying the
-    smallest safe fix, and validating the outcome.
-  background: 'This aws lab teaches systematic troubleshooting: observe, hypothesize, change, verify.'
+  description: Restore healthy behavior for Ec2 — Learn Lab by investigating the failure,
+    applying the smallest safe fix, and validating the outcome.
+  background: 'This aws lab teaches systematic troubleshooting: observe, hypothesize,
+    change, verify.'
   validation:
     type: custom_script
     script: check.sh
-    error_message: Validation did not pass. Re-read the objectives and Hint 2 diagnostic steps.
+    error_message: Validation did not pass. Re-read the objectives and Hint 2 diagnostic
+      steps.
 solution:
-  summary: Identify the misconfiguration affecting this aws lab and apply the minimal fix.
+  summary: Identify the misconfiguration affecting this aws lab and apply the minimal
+    fix.
   files_changed: []
   commands_run:
   - bash check.sh
@@ -139,3 +146,4 @@ guided_mode:
     expected_output: '`check.sh` exits successfully'
     explanation: The lab passes only when real state is healthy.
     next_on: command_success
+learning_track: fundamentals

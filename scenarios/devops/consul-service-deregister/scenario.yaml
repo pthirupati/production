@@ -8,21 +8,23 @@ max_score: 100
 infrastructure_type: docker
 jira_priority: Medium
 is_free: false
-description: 'CONTEXT: A team operating DevOps delivery needs you to resolve `Fix Consul Service Deregistration
-  on Pod Deletion` during a realistic incident. The business impact is reduced service reliability until
-  the underlying state is repaired.
+description: 'CONTEXT: A team operating DevOps delivery needs you to resolve `Fix
+  Consul Service Deregistration on Pod Deletion` during a realistic incident. The
+  business impact is reduced service reliability until the underlying state is repaired.
 
 
-  ENVIRONMENT: You are working in FixitLab''s offline CI/CD lab with git repos, pipelines, artifacts,
-  and runbooks. All tools run locally; no paid APIs or external cloud calls are required.
+  ENVIRONMENT: You are working in FixitLab''s offline CI/CD lab with git repos, pipelines,
+  artifacts, and runbooks. All tools run locally; no paid APIs or external cloud calls
+  are required.
 
 
-  SYMPTOM / STARTING STATE: Ubuntu server running Consul agent. Stale service IDs are:
+  SYMPTOM / STARTING STATE: Ubuntu server running Consul agent. Stale service IDs
+  are:
 
   myapp-pod-abc123 and myapp-pod-def456. These pods no longer exist.
 
-  Consul HTTP API at http://localhost:8500. Use consul CLI or API to deregister. Consul is holding stale
-  service registrations for pods that have been deleted.
+  Consul HTTP API at http://localhost:8500. Use consul CLI or API to deregister. Consul
+  is holding stale service registrations for pods that have been deleted.
 
   Health checks are failing for these ghost services, and load balancers are
 
@@ -31,13 +33,13 @@ description: 'CONTEXT: A team operating DevOps delivery needs you to resolve `Fi
   services and fix the Consul agent configuration to auto-deregister unhealthy services.
 
 
-  OBJECTIVE: List Consul services and identify stale registrations; Deregister the stale service entries
-  via Consul API; Configure enable_tag_override and deregister_critical_service_after. Success means `check.sh`
-  exits successfully.
+  OBJECTIVE: List Consul services and identify stale registrations; Deregister the
+  stale service entries via Consul API; Configure enable_tag_override and deregister_critical_service_after.
+  Success means `check.sh` exits successfully.
 
 
-  WHAT TO AVOID: Do not apply broad destructive changes, skip evidence gathering, or fake completion with
-  marker files — the checker validates real system state.'
+  WHAT TO AVOID: Do not apply broad destructive changes, skip evidence gathering,
+  or fake completion with marker files — the checker validates real system state.'
 objectives:
 - List Consul services and identify stale registrations
 - Deregister the stale service entries via Consul API
@@ -53,8 +55,9 @@ initial_state: 'Ubuntu server running Consul agent. Stale service IDs are:
 hints:
 - order: 1
   cost: 0
-  content: 'Where to look: Start with read-only discovery on the CI/CD lab. For Fix Consul Service Deregistration
-    on Pod Deletion, inspect git repos, pipelines, artifacts, and runbooks before changing anything.'
+  content: 'Where to look: Start with read-only discovery on the CI/CD lab. For Fix
+    Consul Service Deregistration on Pod Deletion, inspect git repos, pipelines, artifacts,
+    and runbooks before changing anything.'
 - order: 2
   cost: 25
   content: 'Diagnostic steps:
@@ -63,7 +66,8 @@ hints:
 
     2. Compare current output to the scenario objectives.
 
-    3. Form a single hypothesis about the smallest fix that would restore healthy state.'
+    3. Form a single hypothesis about the smallest fix that would restore healthy
+    state.'
 - order: 3
   cost: 50
   content: 'Exact fix + verification:
@@ -76,8 +80,8 @@ hints:
 
 
     WHY: the grader validates real state — marker files are ignored.'
-summary: Complete the fix consul service deregistration on pod deletion devops lab and verify success
-  with the checker
+summary: Complete the fix consul service deregistration on pod deletion devops lab
+  and verify success with the checker
 estimated_minutes: 20
 xp_reward: 100
 prerequisites:
@@ -111,16 +115,22 @@ environment:
 tasks:
 - id: task_1
   title: Fix Consul Service Deregistration on Pod Deletion
-  description: Restore healthy behavior for Fix Consul Service Deregistration on Pod Deletion by investigating
-    the failure, applying the smallest safe fix, and validating the outcome.
-  background: 'This devops lab teaches systematic troubleshooting: observe, hypothesize, change, verify.'
+  description: Restore healthy behavior for Fix Consul Service Deregistration on Pod
+    Deletion by investigating the failure, applying the smallest safe fix, and validating
+    the outcome.
+  background: 'This devops lab teaches systematic troubleshooting: observe, hypothesize,
+    change, verify.'
   validation:
     type: custom_script
     script: check.sh
-    error_message: Validation did not pass. Re-read the objectives and Hint 2 diagnostic steps.
+    error_message: Validation did not pass. Re-read the objectives and Hint 2 diagnostic
+      steps.
 solution:
-  summary: Identify the misconfiguration affecting this devops lab and apply the minimal fix.
+  summary: Identify the misconfiguration affecting this devops lab and apply the minimal
+    fix.
   files_changed: []
   commands_run:
   - bash check.sh
   reference_docs: devops-fundamentals
+lab_mode: simulation
+simulation_type: devops

@@ -8,21 +8,22 @@ max_score: 100
 infrastructure_type: docker
 jira_priority: High
 is_free: false
-description: 'CONTEXT: A team operating DevOps delivery needs you to resolve `Tune Fluentd Buffer to Prevent
-  Overflow` during a realistic incident. The business impact is reduced service reliability until the
-  underlying state is repaired.
+description: 'CONTEXT: A team operating DevOps delivery needs you to resolve `Tune
+  Fluentd Buffer to Prevent Overflow` during a realistic incident. The business impact
+  is reduced service reliability until the underlying state is repaired.
 
 
-  ENVIRONMENT: You are working in FixitLab''s offline CI/CD lab with git repos, pipelines, artifacts,
-  and runbooks. All tools run locally; no paid APIs or external cloud calls are required.
+  ENVIRONMENT: You are working in FixitLab''s offline CI/CD lab with git repos, pipelines,
+  artifacts, and runbooks. All tools run locally; no paid APIs or external cloud calls
+  are required.
 
 
   SYMPTOM / STARTING STATE: Ubuntu server running Fluentd. Config at /etc/fluent/fluent.conf.
 
   Current buffer settings are too small: chunk_limit_size 1m, total_limit_size 10m.
 
-  These need to be increased to at least chunk_limit_size 8m, total_limit_size 256m. Fluentd is dropping
-  log events because the buffer is overflowing. The buffer
+  These need to be increased to at least chunk_limit_size 8m, total_limit_size 256m.
+  Fluentd is dropping log events because the buffer is overflowing. The buffer
 
   size limits are too small for the current log volume. Memory buffer chunks
 
@@ -31,12 +32,13 @@ description: 'CONTEXT: A team operating DevOps delivery needs you to resolve `Tu
   in fluent.conf to handle the load without data loss.
 
 
-  OBJECTIVE: Identify the buffer overflow errors in Fluentd logs; Increase the buffer chunk_limit_size
-  and total_limit_size; Tune flush_interval and retry settings. Success means `check.sh` exits successfully.
+  OBJECTIVE: Identify the buffer overflow errors in Fluentd logs; Increase the buffer
+  chunk_limit_size and total_limit_size; Tune flush_interval and retry settings. Success
+  means `check.sh` exits successfully.
 
 
-  WHAT TO AVOID: Do not apply broad destructive changes, skip evidence gathering, or fake completion with
-  marker files — the checker validates real system state.'
+  WHAT TO AVOID: Do not apply broad destructive changes, skip evidence gathering,
+  or fake completion with marker files — the checker validates real system state.'
 objectives:
 - Identify the buffer overflow errors in Fluentd logs
 - Increase the buffer chunk_limit_size and total_limit_size
@@ -52,8 +54,9 @@ initial_state: 'Ubuntu server running Fluentd. Config at /etc/fluent/fluent.conf
 hints:
 - order: 1
   cost: 0
-  content: 'Where to look: Start with read-only discovery on the CI/CD lab. For Tune Fluentd Buffer to
-    Prevent Overflow, inspect git repos, pipelines, artifacts, and runbooks before changing anything.'
+  content: 'Where to look: Start with read-only discovery on the CI/CD lab. For Tune
+    Fluentd Buffer to Prevent Overflow, inspect git repos, pipelines, artifacts, and
+    runbooks before changing anything.'
 - order: 2
   cost: 25
   content: 'Diagnostic steps:
@@ -62,7 +65,8 @@ hints:
 
     2. Compare current output to the scenario objectives.
 
-    3. Form a single hypothesis about the smallest fix that would restore healthy state.'
+    3. Form a single hypothesis about the smallest fix that would restore healthy
+    state.'
 - order: 3
   cost: 50
   content: 'Exact fix + verification:
@@ -75,7 +79,8 @@ hints:
 
 
     WHY: the grader validates real state — marker files are ignored.'
-summary: Complete the tune fluentd buffer to prevent overflow devops lab and verify success with the checker
+summary: Complete the tune fluentd buffer to prevent overflow devops lab and verify
+  success with the checker
 estimated_minutes: 20
 xp_reward: 100
 prerequisites:
@@ -109,16 +114,22 @@ environment:
 tasks:
 - id: task_1
   title: Tune Fluentd Buffer to Prevent Overflow
-  description: Restore healthy behavior for Tune Fluentd Buffer to Prevent Overflow by investigating the
-    failure, applying the smallest safe fix, and validating the outcome.
-  background: 'This devops lab teaches systematic troubleshooting: observe, hypothesize, change, verify.'
+  description: Restore healthy behavior for Tune Fluentd Buffer to Prevent Overflow
+    by investigating the failure, applying the smallest safe fix, and validating the
+    outcome.
+  background: 'This devops lab teaches systematic troubleshooting: observe, hypothesize,
+    change, verify.'
   validation:
     type: custom_script
     script: check.sh
-    error_message: Validation did not pass. Re-read the objectives and Hint 2 diagnostic steps.
+    error_message: Validation did not pass. Re-read the objectives and Hint 2 diagnostic
+      steps.
 solution:
-  summary: Identify the misconfiguration affecting this devops lab and apply the minimal fix.
+  summary: Identify the misconfiguration affecting this devops lab and apply the minimal
+    fix.
   files_changed: []
   commands_run:
   - bash check.sh
   reference_docs: devops-fundamentals
+lab_mode: simulation
+simulation_type: devops

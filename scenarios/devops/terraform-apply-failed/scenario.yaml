@@ -8,21 +8,23 @@ max_score: 100
 infrastructure_type: docker
 jira_priority: Medium
 is_free: false
-description: 'CONTEXT: A team operating DevOps delivery needs you to resolve `Fix Terraform Variable Type
-  Error` during a realistic incident. The business impact is reduced service reliability until the underlying
-  state is repaired.
+description: 'CONTEXT: A team operating DevOps delivery needs you to resolve `Fix
+  Terraform Variable Type Error` during a realistic incident. The business impact
+  is reduced service reliability until the underlying state is repaired.
 
 
-  ENVIRONMENT: You are working in FixitLab''s offline CI/CD lab with git repos, pipelines, artifacts,
-  and runbooks. All tools run locally; no paid APIs or external cloud calls are required.
+  ENVIRONMENT: You are working in FixitLab''s offline CI/CD lab with git repos, pipelines,
+  artifacts, and runbooks. All tools run locally; no paid APIs or external cloud calls
+  are required.
 
 
-  SYMPTOM / STARTING STATE: Ubuntu server with Terraform installed. Working directory is /opt/terraform/infra.
+  SYMPTOM / STARTING STATE: Ubuntu server with Terraform installed. Working directory
+  is /opt/terraform/infra.
 
   The variables.tf file declares instance_count as type string but tfvars provides
 
-  a number value, causing a type mismatch error. Terraform plan is failing with a variable type mismatch
-  error. A recent change
+  a number value, causing a type mismatch error. Terraform plan is failing with a
+  variable type mismatch error. A recent change
 
   to variables.tf introduced an incorrect type constraint. The variable
 
@@ -31,12 +33,13 @@ description: 'CONTEXT: A team operating DevOps delivery needs you to resolve `Fi
   provides a number. Fix the type declaration so terraform plan succeeds.
 
 
-  OBJECTIVE: Run terraform plan and identify the variable type error; Fix the type constraint in variables.tf;
-  Verify terraform plan completes without errors. Success means `check.sh` exits successfully.
+  OBJECTIVE: Run terraform plan and identify the variable type error; Fix the type
+  constraint in variables.tf; Verify terraform plan completes without errors. Success
+  means `check.sh` exits successfully.
 
 
-  WHAT TO AVOID: Do not apply broad destructive changes, skip evidence gathering, or fake completion with
-  marker files — the checker validates real system state.'
+  WHAT TO AVOID: Do not apply broad destructive changes, skip evidence gathering,
+  or fake completion with marker files — the checker validates real system state.'
 objectives:
 - Run terraform plan and identify the variable type error
 - Fix the type constraint in variables.tf
@@ -51,8 +54,9 @@ initial_state: 'Ubuntu server with Terraform installed. Working directory is /op
 hints:
 - order: 1
   cost: 0
-  content: 'Where to look: Start with read-only discovery on the CI/CD lab. For Fix Terraform Variable
-    Type Error, inspect git repos, pipelines, artifacts, and runbooks before changing anything.'
+  content: 'Where to look: Start with read-only discovery on the CI/CD lab. For Fix
+    Terraform Variable Type Error, inspect git repos, pipelines, artifacts, and runbooks
+    before changing anything.'
 - order: 2
   cost: 25
   content: 'Diagnostic steps:
@@ -61,7 +65,8 @@ hints:
 
     2. Compare current output to the scenario objectives.
 
-    3. Form a single hypothesis about the smallest fix that would restore healthy state.'
+    3. Form a single hypothesis about the smallest fix that would restore healthy
+    state.'
 - order: 3
   cost: 50
   content: 'Exact fix + verification:
@@ -74,7 +79,8 @@ hints:
 
 
     WHY: the grader validates real state — marker files are ignored.'
-summary: Complete the fix terraform variable type error devops lab and verify success with the checker
+summary: Complete the fix terraform variable type error devops lab and verify success
+  with the checker
 estimated_minutes: 15
 xp_reward: 100
 prerequisites:
@@ -107,16 +113,21 @@ environment:
 tasks:
 - id: task_1
   title: Fix Terraform Variable Type Error
-  description: Restore healthy behavior for Fix Terraform Variable Type Error by investigating the failure,
-    applying the smallest safe fix, and validating the outcome.
-  background: 'This devops lab teaches systematic troubleshooting: observe, hypothesize, change, verify.'
+  description: Restore healthy behavior for Fix Terraform Variable Type Error by investigating
+    the failure, applying the smallest safe fix, and validating the outcome.
+  background: 'This devops lab teaches systematic troubleshooting: observe, hypothesize,
+    change, verify.'
   validation:
     type: custom_script
     script: check.sh
-    error_message: Validation did not pass. Re-read the objectives and Hint 2 diagnostic steps.
+    error_message: Validation did not pass. Re-read the objectives and Hint 2 diagnostic
+      steps.
 solution:
-  summary: Identify the misconfiguration affecting this devops lab and apply the minimal fix.
+  summary: Identify the misconfiguration affecting this devops lab and apply the minimal
+    fix.
   files_changed: []
   commands_run:
   - bash check.sh
   reference_docs: devops-fundamentals
+lab_mode: simulation
+simulation_type: devops

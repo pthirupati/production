@@ -1064,6 +1064,15 @@ class ValidateLabView(APIView):
             LabSession, pk=session_id, user=request.user, status="RUNNING"
         )
 
+        scenario = session.scenario
+        spec = scenario.coding_spec or {}
+        if getattr(scenario, "coding_mode", False) and spec.get("kind") == "prompt":
+            return Response({
+                "passed": False,
+                "message": "Use Submit in the Prompt Playground to grade this lab.",
+                "output": "PROMPT_PLAYGROUND_REQUIRED",
+            })
+
         resource_id = session.container_id or session.instance_id
         if not resource_id:
             return Response({"error": "No resource for this session"}, status=400)
@@ -1119,7 +1128,110 @@ class ValidateLabView(APIView):
 
         except Exception as e:
             logger.error(f"Validation error: {e}")
-            return Response({"error": "Validation failed"}, status=500)
+            return Response({"error": "Validation failed", "detail": str(e)[:200]}, status=500)
+
+
+class ValidateGuidedStepView(APIView):
+    """Verify a single guided-mode step against live simulation state."""
+
+    permission_classes = [IsAuthenticated]
+
+    _MANUAL_CMDS = frozenset({
+        "open playground", "draft prompt", "submit", "bash check.sh", "./check.sh",
+    })
+
+    def post(self, request, session_id):
+        session = get_object_or_404(
+            LabSession, pk=session_id, user=request.user, status="RUNNING"
+        )
+        step_index = request.data.get("step_index")
+        if step_index is None:
+            return Response({"error": "step_index required"}, status=400)
+        try:
+            step_index = int(step_index)
+        except (TypeError, ValueError):
+            return Response({"error": "step_index must be an integer"}, status=400)
+
+        scenario = session.scenario
+        guided = (scenario.guided_mode or {}) if hasattr(scenario, "guided_mode") else {}
+        steps = guided.get("steps") or []
+        if step_index < 0 or step_index >= len(steps):
+            return Response({"error": "Invalid step_index"}, status=400)
+
+        step = steps[step_index]
+        cmd = (step.get("command") or "").strip()
+        spec = scenario.coding_spec or {}
+        is_prompt = getattr(scenario, "coding_mode", False) and spec.get("kind") == "prompt"
+
+        resource_id = session.container_id or session.instance_id
+        if not resource_id:
+            return Response({"error": "No resource for this session"}, status=400)
+
+        provisioner = get_provisioner(session.provider or "docker")
+        resource_status = provisioner.get_status(resource_id)
+        if resource_status not in ("running", "active"):
+            return Response(
+                {"error": f"Lab environment is not running (status: {resource_status})"},
+                status=400,
+            )
+
+        # Prompt Playground steps — step 2 can verify live rubric score from submissions.
+        if is_prompt and cmd.lower() == "draft prompt":
+            from apps.labs.prompt_eval import evaluate_course
+            submissions = request.data.get("submissions") or {}
+            if not isinstance(submissions, dict) or not submissions:
+                return Response({
+                    "passed": False,
+                    "message": "Write your prompt in the playground and score 80+ before verifying this step.",
+                })
+            verdict = evaluate_course(spec.get("prompt_config", {}) or {}, submissions)
+            if verdict.get("all_passed"):
+                return Response({"passed": True, "message": "Rubric passed — advance to submit."})
+            return Response({
+                "passed": False,
+                "message": verdict.get("summary") or "Prompt rubric not met yet — refine and try again.",
+            })
+
+        # Other prompt/coding manual steps — acknowledge without terminal execution.
+        if cmd.lower() in self._MANUAL_CMDS or step.get("next_on") == "manual":
+            return Response({"passed": True, "message": "Step acknowledged — continue to the next goal."})
+
+        is_simulation = (session.provider or "") == "simulation"
+        db_script = (scenario.validation_script or "").strip()
+
+        try:
+            if cmd.startswith("#") or not cmd:
+                if is_simulation and db_script:
+                    passed, output = provisioner.run_validation(
+                        resource_id, db_script, scenario_slug=scenario.slug or "",
+                    )
+                    if passed:
+                        return Response({"passed": True, "message": "Fix verified — advancing.", "output": output})
+                    return Response({
+                        "passed": False,
+                        "message": output or "Apply the documented fix, then verify this step again.",
+                        "output": output,
+                    })
+                return Response({
+                    "passed": False,
+                    "message": "Run the fix command in the terminal, then verify again.",
+                })
+
+            if is_simulation:
+                code, output = provisioner.execute_command(resource_id, cmd)
+            else:
+                code, output = provisioner.execute_command(resource_id, cmd)
+
+            if code == 0:
+                return Response({"passed": True, "message": "Command succeeded.", "output": output})
+            return Response({
+                "passed": False,
+                "message": output or f"Command failed (exit {code}). Check output and retry.",
+                "output": output,
+            })
+        except Exception as e:
+            logger.error(f"Guided step validation error: {e}")
+            return Response({"error": "Step validation failed", "detail": str(e)[:200]}, status=500)
 
 
 def public_coding_spec(scenario):

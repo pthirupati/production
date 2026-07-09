@@ -8,21 +8,24 @@ max_score: 100
 infrastructure_type: docker
 jira_priority: Medium
 is_free: false
-description: 'CONTEXT: A team operating DevOps delivery needs you to resolve `Fix Packer Build Timeout
-  Configuration` during a realistic incident. The business impact is reduced service reliability until
-  the underlying state is repaired.
+description: 'CONTEXT: A team operating DevOps delivery needs you to resolve `Fix
+  Packer Build Timeout Configuration` during a realistic incident. The business impact
+  is reduced service reliability until the underlying state is repaired.
 
 
-  ENVIRONMENT: You are working in FixitLab''s offline CI/CD lab with git repos, pipelines, artifacts,
-  and runbooks. All tools run locally; no paid APIs or external cloud calls are required.
+  ENVIRONMENT: You are working in FixitLab''s offline CI/CD lab with git repos, pipelines,
+  artifacts, and runbooks. All tools run locally; no paid APIs or external cloud calls
+  are required.
 
 
-  SYMPTOM / STARTING STATE: Ubuntu server with Packer installed. Build template at /opt/packer/build.pkr.hcl.
+  SYMPTOM / STARTING STATE: Ubuntu server with Packer installed. Build template at
+  /opt/packer/build.pkr.hcl.
 
-  Current settings: ssh_timeout = "5m" which is too short. Provisioning takes ~15 minutes.
+  Current settings: ssh_timeout = "5m" which is too short. Provisioning takes ~15
+  minutes.
 
-  Increase ssh_timeout to "30m" and ssh_handshake_attempts to 50. A Packer build is timing out during
-  the provisioning phase. The build template
+  Increase ssh_timeout to "30m" and ssh_handshake_attempts to 50. A Packer build is
+  timing out during the provisioning phase. The build template
 
   has a default SSH handshake timeout that is too short for the slow provisioning
 
@@ -31,12 +34,13 @@ description: 'CONTEXT: A team operating DevOps delivery needs you to resolve `Fi
   Increase the timeout settings so the build completes successfully.
 
 
-  OBJECTIVE: Identify the timeout settings in the Packer template; Increase ssh_handshake_attempts and
-  ssh_timeout; Optionally increase the provisioner timeout. Success means `check.sh` exits successfully.
+  OBJECTIVE: Identify the timeout settings in the Packer template; Increase ssh_handshake_attempts
+  and ssh_timeout; Optionally increase the provisioner timeout. Success means `check.sh`
+  exits successfully.
 
 
-  WHAT TO AVOID: Do not apply broad destructive changes, skip evidence gathering, or fake completion with
-  marker files — the checker validates real system state.'
+  WHAT TO AVOID: Do not apply broad destructive changes, skip evidence gathering,
+  or fake completion with marker files — the checker validates real system state.'
 objectives:
 - Identify the timeout settings in the Packer template
 - Increase ssh_handshake_attempts and ssh_timeout
@@ -44,7 +48,8 @@ objectives:
 - Verify the Packer template validates without errors
 initial_state: 'Ubuntu server with Packer installed. Build template at /opt/packer/build.pkr.hcl.
 
-  Current settings: ssh_timeout = "5m" which is too short. Provisioning takes ~15 minutes.
+  Current settings: ssh_timeout = "5m" which is too short. Provisioning takes ~15
+  minutes.
 
   Increase ssh_timeout to "30m" and ssh_handshake_attempts to 50.
 
@@ -52,8 +57,9 @@ initial_state: 'Ubuntu server with Packer installed. Build template at /opt/pack
 hints:
 - order: 1
   cost: 0
-  content: 'Where to look: Start with read-only discovery on the CI/CD lab. For Fix Packer Build Timeout
-    Configuration, inspect git repos, pipelines, artifacts, and runbooks before changing anything.'
+  content: 'Where to look: Start with read-only discovery on the CI/CD lab. For Fix
+    Packer Build Timeout Configuration, inspect git repos, pipelines, artifacts, and
+    runbooks before changing anything.'
 - order: 2
   cost: 25
   content: 'Diagnostic steps:
@@ -62,7 +68,8 @@ hints:
 
     2. Compare current output to the scenario objectives.
 
-    3. Form a single hypothesis about the smallest fix that would restore healthy state.'
+    3. Form a single hypothesis about the smallest fix that would restore healthy
+    state.'
 - order: 3
   cost: 50
   content: 'Exact fix + verification:
@@ -75,7 +82,8 @@ hints:
 
 
     WHY: the grader validates real state — marker files are ignored.'
-summary: Complete the fix packer build timeout configuration devops lab and verify success with the checker
+summary: Complete the fix packer build timeout configuration devops lab and verify
+  success with the checker
 estimated_minutes: 15
 xp_reward: 100
 prerequisites:
@@ -109,15 +117,19 @@ environment:
 tasks:
 - id: task_1
   title: Fix Packer Build Timeout Configuration
-  description: Restore healthy behavior for Fix Packer Build Timeout Configuration by investigating the
-    failure, applying the smallest safe fix, and validating the outcome.
-  background: 'This devops lab teaches systematic troubleshooting: observe, hypothesize, change, verify.'
+  description: Restore healthy behavior for Fix Packer Build Timeout Configuration
+    by investigating the failure, applying the smallest safe fix, and validating the
+    outcome.
+  background: 'This devops lab teaches systematic troubleshooting: observe, hypothesize,
+    change, verify.'
   validation:
     type: custom_script
     script: check.sh
-    error_message: Validation did not pass. Re-read the objectives and Hint 2 diagnostic steps.
+    error_message: Validation did not pass. Re-read the objectives and Hint 2 diagnostic
+      steps.
 solution:
-  summary: Identify the misconfiguration affecting this devops lab and apply the minimal fix.
+  summary: Identify the misconfiguration affecting this devops lab and apply the minimal
+    fix.
   files_changed: []
   commands_run:
   - bash check.sh
@@ -146,3 +158,5 @@ guided_mode:
     expected_output: '`check.sh` exits successfully'
     explanation: The lab passes only when real state is healthy.
     next_on: command_success
+lab_mode: simulation
+simulation_type: devops

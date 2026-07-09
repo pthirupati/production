@@ -1105,6 +1105,18 @@ export function createLinuxShell(vm, opts = {}) {
   // Real stateful git against this guest's VFS (init/clone/commit/branch/merge…).
   const gitSim = createGitSim({ vfs, cwd, abs, username: sessionUser })
 
+  const parsePasswd = () => {
+    const node = vfs.resolveNode('/etc/passwd')
+    if (!node || node.type !== 'file') return []
+    return (node.content || '').split('\n').filter(Boolean).map((line) => {
+      const p = line.split(':')
+      if (p.length < 7) return null
+      return { name: p[0], uid: +p[2], gid: +p[3], home: p[5], shell: p[6] }
+    }).filter(Boolean)
+  }
+
+  const lookupUser = (name) => parsePasswd().find((u) => u.name === name)
+
   const switchUser = (user) => {
     const uhome = user === 'root' ? '/root' : `/home/${user}`
     env.USER = user
@@ -1692,14 +1704,32 @@ export function createLinuxShell(vm, opts = {}) {
     else if (lc === 'whoami') emit(env.USER)
     else if (lc === 'id') {
       const target = positional[0] || env.USER
-      if (target !== 'root') {
-        const uid = target === 'labuser' ? 1001 : 1000
-        emit(`uid=${uid}(${target}) gid=${uid}(${target}) groups=${uid}(${target}),${isRhel ? '10(wheel)' : '27(sudo)'}`)
-      } else emit('uid=0(root) gid=0(root) groups=0(root)')
+      const u = lookupUser(target)
+      if (!u) emit(`id: '${target}': no such user`)
+      else {
+        const groups = u.name === 'root' ? '0(root)' : `${u.gid}(${u.name})${isRhel ? ',10(wheel)' : ',27(sudo)'}`
+        emit(`uid=${u.uid}(${u.name}) gid=${u.gid}(${u.name}) groups=${groups}`)
+      }
     }
     else if (lc === 'groups') {
       const target = positional[0] || env.USER
-      emit(target === 'root' ? 'root' : `${target} : ${target} ${isRhel ? 'wheel' : 'sudo'} adm`)
+      const u = lookupUser(target)
+      if (!u) emit(`groups: '${target}': no such user`)
+      else emit(u.name === 'root' ? 'root : root' : `${u.name} : ${u.name} ${isRhel ? 'wheel' : 'sudo'} adm`)
+    }
+    else if (lc === 'getent') {
+      const db = positional[0]
+      const key = positional[1]
+      if (db === 'passwd') {
+        const users = key ? parsePasswd().filter((u) => u.name === key) : parsePasswd()
+        if (key && !users.length) { /* empty output, exit 2 handled below */ }
+        else users.forEach((u) => emit(`${u.name}:x:${u.uid}:${u.gid}::${u.home}:${u.shell}`))
+      } else if (db === 'group') {
+        const gnode = vfs.resolveNode('/etc/group')
+        const lines = (gnode?.content || '').split('\n').filter(Boolean)
+        const filtered = key ? lines.filter((l) => l.startsWith(`${key}:`)) : lines
+        filtered.forEach((l) => emit(l))
+      } else emit(`getent: unknown database '${db}'`)
     }
     else if (lc === 'hostname') {
       if (positional[0]) { emit('') } else emit(has('-f') || has('--fqdn') ? `${hostname}.lab.fixitlab.local` : hostname.split('.')[0])
@@ -1722,8 +1752,15 @@ export function createLinuxShell(vm, opts = {}) {
     }
     else if (lc === 'arch') emit('x86_64')
     else if (lc === 'uptime') {
-      if (has('-p')) emit('up 14 days, 3 hours, 22 minutes')
-      else emit(' 14:22:01 up 14 days,  3:22,  1 user,  load average: 0.08, 0.12, 0.09')
+      const ms = Date.now() - (shared.bootEpoch || Date.now())
+      const sec = Math.floor(ms / 1000)
+      const days = Math.floor(sec / 86400)
+      const hrs = Math.floor((sec % 86400) / 3600)
+      const mins = Math.floor((sec % 3600) / 60)
+      const load = '0.08, 0.12, 0.09'
+      const t = new Date().toTimeString().slice(0, 8)
+      if (has('-p')) emit(`up ${days} days, ${hrs} hours, ${mins} minutes`)
+      else emit(` ${t} up ${days} days, ${hrs}:${String(mins).padStart(2, '0')},  1 user,  load average: ${load}`)
     }
     else if (lc === 'date') {
       if (positional[0]?.startsWith('+')) emit(new Date().toISOString())
@@ -2612,8 +2649,23 @@ export function createLinuxShell(vm, opts = {}) {
       else if (svc === 'logs' && op === 'describe-log-groups') emit('{\n    "logGroups": [\n        { "logGroupName": "/aws/eks/prod-cluster/cluster" }\n    ]\n}')
       else emit(`aws: ${svc}: simulated (${[op, ...pos.slice(2)].filter(Boolean).join(' ') || 'no subcommand'}) in ${region}`)
     }
-    else if (lc === 'helm') emit('NAME\tNAMESPACE\tREVISION\tSTATUS\tCHART')
+    else if (lc === 'helm') {
+      const sub = positional[0] || ''
+      if (sub === 'list') emit('NAME\tNAMESPACE\tREVISION\tSTATUS\tCHART\nwebapp\tdefault\t3\tdeployed\twebapp-1.2.0')
+      else if (sub === 'upgrade' || sub === 'install') emit('Release webapp has been upgraded. Happy Helming!')
+      else if (sub === 'history') emit('REVISION\tUPDATED\tSTATUS\tCHART\n3\t2024-05-01 12:00:00\tdeployed\twebapp-1.2.0')
+      else emit('NAME\tNAMESPACE\tREVISION\tSTATUS\tCHART')
+    }
     else if (lc === 'git') emit(gitSim.run(work))
+    else if (['argocd', 'flux', 'mvn', 'sonar-scanner'].includes(lc) || cmd === './mvnw' || (lc === 'java' && work.includes('jenkins-cli'))) {
+      const joined = positional.join(' ')
+      if (lc === 'argocd' && joined.includes('app sync')) emit('Sync Status: Synced\nHealth Status: Healthy')
+      else if (lc === 'argocd') emit(`argocd: ${joined || 'OK'}`)
+      else if (lc === 'flux') emit('NAME\tREADY\tSTATUS\nwebapp\tTrue\tApplied')
+      else if (lc.startsWith('mvn') || lc === './mvnw') emit(joined.includes('package') || joined.includes('install') ? 'BUILD SUCCESS\nTotal time: 12.4 s' : 'Apache Maven 3.9.6')
+      else if (lc === 'sonar-scanner' || joined.includes('sonar:')) emit('ANALYSIS SUCCESSFUL\nQuality gate status: PASSED')
+      else emit(`${lc}: OK`)
+    }
     else if (['ansible', 'ansible-playbook', 'terraform', 'packer', 'vagrant'].includes(lc)) {
       if (lc === 'terraform' && positional[0] === 'version') emit('Terraform v1.7.4\non linux_amd64')
       else emit(`${lc}: simulated (${positional.join(' ') || 'no args'})`)

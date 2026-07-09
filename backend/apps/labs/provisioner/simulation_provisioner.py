@@ -363,7 +363,32 @@ class SimulationProvisioner:
     def execute_command(self, resource_id, command):
         if "check.sh" in (command or ""):
             return 127, "simulation: use validation_script"
-        return 0, f"[simulation] {command}"
+        entry = get_sim_session_by_resource(resource_id)
+        if not entry:
+            from apps.labs.models import LabSession
+            try:
+                lab_session = LabSession.objects.select_related("scenario").get(container_id=resource_id)
+                entry = ensure_sim_session(lab_session)
+            except LabSession.DoesNotExist:
+                return 1, "simulation session not found"
+        engine = entry.get("state", {}).get("engine") if entry else None
+        if not engine:
+            return 1, "simulation engine not ready"
+        from .simulation.rhel_shell import RHELShell
+        from .simulation.simulation_modules import register_modules
+        shell = RHELShell(
+            state=engine.shell.state,
+            scenario_slug=entry["state"].get("scenario_slug", ""),
+            hostname=engine.shell.state.hostname,
+        )
+        shell._engine = engine
+        register_modules(engine, shell)
+        cmd = (command or "").strip()
+        if not cmd or cmd.startswith("#"):
+            return 1, "no command to run"
+        out = shell.run(cmd) or ""
+        code = getattr(shell.state, "last_exit_code", 0)
+        return code, out
 
     def run_validation(self, resource_id, validation_script, scenario_slug: str = ""):
         entry = get_sim_session_by_resource(resource_id)

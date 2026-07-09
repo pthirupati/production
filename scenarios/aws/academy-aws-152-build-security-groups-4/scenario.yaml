@@ -11,52 +11,55 @@ max_score: 100
 is_free: false
 infrastructure_type: docker
 jira_priority: Low
-description: 'CONTEXT: A team operating AWS cloud operations needs you to resolve `Security Groups — Build
-  Lab` during a realistic incident. The business impact is reduced service reliability until the underlying
-  state is repaired.
+description: 'CONTEXT: A team operating AWS cloud operations needs you to resolve
+  `Security Groups — Build Lab` during a realistic incident. The business impact is
+  reduced service reliability until the underlying state is repaired.
 
 
-  ENVIRONMENT: You are working in FixitLab''s offline AWS practice account with AWS CLI, IAM policies,
-  EC2/S3/VPC, security groups, and CloudFormation/Terraform. All tools run locally; no paid APIs or external
-  cloud calls are required.
+  ENVIRONMENT: You are working in FixitLab''s offline AWS practice account with AWS
+  CLI, IAM policies, EC2/S3/VPC, security groups, and CloudFormation/Terraform. All
+  tools run locally; no paid APIs or external cloud calls are required.
 
 
-  SYMPTOM / STARTING STATE: The AWS practice account is ready but Security Groups is not configured yet.
-  Required tools may already be installed; your job is to create the configuration and bring the capability
-  online. Build Security Groups from scratch in this AWS Cloud lab. You start from a minimal environment
-  and must produce a working configuration that demonstrates how security groups fits into AWS cloud operations.
+  SYMPTOM / STARTING STATE: The AWS practice account is ready but Security Groups
+  is not configured yet. Required tools may already be installed; your job is to create
+  the configuration and bring the capability online. Build Security Groups from scratch
+  in this AWS Cloud lab. You start from a minimal environment and must produce a working
+  configuration that demonstrates how security groups fits into AWS cloud operations.
   Plan, implement, then prove it works.
 
 
-  OBJECTIVE: A working Security Groups setup must exist by the end of this lab; Configuration should follow
-  team conventions and be easy to audit; The result should pass validation without manual cleanup. Success
-  means `check.sh` exits successfully.
+  OBJECTIVE: A working Security Groups setup must exist by the end of this lab; Configuration
+  should follow team conventions and be easy to audit; The result should pass validation
+  without manual cleanup. Success means `check.sh` exits successfully.
 
 
-  WHAT TO AVOID: Do not apply broad destructive changes, skip evidence gathering, or fake completion with
-  marker files — the checker validates real system state.'
+  WHAT TO AVOID: Do not apply broad destructive changes, skip evidence gathering,
+  or fake completion with marker files — the checker validates real system state.'
 objectives:
 - A working Security Groups setup must exist by the end of this lab
 - Configuration should follow team conventions and be easy to audit
 - The result should pass validation without manual cleanup
-initial_state: The AWS practice account is ready but Security Groups is not configured yet. Required tools
-  may already be installed; your job is to create the configuration and bring the capability online.
+initial_state: The AWS practice account is ready but Security Groups is not configured
+  yet. Required tools may already be installed; your job is to create the configuration
+  and bring the capability online.
 hints:
 - order: 1
   cost: 0
-  content: 'Where to look: Start with read-only discovery on the AWS practice account. For Security Groups,
-    inspect the relevant AWS CLI, IAM policies, EC2/S3/VPC, security groups, and CloudFormation/Terraform
-    for security groups before changing anything.'
+  content: 'Where to look: Start with read-only discovery on the AWS practice account.
+    For Security Groups, inspect the relevant AWS CLI, IAM policies, EC2/S3/VPC, security
+    groups, and CloudFormation/Terraform for security groups before changing anything.'
 - order: 2
   cost: 25
   content: 'Diagnostic steps:
 
-    1. Gather evidence with the relevant AWS CLI, IAM policies, EC2/S3/VPC, security groups, and CloudFormation/Terraform
-    for security groups.
+    1. Gather evidence with the relevant AWS CLI, IAM policies, EC2/S3/VPC, security
+    groups, and CloudFormation/Terraform for security groups.
 
     2. Compare current output to the scenario objectives.
 
-    3. Form a single hypothesis about the smallest fix that would restore healthy state.'
+    3. Form a single hypothesis about the smallest fix that would restore healthy
+    state.'
 - order: 3
   cost: 50
   content: 'Exact fix + verification:
@@ -69,7 +72,8 @@ hints:
 
 
     WHY: the grader validates real state — marker files are ignored.'
-summary: Complete the security groups — build lab aws lab and verify success with the checker
+summary: Complete the security groups — build lab aws lab and verify success with
+  the checker
 estimated_minutes: 15
 xp_reward: 100
 prerequisites:
@@ -78,6 +82,7 @@ tags:
 - aws
 - do
 - hands-on
+- aws-track:security
 linked_tutorial: aws-fundamentals
 what_you_will_learn:
 - A working Security Groups setup must exist by the end of this lab
@@ -102,15 +107,18 @@ environment:
 tasks:
 - id: task_1
   title: Security Groups — Build Lab
-  description: Restore healthy behavior for Security Groups — Build Lab by investigating the failure,
-    applying the smallest safe fix, and validating the outcome.
-  background: 'This aws lab teaches systematic troubleshooting: observe, hypothesize, change, verify.'
+  description: Restore healthy behavior for Security Groups — Build Lab by investigating
+    the failure, applying the smallest safe fix, and validating the outcome.
+  background: 'This aws lab teaches systematic troubleshooting: observe, hypothesize,
+    change, verify.'
   validation:
     type: custom_script
     script: check.sh
-    error_message: Validation did not pass. Re-read the objectives and Hint 2 diagnostic steps.
+    error_message: Validation did not pass. Re-read the objectives and Hint 2 diagnostic
+      steps.
 solution:
-  summary: Identify the misconfiguration affecting this aws lab and apply the minimal fix.
+  summary: Identify the misconfiguration affecting this aws lab and apply the minimal
+    fix.
   files_changed: []
   commands_run:
   - bash check.sh
@@ -139,3 +147,4 @@ guided_mode:
     expected_output: '`check.sh` exits successfully'
     explanation: The lab passes only when real state is healthy.
     next_on: command_success
+learning_track: security

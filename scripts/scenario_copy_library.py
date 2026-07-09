@@ -664,7 +664,7 @@ def _guided_hints(
         f"Orient yourself before changing anything:\n"
         f"1. Inspect the current state — {inspect}.\n"
         f"2. Write down what looks normal versus wrong or missing for {label}.\n"
-        f"3. Recall the core idea: {concept}. Form one hypothesis before you act."
+        f"3. Review the architecture diagram and objectives. Form one hypothesis before you act."
     )
     tier2 = (
         f"Plan your approach (still no spoilers):\n"

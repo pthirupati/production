@@ -11,51 +11,53 @@ max_score: 100
 is_free: false
 infrastructure_type: docker
 jira_priority: Medium
-description: 'CONTEXT: A team operating AWS cloud operations needs you to resolve `Cognito — Security
-  Lab` during a realistic incident. The business impact is reduced service reliability until the underlying
-  state is repaired.
+description: 'CONTEXT: A team operating AWS cloud operations needs you to resolve
+  `Cognito — Security Lab` during a realistic incident. The business impact is reduced
+  service reliability until the underlying state is repaired.
 
 
-  ENVIRONMENT: You are working in FixitLab''s offline AWS practice account with AWS CLI, IAM policies,
-  EC2/S3/VPC, security groups, and CloudFormation/Terraform. All tools run locally; no paid APIs or external
-  cloud calls are required.
+  ENVIRONMENT: You are working in FixitLab''s offline AWS practice account with AWS
+  CLI, IAM policies, EC2/S3/VPC, security groups, and CloudFormation/Terraform. All
+  tools run locally; no paid APIs or external cloud calls are required.
 
 
-  SYMPTOM / STARTING STATE: The environment is functional but overly permissive around Cognito. Assume
-  an auditor or pen test is next week — tighten controls with evidence. Security review: harden Cognito
-  on this AWS Cloud system. Close unsafe defaults, enforce least privilege, and ensure how cognito fits
-  into AWS cloud operations cannot be abused — without breaking legitimate use.
+  SYMPTOM / STARTING STATE: The environment is functional but overly permissive around
+  Cognito. Assume an auditor or pen test is next week — tighten controls with evidence.
+  Security review: harden Cognito on this AWS Cloud system. Close unsafe defaults,
+  enforce least privilege, and ensure how cognito fits into AWS cloud operations cannot
+  be abused — without breaking legitimate use.
 
 
-  OBJECTIVE: Unsafe defaults related to Cognito are removed or constrained; Access follows least privilege
-  and is auditable; Security checks pass without breaking required functionality. Success means `check.sh`
-  exits successfully.
+  OBJECTIVE: Unsafe defaults related to Cognito are removed or constrained; Access
+  follows least privilege and is auditable; Security checks pass without breaking
+  required functionality. Success means `check.sh` exits successfully.
 
 
-  WHAT TO AVOID: Do not apply broad destructive changes, skip evidence gathering, or fake completion with
-  marker files — the checker validates real system state.'
+  WHAT TO AVOID: Do not apply broad destructive changes, skip evidence gathering,
+  or fake completion with marker files — the checker validates real system state.'
 objectives:
 - Unsafe defaults related to Cognito are removed or constrained
 - Access follows least privilege and is auditable
 - Security checks pass without breaking required functionality
-initial_state: The environment is functional but overly permissive around Cognito. Assume an auditor or
-  pen test is next week — tighten controls with evidence.
+initial_state: The environment is functional but overly permissive around Cognito.
+  Assume an auditor or pen test is next week — tighten controls with evidence.
 hints:
 - order: 1
   cost: 0
-  content: 'Where to look: Start with read-only discovery on the AWS practice account. For Cognito, inspect
-    the relevant AWS CLI, IAM policies, EC2/S3/VPC, security groups, and CloudFormation/Terraform for
-    cognito before changing anything.'
+  content: 'Where to look: Start with read-only discovery on the AWS practice account.
+    For Cognito, inspect the relevant AWS CLI, IAM policies, EC2/S3/VPC, security
+    groups, and CloudFormation/Terraform for cognito before changing anything.'
 - order: 2
   cost: 25
   content: 'Diagnostic steps:
 
-    1. Gather evidence with the relevant AWS CLI, IAM policies, EC2/S3/VPC, security groups, and CloudFormation/Terraform
-    for cognito.
+    1. Gather evidence with the relevant AWS CLI, IAM policies, EC2/S3/VPC, security
+    groups, and CloudFormation/Terraform for cognito.
 
     2. Compare current output to the scenario objectives.
 
-    3. Form a single hypothesis about the smallest fix that would restore healthy state.'
+    3. Form a single hypothesis about the smallest fix that would restore healthy
+    state.'
 - order: 3
   cost: 50
   content: 'Exact fix + verification:
@@ -77,6 +79,7 @@ tags:
 - aws
 - fix
 - hands-on
+- aws-track:security
 linked_tutorial: aws-fundamentals
 what_you_will_learn:
 - Unsafe defaults related to Cognito are removed or constrained
@@ -101,15 +104,18 @@ environment:
 tasks:
 - id: task_1
   title: Cognito — Security Lab
-  description: Restore healthy behavior for Cognito — Security Lab by investigating the failure, applying
-    the smallest safe fix, and validating the outcome.
-  background: 'This aws lab teaches systematic troubleshooting: observe, hypothesize, change, verify.'
+  description: Restore healthy behavior for Cognito — Security Lab by investigating
+    the failure, applying the smallest safe fix, and validating the outcome.
+  background: 'This aws lab teaches systematic troubleshooting: observe, hypothesize,
+    change, verify.'
   validation:
     type: custom_script
     script: check.sh
-    error_message: Validation did not pass. Re-read the objectives and Hint 2 diagnostic steps.
+    error_message: Validation did not pass. Re-read the objectives and Hint 2 diagnostic
+      steps.
 solution:
-  summary: Identify the misconfiguration affecting this aws lab and apply the minimal fix.
+  summary: Identify the misconfiguration affecting this aws lab and apply the minimal
+    fix.
   files_changed: []
   commands_run:
   - bash check.sh
@@ -138,3 +144,4 @@ guided_mode:
     expected_output: '`check.sh` exits successfully'
     explanation: The lab passes only when real state is healthy.
     next_on: command_success
+learning_track: security

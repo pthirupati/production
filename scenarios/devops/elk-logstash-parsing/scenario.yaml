@@ -8,23 +8,25 @@ max_score: 100
 infrastructure_type: docker
 jira_priority: High
 is_free: false
-description: 'CONTEXT: A team operating DevOps delivery needs you to resolve `Fix Logstash Grok Pattern
-  Parsing Failure` during a realistic incident. The business impact is reduced service reliability until
-  the underlying state is repaired.
+description: 'CONTEXT: A team operating DevOps delivery needs you to resolve `Fix
+  Logstash Grok Pattern Parsing Failure` during a realistic incident. The business
+  impact is reduced service reliability until the underlying state is repaired.
 
 
-  ENVIRONMENT: You are working in FixitLab''s offline CI/CD lab with git repos, pipelines, artifacts,
-  and runbooks. All tools run locally; no paid APIs or external cloud calls are required.
+  ENVIRONMENT: You are working in FixitLab''s offline CI/CD lab with git repos, pipelines,
+  artifacts, and runbooks. All tools run locally; no paid APIs or external cloud calls
+  are required.
 
 
   SYMPTOM / STARTING STATE: Ubuntu server running Logstash. Pipeline config at /etc/logstash/conf.d/app.conf.
 
-  Logs at /var/log/app/app.log use format: [2024-01-15 10:30:45] ERROR myapp - Connection timeout
+  Logs at /var/log/app/app.log use format: [2024-01-15 10:30:45] ERROR myapp - Connection
+  timeout
 
   But the grok pattern uses %{TIMESTAMP_ISO8601:timestamp} which does not match
 
-  the bracket-enclosed date format. The ELK stack Logstash pipeline is generating _grokparsefailure tags
-  on
+  the bracket-enclosed date format. The ELK stack Logstash pipeline is generating
+  _grokparsefailure tags on
 
   all incoming log events. The grok pattern in the filter section does not
 
@@ -33,13 +35,13 @@ description: 'CONTEXT: A team operating DevOps delivery needs you to resolve `Fi
   parsed and structured fields are extracted.
 
 
-  OBJECTIVE: Identify the broken grok pattern in the Logstash pipeline config; Examine sample logs to
-  understand the actual format; Fix the grok pattern to correctly parse the log entries. Success means
-  `check.sh` exits successfully.
+  OBJECTIVE: Identify the broken grok pattern in the Logstash pipeline config; Examine
+  sample logs to understand the actual format; Fix the grok pattern to correctly parse
+  the log entries. Success means `check.sh` exits successfully.
 
 
-  WHAT TO AVOID: Do not apply broad destructive changes, skip evidence gathering, or fake completion with
-  marker files — the checker validates real system state.'
+  WHAT TO AVOID: Do not apply broad destructive changes, skip evidence gathering,
+  or fake completion with marker files — the checker validates real system state.'
 objectives:
 - Identify the broken grok pattern in the Logstash pipeline config
 - Examine sample logs to understand the actual format
@@ -47,7 +49,8 @@ objectives:
 - Verify Logstash processes logs without _grokparsefailure
 initial_state: 'Ubuntu server running Logstash. Pipeline config at /etc/logstash/conf.d/app.conf.
 
-  Logs at /var/log/app/app.log use format: [2024-01-15 10:30:45] ERROR myapp - Connection timeout
+  Logs at /var/log/app/app.log use format: [2024-01-15 10:30:45] ERROR myapp - Connection
+  timeout
 
   But the grok pattern uses %{TIMESTAMP_ISO8601:timestamp} which does not match
 
@@ -57,8 +60,9 @@ initial_state: 'Ubuntu server running Logstash. Pipeline config at /etc/logstash
 hints:
 - order: 1
   cost: 0
-  content: 'Where to look: Start with read-only discovery on the CI/CD lab. For Fix Logstash Grok Pattern
-    Parsing Failure, inspect git repos, pipelines, artifacts, and runbooks before changing anything.'
+  content: 'Where to look: Start with read-only discovery on the CI/CD lab. For Fix
+    Logstash Grok Pattern Parsing Failure, inspect git repos, pipelines, artifacts,
+    and runbooks before changing anything.'
 - order: 2
   cost: 25
   content: 'Diagnostic steps:
@@ -67,7 +71,8 @@ hints:
 
     2. Compare current output to the scenario objectives.
 
-    3. Form a single hypothesis about the smallest fix that would restore healthy state.'
+    3. Form a single hypothesis about the smallest fix that would restore healthy
+    state.'
 - order: 3
   cost: 50
   content: 'Exact fix + verification:
@@ -80,8 +85,8 @@ hints:
 
 
     WHY: the grader validates real state — marker files are ignored.'
-summary: Complete the fix logstash grok pattern parsing failure devops lab and verify success with the
-  checker
+summary: Complete the fix logstash grok pattern parsing failure devops lab and verify
+  success with the checker
 estimated_minutes: 20
 xp_reward: 100
 prerequisites:
@@ -115,16 +120,22 @@ environment:
 tasks:
 - id: task_1
   title: Fix Logstash Grok Pattern Parsing Failure
-  description: Restore healthy behavior for Fix Logstash Grok Pattern Parsing Failure by investigating
-    the failure, applying the smallest safe fix, and validating the outcome.
-  background: 'This devops lab teaches systematic troubleshooting: observe, hypothesize, change, verify.'
+  description: Restore healthy behavior for Fix Logstash Grok Pattern Parsing Failure
+    by investigating the failure, applying the smallest safe fix, and validating the
+    outcome.
+  background: 'This devops lab teaches systematic troubleshooting: observe, hypothesize,
+    change, verify.'
   validation:
     type: custom_script
     script: check.sh
-    error_message: Validation did not pass. Re-read the objectives and Hint 2 diagnostic steps.
+    error_message: Validation did not pass. Re-read the objectives and Hint 2 diagnostic
+      steps.
 solution:
-  summary: Identify the misconfiguration affecting this devops lab and apply the minimal fix.
+  summary: Identify the misconfiguration affecting this devops lab and apply the minimal
+    fix.
   files_changed: []
   commands_run:
   - bash check.sh
   reference_docs: devops-fundamentals
+lab_mode: simulation
+simulation_type: devops

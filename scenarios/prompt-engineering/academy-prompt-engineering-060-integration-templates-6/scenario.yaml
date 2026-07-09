@@ -5,75 +5,55 @@ category: Project
 difficulty: hard
 scenario_type: do
 lab_mode: simulation
-simulation_type: python
+simulation_type: generic
 time_limit: 1200
 max_score: 100
 is_free: false
-infrastructure_type: docker
 jira_priority: Medium
-description: 'CONTEXT: A team operating prompt engineering needs you to resolve `prompt-engineering: Jinja2
-  Templates — Integration Lab` during a realistic incident. The business impact is reduced service reliability
-  until the underlying state is repaired.
+description: 'CONTEXT: A team operating prompt engineering needs you to resolve `prompt-engineering:
+  Jinja2 Templates — Integration Lab` during a realistic incident. The business impact
+  is reduced service reliability until the underlying state is repaired.
 
 
-  ENVIRONMENT: You are working in FixitLab''s offline LLM practice workspace with prompt templates, eval
-  sets, and tool configs. All tools run locally; no paid APIs or external cloud calls are required.
+  ENVIRONMENT: You are working in FixitLab''s offline LLM practice workspace with
+  prompt templates, eval sets, and tool configs. All tools run locally; no paid APIs
+  or external cloud calls are required.
 
 
-  SYMPTOM / STARTING STATE: Two systems are deployed but not fully wired together for Jinja2 templates.
-  Downstream consumers are waiting on this integration path. Integration lab: connect Jinja2 templates
-  with an adjacent platform in the prompt-engineering stack. Validate authentication, data handoff, and
-  failure behavior for variables, filters, and conditionals in templates.
+  SYMPTOM / STARTING STATE: Two systems are deployed but not fully wired together
+  for Jinja2 templates. Downstream consumers are waiting on this integration path.
+  Integration lab: connect Jinja2 templates with an adjacent platform in the prompt-engineering
+  stack. Validate authentication, data handoff, and failure behavior for variables,
+  filters, and conditionals in templates.
 
 
-  OBJECTIVE: Jinja2 templates is connected to the adjacent system successfully; Handoff points are authenticated
-  and observable; End-to-end workflow completes without manual intervention. Success means `systemctl
-  is-active nginx` returns active.
+  OBJECTIVE: Jinja2 templates is connected to the adjacent system successfully; Handoff
+  points are authenticated and observable; End-to-end workflow completes without manual
+  intervention. Success means all prompt exercises pass the rubric.
 
 
-  WHAT TO AVOID: Do not apply broad destructive changes, skip evidence gathering, or fake completion with
-  marker files — the checker validates real system state.'
+  WHAT TO AVOID: Do not apply broad destructive changes, skip evidence gathering,
+  or fake completion with marker files — the checker validates real system state.'
 objectives:
 - Jinja2 templates is connected to the adjacent system successfully
 - Handoff points are authenticated and observable
 - End-to-end workflow completes without manual intervention
-initial_state: Two systems are deployed but not fully wired together for Jinja2 templates. Downstream
-  consumers are waiting on this integration path.
+initial_state: A guided AI practice console opens in your browser. It is a rule-based
+  simulator (no real model, no API cost) that scores your prompt live.
 hints:
 - order: 1
   cost: 0
-  content: 'Orient yourself before changing anything:
-
-    1. Inspect the current state — template files, `--check --diff`, and rendered output.
-
-    2. Write down what looks normal versus wrong or missing for Jinja2 templates.
-
-    3. Recall the core idea: variables, filters, and conditionals in templates. Form one hypothesis before
-    you act.'
+  content: Include WHO the AI should act as (role), WHAT to do (task), and HOW to
+    format the answer.
 - order: 2
   cost: 25
-  content: 'Diagnostic steps:
-
-    1. Run `nginx -t` and `systemctl status nginx` for config vs service errors.
-
-    2. Open the cited file under `/etc/nginx/`.
-
-    3. Compare listen/upstream/proxy directives to the scenario objectives.'
+  content: 'Add constraints: word count, audience, tone, or things to avoid.'
 - order: 3
   cost: 50
-  content: 'Exact fix + verification:
-
-    1. Re-check the current state — template files, `--check --diff`, and rendered output.
-
-    2. Configure credentials and networking, then drive one happy-path transaction end to end across both
-    systems.
-
-    3. Verify the result — the rendered file matches the intended config.
-
-    4. Click Check Solution once the objective is met (graded on real state, not a marker file).'
+  content: Use the live score panel — aim for 80+ before submitting.
 cross_technology: true
-summary: Complete the jinja2 templates — integration lab prompt engineering lab and verify success with
-  the checker
+summary: Complete the jinja2 templates — integration lab prompt engineering lab and
+  verify success with the checker
 estimated_minutes: 20
 xp_reward: 100
 prerequisites:
@@ -106,43 +86,68 @@ environment:
 tasks:
 - id: task_1
   title: Jinja2 Templates — Integration Lab
-  description: Restore healthy behavior for Jinja2 Templates — Integration Lab by investigating the failure,
-    applying the smallest safe fix, and validating the outcome.
-  background: 'This prompt engineering lab teaches systematic troubleshooting: observe, hypothesize, change,
-    verify.'
+  description: Complete the templates prompt exercise in the practice console.
   validation:
-    type: service_active
-    command: systemctl is-active nginx
-    expected_status: active
-    error_message: The nginx service is not active yet. Check `systemctl status nginx` and `journalctl
-      -u nginx -n 50`.
+    type: custom_script
+    script: hidden_tests
+    error_message: Prompt did not meet the rubric. Revise and submit again.
 solution:
-  summary: The root cause is an unhealthy `nginx` service; repair it and verify active state.
+  summary: Write a specific prompt covering role, task, constraints, and format for
+    templates.
   files_changed: []
-  commands_run:
-  - systemctl is-active nginx
-  reference_docs: prompt-engineering-fundamentals
+  commands_run: []
 guided_mode:
   enabled: true
   steps:
   - step: 1
-    title: Inspect current state
-    instruction: Run a read-only diagnostic before changing anything.
-    command: systemctl is-active nginx
-    expected_output: Output shows the current failure mode
-    explanation: Evidence-first troubleshooting avoids guessing.
-    next_on: command_success
+    title: Read the lesson
+    instruction: Review the lesson panels in the Prompt Playground.
+    command: open playground
+    expected_output: Lesson content visible
+    explanation: Understand the rubric before writing.
+    next_on: manual
   - step: 2
-    title: Apply the minimal fix
-    instruction: Make one reversible change aligned with the objectives.
-    command: '# your fix command here'
-    expected_output: State moves toward the objective
-    explanation: Small changes make rollback easy if the hypothesis was wrong.
-    next_on: command_success
+    title: Draft your prompt
+    instruction: Write your prompt in the editor and check the live score.
+    command: draft prompt
+    expected_output: Score 80+ on rubric
+    explanation: Iterate until specific enough.
+    next_on: manual
   - step: 3
-    title: Verify with the grader
-    instruction: Run the same verification the checker uses.
-    command: systemctl is-active nginx
-    expected_output: '`systemctl is-active nginx` returns active'
-    explanation: The lab passes only when real state is healthy.
-    next_on: command_success
+    title: Submit for grading
+    instruction: Submit when all exercises pass.
+    command: submit
+    expected_output: All exercises passed
+    explanation: Server re-checks your prompt.
+    next_on: validate
+coding_mode: true
+coding_spec:
+  kind: prompt
+  language: text
+  prompt_config:
+    persona: A helpful AI assistant for learning prompt engineering.
+    lesson:
+    - heading: About Templates
+      body: This lab teaches templates — one of the core skills for reliable LLM workflows.
+        Use the practice console to draft and score your prompt against the rubric.
+    - heading: What good looks like
+      body: Strong prompts assign a role, state the task clearly, set constraints
+        (length, tone, format), and specify the output shape. Vague prompts score
+        low; specific prompts score 80+.
+    rubric:
+    - role
+    - context
+    - task
+    - constraints
+    - format
+    - specificity
+    exercises:
+    - id: reusable-template
+      title: Reusable template
+      goal: Create a template prompt with placeholders for context.
+      success:
+        has_delimiter: true
+        min_words: 20
+      starter: Write your prompt here…
+  instructions: Complete the Jinja2 Templates — Integration Lab exercise in the Prompt
+    Playground. Score 80+ on the rubric, then submit.

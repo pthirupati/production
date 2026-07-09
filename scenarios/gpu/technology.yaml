@@ -4,5 +4,5 @@ name: GPU & NVIDIA
 order: 15
 price: 499
 slug: gpu
-coming_soon: true
+coming_soon: false
 is_active: true

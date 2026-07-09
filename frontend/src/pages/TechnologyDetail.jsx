@@ -15,6 +15,7 @@ import FxStatCard from '../ui/FxStatCard'
 import ScrollReveal from '../ui/ScrollReveal'
 import { fadeUp, staggerContainer, viewportOnce } from '../ui/motion'
 import { useAuthStore } from '../store/authStore'
+import LimitReachedModal from '../components/LimitReachedModal'
 
 const difficultyConfig = {
   easy:   { label: 'Easy',   color: '#56e0b0', bg: 'rgba(86,224,176,.12)' },
@@ -233,6 +234,17 @@ function groupScenariosByCategory(scenarios) {
   return Object.entries(groups).map(([name, items]) => ({ name, items }))
 }
 
+const AWS_LEARNING_TRACKS = [
+  { id: 'fundamentals', label: 'Fundamentals' },
+  { id: 'compute-storage', label: 'Compute & Storage' },
+  { id: 'networking', label: 'Networking' },
+  { id: 'security', label: 'Security' },
+  { id: 'serverless-data', label: 'Serverless & Data' },
+  { id: 'containers', label: 'Containers & EKS' },
+  { id: 'iac', label: 'Infrastructure as Code' },
+  { id: 'troubleshooting', label: 'Troubleshooting' },
+]
+
 export default function TechnologyDetail() {
   const { slug } = useParams()
   const navigate = useNavigate()
@@ -241,6 +253,8 @@ export default function TechnologyDetail() {
   const [loading, setLoading] = useState(true)
   const [activeTab, setActiveTab] = useState('scenarios')
   const [techTutorials, setTechTutorials] = useState([])
+  const [awsTrack, setAwsTrack] = useState('')
+  const [limitInfo, setLimitInfo] = useState(null)
 
   useEffect(() => {
     if (!slug) return
@@ -296,6 +310,11 @@ export default function TechnologyDetail() {
           navigate(`/lab/${session.id}`, { state: { techSlug: slug } })
           return
         } catch (e) {
+          const data = e?.response?.data
+          if (data?.code === 'LIMIT_REACHED') {
+            setLimitInfo(data)
+            return
+          }
           // Tell the user why the workspace didn't open instead of silently
           // dropping to the checklist (e.g. a subscription-gated lab).
           if (e?.response?.status === 403) {
@@ -418,11 +437,17 @@ export default function TechnologyDetail() {
   const tech = techDetail.technology
   const projects = techDetail.projects || []
   const scenarios = sortFreeFirst(techDetail.scenarios || [])
-  const freeScenarios = scenarios.filter(s => s.is_free)
+  const filteredScenarios = awsTrack && tech.slug === 'aws'
+    ? scenarios.filter((s) => {
+        const tagSlugs = (s.tags || []).map((t) => (typeof t === 'string' ? t : t.slug))
+        return tagSlugs.includes(`aws-track:${awsTrack}`)
+      })
+    : scenarios
+  const freeScenarios = filteredScenarios.filter(s => s.is_free)
   const certTracks = techDetail.cert_tracks || []
   const hasProjects = projects.length > 0
-  const hasScenarios = scenarios.length > 0
-  const popularScenarios = scenarios.slice(0, 8)
+  const hasScenarios = filteredScenarios.length > 0
+  const popularScenarios = filteredScenarios.slice(0, 8)
 
   return (
     <motion.div
@@ -431,6 +456,7 @@ export default function TechnologyDetail() {
       initial="hidden"
       animate="visible"
     >
+      <LimitReachedModal info={limitInfo} onClose={() => setLimitInfo(null)} />
       {/* Page header row */}
       <div className="flex items-center justify-between gap-4 flex-wrap">
         <Link to="/technologies" className="flex items-center gap-1.5 text-[13px] font-semibold text-white/60 hover:text-white transition-colors">
@@ -674,6 +700,17 @@ export default function TechnologyDetail() {
 
       {activeTab === 'scenarios' && (
         <div className="grid lg:grid-cols-[1.6fr_1fr] gap-[22px] items-start">
+          {tech.slug === 'aws' && (
+            <ScrollReveal variant={fadeUp} className="lg:col-span-2">
+              <div className="flex flex-wrap gap-2 items-center">
+                <span className="text-xs text-white/50 font-semibold uppercase tracking-wide">Learning tracks</span>
+                <button type="button" onClick={() => setAwsTrack('')} className={`text-xs px-3 py-1 rounded-full border ${!awsTrack ? 'border-accent-cyan text-accent-cyan bg-accent-cyan/10' : 'border-white/10 text-white/50'}`}>All</button>
+                {AWS_LEARNING_TRACKS.map((t) => (
+                  <button key={t.id} type="button" onClick={() => setAwsTrack(t.id)} className={`text-xs px-3 py-1 rounded-full border ${awsTrack === t.id ? 'border-accent-cyan text-accent-cyan bg-accent-cyan/10' : 'border-white/10 text-white/50 hover:border-white/20'}`}>{t.label}</button>
+                ))}
+              </div>
+            </ScrollReveal>
+          )}
           {freeScenarios.length > 0 && (
             <ScrollReveal variant={fadeUp} className="lg:col-span-2">
               <div className="rounded-[16px] p-4 sm:p-5 border-2 border-accent-green/35 bg-gradient-to-r from-accent-green/[0.12] via-accent-green/[0.06] to-transparent">
@@ -724,11 +761,11 @@ export default function TechnologyDetail() {
             )}
 
             {/* Full scenario list by difficulty */}
-            {hasScenarios && scenarios.length > popularScenarios.length && (
+            {hasScenarios && filteredScenarios.length > popularScenarios.length && (
               <div className="mt-6 pt-6 border-t border-white/[0.06]">
                 <h4 className="text-sm font-semibold text-white/70 mb-3">All scenarios by difficulty</h4>
                 {['easy', 'medium', 'hard'].map(difficulty => {
-                  const diffScenarios = sortFreeFirst(scenarios.filter(s => s.difficulty === difficulty))
+                  const diffScenarios = sortFreeFirst(filteredScenarios.filter(s => s.difficulty === difficulty))
                   if (!diffScenarios.length) return null
                   const cfg = difficultyConfig[difficulty]
                   return (

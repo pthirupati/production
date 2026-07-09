@@ -7,42 +7,44 @@ time_limit: 1200
 max_score: 100
 infrastructure_type: docker
 jira_priority: High
-description: 'CONTEXT: A team operating DevOps delivery needs you to resolve `Kubernetes Pod CrashLoopBackOff`
-  during a realistic incident. The business impact is reduced service reliability until the underlying
-  state is repaired.
+description: 'CONTEXT: A team operating DevOps delivery needs you to resolve `Kubernetes
+  Pod CrashLoopBackOff` during a realistic incident. The business impact is reduced
+  service reliability until the underlying state is repaired.
 
 
-  ENVIRONMENT: You are working in FixitLab''s offline CI/CD lab with git repos, pipelines, artifacts,
-  and runbooks. All tools run locally; no paid APIs or external cloud calls are required.
+  ENVIRONMENT: You are working in FixitLab''s offline CI/CD lab with git repos, pipelines,
+  artifacts, and runbooks. All tools run locally; no paid APIs or external cloud calls
+  are required.
 
 
-  SYMPTOM / STARTING STATE: Simulated Kubernetes environment on Ubuntu with a manifest at /opt/k8s/deployment.yaml.
-  The Service targetPort (8080) doesn''t match nginx''s containerPort (80), and nginx isn''t serving,
-  so the app is down. Production pods backing an nginx web service are in CrashLoopBackOff and the site
-  is unreachable. In this manifest the Service''s targetPort doesn''t match nginx''s containerPort, and
-  the web server isn''t actually serving — so traffic never reaches a working backend. Fix the manifest
-  port mapping and get nginx responding.
+  SYMPTOM / STARTING STATE: Simulated Kubernetes environment on Ubuntu with a manifest
+  at /opt/k8s/deployment.yaml. The Service targetPort (8080) doesn''t match nginx''s
+  containerPort (80), and nginx isn''t serving, so the app is down. Production pods
+  backing an nginx web service are in CrashLoopBackOff and the site is unreachable.
+  In this manifest the Service''s targetPort doesn''t match nginx''s containerPort,
+  and the web server isn''t actually serving — so traffic never reaches a working
+  backend. Fix the manifest port mapping and get nginx responding.
 
 
-  OBJECTIVE: Analyze /opt/k8s/deployment.yaml for the port mismatch; Align the Service targetPort with
-  nginx''s containerPort (80); Verify the web server responds on the correct port. Success means `check.sh`
-  exits successfully.
+  OBJECTIVE: Analyze /opt/k8s/deployment.yaml for the port mismatch; Align the Service
+  targetPort with nginx''s containerPort (80); Verify the web server responds on the
+  correct port. Success means `check.sh` exits successfully.
 
 
-  WHAT TO AVOID: Do not apply broad destructive changes, skip evidence gathering, or fake completion with
-  marker files — the checker validates real system state.'
+  WHAT TO AVOID: Do not apply broad destructive changes, skip evidence gathering,
+  or fake completion with marker files — the checker validates real system state.'
 objectives:
 - Analyze /opt/k8s/deployment.yaml for the port mismatch
 - Align the Service targetPort with nginx's containerPort (80)
 - Verify the web server responds on the correct port
 initial_state: Simulated Kubernetes environment on Ubuntu with a manifest at /opt/k8s/deployment.yaml.
-  The Service targetPort (8080) doesn't match nginx's containerPort (80), and nginx isn't serving, so
-  the app is down.
+  The Service targetPort (8080) doesn't match nginx's containerPort (80), and nginx
+  isn't serving, so the app is down.
 hints:
 - order: 1
   cost: 0
-  content: 'Where to look: Run `kubectl get pods -A` and `kubectl describe pod <name>` for any pod not
-    in Running state.'
+  content: 'Where to look: Run `kubectl get pods -A` and `kubectl describe pod <name>`
+    for any pod not in Running state.'
 - order: 2
   cost: 25
   content: 'Diagnostic steps:
@@ -64,7 +66,8 @@ hints:
 
 
     WHY: Kubernetes only reports healthy when the workload actually runs.'
-summary: Complete the kubernetes pod crashloopbackoff devops lab and verify success with the checker
+summary: Complete the kubernetes pod crashloopbackoff devops lab and verify success
+  with the checker
 estimated_minutes: 20
 xp_reward: 100
 prerequisites:
@@ -97,16 +100,21 @@ environment:
 tasks:
 - id: task_1
   title: Kubernetes Pod CrashLoopBackOff
-  description: Restore healthy behavior for Kubernetes Pod CrashLoopBackOff by investigating the failure,
-    applying the smallest safe fix, and validating the outcome.
-  background: 'This devops lab teaches systematic troubleshooting: observe, hypothesize, change, verify.'
+  description: Restore healthy behavior for Kubernetes Pod CrashLoopBackOff by investigating
+    the failure, applying the smallest safe fix, and validating the outcome.
+  background: 'This devops lab teaches systematic troubleshooting: observe, hypothesize,
+    change, verify.'
   validation:
     type: custom_script
     script: check.sh
-    error_message: Validation did not pass. Re-read the objectives and Hint 2 diagnostic steps.
+    error_message: Validation did not pass. Re-read the objectives and Hint 2 diagnostic
+      steps.
 solution:
-  summary: Identify the misconfiguration affecting this devops lab and apply the minimal fix.
+  summary: Identify the misconfiguration affecting this devops lab and apply the minimal
+    fix.
   files_changed: []
   commands_run:
   - bash check.sh
   reference_docs: devops-fundamentals
+lab_mode: simulation
+simulation_type: devops

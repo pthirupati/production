@@ -4196,6 +4196,19 @@ body::after {
   background: rgb(var(--s-950) / 0.5);
   overflow: hidden;
 }
+.tutorial-page .tutorial-body {
+  overflow-x: auto;
+  max-width: 100%;
+}
+.tutorial-page .tutorial-mermaid-host svg {
+  max-width: 100%;
+  height: auto;
+}
+.tutorial-page pre,
+.tutorial-page code {
+  max-width: 100%;
+  overflow-x: auto;
+}
 .tutorial-page .tutorial-image img {
   display: block;
   width: 100%;

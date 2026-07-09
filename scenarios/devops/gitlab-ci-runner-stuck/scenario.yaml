@@ -8,40 +8,43 @@ max_score: 100
 infrastructure_type: docker
 jira_priority: High
 is_free: false
-description: 'CONTEXT: A team operating DevOps delivery needs you to resolve `Register a New GitLab CI
-  Runner` during a realistic incident. The business impact is reduced service reliability until the underlying
-  state is repaired.
+description: 'CONTEXT: A team operating DevOps delivery needs you to resolve `Register
+  a New GitLab CI Runner` during a realistic incident. The business impact is reduced
+  service reliability until the underlying state is repaired.
 
 
-  ENVIRONMENT: You are working in FixitLab''s offline CI/CD lab with git repos, pipelines, artifacts,
-  and runbooks. All tools run locally; no paid APIs or external cloud calls are required.
+  ENVIRONMENT: You are working in FixitLab''s offline CI/CD lab with git repos, pipelines,
+  artifacts, and runbooks. All tools run locally; no paid APIs or external cloud calls
+  are required.
 
 
-  SYMPTOM / STARTING STATE: Ubuntu server. GitLab CI jobs stuck in pending. The GitLab instance is at
+  SYMPTOM / STARTING STATE: Ubuntu server. GitLab CI jobs stuck in pending. The GitLab
+  instance is at
 
   http://gitlab.internal. Registration token is in /etc/gitlab-runner/registration_token.
 
-  gitlab-runner binary may need to be installed. All GitLab CI jobs are stuck in a pending state. The
-  existing CI runner has gone
+  gitlab-runner binary may need to be installed. All GitLab CI jobs are stuck in a
+  pending state. The existing CI runner has gone
 
   offline and there are no available runners to pick up jobs. You need to register
 
   a new GitLab Runner on this server so pipelines can resume.
 
 
-  OBJECTIVE: Identify why jobs are stuck in pending state; Install gitlab-runner if not present; Register
-  a new runner using the registration token. Success means `systemctl is-active gitlab-runner` returns
-  active.
+  OBJECTIVE: Identify why jobs are stuck in pending state; Install gitlab-runner if
+  not present; Register a new runner using the registration token. Success means `systemctl
+  is-active gitlab-runner` returns active.
 
 
-  WHAT TO AVOID: Do not apply broad destructive changes, skip evidence gathering, or fake completion with
-  marker files — the checker validates real system state.'
+  WHAT TO AVOID: Do not apply broad destructive changes, skip evidence gathering,
+  or fake completion with marker files — the checker validates real system state.'
 objectives:
 - Identify why jobs are stuck in pending state
 - Install gitlab-runner if not present
 - Register a new runner using the registration token
 - Verify the runner is active and picking up jobs
-initial_state: 'Ubuntu server. GitLab CI jobs stuck in pending. The GitLab instance is at
+initial_state: 'Ubuntu server. GitLab CI jobs stuck in pending. The GitLab instance
+  is at
 
   http://gitlab.internal. Registration token is in /etc/gitlab-runner/registration_token.
 
@@ -51,13 +54,14 @@ initial_state: 'Ubuntu server. GitLab CI jobs stuck in pending. The GitLab insta
 hints:
 - order: 1
   cost: 0
-  content: 'Where to look: Start with `systemctl status gitlab-runner` and `journalctl -u gitlab-runner
-    -n 50 --no-pager` before changing anything.'
+  content: 'Where to look: Start with `systemctl status gitlab-runner` and `journalctl
+    -u gitlab-runner -n 50 --no-pager` before changing anything.'
 - order: 2
   cost: 25
   content: 'Diagnostic steps:
 
-    1. Run `systemctl status gitlab-runner` — note Active/Failed and the last log lines.
+    1. Run `systemctl status gitlab-runner` — note Active/Failed and the last log
+    lines.
 
     2. Read `journalctl -u gitlab-runner -n 50` for the root error.
 
@@ -70,11 +74,13 @@ hints:
 
     2. Run `systemctl daemon-reload` if you edited a unit file.
 
-    3. Run `systemctl restart gitlab-runner` and confirm `systemctl is-active gitlab-runner` succeeds.
+    3. Run `systemctl restart gitlab-runner` and confirm `systemctl is-active gitlab-runner`
+    succeeds.
 
 
     WHY: the grader checks real service state, not marker files.'
-summary: Complete the register a new gitlab ci runner devops lab and verify success with the checker
+summary: Complete the register a new gitlab ci runner devops lab and verify success
+  with the checker
 estimated_minutes: 15
 xp_reward: 100
 prerequisites:
@@ -108,18 +114,22 @@ environment:
 tasks:
 - id: task_1
   title: Register a New GitLab CI Runner
-  description: Restore healthy behavior for Register a New GitLab CI Runner by investigating the failure,
-    applying the smallest safe fix, and validating the outcome.
-  background: 'This devops lab teaches systematic troubleshooting: observe, hypothesize, change, verify.'
+  description: Restore healthy behavior for Register a New GitLab CI Runner by investigating
+    the failure, applying the smallest safe fix, and validating the outcome.
+  background: 'This devops lab teaches systematic troubleshooting: observe, hypothesize,
+    change, verify.'
   validation:
     type: service_active
     command: systemctl is-active gitlab-runner
     expected_status: active
-    error_message: The gitlab-runner service is not active yet. Check `systemctl status gitlab-runner`
-      and `journalctl -u gitlab-runner -n 50`.
+    error_message: The gitlab-runner service is not active yet. Check `systemctl status
+      gitlab-runner` and `journalctl -u gitlab-runner -n 50`.
 solution:
-  summary: The root cause is an unhealthy `gitlab-runner` service; repair it and verify active state.
+  summary: The root cause is an unhealthy `gitlab-runner` service; repair it and verify
+    active state.
   files_changed: []
   commands_run:
   - systemctl is-active gitlab-runner
   reference_docs: devops-fundamentals
+lab_mode: simulation
+simulation_type: devops

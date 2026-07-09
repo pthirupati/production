@@ -1175,6 +1175,24 @@ def _register_devops(engine: "UnifiedSimulationEngine", shell: RHELShell) -> Non
         if low.startswith("helm upgrade") or low.startswith("helm install"):
             d.helm_release_status = "deployed"
             return "Release webapp has been upgraded. Happy Helming!"
+        if low.startswith("helm list"):
+            return "NAME\tNAMESPACE\tREVISION\tSTATUS\tCHART\nwebapp\tdefault\t3\tdeployed\twebapp-1.2.0"
+        if "argocd app sync" in low or "argocd app get" in low:
+            if d.kubeconfig_valid:
+                return "Sync Status: Synced\nHealth Status: Healthy"
+            return "error: failed to sync: invalid kubeconfig"
+        if "flux reconcile" in low or "flux get" in low:
+            if d.kubeconfig_valid:
+                return "NAME\tREADY\tSTATUS\nwebapp\tTrue\tApplied"
+            return "error: kubeconfig not configured"
+        if low.startswith("mvn ") or low.startswith("./mvnw"):
+            if "package" in low or "install" in low:
+                return "BUILD SUCCESS\nTotal time: 12.4 s"
+            return "Apache Maven 3.9.6"
+        if "sonar-scanner" in low or "mvn sonar:" in low:
+            return "ANALYSIS SUCCESSFUL\nQuality gate status: PASSED"
+        if "jenkins-cli" in low or "java -jar jenkins-cli" in low:
+            return "build scheduled"
         return None
     shell.register_handler(handler)
 

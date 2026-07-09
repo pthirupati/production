@@ -16,6 +16,11 @@ export const labApi = {
     return data
   },
 
+  async validateGuidedStep(sessionId, stepIndex, extra = {}) {
+    const { data } = await api.post(`/labs/${sessionId}/guided-step/`, { step_index: stepIndex, ...extra })
+    return data
+  },
+
   // ── Coding IDE scenarios ──
   async getCodingSpec(sessionId) {
     const { data } = await api.get(`/labs/${sessionId}/coding-spec/`)

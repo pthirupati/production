@@ -8,21 +8,22 @@ max_score: 100
 infrastructure_type: docker
 jira_priority: High
 is_free: false
-description: 'CONTEXT: A team operating DevOps delivery needs you to resolve `Fix Prometheus Scrape Configuration`
-  during a realistic incident. The business impact is reduced service reliability until the underlying
-  state is repaired.
+description: 'CONTEXT: A team operating DevOps delivery needs you to resolve `Fix
+  Prometheus Scrape Configuration` during a realistic incident. The business impact
+  is reduced service reliability until the underlying state is repaired.
 
 
-  ENVIRONMENT: You are working in FixitLab''s offline CI/CD lab with git repos, pipelines, artifacts,
-  and runbooks. All tools run locally; no paid APIs or external cloud calls are required.
+  ENVIRONMENT: You are working in FixitLab''s offline CI/CD lab with git repos, pipelines,
+  artifacts, and runbooks. All tools run locally; no paid APIs or external cloud calls
+  are required.
 
 
   SYMPTOM / STARTING STATE: Ubuntu server running Prometheus at /etc/prometheus/prometheus.yml.
 
   The myapp service is running on port 8080 but prometheus.yml has port 9090.
 
-  The service label "app: myapp-service" doesn''t match the selector "app: myapp". Prometheus is showing
-  targets as DOWN and metrics are not being scraped.
+  The service label "app: myapp-service" doesn''t match the selector "app: myapp".
+  Prometheus is showing targets as DOWN and metrics are not being scraped.
 
   The scrape config in prometheus.yml points to the wrong port and the
 
@@ -31,12 +32,13 @@ description: 'CONTEXT: A team operating DevOps delivery needs you to resolve `Fi
   and service labels so Prometheus can discover and scrape the targets.
 
 
-  OBJECTIVE: Identify why Prometheus targets show as DOWN; Fix the scrape configuration in prometheus.yml;
-  Add correct service labels to match the scrape selector. Success means `check.sh` exits successfully.
+  OBJECTIVE: Identify why Prometheus targets show as DOWN; Fix the scrape configuration
+  in prometheus.yml; Add correct service labels to match the scrape selector. Success
+  means `check.sh` exits successfully.
 
 
-  WHAT TO AVOID: Do not apply broad destructive changes, skip evidence gathering, or fake completion with
-  marker files — the checker validates real system state.'
+  WHAT TO AVOID: Do not apply broad destructive changes, skip evidence gathering,
+  or fake completion with marker files — the checker validates real system state.'
 objectives:
 - Identify why Prometheus targets show as DOWN
 - Fix the scrape configuration in prometheus.yml
@@ -52,8 +54,8 @@ initial_state: 'Ubuntu server running Prometheus at /etc/prometheus/prometheus.y
 hints:
 - order: 1
   cost: 0
-  content: 'Where to look: Open Prometheus → Status → Targets and note which job is DOWN and the last
-    scrape error message.'
+  content: 'Where to look: Open Prometheus → Status → Targets and note which job is
+    DOWN and the last scrape error message.'
 - order: 2
   cost: 25
   content: 'Diagnostic steps:
@@ -75,7 +77,8 @@ hints:
 
 
     WHY: Prometheus only collects metrics from correctly configured targets.'
-summary: Complete the fix prometheus scrape configuration devops lab and verify success with the checker
+summary: Complete the fix prometheus scrape configuration devops lab and verify success
+  with the checker
 estimated_minutes: 20
 xp_reward: 100
 prerequisites:
@@ -109,16 +112,22 @@ environment:
 tasks:
 - id: task_1
   title: Fix Prometheus Scrape Configuration
-  description: Restore healthy behavior for Fix Prometheus Scrape Configuration by investigating the failure,
-    applying the smallest safe fix, and validating the outcome.
-  background: 'This devops lab teaches systematic troubleshooting: observe, hypothesize, change, verify.'
+  description: Restore healthy behavior for Fix Prometheus Scrape Configuration by
+    investigating the failure, applying the smallest safe fix, and validating the
+    outcome.
+  background: 'This devops lab teaches systematic troubleshooting: observe, hypothesize,
+    change, verify.'
   validation:
     type: custom_script
     script: check.sh
-    error_message: Validation did not pass. Re-read the objectives and Hint 2 diagnostic steps.
+    error_message: Validation did not pass. Re-read the objectives and Hint 2 diagnostic
+      steps.
 solution:
-  summary: Identify the misconfiguration affecting this devops lab and apply the minimal fix.
+  summary: Identify the misconfiguration affecting this devops lab and apply the minimal
+    fix.
   files_changed: []
   commands_run:
   - bash check.sh
   reference_docs: devops-fundamentals
+lab_mode: simulation
+simulation_type: devops
