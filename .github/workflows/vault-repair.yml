@@ -54,13 +54,13 @@ jobs:
           ENVF=deploy/production.env
           if [ ! -f "$ENVF" ]; then mkdir -p deploy; cp .env.production "$ENVF" 2>/dev/null || true; fi
           echo "[repair] ensuring Vault container is up"
-          bash scripts/vault/start.sh
+          bash scripts/vault/start.sh </dev/null
           echo "[repair] status BEFORE:"
-          docker exec fixitlab_vault vault status 2>&1 | grep -iE "Initialized|Sealed|Storage" || true
+          docker exec fixitlab_vault vault status </dev/null 2>&1 | grep -iE "Initialized|Sealed|Storage" || true
           echo "[repair] running bootstrap (init -> unseal -> seed KV -> AppRole)"
-          bash scripts/vault/bootstrap.sh "$ENVF"
+          bash scripts/vault/bootstrap.sh "$ENVF" </dev/null
           echo "[repair] status AFTER:"
-          docker exec fixitlab_vault vault status 2>&1 | grep -iE "Initialized|Sealed|Storage" || true
+          docker exec fixitlab_vault vault status </dev/null 2>&1 | grep -iE "Initialized|Sealed|Storage" || true
           echo "[repair] key/approle files present (contents NOT printed):"
           for f in deploy/vault-init.json deploy/vault-approle.env; do
             [ -f "$f" ] && echo "  PRESENT $f ($(wc -l < "$f") lines)" || echo "  MISSING $f"
