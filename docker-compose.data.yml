@@ -42,6 +42,12 @@ services:
       - DB_USER=${POSTGRES_USER:-fixitlab}
       - DB_PASSWORD=${POSTGRES_PASSWORD}
       - DB_NAME=${POSTGRES_DB:-fixitlab}
+      # Postgres stores the role as scram-sha-256 (PG default password_encryption),
+      # so pgBouncer must hold the PLAINTEXT password to negotiate SCRAM with the
+      # server. edoburu only md5-hashes the userlist when AUTH_TYPE=md5 (its default),
+      # which yields "cannot do SCRAM authentication: wrong password type". Force
+      # scram-sha-256 so the userlist stays plaintext and both hops use SCRAM.
+      - AUTH_TYPE=scram-sha-256
       - POOL_MODE=transaction
       - MAX_CLIENT_CONN=1000
       - DEFAULT_POOL_SIZE=25
