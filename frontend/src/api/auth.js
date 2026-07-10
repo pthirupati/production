@@ -95,18 +95,18 @@ export const authApi = {
     return data
   },
 
-  async socialLogin(provider, code, redirectUri, intent = 'login') {
+  async socialLogin(provider, code, redirectUri, state = '') {
     const { data } = await api.post(`/auth/social/${provider}/`, {
-      code, redirect_uri: redirectUri, intent,
+      code, redirect_uri: redirectUri, state,
     })
     useAuthStore.getState().setAuth(data.user, data.access, data.refresh)
     await rehydrateAwsSimForUser()
     return data
   },
 
-  async socialLink(provider, code, redirectUri) {
+  async socialLink(provider, code, redirectUri, state = '') {
     const { data } = await api.post(`/auth/social/link/${provider}/`, {
-      code, redirect_uri: redirectUri,
+      code, redirect_uri: redirectUri, state,
     })
     return data
   },

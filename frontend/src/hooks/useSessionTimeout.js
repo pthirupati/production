@@ -1,5 +1,6 @@
 import { useEffect, useRef } from 'react'
 import { useAuthStore } from '../store/authStore'
+import { authApi } from '../api/auth'
 import toast from 'react-hot-toast'
 import axios from 'axios'
 
@@ -9,11 +10,31 @@ import axios from 'axios'
  * - Warns user 5 minutes before expiry
  * - Attempts silent refresh 2 minutes before expiry
  * - Logs out if refresh fails
+ * - Cookie-only sessions: periodic profile poll detects expiry
  */
 export default function useSessionTimeout() {
-  const { accessToken, refreshToken, setAuth, user, logout } = useAuthStore()
+  const { accessToken, refreshToken, setAuth, user, logout, isAuthenticated } = useAuthStore()
   const timerRef = useRef(null)
   const warnedRef = useRef(false)
+
+  // Cookie-only sessions (no in-memory JWT): poll profile to detect expiry
+  useEffect(() => {
+    if (accessToken || !isAuthenticated) return
+
+    const poll = async () => {
+      try {
+        await authApi.getProfile()
+      } catch {
+        toast.error('Session expired — please log in again', { duration: 5000 })
+        logout()
+        window.location.href = '/login'
+      }
+    }
+
+    poll()
+    const interval = setInterval(poll, 5 * 60_000)
+    return () => clearInterval(interval)
+  }, [accessToken, isAuthenticated, logout])
 
   useEffect(() => {
     if (!accessToken) return
@@ -25,20 +46,17 @@ export default function useSessionTimeout() {
       const now = Math.floor(Date.now() / 1000)
       const remaining = payload.exp - now
 
-      // Already expired
       if (remaining <= 0) {
         doRefresh()
         return
       }
 
-      // Silently refresh at 5 minutes
       if (remaining <= 300 && !warnedRef.current) {
         warnedRef.current = true
         doRefresh()
       }
     }
 
-    // Check every 60 seconds
     checkExpiry()
     timerRef.current = setInterval(checkExpiry, 60_000)
 

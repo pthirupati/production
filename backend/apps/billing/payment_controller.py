@@ -334,7 +334,13 @@ class RazorpayWebhookView(APIView):
             #   True  → valid
             sig_result = self._verify_webhook_signature(payload, signature)
             if sig_result is None:
-                # Secret not configured — acknowledge to stop Razorpay retry loop
+                from django.conf import settings as django_settings
+                if not django_settings.DEBUG:
+                    logger.error("Razorpay webhook secret not configured in production")
+                    return Response(
+                        {"error": "Webhook not configured"},
+                        status=http_status.HTTP_503_SERVICE_UNAVAILABLE,
+                    )
                 return Response({"status": "webhook_secret_not_configured"}, status=http_status.HTTP_200_OK)
             if not sig_result:
                 logger.warning("Invalid Razorpay webhook signature")

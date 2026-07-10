@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { terraformApi } from '../../api/terraform'
 import toast from 'react-hot-toast'
+import { useConfirm } from '../../hooks/useConfirm'
 import CodeEditor from '../ide/CodeEditor'
 import LabTerminal from '../LabTerminal'
 import AwsTerminal from '../aws/terminal/AwsTerminal'
@@ -20,6 +21,7 @@ export default function TerraformWorkspaceIde({
   blockedCommands = [], isMobile = false, state, setState, onRefresh,
   standalone = false,
 }) {
+  const { confirm, ConfirmPortal } = useConfirm()
   const profile = getIacProfile()
   const cli = 'terraform'
   const [files, setFiles] = useState({})
@@ -92,7 +94,7 @@ export default function TerraformWorkspaceIde({
   }
 
   const deleteFile = async (name) => {
-    if (!window.confirm(`Delete ${name}?`)) return
+    if (!await confirm({ message: `Delete ${name}?`, danger: true, confirmLabel: 'Delete' })) return
     const res = await terraformApi.action(sessionId, 'delete_file', { path: name })
     if (res?.ok === false) { toast.error(res.error || 'Delete failed'); return }
     const next = { ...filesRef.current }
@@ -189,6 +191,7 @@ export default function TerraformWorkspaceIde({
   }
 
   return (
+    <>
     <VsCodeWorkbench
       accent={profile.accent}
       className="flex-1 min-h-0"
@@ -284,5 +287,7 @@ export default function TerraformWorkspaceIde({
         </div>
       )}
     />
+    <ConfirmPortal />
+    </>
   )
 }

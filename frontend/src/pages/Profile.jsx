@@ -14,6 +14,7 @@ const GithubIcon = ({ size = 18, className = '' }) => (
   </svg>
 )
 import toast from 'react-hot-toast'
+import { useConfirm } from '../hooks/useConfirm'
 import { startOAuth } from '../utils/oauth'
 import { validators } from '../utils/validators'
 import { SkeletonCard } from '../components/Skeleton'
@@ -22,6 +23,7 @@ import { interviewsApi } from '../api/interviews'
 import { XpLevelCard, StreakWidget, BadgeWall } from '../components/engagement'
 
 export default function Profile() {
+  const { confirm, ConfirmPortal } = useConfirm()
   const { user } = useAuthStore()
   const navigate = useNavigate()
   const [username, setUsername] = useState(user?.username || '')
@@ -161,6 +163,7 @@ export default function Profile() {
   )
 
   return (
+    <>
     <div className="max-w-2xl mx-auto space-y-6 animate-fade-in">
       <PageHeader
         eyebrow="Your account"
@@ -536,7 +539,7 @@ export default function Profile() {
                 type="button"
                 disabled={gdprBusy === 'resume'}
                 onClick={async () => {
-                  if (!window.confirm('Delete your stored resume and parsed data? This cannot be undone.')) return
+                  if (!await confirm({ message: 'Delete your stored resume and parsed data? This cannot be undone.', danger: true, confirmLabel: 'Delete resume' })) return
                   setGdprBusy('resume')
                   try {
                     await interviewsApi.deleteResume()
@@ -744,7 +747,7 @@ export default function Profile() {
             type="button"
             disabled={deletingAccount || deleteConfirm !== 'DELETE MY ACCOUNT'}
             onClick={async () => {
-              if (!window.confirm('This permanently deletes your account and all data. Continue?')) return
+              if (!await confirm({ message: 'This permanently deletes your account and all data. Continue?', danger: true, confirmLabel: 'Delete account' })) return
               setDeletingAccount(true)
               try {
                 const refresh = useAuthStore.getState().refreshToken
@@ -770,5 +773,7 @@ export default function Profile() {
         </div>
       </div>
     </div>
+    <ConfirmPortal />
+    </>
   )
 }

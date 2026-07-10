@@ -27,18 +27,18 @@ def oauth_callback_url(provider: str) -> str:
     return f"{canonical_frontend_url()}/auth/callback/{provider}"
 
 
-def github_authorize_url(*, intent: str = "login") -> str:
+def github_authorize_url(*, state: str) -> str:
     """Full GitHub authorize URL with canonical redirect_uri (matches token exchange)."""
     params = {
         "client_id": settings.GITHUB_CLIENT_ID,
         "redirect_uri": oauth_callback_url("github"),
         "scope": "user:email",
-        "state": intent,
+        "state": state,
     }
     return f"https://github.com/login/oauth/authorize?{urlencode(params)}"
 
 
-def google_authorize_url(*, intent: str = "login") -> str:
+def google_authorize_url(*, state: str) -> str:
     params = {
         "client_id": settings.GOOGLE_CLIENT_ID,
         "redirect_uri": oauth_callback_url("google"),
@@ -46,6 +46,6 @@ def google_authorize_url(*, intent: str = "login") -> str:
         "scope": "openid email profile",
         "access_type": "offline",
         "prompt": "consent",
-        "state": intent,
+        "state": state,
     }
     return f"https://accounts.google.com/o/oauth2/v2/auth?{urlencode(params)}"

@@ -7,6 +7,7 @@ import {
   Share2, Copy, ExternalLink, Image as ImageIcon, Video, Sparkles,
 } from 'lucide-react'
 import toast from 'react-hot-toast'
+import { useConfirm } from '../../hooks/useConfirm'
 
 const EMPTY_FORM = {
   kind: 'campaign',
@@ -74,6 +75,7 @@ function Field({ label, children, hint }) {
 }
 
 export default function AdminCampaigns() {
+  const { confirm, ConfirmPortal } = useConfirm()
   const [tab, setTab] = useState('campaigns') // 'campaigns' | 'social'
   const [campaigns, setCampaigns] = useState([])
   const [loading, setLoading] = useState(true)
@@ -150,7 +152,7 @@ export default function AdminCampaigns() {
   }
 
   const handleDelete = async (c) => {
-    if (!window.confirm(`Delete "${c.title}"? This cannot be undone.`)) return
+    if (!await confirm({ message: `Delete "${c.title}"? This cannot be undone.`, danger: true, confirmLabel: 'Delete' })) return
     try {
       await adminApi.deleteCampaign(c.id)
       toast.success('Deleted')
@@ -176,6 +178,7 @@ export default function AdminCampaigns() {
   }
 
   return (
+    <>
     <div className="space-y-6">
       <AdminPageHeader
         title="Ads & Campaigns"
@@ -428,6 +431,8 @@ export default function AdminCampaigns() {
         <SocialTab campaigns={campaigns} />
       )}
     </div>
+    <ConfirmPortal />
+    </>
   )
 }
 

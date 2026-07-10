@@ -56,7 +56,7 @@ structured_logger = get_structured_logger(__name__)
 
 class AuthRateThrottle(AnonRateThrottle):
     """Strict rate limiting for auth endpoints to prevent brute-force."""
-    rate = '20/minute'
+    scope = 'auth'
 
 
 class SendOTPView(APIView):
@@ -860,6 +860,7 @@ from .oauth_urls import (
     google_authorize_url,
     oauth_callback_url,
 )
+from .oauth_state import issue_oauth_state, validate_oauth_state
 
 
 # ─── Social OAuth ─────────────────────────────────────────────────
@@ -884,7 +885,7 @@ class SocialAuthConfigView(APIView):
                 "client_id": settings.GITHUB_CLIENT_ID,
                 "authorize_url": "https://github.com/login/oauth/authorize",
                 "callback_url": gh_callback,
-                "login_url": github_authorize_url(intent="login") if settings.GITHUB_CLIENT_ID else "",
+                "login_url": "/api/auth/social/start/github/?intent=login" if settings.GITHUB_CLIENT_ID else "",
                 "start_url": "/api/auth/social/start/github/",
                 "app_settings_url": "https://github.com/settings/developers",
             },
@@ -893,7 +894,7 @@ class SocialAuthConfigView(APIView):
                 "client_id": settings.GOOGLE_CLIENT_ID,
                 "authorize_url": "https://accounts.google.com/o/oauth2/v2/auth",
                 "callback_url": google_callback,
-                "login_url": google_authorize_url(intent="login") if settings.GOOGLE_CLIENT_ID else "",
+                "login_url": "/api/auth/social/start/google/?intent=login" if settings.GOOGLE_CLIENT_ID else "",
                 "start_url": "/api/auth/social/start/google/",
             },
         })
@@ -911,11 +912,13 @@ class SocialOAuthStartView(APIView):
         if provider == "github":
             if not settings.GITHUB_CLIENT_ID:
                 return Response({"error": "GitHub login is not configured."}, status=501)
-            return redirect(github_authorize_url(intent=intent))
+            state = issue_oauth_state(intent)
+            return redirect(github_authorize_url(state=state))
         if provider == "google":
             if not settings.GOOGLE_CLIENT_ID:
                 return Response({"error": "Google login is not configured."}, status=501)
-            return redirect(google_authorize_url(intent=intent))
+            state = issue_oauth_state(intent)
+            return redirect(google_authorize_url(state=state))
         return Response({"error": "Unknown provider."}, status=400)
 
 
@@ -928,6 +931,14 @@ class GitHubCallbackView(APIView):
         code = request.data.get("code", "").strip()
         if not code:
             return Response({"error": "Authorization code is required."}, status=400)
+
+        oauth_state = (request.data.get("state") or "").strip()
+        valid, intent = validate_oauth_state(oauth_state)
+        if not valid:
+            return Response(
+                {"error": "Invalid or expired OAuth state. Please try again."},
+                status=400,
+            )
 
         client_id = settings.GITHUB_CLIENT_ID
         client_secret = settings.GITHUB_CLIENT_SECRET
@@ -1001,7 +1012,7 @@ class GitHubCallbackView(APIView):
             logger.error(f"GitHub user info error: {e}")
             return Response({"error": "Failed to get user info from GitHub."}, status=502)
 
-        allow_registration = request.data.get("intent") == "register"
+        allow_registration = intent == "register"
         user, error = self._resolve_social_login(
             "github", gh_id, primary_email, gh_name,
             allow_registration=allow_registration,
@@ -1131,6 +1142,14 @@ class GoogleCallbackView(APIView):
         if not code:
             return Response({"error": "Authorization code is required."}, status=400)
 
+        oauth_state = (request.data.get("state") or "").strip()
+        valid, intent = validate_oauth_state(oauth_state)
+        if not valid:
+            return Response(
+                {"error": "Invalid or expired OAuth state. Please try again."},
+                status=400,
+            )
+
         client_id = settings.GOOGLE_CLIENT_ID
         client_secret = settings.GOOGLE_CLIENT_SECRET
         if not client_id or not client_secret:
@@ -1184,7 +1203,7 @@ class GoogleCallbackView(APIView):
             logger.error(f"Google userinfo error: {e}")
             return Response({"error": "Failed to get user info from Google."}, status=502)
 
-        allow_registration = request.data.get("intent") == "register"
+        allow_registration = intent == "register"
         user, error = GitHubCallbackView._resolve_social_login(
             "google", google_id, email, name,
             allow_registration=allow_registration,
@@ -1244,6 +1263,15 @@ class GitHubLinkView(APIView):
         code = request.data.get("code", "").strip()
         if not code:
             return Response({"error": "Authorization code is required."}, status=400)
+
+        oauth_state = (request.data.get("state") or "").strip()
+        valid, intent = validate_oauth_state(oauth_state)
+        if not valid or intent != "link":
+            return Response(
+                {"error": "Invalid or expired OAuth state. Please try again."},
+                status=400,
+            )
+
         if not settings.GITHUB_CLIENT_ID or not settings.GITHUB_CLIENT_SECRET:
             return Response({"error": "GitHub login is not configured."}, status=501)
 
@@ -1289,6 +1317,15 @@ class GoogleLinkView(APIView):
         code = request.data.get("code", "").strip()
         if not code:
             return Response({"error": "Authorization code is required."}, status=400)
+
+        oauth_state = (request.data.get("state") or "").strip()
+        valid, intent = validate_oauth_state(oauth_state)
+        if not valid or intent != "link":
+            return Response(
+                {"error": "Invalid or expired OAuth state. Please try again."},
+                status=400,
+            )
+
         if not settings.GOOGLE_CLIENT_ID or not settings.GOOGLE_CLIENT_SECRET:
             return Response({"error": "Google login is not configured."}, status=501)
 

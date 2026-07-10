@@ -3,9 +3,11 @@ import { Link, useNavigate, useParams } from 'react-router-dom'
 import { interviewsApi } from '../../api/interviews'
 import { Calendar, Play, CheckCircle2, Lock, Award, ChevronRight, ChevronLeft, Trash2, X } from 'lucide-react'
 import toast from 'react-hot-toast'
+import { useConfirm } from '../../hooks/useConfirm'
 import { PageHeader } from '../../components/design'
 
 export default function InterviewCampaign() {
+  const { confirm, ConfirmPortal } = useConfirm()
   const { campaignId } = useParams()
   const navigate = useNavigate()
   const [campaign, setCampaign] = useState(null)
@@ -57,7 +59,7 @@ export default function InterviewCampaign() {
   }
 
   const cancelCampaign = async () => {
-    if (!window.confirm('Cancel this entire interview campaign?')) return
+    if (!await confirm({ message: 'Cancel this entire interview campaign?', danger: true, confirmLabel: 'Cancel campaign' })) return
     try {
       await interviewsApi.cancelCampaign(campaignId)
       toast.success('Interview cancelled')
@@ -81,6 +83,7 @@ export default function InterviewCampaign() {
   if (!campaign) return null
 
   return (
+    <>
     <div className="max-w-3xl mx-auto space-y-6 animate-fade-in">
       <Link
         to="/interviews"
@@ -259,5 +262,7 @@ export default function InterviewCampaign() {
         })}
       </div>
     </div>
+    <ConfirmPortal />
+    </>
   )
 }

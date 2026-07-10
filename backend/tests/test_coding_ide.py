@@ -192,10 +192,25 @@ class CodingIDEValidationTests(TestCase):
         self.assertNotIn("adds negatives", blob)
         self.assertNotIn("== -2", str(body))
 
-    def test_mentor_reveals_reference_only_when_unlocked(self):
+    def test_mentor_blocks_reference_unlock_on_running_session(self):
         self.scenario.solution_explanation = "Return a + b; addition is commutative."
         self.scenario.save()
         session = self._running_session()
+        resp = self.client.post(
+            f"/api/labs/{session.id}/mentor/",
+            {"language": "python", "code": "def add(a,b): return 0",
+             "unlock_reference": True},
+            format="json",
+        )
+        self.assertEqual(resp.status_code, 403)
+
+    def test_mentor_reveals_reference_when_session_completed(self):
+        self.scenario.solution_explanation = "Return a + b; addition is commutative."
+        self.scenario.save()
+        session = self._running_session()
+        session.status = "COMPLETED"
+        session.validation_passed = True
+        session.save(update_fields=["status", "validation_passed"])
         resp = self.client.post(
             f"/api/labs/{session.id}/mentor/",
             {"language": "python", "code": "def add(a,b): return 0",

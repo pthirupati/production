@@ -156,15 +156,19 @@ ASGI_APPLICATION = "config.asgi.application"
 
 # --------------------------------------------------
 # Database (PostgreSQL – persistent)
+# Runtime uses pgBouncer when PGBOUNCER_HOST is set; migrations use POSTGRES_HOST directly.
 # --------------------------------------------------
+_DB_HOST = env("PGBOUNCER_HOST", default="") or env("POSTGRES_HOST")
+_DB_PORT = env("PGBOUNCER_PORT", default="") or env("POSTGRES_PORT")
+
 DATABASES = {
     "default": {
         "ENGINE": "django.db.backends.postgresql",
         "NAME": env("POSTGRES_DB"),
         "USER": env("POSTGRES_USER"),
         "PASSWORD": env("POSTGRES_PASSWORD"),
-        "HOST": env("POSTGRES_HOST"),
-        "PORT": env("POSTGRES_PORT"),
+        "HOST": _DB_HOST,
+        "PORT": _DB_PORT,
         "CONN_MAX_AGE": 600,  # 10 min persistent connections (reduces connect overhead)
         "CONN_HEALTH_CHECKS": True,  # Verify connections before reuse
         "OPTIONS": {
@@ -684,7 +688,7 @@ ADMIN_ALLOWED_IPS = [ip.strip() for ip in env("ADMIN_ALLOWED_IPS", default="").s
 # restrict admin to those networks. Loopback / in-container callers (health
 # checks + server-side E2E) are always allowed.
 ADMIN_FAIL_CLOSED_WITHOUT_ALLOWLIST = env.bool(
-    "ADMIN_FAIL_CLOSED_WITHOUT_ALLOWLIST", default=False
+    "ADMIN_FAIL_CLOSED_WITHOUT_ALLOWLIST", default=not DEBUG
 )
 # Number of trusted reverse-proxy hops in front of Django (our nginx gateway).
 # Used to read the un-spoofable client IP from the RIGHT of X-Forwarded-For

@@ -4,8 +4,10 @@ import { AdminPageHeader } from '../../components/design'
 import { Wrench, AlertTriangle, Save, ToggleLeft, ToggleRight, Mail, Trash2, Bot, Shield, Eye, EyeOff, RefreshCw, CheckCircle2, KeyRound, Database, Zap, CreditCard } from 'lucide-react'
 import { IMAGE_UPLOAD_HINTS } from '../../utils/mediaUrl'
 import toast from 'react-hot-toast'
+import { useConfirm } from '../../hooks/useConfirm'
 
 export default function AdminSettings() {
+  const { confirm, ConfirmPortal } = useConfirm()
   const [maintenance, setMaintenance] = useState({ maintenance_mode: false, maintenance_message: '' })
   const [config, setConfig] = useState(null)
   const [emailForm, setEmailForm] = useState({ primary_email: '', payment_email: '', support_email: '', admin_display_currency: 'INR' })
@@ -169,7 +171,7 @@ export default function AdminSettings() {
   }
 
   const handleResetDefaults = async () => {
-    if (!window.confirm('Reset platform settings to defaults? Maintenance will be turned off and theme colors restored.')) return
+    if (!await confirm({ message: 'Reset platform settings to defaults? Maintenance will be turned off and theme colors restored.', danger: true, confirmLabel: 'Reset' })) return
     setSaving(true)
     try {
       const result = await adminApi.resetPlatformSettings()
@@ -199,6 +201,7 @@ export default function AdminSettings() {
   }
 
   return (
+    <>
     <div className="space-y-6">
       <AdminPageHeader
         title="Platform Settings"
@@ -900,5 +903,7 @@ export default function AdminSettings() {
         </div>
       </div>
     </div>
+    <ConfirmPortal />
+    </>
   )
 }

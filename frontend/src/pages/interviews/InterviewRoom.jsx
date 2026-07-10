@@ -22,6 +22,8 @@ import {
   CheckCircle2, HelpCircle, RotateCcw, Star,
 } from 'lucide-react'
 import toast from 'react-hot-toast'
+import { useConfirm } from '../../hooks/useConfirm'
+import { usePageTitle } from '../../hooks/usePageTitle'
 
 // How long (ms) of continuous silence on an open question before the bot moves
 // on, so the fixed round time covers the planned material (skip-on-silence).
@@ -80,6 +82,9 @@ export default function InterviewRoom() {
   const observerTokenRef = useRef(observerToken)
   const processedHostMsgRef = useRef(new Set())
   const navigate = useNavigate()
+  const { confirm, ConfirmPortal } = useConfirm()
+
+  usePageTitle('Interview room', 'Live technical interview on FixitLab', { noIndex: true })
 
   // Strip sensitive observer token from URL immediately to avoid leaking via
   // browser history, server logs, or Referer headers.
@@ -686,7 +691,7 @@ export default function InterviewRoom() {
   }, [roundId, started, observerMode])
 
   const cancelInterview = async () => {
-    if (!window.confirm('Cancel this interview round?')) return
+    if (!await confirm({ message: 'Cancel this interview round?', danger: true, confirmLabel: 'Cancel round' })) return
     stopMediaStream(streamRef.current)
     streamRef.current = null
     setMediaStream(null)
@@ -704,12 +709,15 @@ export default function InterviewRoom() {
   // Visible "Back" exit. While a round is live, confirm first (the round keeps
   // running on the server — the candidate can resume from the campaign page).
   // Always releases the camera/mic so the device light turns off on exit.
-  const exitToList = (dest = '/interviews') => {
+  const exitToList = async (dest = '/interviews') => {
     if (started && !observerMode) {
-      const ok = window.confirm(
-        'Leave the interview? The round stays in progress — you can resume it from your interviews page. ' +
-        'To finish and get your report, use "End round" instead.'
-      )
+      const ok = await confirm({
+        title: 'Leave interview?',
+        message:
+          'Leave the interview? The round stays in progress — you can resume it from your interviews page. ' +
+          'To finish and get your report, use "End round" instead.',
+        confirmLabel: 'Leave',
+      })
       if (!ok) return
     }
     stopRecording()
@@ -1277,9 +1285,9 @@ export default function InterviewRoom() {
     }
   }
 
-  const finishAndNextRound = () => {
+  const finishAndNextRound = async () => {
     if (observerMode) return
-    if (!window.confirm('End this round and go to the next one in your campaign?')) return
+    if (!await confirm({ message: 'End this round and go to the next one in your campaign?', confirmLabel: 'End & next' })) return
     endInterview({ goNextRound: true })
   }
 
@@ -2287,6 +2295,7 @@ export default function InterviewRoom() {
         </div>
       </div>
     </div>
+    <ConfirmPortal />
     </>
   )
 }

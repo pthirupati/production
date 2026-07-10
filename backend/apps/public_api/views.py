@@ -523,6 +523,9 @@ class ScenarioDetailView(APIView):
             data["user_progress"] = None
             data["solution_explanation"] = None
 
+        if not data.get("is_accessible", True):
+            data["initial_state"] = None
+
         try:
             from apps.tutorials.models import Tutorial
             from apps.tutorials.serializers import TutorialListSerializer
@@ -541,6 +544,29 @@ class ScenarioDetailView(APIView):
             data["related_tutorials"] = []
 
         return Response(data)
+
+
+def _solution_unlock_allowed(session) -> bool:
+    """Solution is shown only after genuine completion or exhaustion — not on early stop."""
+    if session.status == "COMPLETED":
+        return True
+    if session.status == "EXPIRED":
+        return True
+    if session.status == "FAILED":
+        return True
+    if session.status == "TERMINATED":
+        if session.validation_passed:
+            return True
+        if session.is_expired:
+            return True
+        from apps.hints.models import Hint
+        total_hints = Hint.objects.filter(scenario=session.scenario).count()
+        if total_hints > 0 and session.hints_used >= total_hints:
+            return True
+        return False
+    if session.status == "RUNNING" and session.is_expired:
+        return True
+    return False
 
 
 class CategoriesListView(APIView):
@@ -1318,6 +1344,11 @@ class CodeMentorView(APIView):
 
         # Explicit, confirmed unlock is the ONLY way the answer is returned.
         unlock = bool(request.data.get("unlock_reference"))
+        if unlock and not _solution_unlock_allowed(session):
+            return Response(
+                {"error": "Reference solution only available after session ends or giving up."},
+                status=status.HTTP_403_FORBIDDEN,
+            )
 
         report = analyze(
             language=language,
@@ -2158,10 +2189,7 @@ class ExpiredSessionSolutionView(APIView):
     def get(self, request, session_id):
         session = get_object_or_404(LabSession, pk=session_id, user=request.user)
 
-        # Show solution for sessions that are done or still running but expired
-        if session.status in ("EXPIRED", "TERMINATED", "COMPLETED"):
-            pass  # always show
-        elif session.status == "RUNNING" and session.is_expired:
+        if session.status == "RUNNING" and session.is_expired:
             # Auto-expire the session
             resource_id = session.container_id or session.instance_id
             if resource_id:
@@ -2173,9 +2201,9 @@ class ExpiredSessionSolutionView(APIView):
             session.status = "EXPIRED"
             session.ended_at = timezone.now()
             session.save()
-        else:
+        elif not _solution_unlock_allowed(session):
             return Response(
-                {"error": "Solution only available after session ends"},
+                {"error": "Solution only available after session ends, time expires, or hints are exhausted"},
                 status=status.HTTP_403_FORBIDDEN,
             )
 
@@ -2333,6 +2361,7 @@ class CertificateVerifyView(APIView):
     Certificate ID format: FIXIT-{TECH_SLUG}-{USER_ID}-{YYYYMMDD}
     """
     permission_classes = [AllowAny]
+    throttle_classes = [StrictAnonRateThrottle]
 
     def get(self, request):
         cert_id = request.query_params.get("certificate_id", "").strip()

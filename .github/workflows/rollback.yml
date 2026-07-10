@@ -1,0 +1,40 @@
+name: Rollback
+
+on:
+  workflow_dispatch:
+    inputs:
+      topology:
+        description: Deployment topology
+        required: true
+        default: four-droplet
+        type: choice
+        options:
+          - four-droplet
+          - single-droplet
+      cluster_ip:
+        description: Four-droplet cluster IP (required for four-droplet)
+        required: false
+        type: string
+
+jobs:
+  rollback:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Rollback four-droplet cluster
+        if: inputs.topology == 'four-droplet'
+        env:
+          CLUSTER_IP: ${{ inputs.cluster_ip }}
+        run: |
+          if [ -z "$CLUSTER_IP" ]; then
+            echo "cluster_ip is required for four-droplet rollback"
+            exit 1
+          fi
+          bash scripts/ci-cluster-rollback.sh "$CLUSTER_IP"
+      - name: Rollback single-droplet (git reset on server)
+        if: inputs.topology == 'single-droplet'
+        run: |
+          echo "Single-droplet rollback: run ci-remote-platform.sh deploy on target with previous git ref."
+          echo "Use production workflow deploy with an earlier git_ref input."

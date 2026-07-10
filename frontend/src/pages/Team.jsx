@@ -9,6 +9,7 @@ import {
   Plus, Sparkles
 } from 'lucide-react'
 import toast from 'react-hot-toast'
+import { useConfirm } from '../hooks/useConfirm'
 import { PageHeader } from '../components/design'
 
 // NOTE: api/org.js is owned by another task; once it gains a `create(payload)`
@@ -25,6 +26,7 @@ function formatDate(iso) {
 }
 
 export default function Team() {
+  const { confirm, ConfirmPortal } = useConfirm()
   const [orgs, setOrgs] = useState([])
   const [selected, setSelected] = useState(null)
   const [analytics, setAnalytics] = useState(null)
@@ -128,7 +130,7 @@ export default function Team() {
   }
 
   const handleRemoveMember = async (userId, email) => {
-    if (!selected || !window.confirm(`Remove ${email} from the team?`)) return
+    if (!selected || !await confirm({ message: `Remove ${email} from the team?`, danger: true, confirmLabel: 'Remove' })) return
     setRemovingId(userId)
     try {
       await orgApi.removeMember(selected.slug, userId)
@@ -262,6 +264,7 @@ export default function Team() {
   const pendingInvites = selected?.pending_invites || analytics?.pending_invites || []
 
   return (
+    <>
     <div className="max-w-5xl mx-auto space-y-6">
       <div className="flex items-start justify-between gap-4 flex-wrap">
         <PageHeader
@@ -588,5 +591,7 @@ export default function Team() {
         </div>
       )}
     </div>
+    <ConfirmPortal />
+    </>
   )
 }

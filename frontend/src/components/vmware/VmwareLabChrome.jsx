@@ -8,6 +8,7 @@ import toast from 'react-hot-toast'
 import { labApi } from '../../api/labs'
 import { vmwareApi } from '../../api/vmware'
 import JiraTicketLink from '../JiraTicketLink'
+import { ConfirmDialog } from '../ConfirmModal'
 import VmwareSshTerminal from './VmwareSshTerminal'
 
 const TOAST = { style: { background: '#1b2a3b', color: '#e8edf2', border: '1px solid #2d3a4a', fontSize: '12px' } }
@@ -39,6 +40,7 @@ export default function VmwareLabChrome({
   const [workflowBusy, setWorkflowBusy] = useState(false)
   const [extending, setExtending] = useState(false)
   const [stopping, setStopping] = useState(false)
+  const [showStopConfirm, setShowStopConfirm] = useState(false)
   const [panel, setPanel] = useState(null) // hints | results | info | ticket | ssh
   const [sshVmId, setSshVmId] = useState('')
 
@@ -153,7 +155,11 @@ export default function VmwareLabChrome({
 
   const handleStop = async () => {
     if (!sessionId || stopping) return
-    if (!window.confirm('Stop this lab session? Progress will be saved.')) return
+    setShowStopConfirm(true)
+  }
+
+  const confirmStop = async () => {
+    if (!sessionId || stopping) return
     setStopping(true)
     try {
       await labApi.stopLab(sessionId)
@@ -163,6 +169,7 @@ export default function VmwareLabChrome({
       toast.error(err.response?.data?.error || 'Failed to stop lab', TOAST)
     } finally {
       setStopping(false)
+      setShowStopConfirm(false)
     }
   }
 
@@ -406,6 +413,16 @@ export default function VmwareLabChrome({
           </SidePanel>
         )
       )}
+      <ConfirmDialog
+        open={showStopConfirm}
+        onClose={() => !stopping && setShowStopConfirm(false)}
+        title="Stop lab?"
+        message="Stop this lab session? Progress will be saved."
+        confirmLabel="Stop lab"
+        danger
+        loading={stopping}
+        onConfirm={confirmStop}
+      />
     </>
   )
 }

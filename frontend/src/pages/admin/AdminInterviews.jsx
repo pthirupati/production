@@ -6,6 +6,7 @@ import {
   Gift, DollarSign, Eye, Plus, Trash2, Upload, FileText,
 } from 'lucide-react'
 import toast from 'react-hot-toast'
+import { useConfirm } from '../../hooks/useConfirm'
 
 const TABS = [
   { id: 'overview', label: 'Analytics', icon: BarChart3 },
@@ -19,6 +20,7 @@ const TABS = [
 ]
 
 export default function AdminInterviews() {
+  const { confirm, ConfirmPortal } = useConfirm()
   const [overview, setOverview] = useState(null)
   const [campaigns, setCampaigns] = useState([])
   const [questions, setQuestions] = useState([])
@@ -55,7 +57,7 @@ export default function AdminInterviews() {
   }
 
   const deleteCorpus = async (c) => {
-    if (!window.confirm(`Delete corpus "${c.title}"?`)) return
+    if (!await confirm({ message: `Delete corpus "${c.title}"?`, danger: true, confirmLabel: 'Delete' })) return
     try {
       await adminApi.deleteInterviewAnswerCorpus(c.id)
       toast.success('Corpus deleted')
@@ -88,7 +90,7 @@ export default function AdminInterviews() {
   }
 
   const deleteQuestion = async (q) => {
-    if (!window.confirm('Delete this interview question from the bank?')) return
+    if (!await confirm({ message: 'Delete this interview question from the bank?', danger: true, confirmLabel: 'Delete' })) return
     try {
       await adminApi.deleteInterviewQuestion(q.id)
       setQuestions((qs) => qs.filter((x) => x.id !== q.id))
@@ -160,6 +162,7 @@ export default function AdminInterviews() {
   }
 
   return (
+    <>
     <div className="space-y-6">
       <AdminPageHeader
         title="AI Interview Studio"
@@ -642,5 +645,7 @@ export default function AdminInterviews() {
         </div>
       )}
     </div>
+    <ConfirmPortal />
+    </>
   )
 }

@@ -33,21 +33,19 @@ export default function OAuthCallback() {
       try {
         const socialConfig = await authApi.getSocialConfig()
         const redirectUri = getOAuthRedirectUri(socialConfig, provider)
-        const VALID_INTENTS = ['login', 'register', 'link']
-        const rawIntent = searchParams.get('state') || sessionStorage.getItem('oauth_intent') || searchParams.get('intent') || 'login'
-        const intent = VALID_INTENTS.includes(rawIntent) ? rawIntent : 'login'
-        sessionStorage.removeItem('oauth_intent')
-        if (intent === 'link') {
-          await authApi.socialLink(provider, code, redirectUri)
+        const oauthState = searchParams.get('state') || ''
+        const intentPrefix = oauthState.includes(':') ? oauthState.split(':')[0] : ''
+        if (intentPrefix === 'link') {
+          await authApi.socialLink(provider, code, redirectUri, oauthState)
           setStatus('success')
           toast.success(`${provider === 'github' ? 'GitHub' : 'Google'} linked to your profile`)
           setTimeout(() => navigate('/profile', { replace: true }), 800)
           return
         }
-        await authApi.socialLogin(provider, code, redirectUri, intent)
+        await authApi.socialLogin(provider, code, redirectUri, oauthState)
         setStatus('success')
         toast.success(
-          intent === 'register'
+          intentPrefix === 'register'
             ? `Account created with ${provider === 'github' ? 'GitHub' : 'Google'}!`
             : `Signed in with ${provider === 'github' ? 'GitHub' : 'Google'}!`
         )

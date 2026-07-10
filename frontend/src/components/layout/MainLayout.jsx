@@ -8,6 +8,7 @@ import { useState, useEffect, useRef } from 'react'
 import NotificationBell from './NotificationBell'
 import SupportBotWidget from '../SupportBotWidget'
 import api from '../../api/client'
+import { authApi } from '../../api/auth'
 import { PlatformBanners } from '../PlatformBanners'
 import CampaignBanner from '../CampaignBanner'
 import { FixitLogo } from '../design'
@@ -151,6 +152,8 @@ export default function MainLayout() {
   }, [])
 
   const isLabRoute = location.pathname.startsWith('/lab/')
+  const isInterviewRoute = /^\/interviews\/(room|round|async)\//.test(location.pathname)
+  const isFullscreenRoute = isLabRoute || isInterviewRoute
 
   useEffect(() => {
     if (!searchQuery || searchQuery.length < 2) { setSearchResults(null); return }
@@ -172,8 +175,8 @@ export default function MainLayout() {
     return () => document.removeEventListener('mousedown', handleClickOutside)
   }, [])
 
-  const handleLogout = () => {
-    logout()
+  const handleLogout = async () => {
+    await authApi.logout()
     navigate('/login')
   }
 
@@ -240,12 +243,12 @@ export default function MainLayout() {
                 </button>
                 <FixitLogo to="/dashboard" size="sm" />
               </div>
-              <PlatformBanners config={platformConfig} showMaintenance={!isLabRoute} showPromo={false} />
-              {!isLabRoute && <CampaignBanner placement="banner_top" />}
+              <PlatformBanners config={platformConfig} showMaintenance={!isFullscreenRoute} showPromo={false} />
+              {!isFullscreenRoute && <CampaignBanner placement="banner_top" />}
             </div>
           </div>
 
-          {!isLabRoute && (
+          {!isFullscreenRoute && (
             <div className="flex items-center gap-4 px-4 sm:px-7 h-[62px]" ref={searchRef}>
               <div className="relative flex-1 max-w-[380px]">
                 <Search size={15} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-white/40 pointer-events-none" />
@@ -327,8 +330,8 @@ export default function MainLayout() {
           )}
         </header>
 
-        <main id="main-content" className={`flex-1 min-h-0 overflow-y-auto overflow-x-hidden ${isLabRoute ? 'p-0' : 'p-3 sm:p-6 lg:p-8'}`} role="main">
-          <div className={isLabRoute ? 'h-full' : 'max-w-[1180px] w-full mx-auto'}>
+        <main id="main-content" className={`flex-1 min-h-0 overflow-y-auto overflow-x-hidden ${isFullscreenRoute ? 'p-0' : 'p-3 sm:p-6 lg:p-8'}`} role="main">
+          <div className={isFullscreenRoute ? 'h-full min-h-0' : 'max-w-[1180px] w-full mx-auto'}>
             <Outlet />
           </div>
         </main>

@@ -60,6 +60,7 @@ jobs:
 
           # Core health
           check "api/health"              "$BASE_URL/api/health/"
+          check "api/health/ready"          "$BASE_URL/api/health/ready/"
           check "api/stats"               "$BASE_URL/api/stats/"
           check "api/technologies"        "$BASE_URL/api/technologies/"
           check "api/scenarios"           "$BASE_URL/api/scenarios/"

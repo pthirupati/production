@@ -32,13 +32,13 @@ class OAuthCallbackUrlTests(TestCase):
 
     @override_settings(FRONTEND_URL="https://fixitlab.in", GITHUB_CLIENT_ID="gh-test-id")
     def test_github_authorize_url_uses_canonical_callback(self):
-        url = github_authorize_url(intent="login")
+        url = github_authorize_url(state="login:abc123nonce")
         self.assertIn("client_id=gh-test-id", url)
         self.assertIn(
             "redirect_uri=https%3A%2F%2Ffixitlab.in%2Fauth%2Fcallback%2Fgithub",
             url,
         )
-        self.assertIn("state=login", url)
+        self.assertIn("state=login%3Aabc123nonce", url)
 
     @override_settings(FRONTEND_URL="  https://fixitlab.in/  ", GITHUB_CLIENT_ID="gh-test-id")
     def test_canonical_frontend_url_strips_whitespace(self):

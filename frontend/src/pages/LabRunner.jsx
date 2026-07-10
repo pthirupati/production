@@ -335,6 +335,7 @@ export default function LabRunner() {
   const [provisioning, setProvisioning] = useState(false)
   const [provisioningStep, setProvisioningStep] = useState(0)
   const [provisioningElapsed, setProvisioningElapsed] = useState(0)
+  const [provisioningStuck, setProvisioningStuck] = useState(false)
   const [isCloudLab, setIsCloudLab] = useState(false)
   const [validating, setValidating] = useState(false)
   const [validationResult, setValidationResult] = useState(null)
@@ -611,6 +612,10 @@ export default function LabRunner() {
           setIsCloudLab(cloud)
           elapsedCounter += 3
           setProvisioningElapsed(elapsedCounter)
+          const timeoutSec = cloud ? 300 : 120
+          if (elapsedCounter >= timeoutSec) {
+            setProvisioningStuck(true)
+          }
           // For cloud labs, advance steps more slowly (they take 60-90s)
           if (cloud) {
             setProvisioningStep(prev => {
@@ -1246,10 +1251,26 @@ export default function LabRunner() {
         </div>
         {provisioning && (
           <p className="text-xs text-surface-500 mt-6">
-            {isCloudLab
+            {provisioningStuck
+              ? 'Provisioning is taking longer than expected. You can wait, go back, or retry.'
+              : isCloudLab
               ? `Elapsed: ${provisioningElapsed}s — this usually takes 60–90 seconds`
               : 'This usually takes 5–15 seconds...'}
           </p>
+        )}
+        {provisioningStuck && (
+          <div className="flex flex-wrap gap-3 justify-center mt-4">
+            <button type="button" onClick={() => navigate('/scenarios')} className="btn-secondary text-sm px-4">
+              Back to scenarios
+            </button>
+            <button
+              type="button"
+              onClick={() => { setProvisioningStuck(false); setProvisioningElapsed(0); window.location.reload() }}
+              className="btn-primary text-sm px-4"
+            >
+              Retry
+            </button>
+          </div>
         )}
       </div>
     </div>
@@ -2643,7 +2664,7 @@ export default function LabRunner() {
       </div>
 
       {/* Mobile: floating terminal input bar */}
-      {!isSimPrimaryLab && showMobileInput && (
+      {showMobileInput && (!isSimPrimaryLab || simTerminalOpen) && (
         <div className="sm:hidden fixed bottom-14 inset-x-0 bg-surface-950/95 border-t border-accent-cyan/30 px-3 py-2 flex gap-2 z-40 backdrop-blur-sm">
           <input
             autoFocus
@@ -2673,7 +2694,6 @@ export default function LabRunner() {
       )}
 
       {/* Mobile: floating action bar */}
-      {!isSimPrimaryLab && (
       <div className="sm:hidden fixed bottom-0 inset-x-0 bg-surface-900 border-t border-surface-700/50 px-2 py-2 flex items-center justify-around z-30 pb-[max(0.5rem,env(safe-area-inset-bottom))]">
         <LabTimerBadge variant="mobile-float" />
         <button onClick={() => { setSidebarTab('instructions'); setSidebarOpen(p => !p) }}
@@ -2702,13 +2722,14 @@ export default function LabRunner() {
           className="p-2 text-surface-400 hover:text-accent-red" aria-label="Stop lab">
           <StopCircle size={20} />
         </button>
-        <button onClick={() => setShowMobileInput(p => !p)}
-          className={`p-2 ${showMobileInput ? 'text-accent-cyan' : 'text-surface-400 hover:text-white'}`}
-          aria-label="Terminal input">
+        <button
+          onClick={() => isSimPrimaryLab ? setSimTerminalOpen(p => !p) : setShowMobileInput(p => !p)}
+          className={`p-2 ${(isSimPrimaryLab ? simTerminalOpen : showMobileInput) ? 'text-accent-cyan' : 'text-surface-400 hover:text-white'}`}
+          aria-label={isSimPrimaryLab ? 'Toggle terminal' : 'Terminal input'}
+        >
           <Keyboard size={20} />
         </button>
       </div>
-      )}
 
       {/* Stop confirmation dialog */}
       <ConfirmDialog

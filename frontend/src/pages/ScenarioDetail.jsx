@@ -18,7 +18,7 @@ import {
 import toast from 'react-hot-toast'
 import { PageHeader } from '../components/design'
 import { ScenarioStatsChip } from '../components/engagement'
-import { getScenarioSimInfo } from '../utils/simScenario'
+import { usePageTitle } from '../hooks/usePageTitle'
 
 const typeConfig = {
   fix: { icon: Wrench, label: 'Fix', desc: 'Find and fix the broken service' },
@@ -53,6 +53,12 @@ export default function ScenarioDetail() {
   const [jiraTicket, setJiraTicket] = useState(null)
   const [jiraComments, setJiraComments] = useState([])
   const [activeLabSession, setActiveLabSession] = useState(null)
+
+  usePageTitle(
+    scenario?.title,
+    scenario ? `${scenario.subtitle || scenario.description?.slice(0, 155) || ''} — hands-on lab on FixitLab` : undefined,
+    scenario ? { canonical: `${window.location.origin}/scenarios/${scenario.slug}` } : undefined,
+  )
 
   const loadJiraTicket = (scenarioId, accessible) => {
     if (!isAuthenticated || !scenarioId || accessible === false) {
