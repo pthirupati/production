@@ -28,6 +28,8 @@ def init_lvm_storage_ops(state) -> None:
     """LVM extend: new disk hidden until @storage team provisions it."""
     state.pending_storage_device = "/dev/sdb"
     state.storage_disk_provisioned = False
+    if "/dev/sdb" not in state.block_devices and "/dev/sdb" not in state.hidden_block_devices:
+        state.add_block_device("/dev/sdb", "50G", "disk", present=False)
     if "/dev/sdb" in state.lvm.pvs:
         del state.lvm.pvs["/dev/sdb"]
 

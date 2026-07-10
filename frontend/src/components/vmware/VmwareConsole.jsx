@@ -56,6 +56,20 @@ export default function VmwareConsole({ vm, onClose, onGuestAction }) {
   ), [isWin, vm?.id, vm?.hostname, vm?.ip, vm?.disk_gb, vm?.memory_mb, vm?.cpu, vm?.guest_disk_hidden, vm?.kernel_module_missing])
   const linuxTabs = useLinuxTerminalTabs(vm, { enabled: !isWin })
   const shell = isWin ? winShell : (linuxTabs.activeShell || linuxTabs.getShell(linuxTabs.activeId))
+
+  // Keep in-memory guest shell flags aligned with live vCenter inventory (hot-add/rescan).
+  useEffect(() => {
+    if (isWin || !vm) return
+    linuxTabs.tabs.forEach((tab) => {
+      linuxTabs.getShell(tab.id)?.syncVm?.(vm)
+    })
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- sync guest flags when vCenter hardware changes
+  }, [
+    vm, isWin,
+    vm?.guest_disk_hidden, vm?.guest_disk_visible, vm?.guest_nic_pending,
+    vm?.guest_pending_disks?.length, vm?.guest_pending_nics?.length,
+    vm?.disks?.length, vm?.nics?.length,
+  ])
   const grubEntries = useMemo(() => buildGrubEntries(vm), [vm?.id, vm?.guest_os, vm?.guest_os_version])
 
   const [lines, setLines] = useState([])

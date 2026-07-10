@@ -233,14 +233,13 @@ class RHELOSState:
         self.pid_counter = 900
 
     def _init_block_devices(self) -> None:
-        """Seed the default disk layout: sda (boot + LVM PV) plus a spare sdb."""
+        """Seed the boot disk layout (sda + LVM). Extra disks come from scenario presets or VMware hot-add."""
         self.block_devices = {
             "/dev/sda": SimBlockDevice("/dev/sda", "50G", "disk"),
             "/dev/sda1": SimBlockDevice("/dev/sda1", "1G", "part", parent="/dev/sda",
                                         fstype="xfs", uuid="aaaa1111-boot", mountpoint="/boot"),
             "/dev/sda2": SimBlockDevice("/dev/sda2", "49G", "part", parent="/dev/sda",
                                         fstype="LVM2_member", uuid="bbbb2222-pv"),
-            "/dev/sdb": SimBlockDevice("/dev/sdb", "50G", "disk"),
         }
         # Root + swap LVs exposed as device-mapper block devices.
         self.block_devices["/dev/mapper/rhel-root"] = SimBlockDevice(

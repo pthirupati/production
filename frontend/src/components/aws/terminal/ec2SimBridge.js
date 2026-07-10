@@ -22,9 +22,18 @@ function guestOsLabel(os) {
   return map[os] || os || 'Linux'
 }
 
-function instanceToVm(instance) {
+function instanceToVm(instance, store) {
   const it = getInstanceType(instance.type)
   const hostname = `ip-${(instance.privateIp || '172.31.14.52').replace(/\./g, '-')}`
+  const attached = (store?.volumes || []).filter((v) => v.attachedTo === instance.id)
+  const rootVol = attached.find((v) => (v.device || '').includes('xvda') || (v.device || '').includes('sda')) || attached[0]
+  const diskGb = rootVol?.size || 30
+  const disks = attached.map((v, i) => ({
+    scsi_unit: i,
+    capacity_gb: v.size || 8,
+    label: i === 0 ? 'Root volume' : `EBS volume ${i + 1}`,
+    scsi_id: `0:${i}`,
+  }))
   return {
     id: instance.id,
     name: instance.name || instance.id,
@@ -32,7 +41,9 @@ function instanceToVm(instance) {
     ip: instance.privateIp || '172.31.14.52',
     guest_os: guestOsLabel(instance.os),
     guest_os_version: guestOsLabel(instance.os),
-    disk_gb: 30,
+    disk_gb: diskGb,
+    disks,
+    nics: [{ label: 'Eth0', mac_address: '02:00:00:00:00:01', connected: true }],
     memory_mb: Math.max(512, Math.round((it.memGiB || 1) * 1024)),
     cpu: it.vcpu || 1,
     workload: resolveEc2Workload(instance),
@@ -49,7 +60,7 @@ function writeLines(onWrite, lines) {
  */
 export function createEc2SimShell(instance, opts = {}) {
   const workload = resolveEc2Workload(instance)
-  const vm = instanceToVm(instance)
+  const vm = instanceToVm(instance, store)
   const store = opts.store
   const onExit = opts.onExit
 

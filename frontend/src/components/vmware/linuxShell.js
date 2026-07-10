@@ -102,34 +102,79 @@ function fmtGb(n, opts = {}) {
   return opts.lt ? `<${body}` : body
 }
 
-function visibleGuestDisk(vm, shared) {
-  return !vm?.guest_disk_hidden || shared.diskRescanned
+/** SCSI unit 1 → sdb, 2 → sdc, … (unit 0 is always the boot disk on sda). */
+function scsiUnitToDevLetter(scsiUnit) {
+  const unit = Number(scsiUnit) || 0
+  if (unit <= 0) return null
+  return String.fromCharCode(96 + unit + 1)
 }
 
-/** Extra hot-added disks (SCSI unit > 0) visible after rescan. */
+function scsiUnitToDevPath(scsiUnit) {
+  const letter = scsiUnitToDevLetter(scsiUnit)
+  return letter ? `/dev/sd${letter}` : null
+}
+
+/** Extra (non-boot) disks visible in the guest — mirrors vm.disks[] + hot-add pending state. */
 function guestExtraDisks(vm, shared) {
-  const pending = vm?.guest_pending_disks || []
-  const fromInventory = (vm?.disks || []).filter((d) => (d.scsi_unit ?? 0) > 0)
-  const merged = pending.length ? pending : fromInventory.map((d) => ({
-    scsi_unit: d.scsi_unit,
-    capacity_gb: d.capacity_gb || 20,
-    scsi_id: d.scsi_id || `0:${d.scsi_unit}`,
-  }))
   if (!shared.diskRescanned && vm?.guest_disk_hidden) {
     return []
   }
-  return merged
+  const pending = vm?.guest_pending_disks || []
+  if (pending.length) {
+    return pending.map((d, i) => {
+      const unit = d.scsi_unit ?? (i + 1)
+      return {
+        letter: scsiUnitToDevLetter(unit) || String.fromCharCode(98 + i),
+        scsi_unit: unit,
+        capacity_gb: d.capacity_gb || d.size_gb || 20,
+        scsi_id: d.scsi_id || `0:${unit}`,
+      }
+    })
+  }
+  return (vm?.disks || [])
+    .filter((d) => (d.scsi_unit ?? 0) > 0)
+    .map((d) => ({
+      letter: scsiUnitToDevLetter(d.scsi_unit) || 'b',
+      scsi_unit: d.scsi_unit,
+      capacity_gb: d.capacity_gb || d.size_gb || 20,
+      scsi_id: d.scsi_id || `0:${d.scsi_unit}`,
+    }))
+}
+
+function extraDiskPath(extra) {
+  if (!extra) return null
+  return `/dev/sd${extra.letter || scsiUnitToDevLetter(extra.scsi_unit) || 'b'}`
+}
+
+function extraDiskPartPath(extra) {
+  const base = extraDiskPath(extra)
+  return base ? `${base}1` : null
+}
+
+function devMatchesExtraDisk(dev, vm, shared) {
+  const norm = normalizeDevName(dev || '')
+  return guestExtraDisks(vm, shared).some((d) => {
+    const base = extraDiskPath(d)
+    const part = extraDiskPartPath(d)
+    return norm === base || norm === part || norm.startsWith(`${base}`)
+  })
 }
 
 function guestExtraNics(vm, shared) {
   const pending = vm?.guest_pending_nics || []
   if (!shared.nicRescanned && vm?.guest_nic_pending) return []
-  if (pending.length) return pending
+  if (pending.length) {
+    return pending.map((n, i) => ({
+      name: n.name || `eth${i + 1}`,
+      mac: n.mac || n.mac_address || `00:50:56:${(i + 1).toString(16).padStart(2, '0')}:c3:d4`,
+      label: n.label || `Network adapter ${i + 2}`,
+    }))
+  }
   const nics = vm?.nics || []
   if (nics.length <= 1) return []
   return nics.slice(1).map((n, i) => ({
     name: `eth${i + 1}`,
-    mac: n.mac || `00:50:56:${(i + 1).toString(16).padStart(2, '0')}:c3:d4`,
+    mac: n.mac || n.mac_address || `00:50:56:${(i + 1).toString(16).padStart(2, '0')}:c3:d4`,
     label: n.label || `Network adapter ${i + 2}`,
   }))
 }
@@ -1418,6 +1463,15 @@ export function createLinuxShell(vm, opts = {}) {
     else if (lc === 'ls' || lc === 'll' || lc === 'dir' || lc === 'vdir') {
       const long = lc === 'll' || has('-l') || has('-la') || has('-al')
       const allF = has('-a') || has('-la') || has('-al') || has('-A')
+      const netTarget = positional.find((t) => abs(t).replace(/\/+$/, '') === '/sys/class/net')
+      if (netTarget) {
+        const nicNames = ['lo', 'eth0', ...guestExtraNics(vm, shared).map((n) => n.name)]
+        if (long) {
+          nicNames.forEach((n) => emit(`lrwxrwxrwx 1 root root 0 ${nowStamp()} ${n} -> ../../devices/virtual/net/${n}`))
+        } else {
+          emit(nicNames.join('  '))
+        }
+      } else {
       const targets = positional.length ? positional : [cwd.path]
       targets.forEach((t, ti) => {
         const p = abs(t)
@@ -1444,6 +1498,7 @@ export function createLinuxShell(vm, opts = {}) {
         }
         if (targets.length > 1 && ti < targets.length - 1) out.push('')
       })
+      }
     }
     else if (lc === 'cat' || lc === 'more' || lc === 'less' || lc === 'bat') {
       if (!positional.length) emit('')
@@ -1736,12 +1791,20 @@ export function createLinuxShell(vm, opts = {}) {
         'Filesystem      Size  Used Avail Use% Mounted on',
         `/dev/mapper/rootvg-root  ${rootSize}G  ${used}G   ${avail}G  31% /`,
         'tmpfs           ' + Math.round(memMb / 2) + 'M     0  ' + Math.round(memMb / 2) + 'M   0% /dev/shm',
-        ...(shared.diskMounted ? ['/dev/sdb1         20G  1.2G   19G   6% /data'] : []),
+        ...(shared.diskMounted && guestExtraDisks(vm, shared).length ? (() => {
+          const d = guestExtraDisks(vm, shared)[0]
+          const gb = d.capacity_gb || 20
+          return [`/dev/sd${d.letter}1         ${gb}G  1.2G   ${gb - 1}G   6% /data`]
+        })() : []),
       ])
       else emit([
         'Filesystem     1K-blocks    Used Available Use% Mounted on',
         `/dev/mapper/rootvg-root ${rootSize * 1024 * 1024} ${used * 1024 * 1024} ${avail * 1024 * 1024}  31% /`,
-        ...(shared.diskMounted ? [`/dev/sdb1       20971520 1258291  19713229   6% /data`] : []),
+        ...(shared.diskMounted && guestExtraDisks(vm, shared).length ? (() => {
+          const d = guestExtraDisks(vm, shared)[0]
+          const gb = d.capacity_gb || 20
+          return [`/dev/sd${d.letter}1       ${gb * 1024 * 1024} 1258291  ${(gb - 1) * 1024 * 1024}   6% /data`]
+        })() : []),
       ])
     }
 
@@ -2071,7 +2134,8 @@ export function createLinuxShell(vm, opts = {}) {
         `[    0.000000] Command line: BOOT_IMAGE=/boot/vmlinuz-${kernel} root=UUID=8f3b... ro quiet`,
         '[    1.234567] systemd[1]: Reached target Multi-User System.',
         '[    2.100000] sd 2:0:0:0: [sda] Attached SCSI disk',
-        ...(shared.diskRescanned && vm?.guest_disk_hidden ? ['[ 1284.55] sd 2:0:1:0: [sdb] Attached SCSI disk'] : []),
+        ...guestExtraDisks(vm, shared).map((d) =>
+          `[ 1284.55] sd 2:0:${d.scsi_unit}:0: [sd${d.letter}] Attached SCSI disk`),
         '[    8.442000] IPv6: ADDRCONF(NETDEV_CHANGE): eth0: link becomes ready',
       ])
     }
@@ -2291,12 +2355,14 @@ export function createLinuxShell(vm, opts = {}) {
     /* =================== storage =================== */
     else if (lc === 'lsblk') {
       const extras = guestExtraDisks(vm, shared)
-      const extraLines = extras.flatMap((d, i) => {
-        const dev = String.fromCharCode(98 + i)
+      const extraLines = extras.flatMap((d) => {
+        const letter = d.letter || 'b'
         const gb = d.capacity_gb || 20
+        const maj = 8 + (letter.charCodeAt(0) - 97) * 16
         return [
-          `sd${dev}      8:${16 + i * 16}   0   ${gb}G  0 disk`,
-          ...(shared.diskFormatted && !lvm.extraPvInVg ? [`└─sd${dev}1   8:${17 + i * 16}   0   ${gb}G  0 part${shared.diskMounted ? ' /data' : ''}`] : []),
+          `sd${letter}      ${maj}:0    0   ${gb}G  0 disk`,
+          ...(shared.diskFormatted && !lvm.extraPvInVg ? [`└─sd${letter}1   ${maj}:1    0   ${gb}G  0 part${shared.diskMounted ? ' /data' : ''}`] : []),
+          ...(lvm.extraPvInVg && lvm.extraPvDevice?.includes(`sd${letter}`) ? [`└─rootvg-root 253:0 0 ${Math.round(lvm.rootLvGb)}G  0 lvm  /`] : []),
         ]
       })
       emit([
@@ -2306,59 +2372,68 @@ export function createLinuxShell(vm, opts = {}) {
         `└─sda2   8:2    0  ${diskGb - 1}G  0 part`,
         `  ├─rootvg-root 253:0 0 ${Math.round(lvm.rootLvGb)}G  0 lvm  /`,
         `  └─rootvg-swap 253:1 0  ${lvm.swapGb}G  0 lvm  [SWAP]`,
-        ...(visibleGuestDisk(vm, shared) && !extras.length ? [
-          `sdb      8:16   0   20G  0 disk`,
-          ...(lvm.extraPvInVg ? [`└─rootvg-root 253:0 0 ${Math.round(lvm.rootLvGb)}G  0 lvm  /`] : []),
-          ...(!lvm.extraPvInVg && shared.diskFormatted ? [`└─sdb1   8:17   0   20G  0 part${shared.diskMounted ? ' /data' : ''}`] : []),
-        ] : []),
         ...extraLines,
         'sr0     11:0    1 1024M  0 rom',
       ])
     }
     else if (lc === 'blkid') {
+      const extras = guestExtraDisks(vm, shared)
       emit([
         '/dev/sda1: UUID="1a2b3c4d-5e6f-7081-92a3-b4c5d6e7f809" TYPE="xfs" PARTUUID="000a1b2c-01"',
         '/dev/sda2: UUID="8f3b2c1a-0e4d-4c6b-9a7f-1d2e3f4a5b6c" TYPE="xfs" PARTUUID="000a1b2c-02"',
         ...(lvm.extraPvDevice ? [`${lvm.extraPvDevice}: UUID="lvm-pv-deadc0de" TYPE="LVM2_member"`] : []),
-        ...(!lvm.extraPvDevice && shared.diskFormatted ? ['/dev/sdb1: UUID="deadc0de-1234-5678-9abc-def012345678" TYPE="ext4"'] : []),
+        ...(shared.diskFormatted && extras.length && !lvm.extraPvDevice
+          ? [`${extraDiskPartPath(extras[0])}: UUID="deadc0de-1234-5678-9abc-def012345678" TYPE="ext4"`]
+          : []),
       ])
     }
     else if (lc === 'fdisk' || lc === 'parted' || lc === 'sfdisk' || lc === 'gdisk') {
       if (has('-l') || lc === 'parted') {
+        const extras = guestExtraDisks(vm, shared)
         emit([
           `Disk /dev/sda: ${diskGb} GiB, ${diskGb * 1024 * 1024 * 1024} bytes, ${diskGb * 2 * 1024 * 1024} sectors`,
           'Units: sectors of 1 * 512 = 512 bytes',
           'Device     Boot   Start      End  Sectors Size Type',
           '/dev/sda1  *       2048  2099199  2097152   1G Linux filesystem',
           `/dev/sda2       2099200 ${diskGb * 2 * 1024 * 1024} ... ${diskGb - 1}G Linux filesystem`,
-          ...(visibleGuestDisk(vm, shared) ? ['', `Disk /dev/sdb: 20 GiB, 21474836480 bytes`, shared.diskFormatted ? '/dev/sdb1       2048  41943039  41940992  20G Linux filesystem' : 'Disk /dev/sdb doesn\'t contain a valid partition table'] : []),
+          ...extras.flatMap((d) => {
+            const gb = d.capacity_gb || 20
+            const dev = extraDiskPath(d)
+            return ['', `Disk ${dev}: ${gb} GiB, ${gb * 1024 * 1024 * 1024} bytes`,
+              shared.diskFormatted
+                ? `${extraDiskPartPath(d)}       2048  41943039  41940992  ${gb}G Linux filesystem`
+                : `${dev} doesn't contain a valid partition table`]
+          }),
         ])
-      } else emit(`Welcome to fdisk (util-linux 2.37.4).\nCommand (m for help): (simulated — use 'fdisk -l' to list, or mkfs to format /dev/sdb)`)
+      } else emit('Welcome to fdisk (util-linux 2.37.4).\nCommand (m for help): (simulated — use \'fdisk -l\' to list disks)')
     }
     else if (lc === 'mkfs' || lc.startsWith('mkfs.') || lc === 'mke2fs' || lc === 'mkswap') {
       const dev = positional.find(a => a.includes('/dev/')) || positional[0] || ''
-      if (dev.includes('sdb') && shared.diskRescanned && !shared.diskFormatted) {
+      if (devMatchesExtraDisk(dev, vm, shared) && shared.diskRescanned && !shared.diskFormatted) {
         shared.diskFormatted = true
         emit([`mke2fs 1.46.5 (30-Dec-2021)`, `Creating filesystem with 5242880 4k blocks and 1310720 inodes`, `Filesystem UUID: deadc0de-1234-5678-9abc-def012345678`, `Writing superblocks and filesystem accounting information: done`])
         sideEffect = { action: 'guest_format_disk', vm_id: vm?.id }
-      } else if (dev.includes('sdb') && shared.diskFormatted) {
-        emit(`mke2fs 1.46.5 (30-Dec-2021)\n/dev/sdb contains a ext4 file system\nProceed anyway? (y,N) (simulated — already formatted)`)
-      } else if (!dev.includes('sdb') && dev.includes('sd')) emit(`mkfs.ext4: will not make a filesystem on '${dev}' — it is mounted`)
-      else emit('Usage: mkfs.ext4 /dev/sdb')
+      } else if (devMatchesExtraDisk(dev, vm, shared) && shared.diskFormatted) {
+        emit(`mke2fs 1.46.5 (30-Dec-2021)\n${dev} contains a ext4 file system\nProceed anyway? (y,N) (simulated — already formatted)`)
+      } else if (dev.includes('sd') && !devMatchesExtraDisk(dev, vm, shared)) emit(`mkfs.ext4: ${dev} not found`)
+      else if (dev.includes('sd') && dev.includes('sda')) emit(`mkfs.ext4: will not make a filesystem on '${dev}' — it is mounted`)
+      else emit('Usage: mkfs.ext4 /dev/sdX  (attach a disk in vCenter first)')
     }
     else if (lc === 'mount') {
       const dev = positional[0] || ''
       const mnt = positional[1] || '/data'
+      const extras = guestExtraDisks(vm, shared)
       if (!positional.length) {
         emit(['/dev/sda2 on / type xfs (rw,relatime,seclabel)', '/dev/sda1 on /boot type xfs (rw,relatime)', 'proc on /proc type proc (rw,nosuid,nodev,noexec)', 'tmpfs on /dev/shm type tmpfs (rw,nosuid,nodev)',
-          ...(shared.diskMounted ? ['/dev/sdb1 on /data type ext4 (rw,relatime)'] : [])])
-      } else if (dev.includes('sdb') && shared.diskFormatted && !shared.diskMounted) {
+          ...(shared.diskMounted && extras.length ? [`${extraDiskPartPath(extras[0])} on /data type ext4 (rw,relatime)`] : [])])
+      } else if (devMatchesExtraDisk(dev, vm, shared) && shared.diskFormatted && !shared.diskMounted) {
         shared.diskMounted = true
         vfs.ensureDir(mnt.startsWith('/') ? mnt : '/data')
         emit('')
         sideEffect = { action: 'guest_mount_disk', vm_id: vm?.id }
-      } else if (dev.includes('sdb') && !shared.diskFormatted) emit(`mount: ${mnt}: wrong fs type, bad option, bad superblock on ${dev}. (run mkfs.ext4 ${dev} first)`)
-      else if (dev.includes('sdb') && shared.diskMounted) emit(`mount: ${dev} already mounted on /data.`)
+      } else if (devMatchesExtraDisk(dev, vm, shared) && !shared.diskFormatted) emit(`mount: ${mnt}: wrong fs type, bad option, bad superblock on ${dev}. (run mkfs.ext4 ${dev} first)`)
+      else if (devMatchesExtraDisk(dev, vm, shared) && shared.diskMounted) emit(`mount: ${dev} already mounted on /data.`)
+      else if (dev.includes('sd') && !devMatchesExtraDisk(dev, vm, shared)) emit(`mount: ${dev}: special device does not exist`)
       else emit('')
     }
     else if (lc === 'umount') emit('')
@@ -2376,11 +2451,13 @@ export function createLinuxShell(vm, opts = {}) {
     else if (lc === 'lvs' || lc === 'lvdisplay') emit(['  LV     VG     Attr       LSize   Pool Origin', `  root   rootvg -wi-ao---- ${fmtGb(lvm.rootLvGb, { lt: true })}`, `  swap   rootvg -wi-ao----   ${fmtGb(lvm.swapGb)}`])
     else if (lc === 'pvcreate') {
       const dev = normalizeDevName(positional.find(a => a.includes('/dev/')) || positional[0] || '')
+      const extras = guestExtraDisks(vm, shared)
       if (!dev) emit('pvcreate: Please enter a physical volume path')
-      else if (!visibleGuestDisk(vm, shared) || !dev.includes('sdb')) emit(`  Device ${dev} not found.`)
+      else if (!extras.length || !devMatchesExtraDisk(dev, vm, shared)) emit(`  Device ${dev} not found.`)
       else if (lvm.extraPvDevice) emit(`  Physical volume "${lvm.extraPvDevice}" is already initialized.`)
       else {
         lvm.extraPvDevice = dev
+        lvm.extraPvGb = extras[0]?.capacity_gb || 20
         shared.diskFormatted = false
         shared.diskMounted = false
         emit(`  Physical volume "${dev}" successfully created.`)

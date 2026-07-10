@@ -16,6 +16,8 @@ function cloudShellVm(region) {
     guest_os: 'Amazon Linux 2023',
     guest_os_version: 'Amazon Linux 2023',
     disk_gb: 8,
+    disks: [{ scsi_unit: 0, capacity_gb: 8, label: 'Root volume', scsi_id: '0:0' }],
+    nics: [{ label: 'Eth0', mac_address: '02:00:00:00:00:01', connected: true }],
     memory_mb: 1024,
     cpu: 2,
     workload: 'linux',
