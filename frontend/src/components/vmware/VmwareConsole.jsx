@@ -141,6 +141,18 @@ export default function VmwareConsole({ vm, onClose, onGuestAction }) {
       lines: lines.slice(-400),
       cmd,
       histIdx,
+      authenticated: true,
+    })
+  }, [vm?.id, phase, lines, cmd, histIdx])
+
+  useEffect(() => () => {
+    if (!vm?.id || (phase !== 'shell' && phase !== 'rescue')) return
+    saveConsoleState(vm.id, {
+      phase,
+      lines: lines.slice(-400),
+      cmd,
+      histIdx,
+      authenticated: true,
     })
   }, [vm?.id, phase, lines, cmd, histIdx])
 

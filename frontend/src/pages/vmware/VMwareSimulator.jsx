@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Link, useParams, useSearchParams, useNavigate } from 'react-router-dom'
 import { vmwareApi } from '../../api/vmware'
 import { labApi } from '../../api/labs'
-import { registerLabChildTab, subscribeLabSync } from '../../utils/labSync'
+import { registerLabChildTab, subscribeLabSync, broadcastLabActivity } from '../../utils/labSync'
 import toast from 'react-hot-toast'
 import VmwareLoginGate, { isVcenterAuthenticated } from '../../components/vmware/VmwareLoginGate'
 import VmwareScenarioActions from '../../components/vmware/VmwareScenarioActions'
@@ -807,6 +807,20 @@ export default function VMwareSimulator() {
   }, [load])
 
   useEffect(() => { load() }, [load])
+
+  // Ping parent LabRunner so idle timeout resets while user works in this child tab.
+  useEffect(() => {
+    if (!sessionId) return undefined
+    const ping = () => broadcastLabActivity(sessionId)
+    const events = ['keydown', 'mousedown', 'mousemove', 'touchstart', 'scroll', 'click']
+    events.forEach((e) => window.addEventListener(e, ping, { passive: true }))
+    const iv = setInterval(ping, 60_000)
+    ping()
+    return () => {
+      clearInterval(iv)
+      events.forEach((e) => window.removeEventListener(e, ping))
+    }
+  }, [sessionId])
 
   // Keep guest console VM in sync with vCenter state (disk/NIC hot-add flags).
   useEffect(() => {

@@ -208,6 +208,12 @@ if _role_runs app; then
   echo "Refreshing tutorial enrichment (topic-specific diagrams/commands)..."
   docker compose -f "$COMPOSE_FILE" --env-file "$ENV_FILE" exec -T backend python manage.py re_enrich_tutorials || true
 
+  echo "Validating scenario catalog (hints, validation scripts, check.sh)..."
+  docker compose -f "$COMPOSE_FILE" --env-file "$ENV_FILE" exec -T backend \
+    python manage.py validate_scenario_catalog --fail-on-gaps 2>&1 | tee /tmp/validate_scenario_catalog.log || {
+      echo "WARNING: validate_scenario_catalog reported gaps — review /tmp/validate_scenario_catalog.log"
+    }
+
   echo "Seeding/updating interview question bank (free, rule-based)..."
   docker compose -f "$COMPOSE_FILE" --env-file "$ENV_FILE" exec -T backend python manage.py seed_interview_data || true
 

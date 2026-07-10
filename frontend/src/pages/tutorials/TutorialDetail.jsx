@@ -66,7 +66,6 @@ function normalizeProse(text) {
   return (text || '')
     .replace(/(\w)- (\w)/g, '$1$2')
     .replace(/(\w)-\n(\w)/g, '$1$2')
-    .replace(/\s+/g, ' ')
     .trim()
 }
 

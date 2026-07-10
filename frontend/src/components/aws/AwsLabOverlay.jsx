@@ -28,13 +28,7 @@ export default function AwsLabOverlay({
 }) {
   useEffect(() => {
     if (!sessionId) return
-    const key = `fixitlab-aws-lab-seeded:${sessionId}`
-    try {
-      if (!sessionStorage.getItem(key)) {
-        useAwsStore.getState().resetSimulation()
-        sessionStorage.setItem(key, '1')
-      }
-    } catch { /* storage unavailable */ }
+    useAwsStore.getState().resetSimulation()
   }, [sessionId])
 
   return (

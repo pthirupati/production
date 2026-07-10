@@ -12,7 +12,7 @@ import {
   Ticket as TicketIcon, Lock, ChevronDown, ChevronUp, ThumbsUp, ThumbsDown
 } from 'lucide-react'
 import toast from 'react-hot-toast'
-import { broadcastLabStopped, closeLabChildTabs } from '../utils/labSync'
+import { broadcastLabStopped, closeLabChildTabs, broadcastLabActivity } from '../utils/labSync'
 import { ConfirmDialog } from '../components/ConfirmModal'
 import JiraTicketPanel from '../components/JiraTicketPanel'
 import ItsmTicketPanel from '../components/itsm/ItsmTicketPanel'
@@ -395,6 +395,7 @@ export default function LabRunner() {
   const TOAST = {}
 
   const labChannelRef = useRef(null)  // BroadcastChannel for cross-tab sync
+  const idleResetRef = useRef(null)
   const closeTimerRef = useRef(null)
   const closeCountdownRef = useRef(null)
   // Always-fresh technology slug so cross-tab / async handlers can route back to
@@ -515,6 +516,10 @@ export default function LabRunner() {
 
     channel.onmessage = (event) => {
       const { type, sessionId: stoppedId, reason, closingDelayMs } = event.data || {}
+      if (type === 'lab_activity' && stoppedId === sessionId) {
+        idleResetRef.current?.()
+        return
+      }
       if (type === 'lab_stopped' && stoppedId === sessionId) {
         const finish = () => {
           cleanupLabResources()
@@ -779,6 +784,7 @@ export default function LabRunner() {
         navigate(getLabExitPath(session, '', techSlugRef, scenarioSlugRef))
       }, IDLE_TIMEOUT)
     }
+    idleResetRef.current = resetIdleTimer
 
     // Reset timer on any user interaction
     const events = ['keydown', 'mousedown', 'mousemove', 'touchstart', 'scroll']
@@ -787,6 +793,7 @@ export default function LabRunner() {
 
     return () => {
       if (idleTimer) clearTimeout(idleTimer)
+      idleResetRef.current = null
       events.forEach(e => window.removeEventListener(e, resetIdleTimer))
     }
   }, [session, sessionId])

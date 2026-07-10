@@ -28,6 +28,16 @@ export function registerLabChildTab(sessionId, label = 'lab-child') {
   }
 }
 
+/** Broadcast user activity from child tabs (VMware, etc.) to reset parent idle timer. */
+export function broadcastLabActivity(sessionId) {
+  if (!sessionId || typeof BroadcastChannel === 'undefined') return
+  try {
+    const ch = new BroadcastChannel(channelName(sessionId))
+    ch.postMessage({ type: 'lab_activity', sessionId, ts: Date.now() })
+    ch.close()
+  } catch { /* */ }
+}
+
 /** Broadcast lab stopped/expired/completed to all tabs for this session. */
 export function broadcastLabStopped(sessionId, reason = 'stopped', extra = {}) {
   if (!sessionId || typeof BroadcastChannel === 'undefined') return
