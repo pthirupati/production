@@ -1,5 +1,6 @@
 import api from './client'
 import { useAuthStore } from '../store/authStore'
+import { rehydrateAwsSimForUser, resetAwsSimOnLogout } from '../components/aws/store/awsStore'
 
 export const authApi = {
   async sendOTP(email) {
@@ -22,12 +23,14 @@ export const authApi = {
       last_name: lastName || '',
     })
     useAuthStore.getState().setAuth(data.user, data.access, data.refresh)
+    await rehydrateAwsSimForUser()
     return data
   },
 
   async login(email, password) {
     const { data } = await api.post('/auth/login/', { email, password })
     useAuthStore.getState().setAuth(data.user, data.access, data.refresh)
+    await rehydrateAwsSimForUser()
     return data
   },
 
@@ -43,6 +46,7 @@ export const authApi = {
     } catch {
       // Ignore errors — still clear local state
     } finally {
+      resetAwsSimOnLogout()
       store.logout()
     }
   },
@@ -96,6 +100,7 @@ export const authApi = {
       code, redirect_uri: redirectUri, intent,
     })
     useAuthStore.getState().setAuth(data.user, data.access, data.refresh)
+    await rehydrateAwsSimForUser()
     return data
   },
 

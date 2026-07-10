@@ -7,23 +7,23 @@ import { useLinuxTerminalTabs } from '../linux/useLinuxTerminalTabs'
 const LOGIN_HINT = 'Hint: root/root13 or labuser/labuser@123'
 const GRUB_TIMEOUT = 8 // seconds the GRUB menu counts down before auto-booting
 
-function consoleStorageKey(vmId) {
-  return `fixitlab-vmware-console:${vmId || 'guest'}`
+function consoleStorageKey(labSessionId, vmId) {
+  return `fixitlab-vmware-console:${labSessionId || 'standalone'}:${vmId || 'guest'}`
 }
 
-function loadConsoleState(vmId) {
+function loadConsoleState(labSessionId, vmId) {
   try {
-    const raw = sessionStorage.getItem(consoleStorageKey(vmId))
+    const raw = sessionStorage.getItem(consoleStorageKey(labSessionId, vmId))
     return raw ? JSON.parse(raw) : null
   } catch {
     return null
   }
 }
 
-function saveConsoleState(vmId, snapshot) {
+function saveConsoleState(labSessionId, vmId, snapshot) {
   if (!vmId) return
   try {
-    sessionStorage.setItem(consoleStorageKey(vmId), JSON.stringify(snapshot))
+    sessionStorage.setItem(consoleStorageKey(labSessionId, vmId), JSON.stringify(snapshot))
   } catch { /* storage unavailable */ }
 }
 
@@ -49,12 +49,12 @@ function loginBanner(vm) {
   ]
 }
 
-export default function VmwareConsole({ vm, onClose, onGuestAction }) {
+export default function VmwareConsole({ vm, labSessionId, onClose, onGuestAction }) {
   const isWin = isWindowsGuest(vm)
   const winShell = useMemo(() => (
     isWin ? createWindowsShell(vm) : null
   ), [isWin, vm?.id, vm?.hostname, vm?.ip, vm?.disk_gb, vm?.memory_mb, vm?.cpu, vm?.guest_disk_hidden, vm?.kernel_module_missing])
-  const linuxTabs = useLinuxTerminalTabs(vm, { enabled: !isWin })
+  const linuxTabs = useLinuxTerminalTabs(vm, { enabled: !isWin, labSessionId })
   const shell = isWin ? winShell : (linuxTabs.activeShell || linuxTabs.getShell(linuxTabs.activeId))
 
   // Keep in-memory guest shell flags aligned with live vCenter inventory (hot-add/rescan).
@@ -150,7 +150,7 @@ export default function VmwareConsole({ vm, onClose, onGuestAction }) {
   // Persist shell/rescue session when console is closed and reopened (minimize/reopen flow).
   useEffect(() => {
     if (!vm?.id || (phase !== 'shell' && phase !== 'rescue')) return
-    saveConsoleState(vm.id, {
+    saveConsoleState(labSessionId, vm.id, {
       phase,
       lines: lines.slice(-400),
       cmd,
@@ -161,7 +161,7 @@ export default function VmwareConsole({ vm, onClose, onGuestAction }) {
 
   useEffect(() => () => {
     if (!vm?.id || (phase !== 'shell' && phase !== 'rescue')) return
-    saveConsoleState(vm.id, {
+    saveConsoleState(labSessionId, vm.id, {
       phase,
       lines: lines.slice(-400),
       cmd,
@@ -244,7 +244,7 @@ export default function VmwareConsole({ vm, onClose, onGuestAction }) {
       ])
       return
     }
-    const saved = vm?.id ? loadConsoleState(vm.id) : null
+    const saved = vm?.id ? loadConsoleState(labSessionId, vm.id) : null
     if (saved && (saved.phase === 'shell' || saved.phase === 'rescue') && !vm?.boot_pending) {
       setPhase(saved.phase)
       setLines(Array.isArray(saved.lines) ? saved.lines : [])

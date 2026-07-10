@@ -13,6 +13,8 @@ import {
 } from 'lucide-react'
 import toast from 'react-hot-toast'
 import { broadcastLabStopped, closeLabChildTabs, broadcastLabActivity } from '../utils/labSync'
+import { purgeGuestStateForLab } from '../components/vmware/linuxShell'
+import { awsSimStorageKey } from '../components/aws/store/awsStore'
 import { ConfirmDialog } from '../components/ConfirmModal'
 import JiraTicketPanel from '../components/JiraTicketPanel'
 import ItsmTicketPanel from '../components/itsm/ItsmTicketPanel'
@@ -414,7 +416,10 @@ export default function LabRunner() {
   const LAB_CLOSE_SECONDS = 10
 
   const cleanupLabResources = useCallback(() => {
-    if (sessionId) closeLabChildTabs(sessionId)
+    if (sessionId) {
+      closeLabChildTabs(sessionId)
+      purgeGuestStateForLab(sessionId)
+    }
     clearSession()
     stopTimer()
   }, [clearSession, stopTimer, sessionId])
@@ -1449,7 +1454,7 @@ export default function LabRunner() {
       <SimErrorBoundary
         name={primarySimKind}
         title="Lab simulator error"
-        resetStorageKey={primarySimKind === 'aws' ? 'fixitlab-aws-sim' : undefined}
+        resetStorageKey={primarySimKind === 'aws' ? awsSimStorageKey(useAuthStore.getState().user?.id) : undefined}
       >
         <PrimaryLabSim
           kind={primarySimKind}

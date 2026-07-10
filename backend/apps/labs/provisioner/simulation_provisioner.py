@@ -618,4 +618,10 @@ class SimulationProvisioner:
             te.clear_session(str(session.id))
         except Exception:  # noqa: BLE001
             pass
+        try:
+            from apps.labs.provisioner.simulation.vmware_bridge import clear as clear_vmware_bridge
+
+            clear_vmware_bridge(str(session.id))
+        except Exception:  # noqa: BLE001
+            pass
         drop_sim_session(str(session.id))

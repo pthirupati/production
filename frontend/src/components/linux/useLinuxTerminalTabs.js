@@ -11,12 +11,13 @@ function nextTabId() {
 const TAB_LABELS = ['bash-1', 'bash-2', 'bash-3', 'bash-4', 'bash-5', 'bash-6']
 
 /**
- * Manages multiple independent shell sessions per VM with a shared VFS (via vm.id).
- * Returns shells keyed by tab id; editor tabs (vim/htop) are virtual labels only.
+ * Manages multiple independent shell sessions per VM with a shared VFS scoped to
+ * `${labSessionId}:${vm.id}` so concurrent users never bleed guest state.
  */
-export function useLinuxTerminalTabs(vm, { enabled = true, initialTabs = 1 } = {}) {
-  const vmKey = vm?.id || vm?.name || 'guest'
+export function useLinuxTerminalTabs(vm, { enabled = true, initialTabs = 1, labSessionId = null } = {}) {
+  const vmKey = guestScopeKey(vm, labSessionId)
   const hwSig = [
+    labSessionId,
     vm?.guest_disk_hidden,
     vm?.guest_disk_visible,
     vm?.guest_nic_pending,
@@ -38,12 +39,12 @@ export function useLinuxTerminalTabs(vm, { enabled = true, initialTabs = 1 } = {
 
   const getShell = useCallback((tabId) => {
     if (!shellsRef.current.has(tabId)) {
-      shellsRef.current.set(tabId, createLinuxShell(vm, { sessionId: tabId }))
+      shellsRef.current.set(tabId, createLinuxShell(vm, { labSessionId }))
     }
     return shellsRef.current.get(tabId)
-  }, [vm, vmKey])
+  }, [vm, vmKey, labSessionId])
 
-  // Drop cached shells when VM identity or hot-add hardware flags change
+  // Drop cached shells when VM identity, lab session, or hot-add hardware flags change
   useEffect(() => {
     shellsRef.current = new Map()
   }, [vmKey, hwSig])
@@ -118,4 +119,9 @@ export function useLinuxTerminalTabs(vm, { enabled = true, initialTabs = 1 } = {
     persistTabUi,
     getTabUi,
   }
+}
+
+function guestScopeKey(vm, labSessionId) {
+  const vmId = vm?.id || vm?.name || 'guest'
+  return `${labSessionId || 'standalone'}:${vmId}`
 }

@@ -83,7 +83,10 @@ export function createEc2SimShell(instance, opts = {}) {
   }
 
   const sshUser = opts.user || defaultUser(instance.os)
-  const linux = createLinuxShell(vm, { user: sshUser })
+  const linux = createLinuxShell(vm, {
+    user: sshUser,
+    labSessionId: opts.labSessionId || `ec2-${instance.id}`,
+  })
   // Terraform engine shares the AWS store, so `terraform apply` here creates
   // EC2/S3/SG resources that appear in the console — the full IaC → AWS stack.
   const terraform = createTerraform({

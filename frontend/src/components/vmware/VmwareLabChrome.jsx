@@ -398,7 +398,7 @@ export default function VmwareLabChrome({
                 </select>
               </div>
             )}
-            <VmwareSshTerminal key={sshVm.id} vm={sshVm} sshOk={sshOk} onClose={() => setPanel(null)} />
+            <VmwareSshTerminal key={sshVm.id} vm={sshVm} labSessionId={sessionId} sshOk={sshOk} onClose={() => setPanel(null)} />
           </>
         ) : (
           <SidePanel title="SSH console" onClose={() => setPanel(null)}>

@@ -2666,7 +2666,7 @@ export default function VMwareSimulator() {
 
       {/* Console + context menu */}
       {consoleVm && (
-        <VmwareConsole vm={consoleVm} onClose={() => setConsoleVm(null)} onGuestAction={handleGuestAction} />
+        <VmwareConsole vm={consoleVm} labSessionId={sessionId} onClose={() => setConsoleVm(null)} onGuestAction={handleGuestAction} />
       )}
       {ctxMenu && (
         <VmwareContextMenu

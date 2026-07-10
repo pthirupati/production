@@ -13,8 +13,8 @@ import { ViNanoEditor } from './VmwareConsole'
  * overlay that can be minimized to a taskbar pill or maximized to fill the
  * viewport — not a cramped inline box.
  */
-export default function VmwareSshTerminal({ vm, sshOk = true, onClose }) {
-  const linuxTabs = useLinuxTerminalTabs(vm, { enabled: true })
+export default function VmwareSshTerminal({ vm, labSessionId, sshOk = true, onClose }) {
+  const linuxTabs = useLinuxTerminalTabs(vm, { enabled: true, labSessionId })
   const shell = linuxTabs.activeShell || linuxTabs.getShell(linuxTabs.activeId)
   const ip = vm?.ip || vm?.hostname || vm?.name || 'guest'
   const [lines, setLines] = useState([

@@ -10,6 +10,7 @@ import useSessionTimeout from './hooks/useSessionTimeout'
 import { useThemeStore } from './store/themeStore'
 import { useAuthStore } from './store/authStore'
 import { authApi } from './api/auth'
+import { rehydrateAwsSimForUser } from './components/aws/store/awsStore'
 
 function SessionMonitor() {
   useSessionTimeout()
@@ -37,6 +38,7 @@ function AuthBootValidator() {
         if (cancelled) return
         const { accessToken, refreshToken } = useAuthStore.getState()
         setAuth(profile, accessToken, refreshToken)
+        await rehydrateAwsSimForUser()
       } catch {
         if (!cancelled) logout()
       } finally {

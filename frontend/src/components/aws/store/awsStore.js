@@ -1,5 +1,6 @@
 import { create } from 'zustand'
-import { persist } from 'zustand/middleware'
+import { persist, createJSONStorage } from 'zustand/middleware'
+import { useAuthStore } from '../../../store/authStore'
 import {
   newInstanceId, newVolumeId, newSgId, newKeyPairId, newAmiId, newEipAllocId,
   newEipAssocId, newIamUserId, newIamRoleId, newIamGroupId, newAccessKeyId,
@@ -8,6 +9,35 @@ import {
 import { getAmi, getInstanceType } from '../lib/instanceTypes'
 
 const ACCOUNT_ID = '123456789012'
+
+/** Per-user localStorage key so shared-browser / account-switch does not bleed EC2 state. */
+export function awsSimStorageKey(userId) {
+  return userId ? `fixitlab-aws-sim:${userId}` : 'fixitlab-aws-sim:anon'
+}
+
+function currentAwsSimStorageKey() {
+  return awsSimStorageKey(useAuthStore.getState().user?.id)
+}
+
+const userScopedAwsStorage = createJSONStorage(() => ({
+  getItem: () => {
+    try { return localStorage.getItem(currentAwsSimStorageKey()) } catch { return null }
+  },
+  setItem: (_name, value) => {
+    try { localStorage.setItem(currentAwsSimStorageKey(), value) } catch { /* ignore */ }
+  },
+  removeItem: () => {
+    try { localStorage.removeItem(currentAwsSimStorageKey()) } catch { /* ignore */ }
+  },
+}))
+
+export function rehydrateAwsSimForUser() {
+  return useAwsStore.persist.rehydrate()
+}
+
+export function resetAwsSimOnLogout() {
+  useAwsStore.getState().resetSimulation()
+}
 
 function newGenericId(service, resource) {
   const suffix = Math.random().toString(16).slice(2, 10).padEnd(8, '0')
@@ -549,6 +579,7 @@ export const useAwsStore = create(
     }),
     {
       name: 'fixitlab-aws-sim',
+      storage: userScopedAwsStorage,
       version: 2,
       // Persist resource state + region, but not transient flash messages.
       partialize: (s) => {

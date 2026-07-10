@@ -25,11 +25,23 @@ import { createGitSim } from './gitSim'
 
 const HUMAN_MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
 
-/** Per-VM shared guest state (VFS, packages, disk flags) — all terminal tabs share this. */
+/** Per lab-session + VM guest state (VFS, packages, disk flags). Tabs for the same lab share one entry. */
 const sharedGuestState = new Map()
 
-function guestStateKey(vm) {
-  return String(vm?.id || vm?.name || 'default')
+/** Isolate guest VFS/disk flags per lab session so concurrent users never share in-browser state. */
+export function guestStateKey(vm, labSessionId) {
+  const vmId = String(vm?.id || vm?.name || 'default')
+  const sid = String(labSessionId || vm?.lab_session_id || 'standalone')
+  return `${sid}:${vmId}`
+}
+
+/** Drop cached guest state when a lab session ends (optional hygiene). */
+export function purgeGuestStateForLab(labSessionId) {
+  if (!labSessionId) return
+  const prefix = `${labSessionId}:`
+  for (const key of sharedGuestState.keys()) {
+    if (key.startsWith(prefix)) sharedGuestState.delete(key)
+  }
 }
 
 function formatUptime(ms) {
@@ -42,8 +54,8 @@ function formatUptime(ms) {
   return `${m}m`
 }
 
-function getOrCreateGuestShared(vm) {
-  const key = guestStateKey(vm)
+function getOrCreateGuestShared(vm, labSessionId) {
+  const key = guestStateKey(vm, labSessionId)
   if (!sharedGuestState.has(key)) {
     const family = guestOsFamily(vm)
     const isRhel = family === 'rhel'
@@ -1138,6 +1150,7 @@ function aptProgressChunks(pkgs, action = 'install') {
 
 export function createLinuxShell(vm, opts = {}) {
   const vmRef = { current: vm }
+  const labSessionId = opts.labSessionId || vm?.lab_session_id || null
   const family = guestOsFamily(vmRef.current)
   const isRhel = family === 'rhel'
   const kernel = isRhel ? '5.14.0-362.8.1.el9_3.x86_64' : '5.15.0-91-generic'
@@ -1148,7 +1161,7 @@ export function createLinuxShell(vm, opts = {}) {
   const memMb = vm?.memory_mb || 4096
   const cpu = vm?.cpu || 2
 
-  const shared = getOrCreateGuestShared(vm)
+  const shared = getOrCreateGuestShared(vm, labSessionId)
   const { vfs, services, pkgs } = shared
   const lvm = shared.lvm || (shared.lvm = createLvmState(diskGb))
   let selinuxMode = shared.selinuxMode
@@ -2859,7 +2872,10 @@ export function createLinuxShell(vm, opts = {}) {
     history,
     saveFile,
     readFile,
-    syncVm: (nextVm) => { if (nextVm) vmRef.current = nextVm; getOrCreateGuestShared(vmRef.current) },
+    syncVm: (nextVm) => {
+      if (nextVm) vmRef.current = nextVm
+      getOrCreateGuestShared(vmRef.current, labSessionId)
+    },
     pkgManager: () => pkgManager(vmRef.current),
     // Stateful package DB queries (used by tests + any future programmatic checks).
     isInstalled: (name) => pkgs.has(name),
