@@ -4,7 +4,8 @@ from rest_framework.test import APIClient
 
 from apps.accounts.oauth_state import issue_oauth_state, validate_oauth_state
 from apps.labs.models import LabSession
-from apps.hints.models import Hint, Scenario, Technology
+from apps.hints.models import Hint
+from apps.question_bank.models import Scenario, Technology
 
 User = get_user_model()
 

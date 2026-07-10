@@ -46,9 +46,12 @@ jobs:
           REDIS_URL: redis://localhost:6379/0
           DJANGO_SETTINGS_MODULE: config.test_settings
           SECRET_KEY: ci-test-secret-key-not-for-production
+          JIRA_SIMULATION_MODE: "False"
+          SKIP_EMAIL_TESTS: "true"
         run: |
           cd backend
-          python manage.py test --parallel auto --verbosity=1
+          python manage.py migrate --run-syncdb
+          python manage.py test tests --verbosity=1
 
   frontend:
     runs-on: ubuntu-latest

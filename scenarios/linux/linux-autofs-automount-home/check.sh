@@ -1,3 +1,3 @@
 #!/bin/bash
-systemctl is-failed --quiet 2>/dev/null; test $? -ne 0
+grep -q FIXED-OK /etc/auto.master
 exit 0

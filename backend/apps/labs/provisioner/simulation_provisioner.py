@@ -486,7 +486,14 @@ class SimulationProvisioner:
                 _raw_win_type = (getattr(_win_session.scenario, "simulation_type", "") or "")
             except LabSession.DoesNotExist:
                 _raw_win_type = ""
-        if low_slug.startswith("win-gui-") or _raw_win_type == "windows-server":
+        if (
+            low_slug.startswith(("win-gui-", "windows-", "academy-windows-"))
+            or _raw_win_type in ("windows", "windows-server")
+        ):
+            # audit P0-2: the whole Windows track carries simulation_type
+            # "windows" (not "windows-server") and slugs like academy-windows-*;
+            # gate on the raw type + those prefixes so "Check" routes to the
+            # Windows grader instead of falling through to the Linux validator.
             from apps.labs.models import LabSession
             from apps.vmware_sim.windows_engine import validate_windows_lab, _ensure_session
             try:

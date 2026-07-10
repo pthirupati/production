@@ -1,6 +1,6 @@
 """Tests for simulated RHEL OS shell, engines, and validation."""
 
-from django.test import SimpleTestCase
+from django.test import SimpleTestCase, TestCase
 
 from apps.labs.provisioner.simulation.base_sim import BaseRHELSimulator
 from apps.labs.provisioner.simulation.unified_sim import UnifiedSimulationEngine
@@ -92,7 +92,7 @@ class RHELShellCommandTests(SimpleTestCase):
         self.assertIn("fixitlab", s3.lower())
 
 
-class ValidationTests(SimpleTestCase):
+class ValidationTests(TestCase):  # TestCase: run_validation queries LabSession (provisioner gate cascade)
     NGINX_CHECK = """#!/bin/bash
 nginx -t 2>/dev/null
 pgrep -x nginx
@@ -533,7 +533,7 @@ class EditorPersistenceTests(SimpleTestCase):
         self.assertTrue(ed.dirty)  # still flagged for save-on-close
 
 
-class ProvisionerTests(SimpleTestCase):
+class ProvisionerTests(TestCase):
     def test_run_validation_via_resource_lookup(self):
         from unittest.mock import MagicMock
 

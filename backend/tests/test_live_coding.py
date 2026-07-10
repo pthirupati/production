@@ -14,7 +14,10 @@ class LiveCodingEngineTest(SimpleTestCase):
         rate = signal_hit_rate(text, ["prometheus_client", "Gauge", "start_http_server"])
         self.assertGreaterEqual(rate, 0.66)
         result = grade_by_signals(text, ["prometheus_client", "Gauge"])
-        self.assertTrue(result["validated"])
+        # Anti-cheat: signal presence alone must NEVER fully validate — high
+        # signal rate returns a partial (execution still required).
+        self.assertFalse(result["validated"])
+        self.assertTrue(result.get("partial_signals"))
 
     def test_followup_cycles_phases(self):
         from apps.interviews.services.live_coding import generate_followup
@@ -36,7 +39,11 @@ class LiveCodingEngineTest(SimpleTestCase):
         out = generate_opening(used=set(), rng=random.Random(2), difficulty=2)
         self.assertIsNotNone(out)
         text, cfg = out
-        self.assertIn("coding", text.lower())
+        # Opening is a coding task — assert coding-task language, not one literal word.
+        self.assertTrue(
+            any(w in text.lower() for w in ("coding", "code", "write", "implement", "function")),
+            text,
+        )
         self.assertEqual(cfg.get("kind"), "code")
         self.assertTrue(cfg.get("expected_signals"))
 
