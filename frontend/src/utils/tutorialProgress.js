@@ -1,8 +1,16 @@
-const STORAGE_KEY = 'fixitlab_tutorial_progress'
+import { userScopedKey } from './userScopedStorage'
+import { useAuthStore } from '../store/authStore'
+
+const STORAGE_KEY_BASE = 'fixitlab_tutorial_progress'
+
+function storageKey() {
+  const userId = useAuthStore.getState().user?.id
+  return userScopedKey(STORAGE_KEY_BASE, userId)
+}
 
 function readAll() {
   try {
-    return JSON.parse(localStorage.getItem(STORAGE_KEY) || '{}')
+    return JSON.parse(localStorage.getItem(storageKey()) || '{}')
   } catch {
     return {}
   }
@@ -10,7 +18,7 @@ function readAll() {
 
 function writeAll(data) {
   try {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(data))
+    localStorage.setItem(storageKey(), JSON.stringify(data))
   } catch { /* ignore */ }
 }
 

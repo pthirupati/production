@@ -15,6 +15,7 @@ import FxStatCard from '../ui/FxStatCard'
 import ScrollReveal from '../ui/ScrollReveal'
 import { fadeUp, staggerContainer, viewportOnce } from '../ui/motion'
 import { useAuthStore } from '../store/authStore'
+import { usePageTitle } from '../hooks/usePageTitle'
 import LimitReachedModal from '../components/LimitReachedModal'
 
 const difficultyConfig = {
@@ -255,6 +256,12 @@ export default function TechnologyDetail() {
   const [techTutorials, setTechTutorials] = useState([])
   const [awsTrack, setAwsTrack] = useState('')
   const [limitInfo, setLimitInfo] = useState(null)
+
+  usePageTitle(
+    techDetail?.name,
+    techDetail ? `Hands-on ${techDetail.name} labs, scenarios, and tutorials on FixitLab` : undefined,
+    techDetail ? { canonical: `${typeof window !== 'undefined' ? window.location.origin : ''}/technologies/${techDetail.slug}` } : undefined,
+  )
 
   useEffect(() => {
     if (!slug) return

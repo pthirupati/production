@@ -42,6 +42,7 @@ class SessionTracker:
     """
 
     CACHE_KEY_PREFIX = "user_sessions:"
+    REVOKED_ALL_MARKER = "__revoked_all__"
     SESSION_EXPIRY = 86400 * 7  # 7 days (matches JWT refresh token lifetime)
     # Cap concurrent live jtis per user so the cache entry can't grow unbounded
     # under heavy refresh rotation. Generous enough for several devices/tabs plus
@@ -114,10 +115,11 @@ class SessionTracker:
             return True
         cache_key = cls._get_cache_key(user_id)
         sessions = cache.get(cache_key)
+        if sessions == cls.REVOKED_ALL_MARKER:
+            return False
         if not isinstance(sessions, dict) or not sessions:
-            # No tracking data → fail open (see docstring). A Redis miss returns
-            # None here (CACHES IGNORE_EXCEPTIONS), so a cache outage can never
-            # mass-invalidate live users.
+            if getattr(settings, "JWT_SESSION_FAIL_CLOSED", False):
+                return False
             return True
         return token_jti in sessions
 
@@ -153,8 +155,8 @@ class SessionTracker:
         also rely on refresh-token blacklisting (DB-backed).
         """
         cache_key = cls._get_cache_key(user_id)
-        cache.delete(cache_key)
-        logger.warning("All sessions invalidated for user %s", user_id)
+        cache.set(cache_key, cls.REVOKED_ALL_MARKER, cls.SESSION_EXPIRY)
+        logger.warning("All sessions invalidated for user %s (tombstone set)", user_id)
 
 
 # Cache key for the RUNTIME session-enforcement override. When present it wins

@@ -680,17 +680,17 @@ function TaskEventDetailModal({ item, onClose }) {
   const rows = isTask
     ? [
         ['Task', d.name],
-        ['Status', <span className={d.status === 'success' ? 'text-[#5DB85D]' : 'text-[#D9534F]'}>{d.status === 'success' ? '✓ ' : '✗ '}{d.result || d.status}</span>],
+        ['Status', <span key="status" className={d.status === 'success' ? 'text-[#5DB85D]' : 'text-[#D9534F]'}>{d.status === 'success' ? '✓ ' : '✗ '}{d.result || d.status}</span>],
         ['Target', d.target],
         ['Initiator', d.initiator || 'root'],
         ['Queued', fmtTime(d.queued)],
         ['Started', fmtTime(d.started)],
         ['Completed', fmtTime(d.completed)],
         ['Duration', d.completed && d.started ? `${Math.max(1, Math.round((new Date(d.completed) - new Date(d.started)) / 1000))}s` : '—'],
-        ['Task ID', <span className="font-mono text-[10px]">{d.id || '—'}</span>],
+        ['Task ID', <span key="task-id" className="font-mono text-[10px]">{d.id || '—'}</span>],
       ]
     : [
-        ['Severity', <span style={{ color: sevColor }} className="font-semibold uppercase">{d.severity || 'info'}</span>],
+        ['Severity', <span key="severity" style={{ color: sevColor }} className="font-semibold uppercase">{d.severity || 'info'}</span>],
         ['Entity', d.entity || '—'],
         ['User', d.user || 'root'],
         ['Time', fmtTime(d.time)],

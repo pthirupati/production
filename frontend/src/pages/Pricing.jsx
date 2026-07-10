@@ -18,6 +18,7 @@ import MarketingFooter from './home/components/MarketingFooter'
 import { mergeTechnologies } from '../constants/techCatalog'
 import { PageHeader, FixitPanel } from '../components/design'
 import { useRevealOnScroll } from '../hooks/useRevealOnScroll'
+import { usePageTitle } from '../hooks/usePageTitle'
 import toast from 'react-hot-toast'
 
 const techIcons = {
@@ -130,6 +131,7 @@ function FAQAccordion({ items }) {
 }
 
 export default function Pricing() {
+  usePageTitle('Pricing', 'Technology subscriptions, interview plans, and team seats on FixitLab.')
   const { isAuthenticated, user } = useAuthStore()
   const { theme, toggleTheme } = useThemeStore()
   const getTechnologies = useDataStore(s => s.getTechnologies)

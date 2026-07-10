@@ -6,6 +6,7 @@ import api from '../api/client'
 import { getCategoryClass } from '../data/blogFallback'
 import MarketingPageShell from '../components/MarketingPageShell'
 import { FixitPanel } from '../components/design'
+import { usePageTitle } from '../hooks/usePageTitle'
 
 const blogContent = {
   'why-hands-on-learning-works': {
@@ -726,6 +727,12 @@ export default function BlogPost() {
   const [post, setPost] = useState(blogContent[slug] || null)
   const [related, setRelated] = useState([])
   const [loading, setLoading] = useState(true)
+
+  usePageTitle(
+    post?.title,
+    post?.excerpt || post?.subtitle,
+    post ? { canonical: `${typeof window !== 'undefined' ? window.location.origin : ''}/blog/${slug}` } : undefined,
+  )
 
   useEffect(() => {
     setLoading(true)

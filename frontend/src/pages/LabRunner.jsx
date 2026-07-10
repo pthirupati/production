@@ -593,12 +593,14 @@ export default function LabRunner() {
     let pollTimer = null
     let cancelled = false
     let elapsedCounter = 0
+    let networkErrors = 0
 
     const loadSession = async () => {
       try {
         // Use lightweight single-session endpoint instead of fetching all sessions
         const lab = await labApi.getSessionStatus(sessionId)
         if (cancelled) return
+        networkErrors = 0
 
         if (!lab) {
           toast.error('Lab session not found')
@@ -721,7 +723,8 @@ export default function LabRunner() {
         } else if (lab.status === 'FAILED') {
           setProvisioning(false)
           setLoading(false)
-          toast.error('Server failed to launch. Please try again.')
+          const msg = lab.error_message || lab.provision_error || 'Server failed to launch. Please try again.'
+          toast.error(msg)
           navigate(`/scenarios/${lab.scenario?.slug || ''}`)
         } else {
           // TERMINATED, etc.
@@ -737,7 +740,10 @@ export default function LabRunner() {
             navigate('/scenarios')
             return
           }
-          // For other errors, retry after delay
+          networkErrors += 1
+          if (networkErrors >= 3) {
+            toast.error('Connection issue — retrying lab status…', { id: 'lab-provision-net' })
+          }
           pollTimer = setTimeout(loadSession, 5000)
         }
       }

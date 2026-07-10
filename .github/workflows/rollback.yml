@@ -35,6 +35,11 @@ jobs:
           bash scripts/ci-cluster-rollback.sh "$CLUSTER_IP"
       - name: Rollback single-droplet (git reset on server)
         if: inputs.topology == 'single-droplet'
+        env:
+          CLUSTER_IP: ${{ inputs.cluster_ip }}
         run: |
-          echo "Single-droplet rollback: run ci-remote-platform.sh deploy on target with previous git ref."
-          echo "Use production workflow deploy with an earlier git_ref input."
+          if [ -z "$CLUSTER_IP" ]; then
+            echo "cluster_ip (droplet IP) is required for single-droplet rollback"
+            exit 1
+          fi
+          bash scripts/ci-single-droplet-rollback.sh "$CLUSTER_IP"

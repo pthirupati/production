@@ -1,5 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { Copy, Check, X, ChevronRight, Search, Info, AlertTriangle, CheckCircle2, XCircle, Inbox } from 'lucide-react'
+import { useAuthStore } from '../../../store/authStore'
+import { userScopedKey } from '../../../utils/userScopedStorage'
 
 export function Button({ variant = 'secondary', children, loading, icon: Icon, ...props }) {
   return (
@@ -179,7 +181,8 @@ export function DataTable({ columns, rows, getRowKey, selectable, selected, onSe
   const [pageSize, setPageSize] = useState(20)
   const [menu, setMenu] = useState(null) // { x, y, row }
   const [prefsOpen, setPrefsOpen] = useState(false)
-  const prefKey = tableId ? `aws-sim-table-columns:${tableId}` : null
+  const userId = useAuthStore((s) => s.user?.id)
+  const prefKey = tableId ? userScopedKey(`aws-sim-table-columns:${tableId}`, userId) : null
   const columnKeySignature = columns.map((c) => c.key).join('|')
   const [visibleKeys, setVisibleKeys] = useState(() => {
     if (!prefKey) return columns.map((c) => c.key)

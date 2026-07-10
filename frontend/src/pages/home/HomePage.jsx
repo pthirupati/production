@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { FxPageChrome } from '../../components/marketing'
 import { useFxPage } from '../../hooks/useFxPage'
+import { usePageTitle } from '../../hooks/usePageTitle'
 import { useDataStore } from '../../store/dataStore'
 import { scenarioApi } from '../../api/scenarios'
 import api from '../../api/client'
@@ -29,6 +30,12 @@ export default function HomePage() {
   const [platformConfig, setPlatformConfig] = useState(null)
   const rootRef = useRef(null)
   const { progressRef, toTopRef, navRef, spotRef, initMagnetic } = useFxPage()
+
+  usePageTitle(
+    'Hands-on DevOps & Cloud Labs',
+    'Fix broken production systems in real environments — Linux, AWS, VMware, Kubernetes, and more.',
+    { canonical: `${typeof window !== 'undefined' ? window.location.origin : ''}/` },
+  )
 
   useEffect(() => {
     getTechnologies()

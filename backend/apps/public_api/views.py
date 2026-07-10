@@ -963,6 +963,7 @@ class RestartLabView(APIView):
 
 class ValidateLabView(APIView):
     permission_classes = [IsAuthenticated]
+    throttle_classes = [LabStartThrottle]
 
     def post(self, request, session_id):
         session = get_object_or_404(

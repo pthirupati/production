@@ -108,16 +108,38 @@ function StarBadge({ starData }) {
 // ---------------------------------------------------------------------------
 
 export default function AIScorecard({ report, round, extras = {} }) {
+  const dimensions = useMemo(() => {
+    if (!report) return []
+    const {
+      technical_score = 0,
+      communication_score = 0,
+      problem_solving_score = 0,
+      practical_score = 0,
+      presence_score = 0,
+      resume_alignment_score = 0,
+    } = report
+    const BENCHMARKS = {
+      technical: 68,
+      communication: 72,
+      problem_solving: 65,
+      practical: 60,
+      presence: 70,
+      resume_alignment: 65,
+    }
+    return [
+      { label: 'Technical Depth', score: technical_score, benchmark: BENCHMARKS.technical },
+      { label: 'Communication', score: communication_score, benchmark: BENCHMARKS.communication },
+      { label: 'Problem Solving', score: problem_solving_score, benchmark: BENCHMARKS.problem_solving },
+      { label: 'Practical / Tooling', score: practical_score, benchmark: BENCHMARKS.practical },
+      { label: 'Presence & Confidence', score: presence_score, benchmark: BENCHMARKS.presence },
+      { label: 'Resume Alignment', score: resume_alignment_score, benchmark: BENCHMARKS.resume_alignment },
+    ]
+  }, [report])
+
   if (!report) return null
 
   const {
     overall_score = 0,
-    technical_score = 0,
-    communication_score = 0,
-    problem_solving_score = 0,
-    practical_score = 0,
-    presence_score = 0,
-    resume_alignment_score = 0,
     passed = false,
     summary = '',
     strengths = [],
@@ -131,25 +153,6 @@ export default function AIScorecard({ report, round, extras = {} }) {
     time_management_note = '',
     benchmark_comparison = '',
   } = extras
-
-  // Benchmarks by dimension (typical mid-level DevOps/SRE scores)
-  const BENCHMARKS = {
-    technical: 68,
-    communication: 72,
-    problem_solving: 65,
-    practical: 60,
-    presence: 70,
-    resume_alignment: 65,
-  }
-
-  const dimensions = useMemo(() => [
-    { label: 'Technical Depth', score: technical_score, benchmark: BENCHMARKS.technical },
-    { label: 'Communication', score: communication_score, benchmark: BENCHMARKS.communication },
-    { label: 'Problem Solving', score: problem_solving_score, benchmark: BENCHMARKS.problem_solving },
-    { label: 'Practical / Tooling', score: practical_score, benchmark: BENCHMARKS.practical },
-    { label: 'Presence & Confidence', score: presence_score, benchmark: BENCHMARKS.presence },
-    { label: 'Resume Alignment', score: resume_alignment_score, benchmark: BENCHMARKS.resume_alignment },
-  ], [report])
 
   const passColor = passed ? 'text-green-400' : 'text-red-400'
   const passBg = passed ? 'bg-green-950 border-green-700' : 'bg-red-950 border-red-700'

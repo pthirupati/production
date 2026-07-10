@@ -456,6 +456,8 @@ SKIP_EMAIL_TESTS = env.bool("SKIP_EMAIL_TESTS", default=False)
 E2E_TEST_EMAIL_SUFFIXES = ("@fixitlab-test.local",)
 # When false, skip JWT session invalidation checks (parallel E2E logins).
 JWT_SESSION_ENFORCEMENT = env.bool("JWT_SESSION_ENFORCEMENT", default=True)
+# When True, missing session tracker data rejects tokens (stricter; use with care on Redis outages).
+JWT_SESSION_FAIL_CLOSED = env.bool("JWT_SESSION_FAIL_CLOSED", default=False)
 
 # --------------------------------------------------
 # Configurable Contact Emails

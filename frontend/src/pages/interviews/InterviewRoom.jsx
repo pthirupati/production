@@ -171,6 +171,7 @@ export default function InterviewRoom() {
   const [practiceMode, setPracticalCoaching] = useState(false)
   const [coaching, setCoaching] = useState(null)
   const [typingAnswer, setTypingAnswer] = useState(false)
+  const [mobileTranscriptOpen, setMobileTranscriptOpen] = useState(false)
   const [speechSupported, setSpeechSupported] = useState(true)
   const [ttsSupported, setTtsSupported] = useState(true)
   const voiceUnavailableToastRef = useRef(false)
@@ -1329,8 +1330,13 @@ export default function InterviewRoom() {
   // the candidate sees real feedback; on a pass, their next answer is scored with
   // the practical credit automatically (the backend stamps the round).
   const validatePracticalAnswer = async (answer) => {
-    const res = await interviewsApi.validatePractical(roundId, answer)
-    if (res?.feedback) {
+    try {
+      const res = await interviewsApi.validatePractical(roundId, answer)
+      if (res?.error) {
+        toast.error(res.error)
+        return res
+      }
+      if (res?.feedback) {
       setMessages((m) => [
         ...m,
         {
@@ -1348,8 +1354,12 @@ export default function InterviewRoom() {
       ])
       // Speak the feedback so the loop stays conversational (browser TTS, free).
       speakThenListen(res.feedback, { autoListen: false })
+      }
+      return res
+    } catch (e) {
+      toast.error(e.response?.data?.error || 'Could not validate practical answer')
+      throw e
     }
-    return res
   }
 
   const fmt = (s) => {
@@ -1372,12 +1382,19 @@ export default function InterviewRoom() {
     : null
 
   const startPracticalLabInline = async () => {
-    const lab = await interviewsApi.startPracticalLab(roundId)
-    if (lab?.inline_only) {
+    try {
+      const lab = await interviewsApi.startPracticalLab(roundId)
+      if (lab?.error) {
+        toast.error(lab.error)
+        return lab
+      }
+      if (lab?.inline_only) return lab
+      setPracticalLab(lab)
       return lab
+    } catch (e) {
+      toast.error(e.response?.data?.error || 'Could not start practical lab')
+      throw e
     }
-    if (!lab?.error) setPracticalLab(lab)
-    return lab
   }
 
   if (!round) return <p className="text-surface-500 p-8">Loading room…</p>
@@ -2143,7 +2160,16 @@ export default function InterviewRoom() {
 
           {/* Control bar — hands-free is the default; these are fallbacks for
               accessibility (manual mic toggle, type-to-answer, Done, Skip). */}
-          <div className="p-3 border-t border-surface-800 flex gap-2 items-center">
+          <div className="p-3 border-t border-surface-800 flex flex-wrap gap-2 items-center">
+            <button
+              type="button"
+              onClick={() => setMobileTranscriptOpen((v) => !v)}
+              className={`lg:hidden px-2.5 py-1.5 rounded-lg text-[11px] font-medium shrink-0 inline-flex items-center gap-1 ${
+                mobileTranscriptOpen ? 'bg-indigo-500/20 text-indigo-200' : 'btn-secondary'
+              }`}
+            >
+              <MessageSquare size={14} /> Transcript
+            </button>
             <button
               type="button"
               onClick={() => setPracticalCoaching(v => !v)}
@@ -2229,7 +2255,11 @@ export default function InterviewRoom() {
           </div>
         </div>
 
-        <div className="flex flex-col min-h-0 bg-surface-900/30">
+        <div className={`flex flex-col min-h-0 bg-surface-900/30 ${
+          mobileTranscriptOpen
+            ? 'fixed inset-x-0 bottom-0 z-40 h-[55vh] border-t border-surface-700 lg:relative lg:inset-auto lg:h-auto lg:z-auto'
+            : 'hidden lg:flex'
+        }`}>
           {hostState?.joined && (
             <div className="p-3 border-b border-indigo-500/30 bg-indigo-500/10 text-xs text-indigo-100">
               <p className="font-medium">

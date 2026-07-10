@@ -22,6 +22,17 @@ class OAuthStateTests(TestCase):
         self.assertFalse(validate_oauth_state(state)[0])
 
 
+class SessionTrackerTombstoneTests(TestCase):
+    def test_invalidate_all_sets_tombstone(self):
+        from common.security import SessionTracker
+
+        SessionTracker.record_session(42, "jti-abc", "127.0.0.1", "test")
+        self.assertTrue(SessionTracker.is_session_valid(42, "jti-abc"))
+        SessionTracker.invalidate_all_sessions(42)
+        self.assertFalse(SessionTracker.is_session_valid(42, "jti-abc"))
+        self.assertFalse(SessionTracker.is_session_valid(42, "jti-new"))
+
+
 @override_settings(DEBUG=True)
 class SolutionGatingTests(TestCase):
     def setUp(self):

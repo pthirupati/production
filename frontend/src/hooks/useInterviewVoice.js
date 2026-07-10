@@ -210,7 +210,31 @@ function endsOnConnector(text) {
   return _CONNECTOR_PHRASES.includes(lastTwo)
 }
 
-const VOICE_STORAGE_KEY = 'fixitlab.interview.voiceURI'
+import { userScopedKey } from '../utils/userScopedStorage'
+import { useAuthStore } from '../store/authStore'
+
+const VOICE_STORAGE_BASE = 'fixitlab.interview.voiceURI'
+
+function voiceStorageKey() {
+  const userId = useAuthStore.getState().user?.id
+  return userScopedKey(VOICE_STORAGE_BASE, userId)
+}
+
+function loadPersistedVoiceURI() {
+  try {
+    return window.localStorage.getItem(voiceStorageKey()) || ''
+  } catch {
+    return ''
+  }
+}
+
+function persistVoiceURI(uri) {
+  try {
+    const key = voiceStorageKey()
+    if (uri) window.localStorage.setItem(key, uri)
+    else window.localStorage.removeItem(key)
+  } catch { /* storage unavailable — non-fatal */ }
+}
 
 /** Offline capability probe for preflight (no paid APIs). */
 export function detectSpeechCapabilities() {
@@ -220,21 +244,6 @@ export function detectSpeechCapabilities() {
   const stt = !!(window.SpeechRecognition || window.webkitSpeechRecognition)
   const tts = !!window.speechSynthesis
   return { stt, tts, any: stt || tts }
-}
-
-function loadPersistedVoiceURI() {
-  try {
-    return window.localStorage.getItem(VOICE_STORAGE_KEY) || ''
-  } catch {
-    return ''
-  }
-}
-
-function persistVoiceURI(uri) {
-  try {
-    if (uri) window.localStorage.setItem(VOICE_STORAGE_KEY, uri)
-    else window.localStorage.removeItem(VOICE_STORAGE_KEY)
-  } catch { /* storage unavailable — non-fatal */ }
 }
 
 // ---------------------------------------------------------------------------
