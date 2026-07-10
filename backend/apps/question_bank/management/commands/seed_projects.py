@@ -9073,6 +9073,14 @@ PROJECTS = [
     },
 ]
 
+# Guided projects for technologies that previously had none (aws, postgresql,
+# mysql, react, nodejs, ai-ml, data-science, nmap, sqlite, peoplesoft, wireshark).
+# Kept in a separate module to keep this file reviewable; appended here so the
+# seeder and its integrity tests treat them identically to the originals.
+from apps.question_bank.management.commands.project_data_extra import EXTRA_PROJECTS  # noqa: E402
+
+PROJECTS = PROJECTS + EXTRA_PROJECTS
+
 
 class Command(BaseCommand):
     help = "Seed end-to-end guided projects (5+ per technology, zero-to-hero, plus cross-tech capstones)"

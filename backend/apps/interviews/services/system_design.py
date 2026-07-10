@@ -38,9 +38,12 @@ _DESIGN_DIMENSIONS: dict[str, dict] = {
         ],
     },
     "capacity": {
+        # NOTE: keep these specific to capacity ESTIMATION. Generic words like
+        # "storage", "users", "requests" over-match normal answers (e.g. "Postgres
+        # for storage" is a data-layer choice, not a capacity estimate).
         "keywords": [
-            "rps", "qps", "tps", "users", "requests", "storage", "gb", "tb", "bandwidth",
-            "estimate", "back-of-envelope", "million", "billion", "scale", "throughput",
+            "rps", "qps", "tps", "gb", "tb", "bandwidth", "peak traffic",
+            "estimate", "back-of-envelope", "million", "billion", "throughput",
         ],
         "probes": [
             "Walk me through a back-of-envelope estimate — storage, QPS, and bandwidth.",
@@ -182,7 +185,14 @@ def generate_system_design_question(
     if phase:
         covered.add(phase)
 
-    missing = next_missing_dimension(covered)
+    # Advance from the CURRENT phase forward — never drill back to an earlier
+    # dimension (e.g. don't ask about "requirements" once we're deep in the API).
+    if phase and phase in _PHASE_ORDER:
+        _start = _PHASE_ORDER.index(phase)
+        _ordered = _PHASE_ORDER[_start:] + _PHASE_ORDER[:_start]
+    else:
+        _ordered = list(_PHASE_ORDER)
+    missing = next((d for d in _ordered if d not in covered), None)
     phrase = _extract_quote_phrase(last_answer) if last_answer else None
 
     # Quote their architecture choice and probe trade-offs when we have a phrase.

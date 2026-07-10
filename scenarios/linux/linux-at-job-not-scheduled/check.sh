@@ -1,3 +1,3 @@
 #!/bin/bash
-systemctl is-failed --quiet 2>/dev/null; test $? -ne 0
+grep -q FIXED-OK /var/spool/at/job-0001
 exit 0

@@ -15,10 +15,10 @@ class WindowsCreateAdUserTest(SimpleTestCase):
     def test_create_ad_user_with_groups(self):
         from apps.vmware_sim.windows_engine import apply_action, drop_session, get_state
 
-        session_id = "test-win-create-user"
+        session_id = "test-win-create-user-unique"
         get_state(session_id, "win-ad-unlock")
         result = apply_action(session_id, "create_ad_user", {
-            "name": "jsmith",
+            "name": "jsmith-ci-test",
             "display": "John Smith",
             "ou": "Users",
             "groups": ["Remote Desktop Users"],
@@ -28,7 +28,7 @@ class WindowsCreateAdUserTest(SimpleTestCase):
 
         state = get_state(session_id, "win-ad-unlock")
         users = state["ad"]["users"]
-        user = next(u for u in users if u["name"] == "jsmith")
+        user = next(u for u in users if u["name"] == "jsmith-ci-test")
         self.assertIn("Remote Desktop Users", user["groups"])
         self.assertIn("Domain Users", user["groups"])
         self.assertTrue(user["must_change_pw"])

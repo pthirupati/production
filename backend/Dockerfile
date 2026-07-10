@@ -19,6 +19,9 @@ RUN apt-get update && apt-get install -y \
 # Python deps
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
+# Interview answer relevance uses spaCy; without the model it silently degrades
+# to a weaker TF-IDF signal and under-scores correct answers (audit P0-6/P1-11).
+RUN python -m spacy download en_core_web_sm
 
 # Project code
 COPY . .

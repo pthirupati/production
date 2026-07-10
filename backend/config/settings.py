@@ -158,9 +158,15 @@ ASGI_APPLICATION = "config.asgi.application"
 # Database (PostgreSQL – persistent)
 # Runtime uses pgBouncer when PGBOUNCER_HOST is set; migrations use POSTGRES_HOST directly.
 # --------------------------------------------------
+_USING_PGBOUNCER = bool(env("PGBOUNCER_HOST", default=""))
 _DB_HOST = env("PGBOUNCER_HOST", default="") or env("POSTGRES_HOST")
 _DB_PORT = env("PGBOUNCER_PORT", default="") or env("POSTGRES_PORT")
 
+# When runtime traffic goes through pgBouncer in TRANSACTION pooling mode, Django
+# must NOT hold persistent server connections (CONN_MAX_AGE=0) and must NOT use
+# server-side cursors — otherwise persistent Django conns pin transaction-pooled
+# slots and the pool exhausts under load (audit P0-4). Direct Postgres
+# (migrations, or no pgBouncer) keeps persistent connections for lower overhead.
 DATABASES = {
     "default": {
         "ENGINE": "django.db.backends.postgresql",
@@ -169,8 +175,9 @@ DATABASES = {
         "PASSWORD": env("POSTGRES_PASSWORD"),
         "HOST": _DB_HOST,
         "PORT": _DB_PORT,
-        "CONN_MAX_AGE": 600,  # 10 min persistent connections (reduces connect overhead)
-        "CONN_HEALTH_CHECKS": True,  # Verify connections before reuse
+        "CONN_MAX_AGE": 0 if _USING_PGBOUNCER else 600,
+        "CONN_HEALTH_CHECKS": not _USING_PGBOUNCER,
+        "DISABLE_SERVER_SIDE_CURSORS": _USING_PGBOUNCER,
         "OPTIONS": {
             "connect_timeout": 5,
         },
