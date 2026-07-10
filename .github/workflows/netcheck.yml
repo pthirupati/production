@@ -56,9 +56,14 @@ jobs:
         run: |
           KEY=$(mktemp); printf '%s\n' "$PROD_SSH_KEY" | tr -d '\r' > "$KEY"; chmod 600 "$KEY"
           trap 'rm -f "$KEY"' EXIT
-          C="-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o BatchMode=yes -o ConnectTimeout=15 -i $KEY -o IdentitiesOnly=yes"
+          set +e
+          # Mirror the deploy's remote(): explicit ProxyCommand (as a single opts
+          # element) so the edge jump uses our key — -J does NOT propagate -i.
+          jopts="-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o BatchMode=yes -o ConnectTimeout=12 -i $KEY -o IdentitiesOnly=yes"
+          OPTS=(-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o BatchMode=yes -o ConnectTimeout=12 -i "$KEY" -o IdentitiesOnly=yes
+                -o "ProxyCommand=ssh $jopts -W %h:%p root@${EDGE}")
           echo "===== FROM D2 (app $APP): can it reach D3 ($DB) :6432 / :5432 ? ====="
-          ssh $C -J root@"$EDGE" root@"$APP" 'bash -s' <<EOS </dev/null
+          ssh "${OPTS[@]}" root@"$APP" 'bash -s' <<EOS
           set +e
           for p in 6432 5432; do
             timeout 6 bash -c "cat < /dev/null > /dev/tcp/$DB/\$p" 2>/dev/null \
@@ -68,7 +73,7 @@ jobs:
           grep -iE "^(PGBOUNCER_HOST|PGBOUNCER_PORT|DATABASE_HOST|DATABASE_PORT|POSTGRES_HOST|DB_HOST)=" /opt/fixitlab/.env.production 2>/dev/null || echo "  (.env.production not found)"
           EOS
           echo "===== ON D3 (db $DB): listeners + pgbouncer ====="
-          ssh $C -J root@"$EDGE" root@"$DB" 'bash -s' <<'EOS' </dev/null
+          ssh "${OPTS[@]}" root@"$DB" 'bash -s' <<'EOS'
           set +e
           echo "--- docker ps (data tier) ---"
           docker ps -a --format '{{.Names}} | {{.Status}} | {{.Ports}}' | grep -iE "postgres|pgb" || echo "  no pg/pgb containers"
