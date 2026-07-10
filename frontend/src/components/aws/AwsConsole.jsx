@@ -32,7 +32,7 @@ function serviceFromPath(pathname) {
 export default function AwsConsole({ embedded = false }) {
   const location = useLocation()
   const darkMode = useAwsStore((s) => s.darkMode)
-  const flash = useAwsStore((s) => s.flash)
+  const flash = useAwsStore((s) => s.flash) || []
   const dismissFlash = useAwsStore((s) => s.dismissFlash)
   const [sidebarOpen, setSidebarOpen] = useState(true)
   const [cloudShellOpen, setCloudShellOpen] = useState(false)

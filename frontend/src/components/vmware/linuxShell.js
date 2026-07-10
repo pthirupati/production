@@ -68,8 +68,15 @@ function getOrCreateGuestShared(vm) {
   if (vm?.guest_disk_rescanned || vm?.guest_disk_visible) shared.diskRescanned = true
   if (vm?.guest_disk_formatted) shared.diskFormatted = true
   if (vm?.guest_disk_mounted) shared.diskMounted = true
-  if (vm?.guest_nic_pending === false || (vm?.guest_pending_nics || []).length) shared.nicRescanned = true
+  if (vm?.guest_nic_pending === false) shared.nicRescanned = true
   if (vm?.kernel_module_missing === false) shared.moduleLoaded = true
+  // New hot-added hardware must be rescanned again — reset flags when pending devices appear.
+  if (vm?.guest_disk_hidden && (vm?.guest_pending_disks?.length || 0) > 0 && !vm?.guest_disk_rescanned && !vm?.guest_disk_visible) {
+    shared.diskRescanned = false
+  }
+  if (vm?.guest_nic_pending && (vm?.guest_pending_nics?.length || 0) > 0) {
+    shared.nicRescanned = false
+  }
   return shared
 }
 
@@ -1085,7 +1092,8 @@ function aptProgressChunks(pkgs, action = 'install') {
 }
 
 export function createLinuxShell(vm, opts = {}) {
-  const family = guestOsFamily(vm)
+  const vmRef = { current: vm }
+  const family = guestOsFamily(vmRef.current)
   const isRhel = family === 'rhel'
   const kernel = isRhel ? '5.14.0-362.8.1.el9_3.x86_64' : '5.15.0-91-generic'
   const hostname = vm?.hostname || vm?.name || (isRhel ? 'rhel-server-01' : 'ubuntu-server-01')
@@ -1323,6 +1331,7 @@ export function createLinuxShell(vm, opts = {}) {
   }
 
   const run = (raw, opts = {}) => {
+    getOrCreateGuestShared(vmRef.current)
     const line = raw.trim()
     if (!line) return { lines: [''], prompt: prompt() }
     if (!opts.noHistory) history.push(line)
@@ -2773,7 +2782,8 @@ export function createLinuxShell(vm, opts = {}) {
     history,
     saveFile,
     readFile,
-    pkgManager: () => pkgManager(vm),
+    syncVm: (nextVm) => { if (nextVm) vmRef.current = nextVm; getOrCreateGuestShared(vmRef.current) },
+    pkgManager: () => pkgManager(vmRef.current),
     // Stateful package DB queries (used by tests + any future programmatic checks).
     isInstalled: (name) => pkgs.has(name),
     installedPackages: () => pkgs.rpmList(),

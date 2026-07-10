@@ -7,6 +7,26 @@ import { useLinuxTerminalTabs } from '../linux/useLinuxTerminalTabs'
 const LOGIN_HINT = 'Hint: root/root13 or labuser/labuser@123'
 const GRUB_TIMEOUT = 8 // seconds the GRUB menu counts down before auto-booting
 
+function consoleStorageKey(vmId) {
+  return `fixitlab-vmware-console:${vmId || 'guest'}`
+}
+
+function loadConsoleState(vmId) {
+  try {
+    const raw = sessionStorage.getItem(consoleStorageKey(vmId))
+    return raw ? JSON.parse(raw) : null
+  } catch {
+    return null
+  }
+}
+
+function saveConsoleState(vmId, snapshot) {
+  if (!vmId) return
+  try {
+    sessionStorage.setItem(consoleStorageKey(vmId), JSON.stringify(snapshot))
+  } catch { /* storage unavailable */ }
+}
+
 function isWindowsGuest(vm) {
   return (vm?.guest_os || '').includes('Windows') || (vm?.guest_os_version || '').includes('Windows')
 }
@@ -113,6 +133,17 @@ export default function VmwareConsole({ vm, onClose, onGuestAction }) {
     setLines(prev => [...prev, ...(Array.isArray(text) ? text : [text])])
   }, [])
 
+  // Persist shell/rescue session when console is closed and reopened (minimize/reopen flow).
+  useEffect(() => {
+    if (!vm?.id || (phase !== 'shell' && phase !== 'rescue')) return
+    saveConsoleState(vm.id, {
+      phase,
+      lines: lines.slice(-400),
+      cmd,
+      histIdx,
+    })
+  }, [vm?.id, phase, lines, cmd, histIdx])
+
   // ------------------------------------------------------------------ *
   // Boot / reboot orchestration
   // ------------------------------------------------------------------ *
@@ -185,6 +216,15 @@ export default function VmwareConsole({ vm, onClose, onGuestAction }) {
         'Give root password for maintenance',
         '(or press Control-D to continue): ',
       ])
+      return
+    }
+    const saved = vm?.id ? loadConsoleState(vm.id) : null
+    if (saved && (saved.phase === 'shell' || saved.phase === 'rescue') && !vm?.boot_pending) {
+      setPhase(saved.phase)
+      setLines(Array.isArray(saved.lines) ? saved.lines : [])
+      setCmd(saved.cmd || '')
+      setHistIdx(typeof saved.histIdx === 'number' ? saved.histIdx : -1)
+      setLoginStep('user')
       return
     }
     // A guest that was just powered on / reset this session replays the full

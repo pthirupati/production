@@ -13,6 +13,7 @@ export default function SimWithTerminal({
   terminalHost = 'primary',
   blockedCommands = [],
   isMobile = false,
+  welcomeHint = '',
   children,
 }) {
   return (
@@ -49,6 +50,8 @@ export default function SimWithTerminal({
               hostKey={terminalHost}
               blockedCommands={blockedCommands}
               isMobile={isMobile}
+              welcomeHint={welcomeHint}
+              layoutKey={`${terminalSession?.status || ''}-${terminalSession?.container_id || ''}-${terminalHost}`}
             />
           ) : (
             <div className="flex h-full items-center justify-center px-4 text-center text-sm text-surface-500">

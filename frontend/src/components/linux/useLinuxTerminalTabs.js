@@ -16,6 +16,15 @@ const TAB_LABELS = ['bash-1', 'bash-2', 'bash-3', 'bash-4', 'bash-5', 'bash-6']
  */
 export function useLinuxTerminalTabs(vm, { enabled = true, initialTabs = 1 } = {}) {
   const vmKey = vm?.id || vm?.name || 'guest'
+  const hwSig = [
+    vm?.guest_disk_hidden,
+    vm?.guest_disk_visible,
+    vm?.guest_nic_pending,
+    vm?.guest_pending_disks?.length || 0,
+    vm?.guest_pending_nics?.length || 0,
+    vm?.disks?.length || 0,
+    vm?.nics?.length || 0,
+  ].join('|')
   const [tabs, setTabs] = useState(() => {
     if (!enabled) return []
     const n = Math.max(1, Math.min(initialTabs, TAB_LABELS.length))
@@ -34,10 +43,10 @@ export function useLinuxTerminalTabs(vm, { enabled = true, initialTabs = 1 } = {
     return shellsRef.current.get(tabId)
   }, [vm, vmKey])
 
-  // Drop cached shells when VM identity changes
+  // Drop cached shells when VM identity or hot-add hardware flags change
   useEffect(() => {
     shellsRef.current = new Map()
-  }, [vmKey])
+  }, [vmKey, hwSig])
 
   const activeShell = useMemo(() => {
     if (!enabled || !activeId) return null

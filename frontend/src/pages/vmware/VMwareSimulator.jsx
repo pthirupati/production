@@ -808,6 +808,23 @@ export default function VMwareSimulator() {
 
   useEffect(() => { load() }, [load])
 
+  // Keep guest console VM in sync with vCenter state (disk/NIC hot-add flags).
+  useEffect(() => {
+    if (!consoleVm?.id || !state?.inventory?.vms) return
+    const fresh = state.inventory.vms.find((v) => v.id === consoleVm.id)
+    if (!fresh) return
+    const hwChanged = fresh.guest_disk_hidden !== consoleVm.guest_disk_hidden
+      || fresh.guest_disk_visible !== consoleVm.guest_disk_visible
+      || fresh.guest_nic_pending !== consoleVm.guest_nic_pending
+      || (fresh.guest_pending_disks?.length || 0) !== (consoleVm.guest_pending_disks?.length || 0)
+      || (fresh.guest_pending_nics?.length || 0) !== (consoleVm.guest_pending_nics?.length || 0)
+      || (fresh.disks?.length || 0) !== (consoleVm.disks?.length || 0)
+      || (fresh.nics?.length || 0) !== (consoleVm.nics?.length || 0)
+    if (hwChanged || fresh.power !== consoleVm.power || fresh.boot_pending !== consoleVm.boot_pending) {
+      setConsoleVm(fresh)
+    }
+  }, [state?.inventory?.vms, consoleVm?.id]) // eslint-disable-line react-hooks/exhaustive-deps
+
   // Close this tab when the parent lab stops or the timer expires.
   useEffect(() => {
     if (!sessionId) return undefined

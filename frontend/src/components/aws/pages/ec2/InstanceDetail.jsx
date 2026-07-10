@@ -42,9 +42,9 @@ function consoleOutput(instance, ami) {
 export default function InstanceDetail() {
   const { id } = useParams()
   const navigate = useNavigate()
-  const instance = useAwsStore((s) => s.instances.find((i) => i.id === id))
-  const securityGroups = useAwsStore((s) => s.securityGroups)
-  const volumes = useAwsStore((s) => s.volumes)
+  const instance = useAwsStore((s) => (s.instances || []).find((i) => i.id === id))
+  const securityGroups = useAwsStore((s) => s.securityGroups) || []
+  const volumes = useAwsStore((s) => s.volumes) || []
   const instanceAction = useAwsStore((s) => s.instanceAction)
   const pushFlash = useAwsStore((s) => s.pushFlash)
   const [tab, setTab] = useState('details')

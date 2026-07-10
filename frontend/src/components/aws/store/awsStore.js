@@ -327,13 +327,13 @@ export const useAwsStore = create(
       // ---------- Flash messages ----------
       pushFlash: (type, message) => {
         const id = flashSeq += 1
-        set((s) => ({ flash: [...s.flash, { id, type, message }] }))
+        set((s) => ({ flash: [...(s.flash || []), { id, type, message }] }))
         if (type === 'success' || type === 'info') {
           setTimeout(() => get().dismissFlash(id), 8000)
         }
         return id
       },
-      dismissFlash: (id) => set((s) => ({ flash: s.flash.filter((f) => f.id !== id) })),
+      dismissFlash: (id) => set((s) => ({ flash: (s.flash || []).filter((f) => f.id !== id) })),
 
       // ---------- Account / region ----------
       setRegion: (region) => set({ region }),
@@ -549,11 +549,32 @@ export const useAwsStore = create(
     }),
     {
       name: 'fixitlab-aws-sim',
-      version: 1,
+      version: 2,
       // Persist resource state + region, but not transient flash messages.
       partialize: (s) => {
         const { flash, ...rest } = s
         return rest
+      },
+      merge: (persisted, current) => {
+        const seed = seedState()
+        const p = persisted || {}
+        const merged = { ...current, ...p, flash: [] }
+        merged.account = { ...seed.account, ...(p.account || {}) }
+        merged.region = p.region || current.region || seed.region
+        merged.darkMode = p.darkMode ?? current.darkMode ?? false
+        for (const key of Object.keys(seed)) {
+          if (key === 'account' || key === 'region' || key === 'darkMode' || key === 'flash') continue
+          if (key === 'genericResources') {
+            merged.genericResources = p.genericResources && typeof p.genericResources === 'object'
+              ? { ...seed.genericResources, ...p.genericResources }
+              : seed.genericResources
+            continue
+          }
+          if (Array.isArray(seed[key])) {
+            merged[key] = Array.isArray(p[key]) ? p[key] : seed[key]
+          }
+        }
+        return merged
       },
     },
   ),

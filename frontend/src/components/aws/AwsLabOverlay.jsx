@@ -9,10 +9,11 @@ import '../../styles/lab-chrome.css'
 
 /**
  * AWS Console embedded in LabRunner with full lab chrome (Hints, Check, timer, Stop).
- * Uses MemoryRouter so routing works without an iframe (fixes clipped layout / hidden sidebar).
+ * Terminal panel is toggled from LabRunner's SimWithTerminal wrapper — console is primary.
  */
 export default function AwsLabOverlay({
   embedded = true,
+  onToggleTerminal,
   onExit,
   scenario,
   sessionId,
@@ -44,7 +45,7 @@ export default function AwsLabOverlay({
         subtitle={scenario?.title || scenario?.slug || ''}
         accent="#ff9900"
         className="lab-chrome-bar !bg-[#232f3e] !border-b-[#37475a]"
-        onExit={onExit}
+        onExit={onToggleTerminal}
         onHints={onHints}
         onCheck={onCheck}
         onExtend={onExtend}
@@ -55,7 +56,7 @@ export default function AwsLabOverlay({
         backLabel="Terminal"
         vmwareHref={vmwareHref}
       />
-      <div className="flex-1 min-h-0 overflow-hidden aws-embedded-host">
+      <div className="flex-1 min-h-0 overflow-hidden aws-embedded-host h-full w-full">
         <MemoryRouter initialEntries={['/aws-sim/console/home']}>
           <Routes>
             <Route path="/aws-sim/*" element={<AwsConsole embedded />} />

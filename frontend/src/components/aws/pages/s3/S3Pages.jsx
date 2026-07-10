@@ -43,7 +43,7 @@ function defaultCors() {
 
 export function BucketList() {
   const navigate = useNavigate()
-  const buckets = useAwsStore((s) => s.s3Buckets)
+  const buckets = useAwsStore((s) => s.s3Buckets) || []
   const region = useAwsStore((s) => s.region)
   const createBucket = useAwsStore((s) => s.createBucket)
   const deleteBucket = useAwsStore((s) => s.deleteBucket)
@@ -117,7 +117,7 @@ export function BucketList() {
 export function BucketDetail() {
   const { name } = useParams()
   const navigate = useNavigate()
-  const bucket = useAwsStore((s) => s.s3Buckets.find((b) => b.name === name))
+  const bucket = useAwsStore((s) => (s.s3Buckets || []).find((b) => b.name === name))
   const putObject = useAwsStore((s) => s.putObject)
   const deleteObject = useAwsStore((s) => s.deleteObject)
   const updateBucket = useAwsStore((s) => s.updateBucket)

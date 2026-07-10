@@ -402,15 +402,32 @@ def fix_broken_prose(text: str) -> str:
     # Common seed typos / missing spaces
     fixes = (
         (r"\btutorela\b", "tutorial"),
+        (r"\btutorelas\b", "tutorials"),
         (r"\bmnay\b", "many"),
         (r"\beperince\b", "experience"),
         (r"\btechnolpogy\b", "technology"),
         (r"\bscinario\b", "scenario"),
+        (r"\bscinarios\b", "scenarios"),
+        (r"\bscinarp\b", "script"),
         (r"\bceritifate\b", "certificate"),
         (r"\bconfiguraton\b", "configuration"),
+        (r"\bconfigura\s*tion\b", "configuration"),
         (r"\barchitecure\b", "architecture"),
         (r"\bfrom ero\b", "from zero"),
         (r"\bsratch\b", "scratch"),
+        (r"\bteh\b", "the"),
+        (r"\bwiht\b", "with"),
+        (r"\btaht\b", "that"),
+        (r"\bhte\b", "the"),
+        (r"\brecieve\b", "receive"),
+        (r"\boccured\b", "occurred"),
+        (r"\bseperate\b", "separate"),
+        (r"\bdefinately\b", "definitely"),
+        (r"\benviroment\b", "environment"),
+        (r"\bparamaters\b", "parameters"),
+        (r"\bpriviledge\b", "privilege"),
+        (r"\bauthentica\s*tion\b", "authentication"),
+        (r"\bauthoriza\s*tion\b", "authorization"),
     )
     for pat, repl in fixes:
         text = re.sub(pat, repl, text, flags=re.I)

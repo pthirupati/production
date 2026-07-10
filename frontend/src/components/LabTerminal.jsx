@@ -267,10 +267,13 @@ function LabTerminal({
       }
 
       const ensureWsAuth = async () => {
-        const token = useAuthStore.getState().accessToken
-        if (token && token !== 'null') return true
-        if (useAuthStore.getState().isAuthenticated) {
-          return refreshAuthToken()
+        const { accessToken, isAuthenticated } = useAuthStore.getState()
+        if (accessToken && accessToken !== 'null') return true
+        if (isAuthenticated) {
+          const refreshed = await refreshAuthToken()
+          if (refreshed) return true
+          // Cookie-only sessions: same-origin WebSocket sends httpOnly access_token automatically.
+          return true
         }
         return false
       }

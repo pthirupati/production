@@ -3,6 +3,9 @@ from rest_framework import serializers
 from .models import Tutorial, TutorialProgress, TutorialSection
 
 
+from .completeness import enrich_body
+
+
 class TutorialSectionSerializer(serializers.ModelSerializer):
     quiz = serializers.SerializerMethodField()
 
@@ -30,6 +33,12 @@ class TutorialSectionSerializer(serializers.ModelSerializer):
 
         tutorial = obj.tutorial
         return build_module_quiz(tutorial.topic, tutorial.title)
+
+    def to_representation(self, instance):
+        data = super().to_representation(instance)
+        tutorial = instance.tutorial
+        data["body"] = enrich_body(tutorial.topic, tutorial.title, instance.body or "")
+        return data
 
 
 class TutorialProgressSerializer(serializers.ModelSerializer):

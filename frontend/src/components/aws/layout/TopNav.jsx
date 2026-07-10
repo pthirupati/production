@@ -19,10 +19,10 @@ export default function TopNav({ onToggleSidebar, onToggleCloudShell }) {
   const navigate = useNavigate()
   const region = useAwsStore((s) => s.region)
   const setRegion = useAwsStore((s) => s.setRegion)
-  const account = useAwsStore((s) => s.account)
+  const account = useAwsStore((s) => s.account) || { id: '123456789012', alias: 'my-aws-simulation', email: 'admin@example.com' }
   const darkMode = useAwsStore((s) => s.darkMode)
   const toggleDark = useAwsStore((s) => s.toggleDarkMode)
-  const alarms = useAwsStore((s) => s.cwAlarms)
+  const alarms = useAwsStore((s) => s.cwAlarms) || []
 
   const [openMenu, setOpenMenu] = useState(null) // 'services' | 'region' | 'account' | 'search'
   const [query, setQuery] = useState('')

@@ -684,6 +684,7 @@ export default function LabRunner() {
 
               // Broadcast to other tabs that this lab expired
               broadcastLabStopped(sessionId, 'expired')
+              closeLabChildTabs(sessionId)
               if (labChannelRef.current) {
                 labChannelRef.current.postMessage({ type: 'lab_stopped', sessionId, reason: 'expired' })
               }
@@ -773,6 +774,8 @@ export default function LabRunner() {
         } catch {}
         clearSession()
         stopTimer()
+        broadcastLabStopped(sessionId, 'idle')
+        closeLabChildTabs(sessionId)
         navigate(getLabExitPath(session, '', techSlugRef, scenarioSlugRef))
       }, IDLE_TIMEOUT)
     }
@@ -1331,7 +1334,7 @@ export default function LabRunner() {
     && /maas|lxd|lxc|kvm|virsh|ipmi|pxe/.test((scenario?.slug || '').toLowerCase())
   )
   const isSimPrimaryLab = !isCrossTech && (
-    isTerraformSimLab || isAwxLab || isMonitoringLab || isWindowsGuiLab
+    isAwsLab || isTerraformSimLab || isAwxLab || isMonitoringLab || isWindowsGuiLab
     || isPeopleSoftLab || isBaremetalGuiLab || isDataDashboardLab || isAgentLab
     || isNmapLab || isWiresharkLab
   )
@@ -1411,8 +1414,21 @@ export default function LabRunner() {
     blockedCommands: blockedCmds,
     isMobile,
     vmwareHref: showSimVmwareLink ? vmwareServerHref : null,
+    welcomeHint: terminalHost === 'ssh_client'
+      ? 'Connect manually: ssh -o StrictHostKeyChecking=no user@server-ip (see lab hosts in the sidebar)'
+      : '',
   }
   const renderPrimarySim = () => {
+    if (isAwsLab) {
+      return (
+        <AwsLabOverlay
+          embedded
+          sessionId={sessionId}
+          scenario={scenario}
+          {...primarySimProps}
+        />
+      )
+    }
     if (isTerraformSimLab) {
       return (
         <TerraformSimulator {...primarySimProps} />
@@ -2178,6 +2194,7 @@ export default function LabRunner() {
             terminalHost={terminalHost}
             blockedCommands={blockedCmds}
             isMobile={isMobile}
+            welcomeHint={primarySimProps.welcomeHint}
           >
             {renderPrimarySim()}
           </SimWithTerminal>
@@ -2388,7 +2405,7 @@ export default function LabRunner() {
               <ExternalLink size={12} /> Open Terraform
             </button>
           )}
-          {isAwsLab && (
+          {isAwsLab && !isSimPrimaryLab && (
             <button
               type="button"
               onClick={() => setShowAwsSim(true)}
@@ -2543,7 +2560,7 @@ export default function LabRunner() {
                   isMobile={isMobile}
                   blockedCommands={blockedCmds}
                   className="h-full"
-                  layoutKey={`${session?.status}-${session?.container_id || ''}-${sidebarOpen}-${showTerraformSim}`}
+                  layoutKey={`${session?.status}-${session?.container_id || ''}-${showTerraformSim}`}
                 />
               ))}
             </div>
@@ -2559,7 +2576,7 @@ export default function LabRunner() {
               isMobile={isMobile}
               blockedCommands={blockedCmds}
               className="flex-1 min-h-0"
-              layoutKey={`${session?.status}-${session?.container_id || ''}-${sidebarOpen}-${showTerraformSim}`}
+              layoutKey={`${session?.status}-${session?.container_id || ''}-${showTerraformSim}`}
               welcomeHint={terminalHost === 'ssh_client' && sshClientTarget
                 ? `Type: ssh -o StrictHostKeyChecking=no ${sshClientTarget.ssh_user || 'root'}@${sshClientTarget.ip}`
                 : ''}
@@ -2836,11 +2853,11 @@ export default function LabRunner() {
         />
       )}
 
-      {(isAwsLab || isTerraformSimLab) && showAwsSim && (
+      {isTerraformSimLab && showAwsSim && (
         <AwsLabOverlay
           sessionId={sessionId}
           scenario={scenario}
-          onExit={() => setShowAwsSim(false)}
+          onToggleTerminal={() => setShowAwsSim(false)}
           vmwareHref={showSimVmwareLink ? vmwareServerHref : null}
           {...simChromeProps}
         />
