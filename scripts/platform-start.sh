@@ -183,7 +183,20 @@ fi
 # Database-touching steps run on the node with the backend (single-host or cluster app).
 if _role_runs app; then
   echo "Running migrations (safe — does not wipe data)..."
-  docker compose -f "$COMPOSE_FILE" --env-file "$ENV_FILE" exec -T backend python manage.py migrate --noinput
+  # Retry: in the cluster the backend reaches Postgres via pgBouncer on the data
+  # node over the VPC. A deploy can briefly recreate the data tier, so the first
+  # migrate may hit a transient "connection ... timeout expired". The backend
+  # container's own startup.sh waits for the DB and migrates too; this orchestration
+  # migrate must be equally tolerant instead of failing the whole deploy on a blip.
+  _migrated=0
+  for _m in $(seq 1 12); do
+    if docker compose -f "$COMPOSE_FILE" --env-file "$ENV_FILE" exec -T backend python manage.py migrate --noinput; then
+      _migrated=1; break
+    fi
+    echo "  migrate attempt $_m failed (DB not reachable yet?) — retrying in 6s"
+    sleep 6
+  done
+  if [ "$_migrated" != 1 ]; then echo "ERROR: migrations failed after retries"; exit 1; fi
 
   echo "Syncing superuser credentials from env..."
   docker compose -f "$COMPOSE_FILE" --env-file "$ENV_FILE" exec -T backend python /scripts/create_superuser.py || true
