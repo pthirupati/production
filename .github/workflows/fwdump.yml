@@ -33,7 +33,7 @@ jobs:
       - name: Dump firewalls (full JSON) + droplet IPs
         run: |
           set +e
-          echo "===== droplet tags -> private IPs ====="
+          echo "===== droplet tags -> IPs ====="
           for t in fixitlab-edge fixitlab-app fixitlab-db fixitlab-labs; do
             id=$(doctl compute droplet list --tag-name "$t" --format ID --no-header | head -n1)
             [ -z "$id" ] && { echo "$t: (none)"; continue; }
@@ -42,25 +42,8 @@ jobs:
             echo "$t: id=$id priv=$priv pub=$pub"
           done
           echo
-          echo "===== firewalls: name + inbound + OUTBOUND + droplet_ids ====="
-          doctl compute firewall list -o json 2>&1 | python3 - <<'PY'
-import json,sys
-raw=sys.stdin.read()
-try: fws=json.loads(raw)
-except Exception as e:
-    print("JSON parse failed:",e); print(raw[:2000]); sys.exit(0)
-def fmt(rules,key):
-    out=[]
-    for r in rules or []:
-        proto=r.get("protocol"); ports=r.get("ports")
-        srcs=r.get(key,{}) or {}
-        addrs=srcs.get("addresses",[]); tags=srcs.get("tags",[]); dids=srcs.get("droplet_ids",[])
-        out.append(f"    {proto}/{ports}  <- addrs={addrs} tags={tags} droplet_ids={dids}")
-    return "\n".join(out) if out else "    (none)"
-for fw in fws:
-    print(f"\n# {fw.get('name')}  id={fw.get('id')}")
-    print(f"  droplet_ids={fw.get('droplet_ids')}  tags={(fw.get('tags') or [])}")
-    print("  INBOUND:");  print(fmt(fw.get('inbound_rules'),'sources'))
-    print("  OUTBOUND:"); print(fmt(fw.get('outbound_rules'),'destinations'))
-PY
+          echo "===== firewalls: name / inbound / OUTBOUND / droplet_ids ====="
+          doctl compute firewall list -o json > /tmp/fw.json 2>&1
+          jq -r '.[] | "\n# \(.name)  id=\(.id)\n  droplet_ids=\(.droplet_ids)  tags=\(.tags // [])\n  INBOUND:\n" + ([.inbound_rules[]? | "    \(.protocol)/\(.ports)  <- addrs=\(.sources.addresses // []) tags=\(.sources.tags // []) dids=\(.sources.droplet_ids // [])"] | join("\n")) + "\n  OUTBOUND:\n" + ([.outbound_rules[]? | "    \(.protocol)/\(.ports)  -> addrs=\(.destinations.addresses // []) tags=\(.destinations.tags // []) dids=\(.destinations.droplet_ids // [])"] | join("\n"))' /tmp/fw.json 2>&1 || { echo "jq failed; raw:"; head -c 3000 /tmp/fw.json; }
+          echo
           echo "===== done ====="
