@@ -736,7 +736,7 @@ class InterviewRoundMessageView(APIView):
         is_candidate_question = input_type == "question"
         meta = {
             "input_type": input_type,
-            "command_validated": request.data.get("command_validated", False),
+            # command_validated is set server-side only (practical_lab validation bucket).
             "practice": bool(request.data.get("practice", False)),
             "force_advance": bool(request.data.get("force_advance")),
             "user_skip": bool(request.data.get("user_skip")),

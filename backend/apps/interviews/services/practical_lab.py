@@ -126,6 +126,12 @@ def start_practical_lab(user, round_obj: InterviewRound) -> dict:
     if not scenario:
         return {"error": f"Scenario '{slug}' not found on this server", "code": "SCENARIO_MISSING"}
 
+    from apps.labs.start_gates import lab_start_block_reason
+
+    block = lab_start_block_reason(user, scenario)
+    if block:
+        return block
+
     try:
         session = start_lab_session(user, scenario)
         round_obj.practical_lab_session_id = session.id
@@ -133,7 +139,7 @@ def start_practical_lab(user, round_obj: InterviewRound) -> dict:
         return _session_payload(session)
     except Exception as exc:
         logger.exception("Interview practical lab failed round=%s", round_obj.id)
-        return {"error": str(exc)[:200], "code": "PROVISION_FAILED"}
+        return {"error": "Could not start the practical lab environment.", "code": "PROVISION_FAILED"}
 
 
 def _session_payload(session: LabSession) -> dict:
