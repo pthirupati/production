@@ -1,0 +1,72 @@
+name: Cluster Prep (D1 Vault unseal + D3 DB check)
+
+# Unseals the (already-initialized) Vault on the edge node and reports the
+# Postgres/pgBouncer state on the data node (D3) so we know why the app node
+# times out connecting to 10.x:6432 before re-running the deploy. Read-only for
+# D3; only unseals Vault on D1 (no secret contents printed).
+on:
+  workflow_dispatch: {}
+
+jobs:
+  prep:
+    name: Vault unseal (D1) + DB status (D3)
+    runs-on: ubuntu-latest
+    environment: production
+    timeout-minutes: 15
+    steps:
+      - name: Resolve DO API token (masked)
+        id: tok
+        env:
+          DO_API_TOKEN: ${{ secrets.DO_API_TOKEN }}
+          PRODUCTION_ENV_B64: ${{ secrets.PRODUCTION_ENV_B64 }}
+        run: |
+          TOK="$DO_API_TOKEN"
+          if [ -z "$TOK" ] && [ -n "$PRODUCTION_ENV_B64" ]; then
+            TOK="$(echo "$PRODUCTION_ENV_B64" | base64 -d 2>/dev/null | grep '^DO_API_TOKEN=' | cut -d= -f2- | tr -d '\r')"
+          fi
+          [ -z "$TOK" ] && { echo "No DO token"; exit 1; }
+          echo "::add-mask::$TOK"; echo "token=$TOK" >> "$GITHUB_OUTPUT"
+      - name: Install doctl
+        uses: digitalocean/action-doctl@v2
+        with:
+          token: ${{ steps.tok.outputs.token }}
+      - name: Discover edge + db IPs
+        id: ips
+        run: |
+          EID=$(doctl compute droplet list --tag-name fixitlab-edge --format ID --no-header | head -n1)
+          DID=$(doctl compute droplet list --tag-name fixitlab-db --format ID --no-header | head -n1)
+          EIP=$(doctl compute droplet get "$EID" --format PublicIPv4 --no-header)
+          DPRIV=$(doctl compute droplet get "$DID" --format PrivateIPv4 --no-header)
+          echo "edge=$EIP db_priv=$DPRIV"
+          echo "edge=$EIP" >> "$GITHUB_OUTPUT"
+          echo "db_priv=$DPRIV" >> "$GITHUB_OUTPUT"
+      - name: Unseal Vault on D1 + check DB on D3
+        env:
+          PROD_SSH_KEY: ${{ secrets.PROD_SSH_KEY }}
+          EDGE_IP: ${{ steps.ips.outputs.edge }}
+          DB_PRIV: ${{ steps.ips.outputs.db_priv }}
+        run: |
+          KEY=$(mktemp); printf '%s\n' "$PROD_SSH_KEY" | tr -d '\r' > "$KEY"; chmod 600 "$KEY"
+          trap 'rm -f "$KEY"' EXIT
+          COMMON="-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o BatchMode=yes -o ConnectTimeout=15 -i $KEY -o IdentitiesOnly=yes"
+          echo "===== D1: unseal Vault ====="
+          ssh $COMMON root@"$EDGE_IP" 'bash -s' <<'EOS'
+          set -e; cd /opt/fixitlab
+          bash scripts/vault/unseal.sh </dev/null 2>&1 | tail -5 || true
+          docker exec fixitlab_vault vault status </dev/null 2>&1 | grep -iE "Initialized|Sealed" || true
+          EOS
+          echo "===== D3: DB status (via edge jump) ====="
+          JUMP="-o ProxyCommand=ssh $COMMON -W %h:%p root@$EDGE_IP"
+          ssh $COMMON $JUMP root@"$DB_PRIV" 'bash -s' <<'EOS'
+          set +e
+          echo "--- docker ps (data tier) ---"
+          docker ps -a --format '{{.Names}} | {{.Status}}' | grep -iE "postgres|pgbouncer|pgb" || echo "no postgres/pgbouncer containers"
+          echo "--- listening ports 5432/6432 ---"
+          (ss -tlnp 2>/dev/null || netstat -tlnp 2>/dev/null) | grep -E ":5432|:6432" || echo "nothing on 5432/6432"
+          echo "--- pg_isready via pgbouncer (6432) ---"
+          docker exec fixitlab-pgbouncer-1 pg_isready -h 127.0.0.1 -p 6432 2>&1 || docker run --rm --network host postgres:16 pg_isready -h 127.0.0.1 -p 6432 2>&1 || echo "pg_isready 6432 failed"
+          echo "--- disk ---"; df -h / | tail -1
+          echo "--- data-tier compose recent logs (pgbouncer) ---"
+          docker logs fixitlab-pgbouncer-1 --tail 15 2>&1 || true
+          EOS
+          echo "===== prep done ====="
