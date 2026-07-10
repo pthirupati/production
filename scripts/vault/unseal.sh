@@ -22,13 +22,27 @@ if [ -z "$UNSEAL_KEY" ]; then
   exit 1
 fi
 
-status="$(vault_compose exec -T vault vault status -format=json 2>/dev/null || echo '{}')"
-sealed="$(echo "$status" | python3 -c "import json,sys; print(json.load(sys.stdin).get('sealed', True))" 2>/dev/null || echo True)"
+# After a container recreate Vault starts sealed and, for the first few seconds,
+# reports "not initialized" (Code 400) before it reads the file storage backend.
+# Poll until it is initialized, then unseal — retrying the unseal itself — so a
+# single call reliably leaves Vault unsealed instead of racing the storage load.
+initialized=False; sealed=True
+for _i in $(seq 1 30); do
+  status="$(vault_compose exec -T vault vault status -format=json 2>/dev/null || echo '{}')"
+  initialized="$(echo "$status" | python3 -c "import json,sys; print(json.load(sys.stdin).get('initialized', False))" 2>/dev/null || echo False)"
+  sealed="$(echo "$status" | python3 -c "import json,sys; print(json.load(sys.stdin).get('sealed', True))" 2>/dev/null || echo True)"
+  if [ "$sealed" = "False" ]; then
+    echo "Vault already unsealed"
+    exit 0
+  fi
+  if [ "$initialized" = "True" ]; then
+    if vault_compose exec -T vault vault operator unseal "$UNSEAL_KEY" >/dev/null 2>&1; then
+      echo "Vault unsealed"
+      exit 0
+    fi
+  fi
+  sleep 2
+done
 
-if [ "$sealed" = "False" ]; then
-  echo "Vault already unsealed"
-  exit 0
-fi
-
-vault_compose exec -T vault vault operator unseal "$UNSEAL_KEY" >/dev/null
-echo "Vault unsealed"
+echo "ERROR: Vault did not unseal (initialized=$initialized sealed=$sealed)"
+exit 1
