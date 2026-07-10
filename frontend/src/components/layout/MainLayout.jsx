@@ -179,6 +179,12 @@ export default function MainLayout() {
 
   return (
     <div className="h-screen flex overflow-hidden bg-[#080a16] relative">
+      <a
+        href="#main-content"
+        className="sr-only focus:not-sr-only focus:absolute focus:z-50 focus:top-2 focus:left-2 focus:px-4 focus:py-2 focus:rounded-md focus:bg-accent-cyan focus:text-surface-950 focus:font-semibold"
+      >
+        Skip to main content
+      </a>
       {/* Subtle ambient glow — reference dashboard uses flat dark, not heavy particles */}
       <div className="fixed inset-0 pointer-events-none overflow-hidden z-0">
         <div className="absolute inset-0 bg-[#080a16]" />
@@ -321,7 +327,7 @@ export default function MainLayout() {
           )}
         </header>
 
-        <main className={`flex-1 min-h-0 overflow-y-auto overflow-x-hidden ${isLabRoute ? 'p-0' : 'p-3 sm:p-6 lg:p-8'}`} role="main">
+        <main id="main-content" className={`flex-1 min-h-0 overflow-y-auto overflow-x-hidden ${isLabRoute ? 'p-0' : 'p-3 sm:p-6 lg:p-8'}`} role="main">
           <div className={isLabRoute ? 'h-full' : 'max-w-[1180px] w-full mx-auto'}>
             <Outlet />
           </div>

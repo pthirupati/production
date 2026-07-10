@@ -157,10 +157,10 @@ if _role_runs app; then
   fi
   [ -n "$ENV_HASH" ] && echo "$ENV_HASH" > "$ENV_HASH_FILE"
 
-  echo "Waiting for backend..."
+  echo "Waiting for backend (readiness)..."
   for i in $(seq 1 120); do
     if docker compose -f "$COMPOSE_FILE" --env-file "$ENV_FILE" exec -T backend python -c \
-      "import urllib.request; r=urllib.request.urlopen('http://127.0.0.1:8000/api/health/'); assert r.status==200" 2>/dev/null; then
+      "import urllib.request; r=urllib.request.urlopen('http://127.0.0.1:8000/api/health/ready/'); assert r.status==200" 2>/dev/null; then
       break
     fi
     sleep 3

@@ -117,16 +117,22 @@ function useHydrated() {
 function ProtectedRoute({ children }) {
   const { isAuthenticated } = useAuthStore()
   const hydrated = useHydrated()
+  const location = useLocation()
   if (!hydrated) return <PageLoader />
-  if (!isAuthenticated) return <Navigate to="/login" replace />
+  if (!isAuthenticated) {
+    return <Navigate to="/login" replace state={{ from: location.pathname + location.search }} />
+  }
   return children
 }
 
 function AdminRoute({ children }) {
   const { isAuthenticated, user } = useAuthStore()
   const hydrated = useHydrated()
+  const location = useLocation()
   if (!hydrated) return <PageLoader />
-  if (!isAuthenticated) return <Navigate to="/login" replace />
+  if (!isAuthenticated) {
+    return <Navigate to="/login" replace state={{ from: location.pathname + location.search }} />
+  }
   if (!user?.is_staff) return <Navigate to="/dashboard" replace />
   return children
 }

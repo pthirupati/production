@@ -71,6 +71,7 @@ def lab_start_block_reason(user, scenario) -> dict | None:
                     "Renew now to continue labs — grace period allows viewing only."
                 ),
                 "needs_renewal": True,
+                "renew_url": f"/payment?technology={scenario.technology.slug}&renew=1",
                 "code": "SUBSCRIPTION_EXPIRED",
             }
         has_sub = sub and is_tech_subscription_active(sub)
@@ -125,3 +126,27 @@ def lab_start_block_reason(user, scenario) -> dict | None:
         }
 
     return None
+
+
+def lab_start_block_http_status(block: dict) -> int:
+    """Map a lab_start_block_reason payload to an HTTP status code."""
+    from rest_framework import status as drf_status
+
+    code = block.get("code", "")
+    if code in ("MAINTENANCE", "TECH_MAINTENANCE", "CAPACITY_FULL"):
+        return drf_status.HTTP_503_SERVICE_UNAVAILABLE
+    if code == "MAX_CONCURRENT":
+        return drf_status.HTTP_429_TOO_MANY_REQUESTS
+    return drf_status.HTTP_403_FORBIDDEN
+
+
+def lab_start_block_http_status(block: dict) -> int:
+    """Map a lab_start_block_reason payload to an HTTP status code."""
+    from rest_framework import status as drf_status
+
+    code = block.get("code", "")
+    if code in ("MAINTENANCE", "TECH_MAINTENANCE", "CAPACITY_FULL"):
+        return drf_status.HTTP_503_SERVICE_UNAVAILABLE
+    if code == "MAX_CONCURRENT":
+        return drf_status.HTTP_429_TOO_MANY_REQUESTS
+    return drf_status.HTTP_403_FORBIDDEN

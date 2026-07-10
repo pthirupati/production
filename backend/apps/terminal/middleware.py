@@ -1,11 +1,9 @@
 """
 JWT WebSocket authentication middleware for Django Channels.
-Extracts JWT token from query string: ws://host/ws/terminal/<id>/?token=<jwt>
-Falls back to the httpOnly access_token cookie (same as REST API) when the
-query param is missing — regular users after page reload often have no in-memory JWT.
+Authenticates via the httpOnly access_token cookie (same as REST API).
+Query-string ?token= is ignored — tokens must not appear in URLs/logs.
 """
 import logging
-from urllib.parse import parse_qs
 
 from channels.middleware import BaseMiddleware
 from channels.db import database_sync_to_async
@@ -64,11 +62,19 @@ def _coerce_token_str(token_str) -> str:
 
 @database_sync_to_async
 def get_user_from_token(token_str):
-    """Validate JWT token and return the user."""
+    """Validate JWT token, enforce session revocation, and return the user."""
     try:
         token = AccessToken(_coerce_token_str(token_str))
         user_id = token["user_id"]
-        return User.objects.get(id=user_id)
+        jti = token.get("jti")
+        user = User.objects.get(id=user_id)
+
+        from common.security import SessionTracker, session_enforcement_enabled
+        if session_enforcement_enabled() and jti and not SessionTracker.is_session_valid(user.id, jti):
+            logger.warning("WebSocket JWT session revoked: user=%s jti=%s...", user_id, jti[:16])
+            return AnonymousUser()
+
+        return user
     except Exception as e:
         logger.warning(f"WebSocket JWT auth failed: {e}")
         return AnonymousUser()
@@ -76,16 +82,11 @@ def get_user_from_token(token_str):
 
 class JWTAuthMiddleware(BaseMiddleware):
     """
-    Custom middleware that authenticates WebSocket connections via JWT
-    token passed in the query string or httpOnly access_token cookie.
+    Authenticate WebSocket connections via the httpOnly access_token cookie.
     """
 
     async def __call__(self, scope, receive, send):
-        params = parse_qs(_scope_query_string(scope))
-        token_list = params.get("token", [])
-        token_str = token_list[0] if token_list else None
-        if not token_str or token_str in ("null", "undefined", ""):
-            token_str = _cookie_from_scope(scope, "access_token")
+        token_str = _cookie_from_scope(scope, "access_token")
         if token_str:
             scope["user"] = await get_user_from_token(token_str)
         else:

@@ -257,10 +257,8 @@ function LabTerminal({
       }).filter(Boolean)
 
       const buildWsUrl = () => {
-        const token = useAuthStore.getState().accessToken
         const protocol = window.location.protocol === 'https:' ? 'wss' : 'ws'
         const params = new URLSearchParams()
-        if (token && token !== 'null') params.set('token', token)
         if (hostKey && hostKey !== 'primary') params.set('host', hostKey)
         const qs = params.toString()
         return `${protocol}://${window.location.host}/ws/terminal/${sessionId}/${qs ? `?${qs}` : ''}`

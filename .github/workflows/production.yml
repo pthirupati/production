@@ -1363,6 +1363,9 @@ jobs:
             echo "=== Edge (D1) ==="
             cd /opt/fixitlab
             docker compose -f docker-compose.edge.yml --env-file .env.production ps
+            echo "=== Readiness probe (via edge nginx) ==="
+            curl -sf --max-time 15 "http://127.0.0.1/api/health/ready/" \
+              || { echo "FAIL: readiness probe did not return 200"; exit 1; }
             for NODE in "${{ needs.create-cluster.outputs.db_private_ip }}:data:docker-compose.data.yml" \
                         "${{ needs.create-cluster.outputs.app_private_ip }}:app:docker-compose.app.yml"; do
               IP="${NODE%%:*}"; REST="${NODE#*:}"; ROLE="${REST%%:*}"; CF="${REST#*:}"

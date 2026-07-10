@@ -20,22 +20,27 @@ import { itsmApi } from '../api/itsm'
 import JiraTicketLink from '../components/JiraTicketLink'
 import LabTerminal from '../components/LabTerminal'
 import { LabBackendTerminalStatusBar } from '../components/linux/LinuxTerminalChrome'
-import CodingIDE from '../components/ide/CodingIDE'
-import PromptPlayground from '../components/promptlab/PromptPlayground'
-import MonitoringSimulator from '../components/monitoring/MonitoringSimulator'
-import NmapSimulator from '../components/nmap/NmapSimulator'
-import WiresharkSimulator from '../components/wireshark/WiresharkSimulator'
-import DataDashboardSimulator from '../components/datascience/DataDashboardSimulator'
-import AgentWorkflowSimulator from '../components/aiml/AgentWorkflowSimulator'
-import WindowsServerSimulator from '../components/windows/WindowsServerSimulator'
-import PeopleSoftSimulator from '../components/peoplesoft/PeopleSoftSimulator'
-import AwxSimulator from '../components/awx/AwxSimulator'
-import TerraformSimulator from '../components/terraform/TerraformSimulator'
-import CicdPipelineSim from '../components/devops/CicdPipelineSim'
-import AwsLabOverlay from '../components/aws/AwsLabOverlay'
+import PrimaryLabSim from '../components/lab/PrimaryLabSim'
+import LazySimPanel from '../components/lab/LazySimPanel'
+import SimErrorBoundary from '../components/SimErrorBoundary'
+import {
+  LazyAwsLabOverlay,
+  LazyTerraformSimulator,
+  LazyAwxSimulator,
+  LazyMonitoringSimulator,
+  LazyWindowsServerSimulator,
+  LazyPeopleSoftSimulator,
+  LazyBaremetalSimulator,
+  LazyDataDashboardSimulator,
+  LazyAgentWorkflowSimulator,
+  LazyNmapSimulator,
+  LazyWiresharkSimulator,
+  LazyCicdPipelineSim,
+  LazyCodingIDE,
+  LazyPromptPlayground,
+} from '../components/lab/labSimLoader'
 import { isTerraformLab } from '../utils/iacFlavor'
 import { resetTerraformAwsLabState } from '../utils/terraformAwsBridge'
-import BaremetalSimulator from '../components/baremetal/BaremetalSimulator'
 import { SimWithTerminal } from '../components/sim/shared'
 import SimLabTips from '../components/SimLabTips'
 import DevOpsNetworkingSimToolkit from '../components/DevOpsNetworkingSimToolkit'
@@ -1341,7 +1346,7 @@ export default function LabRunner() {
     && /maas|lxd|lxc|kvm|virsh|ipmi|pxe/.test((scenario?.slug || '').toLowerCase())
   )
   const isSimPrimaryLab = !isCrossTech && (
-    isAwsLab || isTerraformSimLab || isAwxLab || isMonitoringLab || isWindowsGuiLab
+    isAwsLab || isDevOpsPipelineLab || isTerraformSimLab || isAwxLab || isMonitoringLab || isWindowsGuiLab
     || isPeopleSoftLab || isBaremetalGuiLab || isDataDashboardLab || isAgentLab
     || isNmapLab || isWiresharkLab
   )
@@ -1350,6 +1355,19 @@ export default function LabRunner() {
     || showDataDashboardSim || showAgentSim || showWindowsSim || showPeopleSoftSim
     || showAwxSim || showBaremetalSim || showTerraformSim || showAwsSim || showCicdSim
   )
+  const primarySimKind = isAwsLab ? 'aws'
+    : isDevOpsPipelineLab ? 'cicd'
+    : isTerraformSimLab ? 'terraform'
+    : isAwxLab ? 'awx'
+    : isMonitoringLab ? 'monitoring'
+    : isWindowsGuiLab ? 'windows'
+    : isPeopleSoftLab ? 'peoplesoft'
+    : isBaremetalGuiLab ? 'baremetal'
+    : isDataDashboardLab ? 'datadashboard'
+    : isAgentLab ? 'agent'
+    : isNmapLab ? 'nmap'
+    : isWiresharkLab ? 'wireshark'
+    : null
   const solved = validationResult?.passed
   const expired = validationResult?.expired
   const simChromeProps = {
@@ -1426,31 +1444,23 @@ export default function LabRunner() {
       : '',
   }
   const renderPrimarySim = () => {
-    if (isAwsLab) {
-      return (
-        <AwsLabOverlay
+    if (!primarySimKind) return null
+    return (
+      <SimErrorBoundary
+        name={primarySimKind}
+        title="Lab simulator error"
+        resetStorageKey={primarySimKind === 'aws' ? 'fixitlab-aws-sim' : undefined}
+      >
+        <PrimaryLabSim
+          kind={primarySimKind}
           embedded
           sessionId={sessionId}
           scenario={scenario}
+          monitoringFlavor={monitoringFlavor}
           {...primarySimProps}
         />
-      )
-    }
-    if (isTerraformSimLab) {
-      return (
-        <TerraformSimulator {...primarySimProps} />
-      )
-    }
-    if (isAwxLab) return <AwxSimulator {...primarySimProps} />
-    if (isMonitoringLab) return <MonitoringSimulator {...primarySimProps} flavor={monitoringFlavor} />
-    if (isWindowsGuiLab) return <WindowsServerSimulator {...primarySimProps} />
-    if (isPeopleSoftLab) return <PeopleSoftSimulator {...primarySimProps} />
-    if (isBaremetalGuiLab) return <BaremetalSimulator {...primarySimProps} />
-    if (isDataDashboardLab) return <DataDashboardSimulator {...primarySimProps} />
-    if (isAgentLab) return <AgentWorkflowSimulator {...primarySimProps} />
-    if (isNmapLab) return <NmapSimulator {...primarySimProps} />
-    if (isWiresharkLab) return <WiresharkSimulator {...primarySimProps} />
-    return null
+      </SimErrorBoundary>
+    )
   }
 
   const labUnavailable = session && !['RUNNING', 'PROVISIONING'].includes(session.status)
@@ -1532,7 +1542,9 @@ export default function LabRunner() {
             Lesson complete — closing in {closingIn}s…
           </div>
         )}
-        <PromptPlayground
+        <LazySimPanel
+          Sim={LazyPromptPlayground}
+          label="prompt playground"
           sessionId={sessionId}
           scenario={scenario}
           solved={solved}
@@ -1585,7 +1597,9 @@ export default function LabRunner() {
             Challenge solved — lab is closing in {closingIn}s…
           </div>
         )}
-        <CodingIDE
+        <LazySimPanel
+          Sim={LazyCodingIDE}
+          label="coding IDE"
           sessionId={sessionId}
           scenario={scenario}
           solved={solved}
@@ -2209,7 +2223,9 @@ export default function LabRunner() {
         <>
         {isCrossTechMonitoringSplit && (
           <div className="shrink-0 h-[min(48vh,440px)] min-h-[220px] border-b border-surface-800 flex flex-col overflow-hidden">
-            <MonitoringSimulator
+            <LazySimPanel
+              Sim={LazyMonitoringSimulator}
+              label="monitoring"
               sessionId={sessionId}
               scenario={scenario}
               flavor={crossTechMonitoringFlavor}
@@ -2423,7 +2439,7 @@ export default function LabRunner() {
               <ExternalLink size={12} /> AWS Console
             </button>
           )}
-          {isDevOpsPipelineLab && (
+          {isDevOpsPipelineLab && !isSimPrimaryLab && (
             <button
               type="button"
               onClick={() => setShowCicdSim(true)}
@@ -2721,7 +2737,9 @@ export default function LabRunner() {
       {(isMonitoringLab || (isCrossTechMonitoring && !isCrossTechMonitoringSplit)) && !isSimPrimaryLab && showMonitoringSim && (
         <div className="fixed inset-0 z-[60] bg-surface-950">
           <div className="h-full overflow-auto">
-            <MonitoringSimulator
+            <LazySimPanel
+              Sim={LazyMonitoringSimulator}
+              label="monitoring"
               sessionId={sessionId}
               scenario={scenario}
               flavor={monitoringFlavor}
@@ -2738,12 +2756,7 @@ export default function LabRunner() {
       {isNmapLab && !isSimPrimaryLab && showNmapSim && (
         <div className="fixed inset-0 z-[60] bg-surface-950">
           <div className="h-full overflow-auto">
-            <NmapSimulator
-              sessionId={sessionId}
-              scenario={scenario}
-              onExit={() => setShowNmapSim(false)}
-              {...simChromeProps}
-            />
+            <LazySimPanel Sim={LazyNmapSimulator} label="nmap" sessionId={sessionId} scenario={scenario} onExit={() => setShowNmapSim(false)} {...simChromeProps} />
           </div>
         </div>
       )}
@@ -2754,12 +2767,7 @@ export default function LabRunner() {
       {isWiresharkLab && !isSimPrimaryLab && showWiresharkSim && (
         <div className="fixed inset-0 z-[60] bg-surface-950">
           <div className="h-full overflow-auto">
-            <WiresharkSimulator
-              sessionId={sessionId}
-              scenario={scenario}
-              onExit={() => setShowWiresharkSim(false)}
-              {...simChromeProps}
-            />
+            <LazySimPanel Sim={LazyWiresharkSimulator} label="wireshark" sessionId={sessionId} scenario={scenario} onExit={() => setShowWiresharkSim(false)} {...simChromeProps} />
           </div>
         </div>
       )}
@@ -2771,12 +2779,7 @@ export default function LabRunner() {
       {isDataDashboardLab && !isSimPrimaryLab && showDataDashboardSim && (
         <div className="fixed inset-0 z-[60] bg-surface-950">
           <div className="h-full overflow-auto">
-            <DataDashboardSimulator
-              sessionId={sessionId}
-              scenario={scenario}
-              onExit={() => setShowDataDashboardSim(false)}
-              {...simChromeProps}
-            />
+            <LazySimPanel Sim={LazyDataDashboardSimulator} label="data dashboard" sessionId={sessionId} scenario={scenario} onExit={() => setShowDataDashboardSim(false)} {...simChromeProps} />
           </div>
         </div>
       )}
@@ -2789,12 +2792,7 @@ export default function LabRunner() {
       {isAgentLab && !isSimPrimaryLab && showAgentSim && (
         <div className="fixed inset-0 z-[60] bg-surface-950">
           <div className="h-full overflow-auto">
-            <AgentWorkflowSimulator
-              sessionId={sessionId}
-              scenario={scenario}
-              onExit={() => setShowAgentSim(false)}
-              {...simChromeProps}
-            />
+            <LazySimPanel Sim={LazyAgentWorkflowSimulator} label="AI agent" sessionId={sessionId} scenario={scenario} onExit={() => setShowAgentSim(false)} {...simChromeProps} />
           </div>
         </div>
       )}
@@ -2806,49 +2804,31 @@ export default function LabRunner() {
       {isWindowsGuiLab && !isSimPrimaryLab && showWindowsSim && (
         <div className="fixed inset-0 z-[60] bg-surface-950">
           <div className="h-full overflow-auto">
-            <WindowsServerSimulator
-              sessionId={sessionId}
-              scenario={scenario}
-              onExit={() => setShowWindowsSim(false)}
-              {...simChromeProps}
-            />
+            <LazySimPanel Sim={LazyWindowsServerSimulator} label="Windows Server" sessionId={sessionId} scenario={scenario} onExit={() => setShowWindowsSim(false)} {...simChromeProps} />
           </div>
         </div>
       )}
 
       {isPeopleSoftLab && !isSimPrimaryLab && showPeopleSoftSim && (
         <div className="fixed inset-0 z-[60]">
-          <PeopleSoftSimulator
-            sessionId={sessionId}
-            scenario={scenario}
-            onExit={() => setShowPeopleSoftSim(false)}
-            {...simChromeProps}
-          />
+          <LazySimPanel Sim={LazyPeopleSoftSimulator} label="PeopleSoft" sessionId={sessionId} scenario={scenario} onExit={() => setShowPeopleSoftSim(false)} {...simChromeProps} />
         </div>
       )}
 
       {(showAwxLink || (isAwxLab && !isSimPrimaryLab)) && showAwxSim && (
         <div className="fixed inset-0 z-[60]">
-          <AwxSimulator
-            sessionId={sessionId}
-            scenario={scenario}
-            onExit={() => setShowAwxSim(false)}
-            {...simChromeProps}
-          />
+          <LazySimPanel Sim={LazyAwxSimulator} label="AWX" sessionId={sessionId} scenario={scenario} onExit={() => setShowAwxSim(false)} {...simChromeProps} />
         </div>
       )}
 
       {isBaremetalGuiLab && !isSimPrimaryLab && showBaremetalSim && (
-        <BaremetalSimulator
-          sessionId={sessionId}
-          scenario={scenario}
-          onExit={() => setShowBaremetalSim(false)}
-          {...simChromeProps}
-        />
+        <LazySimPanel Sim={LazyBaremetalSimulator} label="bare metal" sessionId={sessionId} scenario={scenario} onExit={() => setShowBaremetalSim(false)} {...simChromeProps} />
       )}
 
       {isTerraformSimLab && !isSimPrimaryLab && showTerraformSim && (
-        <TerraformSimulator
+        <LazySimPanel
+          Sim={LazyTerraformSimulator}
+          label="Terraform"
           sessionId={sessionId}
           scenario={scenario}
           terminalSession={terminalSession}
@@ -2861,7 +2841,9 @@ export default function LabRunner() {
       )}
 
       {isTerraformSimLab && showAwsSim && (
-        <AwsLabOverlay
+        <LazySimPanel
+          Sim={LazyAwsLabOverlay}
+          label="AWS Console"
           sessionId={sessionId}
           scenario={scenario}
           onToggleTerminal={() => setShowAwsSim(false)}
@@ -2870,8 +2852,10 @@ export default function LabRunner() {
         />
       )}
 
-      {isDevOpsPipelineLab && showCicdSim && (
-        <CicdPipelineSim
+      {isDevOpsPipelineLab && !isSimPrimaryLab && showCicdSim && (
+        <LazySimPanel
+          Sim={LazyCicdPipelineSim}
+          label="CI/CD pipeline"
           scenario={scenario}
           onExit={() => setShowCicdSim(false)}
           vmwareHref={showSimVmwareLink ? vmwareServerHref : null}

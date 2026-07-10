@@ -27,6 +27,7 @@ from apps.question_bank.serializers import (
 from apps.labs.models import LabSession
 from apps.labs.serializers import LabSessionSerializer
 from apps.labs.capacity import at_global_capacity
+from apps.labs.start_gates import lab_start_block_reason, lab_start_block_http_status
 from apps.labs.provisioner import get_provisioner, terminate_lab_session, DockerProvisioner
 from apps.labs.completion import finalize_validated_session
 from apps.question_bank.scenario_copy import public_objectives
@@ -623,126 +624,15 @@ class StartLabView(APIView):
     def post(self, request, scenario_id):
         scenario = get_object_or_404(Scenario, pk=scenario_id, is_active=True)
 
-        is_admin = request.user.is_staff or request.user.is_superuser
+        block = lab_start_block_reason(request.user, scenario)
+        if block:
+            return Response(block, status=lab_start_block_http_status(block))
 
-        if not is_admin:
-            # Platform-wide maintenance check
-            try:
-                from apps.adminpanel.platform_config import is_maintenance_active
-                if is_maintenance_active():
-                    from apps.adminpanel.models import PlatformSettings
-                    row = PlatformSettings.objects.filter(pk=1).first()
-                    msg = (row.maintenance_message if row else None) or "FixitLab is currently under maintenance. Labs are temporarily unavailable."
-                    return Response({"error": "maintenance", "message": msg}, status=503)
-            except Exception:
-                pass
-
-            # Technology-specific maintenance check
-            tech = scenario.technology
-            if tech and tech.maintenance_enabled:
-                msg = tech.maintenance_message or f"{tech.name} is currently under maintenance and labs are temporarily unavailable."
-                return Response({"error": "tech_maintenance", "message": msg, "technology": tech.name}, status=503)
-
-        if getattr(scenario.technology, "coming_soon", False):
-            return Response(
-                {"error": "Technology coming soon", "message": f"{scenario.technology.name} is not available yet."},
-                status=403,
-            )
-
-        # Check subscription access for paid scenarios
-        from apps.billing.subscription_utils import (
-            user_has_complimentary_access,
-            is_tech_subscription_active,
-            is_tech_subscription_in_grace,
-        )
-
-        if not scenario.is_free and not user_has_complimentary_access(request.user):
-            from apps.certifications.services.access import user_has_cert_scenario_access
-
-            cert_ok = user_has_cert_scenario_access(request.user, scenario)
-            sub = TechnologySubscription.objects.filter(
-                user=request.user,
-                technology=scenario.technology,
-            ).order_by("-created_at").first()
-            if sub and is_tech_subscription_in_grace(sub):
-                return Response(
-                    {
-                        "error": "Subscription expired",
-                        "message": (
-                            f"Your {scenario.technology.name} subscription expired. "
-                            "Renew now to continue labs — grace period allows viewing only."
-                        ),
-                        "needs_renewal": True,
-                        "renew_url": f"/payment?technology={scenario.technology.slug}&renew=1",
-                    },
-                    status=403,
-                )
-            has_sub = sub and is_tech_subscription_active(sub)
-            if not has_sub and not cert_ok:
-                return Response(
-                    {
-                        "error": "Subscription required. Purchase access to this technology first.",
-                        "code": "SUBSCRIPTION_REQUIRED",
-                        "technology": scenario.technology.name,
-                    },
-                    status=status.HTTP_403_FORBIDDEN,
-                )
-
-        # ── Fast pre-checks (no lock held) ──
-        # These are intentionally outside the atomic block as a performance
-        # optimisation: most requests will fail here and never need the lock.
-        # Both checks are RE-VERIFIED inside the lock below (double-checked
-        # locking pattern) to close the TOCTOU race between concurrent requests.
-
-        # Check billing limits — only count non-failed sessions
-        today_count = LabSession.objects.filter(
-            user=request.user,
-            started_at__date=timezone.now().date()
-        ).exclude(status="FAILED").count()
-        if not can_start_lab(request.user, today_count):
-            from apps.billing.services import get_user_plan_info
-            plan_info = get_user_plan_info(request.user)
-            return Response(
-                {
-                    "error": "Daily lab limit reached. Upgrade your plan for unlimited access.",
-                    "code": "LIMIT_REACHED",
-                    "plan": plan_info["plan"],
-                    "usage": plan_info["usage"],
-                },
-                status=status.HTTP_403_FORBIDDEN,
-            )
-
-        # Hard limit on simultaneously RUNNING/PROVISIONING labs per user
+        infra_type = _lab_infra_type(scenario)
         max_concurrent = int(os.environ.get(
             "MAX_CONCURRENT_LABS_PER_USER",
             str(getattr(settings, "MAX_CONCURRENT_LABS_PER_USER", 2)),
         ))
-        active_count = LabSession.objects.filter(
-            user=request.user,
-            status__in=["RUNNING", "PROVISIONING"],
-        ).count()
-        if active_count >= max_concurrent:
-            return Response(
-                {
-                    "error": f"You already have {active_count} active lab(s) running. "
-                             f"Stop an existing lab before starting a new one.",
-                    "active_labs": active_count,
-                    "max_concurrent": max_concurrent,
-                },
-                status=status.HTTP_429_TOO_MANY_REQUESTS,
-            )
-
-        # ── Global lab-capacity pre-check (PRODUCTION_AUDIT SCALE-01) ──
-        # The single Docker engine has finite capacity; once it saturates, the
-        # next provision throws a 500. Shed gracefully with a friendly 503
-        # instead. This is a cheap unlocked pre-check (most over-capacity
-        # requests bail here); it is RE-VERIFIED race-safely under the global
-        # advisory lock just before the session is created (below). Only
-        # engine-backed (docker) starts count — simulation/cloud labs don't
-        # contend for the D4 engine.
-        infra_type = _lab_infra_type(scenario)
-        if at_global_capacity(infra_type):
-            return Response(LAB_CAPACITY_FULL_RESPONSE, status=status.HTTP_503_SERVICE_UNAVAILABLE)
 
         # ── Cross-tab sync: resume existing active lab for SAME scenario ──
         # If user opens a new tab and clicks "Start Lab" again for a scenario
@@ -1117,7 +1007,7 @@ class ValidateLabView(APIView):
 
         except Exception as e:
             logger.error(f"Validation error: {e}")
-            return Response({"error": "Validation failed", "detail": str(e)[:200]}, status=500)
+            return Response({"error": "Validation failed"}, status=500)
 
 
 class ValidateGuidedStepView(APIView):
@@ -1220,7 +1110,7 @@ class ValidateGuidedStepView(APIView):
             })
         except Exception as e:
             logger.error(f"Guided step validation error: {e}")
-            return Response({"error": "Step validation failed", "detail": str(e)[:200]}, status=500)
+            return Response({"error": "Step validation failed"}, status=500)
 
 
 def public_coding_spec(scenario):

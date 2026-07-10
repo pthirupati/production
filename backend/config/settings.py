@@ -192,8 +192,9 @@ STATIC_ROOT = BASE_DIR / "staticfiles"
 
 MEDIA_URL = "/media/"
 MEDIA_ROOT = BASE_DIR / "media"
-# Serve uploaded files through Django when nginx proxies /media/ to the backend.
-SERVE_MEDIA = env.bool("SERVE_MEDIA", default=True)
+# Serve uploaded files through Django only in DEBUG or when explicitly enabled.
+# Production should serve /media/ from nginx with auth, not via Django.
+SERVE_MEDIA = env.bool("SERVE_MEDIA", default=DEBUG)
 
 # Limit upload sizes to prevent DoS via large file uploads
 FILE_UPLOAD_MAX_MEMORY_SIZE = 5 * 1024 * 1024  # 5MB
@@ -328,11 +329,10 @@ if not SIMPLE_JWT["SIGNING_KEY"]:
         SIMPLE_JWT["ALGORITHM"] = "HS256"
         SIMPLE_JWT["SIGNING_KEY"] = SECRET_KEY
     else:
-        import warnings
-        warnings.warn(
+        from django.core.exceptions import ImproperlyConfigured
+        raise ImproperlyConfigured(
             "JWT RSA keys not configured in production — set JWT_RSA_PRIVATE_KEY, "
-            "JWT_SIGNING_KEY, or JWT_ALGORITHM=HS256",
-            stacklevel=1,
+            "JWT_SIGNING_KEY, or JWT_ALGORITHM=HS256 with JWT_HS256_SECRET"
         )
 
 
