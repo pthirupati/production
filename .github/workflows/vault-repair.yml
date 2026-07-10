@@ -1,0 +1,71 @@
+name: Vault Repair (D1)
+
+# One-shot repair: the CI runner SSHes to the edge droplet and initializes Vault
+# (init -> unseal -> seed KV -> AppRole) via scripts/vault/bootstrap.sh, which
+# also writes deploy/vault-init.json + deploy/vault-approle.env ON THE NODE.
+# Fixes the "Vault is not initialized" deploy failure (empty /vault/data).
+# Prints only vault status + file presence — never key/token contents.
+on:
+  workflow_dispatch: {}
+
+jobs:
+  repair:
+    name: Initialize + unseal Vault on edge (D1)
+    runs-on: ubuntu-latest
+    environment: production
+    timeout-minutes: 15
+    steps:
+      - name: Resolve DO API token (masked)
+        id: tok
+        env:
+          DO_API_TOKEN: ${{ secrets.DO_API_TOKEN }}
+          PRODUCTION_ENV_B64: ${{ secrets.PRODUCTION_ENV_B64 }}
+        run: |
+          TOK="$DO_API_TOKEN"
+          if [ -z "$TOK" ] && [ -n "$PRODUCTION_ENV_B64" ]; then
+            TOK="$(echo "$PRODUCTION_ENV_B64" | base64 -d 2>/dev/null | grep '^DO_API_TOKEN=' | cut -d= -f2- | tr -d '\r')"
+          fi
+          if [ -z "$TOK" ]; then echo "No DO API token available"; exit 1; fi
+          echo "::add-mask::$TOK"; echo "token=$TOK" >> "$GITHUB_OUTPUT"
+      - name: Install doctl
+        uses: digitalocean/action-doctl@v2
+        with:
+          token: ${{ steps.tok.outputs.token }}
+      - name: Discover edge droplet IP
+        id: edge
+        run: |
+          EID=$(doctl compute droplet list --tag-name fixitlab-edge --format ID --no-header | head -n1)
+          [ -z "$EID" ] && { echo "No fixitlab-edge droplet"; exit 1; }
+          IP=$(doctl compute droplet get "$EID" --format PublicIPv4 --no-header)
+          echo "Edge $EID @ $IP"; echo "ip=$IP" >> "$GITHUB_OUTPUT"
+      - name: SSH — initialize + unseal Vault
+        env:
+          PROD_SSH_KEY: ${{ secrets.PROD_SSH_KEY }}
+          EDGE_IP: ${{ steps.edge.outputs.ip }}
+        run: |
+          KEY=$(mktemp); printf '%s\n' "$PROD_SSH_KEY" | tr -d '\r' > "$KEY"; chmod 600 "$KEY"
+          trap 'rm -f "$KEY"' EXIT
+          ssh -i "$KEY" -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null \
+              -o BatchMode=yes -o ConnectTimeout=15 root@"$EDGE_IP" 'bash -s' <<'EOS'
+          set -e
+          cd /opt/fixitlab
+          chmod +x scripts/vault/*.sh scripts/vault/*.py 2>/dev/null || true
+          # Ensure a seed source exists (baked env on the node).
+          ENVF=deploy/production.env
+          if [ ! -f "$ENVF" ]; then mkdir -p deploy; cp .env.production "$ENVF" 2>/dev/null || true; fi
+          echo "[repair] ensuring Vault container is up"
+          bash scripts/vault/start.sh
+          echo "[repair] status BEFORE:"
+          docker exec fixitlab_vault vault status 2>&1 | grep -iE "Initialized|Sealed|Storage" || true
+          echo "[repair] running bootstrap (init -> unseal -> seed KV -> AppRole)"
+          bash scripts/vault/bootstrap.sh "$ENVF"
+          echo "[repair] status AFTER:"
+          docker exec fixitlab_vault vault status 2>&1 | grep -iE "Initialized|Sealed|Storage" || true
+          echo "[repair] key/approle files present (contents NOT printed):"
+          for f in deploy/vault-init.json deploy/vault-approle.env; do
+            [ -f "$f" ] && echo "  PRESENT $f ($(wc -l < "$f") lines)" || echo "  MISSING $f"
+          done
+          MP=$(docker volume inspect fixitlab_vault_data --format '{{.Mountpoint}}' 2>/dev/null)
+          echo "[repair] /vault/data files now: $(find "$MP" -type f 2>/dev/null | wc -l)"
+          echo "[repair] done"
+          EOS
