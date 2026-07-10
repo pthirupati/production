@@ -48,6 +48,20 @@ LABS_PRIVATE_IP="${LABS_PRIVATE_IP:?LABS_PRIVATE_IP required}"
 
 _is_true() { case "${1:-}" in 1|true|TRUE|yes|on) return 0;; *) return 1;; esac; }
 
+# Forward the Vault AppRole to the edge + app nodes so their sync-production-env.sh
+# renders .env.production FROM Vault (the source of truth for rotated secrets such as
+# the DB password / JWT keys) instead of falling back to the stale baked
+# PRODUCTION_ENV_B64. The deploy-cluster job passes these from the vault-cluster job's
+# outputs; if empty, the nodes fall back to the baked env exactly as before (no change).
+VAULT_ENV=""
+if [ -n "${VAULT_ROLE_ID:-}" ] && [ -n "${VAULT_SECRET_ID:-}" ]; then
+  VAULT_ENV="VAULT_ENABLED=${VAULT_ENABLED:-true} VAULT_ROLE_ID=${VAULT_ROLE_ID} VAULT_SECRET_ID=${VAULT_SECRET_ID}"
+  [ -n "${VAULT_UNSEAL_KEY:-}" ] && VAULT_ENV="${VAULT_ENV} VAULT_UNSEAL_KEY=${VAULT_UNSEAL_KEY}"
+  echo "Vault AppRole present — edge+app will render .env.production from Vault (secrets source of truth)"
+else
+  echo "Vault AppRole absent — nodes use baked env (legacy path, unchanged)"
+fi
+
 KEY_FILE=""
 if [ -n "${PROD_SSH_KEY:-}" ] && ! _is_true "$DRY_RUN"; then
   KEY_FILE="$(mktemp)"; printf '%s\n' "$PROD_SSH_KEY" | tr -d '\r' > "$KEY_FILE"; chmod 600 "$KEY_FILE"
@@ -88,13 +102,13 @@ deploy_data() {
 deploy_edge() {
   echo "[2/4] Deploy D1 Edge (gateway/redis/rabbitmq/vault)"
   remote "$EDGE_PUBLIC_IP" direct \
-    "${IMG_ENV} CLUSTER_ROLE=edge APP_PRIVATE_IP=${APP_PRIVATE_IP} BUILD_SCENARIOS=false ./scripts/ci-remote-platform.sh deploy"
+    "${VAULT_ENV} ${IMG_ENV} CLUSTER_ROLE=edge APP_PRIVATE_IP=${APP_PRIVATE_IP} BUILD_SCENARIOS=false ./scripts/ci-remote-platform.sh deploy"
 }
 
 deploy_app() {
   echo "[3/4] Deploy D2 App (backend + celery + migrate)"
   if ! remote "$APP_PRIVATE_IP" via-edge \
-    "${IMG_ENV} CLUSTER_ROLE=app BUILD_SCENARIOS=false ./scripts/ci-remote-platform.sh deploy"; then
+    "${VAULT_ENV} ${IMG_ENV} CLUSTER_ROLE=app BUILD_SCENARIOS=false ./scripts/ci-remote-platform.sh deploy"; then
     echo "===== [diagnostic] D2 backend startup logs (last 120 lines) ====="
     remote "$APP_PRIVATE_IP" via-edge \
       "docker logs fixitlab-backend-1 --tail 120 2>&1 || (cd /opt/fixitlab && docker compose -f docker-compose.app.yml logs --tail 120 backend 2>&1) || true" || true

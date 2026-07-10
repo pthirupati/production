@@ -1208,6 +1208,13 @@ jobs:
       # REAL, independent Vault-persistence signal for the credentials email
       # (ok|failed|skipped) — distinct from the GitHub-secret sync status.
       vault_overlay_status: ${{ steps.vault.outputs.vault_overlay_status || 'skipped' }}
+      # Expose the freshly-bootstrapped AppRole (read off the edge node) so the
+      # deploy job can hand it to the app node WITHOUT depending on GitHub secrets
+      # (the CI token cannot write them). Masked values; used only via env, never
+      # echoed. This is what makes a single trigger self-sufficient.
+      vault_role_id: ${{ steps.vault.outputs.vault_role_id }}
+      vault_secret_id: ${{ steps.vault.outputs.vault_secret_id }}
+      vault_unseal_key: ${{ steps.vault.outputs.vault_unseal_key }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/download-artifact@v4
@@ -1271,6 +1278,14 @@ jobs:
           # cluster NEVER pulls — create-cluster emits no USE_DOCKERHUB/IMAGE_TAG into
           # cluster_ips.env, so ci-cluster-deploy.sh leaves IMG_ENV empty → on-node build.
           BUILD_SCENARIOS: ${{ inputs.build_scenarios }}
+          # Hand the freshly-bootstrapped Vault AppRole to the deploy so the app
+          # node renders .env.production FROM Vault (correct rotated DB password),
+          # not the stale baked env. From the vault-cluster job's outputs; falls
+          # back to repo secrets, and to empty (legacy baked path) if neither.
+          VAULT_ENABLED: "true"
+          VAULT_ROLE_ID: ${{ needs.vault-cluster.outputs.vault_role_id || secrets.VAULT_ROLE_ID }}
+          VAULT_SECRET_ID: ${{ needs.vault-cluster.outputs.vault_secret_id || secrets.VAULT_SECRET_ID }}
+          VAULT_UNSEAL_KEY: ${{ needs.vault-cluster.outputs.vault_unseal_key || secrets.VAULT_UNSEAL_KEY }}
         run: |
           chmod +x scripts/ci-cluster-deploy.sh
           ./scripts/ci-cluster-deploy.sh
