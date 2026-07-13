@@ -27,9 +27,17 @@ class TestLabInfraType(TestCase):
         s = _scenario(lab_mode="docker", simulation_type="terraform", infrastructure_type="docker")
         self.assertEqual(lab_infra_type(s), "simulation")
 
-    def test_plain_docker(self):
+    def test_plain_scenario_defaults_to_simulation(self):
+        # Prod never bakes per-scenario docker images, so an unresolved scenario
+        # must route to the image-free simulation engine (not "docker", which
+        # dead-ends in PROVISION_FAILED "Lab image not built on server").
         s = _scenario(lab_mode="docker", slug="nginx-down", infrastructure_type="docker")
-        self.assertEqual(lab_infra_type(s), "docker")
+        self.assertEqual(lab_infra_type(s), "simulation")
+
+    def test_explicit_cloud_infra_preserved(self):
+        for infra in ("aws_ec2", "digitalocean"):
+            s = _scenario(lab_mode="docker", slug="cloud-lab", infrastructure_type=infra)
+            self.assertEqual(lab_infra_type(s), infra)
 
 
 class TestInterviewPracticalLab(TestCase):
