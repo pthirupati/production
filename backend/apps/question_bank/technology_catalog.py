@@ -130,6 +130,23 @@ TECH_TO_TUTORIAL_TOPICS: dict[str, list[str]] = {
 LEARNING_PATH_LIMIT = 30
 _ACADEMY_SEQ = re.compile(r"academy-[\w-]+-(\d+)-")
 
+# Difficulty ordering for beginner learning paths: each tech's ordered lab list
+# ramps easy -> medium -> hard. Unknown/missing difficulty defaults to medium.
+DIFFICULTY_RANK = {"easy": 0, "medium": 1, "hard": 2}
+
+
+def _difficulty_rank(meta_or_value) -> int:
+    """Return the difficulty rank (0=easy,1=medium,2=hard).
+
+    Accepts either a meta dict (with a ``difficulty`` key) or a raw string.
+    Unknown/missing difficulty defaults to medium (1).
+    """
+    if isinstance(meta_or_value, dict):
+        value = meta_or_value.get("difficulty")
+    else:
+        value = meta_or_value
+    return DIFFICULTY_RANK.get((value or "").strip().lower(), 1)
+
 
 def scenarios_root() -> Path:
     for candidate in (
@@ -172,11 +189,13 @@ def _read_scenario_meta(scenario_dir: Path) -> dict | None:
         return None
     slug = data.get("slug") or scenario_dir.name
     category = data.get("category") or "General"
+    difficulty = (data.get("difficulty") or "medium").strip().lower()
     return {
         "slug": slug,
         "category": category,
         "is_free": bool(data.get("is_free")),
         "title": data.get("title") or slug,
+        "difficulty": difficulty,
     }
 
 
@@ -208,17 +227,25 @@ def build_scenario_index() -> dict[str, dict]:
             by_category.setdefault(cat, []).append(slug)
             meta_by_slug[slug] = meta
             cat_rank = CATEGORY_ORDER.get(cat, 50)
+            # Difficulty is the PRIMARY ordering key (after is_free) so each tech's
+            # path ramps easy -> medium -> hard before category/sequence tie-breaks.
             entries.append(
                 (
                     0 if meta["is_free"] else 1,
+                    _difficulty_rank(meta),
                     cat_rank,
                     *_slug_sort_key(slug),
                     slug,
                 )
             )
 
+        # Per-category lists also order difficulty-first (easy -> medium -> hard),
+        # then academy-sequence/slug as a stable tie-break.
         for cat in by_category:
-            by_category[cat] = sorted(by_category[cat], key=_slug_sort_key)
+            by_category[cat] = sorted(
+                by_category[cat],
+                key=lambda s: (_difficulty_rank(meta_by_slug.get(s, {})), _slug_sort_key(s)),
+            )
 
         ordered = [e[-1] for e in sorted(entries)]
         index[tech_slug] = {
