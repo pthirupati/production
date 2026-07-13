@@ -428,7 +428,21 @@ class SimulationProvisioner:
         slug = scenario_slug or (entry.get("state", {}).get("scenario_slug", "") if entry else "")
         sim_type = (entry.get("state", {}).get("simulation_type", "") if entry else "") or ""
         low_slug = (slug or "").lower()
-        if "vmware" in low_slug:
+        # Cross-technology LINUX/K8s labs whose slug merely CONTAINS "vmware"
+        # (e.g. linux-lvm-extend-vmware-disk-rescan) are NOT pure vCenter labs:
+        # the VMware step is one leg, but the graded objective lives in the RHEL
+        # terminal engine. Routing them to validate_vmware_lab auto-passed on the
+        # fresh vCenter world (the generic "issue resolved" fall-through) — a
+        # fail-open grader. Let them fall through to validate_simulation_state,
+        # which carries the correct fail-closed cross-tech logic (disk revealed +
+        # PV/VG/LV extended, NIC configured, guest reset + service healthy).
+        try:
+            from apps.labs.provisioner.simulation.vmware_bridge import (
+                is_cross_tech_scenario as _is_cross_tech,
+            )
+        except Exception:  # pragma: no cover - defensive
+            _is_cross_tech = lambda _s: False  # noqa: E731
+        if "vmware" in low_slug and not _is_cross_tech(low_slug):
             from apps.labs.models import LabSession
             from apps.vmware_sim.engine import validate_vmware_lab, _ensure_session
             try:

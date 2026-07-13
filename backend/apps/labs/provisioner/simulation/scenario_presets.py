@@ -28,13 +28,78 @@ def apply_scenario_preset(slug: str, state: RHELOSState) -> None:
         # config marker so Check Solution stays fail-closed until the learner
         # applies the documented fix (previously e.g. academy-baremetal-* booted
         # a fully healthy machine and auto-passed the canonical IPMI check).
-        state._mkdir("/opt/fixitlab/academy")
-        state._write_file(
-            f"/opt/fixitlab/academy/{slug}.conf",
-            f"# broken configuration for {slug}\n"
-            "# complete the lab objective, then apply the documented remediation\n"
-            "# this file needs the documented fix\n",
-        )
+        _plant_broken_config_sentinel(slug, state)
+    elif _slug_has_engine_validation(slug):
+        # Engine-backed / dedicated-validator families (devops, networking,
+        # terraform/aws, windows, gpu, k8s, cross-tech VMware, …) are ALREADY
+        # fail-closed: validate_simulation_state (or the dedicated engine
+        # validator) fails until the matching engine flag/state is healed
+        # (terraform_fixed, windows_fixed, BGP established, pods Running, …).
+        # Do NOT plant a sentinel for them — it is unnecessary AND it would
+        # shadow that genuine engine-flag remediation (the documented fix heals
+        # the engine, not a config file), which is exactly the contract the
+        # validation-integrity tests encode. Leave these untouched.
+        pass
+    else:
+        # ── Fail-closed backstop for un-presetted scenarios ──
+        # Any slug that reached here has NO explicit preset, matched no family
+        # keyword, and has no engine-backed validation, so the simulated OS would
+        # boot fully healthy. Many such labs ship a coarse check.sh (`systemctl
+        # is-failed`, `firewall-cmd --state`, …) that then AUTO-PASSES with zero
+        # user action (fail-open). Plant the broken-configuration sentinel so
+        # validation.py fails closed until the documented remediation appends
+        # FIXED-OK. apply_simulation_fix clears the sentinel as its universal
+        # first step, so the E2E contract (unfixed -> FAIL, fixed -> PASS) holds
+        # and future un-presetted scenarios are fail-closed by default.
+        _plant_broken_config_sentinel(slug, state)
+
+
+# Family markers whose scenarios validate against a genuine engine flag/state
+# (canonical topic check in resolve_simulation_validation_script, or a dedicated
+# engine validator in SimulationProvisioner.run_validation). For these the coarse
+# is-failed sentinel is both unnecessary and harmful, so the backstop skips them.
+_ENGINE_VALIDATION_MARKERS = (
+    "devops-", "ci-pipeline", "helm-release", "helm-", "gitlab", "pipeline",
+    "networking-", "bgp", "ntp-drift", "ntp-", "mtu",
+    "terraform", "aws-", "cloudwatch", "lambda", "s3-", "eks", "iam-", "ec2-",
+    "elb", "ecr", "rds", "vpc", "kinesis", "sqs", "secrets-manager", "dynamodb",
+    "windows", "win-", "iis", "hyper-v", "kerberos", "gpo", "ntfs", "smb-",
+    "winrm", "wmi", "sql-server", "sqlserver", "dhcp-", "replication-", "dns-zone",
+    "adcs", "cluster-quorum",
+    "gpu", "nvidia",
+    "k8s", "kubernetes", "crashloop", "pod", "endpoint", "service-not-ready",
+    "nmap-", "wireshark-", "ps-", "ds-dashboard-", "awx", "tower", "agent-",
+)
+
+
+def _slug_has_engine_validation(slug: str) -> bool:
+    """True when the slug maps to an engine-backed / dedicated validator that is
+    already fail-closed, so the sentinel backstop must NOT shadow it."""
+    low = (slug or "").lower()
+    # Cross-technology VMware/k8s labs validate through the engine, not a sentinel.
+    try:
+        from .vmware_bridge import is_cross_tech_scenario as _xt
+        if _xt(low):
+            return True
+    except Exception:
+        pass
+    return any(m in low for m in _ENGINE_VALIDATION_MARKERS)
+
+
+def _plant_broken_config_sentinel(slug: str, state: RHELOSState) -> None:
+    """Write the standard broken-configuration sentinel for `slug`.
+
+    validation.py's `systemctl is-failed`, `firewall-cmd --state` and
+    end-of-function sentinel sweep all fail closed while this file lacks
+    FIXED-OK; apply_simulation_fix appends FIXED-OK to clear it.
+    """
+    state._mkdir("/opt/fixitlab/academy")
+    state._write_file(
+        f"/opt/fixitlab/academy/{slug}.conf",
+        f"# broken configuration for {slug}\n"
+        "# complete the lab objective, then apply the documented remediation\n"
+        "# this file needs the documented fix\n",
+    )
 
 
 def _preset_wrong_nginx_root(state: RHELOSState) -> None:
@@ -4534,3 +4599,62 @@ def _mtu_mismatch_marker(state) -> None:
 
 
 _PRESETS["networking-mtu-mismatch"] = _mtu_mismatch_marker
+
+
+# ── Residual fail-open conversions (sim-rhel-* + keyword-shadowed slugs) ──
+# These scenarios ship the coarse `systemctl is-failed --quiet; test $? -ne 0`
+# check.sh, which auto-passed on the healthy state (fail-open). Their PRESET
+# already breaks a genuine engine state (boot/LVM/patch/user), so we keep that
+# real break AND additionally plant the broken-configuration sentinel the
+# is-failed branch reads. apply_simulation_fix clears the sentinel up front and
+# the topic branch performs the genuine engine repair, so the contract holds:
+# unfixed -> FAIL (sentinel present), fixed -> PASS (FIXED-OK + engine repaired).
+# We wrap per-slug (NOT the shared base preset) so sibling slugs that share the
+# same preset but have a real check.sh are unaffected.
+def _with_sentinel(base, slug: str):
+    def _preset(state: RHELOSState) -> None:
+        if base is not None:
+            base(state)
+        _plant_broken_config_sentinel(slug, state)
+    return _preset
+
+
+_RESIDUAL_SENTINEL_PRESETS = {
+    # sim-rhel-* explicit presets (boot / initramfs / mbr / kernel / patch / lvm / nic)
+    "sim-rhel-boot-grub": _with_sentinel(_preset_boot_issue, "sim-rhel-boot-grub"),
+    "sim-rhel-grub-rescue": _with_sentinel(_preset_boot_issue, "sim-rhel-grub-rescue"),
+    "sim-rhel-initramfs-dracut": _with_sentinel(_preset_initramfs, "sim-rhel-initramfs-dracut"),
+    "sim-rhel-mbr-corrupt": _with_sentinel(_preset_mbr, "sim-rhel-mbr-corrupt"),
+    "sim-rhel-kernel-panic": _with_sentinel(_preset_kernel_panic, "sim-rhel-kernel-panic"),
+    "sim-rhel-patching": _with_sentinel(_preset_patching, "sim-rhel-patching"),
+    "sim-rhel-lvm-extend": _with_sentinel(_preset_lvm_extend, "sim-rhel-lvm-extend"),
+    "sim-rhel-network-nic": _with_sentinel(_preset_network_nic, "sim-rhel-network-nic"),
+    # keyword-shadowed slugs (user / boot / patch family branches) whose check.sh
+    # is the coarse is-failed probe — plant the sentinel explicitly so the family
+    # branch's healthy state no longer auto-passes.
+    # configure-ipmi-user / linux-user-login-fail hit the user branch, but their
+    # fix has no automated map (fail-closed sentinel only). linux-grub-password
+    # hits the boot branch; linux-patch-reboot-required hits the patch branch and
+    # its fix flow needs the patching-ops baseline, so preserve _preset_patching.
+    "configure-ipmi-user": _with_sentinel(None, "configure-ipmi-user"),
+    "linux-grub-password": _with_sentinel(_preset_boot_issue, "linux-grub-password"),
+    "linux-patch-reboot-required": _with_sentinel(_preset_patching, "linux-patch-reboot-required"),
+    "linux-user-login-fail": _with_sentinel(None, "linux-user-login-fail"),
+    # devops / networking / windows scenarios whose check.sh is the COARSE
+    # `systemctl is-failed`/`FAILED=0` probe (NOT the engine check), so the resolver
+    # cannot override it with the canonical engine check and validate auto-passed.
+    # The default backstop deliberately skips these families (their engine-check
+    # siblings must stay engine-graded), so register them EXPLICITLY as sentinel
+    # labs. apply_simulation_fix clears the sentinel up front -> unfixed FAIL,
+    # fixed PASS.
+    "configure-bgp-neighbor-do": _with_sentinel(None, "configure-bgp-neighbor-do"),
+    "create-iis-site-do": _with_sentinel(None, "create-iis-site-do"),
+    "devops-ci-pipeline-failure": _with_sentinel(None, "devops-ci-pipeline-failure"),
+    "devops-helm-release-stuck": _with_sentinel(None, "devops-helm-release-stuck"),
+    "gitlab-ci-runner-stuck": _with_sentinel(None, "gitlab-ci-runner-stuck"),
+    "linux-network-slow-mtu": _with_sentinel(None, "linux-network-slow-mtu"),
+    "networking-bgp-session-down": _with_sentinel(None, "networking-bgp-session-down"),
+    "networking-ntp-drift": _with_sentinel(None, "networking-ntp-drift"),
+    "setup-gitlab-pipeline-do": _with_sentinel(None, "setup-gitlab-pipeline-do"),
+}
+_PRESETS.update(_RESIDUAL_SENTINEL_PRESETS)
