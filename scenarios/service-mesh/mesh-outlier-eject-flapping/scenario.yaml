@@ -1,0 +1,125 @@
+title: Outlier Detection Ejecting Healthy Pods
+slug: mesh-outlier-eject-flapping
+technology: service-mesh
+category: Optimize
+difficulty: hard
+scenario_type: fix
+lab_mode: simulation
+simulation_type: generic
+time_limit: 1500
+max_score: 100
+is_free: false
+infrastructure_type: docker
+jira_priority: High
+description: 'CONTEXT: A platform team operating service mesh needs you to resolve `Outlier Detection
+  Ejecting Healthy Pods` during a realistic delivery incident. The business impact is a stalled or unsafe
+  release until the underlying state is repaired.
+
+
+  ENVIRONMENT: You are working in FixitLab''s offline service-mesh lab with an Istio/Linkerd control plane,
+  sidecar-injected workloads, and mesh CRDs (VirtualService, DestinationRule, AuthorizationPolicy) under
+  /mesh. The mesh runs locally; no cloud load balancer or paid APIs are required.
+
+
+  SYMPTOM / STARTING STATE: The `catalog` service is flapping: latency spikes and requests intermittently
+  fail. The DestinationRule''s outlier detection is too aggressive — a single 5xx ejects a host for a
+  long interval, and with few replicas it ejects most of the pool, then re-admits, then ejects again,
+  causing oscillation.
+
+
+  OBJECTIVE: `outlierDetection` is tuned so tightly (consecutive5xxErrors: 1, high maxEjectionPercent,
+  long baseEjectionTime) that transient errors evict nearly the whole small pool, causing flapping. Remediate
+  by tuning the thresholds (raise consecutive errors, cap maxEjectionPercent, shorten ejection time) so
+  only genuinely bad hosts are ejected. Success is graded on the real repaired state, not a manual marker.
+
+
+  WHAT TO AVOID: Do not suppress the signal, disable the policy/gate, or fake completion with marker files
+  — reproduce the diagnosis, then apply the smallest fix that satisfies the objective and re-run Check
+  Solution.'
+objectives:
+- outlierDetection thresholds are tuned to stop ejecting healthy hosts
+- catalog stops flapping (stable endpoint set, no oscillation)
+- The over-aggressive ejection config is confirmed as root cause
+initial_state: 'The `catalog` service is flapping: latency spikes and requests intermittently fail. The
+  DestinationRule''s outlier detection is too aggressive — a single 5xx ejects a host for a long interval,
+  and with few replicas it ejects most of the pool, then re-admits, then ejects again, causing oscillation.'
+hints:
+- order: 1
+  cost: 0
+  content: "Where to look — orient before changing anything:\n    1. `kubectl get destinationrule catalog\
+    \ -o yaml`\n    2. `istioctl proxy-config cluster deploy/catalog --fqdn catalog.default.svc.cluster.local\
+    \ -o json`\n    3. `kubectl logs deploy/catalog --tail=20`\n    Write down what looks healthy versus\
+    \ wrong. Form one hypothesis before you touch anything."
+- order: 2
+  cost: 25
+  content: "Diagnostic steps:\n    1. Re-run `kubectl get destinationrule catalog -o yaml` and read the\
+    \ status/error carefully.\n    2. Cross-check with `istioctl proxy-config cluster deploy/catalog --fqdn\
+    \ catalog.default.svc.cluster.local -o json` to isolate the failing object.\n    3. State the single\
+    \ root cause in one sentence before you act."
+- order: 3
+  cost: 50
+  content: "Exact fix + verification:\n    1. `outlierDetection` is tuned so tightly (consecutive5xxErrors:\
+    \ 1, high maxEjectionPercent, long baseEjectionTime) that transient errors evict nearly the whole\
+    \ small pool, causing flapping. Remediate by tuning the thresholds (raise consecutive errors, cap\
+    \ maxEjectionPercent, shorten ejection time) so only genuinely bad hosts are ejected.\n    2. Change\
+    \ one thing at a time so you can roll back if the hypothesis was wrong.\n    3. Verify the objective\
+    \ is met, then click Check Solution (graded on real state, not a marker file)."
+summary: Diagnose and resolve outlier detection ejecting healthy pods in the service-mesh simulation lab
+  and verify the healthy end state
+estimated_minutes: 25
+xp_reward: 100
+prerequisites:
+- Basic Kubernetes networking literacy
+tags:
+- service-mesh
+- optimize
+- hands-on
+- simulation
+linked_tutorial: service-mesh-fundamentals
+what_you_will_learn:
+- outlierDetection thresholds are tuned to stop ejecting healthy hosts
+- catalog stops flapping (stable endpoint set, no oscillation)
+- Understand Envoy outlier detection (passive health checking), how over-aggressive ejection destabilizes
+  small pools, and safe tuning
+environment:
+  nodes:
+  - role: primary
+    os: FixitLab service-mesh lab
+    hostname: lab-primary
+    ip: 127.0.0.1
+    specs: local offline simulation
+  pre_installed:
+  - bash
+  - coreutils
+  - kubectl
+  - istioctl
+  - linkerd
+  credentials:
+  - user: root
+    password: lab123
+tasks:
+- id: task_1
+  title: Outlier Detection Ejecting Healthy Pods
+  description: Restore healthy behavior for Outlier Detection Ejecting Healthy Pods by reproducing the
+    diagnosis from the symptom, isolating the root cause with evidence, applying the smallest safe fix,
+    and validating the outcome with the checker.
+  background: 'This service-mesh lab teaches Envoy outlier detection (passive health checking), how over-aggressive
+    ejection destabilizes small pools, and safe tuning through systematic troubleshooting: observe, hypothesize,
+    change, verify.'
+  validation:
+    type: custom_script
+    script: check.sh
+    error_message: The scenario objective is not yet satisfied. Re-read hint tier 2, confirm the root
+      cause, and apply the documented remediation so /opt/fixitlab/academy/mesh-outlier-eject-flapping.conf
+      carries the FIXED-OK marker.
+solution:
+  summary: '`outlierDetection` is tuned so tightly (consecutive5xxErrors: 1, high maxEjectionPercent,
+    long baseEjectionTime) that transient errors evict nearly the whole small pool, causing flapping.
+    Remediate by tuning the thresholds (raise consecutive errors, cap maxEjectionPercent, shorten ejection
+    time) so only genuinely bad hosts are ejected.'
+  files_changed: []
+  commands_run:
+  - kubectl get destinationrule catalog -o yaml
+  - istioctl proxy-config cluster deploy/catalog --fqdn catalog.default.svc.cluster.local -o json
+  - kubectl logs deploy/catalog --tail=20
+  reference_docs: service-mesh-fundamentals

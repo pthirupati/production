@@ -1,0 +1,122 @@
+title: VirtualService Routes to a Missing Subset
+slug: mesh-virtualservice-misroute
+technology: service-mesh
+category: Fix
+difficulty: medium
+scenario_type: fix
+lab_mode: simulation
+simulation_type: generic
+time_limit: 1500
+max_score: 100
+is_free: false
+infrastructure_type: docker
+jira_priority: Medium
+description: 'CONTEXT: A platform team operating service mesh needs you to resolve `VirtualService Routes
+  to a Missing Subset` during a realistic delivery incident. The business impact is a stalled or unsafe
+  release until the underlying state is repaired.
+
+
+  ENVIRONMENT: You are working in FixitLab''s offline service-mesh lab with an Istio/Linkerd control plane,
+  sidecar-injected workloads, and mesh CRDs (VirtualService, DestinationRule, AuthorizationPolicy) under
+  /mesh. The mesh runs locally; no cloud load balancer or paid APIs are required.
+
+
+  SYMPTOM / STARTING STATE: Users hit `reviews` and get HTTP 503 (no healthy upstream). The VirtualService
+  routes 100% of traffic to subset `v3`, but the DestinationRule only defines subsets `v1` and `v2` —
+  there are no `v3` endpoints, so every request fails with no destination.
+
+
+  OBJECTIVE: The VirtualService references subset `v3` that does not exist in the DestinationRule (or
+  has no matching pod labels), so Envoy has no endpoints and returns 503. Fix the route to target an existing
+  subset (or define the v3 subset + its labeled workload) so traffic reaches healthy pods. Success is
+  graded on the real repaired state, not a manual marker.
+
+
+  WHAT TO AVOID: Do not suppress the signal, disable the policy/gate, or fake completion with marker files
+  — reproduce the diagnosis, then apply the smallest fix that satisfies the objective and re-run Check
+  Solution.'
+objectives:
+- The reviews VirtualService routes to a subset backed by real endpoints
+- Requests to reviews return 200 instead of 503
+- The missing-subset root cause is confirmed via proxy-config route/DestinationRule
+initial_state: Users hit `reviews` and get HTTP 503 (no healthy upstream). The VirtualService routes 100%
+  of traffic to subset `v3`, but the DestinationRule only defines subsets `v1` and `v2` — there are no
+  `v3` endpoints, so every request fails with no destination.
+hints:
+- order: 1
+  cost: 0
+  content: "Where to look — orient before changing anything:\n    1. `kubectl get virtualservice reviews\
+    \ -o yaml`\n    2. `kubectl get destinationrule reviews -o yaml`\n    3. `istioctl proxy-config route\
+    \ deploy/productpage`\n    Write down what looks healthy versus wrong. Form one hypothesis before\
+    \ you touch anything."
+- order: 2
+  cost: 25
+  content: "Diagnostic steps:\n    1. Re-run `kubectl get virtualservice reviews -o yaml` and read the\
+    \ status/error carefully.\n    2. Cross-check with `kubectl get destinationrule reviews -o yaml` to\
+    \ isolate the failing object.\n    3. State the single root cause in one sentence before you act."
+- order: 3
+  cost: 50
+  content: "Exact fix + verification:\n    1. The VirtualService references subset `v3` that does not\
+    \ exist in the DestinationRule (or has no matching pod labels), so Envoy has no endpoints and returns\
+    \ 503. Fix the route to target an existing subset (or define the v3 subset + its labeled workload)\
+    \ so traffic reaches healthy pods.\n    2. Change one thing at a time so you can roll back if the\
+    \ hypothesis was wrong.\n    3. Verify the objective is met, then click Check Solution (graded on\
+    \ real state, not a marker file)."
+summary: Diagnose and resolve virtualservice routes to a missing subset in the service-mesh simulation
+  lab and verify the healthy end state
+estimated_minutes: 25
+xp_reward: 100
+prerequisites:
+- Basic Kubernetes networking literacy
+tags:
+- service-mesh
+- fix
+- hands-on
+- simulation
+linked_tutorial: service-mesh-fundamentals
+what_you_will_learn:
+- The reviews VirtualService routes to a subset backed by real endpoints
+- Requests to reviews return 200 instead of 503
+- Understand VirtualService→DestinationRule subset binding, how subset labels map to endpoints, and why
+  a bad subset yields 503 not 404
+environment:
+  nodes:
+  - role: primary
+    os: FixitLab service-mesh lab
+    hostname: lab-primary
+    ip: 127.0.0.1
+    specs: local offline simulation
+  pre_installed:
+  - bash
+  - coreutils
+  - kubectl
+  - istioctl
+  - linkerd
+  credentials:
+  - user: root
+    password: lab123
+tasks:
+- id: task_1
+  title: VirtualService Routes to a Missing Subset
+  description: Restore healthy behavior for VirtualService Routes to a Missing Subset by reproducing the
+    diagnosis from the symptom, isolating the root cause with evidence, applying the smallest safe fix,
+    and validating the outcome with the checker.
+  background: 'This service-mesh lab teaches VirtualService→DestinationRule subset binding, how subset
+    labels map to endpoints, and why a bad subset yields 503 not 404 through systematic troubleshooting:
+    observe, hypothesize, change, verify.'
+  validation:
+    type: custom_script
+    script: check.sh
+    error_message: The scenario objective is not yet satisfied. Re-read hint tier 2, confirm the root
+      cause, and apply the documented remediation so /opt/fixitlab/academy/mesh-virtualservice-misroute.conf
+      carries the FIXED-OK marker.
+solution:
+  summary: The VirtualService references subset `v3` that does not exist in the DestinationRule (or has
+    no matching pod labels), so Envoy has no endpoints and returns 503. Fix the route to target an existing
+    subset (or define the v3 subset + its labeled workload) so traffic reaches healthy pods.
+  files_changed: []
+  commands_run:
+  - kubectl get virtualservice reviews -o yaml
+  - kubectl get destinationrule reviews -o yaml
+  - istioctl proxy-config route deploy/productpage
+  reference_docs: service-mesh-fundamentals

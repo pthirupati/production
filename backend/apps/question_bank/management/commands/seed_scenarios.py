@@ -44,6 +44,10 @@ TECH_META = {
     "ai-ml": {"slug": "ai-ml", "name": "AI & Machine Learning", "icon": "sparkles", "color": "purple", "order": 2},
     "data-science": {"slug": "data-science", "name": "Data Science", "icon": "activity", "color": "pink", "order": 3},
     "windows": {"slug": "windows", "name": "Windows Server", "icon": "server", "color": "blue", "order": 9},
+    "gitops": {"slug": "gitops", "name": "GitOps (ArgoCD & Flux)", "icon": "git-branch", "color": "orange", "order": 35, "description": "Declarative continuous delivery with ArgoCD and Flux — sync failures, drift, App-of-Apps, and reconciliation incidents"},
+    "devsecops-supplychain": {"slug": "devsecops-supplychain", "name": "DevSecOps Supply Chain", "icon": "shield", "color": "red", "order": 36, "description": "Software supply-chain security — image CVE scanning, SBOMs, cosign signing, SLSA provenance, and Falco runtime detection"},
+    "opentelemetry": {"slug": "opentelemetry", "name": "OpenTelemetry", "icon": "activity", "color": "indigo", "order": 37, "description": "Distributed tracing, metrics, and logs — Collector pipelines, context propagation, sampling, and cardinality control"},
+    "service-mesh": {"slug": "service-mesh", "name": "Service Mesh (Istio & Linkerd)", "icon": "network", "color": "purple", "order": 38, "description": "mTLS, traffic routing, and resilience with Istio and Linkerd — sidecar injection, VirtualServices, outlier detection, and authorization policies"},
 }
 
 

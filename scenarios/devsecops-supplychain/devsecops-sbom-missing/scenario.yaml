@@ -1,0 +1,121 @@
+title: Release Rejected for Missing/Invalid SBOM
+slug: devsecops-sbom-missing
+technology: devsecops-supplychain
+category: Harden
+difficulty: medium
+scenario_type: fix
+lab_mode: simulation
+simulation_type: generic
+time_limit: 1500
+max_score: 100
+is_free: false
+infrastructure_type: docker
+jira_priority: Medium
+description: 'CONTEXT: A platform team operating devsecops supplychain needs you to resolve `Release Rejected
+  for Missing/Invalid SBOM` during a realistic delivery incident. The business impact is a stalled or
+  unsafe release until the underlying state is repaired.
+
+
+  ENVIRONMENT: You are working in FixitLab''s offline supply-chain security lab with a local OCI registry,
+  Trivy scanner, cosign keys, an SBOM store, and a Falco runtime sensor under /supplychain. Everything
+  runs locally; no external registry or paid APIs are required.
+
+
+  SYMPTOM / STARTING STATE: The release admission policy rejects `billing:2.1`: the attached SBOM is missing
+  (no `sbom.spdx.json` attestation on the image) so the pipeline cannot enumerate components for license
+  and vulnerability policy. Downstream compliance checks have nothing to read.
+
+
+  OBJECTIVE: The build never generated and attached an SBOM, so there is no machine-readable inventory
+  of what shipped. Remediate by generating the SBOM (syft) and attaching it as an attestation to the image,
+  so the admission policy can read a valid component list. Success is graded on the real repaired state,
+  not a manual marker.
+
+
+  WHAT TO AVOID: Do not suppress the signal, disable the policy/gate, or fake completion with marker files
+  — reproduce the diagnosis, then apply the smallest fix that satisfies the objective and re-run Check
+  Solution.'
+objectives:
+- A valid SBOM (SPDX/CycloneDX) is generated for billing:2.1
+- The SBOM is attached as an attestation the admission policy can verify
+- The missing-SBOM root cause is fixed in the build, not stubbed with an empty file
+initial_state: 'The release admission policy rejects `billing:2.1`: the attached SBOM is missing (no `sbom.spdx.json`
+  attestation on the image) so the pipeline cannot enumerate components for license and vulnerability
+  policy. Downstream compliance checks have nothing to read.'
+hints:
+- order: 1
+  cost: 0
+  content: "Where to look — orient before changing anything:\n    1. `syft billing:2.1 -o spdx-json`\n\
+    \    2. `cosign download sbom billing:2.1`\n    3. `ls -l /supplychain/sbom/`\n    Write down what\
+    \ looks healthy versus wrong. Form one hypothesis before you touch anything."
+- order: 2
+  cost: 25
+  content: "Diagnostic steps:\n    1. Re-run `syft billing:2.1 -o spdx-json` and read the status/error\
+    \ carefully.\n    2. Cross-check with `cosign download sbom billing:2.1` to isolate the failing object.\n\
+    \    3. State the single root cause in one sentence before you act."
+- order: 3
+  cost: 50
+  content: "Exact fix + verification:\n    1. The build never generated and attached an SBOM, so there\
+    \ is no machine-readable inventory of what shipped. Remediate by generating the SBOM (syft) and attaching\
+    \ it as an attestation to the image, so the admission policy can read a valid component list.\n  \
+    \  2. Change one thing at a time so you can roll back if the hypothesis was wrong.\n    3. Verify\
+    \ the objective is met, then click Check Solution (graded on real state, not a marker file)."
+summary: Diagnose and resolve release rejected for missing/invalid sbom in the devsecops-supplychain simulation
+  lab and verify the healthy end state
+estimated_minutes: 25
+xp_reward: 100
+prerequisites:
+- Basic container image and CI/CD literacy
+tags:
+- devsecops-supplychain
+- harden
+- hands-on
+- simulation
+linked_tutorial: devsecops-supplychain-fundamentals
+what_you_will_learn:
+- A valid SBOM (SPDX/CycloneDX) is generated for billing:2.1
+- The SBOM is attached as an attestation the admission policy can verify
+- Understand what an SBOM is (SPDX/CycloneDX), why supply-chain policy requires one, and how to generate
+  + attach it as an attestation
+environment:
+  nodes:
+  - role: primary
+    os: FixitLab supply-chain security lab
+    hostname: lab-primary
+    ip: 127.0.0.1
+    specs: local offline simulation
+  pre_installed:
+  - bash
+  - coreutils
+  - trivy
+  - cosign
+  - syft
+  - falco
+  credentials:
+  - user: root
+    password: lab123
+tasks:
+- id: task_1
+  title: Release Rejected for Missing/Invalid SBOM
+  description: Restore healthy behavior for Release Rejected for Missing/Invalid SBOM by reproducing the
+    diagnosis from the symptom, isolating the root cause with evidence, applying the smallest safe fix,
+    and validating the outcome with the checker.
+  background: 'This devsecops-supplychain lab teaches what an SBOM is (SPDX/CycloneDX), why supply-chain
+    policy requires one, and how to generate + attach it as an attestation through systematic troubleshooting:
+    observe, hypothesize, change, verify.'
+  validation:
+    type: custom_script
+    script: check.sh
+    error_message: The scenario objective is not yet satisfied. Re-read hint tier 2, confirm the root
+      cause, and apply the documented remediation so /opt/fixitlab/academy/devsecops-sbom-missing.conf
+      carries the FIXED-OK marker.
+solution:
+  summary: The build never generated and attached an SBOM, so there is no machine-readable inventory of
+    what shipped. Remediate by generating the SBOM (syft) and attaching it as an attestation to the image,
+    so the admission policy can read a valid component list.
+  files_changed: []
+  commands_run:
+  - syft billing:2.1 -o spdx-json
+  - cosign download sbom billing:2.1
+  - ls -l /supplychain/sbom/
+  reference_docs: devsecops-supplychain-fundamentals

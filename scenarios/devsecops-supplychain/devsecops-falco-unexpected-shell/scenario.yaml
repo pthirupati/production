@@ -1,0 +1,123 @@
+title: 'Falco Alert: Unexpected Shell in Container'
+slug: devsecops-falco-unexpected-shell
+technology: devsecops-supplychain
+category: Fix
+difficulty: medium
+scenario_type: fix
+lab_mode: simulation
+simulation_type: generic
+time_limit: 1500
+max_score: 100
+is_free: false
+infrastructure_type: docker
+jira_priority: Medium
+description: 'CONTEXT: A platform team operating devsecops supplychain needs you to resolve `Falco Alert:
+  Unexpected Shell in Container` during a realistic delivery incident. The business impact is a stalled
+  or unsafe release until the underlying state is repaired.
+
+
+  ENVIRONMENT: You are working in FixitLab''s offline supply-chain security lab with a local OCI registry,
+  Trivy scanner, cosign keys, an SBOM store, and a Falco runtime sensor under /supplychain. Everything
+  runs locally; no external registry or paid APIs are required.
+
+
+  SYMPTOM / STARTING STATE: Falco fired a Warning: `Terminal shell in container` for the `web` pod — a
+  `/bin/bash` was spawned inside a container that should never run an interactive shell. The runtime rule
+  flagged the exec as a potential intrusion or unauthorized debugging on a production workload.
+
+
+  OBJECTIVE: A sidecar/init step (or a leftover debug entrypoint) is spawning an interactive shell in
+  the container at runtime, which Falco''s macro correctly flags. Remediate by removing the shell-spawning
+  step from the workload (the real change) so the offending exec no longer occurs — do NOT silence the
+  Falco rule to hide the alert. Success is graded on the real repaired state, not a manual marker.
+
+
+  WHAT TO AVOID: Do not suppress the signal, disable the policy/gate, or fake completion with marker files
+  — reproduce the diagnosis, then apply the smallest fix that satisfies the objective and re-run Check
+  Solution.'
+objectives:
+- The unexpected shell exec is eliminated from the web workload
+- Falco no longer fires the shell-in-container alert for the web pod
+- The detection rule is left intact (alert fixed at the source, not suppressed)
+initial_state: 'Falco fired a Warning: `Terminal shell in container` for the `web` pod — a `/bin/bash`
+  was spawned inside a container that should never run an interactive shell. The runtime rule flagged
+  the exec as a potential intrusion or unauthorized debugging on a production workload.'
+hints:
+- order: 1
+  cost: 0
+  content: "Where to look — orient before changing anything:\n    1. `cat /supplychain/falco/falco_events.log`\n\
+    \    2. `cat /supplychain/falco/rules/shell_in_container.yaml`\n    3. `ps aux --forest`\n    Write\
+    \ down what looks healthy versus wrong. Form one hypothesis before you touch anything."
+- order: 2
+  cost: 25
+  content: "Diagnostic steps:\n    1. Re-run `cat /supplychain/falco/falco_events.log` and read the status/error\
+    \ carefully.\n    2. Cross-check with `cat /supplychain/falco/rules/shell_in_container.yaml` to isolate\
+    \ the failing object.\n    3. State the single root cause in one sentence before you act."
+- order: 3
+  cost: 50
+  content: "Exact fix + verification:\n    1. A sidecar/init step (or a leftover debug entrypoint) is\
+    \ spawning an interactive shell in the container at runtime, which Falco's macro correctly flags.\
+    \ Remediate by removing the shell-spawning step from the workload (the real change) so the offending\
+    \ exec no longer occurs — do NOT silence the Falco rule to hide the alert.\n    2. Change one thing\
+    \ at a time so you can roll back if the hypothesis was wrong.\n    3. Verify the objective is met,\
+    \ then click Check Solution (graded on real state, not a marker file)."
+summary: 'Diagnose and resolve falco alert: unexpected shell in container in the devsecops-supplychain
+  simulation lab and verify the healthy end state'
+estimated_minutes: 25
+xp_reward: 100
+prerequisites:
+- Basic container image and CI/CD literacy
+tags:
+- devsecops-supplychain
+- fix
+- hands-on
+- simulation
+linked_tutorial: devsecops-supplychain-fundamentals
+what_you_will_learn:
+- The unexpected shell exec is eliminated from the web workload
+- Falco no longer fires the shell-in-container alert for the web pod
+- Understand runtime threat detection with Falco, why interactive shells in containers are a red flag,
+  and fixing the workload not the rule
+environment:
+  nodes:
+  - role: primary
+    os: FixitLab supply-chain security lab
+    hostname: lab-primary
+    ip: 127.0.0.1
+    specs: local offline simulation
+  pre_installed:
+  - bash
+  - coreutils
+  - trivy
+  - cosign
+  - syft
+  - falco
+  credentials:
+  - user: root
+    password: lab123
+tasks:
+- id: task_1
+  title: 'Falco Alert: Unexpected Shell in Container'
+  description: 'Restore healthy behavior for Falco Alert: Unexpected Shell in Container by reproducing
+    the diagnosis from the symptom, isolating the root cause with evidence, applying the smallest safe
+    fix, and validating the outcome with the checker.'
+  background: 'This devsecops-supplychain lab teaches runtime threat detection with Falco, why interactive
+    shells in containers are a red flag, and fixing the workload not the rule through systematic troubleshooting:
+    observe, hypothesize, change, verify.'
+  validation:
+    type: custom_script
+    script: check.sh
+    error_message: The scenario objective is not yet satisfied. Re-read hint tier 2, confirm the root
+      cause, and apply the documented remediation so /opt/fixitlab/academy/devsecops-falco-unexpected-shell.conf
+      carries the FIXED-OK marker.
+solution:
+  summary: A sidecar/init step (or a leftover debug entrypoint) is spawning an interactive shell in the
+    container at runtime, which Falco's macro correctly flags. Remediate by removing the shell-spawning
+    step from the workload (the real change) so the offending exec no longer occurs — do NOT silence the
+    Falco rule to hide the alert.
+  files_changed: []
+  commands_run:
+  - cat /supplychain/falco/falco_events.log
+  - cat /supplychain/falco/rules/shell_in_container.yaml
+  - ps aux --forest
+  reference_docs: devsecops-supplychain-fundamentals

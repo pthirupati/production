@@ -1,0 +1,124 @@
+title: ArgoCD Image Updater Not Promoting Tags
+slug: gitops-image-updater-stuck
+technology: gitops
+category: Fix
+difficulty: hard
+scenario_type: fix
+lab_mode: simulation
+simulation_type: generic
+time_limit: 1500
+max_score: 100
+is_free: false
+infrastructure_type: docker
+jira_priority: High
+description: 'CONTEXT: A platform team operating gitops needs you to resolve `ArgoCD Image Updater Not
+  Promoting Tags` during a realistic delivery incident. The business impact is a stalled or unsafe release
+  until the underlying state is repaired.
+
+
+  ENVIRONMENT: You are working in FixitLab''s offline GitOps practice cluster with ArgoCD/Flux controllers,
+  Application/Kustomization manifests, and a Git source repo under /gitops. All controllers run locally;
+  no external Git host or paid APIs are required.
+
+
+  SYMPTOM / STARTING STATE: A new `checkout-svc` image `v2.3.1` was pushed to the registry hours ago,
+  but ArgoCD Image Updater never wrote the new tag back and the Application still runs `v2.3.0`. Image
+  Updater logs show it evaluated the image but selected no candidate.
+
+
+  OBJECTIVE: The Image Updater annotation uses an update strategy/constraint (e.g. `update-strategy: semver`
+  with a range that excludes 2.3.1, or a mismatched image alias) that filters out the new tag, so no promotion
+  happens. Correct the update strategy/constraint annotation so the new tag is selected and written back
+  to Git. Success is graded on the real repaired state, not a manual marker.
+
+
+  WHAT TO AVOID: Do not suppress the signal, disable the policy/gate, or fake completion with marker files
+  — reproduce the diagnosis, then apply the smallest fix that satisfies the objective and re-run Check
+  Solution.'
+objectives:
+- The Image Updater annotation/strategy correctly matches the new tag
+- checkout-svc is promoted to v2.3.1 and the write-back commits to Git
+- The constraint-mismatch root cause is confirmed from Image Updater logs
+initial_state: A new `checkout-svc` image `v2.3.1` was pushed to the registry hours ago, but ArgoCD Image
+  Updater never wrote the new tag back and the Application still runs `v2.3.0`. Image Updater logs show
+  it evaluated the image but selected no candidate.
+hints:
+- order: 1
+  cost: 0
+  content: "Where to look — orient before changing anything:\n    1. `kubectl logs deploy/argocd-image-updater\
+    \ -n argocd`\n    2. `argocd app get checkout-svc -o yaml`\n    3. `kubectl get application checkout-svc\
+    \ -n argocd -o jsonpath='{.metadata.annotations}'`\n    Write down what looks healthy versus wrong.\
+    \ Form one hypothesis before you touch anything."
+- order: 2
+  cost: 25
+  content: "Diagnostic steps:\n    1. Re-run `kubectl logs deploy/argocd-image-updater -n argocd` and\
+    \ read the status/error carefully.\n    2. Cross-check with `argocd app get checkout-svc -o yaml`\
+    \ to isolate the failing object.\n    3. State the single root cause in one sentence before you act."
+- order: 3
+  cost: 50
+  content: "Exact fix + verification:\n    1. The Image Updater annotation uses an update strategy/constraint\
+    \ (e.g. `update-strategy: semver` with a range that excludes 2.3.1, or a mismatched image alias) that\
+    \ filters out the new tag, so no promotion happens. Correct the update strategy/constraint annotation\
+    \ so the new tag is selected and written back to Git.\n    2. Change one thing at a time so you can\
+    \ roll back if the hypothesis was wrong.\n    3. Verify the objective is met, then click Check Solution\
+    \ (graded on real state, not a marker file)."
+summary: Diagnose and resolve argocd image updater not promoting tags in the gitops simulation lab and
+  verify the healthy end state
+estimated_minutes: 25
+xp_reward: 100
+prerequisites:
+- Basic Kubernetes and Git literacy
+tags:
+- gitops
+- fix
+- hands-on
+- simulation
+linked_tutorial: gitops-fundamentals
+what_you_will_learn:
+- The Image Updater annotation/strategy correctly matches the new tag
+- checkout-svc is promoted to v2.3.1 and the write-back commits to Git
+- Understand automated image promotion, semver/newest-build update strategies, and how a constraint mismatch
+  silently blocks rollout
+environment:
+  nodes:
+  - role: primary
+    os: FixitLab GitOps practice cluster
+    hostname: lab-primary
+    ip: 127.0.0.1
+    specs: local offline simulation
+  pre_installed:
+  - bash
+  - coreutils
+  - kubectl
+  - argocd
+  - flux
+  - git
+  credentials:
+  - user: root
+    password: lab123
+tasks:
+- id: task_1
+  title: ArgoCD Image Updater Not Promoting Tags
+  description: Restore healthy behavior for ArgoCD Image Updater Not Promoting Tags by reproducing the
+    diagnosis from the symptom, isolating the root cause with evidence, applying the smallest safe fix,
+    and validating the outcome with the checker.
+  background: 'This gitops lab teaches automated image promotion, semver/newest-build update strategies,
+    and how a constraint mismatch silently blocks rollout through systematic troubleshooting: observe,
+    hypothesize, change, verify.'
+  validation:
+    type: custom_script
+    script: check.sh
+    error_message: The scenario objective is not yet satisfied. Re-read hint tier 2, confirm the root
+      cause, and apply the documented remediation so /opt/fixitlab/academy/gitops-image-updater-stuck.conf
+      carries the FIXED-OK marker.
+solution:
+  summary: 'The Image Updater annotation uses an update strategy/constraint (e.g. `update-strategy: semver`
+    with a range that excludes 2.3.1, or a mismatched image alias) that filters out the new tag, so no
+    promotion happens. Correct the update strategy/constraint annotation so the new tag is selected and
+    written back to Git.'
+  files_changed: []
+  commands_run:
+  - kubectl logs deploy/argocd-image-updater -n argocd
+  - argocd app get checkout-svc -o yaml
+  - kubectl get application checkout-svc -n argocd -o jsonpath='{.metadata.annotations}'
+  reference_docs: gitops-fundamentals
