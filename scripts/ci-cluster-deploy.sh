@@ -71,12 +71,16 @@ fi
 remote() {
   local target_ip="$1" via_edge="$2"; shift 2
   local script="$*"
-  local opts=(-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o ConnectTimeout=10 -o BatchMode=yes)
+  # ServerAlive* keepalives: a role deploy can sit silent for minutes (e.g. the
+  # backend readiness wait) with no stdout; without keepalives the idle two-hop
+  # tunnel is torn down ("client_loop: send disconnect: Broken pipe") and reds the
+  # job. 15s x 8 tolerates ~2min of silence on BOTH the target and the jump hop.
+  local opts=(-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o ConnectTimeout=10 -o BatchMode=yes -o ServerAliveInterval=15 -o ServerAliveCountMax=8 -o TCPKeepAlive=yes)
   [ -n "$KEY_FILE" ] && opts+=(-i "$KEY_FILE" -o IdentitiesOnly=yes)
   if [ "$via_edge" = "via-edge" ]; then
     # Explicit ProxyCommand so the edge jump uses our key + skips host-key checks
     # (ProxyJump does not propagate -i / StrictHostKeyChecking to the jump host).
-    local jopts="-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o BatchMode=yes -o ConnectTimeout=10"
+    local jopts="-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o BatchMode=yes -o ConnectTimeout=10 -o ServerAliveInterval=15 -o ServerAliveCountMax=8 -o TCPKeepAlive=yes"
     [ -n "$KEY_FILE" ] && jopts="$jopts -i $KEY_FILE -o IdentitiesOnly=yes"
     opts+=(-o "ProxyCommand=ssh $jopts -W %h:%p root@${EDGE_PUBLIC_IP}")
   fi
@@ -107,8 +111,15 @@ deploy_edge() {
 
 deploy_app() {
   echo "[3/4] Deploy D2 App (backend + celery + migrate)"
+  # NOTE: deliberately NO ${VAULT_ENV} here. The app node (D2) has no local Vault
+  # container (Vault runs only on the edge), so forwarding the AppRole made
+  # sync-production-env.sh attempt a local `vault_compose exec` render that hangs/
+  # fails — the regression that broke the 4D deploy after commit 7f8e654. D2 renders
+  # its env the same way the known-good 7f8e654 run did: baked PRODUCTION_ENV_B64 /
+  # last-good .env.production. Vault stays the source of truth on the edge (deploy_edge
+  # keeps ${VAULT_ENV}); the backend's runtime Vault loader still reads it when reachable.
   if ! remote "$APP_PRIVATE_IP" via-edge \
-    "${VAULT_ENV} ${IMG_ENV} CLUSTER_ROLE=app BUILD_SCENARIOS=false ./scripts/ci-remote-platform.sh deploy"; then
+    "${IMG_ENV} CLUSTER_ROLE=app BUILD_SCENARIOS=false ./scripts/ci-remote-platform.sh deploy"; then
     echo "===== [diagnostic] D2 backend startup logs (last 120 lines) ====="
     remote "$APP_PRIVATE_IP" via-edge \
       "docker logs fixitlab-backend-1 --tail 120 2>&1 || (cd /opt/fixitlab && docker compose -f docker-compose.app.yml logs --tail 120 backend 2>&1) || true" || true
