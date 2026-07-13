@@ -6,7 +6,7 @@ Usage: python manage.py seed_scenarios
 
 import os
 import yaml
-from django.core.management.base import BaseCommand
+from django.core.management.base import BaseCommand, CommandError
 from apps.question_bank.models import Technology, Scenario
 from apps.hints.models import Hint
 
@@ -119,6 +119,52 @@ class Command(BaseCommand):
             )
             return technology
 
+    def _assert_no_duplicate_slugs(self, scenarios_dir: str, tech_filter: set) -> None:
+        """Pre-pass: fail if any scenario slug maps to >1 file on disk.
+
+        Mirrors the tech_filter used by the write loop so a filtered seed only
+        guards the files it will actually write. Raises CommandError listing
+        every colliding (slug, [files]) so the failure is actionable.
+        """
+        slug_to_files: dict[str, list[str]] = {}
+        for tech_dir in sorted(os.listdir(scenarios_dir)):
+            tech_path = os.path.join(scenarios_dir, tech_dir)
+            if not os.path.isdir(tech_path):
+                continue
+            if tech_filter and tech_dir.lower() not in tech_filter:
+                continue
+            for scenario_dir in sorted(os.listdir(tech_path)):
+                yaml_path = os.path.join(tech_path, scenario_dir, "scenario.yaml")
+                if not os.path.isfile(yaml_path):
+                    continue
+                try:
+                    with open(yaml_path) as f:
+                        data = yaml.safe_load(f)
+                except yaml.YAMLError:
+                    # Malformed YAML is reported (and skipped) by the write loop;
+                    # don't crash the guard on it.
+                    continue
+                if not data:
+                    continue
+                slug = data.get("slug", scenario_dir)
+                slug_to_files.setdefault(slug, []).append(yaml_path)
+
+        collisions = {s: fs for s, fs in slug_to_files.items() if len(fs) > 1}
+        if collisions:
+            lines = [
+                "Duplicate scenario slugs detected — seeding aborted to avoid "
+                "silently overwriting scenarios (Scenario.slug is globally unique)."
+            ]
+            for slug in sorted(collisions):
+                lines.append(f"  slug '{slug}' used by {len(collisions[slug])} files:")
+                for path in sorted(collisions[slug]):
+                    lines.append(f"      - {path}")
+            lines.append(
+                "Give each scenario a globally-unique slug (rename the alias "
+                "copies) and re-run seed_scenarios."
+            )
+            raise CommandError("\n".join(lines))
+
     def handle(self, *args, **options):
         scenarios_dir = options["dir"]
         tech_filter = {
@@ -138,6 +184,16 @@ class Command(BaseCommand):
         if not os.path.exists(scenarios_dir):
             self.stderr.write(self.style.ERROR(f"Scenarios directory not found: {scenarios_dir}"))
             return
+
+        # ── Collision guard (pre-pass) ──────────────────────────────────────
+        # Scenario.slug is globally unique, but seeding does
+        # update_or_create(slug=...) while iterating tech dirs in sorted order.
+        # If two scenario.yaml files (in different tech dirs) declare the SAME
+        # slug, only the last one written survives — every earlier file is
+        # silently overwritten and vanishes from the platform. Detect that here
+        # (honoring the same --dir/--technologies filters as the write loop)
+        # and FAIL LOUDLY instead of losing scenarios.
+        self._assert_no_duplicate_slugs(scenarios_dir, tech_filter)
 
         count = 0
         for tech_dir in sorted(os.listdir(scenarios_dir)):

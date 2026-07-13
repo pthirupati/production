@@ -61,7 +61,7 @@ objectives:
 - Reinstall GRUB to the disk and regenerate its config so the system boots
 requires_companion_hosts: false
 simulation_type: rhel
-slug: sim-rhel-mbr-corrupt
+slug: rhel-linux-mbr-corrupt-lab
 time_limit: 900
 title: Corrupt MBR / Bootloader
 technology: rhel-linux

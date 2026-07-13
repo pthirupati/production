@@ -1,5 +1,5 @@
 title: 'RHEL Simulation: MySQL Down (Dual Terminal)'
-slug: sim-rhel-mysql-dual
+slug: database-rhel-mysql-dual-lab
 technology: database
 category: Fix
 difficulty: easy

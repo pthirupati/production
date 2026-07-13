@@ -4703,3 +4703,18 @@ _NEW_TRACK_SENTINEL_SLUGS = (
 )
 for _slug in _NEW_TRACK_SENTINEL_SLUGS:
     _PRESETS[_slug] = _with_sentinel(None, _slug)
+
+# Recovered technology-alias copies (slug de-dup): these secondary copies carried
+# the coarse `systemctl is-failed`/`firewall-cmd --state` probe check.sh, which is
+# fail-OPEN once the alias gets its own DB row. Their check.sh was rewritten to the
+# FIXED-OK sentinel grep, so register them as sentinel labs (fail-closed + fixable
+# via apply_simulation_fix's universal sentinel-clear) — identical to the new-track
+# pattern. The genuine, engine-graded version lives under the canonical slug.
+_ALIAS_SENTINEL_SLUGS = (
+    "linux-rhel-boot-grub-lab",
+    "rhel-linux-grub-rescue-lab",
+    "rhel-linux-patching-lab",
+    "linux-rhel-broken-useradd-lab",
+)
+for _slug in _ALIAS_SENTINEL_SLUGS:
+    _PRESETS[_slug] = _with_sentinel(None, _slug)

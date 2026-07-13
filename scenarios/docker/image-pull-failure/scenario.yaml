@@ -61,7 +61,7 @@ objectives:
 - Pull the corrected image and run the container successfully
 requires_companion_hosts: false
 simulation_type: generic
-slug: sim-docker-image-pull
+slug: docker-image-pull-failure-lab
 time_limit: 900
 title: Docker Image Pull Failure
 technology: docker

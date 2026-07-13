@@ -1,5 +1,5 @@
 title: 'RHEL Simulation: Firewall Blocks HTTP (Dual Terminal)'
-slug: sim-rhel-firewalld-dual
+slug: linux-rhel-firewalld-dual-lab
 technology: linux
 category: Fix
 difficulty: easy
