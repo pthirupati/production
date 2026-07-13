@@ -403,6 +403,28 @@ class CouponRedemption(models.Model):
         return f"{self.coupon_id}:{self.user_id}"
 
 
+class ProcessedWebhookEvent(models.Model):
+    """Durable record of a processed payment-provider webhook event.
+
+    The webhook handler dedups fast via Redis (``cache.add``), but a Redis flush
+    would reopen a double-fulfillment window on replay. This table is the
+    authoritative, durable idempotency gate: fulfillment is guarded on
+    ``get_or_create(event_id=...)`` so a replayed event is a no-op.
+    """
+
+    event_id = models.CharField(max_length=200, unique=True, db_index=True)
+    provider = models.CharField(max_length=32, default="razorpay")
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["-created_at"]
+        verbose_name = "Processed webhook event"
+        verbose_name_plural = "Processed webhook events"
+
+    def __str__(self):
+        return f"{self.provider}:{self.event_id}"
+
+
 class UserCertificate(models.Model):
     """Stored certificate with issue and expiry dates."""
 

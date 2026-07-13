@@ -1867,6 +1867,15 @@ class UserProgressView(APIView):
                     target_pool = hard_s if (medium_done >= len(medium_s) * 0.8) else medium_s
                 else:
                     target_pool = easy_s or medium_s
+                # Emit a STABLE next-step: within the chosen difficulty tier, order
+                # by the catalog's academy-sequence/slug key so the recommendation
+                # is deterministic (DB row order is not guaranteed).
+                try:
+                    from apps.question_bank.technology_catalog import _slug_sort_key as _next_sort_key
+                except Exception:
+                    def _next_sort_key(slug):  # noqa: ANN001 — simple fallback
+                        return (slug,)
+                target_pool = sorted(target_pool, key=lambda s: _next_sort_key(s.slug))
                 for s in target_pool:
                     if s.slug not in completed_slugs:
                         recommended.append({
