@@ -59,7 +59,7 @@ objectives:
 - 'Verify the new disk (lsblk/fdisk) and add it: pvcreate, vgextend'
 - Extend the logical volume and grow the XFS filesystem (lvextend + xfs_growfs)
 simulation_type: rhel
-slug: sim-rhel-lvm-extend
+slug: rhel-linux-lvm-extend-lab
 time_limit: 900
 title: Extend LVM Volume Group (Jira storage request)
 technology: rhel-linux

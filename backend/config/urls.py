@@ -1,9 +1,12 @@
 from django.contrib import admin
+from django.contrib.sitemaps.views import index as sitemap_index, sitemap as sitemap_section
 from django.urls import path, include
 from django.conf import settings
 from django.conf.urls.static import static
 from rest_framework.permissions import IsAdminUser
 from drf_spectacular.views import SpectacularAPIView, SpectacularSwaggerView
+
+from apps.public_api.sitemaps import SITEMAPS
 
 from apps.accounts.views import (
     RegisterView, LoginView, UserProfileView, ChangePasswordView,
@@ -17,6 +20,23 @@ from apps.accounts.views import (
 from apps.billing.sales_views import SalesInquiryView
 
 urlpatterns = [
+    # Public SEO sitemap (AllowAny). The index at /sitemap.xml links to one
+    # /sitemap-<section>.xml per catalog section (scenarios, tutorials, projects,
+    # technologies, static). Served through the nginx gateway; not under an
+    # admin-IP-restricted or auth-gated prefix.
+    path(
+        "sitemap.xml",
+        sitemap_index,
+        {"sitemaps": SITEMAPS, "sitemap_url_name": "sitemap_section"},
+        name="sitemap_index",
+    ),
+    path(
+        "sitemap-<section>.xml",
+        sitemap_section,
+        {"sitemaps": SITEMAPS},
+        name="sitemap_section",
+    ),
+
     # Django admin (accessible at /django-admin/ to avoid conflict with frontend /admin/*)
     path("django-admin/", admin.site.urls),
 

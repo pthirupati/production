@@ -435,6 +435,7 @@ class Command(BaseCommand):
         total = 0
         gap_count = 0
         gap_rows: list[tuple[str, list[str]]] = []
+        slug_to_files: dict[str, list[str]] = {}
 
         for tech_path in sorted(SCEN.iterdir()):
             if not tech_path.is_dir() or tech_path.name == "shared":
@@ -452,10 +453,22 @@ class Command(BaseCommand):
                     gap_count += 1
                     rel = yaml_path.relative_to(ROOT)
                     gap_rows.append((str(rel), gaps))
+                # Track slug -> files for the global duplicate-slug check below.
+                try:
+                    data = yaml.safe_load(yaml_path.read_text(encoding="utf-8")) or {}
+                except yaml.YAMLError:
+                    data = {}
+                slug = str(data.get("slug") or yaml_path.parent.name)
+                slug_to_files.setdefault(slug, []).append(str(yaml_path.relative_to(ROOT)))
                 if limit and total >= limit:
                     break
             if limit and total >= limit:
                 break
+
+        # Duplicate-slug detection (mirrors seed_scenarios' collision guard).
+        # Scenario.slug is globally unique, so any slug mapping to >1 file means
+        # seeding will silently overwrite scenarios — catch it in CI pre-deploy.
+        duplicate_slugs = {s: fs for s, fs in slug_to_files.items() if len(fs) > 1}
 
         self.stdout.write(f"Scanned {total} scenarios — {gap_count} with gaps, {total - gap_count} clean")
         for rel, gaps in gap_rows[:50]:
@@ -465,5 +478,17 @@ class Command(BaseCommand):
         if len(gap_rows) > 50:
             self.stdout.write(f"  ... and {len(gap_rows) - 50} more")
 
-        if options["fail_on_gaps"] and gap_count:
+        if duplicate_slugs:
+            self.stdout.write(
+                self.style.ERROR(
+                    f"\nDuplicate scenario slugs detected ({len(duplicate_slugs)}) — "
+                    "these would silently overwrite each other at seed time:"
+                )
+            )
+            for slug in sorted(duplicate_slugs):
+                self.stdout.write(f"  slug '{slug}':")
+                for path in sorted(duplicate_slugs[slug]):
+                    self.stdout.write(f"      - {path}")
+
+        if (options["fail_on_gaps"] and gap_count) or duplicate_slugs:
             sys.exit(1)

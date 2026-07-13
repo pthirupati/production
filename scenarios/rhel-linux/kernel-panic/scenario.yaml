@@ -61,7 +61,7 @@ objectives:
 - Fix the root reference / rebuild initramfs so the system boots
 requires_companion_hosts: false
 simulation_type: rhel
-slug: sim-rhel-kernel-panic
+slug: rhel-linux-kernel-panic-lab
 time_limit: 900
 title: Kernel Panic on Boot
 technology: rhel-linux

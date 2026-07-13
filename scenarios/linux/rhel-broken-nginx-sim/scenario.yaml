@@ -63,7 +63,7 @@ objectives:
 - Start and enable nginx, then verify it serves on port 80
 requires_companion_hosts: false
 simulation_type: generic
-slug: sim-rhel-broken-nginx
+slug: linux-rhel-broken-nginx-sim-lab
 time_limit: 900
 title: Fix Broken Nginx on RHEL
 technology: linux
