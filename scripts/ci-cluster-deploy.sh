@@ -164,12 +164,16 @@ LK=/opt/fixitlab/deploy/labs_ssh/id_ed25519
 if [ ! -f \"\$LK\" ]; then echo '  labs key missing on D2 — skipping prepull'; exit 0; fi
 install -m 700 -d /root/.ssh
 sed -i '/# fixitlab-labs-docker/,+5d' /root/.ssh/config 2>/dev/null || true
-printf '# fixitlab-labs-docker\nHost ${LABS_PRIVATE_IP}\n  IdentityFile %s\n  IdentitiesOnly yes\n  StrictHostKeyChecking no\n  UserKnownHostsFile /dev/null\n' \"\$LK\" >> /root/.ssh/config
+printf '# fixitlab-labs-docker\nHost ${LABS_PRIVATE_IP}\n  IdentityFile %s\n  IdentitiesOnly yes\n  StrictHostKeyChecking no\n  UserKnownHostsFile /dev/null\n  ConnectTimeout 10\n  ServerAliveInterval 10\n  ServerAliveCountMax 3\n' \"\$LK\" >> /root/.ssh/config
 chmod 600 /root/.ssh/config
 export DOCKER_HOST=ssh://root@${LABS_PRIVATE_IP}
-docker pull ${SANDBOX_PYTHON_IMAGE:-python:3.12-alpine} || true
-docker pull ${SANDBOX_NODE_IMAGE:-node:20-alpine} || true
-docker images | grep -E 'python:3.12-alpine|node:20-alpine' && echo '[grader] sandbox images present on D4' || echo '[grader] WARN: images still absent on D4'" || true
+# Bound every D2->D4 docker-over-ssh op with a hard timeout: a flaky/hung labs
+# SSH must NEVER stall the deploy. The runner->edge->app tunnel has SSH keepalive
+# (so it won't broken-pipe), which means a hung inner pull would otherwise block
+# until the 55-min job timeout. This step is non-fatal — a timeout just skips it.
+timeout 90 docker pull ${SANDBOX_PYTHON_IMAGE:-python:3.12-alpine} || echo '  [grader] python sandbox pre-pull skipped (timeout/err)'
+timeout 90 docker pull ${SANDBOX_NODE_IMAGE:-node:20-alpine} || echo '  [grader] node sandbox pre-pull skipped (timeout/err)'
+timeout 30 docker images | grep -E 'python:3.12-alpine|node:20-alpine' && echo '[grader] sandbox images present on D4' || echo '[grader] WARN: images still absent on D4'" || true
 }
 
 main() {
