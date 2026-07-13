@@ -161,8 +161,13 @@ if _role_runs app; then
   for i in $(seq 1 120); do
     if docker compose -f "$COMPOSE_FILE" --env-file "$ENV_FILE" exec -T backend python -c \
       "import urllib.request; r=urllib.request.urlopen('http://127.0.0.1:8000/api/health/ready/'); assert r.status==200" 2>/dev/null; then
+      echo "  backend ready after $(( (i-1)*3 ))s"
       break
     fi
+    # Heartbeat so the (keepalive-protected) deploy SSH tunnel never sits fully
+    # silent for minutes during a slow startup — belt-and-suspenders with the
+    # ServerAlive* opts in ci-cluster-deploy.sh remote().
+    [ $((i % 10)) -eq 0 ] && echo "  ...still waiting for backend readiness (${i}/120)"
     sleep 3
   done
 fi
