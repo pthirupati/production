@@ -61,17 +61,28 @@ def discover_catalog():
         slug = sc.technology.slug if sc.technology_id else "unknown"
         by_tech.setdefault(slug, []).append(sc)
 
+    # Determine deployability using the SAME resolver the runtime uses
+    # (apps.labs.infra.lab_infra_type) so the E2E tests exactly what users can
+    # launch — no blind spot. Previously this used a divergent heuristic
+    # (lab_mode=='simulation' OR sim_type OR image_exists) that silently excluded
+    # ~93 scenarios which defaulted to docker with no baked image, hiding the very
+    # PROVISION_FAILED breakage users hit. lab_infra_type now defaults to
+    # "simulation" (image-free), so those scenarios are deployable and get tested.
+    from apps.labs.infra import lab_infra_type
+
     deployable = []
     missing_images = []
     for sc in scenarios:
         slug = sc.slug or ""
         if sc.technology and getattr(sc.technology, "coming_soon", False):
             continue
-        sim_type = normalize_sim_type(getattr(sc, "simulation_type", None))
-        if getattr(sc, "lab_mode", "") == "simulation" or sim_type in _SIMULATION_ONLY_TYPES:
+        infra = lab_infra_type(sc)
+        if infra == "simulation":
             deployable.append(sc)
-            continue
-        if image_exists(slug):
+        elif infra in ("aws_ec2", "digitalocean"):
+            # Real cloud provisioning is not exercised in the sandbox E2E.
+            missing_images.append(slug)
+        elif image_exists(slug):
             deployable.append(sc)
         else:
             missing_images.append(slug)

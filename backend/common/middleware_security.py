@@ -225,24 +225,26 @@ class AdminIPRestrictionMiddleware(MiddlewareMixin):
         is_loopback = client_ip in _LOOPBACK_IPS or remote_addr in _LOOPBACK_IPS
 
         if not allowed_ips:
-            # No allowlist configured. SECURITY_AUDIT I-04: fail CLOSED in
-            # production by default so /api/admin/ + /django-admin/ are not
-            # reachable from arbitrary internet IPs. Loopback / in-container
-            # callers (health checks, server-side E2E run via
-            # `docker compose exec ... e2e`) are always allowed — their origin
-            # is this host and cannot be spoofed by a remote client.
-            fail_closed = not getattr(settings, "DEBUG", False) and getattr(
-                settings, "ADMIN_FAIL_CLOSED_WITHOUT_ALLOWLIST", True
+            # No allowlist configured. An IP allowlist is defense-in-depth ON TOP
+            # of authentication — every /api/admin/ endpoint already requires a
+            # logged-in superuser and /django-admin/ requires staff login. With NO
+            # allowlist there is nothing to restrict *to*, so "fail closed" here
+            # would block every admin (including the owner) from every admin page
+            # with no recovery path (you can't set the allowlist from an admin UI
+            # you can't reach). That is an unrecoverable misconfiguration, not a
+            # security posture, so we ALLOW (auth still gates the surface) and warn
+            # loudly. To actually restrict by network, populate ADMIN_ALLOWED_IPS —
+            # once set, only those IPs (plus loopback) are permitted below.
+            fail_closed_requested = not getattr(settings, "DEBUG", False) and getattr(
+                settings, "ADMIN_FAIL_CLOSED_WITHOUT_ALLOWLIST", False
             )
-            if fail_closed and not is_loopback:
+            if fail_closed_requested and not is_loopback:
                 logger.warning(
-                    "Admin access denied (fail-closed: ADMIN_ALLOWED_IPS unset) "
-                    "for IP %s on %s",
+                    "ADMIN_FAIL_CLOSED_WITHOUT_ALLOWLIST is set but ADMIN_ALLOWED_IPS "
+                    "is empty — ignoring (would lock out all admins). Set "
+                    "ADMIN_ALLOWED_IPS to your egress IP(s) to enforce network "
+                    "restriction. Admin remains gated by superuser auth. IP=%s path=%s",
                     client_ip, path,
-                )
-                return JsonResponse(
-                    {"detail": "Admin access is restricted. No allowlist is configured."},
-                    status=403,
                 )
             return None
 

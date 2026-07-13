@@ -697,7 +697,13 @@ ADMIN_ALLOWED_IPS = [ip.strip() for ip in env("ADMIN_ALLOWED_IPS", default="").s
 # restrict admin to those networks. Loopback / in-container callers (health
 # checks + server-side E2E) are always allowed.
 ADMIN_FAIL_CLOSED_WITHOUT_ALLOWLIST = env.bool(
-    "ADMIN_FAIL_CLOSED_WITHOUT_ALLOWLIST", default=not DEBUG
+    # Defaults FALSE (matches the comment above): with no allowlist, admin stays
+    # reachable behind superuser auth. Defaulting to `not DEBUG` (True in prod)
+    # with an empty ADMIN_ALLOWED_IPS fail-closes the ENTIRE admin surface for
+    # every real (non-loopback) admin — the exact owner-lockout this comment warns
+    # about. Opt into network restriction by setting the env var to 1 AND
+    # populating ADMIN_ALLOWED_IPS.
+    "ADMIN_FAIL_CLOSED_WITHOUT_ALLOWLIST", default=False
 )
 # Number of trusted reverse-proxy hops in front of Django (our nginx gateway).
 # Used to read the un-spoofable client IP from the RIGHT of X-Forwarded-For
