@@ -4658,3 +4658,48 @@ _RESIDUAL_SENTINEL_PRESETS = {
     "setup-gitlab-pipeline-do": _with_sentinel(None, "setup-gitlab-pipeline-do"),
 }
 _PRESETS.update(_RESIDUAL_SENTINEL_PRESETS)
+
+
+# ── New in-demand technology tracks (GitOps / DevSecOps supply-chain /
+#    OpenTelemetry / Service Mesh) ──
+# These are simulation-only labs with no dedicated engine validator, so they
+# rely on the broken-configuration sentinel for fail-closed grading. Several of
+# the slugs contain incidental substrings that the coarse keyword backstop
+# mis-reads as engine-backed families (e.g. "gitops-"/"devsecops-" trip the
+# PeopleSoft "ps-" marker; "secret" trips "ecr"), which would WRONGLY skip the
+# sentinel and boot a healthy machine (fail-open). Register every slug EXPLICITLY
+# as a sentinel lab so grading is deterministic and immune to substring drift:
+# apply_simulation_fix's universal sentinel-clear appends FIXED-OK up front, so
+# the contract holds — unfixed -> FAIL (sentinel present), fixed -> PASS.
+_NEW_TRACK_SENTINEL_SLUGS = (
+    # GitOps (ArgoCD / Flux)
+    "gitops-argocd-outofsync",
+    "gitops-argocd-sync-hook-failed",
+    "gitops-app-of-apps-misconfig",
+    "gitops-config-drift",
+    "gitops-flux-reconcile-fail",
+    "gitops-image-updater-stuck",
+    # DevSecOps supply-chain
+    "devsecops-trivy-critical-cve",
+    "devsecops-sbom-missing",
+    "devsecops-cosign-unsigned-image",
+    "devsecops-slsa-provenance-gap",
+    "devsecops-falco-unexpected-shell",
+    "devsecops-secret-leaked-layer",
+    # OpenTelemetry
+    "otel-collector-dropped-spans",
+    "otel-broken-trace-propagation",
+    "otel-metric-cardinality-explosion",
+    "otel-exporter-auth-failure",
+    "otel-sampling-misconfigured",
+    "otel-trace-log-correlation",
+    # Service Mesh (Istio / Linkerd)
+    "mesh-mtls-strict-breaks-plaintext",
+    "mesh-virtualservice-misroute",
+    "mesh-outlier-eject-flapping",
+    "mesh-sidecar-not-injected",
+    "mesh-authz-policy-denies",
+    "mesh-retry-timeout-storm",
+)
+for _slug in _NEW_TRACK_SENTINEL_SLUGS:
+    _PRESETS[_slug] = _with_sentinel(None, _slug)

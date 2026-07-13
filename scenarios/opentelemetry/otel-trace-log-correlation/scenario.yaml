@@ -1,0 +1,122 @@
+title: Logs Not Correlated to Traces
+slug: otel-trace-log-correlation
+technology: opentelemetry
+category: Harden
+difficulty: medium
+scenario_type: fix
+lab_mode: simulation
+simulation_type: generic
+time_limit: 1500
+max_score: 100
+is_free: false
+infrastructure_type: docker
+jira_priority: Medium
+description: 'CONTEXT: A platform team operating opentelemetry needs you to resolve `Logs Not Correlated
+  to Traces` during a realistic delivery incident. The business impact is a stalled or unsafe release
+  until the underlying state is repaired.
+
+
+  ENVIRONMENT: You are working in FixitLab''s offline observability lab with an OpenTelemetry Collector,
+  an instrumented demo service, and a local trace/metric backend under /otel. All components run locally;
+  no SaaS observability vendor or paid APIs are required.
+
+
+  SYMPTOM / STARTING STATE: An on-call engineer has a slow trace but cannot jump to the matching logs:
+  the service''s log lines carry no trace_id/span_id, so there is no way to pivot from a span to the exact
+  log entries for that request. Trace↔log correlation is broken.
+
+
+  OBJECTIVE: The logging setup does not inject the active trace context (trace_id/span_id) into log records,
+  and the Collector''s log pipeline does not carry those fields, so logs and traces can''t be joined.
+  Remediate by injecting trace_id/span_id into the log format (and preserving them through the log pipeline)
+  so a span links to its logs. Success is graded on the real repaired state, not a manual marker.
+
+
+  WHAT TO AVOID: Do not suppress the signal, disable the policy/gate, or fake completion with marker files
+  — reproduce the diagnosis, then apply the smallest fix that satisfies the objective and re-run Check
+  Solution.'
+objectives:
+- Log records include the active trace_id and span_id
+- An engineer can pivot from a span to its exact log lines
+- The missing-correlation root cause is fixed in the log format, not worked around manually
+initial_state: 'An on-call engineer has a slow trace but cannot jump to the matching logs: the service''s
+  log lines carry no trace_id/span_id, so there is no way to pivot from a span to the exact log entries
+  for that request. Trace↔log correlation is broken.'
+hints:
+- order: 1
+  cost: 0
+  content: "Where to look — orient before changing anything:\n    1. `cat /otel/service/logging.yaml`\n\
+    \    2. `tail -n 5 /otel/service/app.log`\n    3. `cat /otel/collector/config.yaml`\n    Write down\
+    \ what looks healthy versus wrong. Form one hypothesis before you touch anything."
+- order: 2
+  cost: 25
+  content: "Diagnostic steps:\n    1. Re-run `cat /otel/service/logging.yaml` and read the status/error\
+    \ carefully.\n    2. Cross-check with `tail -n 5 /otel/service/app.log` to isolate the failing object.\n\
+    \    3. State the single root cause in one sentence before you act."
+- order: 3
+  cost: 50
+  content: "Exact fix + verification:\n    1. The logging setup does not inject the active trace context\
+    \ (trace_id/span_id) into log records, and the Collector's log pipeline does not carry those fields,\
+    \ so logs and traces can't be joined. Remediate by injecting trace_id/span_id into the log format\
+    \ (and preserving them through the log pipeline) so a span links to its logs.\n    2. Change one thing\
+    \ at a time so you can roll back if the hypothesis was wrong.\n    3. Verify the objective is met,\
+    \ then click Check Solution (graded on real state, not a marker file)."
+summary: Diagnose and resolve logs not correlated to traces in the opentelemetry simulation lab and verify
+  the healthy end state
+estimated_minutes: 25
+xp_reward: 100
+prerequisites:
+- Basic distributed-systems and HTTP literacy
+tags:
+- opentelemetry
+- harden
+- hands-on
+- simulation
+linked_tutorial: opentelemetry-fundamentals
+what_you_will_learn:
+- Log records include the active trace_id and span_id
+- An engineer can pivot from a span to its exact log lines
+- Understand trace↔log correlation, injecting trace/span IDs into log records, and the operational value
+  of pivoting between signals
+environment:
+  nodes:
+  - role: primary
+    os: FixitLab OpenTelemetry observability lab
+    hostname: lab-primary
+    ip: 127.0.0.1
+    specs: local offline simulation
+  pre_installed:
+  - bash
+  - coreutils
+  - otelcol
+  - curl
+  - jq
+  credentials:
+  - user: root
+    password: lab123
+tasks:
+- id: task_1
+  title: Logs Not Correlated to Traces
+  description: Restore healthy behavior for Logs Not Correlated to Traces by reproducing the diagnosis
+    from the symptom, isolating the root cause with evidence, applying the smallest safe fix, and validating
+    the outcome with the checker.
+  background: 'This opentelemetry lab teaches trace↔log correlation, injecting trace/span IDs into log
+    records, and the operational value of pivoting between signals through systematic troubleshooting:
+    observe, hypothesize, change, verify.'
+  validation:
+    type: custom_script
+    script: check.sh
+    error_message: The scenario objective is not yet satisfied. Re-read hint tier 2, confirm the root
+      cause, and apply the documented remediation so /opt/fixitlab/academy/otel-trace-log-correlation.conf
+      carries the FIXED-OK marker.
+solution:
+  summary: The logging setup does not inject the active trace context (trace_id/span_id) into log records,
+    and the Collector's log pipeline does not carry those fields, so logs and traces can't be joined.
+    Remediate by injecting trace_id/span_id into the log format (and preserving them through the log pipeline)
+    so a span links to its logs.
+  files_changed: []
+  commands_run:
+  - cat /otel/service/logging.yaml
+  - tail -n 5 /otel/service/app.log
+  - cat /otel/collector/config.yaml
+  reference_docs: opentelemetry-fundamentals

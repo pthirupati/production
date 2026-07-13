@@ -1,0 +1,122 @@
+title: App-of-Apps Root Fails to Render Children
+slug: gitops-app-of-apps-misconfig
+technology: gitops
+category: Fix
+difficulty: hard
+scenario_type: fix
+lab_mode: simulation
+simulation_type: generic
+time_limit: 1500
+max_score: 100
+is_free: false
+infrastructure_type: docker
+jira_priority: High
+description: 'CONTEXT: A platform team operating gitops needs you to resolve `App-of-Apps Root Fails to
+  Render Children` during a realistic delivery incident. The business impact is a stalled or unsafe release
+  until the underlying state is repaired.
+
+
+  ENVIRONMENT: You are working in FixitLab''s offline GitOps practice cluster with ArgoCD/Flux controllers,
+  Application/Kustomization manifests, and a Git source repo under /gitops. All controllers run locally;
+  no external Git host or paid APIs are required.
+
+
+  SYMPTOM / STARTING STATE: The `platform-root` App-of-Apps Application syncs green but none of its child
+  Applications (monitoring, ingress, cert-manager) appear in ArgoCD. The root points at a directory of
+  child Application manifests, yet the child set is empty and the platform never bootstraps.
+
+
+  OBJECTIVE: The root Application''s `spec.source.path` points at the wrong directory (or `directory.recurse`
+  is false), so ArgoCD renders zero child Application manifests — a green-but-empty root. Correct the
+  source path (and enable recurse) so the child Applications are generated and adopted. Success is graded
+  on the real repaired state, not a manual marker.
+
+
+  WHAT TO AVOID: Do not suppress the signal, disable the policy/gate, or fake completion with marker files
+  — reproduce the diagnosis, then apply the smallest fix that satisfies the objective and re-run Check
+  Solution.'
+objectives:
+- The platform-root source path/recurse correctly renders the child Application manifests
+- All expected child Applications (monitoring, ingress, cert-manager) appear and sync
+- The empty-render root cause is confirmed via argocd app manifests, not guessed
+initial_state: The `platform-root` App-of-Apps Application syncs green but none of its child Applications
+  (monitoring, ingress, cert-manager) appear in ArgoCD. The root points at a directory of child Application
+  manifests, yet the child set is empty and the platform never bootstraps.
+hints:
+- order: 1
+  cost: 0
+  content: "Where to look — orient before changing anything:\n    1. `argocd app get platform-root`\n\
+    \    2. `kubectl get applications -n argocd`\n    3. `argocd app manifests platform-root`\n    Write\
+    \ down what looks healthy versus wrong. Form one hypothesis before you touch anything."
+- order: 2
+  cost: 25
+  content: "Diagnostic steps:\n    1. Re-run `argocd app get platform-root` and read the status/error\
+    \ carefully.\n    2. Cross-check with `kubectl get applications -n argocd` to isolate the failing\
+    \ object.\n    3. State the single root cause in one sentence before you act."
+- order: 3
+  cost: 50
+  content: "Exact fix + verification:\n    1. The root Application's `spec.source.path` points at the\
+    \ wrong directory (or `directory.recurse` is false), so ArgoCD renders zero child Application manifests\
+    \ — a green-but-empty root. Correct the source path (and enable recurse) so the child Applications\
+    \ are generated and adopted.\n    2. Change one thing at a time so you can roll back if the hypothesis\
+    \ was wrong.\n    3. Verify the objective is met, then click Check Solution (graded on real state,\
+    \ not a marker file)."
+summary: Diagnose and resolve app-of-apps root fails to render children in the gitops simulation lab and
+  verify the healthy end state
+estimated_minutes: 25
+xp_reward: 100
+prerequisites:
+- Basic Kubernetes and Git literacy
+tags:
+- gitops
+- fix
+- hands-on
+- simulation
+linked_tutorial: gitops-fundamentals
+what_you_will_learn:
+- The platform-root source path/recurse correctly renders the child Application manifests
+- All expected child Applications (monitoring, ingress, cert-manager) appear and sync
+- Understand the App-of-Apps pattern, how a root App generates child Applications, and why a green root
+  can still deploy nothing
+environment:
+  nodes:
+  - role: primary
+    os: FixitLab GitOps practice cluster
+    hostname: lab-primary
+    ip: 127.0.0.1
+    specs: local offline simulation
+  pre_installed:
+  - bash
+  - coreutils
+  - kubectl
+  - argocd
+  - flux
+  - git
+  credentials:
+  - user: root
+    password: lab123
+tasks:
+- id: task_1
+  title: App-of-Apps Root Fails to Render Children
+  description: Restore healthy behavior for App-of-Apps Root Fails to Render Children by reproducing the
+    diagnosis from the symptom, isolating the root cause with evidence, applying the smallest safe fix,
+    and validating the outcome with the checker.
+  background: 'This gitops lab teaches the App-of-Apps pattern, how a root App generates child Applications,
+    and why a green root can still deploy nothing through systematic troubleshooting: observe, hypothesize,
+    change, verify.'
+  validation:
+    type: custom_script
+    script: check.sh
+    error_message: The scenario objective is not yet satisfied. Re-read hint tier 2, confirm the root
+      cause, and apply the documented remediation so /opt/fixitlab/academy/gitops-app-of-apps-misconfig.conf
+      carries the FIXED-OK marker.
+solution:
+  summary: The root Application's `spec.source.path` points at the wrong directory (or `directory.recurse`
+    is false), so ArgoCD renders zero child Application manifests — a green-but-empty root. Correct the
+    source path (and enable recurse) so the child Applications are generated and adopted.
+  files_changed: []
+  commands_run:
+  - argocd app get platform-root
+  - kubectl get applications -n argocd
+  - argocd app manifests platform-root
+  reference_docs: gitops-fundamentals
