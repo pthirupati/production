@@ -46,6 +46,7 @@ from .models import Profile, PasswordResetToken, EmailVerificationOTP, SocialAcc
 from apps.notifications.email_dispatch import dispatch_notification_email
 from apps.notifications.tasks import send_notification_email, create_in_app_notification
 from common.security import SessionTracker, TokenHelper
+from apps.auth_app.cookie_auth import LogoutJWTAuthentication
 from common.logging_utils import get_structured_logger
 
 User = get_user_model()
@@ -658,6 +659,10 @@ class ChangePasswordView(APIView):
 
 class LogoutView(APIView):
     """Blacklist the refresh token and clear auth cookies."""
+    # Logout is idempotent: tolerate a valid-but-tombstoned session (e.g. right
+    # after a password change) so the user can always end the session + clear
+    # cookies. Session-invalidation enforcement stays ON for every other endpoint.
+    authentication_classes = [LogoutJWTAuthentication]
     permission_classes = [IsAuthenticated]
 
     def post(self, request):

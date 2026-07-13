@@ -188,11 +188,15 @@ def run_public_tests(s: Suite):
         login_url = gh.get("login_url", "")
         ok_cb = cb == "https://fixitlab.in/auth/callback/github" or cb.endswith("/auth/callback/github")
         s.record("GitHub OAuth callback_url", ok_cb, detail=cb or "missing")
-        encoded = "redirect_uri=https%3A%2F%2Ffixitlab.in%2Fauth%2Fcallback%2Fgithub"
+        # login_url now points at the server-side OAuth start endpoint (the
+        # provider authorize URL + redirect_uri are built server-side for CSRF
+        # state-nonce hardening, not exposed to the client). The canonical
+        # redirect_uri itself is covered by backend tests (test_oauth_urls /
+        # test_oauth_api). Assert the start-endpoint contract here.
         s.record(
-            "GitHub login_url redirect_uri",
-            encoded in login_url,
-            detail="matches canonical callback" if encoded in login_url else login_url[:120],
+            "GitHub login_url start endpoint",
+            "/api/auth/social/start/github/" in login_url,
+            detail=login_url or "missing",
         )
     elif status == 200:
         s.record("GitHub OAuth callback_url", True, detail="GitHub OAuth disabled — skipped")
