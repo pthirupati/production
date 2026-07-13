@@ -10,6 +10,26 @@ import time
 MARKER = "FIXITLAB_SIM_WS"
 WS_HOST = __import__("os").environ.get("E2E_TERMINAL_WS_HOST", "127.0.0.1:8000")
 
+
+def _ws_kwargs(token: str) -> dict:
+    """Connect kwargs for the hardened terminal WS.
+
+    Post-audit the WS requires TWO things (commit 06aa0861f): the JWT via the
+    httpOnly ``access_token`` COOKIE (query-string ``?token=`` is ignored), and a
+    request ``Origin`` permitted by AllowedHostsOriginValidator. The ``websockets``
+    client sends no Origin unless ``origin=`` is passed, and DJANGO_ALLOWED_HOSTS
+    has no ``*`` in prod — so we must supply a matching Origin derived from
+    settings. Uses ``additional_headers`` (websockets>=12; the venv is 16.x).
+    """
+    try:
+        from django.conf import settings
+
+        hosts = [h for h in settings.ALLOWED_HOSTS if h and h != "*"]
+        origin = f"http://{hosts[0]}" if hosts else f"http://{WS_HOST}"
+    except Exception:
+        origin = f"http://{WS_HOST}"
+    return {"additional_headers": {"Cookie": f"access_token={token}"}, "origin": origin}
+
 SIM_PROMPT_RE = re.compile(
     r"(root@|\]#[\s\r]|]\$[\s\r]|\[\w+@\S+|grub rescue>|grub>|login:|ansible@|dev-server)",
     re.IGNORECASE,
@@ -111,10 +131,10 @@ async def _check_sim_terminal_async(session_id: str, token: str, host: str = "pr
     import websockets
 
     _reset_ws_counter(token)
-    host_q = f"&host={host}" if host and host != "primary" else ""
-    uri = f"ws://{WS_HOST}/ws/terminal/{session_id}/?token={token}{host_q}"
+    host_q = f"?host={host}" if host and host != "primary" else ""
+    uri = f"ws://{WS_HOST}/ws/terminal/{session_id}/{host_q}"
     try:
-        async with websockets.connect(uri, open_timeout=15, close_timeout=5) as ws:
+        async with websockets.connect(uri, open_timeout=15, close_timeout=5, **_ws_kwargs(token)) as ws:
             output = await _collect_until_prompt(ws)
             if not _has_sim_prompt(output):
                 await ws.send(json.dumps({"input": "\r"}))
@@ -141,13 +161,13 @@ async def _check_sim_workflow_async(session_id: str, token: str, slug: str) -> t
     if "ssh-stop" in slug or "sshd-down" in slug:
         import websockets
 
-        uri_p = f"ws://{WS_HOST}/ws/terminal/{session_id}/?token={token}"
-        uri_c = f"ws://{WS_HOST}/ws/terminal/{session_id}/?token={token}&host=ssh_client"
+        uri_p = f"ws://{WS_HOST}/ws/terminal/{session_id}/"
+        uri_c = f"ws://{WS_HOST}/ws/terminal/{session_id}/?host=ssh_client"
         try:
-            async with websockets.connect(uri_p, open_timeout=15) as ws_p:
+            async with websockets.connect(uri_p, open_timeout=15, **_ws_kwargs(token)) as ws_p:
                 await _collect_until_prompt(ws_p)
                 await _run_command(ws_p, "systemctl start sshd")
-            async with websockets.connect(uri_c, open_timeout=15) as ws_c:
+            async with websockets.connect(uri_c, open_timeout=15, **_ws_kwargs(token)) as ws_c:
                 await _collect_until_prompt(ws_c)
                 out = await _run_command(ws_c, "echo SSH_CLIENT_OK")
                 if "SSH_CLIENT_OK" not in out:
@@ -159,9 +179,9 @@ async def _check_sim_workflow_async(session_id: str, token: str, slug: str) -> t
     if "firewalld-dual" in slug:
         import websockets
 
-        uri_p = f"ws://{WS_HOST}/ws/terminal/{session_id}/?token={token}"
+        uri_p = f"ws://{WS_HOST}/ws/terminal/{session_id}/"
         try:
-            async with websockets.connect(uri_p, open_timeout=15) as ws_p:
+            async with websockets.connect(uri_p, open_timeout=15, **_ws_kwargs(token)) as ws_p:
                 await _collect_until_prompt(ws_p)
                 await _run_command(
                     ws_p,
@@ -174,9 +194,9 @@ async def _check_sim_workflow_async(session_id: str, token: str, slug: str) -> t
     if "mysql-dual" in slug:
         import websockets
 
-        uri_p = f"ws://{WS_HOST}/ws/terminal/{session_id}/?token={token}"
+        uri_p = f"ws://{WS_HOST}/ws/terminal/{session_id}/"
         try:
-            async with websockets.connect(uri_p, open_timeout=15) as ws_p:
+            async with websockets.connect(uri_p, open_timeout=15, **_ws_kwargs(token)) as ws_p:
                 await _collect_until_prompt(ws_p)
                 await _run_command(ws_p, "systemctl start mysqld")
             return True, "mysql-dual workflow"
