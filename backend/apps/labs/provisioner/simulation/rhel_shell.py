@@ -1800,6 +1800,11 @@ class RHELShell:
                     "POSTCHECK FAILED: services not restored.\n"
                     "In Jira, ask @database team and @application team to start services after patching."
                 )
+            # Passing postcheck IS the documented completion of the patching
+            # remediation; clear any preset-planted sentinel so the fail-closed
+            # sweep in validation.py recognises the repaired engine state.
+            from .ops_state import clear_broken_config_sentinel
+            clear_broken_config_sentinel(self.state, slug)
             return "POSTCHECK PASSED: kernel and package state match baseline"
         script = self.state.read_file(p[1])
         if script:

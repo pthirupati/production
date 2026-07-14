@@ -73,6 +73,9 @@ urlpatterns = [
     # Lab history
     path("api/labs/history/", LabHistoryView.as_view(), name="lab_history"),
 
+    # Live Incident Director + public postmortem artifact (apps.labs)
+    path("api/labs/", include("apps.labs.incident_urls")),
+
     # Organization / team self-service
     path("api/org/", include("apps.accounts.org_urls")),
 
@@ -101,6 +104,10 @@ urlpatterns = [
 
     # Question Bank API (technologies, scenarios CRUD)
     path("api/question_bank/", include("apps.question_bank.urls")),
+
+    # Learning Journeys (read-only, AllowAny — role-based guided tracks over
+    # existing tutorial courses, scenarios, projects, and certification tracks)
+    path("api/journeys/", include("apps.question_bank.journeys_urls")),
 
     # Community Threads
     path("api/community/", include("apps.community.urls")),

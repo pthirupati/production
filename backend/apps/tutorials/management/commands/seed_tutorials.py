@@ -741,9 +741,13 @@ def _filter_specs(specs: list) -> list:
 
 
 def _ensure_assessment_section(sections: list) -> list:
-    """Ensure every tutorial has a section that triggers the 5-question quiz."""
+    """Ensure every tutorial has a section that triggers the 5-question quiz.
+
+    The lean course lessons carry a "Practice & assess" section (matched on
+    "assess"), so no extra section is appended to them.
+    """
     if any(
-        any(k in str(row[0]).lower() for k in ("assessment", "quiz", "checkpoint"))
+        any(k in str(row[0]).lower() for k in ("assess", "assessment", "quiz", "checkpoint"))
         for row in sections
     ):
         return sections
@@ -860,23 +864,18 @@ class Command(BaseCommand):
                         tutorial=obj,
                         order=i,
                         heading=heading,
-                        body=body,
+                        body=enrich_body(
+                            spec.get("topic", ""),
+                            spec.get("title", ""),
+                            body,
+                            heading=heading,
+                            is_first=(i == 0),
+                        ),
                         code=code,
                         code_language=code_language or "bash",
                         code_caption=code_caption,
                     )
-                    for i, (heading, body, code, code_language, code_caption) in enumerate(
-                        (
-                            (
-                                heading,
-                                enrich_body(spec.get("topic", ""), spec.get("title", ""), body),
-                                code,
-                                code_language,
-                                code_caption,
-                            )
-                            for heading, body, code, code_language, code_caption in sections
-                        )
-                    )
+                    for i, (heading, body, code, code_language, code_caption) in enumerate(sections)
                 ]
             )
             # Restore sections key for idempotent re-runs within one process.
