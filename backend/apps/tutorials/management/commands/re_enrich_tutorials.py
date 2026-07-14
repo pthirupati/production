@@ -20,7 +20,7 @@ class Command(BaseCommand):
             topic = section.tutorial.topic or ""
             title = section.tutorial.title or ""
             raw = fix_broken_prose(strip_auto_enrichment(section.body or ""))
-            new_body = enrich_body(topic, title, raw)
+            new_body = enrich_body(topic, title, raw, heading=section.heading or "")
             if new_body != (section.body or ""):
                 updated += 1
                 if not dry:
