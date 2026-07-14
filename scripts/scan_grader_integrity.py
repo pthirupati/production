@@ -28,15 +28,37 @@ Scenario source: the seeded DB when available (Scenario.validation_script holds
 the check.sh text, as seed_scenarios.py loads it); otherwise walks
 scenarios/<tech>/<slug>/scenario.yaml + check.sh from the filesystem.
 
-Run:  backend/.venv/bin/python scripts/scan_grader_integrity.py
+Several technologies do NOT validate through validate_simulation_state at
+runtime — SimulationProvisioner.run_validation routes them to a dedicated,
+self-contained engine validator keyed by session_id + slug (windows, vmware,
+terraform/aws, nmap, wireshark, ai-agent, peoplesoft, data-dashboard, awx, and
+baremetal-IPMI). Those validators build their own fail-closed world from the
+preset, so a scanner that only exercises validate_simulation_state MIS-classifies
+them as fail-open. We reproduce the exact slug/sim_type gating (mirrored from
+scripts/verify_grader_fix.py) so the report reflects what Check-Solution actually
+runs — otherwise the ~40 windows/nmap labs show up as false-positive fail-opens.
+
+Run:
+    backend/.venv/bin/python scripts/scan_grader_integrity.py            # full report
+    backend/.venv/bin/python scripts/scan_grader_integrity.py --check    # CI gate
+    backend/.venv/bin/python scripts/scan_grader_integrity.py --check --allowlist FILE
+
+--check      prints the FAIL-OPEN count + slugs and EXITS 1 if any fail-open
+             grader exists (0 otherwise). Read-only; suitable for CI.
+--allowlist  path to a newline-delimited file of known-tolerated slugs (a frozen
+             list that can only shrink). Under --check the gate ignores fail-open
+             slugs that appear in the allowlist and only fails on NEW ones.
+
 This script performs NO writes.
 """
 
 from __future__ import annotations
 
+import argparse
 import json
 import os
 import sys
+import uuid
 from collections import Counter, defaultdict
 from pathlib import Path
 
@@ -65,6 +87,74 @@ _NO_MATCH_OUTPUTS = {
     "NO_VALIDATION_SCRIPT",
     "Validation not configured — fix the scenario before checking",
 }
+
+
+# ── Faithful runtime dispatch (mirrors SimulationProvisioner.run_validation and
+#    scripts/verify_grader_fix.py._dedicated_validator). ──
+# Technologies below are routed AWAY from validate_simulation_state to a
+# dedicated engine validator at runtime. We reproduce the exact gating so the
+# scanner classifies them by the validator Check-Solution actually invokes,
+# rather than mis-flagging their (unused) check.sh as fail-open.
+def _dedicated_validator(slug: str, raw_sim_type: str):
+    """Return a zero-arg callable -> (passed, output) if this scenario routes to
+    a dedicated engine validator at runtime, else None."""
+    low = (slug or "").lower()
+    st = (raw_sim_type or "").lower()
+
+    def _mk(ensure, validate):
+        def _run():
+            sid = f"scan-eng-{uuid.uuid4().hex}"
+            ensure(sid, slug)
+            return validate(sid, slug)
+
+        return _run
+
+    if "vmware" in low:
+        # Cross-technology linux/k8s labs whose slug contains "vmware" are NOT
+        # routed to the vCenter validator — they validate through
+        # validate_simulation_state. Mirror that here.
+        try:
+            from apps.labs.provisioner.simulation.vmware_bridge import (
+                is_cross_tech_scenario as _is_xtech,
+            )
+        except Exception:
+            _is_xtech = lambda _s: False  # noqa: E731
+        if not _is_xtech(low):
+            from apps.vmware_sim.engine import validate_vmware_lab, _ensure_session
+            return _mk(_ensure_session, validate_vmware_lab)
+    if low.startswith("nmap-") or st == "nmap":
+        from apps.vmware_sim.nmap_engine import validate_nmap_lab, _ensure_session
+        return _mk(_ensure_session, validate_nmap_lab)
+    if low.startswith("wireshark-") or st == "wireshark":
+        from apps.vmware_sim.wireshark_engine import validate_wireshark_lab, _ensure_session
+        return _mk(_ensure_session, validate_wireshark_lab)
+    if low.startswith("agent-") or st == "ai-agent":
+        from apps.vmware_sim.aiml_engine import validate_aiml_lab, _ensure_session
+        return _mk(_ensure_session, validate_aiml_lab)
+    if low.startswith(("win-gui-", "windows-", "academy-windows-")) or st in (
+        "windows",
+        "windows-server",
+    ):
+        from apps.vmware_sim.windows_engine import validate_windows_lab, _ensure_session
+        return _mk(_ensure_session, validate_windows_lab)
+    if low.startswith("ps-") or st == "peoplesoft":
+        from apps.vmware_sim.peoplesoft_engine import validate_peoplesoft_lab, _ensure_session
+        return _mk(_ensure_session, validate_peoplesoft_lab)
+    if low.startswith("ds-dashboard-") or st == "data-dashboard":
+        from apps.vmware_sim.datascience_engine import validate_datascience_lab, _ensure_session
+        return _mk(_ensure_session, validate_datascience_lab)
+    if "awx" in low or "tower" in low or st == "ansible-awx":
+        from apps.vmware_sim.awx_engine import validate_awx_lab, _ensure as awx_ensure
+        return _mk(awx_ensure, validate_awx_lab)
+    if st == "terraform" or low.startswith("terraform-"):
+        from apps.vmware_sim.terraform_engine import validate_terraform_lab, _ensure as tf_ensure
+        return _mk(tf_ensure, validate_terraform_lab)
+    if st == "baremetal" and any(
+        k in low for k in ("maas", "lxd", "lxc", "kvm", "virsh", "ipmi")
+    ):
+        from apps.vmware_sim.baremetal_engine import validate_baremetal_lab, _ensure as bm_ensure
+        return _mk(bm_ensure, validate_baremetal_lab)
+    return None
 
 
 def scenarios_root() -> Path:
@@ -141,7 +231,28 @@ def _first_check_line(script: str) -> str:
 
 
 def classify(slug: str, sim_type: str, db_script: str) -> tuple[str, str]:
-    """Return (classification, output) replicating the runtime validation path."""
+    """Return (classification, output) replicating the runtime validation path.
+
+    Scenarios that route to a dedicated engine validator at runtime are graded
+    by that validator (not validate_simulation_state); we invoke it so their
+    unused check.sh is not mis-flagged as fail-open.
+    """
+    # ── Dedicated-validator technologies (windows/vmware/terraform/…) ──
+    try:
+        ded = _dedicated_validator(slug, sim_type)
+    except Exception:
+        ded = None
+    if ded is not None:
+        try:
+            dp, do = ded()
+        except Exception as exc:
+            return "ERROR", f"dedicated-engine {type(exc).__name__}: {exc}"
+        # A dedicated engine that auto-passes on the fresh (unfixed) world IS a
+        # real fail-open; otherwise it is fail-closed via its own validator.
+        if dp:
+            return "FAIL-OPEN", f"[dedicated] {do}"
+        return "FAIL-CLOSED", f"[dedicated] {do}"
+
     norm_type = normalize_sim_type(sim_type)
     try:
         engine = UnifiedSimulationEngine(scenario_slug=slug, simulation_type=norm_type)
@@ -157,7 +268,47 @@ def classify(slug: str, sim_type: str, db_script: str) -> tuple[str, str]:
     return "FAIL-CLOSED", output
 
 
-def main() -> int:
+def _load_allowlist(path: str | None) -> set[str]:
+    """Read a newline-delimited allowlist of tolerated fail-open slugs.
+
+    Blank lines and lines starting with '#' are ignored. A missing file is
+    treated as an empty allowlist (so the gate fails on ANY fail-open).
+    """
+    if not path:
+        return set()
+    p = Path(path)
+    if not p.is_file():
+        return set()
+    slugs: set[str] = set()
+    for raw in p.read_text(encoding="utf-8").splitlines():
+        line = raw.strip()
+        if not line or line.startswith("#"):
+            continue
+        slugs.add(line)
+    return slugs
+
+
+def main(argv: list[str] | None = None) -> int:
+    ap = argparse.ArgumentParser(
+        description="Grader-integrity scanner (read-only). "
+        "With --check, exits 1 if any fail-open grader exists."
+    )
+    ap.add_argument(
+        "--check",
+        action="store_true",
+        help="strict CI gate: print fail-open count + slugs and exit 1 if any "
+        "fail-open grader exists (outside the allowlist), else exit 0.",
+    )
+    ap.add_argument(
+        "--allowlist",
+        default=None,
+        metavar="FILE",
+        help="path to a newline-delimited file of known-tolerated fail-open "
+        "slugs (a frozen list that can only shrink); the gate ignores these.",
+    )
+    args = ap.parse_args(argv)
+    allowlist = _load_allowlist(args.allowlist)
+
     rows = _iter_from_db()
     source = "database"
     if not rows:
@@ -211,6 +362,12 @@ def main() -> int:
         print(f"  {len(slugs):>4} : {line}")
     print()
 
+    all_fail_open_slugs = sorted(f["slug"] for f in fail_open)
+    # Fail-open slugs NOT covered by the allowlist — these fail the gate.
+    unlisted_fail_open = sorted(s for s in all_fail_open_slugs if s not in allowlist)
+    # Allowlist entries that are no longer fail-open (allowlist should shrink).
+    stale_allowlist = sorted(allowlist - set(all_fail_open_slugs))
+
     payload = {
         "source": source,
         "total_scanned": total,
@@ -220,11 +377,47 @@ def main() -> int:
         "fail_open_by_first_check_line": {
             line: sorted(slugs) for line, slugs in grouped
         },
-        "fail_open_slugs": sorted(f["slug"] for f in fail_open),
+        "fail_open_slugs": all_fail_open_slugs,
+        "allowlisted": sorted(allowlist),
+        "unlisted_fail_open_slugs": unlisted_fail_open,
     }
     print("JSON SUMMARY")
     print("-" * 40)
     print(json.dumps(payload, indent=2, sort_keys=True))
+
+    if not args.check:
+        return 0
+
+    # ── Strict CI gate ──────────────────────────────────────────────────────
+    print()
+    print("=" * 72)
+    print("GRADER-INTEGRITY GATE (--check)")
+    print("=" * 72)
+    print(f"FAIL-OPEN graders          : {len(all_fail_open_slugs)}")
+    print(f"Allowlisted (tolerated)    : {len(allowlist)}")
+    print(f"Fail-open NOT allowlisted  : {len(unlisted_fail_open)}")
+    if stale_allowlist:
+        # Advisory only — the allowlist may only shrink, so flag entries that no
+        # longer fail-open and can be removed. Does not fail the gate.
+        print(
+            "NOTE: allowlist entries no longer fail-open (remove them): "
+            + ", ".join(stale_allowlist)
+        )
+    if unlisted_fail_open:
+        print()
+        print("FAIL: the following fail-open graders are NOT allowlisted:")
+        for slug in unlisted_fail_open:
+            print(f"  - {slug}")
+        print()
+        print(
+            "A fail-open grader auto-passes on the unfixed scenario state — the "
+            "lab would grade as solved without any fix. Repair the check.sh / "
+            "validator so it fail-closes, or (only if genuinely tolerated) add "
+            "the slug to the allowlist file."
+        )
+        return 1
+
+    print("PASS: no fail-open graders outside the allowlist.")
     return 0
 
 
