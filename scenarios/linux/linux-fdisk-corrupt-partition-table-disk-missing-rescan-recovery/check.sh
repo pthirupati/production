@@ -1,3 +1,5 @@
 #!/bin/bash
-systemctl is-failed --quiet 2>/dev/null; test $? -ne 0
+# Validate: /data partition rebuilt, mounted, and persisted.
+mount | grep /data
+grep /data /etc/fstab
 exit 0

@@ -146,9 +146,12 @@ class AdminIpFailClosedTests(TestCase):
 
 
 class AdminIpFailClosedDefaultTests(TestCase):
-    """SECURITY_AUDIT I-04: admin fails CLOSED by default in production, but
-    loopback / in-container callers (health checks, server-side E2E) are always
-    allowed so the green pipeline is unaffected."""
+    """SECURITY_AUDIT I-04: default posture. Admin IP fail-closed is OPT-IN
+    (ADMIN_FAIL_CLOSED_WITHOUT_ALLOWLIST). With the flag UNSET (the default, and
+    what prod uses) an empty allowlist ALLOWS through the IP middleware — admin
+    stays gated by superuser auth — so the owner can never be locked out and the
+    green pipeline is unaffected. Loopback / in-container callers are always
+    allowed regardless of the flag."""
 
     def setUp(self):
         self.factory = RequestFactory()
@@ -165,14 +168,16 @@ class AdminIpFailClosedDefaultTests(TestCase):
         return request
 
     @override_settings(DEBUG=False, ADMIN_ALLOWED_IPS=[],
-                       ADMIN_FAIL_CLOSED_WITHOUT_ALLOWLIST=True)
-    def test_remote_ip_denied_by_default_in_prod(self):
-        # External client (through gateway): XFF right-most is the real peer.
+                       ADMIN_FAIL_CLOSED_WITHOUT_ALLOWLIST=False)
+    def test_remote_ip_allowed_by_default_in_prod(self):
+        # DEFAULT posture (flag unset): an external client (through gateway,
+        # XFF right-most is the real peer) is ALLOWED through the IP middleware
+        # — admin remains gated by superuser auth elsewhere. This is what prod
+        # runs, so it stays unlocked (no owner lockout).
         resp = self.mw.process_request(
             self._admin_request(remote_addr="172.18.0.5", xff="203.0.113.9")
         )
-        self.assertIsNotNone(resp)
-        self.assertEqual(resp.status_code, 403)
+        self.assertIsNone(resp)
 
     @override_settings(DEBUG=False, ADMIN_ALLOWED_IPS=[],
                        ADMIN_FAIL_CLOSED_WITHOUT_ALLOWLIST=True)

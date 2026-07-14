@@ -336,6 +336,9 @@ class InterviewMessage(models.Model):
 
     class Meta:
         ordering = ["created_at"]
+        indexes = [
+            models.Index(fields=["round", "created_at"], name="iv_msg_round_created_idx"),
+        ]
 
 
 class InterviewReport(models.Model):

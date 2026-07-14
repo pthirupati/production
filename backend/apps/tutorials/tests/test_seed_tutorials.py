@@ -10,30 +10,41 @@ from apps.tutorials.models import Tutorial, TutorialSection
 class SeedTutorialsTest(TestCase):
     def test_seed_loads_builtin_and_extra(self):
         call_command("seed_tutorials")
-        # 8 built-in + 32 original (data/tutorials_extra.json).
+        # 8 built-in + extra JSON + hundreds of course-catalog modules.
         self.assertGreaterEqual(Tutorial.objects.count(), 750)
-        self.assertGreater(TutorialSection.objects.count(), 15000)
+        # Lean redesign: course modules are 6 sections each (was 20), so the
+        # section total is far lower than the old ~16k — but still substantial.
+        self.assertGreater(TutorialSection.objects.count(), 4000)
 
-    def test_course_module_has_full_sections(self):
+    def test_course_module_has_lean_six_sections(self):
         call_command("seed_tutorials")
         t = Tutorial.objects.filter(course_slug="database-engineering-zero-hero").order_by("module_order").first()
         self.assertIsNotNone(t)
         self.assertEqual(t.level_track, "beginner")
-        self.assertGreaterEqual(t.sections.count(), 20)
-        first = t.sections.order_by("order").first()
-        self.assertGreater(len(first.body or ""), 2500, "Theory section should have book-level prose")
-        notes = t.sections.filter(heading="Notes and key takeaways").first()
-        self.assertIsNotNone(notes)
-        self.assertIn("checklist", (notes.body or "").lower())
+        # Lean redesign: exactly six sections (no quiz-only extra for course modules).
+        self.assertEqual(t.sections.count(), 6)
+        headings = list(t.sections.order_by("order").values_list("heading", flat=True))
+        self.assertEqual(
+            headings,
+            ["Overview", "Key concepts", "Hands-on walkthrough",
+             "Common pitfalls & fixes", "Practice & assess", "Key takeaways"],
+        )
+        takeaways = t.sections.filter(heading="Key takeaways").first()
+        self.assertIsNotNone(takeaways)
+        self.assertIn("further reading", (takeaways.body or "").lower())
 
-    def test_grafana_module_has_book_content(self):
+    def test_course_module_has_exactly_two_diagrams(self):
         call_command("seed_tutorials")
         t = Tutorial.objects.filter(course_slug="grafana-visualization-zero-hero").order_by("module_order").first()
         self.assertIsNotNone(t)
-        self.assertGreaterEqual(t.sections.count(), 20)
-        theory = t.sections.filter(heading="Theory").first()
-        self.assertGreater(len(theory.body or ""), 2500)
-        self.assertIn("Grafana", theory.body)
+        self.assertEqual(t.sections.count(), 6)
+        blob = "\n".join(s.body or "" for s in t.sections.all())
+        # Exactly one architecture (flowchart) diagram + one sequenceDiagram, no dupes.
+        self.assertEqual(blob.count("```mermaid"), 2, "should have exactly 2 diagrams")
+        self.assertEqual(blob.count("flowchart"), 1)
+        self.assertEqual(blob.count("sequenceDiagram"), 1)
+        overview = t.sections.filter(heading="Overview").first()
+        self.assertIn("Grafana", overview.body)
 
     def test_extra_tutorial_has_sections(self):
         call_command("seed_tutorials")

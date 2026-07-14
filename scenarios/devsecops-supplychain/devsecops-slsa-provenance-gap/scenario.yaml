@@ -1,0 +1,123 @@
+title: SLSA Provenance Attestation Missing
+slug: devsecops-slsa-provenance-gap
+technology: devsecops-supplychain
+category: Harden
+difficulty: hard
+scenario_type: fix
+lab_mode: simulation
+simulation_type: generic
+time_limit: 1500
+max_score: 100
+is_free: false
+infrastructure_type: docker
+jira_priority: High
+description: 'CONTEXT: A platform team operating devsecops supplychain needs you to resolve `SLSA Provenance
+  Attestation Missing` during a realistic delivery incident. The business impact is a stalled or unsafe
+  release until the underlying state is repaired.
+
+
+  ENVIRONMENT: You are working in FixitLab''s offline supply-chain security lab with a local OCI registry,
+  Trivy scanner, cosign keys, an SBOM store, and a Falco runtime sensor under /supplychain. Everything
+  runs locally; no external registry or paid APIs are required.
+
+
+  SYMPTOM / STARTING STATE: The promotion gate to production rejects `gateway:4.2`: the required SLSA
+  build provenance attestation is absent, so the verifier cannot confirm the image was built by the trusted
+  CI builder from the expected source. Verification returns `no provenance found`.
+
+
+  OBJECTIVE: The build pipeline produced the image but never emitted and attached a SLSA provenance attestation
+  describing the builder, source commit, and materials — so the policy cannot verify build integrity.
+  Remediate by generating the provenance in CI and attaching it as an in-toto/SLSA attestation the verifier
+  trusts. Success is graded on the real repaired state, not a manual marker.
+
+
+  WHAT TO AVOID: Do not suppress the signal, disable the policy/gate, or fake completion with marker files
+  — reproduce the diagnosis, then apply the smallest fix that satisfies the objective and re-run Check
+  Solution.'
+objectives:
+- A SLSA build provenance attestation is generated for gateway:4.2
+- cosign verify-attestation --type slsaprovenance succeeds
+- The provenance records the trusted builder and source (root cause of the gap addressed)
+initial_state: 'The promotion gate to production rejects `gateway:4.2`: the required SLSA build provenance
+  attestation is absent, so the verifier cannot confirm the image was built by the trusted CI builder
+  from the expected source. Verification returns `no provenance found`.'
+hints:
+- order: 1
+  cost: 0
+  content: "Where to look — orient before changing anything:\n    1. `cosign verify-attestation --type\
+    \ slsaprovenance gateway:4.2`\n    2. `cosign download attestation gateway:4.2`\n    3. `cat /supplychain/policy/slsa-verify.yaml`\n\
+    \    Write down what looks healthy versus wrong. Form one hypothesis before you touch anything."
+- order: 2
+  cost: 25
+  content: "Diagnostic steps:\n    1. Re-run `cosign verify-attestation --type slsaprovenance gateway:4.2`\
+    \ and read the status/error carefully.\n    2. Cross-check with `cosign download attestation gateway:4.2`\
+    \ to isolate the failing object.\n    3. State the single root cause in one sentence before you act."
+- order: 3
+  cost: 50
+  content: "Exact fix + verification:\n    1. The build pipeline produced the image but never emitted\
+    \ and attached a SLSA provenance attestation describing the builder, source commit, and materials\
+    \ — so the policy cannot verify build integrity. Remediate by generating the provenance in CI and\
+    \ attaching it as an in-toto/SLSA attestation the verifier trusts.\n    2. Change one thing at a time\
+    \ so you can roll back if the hypothesis was wrong.\n    3. Verify the objective is met, then click\
+    \ Check Solution (graded on real state, not a marker file)."
+summary: Diagnose and resolve slsa provenance attestation missing in the devsecops-supplychain simulation
+  lab and verify the healthy end state
+estimated_minutes: 25
+xp_reward: 100
+prerequisites:
+- Basic container image and CI/CD literacy
+tags:
+- devsecops-supplychain
+- harden
+- hands-on
+- simulation
+linked_tutorial: devsecops-supplychain-fundamentals
+what_you_will_learn:
+- A SLSA build provenance attestation is generated for gateway:4.2
+- cosign verify-attestation --type slsaprovenance succeeds
+- Understand SLSA levels, build provenance (in-toto attestations), and how provenance closes the 'who
+  built this and from what' gap
+environment:
+  nodes:
+  - role: primary
+    os: FixitLab supply-chain security lab
+    hostname: lab-primary
+    ip: 127.0.0.1
+    specs: local offline simulation
+  pre_installed:
+  - bash
+  - coreutils
+  - trivy
+  - cosign
+  - syft
+  - falco
+  credentials:
+  - user: root
+    password: lab123
+tasks:
+- id: task_1
+  title: SLSA Provenance Attestation Missing
+  description: Restore healthy behavior for SLSA Provenance Attestation Missing by reproducing the diagnosis
+    from the symptom, isolating the root cause with evidence, applying the smallest safe fix, and validating
+    the outcome with the checker.
+  background: 'This devsecops-supplychain lab teaches SLSA levels, build provenance (in-toto attestations),
+    and how provenance closes the ''who built this and from what'' gap through systematic troubleshooting:
+    observe, hypothesize, change, verify.'
+  validation:
+    type: custom_script
+    script: check.sh
+    error_message: The scenario objective is not yet satisfied. Re-read hint tier 2, confirm the root
+      cause, and apply the documented remediation so /opt/fixitlab/academy/devsecops-slsa-provenance-gap.conf
+      carries the FIXED-OK marker.
+solution:
+  summary: The build pipeline produced the image but never emitted and attached a SLSA provenance attestation
+    describing the builder, source commit, and materials — so the policy cannot verify build integrity.
+    Remediate by generating the provenance in CI and attaching it as an in-toto/SLSA attestation the verifier
+    trusts.
+  files_changed: []
+  commands_run:
+  - cosign verify-attestation --type slsaprovenance gateway:4.2
+  - cosign download attestation gateway:4.2
+  - cat /supplychain/policy/slsa-verify.yaml
+  reference_docs: devsecops-supplychain-fundamentals

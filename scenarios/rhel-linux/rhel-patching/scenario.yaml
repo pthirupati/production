@@ -63,7 +63,7 @@ objectives:
 - Fix any mount issue reported after reboot, then start DB/app via Jira
 requires_companion_hosts: false
 simulation_type: rhel
-slug: sim-rhel-patching
+slug: rhel-linux-patching-lab
 time_limit: 1200
 title: RHEL System Patching (Jira change window)
 technology: rhel-linux

@@ -1,0 +1,122 @@
+title: 'Broken Trace: Context Not Propagated'
+slug: otel-broken-trace-propagation
+technology: opentelemetry
+category: Fix
+difficulty: hard
+scenario_type: fix
+lab_mode: simulation
+simulation_type: generic
+time_limit: 1500
+max_score: 100
+is_free: false
+infrastructure_type: docker
+jira_priority: High
+description: 'CONTEXT: A platform team operating opentelemetry needs you to resolve `Broken Trace: Context
+  Not Propagated` during a realistic delivery incident. The business impact is a stalled or unsafe release
+  until the underlying state is repaired.
+
+
+  ENVIRONMENT: You are working in FixitLab''s offline observability lab with an OpenTelemetry Collector,
+  an instrumented demo service, and a local trace/metric backend under /otel. All components run locally;
+  no SaaS observability vendor or paid APIs are required.
+
+
+  SYMPTOM / STARTING STATE: A single user request produces two disconnected traces instead of one: the
+  frontend span and the backend span have different trace IDs. The distributed trace is broken at the
+  service boundary and you cannot follow a request end to end.
+
+
+  OBJECTIVE: The outbound HTTP client is not injecting the W3C `traceparent` header (propagator not configured
+  / not installed), so the downstream service starts a brand-new trace. Fix context propagation by enabling
+  the W3C TraceContext propagator on the client so traceparent is injected and the child span joins the
+  parent trace. Success is graded on the real repaired state, not a manual marker.
+
+
+  WHAT TO AVOID: Do not suppress the signal, disable the policy/gate, or fake completion with marker files
+  — reproduce the diagnosis, then apply the smallest fix that satisfies the objective and re-run Check
+  Solution.'
+objectives:
+- The outbound client injects the W3C traceparent header
+- A single request produces one connected trace across frontend and backend
+- The missing-propagator root cause is confirmed (not masked by span linking)
+initial_state: 'A single user request produces two disconnected traces instead of one: the frontend span
+  and the backend span have different trace IDs. The distributed trace is broken at the service boundary
+  and you cannot follow a request end to end.'
+hints:
+- order: 1
+  cost: 0
+  content: "Where to look — orient before changing anything:\n    1. `cat /otel/service/http_client.yaml`\n\
+    \    2. `curl -s localhost:16686/api/traces | jq '.data[].traceID'`\n    3. `cat /otel/service/propagators.conf`\n\
+    \    Write down what looks healthy versus wrong. Form one hypothesis before you touch anything."
+- order: 2
+  cost: 25
+  content: "Diagnostic steps:\n    1. Re-run `cat /otel/service/http_client.yaml` and read the status/error\
+    \ carefully.\n    2. Cross-check with `curl -s localhost:16686/api/traces | jq '.data[].traceID'`\
+    \ to isolate the failing object.\n    3. State the single root cause in one sentence before you act."
+- order: 3
+  cost: 50
+  content: "Exact fix + verification:\n    1. The outbound HTTP client is not injecting the W3C `traceparent`\
+    \ header (propagator not configured / not installed), so the downstream service starts a brand-new\
+    \ trace. Fix context propagation by enabling the W3C TraceContext propagator on the client so traceparent\
+    \ is injected and the child span joins the parent trace.\n    2. Change one thing at a time so you\
+    \ can roll back if the hypothesis was wrong.\n    3. Verify the objective is met, then click Check\
+    \ Solution (graded on real state, not a marker file)."
+summary: 'Diagnose and resolve broken trace: context not propagated in the opentelemetry simulation lab
+  and verify the healthy end state'
+estimated_minutes: 25
+xp_reward: 100
+prerequisites:
+- Basic distributed-systems and HTTP literacy
+tags:
+- opentelemetry
+- fix
+- hands-on
+- simulation
+linked_tutorial: opentelemetry-fundamentals
+what_you_will_learn:
+- The outbound client injects the W3C traceparent header
+- A single request produces one connected trace across frontend and backend
+- Understand W3C TraceContext propagation, why traces fragment at service boundaries, and the role of
+  context injectors/extractors
+environment:
+  nodes:
+  - role: primary
+    os: FixitLab OpenTelemetry observability lab
+    hostname: lab-primary
+    ip: 127.0.0.1
+    specs: local offline simulation
+  pre_installed:
+  - bash
+  - coreutils
+  - otelcol
+  - curl
+  - jq
+  credentials:
+  - user: root
+    password: lab123
+tasks:
+- id: task_1
+  title: 'Broken Trace: Context Not Propagated'
+  description: 'Restore healthy behavior for Broken Trace: Context Not Propagated by reproducing the diagnosis
+    from the symptom, isolating the root cause with evidence, applying the smallest safe fix, and validating
+    the outcome with the checker.'
+  background: 'This opentelemetry lab teaches W3C TraceContext propagation, why traces fragment at service
+    boundaries, and the role of context injectors/extractors through systematic troubleshooting: observe,
+    hypothesize, change, verify.'
+  validation:
+    type: custom_script
+    script: check.sh
+    error_message: The scenario objective is not yet satisfied. Re-read hint tier 2, confirm the root
+      cause, and apply the documented remediation so /opt/fixitlab/academy/otel-broken-trace-propagation.conf
+      carries the FIXED-OK marker.
+solution:
+  summary: The outbound HTTP client is not injecting the W3C `traceparent` header (propagator not configured
+    / not installed), so the downstream service starts a brand-new trace. Fix context propagation by enabling
+    the W3C TraceContext propagator on the client so traceparent is injected and the child span joins
+    the parent trace.
+  files_changed: []
+  commands_run:
+  - cat /otel/service/http_client.yaml
+  - curl -s localhost:16686/api/traces | jq '.data[].traceID'
+  - cat /otel/service/propagators.conf
+  reference_docs: opentelemetry-fundamentals

@@ -90,3 +90,20 @@ class CookieJWTAuthentication(JWTAuthentication):
         self._enforce_cookie_csrf(request)
         self._validate_active_session(user, validated_token)
         return user, validated_token
+
+
+class LogoutJWTAuthentication(CookieJWTAuthentication):
+    """Authentication for the logout endpoint ONLY.
+
+    Logout must be idempotent: a token whose session was tombstoned (e.g. by a
+    just-completed password change, which calls SessionTracker.invalidate_all_sessions)
+    is still a valid bearer of identity for the sole purpose of ending the session
+    and clearing cookies. We therefore skip ONLY the session-validity check here,
+    while keeping signature/expiry verification (get_validated_token) and the
+    cookie-CSRF enforcement intact. Every OTHER protected endpoint keeps using the
+    default CookieJWTAuthentication, so a tombstoned/invalidated session is still
+    hard-rejected everywhere except logout.
+    """
+
+    def _validate_active_session(self, user, validated_token):
+        return  # intentionally a no-op for logout only

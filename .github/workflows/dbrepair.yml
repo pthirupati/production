@@ -1,0 +1,80 @@
+name: DB Repair (D3 pgBouncer SCRAM)
+
+# Applies the AUTH_TYPE=scram-sha-256 fix on D3: pull latest compose, force-recreate
+# pgBouncer so its userlist is PLAINTEXT (not md5), then verify the full auth chain
+# client -> pgBouncer -> Postgres end-to-end. Prints no secret values.
+on:
+  workflow_dispatch: {}
+
+jobs:
+  repair:
+    name: Recreate pgBouncer + verify auth chain
+    runs-on: ubuntu-latest
+    environment: production
+    timeout-minutes: 15
+    steps:
+      - name: Resolve DO API token (masked)
+        id: tok
+        env:
+          DO_API_TOKEN: ${{ secrets.DO_API_TOKEN }}
+          PRODUCTION_ENV_B64: ${{ secrets.PRODUCTION_ENV_B64 }}
+        run: |
+          TOK="$DO_API_TOKEN"
+          if [ -z "$TOK" ] && [ -n "$PRODUCTION_ENV_B64" ]; then
+            TOK="$(echo "$PRODUCTION_ENV_B64" | base64 -d 2>/dev/null | grep '^DO_API_TOKEN=' | cut -d= -f2- | tr -d '\r')"
+          fi
+          [ -z "$TOK" ] && { echo "No DO token"; exit 1; }
+          echo "::add-mask::$TOK"; echo "token=$TOK" >> "$GITHUB_OUTPUT"
+      - name: Install doctl
+        uses: digitalocean/action-doctl@v2
+        with:
+          token: ${{ steps.tok.outputs.token }}
+      - name: Discover IPs
+        id: ips
+        run: |
+          eid=$(doctl compute droplet list --tag-name fixitlab-edge --format ID --no-header | head -n1)
+          did=$(doctl compute droplet list --tag-name fixitlab-db --format ID --no-header | head -n1)
+          echo "edge=$(doctl compute droplet get "$eid" --format PublicIPv4 --no-header)" >> "$GITHUB_OUTPUT"
+          echo "db=$(doctl compute droplet get "$did" --format PrivateIPv4 --no-header)" >> "$GITHUB_OUTPUT"
+      - name: Recreate pgBouncer + verify
+        env:
+          PROD_SSH_KEY: ${{ secrets.PROD_SSH_KEY }}
+          EDGE: ${{ steps.ips.outputs.edge }}
+          DB: ${{ steps.ips.outputs.db }}
+        run: |
+          KEY=$(mktemp); printf '%s\n' "$PROD_SSH_KEY" | tr -d '\r' > "$KEY"; chmod 600 "$KEY"
+          trap 'rm -f "$KEY"' EXIT
+          set +e
+          jopts="-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o BatchMode=yes -o ConnectTimeout=12 -i $KEY -o IdentitiesOnly=yes"
+          OPTS=(-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o BatchMode=yes -o ConnectTimeout=12 -i "$KEY" -o IdentitiesOnly=yes
+                -o "ProxyCommand=ssh $jopts -W %h:%p root@${EDGE}")
+          ssh "${OPTS[@]}" root@"$DB" 'bash -s' <<'EOS'
+          set +e
+          cd /opt/fixitlab || { echo "FATAL: /opt/fixitlab missing"; exit 1; }
+          echo "===== sync compose from origin/main ====="
+          git fetch origin main -q && git reset --hard origin/main -q && echo "  reset to $(git rev-parse --short HEAD)"
+          grep -n "AUTH_TYPE" docker-compose.data.yml || echo "  WARN: AUTH_TYPE not in compose!"
+          echo "===== ensure Postgres role password matches baked env (idempotent) ====="
+          PGUSER=$(grep -E '^POSTGRES_USER=' .env.production | head -1 | cut -d= -f2- | tr -d '\r"'); PGUSER=${PGUSER:-fixitlab}
+          PGPW=$(grep -E '^POSTGRES_PASSWORD=' .env.production | head -1 | cut -d= -f2- | tr -d '\r"')
+          docker exec fixitlab_db psql -v ON_ERROR_STOP=1 -U "$PGUSER" -d postgres \
+            -c "ALTER USER \"$PGUSER\" WITH PASSWORD '$PGPW';" >/dev/null 2>&1 && echo "  role password synced" || echo "  WARN sync failed"
+          echo "===== force-recreate pgBouncer ====="
+          docker compose -f docker-compose.data.yml --env-file .env.production up -d --force-recreate pgbouncer 2>&1 | tail -6
+          echo "  waiting for pgbouncer healthy..."
+          for i in $(seq 1 20); do
+            s=$(docker inspect -f '{{.State.Health.Status}}' fixitlab_pgbouncer 2>/dev/null)
+            [ "$s" = "healthy" ] && { echo "  healthy after ${i}0s"; break; }
+            sleep 5
+          done
+          echo "===== new userlist format (prefix only) + auth_type ====="
+          docker exec fixitlab_pgbouncer sh -c '
+            grep -i auth_type /etc/pgbouncer/pgbouncer.ini
+            awk "{c=\$2; gsub(/\"/,\"\",c); print \$1\"  cred_prefix=\"substr(c,1,7)\"  len=\"length(c)}" /etc/pgbouncer/userlist.txt'
+          echo "===== END-TO-END: client -> pgBouncer -> Postgres ====="
+          docker exec fixitlab_pgbouncer sh -c \
+            'PGPASSWORD="$DB_PASSWORD" psql "host=127.0.0.1 port=5432 user=$DB_USER dbname=$DB_NAME sslmode=disable" -tAc "select '"'"'E2E-OK'"'"'"' 2>&1 | tail -3
+          echo "===== recent pgbouncer logs (should show no wrong-password-type) ====="
+          docker logs fixitlab_pgbouncer --since 60s 2>&1 | grep -iE "wrong password|login failed|scram|new connection|closing because" | tail -8 || echo "  (no relevant log lines)"
+          echo "===== done ====="
+          EOS

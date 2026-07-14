@@ -1,5 +1,5 @@
 title: 'RHEL Simulation: IPMI Power Control'
-slug: sim-rhel-baremetal-ipmi
+slug: baremetal-rhel-ipmi-lab
 technology: baremetal
 category: Fix
 difficulty: easy

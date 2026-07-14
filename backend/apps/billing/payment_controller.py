@@ -18,6 +18,7 @@ import stripe
 
 from django.conf import settings
 from django.core.cache import cache
+from django.db import transaction
 from django.utils import timezone
 from rest_framework.permissions import IsAuthenticated, AllowAny
 from rest_framework.response import Response
@@ -25,7 +26,7 @@ from rest_framework.throttling import UserRateThrottle
 from rest_framework.views import APIView
 from rest_framework import status as http_status
 
-from .models import TechnologySubscription, Plan, PaymentTransaction
+from .models import TechnologySubscription, Plan, PaymentTransaction, ProcessedWebhookEvent
 from .payment_service import PaymentService, PaymentServiceException
 from .email_service import EmailAlertService
 from .services import get_user_subscription
@@ -351,7 +352,14 @@ class RazorpayWebhookView(APIView):
 
             event = json.loads(payload)
             event_type = event.get("event", "")
-            event_id = event.get("id") or event.get("event_id", "")
+            # Prefer Razorpay's dedicated event-id header; fall back to the
+            # payload id so replays are still deduplicated when the header is
+            # absent (older webhook versions / manual replays).
+            event_id = (
+                request.META.get("HTTP_X_RAZORPAY_EVENT_ID", "")
+                or event.get("id")
+                or event.get("event_id", "")
+            )
 
             # Reject events older than 5 minutes to prevent replay attacks
             import time as _time
@@ -365,20 +373,42 @@ class RazorpayWebhookView(APIView):
                     )
                     return Response({"status": "stale_event"}, status=http_status.HTTP_200_OK)
 
+            # Fast-path dedup via Redis (best-effort). A Redis flush would reopen
+            # the replay window, so the durable ProcessedWebhookEvent row below is
+            # the authoritative idempotency gate.
             if event_id:
                 cache_key = f"razorpay_webhook:{event_id}"
                 if not cache.add(cache_key, True, timeout=86400):
-                    logger.info("Duplicate Razorpay webhook ignored: %s", event_id)
+                    logger.info("Duplicate Razorpay webhook ignored (cache): %s", event_id)
                     return Response({"status": "duplicate"})
 
             logger.info(f"Razorpay webhook: {event_type}")
 
-            if event_type == "payment.authorized":
-                self._handle_payment_authorized(event)
-            elif event_type == "payment.failed":
-                self._handle_payment_failed(event)
-            elif event_type == "payment.captured":
-                self._handle_payment_captured(event)
+            def _dispatch():
+                if event_type == "payment.authorized":
+                    self._handle_payment_authorized(event)
+                elif event_type == "payment.failed":
+                    self._handle_payment_failed(event)
+                elif event_type == "payment.captured":
+                    self._handle_payment_captured(event)
+
+            if event_id:
+                # Durable, authoritative idempotency: create the processed-event
+                # row and run fulfillment atomically. On replay the row already
+                # exists (created is False) so we skip fulfillment entirely.
+                with transaction.atomic():
+                    _, created = ProcessedWebhookEvent.objects.get_or_create(
+                        event_id=event_id,
+                        defaults={"provider": "razorpay"},
+                    )
+                    if not created:
+                        logger.info("Duplicate Razorpay webhook ignored (db): %s", event_id)
+                        return Response({"status": "duplicate"})
+                    _dispatch()
+            else:
+                # No event id available — fall back to prior behaviour (no durable
+                # gate) rather than crash.
+                _dispatch()
 
             return Response({"status": "ok"})
 

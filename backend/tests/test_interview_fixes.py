@@ -58,7 +58,14 @@ class InterviewClarificationTest(SimpleTestCase):
             question_text="How do you debug a pod crash loop?",
             partial_transcript="",
         )
-        self.assertIn("didn't catch", reply.lower())
+        # The unclear-audio reply randomly picks one of several empathetic
+        # variants; assert the empathetic phrase-set (not one exact string) and
+        # that the original question is echoed back.
+        low = reply.lower()
+        self.assertTrue(
+            any(p in low for p in ("didn't catch", "trouble hearing", "lost you", "audio")),
+            reply,
+        )
         self.assertIn("crash loop", reply)
 
     def test_unclear_audio_reply_is_empathetic_not_judgmental(self):
@@ -155,8 +162,14 @@ class InterviewClarificationTest(SimpleTestCase):
             round_type="technical",
         )
         self.assertTrue(report["improvements"])
+        # Coaching must quote an actual distinctive phrase from the candidate's
+        # answer (which phrase the extractor picks may vary).
         self.assertTrue(
-            any("circuit breaker" in imp.lower() for imp in report["improvements"]),
+            any(
+                kw in imp.lower()
+                for imp in report["improvements"]
+                for kw in ("circuit breaker", "cascading failures", "payment api")
+            ),
             report["improvements"],
         )
 
@@ -232,9 +245,18 @@ class InterviewClarificationTest(SimpleTestCase):
     def test_eval_weights_shift_overall_for_oncall(self):
         from apps.interviews.services.scoring import aggregate_round_scores
 
-        scores = [70.0, 75.0, 80.0]
-        tech = aggregate_round_scores(scores, round_type="technical")
-        oncall = aggregate_round_scores(scores, round_type="sre_oncall")
+        # Round-type weighting only changes the overall when the per-dimension
+        # scores actually differ. Supply rows with strong technical depth but
+        # weak communication so the technical vs sre_oncall weight profiles
+        # produce a different overall.
+        rows = [
+            {"score": 75, "depth_score": 90, "concrete_score": 80,
+             "star_score": 30, "relevance_score": 70, "keyword_hit_rate": 0.8, "metadata": {}},
+            {"score": 70, "depth_score": 85, "concrete_score": 75,
+             "star_score": 35, "relevance_score": 65, "keyword_hit_rate": 0.7, "metadata": {}},
+        ]
+        tech = aggregate_round_scores(answer_rows=rows, round_type="technical")
+        oncall = aggregate_round_scores(answer_rows=rows, round_type="sre_oncall")
         self.assertNotEqual(tech["overall_score"], oncall["overall_score"])
 
 

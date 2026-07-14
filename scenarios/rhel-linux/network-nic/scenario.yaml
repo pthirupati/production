@@ -59,7 +59,7 @@ objectives:
 - Verify the new address with ip addr show dev eth0
 - Confirm the application can bind to the new address (and routing works)
 simulation_type: rhel
-slug: sim-rhel-network-nic
+slug: rhel-linux-network-nic-lab
 time_limit: 900
 title: Network — Add Secondary NIC IP via Jira
 technology: rhel-linux

@@ -9,6 +9,7 @@ renders the same quiz and the correct-answer index is stable.
 
 from __future__ import annotations
 
+import hashlib
 import random
 
 # Each template: (prompt, correct_option, [distractors...], explanation)
@@ -138,25 +139,162 @@ _TEMPLATES: list[tuple[str, str, list[str], str]] = [
 ]
 
 
+# Generic, wrong-but-plausible answers used as distractors for the topic-specific
+# concept questions. They read like real definitions so the correct concept
+# description is not trivially identifiable, but none of them is ever correct.
+_CONCEPT_DISTRACTORS: list[str] = [
+    "A deprecated legacy setting that should always be disabled in production",
+    "A billing tier that unlocks additional cloud quota",
+    "A cosmetic UI theme with no effect on runtime behaviour",
+    "A one-time installer step that never applies after setup",
+    "An optional marketing label with no technical meaning",
+    "A hardware requirement unrelated to how the system is operated",
+]
+
+
+def _stable_index(*parts: str) -> int:
+    """Deterministic non-negative int from the given parts (no RNG/date state)."""
+    digest = hashlib.sha256("::".join(parts).encode("utf-8")).hexdigest()
+    return int(digest[:12], 16)
+
+
+def _load_concepts(topic: str) -> dict:
+    """Return the topic's {concept: description} dict, or {} on any failure.
+
+    Guarded so a missing profile module / attribute never breaks quiz generation.
+    """
+    try:
+        from apps.tutorials.management.commands.curriculum.topic_profiles import (
+            get_profile,
+        )
+
+        profile = get_profile(topic) or {}
+        concepts = profile.get("concepts") or {}
+        if isinstance(concepts, dict):
+            # Only keep string concept/description pairs.
+            return {
+                str(k): str(v)
+                for k, v in concepts.items()
+                if isinstance(k, str) and isinstance(v, str) and v.strip()
+            }
+    except Exception:
+        pass
+    return {}
+
+
+def _concept_questions(topic: str, module: str, n: int) -> list[dict]:
+    """Build up to ``n`` deterministic topic-specific multiple-choice questions.
+
+    Each question asks "In <topic>, what is <concept>?" with the concept's real
+    description as the correct answer and 3 generic distractors. Determinism
+    comes from a stable hash of topic+module+index (no random/date state).
+    """
+    concepts = _load_concepts(topic)
+    if not concepts:
+        return []
+
+    # Deterministic concept order and selection: hash on topic+module so the same
+    # module always renders the same concept questions in the same order.
+    ordered = sorted(
+        concepts.items(),
+        key=lambda kv: _stable_index(topic, module, kv[0]),
+    )
+
+    questions: list[dict] = []
+    for idx, (concept, description) in enumerate(ordered):
+        if len(questions) >= n:
+            break
+        # Pick 3 distractors deterministically without repeats.
+        pool = list(_CONCEPT_DISTRACTORS)
+        start = _stable_index(topic, module, concept, str(idx)) % len(pool)
+        distractors = [pool[(start + j) % len(pool)] for j in range(3)]
+        opts = [description, *distractors]
+        # Stable shuffle: rotate by a per-question offset so the correct index
+        # varies but is fully determined by topic+module+concept.
+        rot = _stable_index(topic, module, concept, "opt") % len(opts)
+        opts = opts[rot:] + opts[:rot]
+        questions.append(
+            {
+                "question": f"In {topic}, what is {concept}?",
+                "options": opts,
+                "answer": opts.index(description),
+                "explanation": f"{concept}: {description}",
+            }
+        )
+    return questions
+
+
 def build_module_quiz(topic: str, module: str, *, count: int = 5) -> dict:
-    """Return a deterministic, scored multi-question quiz for a module."""
+    """Return a deterministic, scored multi-question quiz for a module.
+
+    Draws 2-3 topic-specific concept questions first (when concept data is
+    available), then backfills from the universal templates so the total is
+    always exactly ``count`` (5) at pass_score 0.8. Any failure in the
+    concept layer falls back to 100%-template behaviour.
+    """
     topic = topic or "this technology"
     module = module or topic
     rng = random.Random(f"{topic}::{module}".lower())
-    picks = rng.sample(_TEMPLATES, min(count, len(_TEMPLATES)))
 
-    questions = []
-    for prompt, correct, distractors, explanation in picks:
-        opts = [correct, *distractors]
-        rng.shuffle(opts)
-        questions.append(
-            {
-                "question": prompt.format(module=module, topic=topic),
-                "options": opts,
-                "answer": opts.index(correct),
-                "explanation": explanation,
-            }
-        )
+    questions: list[dict] = []
+    used_prompts: set[str] = set()
+
+    # ── Topic-specific concept questions FIRST (guarded) ──
+    try:
+        # Aim for 2-3 concept questions, deterministically chosen by topic+module.
+        desired_concepts = 2 + (_stable_index(topic, module, "n") % 2)  # 2 or 3
+        desired_concepts = min(desired_concepts, max(0, count))
+        concept_qs = _concept_questions(topic, module, desired_concepts)
+    except Exception:
+        concept_qs = []
+    questions.extend(concept_qs)
+    for q in concept_qs:
+        used_prompts.add(q["question"])
+
+    # ── Backfill from universal templates to reach exactly ``count`` ──
+    remaining = count - len(questions)
+    if remaining > 0:
+        picks = rng.sample(_TEMPLATES, min(remaining, len(_TEMPLATES)))
+        for prompt, correct, distractors, explanation in picks:
+            rendered = prompt.format(module=module, topic=topic)
+            if rendered in used_prompts:
+                continue
+            opts = [correct, *distractors]
+            rng.shuffle(opts)
+            questions.append(
+                {
+                    "question": rendered,
+                    "options": opts,
+                    "answer": opts.index(correct),
+                    "explanation": explanation,
+                }
+            )
+            used_prompts.add(rendered)
+            if len(questions) >= count:
+                break
+
+    # Safety net: if (extremely unlikely) we still fell short, top up from the
+    # remaining templates so the count invariant holds exactly.
+    if len(questions) < count:
+        for prompt, correct, distractors, explanation in _TEMPLATES:
+            rendered = prompt.format(module=module, topic=topic)
+            if rendered in used_prompts:
+                continue
+            opts = [correct, *distractors]
+            rng.shuffle(opts)
+            questions.append(
+                {
+                    "question": rendered,
+                    "options": opts,
+                    "answer": opts.index(correct),
+                    "explanation": explanation,
+                }
+            )
+            used_prompts.add(rendered)
+            if len(questions) >= count:
+                break
+
+    questions = questions[:count]
 
     return {
         "title": f"{module} — module quiz",

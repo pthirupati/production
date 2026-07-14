@@ -267,6 +267,17 @@ class Scenario(models.Model):
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
+    # ── Full-text search (Postgres only) ──
+    # Catalog search uses Postgres full-text + pg_trgm trigram search on prod.
+    # Rather than maintain a stored ``tsvector`` column (which requires
+    # ``django.contrib.postgres`` in INSTALLED_APPS to satisfy the
+    # SearchVectorField system check, and a trigger/signal to keep it fresh),
+    # the search view annotates ``to_tsvector`` at query time. Migration 0023
+    # creates — Postgres-only — a *functional* GIN index on the same weighted
+    # ``to_tsvector`` expression (so the annotate is index-backed) plus a
+    # pg_trgm GIN index on ``title`` for typo tolerance. On SQLite (the offline
+    # test DB) those ops no-op and the view falls back to icontains.
+
     class Meta:
         ordering = ["technology", "difficulty", "title"]
         indexes = [
@@ -353,6 +364,60 @@ class Project(models.Model):
         return f"{self.technology.name} — {self.title}"
 
 
+class ProjectStage(models.Model):
+    """One stage of a staged (multi-lab) project.
+
+    A *flat* project has no stages and launches its single ``project.lab_scenario``
+    on Start (the historical behavior). A *staged* project (e.g. a cross-tech
+    capstone) is broken into ordered stages, each of which can open its OWN lab
+    (``lab_scenario``) in its OWN technology (``stage_technology``), produce an
+    ``handoff_artifact`` for the next stage, and teach a "where real pipelines
+    break" lesson (``breakpoint_note``). Everything here is optional and additive:
+    projects without ProjectStage rows behave exactly as before.
+    """
+
+    project = models.ForeignKey(Project, on_delete=models.CASCADE, related_name="stages")
+    order = models.PositiveIntegerField(default=0, help_text="Stage sequence within the project")
+    title = models.CharField(max_length=200)
+    description = models.TextField(blank=True)
+    stage_technology = models.ForeignKey(
+        Technology,
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name="project_stages",
+        help_text="The technology this stage exercises (nullable — a stage may be doc/postmortem-only).",
+    )
+    lab_scenario = models.ForeignKey(
+        "Scenario",
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name="project_stages_using",
+        help_text="Scenario whose lab environment this stage opens (null = no launchable lab for this stage yet).",
+    )
+    handoff_artifact = models.JSONField(
+        default=dict,
+        blank=True,
+        help_text=(
+            "What this stage produces for the next one (e.g. "
+            "{'name': 'SLO definition', 'description': 'p99<300ms yardstick'}). "
+            "Free-form; empty dict = nothing handed off."
+        ),
+    )
+    breakpoint_note = models.TextField(
+        blank=True,
+        help_text="The 'where real pipelines break' lesson threaded through this stage.",
+    )
+
+    class Meta:
+        ordering = ["order"]
+        unique_together = ("project", "order")
+
+    def __str__(self):
+        return f"{self.project.slug} · stage {self.order}: {self.title}"
+
+
 class ProjectTask(models.Model):
     """A single Jira-style ticket within a Project."""
 
@@ -371,6 +436,31 @@ class ProjectTask(models.Model):
     order = models.PositiveIntegerField(default=0)
     depends_on = models.ForeignKey(
         "self", null=True, blank=True, on_delete=models.SET_NULL, related_name="dependents"
+    )
+    # Optional staging: which ProjectStage this task belongs to. Null on flat
+    # projects (unchanged behavior).
+    stage = models.ForeignKey(
+        ProjectStage,
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name="tasks",
+        help_text="The stage this task belongs to (null on flat projects).",
+    )
+    # Optional real validation: a Scenario whose validator must PASS (the user
+    # must have a validated LabSession for it) before this task can be marked
+    # done and its dependents unlock. Null = self-attest (historical behavior).
+    validation_scenario = models.ForeignKey(
+        "Scenario",
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name="validating_project_tasks",
+        help_text=(
+            "Scenario whose validator proves this task. When set, marking the "
+            "task done requires a passed lab session for this scenario; when "
+            "null, the task is self-attested (backward-compatible)."
+        ),
     )
 
     class Meta:
@@ -400,6 +490,124 @@ class UserProjectProgress(models.Model):
 
     def __str__(self):
         return f"{self.user} → {self.project}"
+
+
+# ─── Learning Journeys ───────────────────────────────────────────────────────
+
+class LearningJourney(models.Model):
+    """A named, role-based guided track that BUNDLES already-existing content.
+
+    A journey is a thin, ordered VIEW over content that already lives elsewhere
+    (a Zero-to-Hero tutorial course, difficulty-ordered scenarios, a capstone
+    Project, and the matching certification track). It owns *no* content of its
+    own — every ``JourneyStep`` references existing content loosely by slug
+    string (and, where cheap, a nullable FK), so a missing or renamed reference
+    degrades gracefully to a plain milestone instead of breaking the page.
+
+    This exists for career-changers/beginners who would otherwise have to
+    self-assemble a path out of 35 technologies and thousands of scenarios.
+    """
+
+    LEVEL_CHOICES = [
+        ("beginner", "Beginner"),
+        ("intermediate", "Intermediate"),
+        ("advanced", "Advanced"),
+    ]
+
+    slug = models.SlugField(max_length=140, unique=True)
+    title = models.CharField(max_length=200)
+    role_label = models.CharField(
+        max_length=120,
+        blank=True,
+        default="",
+        help_text="Target role, e.g. 'Junior Linux Admin', 'Cloud Engineer', 'Kubernetes SRE'",
+    )
+    description = models.TextField(blank=True, default="")
+    level = models.CharField(max_length=20, choices=LEVEL_CHOICES, default="beginner")
+    # Optional branding / cross-linking to the primary technology this journey
+    # draws from. Nullable so a cross-tech journey (e.g. SRE) isn't forced to
+    # pick one, and SET_NULL so deleting a technology never deletes a journey.
+    primary_technology = models.ForeignKey(
+        "Technology",
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name="learning_journeys",
+        help_text="Primary technology for branding (membership is the steps, not this FK).",
+    )
+    order = models.PositiveIntegerField(default=0, help_text="Display order")
+    is_active = models.BooleanField(default=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ["order", "title"]
+
+    def save(self, *args, **kwargs):
+        if not self.slug:
+            from django.utils.text import slugify
+            self.slug = slugify(self.title)[:140]
+        super().save(*args, **kwargs)
+
+    def __str__(self):
+        return f"{self.title} ({self.role_label})" if self.role_label else self.title
+
+
+class JourneyStep(models.Model):
+    """One ordered milestone within a LearningJourney.
+
+    ``kind`` says what class of existing content the step points at, and the
+    reference is kept deliberately loose:
+
+    * ``ref_slug``  — a single content slug (a tutorial ``course_slug``, a
+      ``Project.slug``, or a ``CertificationTrack.slug``). A plain string so a
+      missing/renamed target 404s only for that step, never breaks the journey.
+    * ``ref_slugs`` — an ordered list of ``Scenario.slug`` values for the
+      ``scenarios`` kind (a difficulty-ordered lab set).
+
+    A ``milestone`` step carries no reference and just marks an achievement
+    (e.g. "Sit the RHCSA mock exam"). Titles/descriptions are stored on the step
+    so a step still renders even when its referenced content can't be resolved.
+    """
+
+    KIND_CHOICES = [
+        ("tutorial_course", "Tutorial Course"),
+        ("scenarios", "Scenarios"),
+        ("project", "Project / Capstone"),
+        ("certification", "Certification"),
+        ("milestone", "Milestone"),
+    ]
+
+    journey = models.ForeignKey(
+        LearningJourney, on_delete=models.CASCADE, related_name="steps"
+    )
+    order = models.PositiveIntegerField(default=0)
+    kind = models.CharField(max_length=20, choices=KIND_CHOICES)
+    title = models.CharField(max_length=200)
+    description = models.TextField(blank=True, default="")
+    # Single-slug reference (tutorial course_slug / project slug / cert track slug).
+    ref_slug = models.CharField(
+        max_length=200,
+        blank=True,
+        default="",
+        help_text="Slug of the single referenced content (course/project/cert). Empty for milestones.",
+    )
+    # Ordered list of Scenario slugs for the 'scenarios' kind.
+    ref_slugs = models.JSONField(
+        default=list,
+        blank=True,
+        help_text="Ordered Scenario slugs for the 'scenarios' kind (difficulty-ramped).",
+    )
+    est_minutes = models.PositiveIntegerField(
+        null=True, blank=True, help_text="Optional estimated time to complete this step, in minutes"
+    )
+
+    class Meta:
+        ordering = ["journey", "order"]
+        unique_together = ("journey", "order")
+
+    def __str__(self):
+        return f"{self.journey.slug} · {self.order}. [{self.kind}] {self.title}"
 
 
 class UserTaskProgress(models.Model):

@@ -8,6 +8,7 @@ from django.test import TestCase, override_settings
 from rest_framework.test import APIClient
 
 from apps.accounts.oauth_urls import oauth_callback_url
+from apps.accounts.oauth_state import issue_oauth_state
 
 User = get_user_model()
 
@@ -23,7 +24,10 @@ class SocialAuthConfigAPITest(TestCase):
         gh = resp.data["github"]
         self.assertTrue(gh["enabled"])
         self.assertEqual(gh["callback_url"], "https://fixitlab.in/auth/callback/github")
-        self.assertIn("redirect_uri=https%3A%2F%2Ffixitlab.in%2Fauth%2Fcallback%2Fgithub", gh["login_url"])
+        # login_url now points at the server-side start endpoint, which builds
+        # the GitHub authorize URL (redirect_uri + CSRF nonce state) server-side
+        # instead of exposing it to the client.
+        self.assertIn("/api/auth/social/start/github/", gh["login_url"])
         self.assertIn("oauth_setup_note", resp.data)
         self.assertIn("https://fixitlab.in/auth/callback/github", resp.data["oauth_setup_note"])
 
@@ -51,7 +55,7 @@ class SocialOAuthStartAPITest(TestCase):
         parsed = urlparse(location)
         params = parse_qs(parsed.query)
         self.assertEqual(params["client_id"], ["gh-test-id"])
-        self.assertEqual(params["state"], ["login"])
+        self.assertTrue(params["state"][0].startswith("login:"))
         self.assertEqual(
             params["redirect_uri"],
             [oauth_callback_url("github")],
@@ -69,7 +73,7 @@ class SocialOAuthStartAPITest(TestCase):
         parsed = urlparse(resp["Location"])
         params = parse_qs(parsed.query)
         self.assertEqual(params["redirect_uri"], [oauth_callback_url("google")])
-        self.assertEqual(params["state"], ["register"])
+        self.assertTrue(params["state"][0].startswith("register:"))
 
 
 @override_settings(
@@ -108,7 +112,7 @@ class GoogleOAuthEmailVerificationTests(TestCase):
         with post_patch, get_patch:
             resp = self.client.post(
                 "/api/auth/social/google/",
-                {"code": "auth-code", "intent": "login"},
+                {"code": "auth-code", "intent": "login", "state": issue_oauth_state("login")},
                 format="json",
                 HTTP_X_REQUESTED_WITH="XMLHttpRequest",
             )
@@ -125,7 +129,7 @@ class GoogleOAuthEmailVerificationTests(TestCase):
         with post_patch, get_patch:
             resp = self.client.post(
                 "/api/auth/social/google/",
-                {"code": "auth-code", "intent": "login"},
+                {"code": "auth-code", "intent": "login", "state": issue_oauth_state("login")},
                 format="json",
                 HTTP_X_REQUESTED_WITH="XMLHttpRequest",
             )

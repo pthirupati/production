@@ -161,8 +161,13 @@ if _role_runs app; then
   for i in $(seq 1 120); do
     if docker compose -f "$COMPOSE_FILE" --env-file "$ENV_FILE" exec -T backend python -c \
       "import urllib.request; r=urllib.request.urlopen('http://127.0.0.1:8000/api/health/ready/'); assert r.status==200" 2>/dev/null; then
+      echo "  backend ready after $(( (i-1)*3 ))s"
       break
     fi
+    # Heartbeat so the (keepalive-protected) deploy SSH tunnel never sits fully
+    # silent for minutes during a slow startup — belt-and-suspenders with the
+    # ServerAlive* opts in ci-cluster-deploy.sh remote().
+    [ $((i % 10)) -eq 0 ] && echo "  ...still waiting for backend readiness (${i}/120)"
     sleep 3
   done
 fi
@@ -183,30 +188,50 @@ fi
 # Database-touching steps run on the node with the backend (single-host or cluster app).
 if _role_runs app; then
   echo "Running migrations (safe — does not wipe data)..."
-  docker compose -f "$COMPOSE_FILE" --env-file "$ENV_FILE" exec -T backend python manage.py migrate --noinput
+  # Retry: in the cluster the backend reaches Postgres via pgBouncer on the data
+  # node over the VPC. A deploy can briefly recreate the data tier, so the first
+  # migrate may hit a transient "connection ... timeout expired". The backend
+  # container's own startup.sh waits for the DB and migrates too; this orchestration
+  # migrate must be equally tolerant instead of failing the whole deploy on a blip.
+  _migrated=0
+  for _m in $(seq 1 12); do
+    if docker compose -f "$COMPOSE_FILE" --env-file "$ENV_FILE" exec -T backend python manage.py migrate --noinput; then
+      _migrated=1; break
+    fi
+    echo "  migrate attempt $_m failed (DB not reachable yet?) — retrying in 6s"
+    sleep 6
+  done
+  if [ "$_migrated" != 1 ]; then echo "ERROR: migrations failed after retries"; exit 1; fi
 
   echo "Syncing superuser credentials from env..."
   docker compose -f "$COMPOSE_FILE" --env-file "$ENV_FILE" exec -T backend python /scripts/create_superuser.py || true
 
+  # Content-seed steps are bounded with `timeout` so a slow/runaway seed can NEVER
+  # hang the whole deploy to the 55-min job timeout (the [4D] Deploy cluster hang
+  # was seed_tutorials taking ~an hour). Each is non-fatal — a timeout just skips
+  # that step and the next deploy retries it; the platform stays up either way.
   echo "Seeding/updating scenarios..."
-  docker compose -f "$COMPOSE_FILE" --env-file "$ENV_FILE" exec -T backend \
-    python manage.py seed_scenarios --dir /scenarios --merge-only
+  timeout 600 docker compose -f "$COMPOSE_FILE" --env-file "$ENV_FILE" exec -T backend \
+    python manage.py seed_scenarios --dir /scenarios --merge-only || echo "  WARN: seed_scenarios timed out/failed — retried next deploy"
 
   echo "Admin demo certificate / sample interview..."
-  docker compose -f "$COMPOSE_FILE" --env-file "$ENV_FILE" exec -T backend \
+  timeout 180 docker compose -f "$COMPOSE_FILE" --env-file "$ENV_FILE" exec -T backend \
     python manage.py seed_admin_demo || true
 
   echo "Seeding/updating projects..."
-  docker compose -f "$COMPOSE_FILE" --env-file "$ENV_FILE" exec -T backend python manage.py seed_projects || true
+  timeout 300 docker compose -f "$COMPOSE_FILE" --env-file "$ENV_FILE" exec -T backend python manage.py seed_projects || echo "  WARN: seed_projects timed out/failed"
 
   echo "Seeding/updating certification tracks..."
-  docker compose -f "$COMPOSE_FILE" --env-file "$ENV_FILE" exec -T backend python manage.py seed_certifications || true
+  timeout 180 docker compose -f "$COMPOSE_FILE" --env-file "$ENV_FILE" exec -T backend python manage.py seed_certifications || true
+
+  echo "Seeding/updating learning journeys (role-based guided tracks)..."
+  timeout 120 docker compose -f "$COMPOSE_FILE" --env-file "$ENV_FILE" exec -T backend python manage.py seed_learning_journeys || echo "  WARN: seed_learning_journeys timed out/failed"
 
   echo "Seeding/updating tutorials (public learning content)..."
-  docker compose -f "$COMPOSE_FILE" --env-file "$ENV_FILE" exec -T backend python manage.py seed_tutorials || true
+  timeout 600 docker compose -f "$COMPOSE_FILE" --env-file "$ENV_FILE" exec -T backend python manage.py seed_tutorials || echo "  WARN: seed_tutorials timed out/failed — retried next deploy"
 
   echo "Refreshing tutorial enrichment (topic-specific diagrams/commands)..."
-  docker compose -f "$COMPOSE_FILE" --env-file "$ENV_FILE" exec -T backend python manage.py re_enrich_tutorials || true
+  timeout 600 docker compose -f "$COMPOSE_FILE" --env-file "$ENV_FILE" exec -T backend python manage.py re_enrich_tutorials || echo "  WARN: re_enrich_tutorials timed out/failed — retried next deploy"
 
   echo "Validating scenario catalog (hints, validation scripts, check.sh)..."
   docker compose -f "$COMPOSE_FILE" --env-file "$ENV_FILE" exec -T backend \

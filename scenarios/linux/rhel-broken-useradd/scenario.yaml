@@ -1,5 +1,5 @@
 title: 'RHEL Simulation: Repair Broken /etc/passwd'
-slug: sim-rhel-broken-useradd
+slug: linux-rhel-broken-useradd-lab
 technology: linux
 category: Fix
 difficulty: medium

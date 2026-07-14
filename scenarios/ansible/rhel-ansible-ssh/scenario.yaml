@@ -1,5 +1,5 @@
 title: 'RHEL Simulation: Ansible SSH Key Failure'
-slug: sim-rhel-ansible-ssh
+slug: ansible-rhel-ansible-ssh-lab
 technology: ansible
 category: Fix
 difficulty: medium

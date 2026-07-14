@@ -42,6 +42,7 @@ INSTALLED_APPS = [
     "django.contrib.sessions",
     "django.contrib.messages",
     "django.contrib.staticfiles",
+    "django.contrib.sitemaps",
 
     # Third-party
     "rest_framework",
@@ -158,9 +159,15 @@ ASGI_APPLICATION = "config.asgi.application"
 # Database (PostgreSQL – persistent)
 # Runtime uses pgBouncer when PGBOUNCER_HOST is set; migrations use POSTGRES_HOST directly.
 # --------------------------------------------------
+_USING_PGBOUNCER = bool(env("PGBOUNCER_HOST", default=""))
 _DB_HOST = env("PGBOUNCER_HOST", default="") or env("POSTGRES_HOST")
 _DB_PORT = env("PGBOUNCER_PORT", default="") or env("POSTGRES_PORT")
 
+# When runtime traffic goes through pgBouncer in TRANSACTION pooling mode, Django
+# must NOT hold persistent server connections (CONN_MAX_AGE=0) and must NOT use
+# server-side cursors — otherwise persistent Django conns pin transaction-pooled
+# slots and the pool exhausts under load (audit P0-4). Direct Postgres
+# (migrations, or no pgBouncer) keeps persistent connections for lower overhead.
 DATABASES = {
     "default": {
         "ENGINE": "django.db.backends.postgresql",
@@ -169,8 +176,9 @@ DATABASES = {
         "PASSWORD": env("POSTGRES_PASSWORD"),
         "HOST": _DB_HOST,
         "PORT": _DB_PORT,
-        "CONN_MAX_AGE": 600,  # 10 min persistent connections (reduces connect overhead)
-        "CONN_HEALTH_CHECKS": True,  # Verify connections before reuse
+        "CONN_MAX_AGE": 0 if _USING_PGBOUNCER else 600,
+        "CONN_HEALTH_CHECKS": not _USING_PGBOUNCER,
+        "DISABLE_SERVER_SIDE_CURSORS": _USING_PGBOUNCER,
         "OPTIONS": {
             "connect_timeout": 5,
         },
@@ -449,6 +457,17 @@ SENDGRID_API_KEY = env("SENDGRID_API_KEY", default="")
 
 # Frontend URL for email links
 FRONTEND_URL = env("FRONTEND_URL", default="http://localhost:8080")
+
+# --------------------------------------------------
+# Open Badges 3.0 (Verifiable Credential) issuer
+# --------------------------------------------------
+# Base-64 (raw 32-byte) Ed25519 PRIVATE key seed used to sign issued Open Badge
+# 3.0 credentials. When unset, the issuer lazily generates and persists a
+# keypair under MEDIA_ROOT/openbadge_signing_key.json so verification stays
+# self-consistent offline (dev/self-hosted). For PRODUCTION stability across
+# redeploys/hosts, set OPENBADGE_SIGNING_KEY_B64 to a fixed seed so every node
+# signs with the same key and previously-issued credentials keep verifying.
+OPENBADGE_SIGNING_KEY_B64 = env("OPENBADGE_SIGNING_KEY_B64", default="")
 OAUTH_CALLBACK_BASE_URL = env("OAUTH_CALLBACK_BASE_URL", default="")
 GITHUB_OAUTH_CALLBACK_URL = env("GITHUB_OAUTH_CALLBACK_URL", default="")
 # When true, skip Gmail/SendGrid/SMTP delivery (E2E/CI). OTP still stored in DB.
@@ -690,7 +709,13 @@ ADMIN_ALLOWED_IPS = [ip.strip() for ip in env("ADMIN_ALLOWED_IPS", default="").s
 # restrict admin to those networks. Loopback / in-container callers (health
 # checks + server-side E2E) are always allowed.
 ADMIN_FAIL_CLOSED_WITHOUT_ALLOWLIST = env.bool(
-    "ADMIN_FAIL_CLOSED_WITHOUT_ALLOWLIST", default=not DEBUG
+    # Defaults FALSE (matches the comment above): with no allowlist, admin stays
+    # reachable behind superuser auth. Defaulting to `not DEBUG` (True in prod)
+    # with an empty ADMIN_ALLOWED_IPS fail-closes the ENTIRE admin surface for
+    # every real (non-loopback) admin — the exact owner-lockout this comment warns
+    # about. Opt into network restriction by setting the env var to 1 AND
+    # populating ADMIN_ALLOWED_IPS.
+    "ADMIN_FAIL_CLOSED_WITHOUT_ALLOWLIST", default=False
 )
 # Number of trusted reverse-proxy hops in front of Django (our nginx gateway).
 # Used to read the un-spoofable client IP from the RIGHT of X-Forwarded-For

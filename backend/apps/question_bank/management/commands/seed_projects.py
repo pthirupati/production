@@ -4,7 +4,7 @@ Seeds starter end-to-end projects (2-tier Nginx, 3-tier architecture) for DevOps
 Usage: python manage.py seed_projects
 """
 from django.core.management.base import BaseCommand
-from apps.question_bank.models import Technology, Project, ProjectTask, Scenario
+from apps.question_bank.models import Technology, Project, ProjectStage, ProjectTask, Scenario
 
 
 PROJECTS = [
@@ -9071,7 +9071,2302 @@ PROJECTS = [
             },
         ],
     },
+
+    # ══════════════════════════════════════════════════════════════════════
+    # CROSS-TECHNOLOGY CAPSTONES — WAVE 2 (CAP8–CAP19).
+    # End-to-end, multi-technology "production war-story" capstones. Each is a
+    # single Project bound to one primary technology + one lab_scenario (the
+    # existing model), but the multi-tech story is told through a strict
+    # depends_on task chain where each stage names its technology in the
+    # description + acceptance_criteria — exactly like CAP1–CAP7. Every chain
+    # embeds one deliberate "where real pipelines break" lesson as a hint.
+    # ══════════════════════════════════════════════════════════════════════
+
+    # ── CAP8: Black Friday Incident (SRE) ─────────────────────────────────
+    {
+        "technology_slug": "prometheus",
+        "title": "Capstone: Black Friday Incident — Survive the Traffic Spike (SRE)",
+        "slug": "capstone-black-friday-sre-incident",
+        "architecture_type": "microservices",
+        "description": (
+            "CROSS-TECHNOLOGY CAPSTONE (Prometheus + Python + PostgreSQL + Kubernetes + Nginx). It is 20:00 on "
+            "Black Friday and checkout latency is climbing while CPU sits idle — the classic symptom of a "
+            "saturated dependency, not a saturated app. Play the on-call SRE: define SLIs/SLOs, reproduce the "
+            "spike with a load test, find and fix the true constraint (database connection-pool exhaustion), "
+            "scale correctly with an HPA, shed load gracefully at the edge, and write the postmortem. The "
+            "lesson threaded through every stage: scale the CONSTRAINT, not the stateless replicas."
+        ),
+        "objectives": [
+            "Define request-rate/error/latency SLIs and an SLO to measure the incident against",
+            "Reproduce the failure under a realistic load test and read the signals",
+            "Diagnose and fix the real constraint (DB connection-pool exhaustion), not a symptom",
+            "Autoscale the right tier, shed load at the edge, and write a blameless postmortem",
+        ],
+        "difficulty": "advanced",
+        "estimated_hours": 10,
+        "order": 20,
+        # ── REFERENCE STAGED WORKFLOW ─────────────────────────────────────
+        # CAP8 is the reference implementation of the ProjectStage model: a real
+        # staged, multi-lab, per-stage-technology workflow with artifact handoff
+        # and per-stage "where pipelines break" lessons. Every OTHER capstone
+        # stays flat (no stages) so this change is low-risk. Each stage names a
+        # `technology_slug` and, where a real existing lab fits, a `lab_scenario`
+        # slug (grep-confirmed under scenarios/); stages with no fitting lab
+        # (Nginx edge shedding, postmortem) leave lab_scenario null. Tasks below
+        # bind to a stage via `stage_order` and, where a lab validator can prove
+        # the step, name a `validation_scenario` slug so the next ticket unlocks
+        # on a PASS instead of self-attest.
+        "stages": [
+            {
+                "order": 1,
+                "title": "Define SLIs & SLO (Prometheus)",
+                "technology_slug": "prometheus",
+                "lab_scenario": "academy-prometheus-010-integration-exporters",
+                "description": "Instrument checkout and record the RED signals in Prometheus, then write the SLO that judges the incident.",
+                "handoff_artifact": {
+                    "name": "SLO definition",
+                    "description": "A documented SLO (e.g. p99 < 300ms at 99.9% success) + RED queries — the yardstick every later stage is measured against.",
+                },
+                "breakpoint_note": "Pipelines break when teams fix by vibes: with no SLI, you can't tell a real regression from noise, and you 'fix' the wrong thing. Define the measurement before touching anything.",
+            },
+            {
+                "order": 2,
+                "title": "Reproduce the spike (Python load test)",
+                "technology_slug": "python",
+                "lab_scenario": "academy-python-003-operate-http-api",
+                "description": "Build a Python load generator that ramps concurrency to Black-Friday levels and records latency percentiles as the system degrades.",
+                "handoff_artifact": {
+                    "name": "Repeatable load profile",
+                    "description": "A load test that drives the service into SLO violation on demand + the baseline p50/p95/p99 histogram — reused verbatim in stage 6 to prove the fix.",
+                },
+                "breakpoint_note": "The classic misread: latency climbs while CPU sits idle, so someone adds app replicas. Idle CPU + rising latency = a saturated DEPENDENCY, not compute — the load test is what exposes that.",
+            },
+            {
+                "order": 3,
+                "title": "Fix the real constraint: DB connection pool (PostgreSQL)",
+                "technology_slug": "postgresql",
+                "lab_scenario": "pg-connection-pool",
+                "description": "Correlate the spike with PostgreSQL — backends waiting, connections pinned at max_connections — and right-size/pool the connections so checkout stops starving.",
+                "handoff_artifact": {
+                    "name": "Bounded, pooled DB capacity",
+                    "description": "A known safe max-connections figure (bounded app pool / PgBouncer) — the ceiling the HPA in stage 4 must respect.",
+                },
+                "breakpoint_note": "THE core lesson: adding stateless app replicas here makes it WORSE — every replica opens its own connections and the DB saturates faster. Scale the CONSTRAINT, not the stateless tier.",
+            },
+            {
+                "order": 4,
+                "title": "Autoscale the right tier (Kubernetes HPA)",
+                "technology_slug": "kubernetes",
+                "lab_scenario": "academy-kubernetes-010-integration-autoscaling",
+                "description": "With the DB no longer the wall, add an HPA to the stateless checkout tier that scales on the SLI within a replica ceiling the pooled DB can sustain.",
+                "handoff_artifact": {
+                    "name": "Capacity-safe autoscaling",
+                    "description": "An HPA whose maxReplicas is capped to what the stage-3 pool can serve — safe elasticity, not a re-created outage.",
+                },
+                "breakpoint_note": "An unbounded HPA in front of a fixed connection pool just re-creates the outage at a higher replica count. Autoscaling is only safe AFTER the constraint is fixed and the ceiling respects it.",
+            },
+            {
+                "order": 5,
+                "title": "Shed load at the edge (Nginx)",
+                "technology_slug": None,  # No nginx technology/lab exists yet — configured directly.
+                "lab_scenario": None,
+                "description": "Configure the Nginx edge to rate-limit, cap concurrent connections, and return fast 429/503 + Retry-After beyond safe capacity instead of letting requests pile up.",
+                "handoff_artifact": {
+                    "name": "Graceful overflow behavior",
+                    "description": "limit_req/limit_conn zones + a friendly overflow response — a brownout envelope that keeps the served fraction inside SLO.",
+                },
+                "breakpoint_note": "Without a shed valve, one traffic spike past capacity turns a brownout (serve most, reject some fast) into a blackout (everyone times out). Edge load-shedding is the last line of defense.",
+            },
+            {
+                "order": 6,
+                "title": "Prove recovery under the original load (Prometheus + Python)",
+                "technology_slug": "prometheus",
+                "lab_scenario": "academy-prometheus-010-integration-exporters",
+                "description": "Re-run the exact stage-2 load profile with the pool fix, HPA, and load-shedding in place and confirm the SLO from stage 1 holds.",
+                "handoff_artifact": {
+                    "name": "Green SLO under peak",
+                    "description": "A before/after comparison against the stage-1 SLO proving p99 and error budget hold under the original peak — the evidence for the postmortem.",
+                },
+                "breakpoint_note": "Skipping the re-test under the ORIGINAL load is how 'fixes' regress silently. Green SLO under the same profile that broke it is the only proof the fix was real.",
+            },
+            {
+                "order": 7,
+                "title": "Write the blameless postmortem (SRE)",
+                "technology_slug": None,  # Documentation stage — no lab.
+                "lab_scenario": None,
+                "description": "Document the incident: timeline, the wrong turn (adding app replicas), the true root cause (pool exhaustion), the fix, and the follow-ups that stop a repeat.",
+                "handoff_artifact": {
+                    "name": "Blameless postmortem",
+                    "description": "Timeline + misleading symptom + true root cause + remediation + action items (pool alerts, load-test in CI) — the durable output of the whole incident.",
+                },
+                "breakpoint_note": "Postmortems break when they name a person instead of the trap. Name the trap so the next on-call doesn't fall in it: idle CPU + rising latency = saturated dependency, scale the constraint.",
+            },
+        ],
+        "tasks": [
+            {
+                "jira_key": "CAP8-1",
+                "title": "Define the SLIs and an SLO",
+                "description": "Instrument the checkout service and record request-rate, error-rate, and latency (the RED signals) in Prometheus, then write one availability/latency SLO to judge the incident against (see the academy-prometheus-010-integration-exporters lab).",
+                "acceptance_criteria": "Prometheus scrapes RED metrics for checkout and a documented SLO (e.g. p99 < 300ms at 99.9% success) exists as the yardstick for the incident.",
+                "hint": "You cannot fix what you cannot measure. Define the SLI first — a p99-latency and success-rate query — and an error budget, before touching anything. (Prometheus SLIs.)",
+                "order": 1,
+                "stage_order": 1,
+                "validation_scenario": "academy-prometheus-010-integration-exporters",
+            },
+            {
+                "jira_key": "CAP8-2",
+                "title": "Reproduce the spike with a load test",
+                "description": "Write a Python load generator that ramps concurrent checkout requests to Black-Friday levels and captures latency percentiles as the system degrades.",
+                "acceptance_criteria": "A Python load test drives the service into SLO violation on demand, and the latency histogram shows p99 blowing out while CPU stays low.",
+                "hint": "Ramp concurrency in steps and record per-step p50/p95/p99. The tell is latency exploding while CPU is idle — the bottleneck is a dependency, not compute. (Python load testing.)",
+                "order": 2,
+                "depends_on": "CAP8-1",
+                "stage_order": 2,
+                "validation_scenario": "academy-python-003-operate-http-api",
+            },
+            {
+                "jira_key": "CAP8-3",
+                "title": "Find the real constraint: DB connection-pool exhaustion",
+                "description": "Correlate the latency spike with PostgreSQL: requests are queuing on a saturated connection pool (pg_stat_activity shows waiting backends, active connections pinned at max_connections). Right-size the pool / add a pooler so checkout stops starving.",
+                "acceptance_criteria": "PostgreSQL metrics prove pool exhaustion was the constraint, and after fixing the pool (bounded app pool + PgBouncer, or raised limits) p99 recovers under the same load.",
+                "hint": "THE LESSON: adding stateless app replicas here makes it WORSE — every replica opens its own connections and the DB saturates faster. Scale the constraint: bound and pool the DB connections (see academy-database-006-security-pooling). (PostgreSQL.)",
+                "order": 3,
+                "depends_on": "CAP8-2",
+                "stage_order": 3,
+                "validation_scenario": "pg-connection-pool",
+            },
+            {
+                "jira_key": "CAP8-4",
+                "title": "Autoscale the right tier with an HPA",
+                "description": "Now that the DB is no longer the wall, add a Kubernetes HorizontalPodAutoscaler to the stateless checkout tier so it scales on the SLI (RPS/latency or CPU) within a replica ceiling the pooled DB can sustain.",
+                "acceptance_criteria": "An HPA scales checkout up under load and back down after, and the replica ceiling is chosen so the connection pool is never re-exhausted (see academy-kubernetes-010-integration-autoscaling).",
+                "hint": "Cap maxReplicas to what the DB pool can serve — an unbounded HPA in front of a fixed pool just re-creates the outage at a higher replica count. Autoscaling is only safe once the constraint is fixed. (Kubernetes HPA.)",
+                "order": 4,
+                "depends_on": "CAP8-3",
+                "stage_order": 4,
+                "validation_scenario": "academy-kubernetes-010-integration-autoscaling",
+            },
+            {
+                "jira_key": "CAP8-5",
+                "title": "Shed load gracefully at the edge",
+                "description": "Configure the Nginx edge to protect the system beyond its safe capacity: rate-limit, cap concurrent connections, and return fast 429/503 with Retry-After instead of letting requests pile up.",
+                "acceptance_criteria": "Beyond safe capacity Nginx sheds excess requests with a fast 429/503 + Retry-After, and the served fraction stays within SLO instead of the whole service collapsing.",
+                "hint": "A brownout (serve most, reject some fast) beats a blackout (everyone times out). Use limit_req/limit_conn and a friendly overflow response. (Nginx — no lab slug; configure limit_req_zone and limit_conn_zone directly.)",
+                "order": 5,
+                "depends_on": "CAP8-4",
+                "stage_order": 5,
+                # No nginx lab exists — this stage self-attests (no validation_scenario).
+            },
+            {
+                "jira_key": "CAP8-6",
+                "title": "Prove recovery under the original load",
+                "description": "Re-run the Black-Friday load test end to end with the pool fix, HPA, and load-shedding in place and confirm the SLO holds.",
+                "acceptance_criteria": "Under the original peak load the SLO is met: p99 stays under target, error rate stays inside the budget, and no tier saturates.",
+                "hint": "Re-run the exact CAP8-2 profile so the before/after is apples-to-apples. Green SLO under the same load is the proof the fix was real. (Prometheus + Python validation.)",
+                "order": 6,
+                "depends_on": "CAP8-5",
+                "stage_order": 6,
+                "validation_scenario": "academy-prometheus-010-integration-exporters",
+            },
+            {
+                "jira_key": "CAP8-7",
+                "title": "Write the blameless postmortem",
+                "description": "Document the incident: timeline, the wrong turn (adding app replicas), the real root cause (pool exhaustion), the fix, and the action items that stop a repeat.",
+                "acceptance_criteria": "A blameless postmortem captures the timeline, the misleading symptom, the true root cause, the remediation, and concrete follow-ups (e.g. pool alerts, load-test in CI).",
+                "hint": "Name the trap explicitly so the next on-call doesn't fall in it: idle CPU + rising latency = saturated dependency, scale the constraint. (SRE postmortem.)",
+                "order": 7,
+                "depends_on": "CAP8-6",
+                "stage_order": 7,
+                # Documentation stage — self-attest.
+            },
+        ],
+    },
+
+    # ── CAP9: Strangle the Monolith → Microservices ───────────────────────
+    {
+        "technology_slug": "kubernetes",
+        "title": "Capstone: Strangle the Monolith — Extract a Microservice Safely",
+        "slug": "capstone-strangle-monolith-microservices",
+        "architecture_type": "microservices",
+        "description": (
+            "CROSS-TECHNOLOGY CAPSTONE (Nginx + Python + PostgreSQL + Kubernetes). A monolith is slowing every "
+            "team down. Apply the Strangler Fig pattern: put a routing proxy in front, carve out one bounded "
+            "context into its own service, split the data it owns out of the shared database, and cut traffic "
+            "over on Kubernetes with zero downtime. The lesson that makes or breaks the migration: data "
+            "ownership IS the service boundary — a shared table with dual writers is a corruption bug waiting "
+            "to happen."
+        ),
+        "objectives": [
+            "Insert a strangler proxy so routing can move endpoint-by-endpoint",
+            "Extract one bounded context into a standalone Python service",
+            "Split database ownership so exactly one service writes each table",
+            "Cut over on Kubernetes with a reversible, zero-downtime switch",
+        ],
+        "difficulty": "advanced",
+        "estimated_hours": 10,
+        "order": 21,
+        "tasks": [
+            {
+                "jira_key": "CAP9-1",
+                "title": "Put a strangler proxy in front of the monolith",
+                "description": "Insert an Nginx reverse proxy in front of the monolith so every request flows through a routing layer you control — the seam the migration lives in.",
+                "acceptance_criteria": "All traffic reaches the monolith through Nginx, and routing rules can be added per path prefix without changing clients.",
+                "hint": "The proxy is what lets you move one endpoint at a time. Route everything to the monolith first, prove no behavior changed, then start peeling. (Nginx — no lab slug; use location blocks + proxy_pass.)",
+                "order": 1,
+            },
+            {
+                "jira_key": "CAP9-2",
+                "title": "Pick the bounded context and map its data",
+                "description": "Choose one cohesive capability (e.g. 'shipments') and inventory every table it reads and writes and who else touches them — the true coupling.",
+                "acceptance_criteria": "A documented boundary lists the endpoints and the exact tables the context owns vs. tables it only reads from other contexts.",
+                "hint": "THE LESSON starts here: the boundary is defined by data ownership, not by code layout. If two contexts write the same table, that table is the boundary problem you must solve. (Domain analysis.)",
+                "order": 2,
+                "depends_on": "CAP9-1",
+            },
+            {
+                "jira_key": "CAP9-3",
+                "title": "Extract the service (Python)",
+                "description": "Build the bounded context as a standalone Python HTTP service exposing the same contract, initially reading/writing the same database (see academy-python-003-operate-http-api).",
+                "acceptance_criteria": "A standalone Python service serves the context's endpoints with parity to the monolith, verified against a shared test suite.",
+                "hint": "Keep the API contract identical so the proxy can route to either implementation. Behavior parity first, data split second. (Python service extraction.)",
+                "order": 3,
+                "depends_on": "CAP9-2",
+            },
+            {
+                "jira_key": "CAP9-4",
+                "title": "Route the endpoints to the new service",
+                "description": "Flip the strangler proxy so the extracted context's paths go to the new service while everything else still hits the monolith.",
+                "acceptance_criteria": "The context's endpoints are served by the new service through the proxy; all other endpoints still hit the monolith; no client changed.",
+                "hint": "Move a low-risk read endpoint first and watch metrics, then the writes. The proxy makes every cutover instantly reversible. (Nginx routing.)",
+                "order": 4,
+                "depends_on": "CAP9-3",
+            },
+            {
+                "jira_key": "CAP9-5",
+                "title": "Split database ownership",
+                "description": "Give the new service its own PostgreSQL database/schema and migrate the tables it owns out of the shared DB so exactly one writer owns each table.",
+                "acceptance_criteria": "The extracted tables live in the service's own database, the monolith no longer writes them (it calls the service's API), and a foreign-key/consistency check passes.",
+                "hint": "THE TRAP: leaving both the monolith and the new service writing the same table is a dual-write — under concurrency it silently corrupts data with no error. Cut the shared write path; the monolith must go through the API. (PostgreSQL ownership split; see academy-postgresql-002-build-schemas.)",
+                "order": 5,
+                "depends_on": "CAP9-4",
+            },
+            {
+                "jira_key": "CAP9-6",
+                "title": "Deploy the service on Kubernetes",
+                "description": "Package and deploy the extracted service to Kubernetes with a Deployment, Service, probes, and resource limits, and point the proxy at the cluster Service.",
+                "acceptance_criteria": "The service runs on Kubernetes with readiness/liveness probes, and the proxy resolves it via its cluster Service with endpoints populated (see academy-kubernetes-002-build-deployments).",
+                "hint": "Match the Service selector to the pod labels or endpoints never fill and the proxy 502s. Independent deployability is the payoff of the whole exercise. (Kubernetes deploy.)",
+                "order": 6,
+                "depends_on": "CAP9-5",
+            },
+            {
+                "jira_key": "CAP9-7",
+                "title": "Verify no dual-write corruption and document the seam",
+                "description": "Run concurrent writes across the boundary and confirm there is exactly one writer per table, then document the pattern so the next extraction is faster.",
+                "acceptance_criteria": "A concurrency test shows no lost updates or divergent rows across the boundary, and a runbook records the ownership map and cutover steps.",
+                "hint": "Prove the corruption class is gone, not just absent today: single-writer per table plus API-only cross-context writes. That invariant is the whole point. (Validation + docs.)",
+                "order": 7,
+                "depends_on": "CAP9-6",
+            },
+        ],
+    },
+
+    # ── CAP10: Internal Developer Platform / golden path ──────────────────
+    {
+        "technology_slug": "devops",
+        "title": "Capstone: Internal Developer Platform — A Secure Golden Path",
+        "slug": "capstone-idp-golden-path",
+        "architecture_type": "cicd",
+        "description": (
+            "CROSS-TECHNOLOGY CAPSTONE (Shell + Kubernetes + Security + Prometheus). Build the paved road a "
+            "product team walks to ship a service: a scaffolder that generates the repo, a CI/CD path into a "
+            "per-team namespace, multi-tenant isolation with NetworkPolicy, secrets that never touch git, and "
+            "observability wired in from day one. The lesson: a golden path is only golden if it is "
+            "secure-by-default — if teams have to bolt on isolation and secrets themselves, they won't, and "
+            "the platform becomes the vulnerability."
+        ),
+        "objectives": [
+            "Scaffold a new service repo with a single command",
+            "Give it a CI/CD path that deploys into an isolated per-team namespace",
+            "Enforce tenant isolation with default-deny NetworkPolicy",
+            "Deliver secrets safely and wire observability in by default",
+        ],
+        "difficulty": "advanced",
+        "estimated_hours": 10,
+        "order": 22,
+        "tasks": [
+            {
+                "jira_key": "CAP10-1",
+                "title": "Build the scaffolder",
+                "description": "Write a shell scaffolder that generates a new service repo from a template: app skeleton, Dockerfile, CI config, and k8s manifests, all pre-filled from a service name (see academy-shell-script-002-build-conditionals).",
+                "acceptance_criteria": "Running the scaffolder with a service name produces a working repo that builds and has manifests, with no manual edits required to get to CI.",
+                "hint": "The template encodes every good default so teams inherit them for free. Whatever you don't put in the template, teams will skip. (Shell scaffolding.)",
+                "order": 1,
+            },
+            {
+                "jira_key": "CAP10-2",
+                "title": "Wire the CI/CD path into a per-team namespace",
+                "description": "Give the scaffolded service a pipeline that builds, tests, and deploys into a dedicated Kubernetes namespace for that team.",
+                "acceptance_criteria": "A push runs CI and deploys the service into its own namespace; two teams' services never share a namespace (see academy-devops-002-build-ci-pipeline).",
+                "hint": "One namespace per team is the unit of isolation and quota. Bake the namespace into the pipeline so it's never a manual, forgettable step. (DevOps + Kubernetes.)",
+                "order": 2,
+                "depends_on": "CAP10-1",
+            },
+            {
+                "jira_key": "CAP10-3",
+                "title": "Enforce tenant isolation with NetworkPolicy",
+                "description": "Apply a default-deny NetworkPolicy per namespace so a team's pods can only talk to what they're explicitly allowed to — cross-tenant traffic is blocked by default.",
+                "acceptance_criteria": "With default-deny in place, a pod in team A's namespace cannot reach team B's pods, and allowed intra-namespace/egress flows still work (see academy-kubernetes-009-backup-networkpolicy).",
+                "hint": "THE LESSON: without a default-deny policy, every namespace is flat-network reachable from every other — 'isolation' that isn't. Make deny the default and open only what's needed. (Kubernetes multi-tenancy.)",
+                "order": 3,
+                "depends_on": "CAP10-2",
+            },
+            {
+                "jira_key": "CAP10-4",
+                "title": "Deliver secrets without touching git",
+                "description": "Wire secret delivery into the golden path (sealed secrets / external secrets / mounted Secret from a manager) so the scaffolded service gets credentials at runtime and nothing sensitive is ever committed.",
+                "acceptance_criteria": "The service receives its secrets at runtime, a repo scan finds zero plaintext secrets, and rotating a secret does not require a code change (see academy-kubernetes-006-security-secrets).",
+                "hint": "If the paved road doesn't include secret handling, teams will paste secrets into env files and git. Secure-by-default means the platform hands them the safe way before they invent an unsafe one. (Security.)",
+                "order": 4,
+                "depends_on": "CAP10-3",
+            },
+            {
+                "jira_key": "CAP10-5",
+                "title": "Wire observability in by default",
+                "description": "Ensure every scaffolded service ships a metrics endpoint that Prometheus auto-discovers and a starter dashboard/alert — observability the team gets for free (see academy-prometheus-007-automation-service-discovery).",
+                "acceptance_criteria": "A newly scaffolded service appears in Prometheus targets automatically and exposes RED metrics with a default alert, with no per-service monitoring setup by the team.",
+                "hint": "Auto-discovery via labels means teams never file a ticket to be monitored. Observability opted-out-of, not opted-in-to, is the golden-path way. (Prometheus service discovery.)",
+                "order": 5,
+                "depends_on": "CAP10-4",
+            },
+            {
+                "jira_key": "CAP10-6",
+                "title": "Prove the paved road end to end",
+                "description": "Scaffold a brand-new service and take it from `create` to deployed, isolated, secret-fed, and monitored without hand-editing security or observability.",
+                "acceptance_criteria": "A fresh service reaches production through the golden path with default-deny isolation, runtime secrets, and auto-monitoring — none added manually.",
+                "hint": "The acceptance bar for a golden path is: the easy way IS the secure way. If a shortcut skips isolation or secrets, the path failed. (End-to-end validation.)",
+                "order": 6,
+                "depends_on": "CAP10-5",
+            },
+        ],
+    },
+
+    # ── CAP11: Data Pipeline with SLAs ────────────────────────────────────
+    {
+        "technology_slug": "data-science",
+        "title": "Capstone: Data Pipeline with SLAs — Fresh AND Correct",
+        "slug": "capstone-data-pipeline-slas",
+        "architecture_type": "custom",
+        "description": (
+            "CROSS-TECHNOLOGY CAPSTONE (Python + DevOps + PostgreSQL + Prometheus). Downstream teams depend on "
+            "a daily dataset. Build the pipeline as a product with an SLA: ingest raw data, promise a "
+            "freshness SLO, transform it in the warehouse, gate it on data-quality checks, and monitor "
+            "freshness as an SLI you alert on. The lesson: freshness AND correctness are BOTH SLIs — a "
+            "pipeline that is on time but wrong, or correct but stale, has still broken its contract."
+        ),
+        "objectives": [
+            "Ingest raw data reliably and idempotently",
+            "Define and publish a freshness SLO for the dataset",
+            "Transform the data in the warehouse",
+            "Gate on quality and monitor freshness as an alertable SLI",
+        ],
+        "difficulty": "advanced",
+        "estimated_hours": 9,
+        "order": 23,
+        "tasks": [
+            {
+                "jira_key": "CAP11-1",
+                "title": "Ingest the raw data (Python)",
+                "description": "Write an idempotent Python ingestion job that pulls the source data and lands it in a raw table, safe to re-run without duplicating rows (see academy-python-010-integration-data-processing).",
+                "acceptance_criteria": "The ingestion job lands raw data and re-running it produces no duplicates and no gaps (idempotent by natural key or load window).",
+                "hint": "Idempotency is the foundation of an SLA — retries and backfills must be safe. Upsert on a key or dedupe on a load window. (Python ingestion.)",
+                "order": 1,
+            },
+            {
+                "jira_key": "CAP11-2",
+                "title": "Define the freshness SLO",
+                "description": "Write the dataset's contract: 'data is no more than N hours old, available by HH:MM' and record it as a measurable target the pipeline is judged against.",
+                "acceptance_criteria": "A documented freshness SLO exists (max staleness + availability deadline) that downstream consumers can rely on and you can measure against.",
+                "hint": "An SLA you can't measure is a promise you can't keep. Express freshness as 'now() - max(loaded_at) < N hours' so it's a query, not a vibe. (DevOps/SLO definition.)",
+                "order": 2,
+                "depends_on": "CAP11-1",
+            },
+            {
+                "jira_key": "CAP11-3",
+                "title": "Transform in the warehouse (PostgreSQL)",
+                "description": "Build the modeled tables from raw with SQL transforms, keeping the transform re-runnable and the lineage clear (see academy-postgresql-002-build-schemas).",
+                "acceptance_criteria": "The transform produces the modeled tables deterministically from raw and can be re-run to reproduce the exact output.",
+                "hint": "Keep transforms deterministic and idempotent so a reprocess yields identical results — that's what makes correctness testable. (PostgreSQL transforms.)",
+                "order": 3,
+                "depends_on": "CAP11-2",
+            },
+            {
+                "jira_key": "CAP11-4",
+                "title": "Add quality gates (Python)",
+                "description": "Add data-quality checks (row counts, null/uniqueness/range assertions, referential checks) that BLOCK publication when they fail, so bad data never reaches consumers.",
+                "acceptance_criteria": "Injecting a bad batch causes the quality gate to fail and the dataset is NOT published; a clean batch passes and publishes.",
+                "hint": "THE LESSON, half one: on-time-but-wrong is still an outage. A quality gate must fail the run, not just log a warning — correctness is an SLI, so enforce it. (Python quality gates; academy-python-004-troubleshoot-testing patterns.)",
+                "order": 4,
+                "depends_on": "CAP11-3",
+            },
+            {
+                "jira_key": "CAP11-5",
+                "title": "Monitor freshness as an SLI (Prometheus)",
+                "description": "Export a freshness metric (dataset age / last-successful-load timestamp) to Prometheus and alert when it breaches the SLO from CAP11-2 (see academy-prometheus-003-operate-alerts).",
+                "acceptance_criteria": "Prometheus tracks dataset freshness and fires an alert when staleness exceeds the SLO or a load is missed, before consumers notice.",
+                "hint": "THE LESSON, half two: correct-but-stale is also an outage. Alert on freshness, not just job success — a job that 'succeeds' late still broke the SLA. Monitor BOTH freshness and quality. (Prometheus SLI.)",
+                "order": 5,
+                "depends_on": "CAP11-4",
+            },
+            {
+                "jira_key": "CAP11-6",
+                "title": "Simulate a breach and prove the guarantees",
+                "description": "Run two drills — a late/missing load and a corrupt batch — and confirm each is caught by the right guarantee (freshness alert vs. quality gate).",
+                "acceptance_criteria": "A delayed load trips the freshness alert and a corrupt batch is blocked by the quality gate; a healthy run passes both and publishes on time.",
+                "hint": "Two independent failure modes need two independent guarantees. If a corrupt batch trips only the freshness alert (or vice-versa), you've only covered half the contract. (Reliability drill.)",
+                "order": 6,
+                "depends_on": "CAP11-5",
+            },
+        ],
+    },
+
+    # ── CAP12: Progressive Delivery / canary + rollback ───────────────────
+    {
+        "technology_slug": "kubernetes",
+        "title": "Capstone: Progressive Delivery — Canary with Automated Rollback",
+        "slug": "capstone-progressive-delivery-canary",
+        "architecture_type": "cicd",
+        "description": (
+            "CROSS-TECHNOLOGY CAPSTONE (Kubernetes + Prometheus + Nginx + DevOps). Ship risky changes safely: "
+            "run two versions side by side (blue-green), emit per-version metrics so you can compare them, "
+            "shift a small slice of live traffic to the new version (canary), and wire an automated rollback "
+            "that triggers on an SLO breach. The lesson: a rollback is not a human paging another human at "
+            "02:00 — it is an automated SLO check that yanks the canary before customers feel it."
+        ),
+        "objectives": [
+            "Run two versions concurrently with blue-green Deployments",
+            "Emit per-version metrics to compare candidate vs. stable",
+            "Shift a controlled traffic slice to the canary at the edge",
+            "Automate rollback as an SLO check, not a manual decision",
+        ],
+        "difficulty": "advanced",
+        "estimated_hours": 9,
+        "order": 24,
+        "tasks": [
+            {
+                "jira_key": "CAP12-1",
+                "title": "Stand up blue-green Deployments",
+                "description": "Run the stable (blue) and candidate (green) versions as two Kubernetes Deployments behind version-labelled Services so both are live simultaneously (see academy-kubernetes-002-build-deployments).",
+                "acceptance_criteria": "Both versions run concurrently, each addressable by a version-scoped Service, with the stable version still taking all production traffic.",
+                "hint": "Blue-green gives you an instant, already-warm target to shift to and back from. Label pods by version so metrics and traffic can be sliced. (Kubernetes.)",
+                "order": 1,
+            },
+            {
+                "jira_key": "CAP12-2",
+                "title": "Emit per-version metrics",
+                "description": "Instrument the app so Prometheus records RED metrics broken out by a version label, letting you compare candidate against stable directly.",
+                "acceptance_criteria": "Prometheus shows error rate and latency split by version, so candidate-vs-stable can be compared on the same dashboard (see academy-prometheus-002-build-promql).",
+                "hint": "You can only judge a canary if you can see it separately. A `version` label on the metrics is what turns 'deploy and pray' into 'deploy and measure'. (Prometheus.)",
+                "order": 2,
+                "depends_on": "CAP12-1",
+            },
+            {
+                "jira_key": "CAP12-3",
+                "title": "Shift a canary slice of traffic",
+                "description": "Configure the Nginx edge to send a small weighted slice (e.g. 5%) of live traffic to the green version while the rest stays on blue.",
+                "acceptance_criteria": "Roughly the configured percentage of live requests hit the candidate, confirmed by the per-version metrics, and the split is adjustable.",
+                "hint": "Start small (1–5%). A canary limits blast radius so a bad version harms a sliver of users, not all of them. Use weighted upstreams / split_clients. (Nginx — no lab slug; use upstream weights or split_clients.)",
+                "order": 3,
+                "depends_on": "CAP12-2",
+            },
+            {
+                "jira_key": "CAP12-4",
+                "title": "Define the promotion/rollback SLO check",
+                "description": "Write the automated decision rule: compare the canary's error/latency SLIs against stable over a window and decide promote vs. rollback.",
+                "acceptance_criteria": "A codified SLO check evaluates the canary's metrics against thresholds and outputs a clear promote-or-rollback verdict.",
+                "hint": "THE LESSON: rollback is an automated SLO check, not a Slack message. Encode 'if canary error rate > stable + X for N minutes → rollback' as code that runs on its own. (DevOps decision automation.)",
+                "order": 4,
+                "depends_on": "CAP12-3",
+            },
+            {
+                "jira_key": "CAP12-5",
+                "title": "Wire the automated rollback",
+                "description": "Connect the SLO check to an automated action that shifts traffic back to blue (and halts the rollout) the moment the canary breaches — no human in the loop (see academy-devops-007-automation-rollback).",
+                "acceptance_criteria": "When the SLO check fails, traffic returns to the stable version automatically within the decision window and the rollout is marked failed.",
+                "hint": "The value is in the seconds you save at 02:00. Wire the check's 'rollback' verdict directly to the Nginx weight flip / rollout abort. (DevOps automation.)",
+                "order": 5,
+                "depends_on": "CAP12-4",
+            },
+            {
+                "jira_key": "CAP12-6",
+                "title": "Fire-drill: canary a bad build",
+                "description": "Deploy a deliberately broken green version and confirm the automated rollback pulls it before the SLO is breached for the whole fleet.",
+                "acceptance_criteria": "The bad canary is detected and rolled back automatically, only the canary slice saw errors, and the stable version's SLO was never breached.",
+                "hint": "Then canary a healthy build and confirm it auto-promotes. A rollback system you haven't triggered on purpose is a rollback system you don't have. (Fire drill.)",
+                "order": 6,
+                "depends_on": "CAP12-5",
+            },
+        ],
+    },
+
+    # ── CAP13: On-Call & DR Game-Day ──────────────────────────────────────
+    {
+        "technology_slug": "database",
+        "title": "Capstone: DR Game-Day — Prove Your Backups Under Fire",
+        "slug": "capstone-dr-gameday-backups",
+        "architecture_type": "custom",
+        "description": (
+            "CROSS-TECHNOLOGY CAPSTONE (PostgreSQL + Linux + Networking + Nginx + DevOps). Disaster recovery is "
+            "only real if you've rehearsed it. Take a verified backup, prove your RTO/RPO by actually "
+            "restoring it, stand up a warm standby across the network, script the failover, then run a "
+            "game-day where you kill the primary and recover on the clock. The lesson: an untested backup is "
+            "not a backup — it's a hope, and hope has a nasty habit of failing exactly when you need it."
+        ),
+        "objectives": [
+            "Take a backup and verify it can actually be restored",
+            "Measure real RTO/RPO by restoring, not by assuming",
+            "Bring up a warm standby reachable across the network",
+            "Script the failover and rehearse it in a live game-day",
+        ],
+        "difficulty": "advanced",
+        "estimated_hours": 9,
+        "order": 25,
+        "tasks": [
+            {
+                "jira_key": "CAP13-1",
+                "title": "Take a verified backup",
+                "description": "Take a PostgreSQL backup (base backup + WAL / logical dump) and immediately verify it by checksum and by test-restoring it into a scratch instance (see academy-database-001-learn-backup).",
+                "acceptance_criteria": "A backup exists AND a test restore of it into a scratch instance comes up clean and consistent — the backup is proven, not just present.",
+                "hint": "THE LESSON in one line: an unverified backup is a hope. Restore it now, in calm conditions, so you're not discovering it's corrupt during the outage. (PostgreSQL backup.)",
+                "order": 1,
+            },
+            {
+                "jira_key": "CAP13-2",
+                "title": "Prove RTO and RPO by restoring on the clock",
+                "description": "On a Linux host, time a full restore end to end and measure how much data you'd lose — turning RTO/RPO from aspirations into measured numbers.",
+                "acceptance_criteria": "A timed restore yields a real RTO (time-to-recover) and RPO (data-loss window) that are recorded and compared against the target objectives (see academy-linux-005-production-storage-lvm for the storage side).",
+                "hint": "RTO/RPO on a slide are fiction until you restore and read a stopwatch. Measure them; if they miss target, that's a finding, not a failure. (Linux + DR measurement.)",
+                "order": 2,
+                "depends_on": "CAP13-1",
+            },
+            {
+                "jira_key": "CAP13-3",
+                "title": "Open the standby network path",
+                "description": "Ensure the standby host can reach the primary's replication port across the network/firewall, and only from the standby.",
+                "acceptance_criteria": "The standby opens a TCP connection to the primary's replication port, and that port is closed to everything except the standby (see academy-networking-003-operate-firewall).",
+                "hint": "Replication that can't cross the network is a standby that will never catch up. Verify reachability before configuring replication, and scope the firewall tightly. (Networking.)",
+                "order": 3,
+                "depends_on": "CAP13-2",
+            },
+            {
+                "jira_key": "CAP13-4",
+                "title": "Bring up a warm standby",
+                "description": "Configure streaming replication so the standby continuously tracks the primary and stays within the RPO window (see academy-postgresql-005-production-replication).",
+                "acceptance_criteria": "The standby is streaming, replication lag stays inside the RPO target under write load, and the standby is queryable read-only.",
+                "hint": "A warm standby shrinks RTO from 'restore from backup' to 'promote in seconds'. Watch lag under load — a standby that can't keep up won't meet RPO. (PostgreSQL replication.)",
+                "order": 4,
+                "depends_on": "CAP13-3",
+            },
+            {
+                "jira_key": "CAP13-5",
+                "title": "Script the failover behind the app endpoint",
+                "description": "Promote the standby and repoint the application via the Nginx/proxy endpoint so clients follow the new primary without code changes.",
+                "acceptance_criteria": "Promoting the standby and flipping the Nginx upstream reconnects the app to the new primary with a bounded, measured cutover time.",
+                "hint": "Put the DB address behind a stable endpoint (proxy/DNS) so failover is one flip, not a client-by-client reconfig. Script it — don't improvise it during an incident. (Nginx endpoint + DevOps.)",
+                "order": 5,
+                "depends_on": "CAP13-4",
+            },
+            {
+                "jira_key": "CAP13-6",
+                "title": "Game-day: kill the primary and recover",
+                "description": "Run a live game-day — deliberately kill the primary under simulated load, execute the failover, and record actual RTO/RPO against target (see academy-devops-010-integration-incident-response).",
+                "acceptance_criteria": "With the primary killed under load, the failover recovers service within the RTO/RPO targets and the timeline is captured against the objectives.",
+                "hint": "Do it on purpose, on a calm afternoon, with the whole team watching — that's the only way to trust it on a bad night. Compare measured vs. target and file the gaps. (DevOps game-day.)",
+                "order": 6,
+                "depends_on": "CAP13-5",
+            },
+            {
+                "jira_key": "CAP13-7",
+                "title": "Write the DR runbook and findings",
+                "description": "Document the tested procedure, the measured RTO/RPO, and every gap the game-day exposed, so the next failover is faster and calmer.",
+                "acceptance_criteria": "A DR runbook records the exact failover steps, the measured objectives, and dated action items for any target that was missed.",
+                "hint": "The deliverable of a game-day is a better runbook and a shorter RTO next time. Untested steps in a runbook are the same hope you started with. (DR documentation.)",
+                "order": 7,
+                "depends_on": "CAP13-6",
+            },
+        ],
+    },
+
+    # ── CAP14: Secure SDLC & Supply Chain ─────────────────────────────────
+    {
+        "technology_slug": "security",
+        "title": "Capstone: Secure Supply Chain — Scan, Sign, and Enforce",
+        "slug": "capstone-secure-sdlc-supply-chain",
+        "architecture_type": "cicd",
+        "description": (
+            "CROSS-TECHNOLOGY CAPSTONE (DevOps + Docker + Security + Kubernetes + Linux). Close the software "
+            "supply chain end to end: scan dependencies and images in CI, ship a non-root minimal image, "
+            "generate an SBOM and cryptographically sign the artifact, then ENFORCE at deploy time with an "
+            "admission policy and lock the running workload down with a NetworkPolicy. The lesson: scanning "
+            "without enforcement is security theater — a red scan that still deploys protected nobody."
+        ),
+        "objectives": [
+            "Scan dependencies and images as a CI gate",
+            "Build a non-root, minimal container image",
+            "Produce an SBOM and sign the artifact",
+            "Enforce provenance at admission and constrain the workload at runtime",
+        ],
+        "difficulty": "advanced",
+        "estimated_hours": 10,
+        "order": 26,
+        "tasks": [
+            {
+                "jira_key": "CAP14-1",
+                "title": "Scan as a CI gate",
+                "description": "Add dependency and image vulnerability scanning to CI that FAILS the build on a critical/high finding (see academy-devops-006-security-observability and academy-security-007-automation-vulnerability).",
+                "acceptance_criteria": "A seeded critical CVE fails the pipeline and blocks the merge/publish; a clean build passes. The gate blocks, it doesn't just warn.",
+                "hint": "A scan whose findings are advisory is decoration. Make critical/high a hard fail so a vulnerable artifact cannot proceed. (DevOps + Security scanning.)",
+                "order": 1,
+            },
+            {
+                "jira_key": "CAP14-2",
+                "title": "Build a non-root, minimal image",
+                "description": "Author a multi-stage Dockerfile that runs as a non-root user on a minimal/distroless base with a healthcheck and pinned deps (see academy-docker-006-security-healthchecks).",
+                "acceptance_criteria": "The image runs as non-root (USER is not 0), is minimal (no shell/build tools in the runtime layer), and reports healthy.",
+                "hint": "Every extra binary in the image is attack surface and a future CVE. Drop to distroless + non-root so the runtime has almost nothing to exploit. (Docker hardening.)",
+                "order": 2,
+                "depends_on": "CAP14-1",
+            },
+            {
+                "jira_key": "CAP14-3",
+                "title": "Generate an SBOM and sign the artifact",
+                "description": "Produce a Software Bill of Materials for the image and cryptographically sign the image so its provenance is verifiable downstream.",
+                "acceptance_criteria": "A machine-readable SBOM is attached to the image and a valid signature verifies against the signing key; tampering breaks verification.",
+                "hint": "An SBOM answers 'what's inside?' and the signature answers 'did we build this and has it changed?'. You can't enforce provenance you never recorded. (Security supply chain.)",
+                "order": 3,
+                "depends_on": "CAP14-2",
+            },
+            {
+                "jira_key": "CAP14-4",
+                "title": "Enforce signed provenance at admission",
+                "description": "Add a Kubernetes admission policy that only admits images that are signed by your key (and pass policy), rejecting unsigned or unscanned images at deploy time.",
+                "acceptance_criteria": "An unsigned or policy-violating image is REJECTED by the cluster at admission; a signed, compliant image is admitted.",
+                "hint": "THE LESSON: this is the step that turns scanning-theater into real security. If the cluster will run whatever you push regardless of the scan, the scan protected no one. Gate admission on the signature. (Kubernetes admission control.)",
+                "order": 4,
+                "depends_on": "CAP14-3",
+            },
+            {
+                "jira_key": "CAP14-5",
+                "title": "Constrain the running workload with NetworkPolicy",
+                "description": "Apply a default-deny NetworkPolicy so the admitted workload can only make the connections it actually needs (see academy-kubernetes-009-backup-networkpolicy).",
+                "acceptance_criteria": "The running pod's egress/ingress is default-deny with only required flows allowed; an unexpected outbound connection is blocked.",
+                "hint": "Provenance stops a bad image getting in; runtime policy limits the blast radius if a good image is later compromised. Defense in depth on the Linux/network layer. (Kubernetes + Linux runtime.)",
+                "order": 5,
+                "depends_on": "CAP14-4",
+            },
+            {
+                "jira_key": "CAP14-6",
+                "title": "Prove the chain rejects a tampered artifact",
+                "description": "Attempt to deploy an unsigned/tampered image with a known CVE and confirm the pipeline and cluster block it at every gate; then deploy the clean signed image successfully.",
+                "acceptance_criteria": "The tampered artifact is stopped (CI gate and/or admission), the clean signed artifact deploys and runs constrained, and the audit trail shows why the bad one was rejected.",
+                "hint": "Test the whole chain adversarially — scan → sign → admit → constrain. A gate you never tried to bypass is a gate you don't know works. (End-to-end verification.)",
+                "order": 6,
+                "depends_on": "CAP14-5",
+            },
+        ],
+    },
+
+    # ── CAP15: FinOps — Right-Size & Autoscale ────────────────────────────
+    {
+        "technology_slug": "kubernetes",
+        "title": "Capstone: FinOps — Right-Size, Autoscale, and Attribute Cost",
+        "slug": "capstone-finops-rightsize-autoscale",
+        "architecture_type": "custom",
+        "description": (
+            "CROSS-TECHNOLOGY CAPSTONE (Prometheus + Kubernetes + Shell + Grafana). The cluster bill is "
+            "growing faster than traffic. Measure actual usage against requested resources, right-size the "
+            "requests, add autoscaling so capacity follows demand, scale non-prod to zero off-hours, and "
+            "attribute spend back to teams. The lesson: cost is a reliability dial, not just a finance number "
+            "— over-provisioning wastes money while under-provisioning causes outages, and both are "
+            "engineering decisions you make with data."
+        ),
+        "objectives": [
+            "Measure real usage vs. requested resources",
+            "Right-size requests/limits from the data",
+            "Autoscale so capacity tracks demand",
+            "Scale non-prod to zero and attribute cost by team",
+        ],
+        "difficulty": "advanced",
+        "estimated_hours": 9,
+        "order": 27,
+        "tasks": [
+            {
+                "jira_key": "CAP15-1",
+                "title": "Measure usage vs. requests",
+                "description": "Use Prometheus to compare each workload's actual CPU/memory usage against its Kubernetes resource requests over a representative window (see academy-prometheus-010-integration-exporters).",
+                "acceptance_criteria": "A query/report shows per-workload utilization vs. requests, surfacing the workloads requesting far more than they use.",
+                "hint": "You right-size from data, never from a guess. The gap between p95 usage and requested resources is money on the floor (or a latent outage if it's negative). (Prometheus.)",
+                "order": 1,
+            },
+            {
+                "jira_key": "CAP15-2",
+                "title": "Right-size requests and limits",
+                "description": "Adjust requests/limits to match measured usage plus headroom, reclaiming idle capacity without starving the workload.",
+                "acceptance_criteria": "Requests/limits are tuned to measured usage + headroom, schedulable density improves, and no workload is CPU-throttled or OOM-killed after the change.",
+                "hint": "THE LESSON, half one: over-provisioning burns money; under-provisioning burns your SLO via throttling/OOM. Right-sizing is where cost and reliability are the same dial. (Kubernetes requests/limits.)",
+                "order": 2,
+                "depends_on": "CAP15-1",
+            },
+            {
+                "jira_key": "CAP15-3",
+                "title": "Autoscale so capacity tracks demand",
+                "description": "Add an HPA (and/or cluster autoscaler behavior) so replicas and nodes scale with real demand instead of being statically over-provisioned for peak (see academy-kubernetes-010-integration-autoscaling).",
+                "acceptance_criteria": "Under variable load the workload scales up and back down, and idle capacity is released rather than paid for around the clock.",
+                "hint": "Static capacity for peak means paying for peak 24/7. Autoscaling turns 'always pay for the worst case' into 'pay for what you use'. (Kubernetes autoscaling.)",
+                "order": 3,
+                "depends_on": "CAP15-2",
+            },
+            {
+                "jira_key": "CAP15-4",
+                "title": "Scale non-prod to zero off-hours",
+                "description": "Write a scheduled shell job that scales dev/staging workloads to zero outside business hours and back up before the workday (see academy-shell-script-007-automation-cron).",
+                "acceptance_criteria": "Non-prod workloads are scaled to zero on a schedule overnight/weekends and restored automatically before work hours, with the saved hours quantified.",
+                "hint": "Nobody uses staging at 03:00 on Sunday, yet most teams pay for it. A cron that parks non-prod is often the single biggest, safest cost win. (Shell automation + cron.)",
+                "order": 4,
+                "depends_on": "CAP15-3",
+            },
+            {
+                "jira_key": "CAP15-5",
+                "title": "Attribute cost by team in Grafana",
+                "description": "Build a Grafana dashboard that breaks cost/usage down by team or namespace label so spend is visible to the people who create it (see academy-grafana-002-build-dashboards).",
+                "acceptance_criteria": "A Grafana dashboard shows cost/usage attributed by team/namespace, and each team can see its own spend trend.",
+                "hint": "THE LESSON, half two: unattributed cost is nobody's problem and everybody's bill. Showback/chargeback by team turns cost into a signal engineers actually act on. (Grafana.)",
+                "order": 5,
+                "depends_on": "CAP15-4",
+            },
+            {
+                "jira_key": "CAP15-6",
+                "title": "Quantify the savings and set guardrails",
+                "description": "Compare before/after cost and set guardrails (request/limit ranges, autoscaling bounds, off-hours schedule) so the savings don't erode and reliability stays intact.",
+                "acceptance_criteria": "A before/after comparison shows the cost reduction, SLOs still hold, and guardrails are in place to keep requests right-sized going forward.",
+                "hint": "Prove the dial moved the right way: lower cost AND intact SLO. Then codify the guardrails so the next deploy can't silently re-inflate the bill. (FinOps close-out.)",
+                "order": 6,
+                "depends_on": "CAP15-5",
+            },
+        ],
+    },
+
+    # ── CAP16: Zero-Downtime Schema Migration ─────────────────────────────
+    {
+        "technology_slug": "postgresql",
+        "title": "Capstone: Zero-Downtime Schema Migration — Expand, Migrate, Contract",
+        "slug": "capstone-zero-downtime-schema-migration",
+        "architecture_type": "custom",
+        "description": (
+            "CROSS-TECHNOLOGY CAPSTONE (Python + PostgreSQL + Shell). You must change a hot table's schema with "
+            "the app fully live. Walk the expand-migrate-contract pattern: baseline the current behavior, add "
+            "the new column additively, dual-write to old and new, backfill history, cut reads over behind a "
+            "flag, then contract by dropping the old column. The lesson: never rename/drop in one shot — "
+            "expand-migrate-contract keeps old and new code working simultaneously so no deploy ordering can "
+            "take you down."
+        ),
+        "objectives": [
+            "Baseline the current schema and behavior",
+            "Add the new shape additively (expand) without breaking old code",
+            "Dual-write and backfill so old and new agree",
+            "Cut reads over behind a flag, then contract safely",
+        ],
+        "difficulty": "advanced",
+        "estimated_hours": 9,
+        "order": 28,
+        "tasks": [
+            {
+                "jira_key": "CAP16-1",
+                "title": "Baseline the current behavior (Python)",
+                "description": "Capture the current schema and write tests/fixtures that pin the app's existing read/write behavior against the table (see academy-python-004-troubleshoot-testing).",
+                "acceptance_criteria": "A baseline test suite passes against the current schema and will catch any behavior regression during the migration.",
+                "hint": "You need a green baseline to know each migration step changed nothing observable. Pin behavior first; migrate second. (Python baseline.)",
+                "order": 1,
+            },
+            {
+                "jira_key": "CAP16-2",
+                "title": "Expand: add the new shape additively",
+                "description": "Apply an ADDITIVE DDL change — add the new column (nullable / with default) alongside the old one, without renaming or dropping anything (see academy-postgresql-003-operate-indexes for online/index concerns).",
+                "acceptance_criteria": "The new column exists, the old column is untouched, and the currently-deployed app keeps working unchanged against the expanded schema.",
+                "hint": "THE LESSON: additive-only DDL means old code and new code both run against the same schema — so no deploy order can break. A rename in one shot has no such safe window. Avoid table-rewriting/locking DDL on the hot table. (PostgreSQL expand.)",
+                "order": 2,
+                "depends_on": "CAP16-1",
+            },
+            {
+                "jira_key": "CAP16-3",
+                "title": "Dual-write to old and new (Python)",
+                "description": "Update the app to write BOTH the old and new columns on every write, keeping them consistent for all new rows.",
+                "acceptance_criteria": "Every new write populates both old and new columns consistently, verified by a check that old and new agree for rows written after the change.",
+                "hint": "Dual-write keeps the two representations in sync going forward while you backfill the past. Old readers still see the old column; new readers can start trusting the new one. (Python dual-write.)",
+                "order": 3,
+                "depends_on": "CAP16-2",
+            },
+            {
+                "jira_key": "CAP16-4",
+                "title": "Backfill history (Shell)",
+                "description": "Run a batched, resumable shell/SQL backfill that fills the new column for pre-existing rows without long locks or replication lag spikes (see academy-shell-script-005-production-pipes).",
+                "acceptance_criteria": "All historical rows have the new column populated, the backfill ran in bounded batches without blocking writers, and old==new for every row.",
+                "hint": "Backfill in small committed batches with a sleep — a single UPDATE over a hot table locks it and spikes replication lag. Make it resumable so a restart doesn't redo work. (Shell/SQL backfill.)",
+                "order": 4,
+                "depends_on": "CAP16-3",
+            },
+            {
+                "jira_key": "CAP16-5",
+                "title": "Cut reads over behind a flag (Python)",
+                "description": "Flip reads to the new column behind a feature flag, so you can switch back instantly if anything looks wrong.",
+                "acceptance_criteria": "With the flag on, reads use the new column and the baseline tests still pass; flipping the flag off instantly restores reads from the old column.",
+                "hint": "The flag makes the riskiest step reversible in one toggle. Watch metrics after the flip; only proceed to contract once new-reads are proven in production. (Python flag-gated read cutover.)",
+                "order": 5,
+                "depends_on": "CAP16-4",
+            },
+            {
+                "jira_key": "CAP16-6",
+                "title": "Contract: drop the old column",
+                "description": "After all code reads the new column and the flag is fully rolled out, stop dual-writing and drop the old column in a final contract migration.",
+                "acceptance_criteria": "No code references the old column, dual-write is removed, the old column is dropped, and the baseline suite passes against the final schema.",
+                "hint": "Contract only after the old column is provably unused — check code and query stats. Expand-migrate-contract done: the schema changed under a fully-live app with zero downtime. (PostgreSQL contract.)",
+                "order": 6,
+                "depends_on": "CAP16-5",
+            },
+        ],
+    },
+
+    # ── CAP17: Multi-Region Active/Passive ────────────────────────────────
+    {
+        "technology_slug": "networking",
+        "title": "Capstone: Multi-Region Active/Passive — Fail Over Without Split-Brain",
+        "slug": "capstone-multi-region-active-passive",
+        "architecture_type": "custom",
+        "description": (
+            "CROSS-TECHNOLOGY CAPSTONE (Linux + PostgreSQL + Wireshark + Nginx + Database). Survive a whole "
+            "region going dark. Stand up two regions, replicate the database across the WAN, understand the "
+            "latency you're fighting, add DNS-based failover to the passive region, and — the part everyone "
+            "gets wrong — fence the writer so only ONE region can accept writes at a time. The lesson: enforce "
+            "single-writer fencing, because a naive active/passive failover that lets both regions write "
+            "during a partition gives you split-brain and irreconcilable data."
+        ),
+        "objectives": [
+            "Stand up two regions and connect them",
+            "Replicate the database across the WAN and measure latency",
+            "Add DNS failover to the passive region",
+            "Fence the writer so split-brain is impossible",
+        ],
+        "difficulty": "advanced",
+        "estimated_hours": 10,
+        "order": 29,
+        "tasks": [
+            {
+                "jira_key": "CAP17-1",
+                "title": "Stand up two regions",
+                "description": "Provision an active and a passive region on Linux hosts with routing between them, so you have two independent failure domains (see academy-linux-003-operate-systemd-services for the service layer, academy-networking-001-learn-routing for connectivity).",
+                "acceptance_criteria": "Two regions exist with the app service running in each and routing established between them.",
+                "hint": "Two regions must be genuinely independent failure domains, then explicitly connected — that separation is the whole point of multi-region. (Linux + Networking.)",
+                "order": 1,
+            },
+            {
+                "jira_key": "CAP17-2",
+                "title": "Replicate the database across the WAN",
+                "description": "Configure asynchronous PostgreSQL replication from the active region's primary to the passive region's standby (see academy-postgresql-005-production-replication).",
+                "acceptance_criteria": "The passive region's standby streams from the active primary and stays within an acceptable lag window across the WAN link.",
+                "hint": "Cross-region replication is usually async — the speed of light guarantees lag. That lag is exactly the data you may lose on failover, so measure it. (PostgreSQL WAN replication.)",
+                "order": 2,
+                "depends_on": "CAP17-1",
+            },
+            {
+                "jira_key": "CAP17-3",
+                "title": "Understand the WAN latency (Wireshark)",
+                "description": "Capture and analyze the cross-region replication traffic to quantify round-trip latency and how it bounds replication lag and failover RPO (see academy-wireshark-based scenarios).",
+                "acceptance_criteria": "A packet capture quantifies the WAN round-trip time and shows how it drives replication lag, giving a data-backed RPO estimate.",
+                "hint": "WAN latency is a hard floor on how fresh the passive copy can be — you can't out-engineer physics, only design around it. Read it off the wire, don't assume it. (Wireshark WAN analysis.)",
+                "order": 3,
+                "depends_on": "CAP17-2",
+            },
+            {
+                "jira_key": "CAP17-4",
+                "title": "Add DNS failover to the passive region",
+                "description": "Put the app behind a DNS/endpoint layer (fronted by Nginx) with health checks so client traffic redirects to the passive region when the active one is unreachable (see academy-networking-002-build-dns).",
+                "acceptance_criteria": "Killing the active region causes DNS/health-checked routing to send client traffic to the passive region within the TTL/failover window.",
+                "hint": "DNS failover moves the traffic; it does NOT decide who owns writes. Mind the TTL — a long TTL means clients keep hitting the dead region. (Nginx + DNS failover.)",
+                "order": 4,
+                "depends_on": "CAP17-3",
+            },
+            {
+                "jira_key": "CAP17-5",
+                "title": "Fence the single writer",
+                "description": "Add a fencing mechanism (leader lease / quorum / STONITH-style guard) so that at most ONE region can be promoted to writer — the passive region refuses writes until it provably owns the lease.",
+                "acceptance_criteria": "Under a simulated partition, only one region ever accepts writes; the other refuses promotion, and there is no window where both are writable.",
+                "hint": "THE LESSON: DNS failover + async replication with no fencing = split-brain. During a partition both sides think they're primary, both accept writes, and the data can never be reconciled. Fence writes to a single owner. (Database fencing / single-writer.)",
+                "order": 5,
+                "depends_on": "CAP17-4",
+            },
+            {
+                "jira_key": "CAP17-6",
+                "title": "Game-day: partition and fail over cleanly",
+                "description": "Simulate a region outage and a network partition, execute the failover, and confirm no split-brain occurred and RPO matched the WAN-latency estimate.",
+                "acceptance_criteria": "The failover promotes exactly one writer, traffic follows via DNS, no split-brain writes occurred, and the observed data-loss window matches the measured RPO.",
+                "hint": "Test the partition explicitly, not just a clean shutdown — clean failover is easy; the partition is where split-brain hides. One writer, always. (Multi-region game-day.)",
+                "order": 6,
+                "depends_on": "CAP17-5",
+            },
+        ],
+    },
+
+    # ── CAP18: Junior's First PR to Prod / feature flag (BEGINNER) ────────
+    {
+        "technology_slug": "nodejs",
+        "title": "Capstone: Your First PR to Prod — Ship a Feature Behind a Flag",
+        "slug": "capstone-first-pr-to-prod-feature-flag",
+        "architecture_type": "cicd",
+        "description": (
+            "CROSS-TECHNOLOGY CAPSTONE — BEGINNER ON-RAMP (Node.js + JavaScript + DevOps + Docker). Your first "
+            "change all the way to production, the safe way the pros do it. Run the app locally, add a small "
+            "feature behind an off-by-default flag, test it, open a PR that passes CI, deploy to staging, roll "
+            "it out gradually in prod, and finally remove the flag. The lesson every senior engineer learns "
+            "the hard way: a feature flag has a lifecycle — a flag you never remove becomes flag debt that "
+            "rots the codebase."
+        ),
+        "objectives": [
+            "Run the app locally and make a change",
+            "Add a feature behind an off-by-default flag and test it",
+            "Open a PR that passes CI and deploy to staging",
+            "Roll out gradually in prod, then retire the flag",
+        ],
+        "difficulty": "beginner",
+        "estimated_hours": 7,
+        "order": 30,
+        "tasks": [
+            {
+                "jira_key": "CAP18-1",
+                "title": "Run the app locally (Node.js)",
+                "description": "Clone, install dependencies, and run the Node.js app locally so you can see it working before you change anything (see academy-nodejs-001-learn-express).",
+                "acceptance_criteria": "The app starts locally and its endpoints respond, giving you a known-good baseline to build on.",
+                "hint": "Always get the app running unchanged first — then any breakage you see later is clearly from your change, not the setup. (Node.js local dev.)",
+                "order": 1,
+            },
+            {
+                "jira_key": "CAP18-2",
+                "title": "Add the feature behind an off-by-default flag (Node.js)",
+                "description": "Implement the new feature gated by a feature flag that defaults to OFF, so merging the code changes nothing in production until you decide.",
+                "acceptance_criteria": "With the flag OFF the app behaves exactly as before; with the flag ON the new feature appears. Default is OFF.",
+                "hint": "Off-by-default decouples 'merge the code' from 'turn on the feature'. That's what lets you ship incomplete/risky work safely to main. (Node.js feature flag.)",
+                "order": 2,
+                "depends_on": "CAP18-1",
+            },
+            {
+                "jira_key": "CAP18-3",
+                "title": "Test both flag states (JavaScript)",
+                "description": "Write automated tests covering the feature both OFF (unchanged behavior) and ON (new behavior) (see academy-javascript-007-automation-testing).",
+                "acceptance_criteria": "Tests pass for both flag states, proving the OFF path is a true no-op and the ON path works.",
+                "hint": "Test BOTH states or you don't actually know the flag is safe. The OFF path is the one that ships to everyone first, so prove it changed nothing. (JavaScript testing.)",
+                "order": 3,
+                "depends_on": "CAP18-2",
+            },
+            {
+                "jira_key": "CAP18-4",
+                "title": "Open a PR that passes CI (DevOps)",
+                "description": "Push a branch, open a pull request, and get CI green (lint + tests + build) before requesting review (see academy-devops-002-build-ci-pipeline).",
+                "acceptance_criteria": "A PR exists with CI passing (lint, tests, build all green) and a clear description of the change and the flag.",
+                "hint": "Green CI is the ticket to review — reviewers judge intent, machines judge correctness. Describe the flag and its default in the PR so reviewers know it's safe to merge. (DevOps/CI.)",
+                "order": 4,
+                "depends_on": "CAP18-3",
+            },
+            {
+                "jira_key": "CAP18-5",
+                "title": "Deploy to staging (Docker)",
+                "description": "Build the app image and deploy it to staging, then flip the flag ON in staging to validate the feature in a prod-like environment (see academy-docker-002-build-dockerfile).",
+                "acceptance_criteria": "The image deploys to staging and, with the flag ON there, the feature works end to end in a prod-like environment.",
+                "hint": "Staging is where you turn the flag on FIRST — same artifact as prod, real integrations, no customers. Validate here before touching production. (Docker + staging.)",
+                "order": 5,
+                "depends_on": "CAP18-4",
+            },
+            {
+                "jira_key": "CAP18-6",
+                "title": "Roll out gradually in production (DevOps)",
+                "description": "In prod, enable the flag for a small percentage of users first, watch for errors, then ramp to 100% (see academy-devops-003-operate-cd-release).",
+                "acceptance_criteria": "The flag is enabled for a small cohort, metrics/errors are checked, and it's ramped to 100% only after the small cohort looks healthy.",
+                "hint": "Gradual rollout limits blast radius: if it's broken, a few users hit it, not everyone. Watch error rates at each step before ramping. (DevOps progressive rollout.)",
+                "order": 6,
+                "depends_on": "CAP18-5",
+            },
+            {
+                "jira_key": "CAP18-7",
+                "title": "Retire the flag (Node.js)",
+                "description": "Once the feature is at 100% and stable, remove the flag and its dead OFF-path code, and close the loop.",
+                "acceptance_criteria": "The flag and its now-dead conditional branches are deleted, the feature is unconditional, and tests still pass.",
+                "hint": "THE LESSON: a flag has a lifecycle that ENDS. Leaving stale flags around is flag debt — every unremoved flag doubles a code path forever and eventually causes a 'we forgot which state prod is in' incident. Remove it. (Node.js flag cleanup.)",
+                "order": 7,
+                "depends_on": "CAP18-6",
+            },
+        ],
+    },
+
+    # ── CAP19: ML Platform — Train / Serve / Monitor Drift ────────────────
+    {
+        "technology_slug": "ai-ml",
+        "title": "Capstone: ML Platform — Train, Serve, and Catch Drift",
+        "slug": "capstone-ml-platform-train-serve-drift",
+        "architecture_type": "microservices",
+        "description": (
+            "CROSS-TECHNOLOGY CAPSTONE (Python/scikit-learn + Shell + Docker + Kubernetes + Prometheus + "
+            "DevOps). Take a model from a notebook to a monitored production service — fully offline with "
+            "scikit-learn/spaCy, no external API. Train a model, version the model AND its training data, "
+            "package it, deploy it, detect input/prediction DRIFT, and retrain behind a canary. The lesson "
+            "that separates ML ops from web ops: monitor the DATA, not just uptime — a model can be 100% "
+            "'up' and returning fast responses while quietly becoming wrong as the world shifts under it."
+        ),
+        "objectives": [
+            "Train a model reproducibly offline",
+            "Version both the model and its training data",
+            "Package and deploy the model as a service",
+            "Detect data/prediction drift and retrain safely behind a canary",
+        ],
+        "difficulty": "advanced",
+        "estimated_hours": 10,
+        "order": 31,
+        "tasks": [
+            {
+                "jira_key": "CAP19-1",
+                "title": "Train the model (Python/scikit-learn)",
+                "description": "Train a model offline with scikit-learn/spaCy on a fixed dataset, recording the metrics and the exact code/params used (see academy-ai-ml-003-operate-training).",
+                "acceptance_criteria": "A trained model artifact exists with recorded evaluation metrics, produced reproducibly from a pinned dataset and seed — no external API calls.",
+                "hint": "Reproducibility starts at training: pin the seed, the data, and the params so the same inputs always yield the same model. Everything offline. (scikit-learn/spaCy training.)",
+                "order": 1,
+            },
+            {
+                "jira_key": "CAP19-2",
+                "title": "Version the model AND the data (Shell)",
+                "description": "Write a shell workflow that versions the model artifact together with a hash/snapshot of the training data and the metrics, so any prediction is traceable to a (data, model) pair (see academy-shell-script-009-backup-safe-delete for artifact-handling discipline).",
+                "acceptance_criteria": "Each model version is stored with the hash of its training data and its metrics, and you can recover exactly which data produced any given model.",
+                "hint": "In ML, the DATA is half the artifact. Versioning the model without the data means you can never explain or reproduce a prediction later. Hash and store both. (Shell versioning.)",
+                "order": 2,
+                "depends_on": "CAP19-1",
+            },
+            {
+                "jira_key": "CAP19-3",
+                "title": "Package the model (Docker)",
+                "description": "Wrap the model in a Python inference service and build a Docker image that loads a specific model version and serves predictions (see academy-docker-002-build-dockerfile).",
+                "acceptance_criteria": "A Docker image serves predictions from a pinned model version via an HTTP endpoint and reports healthy, fully offline.",
+                "hint": "The image should reference an explicit model version, never 'latest' — you must know which model is answering. Multi-stage, non-root, healthcheck. (Docker packaging.)",
+                "order": 3,
+                "depends_on": "CAP19-2",
+            },
+            {
+                "jira_key": "CAP19-4",
+                "title": "Deploy the model service (Kubernetes)",
+                "description": "Deploy the inference service to Kubernetes with a Deployment, Service, probes, and resource limits (see academy-kubernetes-002-build-deployments).",
+                "acceptance_criteria": "The model service runs on Kubernetes with readiness/liveness probes and limits, and serves predictions through its Service.",
+                "hint": "Model services are just services — but the readiness probe should confirm the MODEL loaded, not just that the process started. (Kubernetes deploy.)",
+                "order": 4,
+                "depends_on": "CAP19-3",
+            },
+            {
+                "jira_key": "CAP19-5",
+                "title": "Detect data and prediction drift (Prometheus)",
+                "description": "Instrument the service to emit feature-distribution and prediction-distribution statistics, and alert in Prometheus when they drift from the training baseline (see academy-prometheus-003-operate-alerts and academy-ai-ml-008-observability-drift).",
+                "acceptance_criteria": "Prometheus tracks input/prediction distributions vs. the training baseline and fires a drift alert when they diverge — even while latency and uptime stay green.",
+                "hint": "THE LESSON: monitor the DATA, not just uptime. A model with perfect latency and 100% uptime can be silently wrong because the incoming data no longer looks like the training data. Uptime dashboards will never catch that; distribution monitoring will. (Prometheus drift monitoring.)",
+                "order": 5,
+                "depends_on": "CAP19-4",
+            },
+            {
+                "jira_key": "CAP19-6",
+                "title": "Retrain and roll out behind a canary (DevOps)",
+                "description": "When drift fires, retrain on fresh data (producing a new versioned (data, model) pair) and roll the new model out behind a canary, comparing it against the incumbent before full promotion (see academy-devops-007-automation-rollback).",
+                "acceptance_criteria": "A drift alert triggers retraining to a new versioned model, which is canaried against the current model and only promoted if it wins on the eval metrics; otherwise it's rolled back.",
+                "hint": "Never blind-promote a retrained model — a fresh model can be worse. Canary it against the incumbent on real traffic and let the metrics decide, exactly like a code rollout. (DevOps + ML canary.)",
+                "order": 6,
+                "depends_on": "CAP19-5",
+            },
+        ],
+    },
+
+    # ══════════════════════════════════════════════════════════════════════
+    # ZERO-TO-HERO TRACKS for the four in-demand technologies that shipped
+    # scenario tracks but no guided projects yet: DevSecOps Supply Chain,
+    # GitOps, OpenTelemetry, and Service Mesh. Five guided projects each so
+    # every active, learner-facing technology honours the ">=5 projects"
+    # guarantee. Each references the technology's real hands-on scenario slugs.
+    # ══════════════════════════════════════════════════════════════════════
+
+    # ── DevSecOps Supply Chain (devsecops-supplychain) ────────────────────
+    {
+        "technology_slug": "devsecops-supplychain",
+        "title": "Fix a Critical CVE Before It Ships",
+        "slug": "devsecops-fix-critical-cve",
+        "architecture_type": "cicd",
+        "description": (
+            "A Trivy scan just failed the pipeline on a critical CVE in a base image. Triage it, remediate at "
+            "the right layer, and make the scan a real gate — so vulnerable images never reach the registry."
+        ),
+        "objectives": [
+            "Read a scanner report and locate the vulnerable component",
+            "Remediate at the correct layer (base image / dependency)",
+            "Turn the scan into a build-blocking gate",
+        ],
+        "difficulty": "intermediate",
+        "estimated_hours": 4,
+        "order": 40,
+        "tasks": [
+            {
+                "jira_key": "DSEC1-1",
+                "title": "Reproduce the failing scan",
+                "description": "Run the image vulnerability scan and read the report to find the critical CVE and the exact component/version that introduced it (see the devsecops-trivy-critical-cve lab).",
+                "acceptance_criteria": "The scan reproduces the critical finding and you can name the vulnerable package and the layer it came from.",
+                "hint": "Scanners point at a package AND a fixed-in version. Note both — that's your remediation target. (DevSecOps scanning.)",
+                "order": 1,
+            },
+            {
+                "jira_key": "DSEC1-2",
+                "title": "Trace it to the right layer",
+                "description": "Determine whether the CVE comes from the base image or an app dependency, since that decides how you fix it.",
+                "acceptance_criteria": "The vulnerable component is attributed to either the base image or an application dependency with evidence.",
+                "hint": "A CVE in the base image is fixed by bumping/rebasing the image; one in app deps is fixed in your manifest/lockfile. Fix at the wrong layer and it comes back. (Layer analysis.)",
+                "order": 2,
+                "depends_on": "DSEC1-1",
+            },
+            {
+                "jira_key": "DSEC1-3",
+                "title": "Remediate the vulnerability",
+                "description": "Bump the base image or dependency to a fixed version and rebuild.",
+                "acceptance_criteria": "A rebuilt image no longer reports the critical CVE on re-scan.",
+                "hint": "Prefer the minimal bump that clears the CVE; re-scan to confirm you didn't just move the problem. (Remediation.)",
+                "order": 3,
+                "depends_on": "DSEC1-2",
+            },
+            {
+                "jira_key": "DSEC1-4",
+                "title": "Make the scan a blocking gate",
+                "description": "Configure CI so a critical/high finding FAILS the build rather than warning.",
+                "acceptance_criteria": "Re-introducing a critical CVE fails the pipeline; the clean image passes and is allowed to publish.",
+                "hint": "Advisory scans get ignored. Set the severity threshold to fail the job so the gate has teeth. (CI gate.)",
+                "order": 4,
+                "depends_on": "DSEC1-3",
+            },
+            {
+                "jira_key": "DSEC1-5",
+                "title": "Document the remediation policy",
+                "description": "Write the team's policy: severity thresholds, allowed exceptions, and re-scan cadence.",
+                "acceptance_criteria": "A short policy records the fail thresholds, the exception process, and how often images are re-scanned.",
+                "hint": "A policy turns one fix into a repeatable standard the whole team follows. (Policy.)",
+                "order": 5,
+                "depends_on": "DSEC1-4",
+            },
+        ],
+    },
+    {
+        "technology_slug": "devsecops-supplychain",
+        "title": "Sign and Verify Images with Cosign",
+        "slug": "devsecops-cosign-sign-verify",
+        "architecture_type": "cicd",
+        "description": (
+            "Unsigned images can be swapped or tampered between build and deploy. Establish signing with Cosign "
+            "and verification at admission so only images you built and signed can run."
+        ),
+        "objectives": [
+            "Generate signing keys and sign an image",
+            "Verify signatures and reject unsigned images",
+            "Enforce signature verification at deploy time",
+        ],
+        "difficulty": "intermediate",
+        "estimated_hours": 4,
+        "order": 41,
+        "tasks": [
+            {
+                "jira_key": "DSEC2-1",
+                "title": "Reproduce the unsigned-image gap",
+                "description": "Show that an unsigned image is currently accepted, establishing the risk (see the devsecops-cosign-unsigned-image lab).",
+                "acceptance_criteria": "An unsigned image is demonstrably accepted today, documenting the tampering window.",
+                "hint": "Without verification, nothing proves the running image is the one you built. Show the gap first. (Threat framing.)",
+                "order": 1,
+            },
+            {
+                "jira_key": "DSEC2-2",
+                "title": "Generate keys and sign the image",
+                "description": "Create a signing key pair and sign the built image with Cosign.",
+                "acceptance_criteria": "The image has a valid Cosign signature attached in the registry.",
+                "hint": "Keep the private key in a secret store, never in the repo. The signature is your provenance proof. (Cosign signing.)",
+                "order": 2,
+                "depends_on": "DSEC2-1",
+            },
+            {
+                "jira_key": "DSEC2-3",
+                "title": "Verify signatures",
+                "description": "Verify the signature with the public key and confirm a tampered/unsigned image fails verification.",
+                "acceptance_criteria": "The signed image verifies; an unsigned or altered image fails verification.",
+                "hint": "Tampering must break verification — that's the whole guarantee. Test both the pass and fail paths. (Verification.)",
+                "order": 3,
+                "depends_on": "DSEC2-2",
+            },
+            {
+                "jira_key": "DSEC2-4",
+                "title": "Enforce verification at deploy",
+                "description": "Gate deployment on signature verification so unsigned images cannot be admitted.",
+                "acceptance_criteria": "An unsigned image is rejected at deploy time; a signed one is admitted.",
+                "hint": "Signing without enforcement protects no one. Wire verification into admission/deploy. (Enforcement.)",
+                "order": 4,
+                "depends_on": "DSEC2-3",
+            },
+            {
+                "jira_key": "DSEC2-5",
+                "title": "Rotate the signing key safely",
+                "description": "Practise rotating the signing key without breaking verification of already-deployed images.",
+                "acceptance_criteria": "A key rotation completes and both old- and new-signed images verify during the transition.",
+                "hint": "Trust the new key before retiring the old one, or you'll block your own fleet. (Key rotation.)",
+                "order": 5,
+                "depends_on": "DSEC2-4",
+            },
+        ],
+    },
+    {
+        "technology_slug": "devsecops-supplychain",
+        "title": "Generate and Enforce an SBOM",
+        "slug": "devsecops-sbom-generate-enforce",
+        "architecture_type": "cicd",
+        "description": (
+            "You can't secure what you can't inventory. Generate a Software Bill of Materials for every build "
+            "and make it a required, queryable artifact so a new CVE can be answered with 'are we affected?' "
+            "in minutes."
+        ),
+        "objectives": [
+            "Generate an SBOM for the image",
+            "Attach it to the artifact and require it in CI",
+            "Query the SBOM to answer an exposure question",
+        ],
+        "difficulty": "intermediate",
+        "estimated_hours": 4,
+        "order": 42,
+        "tasks": [
+            {
+                "jira_key": "DSEC3-1",
+                "title": "Reproduce the missing-SBOM gap",
+                "description": "Show that the current build ships no SBOM, so exposure questions can't be answered (see the devsecops-sbom-missing lab).",
+                "acceptance_criteria": "It's demonstrated that no SBOM exists for the current artifact.",
+                "hint": "Without an SBOM, 'are we affected by CVE-X?' takes days. Establish the gap. (Framing.)",
+                "order": 1,
+            },
+            {
+                "jira_key": "DSEC3-2",
+                "title": "Generate the SBOM",
+                "description": "Produce a machine-readable SBOM (SPDX/CycloneDX) listing every component and version in the image.",
+                "acceptance_criteria": "A valid SBOM is generated enumerating the image's components and versions.",
+                "hint": "SPDX/CycloneDX are the standard formats — pick one your tooling reads. (SBOM generation.)",
+                "order": 2,
+                "depends_on": "DSEC3-1",
+            },
+            {
+                "jira_key": "DSEC3-3",
+                "title": "Attach and require the SBOM in CI",
+                "description": "Attach the SBOM to the artifact and fail the build if it is missing.",
+                "acceptance_criteria": "The SBOM travels with the artifact and a build lacking one fails.",
+                "hint": "An SBOM that isn't required is an SBOM that silently stops being produced. Gate on it. (CI requirement.)",
+                "order": 3,
+                "depends_on": "DSEC3-2",
+            },
+            {
+                "jira_key": "DSEC3-4",
+                "title": "Answer an exposure question from the SBOM",
+                "description": "Given a newly-disclosed CVE in some package, query the SBOMs to determine which artifacts are affected.",
+                "acceptance_criteria": "A query against the SBOM correctly identifies whether/which artifacts contain the vulnerable component.",
+                "hint": "This is the payoff: minutes, not days, to scope a new CVE. (SBOM query.)",
+                "order": 4,
+                "depends_on": "DSEC3-3",
+            },
+            {
+                "jira_key": "DSEC3-5",
+                "title": "Store SBOMs for historical lookup",
+                "description": "Persist SBOMs so you can answer exposure questions for images built weeks ago.",
+                "acceptance_criteria": "SBOMs for past builds are retrievable and queryable, not just the latest one.",
+                "hint": "The CVE you care about tomorrow affects images you built yesterday. Keep the history. (Retention.)",
+                "order": 5,
+                "depends_on": "DSEC3-4",
+            },
+        ],
+    },
+    {
+        "technology_slug": "devsecops-supplychain",
+        "title": "Close the Provenance Gap with SLSA",
+        "slug": "devsecops-slsa-provenance",
+        "architecture_type": "cicd",
+        "description": (
+            "Prove where your artifacts came from. Establish SLSA-style build provenance so every artifact "
+            "carries verifiable, tamper-evident evidence of how it was built — and enforce it on the way in."
+        ),
+        "objectives": [
+            "Identify the provenance gap in the build",
+            "Emit signed build provenance",
+            "Verify and enforce provenance before deploy",
+        ],
+        "difficulty": "advanced",
+        "estimated_hours": 5,
+        "order": 43,
+        "tasks": [
+            {
+                "jira_key": "DSEC4-1",
+                "title": "Find the provenance gap",
+                "description": "Show that artifacts currently carry no verifiable record of how/where they were built (see the devsecops-slsa-provenance-gap lab).",
+                "acceptance_criteria": "It's demonstrated that no build provenance accompanies the artifact.",
+                "hint": "Provenance answers 'was this built by our pipeline, unmodified?'. Establish that today you can't answer it. (Framing.)",
+                "order": 1,
+            },
+            {
+                "jira_key": "DSEC4-2",
+                "title": "Emit build provenance",
+                "description": "Have the pipeline emit provenance attestation (builder identity, source, materials) for each artifact.",
+                "acceptance_criteria": "Each build produces a provenance attestation recording the builder, source commit, and inputs.",
+                "hint": "The provenance must be generated by the build system, not hand-written, or it proves nothing. (Provenance emission.)",
+                "order": 2,
+                "depends_on": "DSEC4-1",
+            },
+            {
+                "jira_key": "DSEC4-3",
+                "title": "Sign the provenance",
+                "description": "Sign the attestation so it is tamper-evident and bound to the artifact.",
+                "acceptance_criteria": "The provenance is signed and altering it or the artifact breaks verification.",
+                "hint": "Unsigned provenance is just a claim. Signing makes it evidence. (Signing.)",
+                "order": 3,
+                "depends_on": "DSEC4-2",
+            },
+            {
+                "jira_key": "DSEC4-4",
+                "title": "Verify and enforce provenance at admission",
+                "description": "Reject artifacts at deploy time unless they carry valid provenance from the trusted builder.",
+                "acceptance_criteria": "An artifact without valid provenance is rejected; a compliant one is admitted.",
+                "hint": "Enforcement is where SLSA stops being paperwork. Gate admission on it. (Enforcement.)",
+                "order": 4,
+                "depends_on": "DSEC4-3",
+            },
+            {
+                "jira_key": "DSEC4-5",
+                "title": "Attempt a tampered-artifact deploy",
+                "description": "Try to deploy an artifact whose provenance doesn't match and confirm it's blocked.",
+                "acceptance_criteria": "The mismatched/tampered artifact is blocked and the reason is auditable.",
+                "hint": "Test adversarially — a gate you never tried to bypass is a gate you can't trust. (Adversarial test.)",
+                "order": 5,
+                "depends_on": "DSEC4-4",
+            },
+        ],
+    },
+    {
+        "technology_slug": "devsecops-supplychain",
+        "title": "Runtime Detection: Catch an Unexpected Shell with Falco",
+        "slug": "devsecops-falco-runtime-detection",
+        "architecture_type": "custom",
+        "description": (
+            "Supply-chain defense doesn't stop at deploy. Use Falco runtime detection to catch anomalous "
+            "behavior — like a shell spawning inside a container that should never have one — and turn the "
+            "signal into an actionable alert."
+        ),
+        "objectives": [
+            "Deploy runtime detection",
+            "Trigger and observe an anomalous-behavior detection",
+            "Tune rules and route the alert",
+        ],
+        "difficulty": "advanced",
+        "estimated_hours": 5,
+        "order": 44,
+        "tasks": [
+            {
+                "jira_key": "DSEC5-1",
+                "title": "Deploy runtime detection",
+                "description": "Stand up Falco so it observes syscalls/behavior across the workloads (see the devsecops-falco-unexpected-shell lab).",
+                "acceptance_criteria": "Falco is running and receiving events from the workloads.",
+                "hint": "Runtime detection catches what static scanning can't — behavior after deploy. (Runtime setup.)",
+                "order": 1,
+            },
+            {
+                "jira_key": "DSEC5-2",
+                "title": "Trigger an unexpected shell",
+                "description": "Exec a shell inside a container that shouldn't have one and observe the detection fire.",
+                "acceptance_criteria": "The unexpected-shell activity produces a Falco detection event.",
+                "hint": "A shell in a prod container is a classic post-exploitation signal. Prove the rule catches it. (Detection.)",
+                "order": 2,
+                "depends_on": "DSEC5-1",
+            },
+            {
+                "jira_key": "DSEC5-3",
+                "title": "Tune out the false positives",
+                "description": "Adjust rules so legitimate behavior (e.g. an allowed debug sidecar) doesn't drown the signal.",
+                "acceptance_criteria": "Known-good behavior no longer alerts while the real anomaly still does.",
+                "hint": "An alert that cries wolf gets muted. Tune for signal, not noise. (Tuning.)",
+                "order": 3,
+                "depends_on": "DSEC5-2",
+            },
+            {
+                "jira_key": "DSEC5-4",
+                "title": "Route the alert to responders",
+                "description": "Forward the detection to a channel/on-call so a human can act on it.",
+                "acceptance_criteria": "A triggered detection reaches the alerting channel with enough context to respond.",
+                "hint": "A detection nobody sees is not a detection. Route it and include the container/pod context. (Alert routing.)",
+                "order": 4,
+                "depends_on": "DSEC5-3",
+            },
+            {
+                "jira_key": "DSEC5-5",
+                "title": "Write the response runbook",
+                "description": "Document how to triage and contain an unexpected-shell alert.",
+                "acceptance_criteria": "A runbook lists the triage steps, containment actions, and evidence to capture.",
+                "hint": "The alert is only useful if the responder knows what to do next. (Runbook.)",
+                "order": 5,
+                "depends_on": "DSEC5-4",
+            },
+        ],
+    },
+
+    # ── GitOps (gitops) ───────────────────────────────────────────────────
+    {
+        "technology_slug": "gitops",
+        "title": "Resolve an ArgoCD OutOfSync Application",
+        "slug": "gitops-argocd-fix-outofsync",
+        "architecture_type": "cicd",
+        "description": (
+            "An ArgoCD Application is stuck OutOfSync. Learn the GitOps reconciliation loop by diagnosing why "
+            "live state diverged from the Git-declared desired state and bringing them back into agreement — "
+            "the right way, through Git."
+        ),
+        "objectives": [
+            "Read the desired-vs-live diff",
+            "Find the true cause of the divergence",
+            "Reconcile through Git, not by hand",
+        ],
+        "difficulty": "intermediate",
+        "estimated_hours": 4,
+        "order": 45,
+        "tasks": [
+            {
+                "jira_key": "GTOP1-1",
+                "title": "Read the OutOfSync diff",
+                "description": "Inspect the Application to see exactly which resources differ between Git and the cluster (see the gitops-argocd-outofsync lab).",
+                "acceptance_criteria": "The specific resources and fields that diverge are identified from the sync diff.",
+                "hint": "GitOps = Git is the source of truth. The diff tells you what drifted; start there. (Diff reading.)",
+                "order": 1,
+            },
+            {
+                "jira_key": "GTOP1-2",
+                "title": "Find the cause of the drift",
+                "description": "Determine whether a manual kubectl change, a failed sync, or a bad manifest caused the divergence.",
+                "acceptance_criteria": "The root cause of the OutOfSync state is identified with evidence.",
+                "hint": "A manual `kubectl edit` is the classic culprit — GitOps treats that as drift to be reverted. (Root cause.)",
+                "order": 2,
+                "depends_on": "GTOP1-1",
+            },
+            {
+                "jira_key": "GTOP1-3",
+                "title": "Reconcile through Git",
+                "description": "If Git is correct, sync to revert the drift; if the live change was needed, encode it in Git and sync.",
+                "acceptance_criteria": "The Application returns to Synced with live state matching Git.",
+                "hint": "Never fix drift by hand in the cluster — that just creates more drift. Change Git, let the controller reconcile. (Reconcile.)",
+                "order": 3,
+                "depends_on": "GTOP1-2",
+            },
+            {
+                "jira_key": "GTOP1-4",
+                "title": "Prevent recurrence with self-heal",
+                "description": "Enable auto-sync/self-heal so unauthorized live changes are automatically reverted.",
+                "acceptance_criteria": "A manual live change is automatically reverted back to the Git-declared state.",
+                "hint": "Self-heal makes the cluster continuously converge to Git — drift becomes self-correcting. (Self-heal.)",
+                "order": 4,
+                "depends_on": "GTOP1-3",
+            },
+        ],
+    },
+    {
+        "technology_slug": "gitops",
+        "title": "Fix a Failing ArgoCD Sync Hook",
+        "slug": "gitops-argocd-fix-sync-hook",
+        "architecture_type": "cicd",
+        "description": (
+            "A sync is failing at a hook — a pre/post-sync Job that must succeed for the rollout to proceed. "
+            "Diagnose the failing hook, fix it, and make the sync reliable so deployments don't hang."
+        ),
+        "objectives": [
+            "Locate the failing sync hook",
+            "Diagnose why the hook Job fails",
+            "Fix it and make the hook idempotent",
+        ],
+        "difficulty": "intermediate",
+        "estimated_hours": 4,
+        "order": 46,
+        "tasks": [
+            {
+                "jira_key": "GTOP2-1",
+                "title": "Identify the failing hook",
+                "description": "Find which pre/post-sync hook is failing and blocking the sync (see the gitops-argocd-sync-hook-failed lab).",
+                "acceptance_criteria": "The specific failing hook and its phase (pre/post-sync) are identified.",
+                "hint": "Hooks run at defined sync phases; a failed hook stalls the whole rollout. (Hook location.)",
+                "order": 1,
+            },
+            {
+                "jira_key": "GTOP2-2",
+                "title": "Read the hook logs",
+                "description": "Inspect the hook Job's logs/exit code to find the concrete failure.",
+                "acceptance_criteria": "The hook Job's failure cause is identified from its logs and exit status.",
+                "hint": "The Job logs have the truth — a missing secret, a bad migration, an RBAC denial. (Diagnosis.)",
+                "order": 2,
+                "depends_on": "GTOP2-1",
+            },
+            {
+                "jira_key": "GTOP2-3",
+                "title": "Fix the hook and re-sync",
+                "description": "Correct the hook (config, permissions, or command) in Git and re-run the sync.",
+                "acceptance_criteria": "The hook Job succeeds and the sync completes to Synced/Healthy.",
+                "hint": "Fix it in Git so the fix is permanent, then sync. (Fix.)",
+                "order": 3,
+                "depends_on": "GTOP2-2",
+            },
+            {
+                "jira_key": "GTOP2-4",
+                "title": "Make the hook idempotent",
+                "description": "Ensure the hook can run repeatedly (retries, re-syncs) without side effects.",
+                "acceptance_criteria": "Running the hook twice produces the same result with no duplicate side effects.",
+                "hint": "Hooks re-run on every sync — a non-idempotent migration hook will bite you. (Idempotency.)",
+                "order": 4,
+                "depends_on": "GTOP2-3",
+            },
+        ],
+    },
+    {
+        "technology_slug": "gitops",
+        "title": "Recover a Flux Reconciliation Failure",
+        "slug": "gitops-flux-fix-reconcile",
+        "architecture_type": "cicd",
+        "description": (
+            "Flux has stopped reconciling — the cluster is drifting from Git silently. Diagnose the stuck "
+            "reconciliation (source, kustomization, or health check) and restore the continuous-delivery loop."
+        ),
+        "objectives": [
+            "Find where reconciliation is stuck",
+            "Fix the failing source/kustomization",
+            "Confirm continuous reconciliation resumes",
+        ],
+        "difficulty": "intermediate",
+        "estimated_hours": 4,
+        "order": 47,
+        "tasks": [
+            {
+                "jira_key": "GTOP3-1",
+                "title": "Find the stuck reconciliation",
+                "description": "Inspect Flux resources to see which source or kustomization has stopped reconciling (see the gitops-flux-reconcile-fail lab).",
+                "acceptance_criteria": "The specific Flux resource that is failing to reconcile is identified.",
+                "hint": "Flux surfaces status/conditions on each resource — the failing one is where reconciliation halted. (Locate.)",
+                "order": 1,
+            },
+            {
+                "jira_key": "GTOP3-2",
+                "title": "Diagnose the failure",
+                "description": "Read the error (auth to the source, bad manifest, failed health check) causing the stall.",
+                "acceptance_criteria": "The concrete reconciliation error is identified with evidence.",
+                "hint": "Common causes: source auth failure, invalid YAML, or a health check that never goes ready. (Diagnose.)",
+                "order": 2,
+                "depends_on": "GTOP3-1",
+            },
+            {
+                "jira_key": "GTOP3-3",
+                "title": "Fix and re-reconcile",
+                "description": "Correct the underlying issue in Git/config and trigger reconciliation.",
+                "acceptance_criteria": "The resource reconciles successfully and reports Ready.",
+                "hint": "Fix the source of truth, then reconcile — don't patch the cluster directly. (Fix.)",
+                "order": 3,
+                "depends_on": "GTOP3-2",
+            },
+            {
+                "jira_key": "GTOP3-4",
+                "title": "Confirm continuous delivery resumes",
+                "description": "Push a small change to Git and confirm Flux picks it up automatically.",
+                "acceptance_criteria": "A new Git commit is automatically reconciled to the cluster without manual steps.",
+                "hint": "The proof is a hands-off commit-to-cluster round trip. (Verify.)",
+                "order": 4,
+                "depends_on": "GTOP3-3",
+            },
+        ],
+    },
+    {
+        "technology_slug": "gitops",
+        "title": "Eliminate Config Drift for Good",
+        "slug": "gitops-eliminate-config-drift",
+        "architecture_type": "cicd",
+        "description": (
+            "Someone changed a live resource by hand and now the cluster no longer matches Git. Detect the "
+            "drift, revert it through the GitOps loop, and put guardrails in place so manual changes can't "
+            "quietly persist."
+        ),
+        "objectives": [
+            "Detect config drift",
+            "Revert it via Git reconciliation",
+            "Add guardrails against manual changes",
+        ],
+        "difficulty": "intermediate",
+        "estimated_hours": 4,
+        "order": 48,
+        "tasks": [
+            {
+                "jira_key": "GTOP4-1",
+                "title": "Detect the drift",
+                "description": "Compare live cluster state to Git and identify the manually-changed resource (see the gitops-config-drift lab).",
+                "acceptance_criteria": "The drifted resource and the exact changed fields are identified.",
+                "hint": "GitOps controllers continuously diff live vs desired — that diff IS your drift detector. (Detect.)",
+                "order": 1,
+            },
+            {
+                "jira_key": "GTOP4-2",
+                "title": "Decide the source of truth",
+                "description": "Determine whether Git or the live change is correct, and update Git if the change was legitimate.",
+                "acceptance_criteria": "A clear decision is made and, if the change was needed, it's committed to Git.",
+                "hint": "Legitimate changes belong in Git; unauthorized ones get reverted. Either way, Git wins. (Decision.)",
+                "order": 2,
+                "depends_on": "GTOP4-1",
+            },
+            {
+                "jira_key": "GTOP4-3",
+                "title": "Reconcile to remove the drift",
+                "description": "Sync so the cluster matches Git and the drift is gone.",
+                "acceptance_criteria": "Live state matches Git and no drift remains.",
+                "hint": "Let the controller converge — don't hand-edit the cluster to 'fix' it. (Reconcile.)",
+                "order": 3,
+                "depends_on": "GTOP4-2",
+            },
+            {
+                "jira_key": "GTOP4-4",
+                "title": "Add drift guardrails",
+                "description": "Enable auto-heal and/or restrict direct cluster write access so manual drift can't persist.",
+                "acceptance_criteria": "A manual change is either auto-reverted or blocked by access controls.",
+                "hint": "The durable fix is making drift structurally impossible, not just correcting today's instance. (Guardrail.)",
+                "order": 4,
+                "depends_on": "GTOP4-3",
+            },
+        ],
+    },
+    {
+        "technology_slug": "gitops",
+        "title": "Fix an App-of-Apps Misconfiguration",
+        "slug": "gitops-fix-app-of-apps",
+        "architecture_type": "cicd",
+        "description": (
+            "The App-of-Apps pattern manages many child Applications from one parent — until a misconfiguration "
+            "breaks a whole fleet at once. Diagnose the parent, fix the propagation, and understand the "
+            "blast-radius trade-off of this powerful pattern."
+        ),
+        "objectives": [
+            "Understand the App-of-Apps hierarchy",
+            "Diagnose the parent misconfiguration",
+            "Fix propagation and reason about blast radius",
+        ],
+        "difficulty": "advanced",
+        "estimated_hours": 5,
+        "order": 49,
+        "tasks": [
+            {
+                "jira_key": "GTOP5-1",
+                "title": "Map the App-of-Apps hierarchy",
+                "description": "Identify the parent Application and the child Applications it manages (see the gitops-app-of-apps-misconfig lab).",
+                "acceptance_criteria": "The parent and its child Applications are enumerated and the relationship is clear.",
+                "hint": "One parent generates many children — understand the tree before touching it. (Map.)",
+                "order": 1,
+            },
+            {
+                "jira_key": "GTOP5-2",
+                "title": "Diagnose the parent misconfig",
+                "description": "Find the parent-level error (wrong path, repo, or generator) that is breaking the children.",
+                "acceptance_criteria": "The parent-level misconfiguration is identified with evidence.",
+                "hint": "A single wrong path in the parent can orphan or misdeploy the whole fleet. (Diagnose.)",
+                "order": 2,
+                "depends_on": "GTOP5-1",
+            },
+            {
+                "jira_key": "GTOP5-3",
+                "title": "Fix and re-propagate",
+                "description": "Correct the parent in Git and confirm the children reconcile correctly.",
+                "acceptance_criteria": "The parent and all children return to Synced/Healthy.",
+                "hint": "Fix once at the parent, and the fix fans out to every child. (Fix.)",
+                "order": 3,
+                "depends_on": "GTOP5-2",
+            },
+            {
+                "jira_key": "GTOP5-4",
+                "title": "Reason about blast radius",
+                "description": "Document the trade-off: one parent change touches many apps, so add review/staging for parent changes.",
+                "acceptance_criteria": "A note captures the blast-radius risk and a safeguard (e.g. review gate or staged rollout) for parent changes.",
+                "hint": "The same leverage that makes App-of-Apps powerful makes its mistakes fleet-wide. Guard the parent accordingly. (Blast radius.)",
+                "order": 4,
+                "depends_on": "GTOP5-3",
+            },
+        ],
+    },
+
+    # ── OpenTelemetry (opentelemetry) ─────────────────────────────────────
+    {
+        "technology_slug": "opentelemetry",
+        "title": "Fix Broken Trace Context Propagation",
+        "slug": "otel-fix-trace-propagation",
+        "architecture_type": "microservices",
+        "description": (
+            "Traces are breaking into disconnected fragments at a service boundary — the classic 'my trace "
+            "stops here' problem. Diagnose why context isn't propagating and restore end-to-end distributed "
+            "traces across services."
+        ),
+        "objectives": [
+            "Spot where the trace breaks",
+            "Fix context propagation across the boundary",
+            "Verify a complete end-to-end trace",
+        ],
+        "difficulty": "intermediate",
+        "estimated_hours": 4,
+        "order": 50,
+        "tasks": [
+            {
+                "jira_key": "OTEL1-1",
+                "title": "Find where the trace breaks",
+                "description": "Identify the service boundary where the trace splits into disconnected spans (see the otel-broken-trace-propagation lab).",
+                "acceptance_criteria": "The exact hop where context is lost is identified.",
+                "hint": "A trace that 'ends' mid-request usually means context didn't cross a boundary. (Locate.)",
+                "order": 1,
+            },
+            {
+                "jira_key": "OTEL1-2",
+                "title": "Diagnose the propagation gap",
+                "description": "Determine why context isn't carried — missing propagator, dropped headers, or an uninstrumented client.",
+                "acceptance_criteria": "The cause of the broken propagation is identified with evidence.",
+                "hint": "W3C traceparent must survive the hop. A proxy stripping headers or a missing propagator is typical. (Diagnose.)",
+                "order": 2,
+                "depends_on": "OTEL1-1",
+            },
+            {
+                "jira_key": "OTEL1-3",
+                "title": "Fix context propagation",
+                "description": "Configure the propagator / preserve the trace headers so context crosses the boundary.",
+                "acceptance_criteria": "Context is carried across the previously-broken hop.",
+                "hint": "Ensure the same propagator on both sides and that intermediaries pass traceparent through. (Fix.)",
+                "order": 3,
+                "depends_on": "OTEL1-2",
+            },
+            {
+                "jira_key": "OTEL1-4",
+                "title": "Verify an end-to-end trace",
+                "description": "Send a request and confirm a single connected trace spans all services.",
+                "acceptance_criteria": "One request produces one continuous trace across every service it touches.",
+                "hint": "The proof is a single trace ID linking all spans front to back. (Verify.)",
+                "order": 4,
+                "depends_on": "OTEL1-3",
+            },
+        ],
+    },
+    {
+        "technology_slug": "opentelemetry",
+        "title": "Stop the Collector from Dropping Spans",
+        "slug": "otel-fix-dropped-spans",
+        "architecture_type": "custom",
+        "description": (
+            "The OpenTelemetry Collector is silently dropping spans — telemetry you think you have but don't. "
+            "Diagnose the queue/backpressure/export failure and make the pipeline reliable so your traces are "
+            "complete."
+        ),
+        "objectives": [
+            "Detect that spans are being dropped",
+            "Find the pipeline stage causing the loss",
+            "Fix backpressure/export and verify no loss",
+        ],
+        "difficulty": "intermediate",
+        "estimated_hours": 4,
+        "order": 51,
+        "tasks": [
+            {
+                "jira_key": "OTEL2-1",
+                "title": "Confirm spans are being dropped",
+                "description": "Use the Collector's own metrics to prove spans are being received but not exported (see the otel-collector-dropped-spans lab).",
+                "acceptance_criteria": "Collector metrics show a gap between accepted and exported spans.",
+                "hint": "The Collector exposes internal metrics — refused/dropped counters are your smoking gun. (Detect.)",
+                "order": 1,
+            },
+            {
+                "jira_key": "OTEL2-2",
+                "title": "Find the dropping stage",
+                "description": "Identify whether the loss is at the queue (full), the processor, or the exporter (failing/slow backend).",
+                "acceptance_criteria": "The pipeline stage responsible for the drops is identified.",
+                "hint": "A full sending queue or a slow/failing exporter backend is the usual cause. (Locate.)",
+                "order": 2,
+                "depends_on": "OTEL2-1",
+            },
+            {
+                "jira_key": "OTEL2-3",
+                "title": "Fix backpressure and export",
+                "description": "Tune queue size/batching, fix the exporter target, or add retry so spans stop being dropped.",
+                "acceptance_criteria": "Under the same load the accepted/exported gap closes.",
+                "hint": "Right-size the queue and batch, and make sure the backend actually accepts the data. (Fix.)",
+                "order": 3,
+                "depends_on": "OTEL2-2",
+            },
+            {
+                "jira_key": "OTEL2-4",
+                "title": "Verify no loss under load",
+                "description": "Drive representative load and confirm accepted spans equal exported spans.",
+                "acceptance_criteria": "Accepted and exported span counts match under sustained load.",
+                "hint": "Silent data loss is worse than no data — verify the numbers reconcile. (Verify.)",
+                "order": 4,
+                "depends_on": "OTEL2-3",
+            },
+        ],
+    },
+    {
+        "technology_slug": "opentelemetry",
+        "title": "Fix Collector Exporter Authentication",
+        "slug": "otel-fix-exporter-auth",
+        "architecture_type": "custom",
+        "description": (
+            "The Collector can't authenticate to the telemetry backend, so nothing lands. Diagnose the auth "
+            "failure, deliver credentials securely, and get data flowing to the backend."
+        ),
+        "objectives": [
+            "Diagnose the exporter auth failure",
+            "Deliver credentials securely",
+            "Confirm telemetry reaches the backend",
+        ],
+        "difficulty": "intermediate",
+        "estimated_hours": 4,
+        "order": 52,
+        "tasks": [
+            {
+                "jira_key": "OTEL3-1",
+                "title": "Diagnose the auth failure",
+                "description": "Read the exporter errors to confirm the backend is rejecting the Collector's credentials (see the otel-exporter-auth-failure lab).",
+                "acceptance_criteria": "The exporter's authentication error against the backend is identified.",
+                "hint": "401/403 from the exporter means bad or missing credentials, not a network problem. (Diagnose.)",
+                "order": 1,
+            },
+            {
+                "jira_key": "OTEL3-2",
+                "title": "Obtain the correct credentials",
+                "description": "Get the right API key/token/headers the backend expects.",
+                "acceptance_criteria": "The correct credential and its expected header/format are identified.",
+                "hint": "Check the backend's exact auth scheme — header name and token format both matter. (Credentials.)",
+                "order": 2,
+                "depends_on": "OTEL3-1",
+            },
+            {
+                "jira_key": "OTEL3-3",
+                "title": "Deliver credentials securely",
+                "description": "Provide the credential via env/secret rather than hardcoding it in the config.",
+                "acceptance_criteria": "The exporter authenticates using a credential sourced from a secret/env, not plaintext in the committed config.",
+                "hint": "Never commit a telemetry API key to the config repo — inject it. (Secure delivery.)",
+                "order": 3,
+                "depends_on": "OTEL3-2",
+            },
+            {
+                "jira_key": "OTEL3-4",
+                "title": "Confirm data reaches the backend",
+                "description": "Send telemetry and confirm it appears in the backend.",
+                "acceptance_criteria": "Traces/metrics from the Collector are visible in the backend.",
+                "hint": "The end proof is data in the backend UI/query, not just a happy log line. (Verify.)",
+                "order": 4,
+                "depends_on": "OTEL3-3",
+            },
+        ],
+    },
+    {
+        "technology_slug": "opentelemetry",
+        "title": "Tame a Metric Cardinality Explosion",
+        "slug": "otel-fix-cardinality-explosion",
+        "architecture_type": "custom",
+        "description": (
+            "An unbounded label (like user ID or full URL) has blown up metric cardinality, hammering the "
+            "backend and the bill. Find the offending attribute and bound it without losing the signal you "
+            "actually need."
+        ),
+        "objectives": [
+            "Detect the cardinality explosion",
+            "Find the unbounded attribute",
+            "Bound cardinality while keeping the signal",
+        ],
+        "difficulty": "advanced",
+        "estimated_hours": 5,
+        "order": 53,
+        "tasks": [
+            {
+                "jira_key": "OTEL4-1",
+                "title": "Detect the explosion",
+                "description": "Confirm metric series count has exploded and is stressing the pipeline/backend (see the otel-metric-cardinality-explosion lab).",
+                "acceptance_criteria": "The abnormal growth in metric series is confirmed with evidence.",
+                "hint": "Cardinality is series = product of label value counts — one unbounded label dominates. (Detect.)",
+                "order": 1,
+            },
+            {
+                "jira_key": "OTEL4-2",
+                "title": "Find the offending attribute",
+                "description": "Identify the high-cardinality label (user id, request id, raw path) driving the series count.",
+                "acceptance_criteria": "The specific unbounded attribute is identified.",
+                "hint": "Look for labels whose value is effectively unique per request — those never belong on a metric. (Locate.)",
+                "order": 2,
+                "depends_on": "OTEL4-1",
+            },
+            {
+                "jira_key": "OTEL4-3",
+                "title": "Bound the cardinality",
+                "description": "Drop or bucket the attribute (e.g. templated route instead of raw path) via processor/attribute config.",
+                "acceptance_criteria": "Series count drops sharply while the metric still answers its intended question.",
+                "hint": "Templatize paths, drop request-unique IDs — keep the dimension you query on, lose the one that explodes. (Bound.)",
+                "order": 3,
+                "depends_on": "OTEL4-2",
+            },
+            {
+                "jira_key": "OTEL4-4",
+                "title": "Verify signal preserved",
+                "description": "Confirm the dashboards/alerts that used the metric still work after bounding cardinality.",
+                "acceptance_criteria": "Series count is controlled and the metric's dashboards/alerts remain meaningful.",
+                "hint": "Reducing cardinality is only a win if you didn't blind yourself. Check the consumers. (Verify.)",
+                "order": 4,
+                "depends_on": "OTEL4-3",
+            },
+        ],
+    },
+    {
+        "technology_slug": "opentelemetry",
+        "title": "Correlate Traces and Logs",
+        "slug": "otel-trace-log-correlation",
+        "architecture_type": "microservices",
+        "description": (
+            "Debugging is slow because logs and traces live in separate worlds. Wire trace IDs into logs so you "
+            "can jump from a slow span straight to the exact log lines — the single biggest debugging "
+            "accelerator in distributed systems."
+        ),
+        "objectives": [
+            "Establish the missing correlation",
+            "Inject trace context into logs",
+            "Pivot from a trace to its logs",
+        ],
+        "difficulty": "advanced",
+        "estimated_hours": 5,
+        "order": 54,
+        "tasks": [
+            {
+                "jira_key": "OTEL5-1",
+                "title": "Show logs and traces are disconnected",
+                "description": "Demonstrate that today you can't get from a trace to its logs (or vice versa) (see the otel-trace-log-correlation lab).",
+                "acceptance_criteria": "It's shown that logs carry no trace identifier, so the two can't be joined.",
+                "hint": "Without a shared key, a slow trace and its logs are two separate searches. Establish the gap. (Framing.)",
+                "order": 1,
+            },
+            {
+                "jira_key": "OTEL5-2",
+                "title": "Inject trace/span IDs into logs",
+                "description": "Configure logging so each log line emitted during a request carries its trace and span ID.",
+                "acceptance_criteria": "Log lines produced within a traced request include the trace_id (and span_id).",
+                "hint": "Pull the active span's context into the log fields — that shared trace_id is the join key. (Inject.)",
+                "order": 2,
+                "depends_on": "OTEL5-1",
+            },
+            {
+                "jira_key": "OTEL5-3",
+                "title": "Pivot from trace to logs",
+                "description": "From a slow span, use its trace ID to retrieve exactly the logs for that request.",
+                "acceptance_criteria": "A trace ID reliably retrieves the corresponding log lines for that request.",
+                "hint": "This pivot turns 'which of a million logs?' into a single filtered query. (Pivot.)",
+                "order": 3,
+                "depends_on": "OTEL5-2",
+            },
+            {
+                "jira_key": "OTEL5-4",
+                "title": "Debug a real slow request end to end",
+                "description": "Use trace+log correlation to root-cause a deliberately slow/erroring request.",
+                "acceptance_criteria": "The slow/failing request is root-caused using the trace and its correlated logs together.",
+                "hint": "The payoff is a diagnosis in minutes: span shows where, logs show why. (Payoff.)",
+                "order": 4,
+                "depends_on": "OTEL5-3",
+            },
+        ],
+    },
+
+    # ── Service Mesh (service-mesh) ───────────────────────────────────────
+    {
+        "technology_slug": "service-mesh",
+        "title": "Fix a Sidecar That Isn't Injected",
+        "slug": "mesh-fix-sidecar-injection",
+        "architecture_type": "microservices",
+        "description": (
+            "A workload joined the cluster but isn't in the mesh — no sidecar, so no mTLS, no telemetry, no "
+            "policy. Diagnose why injection didn't happen and bring the workload under the mesh correctly."
+        ),
+        "objectives": [
+            "Detect the missing sidecar",
+            "Diagnose why injection was skipped",
+            "Get the workload meshed",
+        ],
+        "difficulty": "intermediate",
+        "estimated_hours": 4,
+        "order": 55,
+        "tasks": [
+            {
+                "jira_key": "MESH1-1",
+                "title": "Detect the missing sidecar",
+                "description": "Confirm the pod is running without the mesh sidecar container (see the mesh-sidecar-not-injected lab).",
+                "acceptance_criteria": "It's confirmed the pod lacks the injected sidecar (container count / proxy absent).",
+                "hint": "No sidecar means the workload is outside the mesh entirely — none of the mesh's guarantees apply. (Detect.)",
+                "order": 1,
+            },
+            {
+                "jira_key": "MESH1-2",
+                "title": "Diagnose why injection skipped",
+                "description": "Check namespace/pod injection labels and the webhook to find why the sidecar wasn't injected.",
+                "acceptance_criteria": "The reason injection was skipped (missing label, disabled webhook, opt-out annotation) is identified.",
+                "hint": "Injection is usually label-gated per namespace/pod — a missing label silently opts you out. (Diagnose.)",
+                "order": 2,
+                "depends_on": "MESH1-1",
+            },
+            {
+                "jira_key": "MESH1-3",
+                "title": "Enable injection and redeploy",
+                "description": "Apply the correct injection label/config and roll the workload so the sidecar is injected.",
+                "acceptance_criteria": "After redeploy the pod runs with the sidecar and joins the mesh.",
+                "hint": "Injection happens at pod creation — you must restart the workload after labeling. (Fix.)",
+                "order": 3,
+                "depends_on": "MESH1-2",
+            },
+            {
+                "jira_key": "MESH1-4",
+                "title": "Confirm the workload is fully meshed",
+                "description": "Verify the workload now has mTLS, telemetry, and is subject to mesh policy.",
+                "acceptance_criteria": "The workload shows sidecar traffic, mTLS, and mesh telemetry.",
+                "hint": "Being in the mesh means the sidecar is actually carrying the traffic — verify, don't assume. (Verify.)",
+                "order": 4,
+                "depends_on": "MESH1-3",
+            },
+        ],
+    },
+    {
+        "technology_slug": "service-mesh",
+        "title": "Roll Out Strict mTLS Without Breaking Plaintext Clients",
+        "slug": "mesh-strict-mtls-rollout",
+        "architecture_type": "microservices",
+        "description": (
+            "Flipping the mesh to STRICT mTLS locked out a legitimate plaintext client and caused an outage. "
+            "Learn the permissive→strict migration path so you can encrypt everything without breaking the "
+            "clients that aren't ready yet."
+        ),
+        "objectives": [
+            "Reproduce the strict-mTLS breakage",
+            "Use PERMISSIVE mode as a migration bridge",
+            "Cut over to STRICT safely",
+        ],
+        "difficulty": "advanced",
+        "estimated_hours": 5,
+        "order": 56,
+        "tasks": [
+            {
+                "jira_key": "MESH2-1",
+                "title": "Reproduce the breakage",
+                "description": "Show that enabling STRICT mTLS breaks a legitimate plaintext (non-mesh) client (see the mesh-mtls-strict-breaks-plaintext lab).",
+                "acceptance_criteria": "STRICT mode is shown to reject the plaintext client, causing the failure.",
+                "hint": "STRICT means 'mTLS or nothing' — anything not speaking mTLS is refused. Establish the break. (Reproduce.)",
+                "order": 1,
+            },
+            {
+                "jira_key": "MESH2-2",
+                "title": "Fall back to PERMISSIVE",
+                "description": "Set the mesh to PERMISSIVE so it accepts both mTLS and plaintext during migration.",
+                "acceptance_criteria": "In PERMISSIVE mode both the meshed and plaintext clients work.",
+                "hint": "PERMISSIVE is the bridge: encrypt mesh-to-mesh while still accepting legacy plaintext. (Bridge.)",
+                "order": 2,
+                "depends_on": "MESH2-1",
+            },
+            {
+                "jira_key": "MESH2-3",
+                "title": "Migrate the plaintext client into the mesh",
+                "description": "Bring the lagging client into the mesh (or onto mTLS) so it no longer needs plaintext.",
+                "acceptance_criteria": "The formerly-plaintext client now communicates over mTLS.",
+                "hint": "You can only go STRICT once every client speaks mTLS — migrate the stragglers first. (Migrate.)",
+                "order": 3,
+                "depends_on": "MESH2-2",
+            },
+            {
+                "jira_key": "MESH2-4",
+                "title": "Cut over to STRICT",
+                "description": "Enable STRICT mTLS now that all clients are on mTLS, and confirm nothing breaks.",
+                "acceptance_criteria": "STRICT mode is enabled and all clients continue to work over mTLS.",
+                "hint": "The safe order is permissive → migrate all → strict. Flipping strict first is the outage you just reproduced. (Cut over.)",
+                "order": 4,
+                "depends_on": "MESH2-3",
+            },
+        ],
+    },
+    {
+        "technology_slug": "service-mesh",
+        "title": "Debug an Authorization Policy That Denies Traffic",
+        "slug": "mesh-fix-authz-policy",
+        "architecture_type": "microservices",
+        "description": (
+            "A mesh AuthorizationPolicy is denying calls that should be allowed. Learn how mesh authz "
+            "evaluation works, find the over-broad or misordered rule, and fix it to least-privilege without "
+            "opening the door too wide."
+        ),
+        "objectives": [
+            "Reproduce the wrongful denial",
+            "Understand authz evaluation order",
+            "Fix the policy to least-privilege",
+        ],
+        "difficulty": "advanced",
+        "estimated_hours": 5,
+        "order": 57,
+        "tasks": [
+            {
+                "jira_key": "MESH3-1",
+                "title": "Reproduce the denial",
+                "description": "Confirm a legitimate call is being denied by an AuthorizationPolicy (see the mesh-authz-policy-denies lab).",
+                "acceptance_criteria": "The denied call and the policy responsible are identified.",
+                "hint": "Mesh authz is default-deny once a policy applies — a too-narrow allow blocks legit traffic. (Reproduce.)",
+                "order": 1,
+            },
+            {
+                "jira_key": "MESH3-2",
+                "title": "Understand the evaluation",
+                "description": "Determine how the mesh evaluates the policy (principals, namespaces, DENY-before-ALLOW) for this request.",
+                "acceptance_criteria": "The evaluation path that leads to the denial is explained with the specific rule.",
+                "hint": "DENY policies win over ALLOW, and once any ALLOW exists for a workload, unlisted callers are denied. (Evaluation.)",
+                "order": 2,
+                "depends_on": "MESH3-1",
+            },
+            {
+                "jira_key": "MESH3-3",
+                "title": "Fix to least-privilege",
+                "description": "Adjust the policy to allow exactly the legitimate caller — no more, no less.",
+                "acceptance_criteria": "The legitimate call is allowed and unauthorized callers are still denied.",
+                "hint": "Resist the urge to allow-all to make it work — add the one principal that's missing. (Least privilege.)",
+                "order": 3,
+                "depends_on": "MESH3-2",
+            },
+            {
+                "jira_key": "MESH3-4",
+                "title": "Verify the policy boundary",
+                "description": "Test both an allowed and a disallowed caller to confirm the boundary is correct.",
+                "acceptance_criteria": "Allowed callers succeed and unauthorized callers are denied.",
+                "hint": "A correct authz fix passes both tests: the right calls in, the wrong calls out. (Verify.)",
+                "order": 4,
+                "depends_on": "MESH3-3",
+            },
+        ],
+    },
+    {
+        "technology_slug": "service-mesh",
+        "title": "Stop a Retry/Timeout Storm",
+        "slug": "mesh-fix-retry-timeout-storm",
+        "architecture_type": "microservices",
+        "description": (
+            "Aggressive retries and mismatched timeouts have turned a small blip into a self-inflicted retry "
+            "storm that amplifies load and takes the service down. Learn how mesh retries and timeouts "
+            "interact and configure them to dampen failure instead of amplifying it."
+        ),
+        "objectives": [
+            "Reproduce the retry-storm amplification",
+            "Fix timeout/retry budget interaction",
+            "Verify the storm is dampened",
+        ],
+        "difficulty": "advanced",
+        "estimated_hours": 5,
+        "order": 58,
+        "tasks": [
+            {
+                "jira_key": "MESH4-1",
+                "title": "Reproduce the storm",
+                "description": "Show how a downstream blip triggers cascading retries that amplify load (see the mesh-retry-timeout-storm lab).",
+                "acceptance_criteria": "A small downstream failure is shown to multiply into a large retry-driven load spike.",
+                "hint": "Each layer retrying N times multiplies load N-deep — a blip becomes a flood. (Reproduce.)",
+                "order": 1,
+            },
+            {
+                "jira_key": "MESH4-2",
+                "title": "Diagnose the timeout/retry mismatch",
+                "description": "Find the misconfigured retries (too many, no budget) and timeouts (outer < inner) driving the amplification.",
+                "acceptance_criteria": "The specific retry count/budget and timeout misconfiguration is identified.",
+                "hint": "If the caller's timeout is shorter than the callee's, retries pile up on work that's still in flight. (Diagnose.)",
+                "order": 2,
+                "depends_on": "MESH4-1",
+            },
+            {
+                "jira_key": "MESH4-3",
+                "title": "Configure sane retries and timeouts",
+                "description": "Set a bounded retry budget, jittered backoff, and coherent per-hop timeouts.",
+                "acceptance_criteria": "Retries are budget-capped and timeouts are consistent across hops.",
+                "hint": "A retry budget caps total retries as a fraction of traffic — the single best anti-storm control. (Fix.)",
+                "order": 3,
+                "depends_on": "MESH4-2",
+            },
+            {
+                "jira_key": "MESH4-4",
+                "title": "Verify graceful degradation",
+                "description": "Re-run the blip and confirm the service degrades gracefully instead of collapsing.",
+                "acceptance_criteria": "Under the same downstream blip, load stays bounded and the service stays up.",
+                "hint": "Good retry config makes a blip a blip, not an outage. Prove it with the same fault. (Verify.)",
+                "order": 4,
+                "depends_on": "MESH4-3",
+            },
+        ],
+    },
+    {
+        "technology_slug": "service-mesh",
+        "title": "Fix a VirtualService Misroute",
+        "slug": "mesh-fix-virtualservice-misroute",
+        "architecture_type": "microservices",
+        "description": (
+            "A VirtualService is sending traffic to the wrong version or subset — canary traffic leaking to "
+            "prod, or a rule shadowing another. Learn mesh routing precedence and fix the route so traffic "
+            "goes exactly where intended."
+        ),
+        "objectives": [
+            "Observe the misrouted traffic",
+            "Understand route/subset matching precedence",
+            "Fix the route and verify the split",
+        ],
+        "difficulty": "intermediate",
+        "estimated_hours": 4,
+        "order": 59,
+        "tasks": [
+            {
+                "jira_key": "MESH5-1",
+                "title": "Observe the misroute",
+                "description": "Confirm traffic is landing on the wrong destination/subset versus intent (see the mesh-virtualservice-misroute lab).",
+                "acceptance_criteria": "The misrouted traffic and the intended-vs-actual destination are identified.",
+                "hint": "Check where requests actually land by version/subset, not where you assume. (Observe.)",
+                "order": 1,
+            },
+            {
+                "jira_key": "MESH5-2",
+                "title": "Understand match precedence",
+                "description": "Determine how the VirtualService rules and DestinationRule subsets are being evaluated (order, match, weights).",
+                "acceptance_criteria": "The rule/subset that is (mis)matching the traffic is identified with the precedence reasoning.",
+                "hint": "Routes are evaluated top-down; the first match wins, so a broad rule can shadow a specific one. (Precedence.)",
+                "order": 2,
+                "depends_on": "MESH5-1",
+            },
+            {
+                "jira_key": "MESH5-3",
+                "title": "Fix the route",
+                "description": "Correct the match/order/weights (and subset labels) so traffic routes as intended.",
+                "acceptance_criteria": "Traffic now reaches the intended destination/subset.",
+                "hint": "Order the specific rule before the broad one, and confirm the subset labels actually select the right pods. (Fix.)",
+                "order": 3,
+                "depends_on": "MESH5-2",
+            },
+            {
+                "jira_key": "MESH5-4",
+                "title": "Verify the traffic split",
+                "description": "Send traffic and confirm the observed split matches the intended routing (e.g. canary weight).",
+                "acceptance_criteria": "The observed traffic distribution matches the intended routing rule.",
+                "hint": "Measure the actual split — routing bugs love to hide in 'looks right'. (Verify.)",
+                "order": 4,
+                "depends_on": "MESH5-3",
+            },
+        ],
+    },
 ]
+
+# Guided projects for technologies that previously had none (aws, postgresql,
+# mysql, react, nodejs, ai-ml, data-science, nmap, sqlite, peoplesoft, wireshark).
+# Kept in a separate module to keep this file reviewable; appended here so the
+# seeder and its integrity tests treat them identically to the originals.
+from apps.question_bank.management.commands.project_data_extra import EXTRA_PROJECTS  # noqa: E402
+
+PROJECTS = PROJECTS + EXTRA_PROJECTS
 
 
 class Command(BaseCommand):
@@ -9088,6 +11383,8 @@ class Command(BaseCommand):
             proj_data = dict(proj_src)
             tech_slug = proj_data.pop("technology_slug")
             tasks_data = proj_data.pop("tasks")
+            # Optional staged workflow (ProjectStage rows). Flat projects omit this.
+            stages_data = proj_data.pop("stages", None) or []
             try:
                 tech = Technology.objects.get(slug=tech_slug)
             except Technology.DoesNotExist:
@@ -9102,10 +11399,52 @@ class Command(BaseCommand):
                 defaults={**proj_data, "technology": tech},
             )
 
+            # Pass 0: create/update the project's stages (idempotent on
+            # (project, order)) so tasks can bind to them by stage_order below.
+            # Only staged projects (a non-empty "stages" list) get any rows; flat
+            # projects are untouched. Unresolvable tech/lab slugs degrade to null
+            # rather than failing the whole seed.
+            stage_by_order = {}
+            for stage_src in stages_data:
+                s_tech = None
+                s_tech_slug = stage_src.get("technology_slug")
+                if s_tech_slug:
+                    s_tech = Technology.objects.filter(slug=s_tech_slug).first()
+                    if s_tech is None:
+                        self.stderr.write(self.style.WARNING(
+                            f"  stage {stage_src['order']} tech '{s_tech_slug}' not found "
+                            f"in '{project.title}' — leaving stage_technology null"
+                        ))
+                s_lab = None
+                s_lab_slug = stage_src.get("lab_scenario")
+                if s_lab_slug:
+                    s_lab = Scenario.objects.filter(slug=s_lab_slug).first()
+                    if s_lab is None:
+                        self.stderr.write(self.style.WARNING(
+                            f"  stage {stage_src['order']} lab '{s_lab_slug}' not found "
+                            f"in '{project.title}' — leaving lab_scenario null"
+                        ))
+                stage, _ = ProjectStage.objects.update_or_create(
+                    project=project,
+                    order=stage_src["order"],
+                    defaults={
+                        "title": stage_src["title"],
+                        "description": stage_src.get("description", ""),
+                        "stage_technology": s_tech,
+                        "lab_scenario": s_lab,
+                        "handoff_artifact": stage_src.get("handoff_artifact", {}) or {},
+                        "breakpoint_note": stage_src.get("breakpoint_note", ""),
+                    },
+                )
+                stage_by_order[stage_src["order"]] = stage
+
             # Pass 1: create/update every task without its depends_on link, so all
-            # referenced tasks exist before we wire up dependencies.
+            # referenced tasks exist before we wire up dependencies. Task-only meta
+            # keys (depends_on, stage_order, validation_scenario) are resolved to
+            # real relations in Pass 2 — strip them from the model defaults here.
+            _task_meta_keys = {"depends_on", "stage_order", "validation_scenario"}
             for task_src in tasks_data:
-                task_data = {k: v for k, v in task_src.items() if k != "depends_on"}
+                task_data = {k: v for k, v in task_src.items() if k not in _task_meta_keys}
                 ProjectTask.objects.update_or_create(
                     project=project,
                     jira_key=task_data["jira_key"],
@@ -9113,23 +11452,55 @@ class Command(BaseCommand):
                 )
                 task_count += 1
 
-            # Pass 2: resolve depends_on (a jira_key string) into the actual ProjectTask.
+            # Pass 2: resolve the string/ordinal references into real relations —
+            # depends_on (jira_key), stage (stage_order), and validation_scenario
+            # (scenario slug). All are optional; a missing/unresolvable reference
+            # is left null with a warning rather than failing the seed.
             for task_src in tasks_data:
-                dep_key = task_src.get("depends_on")
-                if not dep_key:
-                    continue
                 try:
                     task = ProjectTask.objects.get(project=project, jira_key=task_src["jira_key"])
-                    dep = ProjectTask.objects.get(project=project, jira_key=dep_key)
                 except ProjectTask.DoesNotExist:
-                    self.stderr.write(self.style.WARNING(
-                        f"  depends_on '{dep_key}' not found for {task_src['jira_key']} "
-                        f"in '{project.title}' — leaving unset"
-                    ))
                     continue
-                if task.depends_on_id != dep.id:
-                    task.depends_on = dep
-                    task.save(update_fields=["depends_on"])
+                update_fields = []
+
+                dep_key = task_src.get("depends_on")
+                if dep_key:
+                    dep = ProjectTask.objects.filter(project=project, jira_key=dep_key).first()
+                    if dep is None:
+                        self.stderr.write(self.style.WARNING(
+                            f"  depends_on '{dep_key}' not found for {task_src['jira_key']} "
+                            f"in '{project.title}' — leaving unset"
+                        ))
+                    elif task.depends_on_id != dep.id:
+                        task.depends_on = dep
+                        update_fields.append("depends_on")
+
+                stage_order = task_src.get("stage_order")
+                if stage_order is not None:
+                    stage = stage_by_order.get(stage_order)
+                    if stage is None:
+                        self.stderr.write(self.style.WARNING(
+                            f"  stage_order {stage_order} not found for {task_src['jira_key']} "
+                            f"in '{project.title}' — leaving stage null"
+                        ))
+                    elif task.stage_id != stage.id:
+                        task.stage = stage
+                        update_fields.append("stage")
+
+                vsc_slug = task_src.get("validation_scenario")
+                if vsc_slug:
+                    vsc = Scenario.objects.filter(slug=vsc_slug).first()
+                    if vsc is None:
+                        self.stderr.write(self.style.WARNING(
+                            f"  validation_scenario '{vsc_slug}' not found for {task_src['jira_key']} "
+                            f"in '{project.title}' — leaving unset"
+                        ))
+                    elif task.validation_scenario_id != vsc.id:
+                        task.validation_scenario = vsc
+                        update_fields.append("validation_scenario")
+
+                if update_fields:
+                    task.save(update_fields=update_fields)
 
             # Give the project a launchable environment: an active scenario of its
             # technology, so "Start project" opens that tech's lab (terminal /

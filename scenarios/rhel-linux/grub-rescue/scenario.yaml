@@ -61,7 +61,7 @@ objectives:
 - Reinstall GRUB and regenerate its config so the system boots normally
 requires_companion_hosts: false
 simulation_type: rhel
-slug: sim-rhel-grub-rescue
+slug: rhel-linux-grub-rescue-lab
 time_limit: 900
 title: GRUB Rescue Mode
 technology: rhel-linux
