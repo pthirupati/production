@@ -7,6 +7,8 @@ that section writers expand into full lessons.
 
 from __future__ import annotations
 
+from functools import lru_cache
+
 # fmt: off
 TOPIC_PROFILES: dict[str, dict] = {
     "Database": {
@@ -294,7 +296,14 @@ _DEFAULT_PROFILE = {
 }
 
 
+@lru_cache(maxsize=None)
 def get_profile(topic: str) -> dict:
+    """Return the knowledge profile for a topic (memoized).
+
+    The result is deterministic per topic and callers treat it as read-only.
+    Memoizing avoids rebuilding the merged ``get_all_profiles()`` dict on every
+    call — this ran once per section (16k+ times during a full seed).
+    """
     try:
         from .topic_profiles_all import get_all_profiles
         profiles = get_all_profiles()
