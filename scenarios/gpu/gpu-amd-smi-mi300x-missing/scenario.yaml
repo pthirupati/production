@@ -1,0 +1,122 @@
+title: amd-smi Reports a Missing MI300X
+slug: gpu-amd-smi-mi300x-missing
+technology: gpu
+category: Fix
+difficulty: medium
+lab_mode: simulation
+simulation_type: gpu
+time_limit: 1200
+max_score: 100
+is_free: false
+jira_priority: High
+dual_terminal: false
+requires_companion_hosts: false
+description: 'CONTEXT: An SRE/GPU-infrastructure team running a datacenter accelerator fleet must resolve
+  `amd-smi Reports a Missing MI300X` during a live incident. Until the underlying hardware/driver state
+  is repaired, GPU capacity is lost and training/inference jobs fail, so throughput and SLAs are at risk.
+
+
+  ENVIRONMENT: You are on a FixitLab offline GPU node with nvidia-smi, the NVIDIA driver/CUDA stack, DCGM
+  (dcgmi / nv-hostengine / dcgm-exporter), the container toolkit, and — for AMD hosts — the ROCm stack
+  (rocm-smi / amd-smi). All tools run locally; no paid APIs or external cloud calls are required.
+
+
+  SYMPTOM / STARTING STATE: `amd-smi list` and `rocm-smi` enumerate 7 of 8 MI300X. dmesg shows an `amdgpu`
+  probe failure or the kfd node is missing, so one accelerator never registers with ROCm.
+
+
+  OBJECTIVE: Confirm amd-smi lists fewer accelerators than physically installed; Inspect amdgpu/kfd kernel
+  messages to find the device that failed to probe; Recover the missing accelerator and confirm amd-smi
+  lists all 8. Success means `check.sh` exits successfully after you apply the documented remediation.
+
+
+  WHAT TO AVOID: Do not apply broad destructive changes, disable safety limits to mask the fault, skip
+  evidence gathering, or fake completion with marker files — the checker validates real system state.'
+initial_state: An 8x MI300X node where `amd-smi list` shows only 7 accelerators; ROCm jobs schedule onto
+  the wrong device count and OOM.
+objectives:
+- Confirm amd-smi lists fewer accelerators than physically installed
+- Inspect amdgpu/kfd kernel messages to find the device that failed to probe
+- Recover the missing accelerator and confirm amd-smi lists all 8
+hints:
+- order: 1
+  cost: 0
+  content: 'Where to look: `amd-smi list` and `rocm-smi -i` for the ROCm view, then `dmesg | grep -iE
+    ''amdgpu|kfd''` to find the failed probe and `ls /sys/class/kfd/kfd/topology/nodes`.'
+- order: 2
+  cost: 25
+  content: 'Diagnostic steps:
+
+    1. `amd-smi list` — count accelerators and note the missing BDF.
+
+    2. `lspci -d 1002: | grep -i instinct` — confirm the card is on the bus.
+
+    3. `dmesg | grep -iE ''amdgpu.*fail|ring timeout|kfd''` for the probe/reset failure.'
+- order: 3
+  cost: 50
+  content: 'Exact fix + verification:
+
+    1. Recover the device: `amd-smi reset -G <id>` (GPU reset) or reload amdgpu; reseat if the probe keeps
+    failing.
+
+    2. Re-run `amd-smi list` and confirm all 8 MI300X enumerate.
+
+    3. Record the remediation in /opt/fixitlab/academy/gpu-amd-smi-mi300x-missing.conf.
+
+    WHY: the checker validates the accelerator genuinely came back.'
+summary: Diagnose and fix amd-smi reports a missing mi300x on a datacenter GPU node and verify with the
+  checker
+estimated_minutes: 20
+xp_reward: 100
+prerequisites:
+- Basic GPU and Linux troubleshooting literacy
+tags:
+- fix
+- gpu
+- amd
+- hands-on
+linked_tutorial: gpu-fundamentals
+what_you_will_learn:
+- Confirm amd-smi lists fewer accelerators than physically installed
+- Inspect amdgpu/kfd kernel messages to find the device that failed to probe
+- Recover the missing accelerator and confirm amd-smi lists all 8
+environment:
+  nodes:
+  - role: primary
+    os: FixitLab GPU node
+    hostname: gpu-node-01
+    ip: 127.0.0.1
+    specs: local offline simulation (NVIDIA + AMD datacenter GPUs)
+  pre_installed:
+  - bash
+  - coreutils
+  - gpu
+  - nvidia-smi
+  - dcgmi
+  - rocm-smi
+  - journalctl
+  - systemctl
+  credentials:
+  - user: root
+    password: lab123
+tasks:
+- id: task_1
+  title: amd-smi Reports a Missing MI300X
+  description: Restore healthy behavior for amd-smi Reports a Missing MI300X by investigating the failure
+    with the GPU tooling, applying the smallest safe fix, and validating the outcome.
+  background: 'This GPU lab teaches systematic datacenter accelerator troubleshooting: observe, hypothesize,
+    change, verify.'
+  validation:
+    type: command_output
+    command: nvidia-smi
+    expected_output: NVIDIA-SMI
+    error_message: GPU health check still fails. Verify driver, device visibility, and that the documented
+      fix was applied.
+solution:
+  summary: Identify the root cause behind amd-smi reports a missing mi300x and apply the minimal documented
+    fix.
+  files_changed: []
+  commands_run:
+  - nvidia-smi
+  - dcgmi diag -r 1
+  reference_docs: gpu-fundamentals

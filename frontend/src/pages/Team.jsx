@@ -144,6 +144,44 @@ export default function Team() {
     }
   }
 
+  const handleLeaveTeam = async () => {
+    if (!selected) return
+    if (!await confirm({
+      message: `Leave "${selected.name}"? You'll lose access to shared technologies and will need to be re-invited to rejoin.`,
+      danger: true,
+      confirmLabel: 'Leave team',
+    })) return
+    try {
+      await orgApi.leaveTeam(selected.slug)
+      toast.success(`You have left ${selected.name}`)
+      setSelected(null)
+      setAnalytics(null)
+      setMemberDetail(null)
+      await refreshOrgs()
+    } catch (err) {
+      toast.error(err.response?.data?.error || 'Could not leave team')
+    }
+  }
+
+  const handleDeleteTeam = async () => {
+    if (!selected) return
+    if (!await confirm({
+      message: `Delete "${selected.name}"? This permanently removes the team, all memberships and pending invites. This cannot be undone.`,
+      danger: true,
+      confirmLabel: 'Delete team',
+    })) return
+    try {
+      await orgApi.deleteTeam(selected.slug)
+      toast.success(`Team "${selected.name}" deleted`)
+      setSelected(null)
+      setAnalytics(null)
+      setMemberDetail(null)
+      await refreshOrgs()
+    } catch (err) {
+      toast.error(err.response?.data?.error || 'Could not delete team')
+    }
+  }
+
   const handleSaveSettings = async (e) => {
     e.preventDefault()
     if (!selected) return
@@ -527,6 +565,39 @@ export default function Team() {
                 </div>
               </>
             )}
+
+            <div className="border-t border-surface-800 pt-4 space-y-3">
+              <h3 className="font-medium flex items-center gap-2 text-red-400">
+                <AlertCircle size={16} /> Danger zone
+              </h3>
+              {selected.role === 'owner' ? (
+                <div className="flex items-center justify-between gap-3 flex-wrap">
+                  <p className="text-xs text-surface-500 flex-1 min-w-[12rem]">
+                    Permanently delete this team, its memberships and pending invites. This cannot be undone.
+                  </p>
+                  <button
+                    type="button"
+                    onClick={handleDeleteTeam}
+                    className="flex items-center gap-2 text-sm text-red-400 hover:text-red-300 border border-red-500/30 rounded-lg px-3 py-2 shrink-0"
+                  >
+                    <Trash2 size={14} /> Delete team
+                  </button>
+                </div>
+              ) : (
+                <div className="flex items-center justify-between gap-3 flex-wrap">
+                  <p className="text-xs text-surface-500 flex-1 min-w-[12rem]">
+                    Leave this team. You'll lose access to shared technologies and need a new invite to rejoin.
+                  </p>
+                  <button
+                    type="button"
+                    onClick={handleLeaveTeam}
+                    className="flex items-center gap-2 text-sm text-red-400 hover:text-red-300 border border-red-500/30 rounded-lg px-3 py-2 shrink-0"
+                  >
+                    <UserMinus size={14} /> Leave team
+                  </button>
+                </div>
+              )}
+            </div>
           </div>
 
           {memberDetail && (

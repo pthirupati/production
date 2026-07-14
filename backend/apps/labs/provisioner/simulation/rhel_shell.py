@@ -53,15 +53,43 @@ class RHELShell:
             return ""
         if line.startswith("#"):
             return ""
-        if " && " in line:
+
+        # Command-list operators. A real shell splits on `;` (run sequentially,
+        # ignoring exit codes), `&&` (run next only on success) and `||` (run
+        # next only on failure). We handle them here — before dispatch — so any
+        # command can participate, honouring last_exit_code between segments.
+        seq = self._split_operators(line)
+        if seq is not None:
             chunks: list[str] = []
-            for segment in line.split(" && "):
+            for op, segment in seq:
+                if op == "&&" and self.state.last_exit_code not in (0, None):
+                    # Previous command failed — skip this &&-segment but keep the
+                    # failing exit code so a later `||` still fires.
+                    continue
+                if op == "||" and self.state.last_exit_code in (0, None):
+                    # Previous command succeeded — skip the ||-fallback.
+                    continue
                 out = self.run(segment.strip())
                 if out:
                     chunks.append(out)
-                if self.state.last_exit_code not in (0, None):
-                    break
             return "\n".join(chunks)
+
+        # A bare `VAR=value` (optionally several) assignment with no command sets
+        # a shell/environment variable, like a real shell. `VAR=v cmd ...` runs
+        # cmd with the var exported for that invocation.
+        assign = self._parse_assignment(line)
+        if assign is not None:
+            names_values, remainder = assign
+            for k, v in names_values:
+                self.state.env[k] = self._expand(v)
+            if not remainder.strip():
+                self.state.last_exit_code = 0
+                return ""
+            line = remainder
+
+        # Expand $VAR / ${VAR}, $(cmd) / `cmd` command substitution, ~ and globs
+        # so downstream parsing sees the resolved words, as a real shell does.
+        line = self._expand(line)
 
         # Pipelines: run each stage, feeding the previous stdout as stdin to the
         # next. Only a handful of stages consume stdin (grep, awk, wc, sort,
@@ -104,6 +132,37 @@ class RHELShell:
             "ls": self._cmd_ls,
             "cat": self._cmd_cat,
             "echo": self._cmd_echo,
+            "true": self._cmd_true,
+            "false": self._cmd_false,
+            "cut": self._cmd_cut,
+            "tr": self._cmd_tr,
+            "tee": self._cmd_tee,
+            "xargs": self._cmd_xargs,
+            "stat": self._cmd_stat,
+            "du": self._cmd_du,
+            "nproc": self._cmd_nproc,
+            "basename": self._cmd_basename,
+            "dirname": self._cmd_dirname,
+            "readlink": self._cmd_readlink,
+            "realpath": self._cmd_readlink,
+            "seq": self._cmd_seq,
+            "sleep": self._cmd_sleep,
+            "sysctl": self._cmd_sysctl,
+            "diff": self._cmd_diff,
+            "md5sum": self._cmd_md5sum,
+            "sha1sum": self._cmd_sha1sum,
+            "sha256sum": self._cmd_sha256sum,
+            "dig": self._cmd_dig,
+            "nslookup": self._cmd_nslookup,
+            "host": self._cmd_host,
+            "nc": self._cmd_nc,
+            "ncat": self._cmd_nc,
+            "wget": self._cmd_wget,
+            "openssl": self._cmd_openssl,
+            "iptables": self._cmd_iptables,
+            "ip6tables": self._cmd_iptables,
+            "ufw": self._cmd_ufw,
+            "watch": self._cmd_watch,
             "mkdir": self._cmd_mkdir,
             "rm": self._cmd_rm,
             "touch": self._cmd_touch,
@@ -243,9 +302,15 @@ class RHELShell:
 
         fn = dispatch.get(cmd)
         if fn:
+            # Default to success; commands that fail set their own non-zero code.
+            # Resetting here stops a previous failure from leaking into `&&`/`||`.
+            self.state.last_exit_code = 0
             out = fn(parts)
+            if self._looks_like_stderr(out) and self.state.last_exit_code == 0:
+                self.state.last_exit_code = 1
             return self._apply_redirect(out, redirect)
 
+        self.state.last_exit_code = 127
         return self._apply_redirect(f"bash: {cmd}: command not found", redirect)
 
     @staticmethod
@@ -280,6 +345,313 @@ class RHELShell:
     def _is_quoted_pipe(line: str) -> bool:
         """True when every `|` in the line sits inside quotes (nothing to split)."""
         return len(RHELShell._split_pipes(line)) == 1
+
+    @staticmethod
+    def _split_operators(line: str) -> list[tuple[str, str]] | None:
+        """Split a command list on top-level ``;``, ``&&`` and ``||``.
+
+        Returns a list of ``(operator, segment)`` pairs where operator is the
+        connector that *precedes* the segment (``""`` for the first). Returns
+        ``None`` when there is no top-level operator so the caller can take the
+        single-command fast path. Operators inside quotes are ignored, and a
+        bare ``|`` (pipe) is left untouched — pipelines are handled elsewhere.
+        """
+        segments: list[tuple[str, str]] = []
+        buf = ""
+        op = ""
+        quote = ""
+        i = 0
+        n = len(line)
+        found = False
+        while i < n:
+            ch = line[i]
+            if quote:
+                buf += ch
+                if ch == quote:
+                    quote = ""
+                i += 1
+                continue
+            if ch in ("'", '"'):
+                quote = ch
+                buf += ch
+                i += 1
+                continue
+            two = line[i:i + 2]
+            if two == "&&" or two == "||":
+                segments.append((op, buf))
+                op = two
+                buf = ""
+                found = True
+                i += 2
+                continue
+            if ch == ";" and not buf.endswith("\\"):
+                segments.append((op, buf))
+                op = ";"
+                buf = ""
+                found = True
+                i += 1
+                continue
+            buf += ch
+            i += 1
+        segments.append((op, buf))
+        if not found:
+            return None
+        # Drop empty segments produced by a trailing/leading separator.
+        return [(o, s) for (o, s) in segments if s.strip()]
+
+    # ── Expansion & assignment ───────────────────────────────────────
+
+    _ASSIGN_RE = re.compile(r"^([A-Za-z_][A-Za-z0-9_]*)=")
+
+    def _parse_assignment(self, line: str):
+        """Peel leading ``VAR=value`` words off a command line.
+
+        Returns ``(name_value_pairs, remainder)`` when the line begins with at
+        least one assignment, else ``None``. Handles quoted values and the
+        ``VAR=v cmd args`` prefix form. Only splits on unquoted whitespace.
+        """
+        try:
+            tokens = shlex.split(line, posix=True)
+        except ValueError:
+            return None
+        if not tokens or not self._ASSIGN_RE.match(tokens[0]):
+            return None
+        pairs: list[tuple[str, str]] = []
+        idx = 0
+        for tok in tokens:
+            if self._ASSIGN_RE.match(tok):
+                k, v = tok.split("=", 1)
+                pairs.append((k, v))
+                idx += 1
+            else:
+                break
+        # Rebuild the remainder from the original (still-quoted) line so command
+        # parsing downstream keeps quoting intact.
+        remainder_tokens = tokens[idx:]
+        remainder = " ".join(shlex.quote(t) for t in remainder_tokens)
+        return pairs, remainder
+
+    def _expand(self, line: str) -> str:
+        """Perform the common word expansions on a command line.
+
+        Order mirrors bash: command substitution (`$(...)` / backticks) first,
+        then parameter expansion (`$VAR`, `${VAR}`), then tilde, then globbing.
+        Expansions inside single quotes are left literal.
+        """
+        line = self._expand_command_subst(line)
+        line = self._expand_vars(line)
+        line = self._expand_tilde(line)
+        line = self._expand_globs(line)
+        return line
+
+    def _expand_command_subst(self, line: str) -> str:
+        """Resolve ``$(cmd)`` and ``` `cmd` ``` by running the inner command."""
+        if "$(" not in line and "`" not in line:
+            return line
+
+        def run_inner(inner: str) -> str:
+            out = self.run(inner.strip())
+            # Command substitution collapses runs of whitespace/newlines.
+            return " ".join(out.split())
+
+        # $( ... ) — scan for balanced parentheses, skipping single-quoted spans.
+        out = ""
+        i = 0
+        n = len(line)
+        while i < n:
+            if line[i] == "'":
+                j = line.find("'", i + 1)
+                if j == -1:
+                    out += line[i:]
+                    break
+                out += line[i:j + 1]
+                i = j + 1
+                continue
+            if line[i:i + 2] == "$(":
+                depth = 1
+                j = i + 2
+                while j < n and depth:
+                    if line[j] == "(":
+                        depth += 1
+                    elif line[j] == ")":
+                        depth -= 1
+                    if depth == 0:
+                        break
+                    j += 1
+                inner = line[i + 2:j]
+                out += run_inner(inner)
+                i = j + 1
+                continue
+            out += line[i]
+            i += 1
+        line = out
+        # Backtick form (no nesting).
+        if "`" in line:
+            line = re.sub(r"`([^`]*)`", lambda m: run_inner(m.group(1)), line)
+        return line
+
+    def _expand_vars(self, line: str) -> str:
+        """Substitute ``$VAR`` / ``${VAR}`` from the environment.
+
+        Single-quoted spans are preserved literally; everything else (including
+        double-quoted spans, as in a real shell) is expanded. Unset variables
+        expand to the empty string.
+        """
+        if "$" not in line:
+            return line
+        env = self.state.env
+        # Provide a couple of dynamic specials the sim can answer.
+        specials = {
+            "HOME": self.state.users.get(self.state.current_user).home
+            if self.state.current_user in self.state.users else "/root",
+            "USER": self.state.current_user,
+            "UID": str(self.state.users[self.state.current_user].uid)
+            if self.state.current_user in self.state.users else "0",
+            "PWD": self.state.cwd,
+            "HOSTNAME": self.state.hostname,
+            "?": str(self.state.last_exit_code or 0),
+        }
+
+        def lookup(name: str) -> str:
+            if name in env:
+                return env[name]
+            return specials.get(name, "")
+
+        out = ""
+        i = 0
+        n = len(line)
+        while i < n:
+            ch = line[i]
+            if ch == "'":
+                j = line.find("'", i + 1)
+                if j == -1:
+                    out += line[i:]
+                    break
+                out += line[i:j + 1]
+                i = j + 1
+                continue
+            if ch == "$" and i + 1 < n:
+                nxt = line[i + 1]
+                if nxt == "{":
+                    j = line.find("}", i + 2)
+                    if j != -1:
+                        out += lookup(line[i + 2:j])
+                        i = j + 1
+                        continue
+                if nxt == "?":
+                    out += lookup("?")
+                    i += 2
+                    continue
+                m = re.match(r"[A-Za-z_][A-Za-z0-9_]*", line[i + 1:])
+                if m:
+                    out += lookup(m.group(0))
+                    i += 1 + m.end()
+                    continue
+            out += ch
+            i += 1
+        return out
+
+    def _expand_tilde(self, line: str) -> str:
+        """Expand a leading ``~`` in each unquoted word to the user's home."""
+        home = (self.state.users.get(self.state.current_user).home
+                if self.state.current_user in self.state.users else "/root")
+        try:
+            tokens = shlex.split(line, posix=True)
+        except ValueError:
+            return line
+        changed = False
+        for k, tok in enumerate(tokens):
+            if tok == "~":
+                tokens[k] = home
+                changed = True
+            elif tok.startswith("~/"):
+                tokens[k] = home + tok[1:]
+                changed = True
+        if not changed:
+            return line
+        return " ".join(shlex.quote(t) for t in tokens)
+
+    def _expand_globs(self, line: str) -> str:
+        """Expand ``*`` / ``?`` / ``[...]`` patterns against the VFS.
+
+        A word with no matches is left unchanged (bash's default nullglob-off
+        behaviour). Quoted words are never expanded.
+        """
+        if not any(c in line for c in "*?["):
+            return line
+        try:
+            tokens = shlex.split(line, posix=True)
+        except ValueError:
+            return line
+        # shlex strips quotes, so we lose the "was this quoted" signal; re-scan
+        # the raw line to know which tokens carried a quote and must stay literal.
+        quoted = self._quoted_token_flags(line, tokens)
+        out_tokens: list[str] = []
+        for k, tok in enumerate(tokens):
+            if quoted[k] or not any(c in tok for c in "*?["):
+                out_tokens.append(tok)
+                continue
+            matches = self._glob_vfs(tok)
+            if matches:
+                out_tokens.extend(matches)
+            else:
+                out_tokens.append(tok)
+        return " ".join(shlex.quote(t) for t in out_tokens)
+
+    @staticmethod
+    def _quoted_token_flags(line: str, tokens: list[str]) -> list[bool]:
+        """Best-effort: mark tokens that appeared inside quotes in the raw line."""
+        flags = [False] * len(tokens)
+        # Find quoted spans and, for each, flag any token whose text sat inside.
+        spans: list[tuple[int, int]] = []
+        i = 0
+        n = len(line)
+        while i < n:
+            if line[i] in ("'", '"'):
+                q = line[i]
+                j = line.find(q, i + 1)
+                if j == -1:
+                    break
+                spans.append((i, j))
+                i = j + 1
+            else:
+                i += 1
+        for k, tok in enumerate(tokens):
+            for s, e in spans:
+                if line[s + 1:e] and tok in line[s + 1:e]:
+                    flags[k] = True
+                    break
+        return flags
+
+    def _glob_vfs(self, pattern: str) -> list[str]:
+        """Return VFS paths matching a shell glob, preserving relative form."""
+        import fnmatch
+
+        base = self.state.resolve_path(pattern)
+        # Split the pattern into a fixed directory prefix and a wildcard tail so
+        # `/etc/*.conf` lists only /etc's direct children.
+        ap_pattern = base
+        parent = ap_pattern.rsplit("/", 1)[0] or "/"
+        candidates: set[str] = set()
+        # Direct children of the parent dir (files and dirs).
+        entries = self.state.list_dir(parent) or []
+        for name in entries:
+            full = (parent.rstrip("/") + "/" + name) if parent != "/" else "/" + name
+            if fnmatch.fnmatch(full, ap_pattern):
+                candidates.add(full)
+        # Also match any VFS path directly (covers implicit dirs).
+        for path in self.state.vfs:
+            if fnmatch.fnmatch(path, ap_pattern):
+                candidates.add(path)
+        if not candidates:
+            return []
+        results = sorted(candidates)
+        # If the original pattern was relative, present matches relative to cwd.
+        if not pattern.startswith("/") and not pattern.startswith("~"):
+            cwd = self.state.cwd.rstrip("/") + "/"
+            rel = [r[len(cwd):] if r.startswith(cwd) else r for r in results]
+            return rel
+        return results
 
     def _handle_heredoc(self, block: str) -> str | None:
         """Resolve a single-shot heredoc block submitted with embedded newlines.
@@ -2454,6 +2826,637 @@ class RHELShell:
                 f"--- {host} ping statistics ---\n1 packets transmitted, 1 received, 0% packet loss"
             )
         return f"ping: {host}: Name or service not known"
+
+    # ── Core coreutils / text tools ──────────────────────────────────
+
+    def _cmd_true(self, p: list[str]) -> str:
+        self.state.last_exit_code = 0
+        return ""
+
+    def _cmd_false(self, p: list[str]) -> str:
+        self.state.last_exit_code = 1
+        return ""
+
+    def _input_lines(self, files: list[str], err_prefix: str) -> tuple[list[str] | None, str]:
+        """Read lines from file args, else piped stdin. Returns (lines, error)."""
+        if files:
+            content = self.state.read_file(files[-1])
+            if content is None:
+                return None, f"{err_prefix}: {files[-1]}: No such file or directory"
+            return content.splitlines(), ""
+        stdin = self._stdin_lines()
+        return (stdin if stdin is not None else []), ""
+
+    def _cmd_cut(self, p: list[str]) -> str:
+        # cut -d: -f1  |  cut -f2  |  cut -c1-3  (field or char selection)
+        delim = "\t"
+        fields = None
+        chars = None
+        files: list[str] = []
+        i = 1
+        while i < len(p):
+            tok = p[i]
+            if tok == "-d" and i + 1 < len(p):
+                delim = p[i + 1]; i += 2; continue
+            if tok.startswith("-d"):
+                delim = tok[2:] or "\t"; i += 1; continue
+            if tok == "-f" and i + 1 < len(p):
+                fields = p[i + 1]; i += 2; continue
+            if tok.startswith("-f"):
+                fields = tok[2:]; i += 1; continue
+            if tok == "-c" and i + 1 < len(p):
+                chars = p[i + 1]; i += 2; continue
+            if tok.startswith("-c"):
+                chars = tok[2:]; i += 1; continue
+            if not tok.startswith("-"):
+                files.append(tok)
+            i += 1
+        lines, err = self._input_lines(files, "cut")
+        if lines is None:
+            return err
+
+        def indices(spec: str, upper: int) -> list[int]:
+            out: list[int] = []
+            for part in spec.split(","):
+                if "-" in part:
+                    a, b = part.split("-", 1)
+                    lo = int(a) if a else 1
+                    hi = int(b) if b else upper
+                    out.extend(range(lo, hi + 1))
+                elif part:
+                    out.append(int(part))
+            return out
+
+        result = []
+        for ln in lines:
+            if chars is not None:
+                idx = indices(chars, len(ln))
+                result.append("".join(ln[j - 1] for j in idx if 1 <= j <= len(ln)))
+            elif fields is not None:
+                cols = ln.split(delim)
+                # cut prints lines without the delimiter unchanged.
+                if delim not in ln:
+                    result.append(ln)
+                    continue
+                idx = indices(fields, len(cols))
+                picked = [cols[j - 1] for j in idx if 1 <= j <= len(cols)]
+                result.append(delim.join(picked))
+            else:
+                result.append(ln)
+        return "\n".join(result)
+
+    def _cmd_tr(self, p: list[str]) -> str:
+        # tr SET1 SET2  |  tr -d SET  |  tr -s SET  (operates on stdin)
+        delete = "-d" in p
+        squeeze = "-s" in p
+        args = [a for a in p[1:] if not a.startswith("-")]
+        data = getattr(self, "_stdin", None) or ""
+
+        def expand(s: str) -> str:
+            out = ""
+            i = 0
+            while i < len(s):
+                if i + 2 < len(s) and s[i + 1] == "-":
+                    for c in range(ord(s[i]), ord(s[i + 2]) + 1):
+                        out += chr(c)
+                    i += 3
+                else:
+                    out += s[i]
+                    i += 1
+            # Common POSIX class shortcuts.
+            return out
+
+        set1 = expand(args[0]) if args else ""
+        set1 = set1.replace("[:lower:]", "abcdefghijklmnopqrstuvwxyz").replace(
+            "[:upper:]", "ABCDEFGHIJKLMNOPQRSTUVWXYZ")
+        if delete:
+            return "".join(c for c in data if c not in set1)
+        if squeeze and len(args) == 1:
+            out = ""
+            prev = None
+            for c in data:
+                if c in set1 and c == prev:
+                    continue
+                out += c
+                prev = c
+            return out
+        set2 = expand(args[1]) if len(args) > 1 else ""
+        set2 = set2.replace("[:lower:]", "abcdefghijklmnopqrstuvwxyz").replace(
+            "[:upper:]", "ABCDEFGHIJKLMNOPQRSTUVWXYZ")
+        if not set2:
+            return data
+        table = {}
+        for k, c in enumerate(set1):
+            table[c] = set2[k] if k < len(set2) else set2[-1]
+        return "".join(table.get(c, c) for c in data)
+
+    def _cmd_tee(self, p: list[str]) -> str:
+        # tee [-a] FILE... — write stdin to files AND pass it through.
+        append = "-a" in p
+        files = [a for a in p[1:] if not a.startswith("-")]
+        data = getattr(self, "_stdin", None) or ""
+        payload = data if data.endswith("\n") or data == "" else data + "\n"
+        for f in files:
+            self.state.write_file(f, payload, append=append)
+        # tee echoes stdin on to its own stdout.
+        return data.rstrip("\n")
+
+    def _cmd_xargs(self, p: list[str]) -> str:
+        # xargs [-I{}] CMD ... — build a command from the leading command args
+        # and the whitespace-split stdin words, then run it once.
+        data = getattr(self, "_stdin", None) or ""
+        words = data.split()
+        args = p[1:]
+        replace = None
+        if args and args[0] == "-I" and len(args) > 1:
+            replace = args[1]
+            args = args[2:]
+        elif args and args[0].startswith("-I"):
+            replace = args[0][2:]
+            args = args[1:]
+        if not args:
+            # Default command is echo.
+            return " ".join(words)
+        if replace:
+            outputs = []
+            for w in (words or [""]):
+                cmd = " ".join(a.replace(replace, w) for a in args)
+                out = self.run(cmd)
+                if out:
+                    outputs.append(out)
+            return "\n".join(outputs)
+        cmd = " ".join(args) + (" " + " ".join(words) if words else "")
+        return self.run(cmd)
+
+    def _cmd_stat(self, p: list[str]) -> str:
+        fmt = None
+        files: list[str] = []
+        i = 1
+        while i < len(p):
+            tok = p[i]
+            if tok in ("-c", "--format") and i + 1 < len(p):
+                fmt = p[i + 1]; i += 2; continue
+            if tok.startswith("-c"):
+                fmt = tok[2:]; i += 1; continue
+            if not tok.startswith("-"):
+                files.append(tok)
+            i += 1
+        if not files:
+            return "stat: missing operand"
+        out = []
+        for f in files:
+            ap = self.state.resolve_path(f)
+            node = self.state.vfs.get(ap)
+            is_dir = self.state.is_dir(ap)
+            if node is None and not is_dir:
+                out.append(f"stat: cannot statx '{f}': No such file or directory")
+                self.state.last_exit_code = 1
+                continue
+            mode = node.get("mode", "755" if is_dir else "644") if isinstance(node, dict) else "644"
+            owner = node.get("owner", "root") if isinstance(node, dict) else "root"
+            group = node.get("group", owner) if isinstance(node, dict) else "root"
+            content = node.get("content", "") if isinstance(node, dict) else ""
+            size = 4096 if is_dir else len(content)
+            ftype = "directory" if is_dir else "regular file"
+            if fmt:
+                mapping = {
+                    "%n": f, "%s": str(size), "%a": mode, "%U": owner, "%G": group,
+                    "%F": ftype, "%i": "131074", "%h": "1",
+                }
+                rendered = fmt
+                for k, v in mapping.items():
+                    rendered = rendered.replace(k, v)
+                out.append(rendered)
+            else:
+                out.append(
+                    f"  File: {f}\n"
+                    f"  Size: {size:<15} Blocks: 8          IO Block: 4096   {ftype}\n"
+                    f"Access: (0{mode}/{'d' if is_dir else '-'}rwxr-xr-x)  Uid: (    0/{owner:>6})   Gid: (    0/{group:>6})\n"
+                    f"Access: 2026-06-14 10:00:00.000000000 +0000\n"
+                    f"Modify: 2026-06-14 10:00:00.000000000 +0000\n"
+                    f"Change: 2026-06-14 10:00:00.000000000 +0000"
+                )
+        return "\n".join(out)
+
+    def _cmd_du(self, p: list[str]) -> str:
+        summarize = "-s" in "".join(a for a in p[1:] if a.startswith("-"))
+        human = "h" in "".join(a for a in p[1:] if a.startswith("-"))
+        targets = [a for a in p[1:] if not a.startswith("-")] or [self.state.cwd]
+
+        def size_of(ap: str) -> int:
+            total = 0
+            if self.state.is_dir(ap):
+                prefix = ap.rstrip("/") + "/"
+                for path, node in self.state.vfs.items():
+                    if (path == ap or path.startswith(prefix)) and isinstance(node, dict) \
+                            and node.get("type") == "file":
+                        total += len(node.get("content", ""))
+                return total or 4096
+            content = self.state.read_file(ap)
+            return len(content) if content is not None else 0
+
+        def human_kb(nbytes: int) -> str:
+            kb = max(1, (nbytes + 1023) // 1024)
+            if not human:
+                return str(kb)
+            if kb < 1024:
+                return f"{kb}K"
+            return f"{kb / 1024:.1f}M"
+
+        out = []
+        for t in targets:
+            ap = self.state.resolve_path(t)
+            if self.state.read_file(ap) is None and not self.state.is_dir(ap):
+                out.append(f"du: cannot access '{t}': No such file or directory")
+                self.state.last_exit_code = 1
+                continue
+            out.append(f"{human_kb(size_of(ap))}\t{t}")
+        return "\n".join(out)
+
+    def _cmd_nproc(self, p: list[str]) -> str:
+        return str(getattr(self.state, "cpu_count", 4))
+
+    def _cmd_basename(self, p: list[str]) -> str:
+        args = [a for a in p[1:] if not a.startswith("-")]
+        if not args:
+            return "basename: missing operand"
+        name = args[0].rstrip("/").split("/")[-1] or "/"
+        if len(args) > 1 and name.endswith(args[1]):
+            name = name[: -len(args[1])] or name
+        return name
+
+    def _cmd_dirname(self, p: list[str]) -> str:
+        args = [a for a in p[1:] if not a.startswith("-")]
+        if not args:
+            return "dirname: missing operand"
+        path = args[0].rstrip("/")
+        if "/" not in path:
+            return "."
+        head = path.rsplit("/", 1)[0]
+        return head or "/"
+
+    def _cmd_readlink(self, p: list[str]) -> str:
+        args = [a for a in p[1:] if not a.startswith("-")]
+        if not args:
+            return ""
+        # No symlink graph in the VFS — resolve to the canonical absolute path.
+        return self.state.resolve_path(args[0])
+
+    def _cmd_seq(self, p: list[str]) -> str:
+        nums = [a for a in p[1:] if not a.startswith("-") or a.lstrip("-").isdigit()]
+        try:
+            vals = [int(x) for x in nums]
+        except ValueError:
+            return "seq: invalid floating point argument"
+        if len(vals) == 1:
+            start, step, end = 1, 1, vals[0]
+        elif len(vals) == 2:
+            start, step, end = vals[0], 1, vals[1]
+        elif len(vals) >= 3:
+            start, step, end = vals[0], vals[1], vals[2]
+        else:
+            return "seq: missing operand"
+        if step == 0:
+            return ""
+        out = []
+        v = start
+        if step > 0:
+            while v <= end:
+                out.append(str(v)); v += step
+        else:
+            while v >= end:
+                out.append(str(v)); v += step
+        return "\n".join(out)
+
+    def _cmd_sleep(self, p: list[str]) -> str:
+        # Do NOT actually block the terminal in the sim — just succeed.
+        self.state.last_exit_code = 0
+        return ""
+
+    def _cmd_sysctl(self, p: list[str]) -> str:
+        store = getattr(self.state, "sysctl", None)
+        if store is None:
+            store = {
+                "vm.swappiness": "30",
+                "net.ipv4.ip_forward": "0",
+                "kernel.hostname": self.state.hostname,
+                "fs.file-max": "9223372036854775807",
+                "net.ipv4.tcp_syncookies": "1",
+                "vm.max_map_count": "65530",
+            }
+            self.state.sysctl = store
+        args = [a for a in p[1:] if not a.startswith("-")]
+        if "-a" in p or "--all" in p:
+            return "\n".join(f"{k} = {v}" for k, v in store.items())
+        if "-w" in p or (args and "=" in args[0]):
+            for a in args:
+                if "=" in a:
+                    k, v = a.split("=", 1)
+                    store[k.strip()] = v.strip()
+                    return f"{k.strip()} = {v.strip()}"
+            return ""
+        if not args:
+            return "\n".join(f"{k} = {v}" for k, v in store.items())
+        out = []
+        for key in args:
+            if key in store:
+                out.append(f"{key} = {store[key]}")
+            else:
+                out.append(f"sysctl: cannot stat /proc/sys/{key.replace('.', '/')}: No such file or directory")
+                self.state.last_exit_code = 255
+        return "\n".join(out)
+
+    def _cmd_diff(self, p: list[str]) -> str:
+        files = [a for a in p[1:] if not a.startswith("-")]
+        if len(files) < 2:
+            return "diff: missing operand"
+        a = self.state.read_file(files[0])
+        b = self.state.read_file(files[1])
+        if a is None:
+            self.state.last_exit_code = 2
+            return f"diff: {files[0]}: No such file or directory"
+        if b is None:
+            self.state.last_exit_code = 2
+            return f"diff: {files[1]}: No such file or directory"
+        if a == b:
+            self.state.last_exit_code = 0
+            return ""
+        import difflib
+        self.state.last_exit_code = 1
+        if "-u" in p or "--unified" in p:
+            ud = difflib.unified_diff(
+                a.splitlines(), b.splitlines(),
+                fromfile=files[0], tofile=files[1], lineterm="")
+            return "\n".join(ud)
+        # Default (normal) diff: emit a compact ed-style summary.
+        alines, blines = a.splitlines(), b.splitlines()
+        out = []
+        for k, (x, y) in enumerate(zip(alines, blines), 1):
+            if x != y:
+                out.append(f"{k}c{k}\n< {x}\n---\n> {y}")
+        if len(alines) != len(blines):
+            out.append(f"{min(len(alines), len(blines)) + 1}c: files differ in length")
+        return "\n".join(out)
+
+    def _hash_targets(self, p: list[str], algo, label: str) -> str:
+        import hashlib
+        files = [a for a in p[1:] if not a.startswith("-")]
+        if not files and self._stdin_lines() is not None:
+            data = (getattr(self, "_stdin", "") or "").encode()
+            return f"{algo(data).hexdigest()}  -"
+        out = []
+        for f in files:
+            content = self.state.read_file(f)
+            if content is None:
+                out.append(f"{label}: {f}: No such file or directory")
+                self.state.last_exit_code = 1
+                continue
+            out.append(f"{algo(content.encode()).hexdigest()}  {f}")
+        return "\n".join(out)
+
+    def _cmd_md5sum(self, p: list[str]) -> str:
+        import hashlib
+        return self._hash_targets(p, hashlib.md5, "md5sum")
+
+    def _cmd_sha1sum(self, p: list[str]) -> str:
+        import hashlib
+        return self._hash_targets(p, hashlib.sha1, "sha1sum")
+
+    def _cmd_sha256sum(self, p: list[str]) -> str:
+        import hashlib
+        return self._hash_targets(p, hashlib.sha256, "sha256sum")
+
+    # ── Networking / TLS tools ───────────────────────────────────────
+
+    def _resolve_dns(self, name: str) -> str | None:
+        """Resolve a hostname the way the sim's /etc/hosts + known IPs would."""
+        if name in ("localhost", "127.0.0.1", "::1"):
+            return "127.0.0.1"
+        hosts = self.state.read_file("/etc/hosts") or ""
+        for raw in hosts.splitlines():
+            line = raw.split("#", 1)[0].strip()
+            if not line:
+                continue
+            cols = line.split()
+            if name in cols[1:]:
+                return cols[0]
+        host_ips = getattr(self, "_host_ips", {})
+        if name in host_ips:
+            return host_ips[name]
+        if re.match(r"^\d+\.\d+\.\d+\.\d+$", name):
+            return name
+        # A handful of well-known public names resolve deterministically so DNS
+        # lookups in labs succeed offline.
+        known = {
+            "example.com": "93.184.216.34",
+            "google.com": "142.250.72.14",
+            "github.com": "140.82.121.4",
+        }
+        return known.get(name)
+
+    def _cmd_dig(self, p: list[str]) -> str:
+        args = [a for a in p[1:] if not a.startswith("-") and not a.startswith("@")]
+        short = "+short" in p
+        args = [a for a in args if not a.startswith("+")]
+        rtype = "A"
+        name = ""
+        for a in args:
+            if a.upper() in ("A", "AAAA", "MX", "TXT", "NS", "CNAME", "PTR", "SOA"):
+                rtype = a.upper()
+            else:
+                name = a
+        if not name:
+            return "; <<>> DiG 9.16 <<>> \n;; global options: +cmd"
+        ip = self._resolve_dns(name)
+        if short:
+            return ip or ""
+        if ip is None:
+            return (f"; <<>> DiG 9.16.23 <<>> {name}\n;; ->>HEADER<<- opcode: QUERY, status: NXDOMAIN\n"
+                    f";; QUESTION SECTION:\n;{name}.\t\tIN\t{rtype}")
+        return (f"; <<>> DiG 9.16.23 <<>> {name}\n"
+                f";; ->>HEADER<<- opcode: QUERY, status: NOERROR\n\n"
+                f";; QUESTION SECTION:\n;{name}.\t\tIN\t{rtype}\n\n"
+                f";; ANSWER SECTION:\n{name}.\t300\tIN\t{rtype}\t{ip}\n\n"
+                f";; Query time: 1 msec\n;; SERVER: 127.0.0.53#53(127.0.0.53)")
+
+    def _cmd_nslookup(self, p: list[str]) -> str:
+        args = [a for a in p[1:] if not a.startswith("-")]
+        if not args:
+            return "> "
+        name = args[0]
+        ip = self._resolve_dns(name)
+        if ip is None:
+            return (f"Server:\t\t127.0.0.53\nAddress:\t127.0.0.53#53\n\n"
+                    f"** server can't find {name}: NXDOMAIN")
+        return (f"Server:\t\t127.0.0.53\nAddress:\t127.0.0.53#53\n\n"
+                f"Non-authoritative answer:\nName:\t{name}\nAddress: {ip}")
+
+    def _cmd_host(self, p: list[str]) -> str:
+        args = [a for a in p[1:] if not a.startswith("-")]
+        if not args:
+            return "Usage: host [options] name"
+        name = args[0]
+        ip = self._resolve_dns(name)
+        if ip is None:
+            return f"Host {name} not found: 3(NXDOMAIN)"
+        return f"{name} has address {ip}"
+
+    def _cmd_nc(self, p: list[str]) -> str:
+        # nc -zv HOST PORT — connectivity probe. Succeeds when the port maps to a
+        # running service and (for the local host) the firewall allows it.
+        args = [a for a in p[1:] if not a.startswith("-")]
+        if len(args) < 2:
+            return "nc: missing host/port"
+        hostarg, portarg = args[0], args[1]
+        try:
+            port = int(portarg)
+        except ValueError:
+            return f"nc: port number invalid: {portarg}"
+        ip = self._resolve_dns(hostarg)
+        if ip is None:
+            return f"nc: getaddrinfo for host \"{hostarg}\" port {port}: Name or service not known"
+        local = ip in ("127.0.0.1",) or hostarg in ("localhost", self.state.hostname)
+        st = self.state if local else self._server_state()
+        port_to_svc = {22: "sshd", 80: "nginx", 443: "nginx", 3306: "mysqld",
+                       5432: "postgresql", 6379: "redis", 8080: "nginx"}
+        svc_name = port_to_svc.get(port)
+        svc = st.services.get(svc_name) if svc_name else None
+        listening = bool(svc and svc.active == "active") or port == 22
+        if local and listening and not st.firewall.is_port_open(port) and port != 22:
+            listening = False
+        if listening:
+            return (f"Ncat: Version 7.92\n"
+                    f"Connection to {ip} {port} port [tcp/*] succeeded!")
+        self.state.last_exit_code = 1
+        return f"Ncat: Connection refused."
+
+    def _cmd_wget(self, p: list[str]) -> str:
+        url = next((a for a in p[1:] if a.startswith("http") or "://" in a
+                    or "." in a), "")
+        if not url:
+            return "wget: missing URL"
+        # Reuse the curl body plumbing for the actual fetch semantics.
+        body = self._cmd_curl(["curl", url])
+        if body.startswith("curl:"):
+            reason = body.split(")", 1)[-1].strip() or "failed"
+            self.state.last_exit_code = 4
+            return (f"--2026-06-14 10:00:00--  {url}\n"
+                    f"Resolving host... failed: {reason}.")
+        host = url.split("://", 1)[-1].split("/", 1)[0]
+        return (f"--2026-06-14 10:00:00--  {url}\n"
+                f"Resolving {host}... 127.0.0.1\nConnecting to {host}|127.0.0.1|:80... connected.\n"
+                f"HTTP request sent, awaiting response... 200 OK\n"
+                f"Length: {len(body)} [text/html]\nSaving to: 'index.html'\n\n"
+                f"'index.html' saved [{len(body)}/{len(body)}]")
+
+    def _cmd_openssl(self, p: list[str]) -> str:
+        if len(p) < 2:
+            return "usage: openssl command [ options ]"
+        sub = p[1]
+        if sub == "version":
+            return "OpenSSL 3.0.7 1 Nov 2022 (Library: OpenSSL 3.0.7 1 Nov 2022)"
+        if sub == "rand":
+            n = 16
+            for tok in p[2:]:
+                if tok.isdigit():
+                    n = int(tok)
+            import hashlib
+            digest = hashlib.sha256(f"{self.state.hostname}:{n}".encode()).hexdigest()
+            if "-hex" in p:
+                return digest[: n * 2]
+            return digest[: n * 2]
+        if sub == "x509":
+            return ("subject=CN = sim.fixitlab.local\n"
+                    "issuer=CN = FixitLab Root CA\n"
+                    "notBefore=Jun 14 10:00:00 2026 GMT\n"
+                    "notAfter=Jun 14 10:00:00 2027 GMT")
+        if sub in ("genrsa", "genpkey"):
+            return "..+++++\nGenerating RSA private key (simulation)"
+        if sub == "s_client":
+            return ("CONNECTED(00000003)\n"
+                    "depth=0 CN = sim.fixitlab.local\n"
+                    "Verify return code: 0 (ok)")
+        if sub in ("dgst", "sha256"):
+            files = [a for a in p[2:] if not a.startswith("-")]
+            if files:
+                import hashlib
+                content = self.state.read_file(files[0]) or ""
+                return f"SHA256({files[0]})= {hashlib.sha256(content.encode()).hexdigest()}"
+        return f"openssl {sub}: OK (simulation)"
+
+    def _cmd_iptables(self, p: list[str]) -> str:
+        # A thin veneer over the firewalld state so port-open checks stay
+        # consistent. Supports -L/-S listing and -A ... --dport N -j ACCEPT.
+        fw = self.state.firewall
+        line = " ".join(p)
+        if "-L" in p or "--list" in p:
+            open_ports = []
+            z = fw.runtime.get(fw.default_zone, {})
+            for ptok in z.get("ports", []):
+                open_ports.append(ptok.split("/")[0])
+            if "http" in z.get("services", []):
+                open_ports.append("80")
+            rules = "\n".join(
+                f"ACCEPT     tcp  --  anywhere    anywhere    tcp dpt:{pt}"
+                for pt in sorted(set(open_ports), key=lambda x: int(x) if x.isdigit() else 0))
+            return ("Chain INPUT (policy ACCEPT)\n"
+                    "target     prot opt source      destination\n"
+                    f"{rules}" if rules else
+                    "Chain INPUT (policy ACCEPT)\ntarget     prot opt source      destination")
+        if "-S" in p:
+            return "-P INPUT ACCEPT\n-P FORWARD ACCEPT\n-P OUTPUT ACCEPT"
+        if "-A" in p or "-I" in p:
+            m = re.search(r"--dport\s+(\d+)", line)
+            if m and "ACCEPT" in line:
+                fw.add_port(f"{m.group(1)}/tcp", permanent=True)
+                fw.add_port(f"{m.group(1)}/tcp", permanent=False)
+            return ""
+        if "-D" in p or "-F" in p:
+            return ""
+        return ""
+
+    def _cmd_ufw(self, p: list[str]) -> str:
+        fw = self.state.firewall
+        if len(p) < 2:
+            return "ERROR: not enough args"
+        sub = p[1]
+        if sub == "status":
+            z = fw.runtime.get(fw.default_zone, {})
+            rows = []
+            for ptok in z.get("ports", []):
+                port = ptok.split("/")[0]
+                rows.append(f"{port + '/tcp':<26}ALLOW       Anywhere")
+            body = "\n".join(rows) if rows else ""
+            return ("Status: active\n\n"
+                    "To                         Action      From\n"
+                    "--                         ------      ----\n" + body)
+        if sub == "allow":
+            target = p[2] if len(p) > 2 else ""
+            port = re.sub(r"[^0-9]", "", target.split("/")[0])
+            if port:
+                fw.add_port(f"{port}/tcp", permanent=True)
+                fw.add_port(f"{port}/tcp", permanent=False)
+                return f"Rule added"
+            return "Rule added"
+        if sub in ("enable", "disable", "reload", "deny", "delete"):
+            return f"Firewall {sub}d"
+        return "ufw: ok"
+
+    def _cmd_watch(self, p: list[str]) -> str:
+        # Non-interactive: run the wrapped command once and show a header, as a
+        # single-shot `watch -n1 CMD` snapshot would.
+        args = list(p[1:])
+        while args and args[0].startswith("-"):
+            if args[0] in ("-n", "--interval") and len(args) > 1:
+                args = args[2:]
+            else:
+                args = args[1:]
+        if not args:
+            return "Usage: watch [options] command"
+        cmd = " ".join(args)
+        header = f"Every 2.0s: {cmd}"
+        body = self.run(cmd)
+        return f"{header}\n\n{body}" if body else header
 
     def _cmd_reboot(self, p: list[str]) -> str:
         # Restart the uptime clock. The unified engine resets boot_time again in

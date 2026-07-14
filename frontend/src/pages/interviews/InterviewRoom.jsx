@@ -1794,7 +1794,7 @@ export default function InterviewRoom() {
             </button>
           </div>
         )}
-        {browserVoices.length > 0 && (
+        {ttsSupported && (
           <div className="space-y-1.5">
             <p className="text-xs text-surface-400 flex items-center gap-1.5">
               <Volume2 size={12} className="text-indigo-400" />
@@ -1814,6 +1814,11 @@ export default function InterviewRoom() {
               <button
                 type="button"
                 onClick={() => {
+                  // ALWAYS produce sound on Test — even before the async
+                  // voiceschanged event has populated getVoices(). unlockSpeech()
+                  // primes the (possibly paused) engine after this user gesture,
+                  // and speak() falls back to the browser default voice when the
+                  // list is still empty, so the candidate always hears something.
                   unlockSpeech()
                   speak('Hi, this is how I will sound during your interview.', round.persona_voice_id)
                 }}
@@ -1824,7 +1829,9 @@ export default function InterviewRoom() {
               </button>
             </div>
             <p className="text-[10px] text-surface-600">
-              Voices are free and run in your browser. Pick a “Natural”/“Neural” one if available — they sound the most human.
+              {browserVoices.length > 0
+                ? 'Voices are free and run in your browser. Pick a “Natural”/“Neural” one if available — they sound the most human.'
+                : 'Voices are free and run in your browser. Tap Test to hear your device’s default voice — more options appear here once your browser finishes loading them.'}
             </p>
           </div>
         )}

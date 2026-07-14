@@ -1,0 +1,105 @@
+title: 'Exporter Sending Queue Overflows'
+slug: otel-collector-queue-full-dropping
+technology: opentelemetry
+category: Fix
+difficulty: hard
+scenario_type: fix
+lab_mode: simulation
+simulation_type: generic
+time_limit: 1800
+max_score: 100
+is_free: false
+infrastructure_type: docker
+jira_priority: Medium
+description: |-
+  CONTEXT: A platform team operating opentelemetry needs you to resolve `Exporter Sending Queue Overflows` during a realistic delivery incident. The business impact is a stalled or unsafe release until the underlying state is repaired.
+
+  ENVIRONMENT: You are working in FixitLab's offline observability lab with an OpenTelemetry Collector, an instrumented demo service, and a local trace/metric backend under /otel. All components run locally; no SaaS observability vendor or paid APIs are required.
+
+  SYMPTOM / STARTING STATE: Under load, `otelcol_exporter_enqueue_failed_spans` climbs and traces go missing. The backend is up but slow; the exporter's sending queue is tiny and fills, so new spans are dropped rather than retried.
+
+  OBJECTIVE: The exporter's `sending_queue` is undersized (small `queue_size`, low `num_consumers`) for the ingest rate while the backend has latency, so the queue overflows and drops. Enlarge the sending queue and consumer count (and enable persistent queue if needed) so bursts are buffered instead of dropped. Success is graded on the real repaired state, not a manual marker.
+
+  WHAT TO AVOID: Do not suppress the signal, disable the policy/gate, or fake completion with marker files — reproduce the diagnosis, then apply the smallest fix that satisfies the objective and re-run Check Solution.
+objectives:
+- 'otelcol_exporter_enqueue_failed_spans stops climbing'
+- 'The undersized sending queue is confirmed as the drop source'
+- 'Spans are buffered through backend latency after the queue is sized up'
+initial_state: |-
+  Under load, `otelcol_exporter_enqueue_failed_spans` climbs and traces go missing. The backend is up but slow; the exporter's sending queue is tiny and fills, so new spans are dropped rather than retried.
+hints:
+- order: 1
+  cost: 0
+  content: |-
+    Where to look — orient before changing anything:
+        1. `cat /otel/collector/config.yaml`
+        2. `curl -s localhost:8888/metrics | grep enqueue_failed`
+        3. `otelcol validate --config /otel/collector/config.yaml`
+        Write down what looks healthy versus wrong. Form one hypothesis before you touch anything.
+- order: 2
+  cost: 25
+  content: |-
+    Diagnostic steps:
+        1. Re-run `cat /otel/collector/config.yaml` and read the status/error carefully.
+        2. Cross-check with `curl -s localhost:8888/metrics | grep enqueue_failed` to isolate the failing object.
+        3. State the single root cause in one sentence before you act.
+- order: 3
+  cost: 50
+  content: |-
+    Exact fix + verification:
+        1. The exporter's `sending_queue` is undersized (small `queue_size`, low `num_consumers`) for the ingest rate while the backend has latency, so the queue overflows and drops. Enlarge the sending queue and consumer count (and enable persistent queue if needed) so bursts are buffered instead of dropped.
+        2. Change one thing at a time so you can roll back if the hypothesis was wrong.
+        3. Verify the objective is met, then click Check Solution (graded on real state, not a marker file).
+summary: |-
+  Diagnose and resolve exporter sending queue overflows in the opentelemetry simulation lab and verify the healthy end state
+estimated_minutes: 30
+xp_reward: 100
+prerequisites:
+- 'Basic distributed-systems and HTTP literacy'
+tags:
+- 'opentelemetry'
+- 'fix'
+- 'hands-on'
+- 'simulation'
+linked_tutorial: opentelemetry-fundamentals
+what_you_will_learn:
+- 'otelcol_exporter_enqueue_failed_spans stops climbing'
+- 'The undersized sending queue is confirmed as the drop source'
+- 'Understand how the exporter sending queue buffers against backend latency and why an undersized queue drops telemetry under load'
+environment:
+  nodes:
+  - role: primary
+    os: FixitLab OpenTelemetry observability lab
+    hostname: lab-primary
+    ip: 127.0.0.1
+    specs: local offline simulation
+  pre_installed:
+  - bash
+  - coreutils
+  - otelcol
+  - curl
+  - jq
+  credentials:
+  - user: root
+    password: lab123
+tasks:
+- id: task_1
+  title: 'Exporter Sending Queue Overflows'
+  description: |-
+    Restore healthy behavior for Exporter Sending Queue Overflows by reproducing the diagnosis from the symptom, isolating the root cause with evidence, applying the smallest safe fix, and validating the outcome with the checker.
+  background: |-
+    This opentelemetry lab teaches how the exporter sending queue buffers against backend latency and why an undersized queue drops telemetry under load through systematic troubleshooting: observe, hypothesize, change, verify.
+  validation:
+    type: custom_script
+    script: check.sh
+    error_message: |-
+      The scenario objective is not yet satisfied. Re-read hint tier 2, confirm the root cause, and apply the documented remediation so /opt/fixitlab/academy/otel-collector-queue-full-dropping.conf carries the FIXED-OK marker.
+solution:
+  summary: |-
+    The exporter's `sending_queue` is undersized (small `queue_size`, low `num_consumers`) for the ingest rate while the backend has latency, so the queue overflows and drops. Enlarge the sending queue and consumer count (and enable persistent queue if needed) so bursts are buffered instead of dropped.
+  files_changed: []
+  commands_run:
+  - 'cat /otel/collector/config.yaml'
+  - 'curl -s localhost:8888/metrics | grep enqueue_failed'
+  - 'otelcol validate --config /otel/collector/config.yaml'
+  reference_docs: opentelemetry-fundamentals

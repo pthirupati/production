@@ -1,0 +1,122 @@
+title: rocm-smi Shows Degraded xGMI Links
+slug: gpu-rocm-smi-xgmi-degraded
+technology: gpu
+category: Fix
+difficulty: hard
+lab_mode: simulation
+simulation_type: gpu
+time_limit: 1500
+max_score: 100
+is_free: false
+jira_priority: High
+dual_terminal: false
+requires_companion_hosts: false
+description: 'CONTEXT: An SRE/GPU-infrastructure team running a datacenter accelerator fleet must resolve
+  `rocm-smi Shows Degraded xGMI Links` during a live incident. Until the underlying hardware/driver state
+  is repaired, GPU capacity is lost and training/inference jobs fail, so throughput and SLAs are at risk.
+
+
+  ENVIRONMENT: You are on a FixitLab offline GPU node with nvidia-smi, the NVIDIA driver/CUDA stack, DCGM
+  (dcgmi / nv-hostengine / dcgm-exporter), the container toolkit, and — for AMD hosts — the ROCm stack
+  (rocm-smi / amd-smi). All tools run locally; no paid APIs or external cloud calls are required.
+
+
+  SYMPTOM / STARTING STATE: `rocm-smi --showtopo` shows xGMI links negotiated below full width/speed between
+  some accelerators, so intra-node all-reduce falls back to slower paths and busbw collapses.
+
+
+  OBJECTIVE: Read rocm-smi xGMI topology and identify the links running below full width; Correlate the
+  degraded link with reset counts or a marginal device; Restore full xGMI width and confirm topology +
+  bandwidth are healthy. Success means `check.sh` exits successfully after you apply the documented remediation.
+
+
+  WHAT TO AVOID: Do not apply broad destructive changes, disable safety limits to mask the fault, skip
+  evidence gathering, or fake completion with marker files — the checker validates real system state.'
+initial_state: An MI300X node where `rocm-smi --showtopo` reports some xGMI links running at reduced width;
+  multi-GPU collectives are 3x slower than the sister nodes.
+objectives:
+- Read rocm-smi xGMI topology and identify the links running below full width
+- Correlate the degraded link with reset counts or a marginal device
+- Restore full xGMI width and confirm topology + bandwidth are healthy
+hints:
+- order: 1
+  cost: 0
+  content: 'Where to look: `rocm-smi --showtopo` and `rocm-smi --shownodesbw` for the fabric matrix; check
+    per-GPU reset counts with `rocm-smi -a | grep -i reset`.'
+- order: 2
+  cost: 25
+  content: 'Diagnostic steps:
+
+    1. `rocm-smi --showtopo` — find the accelerator pair with reduced xGMI width.
+
+    2. `rocm-smi --shownodesbw` — measured bandwidth confirms the degraded path.
+
+    3. `dmesg | grep -iE ''xgmi|amdgpu.*reset''` for link-training or reset events.'
+- order: 3
+  cost: 50
+  content: 'Exact fix + verification:
+
+    1. Reset the marginal accelerator (`amd-smi reset -G <id>`) to re-train xGMI, or reseat if it will
+    not renegotiate.
+
+    2. Re-run `rocm-smi --showtopo` and confirm every xGMI link is full width.
+
+    3. Apply the documented remediation in /opt/fixitlab/academy/gpu-rocm-smi-xgmi-degraded.conf.
+
+    WHY: the checker validates the fabric genuinely recovered.'
+summary: Diagnose and fix rocm-smi shows degraded xgmi links on a datacenter GPU node and verify with
+  the checker
+estimated_minutes: 25
+xp_reward: 100
+prerequisites:
+- Basic GPU and Linux troubleshooting literacy
+tags:
+- fix
+- gpu
+- amd
+- hands-on
+linked_tutorial: gpu-fundamentals
+what_you_will_learn:
+- Read rocm-smi xGMI topology and identify the links running below full width
+- Correlate the degraded link with reset counts or a marginal device
+- Restore full xGMI width and confirm topology + bandwidth are healthy
+environment:
+  nodes:
+  - role: primary
+    os: FixitLab GPU node
+    hostname: gpu-node-01
+    ip: 127.0.0.1
+    specs: local offline simulation (NVIDIA + AMD datacenter GPUs)
+  pre_installed:
+  - bash
+  - coreutils
+  - gpu
+  - nvidia-smi
+  - dcgmi
+  - rocm-smi
+  - journalctl
+  - systemctl
+  credentials:
+  - user: root
+    password: lab123
+tasks:
+- id: task_1
+  title: rocm-smi Shows Degraded xGMI Links
+  description: Restore healthy behavior for rocm-smi Shows Degraded xGMI Links by investigating the failure
+    with the GPU tooling, applying the smallest safe fix, and validating the outcome.
+  background: 'This GPU lab teaches systematic datacenter accelerator troubleshooting: observe, hypothesize,
+    change, verify.'
+  validation:
+    type: command_output
+    command: nvidia-smi
+    expected_output: NVIDIA-SMI
+    error_message: GPU health check still fails. Verify driver, device visibility, and that the documented
+      fix was applied.
+solution:
+  summary: Identify the root cause behind rocm-smi shows degraded xgmi links and apply the minimal documented
+    fix.
+  files_changed: []
+  commands_run:
+  - nvidia-smi
+  - dcgmi diag -r 1
+  reference_docs: gpu-fundamentals

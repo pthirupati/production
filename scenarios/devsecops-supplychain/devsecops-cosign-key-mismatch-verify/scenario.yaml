@@ -1,0 +1,106 @@
+title: 'Cosign Verify Rejects a Correctly-Signed Image'
+slug: devsecops-cosign-key-mismatch-verify
+technology: devsecops-supplychain
+category: Harden
+difficulty: medium
+scenario_type: fix
+lab_mode: simulation
+simulation_type: generic
+time_limit: 1500
+max_score: 100
+is_free: false
+infrastructure_type: docker
+jira_priority: Medium
+description: |-
+  CONTEXT: A platform team operating devsecops supplychain needs you to resolve `Cosign Verify Rejects a Correctly-Signed Image` during a realistic delivery incident. The business impact is a stalled or unsafe release until the underlying state is repaired.
+
+  ENVIRONMENT: You are working in FixitLab's offline supply-chain security lab with a local OCI registry, Trivy scanner, cosign keys, an SBOM store, and a Falco runtime sensor under /supplychain. Everything runs locally; no external registry or paid APIs are required.
+
+  SYMPTOM / STARTING STATE: The admission gate rejects `worker:1.2` with `error verifying signature: key mismatch` even though CI signed it. The verification policy references an old public key that was rotated out of the signing pipeline.
+
+  OBJECTIVE: The verification policy (`cosign verify --key`) uses a stale public key that no longer matches the current signing key, so valid signatures fail. Update the policy to the current cosign public key (or the correct keyless identity) so genuine signatures verify — do not skip verification. Success is graded on the real repaired state, not a manual marker.
+
+  WHAT TO AVOID: Do not suppress the signal, disable the policy/gate, or fake completion with marker files — reproduce the diagnosis, then apply the smallest fix that satisfies the objective and re-run Check Solution.
+objectives:
+- 'cosign verify accepts the correctly-signed image'
+- 'The stale verification public key is confirmed as root cause'
+- 'Signature verification passes without disabling the gate'
+initial_state: |-
+  The admission gate rejects `worker:1.2` with `error verifying signature: key mismatch` even though CI signed it. The verification policy references an old public key that was rotated out of the signing pipeline.
+hints:
+- order: 1
+  cost: 0
+  content: |-
+    Where to look — orient before changing anything:
+        1. `cosign verify --key /supplychain/cosign.pub worker:1.2`
+        2. `cosign tree worker:1.2`
+        3. `cat /supplychain/policy/verify.yaml`
+        Write down what looks healthy versus wrong. Form one hypothesis before you touch anything.
+- order: 2
+  cost: 25
+  content: |-
+    Diagnostic steps:
+        1. Re-run `cosign verify --key /supplychain/cosign.pub worker:1.2` and read the status/error carefully.
+        2. Cross-check with `cosign tree worker:1.2` to isolate the failing object.
+        3. State the single root cause in one sentence before you act.
+- order: 3
+  cost: 50
+  content: |-
+    Exact fix + verification:
+        1. The verification policy (`cosign verify --key`) uses a stale public key that no longer matches the current signing key, so valid signatures fail. Update the policy to the current cosign public key (or the correct keyless identity) so genuine signatures verify — do not skip verification.
+        2. Change one thing at a time so you can roll back if the hypothesis was wrong.
+        3. Verify the objective is met, then click Check Solution (graded on real state, not a marker file).
+summary: |-
+  Diagnose and resolve cosign verify rejects a correctly-signed image in the devsecops-supplychain simulation lab and verify the healthy end state
+estimated_minutes: 25
+xp_reward: 100
+prerequisites:
+- 'Basic container image and CI/CD literacy'
+tags:
+- 'devsecops-supplychain'
+- 'fix'
+- 'hands-on'
+- 'simulation'
+linked_tutorial: devsecops-supplychain-fundamentals
+what_you_will_learn:
+- 'cosign verify accepts the correctly-signed image'
+- 'The stale verification public key is confirmed as root cause'
+- 'Understand how cosign signature verification pins to a public key or keyless identity and why key rotation must update the verify policy'
+environment:
+  nodes:
+  - role: primary
+    os: FixitLab supply-chain security lab
+    hostname: lab-primary
+    ip: 127.0.0.1
+    specs: local offline simulation
+  pre_installed:
+  - bash
+  - coreutils
+  - trivy
+  - cosign
+  - syft
+  - falco
+  credentials:
+  - user: root
+    password: lab123
+tasks:
+- id: task_1
+  title: 'Cosign Verify Rejects a Correctly-Signed Image'
+  description: |-
+    Restore healthy behavior for Cosign Verify Rejects a Correctly-Signed Image by reproducing the diagnosis from the symptom, isolating the root cause with evidence, applying the smallest safe fix, and validating the outcome with the checker.
+  background: |-
+    This devsecops-supplychain lab teaches how cosign signature verification pins to a public key or keyless identity and why key rotation must update the verify policy through systematic troubleshooting: observe, hypothesize, change, verify.
+  validation:
+    type: custom_script
+    script: check.sh
+    error_message: |-
+      The scenario objective is not yet satisfied. Re-read hint tier 2, confirm the root cause, and apply the documented remediation so /opt/fixitlab/academy/devsecops-cosign-key-mismatch-verify.conf carries the FIXED-OK marker.
+solution:
+  summary: |-
+    The verification policy (`cosign verify --key`) uses a stale public key that no longer matches the current signing key, so valid signatures fail. Update the policy to the current cosign public key (or the correct keyless identity) so genuine signatures verify — do not skip verification.
+  files_changed: []
+  commands_run:
+  - 'cosign verify --key /supplychain/cosign.pub worker:1.2'
+  - 'cosign tree worker:1.2'
+  - 'cat /supplychain/policy/verify.yaml'
+  reference_docs: devsecops-supplychain-fundamentals

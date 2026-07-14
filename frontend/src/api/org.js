@@ -30,6 +30,14 @@ export const orgApi = {
     const { data } = await api.delete(`/org/${slug}/members/${userId}/remove/`)
     return data
   },
+  async leaveTeam(slug) {
+    const { data } = await api.delete(`/org/${slug}/leave/`)
+    return data
+  },
+  async deleteTeam(slug) {
+    const { data } = await api.delete(`/org/${slug}/`)
+    return data
+  },
   async cancelInvite(slug, inviteId) {
     const { data } = await api.delete(`/org/${slug}/invites/${inviteId}/`)
     return data
