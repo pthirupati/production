@@ -48,6 +48,37 @@ def ops_ready_for_patching(state) -> bool:
     )
 
 
+def clear_broken_config_sentinel(state, slug: str = "") -> None:
+    """Mark the preset-planted broken-configuration sentinel as repaired.
+
+    Sentinel scenarios (see scenario_presets._with_sentinel) plant a file
+    ``/opt/fixitlab/academy/<slug>.conf`` containing ``# broken configuration
+    for <slug>`` with NO ``FIXED-OK`` marker, so validation.py's fail-closed
+    sweep keeps the lab unsolved until the documented remediation runs. The E2E
+    harness (scripts/e2e_simulation_fix.apply_simulation_fix) clears it up front,
+    but a learner who performs the genuine in-terminal fix (or a unit test that
+    drives the engine repair directly) must also clear it — otherwise the sweep
+    would fail an engine state that is in fact repaired. This appends the
+    ``FIXED-OK`` marker for the given slug's sentinel file so "fixed -> PASS"
+    holds regardless of whether the fix came from the harness or the terminal.
+    """
+    slug = (slug or getattr(state, "scenario_slug", "") or "").lower()
+    if not slug:
+        return
+    path = f"/opt/fixitlab/academy/{slug}.conf"
+    content = state.read_file(path)
+    if content is None:
+        return
+    if "FIXED-OK" in content:
+        return
+    if f"# broken configuration for {slug}" not in content:
+        return
+    state.write_file(
+        path,
+        content + "\n# FIXED-OK: corrected per the documented remediation\n",
+    )
+
+
 def apply_team_ops_action(engine: UnifiedSimulationEngine | None, action: str, scenario_slug: str = "") -> None:
     """Mutate simulation state when a Jira team bot confirms an action."""
     if not engine or not getattr(engine, "shell", None):
@@ -102,6 +133,9 @@ def apply_team_ops_action(engine: UnifiedSimulationEngine | None, action: str, s
         state.network_nic_provisioned = True
         cfg = state.pending_nic_config or "10.0.0.20/24"
         state.append_host_ip(cfg.split("/")[0] if "/" in cfg else cfg, "eth0")
+        # The NIC hand-off is the documented remediation for the network-nic
+        # sentinel labs; clear the planted sentinel so validation passes.
+        clear_broken_config_sentinel(state, slug)
     elif action == "mount_issue_reported":
         state.mount_issue_after_reboot = True
 
