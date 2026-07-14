@@ -32,7 +32,10 @@ jobs:
       - name: Run health checks
         id: check
         env:
-          BASE_URL: ${{ github.event.inputs.base_url || secrets.PROD_BASE_URL }}
+          # Default to the known prod domain so the heartbeat never depends on an
+          # unset PROD_BASE_URL secret (an empty BASE_URL made every probe hit a
+          # hostless URL → curl 000 → the recurring false "health check failed").
+          BASE_URL: ${{ github.event.inputs.base_url || secrets.PROD_BASE_URL || 'https://fixitlab.in' }}
         run: |
           FAILED=""
           PASS=0
