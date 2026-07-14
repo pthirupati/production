@@ -73,6 +73,9 @@ urlpatterns = [
     # Lab history
     path("api/labs/history/", LabHistoryView.as_view(), name="lab_history"),
 
+    # Live Incident Director + public postmortem artifact (apps.labs)
+    path("api/labs/", include("apps.labs.incident_urls")),
+
     # Organization / team self-service
     path("api/org/", include("apps.accounts.org_urls")),
 
