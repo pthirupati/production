@@ -14,7 +14,7 @@ from rest_framework.permissions import IsAuthenticated, AllowAny
 from rest_framework import status
 from django.shortcuts import get_object_or_404
 from django.utils import timezone
-from django.db import transaction
+from django.db import connection, transaction
 from django.db.models import Q, Count, Avg, Sum, F, Exists, OuterRef, Value, BooleanField
 
 from common.throttles import LabStartThrottle, StrictAnonRateThrottle
@@ -371,6 +371,74 @@ class TechnologyDetailView(APIView):
         return Response({"technology": tech_data, "scenarios": scenario_data, "projects": projects, "cert_tracks": cert_tracks})
 
 
+# Trigram similarity below this is treated as "not a match" for typo fallback.
+# 0.3 is Postgres' historical pg_trgm.similarity_threshold default and works
+# well for catching one/two-character typos in short lab titles.
+_TRGM_SIMILARITY_THRESHOLD = 0.3
+
+
+def _apply_scenario_search(qs, search):
+    """Filter/rank a Scenario queryset by a free-text query.
+
+    Postgres: weighted full-text search (title A > subtitle B > category C >
+    description D) via ``websearch`` query parsing, OR'd with a pg_trgm
+    similarity match on ``title`` for typo tolerance. Results are annotated with
+    ``search_rank`` (full-text SearchRank, boosted by title trigram similarity)
+    so the caller can order by relevance. Both the FTS expression and the trgm
+    match are backed by the GIN indexes created in question_bank migration 0023.
+
+    Any other backend (SQLite in local/offline tests): falls back to the
+    original case-insensitive icontains match across title/subtitle/description
+    and tag names. ``search_rank`` is not annotated on this path — the caller
+    only orders by it under ``connection.vendor == 'postgresql'``.
+    """
+    if connection.vendor == "postgresql":
+        from django.contrib.postgres.search import (
+            SearchQuery,
+            SearchRank,
+            SearchVector,
+            TrigramSimilarity,
+        )
+
+        # NOTE: this vector MUST match the functional GIN index expression in
+        # question_bank migration 0023 (scenario_fts_gin) for it to be used.
+        vector = (
+            SearchVector("title", weight="A", config="english")
+            + SearchVector("subtitle", weight="B", config="english")
+            + SearchVector("category", weight="C", config="english")
+            + SearchVector("description", weight="D", config="english")
+        )
+        query = SearchQuery(search, search_type="websearch", config="english")
+        title_similarity = TrigramSimilarity("title", search)
+
+        return (
+            qs.annotate(
+                _fts_rank=SearchRank(vector, query),
+                _title_sim=title_similarity,
+            )
+            # Full-text hit OR a close-enough title (handles typos the FTS
+            # lexer would otherwise miss, e.g. "kubenetes" -> "kubernetes").
+            .filter(
+                Q(_fts_rank__gt=0)
+                | Q(_title_sim__gt=_TRGM_SIMILARITY_THRESHOLD)
+            )
+            # Blend FTS rank with title similarity so a strong fuzzy title match
+            # still ranks even when the full-text lexer scored it zero.
+            .annotate(
+                search_rank=(F("_fts_rank") + F("_title_sim")),
+            )
+            .distinct()
+        )
+
+    # Non-Postgres fallback (SQLite): original naive substring search.
+    return qs.filter(
+        Q(title__icontains=search)
+        | Q(description__icontains=search)
+        | Q(subtitle__icontains=search)
+        | Q(tags__name__icontains=search)
+    ).distinct()
+
+
 class ScenariosListView(APIView):
     permission_classes = [AllowAny]
     throttle_classes = [StrictAnonRateThrottle]
@@ -420,10 +488,7 @@ class ScenariosListView(APIView):
         if tag:
             qs = qs.filter(tags__slug=tag)
         if search:
-            qs = qs.filter(
-                Q(title__icontains=search) | Q(description__icontains=search) |
-                Q(subtitle__icontains=search) | Q(tags__name__icontains=search)
-            ).distinct()
+            qs = _apply_scenario_search(qs, search)
         if is_free:
             qs = qs.filter(is_free=True)
 
@@ -443,7 +508,13 @@ class ScenariosListView(APIView):
                 )
             )
 
-        qs = qs.order_by("-is_free", "difficulty", "title")
+        # When a Postgres full-text search ran, rank the most relevant labs
+        # first; free/difficulty/title stay as tie-breakers. Otherwise keep the
+        # historical stable ordering (also the SQLite icontains path).
+        if search and connection.vendor == "postgresql":
+            qs = qs.order_by("-search_rank", "-is_free", "difficulty", "title")
+        else:
+            qs = qs.order_by("-is_free", "difficulty", "title")
 
         # Pagination
         from rest_framework.pagination import PageNumberPagination

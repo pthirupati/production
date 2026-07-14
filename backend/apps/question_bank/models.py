@@ -267,6 +267,17 @@ class Scenario(models.Model):
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
+    # ── Full-text search (Postgres only) ──
+    # Catalog search uses Postgres full-text + pg_trgm trigram search on prod.
+    # Rather than maintain a stored ``tsvector`` column (which requires
+    # ``django.contrib.postgres`` in INSTALLED_APPS to satisfy the
+    # SearchVectorField system check, and a trigger/signal to keep it fresh),
+    # the search view annotates ``to_tsvector`` at query time. Migration 0023
+    # creates — Postgres-only — a *functional* GIN index on the same weighted
+    # ``to_tsvector`` expression (so the annotate is index-backed) plus a
+    # pg_trgm GIN index on ``title`` for typo tolerance. On SQLite (the offline
+    # test DB) those ops no-op and the view falls back to icontains.
+
     class Meta:
         ordering = ["technology", "difficulty", "title"]
         indexes = [
