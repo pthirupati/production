@@ -224,6 +224,9 @@ if _role_runs app; then
   echo "Seeding/updating certification tracks..."
   timeout 180 docker compose -f "$COMPOSE_FILE" --env-file "$ENV_FILE" exec -T backend python manage.py seed_certifications || true
 
+  echo "Seeding/updating learning journeys (role-based guided tracks)..."
+  timeout 120 docker compose -f "$COMPOSE_FILE" --env-file "$ENV_FILE" exec -T backend python manage.py seed_learning_journeys || echo "  WARN: seed_learning_journeys timed out/failed"
+
   echo "Seeding/updating tutorials (public learning content)..."
   timeout 600 docker compose -f "$COMPOSE_FILE" --env-file "$ENV_FILE" exec -T backend python manage.py seed_tutorials || echo "  WARN: seed_tutorials timed out/failed — retried next deploy"
 
