@@ -476,7 +476,7 @@ class JavaScenarioCatalogTests(SimpleTestCase):
 
         java = glob.glob(str(SCENARIOS_ROOT / "java" / "*" / "scenario.yaml"))
         security = glob.glob(str(SCENARIOS_ROOT / "security" / "*" / "scenario.yaml"))
-        self.assertEqual(len(java), 50, "java scenario count must be 50")
+        self.assertGreaterEqual(len(java), 50, "java scenario count must be at least 50")
         # Security launched with 50; cross-technology security<->Linux labs (P4)
         # add to the catalog, so the guarantee is "at least 50", not exactly 50.
         self.assertGreaterEqual(

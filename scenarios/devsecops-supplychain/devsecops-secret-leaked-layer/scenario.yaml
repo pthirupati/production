@@ -1,0 +1,123 @@
+title: Secret Baked Into an Image Layer
+slug: devsecops-secret-leaked-layer
+technology: devsecops-supplychain
+category: Harden
+difficulty: hard
+scenario_type: fix
+lab_mode: simulation
+simulation_type: generic
+time_limit: 1500
+max_score: 100
+is_free: false
+infrastructure_type: docker
+jira_priority: High
+description: 'CONTEXT: A platform team operating devsecops supplychain needs you to resolve `Secret Baked
+  Into an Image Layer` during a realistic delivery incident. The business impact is a stalled or unsafe
+  release until the underlying state is repaired.
+
+
+  ENVIRONMENT: You are working in FixitLab''s offline supply-chain security lab with a local OCI registry,
+  Trivy scanner, cosign keys, an SBOM store, and a Falco runtime sensor under /supplychain. Everything
+  runs locally; no external registry or paid APIs are required.
+
+
+  SYMPTOM / STARTING STATE: A secret scanner found an AWS access key embedded in an image layer of `reporting:5.4`:
+  an early Dockerfile step `COPY .env /app/` baked credentials into the image history, where they persist
+  even if a later layer deletes the file. The credential is exposed to anyone who pulls the image.
+
+
+  OBJECTIVE: Copying the .env into the image writes the secret into an immutable layer; deleting it later
+  does not remove it from image history. Remediate by removing the secret from the build (use build secrets
+  / runtime env, add .env to .dockerignore) AND rebuilding so no layer carries the credential — then the
+  leaked key must be rotated. Success is graded on the real repaired state, not a manual marker.
+
+
+  WHAT TO AVOID: Do not suppress the signal, disable the policy/gate, or fake completion with marker files
+  — reproduce the diagnosis, then apply the smallest fix that satisfies the objective and re-run Check
+  Solution.'
+objectives:
+- The Dockerfile no longer copies secrets into any image layer
+- trivy secret scan of the rebuilt image reports no embedded credential
+- The leaked credential is flagged for rotation (root cause fully addressed)
+initial_state: 'A secret scanner found an AWS access key embedded in an image layer of `reporting:5.4`:
+  an early Dockerfile step `COPY .env /app/` baked credentials into the image history, where they persist
+  even if a later layer deletes the file. The credential is exposed to anyone who pulls the image.'
+hints:
+- order: 1
+  cost: 0
+  content: "Where to look — orient before changing anything:\n    1. `trivy image --scanners secret reporting:5.4`\n\
+    \    2. `docker history reporting:5.4`\n    3. `grep -rn 'COPY .env' Dockerfile`\n    Write down what\
+    \ looks healthy versus wrong. Form one hypothesis before you touch anything."
+- order: 2
+  cost: 25
+  content: "Diagnostic steps:\n    1. Re-run `trivy image --scanners secret reporting:5.4` and read the\
+    \ status/error carefully.\n    2. Cross-check with `docker history reporting:5.4` to isolate the failing\
+    \ object.\n    3. State the single root cause in one sentence before you act."
+- order: 3
+  cost: 50
+  content: "Exact fix + verification:\n    1. Copying the .env into the image writes the secret into an\
+    \ immutable layer; deleting it later does not remove it from image history. Remediate by removing\
+    \ the secret from the build (use build secrets / runtime env, add .env to .dockerignore) AND rebuilding\
+    \ so no layer carries the credential — then the leaked key must be rotated.\n    2. Change one thing\
+    \ at a time so you can roll back if the hypothesis was wrong.\n    3. Verify the objective is met,\
+    \ then click Check Solution (graded on real state, not a marker file)."
+summary: Diagnose and resolve secret baked into an image layer in the devsecops-supplychain simulation
+  lab and verify the healthy end state
+estimated_minutes: 25
+xp_reward: 100
+prerequisites:
+- Basic container image and CI/CD literacy
+tags:
+- devsecops-supplychain
+- harden
+- hands-on
+- simulation
+linked_tutorial: devsecops-supplychain-fundamentals
+what_you_will_learn:
+- The Dockerfile no longer copies secrets into any image layer
+- trivy secret scan of the rebuilt image reports no embedded credential
+- Understand image layer immutability, why deleting a file doesn't purge it from history, and injecting
+  secrets at runtime not build time
+environment:
+  nodes:
+  - role: primary
+    os: FixitLab supply-chain security lab
+    hostname: lab-primary
+    ip: 127.0.0.1
+    specs: local offline simulation
+  pre_installed:
+  - bash
+  - coreutils
+  - trivy
+  - cosign
+  - syft
+  - falco
+  credentials:
+  - user: root
+    password: lab123
+tasks:
+- id: task_1
+  title: Secret Baked Into an Image Layer
+  description: Restore healthy behavior for Secret Baked Into an Image Layer by reproducing the diagnosis
+    from the symptom, isolating the root cause with evidence, applying the smallest safe fix, and validating
+    the outcome with the checker.
+  background: 'This devsecops-supplychain lab teaches image layer immutability, why deleting a file doesn''t
+    purge it from history, and injecting secrets at runtime not build time through systematic troubleshooting:
+    observe, hypothesize, change, verify.'
+  validation:
+    type: custom_script
+    script: check.sh
+    error_message: The scenario objective is not yet satisfied. Re-read hint tier 2, confirm the root
+      cause, and apply the documented remediation so /opt/fixitlab/academy/devsecops-secret-leaked-layer.conf
+      carries the FIXED-OK marker.
+solution:
+  summary: Copying the .env into the image writes the secret into an immutable layer; deleting it later
+    does not remove it from image history. Remediate by removing the secret from the build (use build
+    secrets / runtime env, add .env to .dockerignore) AND rebuilding so no layer carries the credential
+    — then the leaked key must be rotated.
+  files_changed: []
+  commands_run:
+  - trivy image --scanners secret reporting:5.4
+  - docker history reporting:5.4
+  - grep -rn 'COPY .env' Dockerfile
+  reference_docs: devsecops-supplychain-fundamentals

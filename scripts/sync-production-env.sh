@@ -35,6 +35,29 @@ _load_vault_approle() {
 
 _load_vault_approle
 
+# Render from Vault; on failure fall back to PRODUCTION_ENV_B64 or the existing
+# last-good $OUT. render-env.sh execs into the LOCAL vault container, which only
+# exists on the edge node — on the app/data nodes (no local Vault) it cannot
+# render, and a sealed/unreachable Vault must never fail the whole deploy. With
+# rotate_secrets=false the fallback values equal what Vault holds, so this is
+# functionally identical on the app node and strictly safer everywhere.
+_render_or_fallback() {
+  if bash "$ROOT/scripts/vault/render-env.sh" "$OUT"; then
+    return 0
+  fi
+  echo "[env] WARN: Vault render failed (no local Vault or Vault unavailable)"
+  if [ -n "${PRODUCTION_ENV_B64:-}" ]; then
+    echo "[env] Falling back to PRODUCTION_ENV_B64"
+    echo "$PRODUCTION_ENV_B64" | base64 -d > "$OUT"; chmod 600 "$OUT"; return 0
+  fi
+  if [ -f "$OUT" ] && [ -s "$OUT" ]; then
+    echo "[env] Falling back to existing $OUT (last-good rendered env)"
+    chmod 600 "$OUT"; return 0
+  fi
+  echo "ERROR: Vault render failed and no fallback env (PRODUCTION_ENV_B64 / existing $OUT) available"
+  return 1
+}
+
 _vault_ready() {
   _env_true "${VAULT_ENABLED:-}" \
     && [ -n "${VAULT_ROLE_ID:-}" ] \
@@ -82,7 +105,7 @@ if [ -n "${PRODUCTION_ENV_B64:-}" ] && _vault_ready; then
   fi
 elif _vault_ready; then
   echo "[env] Rendering .env.production from HashiCorp Vault"
-  bash "$ROOT/scripts/vault/render-env.sh" "$OUT"
+  _render_or_fallback
 elif [ -n "${PRODUCTION_ENV_B64:-}" ]; then
   echo "[env] Writing .env.production from PRODUCTION_ENV_B64 (GitHub secret)"
   echo "$PRODUCTION_ENV_B64" | base64 -d > "$OUT"
@@ -93,14 +116,14 @@ elif [ -n "${PRODUCTION_ENV:-}" ]; then
   chmod 600 "$OUT"
 elif _env_true "${VAULT_ENABLED:-}" && [ -x "$ROOT/scripts/vault/render-env.sh" ]; then
   echo "[env] Rendering .env.production from HashiCorp Vault (local AppRole file)"
-  bash "$ROOT/scripts/vault/render-env.sh" "$OUT"
+  _render_or_fallback
 elif [ -f "$ROOT/deploy/production.env" ]; then
   echo "[env] Using local deploy/production.env (dev only — use GitHub secrets in CI)"
   if _vault_can_seed && _env_true "${VAULT_SEED_FROM_LOCAL:-true}"; then
     _seed_vault_from_file "$ROOT/deploy/production.env"
   fi
   if _env_true "${VAULT_ENABLED:-}" && [ -x "$ROOT/scripts/vault/render-env.sh" ] && [ -f "$ROOT/deploy/vault-approle.env" ]; then
-    bash "$ROOT/scripts/vault/render-env.sh" "$OUT"
+    _render_or_fallback || write_env "$ROOT/deploy/production.env"
   else
     write_env "$ROOT/deploy/production.env"
   fi

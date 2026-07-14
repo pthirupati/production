@@ -12,6 +12,20 @@ MARKER = "FIXITLAB_E2E_TERMINAL"
 WS_HOST = os.environ.get("E2E_TERMINAL_WS_HOST", "127.0.0.1:8000")
 
 
+def _ws_kwargs(token: str) -> dict:
+    """Connect kwargs for the hardened terminal WS: JWT via the access_token
+    COOKIE (query-string ?token= is ignored post-06aa0861f) + a settings-derived
+    Origin permitted by AllowedHostsOriginValidator. websockets>=12 kwarg names."""
+    try:
+        from django.conf import settings
+
+        hosts = [h for h in settings.ALLOWED_HOSTS if h and h != "*"]
+        origin = f"http://{hosts[0]}" if hosts else f"http://{WS_HOST}"
+    except Exception:
+        origin = f"http://{WS_HOST}"
+    return {"additional_headers": {"Cookie": f"access_token={token}"}, "origin": origin}
+
+
 def _reset_ws_counter(token: str) -> None:
     """Ensure per-user WS slot is released after E2E (safety net)."""
     try:
@@ -44,9 +58,9 @@ async def _check_terminal_async(session_id: str, token: str) -> tuple[bool, str]
     import websockets
 
     _reset_ws_counter(token)
-    uri = f"ws://{WS_HOST}/ws/terminal/{session_id}/?token={token}"
+    uri = f"ws://{WS_HOST}/ws/terminal/{session_id}/"
     try:
-        async with websockets.connect(uri, open_timeout=15, close_timeout=5) as ws:
+        async with websockets.connect(uri, open_timeout=15, close_timeout=5, **_ws_kwargs(token)) as ws:
             output = ""
             deadline = time.time() + 20
             got_prompt = False

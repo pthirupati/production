@@ -201,10 +201,12 @@ class AdminIPRestrictionMiddleware(MiddlewareMixin):
 
     When ADMIN_ALLOWED_IPS is empty:
       * dev (DEBUG) — all IPs allowed (development default).
-      * prod with ADMIN_FAIL_CLOSED_WITHOUT_ALLOWLIST=True — admin paths are
-        default-DENIED (fail closed, SECURITY_AUDIT I-01).
-      * prod with the flag False (default) — legacy fail-open (a startup warning
-        is emitted in settings); set the flag on once the allowlist is populated.
+      * prod with ADMIN_FAIL_CLOSED_WITHOUT_ALLOWLIST=False (the default) — ALLOW
+        (admin stays gated by superuser auth); avoids an unrecoverable owner
+        lockout. A startup warning is emitted in settings.
+      * prod with ADMIN_FAIL_CLOSED_WITHOUT_ALLOWLIST=True (opt-in) — non-loopback
+        admin paths are DENIED (fail closed, SECURITY_AUDIT I-01/I-04). Set the
+        flag on once you have populated ADMIN_ALLOWED_IPS with your egress IP(s).
     """
 
     ADMIN_PREFIXES = ("/django-admin/", "/api/admin/")
@@ -225,18 +227,32 @@ class AdminIPRestrictionMiddleware(MiddlewareMixin):
         is_loopback = client_ip in _LOOPBACK_IPS or remote_addr in _LOOPBACK_IPS
 
         if not allowed_ips:
-            # No allowlist configured. SECURITY_AUDIT I-04: fail CLOSED in
-            # production by default so /api/admin/ + /django-admin/ are not
-            # reachable from arbitrary internet IPs. Loopback / in-container
-            # callers (health checks, server-side E2E run via
-            # `docker compose exec ... e2e`) are always allowed — their origin
-            # is this host and cannot be spoofed by a remote client.
-            fail_closed = not getattr(settings, "DEBUG", False) and getattr(
-                settings, "ADMIN_FAIL_CLOSED_WITHOUT_ALLOWLIST", True
+            # No allowlist configured. An IP allowlist is defense-in-depth ON TOP
+            # of authentication — every /api/admin/ endpoint already requires a
+            # logged-in superuser and /django-admin/ requires staff login.
+            #
+            # DEFAULT POSTURE (ADMIN_FAIL_CLOSED_WITHOUT_ALLOWLIST=False): ALLOW.
+            # With no allowlist there is nothing to restrict *to*, and failing
+            # closed here would block every admin (including the owner) from every
+            # admin page with no recovery path (you can't set the allowlist from an
+            # admin UI you can't reach). That is an unrecoverable misconfiguration,
+            # so by default we ALLOW (auth still gates the surface). This is what
+            # prod uses (the env does not set the flag) so it stays unlocked.
+            #
+            # OPT-IN FAIL-CLOSED (ADMIN_FAIL_CLOSED_WITHOUT_ALLOWLIST=True, prod
+            # only): once an operator has explicitly asked for network fail-closed
+            # (SECURITY_AUDIT I-01/I-04), a non-loopback caller reaching an admin
+            # path with an empty allowlist is DENIED (403). Loopback / in-container
+            # callers (health checks, server-side E2E) are always allowed — their
+            # origin is this host and cannot be spoofed by a remote client. To
+            # actually restrict by network, populate ADMIN_ALLOWED_IPS.
+            fail_closed_requested = not getattr(settings, "DEBUG", False) and getattr(
+                settings, "ADMIN_FAIL_CLOSED_WITHOUT_ALLOWLIST", False
             )
-            if fail_closed and not is_loopback:
+            if fail_closed_requested and not is_loopback:
                 logger.warning(
-                    "Admin access denied (fail-closed: ADMIN_ALLOWED_IPS unset) "
+                    "Admin access denied (fail-closed opt-in: "
+                    "ADMIN_FAIL_CLOSED_WITHOUT_ALLOWLIST=1, ADMIN_ALLOWED_IPS empty) "
                     "for IP %s on %s",
                     client_ip, path,
                 )

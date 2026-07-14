@@ -1,0 +1,73 @@
+name: Vault Diagnose (D1)
+
+# Read-only diagnostic: the CI runner discovers the edge droplet and SSHes in to
+# report the live Vault state (status, volume, storage config, keys-file presence).
+# Prints NO secret values. Used to root-cause "Vault is not initialized" on deploy.
+on:
+  workflow_dispatch: {}
+
+jobs:
+  diagnose:
+    name: Diagnose Vault on edge (D1)
+    runs-on: ubuntu-latest
+    environment: production
+    timeout-minutes: 10
+    steps:
+      - name: Resolve DO API token (masked)
+        id: tok
+        env:
+          DO_API_TOKEN: ${{ secrets.DO_API_TOKEN }}
+          PRODUCTION_ENV_B64: ${{ secrets.PRODUCTION_ENV_B64 }}
+        run: |
+          TOK="$DO_API_TOKEN"
+          if [ -z "$TOK" ] && [ -n "$PRODUCTION_ENV_B64" ]; then
+            TOK="$(echo "$PRODUCTION_ENV_B64" | base64 -d 2>/dev/null | grep '^DO_API_TOKEN=' | cut -d= -f2- | tr -d '\r')"
+          fi
+          if [ -z "$TOK" ]; then echo "No DO API token available"; exit 1; fi
+          echo "::add-mask::$TOK"
+          echo "token=$TOK" >> "$GITHUB_OUTPUT"
+      - name: Install doctl
+        uses: digitalocean/action-doctl@v2
+        with:
+          token: ${{ steps.tok.outputs.token }}
+      - name: Discover edge droplet IP
+        id: edge
+        run: |
+          EID=$(doctl compute droplet list --tag-name fixitlab-edge --format ID --no-header | head -n1)
+          if [ -z "$EID" ]; then echo "No fixitlab-edge droplet found"; exit 1; fi
+          IP=$(doctl compute droplet get "$EID" --format PublicIPv4 --no-header)
+          echo "Edge droplet $EID @ $IP"
+          echo "ip=$IP" >> "$GITHUB_OUTPUT"
+      - name: SSH — read-only Vault diagnostics
+        env:
+          PROD_SSH_KEY: ${{ secrets.PROD_SSH_KEY }}
+          EDGE_IP: ${{ steps.edge.outputs.ip }}
+        run: |
+          KEY=$(mktemp); printf '%s\n' "$PROD_SSH_KEY" | tr -d '\r' > "$KEY"; chmod 600 "$KEY"
+          trap 'rm -f "$KEY"' EXIT
+          ssh -i "$KEY" -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null \
+              -o BatchMode=yes -o ConnectTimeout=15 root@"$EDGE_IP" 'bash -s' <<'EOS'
+          set +e
+          echo "===== vault containers ====="
+          docker ps -a --filter name=vault --format '{{.Names}} | {{.Status}} | {{.Image}}'
+          echo "===== vault status (no secrets) ====="
+          docker exec fixitlab_vault vault status 2>&1
+          echo "===== container mounts ====="
+          docker inspect fixitlab_vault --format '{{json .Mounts}}' 2>/dev/null
+          echo "===== compose project managing vault ====="
+          docker inspect fixitlab_vault \
+            --format 'project={{index .Config.Labels "com.docker.compose.project"}} files={{index .Config.Labels "com.docker.compose.project.config_files"}}' 2>/dev/null
+          echo "===== vault volumes ====="
+          docker volume ls | grep -i vault
+          MP=$(docker volume inspect fixitlab_vault_data --format '{{.Mountpoint}}' 2>/dev/null)
+          echo "mountpoint=$MP"
+          echo "data files: $(find "$MP" -type f 2>/dev/null | wc -l)"
+          ls -la "$MP" 2>/dev/null | head -20
+          echo "===== storage backend in config.hcl ====="
+          grep -iA4 storage /opt/fixitlab/infra/vault/config.hcl 2>/dev/null
+          echo "===== init/keys files present? (contents NOT printed) ====="
+          for f in /opt/fixitlab/deploy/vault-init.json /opt/fixitlab/deploy/vault-keys.json /opt/fixitlab/deploy/vault-approle.env; do
+            if [ -f "$f" ]; then echo "PRESENT $f ($(wc -l < "$f") lines)"; else echo "MISSING $f"; fi
+          done
+          echo "===== diagnostics done ====="
+          EOS

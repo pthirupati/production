@@ -10,6 +10,7 @@ import StickyPageToolbar from '../components/StickyPageToolbar'
 import ScenarioNarrative from '../components/scenarios/ScenarioNarrative'
 import LimitReachedModal from '../components/LimitReachedModal'
 import { useAuthStore } from '../store/authStore'
+import { getScenarioSimInfo } from '../utils/simScenario'
 import {
   Clock, Target, Lightbulb, Play, CheckCircle2,
   Wrench, Skull, ArrowLeft, BookmarkPlus, Bookmark,

@@ -1,0 +1,123 @@
+title: Trivy Blocks Deploy on Critical CVE
+slug: devsecops-trivy-critical-cve
+technology: devsecops-supplychain
+category: Harden
+difficulty: easy
+scenario_type: fix
+lab_mode: simulation
+simulation_type: generic
+time_limit: 1500
+max_score: 100
+is_free: false
+infrastructure_type: docker
+jira_priority: Medium
+description: 'CONTEXT: A platform team operating devsecops supplychain needs you to resolve `Trivy Blocks
+  Deploy on Critical CVE` during a realistic delivery incident. The business impact is a stalled or unsafe
+  release until the underlying state is repaired.
+
+
+  ENVIRONMENT: You are working in FixitLab''s offline supply-chain security lab with a local OCI registry,
+  Trivy scanner, cosign keys, an SBOM store, and a Falco runtime sensor under /supplychain. Everything
+  runs locally; no external registry or paid APIs are required.
+
+
+  SYMPTOM / STARTING STATE: The CI gate fails: `trivy image checkout:1.8` reports a CRITICAL, fixed-available
+  CVE in a base OS package (openssl). The pipeline is configured to fail on CRITICAL severity with a fix
+  available, so the release is blocked until the image is remediated.
+
+
+  OBJECTIVE: The image is built on a stale base tag that ships a vulnerable openssl with a fix already
+  published upstream. Remediate by bumping the base image to the patched tag (or adding the package update
+  in the build) so the CRITICAL fixed-available finding clears — do NOT just lower the severity threshold
+  to make the gate pass. Success is graded on the real repaired state, not a manual marker.
+
+
+  WHAT TO AVOID: Do not suppress the signal, disable the policy/gate, or fake completion with marker files
+  — reproduce the diagnosis, then apply the smallest fix that satisfies the objective and re-run Check
+  Solution.'
+objectives:
+- The CRITICAL fixed-available openssl CVE is remediated at the image layer
+- trivy image --severity CRITICAL returns no fixed-available findings
+- The gate is not bypassed by lowering severity thresholds
+initial_state: 'The CI gate fails: `trivy image checkout:1.8` reports a CRITICAL, fixed-available CVE
+  in a base OS package (openssl). The pipeline is configured to fail on CRITICAL severity with a fix available,
+  so the release is blocked until the image is remediated.'
+hints:
+- order: 1
+  cost: 0
+  content: "Where to look — orient before changing anything:\n    1. `trivy image --severity CRITICAL\
+    \ checkout:1.8`\n    2. `trivy image --list-all-pkgs checkout:1.8`\n    3. `grep -n 'FROM' Dockerfile`\n\
+    \    Write down what looks healthy versus wrong. Form one hypothesis before you touch anything."
+- order: 2
+  cost: 25
+  content: "Diagnostic steps:\n    1. Re-run `trivy image --severity CRITICAL checkout:1.8` and read the\
+    \ status/error carefully.\n    2. Cross-check with `trivy image --list-all-pkgs checkout:1.8` to isolate\
+    \ the failing object.\n    3. State the single root cause in one sentence before you act."
+- order: 3
+  cost: 50
+  content: "Exact fix + verification:\n    1. The image is built on a stale base tag that ships a vulnerable\
+    \ openssl with a fix already published upstream. Remediate by bumping the base image to the patched\
+    \ tag (or adding the package update in the build) so the CRITICAL fixed-available finding clears —\
+    \ do NOT just lower the severity threshold to make the gate pass.\n    2. Change one thing at a time\
+    \ so you can roll back if the hypothesis was wrong.\n    3. Verify the objective is met, then click\
+    \ Check Solution (graded on real state, not a marker file)."
+summary: Diagnose and resolve trivy blocks deploy on critical cve in the devsecops-supplychain simulation
+  lab and verify the healthy end state
+estimated_minutes: 25
+xp_reward: 100
+prerequisites:
+- Basic container image and CI/CD literacy
+tags:
+- devsecops-supplychain
+- harden
+- hands-on
+- simulation
+linked_tutorial: devsecops-supplychain-fundamentals
+what_you_will_learn:
+- The CRITICAL fixed-available openssl CVE is remediated at the image layer
+- trivy image --severity CRITICAL returns no fixed-available findings
+- Understand reading a Trivy report, the difference between fixed and won't-fix CVEs, and remediating
+  at the base image layer
+environment:
+  nodes:
+  - role: primary
+    os: FixitLab supply-chain security lab
+    hostname: lab-primary
+    ip: 127.0.0.1
+    specs: local offline simulation
+  pre_installed:
+  - bash
+  - coreutils
+  - trivy
+  - cosign
+  - syft
+  - falco
+  credentials:
+  - user: root
+    password: lab123
+tasks:
+- id: task_1
+  title: Trivy Blocks Deploy on Critical CVE
+  description: Restore healthy behavior for Trivy Blocks Deploy on Critical CVE by reproducing the diagnosis
+    from the symptom, isolating the root cause with evidence, applying the smallest safe fix, and validating
+    the outcome with the checker.
+  background: 'This devsecops-supplychain lab teaches reading a Trivy report, the difference between fixed
+    and won''t-fix CVEs, and remediating at the base image layer through systematic troubleshooting: observe,
+    hypothesize, change, verify.'
+  validation:
+    type: custom_script
+    script: check.sh
+    error_message: The scenario objective is not yet satisfied. Re-read hint tier 2, confirm the root
+      cause, and apply the documented remediation so /opt/fixitlab/academy/devsecops-trivy-critical-cve.conf
+      carries the FIXED-OK marker.
+solution:
+  summary: The image is built on a stale base tag that ships a vulnerable openssl with a fix already published
+    upstream. Remediate by bumping the base image to the patched tag (or adding the package update in
+    the build) so the CRITICAL fixed-available finding clears — do NOT just lower the severity threshold
+    to make the gate pass.
+  files_changed: []
+  commands_run:
+  - trivy image --severity CRITICAL checkout:1.8
+  - trivy image --list-all-pkgs checkout:1.8
+  - grep -n 'FROM' Dockerfile
+  reference_docs: devsecops-supplychain-fundamentals

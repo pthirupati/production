@@ -48,6 +48,20 @@ LABS_PRIVATE_IP="${LABS_PRIVATE_IP:?LABS_PRIVATE_IP required}"
 
 _is_true() { case "${1:-}" in 1|true|TRUE|yes|on) return 0;; *) return 1;; esac; }
 
+# Forward the Vault AppRole to the edge + app nodes so their sync-production-env.sh
+# renders .env.production FROM Vault (the source of truth for rotated secrets such as
+# the DB password / JWT keys) instead of falling back to the stale baked
+# PRODUCTION_ENV_B64. The deploy-cluster job passes these from the vault-cluster job's
+# outputs; if empty, the nodes fall back to the baked env exactly as before (no change).
+VAULT_ENV=""
+if [ -n "${VAULT_ROLE_ID:-}" ] && [ -n "${VAULT_SECRET_ID:-}" ]; then
+  VAULT_ENV="VAULT_ENABLED=${VAULT_ENABLED:-true} VAULT_ROLE_ID=${VAULT_ROLE_ID} VAULT_SECRET_ID=${VAULT_SECRET_ID}"
+  [ -n "${VAULT_UNSEAL_KEY:-}" ] && VAULT_ENV="${VAULT_ENV} VAULT_UNSEAL_KEY=${VAULT_UNSEAL_KEY}"
+  echo "Vault AppRole present — edge+app will render .env.production from Vault (secrets source of truth)"
+else
+  echo "Vault AppRole absent — nodes use baked env (legacy path, unchanged)"
+fi
+
 KEY_FILE=""
 if [ -n "${PROD_SSH_KEY:-}" ] && ! _is_true "$DRY_RUN"; then
   KEY_FILE="$(mktemp)"; printf '%s\n' "$PROD_SSH_KEY" | tr -d '\r' > "$KEY_FILE"; chmod 600 "$KEY_FILE"
@@ -57,12 +71,16 @@ fi
 remote() {
   local target_ip="$1" via_edge="$2"; shift 2
   local script="$*"
-  local opts=(-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o ConnectTimeout=10 -o BatchMode=yes)
+  # ServerAlive* keepalives: a role deploy can sit silent for minutes (e.g. the
+  # backend readiness wait) with no stdout; without keepalives the idle two-hop
+  # tunnel is torn down ("client_loop: send disconnect: Broken pipe") and reds the
+  # job. 15s x 8 tolerates ~2min of silence on BOTH the target and the jump hop.
+  local opts=(-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o ConnectTimeout=10 -o BatchMode=yes -o ServerAliveInterval=15 -o ServerAliveCountMax=8 -o TCPKeepAlive=yes)
   [ -n "$KEY_FILE" ] && opts+=(-i "$KEY_FILE" -o IdentitiesOnly=yes)
   if [ "$via_edge" = "via-edge" ]; then
     # Explicit ProxyCommand so the edge jump uses our key + skips host-key checks
     # (ProxyJump does not propagate -i / StrictHostKeyChecking to the jump host).
-    local jopts="-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o BatchMode=yes -o ConnectTimeout=10"
+    local jopts="-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o BatchMode=yes -o ConnectTimeout=10 -o ServerAliveInterval=15 -o ServerAliveCountMax=8 -o TCPKeepAlive=yes"
     [ -n "$KEY_FILE" ] && jopts="$jopts -i $KEY_FILE -o IdentitiesOnly=yes"
     opts+=(-o "ProxyCommand=ssh $jopts -W %h:%p root@${EDGE_PUBLIC_IP}")
   fi
@@ -88,11 +106,18 @@ deploy_data() {
 deploy_edge() {
   echo "[2/4] Deploy D1 Edge (gateway/redis/rabbitmq/vault)"
   remote "$EDGE_PUBLIC_IP" direct \
-    "${IMG_ENV} CLUSTER_ROLE=edge APP_PRIVATE_IP=${APP_PRIVATE_IP} BUILD_SCENARIOS=false ./scripts/ci-remote-platform.sh deploy"
+    "${VAULT_ENV} ${IMG_ENV} CLUSTER_ROLE=edge APP_PRIVATE_IP=${APP_PRIVATE_IP} BUILD_SCENARIOS=false ./scripts/ci-remote-platform.sh deploy"
 }
 
 deploy_app() {
   echo "[3/4] Deploy D2 App (backend + celery + migrate)"
+  # NOTE: deliberately NO ${VAULT_ENV} here. The app node (D2) has no local Vault
+  # container (Vault runs only on the edge), so forwarding the AppRole made
+  # sync-production-env.sh attempt a local `vault_compose exec` render that hangs/
+  # fails — the regression that broke the 4D deploy after commit 7f8e654. D2 renders
+  # its env the same way the known-good 7f8e654 run did: baked PRODUCTION_ENV_B64 /
+  # last-good .env.production. Vault stays the source of truth on the edge (deploy_edge
+  # keeps ${VAULT_ENV}); the backend's runtime Vault loader still reads it when reachable.
   if ! remote "$APP_PRIVATE_IP" via-edge \
     "${IMG_ENV} CLUSTER_ROLE=app BUILD_SCENARIOS=false ./scripts/ci-remote-platform.sh deploy"; then
     echo "===== [diagnostic] D2 backend startup logs (last 120 lines) ====="
@@ -139,12 +164,16 @@ LK=/opt/fixitlab/deploy/labs_ssh/id_ed25519
 if [ ! -f \"\$LK\" ]; then echo '  labs key missing on D2 — skipping prepull'; exit 0; fi
 install -m 700 -d /root/.ssh
 sed -i '/# fixitlab-labs-docker/,+5d' /root/.ssh/config 2>/dev/null || true
-printf '# fixitlab-labs-docker\nHost ${LABS_PRIVATE_IP}\n  IdentityFile %s\n  IdentitiesOnly yes\n  StrictHostKeyChecking no\n  UserKnownHostsFile /dev/null\n' \"\$LK\" >> /root/.ssh/config
+printf '# fixitlab-labs-docker\nHost ${LABS_PRIVATE_IP}\n  IdentityFile %s\n  IdentitiesOnly yes\n  StrictHostKeyChecking no\n  UserKnownHostsFile /dev/null\n  ConnectTimeout 10\n  ServerAliveInterval 10\n  ServerAliveCountMax 3\n' \"\$LK\" >> /root/.ssh/config
 chmod 600 /root/.ssh/config
 export DOCKER_HOST=ssh://root@${LABS_PRIVATE_IP}
-docker pull ${SANDBOX_PYTHON_IMAGE:-python:3.12-alpine} || true
-docker pull ${SANDBOX_NODE_IMAGE:-node:20-alpine} || true
-docker images | grep -E 'python:3.12-alpine|node:20-alpine' && echo '[grader] sandbox images present on D4' || echo '[grader] WARN: images still absent on D4'" || true
+# Bound every D2->D4 docker-over-ssh op with a hard timeout: a flaky/hung labs
+# SSH must NEVER stall the deploy. The runner->edge->app tunnel has SSH keepalive
+# (so it won't broken-pipe), which means a hung inner pull would otherwise block
+# until the 55-min job timeout. This step is non-fatal — a timeout just skips it.
+timeout 90 docker pull ${SANDBOX_PYTHON_IMAGE:-python:3.12-alpine} || echo '  [grader] python sandbox pre-pull skipped (timeout/err)'
+timeout 90 docker pull ${SANDBOX_NODE_IMAGE:-node:20-alpine} || echo '  [grader] node sandbox pre-pull skipped (timeout/err)'
+timeout 30 docker images | grep -E 'python:3.12-alpine|node:20-alpine' && echo '[grader] sandbox images present on D4' || echo '[grader] WARN: images still absent on D4'" || true
 }
 
 main() {

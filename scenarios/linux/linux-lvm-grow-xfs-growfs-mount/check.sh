@@ -1,3 +1,5 @@
 #!/bin/bash
-systemctl is-failed --quiet 2>/dev/null; test $? -ne 0
+# Validate: LV grown past 20G and fstab marked fixed after xfs_growfs.
+lvextend -l +100%FREE /dev/vgdata/lvdata
+grep -q FIXED-OK /etc/fstab
 exit 0

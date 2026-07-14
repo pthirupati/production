@@ -60,7 +60,7 @@ objectives:
 - Log in as root
 - Run systemctl status sshd in the full shell to confirm the system is operational
 simulation_type: rhel
-slug: sim-rhel-boot-grub
+slug: linux-rhel-boot-grub-lab
 technology: linux
 time_limit: 900
 title: 'RHEL Simulation: GRUB Boot & Rescue'

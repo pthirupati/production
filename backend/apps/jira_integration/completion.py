@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import logging
 
+from django.db import transaction
 from django.db.models import F
 from django.utils import timezone
 
@@ -17,10 +18,14 @@ logger = logging.getLogger(__name__)
 def finalize_lab_completion_if_ready(session) -> bool:
     """
     Record scenario completion when validation passed and Jira ticket is closed.
-    Idempotent via session.completion_finalized.
+    Idempotent AND concurrency-safe: the completion_finalized guard is re-checked
+    under a row lock (SELECT ... FOR UPDATE), so duplicate finalizes — duplicate
+    Jira webhooks, a double-clicked "Check", or a WS+HTTP race — can never
+    double-count XP, attempts, or completions (audit P0-3).
     """
     if session is None:
         return False
+    # Cheap pre-check to avoid taking a lock in the common already-done case.
     if session.completion_finalized:
         return False
     if not session.validation_passed:
@@ -44,30 +49,45 @@ def finalize_lab_completion_if_ready(session) -> bool:
 
     score = session.score or 100
 
+    from apps.labs.models import LabSession
     from apps.progress.services import record_attempt, award_xp_for_completion
 
-    record_attempt(
-        user=session.user,
-        scenario=session.scenario,
-        score=score,
-        completed=True,
-        time_seconds=elapsed,
-        hints_used=session.hints_used,
-    )
+    with transaction.atomic():
+        # Re-fetch under a row lock and re-check the guard. If a concurrent
+        # request already finalized this session, the WHERE no longer matches
+        # (completion_finalized=True) and .first() returns None → we bail out
+        # without awarding anything a second time.
+        locked = (
+            LabSession.objects.select_for_update()
+            .filter(pk=session.pk, completion_finalized=False)
+            .first()
+        )
+        if locked is None:
+            return False
 
-    # Grant XP exactly once per scenario completion. This runs only after the
-    # idempotent completion_finalized guard above, so it cannot double-count.
-    award_xp_for_completion(
-        session.user, score=score,
-        difficulty=getattr(session.scenario, "difficulty", None),
-    )
+        record_attempt(
+            user=session.user,
+            scenario=session.scenario,
+            score=score,
+            completed=True,
+            time_seconds=elapsed,
+            hints_used=session.hints_used,
+        )
 
-    Scenario.objects.filter(pk=session.scenario.pk).update(
-        completions_count=F("completions_count") + 1
-    )
+        # Grant XP exactly once per scenario completion — guarded by the locked
+        # completion_finalized re-check above, so it cannot double-count.
+        award_xp_for_completion(
+            session.user, score=score,
+            difficulty=getattr(session.scenario, "difficulty", None),
+        )
 
-    session.completion_finalized = True
-    session.save(update_fields=["completion_finalized"])
+        Scenario.objects.filter(pk=session.scenario.pk).update(
+            completions_count=F("completions_count") + 1
+        )
+
+        locked.completion_finalized = True
+        locked.save(update_fields=["completion_finalized"])
+        session.completion_finalized = True  # keep caller's instance in sync
 
     try:
         from apps.notifications.tasks import notify_lab_completed

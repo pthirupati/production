@@ -57,7 +57,7 @@ objectives:
 - Open the HTTP port/service in firewalld and reload
 - Verify port 80 is reachable
 simulation_type: generic
-slug: sim-rhel-firewalld-port
+slug: rhel-linux-firewalld-blocked-lab
 title: Open Firewall Port 80
 technology: rhel-linux
 summary: Complete the open firewall port 80 rhel linux lab and verify success with the checker

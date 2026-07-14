@@ -1,0 +1,82 @@
+name: DB Auth Diagnose (D3)
+
+# Read-only: inspect the pgBouncer -> Postgres auth chain on D3 to pin the
+# "cannot do SCRAM authentication: wrong password type" error. Prints auth_type,
+# credential FORMAT prefixes (md5/SCRAM/plain) and password LENGTHS only — never
+# the secret values themselves.
+on:
+  workflow_dispatch: {}
+
+jobs:
+  dbauth:
+    name: Inspect pgBouncer/Postgres auth on D3
+    runs-on: ubuntu-latest
+    environment: production
+    timeout-minutes: 12
+    steps:
+      - name: Resolve DO API token (masked)
+        id: tok
+        env:
+          DO_API_TOKEN: ${{ secrets.DO_API_TOKEN }}
+          PRODUCTION_ENV_B64: ${{ secrets.PRODUCTION_ENV_B64 }}
+        run: |
+          TOK="$DO_API_TOKEN"
+          if [ -z "$TOK" ] && [ -n "$PRODUCTION_ENV_B64" ]; then
+            TOK="$(echo "$PRODUCTION_ENV_B64" | base64 -d 2>/dev/null | grep '^DO_API_TOKEN=' | cut -d= -f2- | tr -d '\r')"
+          fi
+          [ -z "$TOK" ] && { echo "No DO token"; exit 1; }
+          echo "::add-mask::$TOK"; echo "token=$TOK" >> "$GITHUB_OUTPUT"
+      - name: Install doctl
+        uses: digitalocean/action-doctl@v2
+        with:
+          token: ${{ steps.tok.outputs.token }}
+      - name: Discover IPs
+        id: ips
+        run: |
+          eid=$(doctl compute droplet list --tag-name fixitlab-edge --format ID --no-header | head -n1)
+          did=$(doctl compute droplet list --tag-name fixitlab-db --format ID --no-header | head -n1)
+          echo "edge=$(doctl compute droplet get "$eid" --format PublicIPv4 --no-header)" >> "$GITHUB_OUTPUT"
+          echo "db=$(doctl compute droplet get "$did" --format PrivateIPv4 --no-header)" >> "$GITHUB_OUTPUT"
+      - name: Inspect auth chain on D3
+        env:
+          PROD_SSH_KEY: ${{ secrets.PROD_SSH_KEY }}
+          EDGE: ${{ steps.ips.outputs.edge }}
+          DB: ${{ steps.ips.outputs.db }}
+        run: |
+          KEY=$(mktemp); printf '%s\n' "$PROD_SSH_KEY" | tr -d '\r' > "$KEY"; chmod 600 "$KEY"
+          trap 'rm -f "$KEY"' EXIT
+          set +e
+          jopts="-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o BatchMode=yes -o ConnectTimeout=12 -i $KEY -o IdentitiesOnly=yes"
+          OPTS=(-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o BatchMode=yes -o ConnectTimeout=12 -i "$KEY" -o IdentitiesOnly=yes
+                -o "ProxyCommand=ssh $jopts -W %h:%p root@${EDGE}")
+          ssh "${OPTS[@]}" root@"$DB" 'bash -s' <<'EOS'
+          set +e
+          echo "===== pgBouncer generated config (auth_type + userlist FORMAT only) ====="
+          docker exec fixitlab_pgbouncer sh -c '
+            for f in /etc/pgbouncer/pgbouncer.ini /etc/pgbouncer/userlist.txt; do
+              echo "--- $f ---"; [ -f "$f" ] || { echo "(missing)"; continue; }
+              grep -iE "auth_type|auth_file|auth_user|auth_query" "$f" 2>/dev/null
+              if [ "$f" = "/etc/pgbouncer/userlist.txt" ]; then
+                # show user + credential prefix ONLY (md5.. / SCRAM-SHA-256.. / plain), never full secret
+                awk "{u=\$1; c=\$2; gsub(/\"/,\"\",c); pfx=substr(c,1,13); print u\"  cred_prefix=\"pfx\"  cred_len=\"length(c)}" "$f"
+              fi
+            done'
+          echo
+          echo "===== Postgres: role credential format + encryption ====="
+          docker exec fixitlab_db psql -U fixitlab -d postgres -tAc \
+            "SELECT rolname||'  stored='||left(coalesce(rolpassword,'(null)'),13) FROM pg_authid WHERE rolname IN ('fixitlab','postgres')" 2>&1
+          docker exec fixitlab_db psql -U fixitlab -d postgres -tAc "SHOW password_encryption" 2>&1
+          echo
+          echo "===== D3 baked .env.production POSTGRES_* (lengths/prefix only) ====="
+          for k in POSTGRES_USER POSTGRES_DB POSTGRES_PASSWORD; do
+            v=$(grep -E "^$k=" /opt/fixitlab/.env.production 2>/dev/null | head -1 | cut -d= -f2- | tr -d '\r"')
+            if [ "$k" = "POSTGRES_PASSWORD" ]; then echo "$k  len=${#v}  prefix=${v:0:3}...  suffix=...${v: -2}"; else echo "$k=$v"; fi
+          done
+          echo
+          echo "===== does pgBouncer container env DB_PASSWORD match baked? (lengths only) ====="
+          pbp=$(docker exec fixitlab_pgbouncer printenv DB_PASSWORD 2>/dev/null)
+          echo "pgbouncer_env DB_PASSWORD  len=${#pbp}  prefix=${pbp:0:3}...  suffix=...${pbp: -2}"
+          echo "===== live test: connect to Postgres over TCP with pgBouncer's env password ====="
+          docker exec fixitlab_pgbouncer sh -c 'PGPASSWORD="$DB_PASSWORD" psql "host=database port=5432 user=$DB_USER dbname=$DB_NAME sslmode=disable" -tAc "select 1 as ok" 2>&1' | tail -3
+          echo "===== done ====="
+          EOS

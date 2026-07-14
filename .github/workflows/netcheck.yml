@@ -1,0 +1,88 @@
+name: Net Check (D2 -> D3 :6432)
+
+# Read-only network diagnostic for the fatal deploy blocker:
+#   app node (D2) -> pgBouncer (D3, 10.x:6432) "timeout expired".
+# Discovers all droplet IPs, lists DO cloud firewalls/rules, tests TCP
+# reachability FROM D2, and inspects D3's listeners/bindings + pgbouncer.
+# Prints NO secret values.
+on:
+  workflow_dispatch: {}
+
+jobs:
+  netcheck:
+    name: Diagnose D2 -> D3 database path
+    runs-on: ubuntu-latest
+    environment: production
+    timeout-minutes: 15
+    steps:
+      - name: Resolve DO API token (masked)
+        id: tok
+        env:
+          DO_API_TOKEN: ${{ secrets.DO_API_TOKEN }}
+          PRODUCTION_ENV_B64: ${{ secrets.PRODUCTION_ENV_B64 }}
+        run: |
+          TOK="$DO_API_TOKEN"
+          if [ -z "$TOK" ] && [ -n "$PRODUCTION_ENV_B64" ]; then
+            TOK="$(echo "$PRODUCTION_ENV_B64" | base64 -d 2>/dev/null | grep '^DO_API_TOKEN=' | cut -d= -f2- | tr -d '\r')"
+          fi
+          [ -z "$TOK" ] && { echo "No DO token"; exit 1; }
+          echo "::add-mask::$TOK"; echo "token=$TOK" >> "$GITHUB_OUTPUT"
+      - name: Install doctl
+        uses: digitalocean/action-doctl@v2
+        with:
+          token: ${{ steps.tok.outputs.token }}
+      - name: Discover droplet IPs
+        id: ips
+        run: |
+          eid=$(doctl compute droplet list --tag-name fixitlab-edge --format ID --no-header | head -n1)
+          aid=$(doctl compute droplet list --tag-name fixitlab-app  --format ID --no-header | head -n1)
+          did=$(doctl compute droplet list --tag-name fixitlab-db   --format ID --no-header | head -n1)
+          EIP=$(doctl compute droplet get "$eid" --format PublicIPv4 --no-header)
+          APRIV=$(doctl compute droplet get "$aid" --format PrivateIPv4 --no-header)
+          DPRIV=$(doctl compute droplet get "$did" --format PrivateIPv4 --no-header)
+          echo "edge_pub=$EIP app_priv=$APRIV db_priv=$DPRIV"
+          { echo "edge=$EIP"; echo "app=$APRIV"; echo "db=$DPRIV"; } >> "$GITHUB_OUTPUT"
+      - name: DO cloud firewalls (rules for 5432/6432)
+        run: |
+          echo "===== firewalls ====="
+          doctl compute firewall list --format ID,Name,InboundRules --no-header 2>&1 | tr ',' '\n' | grep -iE "6432|5432|firewall|name|protocol|ports|tcp" || \
+            doctl compute firewall list 2>&1 | head -60
+      - name: SSH probe (D2 reachability + D3 listeners)
+        env:
+          PROD_SSH_KEY: ${{ secrets.PROD_SSH_KEY }}
+          EDGE: ${{ steps.ips.outputs.edge }}
+          APP: ${{ steps.ips.outputs.app }}
+          DB: ${{ steps.ips.outputs.db }}
+        run: |
+          KEY=$(mktemp); printf '%s\n' "$PROD_SSH_KEY" | tr -d '\r' > "$KEY"; chmod 600 "$KEY"
+          trap 'rm -f "$KEY"' EXIT
+          set +e
+          # Mirror the deploy's remote(): explicit ProxyCommand (as a single opts
+          # element) so the edge jump uses our key — -J does NOT propagate -i.
+          jopts="-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o BatchMode=yes -o ConnectTimeout=12 -i $KEY -o IdentitiesOnly=yes"
+          OPTS=(-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o BatchMode=yes -o ConnectTimeout=12 -i "$KEY" -o IdentitiesOnly=yes
+                -o "ProxyCommand=ssh $jopts -W %h:%p root@${EDGE}")
+          echo "===== FROM D2 (app $APP): can it reach D3 ($DB) :6432 / :5432 ? ====="
+          ssh "${OPTS[@]}" root@"$APP" 'bash -s' <<EOS
+          set +e
+          for p in 6432 5432; do
+            timeout 6 bash -c "cat < /dev/null > /dev/tcp/$DB/\$p" 2>/dev/null \
+              && echo "  D2->D3:\$p OPEN" || echo "  D2->D3:\$p UNREACHABLE"
+          done
+          echo "--- app .env.production DB lines (host/port only) ---"
+          grep -iE "^(PGBOUNCER_HOST|PGBOUNCER_PORT|DATABASE_HOST|DATABASE_PORT|POSTGRES_HOST|DB_HOST)=" /opt/fixitlab/.env.production 2>/dev/null || echo "  (.env.production not found)"
+          EOS
+          echo "===== ON D3 (db $DB): listeners + pgbouncer ====="
+          ssh "${OPTS[@]}" root@"$DB" 'bash -s' <<'EOS'
+          set +e
+          echo "--- docker ps (data tier) ---"
+          docker ps -a --format '{{.Names}} | {{.Status}} | {{.Ports}}' | grep -iE "postgres|pgb" || echo "  no pg/pgb containers"
+          echo "--- host listeners :5432/:6432 (bind addr matters) ---"
+          (ss -tlnp 2>/dev/null || netstat -tlnp 2>/dev/null) | grep -E ":5432|:6432" || echo "  nothing on 5432/6432"
+          echo "--- ufw / iptables ---"
+          ufw status 2>/dev/null | head -8 || echo "  ufw not present"
+          iptables -L INPUT -n 2>/dev/null | grep -iE "6432|5432|DROP|REJECT|policy" | head -10
+          echo "--- pgbouncer container logs (tail) ---"
+          docker logs fixitlab-pgbouncer-1 --tail 15 2>&1 || docker logs fixitlab_pgbouncer --tail 15 2>&1 || echo "  no pgbouncer logs"
+          EOS
+          echo "===== netcheck done ====="

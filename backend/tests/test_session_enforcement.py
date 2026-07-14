@@ -153,3 +153,58 @@ class RuntimeEnforcementToggleTests(TestCase):
         self.assertFalse(session_enforcement_enabled())
         set_session_enforcement_override(True)
         self.assertTrue(session_enforcement_enabled())
+
+
+@override_settings(JWT_SESSION_ENFORCEMENT=True)
+class LogoutIdempotencyTests(TestCase):
+    """Logout must succeed even when the caller's session was just invalidated.
+
+    Regression for the E2E "Auth logout" 401: a password change tombstones all
+    sessions (SessionTracker.invalidate_all_sessions), and the very next call —
+    logout, reusing the same access token — was rejected 401 "session has been
+    invalidated" before LogoutView could run. Logout is now authenticated with
+    LogoutJWTAuthentication, which skips ONLY the session-validity check. This
+    test also pins the invariant that enforcement stays ON for other endpoints.
+    """
+
+    def setUp(self):
+        cache.clear()
+        self.client = APIClient()
+        self.user = User.objects.create_user(
+            username="lo", email="lo@example.com", password="SecurePass123!"
+        )
+
+    def _login(self):
+        r = self.client.post(
+            "/api/auth/login/",
+            {"email": "lo@example.com", "password": "SecurePass123!"},
+            format="json",
+        )
+        self.assertEqual(r.status_code, status.HTTP_200_OK)
+        return r.data["access"], r.data["refresh"]
+
+    def test_logout_succeeds_after_session_invalidated(self):
+        access, refresh = self._login()
+        # Simulate the password-change tombstone that precedes logout in the E2E.
+        SessionTracker.invalidate_all_sessions(self.user.id)
+
+        self.client.credentials(HTTP_AUTHORIZATION=f"Bearer {access}")
+
+        # Invariant: a normal protected endpoint STILL hard-rejects the tombstoned
+        # session (the security hardening is intact everywhere except logout).
+        self.assertEqual(
+            self.client.get("/api/auth/profile/").status_code,
+            status.HTTP_401_UNAUTHORIZED,
+        )
+
+        # The fix: logout is idempotent and still tears the session down (200).
+        logout = self.client.post("/api/auth/logout/", {"refresh": refresh}, format="json")
+        self.assertEqual(logout.status_code, status.HTTP_200_OK)
+
+    def test_logout_still_rejects_garbage_token(self):
+        # Idempotency must NOT mean "no auth": an absent/garbage token is still 401.
+        self.client.credentials(HTTP_AUTHORIZATION="Bearer not-a-real-jwt")
+        self.assertEqual(
+            self.client.post("/api/auth/logout/").status_code,
+            status.HTTP_401_UNAUTHORIZED,
+        )

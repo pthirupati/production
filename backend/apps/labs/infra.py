@@ -16,4 +16,14 @@ def lab_infra_type(scenario):
     slug = (getattr(scenario, "slug", "") or "").lower()
     if slug.startswith("sim-"):
         return "simulation"
-    return getattr(scenario, "infrastructure_type", "docker") or "docker"
+    # Explicit real-cloud infra still provisions for real.
+    infra = getattr(scenario, "infrastructure_type", "") or ""
+    if infra in ("aws_ec2", "digitalocean"):
+        return infra
+    # Otherwise fall back to the in-memory simulation engine rather than "docker".
+    # Production never bakes per-scenario container images (build_scenarios=false),
+    # so a "docker" route dead-ends in DockerProvisioner with "Lab image not built
+    # on server" -> PROVISION_FAILED. The simulation engine's "generic" persona is
+    # valid for every technology and needs no image, so every scenario stays
+    # launchable. (~93 scenarios previously defaulted to docker and always failed.)
+    return "simulation"

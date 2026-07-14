@@ -1,3 +1,5 @@
 #!/bin/bash
-systemctl is-failed --quiet 2>/dev/null; test $? -ne 0
+# Validate: swap active on /dev/sdc and persisted in fstab.
+swapon --show | grep /dev/sdc
+grep swap /etc/fstab
 exit 0

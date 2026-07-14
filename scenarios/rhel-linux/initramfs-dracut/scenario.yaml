@@ -61,7 +61,7 @@ objectives:
 - Regenerate the initramfs so the root device mounts and the system boots
 requires_companion_hosts: false
 simulation_type: rhel
-slug: sim-rhel-initramfs-dracut
+slug: rhel-linux-initramfs-dracut-lab
 time_limit: 900
 title: Initramfs / Dracut Failure
 technology: rhel-linux

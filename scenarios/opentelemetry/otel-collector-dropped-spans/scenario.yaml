@@ -1,0 +1,122 @@
+title: Collector Pipeline Silently Drops Spans
+slug: otel-collector-dropped-spans
+technology: opentelemetry
+category: Fix
+difficulty: medium
+scenario_type: fix
+lab_mode: simulation
+simulation_type: generic
+time_limit: 1500
+max_score: 100
+is_free: false
+infrastructure_type: docker
+jira_priority: Medium
+description: 'CONTEXT: A platform team operating opentelemetry needs you to resolve `Collector Pipeline
+  Silently Drops Spans` during a realistic delivery incident. The business impact is a stalled or unsafe
+  release until the underlying state is repaired.
+
+
+  ENVIRONMENT: You are working in FixitLab''s offline observability lab with an OpenTelemetry Collector,
+  an instrumented demo service, and a local trace/metric backend under /otel. All components run locally;
+  no SaaS observability vendor or paid APIs are required.
+
+
+  SYMPTOM / STARTING STATE: Traces stopped appearing in the backend even though the app is emitting spans.
+  The Collector is up, but `otelcol_processor_dropped_spans` is climbing. The traces pipeline references
+  a processor that is defined but never wired into the pipeline''s processor list correctly.
+
+
+  OBJECTIVE: The `service.pipelines.traces` block omits (or misorders) a required processor / points the
+  pipeline at an exporter that isn''t defined, so the memory_limiter sheds load and spans are dropped.
+  Fix the pipeline wiring in the Collector config so receivers→processors→exporters are all defined and
+  referenced, then reload. Success is graded on the real repaired state, not a manual marker.
+
+
+  WHAT TO AVOID: Do not suppress the signal, disable the policy/gate, or fake completion with marker files
+  — reproduce the diagnosis, then apply the smallest fix that satisfies the objective and re-run Check
+  Solution.'
+objectives:
+- The traces pipeline correctly wires defined receivers, processors, and exporters
+- otelcol_processor_dropped_spans stops climbing (spans reach the exporter)
+- The pipeline-wiring root cause is confirmed via otelcol validate + metrics
+initial_state: Traces stopped appearing in the backend even though the app is emitting spans. The Collector
+  is up, but `otelcol_processor_dropped_spans` is climbing. The traces pipeline references a processor
+  that is defined but never wired into the pipeline's processor list correctly.
+hints:
+- order: 1
+  cost: 0
+  content: "Where to look — orient before changing anything:\n    1. `cat /otel/collector/config.yaml`\n\
+    \    2. `curl -s localhost:8888/metrics | grep dropped_spans`\n    3. `otelcol validate --config /otel/collector/config.yaml`\n\
+    \    Write down what looks healthy versus wrong. Form one hypothesis before you touch anything."
+- order: 2
+  cost: 25
+  content: "Diagnostic steps:\n    1. Re-run `cat /otel/collector/config.yaml` and read the status/error\
+    \ carefully.\n    2. Cross-check with `curl -s localhost:8888/metrics | grep dropped_spans` to isolate\
+    \ the failing object.\n    3. State the single root cause in one sentence before you act."
+- order: 3
+  cost: 50
+  content: "Exact fix + verification:\n    1. The `service.pipelines.traces` block omits (or misorders)\
+    \ a required processor / points the pipeline at an exporter that isn't defined, so the memory_limiter\
+    \ sheds load and spans are dropped. Fix the pipeline wiring in the Collector config so receivers→processors→exporters\
+    \ are all defined and referenced, then reload.\n    2. Change one thing at a time so you can roll\
+    \ back if the hypothesis was wrong.\n    3. Verify the objective is met, then click Check Solution\
+    \ (graded on real state, not a marker file)."
+summary: Diagnose and resolve collector pipeline silently drops spans in the opentelemetry simulation
+  lab and verify the healthy end state
+estimated_minutes: 25
+xp_reward: 100
+prerequisites:
+- Basic distributed-systems and HTTP literacy
+tags:
+- opentelemetry
+- fix
+- hands-on
+- simulation
+linked_tutorial: opentelemetry-fundamentals
+what_you_will_learn:
+- The traces pipeline correctly wires defined receivers, processors, and exporters
+- otelcol_processor_dropped_spans stops climbing (spans reach the exporter)
+- Understand the Collector's receiver/processor/exporter pipeline model and how a misconfigured pipeline
+  silently drops telemetry
+environment:
+  nodes:
+  - role: primary
+    os: FixitLab OpenTelemetry observability lab
+    hostname: lab-primary
+    ip: 127.0.0.1
+    specs: local offline simulation
+  pre_installed:
+  - bash
+  - coreutils
+  - otelcol
+  - curl
+  - jq
+  credentials:
+  - user: root
+    password: lab123
+tasks:
+- id: task_1
+  title: Collector Pipeline Silently Drops Spans
+  description: Restore healthy behavior for Collector Pipeline Silently Drops Spans by reproducing the
+    diagnosis from the symptom, isolating the root cause with evidence, applying the smallest safe fix,
+    and validating the outcome with the checker.
+  background: 'This opentelemetry lab teaches the Collector''s receiver/processor/exporter pipeline model
+    and how a misconfigured pipeline silently drops telemetry through systematic troubleshooting: observe,
+    hypothesize, change, verify.'
+  validation:
+    type: custom_script
+    script: check.sh
+    error_message: The scenario objective is not yet satisfied. Re-read hint tier 2, confirm the root
+      cause, and apply the documented remediation so /opt/fixitlab/academy/otel-collector-dropped-spans.conf
+      carries the FIXED-OK marker.
+solution:
+  summary: The `service.pipelines.traces` block omits (or misorders) a required processor / points the
+    pipeline at an exporter that isn't defined, so the memory_limiter sheds load and spans are dropped.
+    Fix the pipeline wiring in the Collector config so receivers→processors→exporters are all defined
+    and referenced, then reload.
+  files_changed: []
+  commands_run:
+  - cat /otel/collector/config.yaml
+  - curl -s localhost:8888/metrics | grep dropped_spans
+  - otelcol validate --config /otel/collector/config.yaml
+  reference_docs: opentelemetry-fundamentals

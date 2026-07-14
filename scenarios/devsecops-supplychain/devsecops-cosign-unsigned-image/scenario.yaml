@@ -1,0 +1,122 @@
+title: Cosign Verify Fails on Unsigned Image
+slug: devsecops-cosign-unsigned-image
+technology: devsecops-supplychain
+category: Harden
+difficulty: medium
+scenario_type: fix
+lab_mode: simulation
+simulation_type: generic
+time_limit: 1500
+max_score: 100
+is_free: false
+infrastructure_type: docker
+jira_priority: Medium
+description: 'CONTEXT: A platform team operating devsecops supplychain needs you to resolve `Cosign Verify
+  Fails on Unsigned Image` during a realistic delivery incident. The business impact is a stalled or unsafe
+  release until the underlying state is repaired.
+
+
+  ENVIRONMENT: You are working in FixitLab''s offline supply-chain security lab with a local OCI registry,
+  Trivy scanner, cosign keys, an SBOM store, and a Falco runtime sensor under /supplychain. Everything
+  runs locally; no external registry or paid APIs are required.
+
+
+  SYMPTOM / STARTING STATE: Admission control blocks `analytics:3.0`: `cosign verify` fails with `no matching
+  signatures`. The cluster policy requires images to be signed by the team''s key, but this image was
+  pushed straight from a developer laptop without a signing step.
+
+
+  OBJECTIVE: The image was never signed, so there is no signature for cosign to verify against the trusted
+  key and the policy denies it. Remediate by signing the image with the team''s cosign key (in CI, keyless
+  or key-based) so verification succeeds — do NOT disable the policy. Success is graded on the real repaired
+  state, not a manual marker.
+
+
+  WHAT TO AVOID: Do not suppress the signal, disable the policy/gate, or fake completion with marker files
+  — reproduce the diagnosis, then apply the smallest fix that satisfies the objective and re-run Check
+  Solution.'
+objectives:
+- analytics:3.0 is signed with the team's cosign key
+- cosign verify --key succeeds (matching signature found)
+- The signature-required policy stays enabled (not disabled to pass)
+initial_state: 'Admission control blocks `analytics:3.0`: `cosign verify` fails with `no matching signatures`.
+  The cluster policy requires images to be signed by the team''s key, but this image was pushed straight
+  from a developer laptop without a signing step.'
+hints:
+- order: 1
+  cost: 0
+  content: "Where to look — orient before changing anything:\n    1. `cosign verify --key /supplychain/cosign.pub\
+    \ analytics:3.0`\n    2. `cosign tree analytics:3.0`\n    3. `cat /supplychain/policy/verify.yaml`\n\
+    \    Write down what looks healthy versus wrong. Form one hypothesis before you touch anything."
+- order: 2
+  cost: 25
+  content: "Diagnostic steps:\n    1. Re-run `cosign verify --key /supplychain/cosign.pub analytics:3.0`\
+    \ and read the status/error carefully.\n    2. Cross-check with `cosign tree analytics:3.0` to isolate\
+    \ the failing object.\n    3. State the single root cause in one sentence before you act."
+- order: 3
+  cost: 50
+  content: "Exact fix + verification:\n    1. The image was never signed, so there is no signature for\
+    \ cosign to verify against the trusted key and the policy denies it. Remediate by signing the image\
+    \ with the team's cosign key (in CI, keyless or key-based) so verification succeeds — do NOT disable\
+    \ the policy.\n    2. Change one thing at a time so you can roll back if the hypothesis was wrong.\n\
+    \    3. Verify the objective is met, then click Check Solution (graded on real state, not a marker\
+    \ file)."
+summary: Diagnose and resolve cosign verify fails on unsigned image in the devsecops-supplychain simulation
+  lab and verify the healthy end state
+estimated_minutes: 25
+xp_reward: 100
+prerequisites:
+- Basic container image and CI/CD literacy
+tags:
+- devsecops-supplychain
+- harden
+- hands-on
+- simulation
+linked_tutorial: devsecops-supplychain-fundamentals
+what_you_will_learn:
+- analytics:3.0 is signed with the team's cosign key
+- cosign verify --key succeeds (matching signature found)
+- Understand image signing with cosign, keyed vs keyless signing, and how admission policies enforce provenance
+  via signature verification
+environment:
+  nodes:
+  - role: primary
+    os: FixitLab supply-chain security lab
+    hostname: lab-primary
+    ip: 127.0.0.1
+    specs: local offline simulation
+  pre_installed:
+  - bash
+  - coreutils
+  - trivy
+  - cosign
+  - syft
+  - falco
+  credentials:
+  - user: root
+    password: lab123
+tasks:
+- id: task_1
+  title: Cosign Verify Fails on Unsigned Image
+  description: Restore healthy behavior for Cosign Verify Fails on Unsigned Image by reproducing the diagnosis
+    from the symptom, isolating the root cause with evidence, applying the smallest safe fix, and validating
+    the outcome with the checker.
+  background: 'This devsecops-supplychain lab teaches image signing with cosign, keyed vs keyless signing,
+    and how admission policies enforce provenance via signature verification through systematic troubleshooting:
+    observe, hypothesize, change, verify.'
+  validation:
+    type: custom_script
+    script: check.sh
+    error_message: The scenario objective is not yet satisfied. Re-read hint tier 2, confirm the root
+      cause, and apply the documented remediation so /opt/fixitlab/academy/devsecops-cosign-unsigned-image.conf
+      carries the FIXED-OK marker.
+solution:
+  summary: The image was never signed, so there is no signature for cosign to verify against the trusted
+    key and the policy denies it. Remediate by signing the image with the team's cosign key (in CI, keyless
+    or key-based) so verification succeeds — do NOT disable the policy.
+  files_changed: []
+  commands_run:
+  - cosign verify --key /supplychain/cosign.pub analytics:3.0
+  - cosign tree analytics:3.0
+  - cat /supplychain/policy/verify.yaml
+  reference_docs: devsecops-supplychain-fundamentals

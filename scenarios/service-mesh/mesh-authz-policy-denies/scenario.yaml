@@ -1,0 +1,124 @@
+title: AuthorizationPolicy Denies Legitimate Traffic
+slug: mesh-authz-policy-denies
+technology: service-mesh
+category: Fix
+difficulty: medium
+scenario_type: fix
+lab_mode: simulation
+simulation_type: generic
+time_limit: 1500
+max_score: 100
+is_free: false
+infrastructure_type: docker
+jira_priority: Medium
+description: 'CONTEXT: A platform team operating service mesh needs you to resolve `AuthorizationPolicy
+  Denies Legitimate Traffic` during a realistic delivery incident. The business impact is a stalled or
+  unsafe release until the underlying state is repaired.
+
+
+  ENVIRONMENT: You are working in FixitLab''s offline service-mesh lab with an Istio/Linkerd control plane,
+  sidecar-injected workloads, and mesh CRDs (VirtualService, DestinationRule, AuthorizationPolicy) under
+  /mesh. The mesh runs locally; no cloud load balancer or paid APIs are required.
+
+
+  SYMPTOM / STARTING STATE: The `frontend` can no longer call `payments`: every request returns RBAC:
+  access denied (HTTP 403). A new AuthorizationPolicy on payments allows only a principal that doesn''t
+  match frontend''s actual service-account identity, so legitimate traffic is denied by default.
+
+
+  OBJECTIVE: The AuthorizationPolicy''s `from.source.principals` lists the wrong SPIFFE identity for the
+  frontend service account, so the mesh''s default-deny denies the real caller. Remediate by correcting
+  the principal to frontend''s actual service-account identity so authorized traffic is allowed while
+  everything else stays denied. Success is graded on the real repaired state, not a manual marker.
+
+
+  WHAT TO AVOID: Do not suppress the signal, disable the policy/gate, or fake completion with marker files
+  — reproduce the diagnosis, then apply the smallest fix that satisfies the objective and re-run Check
+  Solution.'
+objectives:
+- The AuthorizationPolicy principal matches frontend's real service-account identity
+- frontend can call payments (no more RBAC 403) while unauthorized callers stay denied
+- The wrong-principal root cause is confirmed via Envoy rbac debug logs
+initial_state: 'The `frontend` can no longer call `payments`: every request returns RBAC: access denied
+  (HTTP 403). A new AuthorizationPolicy on payments allows only a principal that doesn''t match frontend''s
+  actual service-account identity, so legitimate traffic is denied by default.'
+hints:
+- order: 1
+  cost: 0
+  content: "Where to look — orient before changing anything:\n    1. `kubectl get authorizationpolicy\
+    \ -n payments -o yaml`\n    2. `istioctl proxy-config log deploy/payments --level rbac:debug`\n  \
+    \  3. `kubectl get serviceaccount -n frontend`\n    Write down what looks healthy versus wrong. Form\
+    \ one hypothesis before you touch anything."
+- order: 2
+  cost: 25
+  content: "Diagnostic steps:\n    1. Re-run `kubectl get authorizationpolicy -n payments -o yaml` and\
+    \ read the status/error carefully.\n    2. Cross-check with `istioctl proxy-config log deploy/payments\
+    \ --level rbac:debug` to isolate the failing object.\n    3. State the single root cause in one sentence\
+    \ before you act."
+- order: 3
+  cost: 50
+  content: "Exact fix + verification:\n    1. The AuthorizationPolicy's `from.source.principals` lists\
+    \ the wrong SPIFFE identity for the frontend service account, so the mesh's default-deny denies the\
+    \ real caller. Remediate by correcting the principal to frontend's actual service-account identity\
+    \ so authorized traffic is allowed while everything else stays denied.\n    2. Change one thing at\
+    \ a time so you can roll back if the hypothesis was wrong.\n    3. Verify the objective is met, then\
+    \ click Check Solution (graded on real state, not a marker file)."
+summary: Diagnose and resolve authorizationpolicy denies legitimate traffic in the service-mesh simulation
+  lab and verify the healthy end state
+estimated_minutes: 25
+xp_reward: 100
+prerequisites:
+- Basic Kubernetes networking literacy
+tags:
+- service-mesh
+- fix
+- hands-on
+- simulation
+linked_tutorial: service-mesh-fundamentals
+what_you_will_learn:
+- The AuthorizationPolicy principal matches frontend's real service-account identity
+- frontend can call payments (no more RBAC 403) while unauthorized callers stay denied
+- Understand mesh authorization (default-deny, SPIFFE identities), how AuthorizationPolicy principals
+  map to service accounts, and least-privilege allow rules
+environment:
+  nodes:
+  - role: primary
+    os: FixitLab service-mesh lab
+    hostname: lab-primary
+    ip: 127.0.0.1
+    specs: local offline simulation
+  pre_installed:
+  - bash
+  - coreutils
+  - kubectl
+  - istioctl
+  - linkerd
+  credentials:
+  - user: root
+    password: lab123
+tasks:
+- id: task_1
+  title: AuthorizationPolicy Denies Legitimate Traffic
+  description: Restore healthy behavior for AuthorizationPolicy Denies Legitimate Traffic by reproducing
+    the diagnosis from the symptom, isolating the root cause with evidence, applying the smallest safe
+    fix, and validating the outcome with the checker.
+  background: 'This service-mesh lab teaches mesh authorization (default-deny, SPIFFE identities), how
+    AuthorizationPolicy principals map to service accounts, and least-privilege allow rules through systematic
+    troubleshooting: observe, hypothesize, change, verify.'
+  validation:
+    type: custom_script
+    script: check.sh
+    error_message: The scenario objective is not yet satisfied. Re-read hint tier 2, confirm the root
+      cause, and apply the documented remediation so /opt/fixitlab/academy/mesh-authz-policy-denies.conf
+      carries the FIXED-OK marker.
+solution:
+  summary: The AuthorizationPolicy's `from.source.principals` lists the wrong SPIFFE identity for the
+    frontend service account, so the mesh's default-deny denies the real caller. Remediate by correcting
+    the principal to frontend's actual service-account identity so authorized traffic is allowed while
+    everything else stays denied.
+  files_changed: []
+  commands_run:
+  - kubectl get authorizationpolicy -n payments -o yaml
+  - istioctl proxy-config log deploy/payments --level rbac:debug
+  - kubectl get serviceaccount -n frontend
+  reference_docs: service-mesh-fundamentals
