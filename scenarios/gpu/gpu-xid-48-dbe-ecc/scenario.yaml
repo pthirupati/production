@@ -1,0 +1,122 @@
+title: Xid 48 Double-Bit ECC Error
+slug: gpu-xid-48-dbe-ecc
+technology: gpu
+category: Fix
+difficulty: hard
+lab_mode: simulation
+simulation_type: gpu
+time_limit: 1500
+max_score: 100
+is_free: false
+jira_priority: High
+dual_terminal: false
+requires_companion_hosts: false
+description: 'CONTEXT: An SRE/GPU-infrastructure team running a datacenter accelerator fleet must resolve
+  `Xid 48 Double-Bit ECC Error` during a live incident. Until the underlying hardware/driver state is
+  repaired, GPU capacity is lost and training/inference jobs fail, so throughput and SLAs are at risk.
+
+
+  ENVIRONMENT: You are on a FixitLab offline GPU node with nvidia-smi, the NVIDIA driver/CUDA stack, DCGM
+  (dcgmi / nv-hostengine / dcgm-exporter), the container toolkit, and — for AMD hosts — the ROCm stack
+  (rocm-smi / amd-smi). All tools run locally; no paid APIs or external cloud calls are required.
+
+
+  SYMPTOM / STARTING STATE: `dmesg | grep -i xid` shows `NVRM: Xid ... 48, Double Bit ECC`. Xid 48 is
+  an uncorrectable HBM error that corrupts data; the affected page must be retired and the GPU reset before
+  reuse.
+
+
+  OBJECTIVE: Confirm Xid 48 (DBE) in dmesg and the matching uncorrectable ECC count; Check pending page
+  retirement for the affected GPU; Retire the poisoned page(s), reset the GPU, and confirm a clean ECC
+  state. Success means `check.sh` exits successfully after you apply the documented remediation.
+
+
+  WHAT TO AVOID: Do not apply broad destructive changes, disable safety limits to mask the fault, skip
+  evidence gathering, or fake completion with marker files — the checker validates real system state.'
+initial_state: A GPU logging Xid 48 (double-bit ECC / DBE); the running kernel was killed and the GPU
+  needs its poisoned pages retired before it is trusted again.
+objectives:
+- Confirm Xid 48 (DBE) in dmesg and the matching uncorrectable ECC count
+- Check pending page retirement for the affected GPU
+- Retire the poisoned page(s), reset the GPU, and confirm a clean ECC state
+hints:
+- order: 1
+  cost: 0
+  content: 'Where to look: `dmesg -T | grep -i xid` (Xid 48 = DBE), then `nvidia-smi -q -d ECC` and `nvidia-smi
+    -q -d PAGE_RETIREMENT` for the uncorrectable count and pending retirements.'
+- order: 2
+  cost: 25
+  content: 'Diagnostic steps:
+
+    1. `dmesg -T | grep -i ''Xid''` — confirm Xid 48 and the GPU index.
+
+    2. `nvidia-smi -q -d ECC` — Volatile Uncorrectable should be non-zero.
+
+    3. `nvidia-smi -q -d PAGE_RETIREMENT` — check Pending Page Blacklist.'
+- order: 3
+  cost: 50
+  content: 'Exact fix + verification:
+
+    1. Ensure page retirement is enabled, reset the GPU (`nvidia-smi -r -i <id>`) to retire the poisoned
+    page; escalate to RMA if DBEs keep recurring.
+
+    2. Confirm `nvidia-smi -q -d ECC` shows no pending retirement and no new uncorrectable errors.
+
+    3. Apply the documented remediation in /opt/fixitlab/academy/gpu-xid-48-dbe-ecc.conf.
+
+    WHY: the checker validates the ECC fault was genuinely handled.'
+summary: Diagnose and fix xid 48 double-bit ecc error on a datacenter GPU node and verify with the checker
+estimated_minutes: 25
+xp_reward: 100
+prerequisites:
+- Basic GPU and Linux troubleshooting literacy
+tags:
+- fix
+- gpu
+- nvidia
+- hands-on
+linked_tutorial: gpu-fundamentals
+what_you_will_learn:
+- Confirm Xid 48 (DBE) in dmesg and the matching uncorrectable ECC count
+- Check pending page retirement for the affected GPU
+- Retire the poisoned page(s), reset the GPU, and confirm a clean ECC state
+environment:
+  nodes:
+  - role: primary
+    os: FixitLab GPU node
+    hostname: gpu-node-01
+    ip: 127.0.0.1
+    specs: local offline simulation (NVIDIA + AMD datacenter GPUs)
+  pre_installed:
+  - bash
+  - coreutils
+  - gpu
+  - nvidia-smi
+  - dcgmi
+  - rocm-smi
+  - journalctl
+  - systemctl
+  credentials:
+  - user: root
+    password: lab123
+tasks:
+- id: task_1
+  title: Xid 48 Double-Bit ECC Error
+  description: Restore healthy behavior for Xid 48 Double-Bit ECC Error by investigating the failure with
+    the GPU tooling, applying the smallest safe fix, and validating the outcome.
+  background: 'This GPU lab teaches systematic datacenter accelerator troubleshooting: observe, hypothesize,
+    change, verify.'
+  validation:
+    type: command_output
+    command: nvidia-smi
+    expected_output: NVIDIA-SMI
+    error_message: GPU health check still fails. Verify driver, device visibility, and that the documented
+      fix was applied.
+solution:
+  summary: Identify the root cause behind xid 48 double-bit ecc error and apply the minimal documented
+    fix.
+  files_changed: []
+  commands_run:
+  - nvidia-smi
+  - dcgmi diag -r 1
+  reference_docs: gpu-fundamentals

@@ -1,0 +1,105 @@
+title: 'Load-Balancing Exporter Has No Backends'
+slug: otel-loadbalancing-exporter-no-backends
+technology: opentelemetry
+category: Fix
+difficulty: hard
+scenario_type: fix
+lab_mode: simulation
+simulation_type: generic
+time_limit: 1800
+max_score: 100
+is_free: false
+infrastructure_type: docker
+jira_priority: Medium
+description: |-
+  CONTEXT: A platform team operating opentelemetry needs you to resolve `Load-Balancing Exporter Has No Backends` during a realistic delivery incident. The business impact is a stalled or unsafe release until the underlying state is repaired.
+
+  ENVIRONMENT: You are working in FixitLab's offline observability lab with an OpenTelemetry Collector, an instrumented demo service, and a local trace/metric backend under /otel. All components run locally; no SaaS observability vendor or paid APIs are required.
+
+  SYMPTOM / STARTING STATE: A gateway Collector using the loadbalancing exporter drops all traces with `no backends available`. The DNS resolver points at a headless service that currently resolves to zero endpoints, so there is nowhere to route spans.
+
+  OBJECTIVE: The loadbalancing exporter's DNS resolver targets a service with no resolvable endpoints (wrong name or empty backend set), so trace-ID routing has no destinations. Point the resolver at the correct backend service name (or a static list) so endpoints resolve and spans route consistently by trace ID. Success is graded on the real repaired state, not a manual marker.
+
+  WHAT TO AVOID: Do not suppress the signal, disable the policy/gate, or fake completion with marker files — reproduce the diagnosis, then apply the smallest fix that satisfies the objective and re-run Check Solution.
+objectives:
+- 'The loadbalancing exporter resolves at least one backend'
+- 'The empty/misnamed resolver target is confirmed as root cause'
+- 'Spans route to backends by trace ID after resolution is fixed'
+initial_state: |-
+  A gateway Collector using the loadbalancing exporter drops all traces with `no backends available`. The DNS resolver points at a headless service that currently resolves to zero endpoints, so there is nowhere to route spans.
+hints:
+- order: 1
+  cost: 0
+  content: |-
+    Where to look — orient before changing anything:
+        1. `cat /otel/collector/config.yaml`
+        2. `curl -s localhost:8888/metrics | grep -E 'backend|failed'`
+        3. `otelcol validate --config /otel/collector/config.yaml`
+        Write down what looks healthy versus wrong. Form one hypothesis before you touch anything.
+- order: 2
+  cost: 25
+  content: |-
+    Diagnostic steps:
+        1. Re-run `cat /otel/collector/config.yaml` and read the status/error carefully.
+        2. Cross-check with `curl -s localhost:8888/metrics | grep -E 'backend|failed'` to isolate the failing object.
+        3. State the single root cause in one sentence before you act.
+- order: 3
+  cost: 50
+  content: |-
+    Exact fix + verification:
+        1. The loadbalancing exporter's DNS resolver targets a service with no resolvable endpoints (wrong name or empty backend set), so trace-ID routing has no destinations. Point the resolver at the correct backend service name (or a static list) so endpoints resolve and spans route consistently by trace ID.
+        2. Change one thing at a time so you can roll back if the hypothesis was wrong.
+        3. Verify the objective is met, then click Check Solution (graded on real state, not a marker file).
+summary: |-
+  Diagnose and resolve load-balancing exporter has no backends in the opentelemetry simulation lab and verify the healthy end state
+estimated_minutes: 30
+xp_reward: 100
+prerequisites:
+- 'Basic distributed-systems and HTTP literacy'
+tags:
+- 'opentelemetry'
+- 'fix'
+- 'hands-on'
+- 'simulation'
+linked_tutorial: opentelemetry-fundamentals
+what_you_will_learn:
+- 'The loadbalancing exporter resolves at least one backend'
+- 'The empty/misnamed resolver target is confirmed as root cause'
+- 'Understand how the loadbalancing exporter routes by trace ID across resolved backends and why an empty resolver drops everything'
+environment:
+  nodes:
+  - role: primary
+    os: FixitLab OpenTelemetry observability lab
+    hostname: lab-primary
+    ip: 127.0.0.1
+    specs: local offline simulation
+  pre_installed:
+  - bash
+  - coreutils
+  - otelcol
+  - curl
+  - jq
+  credentials:
+  - user: root
+    password: lab123
+tasks:
+- id: task_1
+  title: 'Load-Balancing Exporter Has No Backends'
+  description: |-
+    Restore healthy behavior for Load-Balancing Exporter Has No Backends by reproducing the diagnosis from the symptom, isolating the root cause with evidence, applying the smallest safe fix, and validating the outcome with the checker.
+  background: |-
+    This opentelemetry lab teaches how the loadbalancing exporter routes by trace ID across resolved backends and why an empty resolver drops everything through systematic troubleshooting: observe, hypothesize, change, verify.
+  validation:
+    type: custom_script
+    script: check.sh
+    error_message: |-
+      The scenario objective is not yet satisfied. Re-read hint tier 2, confirm the root cause, and apply the documented remediation so /opt/fixitlab/academy/otel-loadbalancing-exporter-no-backends.conf carries the FIXED-OK marker.
+solution:
+  summary: |-
+    The loadbalancing exporter's DNS resolver targets a service with no resolvable endpoints (wrong name or empty backend set), so trace-ID routing has no destinations. Point the resolver at the correct backend service name (or a static list) so endpoints resolve and spans route consistently by trace ID.
+  files_changed: []
+  commands_run:
+  - 'cat /otel/collector/config.yaml'
+  - 'curl -s localhost:8888/metrics | grep -E ''backend|failed'''
+  - 'otelcol validate --config /otel/collector/config.yaml'
+  reference_docs: opentelemetry-fundamentals

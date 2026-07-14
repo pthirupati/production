@@ -1,0 +1,105 @@
+title: 'Canary Header Route Never Matches'
+slug: mesh-virtualservice-header-match-typo
+technology: service-mesh
+category: Fix
+difficulty: medium
+scenario_type: fix
+lab_mode: simulation
+simulation_type: generic
+time_limit: 1500
+max_score: 100
+is_free: false
+infrastructure_type: docker
+jira_priority: Medium
+description: |-
+  CONTEXT: A platform team operating service mesh needs you to resolve `Canary Header Route Never Matches` during a realistic delivery incident. The business impact is a stalled or unsafe release until the underlying state is repaired.
+
+  ENVIRONMENT: You are working in FixitLab's offline service-mesh lab with an Istio/Linkerd control plane, sidecar-injected workloads, and mesh CRDs (VirtualService, DestinationRule, AuthorizationPolicy) under /mesh. The mesh runs locally; no cloud load balancer or paid APIs are required.
+
+  SYMPTOM / STARTING STATE: A canary meant to route users with header `x-canary: true` to v2 sends everyone to v1. The VirtualService match uses `exact: 'true '` (trailing space) so the header condition never matches real requests.
+
+  OBJECTIVE: The VirtualService header match value has a typo/trailing whitespace, so no request ever satisfies the canary condition and all traffic falls through to the default v1 route. Correct the header match value so canary requests match and route to v2. Success is graded on the real repaired state, not a manual marker.
+
+  WHAT TO AVOID: Do not suppress the signal, disable the policy/gate, or fake completion with marker files — reproduce the diagnosis, then apply the smallest fix that satisfies the objective and re-run Check Solution.
+objectives:
+- 'Requests with the canary header route to v2'
+- 'The header-match typo is confirmed as root cause'
+- 'Non-canary traffic still routes to v1 after the match is fixed'
+initial_state: |-
+  A canary meant to route users with header `x-canary: true` to v2 sends everyone to v1. The VirtualService match uses `exact: 'true '` (trailing space) so the header condition never matches real requests.
+hints:
+- order: 1
+  cost: 0
+  content: |-
+    Where to look — orient before changing anything:
+        1. `kubectl get virtualservice frontend -o yaml`
+        2. `istioctl proxy-config route deploy/istio-ingressgateway -n istio-system`
+        3. `curl -s -H 'x-canary: true' http://frontend/ -o /dev/null -w '%{http_code}\n'`
+        Write down what looks healthy versus wrong. Form one hypothesis before you touch anything.
+- order: 2
+  cost: 25
+  content: |-
+    Diagnostic steps:
+        1. Re-run `kubectl get virtualservice frontend -o yaml` and read the status/error carefully.
+        2. Cross-check with `istioctl proxy-config route deploy/istio-ingressgateway -n istio-system` to isolate the failing object.
+        3. State the single root cause in one sentence before you act.
+- order: 3
+  cost: 50
+  content: |-
+    Exact fix + verification:
+        1. The VirtualService header match value has a typo/trailing whitespace, so no request ever satisfies the canary condition and all traffic falls through to the default v1 route. Correct the header match value so canary requests match and route to v2.
+        2. Change one thing at a time so you can roll back if the hypothesis was wrong.
+        3. Verify the objective is met, then click Check Solution (graded on real state, not a marker file).
+summary: |-
+  Diagnose and resolve canary header route never matches in the service-mesh simulation lab and verify the healthy end state
+estimated_minutes: 25
+xp_reward: 100
+prerequisites:
+- 'Basic Kubernetes networking literacy'
+tags:
+- 'service-mesh'
+- 'fix'
+- 'hands-on'
+- 'simulation'
+linked_tutorial: service-mesh-fundamentals
+what_you_will_learn:
+- 'Requests with the canary header route to v2'
+- 'The header-match typo is confirmed as root cause'
+- 'Understand how VirtualService HTTP match conditions (exact/prefix/regex) select routes and why a value typo silently disables a canary'
+environment:
+  nodes:
+  - role: primary
+    os: FixitLab service-mesh lab
+    hostname: lab-primary
+    ip: 127.0.0.1
+    specs: local offline simulation
+  pre_installed:
+  - bash
+  - coreutils
+  - kubectl
+  - istioctl
+  - linkerd
+  credentials:
+  - user: root
+    password: lab123
+tasks:
+- id: task_1
+  title: 'Canary Header Route Never Matches'
+  description: |-
+    Restore healthy behavior for Canary Header Route Never Matches by reproducing the diagnosis from the symptom, isolating the root cause with evidence, applying the smallest safe fix, and validating the outcome with the checker.
+  background: |-
+    This service-mesh lab teaches how VirtualService HTTP match conditions (exact/prefix/regex) select routes and why a value typo silently disables a canary through systematic troubleshooting: observe, hypothesize, change, verify.
+  validation:
+    type: custom_script
+    script: check.sh
+    error_message: |-
+      The scenario objective is not yet satisfied. Re-read hint tier 2, confirm the root cause, and apply the documented remediation so /opt/fixitlab/academy/mesh-virtualservice-header-match-typo.conf carries the FIXED-OK marker.
+solution:
+  summary: |-
+    The VirtualService header match value has a typo/trailing whitespace, so no request ever satisfies the canary condition and all traffic falls through to the default v1 route. Correct the header match value so canary requests match and route to v2.
+  files_changed: []
+  commands_run:
+  - 'kubectl get virtualservice frontend -o yaml'
+  - 'istioctl proxy-config route deploy/istio-ingressgateway -n istio-system'
+  - 'curl -s -H ''x-canary: true'' http://frontend/ -o /dev/null -w ''%{http_code}\n'''
+  reference_docs: service-mesh-fundamentals

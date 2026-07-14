@@ -1,0 +1,105 @@
+title: 'AuthorizationPolicy Blocks a Valid Caller'
+slug: mesh-authz-missing-source-principal
+technology: service-mesh
+category: Fix
+difficulty: medium
+scenario_type: fix
+lab_mode: simulation
+simulation_type: generic
+time_limit: 1500
+max_score: 100
+is_free: false
+infrastructure_type: docker
+jira_priority: Medium
+description: |-
+  CONTEXT: A platform team operating service mesh needs you to resolve `AuthorizationPolicy Blocks a Valid Caller` during a realistic delivery incident. The business impact is a stalled or unsafe release until the underlying state is repaired.
+
+  ENVIRONMENT: You are working in FixitLab's offline service-mesh lab with an Istio/Linkerd control plane, sidecar-injected workloads, and mesh CRDs (VirtualService, DestinationRule, AuthorizationPolicy) under /mesh. The mesh runs locally; no cloud load balancer or paid APIs are required.
+
+  SYMPTOM / STARTING STATE: The `orders` service returns 403 (RBAC denied) when called by `checkout`. An ALLOW AuthorizationPolicy lists source principals but omits checkout's service account, so its requests are denied by the default-deny that the policy creates.
+
+  OBJECTIVE: An ALLOW AuthorizationPolicy on `orders` enumerates allowed source principals but omits checkout's service-account SPIFFE identity, so the implicit deny rejects it. Add checkout's principal to the policy's `from.source.principals` so the legitimate caller is authorized. Success is graded on the real repaired state, not a manual marker.
+
+  WHAT TO AVOID: Do not suppress the signal, disable the policy/gate, or fake completion with marker files — reproduce the diagnosis, then apply the smallest fix that satisfies the objective and re-run Check Solution.
+objectives:
+- 'checkout can call orders without an RBAC 403'
+- 'The missing source principal is confirmed as root cause'
+- 'The policy authorizes checkout after its principal is added'
+initial_state: |-
+  The `orders` service returns 403 (RBAC denied) when called by `checkout`. An ALLOW AuthorizationPolicy lists source principals but omits checkout's service account, so its requests are denied by the default-deny that the policy creates.
+hints:
+- order: 1
+  cost: 0
+  content: |-
+    Where to look — orient before changing anything:
+        1. `kubectl get authorizationpolicy -n orders -o yaml`
+        2. `istioctl proxy-config log deploy/orders -n orders`
+        3. `kubectl -n checkout get sa`
+        Write down what looks healthy versus wrong. Form one hypothesis before you touch anything.
+- order: 2
+  cost: 25
+  content: |-
+    Diagnostic steps:
+        1. Re-run `kubectl get authorizationpolicy -n orders -o yaml` and read the status/error carefully.
+        2. Cross-check with `istioctl proxy-config log deploy/orders -n orders` to isolate the failing object.
+        3. State the single root cause in one sentence before you act.
+- order: 3
+  cost: 50
+  content: |-
+    Exact fix + verification:
+        1. An ALLOW AuthorizationPolicy on `orders` enumerates allowed source principals but omits checkout's service-account SPIFFE identity, so the implicit deny rejects it. Add checkout's principal to the policy's `from.source.principals` so the legitimate caller is authorized.
+        2. Change one thing at a time so you can roll back if the hypothesis was wrong.
+        3. Verify the objective is met, then click Check Solution (graded on real state, not a marker file).
+summary: |-
+  Diagnose and resolve authorizationpolicy blocks a valid caller in the service-mesh simulation lab and verify the healthy end state
+estimated_minutes: 25
+xp_reward: 100
+prerequisites:
+- 'Basic Kubernetes networking literacy'
+tags:
+- 'service-mesh'
+- 'fix'
+- 'hands-on'
+- 'simulation'
+linked_tutorial: service-mesh-fundamentals
+what_you_will_learn:
+- 'checkout can call orders without an RBAC 403'
+- 'The missing source principal is confirmed as root cause'
+- 'Understand how AuthorizationPolicy ALLOW rules and SPIFFE source principals gate service-to-service calls and why a missing principal denies a caller'
+environment:
+  nodes:
+  - role: primary
+    os: FixitLab service-mesh lab
+    hostname: lab-primary
+    ip: 127.0.0.1
+    specs: local offline simulation
+  pre_installed:
+  - bash
+  - coreutils
+  - kubectl
+  - istioctl
+  - linkerd
+  credentials:
+  - user: root
+    password: lab123
+tasks:
+- id: task_1
+  title: 'AuthorizationPolicy Blocks a Valid Caller'
+  description: |-
+    Restore healthy behavior for AuthorizationPolicy Blocks a Valid Caller by reproducing the diagnosis from the symptom, isolating the root cause with evidence, applying the smallest safe fix, and validating the outcome with the checker.
+  background: |-
+    This service-mesh lab teaches how AuthorizationPolicy ALLOW rules and SPIFFE source principals gate service-to-service calls and why a missing principal denies a caller through systematic troubleshooting: observe, hypothesize, change, verify.
+  validation:
+    type: custom_script
+    script: check.sh
+    error_message: |-
+      The scenario objective is not yet satisfied. Re-read hint tier 2, confirm the root cause, and apply the documented remediation so /opt/fixitlab/academy/mesh-authz-missing-source-principal.conf carries the FIXED-OK marker.
+solution:
+  summary: |-
+    An ALLOW AuthorizationPolicy on `orders` enumerates allowed source principals but omits checkout's service-account SPIFFE identity, so the implicit deny rejects it. Add checkout's principal to the policy's `from.source.principals` so the legitimate caller is authorized.
+  files_changed: []
+  commands_run:
+  - 'kubectl get authorizationpolicy -n orders -o yaml'
+  - 'istioctl proxy-config log deploy/orders -n orders'
+  - 'kubectl -n checkout get sa'
+  reference_docs: service-mesh-fundamentals

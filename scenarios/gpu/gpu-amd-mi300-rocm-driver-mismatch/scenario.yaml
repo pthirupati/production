@@ -1,0 +1,125 @@
+title: ROCm Userspace / amdgpu Driver Mismatch
+slug: gpu-amd-mi300-rocm-driver-mismatch
+technology: gpu
+category: Fix
+difficulty: medium
+lab_mode: simulation
+simulation_type: gpu
+time_limit: 1200
+max_score: 100
+is_free: false
+jira_priority: High
+dual_terminal: false
+requires_companion_hosts: false
+description: 'CONTEXT: An SRE/GPU-infrastructure team running a datacenter accelerator fleet must resolve
+  `ROCm Userspace / amdgpu Driver Mismatch` during a live incident. Until the underlying hardware/driver
+  state is repaired, GPU capacity is lost and training/inference jobs fail, so throughput and SLAs are
+  at risk.
+
+
+  ENVIRONMENT: You are on a FixitLab offline GPU node with nvidia-smi, the NVIDIA driver/CUDA stack, DCGM
+  (dcgmi / nv-hostengine / dcgm-exporter), the container toolkit, and — for AMD hosts — the ROCm stack
+  (rocm-smi / amd-smi). All tools run locally; no paid APIs or external cloud calls are required.
+
+
+  SYMPTOM / STARTING STATE: HIP/PyTorch-ROCm aborts at init (`hipErrorNoBinaryForGpu` / ''no ROCm-capable
+  device''). `rocminfo` errors or shows no agents because the installed ROCm libraries don''t match the
+  running amdgpu kernel module after a mixed upgrade.
+
+
+  OBJECTIVE: Reproduce the ROCm init failure and read the amdgpu kernel version vs the installed ROCm
+  stack; Determine whether the kernel module (dkms) or userspace ROCm packages are stale; Reconcile the
+  versions so rocminfo lists the MI300X agents and HIP initializes. Success means `check.sh` exits successfully
+  after you apply the documented remediation.
+
+
+  WHAT TO AVOID: Do not apply broad destructive changes, disable safety limits to mask the fault, skip
+  evidence gathering, or fake completion with marker files — the checker validates real system state.'
+initial_state: An MI300X node where HIP apps fail to init after a partial ROCm upgrade; the ROCm userspace
+  stack is newer than the loaded amdgpu/KFD kernel driver.
+objectives:
+- Reproduce the ROCm init failure and read the amdgpu kernel version vs the installed ROCm stack
+- Determine whether the kernel module (dkms) or userspace ROCm packages are stale
+- Reconcile the versions so rocminfo lists the MI300X agents and HIP initializes
+hints:
+- order: 1
+  cost: 0
+  content: 'Where to look: `rocminfo` (agents), `dkms status | grep amdgpu` and `modinfo amdgpu | grep
+    version` for the kernel side, and `apt list --installed | grep rocm` (or rpm) for userspace.'
+- order: 2
+  cost: 25
+  content: 'Diagnostic steps:
+
+    1. `rocminfo` — confirm it errors or lists zero GPU agents.
+
+    2. `modinfo amdgpu | grep ^version` vs the installed `rocm-*` package versions.
+
+    3. `dmesg | grep -i amdgpu` for KFD/driver version complaints.'
+- order: 3
+  cost: 50
+  content: 'Exact fix + verification:
+
+    1. Align the stack: rebuild the amdgpu dkms module for the running kernel or complete the ROCm upgrade
+    so kernel and userspace match; reboot to load the rebuilt module.
+
+    2. Re-run `rocminfo` and confirm the MI300X agents are listed and HIP initializes.
+
+    3. Apply the documented remediation in /opt/fixitlab/academy/gpu-amd-mi300-rocm-driver-mismatch.conf.
+
+    WHY: the checker validates ROCm genuinely initializes.'
+summary: Diagnose and fix rocm userspace / amdgpu driver mismatch on a datacenter GPU node and verify
+  with the checker
+estimated_minutes: 20
+xp_reward: 100
+prerequisites:
+- Basic GPU and Linux troubleshooting literacy
+tags:
+- fix
+- gpu
+- amd
+- hands-on
+linked_tutorial: gpu-fundamentals
+what_you_will_learn:
+- Reproduce the ROCm init failure and read the amdgpu kernel version vs the installed ROCm stack
+- Determine whether the kernel module (dkms) or userspace ROCm packages are stale
+- Reconcile the versions so rocminfo lists the MI300X agents and HIP initializes
+environment:
+  nodes:
+  - role: primary
+    os: FixitLab GPU node
+    hostname: gpu-node-01
+    ip: 127.0.0.1
+    specs: local offline simulation (NVIDIA + AMD datacenter GPUs)
+  pre_installed:
+  - bash
+  - coreutils
+  - gpu
+  - nvidia-smi
+  - dcgmi
+  - rocm-smi
+  - journalctl
+  - systemctl
+  credentials:
+  - user: root
+    password: lab123
+tasks:
+- id: task_1
+  title: ROCm Userspace / amdgpu Driver Mismatch
+  description: Restore healthy behavior for ROCm Userspace / amdgpu Driver Mismatch by investigating the
+    failure with the GPU tooling, applying the smallest safe fix, and validating the outcome.
+  background: 'This GPU lab teaches systematic datacenter accelerator troubleshooting: observe, hypothesize,
+    change, verify.'
+  validation:
+    type: command_output
+    command: nvidia-smi
+    expected_output: NVIDIA-SMI
+    error_message: GPU health check still fails. Verify driver, device visibility, and that the documented
+      fix was applied.
+solution:
+  summary: Identify the root cause behind rocm userspace / amdgpu driver mismatch and apply the minimal
+    documented fix.
+  files_changed: []
+  commands_run:
+  - nvidia-smi
+  - dcgmi diag -r 1
+  reference_docs: gpu-fundamentals
