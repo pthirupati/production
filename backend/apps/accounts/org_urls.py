@@ -6,6 +6,7 @@ from .org_views import (
     OrganizationAnalyticsView,
     OrganizationDetailView,
     OrganizationInviteCancelView,
+    OrganizationLeaveView,
     OrganizationMemberDetailView,
     OrganizationMemberRemoveView,
     OrganizationRazorpayVerifyView,
@@ -18,6 +19,7 @@ urlpatterns = [
     # swallowed as an org slug.
     path("create/", CreateOrganizationView.as_view(), name="organization_create"),
     path("<slug:slug>/", OrganizationDetailView.as_view(), name="organization_detail"),
+    path("<slug:slug>/leave/", OrganizationLeaveView.as_view(), name="organization_leave"),
     path("<slug:slug>/analytics/", OrganizationAnalyticsView.as_view(), name="organization_analytics"),
     path("<slug:slug>/members/<int:user_id>/", OrganizationMemberDetailView.as_view(), name="organization_member_detail"),
     path("<slug:slug>/members/<int:user_id>/remove/", OrganizationMemberRemoveView.as_view(), name="organization_member_remove"),

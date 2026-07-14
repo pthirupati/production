@@ -1,0 +1,123 @@
+title: H200 HBM3e Row-Remap Pending
+slug: gpu-h200-hbm3e-row-remap-pending
+technology: gpu
+category: Fix
+difficulty: hard
+lab_mode: simulation
+simulation_type: gpu
+time_limit: 1500
+max_score: 100
+is_free: false
+jira_priority: High
+dual_terminal: false
+requires_companion_hosts: false
+description: 'CONTEXT: An SRE/GPU-infrastructure team running a datacenter accelerator fleet must resolve
+  `H200 HBM3e Row-Remap Pending` during a live incident. Until the underlying hardware/driver state is
+  repaired, GPU capacity is lost and training/inference jobs fail, so throughput and SLAs are at risk.
+
+
+  ENVIRONMENT: You are on a FixitLab offline GPU node with nvidia-smi, the NVIDIA driver/CUDA stack, DCGM
+  (dcgmi / nv-hostengine / dcgm-exporter), the container toolkit, and — for AMD hosts — the ROCm stack
+  (rocm-smi / amd-smi). All tools run locally; no paid APIs or external cloud calls are required.
+
+
+  SYMPTOM / STARTING STATE: `nvidia-smi -q | grep -iA6 ''Remapped Rows''` shows Pending: Yes and a non-zero
+  Uncorrectable remap count. The row-remapping engine needs a GPU reset to apply, and jobs fail to init
+  CUDA in the meantime.
+
+
+  OBJECTIVE: Read the H200 remapped-rows table and confirm a pending remap; Determine whether the remap
+  is due to uncorrectable errors and whether the failure flag is set; Apply the pending remap via GPU
+  reset and confirm Pending returns to No. Success means `check.sh` exits successfully after you apply
+  the documented remediation.
+
+
+  WHAT TO AVOID: Do not apply broad destructive changes, disable safety limits to mask the fault, skip
+  evidence gathering, or fake completion with marker files — the checker validates real system state.'
+initial_state: An H200 141GB node where nvidia-smi reports a pending row-remapping failure on HBM3e; the
+  GPU refuses new CUDA contexts until it is reset.
+objectives:
+- Read the H200 remapped-rows table and confirm a pending remap
+- Determine whether the remap is due to uncorrectable errors and whether the failure flag is set
+- Apply the pending remap via GPU reset and confirm Pending returns to No
+hints:
+- order: 1
+  cost: 0
+  content: 'Where to look: `nvidia-smi -q | grep -iA8 ''Remapped Rows''` shows Correctable/Uncorrectable/Pending/Failure
+    fields specific to HBM3e row remapping on H100/H200.'
+- order: 2
+  cost: 25
+  content: 'Diagnostic steps:
+
+    1. `nvidia-smi -q -i <id> | grep -iA8 ''Remapped Rows''` — note Pending: Yes.
+
+    2. `nvidia-smi -q -d ECC` — confirm the uncorrectable errors driving the remap.
+
+    3. `dmesg | grep -i ''row remap''` for the remap request event.'
+- order: 3
+  cost: 50
+  content: 'Exact fix + verification:
+
+    1. Drain the GPU and reset it (`nvidia-smi -r -i <id>`) so the row remap is applied; a pending remap
+    requires a reset, not just a reboot of the job.
+
+    2. Re-run `nvidia-smi -q | grep -i pending` and confirm Pending: No and Failure: No.
+
+    3. Apply the documented remediation in /opt/fixitlab/academy/gpu-h200-hbm3e-row-remap-pending.conf.
+
+    WHY: the checker validates the remap genuinely applied.'
+summary: Diagnose and fix h200 hbm3e row-remap pending on a datacenter GPU node and verify with the checker
+estimated_minutes: 25
+xp_reward: 100
+prerequisites:
+- Basic GPU and Linux troubleshooting literacy
+tags:
+- fix
+- gpu
+- nvidia
+- hands-on
+linked_tutorial: gpu-fundamentals
+what_you_will_learn:
+- Read the H200 remapped-rows table and confirm a pending remap
+- Determine whether the remap is due to uncorrectable errors and whether the failure flag is set
+- Apply the pending remap via GPU reset and confirm Pending returns to No
+environment:
+  nodes:
+  - role: primary
+    os: FixitLab GPU node
+    hostname: gpu-node-01
+    ip: 127.0.0.1
+    specs: local offline simulation (NVIDIA + AMD datacenter GPUs)
+  pre_installed:
+  - bash
+  - coreutils
+  - gpu
+  - nvidia-smi
+  - dcgmi
+  - rocm-smi
+  - journalctl
+  - systemctl
+  credentials:
+  - user: root
+    password: lab123
+tasks:
+- id: task_1
+  title: H200 HBM3e Row-Remap Pending
+  description: Restore healthy behavior for H200 HBM3e Row-Remap Pending by investigating the failure
+    with the GPU tooling, applying the smallest safe fix, and validating the outcome.
+  background: 'This GPU lab teaches systematic datacenter accelerator troubleshooting: observe, hypothesize,
+    change, verify.'
+  validation:
+    type: command_output
+    command: nvidia-smi
+    expected_output: NVIDIA-SMI
+    error_message: GPU health check still fails. Verify driver, device visibility, and that the documented
+      fix was applied.
+solution:
+  summary: Identify the root cause behind h200 hbm3e row-remap pending and apply the minimal documented
+    fix.
+  files_changed: []
+  commands_run:
+  - nvidia-smi
+  - dcgmi diag -r 1
+  reference_docs: gpu-fundamentals

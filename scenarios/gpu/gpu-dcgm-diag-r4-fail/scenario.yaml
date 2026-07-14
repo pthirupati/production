@@ -1,0 +1,127 @@
+title: DCGM Diagnostic Level 4 (Extended) Fails
+slug: gpu-dcgm-diag-r4-fail
+technology: gpu
+category: Fix
+difficulty: hard
+lab_mode: simulation
+simulation_type: gpu
+time_limit: 1500
+max_score: 100
+is_free: false
+jira_priority: High
+dual_terminal: false
+requires_companion_hosts: false
+description: 'CONTEXT: An SRE/GPU-infrastructure team running a datacenter accelerator fleet must resolve
+  `DCGM Diagnostic Level 4 (Extended) Fails` during a live incident. Until the underlying hardware/driver
+  state is repaired, GPU capacity is lost and training/inference jobs fail, so throughput and SLAs are
+  at risk.
+
+
+  ENVIRONMENT: You are on a FixitLab offline GPU node with nvidia-smi, the NVIDIA driver/CUDA stack, DCGM
+  (dcgmi / nv-hostengine / dcgm-exporter), the container toolkit, and — for AMD hosts — the ROCm stack
+  (rocm-smi / amd-smi). All tools run locally; no paid APIs or external cloud calls are required.
+
+
+  SYMPTOM / STARTING STATE: `dcgmi diag -r 4` (extended, long-running) fails the ''Targeted Stress'' or
+  ''EUD'' plugin: uncorrectable ECC errors and a thermal-violation counter climb during sustained load,
+  indicating marginal HBM or cooling.
+
+
+  OBJECTIVE: Run the extended dcgmi diag -r 4 and capture the failing stress/EUD plugin output; Correlate
+  the failure with ECC error counts and thermal-violation counters; Remediate (RMA marginal HBM, fix cooling,
+  or clear retired-page backlog) and confirm the extended diag passes. Success means `check.sh` exits
+  successfully after you apply the documented remediation.
+
+
+  WHAT TO AVOID: Do not apply broad destructive changes, disable safety limits to mask the fault, skip
+  evidence gathering, or fake completion with marker files — the checker validates real system state.'
+initial_state: A burn-in host where the extended `dcgmi diag -r 4` run trips the Targeted Stress / EUD
+  plugin with double-bit ECC and thermal violations under sustained load.
+objectives:
+- Run the extended dcgmi diag -r 4 and capture the failing stress/EUD plugin output
+- Correlate the failure with ECC error counts and thermal-violation counters
+- Remediate (RMA marginal HBM, fix cooling, or clear retired-page backlog) and confirm the extended diag
+  passes
+hints:
+- order: 1
+  cost: 0
+  content: 'Where to look: `dcgmi diag -r 4` runs the long targeted-stress + EUD plugins; watch `dcgmi
+    dmon -e 1009,1010,203` (ECC + temp) in a second shell during the run.'
+- order: 2
+  cost: 25
+  content: 'Diagnostic steps:
+
+    1. `dcgmi diag -r 4 -j` — capture JSON and note the failing plugin and GPU index.
+
+    2. `nvidia-smi -q -d ECC` — read volatile/aggregate uncorrectable counts.
+
+    3. `nvidia-smi -q -d TEMPERATURE` and the thermal-violation counters for throttling under load.'
+- order: 3
+  cost: 50
+  content: 'Exact fix + verification:
+
+    1. If ECC is the cause, retire pages / plan an RMA; if thermal, restore airflow or lower the sustained
+    power cap.
+
+    2. Re-run `dcgmi diag -r 4` and confirm the stress/EUD plugins PASS with zero uncorrectable ECC.
+
+    3. Record the remediation in /opt/fixitlab/academy/gpu-dcgm-diag-r4-fail.conf.
+
+    WHY: the checker validates the extended diagnostic genuinely passes.'
+summary: Diagnose and fix dcgm diagnostic level 4 (extended) fails on a datacenter GPU node and verify
+  with the checker
+estimated_minutes: 25
+xp_reward: 100
+prerequisites:
+- Basic GPU and Linux troubleshooting literacy
+tags:
+- fix
+- gpu
+- nvidia
+- hands-on
+linked_tutorial: gpu-fundamentals
+what_you_will_learn:
+- Run the extended dcgmi diag -r 4 and capture the failing stress/EUD plugin output
+- Correlate the failure with ECC error counts and thermal-violation counters
+- Remediate (RMA marginal HBM, fix cooling, or clear retired-page backlog) and confirm the extended diag
+  passes
+environment:
+  nodes:
+  - role: primary
+    os: FixitLab GPU node
+    hostname: gpu-node-01
+    ip: 127.0.0.1
+    specs: local offline simulation (NVIDIA + AMD datacenter GPUs)
+  pre_installed:
+  - bash
+  - coreutils
+  - gpu
+  - nvidia-smi
+  - dcgmi
+  - rocm-smi
+  - journalctl
+  - systemctl
+  credentials:
+  - user: root
+    password: lab123
+tasks:
+- id: task_1
+  title: DCGM Diagnostic Level 4 (Extended) Fails
+  description: Restore healthy behavior for DCGM Diagnostic Level 4 (Extended) Fails by investigating
+    the failure with the GPU tooling, applying the smallest safe fix, and validating the outcome.
+  background: 'This GPU lab teaches systematic datacenter accelerator troubleshooting: observe, hypothesize,
+    change, verify.'
+  validation:
+    type: command_output
+    command: nvidia-smi
+    expected_output: NVIDIA-SMI
+    error_message: GPU health check still fails. Verify driver, device visibility, and that the documented
+      fix was applied.
+solution:
+  summary: Identify the root cause behind dcgm diagnostic level 4 (extended) fails and apply the minimal
+    documented fix.
+  files_changed: []
+  commands_run:
+  - nvidia-smi
+  - dcgmi diag -r 1
+  reference_docs: gpu-fundamentals

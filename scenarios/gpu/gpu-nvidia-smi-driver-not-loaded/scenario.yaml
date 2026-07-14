@@ -1,0 +1,127 @@
+title: nvidia-smi Cannot Talk to Driver
+slug: gpu-nvidia-smi-driver-not-loaded
+technology: gpu
+category: Fix
+difficulty: medium
+lab_mode: simulation
+simulation_type: gpu
+time_limit: 1200
+max_score: 100
+is_free: false
+jira_priority: High
+dual_terminal: false
+requires_companion_hosts: false
+description: 'CONTEXT: An SRE/GPU-infrastructure team running a datacenter accelerator fleet must resolve
+  `nvidia-smi Cannot Talk to Driver` during a live incident. Until the underlying hardware/driver state
+  is repaired, GPU capacity is lost and training/inference jobs fail, so throughput and SLAs are at risk.
+
+
+  ENVIRONMENT: You are on a FixitLab offline GPU node with nvidia-smi, the NVIDIA driver/CUDA stack, DCGM
+  (dcgmi / nv-hostengine / dcgm-exporter), the container toolkit, and — for AMD hosts — the ROCm stack
+  (rocm-smi / amd-smi). All tools run locally; no paid APIs or external cloud calls are required.
+
+
+  SYMPTOM / STARTING STATE: nvidia-smi exits non-zero with "NVIDIA-SMI has failed because it couldn''t
+  communicate with the NVIDIA driver". `lsmod | grep nvidia` shows the kernel module is not loaded and
+  dmesg has no NVRM banner.
+
+
+  OBJECTIVE: Confirm nvidia-smi cannot reach the driver and the nvidia kernel module is unloaded; Determine
+  why the module is missing (unloaded, blacklisted, or DKMS build failed); Reload the driver stack and
+  confirm nvidia-smi enumerates the GPUs. Success means `check.sh` exits successfully after you apply
+  the documented remediation.
+
+
+  WHAT TO AVOID: Do not apply broad destructive changes, disable safety limits to mask the fault, skip
+  evidence gathering, or fake completion with marker files — the checker validates real system state.'
+initial_state: A DGX node where nvidia-smi returns 'has failed because it couldn't communicate with the
+  NVIDIA driver'; training jobs cannot see any GPU.
+objectives:
+- Confirm nvidia-smi cannot reach the driver and the nvidia kernel module is unloaded
+- Determine why the module is missing (unloaded, blacklisted, or DKMS build failed)
+- Reload the driver stack and confirm nvidia-smi enumerates the GPUs
+hints:
+- order: 1
+  cost: 0
+  content: 'Where to look: run `nvidia-smi` and read the exact error, then `lsmod | grep nvidia` and `dmesg
+    | grep -i nvrm` to see whether the kernel module is loaded at all.'
+- order: 2
+  cost: 25
+  content: 'Diagnostic steps:
+
+    1. `nvidia-smi` — note the ''couldn''t communicate with the NVIDIA driver'' message.
+
+    2. `lsmod | grep nvidia` — empty output means the module is not loaded.
+
+    3. `dmesg | grep -i nvidia` and `journalctl -k | grep -i nvrm` for load failures.
+
+    4. `nvidia-smi -q` once loaded to confirm all GPUs enumerate.'
+- order: 3
+  cost: 50
+  content: 'Exact fix + verification:
+
+    1. `modprobe nvidia` (and `nvidia_uvm`, `nvidia_drm`) to load the driver, or rebuild with `dkms autoinstall`
+    if the module is missing for the running kernel.
+
+    2. Re-run `nvidia-smi` and confirm the table lists every GPU with a driver/CUDA version.
+
+    3. Apply the documented remediation in /opt/fixitlab/academy/gpu-nvidia-smi-driver-not-loaded.conf
+    so the checker records the fix.
+
+    WHY: the checker validates the driver was genuinely restored, not a marker file.'
+summary: Diagnose and fix nvidia-smi cannot talk to driver on a datacenter GPU node and verify with the
+  checker
+estimated_minutes: 20
+xp_reward: 100
+prerequisites:
+- Basic GPU and Linux troubleshooting literacy
+tags:
+- fix
+- gpu
+- nvidia
+- hands-on
+linked_tutorial: gpu-fundamentals
+what_you_will_learn:
+- Confirm nvidia-smi cannot reach the driver and the nvidia kernel module is unloaded
+- Determine why the module is missing (unloaded, blacklisted, or DKMS build failed)
+- Reload the driver stack and confirm nvidia-smi enumerates the GPUs
+environment:
+  nodes:
+  - role: primary
+    os: FixitLab GPU node
+    hostname: gpu-node-01
+    ip: 127.0.0.1
+    specs: local offline simulation (NVIDIA + AMD datacenter GPUs)
+  pre_installed:
+  - bash
+  - coreutils
+  - gpu
+  - nvidia-smi
+  - dcgmi
+  - rocm-smi
+  - journalctl
+  - systemctl
+  credentials:
+  - user: root
+    password: lab123
+tasks:
+- id: task_1
+  title: nvidia-smi Cannot Talk to Driver
+  description: Restore healthy behavior for nvidia-smi Cannot Talk to Driver by investigating the failure
+    with the GPU tooling, applying the smallest safe fix, and validating the outcome.
+  background: 'This GPU lab teaches systematic datacenter accelerator troubleshooting: observe, hypothesize,
+    change, verify.'
+  validation:
+    type: command_output
+    command: nvidia-smi
+    expected_output: NVIDIA-SMI
+    error_message: GPU health check still fails. Verify driver, device visibility, and that the documented
+      fix was applied.
+solution:
+  summary: Identify the root cause behind nvidia-smi cannot talk to driver and apply the minimal documented
+    fix.
+  files_changed: []
+  commands_run:
+  - nvidia-smi
+  - dcgmi diag -r 1
+  reference_docs: gpu-fundamentals

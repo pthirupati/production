@@ -1,0 +1,126 @@
+title: Power Cap Set Too Low Throttles GPUs
+slug: gpu-power-cap-too-low-throttle
+technology: gpu
+category: Fix
+difficulty: easy
+lab_mode: simulation
+simulation_type: gpu
+time_limit: 900
+max_score: 100
+is_free: false
+jira_priority: Medium
+dual_terminal: false
+requires_companion_hosts: false
+description: 'CONTEXT: An SRE/GPU-infrastructure team running a datacenter accelerator fleet must resolve
+  `Power Cap Set Too Low Throttles GPUs` during a live incident. Until the underlying hardware/driver
+  state is repaired, GPU capacity is lost and training/inference jobs fail, so throughput and SLAs are
+  at risk.
+
+
+  ENVIRONMENT: You are on a FixitLab offline GPU node with nvidia-smi, the NVIDIA driver/CUDA stack, DCGM
+  (dcgmi / nv-hostengine / dcgm-exporter), the container toolkit, and — for AMD hosts — the ROCm stack
+  (rocm-smi / amd-smi). All tools run locally; no paid APIs or external cloud calls are required.
+
+
+  SYMPTOM / STARTING STATE: `nvidia-smi -q -d POWER` shows the Enforced Power Limit well under the Default/Max,
+  and `nvidia-smi -q -d PERFORMANCE` reports ''SW Power Cap: Active''. Clocks are pinned low so the GPUs
+  never reach boost.
+
+
+  OBJECTIVE: Confirm SW power-cap throttling and read the enforced vs default power limit; Determine why
+  the cap was lowered (manual -pl, a stale config, or a facility power budget); Restore an appropriate
+  power limit and confirm the power-cap throttle clears. Success means `check.sh` exits successfully after
+  you apply the documented remediation.
+
+
+  WHAT TO AVOID: Do not apply broad destructive changes, disable safety limits to mask the fault, skip
+  evidence gathering, or fake completion with marker files — the checker validates real system state.'
+initial_state: A node where someone set the GPU power limit far below the board default; nvidia-smi shows
+  'SW Power Cap' throttling and training throughput dropped ~40%.
+objectives:
+- Confirm SW power-cap throttling and read the enforced vs default power limit
+- Determine why the cap was lowered (manual -pl, a stale config, or a facility power budget)
+- Restore an appropriate power limit and confirm the power-cap throttle clears
+hints:
+- order: 1
+  cost: 0
+  content: 'Where to look: `nvidia-smi -q -d POWER` (Enforced/Default/Max Power Limit) and `nvidia-smi
+    -q -d PERFORMANCE | grep -i ''power cap''` for the active throttle reason.'
+- order: 2
+  cost: 25
+  content: 'Diagnostic steps:
+
+    1. `nvidia-smi -q -d PERFORMANCE | grep -i throttle` — confirm ''SW Power Cap: Active''.
+
+    2. `nvidia-smi -q -d POWER` — compare Enforced Power Limit to Default (e.g. 200W enforced vs 400W
+    default).
+
+    3. Check any persistence/startup unit that re-applies `-pl` on boot.'
+- order: 3
+  cost: 50
+  content: 'Exact fix + verification:
+
+    1. Raise the limit to the board default (or the sanctioned budget): `nvidia-smi -pl 400` (and fix
+    the unit that lowered it so it survives reboot).
+
+    2. Re-run `nvidia-smi -q -d PERFORMANCE` and confirm no SW Power Cap throttle and clocks at boost.
+
+    3. Record the remediation in /opt/fixitlab/academy/gpu-power-cap-too-low-throttle.conf.
+
+    WHY: the checker validates the power limit was genuinely restored.'
+summary: Diagnose and fix power cap set too low throttles gpus on a datacenter GPU node and verify with
+  the checker
+estimated_minutes: 15
+xp_reward: 100
+prerequisites:
+- Basic GPU and Linux troubleshooting literacy
+tags:
+- fix
+- gpu
+- nvidia
+- hands-on
+linked_tutorial: gpu-fundamentals
+what_you_will_learn:
+- Confirm SW power-cap throttling and read the enforced vs default power limit
+- Determine why the cap was lowered (manual -pl, a stale config, or a facility power budget)
+- Restore an appropriate power limit and confirm the power-cap throttle clears
+environment:
+  nodes:
+  - role: primary
+    os: FixitLab GPU node
+    hostname: gpu-node-01
+    ip: 127.0.0.1
+    specs: local offline simulation (NVIDIA + AMD datacenter GPUs)
+  pre_installed:
+  - bash
+  - coreutils
+  - gpu
+  - nvidia-smi
+  - dcgmi
+  - rocm-smi
+  - journalctl
+  - systemctl
+  credentials:
+  - user: root
+    password: lab123
+tasks:
+- id: task_1
+  title: Power Cap Set Too Low Throttles GPUs
+  description: Restore healthy behavior for Power Cap Set Too Low Throttles GPUs by investigating the
+    failure with the GPU tooling, applying the smallest safe fix, and validating the outcome.
+  background: 'This GPU lab teaches systematic datacenter accelerator troubleshooting: observe, hypothesize,
+    change, verify.'
+  validation:
+    type: command_output
+    command: nvidia-smi
+    expected_output: NVIDIA-SMI
+    error_message: GPU health check still fails. Verify driver, device visibility, and that the documented
+      fix was applied.
+solution:
+  summary: Identify the root cause behind power cap set too low throttles gpus and apply the minimal documented
+    fix.
+  files_changed: []
+  commands_run:
+  - nvidia-smi
+  - dcgmi diag -r 1
+  reference_docs: gpu-fundamentals

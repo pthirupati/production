@@ -1,0 +1,124 @@
+title: H100 HBM3 Uncorrectable ECC Errors
+slug: gpu-h100-hbm3-ecc-uncorrectable
+technology: gpu
+category: Fix
+difficulty: hard
+lab_mode: simulation
+simulation_type: gpu
+time_limit: 1500
+max_score: 100
+is_free: false
+jira_priority: High
+dual_terminal: false
+requires_companion_hosts: false
+description: 'CONTEXT: An SRE/GPU-infrastructure team running a datacenter accelerator fleet must resolve
+  `H100 HBM3 Uncorrectable ECC Errors` during a live incident. Until the underlying hardware/driver state
+  is repaired, GPU capacity is lost and training/inference jobs fail, so throughput and SLAs are at risk.
+
+
+  ENVIRONMENT: You are on a FixitLab offline GPU node with nvidia-smi, the NVIDIA driver/CUDA stack, DCGM
+  (dcgmi / nv-hostengine / dcgm-exporter), the container toolkit, and — for AMD hosts — the ROCm stack
+  (rocm-smi / amd-smi). All tools run locally; no paid APIs or external cloud calls are required.
+
+
+  SYMPTOM / STARTING STATE: `nvidia-smi -q -d ECC` shows non-zero Volatile and Aggregate Uncorrectable
+  errors on HBM3, and dmesg has an Xid 48/94 (DBE / contained ECC). The GPU keeps poisoning memory pages
+  under load.
+
+
+  OBJECTIVE: Read the ECC error tables and confirm uncorrectable HBM3 errors are present; Check the retired/remapped
+  page state and the associated Xid in dmesg; Retire the affected pages (or drain for RMA) and confirm
+  the GPU returns to a clean ECC state. Success means `check.sh` exits successfully after you apply the
+  documented remediation.
+
+
+  WHAT TO AVOID: Do not apply broad destructive changes, disable safety limits to mask the fault, skip
+  evidence gathering, or fake completion with marker files — the checker validates real system state.'
+initial_state: An H100 SXM node logging uncorrectable (double-bit) HBM3 ECC errors; a training rank crashed
+  with an ECC error and the GPU is flagged for possible RMA.
+objectives:
+- Read the ECC error tables and confirm uncorrectable HBM3 errors are present
+- Check the retired/remapped page state and the associated Xid in dmesg
+- Retire the affected pages (or drain for RMA) and confirm the GPU returns to a clean ECC state
+hints:
+- order: 1
+  cost: 0
+  content: 'Where to look: `nvidia-smi -q -d ECC` for volatile/aggregate uncorrectable counts and `nvidia-smi
+    -q -d PAGE_RETIREMENT`; correlate with `dmesg | grep -i xid`.'
+- order: 2
+  cost: 25
+  content: 'Diagnostic steps:
+
+    1. `nvidia-smi -q -d ECC` — confirm Uncorrectable > 0 on the device.
+
+    2. `nvidia-smi -q -d PAGE_RETIREMENT` — check pending vs already-retired pages.
+
+    3. `dmesg -T | grep -i ''Xid''` — an Xid 48 (DBE) or 94/95 confirms uncorrectable HBM.'
+- order: 3
+  cost: 50
+  content: 'Exact fix + verification:
+
+    1. Trigger page retirement / reset the GPU so pending pages retire; if the count keeps climbing, drain
+    the node and open an RMA.
+
+    2. Confirm `nvidia-smi -q -d ECC` shows no new uncorrectable errors and no pending retirements.
+
+    3. Record the remediation in /opt/fixitlab/academy/gpu-h100-hbm3-ecc-uncorrectable.conf.
+
+    WHY: the checker validates the ECC state was genuinely cleared.'
+summary: Diagnose and fix h100 hbm3 uncorrectable ecc errors on a datacenter GPU node and verify with
+  the checker
+estimated_minutes: 25
+xp_reward: 100
+prerequisites:
+- Basic GPU and Linux troubleshooting literacy
+tags:
+- fix
+- gpu
+- nvidia
+- hands-on
+linked_tutorial: gpu-fundamentals
+what_you_will_learn:
+- Read the ECC error tables and confirm uncorrectable HBM3 errors are present
+- Check the retired/remapped page state and the associated Xid in dmesg
+- Retire the affected pages (or drain for RMA) and confirm the GPU returns to a clean ECC state
+environment:
+  nodes:
+  - role: primary
+    os: FixitLab GPU node
+    hostname: gpu-node-01
+    ip: 127.0.0.1
+    specs: local offline simulation (NVIDIA + AMD datacenter GPUs)
+  pre_installed:
+  - bash
+  - coreutils
+  - gpu
+  - nvidia-smi
+  - dcgmi
+  - rocm-smi
+  - journalctl
+  - systemctl
+  credentials:
+  - user: root
+    password: lab123
+tasks:
+- id: task_1
+  title: H100 HBM3 Uncorrectable ECC Errors
+  description: Restore healthy behavior for H100 HBM3 Uncorrectable ECC Errors by investigating the failure
+    with the GPU tooling, applying the smallest safe fix, and validating the outcome.
+  background: 'This GPU lab teaches systematic datacenter accelerator troubleshooting: observe, hypothesize,
+    change, verify.'
+  validation:
+    type: command_output
+    command: nvidia-smi
+    expected_output: NVIDIA-SMI
+    error_message: GPU health check still fails. Verify driver, device visibility, and that the documented
+      fix was applied.
+solution:
+  summary: Identify the root cause behind h100 hbm3 uncorrectable ecc errors and apply the minimal documented
+    fix.
+  files_changed: []
+  commands_run:
+  - nvidia-smi
+  - dcgmi diag -r 1
+  reference_docs: gpu-fundamentals

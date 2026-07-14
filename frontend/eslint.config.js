@@ -22,7 +22,12 @@ export default [
       'react/prop-types': 'off',
       'react/no-unescaped-entities': 'off',
       'no-unused-vars': ['warn', { argsIgnorePattern: '^_', varsIgnorePattern: '^_' }],
-      'no-undef': 'warn',
+      // no-undef is an ERROR (not warn): an undefined symbol — e.g. a missing
+      // import — is a real runtime crash, not a style nit. A missing import in
+      // ScenarioDetail.jsx crashed the scenario page in prod while all CI was
+      // green, because this was warn-only and warnings were suppressed. Keeping
+      // it as an error makes `eslint` exit non-zero so the CI job fails.
+      'no-undef': 'error',
       'no-empty': 'warn',
       'no-useless-escape': 'off',
       'no-control-regex': 'off',

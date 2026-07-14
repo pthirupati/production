@@ -1,0 +1,125 @@
+title: H100 Fell Off the PCIe Bus
+slug: gpu-h100-fallen-off-bus-pcie
+technology: gpu
+category: Fix
+difficulty: hard
+lab_mode: simulation
+simulation_type: gpu
+time_limit: 1500
+max_score: 100
+is_free: false
+jira_priority: High
+dual_terminal: false
+requires_companion_hosts: false
+description: 'CONTEXT: An SRE/GPU-infrastructure team running a datacenter accelerator fleet must resolve
+  `H100 Fell Off the PCIe Bus` during a live incident. Until the underlying hardware/driver state is repaired,
+  GPU capacity is lost and training/inference jobs fail, so throughput and SLAs are at risk.
+
+
+  ENVIRONMENT: You are on a FixitLab offline GPU node with nvidia-smi, the NVIDIA driver/CUDA stack, DCGM
+  (dcgmi / nv-hostengine / dcgm-exporter), the container toolkit, and — for AMD hosts — the ROCm stack
+  (rocm-smi / amd-smi). All tools run locally; no paid APIs or external cloud calls are required.
+
+
+  SYMPTOM / STARTING STATE: dmesg shows `NVRM: GPU at 0000:8a:00.0 has fallen off the bus.` GPU4 no longer
+  appears in nvidia-smi, `lspci` shows the device but reads return 0xffffffff, and the training job died
+  with an unrecoverable ECC/NVLink error.
+
+
+  OBJECTIVE: Confirm GPU4 has fallen off the PCIe bus and collect the NVRM dmesg evidence; Correlate the
+  drop with a power, thermal, or Xid event in the logs; Reset the device (nvidia-smi -r / GPU reset) or
+  reseat via the fix, then confirm it returns. Success means `check.sh` exits successfully after you apply
+  the documented remediation.
+
+
+  WHAT TO AVOID: Do not apply broad destructive changes, disable safety limits to mask the fault, skip
+  evidence gathering, or fake completion with marker files — the checker validates real system state.'
+initial_state: An 8x H100 SXM node where GPU4 dropped off the PCIe bus mid-training; nvidia-smi shows
+  'GPU has fallen off the bus' and the run crashed with a NCCL timeout.
+objectives:
+- Confirm GPU4 has fallen off the PCIe bus and collect the NVRM dmesg evidence
+- Correlate the drop with a power, thermal, or Xid event in the logs
+- Reset the device (nvidia-smi -r / GPU reset) or reseat via the fix, then confirm it returns
+hints:
+- order: 1
+  cost: 0
+  content: 'Where to look: `dmesg -T | grep -i ''fallen off the bus''` and `nvidia-smi -q -i 4` to see
+    which physical GPU dropped, and `lspci -vvv -s 8a:00.0` to check the link state.'
+- order: 2
+  cost: 25
+  content: 'Diagnostic steps:
+
+    1. `dmesg -T | grep -iE ''nvrm|fallen off|xid''` — capture the exact PCIe address and Xid.
+
+    2. `nvidia-smi` — note the missing GPU index.
+
+    3. `nvidia-smi -q | grep -iE ''ecc|power|temp''` on the surviving GPUs for a common cause.
+
+    4. `cat /sys/bus/pci/devices/0000:8a:00.0/current_link_speed` for a degraded link.'
+- order: 3
+  cost: 50
+  content: 'Exact fix + verification:
+
+    1. Attempt an in-band reset: `nvidia-smi -r -i 4` (or drain + `nvidia-smi --gpu-reset`); if the link
+    is dead, schedule a reseat/power-cycle.
+
+    2. Confirm all 8 GPUs are back in `nvidia-smi` and `dcgmi diag -r 1` passes.
+
+    3. Record the remediation in /opt/fixitlab/academy/gpu-h100-fallen-off-bus-pcie.conf.
+
+    WHY: the checker validates the GPU genuinely returned to the bus.'
+summary: Diagnose and fix h100 fell off the pcie bus on a datacenter GPU node and verify with the checker
+estimated_minutes: 25
+xp_reward: 100
+prerequisites:
+- Basic GPU and Linux troubleshooting literacy
+tags:
+- fix
+- gpu
+- nvidia
+- hands-on
+linked_tutorial: gpu-fundamentals
+what_you_will_learn:
+- Confirm GPU4 has fallen off the PCIe bus and collect the NVRM dmesg evidence
+- Correlate the drop with a power, thermal, or Xid event in the logs
+- Reset the device (nvidia-smi -r / GPU reset) or reseat via the fix, then confirm it returns
+environment:
+  nodes:
+  - role: primary
+    os: FixitLab GPU node
+    hostname: gpu-node-01
+    ip: 127.0.0.1
+    specs: local offline simulation (NVIDIA + AMD datacenter GPUs)
+  pre_installed:
+  - bash
+  - coreutils
+  - gpu
+  - nvidia-smi
+  - dcgmi
+  - rocm-smi
+  - journalctl
+  - systemctl
+  credentials:
+  - user: root
+    password: lab123
+tasks:
+- id: task_1
+  title: H100 Fell Off the PCIe Bus
+  description: Restore healthy behavior for H100 Fell Off the PCIe Bus by investigating the failure with
+    the GPU tooling, applying the smallest safe fix, and validating the outcome.
+  background: 'This GPU lab teaches systematic datacenter accelerator troubleshooting: observe, hypothesize,
+    change, verify.'
+  validation:
+    type: command_output
+    command: nvidia-smi
+    expected_output: NVIDIA-SMI
+    error_message: GPU health check still fails. Verify driver, device visibility, and that the documented
+      fix was applied.
+solution:
+  summary: Identify the root cause behind h100 fell off the pcie bus and apply the minimal documented
+    fix.
+  files_changed: []
+  commands_run:
+  - nvidia-smi
+  - dcgmi diag -r 1
+  reference_docs: gpu-fundamentals

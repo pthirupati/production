@@ -136,5 +136,24 @@ urlpatterns = [
 ]
 
 if settings.DEBUG or getattr(settings, "SERVE_MEDIA", False):
-    urlpatterns += static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
+    # NOTE: django.conf.urls.static.static() short-circuits to [] whenever
+    # DEBUG is False, so it CANNOT serve media in production even with
+    # SERVE_MEDIA=True. In the 4-droplet cluster the App node (D2) runs with
+    # DEBUG=False but must still answer /media/ (the edge gateway proxies
+    # /media/ to it — see gateway/nginx.cluster.conf.template). Wire the static
+    # serve view directly so it works regardless of DEBUG.
+    if settings.DEBUG:
+        urlpatterns += static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
+    else:
+        from django.urls import re_path
+        from django.views.static import serve as _serve_media
+
+        _media_prefix = settings.MEDIA_URL.lstrip("/")
+        urlpatterns += [
+            re_path(
+                rf"^{_media_prefix}(?P<path>.*)$",
+                _serve_media,
+                {"document_root": settings.MEDIA_ROOT},
+            ),
+        ]
 

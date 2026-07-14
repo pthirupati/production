@@ -1,0 +1,106 @@
+title: 'ArgoCD Cannot Authenticate to Git Repo'
+slug: gitops-argocd-repo-auth-401
+technology: gitops
+category: Fix
+difficulty: medium
+scenario_type: fix
+lab_mode: simulation
+simulation_type: generic
+time_limit: 1500
+max_score: 100
+is_free: false
+infrastructure_type: docker
+jira_priority: Medium
+description: |-
+  CONTEXT: A platform team operating gitops needs you to resolve `ArgoCD Cannot Authenticate to Git Repo` during a realistic delivery incident. The business impact is a stalled or unsafe release until the underlying state is repaired.
+
+  ENVIRONMENT: You are working in FixitLab's offline GitOps practice cluster with ArgoCD/Flux controllers, Application/Kustomization manifests, and a Git source repo under /gitops. All controllers run locally; no external Git host or paid APIs are required.
+
+  SYMPTOM / STARTING STATE: The `billing-api` Application shows `ComparisonError` and the repo-server logs `authentication required: Invalid username or password` when fetching the Git repo. The repository credential secret exists but references a rotated deploy token.
+
+  OBJECTIVE: The `repo-creds` secret in the argocd namespace holds a stale Git deploy token that was rotated, so ArgoCD's repo-server gets a 401 and can never render the desired state. Update the credential secret with the current token (or re-add the repo via `argocd repo add` with valid creds) and refresh the Application. Success is graded on the real repaired state, not a manual marker.
+
+  WHAT TO AVOID: Do not suppress the signal, disable the policy/gate, or fake completion with marker files — reproduce the diagnosis, then apply the smallest fix that satisfies the objective and re-run Check Solution.
+objectives:
+- 'The billing-api Application fetches the Git repo without a 401'
+- 'The stale deploy-token credential is confirmed as root cause in the repo-server logs'
+- 'The Application leaves ComparisonError and computes a real diff'
+initial_state: |-
+  The `billing-api` Application shows `ComparisonError` and the repo-server logs `authentication required: Invalid username or password` when fetching the Git repo. The repository credential secret exists but references a rotated deploy token.
+hints:
+- order: 1
+  cost: 0
+  content: |-
+    Where to look — orient before changing anything:
+        1. `argocd app get billing-api`
+        2. `kubectl -n argocd logs deploy/argocd-repo-server --tail=50`
+        3. `kubectl -n argocd get secret repo-creds -o yaml`
+        Write down what looks healthy versus wrong. Form one hypothesis before you touch anything.
+- order: 2
+  cost: 25
+  content: |-
+    Diagnostic steps:
+        1. Re-run `argocd app get billing-api` and read the status/error carefully.
+        2. Cross-check with `kubectl -n argocd logs deploy/argocd-repo-server --tail=50` to isolate the failing object.
+        3. State the single root cause in one sentence before you act.
+- order: 3
+  cost: 50
+  content: |-
+    Exact fix + verification:
+        1. The `repo-creds` secret in the argocd namespace holds a stale Git deploy token that was rotated, so ArgoCD's repo-server gets a 401 and can never render the desired state. Update the credential secret with the current token (or re-add the repo via `argocd repo add` with valid creds) and refresh the Application.
+        2. Change one thing at a time so you can roll back if the hypothesis was wrong.
+        3. Verify the objective is met, then click Check Solution (graded on real state, not a marker file).
+summary: |-
+  Diagnose and resolve argocd cannot authenticate to git repo in the gitops simulation lab and verify the healthy end state
+estimated_minutes: 25
+xp_reward: 100
+prerequisites:
+- 'Basic Kubernetes and Git literacy'
+tags:
+- 'gitops'
+- 'fix'
+- 'hands-on'
+- 'simulation'
+linked_tutorial: gitops-fundamentals
+what_you_will_learn:
+- 'The billing-api Application fetches the Git repo without a 401'
+- 'The stale deploy-token credential is confirmed as root cause in the repo-server logs'
+- 'Understand how ArgoCD stores per-repo credentials, why repo-server auth failures surface as ComparisonError, and how token rotation breaks GitOps fetches'
+environment:
+  nodes:
+  - role: primary
+    os: FixitLab GitOps practice cluster
+    hostname: lab-primary
+    ip: 127.0.0.1
+    specs: local offline simulation
+  pre_installed:
+  - bash
+  - coreutils
+  - kubectl
+  - argocd
+  - flux
+  - git
+  credentials:
+  - user: root
+    password: lab123
+tasks:
+- id: task_1
+  title: 'ArgoCD Cannot Authenticate to Git Repo'
+  description: |-
+    Restore healthy behavior for ArgoCD Cannot Authenticate to Git Repo by reproducing the diagnosis from the symptom, isolating the root cause with evidence, applying the smallest safe fix, and validating the outcome with the checker.
+  background: |-
+    This gitops lab teaches how ArgoCD stores per-repo credentials, why repo-server auth failures surface as ComparisonError, and how token rotation breaks GitOps fetches through systematic troubleshooting: observe, hypothesize, change, verify.
+  validation:
+    type: custom_script
+    script: check.sh
+    error_message: |-
+      The scenario objective is not yet satisfied. Re-read hint tier 2, confirm the root cause, and apply the documented remediation so /opt/fixitlab/academy/gitops-argocd-repo-auth-401.conf carries the FIXED-OK marker.
+solution:
+  summary: |-
+    The `repo-creds` secret in the argocd namespace holds a stale Git deploy token that was rotated, so ArgoCD's repo-server gets a 401 and can never render the desired state. Update the credential secret with the current token (or re-add the repo via `argocd repo add` with valid creds) and refresh the Application.
+  files_changed: []
+  commands_run:
+  - 'argocd app get billing-api'
+  - 'kubectl -n argocd logs deploy/argocd-repo-server --tail=50'
+  - 'kubectl -n argocd get secret repo-creds -o yaml'
+  reference_docs: gitops-fundamentals

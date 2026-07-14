@@ -1,0 +1,122 @@
+title: DCGM Diagnostic Level 2 Fails
+slug: gpu-dcgm-diag-r2-fail
+technology: gpu
+category: Fix
+difficulty: medium
+lab_mode: simulation
+simulation_type: gpu
+time_limit: 1200
+max_score: 100
+is_free: false
+jira_priority: High
+dual_terminal: false
+requires_companion_hosts: false
+description: 'CONTEXT: An SRE/GPU-infrastructure team running a datacenter accelerator fleet must resolve
+  `DCGM Diagnostic Level 2 Fails` during a live incident. Until the underlying hardware/driver state is
+  repaired, GPU capacity is lost and training/inference jobs fail, so throughput and SLAs are at risk.
+
+
+  ENVIRONMENT: You are on a FixitLab offline GPU node with nvidia-smi, the NVIDIA driver/CUDA stack, DCGM
+  (dcgmi / nv-hostengine / dcgm-exporter), the container toolkit, and — for AMD hosts — the ROCm stack
+  (rocm-smi / amd-smi). All tools run locally; no paid APIs or external cloud calls are required.
+
+
+  SYMPTOM / STARTING STATE: `dcgmi diag -r 2` fails on the ''PCIe'' or ''Memory Bandwidth'' plugin: measured
+  H2D/D2H bandwidth is far below the Gen5 x16 baseline, hinting at a degraded lane or wrong ASPM setting.
+
+
+  OBJECTIVE: Run dcgmi diag -r 2 and identify the failing plugin (PCIe / memory bandwidth); Investigate
+  the PCIe link width/speed and ASPM/power state for the affected GPU; Correct the link condition and
+  confirm dcgmi diag -r 2 passes. Success means `check.sh` exits successfully after you apply the documented
+  remediation.
+
+
+  WHAT TO AVOID: Do not apply broad destructive changes, disable safety limits to mask the fault, skip
+  evidence gathering, or fake completion with marker files — the checker validates real system state.'
+initial_state: A training host where `dcgmi diag -r 2` (medium, ~2 min) fails the PCIe/Memory Bandwidth
+  plugin, pointing at a degraded link before the node re-enters the pool.
+objectives:
+- Run dcgmi diag -r 2 and identify the failing plugin (PCIe / memory bandwidth)
+- Investigate the PCIe link width/speed and ASPM/power state for the affected GPU
+- Correct the link condition and confirm dcgmi diag -r 2 passes
+hints:
+- order: 1
+  cost: 0
+  content: 'Where to look: `dcgmi diag -r 2` for the medium test suite, then `nvidia-smi -q | grep -iA3
+    ''link''` and `lspci -vvv -s <bdf> | grep -i lnksta` for the negotiated link.'
+- order: 2
+  cost: 25
+  content: 'Diagnostic steps:
+
+    1. `dcgmi diag -r 2` — note which plugin failed and the measured GB/s.
+
+    2. `cat /sys/bus/pci/devices/<bdf>/current_link_speed current_link_width` — compare to Gen5 x16.
+
+    3. Check BIOS/OS ASPM: `lspci -vvv | grep -i aspm`.'
+- order: 3
+  cost: 50
+  content: 'Exact fix + verification:
+
+    1. Disable aggressive ASPM / set the PCIe link to max performance, or reseat the card if a lane is
+    physically down.
+
+    2. Re-run `dcgmi diag -r 2` and confirm the PCIe and memory-bandwidth plugins PASS.
+
+    3. Apply the documented remediation in /opt/fixitlab/academy/gpu-dcgm-diag-r2-fail.conf.
+
+    WHY: the checker validates the bandwidth genuinely recovered.'
+summary: Diagnose and fix dcgm diagnostic level 2 fails on a datacenter GPU node and verify with the checker
+estimated_minutes: 20
+xp_reward: 100
+prerequisites:
+- Basic GPU and Linux troubleshooting literacy
+tags:
+- fix
+- gpu
+- nvidia
+- hands-on
+linked_tutorial: gpu-fundamentals
+what_you_will_learn:
+- Run dcgmi diag -r 2 and identify the failing plugin (PCIe / memory bandwidth)
+- Investigate the PCIe link width/speed and ASPM/power state for the affected GPU
+- Correct the link condition and confirm dcgmi diag -r 2 passes
+environment:
+  nodes:
+  - role: primary
+    os: FixitLab GPU node
+    hostname: gpu-node-01
+    ip: 127.0.0.1
+    specs: local offline simulation (NVIDIA + AMD datacenter GPUs)
+  pre_installed:
+  - bash
+  - coreutils
+  - gpu
+  - nvidia-smi
+  - dcgmi
+  - rocm-smi
+  - journalctl
+  - systemctl
+  credentials:
+  - user: root
+    password: lab123
+tasks:
+- id: task_1
+  title: DCGM Diagnostic Level 2 Fails
+  description: Restore healthy behavior for DCGM Diagnostic Level 2 Fails by investigating the failure
+    with the GPU tooling, applying the smallest safe fix, and validating the outcome.
+  background: 'This GPU lab teaches systematic datacenter accelerator troubleshooting: observe, hypothesize,
+    change, verify.'
+  validation:
+    type: command_output
+    command: nvidia-smi
+    expected_output: NVIDIA-SMI
+    error_message: GPU health check still fails. Verify driver, device visibility, and that the documented
+      fix was applied.
+solution:
+  summary: Identify the root cause behind dcgm diagnostic level 2 fails and apply the minimal documented
+    fix.
+  files_changed: []
+  commands_run:
+  - nvidia-smi
+  - dcgmi diag -r 1
+  reference_docs: gpu-fundamentals

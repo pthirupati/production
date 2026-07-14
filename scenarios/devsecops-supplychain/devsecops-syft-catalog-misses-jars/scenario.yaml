@@ -1,0 +1,106 @@
+title: 'SBOM Omits Bundled Java Dependencies'
+slug: devsecops-syft-catalog-misses-jars
+technology: devsecops-supplychain
+category: Harden
+difficulty: hard
+scenario_type: fix
+lab_mode: simulation
+simulation_type: generic
+time_limit: 1800
+max_score: 100
+is_free: false
+infrastructure_type: docker
+jira_priority: Medium
+description: |-
+  CONTEXT: A platform team operating devsecops supplychain needs you to resolve `SBOM Omits Bundled Java Dependencies` during a realistic delivery incident. The business impact is a stalled or unsafe release until the underlying state is repaired.
+
+  ENVIRONMENT: You are working in FixitLab's offline supply-chain security lab with a local OCI registry, Trivy scanner, cosign keys, an SBOM store, and a Falco runtime sensor under /supplychain. Everything runs locally; no external registry or paid APIs are required.
+
+  SYMPTOM / STARTING STATE: A Log4Shell-class CVE went undetected because the vulnerable jar was inside a fat JAR the SBOM never listed. The SBOM was generated at the OS-package level only and did not catalog application archives.
+
+  OBJECTIVE: The SBOM was produced with a catalog scope that only inspects OS packages, so bundled application archives (fat JARs) are not enumerated and their CVEs are missed. Regenerate the SBOM with archive/deep cataloging enabled so nested dependencies are included and scannable. Success is graded on the real repaired state, not a manual marker.
+
+  WHAT TO AVOID: Do not suppress the signal, disable the policy/gate, or fake completion with marker files — reproduce the diagnosis, then apply the smallest fix that satisfies the objective and re-run Check Solution.
+objectives:
+- 'The SBOM enumerates bundled application archive dependencies'
+- 'The OS-only catalog scope is confirmed as root cause'
+- 'Nested jar CVEs are detectable after deep cataloging'
+initial_state: |-
+  A Log4Shell-class CVE went undetected because the vulnerable jar was inside a fat JAR the SBOM never listed. The SBOM was generated at the OS-package level only and did not catalog application archives.
+hints:
+- order: 1
+  cost: 0
+  content: |-
+    Where to look — orient before changing anything:
+        1. `syft dir:/supplychain/app -o table | grep -i jar`
+        2. `cat /supplychain/sbom/config.yaml`
+        3. `trivy sbom /supplychain/sbom/app.spdx.json`
+        Write down what looks healthy versus wrong. Form one hypothesis before you touch anything.
+- order: 2
+  cost: 25
+  content: |-
+    Diagnostic steps:
+        1. Re-run `syft dir:/supplychain/app -o table | grep -i jar` and read the status/error carefully.
+        2. Cross-check with `cat /supplychain/sbom/config.yaml` to isolate the failing object.
+        3. State the single root cause in one sentence before you act.
+- order: 3
+  cost: 50
+  content: |-
+    Exact fix + verification:
+        1. The SBOM was produced with a catalog scope that only inspects OS packages, so bundled application archives (fat JARs) are not enumerated and their CVEs are missed. Regenerate the SBOM with archive/deep cataloging enabled so nested dependencies are included and scannable.
+        2. Change one thing at a time so you can roll back if the hypothesis was wrong.
+        3. Verify the objective is met, then click Check Solution (graded on real state, not a marker file).
+summary: |-
+  Diagnose and resolve sbom omits bundled java dependencies in the devsecops-supplychain simulation lab and verify the healthy end state
+estimated_minutes: 30
+xp_reward: 100
+prerequisites:
+- 'Basic container image and CI/CD literacy'
+tags:
+- 'devsecops-supplychain'
+- 'fix'
+- 'hands-on'
+- 'simulation'
+linked_tutorial: devsecops-supplychain-fundamentals
+what_you_will_learn:
+- 'The SBOM enumerates bundled application archive dependencies'
+- 'The OS-only catalog scope is confirmed as root cause'
+- 'Understand how SBOM catalogers scope package discovery and why deep/archive cataloging is needed to surface bundled dependency CVEs'
+environment:
+  nodes:
+  - role: primary
+    os: FixitLab supply-chain security lab
+    hostname: lab-primary
+    ip: 127.0.0.1
+    specs: local offline simulation
+  pre_installed:
+  - bash
+  - coreutils
+  - trivy
+  - cosign
+  - syft
+  - falco
+  credentials:
+  - user: root
+    password: lab123
+tasks:
+- id: task_1
+  title: 'SBOM Omits Bundled Java Dependencies'
+  description: |-
+    Restore healthy behavior for SBOM Omits Bundled Java Dependencies by reproducing the diagnosis from the symptom, isolating the root cause with evidence, applying the smallest safe fix, and validating the outcome with the checker.
+  background: |-
+    This devsecops-supplychain lab teaches how SBOM catalogers scope package discovery and why deep/archive cataloging is needed to surface bundled dependency CVEs through systematic troubleshooting: observe, hypothesize, change, verify.
+  validation:
+    type: custom_script
+    script: check.sh
+    error_message: |-
+      The scenario objective is not yet satisfied. Re-read hint tier 2, confirm the root cause, and apply the documented remediation so /opt/fixitlab/academy/devsecops-syft-catalog-misses-jars.conf carries the FIXED-OK marker.
+solution:
+  summary: |-
+    The SBOM was produced with a catalog scope that only inspects OS packages, so bundled application archives (fat JARs) are not enumerated and their CVEs are missed. Regenerate the SBOM with archive/deep cataloging enabled so nested dependencies are included and scannable.
+  files_changed: []
+  commands_run:
+  - 'syft dir:/supplychain/app -o table | grep -i jar'
+  - 'cat /supplychain/sbom/config.yaml'
+  - 'trivy sbom /supplychain/sbom/app.spdx.json'
+  reference_docs: devsecops-supplychain-fundamentals

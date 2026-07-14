@@ -1,0 +1,105 @@
+title: 'Baggage Dropped Across the Request Path'
+slug: otel-context-baggage-not-propagated
+technology: opentelemetry
+category: Fix
+difficulty: medium
+scenario_type: fix
+lab_mode: simulation
+simulation_type: generic
+time_limit: 1500
+max_score: 100
+is_free: false
+infrastructure_type: docker
+jira_priority: Medium
+description: |-
+  CONTEXT: A platform team operating opentelemetry needs you to resolve `Baggage Dropped Across the Request Path` during a realistic delivery incident. The business impact is a stalled or unsafe release until the underlying state is repaired.
+
+  ENVIRONMENT: You are working in FixitLab's offline observability lab with an OpenTelemetry Collector, an instrumented demo service, and a local trace/metric backend under /otel. All components run locally; no SaaS observability vendor or paid APIs are required.
+
+  SYMPTOM / STARTING STATE: A `tenant.id` set as baggage at the edge is missing on downstream spans, so per-tenant analysis is impossible. The global propagator is set to `tracecontext` only, so the baggage header is never sent or read.
+
+  OBJECTIVE: The SDK propagators list includes `tracecontext` but omits `baggage`, so the W3C baggage header is neither injected nor extracted across hops. Configure the composite propagator to include baggage (tracecontext,baggage) so tenant context flows end to end. Success is graded on the real repaired state, not a manual marker.
+
+  WHAT TO AVOID: Do not suppress the signal, disable the policy/gate, or fake completion with marker files — reproduce the diagnosis, then apply the smallest fix that satisfies the objective and re-run Check Solution.
+objectives:
+- 'Baggage set at the edge appears on downstream spans'
+- 'The missing baggage propagator is confirmed as root cause'
+- 'tenant.id propagates across the full request path after the fix'
+initial_state: |-
+  A `tenant.id` set as baggage at the edge is missing on downstream spans, so per-tenant analysis is impossible. The global propagator is set to `tracecontext` only, so the baggage header is never sent or read.
+hints:
+- order: 1
+  cost: 0
+  content: |-
+    Where to look — orient before changing anything:
+        1. `cat /otel/collector/config.yaml`
+        2. `env | grep OTEL_PROPAGATORS`
+        3. `curl -s localhost:8888/metrics | grep received_spans`
+        Write down what looks healthy versus wrong. Form one hypothesis before you touch anything.
+- order: 2
+  cost: 25
+  content: |-
+    Diagnostic steps:
+        1. Re-run `cat /otel/collector/config.yaml` and read the status/error carefully.
+        2. Cross-check with `env | grep OTEL_PROPAGATORS` to isolate the failing object.
+        3. State the single root cause in one sentence before you act.
+- order: 3
+  cost: 50
+  content: |-
+    Exact fix + verification:
+        1. The SDK propagators list includes `tracecontext` but omits `baggage`, so the W3C baggage header is neither injected nor extracted across hops. Configure the composite propagator to include baggage (tracecontext,baggage) so tenant context flows end to end.
+        2. Change one thing at a time so you can roll back if the hypothesis was wrong.
+        3. Verify the objective is met, then click Check Solution (graded on real state, not a marker file).
+summary: |-
+  Diagnose and resolve baggage dropped across the request path in the opentelemetry simulation lab and verify the healthy end state
+estimated_minutes: 25
+xp_reward: 100
+prerequisites:
+- 'Basic distributed-systems and HTTP literacy'
+tags:
+- 'opentelemetry'
+- 'fix'
+- 'hands-on'
+- 'simulation'
+linked_tutorial: opentelemetry-fundamentals
+what_you_will_learn:
+- 'Baggage set at the edge appears on downstream spans'
+- 'The missing baggage propagator is confirmed as root cause'
+- 'Understand how W3C baggage propagation carries application context across services and why the baggage propagator must be enabled explicitly'
+environment:
+  nodes:
+  - role: primary
+    os: FixitLab OpenTelemetry observability lab
+    hostname: lab-primary
+    ip: 127.0.0.1
+    specs: local offline simulation
+  pre_installed:
+  - bash
+  - coreutils
+  - otelcol
+  - curl
+  - jq
+  credentials:
+  - user: root
+    password: lab123
+tasks:
+- id: task_1
+  title: 'Baggage Dropped Across the Request Path'
+  description: |-
+    Restore healthy behavior for Baggage Dropped Across the Request Path by reproducing the diagnosis from the symptom, isolating the root cause with evidence, applying the smallest safe fix, and validating the outcome with the checker.
+  background: |-
+    This opentelemetry lab teaches how W3C baggage propagation carries application context across services and why the baggage propagator must be enabled explicitly through systematic troubleshooting: observe, hypothesize, change, verify.
+  validation:
+    type: custom_script
+    script: check.sh
+    error_message: |-
+      The scenario objective is not yet satisfied. Re-read hint tier 2, confirm the root cause, and apply the documented remediation so /opt/fixitlab/academy/otel-context-baggage-not-propagated.conf carries the FIXED-OK marker.
+solution:
+  summary: |-
+    The SDK propagators list includes `tracecontext` but omits `baggage`, so the W3C baggage header is neither injected nor extracted across hops. Configure the composite propagator to include baggage (tracecontext,baggage) so tenant context flows end to end.
+  files_changed: []
+  commands_run:
+  - 'cat /otel/collector/config.yaml'
+  - 'env | grep OTEL_PROPAGATORS'
+  - 'curl -s localhost:8888/metrics | grep received_spans'
+  reference_docs: opentelemetry-fundamentals

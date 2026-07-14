@@ -1,0 +1,105 @@
+title: 'Batch Processor Delays Every Export'
+slug: otel-collector-batch-timeout-too-high
+technology: opentelemetry
+category: Fix
+difficulty: medium
+scenario_type: fix
+lab_mode: simulation
+simulation_type: generic
+time_limit: 1500
+max_score: 100
+is_free: false
+infrastructure_type: docker
+jira_priority: Medium
+description: |-
+  CONTEXT: A platform team operating opentelemetry needs you to resolve `Batch Processor Delays Every Export` during a realistic delivery incident. The business impact is a stalled or unsafe release until the underlying state is repaired.
+
+  ENVIRONMENT: You are working in FixitLab's offline observability lab with an OpenTelemetry Collector, an instrumented demo service, and a local trace/metric backend under /otel. All components run locally; no SaaS observability vendor or paid APIs are required.
+
+  SYMPTOM / STARTING STATE: Traces appear in the backend 30–60s after they happen. The Collector is healthy but the batch processor's `timeout` is set to 60s and `send_batch_size` is huge, so spans sit buffered long before export.
+
+  OBJECTIVE: The `batch` processor has an oversized `timeout` and `send_batch_size`, so spans are held far too long before flushing. Tune the batch processor to a small timeout (e.g. 1–5s) and a reasonable batch size so telemetry exports promptly without stalling in the buffer. Success is graded on the real repaired state, not a manual marker.
+
+  WHAT TO AVOID: Do not suppress the signal, disable the policy/gate, or fake completion with marker files — reproduce the diagnosis, then apply the smallest fix that satisfies the objective and re-run Check Solution.
+objectives:
+- 'Spans reach the backend within a few seconds of being emitted'
+- 'The oversized batch timeout/size is confirmed as the delay source'
+- 'Export latency drops after the batch processor is tuned'
+initial_state: |-
+  Traces appear in the backend 30–60s after they happen. The Collector is healthy but the batch processor's `timeout` is set to 60s and `send_batch_size` is huge, so spans sit buffered long before export.
+hints:
+- order: 1
+  cost: 0
+  content: |-
+    Where to look — orient before changing anything:
+        1. `cat /otel/collector/config.yaml`
+        2. `curl -s localhost:8888/metrics | grep batch`
+        3. `otelcol validate --config /otel/collector/config.yaml`
+        Write down what looks healthy versus wrong. Form one hypothesis before you touch anything.
+- order: 2
+  cost: 25
+  content: |-
+    Diagnostic steps:
+        1. Re-run `cat /otel/collector/config.yaml` and read the status/error carefully.
+        2. Cross-check with `curl -s localhost:8888/metrics | grep batch` to isolate the failing object.
+        3. State the single root cause in one sentence before you act.
+- order: 3
+  cost: 50
+  content: |-
+    Exact fix + verification:
+        1. The `batch` processor has an oversized `timeout` and `send_batch_size`, so spans are held far too long before flushing. Tune the batch processor to a small timeout (e.g. 1–5s) and a reasonable batch size so telemetry exports promptly without stalling in the buffer.
+        2. Change one thing at a time so you can roll back if the hypothesis was wrong.
+        3. Verify the objective is met, then click Check Solution (graded on real state, not a marker file).
+summary: |-
+  Diagnose and resolve batch processor delays every export in the opentelemetry simulation lab and verify the healthy end state
+estimated_minutes: 25
+xp_reward: 100
+prerequisites:
+- 'Basic distributed-systems and HTTP literacy'
+tags:
+- 'opentelemetry'
+- 'fix'
+- 'hands-on'
+- 'simulation'
+linked_tutorial: opentelemetry-fundamentals
+what_you_will_learn:
+- 'Spans reach the backend within a few seconds of being emitted'
+- 'The oversized batch timeout/size is confirmed as the delay source'
+- 'Understand how the OpenTelemetry batch processor trades throughput for latency and why an oversized timeout stalls telemetry delivery'
+environment:
+  nodes:
+  - role: primary
+    os: FixitLab OpenTelemetry observability lab
+    hostname: lab-primary
+    ip: 127.0.0.1
+    specs: local offline simulation
+  pre_installed:
+  - bash
+  - coreutils
+  - otelcol
+  - curl
+  - jq
+  credentials:
+  - user: root
+    password: lab123
+tasks:
+- id: task_1
+  title: 'Batch Processor Delays Every Export'
+  description: |-
+    Restore healthy behavior for Batch Processor Delays Every Export by reproducing the diagnosis from the symptom, isolating the root cause with evidence, applying the smallest safe fix, and validating the outcome with the checker.
+  background: |-
+    This opentelemetry lab teaches how the OpenTelemetry batch processor trades throughput for latency and why an oversized timeout stalls telemetry delivery through systematic troubleshooting: observe, hypothesize, change, verify.
+  validation:
+    type: custom_script
+    script: check.sh
+    error_message: |-
+      The scenario objective is not yet satisfied. Re-read hint tier 2, confirm the root cause, and apply the documented remediation so /opt/fixitlab/academy/otel-collector-batch-timeout-too-high.conf carries the FIXED-OK marker.
+solution:
+  summary: |-
+    The `batch` processor has an oversized `timeout` and `send_batch_size`, so spans are held far too long before flushing. Tune the batch processor to a small timeout (e.g. 1–5s) and a reasonable batch size so telemetry exports promptly without stalling in the buffer.
+  files_changed: []
+  commands_run:
+  - 'cat /otel/collector/config.yaml'
+  - 'curl -s localhost:8888/metrics | grep batch'
+  - 'otelcol validate --config /otel/collector/config.yaml'
+  reference_docs: opentelemetry-fundamentals
