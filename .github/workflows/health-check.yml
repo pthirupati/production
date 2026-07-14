@@ -58,8 +58,11 @@ jobs:
           echo "Target: $BASE_URL"
           echo ""
 
-          # Core health
-          check "api/health"              "$BASE_URL/api/health/"
+          # Core health. NOTE: /api/health/ (liveness) is intentionally blocked
+          # from EXTERNAL access by the gateway (nginx.cluster.conf.template — it is
+          # an internal/in-container probe), so probing it from GitHub returns 403.
+          # The externally-reachable readiness signal is /api/health/ready/ (200 when
+          # the DB is up; Vault-on-edge is a non-fatal live source on the app node).
           check "api/health/ready"          "$BASE_URL/api/health/ready/"
           check "api/stats"               "$BASE_URL/api/stats/"
           check "api/technologies"        "$BASE_URL/api/technologies/"
