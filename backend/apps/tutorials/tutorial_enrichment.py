@@ -55,8 +55,38 @@ def _topic_key(topic: str) -> str:
     return aliases.get(key, key.split("-")[0] if key else "general")
 
 
-def architecture_diagram(topic: str, title: str = "", module: str = "") -> str:
-    """Return a Mermaid architecture/flow diagram for the technology track."""
+def _profile_for(topic: str) -> dict:
+    """Best-effort topic profile lookup (safe if curriculum import fails)."""
+    try:
+        from apps.tutorials.management.commands.curriculum.topic_profiles import get_profile
+        return get_profile(topic) or {}
+    except Exception:
+        return {}
+
+
+def architecture_diagram(
+    topic: str,
+    title: str = "",
+    module: str = "",
+    course_slug: str = "",
+    profile: dict | None = None,
+) -> str:
+    """Return a Mermaid architecture/flow diagram for the technology track.
+
+    Now per-course: build the diagram from the course's real components (curated
+    registry or the topic profile). Fall back to the legacy per-key diagram only
+    when no components are available.
+    """
+    if profile is None:
+        profile = _profile_for(topic)
+    from apps.tutorials.course_diagrams import course_architecture_diagram
+
+    per_course = course_architecture_diagram(
+        topic, profile=profile, course_slug=course_slug, module=module, title=title
+    )
+    if per_course:
+        return per_course
+
     key = _topic_key(topic)
     label = re.sub(r"[^A-Za-z0-9 _-]", "", (module or title or topic))[:48] or "Lesson"
     charts: dict[str, str] = {
@@ -307,14 +337,25 @@ def shell_practice_block(topic: str, title: str = "") -> str:
             "```"
         ),
     }
-    return examples.get(
-        key,
-        (
-            "```bash\n"
-            f"# Hands-on inspection for: {title or topic}\n"
-            "echo \"inspect → change one thing → verify with the same command\"\n"
-            "```"
-        ),
+    example = examples.get(key)
+    if example is not None:
+        # Pair the example commands with realistic sample output so the
+        # ShellBlock output pane / "compare to baseline" has content.
+        from apps.tutorials.course_diagrams import shell_block_with_output
+
+        # promql/powershell examples keep their own fenced block; only rebuild
+        # bash-style examples where sample output is meaningful.
+        if example.startswith("```bash"):
+            inner = example.strip("`").split("\n", 1)[-1].rsplit("```", 1)[0]
+            with_output = shell_block_with_output(inner, topic, title)
+            if with_output:
+                return with_output
+        return example
+    return (
+        "```bash\n"
+        f"# Hands-on inspection for: {title or topic}\n"
+        "echo \"inspect → change one thing → verify with the same command\"\n"
+        "```"
     )
 
 
@@ -382,12 +423,78 @@ _ILLUSTRATION_KEYS = frozenset({
     "vmware", "shell", "javascript", "react", "java", "html", "nodejs", "gpu", "ai",
 })
 
+_ILLUSTRATIONS_DIR = None
+_TOPIC_TO_COURSE = None
 
-def topic_illustration(topic: str, title: str = "") -> str:
-    """Markdown hero image for a lesson — maps topic to a static SVG illustration."""
+
+def _illustrations_dir():
+    global _ILLUSTRATIONS_DIR
+    if _ILLUSTRATIONS_DIR is None:
+        from pathlib import Path
+        # backend/apps/tutorials/tutorial_enrichment.py -> parents[3] == repo root
+        _ILLUSTRATIONS_DIR = (
+            Path(__file__).resolve().parents[3]
+            / "frontend" / "public" / "tutorials" / "illustrations"
+        )
+    return _ILLUSTRATIONS_DIR
+
+
+def _topic_to_course_map() -> dict[str, str]:
+    """Map a slugified topic to its primary course_slug (for per-course SVGs).
+
+    Built once from the course catalog; falls back to empty on any import
+    failure so illustration selection degrades to the per-key SVG.
+    """
+    global _TOPIC_TO_COURSE
+    if _TOPIC_TO_COURSE is None:
+        mapping: dict[str, str] = {}
+        try:
+            from apps.tutorials.management.commands.course_catalog import (
+                all_course_definitions,
+            )
+            for course in all_course_definitions():
+                cs = course.get("course_slug", "")
+                ts = re.sub(r"[^a-z0-9]+", "-", (course.get("topic") or "").lower()).strip("-")
+                if ts and cs and ts not in mapping:
+                    mapping[ts] = cs
+        except Exception:
+            mapping = {}
+        _TOPIC_TO_COURSE = mapping
+    return _TOPIC_TO_COURSE
+
+
+def _illustration_key(topic: str, course_slug: str = "") -> str:
+    """Pick the best available SVG: per-course → per-key → general."""
+    dir_ = _illustrations_dir()
+
+    def _exists(name: str) -> bool:
+        try:
+            return (dir_ / f"{name}.svg").is_file()
+        except Exception:
+            return False
+
+    cs = re.sub(r"[^a-z0-9]+", "-", (course_slug or "").lower()).strip("-")
+    if cs and _exists(cs):
+        return cs
+    ts = re.sub(r"[^a-z0-9]+", "-", (topic or "").lower()).strip("-")
+    mapped = _topic_to_course_map().get(ts)
+    if mapped and _exists(mapped):
+        return mapped
     key = _topic_key(topic)
-    if key not in _ILLUSTRATION_KEYS:
-        key = "general"
+    if key in _ILLUSTRATION_KEYS and _exists(key):
+        return key
+    if _exists(key):
+        return key
+    return "general"
+
+
+def topic_illustration(topic: str, title: str = "", course_slug: str = "") -> str:
+    """Markdown hero image for a lesson — maps each course to its own SVG.
+
+    Prefers the per-course illustration (distinct per course_slug), then the
+    per-technology SVG, and finally general.svg only when nothing matches.
+    """
+    key = _illustration_key(topic, course_slug)
     label = re.sub(r"[^A-Za-z0-9 _-]", "", (title or topic))[:64] or key.title()
     return f"![{label} — architecture overview](/tutorials/illustrations/{key}.svg)"
 

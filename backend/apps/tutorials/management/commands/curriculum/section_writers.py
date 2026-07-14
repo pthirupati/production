@@ -81,8 +81,21 @@ def _mermaid_id(text: str, fallback: str = "node") -> str:
     return clean or fallback
 
 
-def _arch_diagram(module: str, profile: dict) -> str:
-    """Topic-aware architecture flowchart built from the profile's components."""
+def _arch_diagram(module: str, profile: dict, topic: str = "", course_slug: str = "") -> str:
+    """Per-course architecture flowchart built from the course's real components.
+
+    Prefers the curated per-course component registry (keyed on course_slug /
+    topic) so distinct courses render distinct diagrams; falls back to the
+    profile-derived components, then to a generic module flow.
+    """
+    from apps.tutorials.course_diagrams import course_architecture_diagram
+
+    per_course = course_architecture_diagram(
+        topic, profile=profile, course_slug=course_slug, module=module
+    )
+    if per_course:
+        return per_course
+
     comps = _components(profile)
     mod_id = _mermaid_id(module, "app")
     lines = ["```mermaid", "flowchart LR", "  user([User / Client]) --> edge[Edge / Load Balancer]"]
@@ -176,18 +189,39 @@ def _write_theory(topic: str, module: str, level: str, profile: dict) -> str:
     return body
 
 
-def _write_architecture(topic: str, module: str, level: str, profile: dict) -> str:
+def _write_architecture(topic: str, module: str, level: str, profile: dict, course_slug: str = "") -> str:
+    from apps.tutorials.course_diagrams import (
+        command_sequence_diagram,
+        is_lifecycle_module,
+        lifecycle_state_diagram,
+    )
+
     arch = profile.get("architecture", "Map control plane vs data plane and list dependencies.")
     engines = profile.get("engines") or profile.get("components") or []
     eng = ""
     if engines:
         eng = f"\n\n**Major components:** {', '.join(engines) if isinstance(engines, list) else engines}."
-    diagram = "\n\n" + _arch_diagram(module, profile)
+    diagram = "\n\n" + _arch_diagram(module, profile, topic=topic, course_slug=course_slug)
+
+    # Additively add a sequence diagram (matching the module's real command
+    # list) and, for lifecycle modules, a state diagram — so the picture tracks
+    # THIS module's exact steps rather than a shared generic flow.
+    seq = command_sequence_diagram(profile.get("commands"), topic, module)
+    seq_block = (
+        f"\n\n**Command sequence** — the calls this module makes, in order:\n\n{seq}"
+        if seq else ""
+    )
+    state_block = ""
+    if is_lifecycle_module(topic, module, course_slug):
+        state_block = (
+            "\n\n**Lifecycle states** — how the managed object moves through its "
+            f"phases:\n\n{lifecycle_state_diagram(topic, module, course_slug)}"
+        )
     return (
         f"## Architecture\n\n"
         f"For **{module}**, draw a one-page diagram before implementing. Label north-south traffic (users → edge → app) "
         f"and east-west traffic (service-to-service). Mark trust boundaries where credentials rotate and where data is encrypted.\n\n"
-        f"{arch}{eng}{diagram}\n\n"
+        f"{arch}{eng}{diagram}{seq_block}{state_block}\n\n"
         f"> [!WARNING] Every arrow that crosses a trust boundary (public → private, app → data) needs "
         f"authentication, encryption in transit, and an audit log. Unmarked arrows are how breaches start.\n\n"
         f"**Failure domains:** identify single points of failure. If one node dies, does the system degrade gracefully "
@@ -238,8 +272,15 @@ def _write_use_cases(topic: str, module: str, level: str, profile: dict) -> str:
 
 
 def _write_labs(topic: str, module: str, level: str, profile: dict, playground: str) -> str:
+    from apps.tutorials.course_diagrams import shell_block_with_output
+
     cmds = profile.get("commands") or {}
     cmd = next(iter(cmds.values()), f"# Practice {module}\nhelp | head -5")
+    # A `$`-prefixed shell block paired with realistic sample output so the
+    # ShellBlock output pane / "compare to baseline" renders expected results.
+    starter_block = shell_block_with_output(cmds or cmd, topic, module) or (
+        f"```bash\n{cmd}\n```"
+    )
     flow = (
         "\n\n```mermaid\n"
         "flowchart TD\n"
@@ -262,7 +303,7 @@ def _write_labs(topic: str, module: str, level: str, profile: dict, playground: 
         f"4. Validate with automated checks or peer review checklist.\n"
         f"5. Write a three-line runbook entry: symptom → cause → fix.\n\n"
         f"Use **Check Solution** when the lab grades real state (not marker files).{flow}\n\n"
-        f"**Starter commands:**\n```bash\n{cmd}\n```\n\n"
+        f"**Starter commands (with expected output):**\n\n{starter_block}\n\n"
         f"> [!GOTCHA] If a command fails with 'permission denied', check whether you need `sudo` "
         f"or a different user context before changing anything else."
     )
@@ -591,6 +632,7 @@ def build_rich_module_sections(
 ) -> list[tuple[str, str, str, str, str]]:
     topic = course["topic"]
     playground = course.get("playground_slug") or topic.lower()
+    course_slug = course.get("course_slug", "")
     profile = get_profile(topic)
     sections: list[tuple[str, str, str, str, str]] = []
     for heading, key in SECTION_HEADINGS:
@@ -598,6 +640,10 @@ def build_rich_module_sections(
         if key == "labs":
             book = get_book_body(topic, module_title, key, level)
             base = writer(topic, module_title, level, profile, playground)
+            body = _enrich(key, topic, module_title, level, f"{book}\n\n---\n\n{base}")
+        elif key == "architecture":
+            book = get_book_body(topic, module_title, key, level)
+            base = writer(topic, module_title, level, profile, course_slug)
             body = _enrich(key, topic, module_title, level, f"{book}\n\n---\n\n{base}")
         elif key == "notes":
             body = writer(topic, module_title, level, profile)
