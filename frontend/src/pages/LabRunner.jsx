@@ -52,6 +52,7 @@ import LabJourneyStrip from '../components/lab/LabJourneyStrip'
 import useLabShortcuts from '../hooks/useLabShortcuts'
 import { useIsMobile } from '../hooks/useMediaQuery'
 import { scenarioTagHaystack } from '../utils/scenarioTags'
+import { parseScenarioSections } from '../components/scenarios/ScenarioNarrative'
 
 function formatLabTime(seconds) {
   const m = Math.floor(seconds / 60)
