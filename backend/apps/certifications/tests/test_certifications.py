@@ -10,9 +10,11 @@ from django.core.management import call_command
 from django.utils import timezone
 from rest_framework.test import APIClient, APITestCase
 
+from apps.certifications import openbadge
 from apps.certifications.models import (
     CertEarnedCertificate,
     CertificationTrack,
+    OpenBadgeCredential,
     TrackScenario,
 )
 from apps.progress.models import UserScenarioProgress
@@ -182,3 +184,83 @@ class CertificationsTestCase(APITestCase):
         submit = self.client.post(f"/api/certifications/exam/{start.data['id']}/submit/")
         holder = submit.data["certificate"]["holder_name"]
         self.assertNotIn("@", holder)  # never leak the user's email
+
+    # ---- Open Badge 3.0 verifiable credential ----
+    def _earn_cert(self):
+        self.client.force_authenticate(user=self.user)
+        start = self.client.post("/api/certifications/rhcsa/exam/start/")
+        self._complete_all_exam_scenarios(start.data)
+        self.client.post(f"/api/certifications/exam/{start.data['id']}/submit/")
+        return CertEarnedCertificate.objects.get(user=self.user, track__slug="rhcsa")
+
+    def test_earning_cert_mints_open_badge(self):
+        cert = self._earn_cert()
+        ob = OpenBadgeCredential.objects.get(certificate=cert)
+        # Spec-shaped OB 3.0 / VC credential.
+        self.assertEqual(
+            ob.credential["type"], ["VerifiableCredential", "OpenBadgeCredential"]
+        )
+        self.assertIn("https://www.w3.org/ns/credentials/v2", ob.credential["@context"])
+        ach = ob.credential["credentialSubject"]["achievement"]
+        self.assertIn("RHCSA", ach["name"])
+        self.assertTrue(ach.get("skills"))          # skills from the cert track objectives
+        self.assertTrue(ach["criteria"]["narrative"])
+        self.assertTrue(ob.credential["evidence"])  # references the exam/score
+        # Recipient email is only ever stored hashed, never in the clear.
+        blob = str(ob.credential)
+        self.assertNotIn(self.user.email, blob)
+        self.assertTrue(ob.recipient_hash.startswith("sha256$"))
+        self.assertNotIn("privateKey", blob)
+
+    def test_verify_endpoint_reports_verified_true(self):
+        cert = self._earn_cert()
+        ob = OpenBadgeCredential.objects.get(certificate=cert)
+        self.client.logout()  # public endpoint — no auth
+        resp = self.client.get(f"/api/certifications/verify/{ob.credential_uuid}/")
+        self.assertEqual(resp.status_code, 200)
+        self.assertTrue(resp.data["verified"])
+        self.assertEqual(resp.data["achievement"]["track_code"], "RHCSA")
+        self.assertEqual(resp.data["achievement"]["score"], 100)
+
+    def test_tampered_credential_verifies_false(self):
+        cert = self._earn_cert()
+        ob = OpenBadgeCredential.objects.get(certificate=cert)
+        # Tamper with the signed body after issuance.
+        ob.credential["credentialSubject"]["achievement"]["name"] = "Forged Master Cert"
+        ob.save(update_fields=["credential"])
+        self.client.logout()
+        resp = self.client.get(f"/api/certifications/verify/{ob.credential_uuid}/")
+        self.assertEqual(resp.status_code, 200)
+        self.assertFalse(resp.data["verified"])
+        # Direct verifier check too.
+        self.assertFalse(openbadge.verify(ob.credential, ob.public_key_b64))
+
+    def test_verify_unknown_credential_404(self):
+        resp = self.client.get(
+            "/api/certifications/verify/00000000-0000-0000-0000-000000000000/"
+        )
+        self.assertEqual(resp.status_code, 404)
+        self.assertFalse(resp.data["verified"])
+
+    def test_raw_credential_json_endpoint(self):
+        cert = self._earn_cert()
+        ob = OpenBadgeCredential.objects.get(certificate=cert)
+        self.client.logout()
+        resp = self.client.get(
+            f"/api/certifications/verify/{ob.credential_uuid}/credential.json"
+        )
+        self.assertEqual(resp.status_code, 200)
+        self.assertEqual(resp.data["id"], ob.credential["id"])
+        self.assertIn("proof", resp.data)
+        # The signed JSON is independently verifiable offline.
+        self.assertTrue(openbadge.verify(resp.data, ob.public_key_b64))
+
+    def test_issuer_is_deterministic_with_fixed_key(self):
+        """Same persisted/fixed key => credential re-verifies; offline (no network)."""
+        cert = self._earn_cert()
+        ob = OpenBadgeCredential.objects.get(certificate=cert)
+        # Re-verify against a freshly loaded signing key's public half.
+        priv = openbadge._signing_key()
+        pub = openbadge.public_key_b64_for(priv)
+        self.assertEqual(pub, ob.public_key_b64)
+        self.assertTrue(openbadge.verify(ob.credential, ob.public_key_b64))

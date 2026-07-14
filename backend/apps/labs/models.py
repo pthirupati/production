@@ -194,3 +194,100 @@ class LabSession(models.Model):
         self.ended_at = timezone.now()
         self.save()
 
+
+class IncidentRun(models.Model):
+    """Persists one Live Incident Director run for scoring / postmortem.
+
+    Additive & optional: a lab session can exist with zero IncidentRuns, so
+    ordinary lab flows are unaffected. The Director (apps.labs.incident_director)
+    creates one of these when its flag is on. All Director-owned facts (the known
+    root cause, the escalation cascade) live here so the auto-postmortem never has
+    to guess.
+    """
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    lab_session = models.ForeignKey(
+        "LabSession",
+        on_delete=models.CASCADE,
+        related_name="incident_runs",
+        null=True,
+        blank=True,
+    )
+    template_key = models.CharField(max_length=100, default="", blank=True)
+    seed = models.CharField(max_length=100, default="", blank=True)
+    root_cause = models.TextField(default="", blank=True)
+    detection_signal = models.TextField(default="", blank=True)
+    difficulty = models.CharField(max_length=20, default="", blank=True)
+    escalations = models.JSONField(
+        default=list, blank=True,
+        help_text="Ordered escalation records [{step, kind, note}] applied by the Director",
+    )
+    director_plan = models.JSONField(
+        default=dict, blank=True,
+        help_text="Full Director.summary() snapshot (template, what_worked, action_items)",
+    )
+    started_at = models.DateTimeField(auto_now_add=True)
+    detected_at = models.DateTimeField(null=True, blank=True)
+    mitigated_at = models.DateTimeField(null=True, blank=True)
+    resolved_at = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        ordering = ["-started_at"]
+        indexes = [
+            models.Index(fields=["lab_session", "started_at"], name="labs_incrun_session_idx"),
+            models.Index(fields=["template_key"], name="labs_incrun_template_idx"),
+        ]
+
+    def __str__(self):
+        return f"IncidentRun {self.template_key} ({self.id})"
+
+
+class Postmortem(models.Model):
+    """Auto-generated blameless postmortem + public replay artifact.
+
+    Gated for public read by an unguessable ``public_token`` (uuid) so it works
+    as a portfolio share link with NO auth (see PublicPostmortemView). Holds the
+    structured JSON and a Markdown rendering produced deterministically (no LLM)
+    by apps.labs.postmortem.
+    """
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    incident_run = models.OneToOneField(
+        "IncidentRun",
+        on_delete=models.CASCADE,
+        related_name="postmortem",
+        null=True,
+        blank=True,
+    )
+    lab_session = models.ForeignKey(
+        "LabSession",
+        on_delete=models.CASCADE,
+        related_name="postmortems",
+        null=True,
+        blank=True,
+    )
+    public_token = models.UUIDField(
+        default=uuid.uuid4, editable=False, unique=True, db_index=True,
+        help_text="Unguessable token that gates public read access (no auth).",
+    )
+    title = models.CharField(max_length=255, default="", blank=True)
+    data = models.JSONField(
+        default=dict, blank=True,
+        help_text="Structured postmortem (timeline, root cause, MTTR, action items).",
+    )
+    markdown = models.TextField(
+        default="", blank=True,
+        help_text="Deterministic Markdown rendering of the postmortem.",
+    )
+    is_public = models.BooleanField(
+        default=True,
+        help_text="If False the public token endpoint returns 404 (owner can unshare).",
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["-created_at"]
+
+    def __str__(self):
+        return f"Postmortem {self.title or self.id}"
+

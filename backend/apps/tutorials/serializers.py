@@ -25,7 +25,7 @@ class TutorialSectionSerializer(serializers.ModelSerializer):
         if obj.quiz_json:
             return obj.quiz_json
         heading = (obj.heading or "").lower()
-        if not any(k in heading for k in ("assessment", "quiz", "checkpoint", "practice question")):
+        if not any(k in heading for k in ("assess", "assessment", "quiz", "checkpoint", "practice question")):
             return None
         # Generate a real, scored end-of-module quiz (5 questions) keyed to the
         # tutorial's topic + module. Deterministic so it is stable per module.
@@ -37,7 +37,13 @@ class TutorialSectionSerializer(serializers.ModelSerializer):
     def to_representation(self, instance):
         data = super().to_representation(instance)
         tutorial = instance.tutorial
-        data["body"] = enrich_body(tutorial.topic, tutorial.title, instance.body or "")
+        data["body"] = enrich_body(
+            tutorial.topic,
+            tutorial.title,
+            instance.body or "",
+            heading=instance.heading or "",
+            is_first=(instance.order == 0),
+        )
         return data
 
 
