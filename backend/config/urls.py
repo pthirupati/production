@@ -105,6 +105,10 @@ urlpatterns = [
     # Question Bank API (technologies, scenarios CRUD)
     path("api/question_bank/", include("apps.question_bank.urls")),
 
+    # Learning Journeys (read-only, AllowAny — role-based guided tracks over
+    # existing tutorial courses, scenarios, projects, and certification tracks)
+    path("api/journeys/", include("apps.question_bank.journeys_urls")),
+
     # Community Threads
     path("api/community/", include("apps.community.urls")),
 
