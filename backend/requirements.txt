@@ -10,7 +10,7 @@ django-redis>=7.0.0
 
 # Auth
 djangorestframework-simplejwt>=5.5.1
-PyJWT>=2.8
+PyJWT>=2.13.0
 argon2-cffi>=23.1
 
 # WebSockets
