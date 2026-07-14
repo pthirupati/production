@@ -1,0 +1,36 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 420" role="img" aria-label="Data Science: Zero to Hero architecture">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#0f172a"/>
+      <stop offset="100%" stop-color="#1e293b"/>
+    </linearGradient>
+    <linearGradient id="accent" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0%" stop-color="#2dd4bf"/>
+      <stop offset="100%" stop-color="#14b8a6"/>
+    </linearGradient>
+    <marker id="arrow" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+      <path d="M0 0 L10 5 L0 10 z" fill="#14b8a6"/>
+    </marker>
+  </defs>
+  <rect width="800" height="420" rx="16" fill="url(#bg)"/>
+  <text x="400" y="52" text-anchor="middle" fill="#e2e8f0" font-family="system-ui,sans-serif" font-size="26" font-weight="700">Data Science: Zero to Hero</text>
+  <text x="400" y="82" text-anchor="middle" fill="#94a3b8" font-family="system-ui,sans-serif" font-size="13">Architecture overview — the real components you will operate</text>
+  <rect x="40" y="104" width="720" height="290" rx="14" fill="#0f172a" fill-opacity="0.35" stroke="#334155" stroke-width="1"/>
+  <text x="224" y="134" text-anchor="middle" fill="#64748b" font-family="system-ui,sans-serif" font-size="11">operator / user →</text>
+  <rect x="149" y="150" width="150" height="74" rx="10" fill="#1e293b" stroke="url(#accent)" stroke-width="2"/>
+  <text x="224" y="191" text-anchor="middle" fill="#e2e8f0" font-family="system-ui,sans-serif" font-size="13" font-weight="600">Raw data</text>
+  <rect x="325" y="150" width="150" height="74" rx="10" fill="#1e293b" stroke="url(#accent)" stroke-width="2"/>
+  <text x="400" y="191" text-anchor="middle" fill="#e2e8f0" font-family="system-ui,sans-serif" font-size="13" font-weight="600">Clean / features</text>
+  <rect x="501" y="150" width="150" height="74" rx="10" fill="#1e293b" stroke="url(#accent)" stroke-width="2"/>
+  <text x="576" y="183" text-anchor="middle" fill="#e2e8f0" font-family="system-ui,sans-serif" font-size="12.5" font-weight="600">scikit-learn</text>
+  <text x="576" y="201" text-anchor="middle" fill="#cbd5e1" font-family="system-ui,sans-serif" font-size="12.5" font-weight="600">model</text>
+  <path d="M299 187 H319" stroke="url(#accent)" stroke-width="2" marker-end="url(#arrow)"/>
+  <path d="M475 187 H495" stroke="url(#accent)" stroke-width="2" marker-end="url(#arrow)"/>
+  <rect x="237" y="284" width="150" height="74" rx="10" fill="#1e293b" stroke="url(#accent)" stroke-width="2"/>
+  <text x="312" y="325" text-anchor="middle" fill="#e2e8f0" font-family="system-ui,sans-serif" font-size="13" font-weight="600">Evaluate</text>
+  <rect x="413" y="284" width="150" height="74" rx="10" fill="#1e293b" stroke="url(#accent)" stroke-width="2"/>
+  <text x="488" y="325" text-anchor="middle" fill="#e2e8f0" font-family="system-ui,sans-serif" font-size="13" font-weight="600">Report / viz</text>
+  <path d="M387 321 H407" stroke="url(#accent)" stroke-width="2" marker-end="url(#arrow)"/>
+  <path d="M576 224 V254 H312 V278" stroke="url(#accent)" stroke-width="2" fill="none" marker-end="url(#arrow)"/>
+  <text x="488" y="380" text-anchor="middle" fill="#64748b" font-family="system-ui,sans-serif" font-size="11">→ logs &amp; metrics</text>
+</svg>

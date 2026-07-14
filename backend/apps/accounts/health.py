@@ -63,8 +63,20 @@ def readiness_check(request):
 
     vault = _vault_status()
     checks["vault"] = vault
-    if vault.get("enabled") and vault.get("status") == "unavailable":
-        overall = "degraded" if overall == "ok" else overall
+    # Vault is a live secret SOURCE, not a hard runtime dependency. In the 4D
+    # cluster the backend runs on the APP node while Vault lives on the EDGE, so
+    # the app node loads its secrets from the rendered/baked env by design. If this
+    # process is serving the request, its critical secrets (SECRET_KEY, DB creds,
+    # …) are already present — a sealed/unreachable Vault is a by-design fallback,
+    # NOT a readiness failure. Surface it as an informational sub-status but keep
+    # the node "ok" as long as the database is reachable. Only a genuinely missing
+    # secret would prevent the process from booting at all (so it couldn't answer
+    # this probe). Rotation still flows through the edge Vault when available.
+    if vault.get("enabled") and vault.get("status") in ("unavailable", "degraded"):
+        checks["vault"]["note"] = (
+            "live Vault unavailable on this node; serving from rendered/baked env "
+            "(Vault is a rotation source, not required to serve traffic)"
+        )
 
     code = 200 if overall in ("ok", "degraded") else 503
     return JsonResponse({"status": overall, "checks": checks}, status=code)

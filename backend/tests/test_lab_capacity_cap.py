@@ -55,38 +55,45 @@ class CapacityHelperTests(TestCase):
             for i in range(3)
         ]
 
-    def test_simulation_and_cloud_do_not_consume_engine(self):
+    def test_docker_and_simulation_consume_capacity_cloud_does_not(self):
+        # The cap is uniform resource/abuse protection: both the docker engine
+        # and the in-process simulation engine (the default route for most
+        # scenarios) consume shared platform capacity. Only per-VM cloud
+        # providers (own vendor quota) are exempt.
         self.assertTrue(consumes_engine_capacity("docker"))
         self.assertTrue(consumes_engine_capacity(""))  # default == docker
-        self.assertFalse(consumes_engine_capacity("simulation"))
+        self.assertTrue(consumes_engine_capacity("simulation"))
         self.assertFalse(consumes_engine_capacity("aws_ec2"))
         self.assertFalse(consumes_engine_capacity("digitalocean"))
 
-    def test_count_only_counts_active_docker_sessions(self):
+    def test_count_includes_active_docker_and_simulation_not_terminal(self):
         _running_docker_session(self.users[0], self.scenario)
         # PROVISIONING also counts.
         LabSession.objects.create(
             user=self.users[1], scenario=self.scenario, status="PROVISIONING",
             provider="docker", duration_limit=3600,
         )
-        # Terminal / non-engine sessions must NOT count.
+        # Terminal sessions must NOT count.
         LabSession.objects.create(
             user=self.users[2], scenario=self.scenario, status="TERMINATED",
             provider="docker", duration_limit=3600,
         )
+        # An active simulation session DOES count (uniform cap).
         LabSession.objects.create(
             user=self.users[2], scenario=self.scenario, status="RUNNING",
             provider="simulation", duration_limit=3600,
         )
-        self.assertEqual(count_active_engine_labs(), 2)
+        self.assertEqual(count_active_engine_labs(), 3)
 
     @override_settings(MAX_CONCURRENT_LABS=1)
-    def test_at_global_capacity_true_when_full_false_for_simulation(self):
+    def test_at_global_capacity_true_for_all_shared_providers_when_full(self):
         _running_docker_session(self.users[0], self.scenario)
-        # Docker start is shed at the ceiling…
+        # At the ceiling, BOTH a docker start and a simulation start are shed —
+        # the cap applies uniformly to every shared-capacity provisioner.
         self.assertTrue(at_global_capacity("docker"))
-        # …but a simulation start never contends for the engine.
-        self.assertFalse(at_global_capacity("simulation"))
+        self.assertTrue(at_global_capacity("simulation"))
+        # A cloud start is still exempt (its own vendor quota governs it).
+        self.assertFalse(at_global_capacity("aws_ec2"))
 
 
 @override_settings(MAX_CONCURRENT_LABS=2)
@@ -206,9 +213,11 @@ class CapacityCapRaceTests(TransactionTestCase):
                 f"unexpected status: {results}",
             )
 
-        created = LabSession.objects.filter(
-            provider="docker", status__in=("RUNNING", "PROVISIONING"),
-        ).count()
+        # Count every shared-capacity session (docker + simulation): the docker
+        # lab_mode scenario resolves to the in-process simulation engine at
+        # runtime, so the created sessions carry provider="simulation" — but the
+        # uniform cap governs them just the same.
+        created = count_active_engine_labs()
         # The cap must hold exactly — never overshoot.
         self.assertLessEqual(created, 5, f"overshot cap: {created} active, results={results}")
         # And we should fill right up to it (10 racers, cap 5).

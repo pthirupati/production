@@ -457,6 +457,17 @@ SENDGRID_API_KEY = env("SENDGRID_API_KEY", default="")
 
 # Frontend URL for email links
 FRONTEND_URL = env("FRONTEND_URL", default="http://localhost:8080")
+
+# --------------------------------------------------
+# Open Badges 3.0 (Verifiable Credential) issuer
+# --------------------------------------------------
+# Base-64 (raw 32-byte) Ed25519 PRIVATE key seed used to sign issued Open Badge
+# 3.0 credentials. When unset, the issuer lazily generates and persists a
+# keypair under MEDIA_ROOT/openbadge_signing_key.json so verification stays
+# self-consistent offline (dev/self-hosted). For PRODUCTION stability across
+# redeploys/hosts, set OPENBADGE_SIGNING_KEY_B64 to a fixed seed so every node
+# signs with the same key and previously-issued credentials keep verifying.
+OPENBADGE_SIGNING_KEY_B64 = env("OPENBADGE_SIGNING_KEY_B64", default="")
 OAUTH_CALLBACK_BASE_URL = env("OAUTH_CALLBACK_BASE_URL", default="")
 GITHUB_OAUTH_CALLBACK_URL = env("GITHUB_OAUTH_CALLBACK_URL", default="")
 # When true, skip Gmail/SendGrid/SMTP delivery (E2E/CI). OTP still stored in DB.

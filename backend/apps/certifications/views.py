@@ -24,10 +24,12 @@ from apps.adminpanel.permissions import IsPlatformAdmin
 from apps.progress.models import UserScenarioProgress
 
 from common.throttles import StrictAnonRateThrottle
+from . import openbadge
 from .models import (
     CertEarnedCertificate,
     CertificationTrack,
     ExamAttempt,
+    OpenBadgeCredential,
 )
 from .serializers import (
     AdminTrackSerializer,
@@ -468,6 +470,14 @@ class ExamSubmitView(APIView):
             cert.issued_at = timezone.now()
             cert.expires_at = expires
             cert.save(update_fields=["attempt", "score", "holder_name", "issued_at", "expires_at"])
+
+        # Mint the verifiable Open Badge 3.0 credential from the earned cert.
+        # Non-fatal: a signing/keystore failure must never block earning the
+        # certificate itself.
+        try:
+            openbadge.issue_for_certificate(cert)
+        except Exception:
+            logger.exception("Open Badge 3.0 minting failed for cert %s", cert.certificate_id)
         return cert
 
     @staticmethod
@@ -636,4 +646,70 @@ class CertVerifyView(APIView):
                 "valid": not cert.is_expired,
                 "certificate": CertificateSerializer(cert).data,
             }
+        )
+
+
+class OpenBadgeVerifyView(APIView):
+    """GET /api/certifications/verify/<credential_id>/ — public OB 3.0 verify.
+
+    Re-checks the stored credential's Ed25519 proof against its stored public
+    key (offline, no network) and returns ``verified: true/false`` plus a
+    human-readable achievement summary. AllowAny + strict anon throttle;
+    outside the admin-IP gate (which only covers /django-admin/ + /api/admin/).
+    """
+
+    permission_classes = [AllowAny]
+    throttle_classes = [StrictAnonRateThrottle]
+
+    def get(self, request, credential_id):
+        try:
+            ob = OpenBadgeCredential.objects.select_related(
+                "certificate__track"
+            ).get(credential_uuid=credential_id)
+        except (OpenBadgeCredential.DoesNotExist, ValueError, TypeError):
+            return Response(
+                {"verified": False, "error": "Credential not found"}, status=404
+            )
+
+        verified = openbadge.verify(ob.credential, ob.public_key_b64)
+        cert = ob.certificate
+        return Response(
+            {
+                "verified": verified,
+                "expired": cert.is_expired,
+                "credential_id": str(ob.credential_uuid),
+                "achievement": {
+                    "name": ob.achievement_name,
+                    "description": ob.achievement_description,
+                    "track_code": cert.track.code,
+                    "track_name": cert.track.name,
+                    "issuer": "FixitLab",
+                    "holder_name": cert.holder_name,
+                    "score": cert.score,
+                    "issued_on": ob.issued_on,
+                    "expires_at": cert.expires_at,
+                    "certificate_id": cert.certificate_id,
+                },
+            }
+        )
+
+
+class OpenBadgeCredentialJSONView(APIView):
+    """GET /api/certifications/verify/<credential_id>/credential.json — the raw
+    signed OB 3.0 JSON-LD, for import into a wallet / LinkedIn / third-party
+    verifier. AllowAny + throttled; the private key is never included."""
+
+    permission_classes = [AllowAny]
+    throttle_classes = [StrictAnonRateThrottle]
+
+    def get(self, request, credential_id):
+        try:
+            ob = OpenBadgeCredential.objects.get(credential_uuid=credential_id)
+        except (OpenBadgeCredential.DoesNotExist, ValueError, TypeError):
+            return Response({"error": "Credential not found"}, status=404)
+        # Return the signed credential document verbatim (contains public key +
+        # proof only). Content-type is JSON-LD so wallets recognize it.
+        return Response(
+            ob.credential,
+            content_type="application/ld+json",
         )
