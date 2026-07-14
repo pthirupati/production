@@ -224,6 +224,27 @@ def enrich_body(topic: str, title: str, body: str) -> str:
         )
     if not MERMAID_RE.search(body):
         additions.append(architecture_diagram(topic, title=title))
+        # Additively add a sequence diagram from the topic's command list and,
+        # for lifecycle-type topics, a state diagram — so the picture matches
+        # the actual steps of THIS course, not a shared generic flow.
+        try:
+            from apps.tutorials.course_diagrams import (
+                command_sequence_diagram,
+                is_lifecycle_module,
+                lifecycle_state_diagram,
+            )
+            from apps.tutorials.management.commands.curriculum.topic_profiles import (
+                get_profile,
+            )
+
+            prof = get_profile(topic) or {}
+            seq = command_sequence_diagram(prof.get("commands"), topic, title)
+            if seq:
+                additions.append(seq)
+            if is_lifecycle_module(topic, title):
+                additions.append(lifecycle_state_diagram(topic, title))
+        except Exception:
+            pass
     if not TABLE_RE.search(body):
         additions.append(reference_table(topic, title))
     if not CODE_RE.search(body):

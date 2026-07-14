@@ -353,6 +353,60 @@ class Project(models.Model):
         return f"{self.technology.name} — {self.title}"
 
 
+class ProjectStage(models.Model):
+    """One stage of a staged (multi-lab) project.
+
+    A *flat* project has no stages and launches its single ``project.lab_scenario``
+    on Start (the historical behavior). A *staged* project (e.g. a cross-tech
+    capstone) is broken into ordered stages, each of which can open its OWN lab
+    (``lab_scenario``) in its OWN technology (``stage_technology``), produce an
+    ``handoff_artifact`` for the next stage, and teach a "where real pipelines
+    break" lesson (``breakpoint_note``). Everything here is optional and additive:
+    projects without ProjectStage rows behave exactly as before.
+    """
+
+    project = models.ForeignKey(Project, on_delete=models.CASCADE, related_name="stages")
+    order = models.PositiveIntegerField(default=0, help_text="Stage sequence within the project")
+    title = models.CharField(max_length=200)
+    description = models.TextField(blank=True)
+    stage_technology = models.ForeignKey(
+        Technology,
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name="project_stages",
+        help_text="The technology this stage exercises (nullable — a stage may be doc/postmortem-only).",
+    )
+    lab_scenario = models.ForeignKey(
+        "Scenario",
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name="project_stages_using",
+        help_text="Scenario whose lab environment this stage opens (null = no launchable lab for this stage yet).",
+    )
+    handoff_artifact = models.JSONField(
+        default=dict,
+        blank=True,
+        help_text=(
+            "What this stage produces for the next one (e.g. "
+            "{'name': 'SLO definition', 'description': 'p99<300ms yardstick'}). "
+            "Free-form; empty dict = nothing handed off."
+        ),
+    )
+    breakpoint_note = models.TextField(
+        blank=True,
+        help_text="The 'where real pipelines break' lesson threaded through this stage.",
+    )
+
+    class Meta:
+        ordering = ["order"]
+        unique_together = ("project", "order")
+
+    def __str__(self):
+        return f"{self.project.slug} · stage {self.order}: {self.title}"
+
+
 class ProjectTask(models.Model):
     """A single Jira-style ticket within a Project."""
 
@@ -371,6 +425,31 @@ class ProjectTask(models.Model):
     order = models.PositiveIntegerField(default=0)
     depends_on = models.ForeignKey(
         "self", null=True, blank=True, on_delete=models.SET_NULL, related_name="dependents"
+    )
+    # Optional staging: which ProjectStage this task belongs to. Null on flat
+    # projects (unchanged behavior).
+    stage = models.ForeignKey(
+        ProjectStage,
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name="tasks",
+        help_text="The stage this task belongs to (null on flat projects).",
+    )
+    # Optional real validation: a Scenario whose validator must PASS (the user
+    # must have a validated LabSession for it) before this task can be marked
+    # done and its dependents unlock. Null = self-attest (historical behavior).
+    validation_scenario = models.ForeignKey(
+        "Scenario",
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name="validating_project_tasks",
+        help_text=(
+            "Scenario whose validator proves this task. When set, marking the "
+            "task done requires a passed lab session for this scenario; when "
+            "null, the task is self-attested (backward-compatible)."
+        ),
     )
 
     class Meta:

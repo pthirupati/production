@@ -1,0 +1,62 @@
+# FixitLab — Grader integrity gate (no fail-open labs).
+#
+# Enforces the grader "trust anchor": no simulation lab may ship a grader that
+# auto-passes on the UNFIXED (broken) scenario state. scripts/scan_grader_integrity.py
+# rebuilds the real UnifiedSimulationEngine on the unfixed state and, for the
+# technologies that route to a dedicated engine validator at runtime (windows,
+# nmap, vmware, terraform, …), invokes that validator — faithfully reproducing
+# the Check-Solution path — then classifies every grader FAIL-OPEN / NO-MATCH /
+# FAIL-CLOSED. With --check it exits 1 if ANY fail-open grader exists (outside an
+# optional allowlist), else 0. FAIL-OPEN is currently 0, so any PR that
+# re-introduces a fail-open grader turns this job red.
+#
+# This is a lightweight, read-only CODE-QUALITY check for PRs. It provisions no
+# droplets, needs no secrets, and is completely separate from the production
+# deploy (production.yml) — it neither triggers nor gates a deploy.
+#
+# Triggers: every PR, pushes to main, and manual dispatch.
+
+name: Grader integrity
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+
+concurrency:
+  group: grader-integrity-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  grader-integrity:
+    name: Grader integrity (no fail-open labs)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: pip
+          cache-dependency-path: backend/requirements.txt
+      # Install the full backend requirement set (same pattern as ci.yml) so the
+      # sim-engine import chain resolves. The scanner needs Django + the
+      # simulation provisioner/vmware_sim engines and their transitive deps
+      # (channels, celery, DRF, drf-spectacular, paramiko, docker, cryptography,
+      # jinja2, pyyaml, …). It does NOT import spaCy / scikit-learn, but we install
+      # the whole file (pip-cached) for parity with CI and to stay robust against
+      # lazy imports rather than hand-maintaining a fragile subset.
+      - name: Install backend deps
+        run: pip install -r backend/requirements.txt
+      - name: Scan for fail-open graders
+        # No DB is seeded here, so the scanner reads scenario.yaml + check.sh from
+        # the filesystem (read-only). --check exits 1 on any fail-open grader.
+        env:
+          DJANGO_SETTINGS_MODULE: config.test_settings
+          SECRET_KEY: ci-grader-integrity-secret-not-for-production
+        run: |
+          cd backend
+          python ../scripts/scan_grader_integrity.py --check

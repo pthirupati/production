@@ -105,9 +105,41 @@ def _mark_accessible(scenario_data_list, subscribed_tech_ids, user=None):
             item["is_accessible"] = tech_id in subscribed_tech_ids
 
 
+def _serialize_project_stages(project):
+    """Return the ordered stages for a project (empty list for flat projects).
+
+    Additive: flat projects (no ProjectStage rows) return [] so the payload is
+    unchanged for them.
+    """
+    stages = (
+        project.stages.all()
+        .select_related("stage_technology", "lab_scenario")
+        .order_by("order")
+    )
+    result = []
+    for s in stages:
+        result.append({
+            "id": s.id,
+            "order": s.order,
+            "title": s.title,
+            "description": s.description,
+            "stage_technology": s.stage_technology.slug if s.stage_technology_id else None,
+            "stage_technology_name": s.stage_technology.name if s.stage_technology_id else None,
+            "lab_scenario_id": s.lab_scenario_id,
+            "lab_scenario_slug": s.lab_scenario.slug if s.lab_scenario_id else None,
+            "handoff_artifact": s.handoff_artifact or {},
+            "breakpoint_note": s.breakpoint_note,
+        })
+    return result
+
+
 def _serialize_projects(tech, user):
     """Return serialized projects list for a technology, with user progress overlaid."""
-    projects = Project.objects.filter(technology=tech, is_active=True).prefetch_related("tasks").order_by("order")
+    projects = (
+        Project.objects.filter(technology=tech, is_active=True)
+        .prefetch_related("tasks", "stages__stage_technology", "stages__lab_scenario")
+        .order_by("order")
+    )
     progress_map = {}
     task_progress_map = {}
     if user and user.is_authenticated:
@@ -127,9 +159,12 @@ def _serialize_projects(tech, user):
                 "acceptance_criteria": t.acceptance_criteria,
                 "order": t.order,
                 "depends_on": t.depends_on_id,
+                "stage_id": t.stage_id,
+                "validation_scenario_id": t.validation_scenario_id,
                 "user_status": task_progress_map.get(t.id, {}).get("status", "todo"),
             }
             tasks_data.append(task_item)
+        stages_data = _serialize_project_stages(p)
         result.append({
             "id": p.id,
             "title": p.title,
@@ -141,6 +176,9 @@ def _serialize_projects(tech, user):
             "estimated_hours": p.estimated_hours,
             "task_count": len(tasks_data),
             "tasks": tasks_data,
+            # Ordered stages when the project is staged; [] for flat projects.
+            "stages": stages_data,
+            "is_staged": bool(stages_data),
             "user_progress": progress_map.get(p.id),
         })
     return result
@@ -2581,8 +2619,56 @@ class BlogDetailView(APIView):
 
 # ─── Projects API ─────────────────────────────────────────────────────────────
 
+def _current_project_stage(project, user):
+    """Return the current ProjectStage for a staged project, or None if flat.
+
+    The current stage is the first stage (by ``order``) that is not yet complete.
+    A stage is complete when all of its tasks are done for this user. When a
+    project has stages but they are all complete, the last stage is returned so
+    "Start/Resume" still opens a valid lab. Returns None for a flat project (no
+    stages) so callers fall back to the single ``project.lab_scenario``.
+    """
+    stages = list(project.stages.all().select_related("lab_scenario").order_by("order"))
+    if not stages:
+        return None
+    done_task_ids = set(
+        UserTaskProgress.objects.filter(
+            user=user, task__project=project, status="done"
+        ).values_list("task_id", flat=True)
+    )
+    for stage in stages:
+        stage_task_ids = list(stage.tasks.values_list("id", flat=True))
+        # A stage with no tasks is treated as immediately complete (skip it).
+        if stage_task_ids and not all(tid in done_task_ids for tid in stage_task_ids):
+            return stage
+    # Everything complete — return the last stage so Start still opens a lab.
+    return stages[-1]
+
+
+def _user_passed_scenario(user, scenario) -> bool:
+    """True when the user has a validated (passed) lab session for `scenario`.
+
+    Reuses the SAME completion signal that ValidateLabView / CodeValidateView
+    write via apps.labs.completion.finalize_validated_session — a LabSession with
+    validation_passed=True. This is the single source of truth for "the scenario
+    validator passed", so a project task can gate on it without re-running the
+    validator here.
+    """
+    if scenario is None:
+        return False
+    return LabSession.objects.filter(
+        user=user, scenario=scenario, validation_passed=True
+    ).exists()
+
+
 class ProjectStartView(APIView):
-    """POST — start or resume a project; returns the project with tasks and current user progress."""
+    """POST — start or resume a project; returns the project with tasks and current user progress.
+
+    For a *flat* project (no stages) this opens the single ``project.lab_scenario``
+    exactly as before. For a *staged* project it opens the CURRENT stage's
+    ``lab_scenario`` (the first stage whose tasks are not all done), so the learner
+    lands in the right lab for wherever they are in the staged workflow.
+    """
     permission_classes = [IsAuthenticated]
 
     def post(self, request, project_id):
@@ -2594,15 +2680,45 @@ class ProjectStartView(APIView):
         # Ensure a UserTaskProgress row exists for every task
         for task in project.tasks.all():
             UserTaskProgress.objects.get_or_create(user=request.user, task=task)
-        return Response({
+
+        # Default to the flat project's single lab_scenario (unchanged behavior).
+        lab_scenario = project.lab_scenario
+        current_stage = None
+        try:
+            current_stage = _current_project_stage(project, request.user)
+        except Exception as e:
+            # Never fail Start because of stage resolution — fall back to flat.
+            logger.warning(f"Stage resolution failed for project {project.id}: {e}")
+            current_stage = None
+        # A staged project opens the current stage's lab. If that stage has no
+        # lab of its own (e.g. a postmortem/doc stage), fall back to the
+        # project-level lab_scenario so Start still yields a workspace.
+        if current_stage is not None and current_stage.lab_scenario_id:
+            lab_scenario = current_stage.lab_scenario
+
+        payload = {
             "status": progress.status,
             "started_at": str(progress.started_at),
             "project_id": project.id,
             # The lab the frontend should launch so the user gets a working
             # environment (terminal / sim / IDE / VMware / Grafana) for the project.
-            "lab_scenario_id": project.lab_scenario_id,
-            "lab_scenario_slug": project.lab_scenario.slug if project.lab_scenario_id else None,
-        })
+            "lab_scenario_id": lab_scenario.id if lab_scenario else None,
+            "lab_scenario_slug": lab_scenario.slug if lab_scenario else None,
+            "is_staged": current_stage is not None,
+        }
+        if current_stage is not None:
+            payload["current_stage"] = {
+                "id": current_stage.id,
+                "order": current_stage.order,
+                "title": current_stage.title,
+                "stage_technology": (
+                    current_stage.stage_technology.slug
+                    if current_stage.stage_technology_id else None
+                ),
+                "handoff_artifact": current_stage.handoff_artifact or {},
+                "breakpoint_note": current_stage.breakpoint_note,
+            }
+        return Response(payload)
 
 
 class ProjectTaskUpdateView(APIView):
@@ -2618,6 +2734,38 @@ class ProjectTaskUpdateView(APIView):
         new_status = request.data.get("status", utp.status)
         if new_status not in ("todo", "in_progress", "done"):
             return Response({"error": "Invalid status"}, status=400)
+
+        # ── Optional real validation gate ──────────────────────────────────
+        # If this task (or its stage's lab) has a configured validator, the user
+        # must have PASSED that scenario's lab (a validated LabSession) before we
+        # let them mark the task done and unlock its dependents. This reuses the
+        # exact completion signal ValidateLabView writes. If NO validator is
+        # configured, we preserve today's self-attest behavior. Any error here
+        # falls back to self-attest — it must never 500.
+        if new_status == "done":
+            try:
+                validator_scenario = task.validation_scenario
+                if validator_scenario is None and task.stage_id:
+                    stage_lab = task.stage.lab_scenario
+                    # Only gate on the stage lab if it actually has a validator.
+                    if stage_lab and (stage_lab.validation_script or "").strip():
+                        validator_scenario = stage_lab
+                if validator_scenario is not None and not _user_passed_scenario(
+                    request.user, validator_scenario
+                ):
+                    return Response({
+                        "error": "validation_required",
+                        "message": (
+                            f"Complete and pass the lab '{validator_scenario.slug}' "
+                            "before marking this task done — the next ticket unlocks "
+                            "on a passing validation."
+                        ),
+                        "validation_scenario_slug": validator_scenario.slug,
+                    }, status=409)
+            except Exception as e:
+                # Never block on a validation-lookup failure — fall back to the
+                # historical self-attest behavior with the change still applied.
+                logger.warning(f"Task validation gate errored for task {task.id}: {e}")
 
         utp.status = new_status
         utp.notes = request.data.get("notes", utp.notes)
