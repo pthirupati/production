@@ -4,7 +4,7 @@ Seeds starter end-to-end projects (2-tier Nginx, 3-tier architecture) for DevOps
 Usage: python manage.py seed_projects
 """
 from django.core.management.base import BaseCommand
-from apps.question_bank.models import Technology, Project, ProjectTask, Scenario
+from apps.question_bank.models import Technology, Project, ProjectStage, ProjectTask, Scenario
 
 
 PROJECTS = [
@@ -9105,6 +9105,103 @@ PROJECTS = [
         "difficulty": "advanced",
         "estimated_hours": 10,
         "order": 20,
+        # ── REFERENCE STAGED WORKFLOW ─────────────────────────────────────
+        # CAP8 is the reference implementation of the ProjectStage model: a real
+        # staged, multi-lab, per-stage-technology workflow with artifact handoff
+        # and per-stage "where pipelines break" lessons. Every OTHER capstone
+        # stays flat (no stages) so this change is low-risk. Each stage names a
+        # `technology_slug` and, where a real existing lab fits, a `lab_scenario`
+        # slug (grep-confirmed under scenarios/); stages with no fitting lab
+        # (Nginx edge shedding, postmortem) leave lab_scenario null. Tasks below
+        # bind to a stage via `stage_order` and, where a lab validator can prove
+        # the step, name a `validation_scenario` slug so the next ticket unlocks
+        # on a PASS instead of self-attest.
+        "stages": [
+            {
+                "order": 1,
+                "title": "Define SLIs & SLO (Prometheus)",
+                "technology_slug": "prometheus",
+                "lab_scenario": "academy-prometheus-010-integration-exporters",
+                "description": "Instrument checkout and record the RED signals in Prometheus, then write the SLO that judges the incident.",
+                "handoff_artifact": {
+                    "name": "SLO definition",
+                    "description": "A documented SLO (e.g. p99 < 300ms at 99.9% success) + RED queries — the yardstick every later stage is measured against.",
+                },
+                "breakpoint_note": "Pipelines break when teams fix by vibes: with no SLI, you can't tell a real regression from noise, and you 'fix' the wrong thing. Define the measurement before touching anything.",
+            },
+            {
+                "order": 2,
+                "title": "Reproduce the spike (Python load test)",
+                "technology_slug": "python",
+                "lab_scenario": "academy-python-003-operate-http-api",
+                "description": "Build a Python load generator that ramps concurrency to Black-Friday levels and records latency percentiles as the system degrades.",
+                "handoff_artifact": {
+                    "name": "Repeatable load profile",
+                    "description": "A load test that drives the service into SLO violation on demand + the baseline p50/p95/p99 histogram — reused verbatim in stage 6 to prove the fix.",
+                },
+                "breakpoint_note": "The classic misread: latency climbs while CPU sits idle, so someone adds app replicas. Idle CPU + rising latency = a saturated DEPENDENCY, not compute — the load test is what exposes that.",
+            },
+            {
+                "order": 3,
+                "title": "Fix the real constraint: DB connection pool (PostgreSQL)",
+                "technology_slug": "postgresql",
+                "lab_scenario": "pg-connection-pool",
+                "description": "Correlate the spike with PostgreSQL — backends waiting, connections pinned at max_connections — and right-size/pool the connections so checkout stops starving.",
+                "handoff_artifact": {
+                    "name": "Bounded, pooled DB capacity",
+                    "description": "A known safe max-connections figure (bounded app pool / PgBouncer) — the ceiling the HPA in stage 4 must respect.",
+                },
+                "breakpoint_note": "THE core lesson: adding stateless app replicas here makes it WORSE — every replica opens its own connections and the DB saturates faster. Scale the CONSTRAINT, not the stateless tier.",
+            },
+            {
+                "order": 4,
+                "title": "Autoscale the right tier (Kubernetes HPA)",
+                "technology_slug": "kubernetes",
+                "lab_scenario": "academy-kubernetes-010-integration-autoscaling",
+                "description": "With the DB no longer the wall, add an HPA to the stateless checkout tier that scales on the SLI within a replica ceiling the pooled DB can sustain.",
+                "handoff_artifact": {
+                    "name": "Capacity-safe autoscaling",
+                    "description": "An HPA whose maxReplicas is capped to what the stage-3 pool can serve — safe elasticity, not a re-created outage.",
+                },
+                "breakpoint_note": "An unbounded HPA in front of a fixed connection pool just re-creates the outage at a higher replica count. Autoscaling is only safe AFTER the constraint is fixed and the ceiling respects it.",
+            },
+            {
+                "order": 5,
+                "title": "Shed load at the edge (Nginx)",
+                "technology_slug": None,  # No nginx technology/lab exists yet — configured directly.
+                "lab_scenario": None,
+                "description": "Configure the Nginx edge to rate-limit, cap concurrent connections, and return fast 429/503 + Retry-After beyond safe capacity instead of letting requests pile up.",
+                "handoff_artifact": {
+                    "name": "Graceful overflow behavior",
+                    "description": "limit_req/limit_conn zones + a friendly overflow response — a brownout envelope that keeps the served fraction inside SLO.",
+                },
+                "breakpoint_note": "Without a shed valve, one traffic spike past capacity turns a brownout (serve most, reject some fast) into a blackout (everyone times out). Edge load-shedding is the last line of defense.",
+            },
+            {
+                "order": 6,
+                "title": "Prove recovery under the original load (Prometheus + Python)",
+                "technology_slug": "prometheus",
+                "lab_scenario": "academy-prometheus-010-integration-exporters",
+                "description": "Re-run the exact stage-2 load profile with the pool fix, HPA, and load-shedding in place and confirm the SLO from stage 1 holds.",
+                "handoff_artifact": {
+                    "name": "Green SLO under peak",
+                    "description": "A before/after comparison against the stage-1 SLO proving p99 and error budget hold under the original peak — the evidence for the postmortem.",
+                },
+                "breakpoint_note": "Skipping the re-test under the ORIGINAL load is how 'fixes' regress silently. Green SLO under the same profile that broke it is the only proof the fix was real.",
+            },
+            {
+                "order": 7,
+                "title": "Write the blameless postmortem (SRE)",
+                "technology_slug": None,  # Documentation stage — no lab.
+                "lab_scenario": None,
+                "description": "Document the incident: timeline, the wrong turn (adding app replicas), the true root cause (pool exhaustion), the fix, and the follow-ups that stop a repeat.",
+                "handoff_artifact": {
+                    "name": "Blameless postmortem",
+                    "description": "Timeline + misleading symptom + true root cause + remediation + action items (pool alerts, load-test in CI) — the durable output of the whole incident.",
+                },
+                "breakpoint_note": "Postmortems break when they name a person instead of the trap. Name the trap so the next on-call doesn't fall in it: idle CPU + rising latency = saturated dependency, scale the constraint.",
+            },
+        ],
         "tasks": [
             {
                 "jira_key": "CAP8-1",
@@ -9113,6 +9210,8 @@ PROJECTS = [
                 "acceptance_criteria": "Prometheus scrapes RED metrics for checkout and a documented SLO (e.g. p99 < 300ms at 99.9% success) exists as the yardstick for the incident.",
                 "hint": "You cannot fix what you cannot measure. Define the SLI first — a p99-latency and success-rate query — and an error budget, before touching anything. (Prometheus SLIs.)",
                 "order": 1,
+                "stage_order": 1,
+                "validation_scenario": "academy-prometheus-010-integration-exporters",
             },
             {
                 "jira_key": "CAP8-2",
@@ -9122,6 +9221,8 @@ PROJECTS = [
                 "hint": "Ramp concurrency in steps and record per-step p50/p95/p99. The tell is latency exploding while CPU is idle — the bottleneck is a dependency, not compute. (Python load testing.)",
                 "order": 2,
                 "depends_on": "CAP8-1",
+                "stage_order": 2,
+                "validation_scenario": "academy-python-003-operate-http-api",
             },
             {
                 "jira_key": "CAP8-3",
@@ -9131,6 +9232,8 @@ PROJECTS = [
                 "hint": "THE LESSON: adding stateless app replicas here makes it WORSE — every replica opens its own connections and the DB saturates faster. Scale the constraint: bound and pool the DB connections (see academy-database-006-security-pooling). (PostgreSQL.)",
                 "order": 3,
                 "depends_on": "CAP8-2",
+                "stage_order": 3,
+                "validation_scenario": "pg-connection-pool",
             },
             {
                 "jira_key": "CAP8-4",
@@ -9140,6 +9243,8 @@ PROJECTS = [
                 "hint": "Cap maxReplicas to what the DB pool can serve — an unbounded HPA in front of a fixed pool just re-creates the outage at a higher replica count. Autoscaling is only safe once the constraint is fixed. (Kubernetes HPA.)",
                 "order": 4,
                 "depends_on": "CAP8-3",
+                "stage_order": 4,
+                "validation_scenario": "academy-kubernetes-010-integration-autoscaling",
             },
             {
                 "jira_key": "CAP8-5",
@@ -9149,6 +9254,8 @@ PROJECTS = [
                 "hint": "A brownout (serve most, reject some fast) beats a blackout (everyone times out). Use limit_req/limit_conn and a friendly overflow response. (Nginx — no lab slug; configure limit_req_zone and limit_conn_zone directly.)",
                 "order": 5,
                 "depends_on": "CAP8-4",
+                "stage_order": 5,
+                # No nginx lab exists — this stage self-attests (no validation_scenario).
             },
             {
                 "jira_key": "CAP8-6",
@@ -9158,6 +9265,8 @@ PROJECTS = [
                 "hint": "Re-run the exact CAP8-2 profile so the before/after is apples-to-apples. Green SLO under the same load is the proof the fix was real. (Prometheus + Python validation.)",
                 "order": 6,
                 "depends_on": "CAP8-5",
+                "stage_order": 6,
+                "validation_scenario": "academy-prometheus-010-integration-exporters",
             },
             {
                 "jira_key": "CAP8-7",
@@ -9167,6 +9276,8 @@ PROJECTS = [
                 "hint": "Name the trap explicitly so the next on-call doesn't fall in it: idle CPU + rising latency = saturated dependency, scale the constraint. (SRE postmortem.)",
                 "order": 7,
                 "depends_on": "CAP8-6",
+                "stage_order": 7,
+                # Documentation stage — self-attest.
             },
         ],
     },
@@ -11272,6 +11383,8 @@ class Command(BaseCommand):
             proj_data = dict(proj_src)
             tech_slug = proj_data.pop("technology_slug")
             tasks_data = proj_data.pop("tasks")
+            # Optional staged workflow (ProjectStage rows). Flat projects omit this.
+            stages_data = proj_data.pop("stages", None) or []
             try:
                 tech = Technology.objects.get(slug=tech_slug)
             except Technology.DoesNotExist:
@@ -11286,10 +11399,52 @@ class Command(BaseCommand):
                 defaults={**proj_data, "technology": tech},
             )
 
+            # Pass 0: create/update the project's stages (idempotent on
+            # (project, order)) so tasks can bind to them by stage_order below.
+            # Only staged projects (a non-empty "stages" list) get any rows; flat
+            # projects are untouched. Unresolvable tech/lab slugs degrade to null
+            # rather than failing the whole seed.
+            stage_by_order = {}
+            for stage_src in stages_data:
+                s_tech = None
+                s_tech_slug = stage_src.get("technology_slug")
+                if s_tech_slug:
+                    s_tech = Technology.objects.filter(slug=s_tech_slug).first()
+                    if s_tech is None:
+                        self.stderr.write(self.style.WARNING(
+                            f"  stage {stage_src['order']} tech '{s_tech_slug}' not found "
+                            f"in '{project.title}' — leaving stage_technology null"
+                        ))
+                s_lab = None
+                s_lab_slug = stage_src.get("lab_scenario")
+                if s_lab_slug:
+                    s_lab = Scenario.objects.filter(slug=s_lab_slug).first()
+                    if s_lab is None:
+                        self.stderr.write(self.style.WARNING(
+                            f"  stage {stage_src['order']} lab '{s_lab_slug}' not found "
+                            f"in '{project.title}' — leaving lab_scenario null"
+                        ))
+                stage, _ = ProjectStage.objects.update_or_create(
+                    project=project,
+                    order=stage_src["order"],
+                    defaults={
+                        "title": stage_src["title"],
+                        "description": stage_src.get("description", ""),
+                        "stage_technology": s_tech,
+                        "lab_scenario": s_lab,
+                        "handoff_artifact": stage_src.get("handoff_artifact", {}) or {},
+                        "breakpoint_note": stage_src.get("breakpoint_note", ""),
+                    },
+                )
+                stage_by_order[stage_src["order"]] = stage
+
             # Pass 1: create/update every task without its depends_on link, so all
-            # referenced tasks exist before we wire up dependencies.
+            # referenced tasks exist before we wire up dependencies. Task-only meta
+            # keys (depends_on, stage_order, validation_scenario) are resolved to
+            # real relations in Pass 2 — strip them from the model defaults here.
+            _task_meta_keys = {"depends_on", "stage_order", "validation_scenario"}
             for task_src in tasks_data:
-                task_data = {k: v for k, v in task_src.items() if k != "depends_on"}
+                task_data = {k: v for k, v in task_src.items() if k not in _task_meta_keys}
                 ProjectTask.objects.update_or_create(
                     project=project,
                     jira_key=task_data["jira_key"],
@@ -11297,23 +11452,55 @@ class Command(BaseCommand):
                 )
                 task_count += 1
 
-            # Pass 2: resolve depends_on (a jira_key string) into the actual ProjectTask.
+            # Pass 2: resolve the string/ordinal references into real relations —
+            # depends_on (jira_key), stage (stage_order), and validation_scenario
+            # (scenario slug). All are optional; a missing/unresolvable reference
+            # is left null with a warning rather than failing the seed.
             for task_src in tasks_data:
-                dep_key = task_src.get("depends_on")
-                if not dep_key:
-                    continue
                 try:
                     task = ProjectTask.objects.get(project=project, jira_key=task_src["jira_key"])
-                    dep = ProjectTask.objects.get(project=project, jira_key=dep_key)
                 except ProjectTask.DoesNotExist:
-                    self.stderr.write(self.style.WARNING(
-                        f"  depends_on '{dep_key}' not found for {task_src['jira_key']} "
-                        f"in '{project.title}' — leaving unset"
-                    ))
                     continue
-                if task.depends_on_id != dep.id:
-                    task.depends_on = dep
-                    task.save(update_fields=["depends_on"])
+                update_fields = []
+
+                dep_key = task_src.get("depends_on")
+                if dep_key:
+                    dep = ProjectTask.objects.filter(project=project, jira_key=dep_key).first()
+                    if dep is None:
+                        self.stderr.write(self.style.WARNING(
+                            f"  depends_on '{dep_key}' not found for {task_src['jira_key']} "
+                            f"in '{project.title}' — leaving unset"
+                        ))
+                    elif task.depends_on_id != dep.id:
+                        task.depends_on = dep
+                        update_fields.append("depends_on")
+
+                stage_order = task_src.get("stage_order")
+                if stage_order is not None:
+                    stage = stage_by_order.get(stage_order)
+                    if stage is None:
+                        self.stderr.write(self.style.WARNING(
+                            f"  stage_order {stage_order} not found for {task_src['jira_key']} "
+                            f"in '{project.title}' — leaving stage null"
+                        ))
+                    elif task.stage_id != stage.id:
+                        task.stage = stage
+                        update_fields.append("stage")
+
+                vsc_slug = task_src.get("validation_scenario")
+                if vsc_slug:
+                    vsc = Scenario.objects.filter(slug=vsc_slug).first()
+                    if vsc is None:
+                        self.stderr.write(self.style.WARNING(
+                            f"  validation_scenario '{vsc_slug}' not found for {task_src['jira_key']} "
+                            f"in '{project.title}' — leaving unset"
+                        ))
+                    elif task.validation_scenario_id != vsc.id:
+                        task.validation_scenario = vsc
+                        update_fields.append("validation_scenario")
+
+                if update_fields:
+                    task.save(update_fields=update_fields)
 
             # Give the project a launchable environment: an active scenario of its
             # technology, so "Start project" opens that tech's lab (terminal /

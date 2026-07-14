@@ -6,6 +6,7 @@ solution" boilerplate with practical, topic-aware content.
 from __future__ import annotations
 
 import re
+from functools import lru_cache
 
 ENRICHMENT_HEADER = "## Architecture, commands & reference"
 LEGACY_ENRICHMENT_HEADERS = (
@@ -18,6 +19,99 @@ _LEGACY_GENERIC_MERMAID = re.compile(
     r"\n+```mermaid\nflowchart LR\n\s+concept\[Core concept\].*?```\s*",
     re.DOTALL | re.I,
 )
+
+# Line-wrap hyphenation repairs (soft hyphen across a space or a newline).
+_HYPHEN_SPACE_RE = re.compile(r"(\w)- (\w)")
+_HYPHEN_NEWLINE_RE = re.compile(r"(\w)-\n(\w)")
+
+# Common seed typos / missing spaces. Precompiled once at import time so the
+# per-section enrichment loop (16k+ sections during a full seed) does not pay
+# regex-compile/lookup cost on every call — this was the dominant seed hot path.
+_PROSE_FIX_SPECS = (
+    (r"\btutorela\b", "tutorial"),
+    (r"\btutorelas\b", "tutorials"),
+    (r"\bmnay\b", "many"),
+    (r"\beperince\b", "experience"),
+    (r"\btechnolpogy\b", "technology"),
+    (r"\bscinario\b", "scenario"),
+    (r"\bscinarios\b", "scenarios"),
+    (r"\bscinarp\b", "script"),
+    (r"\bceritifate\b", "certificate"),
+    (r"\bconfiguraton\b", "configuration"),
+    (r"\bconfigura\s*tion\b", "configuration"),
+    (r"\barchitecure\b", "architecture"),
+    (r"\bfrom ero\b", "from zero"),
+    (r"\bsratch\b", "scratch"),
+    (r"\bteh\b", "the"),
+    (r"\bwiht\b", "with"),
+    (r"\btaht\b", "that"),
+    (r"\bhte\b", "the"),
+    (r"\brecieve\b", "receive"),
+    (r"\boccured\b", "occurred"),
+    (r"\bseperate\b", "separate"),
+    (r"\bdefinately\b", "definitely"),
+    (r"\benviroment\b", "environment"),
+    (r"\bparamaters\b", "parameters"),
+    (r"\bpriviledge\b", "privilege"),
+    (r"\bauthentica\s*tion\b", "authentication"),
+    (r"\bauthoriza\s*tion\b", "authorization"),
+)
+_PROSE_FIXES = tuple(
+    (re.compile(pat, re.I), repl) for pat, repl in _PROSE_FIX_SPECS
+)
+
+# Single-pass equivalent of the per-pattern loop above: one compiled alternation
+# scanned once over the body instead of ~40 separate full-text passes. Each typo
+# token is distinct and non-chaining, so first-alternative-wins matching yields
+# the same result as applying the patterns in sequence. Replacement is resolved
+# by normalizing the matched text (lowercase + collapse the two ``\s*`` gaps)
+# and looking it up in a dict — preserving byte-identical output.
+_PROSE_FIX_LOOKUP = {
+    "tutorela": "tutorial",
+    "tutorelas": "tutorials",
+    "mnay": "many",
+    "eperince": "experience",
+    "technolpogy": "technology",
+    "scinario": "scenario",
+    "scinarios": "scenarios",
+    "scinarp": "script",
+    "ceritifate": "certificate",
+    "configuraton": "configuration",
+    "configuration": "configuration",  # matches ``configura\s*tion``
+    "architecure": "architecture",
+    "from ero": "from zero",
+    "sratch": "scratch",
+    "teh": "the",
+    "wiht": "with",
+    "taht": "that",
+    "hte": "the",
+    "recieve": "receive",
+    "occured": "occurred",
+    "seperate": "separate",
+    "definately": "definitely",
+    "enviroment": "environment",
+    "paramaters": "parameters",
+    "priviledge": "privilege",
+    "authentication": "authentication",  # matches ``authentica\s*tion``
+    "authorization": "authorization",  # matches ``authoriza\s*tion``
+}
+_PROSE_FIX_COMBINED = re.compile(
+    "|".join(f"(?:{pat})" for pat, _ in _PROSE_FIX_SPECS), re.I
+)
+_WS_RE = re.compile(r"\s+")
+
+
+def _prose_fix_sub(match: re.Match) -> str:
+    # Resolve the replacement for a matched typo token. Try the raw lowercased
+    # text first (covers "from ero" whose key keeps its space), then the
+    # whitespace-collapsed form (covers the ``\s*`` gaps in configura/authentica/
+    # authoriza patterns, e.g. "configura tion" -> "configuration").
+    text = match.group(0)
+    lower = text.lower()
+    repl = _PROSE_FIX_LOOKUP.get(lower)
+    if repl is not None:
+        return repl
+    return _PROSE_FIX_LOOKUP.get(_WS_RE.sub("", lower), text)
 
 
 def strip_auto_enrichment(body: str) -> str:
@@ -55,8 +149,44 @@ def _topic_key(topic: str) -> str:
     return aliases.get(key, key.split("-")[0] if key else "general")
 
 
-def architecture_diagram(topic: str, title: str = "", module: str = "") -> str:
-    """Return a Mermaid architecture/flow diagram for the technology track."""
+@lru_cache(maxsize=None)
+def _profile_for(topic: str) -> dict:
+    """Best-effort topic profile lookup (safe if curriculum import fails).
+
+    Memoized: the profile for a topic is deterministic, and enrichment is
+    called once per section (16k+ during a full seed) with only a handful of
+    distinct topics. The returned dict is treated as read-only by all callers.
+    """
+    try:
+        from apps.tutorials.management.commands.curriculum.topic_profiles import get_profile
+        return get_profile(topic) or {}
+    except Exception:
+        return {}
+
+
+def architecture_diagram(
+    topic: str,
+    title: str = "",
+    module: str = "",
+    course_slug: str = "",
+    profile: dict | None = None,
+) -> str:
+    """Return a Mermaid architecture/flow diagram for the technology track.
+
+    Now per-course: build the diagram from the course's real components (curated
+    registry or the topic profile). Fall back to the legacy per-key diagram only
+    when no components are available.
+    """
+    if profile is None:
+        profile = _profile_for(topic)
+    from apps.tutorials.course_diagrams import course_architecture_diagram
+
+    per_course = course_architecture_diagram(
+        topic, profile=profile, course_slug=course_slug, module=module, title=title
+    )
+    if per_course:
+        return per_course
+
     key = _topic_key(topic)
     label = re.sub(r"[^A-Za-z0-9 _-]", "", (module or title or topic))[:48] or "Lesson"
     charts: dict[str, str] = {
@@ -307,14 +437,25 @@ def shell_practice_block(topic: str, title: str = "") -> str:
             "```"
         ),
     }
-    return examples.get(
-        key,
-        (
-            "```bash\n"
-            f"# Hands-on inspection for: {title or topic}\n"
-            "echo \"inspect → change one thing → verify with the same command\"\n"
-            "```"
-        ),
+    example = examples.get(key)
+    if example is not None:
+        # Pair the example commands with realistic sample output so the
+        # ShellBlock output pane / "compare to baseline" has content.
+        from apps.tutorials.course_diagrams import shell_block_with_output
+
+        # promql/powershell examples keep their own fenced block; only rebuild
+        # bash-style examples where sample output is meaningful.
+        if example.startswith("```bash"):
+            inner = example.strip("`").split("\n", 1)[-1].rsplit("```", 1)[0]
+            with_output = shell_block_with_output(inner, topic, title)
+            if with_output:
+                return with_output
+        return example
+    return (
+        "```bash\n"
+        f"# Hands-on inspection for: {title or topic}\n"
+        "echo \"inspect → change one thing → verify with the same command\"\n"
+        "```"
     )
 
 
@@ -382,12 +523,96 @@ _ILLUSTRATION_KEYS = frozenset({
     "vmware", "shell", "javascript", "react", "java", "html", "nodejs", "gpu", "ai",
 })
 
+_ILLUSTRATIONS_DIR = None
+_TOPIC_TO_COURSE = None
 
-def topic_illustration(topic: str, title: str = "") -> str:
-    """Markdown hero image for a lesson — maps topic to a static SVG illustration."""
+
+def _illustrations_dir():
+    global _ILLUSTRATIONS_DIR
+    if _ILLUSTRATIONS_DIR is None:
+        from pathlib import Path
+        # backend/apps/tutorials/tutorial_enrichment.py -> parents[3] == repo root
+        _ILLUSTRATIONS_DIR = (
+            Path(__file__).resolve().parents[3]
+            / "frontend" / "public" / "tutorials" / "illustrations"
+        )
+    return _ILLUSTRATIONS_DIR
+
+
+@lru_cache(maxsize=1)
+def _existing_illustration_keys() -> frozenset[str]:
+    """Set of illustration keys that have an ``<key>.svg`` on disk.
+
+    Listed once (single directory scan) instead of a per-section filesystem
+    ``stat`` — illustration selection happens for every section during seeding.
+    """
+    import os
+
+    try:
+        return frozenset(
+            name[:-4]
+            for name in os.listdir(_illustrations_dir())
+            if name.endswith(".svg")
+        )
+    except OSError:
+        return frozenset()
+
+
+def _topic_to_course_map() -> dict[str, str]:
+    """Map a slugified topic to its primary course_slug (for per-course SVGs).
+
+    Built once from the course catalog; falls back to empty on any import
+    failure so illustration selection degrades to the per-key SVG.
+    """
+    global _TOPIC_TO_COURSE
+    if _TOPIC_TO_COURSE is None:
+        mapping: dict[str, str] = {}
+        try:
+            from apps.tutorials.management.commands.course_catalog import (
+                all_course_definitions,
+            )
+            for course in all_course_definitions():
+                cs = course.get("course_slug", "")
+                ts = re.sub(r"[^a-z0-9]+", "-", (course.get("topic") or "").lower()).strip("-")
+                if ts and cs and ts not in mapping:
+                    mapping[ts] = cs
+        except Exception:
+            mapping = {}
+        _TOPIC_TO_COURSE = mapping
+    return _TOPIC_TO_COURSE
+
+
+@lru_cache(maxsize=None)
+def _illustration_key(topic: str, course_slug: str = "") -> str:
+    """Pick the best available SVG: per-course → per-key → general.
+
+    Memoized on (topic, course_slug); existence is checked against a set of
+    filenames listed once from disk instead of a per-call ``stat``.
+    """
+    exists = _existing_illustration_keys()
+
+    cs = re.sub(r"[^a-z0-9]+", "-", (course_slug or "").lower()).strip("-")
+    if cs and cs in exists:
+        return cs
+    ts = re.sub(r"[^a-z0-9]+", "-", (topic or "").lower()).strip("-")
+    mapped = _topic_to_course_map().get(ts)
+    if mapped and mapped in exists:
+        return mapped
     key = _topic_key(topic)
-    if key not in _ILLUSTRATION_KEYS:
-        key = "general"
+    if key in _ILLUSTRATION_KEYS and key in exists:
+        return key
+    if key in exists:
+        return key
+    return "general"
+
+
+def topic_illustration(topic: str, title: str = "", course_slug: str = "") -> str:
+    """Markdown hero image for a lesson — maps each course to its own SVG.
+
+    Prefers the per-course illustration (distinct per course_slug), then the
+    per-technology SVG, and finally general.svg only when nothing matches.
+    """
+    key = _illustration_key(topic, course_slug)
     label = re.sub(r"[^A-Za-z0-9 _-]", "", (title or topic))[:64] or key.title()
     return f"![{label} — architecture overview](/tutorials/illustrations/{key}.svg)"
 
@@ -397,38 +622,8 @@ def fix_broken_prose(text: str) -> str:
     if not text:
         return text
     # configura- tion → configuration (soft hyphen across lines)
-    text = re.sub(r"(\w)- (\w)", r"\1\2", text)
-    text = re.sub(r"(\w)-\n(\w)", r"\1\2", text)
-    # Common seed typos / missing spaces
-    fixes = (
-        (r"\btutorela\b", "tutorial"),
-        (r"\btutorelas\b", "tutorials"),
-        (r"\bmnay\b", "many"),
-        (r"\beperince\b", "experience"),
-        (r"\btechnolpogy\b", "technology"),
-        (r"\bscinario\b", "scenario"),
-        (r"\bscinarios\b", "scenarios"),
-        (r"\bscinarp\b", "script"),
-        (r"\bceritifate\b", "certificate"),
-        (r"\bconfiguraton\b", "configuration"),
-        (r"\bconfigura\s*tion\b", "configuration"),
-        (r"\barchitecure\b", "architecture"),
-        (r"\bfrom ero\b", "from zero"),
-        (r"\bsratch\b", "scratch"),
-        (r"\bteh\b", "the"),
-        (r"\bwiht\b", "with"),
-        (r"\btaht\b", "that"),
-        (r"\bhte\b", "the"),
-        (r"\brecieve\b", "receive"),
-        (r"\boccured\b", "occurred"),
-        (r"\bseperate\b", "separate"),
-        (r"\bdefinately\b", "definitely"),
-        (r"\benviroment\b", "environment"),
-        (r"\bparamaters\b", "parameters"),
-        (r"\bpriviledge\b", "privilege"),
-        (r"\bauthentica\s*tion\b", "authentication"),
-        (r"\bauthoriza\s*tion\b", "authorization"),
-    )
-    for pat, repl in fixes:
-        text = re.sub(pat, repl, text, flags=re.I)
-    return text
+    text = _HYPHEN_SPACE_RE.sub(r"\1\2", text)
+    text = _HYPHEN_NEWLINE_RE.sub(r"\1\2", text)
+    # Common seed typos / missing spaces: one combined alternation scanned once
+    # instead of ~40 separate full-text passes (the dominant seed hot path).
+    return _PROSE_FIX_COMBINED.sub(_prose_fix_sub, text)

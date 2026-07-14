@@ -32,7 +32,10 @@ jobs:
       - name: Run health checks
         id: check
         env:
-          BASE_URL: ${{ github.event.inputs.base_url || secrets.PROD_BASE_URL }}
+          # Default to the known prod domain so the heartbeat never depends on an
+          # unset PROD_BASE_URL secret (an empty BASE_URL made every probe hit a
+          # hostless URL → curl 000 → the recurring false "health check failed").
+          BASE_URL: ${{ github.event.inputs.base_url || secrets.PROD_BASE_URL || 'https://fixitlab.in' }}
         run: |
           FAILED=""
           PASS=0
@@ -58,8 +61,11 @@ jobs:
           echo "Target: $BASE_URL"
           echo ""
 
-          # Core health
-          check "api/health"              "$BASE_URL/api/health/"
+          # Core health. NOTE: /api/health/ (liveness) is intentionally blocked
+          # from EXTERNAL access by the gateway (nginx.cluster.conf.template — it is
+          # an internal/in-container probe), so probing it from GitHub returns 403.
+          # The externally-reachable readiness signal is /api/health/ready/ (200 when
+          # the DB is up; Vault-on-edge is a non-fatal live source on the app node).
           check "api/health/ready"          "$BASE_URL/api/health/ready/"
           check "api/stats"               "$BASE_URL/api/stats/"
           check "api/technologies"        "$BASE_URL/api/technologies/"
