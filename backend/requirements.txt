@@ -45,7 +45,7 @@ stripe>=15.2.1,<16.0
 
 # Monitoring & observability
 sentry-sdk[django]>=2.63.0
-structlog>=24.1
+structlog>=26.1.0
 
 # Security
 django-ratelimit>=4.1
