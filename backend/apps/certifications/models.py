@@ -233,3 +233,47 @@ class CertEarnedCertificate(models.Model):
     @property
     def is_expired(self):
         return timezone.now() > self.expires_at
+
+
+class OpenBadgeCredential(models.Model):
+    """A W3C Verifiable Credential / Open Badge 3.0 minted from an earned cert.
+
+    Additive layer over ``CertEarnedCertificate``: when a learner passes a
+    track's mock exam and a cert is issued, we mint a spec-shaped OB 3.0
+    JSON-LD credential, Ed25519-sign it, and store the signed document plus the
+    public key used, so the credential can be re-verified offline by the public
+    verify endpoint (or any third-party wallet/verifier) with no server-side
+    secret. The private key never touches this table.
+    """
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    # Public, non-enumerable identifier used in the credential's `id` and the
+    # verify URL. Distinct from the human-facing CertEarnedCertificate id.
+    credential_uuid = models.UUIDField(default=uuid.uuid4, unique=True, editable=False)
+    certificate = models.OneToOneField(
+        CertEarnedCertificate,
+        on_delete=models.CASCADE,
+        related_name="open_badge",
+    )
+    # Denormalized so a credential can be looked up / verified even if the
+    # underlying user or track row changes; recipient email is stored ONLY as a
+    # salted hash (identityHash), never in the clear.
+    recipient_hash = models.CharField(max_length=128, blank=True, default="")
+    achievement_name = models.CharField(max_length=255)
+    achievement_description = models.TextField(blank=True, default="")
+    # The full, signed OB 3.0 credential document (JSON-LD). Source of truth for
+    # verification — the proof inside it is checked against `public_key_b64`.
+    credential = models.JSONField(default=dict, blank=True)
+    # Base-64 raw 32-byte Ed25519 PUBLIC key that verifies the proof. Persisted
+    # so verification is self-contained even if the signing key later rotates.
+    public_key_b64 = models.CharField(max_length=128, blank=True, default="")
+    # Detached-JWS proof value (also embedded inside `credential.proof`).
+    proof_value = models.TextField(blank=True, default="")
+    issued_on = models.DateTimeField(default=timezone.now)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["-created_at"]
+
+    def __str__(self):
+        return f"OB3:{self.credential_uuid}"
