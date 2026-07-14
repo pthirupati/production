@@ -1,0 +1,105 @@
+title: 'VirtualService Names an Undefined Subset'
+slug: mesh-destinationrule-subset-undefined
+technology: service-mesh
+category: Fix
+difficulty: medium
+scenario_type: fix
+lab_mode: simulation
+simulation_type: generic
+time_limit: 1500
+max_score: 100
+is_free: false
+infrastructure_type: docker
+jira_priority: Medium
+description: |-
+  CONTEXT: A platform team operating service mesh needs you to resolve `VirtualService Names an Undefined Subset` during a realistic delivery incident. The business impact is a stalled or unsafe release until the underlying state is repaired.
+
+  ENVIRONMENT: You are working in FixitLab's offline service-mesh lab with an Istio/Linkerd control plane, sidecar-injected workloads, and mesh CRDs (VirtualService, DestinationRule, AuthorizationPolicy) under /mesh. The mesh runs locally; no cloud load balancer or paid APIs are required.
+
+  SYMPTOM / STARTING STATE: Requests to `reviews` fail with `no healthy upstream`. The VirtualService routes 90% to subset `v2`, but the DestinationRule only defines `v1`, so Envoy has no cluster for v2 and drops the traffic.
+
+  OBJECTIVE: The VirtualService references a subset (`v2`) that the DestinationRule never defines, so Envoy has no matching cluster and returns no healthy upstream. Add the `v2` subset (with its label selector) to the DestinationRule so the route resolves, then re-test. Success is graded on the real repaired state, not a manual marker.
+
+  WHAT TO AVOID: Do not suppress the signal, disable the policy/gate, or fake completion with marker files — reproduce the diagnosis, then apply the smallest fix that satisfies the objective and re-run Check Solution.
+objectives:
+- 'Requests to the reviews service stop returning no healthy upstream'
+- 'The undefined DestinationRule subset is confirmed as root cause'
+- 'The v2 route resolves once the subset is defined'
+initial_state: |-
+  Requests to `reviews` fail with `no healthy upstream`. The VirtualService routes 90% to subset `v2`, but the DestinationRule only defines `v1`, so Envoy has no cluster for v2 and drops the traffic.
+hints:
+- order: 1
+  cost: 0
+  content: |-
+    Where to look — orient before changing anything:
+        1. `kubectl get virtualservice reviews -o yaml`
+        2. `kubectl get destinationrule reviews -o yaml`
+        3. `istioctl proxy-config cluster deploy/productpage`
+        Write down what looks healthy versus wrong. Form one hypothesis before you touch anything.
+- order: 2
+  cost: 25
+  content: |-
+    Diagnostic steps:
+        1. Re-run `kubectl get virtualservice reviews -o yaml` and read the status/error carefully.
+        2. Cross-check with `kubectl get destinationrule reviews -o yaml` to isolate the failing object.
+        3. State the single root cause in one sentence before you act.
+- order: 3
+  cost: 50
+  content: |-
+    Exact fix + verification:
+        1. The VirtualService references a subset (`v2`) that the DestinationRule never defines, so Envoy has no matching cluster and returns no healthy upstream. Add the `v2` subset (with its label selector) to the DestinationRule so the route resolves, then re-test.
+        2. Change one thing at a time so you can roll back if the hypothesis was wrong.
+        3. Verify the objective is met, then click Check Solution (graded on real state, not a marker file).
+summary: |-
+  Diagnose and resolve virtualservice names an undefined subset in the service-mesh simulation lab and verify the healthy end state
+estimated_minutes: 25
+xp_reward: 100
+prerequisites:
+- 'Basic Kubernetes networking literacy'
+tags:
+- 'service-mesh'
+- 'fix'
+- 'hands-on'
+- 'simulation'
+linked_tutorial: service-mesh-fundamentals
+what_you_will_learn:
+- 'Requests to the reviews service stop returning no healthy upstream'
+- 'The undefined DestinationRule subset is confirmed as root cause'
+- 'Understand how VirtualService routes bind to DestinationRule subsets and why an undefined subset yields no healthy upstream'
+environment:
+  nodes:
+  - role: primary
+    os: FixitLab service-mesh lab
+    hostname: lab-primary
+    ip: 127.0.0.1
+    specs: local offline simulation
+  pre_installed:
+  - bash
+  - coreutils
+  - kubectl
+  - istioctl
+  - linkerd
+  credentials:
+  - user: root
+    password: lab123
+tasks:
+- id: task_1
+  title: 'VirtualService Names an Undefined Subset'
+  description: |-
+    Restore healthy behavior for VirtualService Names an Undefined Subset by reproducing the diagnosis from the symptom, isolating the root cause with evidence, applying the smallest safe fix, and validating the outcome with the checker.
+  background: |-
+    This service-mesh lab teaches how VirtualService routes bind to DestinationRule subsets and why an undefined subset yields no healthy upstream through systematic troubleshooting: observe, hypothesize, change, verify.
+  validation:
+    type: custom_script
+    script: check.sh
+    error_message: |-
+      The scenario objective is not yet satisfied. Re-read hint tier 2, confirm the root cause, and apply the documented remediation so /opt/fixitlab/academy/mesh-destinationrule-subset-undefined.conf carries the FIXED-OK marker.
+solution:
+  summary: |-
+    The VirtualService references a subset (`v2`) that the DestinationRule never defines, so Envoy has no matching cluster and returns no healthy upstream. Add the `v2` subset (with its label selector) to the DestinationRule so the route resolves, then re-test.
+  files_changed: []
+  commands_run:
+  - 'kubectl get virtualservice reviews -o yaml'
+  - 'kubectl get destinationrule reviews -o yaml'
+  - 'istioctl proxy-config cluster deploy/productpage'
+  reference_docs: service-mesh-fundamentals

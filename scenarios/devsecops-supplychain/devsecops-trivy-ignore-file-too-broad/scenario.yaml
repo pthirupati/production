@@ -1,0 +1,106 @@
+title: 'A Broad .trivyignore Hides Real CVEs'
+slug: devsecops-trivy-ignore-file-too-broad
+technology: devsecops-supplychain
+category: Harden
+difficulty: medium
+scenario_type: fix
+lab_mode: simulation
+simulation_type: generic
+time_limit: 1500
+max_score: 100
+is_free: false
+infrastructure_type: docker
+jira_priority: Medium
+description: |-
+  CONTEXT: A platform team operating devsecops supplychain needs you to resolve `A Broad .trivyignore Hides Real CVEs` during a realistic delivery incident. The business impact is a stalled or unsafe release until the underlying state is repaired.
+
+  ENVIRONMENT: You are working in FixitLab's offline supply-chain security lab with a local OCI registry, Trivy scanner, cosign keys, an SBOM store, and a Falco runtime sensor under /supplychain. Everything runs locally; no external registry or paid APIs are required.
+
+  SYMPTOM / STARTING STATE: A CRITICAL RCE CVE slipped past the gate. The `.trivyignore` file contains a wildcard/blanket entry added months ago to silence one finding, and it now suppresses many unrelated, still-exploitable CVEs.
+
+  OBJECTIVE: The `.trivyignore` has an over-broad or unexpiring entry that suppresses far more than the one accepted risk, hiding real CVEs. Scope the ignore to the specific CVE ID with a documented expiry (or remove it) so genuine findings are surfaced again. Success is graded on the real repaired state, not a manual marker.
+
+  WHAT TO AVOID: Do not suppress the signal, disable the policy/gate, or fake completion with marker files — reproduce the diagnosis, then apply the smallest fix that satisfies the objective and re-run Check Solution.
+objectives:
+- 'The previously hidden CRITICAL CVE is reported by the scan'
+- 'The over-broad .trivyignore entry is confirmed as root cause'
+- 'The ignore list is scoped to specific, documented, expiring exceptions'
+initial_state: |-
+  A CRITICAL RCE CVE slipped past the gate. The `.trivyignore` file contains a wildcard/blanket entry added months ago to silence one finding, and it now suppresses many unrelated, still-exploitable CVEs.
+hints:
+- order: 1
+  cost: 0
+  content: |-
+    Where to look — orient before changing anything:
+        1. `cat /supplychain/.trivyignore`
+        2. `trivy image --severity CRITICAL --ignorefile /dev/null api:2.3`
+        3. `trivy image --severity CRITICAL api:2.3`
+        Write down what looks healthy versus wrong. Form one hypothesis before you touch anything.
+- order: 2
+  cost: 25
+  content: |-
+    Diagnostic steps:
+        1. Re-run `cat /supplychain/.trivyignore` and read the status/error carefully.
+        2. Cross-check with `trivy image --severity CRITICAL --ignorefile /dev/null api:2.3` to isolate the failing object.
+        3. State the single root cause in one sentence before you act.
+- order: 3
+  cost: 50
+  content: |-
+    Exact fix + verification:
+        1. The `.trivyignore` has an over-broad or unexpiring entry that suppresses far more than the one accepted risk, hiding real CVEs. Scope the ignore to the specific CVE ID with a documented expiry (or remove it) so genuine findings are surfaced again.
+        2. Change one thing at a time so you can roll back if the hypothesis was wrong.
+        3. Verify the objective is met, then click Check Solution (graded on real state, not a marker file).
+summary: |-
+  Diagnose and resolve a broad .trivyignore hides real cves in the devsecops-supplychain simulation lab and verify the healthy end state
+estimated_minutes: 25
+xp_reward: 100
+prerequisites:
+- 'Basic container image and CI/CD literacy'
+tags:
+- 'devsecops-supplychain'
+- 'fix'
+- 'hands-on'
+- 'simulation'
+linked_tutorial: devsecops-supplychain-fundamentals
+what_you_will_learn:
+- 'The previously hidden CRITICAL CVE is reported by the scan'
+- 'The over-broad .trivyignore entry is confirmed as root cause'
+- 'Understand how .trivyignore accepts risk and why broad or unexpiring ignore entries create dangerous blind spots'
+environment:
+  nodes:
+  - role: primary
+    os: FixitLab supply-chain security lab
+    hostname: lab-primary
+    ip: 127.0.0.1
+    specs: local offline simulation
+  pre_installed:
+  - bash
+  - coreutils
+  - trivy
+  - cosign
+  - syft
+  - falco
+  credentials:
+  - user: root
+    password: lab123
+tasks:
+- id: task_1
+  title: 'A Broad .trivyignore Hides Real CVEs'
+  description: |-
+    Restore healthy behavior for A Broad .trivyignore Hides Real CVEs by reproducing the diagnosis from the symptom, isolating the root cause with evidence, applying the smallest safe fix, and validating the outcome with the checker.
+  background: |-
+    This devsecops-supplychain lab teaches how .trivyignore accepts risk and why broad or unexpiring ignore entries create dangerous blind spots through systematic troubleshooting: observe, hypothesize, change, verify.
+  validation:
+    type: custom_script
+    script: check.sh
+    error_message: |-
+      The scenario objective is not yet satisfied. Re-read hint tier 2, confirm the root cause, and apply the documented remediation so /opt/fixitlab/academy/devsecops-trivy-ignore-file-too-broad.conf carries the FIXED-OK marker.
+solution:
+  summary: |-
+    The `.trivyignore` has an over-broad or unexpiring entry that suppresses far more than the one accepted risk, hiding real CVEs. Scope the ignore to the specific CVE ID with a documented expiry (or remove it) so genuine findings are surfaced again.
+  files_changed: []
+  commands_run:
+  - 'cat /supplychain/.trivyignore'
+  - 'trivy image --severity CRITICAL --ignorefile /dev/null api:2.3'
+  - 'trivy image --severity CRITICAL api:2.3'
+  reference_docs: devsecops-supplychain-fundamentals

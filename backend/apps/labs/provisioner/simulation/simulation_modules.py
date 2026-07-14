@@ -195,6 +195,115 @@ def _register_gpu(engine: "UnifiedSimulationEngine", shell: RHELShell) -> None:
                 if not healthy:
                     return "NVIDIA-SMI has failed because it couldn't communicate with the NVIDIA driver."
                 return f"{GPU_NAMES[0]}, {random.randint(30, 85)}, {random.randint(2000, 38000)}, 40960"
+            # ── nvidia-smi sub-commands (topology / nvlink / mig / -q -d <section>) ──
+            # Datacenter-realistic detail views. Cosmetic only: the healthy path
+            # renders a clean view; the unhealthy path mirrors a fallen-off driver.
+            if not healthy and any(k in low for k in ("topo", "nvlink", "mig", "-q")):
+                return "NVIDIA-SMI has failed because it couldn't communicate with the NVIDIA driver."
+            if "topo" in low and "-m" in low:
+                return (
+                    "\t GPU0\t GPU1\t GPU2\t GPU3\t CPU Affinity\t NUMA Affinity\n"
+                    "GPU0\t X   \t NV18\t NV18\t NV18\t 0-31       \t 0\n"
+                    "GPU1\t NV18\t X   \t NV18\t NV18\t 0-31       \t 0\n"
+                    "GPU2\t NV18\t NV18\t X   \t NV18\t 32-63      \t 1\n"
+                    "GPU3\t NV18\t NV18\t NV18\t X   \t 32-63      \t 1\n\n"
+                    "Legend: X = Self, NV# = NVLink connection (# links), "
+                    "SYS = across PCIe+SMP interconnect, PIX = single PCIe bridge")
+            if "nvlink" in low:
+                if "-e" in parts:
+                    return ("GPU 0: NVIDIA H100 80GB HBM3\n"
+                            "\t Link 0: Replay Errors: 0\n"
+                            "\t Link 0: Recovery Errors: 0\n"
+                            "\t Link 0: CRC Errors: 0")
+                return ("GPU 0: NVIDIA H100 80GB HBM3\n"
+                        "\t Link 0: 26.562 GB/s\n"
+                        "\t Link 1: 26.562 GB/s\n"
+                        "\t Link 2: 26.562 GB/s\n"
+                        "\t Link 3: 26.562 GB/s")
+            if "mig" in low:
+                if "-lgip" in low:
+                    return ("+-----------------------------------------------------------------------------+\n"
+                            "| GPU instance profiles:                                                      |\n"
+                            "| GPU   Name             ID    Instances   Memory     P2P    SM    DEC   ENC   |\n"
+                            "|                              Free/Total   GiB              CE    JPEG  OFA   |\n"
+                            "|=============================================================================|\n"
+                            "|   0  MIG 1g.10gb       19     7/7        9.75       No     14    1     0     |\n"
+                            "|   0  MIG 2g.20gb       14     3/3        19.62      No     28    2     0     |\n"
+                            "|   0  MIG 3g.40gb        9     2/2        39.50      No     42    3     0     |\n"
+                            "|   0  MIG 7g.80gb        0     1/1        79.25      No     98    7     0     |\n"
+                            "+-----------------------------------------------------------------------------+")
+                if "-lgi" in low or "-lci" in low:
+                    return ("+-------------------------------------------------------+\n"
+                            "| GPU instances:                                        |\n"
+                            "| GPU   Name          Profile  Instance   Placement     |\n"
+                            "|                     ID       ID         Start:Size     |\n"
+                            "|=======================================================|\n"
+                            "|   0  MIG 3g.40gb     9        1          0:4            |\n"
+                            "|   0  MIG 3g.40gb     9        2          4:4            |\n"
+                            "+-------------------------------------------------------+")
+                return ""
+            if "-q" in parts or low.startswith("nvidia-smi -q"):
+                if "ecc" in low:
+                    return ("==============NVSMI LOG==============\n"
+                            "Ecc Mode\n"
+                            "\t Current                       : Enabled\n"
+                            "ECC Errors\n"
+                            "\t Volatile\n"
+                            "\t\t SRAM Correctable          : 0\n"
+                            "\t\t SRAM Uncorrectable        : 0\n"
+                            "\t\t DRAM Correctable          : 0\n"
+                            "\t\t DRAM Uncorrectable        : 0\n"
+                            "\t Aggregate\n"
+                            "\t\t DRAM Uncorrectable        : 0")
+                if "page_retirement" in low or "remap" in low or "row" in low:
+                    return ("==============NVSMI LOG==============\n"
+                            "Remapped Rows\n"
+                            "\t Correctable Error              : 0\n"
+                            "\t Uncorrectable Error            : 0\n"
+                            "\t Pending                        : No\n"
+                            "\t Remapping Failure Occurred     : No\n"
+                            "Retired Pages\n"
+                            "\t Single Bit ECC                 : 0\n"
+                            "\t Double Bit ECC                 : 0\n"
+                            "\t Pending Page Blacklist         : No")
+                if "temperature" in low:
+                    t = random.randint(34, 62)
+                    return ("==============NVSMI LOG==============\n"
+                            "Temperature\n"
+                            f"\t GPU Current Temp               : {t} C\n"
+                            "\t GPU Slowdown Temp              : 87 C\n"
+                            "\t GPU Shutdown Temp              : 92 C\n"
+                            f"\t Memory Current Temp            : {t + 6} C\n"
+                            "\t Memory Max Operating Temp      : 95 C")
+                if "power" in low:
+                    return ("==============NVSMI LOG==============\n"
+                            "Power Readings\n"
+                            "\t Power Draw                     : 118.42 W\n"
+                            "\t Current Power Limit            : 700.00 W\n"
+                            "\t Default Power Limit            : 700.00 W\n"
+                            "\t Enforced Power Limit           : 700.00 W\n"
+                            "\t Max Power Limit                : 700.00 W")
+                if "performance" in low or "clock" in low:
+                    return ("==============NVSMI LOG==============\n"
+                            "Clocks Throttle Reasons\n"
+                            "\t Idle                           : Not Active\n"
+                            "\t SW Power Cap                   : Not Active\n"
+                            "\t HW Thermal Slowdown            : Not Active\n"
+                            "\t HW Power Brake Slowdown        : Not Active\n"
+                            "\t SW Thermal Slowdown            : Not Active")
+                # generic `-q` dump
+                return ("==============NVSMI LOG==============\n"
+                        "Driver Version                        : 550.90.07\n"
+                        "CUDA Version                          : 12.4\n"
+                        "Attached GPUs                         : 8\n"
+                        "GPU 00000000:01:00.0\n"
+                        "\t Product Name                  : NVIDIA H100 80GB HBM3\n"
+                        "\t Persistence Mode              : Enabled\n"
+                        "\t MIG Mode\n"
+                        "\t\t Current                   : Disabled")
+            if "-pm" in parts or "-pl" in parts or low.startswith("nvidia-smi -r"):
+                # persistence-mode / power-limit set, or GPU reset — acknowledge.
+                return "All done."
             if healthy:
                 util = random.randint(0, 95)
                 mem = random.randint(1000, 38000)
@@ -243,6 +352,52 @@ def _register_gpu(engine: "UnifiedSimulationEngine", shell: RHELShell) -> None:
         if low.startswith("dcgmi") or low.startswith("dcgm"):
             if not healthy:
                 return "Error: Unable to connect to nv-hostengine. GPU driver not loaded."
+            if "discovery" in low:
+                return ("8 GPUs found.\n"
+                        "+--------+----------------------------------------------------------------------+\n"
+                        "| GPU ID | Device Information                                                   |\n"
+                        "+========+======================================================================+\n"
+                        "| 0      | Name: NVIDIA H100 80GB HBM3                                          |\n"
+                        "|        | PCI Bus ID: 00000000:01:00.0                                        |\n"
+                        "| 1-7    | Name: NVIDIA H100 80GB HBM3                                          |\n"
+                        "+--------+----------------------------------------------------------------------+")
+            if "diag" in low:
+                # `dcgmi diag -r <1|2|3|4>` — the sim renders a clean pass run.
+                level = "1"
+                for tok in ("-r", "--run"):
+                    if tok in parts:
+                        try:
+                            level = parts[parts.index(tok) + 1]
+                        except (ValueError, IndexError):
+                            pass
+                return (f"Successfully ran diagnostic (run level {level}) for group.\n"
+                        "+---------------------------+------------------------------------------------+\n"
+                        "|Diagnostic                 | Result                                         |\n"
+                        "+===========================+================================================+\n"
+                        "|-----  Deployment  --------+------------------------------------------------|\n"
+                        "| Denylist                  | Pass                                           |\n"
+                        "| NVML Library              | Pass                                           |\n"
+                        "| CUDA Main Library         | Pass                                           |\n"
+                        "| Persistence Mode          | Pass                                           |\n"
+                        "|-----  Integration  -------+------------------------------------------------|\n"
+                        "| PCIe                      | Pass - All                                     |\n"
+                        "|-----  Hardware  ----------+------------------------------------------------|\n"
+                        "| GPU Memory                | Pass - All                                     |\n"
+                        "| Memory Bandwidth          | Pass - All                                     |\n"
+                        "|-----  Stress  ------------+------------------------------------------------|\n"
+                        "| Targeted Stress           | Pass - All                                     |\n"
+                        "| Targeted Power            | Pass - All                                     |\n"
+                        "+---------------------------+------------------------------------------------+")
+            if "health" in low:
+                return ("+-----------------------------------------------------------------------------+\n"
+                        "| Health Monitor Report                                                       |\n"
+                        "+=================================+===========================================+\n"
+                        "| Overall Health                  | Healthy                                   |\n"
+                        "+---------------------------------+-------------------------------------------+")
+            if "dmon" in low:
+                return ("# Entity  GPUTL  MCUTL   TMPTR   POWER   ECCUC\n"
+                        "    GPU 0    37     22      41      118       0\n"
+                        "    GPU 1    41     25      43      126       0")
             return ("+----+-----------+----------------------------------------------------------+\n"
                     "| GPU| Health    | Details                                                  |\n"
                     "+====+===========+==========================================================+\n"
@@ -253,7 +408,33 @@ def _register_gpu(engine: "UnifiedSimulationEngine", shell: RHELShell) -> None:
                 return "Error: NVIDIA driver is not loaded"
             return f"[0] {GPU_NAMES[0]} | {random.randint(35, 75)}'C, {random.randint(10, 90)} % | {random.randint(2000, 38000)} / 40960 MB"
         if low.startswith("rocm-smi") or low.startswith("amd-smi"):
-            return "ROCm System Management Interface\nGPU  Temp  AvgPwr  Use%\n0    45c   120W    37%"
+            if "showtopo" in low or "shownodesbw" in low or "topo" in low:
+                return ("============================ Weight between two GPUs ========================\n"
+                        "       GPU0         GPU1         GPU2         GPU3\n"
+                        "GPU0   0            15           15           15\n"
+                        "GPU1   15           0            15           15\n"
+                        "GPU2   15           15           0            15\n"
+                        "GPU3   15           15           15           0\n"
+                        "==================== Link Type between two GPUs ====================\n"
+                        "       GPU0   GPU1   GPU2   GPU3\n"
+                        "GPU0   0      XGMI   XGMI   XGMI\n"
+                        "GPU1   XGMI   0      XGMI   XGMI\n"
+                        "GPU2   XGMI   XGMI   0      XGMI\n"
+                        "GPU3   XGMI   XGMI   XGMI   0")
+            if low.startswith("amd-smi") and "list" in low:
+                return ("GPU: 0\n    BDF: 0000:05:00.0\n    UUID: 12ff74a1-0000-1000-...\n"
+                        "    KFD_ID: 63274\n    NODE_ID: 2\n    Market Name: AMD Instinct MI300X\n"
+                        "GPU: 1\n    BDF: 0000:26:00.0\n    Market Name: AMD Instinct MI300X\n"
+                        "... (8 accelerators)")
+            if "static" in low or "rocminfo" in low:
+                return ("Agent 2\n  Name:                    gfx942\n  Marketing Name:          AMD Instinct MI300X\n"
+                        "  Device Type:             GPU\n  Wavefront Size:          64(0x40)")
+            return ("========================= ROCm System Management Interface =========================\n"
+                    "================================= Concise Info =====================================\n"
+                    "GPU  Temp   AvgPwr  SCLK     MCLK     Fan  Perf  PwrCap  VRAM%  GPU%\n"
+                    "0    45.0c  120.0W  1300Mhz  1600Mhz  0%   auto  750.0W   37%   37%\n"
+                    "1    46.0c  124.0W  1300Mhz  1600Mhz  0%   auto  750.0W   41%   40%\n"
+                    "====================================================================================")
         return f"{line}: OK (GPU simulation)"
     shell.register_handler(handler)
 

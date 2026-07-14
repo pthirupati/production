@@ -1,0 +1,105 @@
+title: 'Namespace Labeled for the Wrong Istio Revision'
+slug: mesh-namespace-injection-revision-mismatch
+technology: service-mesh
+category: Fix
+difficulty: medium
+scenario_type: fix
+lab_mode: simulation
+simulation_type: generic
+time_limit: 1500
+max_score: 100
+is_free: false
+infrastructure_type: docker
+jira_priority: Medium
+description: |-
+  CONTEXT: A platform team operating service mesh needs you to resolve `Namespace Labeled for the Wrong Istio Revision` during a realistic delivery incident. The business impact is a stalled or unsafe release until the underlying state is repaired.
+
+  ENVIRONMENT: You are working in FixitLab's offline service-mesh lab with an Istio/Linkerd control plane, sidecar-injected workloads, and mesh CRDs (VirtualService, DestinationRule, AuthorizationPolicy) under /mesh. The mesh runs locally; no cloud load balancer or paid APIs are required.
+
+  SYMPTOM / STARTING STATE: New pods in `web` come up without a sidecar even though the namespace is labeled for injection. It uses `istio-injection=enabled` while the cluster runs a revisioned control plane that only injects for `istio.io/rev=`.
+
+  OBJECTIVE: The namespace uses the legacy `istio-injection=enabled` label while the installation is revision-based, so the revisioned injector webhook does not match and skips injection. Relabel the namespace with the matching `istio.io/rev=<revision>` (removing the legacy label) and restart the workloads so sidecars are injected. Success is graded on the real repaired state, not a manual marker.
+
+  WHAT TO AVOID: Do not suppress the signal, disable the policy/gate, or fake completion with marker files — reproduce the diagnosis, then apply the smallest fix that satisfies the objective and re-run Check Solution.
+objectives:
+- 'New web pods come up with the istio-proxy sidecar'
+- 'The revision-label mismatch is confirmed as root cause'
+- 'The revisioned injector matches the namespace after relabeling'
+initial_state: |-
+  New pods in `web` come up without a sidecar even though the namespace is labeled for injection. It uses `istio-injection=enabled` while the cluster runs a revisioned control plane that only injects for `istio.io/rev=`.
+hints:
+- order: 1
+  cost: 0
+  content: |-
+    Where to look — orient before changing anything:
+        1. `kubectl get namespace web --show-labels`
+        2. `kubectl get mutatingwebhookconfiguration -l app=sidecar-injector`
+        3. `istioctl tag list`
+        Write down what looks healthy versus wrong. Form one hypothesis before you touch anything.
+- order: 2
+  cost: 25
+  content: |-
+    Diagnostic steps:
+        1. Re-run `kubectl get namespace web --show-labels` and read the status/error carefully.
+        2. Cross-check with `kubectl get mutatingwebhookconfiguration -l app=sidecar-injector` to isolate the failing object.
+        3. State the single root cause in one sentence before you act.
+- order: 3
+  cost: 50
+  content: |-
+    Exact fix + verification:
+        1. The namespace uses the legacy `istio-injection=enabled` label while the installation is revision-based, so the revisioned injector webhook does not match and skips injection. Relabel the namespace with the matching `istio.io/rev=<revision>` (removing the legacy label) and restart the workloads so sidecars are injected.
+        2. Change one thing at a time so you can roll back if the hypothesis was wrong.
+        3. Verify the objective is met, then click Check Solution (graded on real state, not a marker file).
+summary: |-
+  Diagnose and resolve namespace labeled for the wrong istio revision in the service-mesh simulation lab and verify the healthy end state
+estimated_minutes: 25
+xp_reward: 100
+prerequisites:
+- 'Basic Kubernetes networking literacy'
+tags:
+- 'service-mesh'
+- 'fix'
+- 'hands-on'
+- 'simulation'
+linked_tutorial: service-mesh-fundamentals
+what_you_will_learn:
+- 'New web pods come up with the istio-proxy sidecar'
+- 'The revision-label mismatch is confirmed as root cause'
+- 'Understand how revisioned Istio installs use istio.io/rev labels for injection and why the legacy injection label is ignored under revisions'
+environment:
+  nodes:
+  - role: primary
+    os: FixitLab service-mesh lab
+    hostname: lab-primary
+    ip: 127.0.0.1
+    specs: local offline simulation
+  pre_installed:
+  - bash
+  - coreutils
+  - kubectl
+  - istioctl
+  - linkerd
+  credentials:
+  - user: root
+    password: lab123
+tasks:
+- id: task_1
+  title: 'Namespace Labeled for the Wrong Istio Revision'
+  description: |-
+    Restore healthy behavior for Namespace Labeled for the Wrong Istio Revision by reproducing the diagnosis from the symptom, isolating the root cause with evidence, applying the smallest safe fix, and validating the outcome with the checker.
+  background: |-
+    This service-mesh lab teaches how revisioned Istio installs use istio.io/rev labels for injection and why the legacy injection label is ignored under revisions through systematic troubleshooting: observe, hypothesize, change, verify.
+  validation:
+    type: custom_script
+    script: check.sh
+    error_message: |-
+      The scenario objective is not yet satisfied. Re-read hint tier 2, confirm the root cause, and apply the documented remediation so /opt/fixitlab/academy/mesh-namespace-injection-revision-mismatch.conf carries the FIXED-OK marker.
+solution:
+  summary: |-
+    The namespace uses the legacy `istio-injection=enabled` label while the installation is revision-based, so the revisioned injector webhook does not match and skips injection. Relabel the namespace with the matching `istio.io/rev=<revision>` (removing the legacy label) and restart the workloads so sidecars are injected.
+  files_changed: []
+  commands_run:
+  - 'kubectl get namespace web --show-labels'
+  - 'kubectl get mutatingwebhookconfiguration -l app=sidecar-injector'
+  - 'istioctl tag list'
+  reference_docs: service-mesh-fundamentals
