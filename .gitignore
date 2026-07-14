@@ -26,6 +26,12 @@ frontend/dist/
 *.pem
 *.key
 
+# --- User uploads & runtime-generated media (NEVER commit) ---
+# MEDIA_ROOT = backend/media. Holds community thread attachments and the
+# auto-generated Open Badge Ed25519 signing key (openbadge_signing_key.json) —
+# both are per-host runtime artifacts / secrets, never source.
+backend/media/
+
 # --- Private owner/startup documentation (confidential — NEVER commit) ---
 docs/private/
 

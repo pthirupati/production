@@ -1,0 +1,126 @@
+title: DCGM Discovery Shows a Missing GPU
+slug: gpu-dcgmi-discovery-missing-gpu
+technology: gpu
+category: Fix
+difficulty: medium
+lab_mode: simulation
+simulation_type: gpu
+time_limit: 1200
+max_score: 100
+is_free: false
+jira_priority: High
+dual_terminal: false
+requires_companion_hosts: false
+description: 'CONTEXT: An SRE/GPU-infrastructure team running a datacenter accelerator fleet must resolve
+  `DCGM Discovery Shows a Missing GPU` during a live incident. Until the underlying hardware/driver state
+  is repaired, GPU capacity is lost and training/inference jobs fail, so throughput and SLAs are at risk.
+
+
+  ENVIRONMENT: You are on a FixitLab offline GPU node with nvidia-smi, the NVIDIA driver/CUDA stack, DCGM
+  (dcgmi / nv-hostengine / dcgm-exporter), the container toolkit, and — for AMD hosts — the ROCm stack
+  (rocm-smi / amd-smi). All tools run locally; no paid APIs or external cloud calls are required.
+
+
+  SYMPTOM / STARTING STATE: `dcgmi discovery -l` reports 7 GPUs instead of 8, while `nvidia-smi` intermittently
+  shows the 8th. nv-hostengine has a stale device list and DCGM group membership is wrong.
+
+
+  OBJECTIVE: Run dcgmi discovery and confirm the GPU count mismatch versus nvidia-smi; Determine whether
+  nv-hostengine has a stale topology or the GPU is genuinely unhealthy; Restore full discovery so all
+  8 GPUs are enumerated by DCGM. Success means `check.sh` exits successfully after you apply the documented
+  remediation.
+
+
+  WHAT TO AVOID: Do not apply broad destructive changes, disable safety limits to mask the fault, skip
+  evidence gathering, or fake completion with marker files — the checker validates real system state.'
+initial_state: A node that should expose 8 GPUs but `dcgmi discovery -l` only lists 7; the fleet scheduler
+  keeps under-allocating this host.
+objectives:
+- Run dcgmi discovery and confirm the GPU count mismatch versus nvidia-smi
+- Determine whether nv-hostengine has a stale topology or the GPU is genuinely unhealthy
+- Restore full discovery so all 8 GPUs are enumerated by DCGM
+hints:
+- order: 1
+  cost: 0
+  content: 'Where to look: `dcgmi discovery -l` for the DCGM view and compare with `nvidia-smi -L`; check
+    `systemctl status nvidia-dcgm` / nv-hostengine.'
+- order: 2
+  cost: 25
+  content: 'Diagnostic steps:
+
+    1. `dcgmi discovery -l` — count the GPUs DCGM sees.
+
+    2. `nvidia-smi -L` — count what the driver sees.
+
+    3. `systemctl status nvidia-dcgm nv-hostengine` — a stale or crashed hostengine explains a phantom
+    count.
+
+    4. `dcgmi group -l` to inspect the default group membership.'
+- order: 3
+  cost: 50
+  content: 'Exact fix + verification:
+
+    1. Restart the host engine: `systemctl restart nvidia-dcgm` (or `nv-hostengine -t && nv-hostengine`)
+    so it re-scans the topology.
+
+    2. Re-run `dcgmi discovery -l` and confirm all 8 GPUs appear.
+
+    3. Apply the documented remediation in /opt/fixitlab/academy/gpu-dcgmi-discovery-missing-gpu.conf.
+
+    WHY: the checker validates DCGM genuinely re-enumerated the fleet.'
+summary: Diagnose and fix dcgm discovery shows a missing gpu on a datacenter GPU node and verify with
+  the checker
+estimated_minutes: 20
+xp_reward: 100
+prerequisites:
+- Basic GPU and Linux troubleshooting literacy
+tags:
+- fix
+- gpu
+- nvidia
+- hands-on
+linked_tutorial: gpu-fundamentals
+what_you_will_learn:
+- Run dcgmi discovery and confirm the GPU count mismatch versus nvidia-smi
+- Determine whether nv-hostengine has a stale topology or the GPU is genuinely unhealthy
+- Restore full discovery so all 8 GPUs are enumerated by DCGM
+environment:
+  nodes:
+  - role: primary
+    os: FixitLab GPU node
+    hostname: gpu-node-01
+    ip: 127.0.0.1
+    specs: local offline simulation (NVIDIA + AMD datacenter GPUs)
+  pre_installed:
+  - bash
+  - coreutils
+  - gpu
+  - nvidia-smi
+  - dcgmi
+  - rocm-smi
+  - journalctl
+  - systemctl
+  credentials:
+  - user: root
+    password: lab123
+tasks:
+- id: task_1
+  title: DCGM Discovery Shows a Missing GPU
+  description: Restore healthy behavior for DCGM Discovery Shows a Missing GPU by investigating the failure
+    with the GPU tooling, applying the smallest safe fix, and validating the outcome.
+  background: 'This GPU lab teaches systematic datacenter accelerator troubleshooting: observe, hypothesize,
+    change, verify.'
+  validation:
+    type: command_output
+    command: nvidia-smi
+    expected_output: NVIDIA-SMI
+    error_message: GPU health check still fails. Verify driver, device visibility, and that the documented
+      fix was applied.
+solution:
+  summary: Identify the root cause behind dcgm discovery shows a missing gpu and apply the minimal documented
+    fix.
+  files_changed: []
+  commands_run:
+  - nvidia-smi
+  - dcgmi diag -r 1
+  reference_docs: gpu-fundamentals

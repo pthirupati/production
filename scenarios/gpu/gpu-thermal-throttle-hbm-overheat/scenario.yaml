@@ -1,0 +1,125 @@
+title: GPU Thermal Throttling from HBM Overheat
+slug: gpu-thermal-throttle-hbm-overheat
+technology: gpu
+category: Fix
+difficulty: medium
+lab_mode: simulation
+simulation_type: gpu
+time_limit: 1200
+max_score: 100
+is_free: false
+jira_priority: High
+dual_terminal: false
+requires_companion_hosts: false
+description: 'CONTEXT: An SRE/GPU-infrastructure team running a datacenter accelerator fleet must resolve
+  `GPU Thermal Throttling from HBM Overheat` during a live incident. Until the underlying hardware/driver
+  state is repaired, GPU capacity is lost and training/inference jobs fail, so throughput and SLAs are
+  at risk.
+
+
+  ENVIRONMENT: You are on a FixitLab offline GPU node with nvidia-smi, the NVIDIA driver/CUDA stack, DCGM
+  (dcgmi / nv-hostengine / dcgm-exporter), the container toolkit, and — for AMD hosts — the ROCm stack
+  (rocm-smi / amd-smi). All tools run locally; no paid APIs or external cloud calls are required.
+
+
+  SYMPTOM / STARTING STATE: `nvidia-smi -q -d TEMPERATURE,PERFORMANCE` shows GPU/HBM temps near the slowdown
+  threshold with ''HW Thermal Slowdown: Active''; clocks drop to base and throughput craters. A blocked
+  inlet or failed fan is starving airflow.
+
+
+  OBJECTIVE: Confirm the GPUs are thermally throttling and read GPU + HBM/memory temperatures; Identify
+  the airflow/fan/inlet cause versus an over-aggressive power cap; Restore cooling so the thermal slowdown
+  clears and clocks return to boost. Success means `check.sh` exits successfully after you apply the documented
+  remediation.
+
+
+  WHAT TO AVOID: Do not apply broad destructive changes, disable safety limits to mask the fault, skip
+  evidence gathering, or fake completion with marker files — the checker validates real system state.'
+initial_state: A rack where two GPUs throttle hard under load; nvidia-smi shows HW Thermal Slowdown active
+  and HBM memory temperature near the shutdown limit.
+objectives:
+- Confirm the GPUs are thermally throttling and read GPU + HBM/memory temperatures
+- Identify the airflow/fan/inlet cause versus an over-aggressive power cap
+- Restore cooling so the thermal slowdown clears and clocks return to boost
+hints:
+- order: 1
+  cost: 0
+  content: 'Where to look: `nvidia-smi -q -d TEMPERATURE` (GPU + Memory temp), `nvidia-smi -q -d PERFORMANCE`
+    (Clocks Throttle Reasons), and `nvidia-smi dmon -s pct` to watch temp/clocks live.'
+- order: 2
+  cost: 25
+  content: 'Diagnostic steps:
+
+    1. `nvidia-smi -q -d PERFORMANCE | grep -i throttle` — confirm ''HW Thermal Slowdown: Active''.
+
+    2. `nvidia-smi -q -d TEMPERATURE` — read GPU Current and Memory (HBM) temps versus Slowdown/Shutdown.
+
+    3. Check chassis: fan tach, inlet temp, and whether a neighboring GPU shares the failure.'
+- order: 3
+  cost: 50
+  content: 'Exact fix + verification:
+
+    1. Restore airflow (clear the blockage / replace the failed fan / fix the fan curve); do not just
+    raise the shutdown limit.
+
+    2. Re-run `nvidia-smi -q -d PERFORMANCE` and confirm no thermal slowdown and clocks at boost.
+
+    3. Apply the documented remediation in /opt/fixitlab/academy/gpu-thermal-throttle-hbm-overheat.conf.
+
+    WHY: the checker validates the thermal condition genuinely cleared.'
+summary: Diagnose and fix gpu thermal throttling from hbm overheat on a datacenter GPU node and verify
+  with the checker
+estimated_minutes: 20
+xp_reward: 100
+prerequisites:
+- Basic GPU and Linux troubleshooting literacy
+tags:
+- fix
+- gpu
+- nvidia
+- hands-on
+linked_tutorial: gpu-fundamentals
+what_you_will_learn:
+- Confirm the GPUs are thermally throttling and read GPU + HBM/memory temperatures
+- Identify the airflow/fan/inlet cause versus an over-aggressive power cap
+- Restore cooling so the thermal slowdown clears and clocks return to boost
+environment:
+  nodes:
+  - role: primary
+    os: FixitLab GPU node
+    hostname: gpu-node-01
+    ip: 127.0.0.1
+    specs: local offline simulation (NVIDIA + AMD datacenter GPUs)
+  pre_installed:
+  - bash
+  - coreutils
+  - gpu
+  - nvidia-smi
+  - dcgmi
+  - rocm-smi
+  - journalctl
+  - systemctl
+  credentials:
+  - user: root
+    password: lab123
+tasks:
+- id: task_1
+  title: GPU Thermal Throttling from HBM Overheat
+  description: Restore healthy behavior for GPU Thermal Throttling from HBM Overheat by investigating
+    the failure with the GPU tooling, applying the smallest safe fix, and validating the outcome.
+  background: 'This GPU lab teaches systematic datacenter accelerator troubleshooting: observe, hypothesize,
+    change, verify.'
+  validation:
+    type: command_output
+    command: nvidia-smi
+    expected_output: NVIDIA-SMI
+    error_message: GPU health check still fails. Verify driver, device visibility, and that the documented
+      fix was applied.
+solution:
+  summary: Identify the root cause behind gpu thermal throttling from hbm overheat and apply the minimal
+    documented fix.
+  files_changed: []
+  commands_run:
+  - nvidia-smi
+  - dcgmi diag -r 1
+  reference_docs: gpu-fundamentals

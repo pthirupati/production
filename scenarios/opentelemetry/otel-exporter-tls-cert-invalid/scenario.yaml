@@ -1,0 +1,105 @@
+title: 'OTLP Export Fails TLS Verification'
+slug: otel-exporter-tls-cert-invalid
+technology: opentelemetry
+category: Fix
+difficulty: medium
+scenario_type: fix
+lab_mode: simulation
+simulation_type: generic
+time_limit: 1500
+max_score: 100
+is_free: false
+infrastructure_type: docker
+jira_priority: Medium
+description: |-
+  CONTEXT: A platform team operating opentelemetry needs you to resolve `OTLP Export Fails TLS Verification` during a realistic delivery incident. The business impact is a stalled or unsafe release until the underlying state is repaired.
+
+  ENVIRONMENT: You are working in FixitLab's offline observability lab with an OpenTelemetry Collector, an instrumented demo service, and a local trace/metric backend under /otel. All components run locally; no SaaS observability vendor or paid APIs are required.
+
+  SYMPTOM / STARTING STATE: The exporter logs `x509: certificate signed by unknown authority` and no telemetry ships. The backend uses a private CA but the Collector's OTLP exporter does not trust it.
+
+  OBJECTIVE: The Collector's OTLP exporter TLS block does not reference the backend's CA bundle (`ca_file`), so certificate verification fails. Add the correct `tls.ca_file` (or the proper cert/key pair) so the exporter trusts the backend, then reload — do not disable verification with `insecure: true`. Success is graded on the real repaired state, not a manual marker.
+
+  WHAT TO AVOID: Do not suppress the signal, disable the policy/gate, or fake completion with marker files — reproduce the diagnosis, then apply the smallest fix that satisfies the objective and re-run Check Solution.
+objectives:
+- 'The OTLP exporter completes TLS handshake with the backend'
+- 'The missing CA bundle is confirmed as the verification failure cause'
+- 'Verification is fixed by trusting the CA, not by disabling TLS'
+initial_state: |-
+  The exporter logs `x509: certificate signed by unknown authority` and no telemetry ships. The backend uses a private CA but the Collector's OTLP exporter does not trust it.
+hints:
+- order: 1
+  cost: 0
+  content: |-
+    Where to look — orient before changing anything:
+        1. `cat /otel/collector/config.yaml`
+        2. `openssl s_client -connect backend:4317 -showcerts </dev/null`
+        3. `otelcol validate --config /otel/collector/config.yaml`
+        Write down what looks healthy versus wrong. Form one hypothesis before you touch anything.
+- order: 2
+  cost: 25
+  content: |-
+    Diagnostic steps:
+        1. Re-run `cat /otel/collector/config.yaml` and read the status/error carefully.
+        2. Cross-check with `openssl s_client -connect backend:4317 -showcerts </dev/null` to isolate the failing object.
+        3. State the single root cause in one sentence before you act.
+- order: 3
+  cost: 50
+  content: |-
+    Exact fix + verification:
+        1. The Collector's OTLP exporter TLS block does not reference the backend's CA bundle (`ca_file`), so certificate verification fails. Add the correct `tls.ca_file` (or the proper cert/key pair) so the exporter trusts the backend, then reload — do not disable verification with `insecure: true`.
+        2. Change one thing at a time so you can roll back if the hypothesis was wrong.
+        3. Verify the objective is met, then click Check Solution (graded on real state, not a marker file).
+summary: |-
+  Diagnose and resolve otlp export fails tls verification in the opentelemetry simulation lab and verify the healthy end state
+estimated_minutes: 25
+xp_reward: 100
+prerequisites:
+- 'Basic distributed-systems and HTTP literacy'
+tags:
+- 'opentelemetry'
+- 'fix'
+- 'hands-on'
+- 'simulation'
+linked_tutorial: opentelemetry-fundamentals
+what_you_will_learn:
+- 'The OTLP exporter completes TLS handshake with the backend'
+- 'The missing CA bundle is confirmed as the verification failure cause'
+- 'Understand how OTLP exporter TLS verification works and why trusting a private CA is the correct fix instead of insecure mode'
+environment:
+  nodes:
+  - role: primary
+    os: FixitLab OpenTelemetry observability lab
+    hostname: lab-primary
+    ip: 127.0.0.1
+    specs: local offline simulation
+  pre_installed:
+  - bash
+  - coreutils
+  - otelcol
+  - curl
+  - jq
+  credentials:
+  - user: root
+    password: lab123
+tasks:
+- id: task_1
+  title: 'OTLP Export Fails TLS Verification'
+  description: |-
+    Restore healthy behavior for OTLP Export Fails TLS Verification by reproducing the diagnosis from the symptom, isolating the root cause with evidence, applying the smallest safe fix, and validating the outcome with the checker.
+  background: |-
+    This opentelemetry lab teaches how OTLP exporter TLS verification works and why trusting a private CA is the correct fix instead of insecure mode through systematic troubleshooting: observe, hypothesize, change, verify.
+  validation:
+    type: custom_script
+    script: check.sh
+    error_message: |-
+      The scenario objective is not yet satisfied. Re-read hint tier 2, confirm the root cause, and apply the documented remediation so /opt/fixitlab/academy/otel-exporter-tls-cert-invalid.conf carries the FIXED-OK marker.
+solution:
+  summary: |-
+    The Collector's OTLP exporter TLS block does not reference the backend's CA bundle (`ca_file`), so certificate verification fails. Add the correct `tls.ca_file` (or the proper cert/key pair) so the exporter trusts the backend, then reload — do not disable verification with `insecure: true`.
+  files_changed: []
+  commands_run:
+  - 'cat /otel/collector/config.yaml'
+  - 'openssl s_client -connect backend:4317 -showcerts </dev/null'
+  - 'otelcol validate --config /otel/collector/config.yaml'
+  reference_docs: opentelemetry-fundamentals

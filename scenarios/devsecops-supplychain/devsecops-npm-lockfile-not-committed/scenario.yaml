@@ -1,0 +1,106 @@
+title: 'Non-Reproducible Build: Lockfile Missing'
+slug: devsecops-npm-lockfile-not-committed
+technology: devsecops-supplychain
+category: Harden
+difficulty: medium
+scenario_type: fix
+lab_mode: simulation
+simulation_type: generic
+time_limit: 1500
+max_score: 100
+is_free: false
+infrastructure_type: docker
+jira_priority: Medium
+description: |-
+  CONTEXT: A platform team operating devsecops supplychain needs you to resolve `Non-Reproducible Build: Lockfile Missing` during a realistic delivery incident. The business impact is a stalled or unsafe release until the underlying state is repaired.
+
+  ENVIRONMENT: You are working in FixitLab's offline supply-chain security lab with a local OCI registry, Trivy scanner, cosign keys, an SBOM store, and a Falco runtime sensor under /supplychain. Everything runs locally; no external registry or paid APIs are required.
+
+  SYMPTOM / STARTING STATE: Two CI runs of the same commit produce images with different dependency versions. The repo has `package.json` but no committed `package-lock.json`, so `npm install` resolves floating ranges differently each build.
+
+  OBJECTIVE: The lockfile is not committed, so dependency resolution is non-deterministic and builds are not reproducible (and cannot be reliably scanned). Commit the lockfile and switch the build to `npm ci` so every build installs the exact pinned tree. Success is graded on the real repaired state, not a manual marker.
+
+  WHAT TO AVOID: Do not suppress the signal, disable the policy/gate, or fake completion with marker files — reproduce the diagnosis, then apply the smallest fix that satisfies the objective and re-run Check Solution.
+objectives:
+- 'The build resolves an identical, pinned dependency tree every run'
+- 'The missing committed lockfile is confirmed as root cause'
+- 'The build uses ci-mode against a committed lockfile after the fix'
+initial_state: |-
+  Two CI runs of the same commit produce images with different dependency versions. The repo has `package.json` but no committed `package-lock.json`, so `npm install` resolves floating ranges differently each build.
+hints:
+- order: 1
+  cost: 0
+  content: |-
+    Where to look — orient before changing anything:
+        1. `ls -a /supplychain/app`
+        2. `grep -n 'npm install\|npm ci' Dockerfile`
+        3. `cat /supplychain/app/package.json | head`
+        Write down what looks healthy versus wrong. Form one hypothesis before you touch anything.
+- order: 2
+  cost: 25
+  content: |-
+    Diagnostic steps:
+        1. Re-run `ls -a /supplychain/app` and read the status/error carefully.
+        2. Cross-check with `grep -n 'npm install\|npm ci' Dockerfile` to isolate the failing object.
+        3. State the single root cause in one sentence before you act.
+- order: 3
+  cost: 50
+  content: |-
+    Exact fix + verification:
+        1. The lockfile is not committed, so dependency resolution is non-deterministic and builds are not reproducible (and cannot be reliably scanned). Commit the lockfile and switch the build to `npm ci` so every build installs the exact pinned tree.
+        2. Change one thing at a time so you can roll back if the hypothesis was wrong.
+        3. Verify the objective is met, then click Check Solution (graded on real state, not a marker file).
+summary: |-
+  Diagnose and resolve non-reproducible build: lockfile missing in the devsecops-supplychain simulation lab and verify the healthy end state
+estimated_minutes: 25
+xp_reward: 100
+prerequisites:
+- 'Basic container image and CI/CD literacy'
+tags:
+- 'devsecops-supplychain'
+- 'fix'
+- 'hands-on'
+- 'simulation'
+linked_tutorial: devsecops-supplychain-fundamentals
+what_you_will_learn:
+- 'The build resolves an identical, pinned dependency tree every run'
+- 'The missing committed lockfile is confirmed as root cause'
+- 'Understand why a committed lockfile plus ci-mode installs make builds reproducible and scannable in the supply chain'
+environment:
+  nodes:
+  - role: primary
+    os: FixitLab supply-chain security lab
+    hostname: lab-primary
+    ip: 127.0.0.1
+    specs: local offline simulation
+  pre_installed:
+  - bash
+  - coreutils
+  - trivy
+  - cosign
+  - syft
+  - falco
+  credentials:
+  - user: root
+    password: lab123
+tasks:
+- id: task_1
+  title: 'Non-Reproducible Build: Lockfile Missing'
+  description: |-
+    Restore healthy behavior for Non-Reproducible Build: Lockfile Missing by reproducing the diagnosis from the symptom, isolating the root cause with evidence, applying the smallest safe fix, and validating the outcome with the checker.
+  background: |-
+    This devsecops-supplychain lab teaches why a committed lockfile plus ci-mode installs make builds reproducible and scannable in the supply chain through systematic troubleshooting: observe, hypothesize, change, verify.
+  validation:
+    type: custom_script
+    script: check.sh
+    error_message: |-
+      The scenario objective is not yet satisfied. Re-read hint tier 2, confirm the root cause, and apply the documented remediation so /opt/fixitlab/academy/devsecops-npm-lockfile-not-committed.conf carries the FIXED-OK marker.
+solution:
+  summary: |-
+    The lockfile is not committed, so dependency resolution is non-deterministic and builds are not reproducible (and cannot be reliably scanned). Commit the lockfile and switch the build to `npm ci` so every build installs the exact pinned tree.
+  files_changed: []
+  commands_run:
+  - 'ls -a /supplychain/app'
+  - 'grep -n ''npm install\|npm ci'' Dockerfile'
+  - 'cat /supplychain/app/package.json | head'
+  reference_docs: devsecops-supplychain-fundamentals

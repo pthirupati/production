@@ -1,0 +1,106 @@
+title: 'Internal Package Resolves From the Public Index'
+slug: devsecops-dependency-confusion-public-source
+technology: devsecops-supplychain
+category: Harden
+difficulty: hard
+scenario_type: fix
+lab_mode: simulation
+simulation_type: generic
+time_limit: 1800
+max_score: 100
+is_free: false
+infrastructure_type: docker
+jira_priority: Medium
+description: |-
+  CONTEXT: A platform team operating devsecops supplychain needs you to resolve `Internal Package Resolves From the Public Index` during a realistic delivery incident. The business impact is a stalled or unsafe release until the underlying state is repaired.
+
+  ENVIRONMENT: You are working in FixitLab's offline supply-chain security lab with a local OCI registry, Trivy scanner, cosign keys, an SBOM store, and a Falco runtime sensor under /supplychain. Everything runs locally; no external registry or paid APIs are required.
+
+  SYMPTOM / STARTING STATE: A build pulled `acme-internal-utils` from the public registry instead of the private one — a dependency-confusion vector. The package manager config lists the public index first with no scope pinning for internal packages.
+
+  OBJECTIVE: The package-manager config resolves the internal package name from the public index (no scoped registry mapping), exposing a dependency-confusion attack. Pin the internal scope/namespace to the private registry (and disable public fallback for it) so internal packages only resolve from the trusted source. Success is graded on the real repaired state, not a manual marker.
+
+  WHAT TO AVOID: Do not suppress the signal, disable the policy/gate, or fake completion with marker files — reproduce the diagnosis, then apply the smallest fix that satisfies the objective and re-run Check Solution.
+objectives:
+- 'The internal package resolves only from the private registry'
+- 'The public-first resolution / missing scope pin is confirmed as root cause'
+- 'Public fallback for internal scopes is disabled after the fix'
+initial_state: |-
+  A build pulled `acme-internal-utils` from the public registry instead of the private one — a dependency-confusion vector. The package manager config lists the public index first with no scope pinning for internal packages.
+hints:
+- order: 1
+  cost: 0
+  content: |-
+    Where to look — orient before changing anything:
+        1. `cat /supplychain/app/.npmrc`
+        2. `grep -rn 'registry' /supplychain/app/.npmrc`
+        3. `npm config get registry`
+        Write down what looks healthy versus wrong. Form one hypothesis before you touch anything.
+- order: 2
+  cost: 25
+  content: |-
+    Diagnostic steps:
+        1. Re-run `cat /supplychain/app/.npmrc` and read the status/error carefully.
+        2. Cross-check with `grep -rn 'registry' /supplychain/app/.npmrc` to isolate the failing object.
+        3. State the single root cause in one sentence before you act.
+- order: 3
+  cost: 50
+  content: |-
+    Exact fix + verification:
+        1. The package-manager config resolves the internal package name from the public index (no scoped registry mapping), exposing a dependency-confusion attack. Pin the internal scope/namespace to the private registry (and disable public fallback for it) so internal packages only resolve from the trusted source.
+        2. Change one thing at a time so you can roll back if the hypothesis was wrong.
+        3. Verify the objective is met, then click Check Solution (graded on real state, not a marker file).
+summary: |-
+  Diagnose and resolve internal package resolves from the public index in the devsecops-supplychain simulation lab and verify the healthy end state
+estimated_minutes: 30
+xp_reward: 100
+prerequisites:
+- 'Basic container image and CI/CD literacy'
+tags:
+- 'devsecops-supplychain'
+- 'fix'
+- 'hands-on'
+- 'simulation'
+linked_tutorial: devsecops-supplychain-fundamentals
+what_you_will_learn:
+- 'The internal package resolves only from the private registry'
+- 'The public-first resolution / missing scope pin is confirmed as root cause'
+- 'Understand how dependency confusion exploits public/private resolution order and how scoped registry pinning prevents it'
+environment:
+  nodes:
+  - role: primary
+    os: FixitLab supply-chain security lab
+    hostname: lab-primary
+    ip: 127.0.0.1
+    specs: local offline simulation
+  pre_installed:
+  - bash
+  - coreutils
+  - trivy
+  - cosign
+  - syft
+  - falco
+  credentials:
+  - user: root
+    password: lab123
+tasks:
+- id: task_1
+  title: 'Internal Package Resolves From the Public Index'
+  description: |-
+    Restore healthy behavior for Internal Package Resolves From the Public Index by reproducing the diagnosis from the symptom, isolating the root cause with evidence, applying the smallest safe fix, and validating the outcome with the checker.
+  background: |-
+    This devsecops-supplychain lab teaches how dependency confusion exploits public/private resolution order and how scoped registry pinning prevents it through systematic troubleshooting: observe, hypothesize, change, verify.
+  validation:
+    type: custom_script
+    script: check.sh
+    error_message: |-
+      The scenario objective is not yet satisfied. Re-read hint tier 2, confirm the root cause, and apply the documented remediation so /opt/fixitlab/academy/devsecops-dependency-confusion-public-source.conf carries the FIXED-OK marker.
+solution:
+  summary: |-
+    The package-manager config resolves the internal package name from the public index (no scoped registry mapping), exposing a dependency-confusion attack. Pin the internal scope/namespace to the private registry (and disable public fallback for it) so internal packages only resolve from the trusted source.
+  files_changed: []
+  commands_run:
+  - 'cat /supplychain/app/.npmrc'
+  - 'grep -rn ''registry'' /supplychain/app/.npmrc'
+  - 'npm config get registry'
+  reference_docs: devsecops-supplychain-fundamentals

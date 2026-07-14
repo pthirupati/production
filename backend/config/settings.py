@@ -204,9 +204,21 @@ STATIC_ROOT = BASE_DIR / "staticfiles"
 
 MEDIA_URL = "/media/"
 MEDIA_ROOT = BASE_DIR / "media"
-# Serve uploaded files through Django only in DEBUG or when explicitly enabled.
-# Production should serve /media/ from nginx with auth, not via Django.
-SERVE_MEDIA = env.bool("SERVE_MEDIA", default=DEBUG)
+# Serve uploaded files through Django in DEBUG, when explicitly enabled, or when
+# this node is the App droplet (D2) in the 4-droplet cluster.
+#
+# In the cluster the edge gateway (D1) proxies /media/ across the VPC to the App
+# backend (D2) — see gateway/nginx.cluster.conf.template. Uploaded files (e.g.
+# community thread screenshots) live in the media volume ON D2, so D2's Django
+# must actually answer /media/ requests or every uploaded image 404s. Docker
+# named volumes are per-host, so nginx on D1 cannot serve them from a local
+# alias. The App role is the stable identity for this node (CLUSTER_ROLE=app),
+# so default SERVE_MEDIA True there; SERVE_MEDIA env still wins if set.
+_CLUSTER_ROLE = env("CLUSTER_ROLE", default="")
+SERVE_MEDIA = env.bool(
+    "SERVE_MEDIA",
+    default=DEBUG or (_CLUSTER_ROLE == "app"),
+)
 
 # Limit upload sizes to prevent DoS via large file uploads
 FILE_UPLOAD_MAX_MEMORY_SIZE = 5 * 1024 * 1024  # 5MB

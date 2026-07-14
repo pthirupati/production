@@ -1,0 +1,105 @@
+title: 'Orchestrator Kills Collector on Failed Health Check'
+slug: otel-collector-extension-healthcheck-down
+technology: opentelemetry
+category: Fix
+difficulty: medium
+scenario_type: fix
+lab_mode: simulation
+simulation_type: generic
+time_limit: 1500
+max_score: 100
+is_free: false
+infrastructure_type: docker
+jira_priority: Medium
+description: |-
+  CONTEXT: A platform team operating opentelemetry needs you to resolve `Orchestrator Kills Collector on Failed Health Check` during a realistic delivery incident. The business impact is a stalled or unsafe release until the underlying state is repaired.
+
+  ENVIRONMENT: You are working in FixitLab's offline observability lab with an OpenTelemetry Collector, an instrumented demo service, and a local trace/metric backend under /otel. All components run locally; no SaaS observability vendor or paid APIs are required.
+
+  SYMPTOM / STARTING STATE: The Collector is restarted every minute by its supervisor. The liveness probe hits `/` on port 13133 but the health_check extension is either not enabled or bound to a different port, so the probe always fails.
+
+  OBJECTIVE: The health_check extension is missing from `service.extensions` (or bound to a non-probed port), so the liveness probe fails and the supervisor kills the Collector. Enable and reference the health_check extension on the probed endpoint so liveness passes and the Collector stops restarting. Success is graded on the real repaired state, not a manual marker.
+
+  WHAT TO AVOID: Do not suppress the signal, disable the policy/gate, or fake completion with marker files — reproduce the diagnosis, then apply the smallest fix that satisfies the objective and re-run Check Solution.
+objectives:
+- 'The health_check endpoint returns healthy on the probed port'
+- 'The disabled/misbound health_check extension is confirmed as root cause'
+- 'The Collector stops crash-restarting once liveness passes'
+initial_state: |-
+  The Collector is restarted every minute by its supervisor. The liveness probe hits `/` on port 13133 but the health_check extension is either not enabled or bound to a different port, so the probe always fails.
+hints:
+- order: 1
+  cost: 0
+  content: |-
+    Where to look — orient before changing anything:
+        1. `cat /otel/collector/config.yaml`
+        2. `curl -s localhost:13133/`
+        3. `otelcol validate --config /otel/collector/config.yaml`
+        Write down what looks healthy versus wrong. Form one hypothesis before you touch anything.
+- order: 2
+  cost: 25
+  content: |-
+    Diagnostic steps:
+        1. Re-run `cat /otel/collector/config.yaml` and read the status/error carefully.
+        2. Cross-check with `curl -s localhost:13133/` to isolate the failing object.
+        3. State the single root cause in one sentence before you act.
+- order: 3
+  cost: 50
+  content: |-
+    Exact fix + verification:
+        1. The health_check extension is missing from `service.extensions` (or bound to a non-probed port), so the liveness probe fails and the supervisor kills the Collector. Enable and reference the health_check extension on the probed endpoint so liveness passes and the Collector stops restarting.
+        2. Change one thing at a time so you can roll back if the hypothesis was wrong.
+        3. Verify the objective is met, then click Check Solution (graded on real state, not a marker file).
+summary: |-
+  Diagnose and resolve orchestrator kills collector on failed health check in the opentelemetry simulation lab and verify the healthy end state
+estimated_minutes: 25
+xp_reward: 100
+prerequisites:
+- 'Basic distributed-systems and HTTP literacy'
+tags:
+- 'opentelemetry'
+- 'fix'
+- 'hands-on'
+- 'simulation'
+linked_tutorial: opentelemetry-fundamentals
+what_you_will_learn:
+- 'The health_check endpoint returns healthy on the probed port'
+- 'The disabled/misbound health_check extension is confirmed as root cause'
+- 'Understand how the health_check extension exposes Collector liveness and why an unreferenced extension causes restart loops'
+environment:
+  nodes:
+  - role: primary
+    os: FixitLab OpenTelemetry observability lab
+    hostname: lab-primary
+    ip: 127.0.0.1
+    specs: local offline simulation
+  pre_installed:
+  - bash
+  - coreutils
+  - otelcol
+  - curl
+  - jq
+  credentials:
+  - user: root
+    password: lab123
+tasks:
+- id: task_1
+  title: 'Orchestrator Kills Collector on Failed Health Check'
+  description: |-
+    Restore healthy behavior for Orchestrator Kills Collector on Failed Health Check by reproducing the diagnosis from the symptom, isolating the root cause with evidence, applying the smallest safe fix, and validating the outcome with the checker.
+  background: |-
+    This opentelemetry lab teaches how the health_check extension exposes Collector liveness and why an unreferenced extension causes restart loops through systematic troubleshooting: observe, hypothesize, change, verify.
+  validation:
+    type: custom_script
+    script: check.sh
+    error_message: |-
+      The scenario objective is not yet satisfied. Re-read hint tier 2, confirm the root cause, and apply the documented remediation so /opt/fixitlab/academy/otel-collector-extension-healthcheck-down.conf carries the FIXED-OK marker.
+solution:
+  summary: |-
+    The health_check extension is missing from `service.extensions` (or bound to a non-probed port), so the liveness probe fails and the supervisor kills the Collector. Enable and reference the health_check extension on the probed endpoint so liveness passes and the Collector stops restarting.
+  files_changed: []
+  commands_run:
+  - 'cat /otel/collector/config.yaml'
+  - 'curl -s localhost:13133/'
+  - 'otelcol validate --config /otel/collector/config.yaml'
+  reference_docs: opentelemetry-fundamentals

@@ -88,6 +88,42 @@ else
   echo "WARN: HTTPS site check failed (DNS/SSL may still be propagating)"
 fi
 
+# ── 3b. Served frontend build (index.html + one hashed JS chunk) ──
+# Cheap guard against a broken/undeployed build: fetch the served SPA shell from
+# the edge, pull the first hashed /assets/*.js chunk it references, and assert
+# both return HTTP 200. This catches build/deploy breakage (missing index.html,
+# stale HTML pointing at chunks that were never uploaded, chunk 404s).
+# HONEST LIMITATION: this does NOT catch runtime JS errors — a chunk can be a
+# valid 200 and still throw on load (e.g. a missing import surfacing as
+# "X is not defined"). The eslint no-undef=error gate in CI is the guard for
+# that class; the Lab UI Playwright smoke ([5b/7]) catches some runtime crashes.
+echo ""
+echo ">>> [3b/7] Served frontend build (index.html + hashed chunk)"
+_index_html="$(curl -sf --max-time 20 "${SITE_URL}/" 2>/dev/null || true)"
+if [ -z "$_index_html" ]; then
+  echo "ERROR: could not fetch ${SITE_URL}/ (index.html) — build/deploy may be broken"
+  fail=1
+elif ! printf '%s' "$_index_html" | grep -q '<div id="root"'; then
+  echo "ERROR: ${SITE_URL}/ did not return the SPA shell (no #root) — served HTML looks wrong"
+  fail=1
+else
+  echo "  ✓ index.html served (contains #root)"
+  # First hashed JS chunk referenced by the shell, e.g. /assets/index-r9m0SiSC.js
+  _chunk="$(printf '%s' "$_index_html" | grep -oE '/assets/[A-Za-z0-9._-]+\.js' | head -n1 || true)"
+  if [ -z "$_chunk" ]; then
+    echo "ERROR: index.html referenced no /assets/*.js chunk — build output looks empty/broken"
+    fail=1
+  else
+    _code="$(curl -s -o /dev/null -w '%{http_code}' --max-time 20 "${SITE_URL}${_chunk}" || echo 000)"
+    if [ "$_code" = "200" ]; then
+      echo "  ✓ hashed chunk ${_chunk} served (200)"
+    else
+      echo "ERROR: hashed chunk ${_chunk} returned HTTP ${_code} (expected 200) — build assets not deployed"
+      fail=1
+    fi
+  fi
+fi
+
 # ── 4. Scenario Docker images ──
 echo ""
 echo ">>> [4/7] Scenario lab images"

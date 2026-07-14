@@ -1,0 +1,106 @@
+title: 'Hardening Gate Fails: Image Runs as Root'
+slug: devsecops-image-runs-as-root
+technology: devsecops-supplychain
+category: Harden
+difficulty: easy
+scenario_type: fix
+lab_mode: simulation
+simulation_type: generic
+time_limit: 1200
+max_score: 100
+is_free: false
+infrastructure_type: docker
+jira_priority: Medium
+description: |-
+  CONTEXT: A platform team operating devsecops supplychain needs you to resolve `Hardening Gate Fails: Image Runs as Root` during a realistic delivery incident. The business impact is a stalled or unsafe release until the underlying state is repaired.
+
+  ENVIRONMENT: You are working in FixitLab's offline supply-chain security lab with a local OCI registry, Trivy scanner, cosign keys, an SBOM store, and a Falco runtime sensor under /supplychain. Everything runs locally; no external registry or paid APIs are required.
+
+  SYMPTOM / STARTING STATE: The policy gate rejects `frontend:2.0` with `container must not run as root`. The Dockerfile never sets a `USER`, so the effective user is UID 0, violating the run-as-non-root policy.
+
+  OBJECTIVE: The Dockerfile omits a non-root `USER` directive, so the container runs as root and fails the hardening policy. Add a dedicated non-root user (and chown the app dir) and set `USER` in the Dockerfile, then rebuild so the image runs unprivileged. Success is graded on the real repaired state, not a manual marker.
+
+  WHAT TO AVOID: Do not suppress the signal, disable the policy/gate, or fake completion with marker files — reproduce the diagnosis, then apply the smallest fix that satisfies the objective and re-run Check Solution.
+objectives:
+- 'The rebuilt image runs as a non-root user'
+- 'The missing USER directive is confirmed as root cause'
+- 'The run-as-non-root policy passes after the fix'
+initial_state: |-
+  The policy gate rejects `frontend:2.0` with `container must not run as root`. The Dockerfile never sets a `USER`, so the effective user is UID 0, violating the run-as-non-root policy.
+hints:
+- order: 1
+  cost: 0
+  content: |-
+    Where to look — orient before changing anything:
+        1. `docker image inspect frontend:2.0 --format '{{.Config.User}}'`
+        2. `grep -n 'USER' Dockerfile`
+        3. `trivy config Dockerfile`
+        Write down what looks healthy versus wrong. Form one hypothesis before you touch anything.
+- order: 2
+  cost: 25
+  content: |-
+    Diagnostic steps:
+        1. Re-run `docker image inspect frontend:2.0 --format '{{.Config.User}}'` and read the status/error carefully.
+        2. Cross-check with `grep -n 'USER' Dockerfile` to isolate the failing object.
+        3. State the single root cause in one sentence before you act.
+- order: 3
+  cost: 50
+  content: |-
+    Exact fix + verification:
+        1. The Dockerfile omits a non-root `USER` directive, so the container runs as root and fails the hardening policy. Add a dedicated non-root user (and chown the app dir) and set `USER` in the Dockerfile, then rebuild so the image runs unprivileged.
+        2. Change one thing at a time so you can roll back if the hypothesis was wrong.
+        3. Verify the objective is met, then click Check Solution (graded on real state, not a marker file).
+summary: |-
+  Diagnose and resolve hardening gate fails: image runs as root in the devsecops-supplychain simulation lab and verify the healthy end state
+estimated_minutes: 20
+xp_reward: 100
+prerequisites:
+- 'Basic container image and CI/CD literacy'
+tags:
+- 'devsecops-supplychain'
+- 'fix'
+- 'hands-on'
+- 'simulation'
+linked_tutorial: devsecops-supplychain-fundamentals
+what_you_will_learn:
+- 'The rebuilt image runs as a non-root user'
+- 'The missing USER directive is confirmed as root cause'
+- 'Understand why containers should run as non-root and how a Dockerfile USER directive satisfies run-as-non-root supply-chain policy'
+environment:
+  nodes:
+  - role: primary
+    os: FixitLab supply-chain security lab
+    hostname: lab-primary
+    ip: 127.0.0.1
+    specs: local offline simulation
+  pre_installed:
+  - bash
+  - coreutils
+  - trivy
+  - cosign
+  - syft
+  - falco
+  credentials:
+  - user: root
+    password: lab123
+tasks:
+- id: task_1
+  title: 'Hardening Gate Fails: Image Runs as Root'
+  description: |-
+    Restore healthy behavior for Hardening Gate Fails: Image Runs as Root by reproducing the diagnosis from the symptom, isolating the root cause with evidence, applying the smallest safe fix, and validating the outcome with the checker.
+  background: |-
+    This devsecops-supplychain lab teaches why containers should run as non-root and how a Dockerfile USER directive satisfies run-as-non-root supply-chain policy through systematic troubleshooting: observe, hypothesize, change, verify.
+  validation:
+    type: custom_script
+    script: check.sh
+    error_message: |-
+      The scenario objective is not yet satisfied. Re-read hint tier 2, confirm the root cause, and apply the documented remediation so /opt/fixitlab/academy/devsecops-image-runs-as-root.conf carries the FIXED-OK marker.
+solution:
+  summary: |-
+    The Dockerfile omits a non-root `USER` directive, so the container runs as root and fails the hardening policy. Add a dedicated non-root user (and chown the app dir) and set `USER` in the Dockerfile, then rebuild so the image runs unprivileged.
+  files_changed: []
+  commands_run:
+  - 'docker image inspect frontend:2.0 --format ''{{.Config.User}}'''
+  - 'grep -n ''USER'' Dockerfile'
+  - 'trivy config Dockerfile'
+  reference_docs: devsecops-supplychain-fundamentals

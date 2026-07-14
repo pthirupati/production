@@ -1,0 +1,123 @@
+title: MIG Instance Profile Mismatch
+slug: gpu-mig-instance-profile-mismatch
+technology: gpu
+category: Fix
+difficulty: hard
+lab_mode: simulation
+simulation_type: gpu
+time_limit: 1500
+max_score: 100
+is_free: false
+jira_priority: Medium
+dual_terminal: false
+requires_companion_hosts: false
+description: 'CONTEXT: An SRE/GPU-infrastructure team running a datacenter accelerator fleet must resolve
+  `MIG Instance Profile Mismatch` during a live incident. Until the underlying hardware/driver state is
+  repaired, GPU capacity is lost and training/inference jobs fail, so throughput and SLAs are at risk.
+
+
+  ENVIRONMENT: You are on a FixitLab offline GPU node with nvidia-smi, the NVIDIA driver/CUDA stack, DCGM
+  (dcgmi / nv-hostengine / dcgm-exporter), the container toolkit, and — for AMD hosts — the ROCm stack
+  (rocm-smi / amd-smi). All tools run locally; no paid APIs or external cloud calls are required.
+
+
+  SYMPTOM / STARTING STATE: `nvidia-smi mig -lgi` lists GPU instances that do not match what workloads
+  request (e.g. all 1g.10gb, none of the required 3g.40gb). The k8s device plugin advertises the wrong
+  MIG resources so pods cannot schedule.
+
+
+  OBJECTIVE: Inspect current MIG mode and the existing GPU/compute instance profiles; Determine the profile
+  the workload requires and why the current layout blocks it; Recreate the correct MIG instances and confirm
+  they are available to schedule. Success means `check.sh` exits successfully after you apply the documented
+  remediation.
+
+
+  WHAT TO AVOID: Do not apply broad destructive changes, disable safety limits to mask the fault, skip
+  evidence gathering, or fake completion with marker files — the checker validates real system state.'
+initial_state: An A100/H100 where MIG is enabled but partitioned into the wrong profiles; a pod requesting
+  a 3g.40gb slice stays Pending because only 1g.10gb instances exist.
+objectives:
+- Inspect current MIG mode and the existing GPU/compute instance profiles
+- Determine the profile the workload requires and why the current layout blocks it
+- Recreate the correct MIG instances and confirm they are available to schedule
+hints:
+- order: 1
+  cost: 0
+  content: 'Where to look: `nvidia-smi mig -lgip` (available profiles), `nvidia-smi mig -lgi` (existing
+    GPU instances), and `nvidia-smi mig -lci` (compute instances).'
+- order: 2
+  cost: 25
+  content: 'Diagnostic steps:
+
+    1. `nvidia-smi -q | grep -i ''MIG Mode''` — confirm MIG is Enabled.
+
+    2. `nvidia-smi mig -lgi` — list current instances and compare to the requested profile.
+
+    3. `nvidia-smi mig -lgip` — confirm the target profile ID (e.g. 3g.40gb) is placeable.'
+- order: 3
+  cost: 50
+  content: 'Exact fix + verification:
+
+    1. Destroy the wrong instances (`nvidia-smi mig -dci && nvidia-smi mig -dgi`) and recreate the required
+    layout (`nvidia-smi mig -cgi 3g.40gb -C`).
+
+    2. Confirm `nvidia-smi mig -lgi` shows the required instances and the workload schedules.
+
+    3. Apply the documented remediation in /opt/fixitlab/academy/gpu-mig-instance-profile-mismatch.conf.
+
+    WHY: the checker validates the correct MIG layout exists.'
+summary: Diagnose and fix mig instance profile mismatch on a datacenter GPU node and verify with the checker
+estimated_minutes: 25
+xp_reward: 100
+prerequisites:
+- Basic GPU and Linux troubleshooting literacy
+tags:
+- fix
+- gpu
+- nvidia
+- hands-on
+linked_tutorial: gpu-fundamentals
+what_you_will_learn:
+- Inspect current MIG mode and the existing GPU/compute instance profiles
+- Determine the profile the workload requires and why the current layout blocks it
+- Recreate the correct MIG instances and confirm they are available to schedule
+environment:
+  nodes:
+  - role: primary
+    os: FixitLab GPU node
+    hostname: gpu-node-01
+    ip: 127.0.0.1
+    specs: local offline simulation (NVIDIA + AMD datacenter GPUs)
+  pre_installed:
+  - bash
+  - coreutils
+  - gpu
+  - nvidia-smi
+  - dcgmi
+  - rocm-smi
+  - journalctl
+  - systemctl
+  credentials:
+  - user: root
+    password: lab123
+tasks:
+- id: task_1
+  title: MIG Instance Profile Mismatch
+  description: Restore healthy behavior for MIG Instance Profile Mismatch by investigating the failure
+    with the GPU tooling, applying the smallest safe fix, and validating the outcome.
+  background: 'This GPU lab teaches systematic datacenter accelerator troubleshooting: observe, hypothesize,
+    change, verify.'
+  validation:
+    type: command_output
+    command: nvidia-smi
+    expected_output: NVIDIA-SMI
+    error_message: GPU health check still fails. Verify driver, device visibility, and that the documented
+      fix was applied.
+solution:
+  summary: Identify the root cause behind mig instance profile mismatch and apply the minimal documented
+    fix.
+  files_changed: []
+  commands_run:
+  - nvidia-smi
+  - dcgmi diag -r 1
+  reference_docs: gpu-fundamentals

@@ -480,6 +480,284 @@ class AwkTarCommandTests(SimpleTestCase):
         self.assertEqual(shell.state.read_file("/opt/proj/lib/util.py"), "x = 2")
 
 
+class ShellOperatorTests(SimpleTestCase):
+    """`;`, `&&` and `||` command-list operators."""
+
+    def test_semicolon_runs_all(self):
+        shell = RHELShell()
+        self.assertEqual(shell.run("echo one ; echo two"), "one\ntwo")
+
+    def test_and_short_circuits_on_failure(self):
+        shell = RHELShell()
+        # `false` fails, so the &&-segment must be skipped.
+        self.assertEqual(shell.run("false && echo NOPE"), "")
+
+    def test_and_runs_on_success(self):
+        shell = RHELShell()
+        self.assertEqual(shell.run("true && echo YES"), "YES")
+
+    def test_or_fires_on_failure(self):
+        shell = RHELShell()
+        self.assertEqual(shell.run("false || echo FALLBACK"), "FALLBACK")
+
+    def test_or_skips_on_success(self):
+        shell = RHELShell()
+        self.assertEqual(shell.run("true || echo SKIPPED"), "")
+
+    def test_command_not_found_sets_exit_and_triggers_or(self):
+        shell = RHELShell()
+        # As in a real shell the error goes to the terminal AND the ||-fallback
+        # fires because the failed lookup sets a non-zero exit code.
+        out = shell.run("nosuchcmd || echo RECOVERED")
+        self.assertIn("command not found", out)
+        self.assertIn("RECOVERED", out)
+
+    def test_quoted_operator_not_split(self):
+        shell = RHELShell()
+        self.assertEqual(shell.run('echo "a; b && c"'), "a; b && c")
+
+    def test_escaped_semicolon_in_find_not_split(self):
+        shell = RHELShell()
+        # Must not raise; find still resolves the matching path.
+        out = shell.run(r"find /etc/passwd")
+        self.assertEqual(out, "/etc/passwd")
+
+
+class ShellExpansionTests(SimpleTestCase):
+    """Variable, command-substitution, tilde and glob expansion."""
+
+    def test_var_expansion(self):
+        shell = RHELShell()
+        self.assertEqual(shell.run("echo $USER"), "root")
+        self.assertEqual(shell.run("echo $HOME"), "/root")
+
+    def test_braced_var_expansion(self):
+        shell = RHELShell()
+        self.assertEqual(shell.run("echo ${HOME}/bin"), "/root/bin")
+
+    def test_assignment_then_use(self):
+        shell = RHELShell()
+        shell.run("MYVAR=hello")
+        self.assertEqual(shell.state.env.get("MYVAR"), "hello")
+        self.assertEqual(shell.run("echo $MYVAR"), "hello")
+
+    def test_assignment_and_use_in_one_line(self):
+        shell = RHELShell()
+        self.assertEqual(shell.run("FOO=bar; echo $FOO"), "bar")
+
+    def test_undefined_var_is_empty(self):
+        shell = RHELShell()
+        self.assertEqual(shell.run("echo [${NOPE}]"), "[]")
+
+    def test_command_substitution(self):
+        shell = RHELShell()
+        self.assertEqual(shell.run("echo $(whoami)"), "root")
+
+    def test_command_substitution_with_pipe(self):
+        shell = RHELShell()
+        self.assertEqual(
+            shell.run("echo $(grep root /etc/passwd | cut -d: -f1)"), "root")
+
+    def test_tilde_expansion_in_redirect(self):
+        shell = RHELShell()
+        shell.run("echo hi > ~/note.txt")
+        self.assertEqual(shell.state.read_file("/root/note.txt"), "hi\n")
+
+    def test_glob_expansion(self):
+        shell = RHELShell()
+        shell.state.write_file("/tmp/globtest/a.log", "1")
+        shell.state.write_file("/tmp/globtest/b.log", "2")
+        shell.state.write_file("/tmp/globtest/c.txt", "3")
+        shell.run("cd /tmp/globtest")
+        # echo joins all expanded words, so it shows the full glob result.
+        out = shell.run("echo *.log")
+        self.assertIn("a.log", out)
+        self.assertIn("b.log", out)
+        self.assertNotIn("c.txt", out)
+
+    def test_glob_absolute_path(self):
+        shell = RHELShell()
+        shell.state.write_file("/tmp/gt2/x.conf", "1")
+        shell.state.write_file("/tmp/gt2/y.conf", "2")
+        out = shell.run("echo /tmp/gt2/*.conf")
+        self.assertIn("/tmp/gt2/x.conf", out)
+        self.assertIn("/tmp/gt2/y.conf", out)
+
+    def test_glob_no_match_left_literal(self):
+        shell = RHELShell()
+        out = shell.run("echo /tmp/no-such-dir/*.zzz")
+        self.assertIn("*.zzz", out)
+
+
+class CoreutilsCommandTests(SimpleTestCase):
+    def test_true_false_exit_codes(self):
+        shell = RHELShell()
+        shell.run("true")
+        self.assertEqual(shell.state.last_exit_code, 0)
+        shell.run("false")
+        self.assertEqual(shell.state.last_exit_code, 1)
+
+    def test_cut_field(self):
+        shell = RHELShell()
+        self.assertEqual(shell.run("cut -d: -f1 /etc/passwd").splitlines()[0], "root")
+
+    def test_cut_from_pipe(self):
+        shell = RHELShell()
+        self.assertEqual(shell.run("echo a:b:c | cut -d: -f2"), "b")
+
+    def test_cut_char_range(self):
+        shell = RHELShell()
+        self.assertEqual(shell.run("echo abcdef | cut -c2-4"), "bcd")
+
+    def test_tr_translate_and_delete(self):
+        shell = RHELShell()
+        self.assertEqual(shell.run("echo hello | tr a-z A-Z"), "HELLO")
+        self.assertEqual(shell.run("echo hello | tr -d l"), "heo")
+
+    def test_tee_writes_and_passes_through(self):
+        shell = RHELShell()
+        out = shell.run("echo persisted | tee /tmp/tee.txt")
+        self.assertEqual(out, "persisted")
+        self.assertEqual(shell.state.read_file("/tmp/tee.txt"), "persisted\n")
+
+    def test_tee_append(self):
+        shell = RHELShell()
+        shell.run("echo one | tee /tmp/tee2.txt")
+        shell.run("echo two | tee -a /tmp/tee2.txt")
+        self.assertEqual(shell.state.read_file("/tmp/tee2.txt"), "one\ntwo\n")
+
+    def test_xargs_appends_stdin(self):
+        shell = RHELShell()
+        self.assertEqual(shell.run("echo world | xargs echo hello"), "hello world")
+
+    def test_stat_format(self):
+        shell = RHELShell()
+        shell.state.write_file("/tmp/s.txt", "12345")
+        self.assertEqual(shell.run("stat -c %s /tmp/s.txt"), "5")
+
+    def test_stat_missing_file(self):
+        shell = RHELShell()
+        out = shell.run("stat /tmp/does-not-exist")
+        self.assertIn("No such file", out)
+        self.assertEqual(shell.state.last_exit_code, 1)
+
+    def test_du_summarize(self):
+        shell = RHELShell()
+        shell.state.write_file("/tmp/dudir/f.txt", "x" * 2048)
+        out = shell.run("du -sh /tmp/dudir")
+        self.assertIn("/tmp/dudir", out)
+
+    def test_nproc(self):
+        shell = RHELShell()
+        self.assertTrue(shell.run("nproc").isdigit())
+
+    def test_basename_dirname(self):
+        shell = RHELShell()
+        self.assertEqual(shell.run("basename /a/b/c.txt"), "c.txt")
+        self.assertEqual(shell.run("basename /a/b/c.txt .txt"), "c")
+        self.assertEqual(shell.run("dirname /a/b/c.txt"), "/a/b")
+
+    def test_seq(self):
+        shell = RHELShell()
+        self.assertEqual(shell.run("seq 3"), "1\n2\n3")
+        self.assertEqual(shell.run("seq 2 2 6"), "2\n4\n6")
+
+    def test_sleep_is_noop(self):
+        shell = RHELShell()
+        self.assertEqual(shell.run("sleep 5"), "")
+        self.assertEqual(shell.state.last_exit_code, 0)
+
+    def test_sysctl_read_and_write(self):
+        shell = RHELShell()
+        self.assertIn("vm.swappiness", shell.run("sysctl vm.swappiness"))
+        shell.run("sysctl -w vm.swappiness=10")
+        self.assertIn("= 10", shell.run("sysctl vm.swappiness"))
+
+    def test_diff_reports_change(self):
+        shell = RHELShell()
+        shell.state.write_file("/tmp/a1", "line1\nline2\n")
+        shell.state.write_file("/tmp/b1", "line1\nCHANGED\n")
+        out = shell.run("diff /tmp/a1 /tmp/b1")
+        self.assertIn("CHANGED", out)
+        self.assertEqual(shell.state.last_exit_code, 1)
+
+    def test_diff_identical_files(self):
+        shell = RHELShell()
+        shell.state.write_file("/tmp/a2", "same\n")
+        shell.state.write_file("/tmp/b2", "same\n")
+        self.assertEqual(shell.run("diff /tmp/a2 /tmp/b2"), "")
+        self.assertEqual(shell.state.last_exit_code, 0)
+
+    def test_md5sum_deterministic(self):
+        shell = RHELShell()
+        shell.state.write_file("/tmp/h.txt", "content")
+        out = shell.run("md5sum /tmp/h.txt")
+        # md5("content")
+        self.assertTrue(out.startswith("9a0364b9e99bb480dd25e1f0284c8555"))
+        self.assertIn("/tmp/h.txt", out)
+
+
+class NetworkingToolTests(SimpleTestCase):
+    def test_dig_short(self):
+        shell = RHELShell()
+        self.assertEqual(shell.run("dig +short example.com"), "93.184.216.34")
+
+    def test_dig_localhost(self):
+        shell = RHELShell()
+        self.assertEqual(shell.run("dig +short localhost"), "127.0.0.1")
+
+    def test_nslookup_resolves(self):
+        shell = RHELShell()
+        self.assertIn("93.184.216.34", shell.run("nslookup example.com"))
+
+    def test_host_nxdomain(self):
+        shell = RHELShell()
+        self.assertIn("not found", shell.run("host no-such-host.invalid"))
+
+    def test_dig_uses_etc_hosts(self):
+        shell = RHELShell()
+        shell.state.write_file("/etc/hosts", "127.0.0.1 localhost\n10.5.5.5 app.internal\n")
+        self.assertEqual(shell.run("dig +short app.internal"), "10.5.5.5")
+
+    def test_nc_open_port(self):
+        shell = RHELShell()
+        out = shell.run("nc -zv localhost 22")
+        self.assertIn("succeeded", out)
+
+    def test_nc_refused_when_service_down(self):
+        shell = RHELShell()
+        nginx = shell.state.services.get("nginx")
+        if nginx:
+            nginx.active = "inactive"
+        out = shell.run("nc -zv localhost 80")
+        self.assertIn("refused", out.lower())
+        self.assertEqual(shell.state.last_exit_code, 1)
+
+    def test_openssl_version(self):
+        shell = RHELShell()
+        self.assertIn("OpenSSL", shell.run("openssl version"))
+
+    def test_wget_success(self):
+        shell = RHELShell()
+        out = shell.run("wget http://localhost")
+        self.assertIn("200 OK", out)
+
+    def test_iptables_add_opens_port(self):
+        shell = RHELShell()
+        shell.run("iptables -A INPUT -p tcp --dport 8080 -j ACCEPT")
+        self.assertTrue(shell.state.firewall.is_port_open(8080))
+
+    def test_ufw_allow_opens_port(self):
+        shell = RHELShell()
+        shell.run("ufw allow 9090/tcp")
+        self.assertTrue(shell.state.firewall.is_port_open(9090))
+
+    def test_watch_runs_wrapped_command_once(self):
+        shell = RHELShell()
+        out = shell.run("watch -n1 echo hi")
+        self.assertIn("hi", out)
+
+
 class EditorPersistenceTests(SimpleTestCase):
     def _drain(self, holder):
         import queue
