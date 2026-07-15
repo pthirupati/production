@@ -10,6 +10,7 @@
  */
 import { useAwsStore } from '../components/aws/store/awsStore'
 import { parseHcl, parseBody } from '../components/aws/terminal/hclParser'
+import { awsCli } from '../components/aws/terminal/awscli'
 
 // Resource addresses already mirrored into the console this page session, so a
 // re-apply of an unchanged config does not duplicate instances/buckets/SGs.
@@ -18,7 +19,7 @@ import { parseHcl, parseBody } from '../components/aws/terminal/hclParser'
 const syncedAddresses = new Set()
 
 /** Concatenate every *.tf file in the workspace so multi-file configs parse. */
-function collectHcl(files = {}) {
+export function collectHcl(files = {}) {
   let src = ''
   for (const [key, content] of Object.entries(files)) {
     if (typeof content !== 'string') continue
@@ -26,6 +27,71 @@ function collectHcl(files = {}) {
     if (/(\.|_)tf$/.test(key)) src += `\n${content}\n`
   }
   return src
+}
+
+/**
+ * Mirror a single parsed HCL resource into the shared AWS store. Returns the
+ * created store handles (ids / names) so callers can build both a `markLabManaged`
+ * ledger and progressive `terraform apply` output. Idempotent per address via the
+ * shared `syncedAddresses` ledger, so re-applying an unchanged config is a no-op.
+ */
+function createResourceInStore(store, r, region) {
+  const address = `${r.type}.${r.name}`
+  if (syncedAddresses.has(address)) return []
+  const attrs = r.attrs || {}
+  const created = []
+
+  if (r.type === 'aws_instance') {
+    const count = Number(attrs.count) || 1
+    const name = (attrs.tags && attrs.tags.Name) || r.name
+    const launched = store.launchInstances({
+      name,
+      amiId: attrs.ami || undefined,
+      type: attrs.instance_type || 't3.micro',
+      count,
+      keyName: attrs.key_name || '',
+      subnetId: attrs.subnet_id || '',
+      securityGroups: Array.isArray(attrs.vpc_security_group_ids) ? attrs.vpc_security_group_ids : [],
+      volumeSize: attrs.root_block_device?.volume_size || 8,
+      volumeType: attrs.root_block_device?.volume_type || 'gp3',
+      monitoring: !!attrs.monitoring,
+      tags: attrs.tags || {},
+    }) || []
+    created.push(...launched.map((i) => i.id))
+  } else if (r.type === 'aws_s3_bucket') {
+    const bucketName = attrs.bucket || r.name
+    if (!store.s3Buckets?.some((b) => b.name === bucketName)) {
+      store.createBucket?.({ name: bucketName, region, blockPublic: true })
+      created.push(`bucket:${bucketName}`)
+    }
+  } else if (r.type === 'aws_security_group') {
+    const sgName = attrs.name || r.name
+    if (!store.securityGroups?.some((sg) => sg.name === sgName)) {
+      const inbound = (r.blocks || []).filter((b) => b.key === 'ingress').map((b) => {
+        const ia = parseBody(b.body).attrs
+        return {
+          id: `sgr-${Math.random().toString(16).slice(2, 8)}`,
+          type: 'Custom',
+          protocol: ia.protocol || 'tcp',
+          from: Number(ia.from_port) || 0,
+          to: Number(ia.to_port) || 0,
+          source: (Array.isArray(ia.cidr_blocks) ? ia.cidr_blocks[0] : ia.cidr_blocks) || '0.0.0.0/0',
+          description: ia.description || '',
+        }
+      })
+      const sg = store.createSecurityGroup?.({
+        name: sgName,
+        description: attrs.description || 'Managed by Terraform',
+        vpcId: attrs.vpc_id || store.vpcs?.[0]?.id || '',
+        inbound,
+      })
+      if (sg?.id) created.push(`sg:${sgName}`)
+    }
+  }
+  // aws_instance / bucket / SG mirrored above; any other type is recorded so a
+  // re-apply stays consistent but creates no store object.
+  syncedAddresses.add(address)
+  return created
 }
 
 /** After terraform apply (backend or terminal), mirror resources into AWS GUI. */
@@ -45,69 +111,126 @@ export function syncTerraformApplyToAwsConsole(state) {
   const created = []
 
   for (const r of resources) {
-    const address = `${r.type}.${r.name}`
-    if (syncedAddresses.has(address)) continue
-    const attrs = r.attrs || {}
-
-    if (r.type === 'aws_instance') {
-      const count = Number(attrs.count) || 1
-      const name = (attrs.tags && attrs.tags.Name) || r.name
-      const launched = store.launchInstances({
-        name,
-        amiId: attrs.ami || undefined,
-        type: attrs.instance_type || 't3.micro',
-        count,
-        keyName: attrs.key_name || '',
-        subnetId: attrs.subnet_id || '',
-        securityGroups: Array.isArray(attrs.vpc_security_group_ids) ? attrs.vpc_security_group_ids : [],
-        volumeSize: attrs.root_block_device?.volume_size || 8,
-        volumeType: attrs.root_block_device?.volume_type || 'gp3',
-        monitoring: !!attrs.monitoring,
-        tags: attrs.tags || {},
-      }) || []
-      created.push(...launched.map((i) => i.id))
-      syncedAddresses.add(address)
-    } else if (r.type === 'aws_s3_bucket') {
-      const bucketName = attrs.bucket || r.name
-      if (!store.s3Buckets?.some((b) => b.name === bucketName)) {
-        store.createBucket?.({ name: bucketName, region, blockPublic: true })
-        created.push(`bucket:${bucketName}`)
-      }
-      syncedAddresses.add(address)
-    } else if (r.type === 'aws_security_group') {
-      const sgName = attrs.name || r.name
-      if (!store.securityGroups?.some((sg) => sg.name === sgName)) {
-        const inbound = (r.blocks || []).filter((b) => b.key === 'ingress').map((b) => {
-          const ia = parseBody(b.body).attrs
-          return {
-            id: `sgr-${Math.random().toString(16).slice(2, 8)}`,
-            type: 'Custom',
-            protocol: ia.protocol || 'tcp',
-            from: Number(ia.from_port) || 0,
-            to: Number(ia.to_port) || 0,
-            source: (Array.isArray(ia.cidr_blocks) ? ia.cidr_blocks[0] : ia.cidr_blocks) || '0.0.0.0/0',
-            description: ia.description || '',
-          }
-        })
-        const sg = store.createSecurityGroup?.({
-          name: sgName,
-          description: attrs.description || 'Managed by Terraform',
-          vpcId: attrs.vpc_id || store.vpcs?.[0]?.id || '',
-          inbound,
-        })
-        if (sg?.id) created.push(`sg:${sgName}`)
-      }
-      syncedAddresses.add(address)
-    } else {
-      // Unmodeled resource type — record so a re-apply stays consistent.
-      syncedAddresses.add(address)
-    }
+    created.push(...createResourceInStore(store, r, region))
   }
 
   if (created.length) {
     store.markLabManaged?.(created)
     store.pushFlash('success', `${created.length} resource(s) from Terraform apply — open AWS Console to verify.`)
   }
+}
+
+/** Addresses currently mirrored into the console — backs `terraform state list`. */
+export function terraformStateList() {
+  return Array.from(syncedAddresses)
+}
+
+/**
+ * Run a `terraform` subcommand against the live workspace files and the SHARED
+ * AWS store, so the terraform lab terminal drives the exact same infrastructure
+ * the IDE buttons and the AWS Console read from. Returns an array of output lines
+ * (ANSI allowed) mirroring the real CLI. `apply` performs the store mutations and
+ * marks them lab-managed for teardown.
+ */
+export function runTerraformCommand(argv = [], files = {}) {
+  const sub = (argv[0] || '').replace(/^-+/, '')
+  const rest = argv.slice(1)
+  const src = collectHcl(files)
+  const store = useAwsStore.getState()
+
+  if (!sub || sub === 'help') {
+    return [
+      'Usage: terraform [global options] <subcommand> [args]',
+      '',
+      'Common commands:',
+      '  init        Prepare your working directory for other commands',
+      '  validate    Check whether the configuration is valid',
+      '  plan        Show changes required by the current configuration',
+      '  apply       Create or update infrastructure (mirrors into the AWS Console)',
+      '  destroy     Destroy previously-created infrastructure',
+      '  state list  List resources tracked in state',
+      '  output      Show output values from your root module',
+    ]
+  }
+  if (sub === 'version') return ['Terraform v1.7.5', 'on linux_amd64', '+ provider registry.terraform.io/hashicorp/aws v5.40.0']
+  if (sub === 'fmt') return rest.includes('-check') ? [] : ['main.tf']
+  if (sub === 'init') {
+    return [
+      '\x1b[1mInitializing the backend...\x1b[0m',
+      '\x1b[1mInitializing provider plugins...\x1b[0m',
+      '- Installing hashicorp/aws v5.40.0...',
+      '- Installed hashicorp/aws v5.40.0 (signed by HashiCorp)',
+      '',
+      '\x1b[32mTerraform has been successfully initialized!\x1b[0m',
+    ]
+  }
+
+  const { resources, provider, outputs } = src.trim() ? parseHcl(src) : { resources: [], provider: null, outputs: [] }
+
+  if (sub === 'validate') {
+    if (!src.trim()) return ['\x1b[31mError: No configuration files found.\x1b[0m']
+    return ['\x1b[32mSuccess!\x1b[0m The configuration is valid.']
+  }
+  if (sub === 'plan') {
+    if (!resources.length) return ['\x1b[31mError: No resources to create — write HCL in the editor first.\x1b[0m']
+    const toAdd = resources.filter((r) => !syncedAddresses.has(`${r.type}.${r.name}`))
+    const lines = ['Terraform will perform the following actions:', '']
+    toAdd.forEach((r) => lines.push(`  \x1b[32m+\x1b[0m resource "${r.type}" "${r.name}"`))
+    lines.push('', `\x1b[1mPlan:\x1b[0m ${toAdd.length} to add, 0 to change, 0 to destroy.`)
+    return lines
+  }
+  if (sub === 'apply') {
+    if (!resources.length) return ['\x1b[31mError: No resources to create — write HCL in the editor first.\x1b[0m']
+    const region = provider?.region || store.region
+    const toAdd = resources.filter((r) => !syncedAddresses.has(`${r.type}.${r.name}`))
+    if (!toAdd.length) {
+      return ['\x1b[1mNo changes.\x1b[0m Your infrastructure matches the configuration.', '', '\x1b[32mApply complete!\x1b[0m Resources: 0 added, 0 changed, 0 destroyed.']
+    }
+    const lines = []
+    const created = []
+    toAdd.forEach((r) => {
+      lines.push(`aws_${r.type.replace(/^aws_/, '')}.${r.name}: Creating...`)
+      const handles = createResourceInStore(store, r, region)
+      created.push(...handles)
+      const idLabel = handles[0] || r.name
+      lines.push(`aws_${r.type.replace(/^aws_/, '')}.${r.name}: Creation complete after 3s [id=${idLabel}]`)
+    })
+    if (created.length) {
+      store.markLabManaged?.(created)
+      store.pushFlash?.('success', `${created.length} resource(s) from Terraform apply — open AWS Console to verify.`)
+    }
+    lines.push('', `\x1b[32mApply complete!\x1b[0m Resources: ${toAdd.length} added, 0 changed, 0 destroyed.`)
+    lines.push('Run `aws ec2 describe-instances` or open the AWS Console to see them.')
+    return lines
+  }
+  if (sub === 'destroy') {
+    const addrs = terraformStateList()
+    if (!addrs.length) return ['\x1b[1mNo changes.\x1b[0m No objects need to be destroyed.', '', '\x1b[32mDestroy complete!\x1b[0m Resources: 0 destroyed.']
+    resetTerraformAwsLabState()
+    const lines = addrs.map((a) => `${a}: Destruction complete after 1s`)
+    return [...lines, '', `\x1b[32mDestroy complete!\x1b[0m Resources: ${addrs.length} destroyed.`]
+  }
+  if (sub === 'state') {
+    if (rest[0] === 'list') return terraformStateList()
+    return ['Usage: terraform state <list>']
+  }
+  if (sub === 'output') {
+    if (!outputs.length) return ['\x1b[33mWarning:\x1b[0m No outputs found']
+    return outputs.map((o) => `${o.name} = "${o.attrs.value ?? ''}"`)
+  }
+  return [`Terraform has no command named "${sub}".`, 'Run "terraform help" to see available commands.']
+}
+
+/**
+ * Run an `aws ...` CLI command against the SHARED AWS store, so the terraform lab
+ * terminal can verify resources terraform apply created (e.g.
+ * `aws ec2 describe-instances`). Delegates to the console's read-only awscli
+ * engine; returns output split into lines.
+ */
+export function runAwsCommand(argv = []) {
+  const store = useAwsStore.getState()
+  const out = awsCli(argv, store, { region: store.region })
+  return String(out ?? '').split('\n')
 }
 
 /** Tear down lab-created AWS sim resources when the lab session ends. */

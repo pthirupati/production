@@ -1,17 +1,23 @@
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { lazy, Suspense, useCallback, useEffect, useRef, useState } from 'react'
+import { MemoryRouter, Routes, Route } from 'react-router-dom'
 import { terraformApi } from '../../api/terraform'
 import toast from 'react-hot-toast'
 import { useConfirm } from '../../hooks/useConfirm'
 import CodeEditor from '../ide/CodeEditor'
 import LabTerminal, { scheduleReadySend } from '../LabTerminal'
-import AwsTerminal from '../aws/terminal/AwsTerminal'
+import TerraformAwsTerminal from './TerraformAwsTerminal'
 import VsCodeWorkbench, { VscFileItem, VscEditorTab, VscPanelTab, VscActivityButton } from '../ide/VsCodeWorkbench'
 import { getIacProfile } from '../../utils/iacFlavor'
-import { syncTerraformApplyToAwsConsole, awsConsoleUrlForResource } from '../../utils/terraformAwsBridge'
+import { LabChromeControls } from '../lab/LabChromeBar'
+import { syncTerraformApplyToAwsConsole } from '../../utils/terraformAwsBridge'
 import {
-  FileCode, FolderOpen, Play, Plus, Trash2, AlertTriangle, RefreshCw, Terminal, CloudCog, Files, CheckCircle2, History, ExternalLink,
+  FileCode, FolderOpen, Play, Plus, Trash2, AlertTriangle, RefreshCw, Terminal, CloudCog, Files, CheckCircle2, History, ExternalLink, LayoutDashboard,
 } from 'lucide-react'
 import '../../styles/vscode-workbench.css'
+
+// Full AWS console, embedded read-only-router style so the terraform lab can show
+// exactly the resources `terraform apply` created without leaving the IDE.
+const AwsConsole = lazy(() => import('../aws/AwsConsole'))
 
 const DEFAULT_FILES = ['main.tf', 'variables.tf', 'outputs.tf']
 
@@ -20,6 +26,11 @@ export default function TerraformWorkspaceIde({
   sessionId, scenario, terminalSession, terminalHost = 'primary',
   blockedCommands = [], isMobile = false, state, setState, onRefresh,
   standalone = false,
+  // Lab chrome controls — rendered inline in the IDE toolbar so the standard
+  // Hints / Check / +30m / Stop buttons are always reachable in a terraform lab,
+  // even when the IDE is the standalone surface inside the Cloud shell.
+  onHints, onCheck, onExtend, onStop,
+  hintsLabel, checkDisabled, extendDisabled, showLabControls = false,
 }) {
   const { confirm, ConfirmPortal } = useConfirm()
   const profile = getIacProfile()
@@ -27,7 +38,6 @@ export default function TerraformWorkspaceIde({
   const [files, setFiles] = useState({})
   const [activeFile, setActiveFile] = useState('main.tf')
   const [bottomTab, setBottomTab] = useState('output')
-  const [lastAwsResource, setLastAwsResource] = useState(null)
   const [output, setOutput] = useState('')
   const [busy, setBusy] = useState(false)
   const [dirty, setDirty] = useState(false)
@@ -107,7 +117,7 @@ export default function TerraformWorkspaceIde({
         setOutput(res?.output || res?.plan?.summary || JSON.stringify(res?.plan || res, null, 2) || '')
         if (action === `${actionPrefix}_apply` || action === 'terraform_apply') {
           syncTerraformApplyToAwsConsole(res?.state ? { state: res.state } : state)
-          setLastAwsResource({ type: 'instance', id: null })
+          toast.success('Resources mirrored to the AWS Console — open the AWS Console tab to verify.', { duration: 3500 })
         }
       }
       if (res?.state) setState(res.state)
@@ -197,21 +207,33 @@ export default function TerraformWorkspaceIde({
         <div className="h-full min-h-[200px] flex flex-col gap-2">
           <div className="flex items-center justify-between gap-2 shrink-0 px-1">
             <p className="text-[10px] text-[var(--vsc-muted)]">
-              AWS CloudShell — run <code className="text-orange-300">aws</code> and <code className="text-violet-300">terraform</code> commands in a real terminal. Resources appear in the AWS Console.
+              AWS CloudShell — <code className="text-violet-300">terraform apply</code> the files in this editor, then verify with <code className="text-orange-300">aws ec2 describe-instances</code>. Same store as the AWS Console.
             </p>
-            <a
-              href={awsConsoleUrlForResource(lastAwsResource?.type, lastAwsResource?.id)}
-              target="_blank"
-              rel="noopener noreferrer"
+            <button
+              type="button"
+              onClick={() => setBottomTab('console')}
               className="vsc-btn text-[10px] inline-flex items-center gap-1"
               style={{ borderColor: '#ff9900', color: '#ff9900' }}
             >
               <ExternalLink size={11} /> Open AWS Console
-            </a>
+            </button>
           </div>
           <div className="flex-1 min-h-[180px] rounded border border-[var(--vsc-border)] overflow-hidden">
-            <AwsTerminal cloudShell />
+            <TerraformAwsTerminal filesRef={filesRef} />
           </div>
+        </div>
+      )
+    }
+    if (bottomTab === 'console') {
+      return (
+        <div className="h-full min-h-[220px] rounded border border-[var(--vsc-border)] overflow-hidden aws-embedded-host">
+          <Suspense fallback={<div className="p-4 text-xs text-[var(--vsc-muted)]">Loading AWS Console…</div>}>
+            <MemoryRouter initialEntries={['/aws-sim/ec2/instances']}>
+              <Routes>
+                <Route path="/aws-sim/*" element={<AwsConsole embedded />} />
+              </Routes>
+            </MemoryRouter>
+          </Suspense>
         </div>
       )
     }
@@ -251,6 +273,7 @@ export default function TerraformWorkspaceIde({
         <div className="vsc-activity-bar hidden sm:flex">
           <VscActivityButton active title="Explorer"><Files size={22} /></VscActivityButton>
           <VscActivityButton active={bottomTab === 'aws'} onClick={() => setBottomTab('aws')} title="AWS CLI"><CloudCog size={22} /></VscActivityButton>
+          <VscActivityButton active={bottomTab === 'console'} onClick={() => setBottomTab('console')} title="AWS Console"><LayoutDashboard size={22} /></VscActivityButton>
           {canTerminal && (
             <VscActivityButton active={bottomTab === 'terminal'} onClick={() => { setBottomTab('terminal'); setShowTerminal(true) }} title="Terminal"><Terminal size={22} /></VscActivityButton>
           )}
@@ -290,14 +313,28 @@ export default function TerraformWorkspaceIde({
           <FileCode size={12} /> {f}{dirty && activeFile === f ? ' ●' : ''}
         </VscEditorTab>
       ))}
-      editorToolbar={!standalone && (
+      editorToolbar={(
         <>
-          {[`${cli} init`, `${cli} plan`, `${cli} apply -auto-approve`].map((cmd) => (
+          {!standalone && [`${cli} init`, `${cli} plan`, `${cli} apply -auto-approve`].map((cmd) => (
             <button key={cmd} type="button" onClick={() => sendToTerminal(cmd)} className="vsc-btn"
               title={terminalReady[terminalHost] ? `Run: ${cmd}` : 'Opens the terminal and runs once connected'}>
               <Terminal size={11} /> {cmd}
             </button>
           ))}
+          {showLabControls && (onHints || onCheck || onExtend || onStop) && (
+            <div className="ml-auto flex items-center gap-1.5 lab-chrome-actions">
+              <LabChromeControls
+                onHints={onHints}
+                onCheck={onCheck}
+                onExtend={onExtend}
+                onStop={onStop}
+                hintsLabel={hintsLabel}
+                checkDisabled={checkDisabled}
+                extendDisabled={extendDisabled}
+                showTimer={false}
+              />
+            </div>
+          )}
         </>
       )}
       editor={(
@@ -311,6 +348,7 @@ export default function TerraformWorkspaceIde({
             <VscPanelTab active={bottomTab === 'output'} onClick={() => setBottomTab('output')}>{profile.label} Output</VscPanelTab>
             <VscPanelTab active={bottomTab === 'events'} onClick={() => setBottomTab('events')}><History size={11} /> Events</VscPanelTab>
             <VscPanelTab active={bottomTab === 'aws'} onClick={() => setBottomTab('aws')}>AWS CLI</VscPanelTab>
+            <VscPanelTab active={bottomTab === 'console'} onClick={() => setBottomTab('console')}><LayoutDashboard size={11} /> AWS Console</VscPanelTab>
             {canTerminal && showTerminal && (
               <VscPanelTab active={bottomTab === 'terminal'} onClick={() => setBottomTab('terminal')}>Terminal</VscPanelTab>
             )}
