@@ -1376,8 +1376,19 @@ def generate_question(
         angle = _FALLBACK_ANGLES[len(used) % len(_FALLBACK_ANGLES)]
         gq = f"{base} {angle}"
     stitch = _maybe_stitch(last_answer_quality, rng)
+    final = _finalize(f"{stitch} {gq}".strip() if stitch else gq)
+    # Guarantee no verbatim repeat within the round. `used` holds prior FINALIZED
+    # (resume-context-prefixed) questions, but the pool pick above checks the RAW
+    # prompt — so a prefixed collision can slip through (the finalized text was
+    # already asked). If so, append a deterministic rotating angle, then a turn
+    # ordinal as a hard backstop — no rng/date, so it stays reproducible.
+    if _normalize(final) in used:
+        final = f"{final} {_FALLBACK_ANGLES[len(used) % len(_FALLBACK_ANGLES)]}"
+        if _normalize(final) in used:
+            final = f"{final} (angle {len(used) + 1})"
+    used.add(_normalize(final))
     return GeneratedQuestion(
-        text=_finalize(f"{stitch} {gq}".strip() if stitch else gq),
+        text=final,
         category="technical",
         topic=current_topic,
         difficulty=eff_difficulty,
