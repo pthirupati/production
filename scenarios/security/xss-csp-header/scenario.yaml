@@ -8,13 +8,15 @@ max_score: 100
 infrastructure_type: docker
 jira_priority: High
 is_free: false
-description: 'CONTEXT: A team operating security hardening needs you to resolve `XSS and CSP Header -
-  Add Content Security Policy to Prevent` during a realistic incident. The business impact is reduced
-  service reliability until the underlying state is repaired.
+description: 'CONTEXT: A team operating security hardening has raised a ticket for `XSS and CSP Header
+  - Add Content Security Policy to Prevent`. A customer-facing workflow is degraded and the on-call engineer
+  (you) must diagnose and resolve it. Business impact: reduced service reliability and blocked users until
+  the underlying state is repaired.
 
 
-  ENVIRONMENT: You are working in FixitLab''s offline hardening lab with SSH, firewall, TLS, audit logs,
-  and IAM settings. All tools run locally; no paid APIs or external cloud calls are required.
+  ENVIRONMENT: You are working in FixitLab''s offline hardening lab. The architecture is a single lab-primary
+  node exposing SSH, firewall, TLS, audit logs, and IAM settings; treat it as the production host for
+  this incident. All tools run locally — no paid APIs or external cloud calls are required.
 
 
   SYMPTOM / STARTING STATE: Ubuntu server running nginx as a reverse proxy for a Flask web app on port
@@ -22,21 +24,29 @@ description: 'CONTEXT: A team operating security hardening needs you to resolve 
 
   The nginx config at /etc/nginx/conf.d/app.conf has no security headers configured.
 
-  curl is available for testing. The app is reachable at http://localhost/. A penetration test has identified
-  a reflected cross-site scripting (XSS)
-
-  vulnerability in the search parameter of a web application. While the
-
-  underlying code fix is pending, you must add a Content Security Policy header
-
-  via nginx to block inline script execution and restrict resource loading to
-
-  same-origin only. Also add X-Frame-Options and X-Content-Type-Options headers.
+  curl is available for testing. The app is reachable at http://localhost/.
 
 
   OBJECTIVE: Add a Content-Security-Policy header to /etc/nginx/conf.d/app.conf restricting script-src
   to ''self''; Add X-Frame-Options DENY and X-Content-Type-Options nosniff headers; Reload nginx and verify
-  all three security headers are present using curl. Success means `check.sh` exits successfully.
+  all three security headers are present using curl. Acceptance criteria: the change is minimal and reversible,
+  and success means `check.sh` exits successfully.
+
+
+  WORK TO DO: Required tooling is pre-installed; if a command is missing, note it and use the equivalent
+  already on the host. Make the smallest configuration change that moves the system toward the objective
+  (edit the relevant SSH, firewall, TLS, audit logs, and IAM settings), changing one thing at a time.
+  Check your work continuously against the objective — success means `check.sh` exits successfully.
+
+
+  VERIFY: Re-run the same check the grader uses and confirm `check.sh` exits successfully. Capture the
+  before/after output as evidence. Success criteria: the objective''s healthy state holds on a repeat
+  check, not just once.
+
+
+  ROLLBACK: If a change makes things worse, revert that single change immediately (restore the original
+  config file / undo the edit / restart the affected component) and re-observe before trying another hypothesis.
+  Never stack unverified changes.
 
 
   WHAT TO AVOID: Do not apply broad destructive changes, skip evidence gathering, or fake completion with
@@ -55,29 +65,48 @@ initial_state: 'Ubuntu server running nginx as a reverse proxy for a Flask web a
 hints:
 - order: 1
   cost: 0
-  content: 'Where to look: Test the config to get the exact file and line: `nginx -t`. It prints the offending
-    directive (e.g. unknown directive "listn").'
+  content: 'ORIENT — what to observe and why:
+
+    Do not touch anything yet. First observe the symptom: XSS and CSP header - add content security policy
+    to prevent is not behaving as the scenario objectives require. This lab is about XSS and CSP header
+    - add content security policy to prevent — how XSS and CSP header - add content security policy to
+    prevent behaves in a security hardening environment. Read the objectives and the current state, and
+    note precisely what looks wrong versus healthy before you form any theory.'
 - order: 2
+  cost: 10
+  content: 'APPROACH — the troubleshooting method:
+
+    Work from evidence, not guesses. For XSS and CSP header - add content security policy to prevent problems
+    the reliable method is: (1) reproduce/observe the failure, (2) narrow from the whole system down to
+    the one component that owns the symptom, (3) change exactly one thing, (4) re-check. Fix the underlying
+    misconfiguration you identified (not just the noisy log line), changing one thing at a time.'
+- order: 3
   cost: 25
-  content: 'Diagnostic steps:
+  content: 'WHICH TOOL — the diagnostic command(s):
+
+    Test the config to get the exact file and line: `nginx -t`. It prints the offending directive (e.g.
+    unknown directive "listn").'
+- order: 4
+  cost: 40
+  content: 'NARROW DOWN — isolate the subsystem:
 
     1. Run `nginx -t` and `systemctl status nginx` for config vs service errors.
 
     2. Open the cited file under `/etc/nginx/`.
 
     3. Compare listen/upstream/proxy directives to the scenario objectives.'
-- order: 3
-  cost: 50
-  content: 'Exact fix + verification:
+- order: 5
+  cost: 60
+  content: 'NEAR-SOLUTION — the fix shape + verify (you still apply it):
 
-    1. Reload nginx and verify all three security headers are present using curl.
+    1. Fix the stream block in nginx config (upstream, listen, proxy_pass).
 
-    2. Re-run the lab checker (`check.sh` or Check Solution).
+    2. Run `nginx -t`, then `systemctl enable --now nginx`.
 
-    3. Confirm every scenario objective is satisfied.
+    3. Confirm `systemctl is-active nginx` returns active.
 
 
-    WHY: the grader validates real state — marker files are ignored.'
+    WHY: stream proxies fail when the TCP upstream or listen directive is wrong.'
 summary: Complete the xss and csp header - add content security policy to prevent security lab and verify
   success with the checker
 estimated_minutes: 15

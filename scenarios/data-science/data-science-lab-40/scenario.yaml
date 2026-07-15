@@ -2,24 +2,39 @@ title: Secure data-science permissions (lab 40)
 slug: data-science-lab-40
 technology: data-science
 category: Fix
-description: 'CONTEXT: A team operating data science needs you to resolve `Secure data-science permissions
-  (lab 40)` during a realistic incident. The business impact is reduced service reliability until the
-  underlying state is repaired.
+description: 'CONTEXT: A team operating data science has raised a ticket for `Secure data-science permissions
+  (lab 40)`. A customer-facing workflow is degraded and the on-call engineer (you) must diagnose and resolve
+  it. Business impact: reduced service reliability and blocked users until the underlying state is repaired.
 
 
-  ENVIRONMENT: You are working in FixitLab''s offline notebook lab with pandas/notebook workflows, joins,
-  and charts. All tools run locally; no paid APIs or external cloud calls are required.
+  ENVIRONMENT: You are working in FixitLab''s offline notebook lab. The architecture is a single lab-primary
+  node exposing pandas/notebook workflows, joins, and charts; treat it as the production host for this
+  incident. All tools run locally — no paid APIs or external cloud calls are required.
 
 
   SYMPTOM / STARTING STATE: Hands-on data-science scenario: secure permissions in a simulated environment.
-  Hands-on data-science scenario: secure permissions in a simulated environment. This data science scenario
-  focuses on data science: Secure data-science permissions (lab 40). Read the environment, form a hypothesis,
-  apply a minimal fix, and verify behavior before closing the ticket.
 
 
   OBJECTIVE: Understand the current failure mode affecting Secure data-science permissions (lab 40); Restore
   expected service behavior with a minimal, documented change; Verify the fix holds under a realistic
-  smoke test. Success means all hidden tests pass.
+  smoke test. Acceptance criteria: the change is minimal and reversible, and success means all hidden
+  tests pass.
+
+
+  WORK TO DO: Required tooling is pre-installed; if a command is missing, note it and use the equivalent
+  already on the host. Make the smallest configuration change that moves the system toward the objective
+  (edit the relevant pandas/notebook workflows, joins, and charts), changing one thing at a time. Check
+  your work continuously against the objective — success means all hidden tests pass.
+
+
+  VERIFY: Re-run the same check the grader uses and confirm all hidden tests pass. Capture the before/after
+  output as evidence. Success criteria: the objective''s healthy state holds on a repeat check, not just
+  once.
+
+
+  ROLLBACK: If a change makes things worse, revert that single change immediately (restore the original
+  config file / undo the edit / restart the affected component) and re-observe before trying another hypothesis.
+  Never stack unverified changes.
 
 
   WHAT TO AVOID: Do not apply broad destructive changes, skip evidence gathering, or fake completion with
@@ -42,29 +57,52 @@ initial_state: 'Hands-on data-science scenario: secure permissions in a simulate
 hints:
 - order: 1
   cost: 0
-  content: 'Where to look: Open `solution.py`, read the instructions, and run the visible tests to see
-    which assertion fails first.'
+  content: 'ORIENT — what to observe and why:
+
+    Do not touch anything yet. First observe the symptom: secure data-science permissions (lab 40) is
+    not behaving as the scenario objectives require. This lab is about secure data-science permissions
+    (lab 40) — how secure data-science permissions (lab 40) behaves in a data science environment. Read
+    the objectives and the current state, and note precisely what looks wrong versus healthy before you
+    form any theory.'
 - order: 2
-  cost: 25
-  content: 'Diagnostic steps:
+  cost: 10
+  content: 'APPROACH — the troubleshooting method:
 
-    1. Click Run and read the traceback — note line number and actual vs expected values.
-
-    2. Reproduce the failure with the smallest input from a visible test.
-
-    3. Compare your implementation to the bug described in the lab prompt.'
+    Work from evidence, not guesses. For secure data-science permissions (lab 40) problems the reliable
+    method is: (1) reproduce/observe the failure, (2) narrow from the whole system down to the one component
+    that owns the symptom, (3) change exactly one thing, (4) re-check. Fix the underlying misconfiguration
+    you identified (not just the noisy log line), changing one thing at a time.'
 - order: 3
-  cost: 50
-  content: 'Exact fix + verification:
+  cost: 25
+  content: 'WHICH TOOL — the diagnostic command(s):
 
-    1. Verify the fix holds under a realistic smoke test.
+    Open `solution.py`, read the instructions, and run the visible tests to see which assertion fails
+    first.'
+- order: 4
+  cost: 40
+  content: 'NARROW DOWN — isolate the subsystem:
 
-    2. Re-run the lab checker (`check.sh` or Check Solution).
+    1. From the evidence above, decide which single part of secure data-science permissions (lab 40) is
+    at fault.
 
-    3. Confirm every scenario objective is satisfied.
+    2. Re-run the most relevant of pandas/notebook workflows, joins, and charts focused on just that part
+    to confirm it.
+
+    3. State a one-line hypothesis: the smallest change that would move the state from ''secure data-science
+    permissions (lab 40) is not behaving as the scenario objectives require'' toward ''all hidden tests
+    pass''.'
+- order: 5
+  cost: 60
+  content: 'NEAR-SOLUTION — the fix shape + verify (you still apply it):
+
+    1. Edit `solution.py` with the smallest correct change.
+
+    2. Re-run visible tests, then Check Solution (includes hidden tests).
+
+    3. Confirm every test passes.
 
 
-    WHY: the grader validates real state — marker files are ignored.'
+    WHY: coding labs grade against hidden test cases, not marker files.'
 coding_spec:
   language: python
   entrypoint: solution.py

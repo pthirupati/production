@@ -11,28 +11,46 @@ is_free: false
 jira_priority: High
 dual_terminal: false
 requires_companion_hosts: false
-description: 'CONTEXT: An SRE/GPU-infrastructure team running a datacenter accelerator fleet must resolve
-  `Xid 48 Double-Bit ECC Error` during a live incident. Until the underlying hardware/driver state is
-  repaired, GPU capacity is lost and training/inference jobs fail, so throughput and SLAs are at risk.
+description: 'CONTEXT: A team operating GPU operations has raised a ticket for `Xid 48 Double-Bit ECC
+  Error`. A customer-facing workflow is degraded and the on-call engineer (you) must diagnose and resolve
+  it. Business impact: reduced service reliability and blocked users until the underlying state is repaired.
 
 
-  ENVIRONMENT: You are on a FixitLab offline GPU node with nvidia-smi, the NVIDIA driver/CUDA stack, DCGM
-  (dcgmi / nv-hostengine / dcgm-exporter), the container toolkit, and — for AMD hosts — the ROCm stack
-  (rocm-smi / amd-smi). All tools run locally; no paid APIs or external cloud calls are required.
+  ENVIRONMENT: You are working in FixitLab''s offline GPU node. The architecture is a single lab-primary
+  node exposing nvidia-smi, drivers, CUDA, and container toolkit; treat it as the production host for
+  this incident. All tools run locally — no paid APIs or external cloud calls are required.
 
 
-  SYMPTOM / STARTING STATE: `dmesg | grep -i xid` shows `NVRM: Xid ... 48, Double Bit ECC`. Xid 48 is
-  an uncorrectable HBM error that corrupts data; the affected page must be retired and the GPU reset before
-  reuse.
+  SYMPTOM / STARTING STATE: A GPU logging Xid 48 (double-bit ECC / DBE); the running kernel was killed
+  and the GPU needs its poisoned pages retired before it is trusted again. `dmesg | grep -i xid` shows
+  `NVRM: Xid ... 48, Double Bit ECC`. Xid 48 is an uncorrectable HBM error that corrupts data; the affected
+  page must be retired and the GPU reset before reuse.
 
 
   OBJECTIVE: Confirm Xid 48 (DBE) in dmesg and the matching uncorrectable ECC count; Check pending page
   retirement for the affected GPU; Retire the poisoned page(s), reset the GPU, and confirm a clean ECC
-  state. Success means `check.sh` exits successfully after you apply the documented remediation.
+  state. Acceptance criteria: the change is minimal and reversible, and success means `nvidia-smi` includes
+  `NVIDIA-SMI`.
 
 
-  WHAT TO AVOID: Do not apply broad destructive changes, disable safety limits to mask the fault, skip
-  evidence gathering, or fake completion with marker files — the checker validates real system state.'
+  WORK TO DO: Required tooling is pre-installed; if a command is missing, note it and use the equivalent
+  already on the host. Make the smallest configuration change that moves the system toward the objective
+  (edit the relevant nvidia-smi, drivers, CUDA, and container toolkit), changing one thing at a time.
+  Check your work continuously against the objective — success means `nvidia-smi` includes `NVIDIA-SMI`.
+
+
+  VERIFY: Re-run the same check the grader uses and confirm `nvidia-smi` includes `NVIDIA-SMI`. Capture
+  the before/after output as evidence. Success criteria: the objective''s healthy state holds on a repeat
+  check, not just once.
+
+
+  ROLLBACK: If a change makes things worse, revert that single change immediately (restore the original
+  config file / undo the edit / restart the affected component) and re-observe before trying another hypothesis.
+  Never stack unverified changes.
+
+
+  WHAT TO AVOID: Do not apply broad destructive changes, skip evidence gathering, or fake completion with
+  marker files — the checker validates real system state.'
 initial_state: A GPU logging Xid 48 (double-bit ECC / DBE); the running kernel was killed and the GPU
   needs its poisoned pages retired before it is trusted again.
 objectives:
@@ -42,29 +60,46 @@ objectives:
 hints:
 - order: 1
   cost: 0
-  content: 'Where to look: `dmesg -T | grep -i xid` (Xid 48 = DBE), then `nvidia-smi -q -d ECC` and `nvidia-smi
-    -q -d PAGE_RETIREMENT` for the uncorrectable count and pending retirements.'
+  content: 'ORIENT — what to observe and why:
+
+    Do not touch anything yet. First observe the symptom: xid 48 Double-Bit ECC error is not behaving
+    as the scenario objectives require. This lab is about xid 48 Double-Bit ECC error — how xid 48 Double-Bit
+    ECC error behaves in a GPU operations environment. Read the objectives and the current state, and
+    note precisely what looks wrong versus healthy before you form any theory.'
 - order: 2
-  cost: 25
-  content: 'Diagnostic steps:
+  cost: 10
+  content: 'APPROACH — the troubleshooting method:
 
-    1. `dmesg -T | grep -i ''Xid''` — confirm Xid 48 and the GPU index.
-
-    2. `nvidia-smi -q -d ECC` — Volatile Uncorrectable should be non-zero.
-
-    3. `nvidia-smi -q -d PAGE_RETIREMENT` — check Pending Page Blacklist.'
+    Work from evidence, not guesses. For xid 48 Double-Bit ECC error problems the reliable method is:
+    (1) reproduce/observe the failure, (2) narrow from the whole system down to the one component that
+    owns the symptom, (3) change exactly one thing, (4) re-check. Fix the underlying misconfiguration
+    you identified (not just the noisy log line), changing one thing at a time.'
 - order: 3
-  cost: 50
-  content: 'Exact fix + verification:
+  cost: 25
+  content: 'WHICH TOOL — the diagnostic command(s):
 
-    1. Ensure page retirement is enabled, reset the GPU (`nvidia-smi -r -i <id>`) to retire the poisoned
-    page; escalate to RMA if DBEs keep recurring.
+    Run `docker ps -a` and `docker logs <container>` for the failing container.'
+- order: 4
+  cost: 40
+  content: 'NARROW DOWN — isolate the subsystem:
 
-    2. Confirm `nvidia-smi -q -d ECC` shows no pending retirement and no new uncorrectable errors.
+    1. `docker ps -a` — note Exited status and exit code.
 
-    3. Apply the documented remediation in /opt/fixitlab/academy/gpu-xid-48-dbe-ecc.conf.
+    2. `docker logs <name>` for the startup error.
 
-    WHY: the checker validates the ECC fault was genuinely handled.'
+    3. Inspect the Dockerfile or `docker run` flags if the image is wrong.'
+- order: 5
+  cost: 60
+  content: 'NEAR-SOLUTION — the fix shape + verify (you still apply it):
+
+    1. Fix image, port mapping, volume, or env configuration.
+
+    2. `docker start <name>` or re-run with corrected flags.
+
+    3. Confirm `nvidia-smi` shows the container Up.
+
+
+    WHY: the checker validates the container is actually running.'
 summary: Diagnose and fix xid 48 double-bit ecc error on a datacenter GPU node and verify with the checker
 estimated_minutes: 25
 xp_reward: 100

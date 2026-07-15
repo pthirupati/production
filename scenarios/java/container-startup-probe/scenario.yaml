@@ -10,25 +10,40 @@ simulation_type: java
 infrastructure_type: simulation
 jira_priority: High
 is_free: false
-description: 'CONTEXT: A team operating Java applications needs you to resolve `Spring Boot Pod Killed
-  by an Aggressive Startup Probe` during a realistic incident. The business impact is reduced service
-  reliability until the underlying state is repaired.
+description: 'CONTEXT: A team operating Java applications has raised a ticket for `Spring Boot Pod Killed
+  by an Aggressive Startup Probe`. A customer-facing workflow is degraded and the on-call engineer (you)
+  must diagnose and resolve it. Business impact: reduced service reliability and blocked users until the
+  underlying state is repaired.
 
 
-  ENVIRONMENT: You are working in FixitLab''s offline Java project with Maven/Gradle, JVM logs, and Spring
-  configuration. All tools run locally; no paid APIs or external cloud calls are required.
+  ENVIRONMENT: You are working in FixitLab''s offline Java project. The architecture is a single lab-primary
+  node exposing Maven/Gradle, JVM logs, and Spring configuration; treat it as the production host for
+  this incident. All tools run locally — no paid APIs or external cloud calls are required.
 
 
   SYMPTOM / STARTING STATE: Deployment manifest at /app/k8s/deployment.yaml sets a startupProbe with failureThreshold
-  3 and periodSeconds 3 (~9s) while the app needs ~40s to boot. A Spring Boot service takes ~40s to warm
-  up (Flyway migrations + cache priming), but the Kubernetes startupProbe gives it only 10s before the
-  kubelet kills and restarts the container — a permanent CrashLoopBackOff. Tune the probe to allow the
-  real startup time using the Actuator readiness group.
+  3 and periodSeconds 3 (~9s) while the app needs ~40s to boot.
 
 
   OBJECTIVE: Read the deployment''s startupProbe and compare its budget to real boot time; Increase failureThreshold/periodSeconds
-  to cover the warm-up window; Point the probe at /actuator/health/readiness. Success means `check.sh`
-  exits successfully.
+  to cover the warm-up window; Point the probe at /actuator/health/readiness. Acceptance criteria: the
+  change is minimal and reversible, and success means `check.sh` exits successfully.
+
+
+  WORK TO DO: Required tooling is pre-installed; if a command is missing, note it and use the equivalent
+  already on the host. Make the smallest configuration change that moves the system toward the objective
+  (edit the relevant Maven/Gradle, JVM logs, and Spring configuration), changing one thing at a time.
+  Check your work continuously against the objective — success means `check.sh` exits successfully.
+
+
+  VERIFY: Re-run the same check the grader uses and confirm `check.sh` exits successfully. Capture the
+  before/after output as evidence. Success criteria: the objective''s healthy state holds on a repeat
+  check, not just once.
+
+
+  ROLLBACK: If a change makes things worse, revert that single change immediately (restore the original
+  config file / undo the edit / restart the affected component) and re-observe before trying another hypothesis.
+  Never stack unverified changes.
 
 
   WHAT TO AVOID: Do not apply broad destructive changes, skip evidence gathering, or fake completion with
@@ -45,20 +60,38 @@ initial_state: 'Deployment manifest at /app/k8s/deployment.yaml sets a startupPr
 hints:
 - order: 1
   cost: 0
-  content: 'Where to look: Run `kubectl get pods -A` and `kubectl describe pod <name>` for any pod not
-    in Running state.'
+  content: 'ORIENT — what to observe and why:
+
+    Do not touch anything yet. First observe the symptom: spring boot pod killed by an aggressive startup
+    probe is not behaving as the scenario objectives require. This lab is about spring boot pod killed
+    by an aggressive startup probe — how spring boot pod killed by an aggressive startup probe behaves
+    in a Java applications environment. Read the objectives and the current state, and note precisely
+    what looks wrong versus healthy before you form any theory.'
 - order: 2
+  cost: 10
+  content: 'APPROACH — the troubleshooting method:
+
+    Work from evidence, not guesses. For spring boot pod killed by an aggressive startup probe problems
+    the reliable method is: (1) reproduce/observe the failure, (2) narrow from the whole system down to
+    the one component that owns the symptom, (3) change exactly one thing, (4) re-check. Fix the underlying
+    misconfiguration you identified (not just the noisy log line), changing one thing at a time.'
+- order: 3
   cost: 25
-  content: 'Diagnostic steps:
+  content: 'WHICH TOOL — the diagnostic command(s):
+
+    Run `kubectl get pods -A` and `kubectl describe pod <name>` for any pod not in Running state.'
+- order: 4
+  cost: 40
+  content: 'NARROW DOWN — isolate the subsystem:
 
     1. `kubectl get pods` — note CrashLoopBackOff, ImagePullBackOff, or Pending.
 
     2. `kubectl describe pod <name>` — read Events at the bottom.
 
     3. `kubectl logs <name> [--previous]` if the container restarted.'
-- order: 3
-  cost: 50
-  content: 'Exact fix + verification:
+- order: 5
+  cost: 60
+  content: 'NEAR-SOLUTION — the fix shape + verify (you still apply it):
 
     1. Fix the root cause (image name, env var, volume mount, or probe).
 

@@ -11,22 +11,39 @@ max_score: 100
 is_free: false
 infrastructure_type: docker
 jira_priority: Medium
-description: 'CONTEXT: A team operating packet analysis needs you to resolve `wireshark: Http Analysis
-  — Production Readiness` during a realistic incident. The business impact is reduced service reliability
-  until the underlying state is repaired.
+description: 'CONTEXT: A team operating packet analysis has raised a ticket for `Http Analysis — Production
+  Lab`. A customer-facing workflow is degraded and the on-call engineer (you) must diagnose and resolve
+  it. Business impact: reduced service reliability and blocked users until the underlying state is repaired.
 
 
-  ENVIRONMENT: You are working in FixitLab''s offline capture lab with pcap files, display filters, and
-  protocol decode. All tools run locally; no paid APIs or external cloud calls are required.
+  ENVIRONMENT: You are working in FixitLab''s offline capture lab. The architecture is a single lab-primary
+  node exposing pcap files, display filters, and protocol decode; treat it as the production host for
+  this incident. All tools run locally — no paid APIs or external cloud calls are required.
 
 
   SYMPTOM / STARTING STATE: A feature fix works in dev, but HTTP analysis is not production ready — missing
-  guardrails, runbooks, or capacity checks. Production readiness for HTTP analysis. Harden, document,
-  and validate requests, responses, and timing so the change is safe to run during a maintenance window.
+  guardrails, runbooks, or capacity checks.
 
 
   OBJECTIVE: Day-2 HTTP analysis work completes safely in this environment; Changes are verified with
-  before/after checks; The system remains stable for dependent teams. Success means `check.sh` exits successfully.
+  before/after checks; The system remains stable for dependent teams. Acceptance criteria: the change
+  is minimal and reversible, and success means `check.sh` exits successfully.
+
+
+  WORK TO DO: Required tooling is pre-installed; if a command is missing, note it and use the equivalent
+  already on the host. Make the smallest configuration change that moves the system toward the objective
+  (edit the relevant pcap files, display filters, and protocol decode), changing one thing at a time.
+  Check your work continuously against the objective — success means `check.sh` exits successfully.
+
+
+  VERIFY: Re-run the same check the grader uses and confirm `check.sh` exits successfully. Capture the
+  before/after output as evidence. Success criteria: the objective''s healthy state holds on a repeat
+  check, not just once.
+
+
+  ROLLBACK: If a change makes things worse, revert that single change immediately (restore the original
+  config file / undo the edit / restart the affected component) and re-observe before trying another hypothesis.
+  Never stack unverified changes.
 
 
   WHAT TO AVOID: Do not apply broad destructive changes, skip evidence gathering, or fake completion with
@@ -40,28 +57,54 @@ initial_state: A feature fix works in dev, but HTTP analysis is not production r
 hints:
 - order: 1
   cost: 0
-  content: 'Where to look: Load the capture in Wireshark and apply a display filter matching the symptom.'
+  content: 'ORIENT — what to observe and why:
+
+    Do not touch anything yet. First observe the symptom: slow or failing HTTP calls. This lab is about
+    HTTP analysis — requests, responses, and timing. Read the objectives and the current state, and note
+    precisely what looks wrong versus healthy before you form any theory.'
 - order: 2
-  cost: 25
-  content: 'Diagnostic steps:
+  cost: 10
+  content: 'APPROACH — the troubleshooting method:
 
-    1. Note protocol, source/dest IP, and TCP flags on failing packets.
-
-    2. Follow TCP stream or export objects if HTTP/DNS is involved.
-
-    3. Compare timing (retransmissions, RST, TLS alerts) to the lab question.'
+    Work from evidence, not guesses. For HTTP analysis problems the reliable method is: (1) reproduce/observe
+    the failure, (2) narrow from the whole system down to the one component that owns the symptom, (3)
+    change exactly one thing, (4) re-check. Apply production standards for HTTP analysis: resource limits,
+    monitoring, access controls, and a written rollback step.'
 - order: 3
-  cost: 50
-  content: 'Exact fix + verification:
+  cost: 25
+  content: 'WHICH TOOL — the diagnostic command(s):
 
-    1. Apply the filter or analysis steps the objectives describe.
+    1. Inspect the current state with HTTP streams and status codes.
 
-    2. Document the answer (host, port, flag, or root cause).
+    2. Each command above tells you something specific — status/health, recent errors, and the effective
+    configuration. Read them in that order.
 
-    3. Submit via Check Solution in the Wireshark simulator.
+    3. Compare what you see to the objectives; the gap points at the fault.'
+- order: 4
+  cost: 40
+  content: 'NARROW DOWN — isolate the subsystem:
+
+    1. From the evidence above, decide which single part of HTTP analysis is at fault.
+
+    2. Re-run the most relevant of HTTP streams and status codes focused on just that part to confirm
+    it.
+
+    3. State a one-line hypothesis: the smallest change that would move the state from ''slow or failing
+    HTTP calls'' toward ''the HTTP issue is pinpointed''.'
+- order: 5
+  cost: 60
+  content: 'NEAR-SOLUTION — the fix shape + verify (you still apply it):
+
+    1. Apply the smallest reversible change your hypothesis points to. Apply production standards for
+    HTTP analysis: resource limits, monitoring, access controls, and a written rollback step.
+
+    2. Re-run `bash check.sh` and confirm the HTTP issue is pinpointed.
+
+    3. If it still fails, the hypothesis was wrong — go back to the evidence, do not stack changes.
 
 
-    WHY: packet labs grade your analysis, not arbitrary shell markers.'
+    WHY: the grader validates real system state, not marker files — a fix only counts when the subsystem
+    is actually healthy.'
 summary: Complete the http analysis — production lab wireshark lab and verify success with the checker
 estimated_minutes: 20
 xp_reward: 100

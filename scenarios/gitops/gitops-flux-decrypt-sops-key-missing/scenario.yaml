@@ -11,16 +11,44 @@ max_score: 100
 is_free: false
 infrastructure_type: docker
 jira_priority: Medium
-description: |-
-  CONTEXT: A platform team operating gitops needs you to resolve `Flux Cannot Decrypt SOPS-Encrypted Secrets` during a realistic delivery incident. The business impact is a stalled or unsafe release until the underlying state is repaired.
+description: 'CONTEXT: A team operating gitops has raised a ticket for `Flux Cannot Decrypt SOPS-Encrypted
+  Secrets`. A customer-facing workflow is degraded and the on-call engineer (you) must diagnose and resolve
+  it. Business impact: reduced service reliability and blocked users until the underlying state is repaired.
 
-  ENVIRONMENT: You are working in FixitLab's offline GitOps practice cluster with ArgoCD/Flux controllers, Application/Kustomization manifests, and a Git source repo under /gitops. All controllers run locally; no external Git host or paid APIs are required.
 
-  SYMPTOM / STARTING STATE: The `secrets` Kustomization fails with `failed to decrypt … no key could decrypt the data`. The manifests are SOPS-encrypted but the age key the controller needs is not mounted.
+  ENVIRONMENT: You are working in FixitLab''s offline FixitLab practice environment. The architecture
+  is a single lab-primary node exposing CLI and configuration files; treat it as the production host for
+  this incident. All tools run locally — no paid APIs or external cloud calls are required.
 
-  OBJECTIVE: The Kustomization references SOPS decryption but the `sops-age` secret holding the private age key is missing (or not referenced in `spec.decryption`), so kustomize-controller cannot decrypt. Create/reference the age key secret under `spec.decryption.secretRef` so the controller decrypts and applies the secrets. Success is graded on the real repaired state, not a manual marker.
 
-  WHAT TO AVOID: Do not suppress the signal, disable the policy/gate, or fake completion with marker files — reproduce the diagnosis, then apply the smallest fix that satisfies the objective and re-run Check Solution.
+  SYMPTOM / STARTING STATE: The `secrets` Kustomization fails with `failed to decrypt … no key could decrypt
+  the data`. The manifests are SOPS-encrypted but the age key the controller needs is not mounted.
+
+
+  OBJECTIVE: The secrets Kustomization decrypts and applies successfully; The missing SOPS age key is
+  confirmed as the decrypt failure cause; Encrypted values render into real Kubernetes Secrets after the
+  key is provided. Acceptance criteria: the change is minimal and reversible, and success means `check.sh`
+  exits successfully.
+
+
+  WORK TO DO: Required tooling is pre-installed; if a command is missing, note it and use the equivalent
+  already on the host. Make the smallest configuration change that moves the system toward the objective
+  (edit the relevant CLI and configuration files), changing one thing at a time. Check your work continuously
+  against the objective — success means `check.sh` exits successfully.
+
+
+  VERIFY: Re-run the same check the grader uses and confirm `check.sh` exits successfully. Capture the
+  before/after output as evidence. Success criteria: the objective''s healthy state holds on a repeat
+  check, not just once.
+
+
+  ROLLBACK: If a change makes things worse, revert that single change immediately (restore the original
+  config file / undo the edit / restart the affected component) and re-observe before trying another hypothesis.
+  Never stack unverified changes.
+
+
+  WHAT TO AVOID: Do not apply broad destructive changes, skip evidence gathering, or fake completion with
+  marker files — the checker validates real system state.'
 objectives:
 - 'The secrets Kustomization decrypts and applies successfully'
 - 'The missing SOPS age key is confirmed as the decrypt failure cause'
@@ -30,26 +58,58 @@ initial_state: |-
 hints:
 - order: 1
   cost: 0
-  content: |-
-    Where to look — orient before changing anything:
-        1. `flux get kustomizations`
-        2. `kubectl -n flux-system get secret sops-age`
-        3. `kubectl -n flux-system get kustomization secrets -o yaml`
-        Write down what looks healthy versus wrong. Form one hypothesis before you touch anything.
+  content: 'ORIENT — what to observe and why:
+
+    Do not touch anything yet. First observe the symptom: flux cannot decrypt SOPS-Encrypted secrets is
+    not behaving as the scenario objectives require. This lab is about flux cannot decrypt SOPS-Encrypted
+    secrets — how flux cannot decrypt SOPS-Encrypted secrets behaves in a gitops environment. Read the
+    objectives and the current state, and note precisely what looks wrong versus healthy before you form
+    any theory.'
 - order: 2
-  cost: 25
-  content: |-
-    Diagnostic steps:
-        1. Re-run `flux get kustomizations` and read the status/error carefully.
-        2. Cross-check with `kubectl -n flux-system get secret sops-age` to isolate the failing object.
-        3. State the single root cause in one sentence before you act.
+  cost: 10
+  content: 'APPROACH — the troubleshooting method:
+
+    Work from evidence, not guesses. For flux cannot decrypt SOPS-Encrypted secrets problems the reliable
+    method is: (1) reproduce/observe the failure, (2) narrow from the whole system down to the one component
+    that owns the symptom, (3) change exactly one thing, (4) re-check. Fix the underlying misconfiguration
+    you identified (not just the noisy log line), changing one thing at a time.'
 - order: 3
-  cost: 50
-  content: |-
-    Exact fix + verification:
-        1. The Kustomization references SOPS decryption but the `sops-age` secret holding the private age key is missing (or not referenced in `spec.decryption`), so kustomize-controller cannot decrypt. Create/reference the age key secret under `spec.decryption.secretRef` so the controller decrypts and applies the secrets.
-        2. Change one thing at a time so you can roll back if the hypothesis was wrong.
-        3. Verify the objective is met, then click Check Solution (graded on real state, not a marker file).
+  cost: 25
+  content: 'WHICH TOOL — the diagnostic command(s):
+
+    1. Inspect the current state with CLI tools for Flux Cannot Decrypt SOPS-Encrypted Secrets.
+
+    2. Each command above tells you something specific — status/health, recent errors, and the effective
+    configuration. Read them in that order.
+
+    3. Compare what you see to the objectives; the gap points at the fault.'
+- order: 4
+  cost: 40
+  content: 'NARROW DOWN — isolate the subsystem:
+
+    1. From the evidence above, decide which single part of flux cannot decrypt SOPS-Encrypted secrets
+    is at fault.
+
+    2. Re-run the most relevant of CLI tools for Flux Cannot Decrypt SOPS-Encrypted Secrets focused on
+    just that part to confirm it.
+
+    3. State a one-line hypothesis: the smallest change that would move the state from ''flux cannot decrypt
+    SOPS-Encrypted secrets is not behaving as the scenario objectives require'' toward ''`check.sh` exits
+    successfully''.'
+- order: 5
+  cost: 60
+  content: 'NEAR-SOLUTION — the fix shape + verify (you still apply it):
+
+    1. Apply the smallest reversible change your hypothesis points to. Fix the underlying misconfiguration
+    you identified (not just the noisy log line), changing one thing at a time.
+
+    2. Re-run `bash check.sh` and confirm `check.sh` exits successfully.
+
+    3. If it still fails, the hypothesis was wrong — go back to the evidence, do not stack changes.
+
+
+    WHY: the grader validates real system state, not marker files — a fix only counts when the subsystem
+    is actually healthy.'
 summary: |-
   Diagnose and resolve flux cannot decrypt sops-encrypted secrets in the gitops simulation lab and verify the healthy end state
 estimated_minutes: 30

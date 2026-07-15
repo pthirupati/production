@@ -11,24 +11,42 @@ max_score: 100
 is_free: false
 infrastructure_type: docker
 jira_priority: Medium
-description: 'CONTEXT: A team operating FixitLab simulation needs you to resolve `simulation: Terraform
-  State — Daily Operations` during a realistic incident. The business impact is reduced service reliability
-  until the underlying state is repaired.
+description: 'CONTEXT: A team operating FixitLab simulation has raised a ticket for `Terraform State —
+  Operate Lab`. A customer-facing workflow is degraded and the on-call engineer (you) must diagnose and
+  resolve it. Business impact: reduced service reliability and blocked users until the underlying state
+  is repaired.
 
 
-  ENVIRONMENT: You are working in FixitLab''s offline simulation sandbox with terminal state, validation
-  hooks, and lab authoring markers. All tools run locally; no paid APIs or external cloud calls are required.
+  ENVIRONMENT: You are working in FixitLab''s offline simulation sandbox. The architecture is a single
+  lab-primary node exposing terminal state, validation hooks, and lab authoring markers; treat it as the
+  production host for this incident. All tools run locally — no paid APIs or external cloud calls are
+  required.
 
 
   SYMPTOM / STARTING STATE: The simulation sandbox is healthy enough for scheduled work on Terraform state.
-  Complete the maintenance task without unnecessary downtime. Day-2 operations: perform a routine Terraform
-  state task safely in simulation. Follow change control — inspect, change, verify — while working with
-  local vs remote state, locking, drift, and resource addressing.
+  Complete the maintenance task without unnecessary downtime.
 
 
   OBJECTIVE: Day-2 Terraform state work completes safely in this environment; Changes are verified with
-  before/after checks; The system remains stable for dependent teams. Success means `systemctl is-active
-  crond` returns active.
+  before/after checks; The system remains stable for dependent teams. Acceptance criteria: the change
+  is minimal and reversible, and success means `systemctl is-active crond` returns active.
+
+
+  WORK TO DO: Required tooling is pre-installed; if a command is missing, note it and use the equivalent
+  already on the host. Make the smallest configuration change that moves the system toward the objective
+  (edit the relevant terminal state, validation hooks, and lab authoring markers), changing one thing
+  at a time. Check your work continuously against the objective — success means `systemctl is-active crond`
+  returns active.
+
+
+  VERIFY: Re-run the same check the grader uses and confirm `systemctl is-active crond` returns active.
+  Capture the before/after output as evidence. Success criteria: the objective''s healthy state holds
+  on a repeat check, not just once.
+
+
+  ROLLBACK: If a change makes things worse, revert that single change immediately (restore the original
+  config file / undo the edit / restart the affected component) and re-observe before trying another hypothesis.
+  Never stack unverified changes.
 
 
   WHAT TO AVOID: Do not apply broad destructive changes, skip evidence gathering, or fake completion with
@@ -42,35 +60,46 @@ initial_state: The simulation sandbox is healthy enough for scheduled work on Te
 hints:
 - order: 1
   cost: 0
-  content: 'Orient yourself before changing anything:
+  content: 'ORIENT — what to observe and why:
 
-    1. Inspect the current state — `terraform state list`, `terraform show`, and backend config.
-
-    2. Write down what looks normal versus wrong or missing for Terraform state.
-
-    3. Recall the core idea: local vs remote state, locking, drift, and resource addressing. Form one
-    hypothesis before you act.'
+    Do not touch anything yet. First observe the symptom: state and real infrastructure disagree or locks
+    block applies. This lab is about Terraform state — local vs remote state, locking, drift, and resource
+    addressing. Read the objectives and the current state, and note precisely what looks wrong versus
+    healthy before you form any theory.'
 - order: 2
+  cost: 10
+  content: 'APPROACH — the troubleshooting method:
+
+    Work from evidence, not guesses. For Terraform state problems the reliable method is: (1) reproduce/observe
+    the failure, (2) narrow from the whole system down to the one component that owns the symptom, (3)
+    change exactly one thing, (4) re-check. Execute the maintenance in small, reversible steps, taking
+    a snapshot or backup first if the change is risky.'
+- order: 3
   cost: 25
-  content: 'Diagnostic steps:
+  content: 'WHICH TOOL — the diagnostic command(s):
+
+    Start with `systemctl status crond` and `journalctl -u crond -n 50 --no-pager` before changing anything.'
+- order: 4
+  cost: 40
+  content: 'NARROW DOWN — isolate the subsystem:
 
     1. Run `systemctl status crond` — note Active/Failed and the last log lines.
 
     2. Read `journalctl -u crond -n 50` for the root error.
 
     3. Form a hypothesis about the smallest config or permission fix.'
-- order: 3
-  cost: 50
-  content: 'Exact fix + verification:
+- order: 5
+  cost: 60
+  content: 'NEAR-SOLUTION — the fix shape + verify (you still apply it):
 
-    1. Re-check the current state — `terraform state list`, `terraform show`, and backend config.
+    1. Apply the minimal fix (config, unit override, or missing directory).
 
-    2. Execute the maintenance in small, reversible steps, taking a snapshot or backup first if the change
-    is risky.
+    2. Run `systemctl daemon-reload` if you edited a unit file.
 
-    3. Verify the result — state accurately reflects deployed resources.
+    3. Run `systemctl restart crond` and confirm `systemctl is-active crond` succeeds.
 
-    4. Click Check Solution once the objective is met (graded on real state, not a marker file).'
+
+    WHY: the grader checks real service state, not marker files.'
 summary: Complete the terraform state — operate lab simulation lab and verify success with the checker
 estimated_minutes: 20
 xp_reward: 100

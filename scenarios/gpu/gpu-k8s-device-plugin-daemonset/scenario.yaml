@@ -3,13 +3,15 @@ slug: gpu-k8s-device-plugin-daemonset
 technology: gpu
 category: Fix
 difficulty: hard
-description: 'CONTEXT: A team operating GPU operations needs you to resolve `GPU ↔ Kubernetes: Device
-  Plugin Won''t Expose nvidia.com/gpu` during a realistic incident. The business impact is reduced service
-  reliability until the underlying state is repaired.
+description: 'CONTEXT: A team operating GPU operations has raised a ticket for `GPU ↔ Kubernetes: Device
+  Plugin Won''t Expose nvidia.com/gpu`. A customer-facing workflow is degraded and the on-call engineer
+  (you) must diagnose and resolve it. Business impact: reduced service reliability and blocked users until
+  the underlying state is repaired.
 
 
-  ENVIRONMENT: You are working in FixitLab''s offline GPU node with nvidia-smi, drivers, CUDA, and container
-  toolkit. All tools run locally; no paid APIs or external cloud calls are required.
+  ENVIRONMENT: You are working in FixitLab''s offline GPU node. The architecture is a single lab-primary
+  node exposing nvidia-smi, drivers, CUDA, and container toolkit; treat it as the production host for
+  this incident. All tools run locally — no paid APIs or external cloud calls are required.
 
 
   SYMPTOM / STARTING STATE: A GPU node feeding a Kubernetes cluster. The NVIDIA container runtime is not
@@ -17,28 +19,29 @@ description: 'CONTEXT: A team operating GPU operations needs you to resolve `GPU
 
   default, and /etc/nvidia-container-runtime/k8s-device-plugin.yaml (the device
 
-  plugin DaemonSet) is misconfigured, so `nvidia.com/gpu` is never advertised. CROSS-TECHNOLOGY task (GPU
-  <-> Kubernetes). GPU jobs sit Pending on the cluster
-
-  because no node advertises the `nvidia.com/gpu` resource. The NVIDIA device-plugin
-
-  DaemonSet manifest at /etc/nvidia-container-runtime/k8s-device-plugin.yaml is
-
-  broken: the container runtime is not set to `nvidia` in the runtime config it
-
-  references, the DaemonSet uses the wrong image tag, and it lacks the privileged
-
-  /var/lib/kubelet/device-plugins mount — so the plugin never registers the GPU.
-
-  Reconcile the GPU runtime + device-plugin manifest so the cluster can schedule
-
-  GPU workloads.
+  plugin DaemonSet) is misconfigured, so `nvidia.com/gpu` is never advertised.
 
 
   OBJECTIVE: Confirm no node advertises nvidia.com/gpu and GPU pods are Pending; Set the NVIDIA runtime
   as default and correct the device-plugin DaemonSet manifest (image, device-plugins mount); Confirm the
-  manifest is corrected so the plugin registers and GPUs become schedulable. Success means `check.sh`
-  exits successfully.
+  manifest is corrected so the plugin registers and GPUs become schedulable. Acceptance criteria: the
+  change is minimal and reversible, and success means `nvidia-smi` includes `NVIDIA-SMI`.
+
+
+  WORK TO DO: Required tooling is pre-installed; if a command is missing, note it and use the equivalent
+  already on the host. Make the smallest configuration change that moves the system toward the objective
+  (edit the relevant nvidia-smi, drivers, CUDA, and container toolkit), changing one thing at a time.
+  Check your work continuously against the objective — success means `nvidia-smi` includes `NVIDIA-SMI`.
+
+
+  VERIFY: Re-run the same check the grader uses and confirm `nvidia-smi` includes `NVIDIA-SMI`. Capture
+  the before/after output as evidence. Success criteria: the objective''s healthy state holds on a repeat
+  check, not just once.
+
+
+  ROLLBACK: If a change makes things worse, revert that single change immediately (restore the original
+  config file / undo the edit / restart the affected component) and re-observe before trying another hypothesis.
+  Never stack unverified changes.
 
 
   WHAT TO AVOID: Do not apply broad destructive changes, skip evidence gathering, or fake completion with
@@ -66,20 +69,37 @@ dual_terminal: false
 hints:
 - order: 1
   cost: 0
-  content: 'Where to look: Run `kubectl get pods -A` and `kubectl describe pod <name>` for any pod not
-    in Running state.'
+  content: 'ORIENT — what to observe and why:
+
+    Do not touch anything yet. First observe the symptom: GPU ↔ kubernetes is not behaving as the scenario
+    objectives require. This lab is about GPU ↔ kubernetes — how GPU ↔ kubernetes behaves in a GPU operations
+    environment. Read the objectives and the current state, and note precisely what looks wrong versus
+    healthy before you form any theory.'
 - order: 2
+  cost: 10
+  content: 'APPROACH — the troubleshooting method:
+
+    Work from evidence, not guesses. For GPU ↔ kubernetes problems the reliable method is: (1) reproduce/observe
+    the failure, (2) narrow from the whole system down to the one component that owns the symptom, (3)
+    change exactly one thing, (4) re-check. Fix the underlying misconfiguration you identified (not just
+    the noisy log line), changing one thing at a time.'
+- order: 3
   cost: 25
-  content: 'Diagnostic steps:
+  content: 'WHICH TOOL — the diagnostic command(s):
+
+    Run `kubectl get pods -A` and `kubectl describe pod <name>` for any pod not in Running state.'
+- order: 4
+  cost: 40
+  content: 'NARROW DOWN — isolate the subsystem:
 
     1. `kubectl get pods` — note CrashLoopBackOff, ImagePullBackOff, or Pending.
 
     2. `kubectl describe pod <name>` — read Events at the bottom.
 
     3. `kubectl logs <name> [--previous]` if the container restarted.'
-- order: 3
-  cost: 50
-  content: 'Exact fix + verification:
+- order: 5
+  cost: 60
+  content: 'NEAR-SOLUTION — the fix shape + verify (you still apply it):
 
     1. Fix the root cause (image name, env var, volume mount, or probe).
 

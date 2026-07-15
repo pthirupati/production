@@ -10,25 +10,40 @@ infrastructure_type: docker
 lab_mode: docker
 jira_priority: Low
 is_free: false
-description: 'CONTEXT: A team operating security hardening needs you to resolve `Harden Firewalld Zone`
-  during a realistic incident. The business impact is reduced service reliability until the underlying
-  state is repaired.
+description: 'CONTEXT: A team operating security hardening has raised a ticket for `Harden Firewalld Zone`.
+  A customer-facing workflow is degraded and the on-call engineer (you) must diagnose and resolve it.
+  Business impact: reduced service reliability and blocked users until the underlying state is repaired.
 
 
-  ENVIRONMENT: You are working in FixitLab''s offline hardening lab with SSH, firewall, TLS, audit logs,
-  and IAM settings. All tools run locally; no paid APIs or external cloud calls are required.
+  ENVIRONMENT: You are working in FixitLab''s offline hardening lab. The architecture is a single lab-primary
+  node exposing SSH, firewall, TLS, audit logs, and IAM settings; treat it as the production host for
+  this incident. All tools run locally — no paid APIs or external cloud calls are required.
 
 
   SYMPTOM / STARTING STATE: Linux host with firewalld active. The interface zone assignment and allowed
-  services aren''t yet hardened to a minimal public-zone configuration. Build/hardening task: place the
-  server''s network interface into the firewalld public zone and open only the ports the service genuinely
-  needs, removing anything unnecessary. The goal is a minimal, least-privilege firewall posture — the
-  interface bound to the right zone, with an explicit, small allow-list, made persistent.
+  services aren''t yet hardened to a minimal public-zone configuration.
 
 
   OBJECTIVE: Assign the interface to the firewalld public zone; Open only the required ports/services
-  and remove the rest; Make the configuration permanent and verify it. Success means `check.sh` exits
-  successfully.
+  and remove the rest; Make the configuration permanent and verify it. Acceptance criteria: the change
+  is minimal and reversible, and success means `firewall-cmd --list-ports` includes `80/tcp`.
+
+
+  WORK TO DO: Required tooling is pre-installed; if a command is missing, note it and use the equivalent
+  already on the host. Make the smallest configuration change that moves the system toward the objective
+  (edit the relevant SSH, firewall, TLS, audit logs, and IAM settings), changing one thing at a time.
+  Check your work continuously against the objective — success means `firewall-cmd --list-ports` includes
+  `80/tcp`.
+
+
+  VERIFY: Re-run the same check the grader uses and confirm `firewall-cmd --list-ports` includes `80/tcp`.
+  Capture the before/after output as evidence. Success criteria: the objective''s healthy state holds
+  on a repeat check, not just once.
+
+
+  ROLLBACK: If a change makes things worse, revert that single change immediately (restore the original
+  config file / undo the edit / restart the affected component) and re-observe before trying another hypothesis.
+  Never stack unverified changes.
 
 
   WHAT TO AVOID: Do not apply broad destructive changes, skip evidence gathering, or fake completion with
@@ -42,19 +57,40 @@ initial_state: Linux host with firewalld active. The interface zone assignment a
 hints:
 - order: 1
   cost: 0
-  content: 'Where to look: Run `firewall-cmd --state` and `firewall-cmd --list-all` for active zones.'
+  content: 'ORIENT — what to observe and why:
+
+    Do not touch anything yet. First observe the symptom: harden firewalld zone is not behaving as the
+    scenario objectives require. This lab is about harden firewalld zone — how harden firewalld zone behaves
+    in a security hardening environment. Read the objectives and the current state, and note precisely
+    what looks wrong versus healthy before you form any theory.'
 - order: 2
-  cost: 25
-  content: 'Diagnostic steps:
+  cost: 10
+  content: 'APPROACH — the troubleshooting method:
 
-    1. Identify which zone is active and which ports/services are allowed.
-
-    2. Compare to the port the scenario expects (often 80/tcp or 443/tcp).
-
-    3. Check if the service is bound but blocked externally.'
+    Work from evidence, not guesses. For harden firewalld zone problems the reliable method is: (1) reproduce/observe
+    the failure, (2) narrow from the whole system down to the one component that owns the symptom, (3)
+    change exactly one thing, (4) re-check. Execute the maintenance in small, reversible steps, taking
+    a snapshot or backup first if the change is risky.'
 - order: 3
-  cost: 50
-  content: 'Exact fix + verification:
+  cost: 25
+  content: 'WHICH TOOL — the diagnostic command(s):
+
+    Run `firewall-cmd --state` and `firewall-cmd --list-all` for active zones.'
+- order: 4
+  cost: 40
+  content: 'NARROW DOWN — isolate the subsystem:
+
+    1. From the evidence above, decide which single part of harden firewalld zone is at fault.
+
+    2. Re-run the most relevant of `firewall-cmd --list-ports` output focused on just that part to confirm
+    it.
+
+    3. State a one-line hypothesis: the smallest change that would move the state from ''harden firewalld
+    zone is not behaving as the scenario objectives require'' toward ''`firewall-cmd --list-ports` includes
+    `80/tcp`''.'
+- order: 5
+  cost: 60
+  content: 'NEAR-SOLUTION — the fix shape + verify (you still apply it):
 
     1. `firewall-cmd --permanent --add-service=http` (or the needed port).
 
