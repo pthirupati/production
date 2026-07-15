@@ -89,7 +89,11 @@ class ScenarioSearchTests(TestCase):
         self.assertIsInstance(payload["results"], list)
 
     def test_empty_result_for_nonsense(self):
-        payload = self._search("zzzzz-no-such-lab-xyzzy")
+        # A single gibberish token. Postgres FTS tokenizes the query, so a string
+        # with real word-tokens ("no", "such", "lab") would legitimately match many
+        # scenarios; genuine nonsense must have no real tokens and near-zero trigram
+        # similarity to any title.
+        payload = self._search("qwzxlkjhgfdsapoiuyt")
         self.assertEqual(payload["results"], [])
 
     def test_helper_returns_queryset(self):
