@@ -14,7 +14,7 @@ import {
 import toast from 'react-hot-toast'
 import { broadcastLabStopped, closeLabChildTabs, broadcastLabActivity } from '../utils/labSync'
 import { purgeGuestStateForLab } from '../components/vmware/linuxShell'
-import { awsSimStorageKey } from '../components/aws/store/awsStore'
+import { awsSimStorageKey, hardResetAwsSim } from '../components/aws/store/awsStore'
 import { ConfirmDialog } from '../components/ConfirmModal'
 import JiraTicketPanel from '../components/JiraTicketPanel'
 import ItsmTicketPanel from '../components/itsm/ItsmTicketPanel'
@@ -396,6 +396,9 @@ export default function LabRunner() {
   const [showCicdSim, setShowCicdSim] = useState(false)
   const [simTerminalOpen, setSimTerminalOpen] = useState(false)
   const [showBaremetalSim, setShowBaremetalSim] = useState(false)
+  // Bumped by the sim error-boundary "Reset saved state" action to force a
+  // clean remount of the primary simulator subtree after re-seeding its store.
+  const [simResetNonce, setSimResetNonce] = useState(0)
   const [mobileInput, setMobileInput] = useState('')
   const [showMobileInput, setShowMobileInput] = useState(false)
   const terminalRefs = useRef({})
@@ -1525,11 +1528,17 @@ export default function LabRunner() {
   }
   const renderPrimarySim = () => {
     if (!primarySimKind) return null
+    const isAws = primarySimKind === 'aws'
     return (
       <SimErrorBoundary
+        // Remount the boundary + sim subtree from scratch after a reset so no
+        // stale in-memory state survives into the retry.
+        key={`${primarySimKind}:${simResetNonce}`}
         name={primarySimKind}
         title="Lab simulator error"
-        resetStorageKey={primarySimKind === 'aws' ? awsSimStorageKey(useAuthStore.getState().user?.id) : undefined}
+        resetStorageKey={isAws ? awsSimStorageKey(useAuthStore.getState().user?.id) : undefined}
+        // AWS: wipe persisted blob AND re-seed the live store, then remount.
+        onResetStorage={isAws ? () => { hardResetAwsSim(); setSimResetNonce((n) => n + 1) } : undefined}
       >
         <PrimaryLabSim
           kind={primarySimKind}

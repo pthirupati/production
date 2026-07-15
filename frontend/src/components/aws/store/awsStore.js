@@ -56,6 +56,18 @@ export function resetAwsSimOnLogout() {
   useAwsStore.getState().resetSimulation()
 }
 
+/**
+ * Hard reset used by the lab error-boundary "Reset saved state" action: wipe the
+ * persisted blob for the current user AND re-seed the live in-memory store so a
+ * corrupt/old payload can neither rehydrate again nor keep crashing the mount.
+ * Every step is independently guarded so the recovery path itself never throws.
+ */
+export function hardResetAwsSim() {
+  try { localStorage.removeItem(currentAwsSimStorageKey()) } catch { /* ignore */ }
+  try { useAwsStore.getState().resetSimulation() } catch { /* ignore */ }
+  try { useAwsStore.getState()._ensureTick() } catch { /* ignore */ }
+}
+
 function newGenericId(service, resource) {
   const suffix = Math.random().toString(16).slice(2, 10).padEnd(8, '0')
   const shapes = {
@@ -460,6 +472,48 @@ function removeGeneric(s, service, resource, id) {
       },
     },
   }
+}
+
+/**
+ * Merge a persisted (possibly old-version / partially-corrupt) blob onto the
+ * fresh store. Every field is coerced to a safe default: arrays that are missing
+ * or the wrong type fall back to seed arrays, object-shaped chrome fields are
+ * shallow-merged onto seed, and genericResources is deep-merged per service.
+ * A returning user's own resources survive; new v3 fields appear seeded.
+ * Pure + defensive so the persist merge() can call it inside a try/catch.
+ */
+function mergePersistedAws(persisted, current) {
+  const seed = seedState()
+  const p = persisted && typeof persisted === 'object' && !Array.isArray(persisted) ? persisted : {}
+  const merged = { ...current, ...p, flash: [] }
+  merged.account = { ...seed.account, ...(p.account && typeof p.account === 'object' ? p.account : {}) }
+  merged.region = (typeof p.region === 'string' && p.region) || current.region || seed.region
+  merged.darkMode = typeof p.darkMode === 'boolean' ? p.darkMode : (current.darkMode ?? false)
+  // Object-shaped chrome / principal fields: shallow-merge onto seed defaults.
+  merged.currentPrincipal = p.currentPrincipal && typeof p.currentPrincipal === 'object'
+    ? { ...seed.currentPrincipal, ...p.currentPrincipal }
+    : seed.currentPrincipal
+  merged.settings = { ...seed.settings, ...(p.settings && typeof p.settings === 'object' ? p.settings : {}) }
+  const objectKeys = new Set(['account', 'region', 'darkMode', 'flash', 'genericResources', 'currentPrincipal', 'settings'])
+  for (const key of Object.keys(seed)) {
+    if (objectKeys.has(key)) continue
+    if (Array.isArray(seed[key])) {
+      merged[key] = Array.isArray(p[key]) ? p[key] : seed[key]
+    }
+  }
+  // genericResources: deep-merge per service so new nested seeds appear for old
+  // persisted state while user rows survive. Guard each level's type.
+  if (p.genericResources && typeof p.genericResources === 'object' && !Array.isArray(p.genericResources)) {
+    const g = { ...seed.genericResources }
+    for (const svc of Object.keys(p.genericResources)) {
+      const pv = p.genericResources[svc]
+      g[svc] = { ...(seed.genericResources[svc] || {}), ...(pv && typeof pv === 'object' ? pv : {}) }
+    }
+    merged.genericResources = g
+  } else {
+    merged.genericResources = seed.genericResources
+  }
+  return merged
 }
 
 export const useAwsStore = create(
@@ -1300,44 +1354,27 @@ export const useAwsStore = create(
       version: 3,
       // v2 -> v3: new fields get their seeded defaults via merge(); nothing to
       // strip. Provide migrate so zustand does not discard the older payload.
-      migrate: (persistedState) => persistedState || {},
+      // Coerce anything that is not a plain object (null / primitive / array
+      // from a hand-corrupted blob) to {} so merge() only ever spreads an object.
+      migrate: (persistedState) => (
+        persistedState && typeof persistedState === 'object' && !Array.isArray(persistedState)
+          ? persistedState
+          : {}
+      ),
       // Persist resource state + region, but not transient flash messages.
       partialize: (s) => {
         const { flash, ...rest } = s
         return rest
       },
       merge: (persisted, current) => {
-        const seed = seedState()
-        const p = persisted || {}
-        const merged = { ...current, ...p, flash: [] }
-        merged.account = { ...seed.account, ...(p.account || {}) }
-        merged.region = p.region || current.region || seed.region
-        merged.darkMode = p.darkMode ?? current.darkMode ?? false
-        // Object-shaped chrome / principal fields: shallow-merge onto seed defaults.
-        merged.currentPrincipal = p.currentPrincipal && typeof p.currentPrincipal === 'object'
-          ? { ...seed.currentPrincipal, ...p.currentPrincipal }
-          : seed.currentPrincipal
-        merged.settings = { ...seed.settings, ...(p.settings && typeof p.settings === 'object' ? p.settings : {}) }
-        const objectKeys = new Set(['account', 'region', 'darkMode', 'flash', 'genericResources', 'currentPrincipal', 'settings'])
-        for (const key of Object.keys(seed)) {
-          if (objectKeys.has(key)) continue
-          if (key === 'genericResources') continue
-          if (Array.isArray(seed[key])) {
-            merged[key] = Array.isArray(p[key]) ? p[key] : seed[key]
-          }
+        // Whole-merge fallback: if any field of a corrupt blob makes the merge
+        // throw, fall back to a clean seed rather than crashing rehydrate (which
+        // would blow up the console mount → error boundary).
+        try {
+          return mergePersistedAws(persisted, current)
+        } catch {
+          return { ...current, ...seedState(), flash: [] }
         }
-        // genericResources: deep-merge per service so new nested seeds appear
-        // for old persisted state while user rows survive.
-        if (p.genericResources && typeof p.genericResources === 'object') {
-          const g = { ...seed.genericResources }
-          for (const svc of Object.keys(p.genericResources)) {
-            g[svc] = { ...(seed.genericResources[svc] || {}), ...(p.genericResources[svc] || {}) }
-          }
-          merged.genericResources = g
-        } else {
-          merged.genericResources = seed.genericResources
-        }
-        return merged
       },
       // On load/rehydrate: resolve any past-due transitions immediately (no
       // stranded mid-transition resources) and arm the single global tick.

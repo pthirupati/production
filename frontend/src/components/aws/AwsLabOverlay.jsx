@@ -1,4 +1,4 @@
-import { useEffect } from 'react'
+import { useEffect, useState } from 'react'
 import { MemoryRouter, Routes, Route } from 'react-router-dom'
 import { Cloud } from 'lucide-react'
 import LabChromeBar from '../lab/LabChromeBar'
@@ -26,9 +26,21 @@ export default function AwsLabOverlay({
   extendDisabled,
   vmwareHref,
 }) {
+  // Reset the simulation to a clean seed BEFORE the console renders, not after.
+  // Doing this in a lazy useState initializer means the very first paint is
+  // driven by fresh seed state — never a rehydrated old/corrupt v2 blob — so a
+  // returning user can't hit a stale-state render crash. The initializer runs
+  // exactly once per mount (guarded so it can never throw the mount).
+  useState(() => {
+    try { useAwsStore.getState().resetSimulation() } catch { /* ignore */ }
+    return true
+  })
+
+  // Re-seed again if this overlay is reused for a different lab session without
+  // a full remount (defensive; the key on the parent boundary already remounts).
   useEffect(() => {
     if (!sessionId) return
-    useAwsStore.getState().resetSimulation()
+    try { useAwsStore.getState().resetSimulation() } catch { /* ignore */ }
   }, [sessionId])
 
   return (
