@@ -203,7 +203,12 @@ class FollowUpReferencesAnswerTest(TestCase):
             )
             if "cache ttl" in q.text.lower() or "memory leak" in q.text.lower():
                 found = True
-                self.assertIn(q.kind, ("cross", "drill", "followup"))
+                # conversational_* kinds (grounded follow-ups from the services/
+                # conversation engine) are valid alongside cross/drill/followup.
+                self.assertTrue(
+                    q.kind in ("cross", "drill", "followup") or (q.kind or "").startswith("conversational"),
+                    f"unexpected follow-up kind: {q.kind!r}",
+                )
                 break
         self.assertTrue(found, "a follow-up must reference the candidate's own words")
 
