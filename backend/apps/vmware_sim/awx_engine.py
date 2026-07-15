@@ -198,6 +198,87 @@ def _advance_jobs(state: dict) -> bool:
     return changed
 
 
+# ---------------------------------------------------------------------------
+# Cross-technology chain: ANSIBLE (AWX) → LINUX terminal.
+#
+# When a job template that "configures a service" runs to SUCCESS, we publish
+# the intended end-state to the shared VMware/Linux bridge (record_ansible_result),
+# keyed by the lab session id. The Linux terminal for the SAME session then
+# reveals the service as installed + started when it inspects the unit
+# (`systemctl is-active <svc>` → active, config file present) — see
+# RHELOSState.reveal_ansible_services. Fail-closed: nothing is recorded until a
+# service-configuring template actually launches successfully, so before the
+# playbook runs the guest sees the service inactive/absent.
+# ---------------------------------------------------------------------------
+
+# Map a template name / playbook to the Linux service it configures + where its
+# config lives. Keyed on tokens found in the template name or playbook filename;
+# a scenario can also pass an explicit `service` in the launch payload.
+_SERVICE_PLAYBOOKS: dict[str, dict] = {
+    "nginx": {"service": "nginx", "package": "nginx", "config_path": "/etc/nginx/nginx.conf"},
+    "httpd": {"service": "httpd", "package": "httpd", "config_path": "/etc/httpd/conf/httpd.conf"},
+    "apache": {"service": "httpd", "package": "httpd", "config_path": "/etc/httpd/conf/httpd.conf"},
+    "chrony": {"service": "chronyd", "package": "chrony", "config_path": "/etc/chrony.conf"},
+    "postgres": {"service": "postgresql", "package": "postgresql-server", "config_path": "/var/lib/pgsql/data/postgresql.conf"},
+    "postgresql": {"service": "postgresql", "package": "postgresql-server", "config_path": "/var/lib/pgsql/data/postgresql.conf"},
+    "mariadb": {"service": "mariadb", "package": "mariadb-server", "config_path": "/etc/my.cnf"},
+    "mysql": {"service": "mariadb", "package": "mariadb-server", "config_path": "/etc/my.cnf"},
+    "redis": {"service": "redis", "package": "redis", "config_path": "/etc/redis/redis.conf"},
+    "docker": {"service": "docker", "package": "docker-ce", "config_path": "/etc/docker/daemon.json"},
+    "firewalld": {"service": "firewalld", "package": "firewalld", "config_path": "/etc/firewalld/firewalld.conf"},
+}
+
+
+def _service_config_for(template_name: str, playbook: str, payload: dict) -> dict | None:
+    """Resolve which Linux service (if any) a launched template configures.
+
+    An explicit `service` in the launch payload wins; otherwise match a known
+    token in the template name or playbook filename. Returns a bridge-ready
+    result dict, or None when the template does not configure a service (so we
+    record nothing and the chain stays fail-closed)."""
+    explicit = (payload.get("service") or "").strip()
+    if explicit:
+        spec = _SERVICE_PLAYBOOKS.get(explicit.lower(), {})
+        return {
+            "service": explicit,
+            "installed": True,
+            "started": bool(payload.get("started", True)),
+            "enabled": bool(payload.get("enabled", True)),
+            "config_path": payload.get("config_path") or spec.get("config_path") or "",
+            "config_content": payload.get("config_content") or "",
+            "package": payload.get("package") or spec.get("package") or explicit,
+        }
+    haystack = f"{template_name} {playbook}".lower()
+    for token, spec in _SERVICE_PLAYBOOKS.items():
+        if token in haystack:
+            return {
+                "service": spec["service"],
+                "installed": True,
+                "started": True,
+                "enabled": True,
+                "config_path": spec.get("config_path", ""),
+                "config_content": "",
+                "package": spec.get("package", spec["service"]),
+            }
+    return None
+
+
+def _bridge_ansible_result(session_id: str, template_name: str, playbook: str,
+                           payload: dict) -> None:
+    """If a launched template configures a service, publish its intended end
+    state to the Linux bridge. Best-effort: never let a bridge failure break the
+    AWX action."""
+    result = _service_config_for(template_name, playbook, payload)
+    if not result:
+        return
+    try:
+        from apps.labs.provisioner.simulation.vmware_bridge import record_ansible_result
+
+        record_ansible_result(str(session_id), result)
+    except Exception:
+        pass
+
+
 def _base_state() -> dict:
     return {
         "session": {"logged_in": False, "user": ""},
@@ -415,6 +496,9 @@ def apply_action(session_id: str, action: str, payload: dict | None = None) -> d
         state["events"].insert(0, {"time": _now_iso(), "message": f"Job {job['name']} launched (#{job['id']})", "severity": "success"})
         _activity(state, f"Launched job template {job['name']}", f"Job #{job['id']}")
         _save(session_id, entry)
+        # Cross-tech: a service-configuring template launched successfully →
+        # publish its intended end state so the Linux terminal reveals it.
+        _bridge_ansible_result(session_id, job.get("name", ""), job.get("playbook", ""), payload)
         return {"ok": True, "message": "Job launched", "job_id": job["id"]}
 
     if action == "create_template":
@@ -513,6 +597,8 @@ def apply_action(session_id: str, action: str, payload: dict | None = None) -> d
         state["events"].insert(0, {"time": _now_iso(), "message": f"Job {job['name']} relaunched (#{job['id']})", "severity": "success"})
         _activity(state, "Relaunched job", f"Job #{job['id']}")
         _save(session_id, entry)
+        # Cross-tech: a relaunched service-configuring template re-converges the box.
+        _bridge_ansible_result(session_id, job.get("name", ""), job.get("playbook", ""), payload)
         return {"ok": True, "message": "Job relaunched", "job_id": job["id"]}
 
     if action == "cancel_job":

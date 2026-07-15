@@ -103,6 +103,13 @@ def _series_for_metric(metric: str, broken: dict, t: float) -> list[dict]:
             for inst in instances:
                 val = 0 if inst in down else 1
                 emit({"job": job, "instance": inst}, val)
+        # Cross-tech: workloads published by the Linux/k8s side for this session
+        # (record_workload on the bridge) surface as real `up` series. Fail-closed
+        # — only workloads actually recorded appear, and a stopped one is up == 0.
+        for wl in broken.get("workload_targets") or []:
+            emit({"job": wl.get("job") or "workload",
+                  "instance": wl.get("instance") or wl.get("name")},
+                 1 if wl.get("up") else 0)
     elif metric == "node_cpu_seconds_total":
         for inst in _INSTANCES:
             for mode in ("idle", "user", "system", "iowait"):
@@ -795,6 +802,56 @@ def _ensure_session(session_id: str, scenario_slug: str = "") -> dict:
     return entry
 
 
+def _merge_bridge_workloads(state: dict, session_id: str) -> list[dict]:
+    """Cross-tech: fold workloads the Linux/k8s side published for this session
+    (record_workload on the shared bridge) into the monitoring world.
+
+    Each workload becomes (a) a Prometheus scrape target — up or DOWN per its
+    `up` flag — and (b) is stashed on state["broken"]["workload_targets"] so the
+    PromQL `up` series reflects it (see _series_for_metric). Fail-closed: with no
+    workloads recorded this is a no-op and no target/`up` series is fabricated.
+    Returns the workload list read from the bridge."""
+    if not session_id:
+        state.get("broken", {})["workload_targets"] = []
+        return []
+    try:
+        from apps.labs.provisioner.simulation.vmware_bridge import workloads as bridge_workloads
+
+        wls = bridge_workloads(str(session_id))
+    except Exception:
+        wls = []
+    # Publish for the `up` series generator (always overwrite so a removed
+    # workload disappears from `up`).
+    state.setdefault("broken", {})["workload_targets"] = wls
+    if not wls:
+        return []
+    prom = state.setdefault("prometheus", {})
+    targets = prom.setdefault("targets", [])
+    existing = {t.get("instance") or t.get("labels", {}).get("instance") for t in targets}
+    for wl in wls:
+        inst = wl.get("instance") or wl.get("name")
+        if inst in existing:
+            # Refresh health so a workload that went up/down is reflected.
+            for t in targets:
+                if (t.get("instance") or t.get("labels", {}).get("instance")) == inst:
+                    t["health"] = "up" if wl.get("up") else "down"
+                    t["last_error"] = "" if wl.get("up") else "connection refused"
+            continue
+        targets.append({
+            "job": wl.get("job") or "workload",
+            "instance": inst,
+            "labels": {"job": wl.get("job") or "workload", "instance": inst},
+            "health": "up" if wl.get("up") else "down",
+            "scrape_url": f"http://{inst}/metrics",
+            "last_scrape": _now_iso(),
+            "scrape_duration_ms": 18,
+            "last_error": "" if wl.get("up") else "connection refused",
+            "source": "workload-bridge",
+        })
+        existing.add(inst)
+    return wls
+
+
 def _merge_lab_hosts(state: dict, session_id: str) -> None:
     """Inject lab session hosts + VMware-created VMs as Prometheus scrape targets."""
     try:
@@ -853,6 +910,7 @@ def get_state(session_id: str, scenario_slug: str = "") -> dict:
     entry = _ensure_session(session_id, scenario_slug)
     state = copy.deepcopy(entry["state"])
     _merge_lab_hosts(state, session_id)
+    _merge_bridge_workloads(state, session_id)
     graf = state["grafana"]
     prom = state["prometheus"]
     broken = state["broken"]
@@ -898,6 +956,10 @@ def apply_action(session_id: str, action: str, payload: dict | None = None) -> d
 
     if action == "query":
         expr = payload.get("expr", "") or payload.get("query", "")
+        # Fold in cross-tech workloads published on the bridge so `up{...}` for
+        # this session reflects the real running workload (fail-closed: none
+        # recorded → no extra `up` series).
+        _merge_bridge_workloads(state, session_id)
         res = eval_promql(expr, broken)
         return {"ok": True, "query": expr, "result": res}
 

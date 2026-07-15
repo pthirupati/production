@@ -47,6 +47,12 @@ except Exception:
     )
 
 MARKER_RE = re.compile(r"grep\s+-q\s+FIXED-OK|FIXED-OK.*grep", re.I)
+# An already-upgraded service lab (a prior generator run rewrote its check.sh to
+# `systemctl is-active <unit>`). We must re-match these so re-runs can retarget
+# the graded unit to a topic-appropriate one — otherwise the gate would skip
+# them and _emit_* would ship EMPTY preset/fix maps. Kept narrow (only the
+# generator's own service probe) so we never clobber hand-authored checks.
+ALREADY_SERVICE_RE = re.compile(r"^\s*systemctl is-active \S+\s*$", re.M)
 
 DEDICATED_SIM = frozenset({
     "nmap", "wireshark", "vmware", "terraform", "peoplesoft",
@@ -75,6 +81,15 @@ SERVICE_DESC: dict[str, str] = {
     "rabbitmq-server": "RabbitMQ broker",
     "postfix": "Postfix Mail Transport Agent",
     "sshd": "OpenSSH server daemon",
+    # Topic-appropriate application units so the graded fault matches the
+    # scenario's described incident (see TASK #8 / test_academy_fix_alignment).
+    "model-server": "ML Model Inference Server",
+    "jupyter": "Jupyter Notebook Server",
+    "spring-boot": "Spring Boot Application Service",
+    "node-app": "Node.js Application Service",
+    "grafana-server": "Grafana Dashboard Server",
+    "prometheus": "Prometheus Monitoring Server",
+    "gunicorn": "Gunicorn Python WSGI Server",
 }
 
 TECH_SERVICE_POOLS: dict[str, list[str]] = {
@@ -82,8 +97,8 @@ TECH_SERVICE_POOLS: dict[str, list[str]] = {
     "rhel-linux": ["chronyd", "rsyslog", "firewalld", "sssd", "auditd"],
     "docker": ["docker"],
     "devops": ["nginx", "crond", "rsyslog"],
-    "grafana": ["nginx", "rsyslog"],
-    "prometheus": ["nginx", "crond"],
+    "grafana": ["grafana-server"],
+    "prometheus": ["prometheus"],
     "networking": ["nginx", "named", "haproxy"],
     "security": ["sshd", "auditd", "firewalld"],
     "shell-script": ["crond", "rsyslog"],
@@ -93,14 +108,14 @@ TECH_SERVICE_POOLS: dict[str, list[str]] = {
     "mysql": ["mysqld"],
     "postgresql": ["postgresql"],
     "sqlite": ["postgresql"],
-    "python": ["nginx", "crond"],
-    "java": ["nginx"],
-    "javascript": ["nginx"],
-    "nodejs": ["nginx"],
-    "react": ["nginx"],
-    "ai-ml": ["nginx"],
-    "data-science": ["nginx"],
-    "prompt-engineering": ["nginx"],
+    "python": ["gunicorn"],
+    "java": ["spring-boot"],
+    "javascript": ["node-app"],
+    "nodejs": ["node-app"],
+    "react": ["node-app"],
+    "ai-ml": ["model-server"],
+    "data-science": ["jupyter"],
+    "prompt-engineering": ["model-server"],
     "gpu": ["nginx"],
     "baremetal": ["chronyd", "rsyslog"],
     "ansible": ["nginx"],
@@ -362,7 +377,15 @@ def main() -> None:
             if mode == "skip":
                 continue
             check_body = check_path.read_text(encoding="utf-8") if check_path.is_file() else ""
-            if not MARKER_RE.search(check_body):
+            # Match still-marker labs (first upgrade) AND already-upgraded service
+            # labs (re-run: retarget the graded unit). Non-service already-upgraded
+            # modes (ansible/k8s/gpu/docker/dedicated) carry no `systemctl is-active`
+            # line, so they only re-match when the classify() mode below matches —
+            # their check.sh is regenerated deterministically regardless.
+            is_marker = bool(MARKER_RE.search(check_body))
+            is_upgraded_service = bool(ALREADY_SERVICE_RE.search(check_body))
+            is_upgraded_nonservice = mode in {"ansible", "k8s", "gpu", "docker_compose"}
+            if not (is_marker or is_upgraded_service or is_upgraded_nonservice):
                 continue
 
             unit = assign_service_unit(tech, slug)
@@ -372,7 +395,13 @@ def main() -> None:
 
             if not args.dry_run:
                 check_path.write_text(script + "exit 0\n", encoding="utf-8")
-                patch_scenario_yaml(yaml_path, mode, unit, topic_label)
+                # Only FIRST-TIME upgrades (marker still present) get the scenario.yaml
+                # description/objectives/hints template. Already-upgraded labs were
+                # further enriched downstream (topic-specific ticket context); a re-run
+                # here only RETARGETS the graded unit (check.sh + maps) and must NOT
+                # clobber that enrichment — per TASK #8 "keep the enriched description".
+                if is_marker:
+                    patch_scenario_yaml(yaml_path, mode, unit, topic_label)
 
             if mode == "service":
                 preset_entries[slug] = ("service", unit)

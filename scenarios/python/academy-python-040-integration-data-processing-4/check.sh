@@ -1,3 +1,3 @@
 #!/usr/bin/env bash
-systemctl is-active crond
+systemctl is-active gunicorn
 exit 0

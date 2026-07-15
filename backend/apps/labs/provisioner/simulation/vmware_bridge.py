@@ -214,6 +214,142 @@ def consume_pending_nic(session_id: str) -> dict | None:
     return nic
 
 
+# ── Ansible (AWX) ⇄ Linux terminal ────────────────────────────────────────────
+# For a cross-tech automation lab the AWX job template and the Linux box describe
+# the SAME server sharing one lab session id. When an AWX job template that
+# "configures a service" runs to SUCCESS, the AWX engine records the intended end
+# state here (service installed + started + its config written), keyed by session
+# id. The Linux terminal then drains this record the first time it inspects that
+# service (`systemctl is-active/status`, `rpm -q`, cat of the config), exactly
+# like the disk/NIC reveal train: the hardware/automation happened on the other
+# engine, and the guest only reflects it once it looks.
+#
+# Fail-closed by construction: before the playbook runs there is NO ansible
+# record, so the service reports inactive/unknown and the config file is absent.
+# A scenario can only be solved after the playbook genuinely runs in AWX AND the
+# terminal reveals the result AND (per the check.sh recipe) the learner confirms
+# it. Multiple services are supported (a playbook may configure several); each is
+# consumed independently and moved pending → applied so a re-inspect is stable.
+#
+# Stored shape under the session key:
+#   ansible_pending : [ {service, installed, started, enabled, config_path,
+#                        config_content, package} , ... ]  (not yet seen by guest)
+#   ansible_applied : {service: {...}}  (already revealed to the guest)
+
+def record_ansible_result(session_id: str, result: dict) -> None:
+    """AWX job-template success → register the service state the playbook
+    intended, for the Linux terminal to reveal. `result` carries at least
+    `service`; optional installed/started/enabled/config_path/config_content/
+    package refine what the guest shows once it inspects the unit."""
+    if not result or not result.get("service"):
+        return
+    service = str(result["service"])
+    data = _load(session_id)
+    pending = data.setdefault("ansible_pending", [])
+    applied = data.get("ansible_applied", {})
+    entry = {
+        "service": service,
+        "installed": bool(result.get("installed", True)),
+        "started": bool(result.get("started", True)),
+        "enabled": bool(result.get("enabled", True)),
+        "config_path": result.get("config_path") or "",
+        "config_content": result.get("config_content") or "",
+        "package": result.get("package") or service,
+    }
+    # Idempotent: a re-run replaces the pending record for that service rather
+    # than duplicating it, and re-arms an already-applied service (a relaunch
+    # re-converges the box).
+    data["ansible_pending"] = [e for e in pending if e.get("service") != service]
+    data["ansible_pending"].append(entry)
+    applied.pop(service, None)
+    _save(session_id, data)
+
+
+def has_pending_ansible(session_id: str) -> bool:
+    return bool(_load(session_id).get("ansible_pending"))
+
+
+def pending_ansible(session_id: str) -> list[dict]:
+    return list(_load(session_id).get("ansible_pending", []))
+
+
+def consume_ansible_results(session_id: str) -> list[dict]:
+    """Drain every service an AWX playbook configured for this session.
+
+    Returned records are moved pending → applied so a second inspection does not
+    re-apply them (but the applied snapshot is kept so a later reader can still
+    tell the service came from Ansible). Returns [] when no playbook has run —
+    the fail-closed default."""
+    data = _load(session_id)
+    pending = data.get("ansible_pending", [])
+    if not pending:
+        return []
+    applied = data.setdefault("ansible_applied", {})
+    for entry in pending:
+        applied[entry["service"]] = entry
+    data["ansible_pending"] = []
+    _save(session_id, data)
+    return list(pending)
+
+
+def ansible_applied(session_id: str) -> dict:
+    """Snapshot of services already revealed from Ansible (service → record)."""
+    return dict(_load(session_id).get("ansible_applied", {}))
+
+
+# ── Workload (Linux service / k8s pod) ⇄ Monitoring (Prometheus/Grafana) ──────
+# A workload that is actually running in the Linux sim (a started systemd unit)
+# or a k8s deployment with ready pods is, in the real world, a thing Prometheus
+# can scrape. This bridge lets the workload side (Linux/k8s) publish a scrape
+# target for the SAME lab session, which the monitoring engine reads so PromQL
+# `up{...}` and the Prometheus target list reflect the real workload.
+#
+# Fail-closed by construction: the monitoring engine only synthesises an `up`
+# series / target for a workload that has been recorded here with up=True. No
+# workload recorded → no extra target, and `up` for it is absent (not fabricated
+# as 1). A workload recorded with up=False surfaces as a target scraping DOWN
+# (up == 0), which is what a stopped service should look like to monitoring.
+#
+# Stored shape under the session key:
+#   workloads : {name: {name, up, job, instance, port}}
+
+_WORKLOAD_DEFAULT_PORT = 9100
+
+
+def record_workload(session_id: str, workload: dict) -> None:
+    """Linux/k8s side → publish/refresh a scrape target for the monitoring
+    engine. `workload` needs `name`; `up` (default True) sets whether the target
+    scrapes up. Optional job/instance/port refine the emitted series labels."""
+    if not workload or not workload.get("name"):
+        return
+    name = str(workload["name"])
+    data = _load(session_id)
+    workloads = data.setdefault("workloads", {})
+    port = int(workload.get("port") or _WORKLOAD_DEFAULT_PORT)
+    workloads[name] = {
+        "name": name,
+        "up": bool(workload.get("up", True)),
+        "job": workload.get("job") or "workload",
+        "instance": workload.get("instance") or f"{name}:{port}",
+        "port": port,
+    }
+    _save(session_id, data)
+
+
+def remove_workload(session_id: str, name: str) -> None:
+    """Workload stopped/deleted → drop it so monitoring no longer scrapes it."""
+    if not name:
+        return
+    data = _load(session_id)
+    if data.get("workloads", {}).pop(name, None) is not None:
+        _save(session_id, data)
+
+
+def workloads(session_id: str) -> list[dict]:
+    """All workloads published for this session (for the monitoring engine)."""
+    return list(_load(session_id).get("workloads", {}).values())
+
+
 def clear(session_id: str) -> None:
     cache.delete(_key(str(session_id)))
 

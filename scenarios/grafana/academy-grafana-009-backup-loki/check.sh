@@ -1,3 +1,3 @@
 #!/usr/bin/env bash
-systemctl is-active nginx
+systemctl is-active grafana-server
 exit 0

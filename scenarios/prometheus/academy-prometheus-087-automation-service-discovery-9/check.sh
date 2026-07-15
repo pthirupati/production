@@ -1,3 +1,3 @@
 #!/usr/bin/env bash
-systemctl is-active nginx
+systemctl is-active prometheus
 exit 0

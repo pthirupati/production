@@ -1259,6 +1259,15 @@ class RHELShell:
         self.state.groups[p[-1]] = [self.state.uid_counter]
         return ""
 
+    def _publish_workload(self, unit: str) -> None:
+        """Cross-tech: publish a service's up/down state to the monitoring sim so a
+        running workload shows as a Prometheus target (no-op for non-monitorable
+        units / when the seam is unavailable)."""
+        try:
+            self.state.publish_workload_to_monitoring(unit)
+        except Exception:
+            pass
+
     def _cmd_systemctl(self, p: list[str]) -> str:
         # Separate options (--failed, --type=service, --no-pager, -a, …) from the
         # verb and unit so `systemctl --failed`, `systemctl list-units --failed`
@@ -1269,6 +1278,14 @@ class RHELShell:
         action = words[0] if words else ""
         unit = words[1] if len(words) > 1 else ""
         unit = unit.replace(".service", "").replace(".socket", "").replace(".target", "")
+
+        # Cross-tech: a service an Ansible/AWX playbook just configured for this
+        # session surfaces here (installed + registered), so `systemctl status/
+        # is-active <svc>` reflects the playbook run — mirrors reveal_bridge_nic.
+        try:
+            self.state.reveal_ansible_services()
+        except Exception:
+            pass
 
         if action in ("emergency", "rescue"):
             self.state.emergency_mode = True
@@ -1337,10 +1354,12 @@ class RHELShell:
         if action == "start":
             svc.active = "active"
             svc.sub_state = "running"
+            self._publish_workload(unit)  # cross-tech: surface in monitoring as up
             return ""
         if action == "stop":
             svc.active = "inactive"
             svc.sub_state = "dead"
+            self._publish_workload(unit)  # cross-tech: monitoring target goes down
             return ""
         if action in ("restart", "reload-or-restart", "try-restart", "reload"):
             # reload/reload-or-restart on a running unit just re-reads config; on a

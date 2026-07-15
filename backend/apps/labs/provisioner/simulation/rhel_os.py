@@ -761,6 +761,86 @@ class RHELOSState:
         self.network_ifs[name] = {"up": True, "addrs": [ip]}
         return True
 
+    def reveal_ansible_services(self) -> list[str]:
+        """Cross-tech read: fold in services an AWX playbook configured for this
+        lab session (ANSIBLE(AWX) → LINUX chain). Drains the shared bridge and,
+        for each service the playbook ran to success, installs its package
+        (so `rpm -q` sees it and its config lands on disk), registers the unit,
+        and starts/enables it per the recorded intent — so the terminal's
+        `systemctl is-active <svc>` reports `active` after (and only after) the
+        playbook has run in AWX. Additive + fail-closed: with nothing recorded
+        this is a no-op and the service stays inactive/unknown. Returns the list
+        of service names revealed (newly converged) this call."""
+        if not self.session_id:
+            return []
+        try:
+            from .vmware_bridge import consume_ansible_results
+        except Exception:
+            return []
+        revealed: list[str] = []
+        for result in consume_ansible_results(self.session_id):
+            service = result.get("service")
+            if not service:
+                continue
+            # 1) Install the package the playbook installed (idempotent) so the
+            #    config file + binaries + unit exist just as a real install would.
+            if result.get("installed", True):
+                pkg = result.get("package") or service
+                if not self.is_package_installed(pkg):
+                    try:
+                        self.install_package(pkg)
+                    except Exception:
+                        pass
+                # Unknown-to-catalog service still needs a queryable unit.
+                if service not in self.services:
+                    self.register_package_service(service)
+            # 2) Write the config the playbook rendered, if it supplied one and
+            #    the install did not already lay one down.
+            cfg_path = result.get("config_path")
+            if cfg_path:
+                content = result.get("config_content") or ""
+                if content or not self.file_exists(cfg_path):
+                    self.write_file(cfg_path, content)
+            # 3) Converge the unit's runtime state to what the playbook asserts.
+            svc = self.services.get(service)
+            if svc is None:
+                svc = SimService(service, description=f"{service} (configured by Ansible)")
+                self.services[service] = svc
+            if result.get("started", True):
+                svc.active = "active"
+                svc.sub_state = "running"
+            if result.get("enabled", True):
+                svc.enabled = "enabled"
+            revealed.append(service)
+        return revealed
+
+    def publish_workload_to_monitoring(self, service: str, *, port: int = 9100,
+                                       job: str = "node") -> bool:
+        """Cross-tech write: expose a Linux service as a Prometheus scrape target
+        for the monitoring engine (WORKLOAD → MONITORING chain). The workload's
+        `up` value is read from the REAL service state — active → up=1, otherwise
+        up=0 — so a stopped service correctly scrapes DOWN and monitoring never
+        fabricates a healthy target. Returns True if a record was published.
+        Fail-closed: an unknown unit is not published at all (no target)."""
+        if not self.session_id:
+            return False
+        svc = self.services.get(service)
+        if svc is None:
+            return False
+        try:
+            from .vmware_bridge import record_workload
+        except Exception:
+            return False
+        instance = f"{self.hostname}:{port}"
+        record_workload(self.session_id, {
+            "name": service,
+            "up": svc.active == "active",
+            "job": job,
+            "instance": instance,
+            "port": port,
+        })
+        return True
+
     def recover_from_vmware_reset(self) -> bool:
         """If the guest was hung and VMware reset it for this session, recover."""
         if not self.server_hung or not self.session_id:
