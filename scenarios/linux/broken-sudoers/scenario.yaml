@@ -9,24 +9,39 @@ time_limit: 600
 max_score: 100
 infrastructure_type: docker
 jira_priority: Low
-description: 'CONTEXT: A team operating Linux administration needs you to resolve `Broken sudoers Configuration`
-  during a realistic incident. The business impact is reduced service reliability until the underlying
-  state is repaired.
+description: 'CONTEXT: A team operating Linux administration has raised a ticket for `Broken sudoers Configuration`.
+  A customer-facing workflow is degraded and the on-call engineer (you) must diagnose and resolve it.
+  Business impact: reduced service reliability and blocked users until the underlying state is repaired.
 
 
-  ENVIRONMENT: You are working in FixitLab''s offline Linux practice server with terminal and config files
-  under /etc and /var. All tools run locally; no paid APIs or external cloud calls are required.
+  ENVIRONMENT: You are working in FixitLab''s offline Linux practice server. The architecture is a single
+  lab-primary node exposing terminal and config files under /etc and /var; treat it as the production
+  host for this incident. All tools run locally — no paid APIs or external cloud calls are required.
 
 
   SYMPTOM / STARTING STATE: Linux server where the sudoers configuration has a typo in the devops rule,
-  so devops cannot use sudo. Editing must be done safely to avoid locking out sudo entirely. User ''devops''
-  can no longer run sudo — commands fail (often with a parse/syntax complaint) because a typo was introduced
-  into the sudoers configuration (e.g. `ALLL` instead of `ALL`). A malformed sudoers line breaks privilege
-  escalation for that user. Repair the entry safely with visudo and confirm devops regains sudo.
+  so devops cannot use sudo. Editing must be done safely to avoid locking out sudo entirely.
 
 
   OBJECTIVE: Diagnose why sudo fails for devops; Fix the sudoers typo safely with visudo; Verify devops
-  can run sudo commands again. Success means `check.sh` exits successfully.
+  can run sudo commands again. Acceptance criteria: the change is minimal and reversible, and success
+  means `check.sh` exits successfully.
+
+
+  WORK TO DO: Required tooling is pre-installed; if a command is missing, note it and use the equivalent
+  already on the host. Make the smallest configuration change that moves the system toward the objective
+  (edit the relevant terminal and config files under /etc and /var), changing one thing at a time. Check
+  your work continuously against the objective — success means `check.sh` exits successfully.
+
+
+  VERIFY: Re-run the same check the grader uses and confirm `check.sh` exits successfully. Capture the
+  before/after output as evidence. Success criteria: the objective''s healthy state holds on a repeat
+  check, not just once.
+
+
+  ROLLBACK: If a change makes things worse, revert that single change immediately (restore the original
+  config file / undo the edit / restart the affected component) and re-observe before trying another hypothesis.
+  Never stack unverified changes.
 
 
   WHAT TO AVOID: Do not apply broad destructive changes, skip evidence gathering, or fake completion with
@@ -40,29 +55,55 @@ initial_state: Linux server where the sudoers configuration has a typo in the de
 hints:
 - order: 1
   cost: 0
-  content: 'Where to look: Start with read-only discovery on the Linux practice server. For Broken sudoers
-    Configuration, inspect terminal and config files under /etc and /var before changing anything.'
+  content: 'ORIENT — what to observe and why:
+
+    Do not touch anything yet. First observe the symptom: broken sudoers configuration is not behaving
+    as the scenario objectives require. This lab is about broken sudoers configuration — how broken sudoers
+    configuration behaves in a Linux administration environment. Read the objectives and the current state,
+    and note precisely what looks wrong versus healthy before you form any theory.'
 - order: 2
-  cost: 25
-  content: 'Diagnostic steps:
+  cost: 10
+  content: 'APPROACH — the troubleshooting method:
 
-    1. Gather evidence with terminal and config files under /etc and /var.
-
-    2. Compare current output to the scenario objectives.
-
-    3. Form a single hypothesis about the smallest fix that would restore healthy state.'
+    Work from evidence, not guesses. For broken sudoers configuration problems the reliable method is:
+    (1) reproduce/observe the failure, (2) narrow from the whole system down to the one component that
+    owns the symptom, (3) change exactly one thing, (4) re-check. Create the smallest working slice of
+    broken sudoers configuration first, validate it, then add the remaining pieces one at a time.'
 - order: 3
-  cost: 50
-  content: 'Exact fix + verification:
+  cost: 25
+  content: 'WHICH TOOL — the diagnostic command(s):
 
-    1. Verify devops can run sudo commands again.
+    1. Inspect the current state with terminal and config files under /etc and /var.
 
-    2. Re-run the lab checker (`check.sh` or Check Solution).
+    2. Each command above tells you something specific — status/health, recent errors, and the effective
+    configuration. Read them in that order.
 
-    3. Confirm every scenario objective is satisfied.
+    3. Compare what you see to the objectives; the gap points at the fault.'
+- order: 4
+  cost: 40
+  content: 'NARROW DOWN — isolate the subsystem:
+
+    1. From the evidence above, decide which single part of broken sudoers configuration is at fault.
+
+    2. Re-run the most relevant of terminal and config files under /etc and /var focused on just that
+    part to confirm it.
+
+    3. State a one-line hypothesis: the smallest change that would move the state from ''broken sudoers
+    configuration is not behaving as the scenario objectives require'' toward ''`check.sh` exits successfully''.'
+- order: 5
+  cost: 60
+  content: 'NEAR-SOLUTION — the fix shape + verify (you still apply it):
+
+    1. Apply the smallest reversible change your hypothesis points to. Create the smallest working slice
+    of broken sudoers configuration first, validate it, then add the remaining pieces one at a time.
+
+    2. Re-run `bash check.sh` and confirm `check.sh` exits successfully.
+
+    3. If it still fails, the hypothesis was wrong — go back to the evidence, do not stack changes.
 
 
-    WHY: the grader validates real state — marker files are ignored.'
+    WHY: the grader validates real system state, not marker files — a fix only counts when the subsystem
+    is actually healthy.'
 summary: Complete the broken sudoers configuration linux lab and verify success with the checker
 estimated_minutes: 10
 xp_reward: 100

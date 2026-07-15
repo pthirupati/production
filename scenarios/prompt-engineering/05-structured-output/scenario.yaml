@@ -1,26 +1,41 @@
 title: 'Structured Output: Get Clean JSON'
 slug: structured-output
 category: Build
-description: 'CONTEXT: A team operating prompt engineering needs you to resolve `Structured Output: Get
-  Clean JSON` during a realistic incident. The business impact is reduced service reliability until the
-  underlying state is repaired.
+description: 'CONTEXT: A team operating prompt engineering has raised a ticket for `Structured Output:
+  Get Clean JSON`. A customer-facing workflow is degraded and the on-call engineer (you) must diagnose
+  and resolve it. Business impact: reduced service reliability and blocked users until the underlying
+  state is repaired.
 
 
-  ENVIRONMENT: You are working in FixitLab''s offline LLM practice workspace with prompt templates, eval
-  sets, and tool configs. All tools run locally; no paid APIs or external cloud calls are required.
+  ENVIRONMENT: You are working in FixitLab''s offline LLM practice workspace. The architecture is a single
+  lab-primary node exposing prompt templates, eval sets, and tool configs; treat it as the production
+  host for this incident. All tools run locally — no paid APIs or external cloud calls are required.
 
 
   SYMPTOM / STARTING STATE: The guided AI practice console opens with a flagship JSON-extraction exercise.
-  Write a prompt that makes the simulator return clean JSON and nothing else. Rule-based and free. When
-  an AI feeds another program, you need machine-readable output — not prose. Learn the techniques that
-  make models return clean, parseable JSON every time: specify the exact schema, show an example, forbid
-  extra text, and prefill the opening brace. This is the flagship exercise: get the simulator to emit
-  valid JSON.
+  Write a prompt that makes the simulator return clean JSON and nothing else. Rule-based and free.
 
 
   OBJECTIVE: List the techniques that reliably produce parseable structured output; Write a prompt that
   returns ONLY valid JSON matching a given schema; Pass the flagship exercise — a prompt that extracts
-  fields into JSON with no extra prose. Success means all hidden tests pass.
+  fields into JSON with no extra prose. Acceptance criteria: the change is minimal and reversible, and
+  success means all hidden tests pass.
+
+
+  WORK TO DO: Required tooling is pre-installed; if a command is missing, note it and use the equivalent
+  already on the host. Make the smallest configuration change that moves the system toward the objective
+  (edit the relevant prompt templates, eval sets, and tool configs), changing one thing at a time. Check
+  your work continuously against the objective — success means all hidden tests pass.
+
+
+  VERIFY: Re-run the same check the grader uses and confirm all hidden tests pass. Capture the before/after
+  output as evidence. Success criteria: the objective''s healthy state holds on a repeat check, not just
+  once.
+
+
+  ROLLBACK: If a change makes things worse, revert that single change immediately (restore the original
+  config file / undo the edit / restart the affected component) and re-observe before trying another hypothesis.
+  Never stack unverified changes.
 
 
   WHAT TO AVOID: Do not apply broad destructive changes, skip evidence gathering, or fake completion with
@@ -134,29 +149,49 @@ coding_spec:
 hints:
 - order: 1
   cost: 0
-  content: 'Where to look: Open `the solution file`, read the instructions, and run the visible tests
-    to see which assertion fails first.'
+  content: 'ORIENT — what to observe and why:
+
+    Do not touch anything yet. First observe the symptom: structured output is not behaving as the scenario
+    objectives require. This lab is about structured output — how structured output behaves in a prompt
+    engineering environment. Read the objectives and the current state, and note precisely what looks
+    wrong versus healthy before you form any theory.'
 - order: 2
-  cost: 25
-  content: 'Diagnostic steps:
+  cost: 10
+  content: 'APPROACH — the troubleshooting method:
 
-    1. Click Run and read the traceback — note line number and actual vs expected values.
-
-    2. Reproduce the failure with the smallest input from a visible test.
-
-    3. Compare your implementation to the bug described in the lab prompt.'
+    Work from evidence, not guesses. For structured output problems the reliable method is: (1) reproduce/observe
+    the failure, (2) narrow from the whole system down to the one component that owns the symptom, (3)
+    change exactly one thing, (4) re-check. Execute the maintenance in small, reversible steps, taking
+    a snapshot or backup first if the change is risky.'
 - order: 3
-  cost: 50
-  content: 'Exact fix + verification:
+  cost: 25
+  content: 'WHICH TOOL — the diagnostic command(s):
 
-    1. Pass the flagship exercise — a prompt that extracts fields into JSON with no extra prose.
+    Open `the solution file`, read the instructions, and run the visible tests to see which assertion
+    fails first.'
+- order: 4
+  cost: 40
+  content: 'NARROW DOWN — isolate the subsystem:
 
-    2. Re-run the lab checker (`check.sh` or Check Solution).
+    1. From the evidence above, decide which single part of structured output is at fault.
 
-    3. Confirm every scenario objective is satisfied.
+    2. Re-run the most relevant of prompt templates, eval sets, and tool configs focused on just that
+    part to confirm it.
+
+    3. State a one-line hypothesis: the smallest change that would move the state from ''structured output
+    is not behaving as the scenario objectives require'' toward ''all hidden tests pass''.'
+- order: 5
+  cost: 60
+  content: 'NEAR-SOLUTION — the fix shape + verify (you still apply it):
+
+    1. Edit `the solution file` with the smallest correct change.
+
+    2. Re-run visible tests, then Check Solution (includes hidden tests).
+
+    3. Confirm every test passes.
 
 
-    WHY: the grader validates real state — marker files are ignored.'
+    WHY: coding labs grade against hidden test cases, not marker files.'
 technology: prompt-engineering
 summary: 'Complete the structured output: get clean json prompt engineering lab and verify success with
   the checker'

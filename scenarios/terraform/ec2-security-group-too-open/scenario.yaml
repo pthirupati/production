@@ -2,26 +2,41 @@ title: EC2 Security Group Allows Unrestricted SSH
 slug: aws-ec2-sg-too-open
 difficulty: easy
 category: Fix
-description: 'CONTEXT: A team operating Terraform IaC needs you to resolve `EC2 Security Group Allows
-  Unrestricted SSH` during a realistic incident. The business impact is reduced service reliability until
-  the underlying state is repaired.
+description: 'CONTEXT: A team operating Terraform IaC has raised a ticket for `EC2 Security Group Allows
+  Unrestricted SSH`. A customer-facing workflow is degraded and the on-call engineer (you) must diagnose
+  and resolve it. Business impact: reduced service reliability and blocked users until the underlying
+  state is repaired.
 
 
-  ENVIRONMENT: You are working in FixitLab''s offline Terraform workspace with HCL files, state, and plan/apply
-  workflow. All tools run locally; no paid APIs or external cloud calls are required.
+  ENVIRONMENT: You are working in FixitLab''s offline Terraform workspace. The architecture is a single
+  lab-primary node exposing HCL files, state, and plan/apply workflow; treat it as the production host
+  for this incident. All tools run locally — no paid APIs or external cloud calls are required.
 
 
   SYMPTOM / STARTING STATE: Simulated AWS environment with an EC2 instance and a security group that has
   a permissive inbound rule: port 22 open to all IPv4 addresses. This violates least-privilege network
-  access principles. An EC2 security group has an inbound rule allowing SSH (port 22) from 0.0.0.0/0,
-  exposing the instance to brute-force attempts from the entire internet. This violates least-privilege
-  network access. Replace the open rule with a tightly-scoped CIDR so only trusted networks can reach
-  SSH, without locking out legitimate administrators.
+  access principles.
 
 
   OBJECTIVE: Identify the security group with the 0.0.0.0/0 SSH rule using the AWS CLI; Revoke the world-open
-  SSH ingress rule; Re-authorize SSH from a specific trusted CIDR and verify the rule is scoped. Success
-  means `check.sh` exits successfully.
+  SSH ingress rule; Re-authorize SSH from a specific trusted CIDR and verify the rule is scoped. Acceptance
+  criteria: the change is minimal and reversible, and success means `check.sh` exits successfully.
+
+
+  WORK TO DO: Required tooling is pre-installed; if a command is missing, note it and use the equivalent
+  already on the host. Make the smallest configuration change that moves the system toward the objective
+  (edit the relevant HCL files, state, and plan/apply workflow), changing one thing at a time. Check your
+  work continuously against the objective — success means `check.sh` exits successfully.
+
+
+  VERIFY: Re-run the same check the grader uses and confirm `check.sh` exits successfully. Capture the
+  before/after output as evidence. Success criteria: the objective''s healthy state holds on a repeat
+  check, not just once.
+
+
+  ROLLBACK: If a change makes things worse, revert that single change immediately (restore the original
+  config file / undo the edit / restart the affected component) and re-observe before trying another hypothesis.
+  Never stack unverified changes.
 
 
   WHAT TO AVOID: Do not apply broad destructive changes, skip evidence gathering, or fake completion with
@@ -40,19 +55,38 @@ is_free: true
 hints:
 - order: 1
   cost: 0
-  content: 'Where to look: Run `systemctl status sshd` and `ss -tlnp | grep :22` on the target host.'
+  content: 'ORIENT — what to observe and why:
+
+    Do not touch anything yet. First observe the symptom: EC2 security group allows unrestricted SSH is
+    not behaving as the scenario objectives require. This lab is about EC2 security group allows unrestricted
+    SSH — how EC2 security group allows unrestricted SSH behaves in a Terraform IaC environment. Read
+    the objectives and the current state, and note precisely what looks wrong versus healthy before you
+    form any theory.'
 - order: 2
+  cost: 10
+  content: 'APPROACH — the troubleshooting method:
+
+    Work from evidence, not guesses. For EC2 security group allows unrestricted SSH problems the reliable
+    method is: (1) reproduce/observe the failure, (2) narrow from the whole system down to the one component
+    that owns the symptom, (3) change exactly one thing, (4) re-check. Fix the underlying misconfiguration
+    you identified (not just the noisy log line), changing one thing at a time.'
+- order: 3
   cost: 25
-  content: 'Diagnostic steps:
+  content: 'WHICH TOOL — the diagnostic command(s):
+
+    Run `systemctl status sshd` and `ss -tlnp | grep :22` on the target host.'
+- order: 4
+  cost: 40
+  content: 'NARROW DOWN — isolate the subsystem:
 
     1. Confirm sshd is active and listening on port 22.
 
     2. Check `firewall-cmd` or iptables for blocked port 22.
 
     3. Read `/var/log/secure` for auth or config errors.'
-- order: 3
-  cost: 50
-  content: 'Exact fix + verification:
+- order: 5
+  cost: 60
+  content: 'NEAR-SOLUTION — the fix shape + verify (you still apply it):
 
     1. Fix sshd_config, firewall, or socket unit as needed.
 

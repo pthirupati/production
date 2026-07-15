@@ -21,12 +21,32 @@ from django.core.management.base import BaseCommand
 ROOT = Path(__file__).resolve().parents[5]
 SCEN = ROOT / "scenarios"
 
+# Reuse the single source of truth for the catalog standards defined alongside
+# the generator, so the validator enforces exactly what the enricher emits.
+_SCRIPTS = ROOT / "scripts"
+if str(_SCRIPTS) not in sys.path:
+    sys.path.insert(0, str(_SCRIPTS))
+try:
+    from scenario_copy_library import (  # noqa: E402
+        HINT_LADDER_RUNGS,
+        TICKET_REQUIRED_SECTIONS,
+    )
+except Exception:  # pragma: no cover - defensive; keep validator importable
+    HINT_LADDER_RUNGS = 5
+    TICKET_REQUIRED_SECTIONS = (
+        "CONTEXT:", "ENVIRONMENT:", "SYMPTOM", "OBJECTIVE:",
+        "WORK TO DO:", "VERIFY:", "WHAT TO AVOID:",
+    )
+
 MARKER_ONLY_RE = re.compile(r"grep\s+-q\s+FIXED-OK|FIXED-OK.*grep", re.I)
 # Truly fake completion marker: a sentinel file the learner writes by hand
 # (echo FIXED-OK > /tmp/scenario-fixed). This proves nothing about lab state.
 TMP_MARKER_RE = re.compile(r"/tmp/scenario-fixed|FIX_MARKER", re.I)
 GUIDED_HINT_RE = re.compile(
-    r"(Orient yourself|Plan your approach|Guided walkthrough|Where to look|"
+    # New 5-rung HINT_LADDER labels, plus the legacy guided prefixes and any
+    # numbered step, so both new and older rich hints pass.
+    r"(ORIENT|APPROACH|WHICH TOOL|NARROW DOWN|NEAR-SOLUTION|"
+    r"Orient yourself|Plan your approach|Guided walkthrough|Where to look|"
     r"Diagnostic steps|Exact fix|\n\s*1\.\s)",
     re.I,
 )
@@ -42,7 +62,10 @@ DEDICATED_SIM_TYPES = frozenset({
     "datascience",
 })
 
-DESCRIPTION_SECTIONS = ("CONTEXT:", "ENVIRONMENT:", "SYMPTOM", "OBJECTIVE:", "WHAT TO AVOID:")
+# Company-ticket description standard (single source of truth in the copy
+# library). Enforces the richer sections — including the load-bearing WORK TO DO
+# (what to install / change) and VERIFY (how to check) — not just the legacy 5.
+DESCRIPTION_SECTIONS = TICKET_REQUIRED_SECTIONS
 REAL_VALIDATION_TYPES = frozenset({
     "command_output",
     "file_contains",
@@ -128,6 +151,9 @@ def _description_for(data: dict, path: Path) -> str:
         "No external services or paid APIs are required.\n\n"
         f"SYMPTOM / STARTING STATE: {initial or existing or 'TODO: describe the starting failure the learner observes.'}\n\n"
         f"OBJECTIVE: {objective}. The solution must be validated by the scenario checker, not by a manual marker.\n\n"
+        "WORK TO DO: TODO: List what to install, what to configure, and what to change to satisfy the objective.\n\n"
+        "VERIFY: TODO: Re-run the scenario checker and confirm the healthy end state holds on a repeat check.\n\n"
+        "ROLLBACK: TODO: If a change makes things worse, revert that single change and re-observe before trying another.\n\n"
         "WHAT TO AVOID: TODO: Do not apply broad, destructive changes; make the smallest fix that satisfies the objective."
     )
 
@@ -357,10 +383,10 @@ def validate_scenario_file(path: Path, *, fix_stubs: bool = False) -> list[str]:
         gaps.append("fewer than 2 objectives")
 
     hints = data.get("hints") or []
-    if len(hints) < 3:
-        gaps.append("fewer than 3 hints")
+    if len(hints) < HINT_LADDER_RUNGS:
+        gaps.append(f"fewer than {HINT_LADDER_RUNGS} hints (graduated ladder required)")
     else:
-        for i, h in enumerate(sorted(hints, key=lambda x: x.get("order", 0))[:3], 1):
+        for i, h in enumerate(sorted(hints, key=lambda x: x.get("order", 0)), 1):
             content = (h.get("content") or "").strip()
             if len(content) < 40:
                 gaps.append(f"hint {i} too short")

@@ -22,6 +22,63 @@ export function isValidCidr(cidr) {
   return prefix >= 0 && prefix <= 32
 }
 
+// Parse a CIDR into { net: [o0,o1,o2,o3], prefix } or null if invalid.
+function parseCidr(cidr) {
+  const m = /^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})\/(\d{1,2})$/.exec(cidr || '')
+  if (!m) return null
+  const net = [m[1], m[2], m[3], m[4]].map(Number)
+  if (net.some((o) => o > 255)) return null
+  const prefix = Number(m[5])
+  if (prefix < 0 || prefix > 32) return null
+  return { net, prefix }
+}
+
+function cidrToInt(net) {
+  return ((net[0] << 24) >>> 0) + (net[1] << 16) + (net[2] << 8) + net[3]
+}
+
+function maskBounds(cidr) {
+  const p = parseCidr(cidr)
+  if (!p) return null
+  const base = cidrToInt(p.net) >>> 0
+  const hostBits = 32 - p.prefix
+  const mask = p.prefix === 0 ? 0 : (0xffffffff << hostBits) >>> 0
+  const start = (base & mask) >>> 0
+  const size = hostBits === 32 ? 0x100000000 : 2 ** hostBits
+  const end = start + size - 1
+  return { start, end }
+}
+
+// Is `child` fully contained within `parent` (VPC CIDR)?
+export function cidrWithinVpc(child, parent) {
+  const c = maskBounds(child)
+  const p = maskBounds(parent)
+  const cp = parseCidr(child)
+  const pp = parseCidr(parent)
+  if (!c || !p || !cp || !pp) return false
+  if (cp.prefix < pp.prefix) return false // child block bigger than parent
+  return c.start >= p.start && c.end <= p.end
+}
+
+// Do two CIDR ranges overlap at all?
+export function cidrsOverlap(a, b) {
+  const ba = maskBounds(a)
+  const bb = maskBounds(b)
+  if (!ba || !bb) return false
+  return ba.start <= bb.end && bb.start <= ba.end
+}
+
+// AMI architecture must match the instance-type architecture (x86_64 vs arm64).
+export function amiArchMatchesInstanceType(amiArch, instanceArch) {
+  if (!amiArch || !instanceArch) return true // unknown -> permissive
+  return String(amiArch) === String(instanceArch)
+}
+
+// Security-group names must be unique within a VPC.
+export function duplicateSgNameInVpc(name, vpcId, groups) {
+  return (groups || []).some((g) => g.name === name && g.vpcId === vpcId)
+}
+
 // Minimal IAM policy JSON sanity check.
 export function isValidPolicyJson(text) {
   try {

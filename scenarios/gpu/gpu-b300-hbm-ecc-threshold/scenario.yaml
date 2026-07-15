@@ -11,30 +11,47 @@ is_free: false
 jira_priority: High
 dual_terminal: false
 requires_companion_hosts: false
-description: 'CONTEXT: An SRE/GPU-infrastructure team running a datacenter accelerator fleet must resolve
-  `B300 HBM ECC Over Retirement Threshold` during a live incident. Until the underlying hardware/driver
-  state is repaired, GPU capacity is lost and training/inference jobs fail, so throughput and SLAs are
-  at risk.
+description: 'CONTEXT: A team operating GPU operations has raised a ticket for `B300 HBM ECC Over Retirement
+  Threshold`. A customer-facing workflow is degraded and the on-call engineer (you) must diagnose and
+  resolve it. Business impact: reduced service reliability and blocked users until the underlying state
+  is repaired.
 
 
-  ENVIRONMENT: You are on a FixitLab offline GPU node with nvidia-smi, the NVIDIA driver/CUDA stack, DCGM
-  (dcgmi / nv-hostengine / dcgm-exporter), the container toolkit, and — for AMD hosts — the ROCm stack
-  (rocm-smi / amd-smi). All tools run locally; no paid APIs or external cloud calls are required.
+  ENVIRONMENT: You are working in FixitLab''s offline GPU node. The architecture is a single lab-primary
+  node exposing nvidia-smi, drivers, CUDA, and container toolkit; treat it as the production host for
+  this incident. All tools run locally — no paid APIs or external cloud calls are required.
 
 
-  SYMPTOM / STARTING STATE: Aggregate correctable HBM ECC errors and retired pages on a B300 GPU exceeded
-  the vendor field threshold. The DCGM health watch marks the GPU ''warn/fail'' and the scheduler cordoned
-  the node.
+  SYMPTOM / STARTING STATE: A Blackwell B300-class node where a GPU crossed the field ECC retired-page
+  threshold; the health policy quarantined it and the on-call needs a decision. Aggregate correctable
+  HBM ECC errors and retired pages on a B300 GPU exceeded the vendor field threshold. The DCGM health
+  watch marks the GPU ''warn/fail'' and the scheduler cordoned the node.
 
 
   OBJECTIVE: Confirm the B300 GPU crossed the retired-page/ECC field threshold via nvidia-smi and DCGM;
   Decide between page retirement + return-to-service and drain-for-RMA per the threshold; Apply the decision
-  and confirm DCGM health reports the GPU healthy or properly drained. Success means `check.sh` exits
-  successfully after you apply the documented remediation.
+  and confirm DCGM health reports the GPU healthy or properly drained. Acceptance criteria: the change
+  is minimal and reversible, and success means `nvidia-smi` includes `NVIDIA-SMI`.
 
 
-  WHAT TO AVOID: Do not apply broad destructive changes, disable safety limits to mask the fault, skip
-  evidence gathering, or fake completion with marker files — the checker validates real system state.'
+  WORK TO DO: Required tooling is pre-installed; if a command is missing, note it and use the equivalent
+  already on the host. Make the smallest configuration change that moves the system toward the objective
+  (edit the relevant nvidia-smi, drivers, CUDA, and container toolkit), changing one thing at a time.
+  Check your work continuously against the objective — success means `nvidia-smi` includes `NVIDIA-SMI`.
+
+
+  VERIFY: Re-run the same check the grader uses and confirm `nvidia-smi` includes `NVIDIA-SMI`. Capture
+  the before/after output as evidence. Success criteria: the objective''s healthy state holds on a repeat
+  check, not just once.
+
+
+  ROLLBACK: If a change makes things worse, revert that single change immediately (restore the original
+  config file / undo the edit / restart the affected component) and re-observe before trying another hypothesis.
+  Never stack unverified changes.
+
+
+  WHAT TO AVOID: Do not apply broad destructive changes, skip evidence gathering, or fake completion with
+  marker files — the checker validates real system state.'
 initial_state: A Blackwell B300-class node where a GPU crossed the field ECC retired-page threshold; the
   health policy quarantined it and the on-call needs a decision.
 objectives:
@@ -44,30 +61,46 @@ objectives:
 hints:
 - order: 1
   cost: 0
-  content: 'Where to look: `nvidia-smi -q -d PAGE_RETIREMENT,ECC` for the retired-page count and `dcgmi
-    health -g 0 -c` for the DCGM health watch verdict.'
+  content: 'ORIENT — what to observe and why:
+
+    Do not touch anything yet. First observe the symptom: B300 HBM ECC over retirement threshold is not
+    behaving as the scenario objectives require. This lab is about B300 HBM ECC over retirement threshold
+    — how B300 HBM ECC over retirement threshold behaves in a GPU operations environment. Read the objectives
+    and the current state, and note precisely what looks wrong versus healthy before you form any theory.'
 - order: 2
-  cost: 25
-  content: 'Diagnostic steps:
+  cost: 10
+  content: 'APPROACH — the troubleshooting method:
 
-    1. `nvidia-smi -q -d PAGE_RETIREMENT` — compare retired pages to the field limit.
-
-    2. `dcgmi health -g 0 -c` — read the warn/fail reason string.
-
-    3. `nvidia-smi -q -d ECC` — check whether errors are still accumulating (RMA) or stable (retire +
-    return).'
+    Work from evidence, not guesses. For B300 HBM ECC over retirement threshold problems the reliable
+    method is: (1) reproduce/observe the failure, (2) narrow from the whole system down to the one component
+    that owns the symptom, (3) change exactly one thing, (4) re-check. Fix the underlying misconfiguration
+    you identified (not just the noisy log line), changing one thing at a time.'
 - order: 3
-  cost: 50
-  content: 'Exact fix + verification:
+  cost: 25
+  content: 'WHICH TOOL — the diagnostic command(s):
 
-    1. If under threshold and stable, retire pages and reset to return the GPU; if over the RMA threshold,
-    cordon/drain and flag for replacement.
+    Run `docker ps -a` and `docker logs <container>` for the failing container.'
+- order: 4
+  cost: 40
+  content: 'NARROW DOWN — isolate the subsystem:
 
-    2. Re-run `dcgmi health -g 0 -c` and confirm Healthy (or a clean, intentional drain).
+    1. `docker ps -a` — note Exited status and exit code.
 
-    3. Record the remediation in /opt/fixitlab/academy/gpu-b300-hbm-ecc-threshold.conf.
+    2. `docker logs <name>` for the startup error.
 
-    WHY: the checker validates a real health decision was recorded.'
+    3. Inspect the Dockerfile or `docker run` flags if the image is wrong.'
+- order: 5
+  cost: 60
+  content: 'NEAR-SOLUTION — the fix shape + verify (you still apply it):
+
+    1. Fix image, port mapping, volume, or env configuration.
+
+    2. `docker start <name>` or re-run with corrected flags.
+
+    3. Confirm `nvidia-smi` shows the container Up.
+
+
+    WHY: the checker validates the container is actually running.'
 summary: Diagnose and fix b300 hbm ecc over retirement threshold on a datacenter GPU node and verify with
   the checker
 estimated_minutes: 25

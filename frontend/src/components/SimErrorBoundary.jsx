@@ -20,8 +20,21 @@ export default class SimErrorBoundary extends Component {
   }
 
   handleReset = () => {
-    if (this.props.onReset) this.props.onReset()
+    try { this.props.onReset?.() } catch { /* ignore */ }
     this.setState({ error: null })
+  }
+
+  handleResetStorage = () => {
+    // 1) Clear the persisted blob so a corrupt/old payload can't rehydrate again.
+    if (this.props.resetStorageKey) {
+      try { localStorage.removeItem(this.props.resetStorageKey) } catch { /* ignore */ }
+    }
+    // 2) Re-seed the live in-memory store. Without this, "Try again" would
+    //    re-render the same broken in-memory state and crash immediately —
+    //    clearing localStorage alone only helps after a full reload.
+    try { this.props.onResetStorage?.() } catch { /* ignore */ }
+    // 3) Recover in place (no full reload needed).
+    this.handleReset()
   }
 
   render() {
@@ -45,13 +58,10 @@ export default class SimErrorBoundary extends Component {
             >
               <RefreshCw size={14} /> Try again
             </button>
-            {this.props.resetStorageKey && (
+            {(this.props.resetStorageKey || this.props.onResetStorage) && (
               <button
                 type="button"
-                onClick={() => {
-                  try { localStorage.removeItem(this.props.resetStorageKey) } catch { /* */ }
-                  this.handleReset()
-                }}
+                onClick={this.handleResetStorage}
                 className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md border border-surface-600 text-surface-300 text-sm hover:bg-surface-800"
               >
                 Reset saved state

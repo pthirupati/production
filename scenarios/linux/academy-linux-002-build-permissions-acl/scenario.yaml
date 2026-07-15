@@ -11,25 +11,42 @@ max_score: 100
 is_free: true
 infrastructure_type: docker
 jira_priority: Low
-description: 'CONTEXT: A team operating Linux administration needs you to resolve `linux: File Permissions
-  And Acls — Build From Scratch` during a realistic incident. The business impact is reduced service reliability
-  until the underlying state is repaired.
+description: 'CONTEXT: A team operating Linux administration has raised a ticket for `File Permissions
+  And Acls — Build Lab`. A customer-facing workflow is degraded and the on-call engineer (you) must diagnose
+  and resolve it. Business impact: reduced service reliability and blocked users until the underlying
+  state is repaired.
 
 
-  ENVIRONMENT: You are working in FixitLab''s offline Linux practice server with terminal and config files
-  under /etc and /var. All tools run locally; no paid APIs or external cloud calls are required.
+  ENVIRONMENT: You are working in FixitLab''s offline Linux practice server. The architecture is a single
+  lab-primary node exposing terminal and config files under /etc and /var; treat it as the production
+  host for this incident. All tools run locally — no paid APIs or external cloud calls are required.
 
 
   SYMPTOM / STARTING STATE: The Linux practice server is ready but file permissions and ACLs is not configured
   yet. Required tools may already be installed; your job is to create the configuration and bring the
-  capability online. Build file permissions and ACLs from scratch in this linux lab. You start from a
-  minimal environment and must produce a working configuration that demonstrates owner/group/other bits,
-  ACL entries, and default ACL inheritance. Plan, implement, then prove it works.
+  capability online.
 
 
   OBJECTIVE: A working file permissions and ACLs setup must exist by the end of this lab; Configuration
   should follow team conventions and be easy to audit; The result should pass validation without manual
-  cleanup. Success means `systemctl is-active chronyd` returns active.
+  cleanup. Acceptance criteria: the change is minimal and reversible, and success means `systemctl is-active
+  chronyd` returns active.
+
+
+  WORK TO DO: Required tooling is pre-installed; if a command is missing, note it and use the equivalent
+  already on the host. Make the smallest configuration change that moves the system toward the objective
+  (edit the relevant terminal and config files under /etc and /var), changing one thing at a time. Check
+  your work continuously against the objective — success means `systemctl is-active chronyd` returns active.
+
+
+  VERIFY: Re-run the same check the grader uses and confirm `systemctl is-active chronyd` returns active.
+  Capture the before/after output as evidence. Success criteria: the objective''s healthy state holds
+  on a repeat check, not just once.
+
+
+  ROLLBACK: If a change makes things worse, revert that single change immediately (restore the original
+  config file / undo the edit / restart the affected component) and re-observe before trying another hypothesis.
+  Never stack unverified changes.
 
 
   WHAT TO AVOID: Do not apply broad destructive changes, skip evidence gathering, or fake completion with
@@ -44,35 +61,47 @@ initial_state: The Linux practice server is ready but file permissions and ACLs 
 hints:
 - order: 1
   cost: 0
-  content: 'Orient yourself before changing anything:
+  content: 'ORIENT — what to observe and why:
 
-    1. Inspect the current state — `ls -la`, `getfacl`, and `namei -l` on the affected path.
-
-    2. Write down what looks normal versus wrong or missing for file permissions and ACLs.
-
-    3. Recall the core idea: owner/group/other bits, ACL entries, and default ACL inheritance. Form one
-    hypothesis before you act.'
+    Do not touch anything yet. First observe the symptom: applications fail with permission denied even
+    though the user exists. This lab is about file permissions and ACLs — owner/group/other bits, ACL
+    entries, and default ACL inheritance. Read the objectives and the current state, and note precisely
+    what looks wrong versus healthy before you form any theory.'
 - order: 2
+  cost: 10
+  content: 'APPROACH — the troubleshooting method:
+
+    Work from evidence, not guesses. For file permissions and ACLs problems the reliable method is: (1)
+    reproduce/observe the failure, (2) narrow from the whole system down to the one component that owns
+    the symptom, (3) change exactly one thing, (4) re-check. Create the smallest working slice of file
+    permissions and ACLs first, validate it, then add the remaining pieces one at a time.'
+- order: 3
   cost: 25
-  content: 'Diagnostic steps:
+  content: 'WHICH TOOL — the diagnostic command(s):
+
+    Start with `systemctl status chronyd` and `journalctl -u chronyd -n 50 --no-pager` before changing
+    anything.'
+- order: 4
+  cost: 40
+  content: 'NARROW DOWN — isolate the subsystem:
 
     1. Run `systemctl status chronyd` — note Active/Failed and the last log lines.
 
     2. Read `journalctl -u chronyd -n 50` for the root error.
 
     3. Form a hypothesis about the smallest config or permission fix.'
-- order: 3
-  cost: 50
-  content: 'Exact fix + verification:
+- order: 5
+  cost: 60
+  content: 'NEAR-SOLUTION — the fix shape + verify (you still apply it):
 
-    1. Re-check the current state — `ls -la`, `getfacl`, and `namei -l` on the affected path.
+    1. Apply the minimal fix (config, unit override, or missing directory).
 
-    2. Create the smallest working slice of file permissions and ACLs first, validate it, then add the
-    remaining pieces one at a time.
+    2. Run `systemctl daemon-reload` if you edited a unit file.
 
-    3. Verify the result — the process user can read/write/execute exactly what the service needs.
+    3. Run `systemctl restart chronyd` and confirm `systemctl is-active chronyd` succeeds.
 
-    4. Click Check Solution once the objective is met (graded on real state, not a marker file).'
+
+    WHY: the grader checks real service state, not marker files.'
 summary: Complete the file permissions and acls — build lab linux lab and verify success with the checker
 estimated_minutes: 15
 xp_reward: 100

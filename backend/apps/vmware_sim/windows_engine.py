@@ -43,6 +43,14 @@ from django.core.cache import cache
 
 SESSION_TTL = 7200  # 2-hour TTL matching the other simulator engines
 
+# Interactive-session idle timeout (seconds). A signed-in console/RDP session
+# with no activity for this long auto-locks, exactly like a real "on resume,
+# display logon screen" screen-saver / RDP idle-session-limit policy. Kept short
+# so the effect is observable in a lab sitting. Advanced on wall-clock in
+# get_state (mirrors the baremetal/nmap/monitoring wall-clock advance pattern).
+SESSION_IDLE_LOCK_SECONDS = 900   # 15 min idle -> auto-lock
+RDP_DISCONNECT_LOGOFF_SECONDS = 1800  # disconnected RDP session logs off after 30 min
+
 
 def _session_key(session_id: str) -> str:
     return f"windows_session:{session_id}"
@@ -57,6 +65,10 @@ def _load_session(session_id: str) -> dict | None:
 
 def _save_session(session_id: str, entry: dict) -> None:
     cache.set(_session_key(str(session_id)), json.dumps(entry, default=str), SESSION_TTL)
+
+
+def _now() -> float:
+    return time.time()
 
 
 def _now_iso() -> str:
@@ -225,12 +237,27 @@ def _base_world() -> dict:
             _service("Spooler", "Print Spooler", "running", "automatic"),
             _service("wuauserv", "Windows Update", "running", "manual"),
         ],
-        # Login/lock screen gate state for the UI (purely cosmetic for grading).
+        # Interactive session state for the UI. NOT graded — the validators only
+        # inspect roles/users/services/updates/domain — but modelled with a real
+        # login/lock/logoff lifecycle + idle timeout instead of a static flag so
+        # the lock screen behaves like a real console/RDP session.
+        #   state: logged_off | active | idle | locked
         "session": {
             "logged_in": False,
             "locked": False,
             "current_user": "CORP\\Administrator",
+            "state": "logged_off",
+            "login_at": None,        # wall-clock epoch of sign-in
+            "last_activity": None,   # wall-clock epoch of last interaction
+            "logon_type": "Console",  # Console | RemoteInteractive (RDP)
         },
+        # Terminal Services / RDP sessions visible in "quser" / Task Manager Users.
+        # Session 0 is the always-present services session; interactive sessions
+        # (console + any RDP) advance through Active -> Disconnected -> logged off.
+        "rdp_sessions": [
+            {"id": 0, "user": "SYSTEM", "state": "Services", "type": "Services",
+             "client": "", "idle_seconds": 0, "logon_at": None},
+        ],
         "group_policy": {
             "forest": DEFAULT_DOMAIN,
             "containers": [
@@ -539,6 +566,63 @@ def _event(state: dict, message: str) -> None:
     state["events"] = state["events"][:60]
 
 
+# ---------------------------------------------------------------------------
+# Wall-clock RDP / logon session lifecycle
+#
+# A signed-in interactive session idles and then auto-locks after
+# SESSION_IDLE_LOCK_SECONDS of no activity (mirrors the "on resume, display logon
+# screen" GPO / RDP idle limit). A disconnected RDP session is logged off after
+# RDP_DISCONNECT_LOGOFF_SECONDS. Advanced on read/action so the lock screen and
+# quser view reflect real elapsed time. Purely session-lifecycle + display —
+# validators never inspect the session block, so grading is unaffected.
+# ---------------------------------------------------------------------------
+
+def _touch_session(world: dict, now: float | None = None) -> None:
+    """Record activity: an active/idle/locked session becomes active again."""
+    now = _now() if now is None else now
+    sess = world.get("session", {})
+    if sess.get("logged_in"):
+        sess["last_activity"] = now
+        if not sess.get("locked"):
+            sess["state"] = "active"
+    for r in world.get("rdp_sessions", []):
+        if r.get("type") != "Services" and r.get("state") in ("Active", "Idle"):
+            r["idle_seconds"] = 0
+            r["state"] = "Active"
+
+
+def _advance_session(world: dict, now: float | None = None) -> bool:
+    """Advance the interactive-session lifecycle by wall-clock. Returns True if
+    anything changed."""
+    now = _now() if now is None else now
+    changed = False
+    sess = world.get("session")
+    if sess and sess.get("logged_in") and not sess.get("locked"):
+        last = sess.get("last_activity")
+        if last is not None:
+            idle = max(0.0, now - float(last))
+            if idle >= SESSION_IDLE_LOCK_SECONDS:
+                sess["locked"] = True
+                sess["state"] = "locked"
+                changed = True
+            elif idle >= SESSION_IDLE_LOCK_SECONDS / 2 and sess.get("state") != "idle":
+                sess["state"] = "idle"
+                changed = True
+
+    for r in world.get("rdp_sessions", []):
+        if r.get("type") == "Services":
+            continue
+        logon_at = r.get("logon_at")
+        if logon_at is not None:
+            r["idle_seconds"] = int(max(0, now - float(logon_at)))
+        if r.get("state") == "Disconnected":
+            disc_at = r.get("disconnected_at")
+            if disc_at is not None and now - float(disc_at) >= RDP_DISCONNECT_LOGOFF_SECONDS:
+                r["state"] = "LoggedOff"
+                changed = True
+    return changed
+
+
 def _overlay_vmware_bridge(world: dict, session_id: str) -> None:
     """Merge VMware hot-added disks into Windows Disk Management (offline until rescan)."""
     try:
@@ -585,6 +669,10 @@ def _overlay_vmware_bridge(world: dict, session_id: str) -> None:
 
 def get_state(session_id: str, scenario_slug: str = "") -> dict:
     entry = _ensure_session(session_id, scenario_slug)
+    # Advance the interactive-session lifecycle (idle-lock / RDP logoff) on read
+    # so the lock screen reflects wall-clock time even with no action taken.
+    if _advance_session(entry["state"]["world"]):
+        _save_session(str(session_id), entry)
     state = copy.deepcopy(entry["state"])
     world = state["world"]
     _overlay_vmware_bridge(world, session_id)
@@ -605,6 +693,7 @@ def get_state(session_id: str, scenario_slug: str = "") -> dict:
         "updates": world["updates"],
         "services": world["services"],
         "session": world["session"],
+        "rdp_sessions": world.get("rdp_sessions", []),
         "group_policy": world.get("group_policy", {}),
         "storage": world.get("storage", {}),
         "network": world.get("network", {}),
@@ -659,6 +748,12 @@ def apply_action(session_id: str, action: str, payload: dict | None = None) -> d
         return {"ok": False, "error": f"action failed: {exc}"}
 
     if result.get("ok"):
+        # A successful GUI action counts as session activity, so an admin who is
+        # actively working won't idle-lock mid-task (login/lock/logout manage
+        # their own state above and are skipped).
+        if action not in ("login", "sign_in", "lock", "logout", "sign_out",
+                          "disconnect_rdp", "disconnect_session"):
+            _touch_session(world)
         _save_session(str(session_id), entry)
     return result
 
@@ -666,26 +761,87 @@ def apply_action(session_id: str, action: str, payload: dict | None = None) -> d
 def _dispatch(world: dict, state: dict, action: str, payload: dict) -> dict:
     act = (action or "").strip()
 
-    # ---- Login / lock screen gate (cosmetic; not graded) ----
+    # Advance the wall-clock session lifecycle before handling the action so a
+    # session that idle-locked between requests is seen in its current state.
+    _advance_session(world)
+
+    # ---- Login / lock screen gate (session lifecycle; not graded) ----
     if act in ("login", "sign_in"):
-        world["session"]["logged_in"] = True
-        world["session"]["locked"] = False
-        _event(state, "Administrator signed in")
+        now = _now()
+        sess = world["session"]
+        logon_type = "RemoteInteractive" if payload.get("rdp") else (
+            payload.get("logon_type") or "Console")
+        sess["logged_in"] = True
+        sess["locked"] = False
+        sess["state"] = "active"
+        sess["login_at"] = now
+        sess["last_activity"] = now
+        sess["logon_type"] = logon_type
+        if payload.get("user"):
+            sess["current_user"] = payload["user"]
+        # Register / refresh the interactive RDP/console session for quser view.
+        user = sess["current_user"]
+        rdp = world.setdefault("rdp_sessions", [])
+        existing = next((r for r in rdp if r.get("user") == user and r.get("type") != "Services"), None)
+        entry_r = existing or {"id": len(rdp)}
+        entry_r.update({
+            "user": user,
+            "state": "Active",
+            "type": logon_type,
+            "client": payload.get("client") or ("rdp-client" if logon_type == "RemoteInteractive" else "console"),
+            "idle_seconds": 0,
+            "logon_at": now,
+        })
+        entry_r.pop("disconnected_at", None)
+        if existing is None:
+            rdp.append(entry_r)
+        _event(state, f"{user} signed in ({logon_type})")
         return {"ok": True, "message": "Signed in"}
 
     if act in ("lock",):
         world["session"]["locked"] = True
+        world["session"]["state"] = "locked"
         _event(state, "Workstation locked")
         return {"ok": True, "message": "Workstation locked"}
 
     if act in ("unlock", "unlock_session"):
         world["session"]["locked"] = False
         world["session"]["logged_in"] = True
+        world["session"]["state"] = "active"
+        world["session"]["last_activity"] = _now()
+        _touch_session(world)
         _event(state, "Workstation unlocked")
         return {"ok": True, "message": "Workstation unlocked"}
 
+    if act in ("disconnect_rdp", "disconnect_session"):
+        # RDP disconnect leaves the session running-but-disconnected; it logs off
+        # after RDP_DISCONNECT_LOGOFF_SECONDS (see _advance_session).
+        now = _now()
+        target = payload.get("user") or world["session"].get("current_user")
+        found = False
+        for r in world.get("rdp_sessions", []):
+            if r.get("type") != "Services" and r.get("user") == target and r.get("state") in ("Active", "Idle"):
+                r["state"] = "Disconnected"
+                r["disconnected_at"] = now
+                found = True
+        world["session"]["state"] = "disconnected"
+        _event(state, f"RDP session for {target} disconnected")
+        return {"ok": found, "message": "RDP session disconnected" if found
+                else "No active RDP session to disconnect"}
+
     if act in ("logout", "sign_out"):
-        world["session"]["logged_in"] = False
+        sess = world["session"]
+        user = sess.get("current_user")
+        sess["logged_in"] = False
+        sess["locked"] = False
+        sess["state"] = "logged_off"
+        sess["login_at"] = None
+        sess["last_activity"] = None
+        # Drop the interactive session (keeps the always-present Services row).
+        world["rdp_sessions"] = [
+            r for r in world.get("rdp_sessions", [])
+            if r.get("type") == "Services" or r.get("user") != user
+        ]
         _event(state, "Administrator signed out")
         return {"ok": True, "message": "Signed out"}
 

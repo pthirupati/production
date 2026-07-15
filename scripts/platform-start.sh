@@ -210,9 +210,13 @@ if _role_runs app; then
   # hang the whole deploy to the 55-min job timeout (the [4D] Deploy cluster hang
   # was seed_tutorials taking ~an hour). Each is non-fatal — a timeout just skips
   # that step and the next deploy retries it; the platform stays up either way.
-  echo "Seeding/updating scenarios..."
-  timeout 600 docker compose -f "$COMPOSE_FILE" --env-file "$ENV_FILE" exec -T backend \
-    python manage.py seed_scenarios --dir /scenarios --merge-only || echo "  WARN: seed_scenarios timed out/failed — retried next deploy"
+  # MERGE_SEED_ONLY=true (default) skips existing scenarios (fast, add-only);
+  # =false re-seeds so edited hints/descriptions/fields reach the DB.
+  SEED_MERGE_ARG="--merge-only"
+  [ "${MERGE_SEED_ONLY:-true}" = "false" ] && SEED_MERGE_ARG=""
+  echo "Seeding/updating scenarios (MERGE_SEED_ONLY=${MERGE_SEED_ONLY:-true})..."
+  timeout 900 docker compose -f "$COMPOSE_FILE" --env-file "$ENV_FILE" exec -T backend \
+    python manage.py seed_scenarios --dir /scenarios $SEED_MERGE_ARG || echo "  WARN: seed_scenarios timed out/failed — retried next deploy"
 
   echo "Admin demo certificate / sample interview..."
   timeout 180 docker compose -f "$COMPOSE_FILE" --env-file "$ENV_FILE" exec -T backend \

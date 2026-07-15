@@ -10,25 +10,42 @@ infrastructure_type: docker
 lab_mode: docker
 jira_priority: Low
 is_free: false
-description: 'CONTEXT: A team operating Linux administration needs you to resolve `Deploy a Static Website
-  with Nginx` during a realistic incident. The business impact is reduced service reliability until the
-  underlying state is repaired.
+description: 'CONTEXT: A team operating Linux administration has raised a ticket for `Deploy a Static
+  Website with Nginx`. A customer-facing workflow is degraded and the on-call engineer (you) must diagnose
+  and resolve it. Business impact: reduced service reliability and blocked users until the underlying
+  state is repaired.
 
 
-  ENVIRONMENT: You are working in FixitLab''s offline Linux practice server with terminal and config files
-  under /etc and /var. All tools run locally; no paid APIs or external cloud calls are required.
+  ENVIRONMENT: You are working in FixitLab''s offline Linux practice server. The architecture is a single
+  lab-primary node exposing terminal and config files under /etc and /var; treat it as the production
+  host for this incident. All tools run locally — no paid APIs or external cloud calls are required.
 
 
   SYMPTOM / STARTING STATE: Fresh Ubuntu server with nginx installed but not configured.
 
-  No website is deployed yet — this is a greenfield task. Build task: deploy a static website from scratch
-  and serve it with nginx on port 80. Starting from a host with nginx but no site, create the page content,
-  add an nginx server block pointing at it, enable the site, and verify the page is served over HTTP.
+  No website is deployed yet — this is a greenfield task.
 
 
   OBJECTIVE: Create /var/www/mysite/index.html with your page content; Configure and enable an nginx site
   at /etc/nginx/sites-available/mysite (root /var/www/mysite); Start nginx and verify curl http://localhost
-  returns your page. Success means HTTP 200 from http://localhost.
+  returns your page. Acceptance criteria: the change is minimal and reversible, and success means HTTP
+  200 from http://localhost.
+
+
+  WORK TO DO: Required tooling is pre-installed; if a command is missing, note it and use the equivalent
+  already on the host. Make the smallest configuration change that moves the system toward the objective
+  (edit the relevant terminal and config files under /etc and /var), changing one thing at a time. Check
+  your work continuously against the objective — success means HTTP 200 from http://localhost.
+
+
+  VERIFY: Re-run the same check the grader uses and confirm HTTP 200 from http://localhost. Capture the
+  before/after output as evidence. Success criteria: the objective''s healthy state holds on a repeat
+  check, not just once.
+
+
+  ROLLBACK: If a change makes things worse, revert that single change immediately (restore the original
+  config file / undo the edit / restart the affected component) and re-observe before trying another hypothesis.
+  Never stack unverified changes.
 
 
   WHAT TO AVOID: Do not apply broad destructive changes, skip evidence gathering, or fake completion with
@@ -45,20 +62,38 @@ initial_state: 'Fresh Ubuntu server with nginx installed but not configured.
 hints:
 - order: 1
   cost: 0
-  content: 'Where to look: Test the config to get the exact file and line: `nginx -t`. It prints the offending
-    directive (e.g. unknown directive "listn").'
+  content: 'ORIENT — what to observe and why:
+
+    Do not touch anything yet. First observe the symptom: deploy a static website with nginx is not behaving
+    as the scenario objectives require. This lab is about deploy a static website with nginx — how deploy
+    a static website with nginx behaves in a Linux administration environment. Read the objectives and
+    the current state, and note precisely what looks wrong versus healthy before you form any theory.'
 - order: 2
-  cost: 25
-  content: 'Diagnostic steps:
+  cost: 10
+  content: 'APPROACH — the troubleshooting method:
 
-    1. Run `nginx -t` and note the file path and line number in the error.
-
-    2. Open that file (often `/etc/nginx/nginx.conf` or under `/etc/nginx/conf.d/`).
-
-    3. Compare the bad directive to the nginx docs — typos like `listn` should be `listen`.'
+    Work from evidence, not guesses. For deploy a static website with nginx problems the reliable method
+    is: (1) reproduce/observe the failure, (2) narrow from the whole system down to the one component
+    that owns the symptom, (3) change exactly one thing, (4) re-check. Execute the maintenance in small,
+    reversible steps, taking a snapshot or backup first if the change is risky.'
 - order: 3
-  cost: 50
-  content: 'Exact fix + verification:
+  cost: 25
+  content: 'WHICH TOOL — the diagnostic command(s):
+
+    Test the config to get the exact file and line: `nginx -t`. It prints the offending directive (e.g.
+    unknown directive "listn").'
+- order: 4
+  cost: 40
+  content: 'NARROW DOWN — isolate the subsystem:
+
+    1. Run `nginx -t` and `systemctl status nginx` for config vs service errors.
+
+    2. Open the cited file under `/etc/nginx/`.
+
+    3. Compare listen/upstream/proxy directives to the scenario objectives.'
+- order: 5
+  cost: 60
+  content: 'NEAR-SOLUTION — the fix shape + verify (you still apply it):
 
     1. Correct the typo on the reported line and save the file.
 

@@ -2,26 +2,41 @@ title: Group Policy Not Applying
 slug: win-gpo-not-applying
 difficulty: medium
 category: Fix
-description: 'CONTEXT: A team operating Windows Server needs you to resolve `Group Policy Not Applying`
-  during a realistic incident. The business impact is reduced service reliability until the underlying
-  state is repaired.
+description: 'CONTEXT: A team operating Windows Server has raised a ticket for `Group Policy Not Applying`.
+  A customer-facing workflow is degraded and the on-call engineer (you) must diagnose and resolve it.
+  Business impact: reduced service reliability and blocked users until the underlying state is repaired.
 
 
-  ENVIRONMENT: You are working in FixitLab''s offline Windows Server host with PowerShell, Server Manager,
-  and AD tools. All tools run locally; no paid APIs or external cloud calls are required.
+  ENVIRONMENT: You are working in FixitLab''s offline Windows Server host. The architecture is a single
+  lab-primary node exposing PowerShell, Server Manager, and AD tools; treat it as the production host
+  for this incident. All tools run locally — no paid APIs or external cloud calls are required.
 
 
   SYMPTOM / STARTING STATE: Windows Server 2022 with Active Directory and Group Policy Management installed.
   A GPO is linked to an OU but not applying to target objects. GPResult may show the GPO as denied or
-  not applied. WMI filters or security group filters may be incorrectly configured. A Group Policy Object
-  is not applying to computers or users in a target Organizational Unit. Policy settings are not being
-  enforced despite the GPO being linked. The issue may involve a broken GPO link, WMI filter misconfiguration,
-  security filtering, or loopback processing settings.
+  not applied. WMI filters or security group filters may be incorrectly configured.
 
 
   OBJECTIVE: Diagnose why the GPO is not applying to the target OU using gpresult and GPMC; Fix the GPO
   link, security filtering, or WMI filter as appropriate; Confirm the policy applies correctly after running
-  gpupdate. Success means `check.sh` exits successfully.
+  gpupdate. Acceptance criteria: the change is minimal and reversible, and success means `check.sh` exits
+  successfully.
+
+
+  WORK TO DO: Required tooling is pre-installed; if a command is missing, note it and use the equivalent
+  already on the host. Make the smallest configuration change that moves the system toward the objective
+  (edit the relevant PowerShell, Server Manager, and AD tools), changing one thing at a time. Check your
+  work continuously against the objective — success means `check.sh` exits successfully.
+
+
+  VERIFY: Re-run the same check the grader uses and confirm `check.sh` exits successfully. Capture the
+  before/after output as evidence. Success criteria: the objective''s healthy state holds on a repeat
+  check, not just once.
+
+
+  ROLLBACK: If a change makes things worse, revert that single change immediately (restore the original
+  config file / undo the edit / restart the affected component) and re-observe before trying another hypothesis.
+  Never stack unverified changes.
 
 
   WHAT TO AVOID: Do not apply broad destructive changes, skip evidence gathering, or fake completion with
@@ -41,19 +56,37 @@ is_free: false
 hints:
 - order: 1
   cost: 0
-  content: 'Where to look: Run `nvidia-smi` and `dmesg | grep -i nvidia` for driver visibility.'
+  content: 'ORIENT — what to observe and why:
+
+    Do not touch anything yet. First observe the symptom: group policy not applying is not behaving as
+    the scenario objectives require. This lab is about group policy not applying — how group policy not
+    applying behaves in a Windows Server environment. Read the objectives and the current state, and note
+    precisely what looks wrong versus healthy before you form any theory.'
 - order: 2
+  cost: 10
+  content: 'APPROACH — the troubleshooting method:
+
+    Work from evidence, not guesses. For group policy not applying problems the reliable method is: (1)
+    reproduce/observe the failure, (2) narrow from the whole system down to the one component that owns
+    the symptom, (3) change exactly one thing, (4) re-check. Fix the underlying misconfiguration you identified
+    (not just the noisy log line), changing one thing at a time.'
+- order: 3
   cost: 25
-  content: 'Diagnostic steps:
+  content: 'WHICH TOOL — the diagnostic command(s):
+
+    Run `nvidia-smi` and `dmesg | grep -i nvidia` for driver visibility.'
+- order: 4
+  cost: 40
+  content: 'NARROW DOWN — isolate the subsystem:
 
     1. Check if the GPU appears in `lspci | grep -i nvidia`.
 
     2. Verify the correct driver module is loaded (`lsmod | grep nvidia`).
 
     3. Look for Xid errors or fallen-off-bus messages in dmesg.'
-- order: 3
-  cost: 50
-  content: 'Exact fix + verification:
+- order: 5
+  cost: 60
+  content: 'NEAR-SOLUTION — the fix shape + verify (you still apply it):
 
     1. Reload driver, rebind PCI, or fix persistence mode per the scenario.
 

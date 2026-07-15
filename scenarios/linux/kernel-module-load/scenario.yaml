@@ -2,25 +2,40 @@ title: Load Kernel Module and Make It Persistent Across Reboots
 slug: linux-kernel-module-load
 difficulty: easy
 category: Fix
-description: 'CONTEXT: A team operating Linux administration needs you to resolve `Load Kernel Module
-  and Make It Persistent Across Reboots` during a realistic incident. The business impact is reduced service
-  reliability until the underlying state is repaired.
+description: 'CONTEXT: A team operating Linux administration has raised a ticket for `Load Kernel Module
+  and Make It Persistent Across Reboots`. A customer-facing workflow is degraded and the on-call engineer
+  (you) must diagnose and resolve it. Business impact: reduced service reliability and blocked users until
+  the underlying state is repaired.
 
 
-  ENVIRONMENT: You are working in FixitLab''s offline Linux practice server with terminal and config files
-  under /etc and /var. All tools run locally; no paid APIs or external cloud calls are required.
+  ENVIRONMENT: You are working in FixitLab''s offline Linux practice server. The architecture is a single
+  lab-primary node exposing terminal and config files under /etc and /var; treat it as the production
+  host for this incident. All tools run locally — no paid APIs or external cloud calls are required.
 
 
   SYMPTOM / STARTING STATE: Linux node intended for Kubernetes where br_netfilter is not loaded; bridged
-  traffic isn''t subject to iptables and the bridge-nf sysctls are unavailable. A Kubernetes node setup
-  requires the br_netfilter kernel module so that bridged pod traffic is processed by iptables, but the
-  module isn''t loaded (and won''t persist across reboots). Without it, the related sysctls can''t be
-  set and pod networking misbehaves. Load the module now, make it load at boot, and enable the bridge-nf
-  sysctl.
+  traffic isn''t subject to iptables and the bridge-nf sysctls are unavailable.
 
 
   OBJECTIVE: Load br_netfilter immediately and confirm with lsmod; Make it load on boot via /etc/modules-load.d/;
-  Enable net.bridge.bridge-nf-call-iptables=1 persistently. Success means `check.sh` exits successfully.
+  Enable net.bridge.bridge-nf-call-iptables=1 persistently. Acceptance criteria: the change is minimal
+  and reversible, and success means `check.sh` exits successfully.
+
+
+  WORK TO DO: Required tooling is pre-installed; if a command is missing, note it and use the equivalent
+  already on the host. Make the smallest configuration change that moves the system toward the objective
+  (edit the relevant terminal and config files under /etc and /var), changing one thing at a time. Check
+  your work continuously against the objective — success means `check.sh` exits successfully.
+
+
+  VERIFY: Re-run the same check the grader uses and confirm `check.sh` exits successfully. Capture the
+  before/after output as evidence. Success criteria: the objective''s healthy state holds on a repeat
+  check, not just once.
+
+
+  ROLLBACK: If a change makes things worse, revert that single change immediately (restore the original
+  config file / undo the edit / restart the affected component) and re-observe before trying another hypothesis.
+  Never stack unverified changes.
 
 
   WHAT TO AVOID: Do not apply broad destructive changes, skip evidence gathering, or fake completion with
@@ -39,20 +54,38 @@ is_free: false
 hints:
 - order: 1
   cost: 0
-  content: 'Where to look: Run `kubectl get pods -A` and `kubectl describe pod <name>` for any pod not
-    in Running state.'
+  content: 'ORIENT — what to observe and why:
+
+    Do not touch anything yet. First observe the symptom: load kernel module and make it persistent across
+    reboots is not behaving as the scenario objectives require. This lab is about load kernel module and
+    make it persistent across reboots — how load kernel module and make it persistent across reboots behaves
+    in a Linux administration environment. Read the objectives and the current state, and note precisely
+    what looks wrong versus healthy before you form any theory.'
 - order: 2
+  cost: 10
+  content: 'APPROACH — the troubleshooting method:
+
+    Work from evidence, not guesses. For load kernel module and make it persistent across reboots problems
+    the reliable method is: (1) reproduce/observe the failure, (2) narrow from the whole system down to
+    the one component that owns the symptom, (3) change exactly one thing, (4) re-check. Fix the underlying
+    misconfiguration you identified (not just the noisy log line), changing one thing at a time.'
+- order: 3
   cost: 25
-  content: 'Diagnostic steps:
+  content: 'WHICH TOOL — the diagnostic command(s):
+
+    Run `kubectl get pods -A` and `kubectl describe pod <name>` for any pod not in Running state.'
+- order: 4
+  cost: 40
+  content: 'NARROW DOWN — isolate the subsystem:
 
     1. `kubectl get pods` — note CrashLoopBackOff, ImagePullBackOff, or Pending.
 
     2. `kubectl describe pod <name>` — read Events at the bottom.
 
     3. `kubectl logs <name> [--previous]` if the container restarted.'
-- order: 3
-  cost: 50
-  content: 'Exact fix + verification:
+- order: 5
+  cost: 60
+  content: 'NEAR-SOLUTION — the fix shape + verify (you still apply it):
 
     1. Fix the root cause (image name, env var, volume mount, or probe).
 

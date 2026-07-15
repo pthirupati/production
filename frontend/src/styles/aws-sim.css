@@ -151,6 +151,26 @@
 .aws-badge-terminated .aws-dot { background: var(--aws-text-muted); }
 .aws-badge-creating { background: var(--aws-info-bg); color: var(--aws-info); }
 .aws-badge-creating .aws-dot { background: var(--aws-info); }
+
+/* Transitional states — informational blue with animated dot, like pending. */
+.aws-badge-shutting-down { background: var(--aws-warning-bg); color: var(--aws-warning); }
+.aws-badge-shutting-down .aws-dot { background: var(--aws-warning); animation: aws-pulse 1.2s ease-in-out infinite; }
+.aws-badge-rebooting { background: var(--aws-warning-bg); color: var(--aws-warning); }
+.aws-badge-rebooting .aws-dot { background: var(--aws-warning); animation: aws-pulse 1.2s ease-in-out infinite; }
+.aws-badge-impaired { background: var(--aws-error-bg); color: var(--aws-error); }
+.aws-badge-impaired .aws-dot { background: var(--aws-error); animation: aws-pulse 1.2s ease-in-out infinite; }
+.aws-badge-initializing { background: var(--aws-info-bg); color: var(--aws-info); }
+.aws-badge-initializing .aws-dot { background: var(--aws-info); animation: aws-pulse 1.2s ease-in-out infinite; }
+.aws-badge-modifying { background: var(--aws-warning-bg); color: var(--aws-warning); }
+.aws-badge-modifying .aws-dot { background: var(--aws-warning); animation: aws-pulse 1.2s ease-in-out infinite; }
+.aws-badge-deleting { background: var(--aws-error-bg); color: var(--aws-error); }
+.aws-badge-deleting .aws-dot { background: var(--aws-error); animation: aws-pulse 1.2s ease-in-out infinite; }
+.aws-badge-backing-up { background: var(--aws-info-bg); color: var(--aws-info); }
+.aws-badge-backing-up .aws-dot { background: var(--aws-info); animation: aws-pulse 1.2s ease-in-out infinite; }
+.aws-badge-in-progress,
+.aws-badge-create_in_progress { background: var(--aws-info-bg); color: var(--aws-info); }
+.aws-badge-in-progress .aws-dot,
+.aws-badge-create_in_progress .aws-dot { background: var(--aws-info); animation: aws-pulse 1.2s ease-in-out infinite; }
 @keyframes aws-pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.3; } }
 
 /* Cards */
@@ -185,15 +205,35 @@
 .aws-topnav { height: 48px; background: var(--aws-nav-bg); display: flex; align-items: center; color: var(--aws-nav-text); padding: 0 12px; gap: 12px; position: sticky; top: 0; z-index: 100; }
 .aws-topnav-btn { background: transparent; border: none; color: var(--aws-nav-text); height: 32px; padding: 0 10px; border-radius: var(--aws-radius); display: inline-flex; align-items: center; gap: 6px; cursor: pointer; font-size: 14px; }
 .aws-topnav-btn:hover { background: var(--aws-nav-hover); }
+/* Favorites bar — pinned services, sits as a slim strip under the top row */
+.aws-favbar { position: absolute; top: 48px; left: 0; right: 0; height: 34px; background: var(--aws-darker-blue); display: flex; align-items: center; gap: 4px; padding: 0 12px; overflow-x: auto; z-index: 99; box-shadow: 0 1px 0 rgba(0,0,0,0.25); }
+.aws-favbar-item { background: transparent; border: none; color: var(--aws-nav-text); height: 24px; padding: 0 8px; border-radius: var(--aws-radius); display: inline-flex; align-items: center; gap: 5px; cursor: pointer; font-size: 12px; white-space: nowrap; }
+.aws-favbar-item:hover { background: var(--aws-nav-hover); }
+.aws-mega-item:hover { background: var(--aws-sidebar-hover-bg); border-radius: var(--aws-radius); }
 .aws-leftnav { width: 220px; min-width: 220px; flex-shrink: 0; background: var(--aws-sidebar-bg); border-right: 1px solid var(--aws-sidebar-border); overflow-y: auto; }
 .aws-leftnav-item { display: block; padding: 7px 16px; font-size: 14px; color: var(--aws-text-primary); cursor: pointer; border-left: 3px solid transparent; }
 .aws-leftnav-item:hover { background: var(--aws-sidebar-hover-bg); text-decoration: none; }
 .aws-leftnav-item.aws-active { background: var(--aws-sidebar-active-bg); border-left-color: var(--aws-sidebar-active-border); color: var(--aws-sidebar-active-text); font-weight: 700; }
 .aws-leftnav-group { padding: 12px 16px 4px; font-size: 12px; font-weight: 700; color: var(--aws-text-secondary); }
+.aws-leftnav-title { padding: 12px 12px 12px 16px; display: flex; align-items: center; justify-content: space-between; gap: 8px; font-weight: 700; border-bottom: 1px solid var(--aws-sidebar-border); }
+.aws-leftnav-collapse-btn, .aws-leftnav-rail-toggle { background: transparent; border: none; cursor: pointer; color: var(--aws-text-secondary); padding: 4px; border-radius: var(--aws-radius); display: inline-flex; align-items: center; justify-content: center; }
+.aws-leftnav-collapse-btn:hover, .aws-leftnav-rail-toggle:hover { background: var(--aws-sidebar-hover-bg); color: var(--aws-text-link); }
+/* Collapsed icon rail — narrow, does not unmount so page state survives */
+.aws-leftnav-collapsed { width: 48px; min-width: 48px; display: flex; flex-direction: column; align-items: center; padding: 8px 0; gap: 4px; }
+.aws-leftnav-rail-icon { width: 34px; height: 34px; display: flex; align-items: center; justify-content: center; color: var(--aws-text-secondary); margin-bottom: 4px; }
+.aws-leftnav-rail-item { width: 34px; height: 34px; display: flex; align-items: center; justify-content: center; background: transparent; border: none; border-left: 3px solid transparent; border-radius: var(--aws-radius); cursor: pointer; color: var(--aws-text-secondary); }
+.aws-leftnav-rail-item:hover { background: var(--aws-sidebar-hover-bg); color: var(--aws-text-link); }
+.aws-leftnav-rail-item.aws-active { background: var(--aws-sidebar-active-bg); border-left-color: var(--aws-sidebar-active-border); color: var(--aws-sidebar-active-text); }
 
 .aws-breadcrumb { height: 36px; display: flex; align-items: center; gap: 8px; font-size: 13px; padding: 0 20px; color: var(--aws-text-muted); }
 .aws-page { padding: 20px; max-width: 100%; min-width: 0; box-sizing: border-box; }
 .aws-summary-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 12px; }
+/* Console Home customizable widget grid */
+.aws-home-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; }
+.aws-home-widget { position: relative; }
+.aws-widget-remove { opacity: 0; transition: opacity 0.12s ease; }
+.aws-home-widget:hover .aws-widget-remove { opacity: 1; }
+@media (max-width: 900px) { .aws-home-grid { grid-template-columns: 1fr; } }
 .aws-kv { display: flex; flex-direction: column; gap: 2px; }
 
 /* Embedded in lab overlay — fill parent, not viewport */

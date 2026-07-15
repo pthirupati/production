@@ -10,21 +10,39 @@ max_score: 100
 is_free: true
 jira_priority: High
 dual_terminal: false
-description: 'CONTEXT: A team operating bare metal operations needs you to resolve `Server Power-Capped
-  Below Workload Need` during a realistic incident. The business impact is reduced service reliability
-  until the underlying state is repaired.
+description: 'CONTEXT: A team operating bare metal operations has raised a ticket for `Server Power-Capped
+  Below Workload Need`. A customer-facing workflow is degraded and the on-call engineer (you) must diagnose
+  and resolve it. Business impact: reduced service reliability and blocked users until the underlying
+  state is repaired.
 
 
-  ENVIRONMENT: You are working in FixitLab''s offline physical server lab with IPMI, RAID, BIOS, and out-of-band
-  console. All tools run locally; no paid APIs or external cloud calls are required.
+  ENVIRONMENT: You are working in FixitLab''s offline physical server lab. The architecture is a single
+  lab-primary node exposing IPMI, RAID, BIOS, and out-of-band console; treat it as the production host
+  for this incident. All tools run locally — no paid APIs or external cloud calls are required.
 
 
-  SYMPTOM / STARTING STATE: A server with an enforced power cap that''s too low. Performance is throttled
-  because a node power cap is set below the workload''s need.
+  SYMPTOM / STARTING STATE: A server with an enforced power cap that''s too low.
 
 
   OBJECTIVE: Confirm the issue: CPU/GPU throttled by power cap; Apply the documented fix in /etc/bmc/power-cap.cfg;
-  Verify the configuration is corrected. Success means `check.sh` exits successfully.
+  Verify the configuration is corrected. Acceptance criteria: the change is minimal and reversible, and
+  success means `check.sh` exits successfully.
+
+
+  WORK TO DO: Required tooling is pre-installed; if a command is missing, note it and use the equivalent
+  already on the host. Make the smallest configuration change that moves the system toward the objective
+  (edit the relevant IPMI, RAID, BIOS, and out-of-band console), changing one thing at a time. Check your
+  work continuously against the objective — success means `check.sh` exits successfully.
+
+
+  VERIFY: Re-run the same check the grader uses and confirm `check.sh` exits successfully. Capture the
+  before/after output as evidence. Success criteria: the objective''s healthy state holds on a repeat
+  check, not just once.
+
+
+  ROLLBACK: If a change makes things worse, revert that single change immediately (restore the original
+  config file / undo the edit / restart the affected component) and re-observe before trying another hypothesis.
+  Never stack unverified changes.
 
 
   WHAT TO AVOID: Do not apply broad destructive changes, skip evidence gathering, or fake completion with
@@ -37,19 +55,38 @@ objectives:
 hints:
 - order: 1
   cost: 0
-  content: 'Where to look: Run `nvidia-smi` and `dmesg | grep -i nvidia` for driver visibility.'
+  content: 'ORIENT — what to observe and why:
+
+    Do not touch anything yet. First observe the symptom: server Power-Capped below workload need is not
+    behaving as the scenario objectives require. This lab is about server Power-Capped below workload
+    need — how server Power-Capped below workload need behaves in a bare metal operations environment.
+    Read the objectives and the current state, and note precisely what looks wrong versus healthy before
+    you form any theory.'
 - order: 2
+  cost: 10
+  content: 'APPROACH — the troubleshooting method:
+
+    Work from evidence, not guesses. For server Power-Capped below workload need problems the reliable
+    method is: (1) reproduce/observe the failure, (2) narrow from the whole system down to the one component
+    that owns the symptom, (3) change exactly one thing, (4) re-check. Fix the underlying misconfiguration
+    you identified (not just the noisy log line), changing one thing at a time.'
+- order: 3
   cost: 25
-  content: 'Diagnostic steps:
+  content: 'WHICH TOOL — the diagnostic command(s):
+
+    Run `nvidia-smi` and `dmesg | grep -i nvidia` for driver visibility.'
+- order: 4
+  cost: 40
+  content: 'NARROW DOWN — isolate the subsystem:
 
     1. Check if the GPU appears in `lspci | grep -i nvidia`.
 
     2. Verify the correct driver module is loaded (`lsmod | grep nvidia`).
 
     3. Look for Xid errors or fallen-off-bus messages in dmesg.'
-- order: 3
-  cost: 50
-  content: 'Exact fix + verification:
+- order: 5
+  cost: 60
+  content: 'NEAR-SOLUTION — the fix shape + verify (you still apply it):
 
     1. Reload driver, rebind PCI, or fix persistence mode per the scenario.
 

@@ -1,22 +1,37 @@
 category: Fix
-description: 'CONTEXT: A team operating Linux administration needs you to resolve `Open Firewall Port
-  80` during a realistic incident. The business impact is reduced service reliability until the underlying
-  state is repaired.
+description: 'CONTEXT: A team operating Linux administration has raised a ticket for `Open Firewall Port
+  80`. A customer-facing workflow is degraded and the on-call engineer (you) must diagnose and resolve
+  it. Business impact: reduced service reliability and blocked users until the underlying state is repaired.
 
 
-  ENVIRONMENT: You are working in FixitLab''s offline Linux practice server with terminal and config files
-  under /etc and /var. All tools run locally; no paid APIs or external cloud calls are required.
+  ENVIRONMENT: You are working in FixitLab''s offline Linux practice server. The architecture is a single
+  lab-primary node exposing terminal and config files under /etc and /var; treat it as the production
+  host for this incident. All tools run locally — no paid APIs or external cloud calls are required.
 
 
   SYMPTOM / STARTING STATE: Simulated RHEL host. nginx is active and answers on localhost, but firewalld
-  does not permit inbound HTTP, so external access to port 80 is blocked. nginx is running and serving
-  locally, but remote clients can''t reach it because firewalld is blocking inbound port 80. The web service
-  has no firewall exception, so connections from outside time out or are refused. Open port 80 (or the
-  http service) in firewalld, reload, and confirm the site becomes reachable.
+  does not permit inbound HTTP, so external access to port 80 is blocked.
 
 
   OBJECTIVE: Confirm nginx serves locally but port 80 is blocked by firewalld; Open the HTTP port/service
-  in firewalld and reload; Verify port 80 is reachable. Success means `check.sh` exits successfully.
+  in firewalld and reload; Verify port 80 is reachable. Acceptance criteria: the change is minimal and
+  reversible, and success means `check.sh` exits successfully.
+
+
+  WORK TO DO: Required tooling is pre-installed; if a command is missing, note it and use the equivalent
+  already on the host. Make the smallest configuration change that moves the system toward the objective
+  (edit the relevant terminal and config files under /etc and /var), changing one thing at a time. Check
+  your work continuously against the objective — success means `check.sh` exits successfully.
+
+
+  VERIFY: Re-run the same check the grader uses and confirm `check.sh` exits successfully. Capture the
+  before/after output as evidence. Success criteria: the objective''s healthy state holds on a repeat
+  check, not just once.
+
+
+  ROLLBACK: If a change makes things worse, revert that single change immediately (restore the original
+  config file / undo the edit / restart the affected component) and re-observe before trying another hypothesis.
+  Never stack unverified changes.
 
 
   WHAT TO AVOID: Do not apply broad destructive changes, skip evidence gathering, or fake completion with
@@ -25,20 +40,38 @@ difficulty: easy
 hints:
 - order: 1
   cost: 0
-  content: 'Where to look: Test the config to get the exact file and line: `nginx -t`. It prints the offending
-    directive (e.g. unknown directive "listn").'
+  content: 'ORIENT — what to observe and why:
+
+    Do not touch anything yet. First observe the symptom: open firewall port 80 is not behaving as the
+    scenario objectives require. This lab is about open firewall port 80 — how open firewall port 80 behaves
+    in a Linux administration environment. Read the objectives and the current state, and note precisely
+    what looks wrong versus healthy before you form any theory.'
 - order: 2
-  cost: 25
-  content: 'Diagnostic steps:
+  cost: 10
+  content: 'APPROACH — the troubleshooting method:
 
-    1. Run `nginx -t` and note the file path and line number in the error.
-
-    2. Open that file (often `/etc/nginx/nginx.conf` or under `/etc/nginx/conf.d/`).
-
-    3. Compare the bad directive to the nginx docs — typos like `listn` should be `listen`.'
+    Work from evidence, not guesses. For open firewall port 80 problems the reliable method is: (1) reproduce/observe
+    the failure, (2) narrow from the whole system down to the one component that owns the symptom, (3)
+    change exactly one thing, (4) re-check. Fix the underlying misconfiguration you identified (not just
+    the noisy log line), changing one thing at a time.'
 - order: 3
-  cost: 50
-  content: 'Exact fix + verification:
+  cost: 25
+  content: 'WHICH TOOL — the diagnostic command(s):
+
+    Test the config to get the exact file and line: `nginx -t`. It prints the offending directive (e.g.
+    unknown directive "listn").'
+- order: 4
+  cost: 40
+  content: 'NARROW DOWN — isolate the subsystem:
+
+    1. Run `nginx -t` and `systemctl status nginx` for config vs service errors.
+
+    2. Open the cited file under `/etc/nginx/`.
+
+    3. Compare listen/upstream/proxy directives to the scenario objectives.'
+- order: 5
+  cost: 60
+  content: 'NEAR-SOLUTION — the fix shape + verify (you still apply it):
 
     1. Correct the typo on the reported line and save the file.
 

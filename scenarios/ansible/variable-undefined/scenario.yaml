@@ -2,25 +2,41 @@ title: Variable Not Defined Error
 slug: ansible-variable-undefined
 difficulty: medium
 category: Fix
-description: 'CONTEXT: A team operating Ansible automation needs you to resolve `Variable Not Defined
-  Error` during a realistic incident. The business impact is reduced service reliability until the underlying
-  state is repaired.
+description: 'CONTEXT: A team operating Ansible automation has raised a ticket for `Variable Not Defined
+  Error`. A customer-facing workflow is degraded and the on-call engineer (you) must diagnose and resolve
+  it. Business impact: reduced service reliability and blocked users until the underlying state is repaired.
 
 
-  ENVIRONMENT: You are working in FixitLab''s offline Ansible control node with inventory, playbooks,
-  roles, and ansible-playbook. All tools run locally; no paid APIs or external cloud calls are required.
+  ENVIRONMENT: You are working in FixitLab''s offline Ansible control node. The architecture is a single
+  lab-primary node exposing inventory, playbooks, roles, and ansible-playbook; treat it as the production
+  host for this incident. All tools run locally — no paid APIs or external cloud calls are required.
 
 
   SYMPTOM / STARTING STATE: Simulated control node. Playbook deploy.yml fails on the "Configure nginx"
-  task with an undefined variable error. Other tasks have already run. A playbook fails mid-run with "AnsibleUndefinedVariable:
-  ''app_port'' is undefined". The variable is declared in group_vars but is misspelled in the task and
-  missing from host_vars for one host. You must locate all usages, fix the variable name, and add the
-  missing host override before the playbook will complete.
+  task with an undefined variable error. Other tasks have already run.
 
 
   OBJECTIVE: Read the error to identify the exact variable name and task that failed; Fix the variable
   reference in the task and add the missing host_vars entry; Run the playbook again and confirm it completes
-  without variable errors. Success means `check.sh` exits successfully.
+  without variable errors. Acceptance criteria: the change is minimal and reversible, and success means
+  `ansible webservers -m ping` includes `SUCCESS`.
+
+
+  WORK TO DO: Required tooling is pre-installed; if a command is missing, note it and use the equivalent
+  already on the host. Make the smallest configuration change that moves the system toward the objective
+  (edit the relevant inventory, playbooks, roles, and ansible-playbook), changing one thing at a time.
+  Check your work continuously against the objective — success means `ansible webservers -m ping` includes
+  `SUCCESS`.
+
+
+  VERIFY: Re-run the same check the grader uses and confirm `ansible webservers -m ping` includes `SUCCESS`.
+  Capture the before/after output as evidence. Success criteria: the objective''s healthy state holds
+  on a repeat check, not just once.
+
+
+  ROLLBACK: If a change makes things worse, revert that single change immediately (restore the original
+  config file / undo the edit / restart the affected component) and re-observe before trying another hypothesis.
+  Never stack unverified changes.
 
 
   WHAT TO AVOID: Do not apply broad destructive changes, skip evidence gathering, or fake completion with
@@ -41,29 +57,47 @@ is_free: false
 hints:
 - order: 1
   cost: 0
-  content: 'Where to look: Start with read-only discovery on the Ansible control node. For Variable Not
-    Defined Error, inspect `ansible webservers -m ping` output before changing anything.'
+  content: 'ORIENT — what to observe and why:
+
+    Do not touch anything yet. First observe the symptom: variable not defined error is not behaving as
+    the scenario objectives require. This lab is about variable not defined error — how variable not defined
+    error behaves in a Ansible automation environment. Read the objectives and the current state, and
+    note precisely what looks wrong versus healthy before you form any theory.'
 - order: 2
-  cost: 25
-  content: 'Diagnostic steps:
+  cost: 10
+  content: 'APPROACH — the troubleshooting method:
 
-    1. Gather evidence with `ansible webservers -m ping` output.
-
-    2. Compare current output to the scenario objectives.
-
-    3. Form a single hypothesis about the smallest fix that would restore healthy state.'
+    Work from evidence, not guesses. For variable not defined error problems the reliable method is: (1)
+    reproduce/observe the failure, (2) narrow from the whole system down to the one component that owns
+    the symptom, (3) change exactly one thing, (4) re-check. Fix the underlying misconfiguration you identified
+    (not just the noisy log line), changing one thing at a time.'
 - order: 3
-  cost: 50
-  content: 'Exact fix + verification:
+  cost: 25
+  content: 'WHICH TOOL — the diagnostic command(s):
 
-    1. Run the playbook again and confirm it completes without variable errors.
+    Run `ansible-playbook site.yml -vv` (or the scenario playbook) and read the first FAILED task — note
+    host, task name, and error message.'
+- order: 4
+  cost: 40
+  content: 'NARROW DOWN — isolate the subsystem:
 
-    2. Re-run the lab checker (`check.sh` or Check Solution).
+    1. Re-run with `-vvv` on the failing host only (`--limit <host>`).
 
-    3. Confirm every scenario objective is satisfied.
+    2. Check inventory, SSH connectivity, and `ansible.cfg` privilege settings.
+
+    3. Compare the failed module output to the scenario objectives.'
+- order: 5
+  cost: 60
+  content: 'NEAR-SOLUTION — the fix shape + verify (you still apply it):
+
+    1. Apply the minimal fix on the failing host (config, service, or variable).
+
+    2. Re-run the playbook to a clean PLAY RECAP (failed=0).
+
+    3. Confirm `ansible webservers -m ping` succeeds.
 
 
-    WHY: the grader validates real state — marker files are ignored.'
+    WHY: Ansible labs grade real playbook outcomes, not marker files.'
 requires_companion_hosts: false
 dual_terminal: false
 jira_priority: Medium
