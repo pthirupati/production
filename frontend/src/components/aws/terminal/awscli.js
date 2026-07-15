@@ -14,11 +14,28 @@ function parseFlags(tokens) {
   for (let i = 0; i < tokens.length; i += 1) {
     const t = tokens[i]
     if (t.startsWith('--')) {
-      const key = t.slice(2)
-      const next = tokens[i + 1]
+      let key = t.slice(2)
+      // `--key=value` form (real CLI accepts it interchangeably with `--key value`).
+      let eqVal = null
+      const eq = key.indexOf('=')
+      if (eq >= 0) { eqVal = key.slice(eq + 1); key = key.slice(0, eq) }
       // Boolean-only flags never consume a following value.
       if (BOOLEAN_FLAGS.has(key)) { flags[key] = true; continue }
-      if (next && !next.startsWith('--')) { flags[key] = next; i += 1 } else { flags[key] = true }
+      if (eqVal != null) { flags[key] = eqVal; continue }
+      const next = tokens[i + 1]
+      if (next == null || next.startsWith('--')) { flags[key] = true; continue }
+      // List-type params take one-or-more values (`--instance-ids i-1 i-2 i-3`,
+      // `--tags Key=..,Value=.. Key=..,Value=..`). Collect every consecutive
+      // non-flag token, space-joined — every consumer splits on whitespace.
+      // Scalar params take exactly one value so a trailing positional (e.g.
+      // `lambda invoke --function-name fn out.json`) is not swallowed.
+      if (LIST_FLAGS.has(key)) {
+        const vals = []
+        while (tokens[i + 1] != null && !tokens[i + 1].startsWith('--')) { vals.push(tokens[i + 1]); i += 1 }
+        flags[key] = vals.join(' ')
+      } else {
+        flags[key] = next; i += 1
+      }
     } else positional.push(t)
   }
   return { flags, positional }
@@ -26,6 +43,18 @@ function parseFlags(tokens) {
 
 // Flags the real CLI treats as valueless switches.
 const BOOLEAN_FLAGS = new Set(['dry-run', 'no-cli-pager', 'no-paginate', 'no-verify-ssl'])
+
+// Params that accept one-or-more space-separated values (nargs='+' in the real
+// CLI). Everything else takes exactly one value so a trailing positional isn't
+// swallowed (e.g. `lambda invoke --function-name fn OUTFILE`).
+const LIST_FLAGS = new Set([
+  'instance-ids', 'resources', 'tags', 'filters', 'filter',
+  'security-group-ids', 'security-groups', 'groups', 'subnet-ids',
+  'volume-ids', 'snapshot-ids', 'allocation-ids', 'group-ids', 'key-names',
+  'image-ids', 'zone-names', 'region-names', 'db-instance-identifiers',
+  'function-names', 'attribute-names', 'log-group-names', 'table-names',
+  'policy-arns', 'user-names', 'role-names',
+])
 
 // EC2 instance-state -> numeric State.Code (matches the real API).
 const EC2_STATE_CODE = { pending: 0, running: 16, 'shutting-down': 32, terminated: 48, stopping: 64, stopped: 80, rebooting: 16 }
@@ -234,6 +263,18 @@ function publicRow(row) {
   return out
 }
 
+// Map an rds store row to the real DescribeDBInstances DBInstance shape — the
+// single source of truth for describe / reboot / start / stop responses.
+function rdsToApi(db, region) {
+  return {
+    DBInstanceIdentifier: db.name, DBInstanceClass: db.class, Engine: db.engine,
+    DBInstanceStatus: db.status,
+    Endpoint: { Address: String(db.endpoint || '').split(':')[0], Port: Number(String(db.endpoint || '5432').split(':')[1] || 5432) },
+    AllocatedStorage: db.storage, MultiAZ: Boolean(db.multiAz),
+    DBInstanceArn: arn('rds', region, ACCOUNT, `db:${db.name}`),
+  }
+}
+
 function rowToGenericCli(serviceKey, resourceKey, row, region, cfg) {
   return {
     Name: row.name,
@@ -390,12 +431,14 @@ function runCommand(service, command, rest, flags, region, store) {
       if (guard) return guard
       const ids = idList(flags.resources)
       const tags = parseCreateTags(flags.tags)
-      // The store only exposes a Name-tag setter for instances (used by the
-      // console rename flow); apply Name so CLI + GUI stay in sync. Other tag
-      // keys are accepted silently, matching the real CLI's empty success.
-      if (tags.Name && store.setInstanceName) {
+      // Merge every supplied tag onto the target instance(s) so CLI-created tags
+      // (not just Name) show up in describe-instances and the console. Falls back
+      // to the Name-only setter if the richer action is unavailable.
+      if (Object.keys(tags).length) {
         for (const id of ids) {
-          if (store.instances.find((x) => x.id === id)) store.setInstanceName(id, tags.Name)
+          if (!store.instances.find((x) => x.id === id)) continue
+          if (store.setInstanceTags) store.setInstanceTags(id, tags)
+          else if (tags.Name && store.setInstanceName) store.setInstanceName(id, tags.Name)
         }
       }
       return ''
@@ -582,6 +625,39 @@ function runCommand(service, command, rest, flags, region, store) {
       const ids = idList(flags['instance-ids'])
       return j({ InstanceMonitorings: ids.map((id) => ({ InstanceId: id, Monitoring: { State: on ? 'pending' : 'disabling' } })) })
     }
+    if (command === 'modify-instance-attribute') {
+      const guard = guardEc2('ec2:ModifyInstanceAttribute', 'ModifyInstanceAttribute')
+      if (guard) return guard
+      const id = flags['instance-id']
+      const inst = store.instances.find((x) => x.id === id)
+      if (!inst) return `\nAn error occurred (InvalidInstanceID.NotFound) when calling the ModifyInstanceAttribute operation: The instance ID '${id || ''}' does not exist`
+      // `--attribute <name> --value <v>` long form -> normalize to shorthand flags.
+      const attr = flags.attribute
+      const value = flags.value
+      // disableApiTermination: shorthand (--disable-api-termination / --no-...) or --attribute form.
+      let termChange = null
+      if (attr === 'disableApiTermination') termChange = String(value) === 'true'
+      else if (flags['disable-api-termination'] != null) termChange = String(flags['disable-api-termination']) !== 'false'
+      else if (flags['no-disable-api-termination'] != null) termChange = false
+      if (termChange != null && store.setDisableApiTermination) {
+        store.setDisableApiTermination(id, termChange)
+        return ''
+      }
+      // instanceType: real API requires the instance be stopped first.
+      const newType = attr === 'instanceType' ? value : flags['instance-type']
+      if (newType != null && newType !== true) {
+        if (inst.state !== 'stopped') {
+          return `\nAn error occurred (IncorrectInstanceState) when calling the ModifyInstanceAttribute operation: The instance '${id}' is not in the 'stopped' state.`
+        }
+        // NOTE: no store setter for instance type yet (setInstanceType needed to
+        // reflect the change in describe-instances / the console). Accepted as
+        // empty success like the real CLI once the instance is stopped.
+        if (store.setInstanceType) store.setInstanceType(id, String(newType))
+        return ''
+      }
+      // sourceDestCheck / groups etc.: accept as empty success (real CLI prints nothing).
+      return ''
+    }
     return `\nAn error occurred (InvalidAction) when calling the ${command} operation: aws ec2 ${command} is not yet simulated.`
   }
 
@@ -648,13 +724,26 @@ function runCommand(service, command, rest, flags, region, store) {
     }
     if (command === 'put-object') {
       if (!flags.bucket || !flags.key) return '\nAn error occurred (ValidationError) when calling the PutObject operation: Missing required bucket/key'
+      if (!bucket) return '\nAn error occurred (NoSuchBucket) when calling the PutObject operation: The specified bucket does not exist'
       store.putObject(flags.bucket, flags.key, flags.body ? 1024 : 0)
       return j({ ETag: stableEtag(`${flags.bucket}/${flags.key}`), ServerSideEncryption: 'AES256' })
     }
     if (command === 'delete-object') {
       if (!flags.bucket || !flags.key) return '\nAn error occurred (ValidationError) when calling the DeleteObject operation: Missing required bucket/key'
+      if (!bucket) return '\nAn error occurred (NoSuchBucket) when calling the DeleteObject operation: The specified bucket does not exist'
       store.deleteObject(flags.bucket, flags.key)
       return j({})
+    }
+    if (command === 'head-bucket') {
+      // Real CLI: empty success if the bucket exists, 404 error otherwise.
+      if (!bucket) return '\nAn error occurred (404) when calling the HeadBucket operation: Not Found'
+      return ''
+    }
+    if (command === 'head-object') {
+      if (!bucket) return '\nAn error occurred (404) when calling the HeadObject operation: Not Found'
+      const obj = bucket.objects.find((o) => o.key === flags.key)
+      if (!obj) return '\nAn error occurred (404) when calling the HeadObject operation: Not Found'
+      return j({ ContentLength: obj.size, LastModified: obj.modified, ETag: obj.etag || stableEtag(`${bucket.name}/${obj.key}`), ContentType: 'binary/octet-stream', StorageClass: obj.storageClass || 'STANDARD', ServerSideEncryption: 'AES256' })
     }
     if (command === 'get-bucket-versioning') {
       if (!bucket) return '\nAn error occurred (NoSuchBucket) when calling the GetBucketVersioning operation: The specified bucket does not exist'
@@ -762,6 +851,77 @@ function runCommand(service, command, rest, flags, region, store) {
       const u = store.iamUsers.find((x) => x.name === name)
       if (!u) return '\nAn error occurred (NoSuchEntity) when calling the ListAccessKeys operation: The user with name cannot be found.'
       return j({ AccessKeyMetadata: u.accessKeys.map((k) => ({ UserName: name, AccessKeyId: k.id, Status: k.status, CreateDate: k.created })) })
+    }
+    // Managed-policy ARN for a policy name (AWS-managed vs customer-managed).
+    const policyArn = (pname) => {
+      const p = store.iamPolicies.find((x) => x.name === pname)
+      return (p && p.type !== 'AWS managed')
+        ? arn('iam', region, ACCOUNT, `policy/${pname}`)
+        : arn('iam', region, 'aws', `policy/${pname}`)
+    }
+    if (command === 'list-attached-user-policies') {
+      const u = store.iamUsers.find((x) => x.name === flags['user-name'])
+      if (!u) return '\nAn error occurred (NoSuchEntity) when calling the ListAttachedUserPolicies operation: The user with name cannot be found.'
+      return j({ AttachedPolicies: (u.policies || []).map((p) => ({ PolicyName: p, PolicyArn: policyArn(p) })), IsTruncated: false })
+    }
+    if (command === 'list-attached-role-policies') {
+      const r = store.iamRoles.find((x) => x.name === flags['role-name'])
+      if (!r) return '\nAn error occurred (NoSuchEntity) when calling the ListAttachedRolePolicies operation: The role with name cannot be found.'
+      return j({ AttachedPolicies: (r.policies || []).map((p) => ({ PolicyName: p, PolicyArn: policyArn(p) })), IsTruncated: false })
+    }
+    if (command === 'list-attached-group-policies') {
+      const g = store.iamGroups.find((x) => x.name === flags['group-name'])
+      if (!g) return '\nAn error occurred (NoSuchEntity) when calling the ListAttachedGroupPolicies operation: The group with name cannot be found.'
+      return j({ AttachedPolicies: (g.policies || []).map((p) => ({ PolicyName: p, PolicyArn: policyArn(p) })), IsTruncated: false })
+    }
+    if (command === 'list-groups-for-user') {
+      const u = store.iamUsers.find((x) => x.name === flags['user-name'])
+      if (!u) return '\nAn error occurred (NoSuchEntity) when calling the ListGroupsForUser operation: The user with name cannot be found.'
+      return j({ Groups: (u.groups || []).map((gn) => {
+        const g = store.iamGroups.find((x) => x.name === gn)
+        return { GroupName: gn, GroupId: g?.id || 'AGPAEXAMPLE', Arn: arn('iam', region, ACCOUNT, `group/${gn}`), CreateDate: g?.created }
+      }) })
+    }
+    if (command === 'get-role') {
+      const r = store.iamRoles.find((x) => x.name === flags['role-name'])
+      if (!r) return '\nAn error occurred (NoSuchEntity) when calling the GetRole operation: The role with name cannot be found.'
+      return j({ Role: {
+        RoleName: r.name, RoleId: r.id, Arn: arn('iam', region, ACCOUNT, `role/${r.name}`), CreateDate: r.created,
+        AssumeRolePolicyDocument: { Version: '2012-10-17', Statement: [{ Effect: 'Allow', Principal: { Service: r.trustedEntity }, Action: 'sts:AssumeRole' }] },
+      } })
+    }
+    if (command === 'get-policy') {
+      const parn = String(flags['policy-arn'] || '')
+      const pname = parn.split('/').pop()
+      const p = store.iamPolicies.find((x) => x.name === pname)
+      if (!p) return '\nAn error occurred (NoSuchEntity) when calling the GetPolicy operation: Policy not found.'
+      return j({ Policy: { PolicyName: p.name, Arn: policyArn(p.name), AttachmentCount: p.attached || 0, IsAttachable: true, CreateDate: p.created, Description: p.description } })
+    }
+    if (command === 'attach-user-policy' || command === 'detach-user-policy') {
+      const op = command === 'attach-user-policy' ? 'AttachUserPolicy' : 'DetachUserPolicy'
+      const u = store.iamUsers.find((x) => x.name === flags['user-name'])
+      if (!u) return `\nAn error occurred (NoSuchEntity) when calling the ${op} operation: The user with name cannot be found.`
+      if (!flags['policy-arn']) return `\nAn error occurred (ValidationError) when calling the ${op} operation: Missing required parameter PolicyArn`
+      const pname = String(flags['policy-arn']).split('/').pop()
+      const next = command === 'attach-user-policy'
+        ? Array.from(new Set([...(u.policies || []), pname]))
+        : (u.policies || []).filter((p) => p !== pname)
+      // Prefer a dedicated setter; fall back to updateIamUser if present. If the
+      // store exposes neither, the call still succeeds (empty output) — attach
+      // persistence needs a store action (setUserPolicies/updateIamUser).
+      if (store.setUserPolicies) store.setUserPolicies(u.name, next)
+      else if (store.updateIamUser) store.updateIamUser(u.name, { policies: next })
+      return ''
+    }
+    if (command === 'get-account-summary') {
+      return j({ SummaryMap: {
+        Users: store.iamUsers.length,
+        Groups: store.iamGroups.length,
+        Roles: store.iamRoles.length,
+        Policies: store.iamPolicies.filter((p) => p.type !== 'AWS managed').length,
+        UsersQuota: 5000, GroupsQuota: 300, RolesQuota: 1000,
+        AccountMFAEnabled: 0, AccessKeysPerUserQuota: 2, MFADevices: 0,
+      } })
     }
     return `\nAn error occurred (InvalidAction) when calling the ${command} operation: aws iam ${command} is not yet simulated.`
   }
@@ -918,6 +1078,21 @@ function runCommand(service, command, rest, flags, region, store) {
     }
   }
 
+  // --- RDS start/stop-db-instance (not part of the single-action generic spec) ---
+  if (service === 'rds' && (command === 'start-db-instance' || command === 'stop-db-instance')) {
+    const op = command === 'start-db-instance' ? 'StartDBInstance' : 'StopDBInstance'
+    const wantId = flags['db-instance-identifier']
+    const rows = (store.genericResources?.rds?.databases || []).filter((r) => !r.region || r.region === region)
+    const db = rows.find((r) => r.name === wantId || r.id === wantId)
+    if (!db) return `\nAn error occurred (DBInstanceNotFound) when calling the ${op} operation: DBInstance ${wantId || ''} not found.`
+    const action = command === 'start-db-instance' ? 'start' : 'stop'
+    // Real API rejects start on an already-available / stop on an already-stopped DB.
+    if (action === 'start' && db.status === 'available') return `\nAn error occurred (InvalidDBInstanceState) when calling the ${op} operation: Instance ${db.name} is not in a stopped state.`
+    if (action === 'stop' && db.status === 'stopped') return `\nAn error occurred (InvalidDBInstanceState) when calling the ${op} operation: Instance ${db.name} is already stopped.`
+    if (store.transitionGenericResource) store.transitionGenericResource('rds', 'databases', db.id, action)
+    return j({ DBInstance: rdsToApi({ ...db, status: action === 'stop' ? 'stopping' : 'starting' }, region) })
+  }
+
   // --- Generic AWS services backed by the console store ---
   // This covers the broad service catalog (Lambda, RDS, DynamoDB, ECS/EKS,
   // SQS/SNS, CloudFormation, Glue, Kinesis, etc.) so CloudShell and Terraform
@@ -1025,6 +1200,9 @@ function runCommand(service, command, rest, flags, region, store) {
         const row = found || rows[0]
         if (!row) return `\nAn error occurred (ResourceNotFoundException) when calling the ${command} operation: ${serviceCfg.title} resource not found`
         store.updateGenericResource?.(serviceKey, resourceKey, row.id, { lastRun: new Date().toISOString(), status: row.status || 'Active' })
+        // Native API shape for rds actions (reboot/start/stop-db-instance all
+        // return { DBInstance: {...} }) — never leak the raw store row.
+        if (serviceKey === 'rds') return j({ DBInstance: rdsToApi(row, region) })
         return j({ [resourceKey.replace(/-/g, '_')]: rowToGenericCli(serviceKey, resourceKey, row, region, cfg) })
       }
     }

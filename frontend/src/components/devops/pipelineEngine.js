@@ -301,30 +301,31 @@ export function createPipelineRun(pipeline, opts = {}) {
 
 /** Build realistic ANSI-tagged log lines for a step. */
 function buildStepLog(job, step) {
-  const cmd = (step.run || step.name || '').trim()
+  // A step's `run` can be a multi-command script (GitHub `run: |`, or a GitLab
+  // `script:` line that itself chains with `&&`). Echo + synthesize output per
+  // command line so the console reads like a real runner rather than dumping a
+  // whole script after a single `$`.
+  const raw = (step.run || step.name || '').trim()
+  const commands = raw.split('\n').map((c) => c.trim()).filter(Boolean)
   const lines = []
-  lines.push(ansi('cyan', `$ ${cmd}`))
-
-  if (/npm ci|npm install|yarn/i.test(cmd)) {
-    lines.push('added 842 packages in 6s')
-  } else if (/npm run build|mvn .*package|gradle .*build|go build/i.test(cmd)) {
-    lines.push(ansi('green', 'BUILD SUCCESS'))
-  } else if (/npm test|pytest|go test|mvn .*test|jest/i.test(cmd)) {
-    lines.push(ansi('green', 'Tests run: 42, Failures: 0'))
-    lines.push('Coverage: 78%')
-  } else if (/docker (build|pull|push)/i.test(cmd)) {
-    lines.push('Successfully tagged image')
-  } else if (/kubectl apply|argocd app sync|helm (upgrade|install)|flux/i.test(cmd)) {
-    lines.push(ansi('green', 'Sync status: Synced'))
-    lines.push(ansi('green', 'Health: Healthy'))
-  } else if (/sonar/i.test(cmd)) {
-    lines.push(ansi('green', 'Quality Gate PASSED'))
-  } else {
-    lines.push('done')
+  for (const cmd of (commands.length ? commands : [raw])) {
+    lines.push(ansi('cyan', `$ ${cmd}`))
+    lines.push(...commandOutput(cmd))
   }
-
   if (job.environment) lines.push(`Deploying to environment: ${job.environment}`)
   return lines
+}
+
+/** Synthesize realistic stdout for a single shell command. */
+function commandOutput(cmd) {
+  if (/npm ci|npm install|yarn/i.test(cmd)) return ['added 842 packages in 6s']
+  if (/npm run build|mvn .*package|gradle .*build|go build/i.test(cmd)) return [ansi('green', 'BUILD SUCCESS')]
+  if (/npm test|pytest|go test|mvn .*test|jest/i.test(cmd)) return [ansi('green', 'Tests run: 42, Failures: 0'), 'Coverage: 78%']
+  if (/docker (build|pull|push)/i.test(cmd)) return ['Successfully tagged image']
+  if (/kubectl apply|argocd app sync|helm (upgrade|install)|flux/i.test(cmd)) return [ansi('green', 'Sync status: Synced'), ansi('green', 'Health: Healthy')]
+  if (/sonar/i.test(cmd)) return [ansi('green', 'Quality Gate PASSED')]
+  if (/^(git |checkout|actions\/checkout|uses actions\/checkout)/i.test(cmd)) return ['HEAD is now at a1b2c3d']
+  return ['done']
 }
 
 /** Decide whether a step fails given its fault descriptor. */

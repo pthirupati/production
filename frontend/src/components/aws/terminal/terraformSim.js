@@ -11,6 +11,7 @@
 //            aws_security_group, aws_key_pair (others are planned but no-op).
 
 import { parseHcl, parseBody } from './hclParser'
+import { useAwsStore } from '../store/awsStore'
 
 const TF_VERSION = 'Terraform v1.7.5\non linux_amd64\n+ provider registry.terraform.io/hashicorp/aws v5.40.0'
 
@@ -98,6 +99,49 @@ export function createTerraform({ store, readFile, getCwd, region }) {
     return [`${fmtAddr(r)}: Creation complete after 0s [id=${r.name}]`]
   }
 
+  // The passed `store` is a zustand snapshot; its action methods stay bound and
+  // mutate correctly, but its data arrays go stale after a `set`. For reads that
+  // must reflect just-applied resources (e.g. `state show`), pull the live state
+  // off the shared singleton, falling back to the snapshot for custom mocks.
+  const liveStore = () => {
+    try { return useAwsStore.getState() } catch { return store }
+  }
+
+  // Render `terraform state show <addr>` as a real resource block, reading the
+  // live attributes back out of the AWS store for whatever this session applied.
+  const showResource = (address) => {
+    const rec = applied.get(address)
+    if (!rec) {
+      return [`\x1b[31mError:\x1b[0m No instance found for ${address || '<address>'}`,
+        'Run `terraform state list` to see resources tracked in state.']
+    }
+    const live = liveStore()
+    const attrs = []
+    if (rec.kind === 'instance') {
+      const inst = (live.instances || []).find((i) => i.id === rec.ids[0])
+      if (inst) {
+        attrs.push(['id', inst.id], ['ami', inst.amiId], ['instance_type', inst.type],
+          ['availability_zone', inst.az], ['private_ip', inst.privateIp || ''],
+          ['public_ip', inst.publicIp || ''], ['key_name', inst.keyName || ''],
+          ['subnet_id', inst.subnetId || ''], ['instance_state', inst.state])
+      }
+    } else if (rec.kind === 'bucket') {
+      const b = (live.s3Buckets || []).find((x) => x.name === rec.ids[0])
+      if (b) attrs.push(['id', b.name], ['bucket', b.name], ['region', b.region])
+    } else if (rec.kind === 'sg') {
+      const sg = (live.securityGroups || []).find((x) => x.id === rec.ids[0])
+      if (sg) attrs.push(['id', sg.id], ['name', sg.name], ['vpc_id', sg.vpcId || ''],
+        ['description', sg.description || ''])
+    } else if (rec.kind === 'keypair') {
+      attrs.push(['id', rec.ids[0]], ['key_name', rec.ids[0]])
+    }
+    const [type, name] = address.split('.')
+    const lines = [`# ${address}:`, `resource "${type}" "${name}" {`]
+    for (const [k, v] of attrs) lines.push(`    ${k} = "${v}"`)
+    lines.push('}')
+    return lines
+  }
+
   const destroyAll = () => {
     const lines = []
     for (const [a, rec] of applied.entries()) {
@@ -146,7 +190,11 @@ export function createTerraform({ store, readFile, getCwd, region }) {
           '  destroy     Destroy previously-created infrastructure',
           '  fmt         Reformat your configuration in the standard style',
           '  output      Show output values from your root module',
+          "  show        Show the current state or a saved plan",
           "  state       Advanced state management (e.g. 'state list')",
+          '  providers   Show the providers required for this configuration',
+          '  workspace   Workspace management',
+          '  refresh     Update the state to match remote systems',
         ]
       }
       if (sub === 'version' || sub === '-version' || sub === '--version') return TF_VERSION.split('\n')
@@ -228,12 +276,52 @@ export function createTerraform({ store, readFile, getCwd, region }) {
       }
       if (sub === 'state') {
         if (rest[0] === 'list') return Array.from(applied.keys())
-        if (rest[0] === 'show') return ['# Use the AWS console (EC2/S3) to inspect managed resources.']
-        return ['Usage: terraform state <list|show>']
+        if (rest[0] === 'show') {
+          const addr = rest[1]
+          if (!addr) return ['\x1b[31mError:\x1b[0m Exactly one argument expected.', 'Usage: terraform state show ADDRESS']
+          return showResource(addr)
+        }
+        return ['Usage: terraform state <subcommand> [options] [args]', '', 'Subcommands:', '  list   List resources in the state', '  show   Show a resource in the state']
+      }
+      // `terraform show` (no state) prints the whole applied state.
+      if (sub === 'show') {
+        const addrs = Array.from(applied.keys())
+        if (!addrs.length) return ['The state file is empty. No resources are represented.']
+        const lines = ['# terraform.tfstate', '']
+        addrs.forEach((a) => { lines.push(...showResource(a), '') })
+        return lines
+      }
+      if (sub === 'refresh') {
+        const n = applied.size
+        return [`\x1b[32mApply complete!\x1b[0m Resources: 0 added, 0 changed, 0 destroyed.`,
+          n ? `Refreshed ${n} resource(s) in state.` : 'Empty or non-existent state, no refresh needed.']
+      }
+      if (sub === 'providers') {
+        return ['Providers required by configuration:', '.', '└── provider[registry.terraform.io/hashicorp/aws] >= 5.0']
+      }
+      if (sub === 'workspace') {
+        if (rest[0] === 'show') return ['default']
+        if (rest[0] === 'list') return ['* default']
+        if (rest[0] === 'new' || rest[0] === 'select') return [`Switched to workspace "${rest[1] || 'default'}".`]
+        return ['Usage: terraform workspace <list|show|new|select> [name]']
       }
       if (sub === 'output') {
         const { outputs } = planFromConfig()
-        if (!outputs.length) return ['\x1b[33mWarning:\x1b[0m No outputs found']
+        const asJson = rest.includes('-json')
+        if (!outputs.length) {
+          return asJson ? ['{}'] : ['\x1b[33mWarning:\x1b[0m No outputs found']
+        }
+        if (asJson) {
+          const obj = {}
+          outputs.forEach((o) => { obj[o.name] = { sensitive: false, type: 'string', value: o.attrs.value ?? '' } })
+          return JSON.stringify(obj, null, 2).split('\n')
+        }
+        // `terraform output NAME` prints just that value (quoted), like the real CLI.
+        const named = rest.find((a) => !a.startsWith('-'))
+        if (named) {
+          const o = outputs.find((x) => x.name === named)
+          return o ? [`"${o.attrs.value ?? ''}"`] : [`\x1b[31mError:\x1b[0m Output "${named}" not found`]
+        }
         return outputs.map((o) => `${o.name} = "${o.attrs.value ?? ''}"`)
       }
       return [`Terraform has no command named "${sub}".`, 'Run "terraform -help" to see available commands.']

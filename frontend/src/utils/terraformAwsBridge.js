@@ -94,6 +94,41 @@ function createResourceInStore(store, r, region) {
   return created
 }
 
+/**
+ * Render a single applied resource as a `terraform state show`-style block,
+ * resolving live attributes out of the shared AWS store. `r` is the parsed HCL
+ * resource; matching against the store is by name/tag so it reflects what apply
+ * actually created.
+ */
+function renderResourceState(store, r) {
+  const attrs = []
+  const address = `${r.type}.${r.name}`
+  const a = r.attrs || {}
+  if (r.type === 'aws_instance') {
+    const wanted = (a.tags && a.tags.Name) || r.name
+    const inst = (store.instances || []).find((i) => i.name === wanted || i.tags?.Name === wanted)
+    if (inst) {
+      attrs.push(['id', inst.id], ['ami', inst.amiId || a.ami || ''], ['instance_type', inst.type],
+        ['availability_zone', inst.az], ['private_ip', inst.privateIp || ''],
+        ['public_ip', inst.publicIp || ''], ['key_name', inst.keyName || ''],
+        ['subnet_id', inst.subnetId || ''], ['instance_state', inst.state])
+    }
+  } else if (r.type === 'aws_s3_bucket') {
+    const name = a.bucket || r.name
+    const b = (store.s3Buckets || []).find((x) => x.name === name)
+    if (b) attrs.push(['id', b.name], ['bucket', b.name], ['region', b.region])
+  } else if (r.type === 'aws_security_group') {
+    const name = a.name || r.name
+    const sg = (store.securityGroups || []).find((x) => x.name === name)
+    if (sg) attrs.push(['id', sg.id], ['name', sg.name], ['vpc_id', sg.vpcId || ''],
+      ['description', sg.description || ''])
+  }
+  const lines = [`# ${address}:`, `resource "${r.type}" "${r.name}" {`]
+  for (const [k, v] of attrs) lines.push(`    ${k} = "${v}"`)
+  lines.push('}')
+  return lines
+}
+
 /** After terraform apply (backend or terminal), mirror resources into AWS GUI. */
 export function syncTerraformApplyToAwsConsole(state) {
   const tf = state?.state?.terraform || state?.terraform || {}
@@ -148,8 +183,11 @@ export function runTerraformCommand(argv = [], files = {}) {
       '  plan        Show changes required by the current configuration',
       '  apply       Create or update infrastructure (mirrors into the AWS Console)',
       '  destroy     Destroy previously-created infrastructure',
-      '  state list  List resources tracked in state',
+      '  state       Advanced state management (list, show)',
+      '  show        Show the current state',
       '  output      Show output values from your root module',
+      '  providers   Show the providers required for this configuration',
+      '  workspace   Workspace management',
     ]
   }
   if (sub === 'version') return ['Terraform v1.7.5', 'on linux_amd64', '+ provider registry.terraform.io/hashicorp/aws v5.40.0']
@@ -212,10 +250,54 @@ export function runTerraformCommand(argv = [], files = {}) {
   }
   if (sub === 'state') {
     if (rest[0] === 'list') return terraformStateList()
-    return ['Usage: terraform state <list>']
+    if (rest[0] === 'show') {
+      const addr = rest[1]
+      if (!addr) return ['\x1b[31mError:\x1b[0m Exactly one argument expected.', 'Usage: terraform state show ADDRESS']
+      if (!syncedAddresses.has(addr)) {
+        return [`\x1b[31mError:\x1b[0m No instance found for ${addr}`, 'Run `terraform state list` to see tracked resources.']
+      }
+      const r = resources.find((x) => `${x.type}.${x.name}` === addr)
+      return r ? renderResourceState(store, r) : [`# ${addr}`, '(no attributes available)']
+    }
+    return ['Usage: terraform state <subcommand> [args]', '', 'Subcommands:', '  list   List resources in the state', '  show   Show a resource in the state']
+  }
+  if (sub === 'show') {
+    const addrs = terraformStateList()
+    if (!addrs.length) return ['The state file is empty. No resources are represented.']
+    const lines = ['# terraform.tfstate', '']
+    for (const addr of addrs) {
+      const r = resources.find((x) => `${x.type}.${x.name}` === addr)
+      if (r) lines.push(...renderResourceState(store, r), '')
+    }
+    return lines
+  }
+  if (sub === 'providers') {
+    return ['Providers required by configuration:', '.', '└── provider[registry.terraform.io/hashicorp/aws] >= 5.0']
+  }
+  if (sub === 'refresh') {
+    const n = terraformStateList().length
+    return ['\x1b[32mApply complete!\x1b[0m Resources: 0 added, 0 changed, 0 destroyed.',
+      n ? `Refreshed ${n} resource(s) in state.` : 'Empty or non-existent state, no refresh needed.']
+  }
+  if (sub === 'workspace') {
+    if (rest[0] === 'show') return ['default']
+    if (rest[0] === 'list') return ['* default']
+    if (rest[0] === 'new' || rest[0] === 'select') return [`Switched to workspace "${rest[1] || 'default'}".`]
+    return ['Usage: terraform workspace <list|show|new|select> [name]']
   }
   if (sub === 'output') {
-    if (!outputs.length) return ['\x1b[33mWarning:\x1b[0m No outputs found']
+    const asJson = rest.includes('-json')
+    if (!outputs.length) return asJson ? ['{}'] : ['\x1b[33mWarning:\x1b[0m No outputs found']
+    if (asJson) {
+      const obj = {}
+      outputs.forEach((o) => { obj[o.name] = { sensitive: false, type: 'string', value: o.attrs.value ?? '' } })
+      return JSON.stringify(obj, null, 2).split('\n')
+    }
+    const named = rest.find((x) => !x.startsWith('-'))
+    if (named) {
+      const o = outputs.find((x) => x.name === named)
+      return o ? [`"${o.attrs.value ?? ''}"`] : [`\x1b[31mError:\x1b[0m Output "${named}" not found`]
+    }
     return outputs.map((o) => `${o.name} = "${o.attrs.value ?? ''}"`)
   }
   return [`Terraform has no command named "${sub}".`, 'Run "terraform help" to see available commands.']

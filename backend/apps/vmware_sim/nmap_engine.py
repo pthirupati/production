@@ -629,7 +629,19 @@ def _run_scan(inv: dict, targets: Any, flags: Any, sudo: bool) -> dict:
     eff_caps["syn_scan"] = effective_syn
     eff_caps["os_detect"] = effective_os and sudo
 
-    ports_to_scan = caps["ports"] if caps["ports"] is not None else _DEFAULT_TOP_PORTS
+    if caps.get("all_ports"):
+        # A full-range sweep (`-p-` / `-p 1-65535`) probes every port, so it must
+        # reveal ports outside the default top-ports set. We can't enumerate all
+        # 65535 cheaply, so scan the default top-ports UNION every ground-truth
+        # port present on any candidate host — the full sweep then surfaces open
+        # ports (e.g. 8443 on the bastion) that the default scan would miss.
+        gt_ports = {p["port"] for ip in candidate_ips
+                    for p in (_find_host(inv, ip) or {}).get("ports", [])}
+        ports_to_scan = sorted(set(_DEFAULT_TOP_PORTS) | gt_ports)
+    elif caps["ports"] is not None:
+        ports_to_scan = caps["ports"]
+    else:
+        ports_to_scan = _DEFAULT_TOP_PORTS
 
     result_hosts: list[dict] = []
     hosts_up = 0
@@ -667,6 +679,18 @@ def _run_scan(inv: dict, targets: Any, flags: Any, sudo: bool) -> dict:
             result_hosts.append(entry)
             continue
 
+        # Real nmap collapses the mass of uninteresting ports into a single
+        # "Not shown: N closed/filtered tcp ports" line and lists only the
+        # interesting (open / open|filtered / filtered) ones — UNLESS the learner
+        # asked for a specific, bounded port list (e.g. `-p 22,3306`), in which
+        # case nmap prints the exact state of each requested port, closed included.
+        explicit_small_list = (
+            caps["ports"] is not None
+            and not caps.get("all_ports")
+            and len(caps["ports"]) <= 25
+        )
+        not_shown_closed = 0
+        not_shown_filtered = 0
         for pnum in ports_to_scan:
             port = next((p for p in host["ports"] if p["port"] == pnum), None)
             if port is None:
@@ -675,17 +699,29 @@ def _run_scan(inv: dict, targets: Any, flags: Any, sudo: bool) -> dict:
                     state = "filtered"
                 else:
                     state = "closed"
-                # nmap only prints open / open|filtered by default; we surface
-                # filtered explicitly (for the blocked-scan scenario) but omit
-                # plain closed to keep output readable.
                 if state == "filtered":
+                    # A drop-all firewall's filtered ports are the teaching point;
+                    # surface them (matches nmap listing many filtered ports).
                     entry["ports"].append({
                         "port": pnum, "proto": "tcp", "state": "filtered",
                         "service": _guess_service(pnum),
                     })
+                elif explicit_small_list:
+                    # Learner explicitly probed this port — show its closed state.
+                    entry["ports"].append({
+                        "port": pnum, "proto": "tcp", "state": "closed",
+                        "service": _guess_service(pnum),
+                    })
+                else:
+                    not_shown_closed += 1
                 continue
 
             state = _observed_port_state(host, port, eff_caps, sudo)
+            if state == "closed" and not explicit_small_list:
+                # Collapse a known-closed port into the "Not shown" tally rather
+                # than printing a CLOSED row (nmap default behaviour).
+                not_shown_closed += 1
+                continue
             pinfo: dict = {
                 "port": pnum, "proto": port["proto"], "state": state,
                 "service": port["service"],
@@ -694,6 +730,23 @@ def _run_scan(inv: dict, targets: Any, flags: Any, sudo: bool) -> dict:
                 pinfo["version"] = port.get("version", "")
                 pinfo["product"] = port.get("product", "")
             entry["ports"].append(pinfo)
+
+        # nmap prints e.g. "Not shown: 996 closed tcp ports (conn-refused)".
+        # For the default / -F / full-range cases the engine only walks a
+        # representative subset of ports, but the wire-feel should reflect the
+        # true probe count (~1000 default, 65535 for -p-), so pad the not-shown
+        # tally up to (intended ports − ports actually surfaced). An explicit
+        # small -p list reports exactly what was requested, so no padding.
+        if not explicit_small_list:
+            surfaced = len(entry["ports"])
+            intended = _intended_port_count(caps)
+            padded_not_shown = max(not_shown_closed, intended - surfaced - not_shown_filtered)
+            not_shown_closed = padded_not_shown
+        if not_shown_closed or not_shown_filtered:
+            entry["not_shown"] = {
+                "closed": not_shown_closed,
+                "filtered": not_shown_filtered,
+            }
 
         # OS detection only with -O (or -A) AND sudo.
         if eff_caps["os_detect"] and any(p["state"] == "open" for p in host["ports"]):

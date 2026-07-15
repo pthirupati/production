@@ -224,9 +224,15 @@ const WS_MENUS = [
   ['Help', ['Contents', 'Supported Protocols', 'FAQ', 'Man Pages', 'Website', 'Sample Captures', 'About Wireshark']],
 ]
 
+// Field snippets that insert a *complete, usable* display filter for THIS
+// capture (the packet set only carries HTTP/DNS/TLS/SSH over TCP/UDP, so we
+// don't offer arp/eth/frame fields that would match nothing). Clicking a chip
+// drops a ready-to-apply term; the engine accepts these verbatim, so the filter
+// bar never goes red on a suggested field. Mirrors Wireshark's field-name
+// autocomplete but pre-filled with real values from the capture.
 const DISPLAY_AUTOCOMPLETE = [
-  'ip.addr', 'tcp.port', 'udp.port', 'http', 'dns', 'icmp', 'arp', 'eth.addr',
-  'frame.number', 'tcp.flags', 'http.request', 'http.response', 'ssl', 'tls',
+  'ip.addr==93.184.216.34', 'ip.src==10.0.0.15', 'tcp.port==80', 'udp.port==53',
+  'http.request', 'http.response', 'tcp.flags.syn==1', 'tls',
 ]
 
 function ModalShell({ title, children, onClose }) {

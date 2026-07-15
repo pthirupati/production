@@ -16,15 +16,16 @@
 
 // ---------------- JMESPath subset ----------------
 
-// Split a query on top-level dots, keeping bracket groups intact.
+// Split a query on top-level dots, keeping bracket/brace groups intact
+// (`Tags[?Key==\`Name\`]`, `{Id:InstanceId,Az:Placement.AvailabilityZone}`).
 function splitPath(expr) {
   const parts = []
   let buf = ''
   let depth = 0
   for (let i = 0; i < expr.length; i += 1) {
     const ch = expr[i]
-    if (ch === '[') depth += 1
-    if (ch === ']') depth -= 1
+    if (ch === '[' || ch === '{') depth += 1
+    if (ch === ']' || ch === '}') depth -= 1
     if (ch === '.' && depth === 0) { parts.push(buf); buf = '' } else buf += ch
   }
   if (buf !== '') parts.push(buf)
@@ -42,6 +43,30 @@ function parseSegment(seg) {
   let bm
   while ((bm = re.exec(rest)) != null) brackets.push(bm[1].trim())
   return { key, brackets }
+}
+
+// Is a bracket inner a multiselect-list body, e.g. `InstanceId,State.Name`?
+// (a top-level comma, not a filter `?...`, not a plain index).
+function isMultiselectList(inner) {
+  if (!inner || inner.startsWith('?')) return false
+  return splitTopLevel(inner, ',').length > 1
+}
+
+// Evaluate a multiselect list `[a,b]` against a single element -> [va, vb].
+function evalMultiselectList(el, inner) {
+  return splitTopLevel(inner, ',').map((e) => resolvePath(el, e.trim()))
+}
+
+// Evaluate a multiselect hash `{k1:expr1,k2:expr2}` against one element.
+function evalMultiselectHash(el, body) {
+  const out = {}
+  for (const pair of splitTopLevel(body, ',')) {
+    const idx = pair.indexOf(':')
+    if (idx < 0) continue
+    const k = pair.slice(0, idx).trim().replace(/^["']|["']$/g, '')
+    out[k] = resolvePath(el, pair.slice(idx + 1).trim())
+  }
+  return out
 }
 
 function stripQuotes(v) {
@@ -100,6 +125,15 @@ function resolvePath(root, expr) {
   let cur = root
   let projected = false
   for (const seg of segments) {
+    // Multiselect hash `{k:expr,...}` as a whole segment — build an object per
+    // element (or a single object if not projecting).
+    if (seg.startsWith('{') && seg.endsWith('}')) {
+      const body = seg.slice(1, -1)
+      cur = (projected && Array.isArray(cur))
+        ? cur.map((el) => evalMultiselectHash(el, body))
+        : evalMultiselectHash(cur, body)
+      continue
+    }
     const { key, brackets } = parseSegment(seg)
     if (key) {
       if (projected && Array.isArray(cur)) {
@@ -110,12 +144,27 @@ function resolvePath(root, expr) {
     }
     for (const b of brackets) {
       const isFilter = b.startsWith('?')
+      // Multiselect list `[a,b,...]` — project each element to a value list.
+      if (isMultiselectList(b)) {
+        cur = (projected && Array.isArray(cur))
+          ? cur.map((el) => evalMultiselectList(el, b))
+          : evalMultiselectList(cur, b)
+        projected = true
+        continue
+      }
       if (projected && Array.isArray(cur) && b === '') {
         // flatten one level of an already-projected list of lists
         cur = cur.reduce((acc, el) => acc.concat(Array.isArray(el) ? el : (el == null ? [] : [el])), [])
       } else if (projected && Array.isArray(cur) && isFilter) {
-        // A filter applies to the whole projected list, not per element.
-        cur = applyBracket(cur, b)
+        // After a key projection `cur` may be a list of lists (e.g.
+        // `Reservations[].Instances` -> [[inst],[inst]]); a filter like
+        // `Instances[?State.Name=='running']` applies inside each sublist, then
+        // the results flatten. A flat list is filtered directly.
+        if (cur.some((el) => Array.isArray(el))) {
+          cur = cur.reduce((acc, el) => acc.concat(applyBracket(Array.isArray(el) ? el : [el], b)), [])
+        } else {
+          cur = applyBracket(cur, b)
+        }
       } else if (projected && Array.isArray(cur)) {
         // Index into each element of a projected list.
         cur = cur.map((el) => applyBracket(el, b))
@@ -192,9 +241,13 @@ function unwrapForTable(value) {
 }
 
 // `--output text`: tab-separated rows, arrays/objects flattened depth-first.
+// A row that is itself a flat list of scalars (the `X[].[a,b]` multiselect
+// shape) collapses to a single tab-joined line, matching the real CLI.
 function renderText(value) {
   const rows = []
+  const isScalarRow = (v) => Array.isArray(v) && v.every((el) => el == null || typeof el !== 'object')
   const walk = (v) => {
+    if (isScalarRow(v)) { rows.push(v.map((el) => scalarText(el)).join('\t')); return }
     if (Array.isArray(v)) { v.forEach(walk); return }
     if (v && typeof v === 'object') {
       rows.push(Object.keys(v).sort().map((k) => scalarText(v[k])).join('\t'))
@@ -202,6 +255,8 @@ function renderText(value) {
     }
     rows.push(scalarText(v))
   }
+  // A top-level scalar list prints one value per line; only *nested* scalar
+  // lists (multiselect rows) collapse to a tab-joined line.
   if (Array.isArray(value)) value.forEach(walk)
   else walk(value)
   return rows.join('\n')
@@ -217,6 +272,16 @@ function renderTable(rawValue) {
 
   const objRows = list.filter((r) => r && typeof r === 'object' && !Array.isArray(r))
   if (!objRows.length) {
+    // Multiselect-list rows (`X[].[a,b]`) -> one column per element, no header.
+    const arrayRows = list.filter((r) => Array.isArray(r))
+    if (arrayRows.length && arrayRows.length === list.length) {
+      const ncols = Math.max(...arrayRows.map((r) => r.length))
+      const widths = Array.from({ length: ncols }, (_, i) =>
+        Math.max(1, ...arrayRows.map((r) => scalarText(r[i]).length)))
+      const sep = `+${widths.map((w) => '-'.repeat(w + 2)).join('+')}+`
+      const line = (cells) => `| ${widths.map((w, i) => scalarText(cells[i]).padEnd(w)).join(' | ')} |`
+      return [sep, ...arrayRows.map(line), sep].join('\n')
+    }
     // list of scalars -> single-column table
     const cells = list.map((v) => scalarText(v))
     const w = Math.max(1, ...cells.map((c) => c.length))

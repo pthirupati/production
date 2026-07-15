@@ -187,6 +187,16 @@ const SCOPED_CSS = `
 .nmap-sim .nm-modal-body { padding: .85rem; overflow: auto; }
 `
 
+// The engine's version string usually already embeds the product name (e.g.
+// "nginx 1.18.0"), so naively joining product + version double-prints it
+// ("nginx nginx 1.18.0"). Only prefix the product when it isn't already there.
+function fmtVersion(p) {
+  const ver = String(p?.version || '').trim()
+  const prod = String(p?.product || '').trim()
+  if (prod && !ver.toLowerCase().includes(prod.toLowerCase())) return `${prod} ${ver}`.trim()
+  return ver
+}
+
 function StateBadge({ state }) {
   const cls = state === 'open' ? 'nm-b-open' : state === 'filtered' ? 'nm-b-filtered' : 'nm-b-closed'
   return <span className={`nm-badge ${cls}`}>{(state || 'closed').toUpperCase()}</span>
@@ -219,15 +229,23 @@ function nmapOutput(scan, activeHost) {
   const hosts = scan.hosts || []
   const blocks = hosts.map((h) => {
     const ports = (h.ports || []).map((p) => {
-      const version = [p.product, p.version].filter(Boolean).join(' ')
-      return `${String(p.port).padEnd(8)}/${(p.proto || 'tcp').padEnd(4)} ${String(p.state || 'closed').padEnd(9)} ${String(p.service || 'unknown').padEnd(12)} ${version}`.trimEnd()
+      // nmap renders the port as "22/tcp" as one column, then pads.
+      return `${`${p.port}/${p.proto || 'tcp'}`.padEnd(9)} ${String(p.state || 'closed').padEnd(9)} ${String(p.service || 'unknown').padEnd(12)} ${fmtVersion(p)}`.trimEnd()
     }).join('\n')
     const selected = activeHost?.ip === h.ip ? ' [selected]' : ''
+    // Real nmap collapses the uninteresting ports into a single "Not shown:" line
+    // (e.g. "Not shown: 997 closed tcp ports (conn-refused)") above the table.
+    const ns = h.not_shown || {}
+    const nsParts = []
+    if (ns.closed) nsParts.push(`${ns.closed} closed tcp ports (conn-refused)`)
+    if (ns.filtered) nsParts.push(`${ns.filtered} filtered tcp ports (no-response)`)
+    const notShownLine = nsParts.length ? `Not shown: ${nsParts.join(', ')}` : null
     return [
       `Nmap scan report for ${h.hostname ? `${h.hostname} (${h.ip})` : h.ip}${selected}`,
       `Host is ${h.state || 'up'} (${h.latency || '0.0032s'} latency).`,
       h.mac ? `MAC Address: ${h.mac}${h.vendor ? ` (${h.vendor})` : ''}` : null,
-      ports ? 'PORT      STATE     SERVICE      VERSION' : 'All 1000 scanned ports are closed or filtered',
+      ports ? notShownLine : null,
+      ports ? 'PORT      STATE     SERVICE      VERSION' : (notShownLine || 'All 1000 scanned ports are in ignored states.'),
       ports || null,
       h.os ? `OS details: ${h.os}${h.os_accuracy ? ` (${h.os_accuracy}% accuracy)` : ''}` : null,
       'Network Distance: 1 hop',
@@ -832,7 +850,7 @@ export default function NmapSimulator({
                     return (
                     <tr key={`${p.host}-${p.port}-${p.proto}`} onClick={() => setSelectedHost(p.host)}>
                       <td className="nm-mono">{p.host}</td><td className="nm-mono">{p.port}</td><td>{p.proto || 'tcp'}</td><td><StateBadge state={p.state} /></td><td>{p.service || '—'}</td>
-                      <td className="nm-mono text-[11px]" style={{ color: 'var(--nm-muted)' }}>{[p.product, p.version].filter(Boolean).join(' ') || '—'}</td>
+                      <td className="nm-mono text-[11px]" style={{ color: 'var(--nm-muted)' }}>{fmtVersion(p) || '—'}</td>
                       <td>
                         {pending ? (
                           <span className="text-[11px] nm-mono" style={{ color: 'var(--nm-muted)' }}>→ {pending.to}…</span>

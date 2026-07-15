@@ -370,6 +370,16 @@ BASE_BINARIES: dict[str, str] = {
     "ip": "/usr/sbin/ip", "ss": "/usr/sbin/ss", "mount": "/usr/bin/mount",
     "umount": "/usr/bin/umount", "lsblk": "/usr/bin/lsblk", "blkid": "/usr/sbin/blkid",
     "dmesg": "/usr/bin/dmesg", "uptime": "/usr/bin/uptime",
+    # util-linux / procps-ng / coreutils tools present on a stock RHEL box.
+    "top": "/usr/bin/top", "pidof": "/usr/sbin/pidof", "pgrep": "/usr/bin/pgrep",
+    "pkill": "/usr/bin/pkill", "killall": "/usr/bin/killall", "pstree": "/usr/bin/pstree",
+    "vmstat": "/usr/bin/vmstat", "nice": "/usr/bin/nice", "renice": "/usr/bin/renice",
+    "uniq": "/usr/bin/uniq", "findmnt": "/usr/bin/findmnt", "lscpu": "/usr/bin/lscpu",
+    "lsmod": "/usr/sbin/lsmod", "file": "/usr/bin/file", "who": "/usr/bin/who",
+    "w": "/usr/bin/w", "last": "/usr/bin/last", "chage": "/usr/bin/chage",
+    "ethtool": "/usr/sbin/ethtool", "hostnamectl": "/usr/bin/hostnamectl",
+    "timedatectl": "/usr/bin/timedatectl", "nmcli": "/usr/bin/nmcli",
+    "lsof": "/usr/bin/lsof", "stat": "/usr/bin/stat", "nproc": "/usr/bin/nproc",
 }
 
 
@@ -526,13 +536,28 @@ class RHELOSState:
     def _init_base_system(self) -> None:
         self.users["root"] = SimUser("root", 0, 0, "/root", "/bin/bash", "root")
         self._write_file("/etc/hostname", self.hostname + "\n")
-        self._write_file("/etc/os-release", f'NAME="{self.os_release}"\nVERSION_ID="9.3"\n')
+        self._write_file("/etc/os-release",
+                         f'NAME="Red Hat Enterprise Linux"\n'
+                         f'VERSION="9.3 (Plow)"\nID="rhel"\nID_LIKE="fedora"\n'
+                         f'VERSION_ID="9.3"\n'
+                         f'PRETTY_NAME="{self.os_release}"\n'
+                         f'ANSI_COLOR="0;31"\nCPE_NAME="cpe:/o:redhat:enterprise_linux:9::baseos"\n')
+        self._write_file("/etc/redhat-release", self.os_release + "\n")
+        self._write_file("/etc/system-release", self.os_release + "\n")
         self._write_file("/etc/passwd", "root:x:0:0:root:/root:/bin/bash\n")
         self._write_file("/etc/group", "root:x:0:\n")
         self._write_file("/etc/shadow", "root:*:19000:0:99999:7:::\n")
         self._write_file("/etc/shells", "/bin/sh\n/bin/bash\n")
-        self._write_file("/etc/resolv.conf", "nameserver 8.8.8.8\n")
-        self._write_file("/etc/hosts", f"127.0.0.1 localhost\n127.0.1.1 {self.hostname}\n")
+        self._write_file("/etc/resolv.conf", "nameserver 8.8.8.8\nnameserver 1.1.1.1\n")
+        self._write_file("/etc/hosts", f"127.0.0.1 localhost localhost.localdomain\n::1 localhost\n127.0.1.1 {self.hostname}\n")
+        # A few /proc pseudo-files learners routinely cat.
+        self._write_file("/proc/cpuinfo", self._proc_cpuinfo())
+        self._write_file("/proc/meminfo", self._proc_meminfo())
+        self._write_file("/proc/loadavg", "0.08 0.04 0.01 1/234 900\n")
+        self._write_file("/proc/version",
+                         f"Linux version {self.kernel} (mockbuild@rhel) "
+                         f"(gcc 11.4.1) #1 SMP PREEMPT_DYNAMIC\n")
+        self._write_file("/proc/uptime", "3600.00 3550.00\n")
         self._mkdir("/root")
         self._mkdir("/home")
         self._mkdir("/etc/systemd/system")
@@ -633,6 +658,37 @@ class RHELOSState:
             "/dev/mapper/rhel-swap", "8G", "lvm", parent="/dev/sda2",
             fstype="swap", uuid="dddd4444-swap", mountpoint="[SWAP]")
         self.swaps["/dev/mapper/rhel-swap"] = {"size": 8 * 1024 * 1024, "used": 0}
+
+    def _proc_cpuinfo(self, cores: int = 4) -> str:
+        blocks = []
+        for i in range(cores):
+            blocks.append(
+                f"processor\t: {i}\n"
+                "vendor_id\t: GenuineIntel\n"
+                "cpu family\t: 6\nmodel\t\t: 85\n"
+                "model name\t: Intel(R) Xeon(R) Platinum 8259CL CPU @ 2.50GHz\n"
+                "stepping\t: 7\nmicrocode\t: 0x1\n"
+                "cpu MHz\t\t: 2500.000\ncache size\t: 36608 KB\n"
+                f"physical id\t: 0\nsiblings\t: {cores}\ncore id\t\t: {i}\n"
+                f"cpu cores\t: {cores}\napicid\t\t: {i}\n"
+                "flags\t\t: fpu vme de pse tsc msr pae mce cx8 apic sep mtrr sse sse2 ss ht\n"
+                "bogomips\t: 5000.00\n"
+            )
+        return "\n".join(blocks)
+
+    def _proc_meminfo(self) -> str:
+        return (
+            "MemTotal:       16384000 kB\n"
+            "MemFree:        11534336 kB\n"
+            "MemAvailable:   13631488 kB\n"
+            "Buffers:          131072 kB\n"
+            "Cached:          2965504 kB\n"
+            "SwapCached:            0 kB\n"
+            "Active:          2097152 kB\n"
+            "Inactive:        1048576 kB\n"
+            "SwapTotal:       8388608 kB\n"
+            "SwapFree:        8388608 kB\n"
+        )
 
     def gen_uuid(self) -> str:
         import uuid as _uuid

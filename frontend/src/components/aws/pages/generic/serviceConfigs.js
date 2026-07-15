@@ -65,6 +65,8 @@ export const SERVICE_CONFIGS = {
           actions: {
             reboot: { interim: 'rebooting', final: 'available', delayMs: 6000 },
             modify: { interim: 'modifying', final: 'available', delayMs: 6000 },
+            stop: { interim: 'stopping', final: 'stopped', delayMs: 6000 },
+            start: { interim: 'starting', final: 'available', delayMs: 6000 },
           },
           deleteState: 'deleting',
         },

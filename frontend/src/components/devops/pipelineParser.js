@@ -318,6 +318,11 @@ function parseBlockBody(body) {
 
     if (val && !isListMarker(val)) {
       props[key] = stripQuotes(val)
+    } else if (isBlockScalar(val)) {
+      // Literal/folded block scalar (`script: |`, `run: >-`, …). Each indented
+      // non-empty line is a command; treat them as list items so multi-line
+      // `script:` blocks yield real steps (they are the most common GitLab form).
+      lists[key] = blockScalarLines(nested)
     } else if (nested.some((l) => /^\s*-\s+/.test(l))) {
       lists[key] = parseYamlList(val, nested)
     } else if (nested.length) {
@@ -385,29 +390,51 @@ function parseGithubSteps(body) {
   const region = body.slice(stepsStart + 1)
   const steps = []
   let cur = null
+  // When a `run: |` (or `>`) block scalar is open, collect continuation lines
+  // indented deeper than the `run:` key into the current step's run command.
+  let blockRun = null // { indent } while consuming a run block scalar
   for (const line of region) {
     if (!line.trim()) continue
-    if (indentOf(line) <= stepsIndent && !/^\s*-/.test(line)) break
+    const ind = indentOf(line)
+    if (blockRun) {
+      if (ind > blockRun.indent) { cur.run.push(line.trim()); continue }
+      blockRun = null // dedent → block ended, fall through to normal handling
+    }
+    if (ind <= stepsIndent && !/^\s*-/.test(line)) break
     const itemStart = line.match(/^\s*-\s+(.*)$/)
     if (itemStart) {
       if (cur) steps.push(cur)
-      cur = { name: '', run: '' }
-      applyStepKv(cur, itemStart[1])
+      cur = { name: '', run: [] }
+      if (applyStepKv(cur, itemStart[1])) blockRun = { indent: ind + 2 }
       continue
     }
-    if (cur) applyStepKv(cur, line.trim())
+    if (cur && applyStepKv(cur, line.trim(), ind)) blockRun = { indent: ind }
   }
   if (cur) steps.push(cur)
-  return steps.map((s) => ({ name: s.name || firstToken(s.run) || 'step', run: s.run || s.name }))
+  return steps.map((s) => {
+    const run = Array.isArray(s.run) ? s.run.join('\n') : s.run
+    return { name: s.name || firstToken(run) || 'step', run: run || s.name }
+  })
 }
 
+/**
+ * Apply a `key: value` fragment to a step. `step.run` accumulates into an array
+ * so a `run: |` block scalar can append continuation lines. Returns true when the
+ * `run:` value opened a block scalar (so the caller starts collecting its lines).
+ */
 function applyStepKv(step, fragment) {
   const kv = fragment.match(/^([A-Za-z0-9_.\-]+):\s*(.*)$/)
-  if (!kv) return
+  if (!kv) return false
   const [, key, value] = kv
-  if (key === 'name') step.name = stripQuotes(value)
-  else if (key === 'run') step.run = stripQuotes(value.replace(/^\|>?-?\s*/, ''))
-  else if (key === 'uses') step.run = `uses ${stripQuotes(value)}`
+  if (key === 'name') { step.name = stripQuotes(value); return false }
+  if (key === 'uses') { step.run.push(`uses ${stripQuotes(value)}`); return false }
+  if (key === 'run') {
+    if (isBlockScalar(value)) return true // block scalar → lines follow
+    const inline = stripQuotes(value)
+    if (inline) step.run.push(inline)
+    return false
+  }
+  return false
 }
 
 /** Parse Jenkins `steps { sh '...'; sh '...' }` inside a stage body. */
@@ -477,7 +504,17 @@ function uniqueStages(rawJobs) {
 
 function isListMarker(val) {
   const t = (val || '').trim()
-  return t === '' || t === '|' || t === '>' || t === '|-' || t === '>-'
+  return t === '' || isBlockScalar(t)
+}
+
+/** A YAML block-scalar indicator: `|`, `>`, with optional chomping/indent hints. */
+function isBlockScalar(val) {
+  return /^[|>][+-]?\d*$/.test((val || '').trim())
+}
+
+/** Turn the indented body of a literal/folded block scalar into per-line items. */
+function blockScalarLines(nested) {
+  return nested.map((l) => l.trim()).filter(Boolean)
 }
 
 function stripQuotes(val) {

@@ -1093,3 +1093,227 @@ class IpCommandTests(SimpleTestCase):
             self.assertIn("10.0.0.77", out)
         finally:
             vb.clear(sid)
+
+
+class SocketToolTests(SimpleTestCase):
+    """ss / netstat / lsof must reflect which services are actually running."""
+
+    def test_ss_shows_sshd_listener(self):
+        sh = RHELShell()
+        out = sh.run("ss -tlnp")
+        self.assertIn("LISTEN", out)
+        self.assertIn(":22", out)
+        self.assertIn("sshd", out)
+        # The old stub emitted a garbled unix-socket line — must be gone.
+        self.assertNotIn("u_str", out)
+
+    def test_ss_reflects_service_state(self):
+        sh = RHELShell()
+        self.assertNotIn(":80", sh.run("ss -tlnp"))  # nginx not installed/running
+        sh.run("dnf install -y nginx")
+        sh.run("systemctl start nginx")
+        out = sh.run("ss -tlnp")
+        self.assertIn(":80", out)
+        self.assertIn("nginx", out)
+        # Stopping it removes the listener.
+        sh.run("systemctl stop nginx")
+        self.assertNotIn(":80", sh.run("ss -tlnp"))
+
+    def test_netstat_tulpn_lists_servers(self):
+        sh = RHELShell()
+        out = sh.run("netstat -tulpn")
+        self.assertIn("0.0.0.0:22", out)
+        self.assertIn("LISTEN", out)
+        self.assertIn("sshd", out)
+
+    def test_ss_udp_filter(self):
+        sh = RHELShell()
+        out = sh.run("ss -uln")
+        self.assertIn(":123", out)   # chronyd UDP
+        self.assertNotIn(":22", out) # tcp filtered out
+
+    def test_lsof_port_filter(self):
+        sh = RHELShell()
+        self.assertIn("sshd", sh.run("lsof -i :22"))
+        self.assertEqual(sh.run("lsof -i :80").strip(), "")
+
+
+class SystemctlActionTests(SimpleTestCase):
+    def test_is_enabled(self):
+        sh = RHELShell()
+        self.assertEqual(sh.run("systemctl is-enabled sshd").strip(), "enabled")
+        sh.run("systemctl disable sshd")
+        self.assertEqual(sh.run("systemctl is-enabled sshd").strip(), "disabled")
+
+    def test_is_active_and_failed(self):
+        sh = RHELShell()
+        self.assertEqual(sh.run("systemctl is-active sshd").strip(), "active")
+        self.assertEqual(sh.run("systemctl is-failed sshd").strip(), "active")
+
+    def test_status_no_arg_is_overview(self):
+        sh = RHELShell()
+        out = sh.run("systemctl status")
+        self.assertNotIn("could not be found", out)
+        self.assertIn("State:", out)
+
+    def test_failed_listing(self):
+        sh = RHELShell()
+        # No failed units on a healthy box.
+        self.assertNotIn("could not be found", sh.run("systemctl --failed"))
+        self.assertNotIn("could not be found", sh.run("systemctl list-units --failed"))
+        # Mark one failed and confirm it surfaces.
+        sh.state.services["sshd"].active = "failed"
+        self.assertIn("sshd", sh.run("systemctl --failed"))
+
+    def test_list_unit_files(self):
+        sh = RHELShell()
+        out = sh.run("systemctl list-unit-files")
+        self.assertIn("sshd.service", out)
+        self.assertIn("UNIT FILE", out)
+
+    def test_reload_and_mask(self):
+        sh = RHELShell()
+        self.assertNotIn("Unknown operation", sh.run("systemctl reload sshd"))
+        self.assertNotIn("Unknown operation", sh.run("systemctl reload-or-restart sshd"))
+        out = sh.run("systemctl mask sshd")
+        self.assertIn("/dev/null", out)
+        self.assertEqual(sh.state.services["sshd"].enabled, "masked")
+
+
+class SystemInfoToolTests(SimpleTestCase):
+    def test_hostname_dash_I_returns_ip(self):
+        sh = RHELShell()
+        out = sh.run("hostname -I").strip()
+        self.assertEqual(out, "10.0.0.10")
+        self.assertNotIn("rhel-sim", out)
+
+    def test_ping_parses_count_flag(self):
+        sh = RHELShell()
+        out = sh.run("ping -c1 8.8.8.8")
+        self.assertIn("1 packets transmitted, 1 received", out)
+        self.assertNotIn("Name or service not known", out)
+        out2 = sh.run("ping -c 2 10.0.0.1")
+        self.assertIn("2 packets transmitted, 2 received", out2)
+
+    def test_ping_bad_host(self):
+        sh = RHELShell()
+        self.assertIn("Name or service not known", sh.run("ping this is not a host"))
+
+    def test_free_units(self):
+        sh = RHELShell()
+        self.assertIn("Gi", sh.run("free -h"))
+        m = sh.run("free -m")
+        self.assertIn("16384", m)   # 16 GiB in MiB
+
+    def test_top_batch(self):
+        sh = RHELShell()
+        out = sh.run("top -bn1")
+        self.assertIn("PID", out)
+        self.assertIn("sshd", out)
+
+    def test_pidof_and_pstree(self):
+        sh = RHELShell()
+        self.assertEqual(sh.run("pidof sshd").strip(), "412")
+        self.assertIn("systemd", sh.run("pstree"))
+
+    def test_missing_procps_tools_present(self):
+        sh = RHELShell()
+        for cmd in ("lscpu", "vmstat", "findmnt", "uniq /etc/passwd", "who", "w",
+                    "last", "lsmod", "arp -n", "route -n", "ifconfig", "ethtool eth0",
+                    "traceroute 8.8.8.8", "file /etc/passwd", "hostnamectl",
+                    "timedatectl", "chage -l root"):
+            out = sh.run(cmd)
+            self.assertNotIn("command not found", out, f"{cmd} should exist: {out!r}")
+
+    def test_proc_files_and_release(self):
+        sh = RHELShell()
+        self.assertIn("processor", sh.run("cat /proc/cpuinfo"))
+        self.assertIn("MemTotal", sh.run("cat /proc/meminfo"))
+        self.assertIn("Red Hat", sh.run("cat /etc/redhat-release"))
+
+    def test_nmcli_device_status(self):
+        sh = RHELShell()
+        out = sh.run("nmcli dev")
+        self.assertIn("eth0", out)
+        self.assertIn("connected", out)
+        self.assertNotIn("nmcli: OK", out)
+
+    def test_ls_long_shows_real_mode(self):
+        sh = RHELShell()
+        sh.state.write_file("/tmp/only-owner", "x")
+        sh.state.vfs[sh.state.resolve_path("/tmp/only-owner")]["mode"] = "600"
+        out = sh.run("ls -l /tmp/only-owner")
+        self.assertIn("rw-------", out)
+
+    def test_ls_la_shows_dot_entries(self):
+        sh = RHELShell()
+        out = sh.run("ls -la")
+        self.assertIn(" .", out)
+        self.assertIn(" ..", out)
+
+    def test_stat_mode_matches_octal(self):
+        sh = RHELShell()
+        out = sh.run("stat /etc/passwd")
+        self.assertIn("0644/-rw-r--r--", out)  # symbolic must match octal
+
+
+class RpmDnfQueryTests(SimpleTestCase):
+    def test_rpm_qi(self):
+        sh = RHELShell()
+        out = sh.run("rpm -qi bash")
+        self.assertIn("Name        : bash", out)
+        self.assertIn("License", out)
+        self.assertNotIn("rpm: OK", out)
+
+    def test_rpm_ql_and_qf(self):
+        sh = RHELShell()
+        sh.run("dnf install -y nginx")
+        ql = sh.run("rpm -ql nginx")
+        self.assertIn("/usr/sbin/nginx", ql)
+        qf = sh.run("rpm -qf /usr/sbin/nginx")
+        self.assertIn("nginx", qf)
+
+    def test_rpm_missing_package(self):
+        sh = RHELShell()
+        self.assertIn("is not installed", sh.run("rpm -q doesnotexist"))
+
+    def test_dnf_info_and_search(self):
+        sh = RHELShell()
+        info = sh.run("dnf info nginx")
+        self.assertIn("Name", info)
+        self.assertIn("nginx", info)
+        self.assertNotIn("simulation", info)
+        search = sh.run("dnf search web")
+        self.assertIn("nginx", search)
+
+    def test_find_by_name(self):
+        sh = RHELShell()
+        out = sh.run("find / -name passwd")
+        self.assertIn("/etc/passwd", out)
+        out2 = sh.run("find /etc -name '*.conf'")
+        self.assertIn("resolv.conf", out2)
+
+
+class HeadTailShorthandTests(SimpleTestCase):
+    def setUp(self):
+        self.sh = RHELShell()
+        self.sh.state.write_file("/tmp/lines.txt", "l1\nl2\nl3\nl4\nl5\n")
+
+    def test_head_dash_n_shorthand(self):
+        self.assertEqual(self.sh.run("head -2 /tmp/lines.txt"), "l1\nl2")
+        self.assertEqual(self.sh.run("head -n2 /tmp/lines.txt"), "l1\nl2")
+        self.assertEqual(self.sh.run("head -n 3 /tmp/lines.txt"), "l1\nl2\nl3")
+
+    def test_tail_dash_n_shorthand(self):
+        self.assertEqual(self.sh.run("tail -1 /tmp/lines.txt"), "l5")
+        self.assertEqual(self.sh.run("tail -n 2 /tmp/lines.txt"), "l4\nl5")
+
+    def test_head_over_pipe_limits(self):
+        out = self.sh.run("systemctl status sshd | head -2")
+        self.assertEqual(len(out.splitlines()), 2)
+
+    def test_is_active_unknown_unit_chains(self):
+        # `systemctl is-active nginx || echo DOWN` must fire the fallback.
+        out = self.sh.run("systemctl is-active nginx || echo DOWN")
+        self.assertIn("DOWN", out)
+        self.assertNotIn("could not be found", out)
