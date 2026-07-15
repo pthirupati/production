@@ -244,12 +244,31 @@ def deliver_team_reply_now(
         return
 
     engine = None
+    engine_is_live = False  # True when we found the engine in *this* process's memory
     if session_id:
         from apps.labs.provisioner.simulation.ops_state import (
             apply_team_ops_action,
             get_simulation_engine_for_session,
         )
+
         engine = get_simulation_engine_for_session(session_id)
+        if engine is None:
+            # ops_state.get_simulation_engine_for_session() reads entry["engine"],
+            # but register_sim_session() stores the engine under
+            # entry["state"]["engine"] — so the live in-process engine is missed
+            # even inside the web worker. Look it up under the real key too.
+            engine = _live_engine_from_registry(session_id)
+        engine_is_live = engine is not None
+
+        # BUG C fix: the Celery worker that runs this delayed reply is a *separate
+        # process* from the web/gunicorn worker that holds the in-memory
+        # `_SIM_SESSIONS` engine, so the lookup above returns None there and the
+        # requested team action (backup_taken / *_stopped / disk / nic …) was
+        # silently dropped — teams "replied" but never acted. Fall back to the
+        # DB-persisted engine snapshot so the action is applied and re-persisted;
+        # the learner's next terminal command restores the mutated state.
+        if engine is None:
+            engine = _restore_engine_from_snapshot(session_id)
 
     start_actions = [a for a in actions if a.endswith("_started")]
     prep_actions = [a for a in actions if not a.endswith("_started")]
@@ -265,9 +284,85 @@ def deliver_team_reply_now(
             and not state.mount_filesystems_fixed
         ):
             mount_author, mount_msg = build_mount_failure_reply(ticket)
+            # A restored-from-snapshot engine was mutated to report the mount
+            # failure path; persist that too so state stays coherent.
+            if engine is not None and not engine_is_live:
+                _persist_engine_snapshot(session_id, engine)
             add_comment(ticket, None, mount_msg, session=ticket.last_session, author=mount_author)
             return
         for action in start_actions:
             apply_team_ops_action(engine, action, scenario_slug)
 
+    # If we operated on a snapshot-restored engine (Celery worker had no live
+    # engine), write the mutated state back to the DB snapshot so it survives
+    # into the web worker on the learner's next command. When the engine was
+    # already live in-process, the web worker's normal per-command persistence
+    # owns the snapshot and we must NOT clobber it here.
+    if engine is not None and not engine_is_live and (prep_actions or start_actions):
+        _persist_engine_snapshot(session_id, engine)
+
     add_comment(ticket, None, message, session=ticket.last_session, author=author)
+
+
+def _live_engine_from_registry(session_id: str):
+    """Return the in-process live engine for this session, or None.
+
+    Reads the real storage location (`entry["state"]["engine"]`) that
+    register_sim_session writes to. Only useful when the delivery runs in the
+    same process that holds the engine (e.g. the sync fallback inside gunicorn);
+    a separate Celery worker will have an empty registry and get None here.
+    """
+    try:
+        from apps.labs.provisioner.simulation.shell import get_sim_session
+    except Exception:  # pragma: no cover - defensive import guard
+        return None
+    entry = get_sim_session(str(session_id))
+    if not entry:
+        return None
+    state = entry.get("state")
+    if isinstance(state, dict):
+        return state.get("engine")
+    return None
+
+
+def _restore_engine_from_snapshot(session_id: str):
+    """Rebuild the simulation engine from LabSession.simulation_snapshot.
+
+    Used by the Celery worker (a different process than the web worker that owns
+    the in-memory engine registry) so team-bot actions still mutate real state.
+    Returns None if there is no usable snapshot.
+    """
+    try:
+        from apps.labs.models import LabSession
+        from apps.labs.provisioner.simulation.sim_persistence import restore_engine
+    except Exception as exc:  # pragma: no cover - defensive import guard
+        logger.warning("Cannot import snapshot restore for team reply: %s", exc)
+        return None
+
+    snap = (
+        LabSession.objects.filter(id=session_id)
+        .values_list("simulation_snapshot", flat=True)
+        .first()
+    )
+    if not snap:
+        return None
+    try:
+        return restore_engine(snap)
+    except Exception as exc:
+        logger.warning("Failed to restore engine snapshot for team reply session=%s: %s", session_id, exc)
+        return None
+
+
+def _persist_engine_snapshot(session_id: str, engine) -> None:
+    """Write a mutated (snapshot-restored) engine back to the DB snapshot."""
+    try:
+        from apps.labs.models import LabSession
+        from apps.labs.provisioner.simulation.sim_persistence import snapshot_engine
+    except Exception as exc:  # pragma: no cover - defensive import guard
+        logger.warning("Cannot import snapshot save for team reply: %s", exc)
+        return
+    try:
+        snap = snapshot_engine(engine)
+        LabSession.objects.filter(id=session_id).update(simulation_snapshot=snap)
+    except Exception as exc:
+        logger.warning("Failed to persist engine snapshot for team reply session=%s: %s", session_id, exc)
