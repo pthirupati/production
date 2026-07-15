@@ -1580,15 +1580,28 @@ class RHELShell:
         return "\n".join(base + extra)
 
     def _cmd_ip(self, p: list[str]) -> str:
-        if len(p) > 1 and p[1] == "addr":
-            if len(p) > 2 and p[2] == "add" and len(p) > 3:
-                addr = p[3]
-                dev = "eth0"
-                if "dev" in p:
-                    dev = p[p.index("dev") + 1]
-                # Cross-tech: a NIC added in VMware appears only after the guest
-                # discovers it (a rescan). Pull it from the bridge on demand so the
-                # operator can configure the new link they just added in VMware.
+        # Parse `ip [OPTIONS] OBJECT [COMMAND]` the way real iproute2 does: strip
+        # global options and expand the ubiquitous abbreviations everyone types
+        # (ip a / ip a s / ip a s eth0 / ip -br a / ip l / ip link / ip r).
+        brief = False
+        args: list[str] = []
+        for a in p[1:]:
+            if a in ("-br", "-brief", "-o", "-oneline"):
+                brief = True
+            elif a.startswith("-"):
+                continue  # -4/-6/-c/-color/-s/-d/-human/-json etc: accepted, ignored
+            else:
+                args.append(a)
+        obj = args[0].lower() if args else "addr"
+        rest = args[1:]
+
+        # ── addr / address (a, ad, addr, address) ──
+        if obj in ("a", "ad", "addr", "address"):
+            if rest and rest[0] in ("add",) and len(rest) >= 2:
+                addr = rest[1]
+                dev = rest[rest.index("dev") + 1] if "dev" in rest else "eth0"
+                # Cross-tech: a NIC hot-added in VMware only appears after the guest
+                # discovers it — reveal it on demand so the operator can configure it.
                 if dev not in self.state.network_ifs:
                     self.state.reveal_bridge_nic()
                 if dev not in self.state.network_ifs:
@@ -1596,20 +1609,116 @@ class RHELShell:
                 if addr not in self.state.network_ifs[dev]["addrs"]:
                     self.state.network_ifs[dev]["addrs"].append(addr)
                 return ""
-            return self.state.format_ip_addr()
-        if len(p) > 1 and p[1] == "link" and len(p) > 2:
-            if p[2] == "set" and len(p) > 3:
-                dev = p[3]
+            if rest and rest[0] in ("del", "delete") and len(rest) >= 2:
+                addr = rest[1]
+                dev = rest[rest.index("dev") + 1] if "dev" in rest else "eth0"
+                ifc = self.state.network_ifs.get(dev)
+                if ifc and addr in ifc.get("addrs", []):
+                    ifc["addrs"].remove(addr)
+                return ""
+            # listing (ip a / ip a s / ip addr show [dev] NAME): reveal a NIC the
+            # operator just added in VMware so `ip a` actually shows what they added.
+            self.state.reveal_bridge_nic()
+            dev_filter = None
+            tail = [x for x in rest if x not in ("s", "sh", "show", "list", "ls", "dev")]
+            if tail:
+                dev_filter = tail[0]
+            return self._render_ip_addr(brief=brief, dev=dev_filter)
+
+        # ── link (l, li, link) ──
+        if obj in ("l", "li", "link"):
+            if rest and rest[0] == "set":
+                devtoks = [x for x in rest[1:] if x not in ("up", "down", "dev")]
+                dev = devtoks[0] if devtoks else "eth0"
+                if dev not in self.state.network_ifs:
+                    self.state.reveal_bridge_nic()
                 if dev not in self.state.network_ifs:
                     self.state.network_ifs[dev] = {"up": True, "addrs": []}
-                if "up" in p:
+                if "up" in rest:
                     self.state.network_ifs[dev]["up"] = True
-                if "down" in p:
+                if "down" in rest:
                     self.state.network_ifs[dev]["up"] = False
                 return ""
-        if len(p) > 1 and p[1] == "route" and (len(p) < 3 or p[2] == "show"):
-            return "default via 10.0.0.1 dev eth0 proto static\n10.0.0.0/24 dev eth0 proto kernel scope link src 10.0.0.10"
-        return "Usage: ip addr | ip link set dev eth0 up | ip route show"
+            self.state.reveal_bridge_nic()
+            return self._render_ip_link(brief=brief)
+
+        # ── route (r, ro, route) ──
+        if obj in ("r", "ro", "route"):
+            return ("default via 10.0.0.1 dev eth0 proto static\n"
+                    "10.0.0.0/24 dev eth0 proto kernel scope link src 10.0.0.10")
+
+        # ── neigh / arp table (n, ne, neigh) ──
+        if obj in ("n", "ne", "neigh", "neighbor", "neighbour"):
+            return "10.0.0.1 dev eth0 lladdr 00:50:56:a1:b2:c3 REACHABLE"
+
+        return ("Usage: ip [ -br ] OBJECT { COMMAND }\n"
+                "where OBJECT := { addr | link | route | neigh }")
+
+    def _nic_mac(self, name: str) -> str:
+        if name == "lo":
+            return "00:00:00:00:00:00"
+        try:
+            n = int("".join(ch for ch in name if ch.isdigit()) or "0")
+        except ValueError:
+            n = 0
+        return f"00:50:56:a1:b2:{n:02x}"
+
+    def _render_ip_addr(self, brief: bool = False, dev: str | None = None) -> str:
+        items = list(self.state.network_ifs.items())
+        if dev:
+            items = [(n, d) for n, d in items if n == dev]
+            if not items:
+                return f'Device "{dev}" does not exist.'
+        if brief:
+            lines = []
+            for name, data in items:
+                state = "UP" if data.get("up", True) else "DOWN"
+                if name == "lo":
+                    state = "UNKNOWN"
+                addrs = " ".join(data.get("addrs", []))
+                lines.append(f"{name:<12} {state:<8} {addrs}")
+            return "\n".join(lines)
+        lines = []
+        for idx, (name, data) in enumerate(self.state.network_ifs.items(), 1):
+            if dev and name != dev:
+                continue
+            up = data.get("up", True)
+            if name == "lo":
+                flags = "LOOPBACK,UP,LOWER_UP"
+            elif up:
+                flags = "BROADCAST,MULTICAST,UP,LOWER_UP"
+            else:
+                flags = "NO-CARRIER,BROADCAST,MULTICAST,UP" if data.get("addrs") else "BROADCAST,MULTICAST"
+            mtu = 65536 if name == "lo" else 1500
+            st = "UP" if up else "DOWN"
+            lines.append(f"{idx}: {name}: <{flags}> mtu {mtu} qdisc {'noqueue' if name=='lo' else 'fq_codel'} state {'UNKNOWN' if name=='lo' else st} group default")
+            lines.append(f"    link/{'loopback' if name=='lo' else 'ether'} {self._nic_mac(name)} brd ff:ff:ff:ff:ff:ff")
+            for addr in data.get("addrs", []):
+                ip, _, prefix = addr.partition("/")
+                if name == "lo":
+                    lines.append(f"    inet {ip}/{prefix or '8'} scope host {name}")
+                else:
+                    lines.append(f"    inet {ip}/{prefix or '24'} brd {ip.rsplit('.', 1)[0]}.255 scope global {name}")
+        return "\n".join(lines)
+
+    def _render_ip_link(self, brief: bool = False) -> str:
+        lines = []
+        for idx, (name, data) in enumerate(self.state.network_ifs.items(), 1):
+            up = data.get("up", True)
+            if brief:
+                lines.append(f"{name:<12} {'UP' if up else 'DOWN'}")
+                continue
+            if name == "lo":
+                flags = "LOOPBACK,UP,LOWER_UP"
+            elif up:
+                flags = "BROADCAST,MULTICAST,UP,LOWER_UP"
+            else:
+                flags = "NO-CARRIER,BROADCAST,MULTICAST,UP"
+            mtu = 65536 if name == "lo" else 1500
+            st = "UP" if up else "DOWN"
+            lines.append(f"{idx}: {name}: <{flags}> mtu {mtu} qdisc {'noqueue' if name=='lo' else 'fq_codel'} state {'UNKNOWN' if name=='lo' else st} mode DEFAULT group default")
+            lines.append(f"    link/{'loopback' if name=='lo' else 'ether'} {self._nic_mac(name)} brd ff:ff:ff:ff:ff:ff")
+        return "\n".join(lines)
 
     def _cmd_ss(self, p: list[str]) -> str:
         return "Netid State  Recv-Q Send-Q Local Address:Port Peer Address:Port\nu_str ESTAB  0      0      * 22                * *\n"

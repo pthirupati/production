@@ -471,9 +471,20 @@ export default function NmapSimulator({
     load()
   }, [sessionId, load, clearStream])
 
+  // Stop/start a listening service on a host. The port's state changes on the
+  // network after a short wall-clock delay (modelled server-side), so a re-scan
+  // is required to observe it — mirroring real socket teardown/bind latency.
+  const serviceControl = useCallback(async (ip, port, action) => {
+    try {
+      await nmapApi.action(sessionId, action, { ip, port })
+    } catch { /* ignore — surfaced via reload */ }
+    load()
+  }, [sessionId, load])
+
   const summary = state?.summary || {}
   const inventory = state?.inventory || {}
   const goal = state?.goal || {}
+  const pendingTransitions = state?.pending_transitions || []
   const firewall = inventory.firewall
   const scanHosts = useMemo(() => lastScan?.hosts || [], [lastScan])
   const activeHost = scanHosts.find(h => h.ip === selectedHost) || scanHosts[0] || null
@@ -770,6 +781,19 @@ export default function NmapSimulator({
 
         {lastScan && tab === 'ports' && (
           <div className="grid grid-cols-1 lg:grid-cols-[260px_1fr] gap-3">
+            {pendingTransitions.length > 0 && (
+              <div className="lg:col-span-2 nm-card p-2 text-[12px] flex items-center gap-2 flex-wrap"
+                   style={{ borderColor: 'rgba(240,200,80,.5)', background: 'rgba(240,200,80,.08)' }}>
+                <Radar size={13} style={{ color: 'var(--nm-muted)' }} />
+                <span style={{ color: 'var(--nm-muted)' }}>Service change in progress —</span>
+                {pendingTransitions.map((t) => (
+                  <span key={`${t.ip}-${t.port}`} className="nm-mono">
+                    {t.ip}:{t.port} → {t.to}
+                  </span>
+                ))}
+                <span style={{ color: 'var(--nm-muted)' }}>· re-scan to confirm the new state.</span>
+              </div>
+            )}
             <div className="nm-sidebar">
               <div className="nm-sidebar-head">Hosts</div>
               {scanHosts.map((h) => {
@@ -799,16 +823,33 @@ export default function NmapSimulator({
                 <span className="text-[11px] nm-mono" style={{ color: 'var(--nm-muted)' }}>{filteredPorts.length}/{allPorts.length}</span>
               </div>
               <table className="nm-table">
-                <thead><tr><th>Host</th><th>Port</th><th>Protocol</th><th>State</th><th>Service</th><th>Version</th></tr></thead>
+                <thead><tr><th>Host</th><th>Port</th><th>Protocol</th><th>State</th><th>Service</th><th>Version</th><th>Service control</th></tr></thead>
                 <tbody>
                   {filteredPorts.length === 0 ? (
-                    <tr><td colSpan={6} className="text-center py-6" style={{ color: 'var(--nm-muted)' }}>No ports match “{portFilter}”.</td></tr>
-                  ) : filteredPorts.map((p) => (
+                    <tr><td colSpan={7} className="text-center py-6" style={{ color: 'var(--nm-muted)' }}>No ports match “{portFilter}”.</td></tr>
+                  ) : filteredPorts.map((p) => {
+                    const pending = pendingTransitions.find((t) => t.ip === p.host && t.port === p.port)
+                    return (
                     <tr key={`${p.host}-${p.port}-${p.proto}`} onClick={() => setSelectedHost(p.host)}>
                       <td className="nm-mono">{p.host}</td><td className="nm-mono">{p.port}</td><td>{p.proto || 'tcp'}</td><td><StateBadge state={p.state} /></td><td>{p.service || '—'}</td>
                       <td className="nm-mono text-[11px]" style={{ color: 'var(--nm-muted)' }}>{[p.product, p.version].filter(Boolean).join(' ') || '—'}</td>
+                      <td>
+                        {pending ? (
+                          <span className="text-[11px] nm-mono" style={{ color: 'var(--nm-muted)' }}>→ {pending.to}…</span>
+                        ) : p.state === 'open' ? (
+                          <button className="nm-btn !py-0.5 !px-2 !text-[11px]"
+                                  onClick={(e) => { e.stopPropagation(); serviceControl(p.host, p.port, 'stop_service') }}>
+                            Stop service
+                          </button>
+                        ) : p.state === 'closed' ? (
+                          <button className="nm-btn !py-0.5 !px-2 !text-[11px]"
+                                  onClick={(e) => { e.stopPropagation(); serviceControl(p.host, p.port, 'start_service') }}>
+                            Start service
+                          </button>
+                        ) : <span style={{ color: 'var(--nm-muted)' }}>—</span>}
+                      </td>
                     </tr>
-                  ))}
+                  )})}
                 </tbody>
               </table>
             </div>

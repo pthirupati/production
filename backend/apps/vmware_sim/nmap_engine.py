@@ -39,6 +39,15 @@ from django.core.cache import cache
 
 SESSION_TTL = 7200  # 2-hour TTL matching the other simulator engines
 
+# Wall-clock delay (seconds) before a service state change a learner makes
+# (stop/start a listener) is reflected by the network. Stopping a daemon does
+# not instantly tear the socket down — connections drain and the kernel stops
+# accepting new SYNs a moment later — so a port a learner "closes" keeps reading
+# `open` on a scan run immediately after, then flips to `closed` on a re-scan
+# once the transition has elapsed. Kept short so the effect is observable within
+# a single lab sitting. This mirrors the baremetal/monitoring wall-clock pattern.
+PORT_TRANSITION_SECONDS = 8
+
 
 def _session_key(session_id: str) -> str:
     return f"nmap_session:{session_id}"
@@ -395,6 +404,80 @@ def _find_host(inv: dict, ip: str) -> dict | None:
         if h["ip"] == ip:
             return h
     return None
+
+
+def _find_port(host: dict, port: int) -> dict | None:
+    for p in host.get("ports", []):
+        if p["port"] == int(port):
+            return p
+    return None
+
+
+# ---------------------------------------------------------------------------
+# Wall-clock port-state transitions
+#
+# A learner who stops a service (or starts a new listener) changes the *intrinsic*
+# state of a ground-truth port. Real networks don't flip instantly: a stopped
+# daemon keeps its socket briefly before the kernel refuses new SYNs, and a newly
+# started listener takes a beat to bind. We model this by stamping a pending
+# transition on the port with a target state + effective-at wall-clock time.
+#
+# `_advance_ports` is called on every read / action / scan / validate, exactly
+# like the baremetal `_tick`. Until the transition elapses the port keeps its
+# previous intrinsic state, so a scan run right after the change still shows the
+# old state; a re-scan after PORT_TRANSITION_SECONDS shows the new one.
+#
+# IMPORTANT: this only mutates ground-truth intrinsic `state` (open|closed) that
+# *future* scans observe. It never touches the `discovered` knowledge base that
+# validate_nmap_lab grades on, so grading is completely unaffected.
+# ---------------------------------------------------------------------------
+
+def _advance_ports(inv: dict, now: float | None = None) -> bool:
+    """Apply any pending port transitions whose effective time has arrived.
+
+    Returns True if anything changed (so callers can persist)."""
+    now = _now() if now is None else now
+    changed = False
+    for host in inv.get("hosts", []):
+        for port in host.get("ports", []):
+            pending = port.get("pending_state")
+            eff = port.get("transition_at")
+            if not pending or eff is None:
+                continue
+            if now >= float(eff):
+                port["state"] = pending
+                port.pop("pending_state", None)
+                port.pop("transition_at", None)
+                changed = True
+    return changed
+
+
+def _schedule_port_transition(host: dict, port_num: int, target_state: str,
+                              now: float | None = None,
+                              service: str = "") -> tuple[bool, str]:
+    """Queue a port to move to `target_state` (open|closed) after the delay.
+
+    If the port isn't in the ground-truth inventory yet and we're opening it, add
+    it (a newly started listener). Returns (ok, message)."""
+    now = _now() if now is None else now
+    target_state = "open" if str(target_state).lower() == "open" else "closed"
+    port = _find_port(host, port_num)
+    if port is None:
+        if target_state == "closed":
+            return False, f"port {port_num} is not listening on {host['ip']}"
+        # New listener bound by the learner.
+        port = _port(int(port_num), "closed", service or _guess_service(int(port_num)))
+        host.setdefault("ports", []).append(port)
+    # Cancel a no-op (already in / already heading to the requested state).
+    if port.get("pending_state") == target_state:
+        return True, f"port {port_num} already transitioning to {target_state}"
+    if port["state"] == target_state and not port.get("pending_state"):
+        return True, f"port {port_num} is already {target_state}"
+    port["pending_state"] = target_state
+    port["transition_at"] = now + PORT_TRANSITION_SECONDS
+    verb = "starting" if target_state == "open" else "stopping"
+    return True, (f"{verb} service on {host['ip']}:{port_num} — the port will read "
+                  f"'{target_state}' on a re-scan in ~{PORT_TRANSITION_SECONDS}s")
 
 
 # ---------------------------------------------------------------------------
@@ -821,6 +904,10 @@ def _ensure_session(session_id: str, scenario_slug: str = "") -> dict:
 
 def get_state(session_id: str, scenario_slug: str = "") -> dict:
     entry = _ensure_session(session_id, scenario_slug)
+    # Advance any pending wall-clock port transitions on read so the topology
+    # reflects real time even when no scan/action has happened since the change.
+    if _advance_ports(entry["state"]["inventory"]):
+        _save_session(str(session_id), entry)
     state = copy.deepcopy(entry["state"])
     inv = state["inventory"]
     disc = state.get("discovered", {})
@@ -858,6 +945,17 @@ def get_state(session_id: str, scenario_slug: str = "") -> dict:
             ],
         },
         "goal": goal,
+        # In-flight service transitions the learner kicked off (stop/start a
+        # listener). Display-only: lets the UI show "web01:80 stopping…" and hint
+        # that a re-scan is needed. Does not leak undiscovered ground truth — only
+        # ports the learner is actively changing appear here.
+        "pending_transitions": [
+            {"ip": h["ip"], "port": p["port"],
+             "to": p.get("pending_state"), "service": p.get("service", "")}
+            for h in inv["hosts"]
+            for p in h.get("ports", [])
+            if p.get("pending_state")
+        ],
         "scan_log": disc.get("scans", []),
         # `events` is the contract-named field (mirrors the VMware engine shape
         # {session_id, scenario_slug, inventory, summary, events}); it aliases
@@ -902,6 +1000,10 @@ def apply_action(session_id: str, action: str, payload: dict | None = None) -> d
         return {"ok": False, "error": "Nmap simulation session not found"}
     state = entry["state"]
     inv = state["inventory"]
+    # Advance any pending wall-clock port transitions before handling the action
+    # so a scan sees the up-to-date topology (a service the learner stopped long
+    # enough ago now reads closed; one stopped moments ago still reads open).
+    _advance_ports(inv)
 
     if action == "scan":
         targets = payload.get("targets") or payload.get("target") or "all"
@@ -932,6 +1034,37 @@ def apply_action(session_id: str, action: str, payload: dict | None = None) -> d
         _record_discovery(state, scan)
         _save_session(str(session_id), entry)
         return {"ok": True, "message": scan["summary"], "scan": scan}
+
+    # ── Service lifecycle: stop/start a listener on a host ──────────────────
+    # These let a learner change the network they're scanning (e.g. "stop the
+    # exposed telnet service") and then confirm the change with a follow-up scan.
+    # The change takes PORT_TRANSITION_SECONDS of wall-clock to take effect, so
+    # an immediate re-scan still shows the old state — modelling real socket
+    # teardown/bind latency. Grading is untouched (it reads `discovered`).
+    if action in ("stop_service", "close_port"):
+        ip = payload.get("ip") or payload.get("target")
+        host = _find_host(inv, ip) if ip else None
+        if not host:
+            return {"ok": False, "error": f"host {ip} not found on {inv['subnet']}"}
+        port_num = payload.get("port")
+        if port_num in (None, ""):
+            return {"ok": False, "error": "a port is required"}
+        ok, msg = _schedule_port_transition(host, int(port_num), "closed")
+        _save_session(str(session_id), entry)
+        return {"ok": ok, "message": msg}
+
+    if action in ("start_service", "open_port"):
+        ip = payload.get("ip") or payload.get("target")
+        host = _find_host(inv, ip) if ip else None
+        if not host:
+            return {"ok": False, "error": f"host {ip} not found on {inv['subnet']}"}
+        port_num = payload.get("port")
+        if port_num in (None, ""):
+            return {"ok": False, "error": "a port is required"}
+        ok, msg = _schedule_port_transition(
+            host, int(port_num), "open", service=payload.get("service", ""))
+        _save_session(str(session_id), entry)
+        return {"ok": ok, "message": msg}
 
     if action == "reset":
         state["discovered"] = {

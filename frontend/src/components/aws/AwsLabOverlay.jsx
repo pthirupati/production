@@ -38,9 +38,14 @@ export default function AwsLabOverlay({
 
   // Re-seed again if this overlay is reused for a different lab session without
   // a full remount (defensive; the key on the parent boundary already remounts).
+  // Also arm the server-side action sync so every mutating console click is
+  // mirrored into the graded engine world. Disarm on unmount / session change so
+  // a stray later click can't leak into a released session's log.
   useEffect(() => {
-    if (!sessionId) return
+    if (!sessionId) return undefined
     try { useAwsStore.getState().resetSimulation() } catch { /* ignore */ }
+    try { useAwsStore.getState().armLabSync(sessionId) } catch { /* ignore */ }
+    return () => { try { useAwsStore.getState().disarmLabSync() } catch { /* ignore */ } }
   }, [sessionId])
 
   return (

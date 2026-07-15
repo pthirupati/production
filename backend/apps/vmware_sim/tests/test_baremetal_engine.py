@@ -186,3 +186,57 @@ class BaremetalLifecycleTests(TestCase):
         bm.get_state(sid, "maas-commission")
         res = bm.apply_action(sid, "maas_commission", {"machine_id": 2})
         self.assertFalse(res["ok"])
+
+    # ── IPMI power verbs (on/off/cycle/status) ─────────────────────────────
+    def test_ipmi_power_status(self):
+        sid = self._session("maas-commission")
+        res = bm.apply_action(sid, "ipmi_power", {"machine_id": 1, "verb": "status"})
+        self.assertTrue(res["ok"], res)
+        self.assertEqual(res["power"], self._machine(sid, 1)["power"])
+
+    def test_ipmi_power_off_then_on(self):
+        sid = self._session("maas-commission")
+        res = bm.apply_action(sid, "ipmi_power", {"machine_id": 1, "verb": "off"})
+        self.assertTrue(res["ok"], res)
+        self.assertEqual(self._machine(sid, 1)["power"], "off")
+        res = bm.apply_action(sid, "ipmi_power", {"machine_id": 1, "verb": "on"})
+        self.assertEqual(self._machine(sid, 1)["power"], "on")
+
+    def test_ipmi_power_cycle_logs_pxe_boot(self):
+        sid = self._session("maas-commission")
+        res = bm.apply_action(sid, "ipmi_power", {"machine_id": 1, "verb": "cycle"})
+        self.assertTrue(res["ok"], res)
+        self.assertEqual(self._machine(sid, 1)["power"], "on")
+        log = " ".join(e["message"] for e in self._machine(sid, 1)["log"])
+        self.assertIn("power cycle", log.lower())
+        self.assertIn("PXE", log)
+
+    def test_ipmi_power_fails_when_bmc_unreachable(self):
+        sid = self._session("maas-commission")
+        # gpu-node-02's BMC is unreachable at the start of the maas scenario.
+        res = bm.apply_action(sid, "ipmi_power", {"machine_id": 2, "verb": "on"})
+        self.assertFalse(res["ok"])
+
+    # ── MAAS enlist (PXE) — start of the lifecycle ─────────────────────────
+    def test_enlist_adds_new_machine(self):
+        sid = self._session("maas-commission")
+        before = len(bm.get_state(sid)["state"]["maas"]["machines"])
+        res = bm.apply_action(sid, "maas_enlist", {"hostname": "node-99"})
+        self.assertTrue(res["ok"], res)
+        machines = bm.get_state(sid)["state"]["maas"]["machines"]
+        self.assertEqual(len(machines), before + 1)
+        new = next(m for m in machines if m["hostname"] == "node-99")
+        self.assertEqual(new["status"], "New")
+        log = " ".join(e["message"] for e in new["log"])
+        self.assertIn("PXE", log)
+
+    def test_enlisted_machine_can_commission_to_ready(self):
+        sid = self._session("maas-commission")
+        res = bm.apply_action(sid, "maas_enlist", {"hostname": "node-77"})
+        mid = res["machine_id"]
+        base = 9_000_000.0
+        with mock.patch.object(bm, "_now", return_value=base):
+            bm.apply_action(sid, "maas_commission", {"machine_id": mid})
+        with mock.patch.object(bm, "_now", return_value=base + bm.COMMISSION_SECONDS + 1):
+            m = next(m for m in bm.get_state(sid)["state"]["maas"]["machines"] if m["id"] == mid)
+            self.assertEqual(m["status"], "Ready")

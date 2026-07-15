@@ -1432,6 +1432,7 @@ jobs:
                 -e DJANGO_SETTINGS_MODULE=config.test_settings \
                 "$IMG" \
                 python manage.py test tests.test_jira_webhooks tests.test_api_security tests.test_billing_webhooks \
+                tests.test_academy_fix_alignment apps.vmware_sim.tests tests.test_simulation_os \
                 --settings=config.test_settings --verbosity=2
             '
 

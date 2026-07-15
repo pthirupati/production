@@ -1019,3 +1019,116 @@ def apply_action(session_id: str, action: str, payload: dict | None = None) -> d
         return {"ok": True, "message": "Simulator refreshed to healthy state"}
 
     return {"ok": False, "error": f"unknown action: {action}"}
+
+
+# ---------------------------------------------------------------------------
+# Server-side grader — fail-CLOSED.
+#
+# The audit found the monitoring simulator was routed in simulation_provisioner
+# but had NO validator: "Check" fell through to the generic path, which can
+# fail-open on a fresh observability world. This grades against the *engine
+# state* the learner repaired through the simulator UI (datasource health,
+# scrape targets up, panels no longer "No data", alert rules quiet, series
+# cardinality back to normal). A freshly-seeded scenario always carries an
+# unresolved fault, so validation returns (False, reason) until the specific
+# repair action (add_datasource / reload_config / delete_scrape_target /
+# update_panel / mark_fix_applied, etc.) clears it — never before.
+# ---------------------------------------------------------------------------
+
+def validate_monitoring_lab(session_id: str, scenario_slug: str = "") -> tuple[bool, str]:
+    entry = _load_session(str(session_id))
+    if not entry:
+        # No engine state at all → cannot confirm the learner fixed anything.
+        return False, "No monitoring simulation session"
+    state = entry.get("state") or {}
+    graf = state.get("grafana") or {}
+    prom = state.get("prometheus") or {}
+    broken = state.get("broken") or {}
+    slug = (scenario_slug or entry.get("scenario_slug") or "").lower()
+
+    # If the learner explicitly reported the config fixed (UI "mark fix
+    # applied" after rewriting prometheus.yml / grafana provisioning + FIXED-OK
+    # in the terminal), honor it: mark_fix_applied clears every broken flag and
+    # brings datasources/targets back healthy, so the checks below all pass.
+    fix_applied = bool(state.get("fix_applied"))
+
+    # 1) Datasource health — a datasource-misconfig scenario fails until the
+    #    Prometheus datasource is reachable again (or a replacement was added).
+    ds_scenario = any(k in slug for k in ("datasource", "no-data", "nodata"))
+    prom_ds = [d for d in graf.get("datasources", []) if d.get("type") == "prometheus"]
+    prom_ds_ok = any(d.get("status") == "ok" for d in prom_ds)
+    if ds_scenario:
+        if not prom_ds_ok:
+            return False, "Prometheus datasource health check still failing — add/fix the datasource"
+        if broken.get("no_data_metrics"):
+            return False, "Panels still return 'No data' — reload Prometheus / fix the datasource"
+
+    # 2) Scrape targets / exporters must be up for a target-down scenario.
+    down_targets = [t for t in prom.get("targets", []) if t.get("health") == "down"]
+    target_scenario = any(
+        k in slug for k in ("target-down", "exporter-down", "node-exporter", "scrape-fail",
+                             "blackbox", "probe")
+    )
+    if target_scenario and down_targets and not fix_applied:
+        names = ", ".join(sorted(t.get("instance") or t.get("labels", {}).get("instance", "?")
+                                 for t in down_targets))
+        return False, f"Scrape target(s) still DOWN: {names}"
+
+    # 3) High-cardinality / TSDB pressure must be relieved.
+    if any(k in slug for k in ("cardinality", "high-card", "label-explosion")):
+        if broken.get("high_cardinality_metric") and not fix_applied:
+            return False, "High cardinality still present — drop the unbounded label"
+        if int(prom.get("tsdb", {}).get("head_series", 0)) > 800_000 and not fix_applied:
+            return False, "TSDB head series still elevated — reduce cardinality"
+
+    # 4) Alert misrouting / broken contact point must be resolved.
+    if any(k in slug for k in ("alert", "flap", "contact-point", "routing", "silence")):
+        if broken.get("alert_misrouted") and not fix_applied:
+            return False, "Alert routing still misconfigured — fix the contact point / route"
+        cps = graf.get("contact_points", [])
+        if any(not c.get("configured") for c in cps) and not fix_applied:
+            unconf = next(c for c in cps if not c.get("configured"))
+            return False, f"Contact point '{unconf.get('name')}' is not configured"
+
+    # 5) Recording rule must evaluate cleanly.
+    if "recording" in slug:
+        bad_rr = [r for r in prom.get("recording_rules", []) if r.get("health") not in ("ok", None)]
+        if bad_rr and not fix_applied:
+            return False, f"Recording rule {bad_rr[0].get('name')} still failing to evaluate"
+
+    # 6) remote_write / federation reachability.
+    if "remote-write" in slug or "remote_write" in slug:
+        bad_rw = [w for w in prom.get("remote_write", []) if w.get("health") == "down"]
+        if bad_rw and not fix_applied:
+            return False, "remote_write endpoint still unreachable"
+    if "federation" in slug or "federate" in slug:
+        fed = prom.get("federation") or {}
+        if fed.get("enabled") and not fed.get("match") and not fix_applied:
+            return False, "Federation scrape still misconfigured (match[] empty)"
+
+    # 7) Fail-closed backstop: for a scenario we didn't specifically key on, the
+    #    generic broken summary must have been cleared (via mark_fix_applied) or
+    #    the primary health signals must be clean. This prevents a fresh, never-
+    #    touched session (which always carries a fault summary + broken state)
+    #    from auto-passing.
+    keyed = ds_scenario or target_scenario or any(
+        k in slug for k in ("cardinality", "high-card", "label-explosion", "alert", "flap",
+                             "contact-point", "routing", "silence", "recording",
+                             "remote-write", "remote_write", "federation", "federate")
+    )
+    if not keyed:
+        has_signal_fault = (
+            bool(down_targets)
+            or bool(broken.get("no_data_metrics"))
+            or bool(broken.get("high_cardinality_metric"))
+            or bool(broken.get("panels_no_data"))
+            or bool(broken.get("alert_misrouted"))
+            or not prom_ds_ok
+        )
+        if not fix_applied and has_signal_fault:
+            return False, broken.get("summary") or "Monitoring stack still has an unresolved fault"
+        if not fix_applied and broken.get("summary"):
+            # A summary with no clearable signal → require the explicit fix marker.
+            return False, "Apply your fix in the simulator before checking"
+
+    return True, "Monitoring stack healthy — validation passed"

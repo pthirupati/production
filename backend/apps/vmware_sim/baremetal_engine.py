@@ -337,6 +337,59 @@ def apply_action(session_id: str, action: str, payload: dict | None = None) -> d
         _save(session_id, entry)
         return {"ok": True, "message": f"Power {m['power']}"}
 
+    if action == "ipmi_power":
+        # Full `ipmitool power on|off|cycle|status` verbs against a machine's BMC.
+        mid = int(payload.get("machine_id") or 2)
+        m = _find_machine(state, mid)
+        if not m:
+            return {"ok": False, "error": f"Machine {mid} not found"}
+        verb = (payload.get("verb") or payload.get("power") or "status").lower()
+        # The BMC must be reachable to control power out-of-band.
+        bmc = next((b for b in state["ipmi"]["bmc_hosts"]
+                    if b.get("name") == m.get("hostname")), None)
+        if verb == "status":
+            return {"ok": True, "message": f"Chassis Power is {m.get('power', 'off')}",
+                    "power": m.get("power", "off")}
+        if bmc is not None and not bmc.get("reachable"):
+            return {"ok": False,
+                    "error": (f"IPMI to {m.get('hostname')} BMC failed — host unreachable. "
+                              "Restore BMC connectivity first (ipmi_power_on).")}
+        if verb == "cycle":
+            # Power cycle: off, POST, PXE re-request, back on.
+            m["power"] = "on"
+            _log(m, "IPMI chassis power cycle — resetting host")
+            _log(m, "POST: memory + CPU check passed")
+            _log(m, "PXE: DHCP request on eth0 (vlan pxe) — awaiting next-server")
+            state["events"].insert(0, {"time": _now_iso(),
+                                       "message": f"{m.get('hostname')} power-cycled via IPMI", "severity": "info"})
+            _save(session_id, entry)
+            return {"ok": True, "message": f"Power cycle issued to {m.get('hostname')}",
+                    "power": "on"}
+        target = "on" if verb == "on" else "off"
+        m["power"] = target
+        _log(m, f"IPMI chassis power {target}")
+        if bmc is not None:
+            bmc["power"] = target
+        _save(session_id, entry)
+        return {"ok": True, "message": f"Chassis Power set to {target}", "power": target}
+
+    if action == "maas_enlist":
+        # A new bare-metal node PXE-boots and enlists into MAAS as "New" (the
+        # first step of the enlist -> commission -> ready -> deploy lifecycle).
+        machines = state["maas"]["machines"]
+        new_id = (max((mm.get("id") or 0) for mm in machines) + 1) if machines else 1
+        hostname = payload.get("hostname") or f"node-{new_id:02d}"
+        m = _machine(new_id, hostname, "New", "off", "")
+        _log(m, "PXE boot detected — enlisting into MAAS region controller")
+        _log(m, "Captured BMC/MAC — machine registered as New (needs commissioning)")
+        machines.append(m)
+        state["ipmi"]["bmc_hosts"].append(
+            {"name": hostname, "reachable": True, "power": "off"})
+        state["events"].insert(0, {"time": _now_iso(),
+                                   "message": f"New machine {hostname} enlisted via PXE", "severity": "info"})
+        _save(session_id, entry)
+        return {"ok": True, "message": f"Machine {hostname} enlisted (New)", "machine_id": new_id}
+
     if action == "lxd_start":
         name = payload.get("name") or broken.get("container_stopped") or "batch-job"
         for c in state["lxd"]["containers"]:

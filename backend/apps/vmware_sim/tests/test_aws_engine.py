@@ -205,6 +205,112 @@ class ValidationTests(AwsEngineBaseTest):
         self.assertFalse(ok, reason)
 
 
+class GuiSyncContractTests(AwsEngineBaseTest):
+    """Lock the action-name / payload contract the frontend awsStore mirror sends.
+
+    These exercise the exact engine action names + payload keys that
+    awsStore.js `_syncAction(...)` emits when a graded AWS lab is active, so a
+    console GUI click (or an `aws ...` terminal command that funnels through the
+    same store methods) lands in the server-side world the grader reads.
+    """
+
+    def test_launch_via_gui_payload_grades_pass(self):
+        # awsStore.launchInstances -> _syncAction('launch_instance', {...}).
+        slug = "aws-ec2-launch-web"
+        sid = self._session(slug)
+        self.assertFalse(ae.validate_aws_lab(sid, slug)[0])
+        res = ae.apply_action(sid, "launch_instance", {
+            "name": "app-web-01",
+            "instance_type": "t3.micro",
+            "ami_id": "ami-0c02fb55956c7d316",
+            "count": 1,
+            "subnet_id": "",
+            "security_groups": ["sg-0a1b2c3web00001"],
+            "key_name": "demo-key-pair",
+            "volume_size": 8,
+            "volume_type": "gp3",
+            "monitoring": False,
+            "tags": {"Name": "app-web-01"},
+        })
+        self.assertTrue(res["ok"], res)
+        with mock.patch.object(ae, "_now", return_value=ae.time.time() + ae.PENDING_SECONDS + 1):
+            ae.get_state(sid, slug)
+            ok, reason = ae.validate_aws_lab(sid, slug)
+        self.assertTrue(ok, reason)
+
+    def test_launch_wrong_type_grades_fail(self):
+        # Correct name but wrong instance type must NOT satisfy the objective.
+        slug = "aws-ec2-launch-web"
+        sid = self._session(slug)
+        ae.apply_action(sid, "launch_instance", {
+            "name": "app-web-01", "instance_type": "t3.large", "count": 1,
+            "tags": {"Name": "app-web-01"},
+        })
+        with mock.patch.object(ae, "_now", return_value=ae.time.time() + ae.PENDING_SECONDS + 1):
+            ae.get_state(sid, slug)
+            ok, _ = ae.validate_aws_lab(sid, slug)
+        self.assertFalse(ok)
+
+    def test_sg_add_then_remove_via_gui_payload(self):
+        # awsStore.setSgRules diffs by (port, source): a removed open-SSH rule is
+        # mirrored as remove_sg_rule{port, source}; an added rule as
+        # add_sg_rule{from_port, to_port, source}. Verify both shapes work and
+        # the restrict-SSH objective flips fail -> pass.
+        slug = "aws-sg-restrict-ssh"
+        sid = self._session(slug)
+        self.assertFalse(ae.validate_aws_lab(sid, slug)[0])
+        # Remove the seeded 0.0.0.0/0:22 rule (GUI "Save" diff -> remove_sg_rule).
+        res = ae.apply_action(sid, "remove_sg_rule", {
+            "group_id": "sg-0a1b2c3web00001", "direction": "inbound", "port": 22, "source": "0.0.0.0/0",
+        })
+        self.assertTrue(res["ok"], res)
+        # Re-add SSH but scoped to a bastion CIDR (add_sg_rule with from_port/to_port).
+        res = ae.apply_action(sid, "add_sg_rule", {
+            "group_id": "sg-0a1b2c3web00001", "direction": "inbound", "type": "SSH",
+            "protocol": "TCP", "from_port": 22, "to_port": 22, "source": "10.0.0.0/8", "description": "bastion",
+        })
+        self.assertTrue(res["ok"], res)
+        ok, reason = ae.validate_aws_lab(sid, slug)
+        self.assertTrue(ok, reason)
+
+    def test_bucket_encryption_via_gui_update_payload(self):
+        # awsStore.updateBucket -> _syncAction('update_bucket', {name, patch}).
+        slug = "aws-s3-encrypt-logs"
+        sid = self._session(slug)
+        self.assertFalse(ae.validate_aws_lab(sid, slug)[0])
+        res = ae.apply_action(sid, "update_bucket", {
+            "name": "my-logs-demo-123456", "patch": {"encryption": "SSE-S3"},
+        })
+        self.assertTrue(res["ok"], res)
+        ok, reason = ae.validate_aws_lab(sid, slug)
+        self.assertTrue(ok, reason)
+
+    def test_stop_via_gui_instance_action_payload(self):
+        # awsStore.instanceAction -> _syncAction('instance_action', {op, instance_ids})
+        # identifying by Name tag ("web-server-01").
+        slug = "aws-stop-instance"
+        sid = self._session(slug)
+        self.assertFalse(ae.validate_aws_lab(sid, slug)[0])
+        res = ae.apply_action(sid, "instance_action", {"op": "stop", "instance_ids": ["web-server-01"]})
+        self.assertTrue(res["ok"], res)
+        with mock.patch.object(ae, "_now", return_value=ae.time.time() + ae.STOPPING_SECONDS + 1):
+            ae.get_state(sid, slug)
+            ok, reason = ae.validate_aws_lab(sid, slug)
+        self.assertTrue(ok, reason)
+
+    def test_tag_via_gui_set_tags_payload(self):
+        # awsStore.setInstanceTags -> _syncAction('set_tags', {instance_id, tags}).
+        slug = "aws-tag-instance"
+        sid = self._session(slug)
+        self.assertFalse(ae.validate_aws_lab(sid, slug)[0])
+        res = ae.apply_action(sid, "set_tags", {
+            "instance_id": "db-server-01", "tags": {"Environment": "production"},
+        })
+        self.assertTrue(res["ok"], res)
+        ok, reason = ae.validate_aws_lab(sid, slug)
+        self.assertTrue(ok, reason)
+
+
 class SessionContractTests(AwsEngineBaseTest):
     def test_drop_session_clears_state(self):
         sid = self._session()

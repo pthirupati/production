@@ -24,6 +24,7 @@ import {
   cidrWithinVpc, cidrsOverlap, duplicateSgNameInVpc,
 } from '../lib/validators'
 import { SERVICE_CONFIGS } from '../pages/generic/serviceConfigs'
+import { awsSimApi } from '../../../api/awsSim'
 
 const ACCOUNT_ID = '123456789012'
 
@@ -444,6 +445,62 @@ function seedState() {
 
 let flashSeq = 1
 
+// ---------- Lab action sync (GUI clicks -> server-side action log) ----------
+// When an AWS lab session is active, every mutating console action is mirrored
+// to the server-authoritative engine (aws_engine.py) so validate_aws_lab grades
+// the learner's real GUI clicks — not a fresh, never-touched server world.
+//
+// Design: fire-and-forget, debounced, offline-safe. Actions are queued and
+// flushed in order on a short debounce so a burst of edits (e.g. launch wizard)
+// coalesces into a few sequential POSTs without blocking the optimistic UI. A
+// failed/offline sync is swallowed (awsSimApi.syncAction never rejects) so the
+// console keeps working; the next successful "Check" simply grades whatever the
+// server has recorded so far.
+const _labSync = {
+  sessionId: null,
+  queue: [],
+  timer: null,
+  flushing: false,
+}
+
+const SYNC_DEBOUNCE_MS = 250
+
+function labSyncArm(sessionId) {
+  _labSync.sessionId = sessionId || null
+  _labSync.queue = []
+  if (_labSync.timer) { clearTimeout(_labSync.timer); _labSync.timer = null }
+}
+
+function labSyncDisarm() {
+  _labSync.sessionId = null
+  _labSync.queue = []
+  if (_labSync.timer) { clearTimeout(_labSync.timer); _labSync.timer = null }
+}
+
+async function labSyncFlush() {
+  if (_labSync.flushing) return
+  const sid = _labSync.sessionId
+  if (!sid) { _labSync.queue = []; return }
+  _labSync.flushing = true
+  try {
+    // Drain in FIFO order so server state advances the same way the GUI did.
+    while (_labSync.queue.length && _labSync.sessionId === sid) {
+      const { action, payload } = _labSync.queue.shift()
+      // syncAction resolves null (never rejects) on any failure/offline.
+      await awsSimApi.syncAction(sid, action, payload)
+    }
+  } catch { /* offline / unexpected — drop silently, UI already updated */ }
+  finally { _labSync.flushing = false }
+}
+
+/** Enqueue one translated engine action; schedules a debounced flush. No-op when no lab session is armed. */
+function labSyncEnqueue(action, payload) {
+  if (!_labSync.sessionId || !action) return
+  _labSync.queue.push({ action, payload: payload || {} })
+  if (_labSync.timer) clearTimeout(_labSync.timer)
+  _labSync.timer = setTimeout(() => { _labSync.timer = null; labSyncFlush() }, SYNC_DEBOUNCE_MS)
+}
+
 // ---------- Generic-resource lifecycle helpers ----------
 function genericCfg(service, resource) {
   return SERVICE_CONFIGS[service]?.resources?.[resource]
@@ -537,6 +594,16 @@ export const useAwsStore = create(
       toggleDarkMode: () => set((s) => ({ darkMode: !s.darkMode })),
       resetSimulation: () => set({ ...seedState() }),
 
+      // ---------- Lab action sync ----------
+      // Arm/disarm mirroring of GUI mutations to the server-side action log for
+      // grading. Called by AwsLabOverlay with the LabSession id (armed on mount,
+      // disarmed on unmount). Sandbox / non-lab use passes no session and stays
+      // purely local. `_syncAction` is the internal hook mutating actions call.
+      armLabSync: (sessionId) => { labSyncArm(sessionId) },
+      disarmLabSync: () => { labSyncDisarm() },
+      isLabSyncArmed: () => Boolean(_labSync.sessionId),
+      _syncAction: (action, payload) => { labSyncEnqueue(action, payload) },
+
       markLabManaged: (ids) => set((s) => ({
         labManagedIds: [...new Set([...(s.labManagedIds || []), ...(ids || [])])],
       })),
@@ -588,6 +655,20 @@ export const useAwsStore = create(
         }
         set((s) => ({ instances: [...s.instances, ...created] }))
         get()._ensureTick()
+        // Mirror the launch to the server-side action log for grading.
+        get()._syncAction('launch_instance', {
+          name: name || '',
+          instance_type: type,
+          ami_id: amiId,
+          count,
+          subnet_id: subnetId || '',
+          security_groups: securityGroups || [],
+          key_name: keyName || '',
+          volume_size: volumeSize || 8,
+          volume_type: volumeType || 'gp3',
+          monitoring: !!monitoring,
+          tags: { ...(name ? { Name: name } : {}), ...(tags || {}) },
+        })
         return created
       },
 
@@ -625,6 +706,15 @@ export const useAwsStore = create(
           }),
         }))
         get()._ensureTick()
+        // Mirror lifecycle op to the server log. Identify by Name tag when the
+        // instance has one (seed + named launches survive the client<->server id
+        // gap); fall back to the raw id. The engine matches id OR name OR Name.
+        const { instances: liveInstances } = get()
+        const idents = ids.map((id) => {
+          const inst = liveInstances.find((x) => x.id === id)
+          return inst?.tags?.Name || inst?.name || id
+        })
+        get()._syncAction('instance_action', { op: action, instance_ids: idents })
         return ok()
       },
 
@@ -737,9 +827,28 @@ export const useAwsStore = create(
       // Arm the single global 1s tick (module-level guarded).
       _ensureTick: () => { armLifecycleTick(() => { try { get().reconcile() } catch { /* ignore */ } }) },
 
-      setInstanceName: (id, name) => set((s) => ({
-        instances: s.instances.map((x) => (x.id === id ? { ...x, name, tags: { ...x.tags, Name: name } } : x)),
-      })),
+      setInstanceName: (id, name) => {
+        const prev = get().instances.find((x) => x.id === id)
+        set((s) => ({
+          instances: s.instances.map((x) => (x.id === id ? { ...x, name, tags: { ...x.tags, Name: name } } : x)),
+        }))
+        // Mirror the rename as a tag update (identify by prior Name/id).
+        get()._syncAction('set_tags', { instance_id: prev?.tags?.Name || prev?.name || id, tags: { Name: name } })
+      },
+
+      // Add/replace instance tags (used by the EC2 tag editor). Mirrors to the
+      // server-side action log so the "add tag key=value" objective is gradeable.
+      setInstanceTags: (id, tags) => {
+        const patch = tags && typeof tags === 'object' ? tags : {}
+        const prev = get().instances.find((x) => x.id === id)
+        set((s) => ({
+          instances: s.instances.map((x) => (x.id === id
+            ? { ...x, tags: { ...x.tags, ...patch }, ...(patch.Name ? { name: patch.Name } : {}) }
+            : x)),
+        }))
+        get()._syncAction('set_tags', { instance_id: prev?.tags?.Name || prev?.name || id, tags: patch })
+        return ok()
+      },
 
       // ---------- Key pairs ----------
       createKeyPair: ({ name, type }) => {
@@ -760,6 +869,9 @@ export const useAwsStore = create(
         }
         const sg = { id: newSgId(), region, name, description, vpcId, inbound: inbound || [], outbound: [{ id: 'sgr-o', type: 'All traffic', protocol: 'All', from: 0, to: 65535, source: '0.0.0.0/0', description: '' }] }
         set((s) => ({ securityGroups: [...s.securityGroups, sg] }))
+        get()._syncAction('create_security_group', {
+          name, description: description || '', vpc_id: vpcId, inbound: inbound || [],
+        })
         return sg
       },
       // Guarded: SG cannot be deleted if attached to a live instance or referenced by another SG.
@@ -781,25 +893,60 @@ export const useAwsStore = create(
         return ok()
       },
       // SG rule CRUD. direction = 'inbound' | 'outbound'.
+      // The server engine grades ingress by (port, source), so mirror each rule
+      // change as an add_sg_rule / remove_sg_rule identified by group id + port +
+      // source (robust across the client<->server rule-id gap).
       addSgRule: (id, direction, rule) => {
         const dir = direction === 'outbound' ? 'outbound' : 'inbound'
         const r = { id: newSgRuleId(), ...rule }
         set((s) => ({ securityGroups: s.securityGroups.map((sg) => (sg.id === id ? { ...sg, [dir]: [...(sg[dir] || []), r] } : sg)) }))
+        get()._syncAction('add_sg_rule', {
+          group_id: id, direction: dir, type: r.type, protocol: r.protocol,
+          from_port: r.from, to_port: r.to, source: r.source, description: r.description || '',
+        })
         return r
       },
       updateSgRule: (id, direction, ruleId, patch) => {
         const dir = direction === 'outbound' ? 'outbound' : 'inbound'
-        set((s) => ({ securityGroups: s.securityGroups.map((sg) => (sg.id === id ? { ...sg, [dir]: (sg[dir] || []).map((r) => (r.id === ruleId ? { ...r, ...patch } : r)) } : sg)) }))
+        const sg = get().securityGroups.find((g) => g.id === id)
+        const before = (sg?.[dir] || []).find((r) => r.id === ruleId)
+        set((s) => ({ securityGroups: s.securityGroups.map((g) => (g.id === id ? { ...g, [dir]: (g[dir] || []).map((r) => (r.id === ruleId ? { ...r, ...patch } : r)) } : g)) }))
+        // Mirror as remove(old) + add(new) so the server's (port, source) view tracks the edit.
+        if (before) get()._syncAction('remove_sg_rule', { group_id: id, direction: dir, port: before.from, source: before.source })
+        const after = { ...(before || {}), ...patch }
+        get()._syncAction('add_sg_rule', {
+          group_id: id, direction: dir, type: after.type, protocol: after.protocol,
+          from_port: after.from, to_port: after.to, source: after.source, description: after.description || '',
+        })
         return ok()
       },
       deleteSgRule: (id, direction, ruleId) => {
         const dir = direction === 'outbound' ? 'outbound' : 'inbound'
-        set((s) => ({ securityGroups: s.securityGroups.map((sg) => (sg.id === id ? { ...sg, [dir]: (sg[dir] || []).filter((r) => r.id !== ruleId) } : sg)) }))
+        const sg = get().securityGroups.find((g) => g.id === id)
+        const target = (sg?.[dir] || []).find((r) => r.id === ruleId)
+        set((s) => ({ securityGroups: s.securityGroups.map((g) => (g.id === id ? { ...g, [dir]: (g[dir] || []).filter((r) => r.id !== ruleId) } : g)) }))
+        if (target) get()._syncAction('remove_sg_rule', { group_id: id, direction: dir, port: target.from, source: target.source })
         return ok()
       },
       setSgRules: (id, direction, rules) => {
         const dir = direction === 'outbound' ? 'outbound' : 'inbound'
-        set((s) => ({ securityGroups: s.securityGroups.map((sg) => (sg.id === id ? { ...sg, [dir]: (rules || []).map((r) => ({ id: r.id || newSgRuleId(), ...r })) } : sg)) }))
+        const sg = get().securityGroups.find((g) => g.id === id)
+        const before = (sg?.[dir] || [])
+        const next = (rules || [])
+        set((s) => ({ securityGroups: s.securityGroups.map((g) => (g.id === id ? { ...g, [dir]: next.map((r) => ({ id: r.id || newSgRuleId(), ...r })) } : g)) }))
+        // Diff by (port, source) so the bulk Save mirrors as discrete add/remove ops.
+        const keyOf = (r) => `${r.from}|${r.to}|${r.source}`
+        const beforeKeys = new Set(before.map(keyOf))
+        const nextKeys = new Set(next.map(keyOf))
+        before.filter((r) => !nextKeys.has(keyOf(r))).forEach((r) => {
+          get()._syncAction('remove_sg_rule', { group_id: id, direction: dir, port: r.from, source: r.source })
+        })
+        next.filter((r) => !beforeKeys.has(keyOf(r))).forEach((r) => {
+          get()._syncAction('add_sg_rule', {
+            group_id: id, direction: dir, type: r.type, protocol: r.protocol,
+            from_port: r.from, to_port: r.to, source: r.source, description: r.description || '',
+          })
+        })
         return ok()
       },
 
@@ -1069,6 +1216,10 @@ export const useAwsStore = create(
           objects: [],
         }
         set((s) => ({ s3Buckets: [...s.s3Buckets, bucket] }))
+        get()._syncAction('create_bucket', {
+          name, region: bucket.region, versioning: !!versioning,
+          block_public: blockPublic !== false, encryption: encryption || 'SSE-S3',
+        })
         return bucket
       },
       deleteBucket: (name) => {
@@ -1080,17 +1231,29 @@ export const useAwsStore = create(
           return fail(err)
         }
         set((s) => ({ s3Buckets: s.s3Buckets.filter((b) => b.name !== name) }))
+        get()._syncAction('delete_bucket', { name })
         return ok()
       },
-      updateBucket: (name, patch) => set((s) => ({
-        s3Buckets: s.s3Buckets.map((b) => (b.name === name ? { ...b, ...patch } : b)),
-      })),
-      putObject: (bucketName, key, size) => set((s) => ({
-        s3Buckets: s.s3Buckets.map((b) => (b.name === bucketName ? { ...b, objects: [...b.objects.filter((o) => o.key !== key), { key, size: size || 0, modified: new Date().toISOString(), storageClass: 'STANDARD', etag: `"${Math.random().toString(16).slice(2, 34).padEnd(32, '0')}"` }] } : b)),
-      })),
-      deleteObject: (bucketName, key) => set((s) => ({
-        s3Buckets: s.s3Buckets.map((b) => (b.name === bucketName ? { ...b, objects: b.objects.filter((o) => o.key !== key) } : b)),
-      })),
+      updateBucket: (name, patch) => {
+        set((s) => ({ s3Buckets: s.s3Buckets.map((b) => (b.name === name ? { ...b, ...patch } : b)) }))
+        // Mirror the encryption / public-access / versioning toggles the grader reads.
+        get()._syncAction('update_bucket', { name, patch: patch || {} })
+        return ok()
+      },
+      putObject: (bucketName, key, size) => {
+        set((s) => ({
+          s3Buckets: s.s3Buckets.map((b) => (b.name === bucketName ? { ...b, objects: [...b.objects.filter((o) => o.key !== key), { key, size: size || 0, modified: new Date().toISOString(), storageClass: 'STANDARD', etag: `"${Math.random().toString(16).slice(2, 34).padEnd(32, '0')}"` }] } : b)),
+        }))
+        get()._syncAction('put_object', { bucket: bucketName, key, size: size || 0 })
+        return ok()
+      },
+      deleteObject: (bucketName, key) => {
+        set((s) => ({
+          s3Buckets: s.s3Buckets.map((b) => (b.name === bucketName ? { ...b, objects: b.objects.filter((o) => o.key !== key) } : b)),
+        }))
+        get()._syncAction('delete_object', { bucket: bucketName, key })
+        return ok()
+      },
 
       // ---------- IAM ----------
       createIamUser: ({ name, consoleAccess, policies }) => {

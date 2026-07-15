@@ -1051,3 +1051,45 @@ class PackageInstallTests(SimpleTestCase):
             # the unit(s) the package ships are now known
             for unit, _ in PACKAGE_CATALOG[pkg].units:
                 self.assertIn(unit, shell.state.services, f"{pkg} unit {unit} missing")
+
+
+class IpCommandTests(SimpleTestCase):
+    """`ip` must accept the real-world abbreviations, not just the full forms."""
+
+    def _ip(self, cmd):
+        return str(RHELShell().run(cmd)).strip()
+
+    def test_ip_abbreviations_show_addresses(self):
+        for cmd in ("ip a", "ip a s", "ip addr", "ip addr show", "ip address", "ip -br a", "ip a s eth0"):
+            out = self._ip(cmd)
+            self.assertFalse(out.startswith("Usage"), f"{cmd!r} returned Usage instead of output")
+            self.assertIn("eth0" if "eth0" in cmd else "lo", out, f"{cmd!r} missing interface")
+
+    def test_ip_link_and_route_and_neigh(self):
+        self.assertFalse(self._ip("ip link").startswith("Usage"))
+        self.assertFalse(self._ip("ip l").startswith("Usage"))
+        self.assertIn("default via", self._ip("ip r"))
+        self.assertIn("default via", self._ip("ip route show"))
+        self.assertNotEqual(self._ip("ip neigh"), "")
+
+    def test_ip_link_set_up_down(self):
+        sh = RHELShell()
+        sh.run("ip link set eth0 down")
+        self.assertFalse(sh.state.network_ifs["eth0"].get("up", True))
+        sh.run("ip link set dev eth0 up")
+        self.assertTrue(sh.state.network_ifs["eth0"].get("up", True))
+
+    def test_cross_tech_nic_revealed_on_listing(self):
+        """A NIC hot-added in VMware must surface when the operator runs `ip a`."""
+        from apps.labs.provisioner.simulation import vmware_bridge as vb
+        sh = RHELShell()
+        sid = "test-iptest-crosstech"
+        sh.state.session_id = sid
+        vb.clear(sid)
+        try:
+            vb.record_pending_nic(sid, "10.0.0.77/24")
+            out = str(sh.run("ip a"))
+            self.assertIn("eth1", out)
+            self.assertIn("10.0.0.77", out)
+        finally:
+            vb.clear(sid)

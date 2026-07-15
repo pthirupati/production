@@ -5,6 +5,8 @@ the -T template, host count, and port count), the new timing metadata is
 surfaced on the scan result, and — critically — none of the timing work
 changes what the scan DISCOVERS (grading must be unaffected).
 """
+from unittest import mock
+
 from django.core.cache import cache
 from django.test import TestCase
 
@@ -207,3 +209,76 @@ class GradingUnaffectedByTimingTests(TestCase):
                 if p.get("state") == "open")
 
         self.assertEqual(open_ports(state_a), open_ports(state_b))
+
+
+class PortTransitionLifecycleTests(TestCase):
+    """A service a learner stops closes after a wall-clock delay; an immediate
+    re-scan still shows it open, a later re-scan shows it closed. Grading is
+    unaffected (it reads `discovered`, not ground truth)."""
+
+    def setUp(self):
+        cache.clear()
+
+    def _observed(self, sid, ip, port, sudo=False):
+        res = ne.apply_action(sid, "scan", {"targets": ip, "flags": ["-p", str(port)], "sudo": sudo})
+        for h in res["scan"]["hosts"]:
+            if h["ip"] == ip:
+                for p in h["ports"]:
+                    if p["port"] == port:
+                        return p["state"]
+        return None
+
+    def test_stop_service_delays_then_closes_on_rescan(self):
+        sid = "port-trans-1"
+        ne._ensure_session(sid, "open-ports")
+        base = 5_000_000.0
+        # web01:80 starts open.
+        with mock.patch.object(ne, "_now", return_value=base):
+            self.assertEqual(self._observed(sid, "10.10.10.10", 80), "open")
+            res = ne.apply_action(sid, "stop_service", {"ip": "10.10.10.10", "port": 80})
+            self.assertTrue(res["ok"], res)
+        # Immediately after: transition hasn't elapsed — still open.
+        with mock.patch.object(ne, "_now", return_value=base + 1):
+            self.assertEqual(self._observed(sid, "10.10.10.10", 80), "open")
+        # After the delay: a re-scan reflects the closed port.
+        with mock.patch.object(ne, "_now", return_value=base + ne.PORT_TRANSITION_SECONDS + 1):
+            self.assertEqual(self._observed(sid, "10.10.10.10", 80), "closed")
+
+    def test_start_service_opens_new_port_after_delay(self):
+        sid = "port-trans-2"
+        ne._ensure_session(sid, "open-ports")
+        base = 6_000_000.0
+        # Port 9000 not listening initially — start it.
+        with mock.patch.object(ne, "_now", return_value=base):
+            res = ne.apply_action(sid, "start_service",
+                                  {"ip": "10.10.10.10", "port": 9000, "service": "custom"})
+            self.assertTrue(res["ok"], res)
+        with mock.patch.object(ne, "_now", return_value=base + ne.PORT_TRANSITION_SECONDS + 1):
+            self.assertEqual(self._observed(sid, "10.10.10.10", 9000), "open")
+
+    def test_pending_transitions_surfaced_in_state(self):
+        sid = "port-trans-3"
+        ne._ensure_session(sid, "open-ports")
+        base = 7_000_000.0
+        with mock.patch.object(ne, "_now", return_value=base):
+            ne.apply_action(sid, "stop_service", {"ip": "10.10.10.10", "port": 443})
+            st = ne.get_state(sid, "open-ports")
+        pending = st["pending_transitions"]
+        self.assertTrue(any(p["port"] == 443 and p["to"] == "closed" for p in pending))
+
+    def test_grading_unaffected_by_stop_service(self):
+        # Discovering the open ports still passes even after stopping one, because
+        # grading reads what was DISCOVERED, not the live ground-truth port state.
+        sid = "port-trans-grade"
+        ne._ensure_session(sid, "open-ports")
+        ne.apply_action(sid, "scan", {"targets": "10.10.10.10", "flags": ["-sV"],
+                                      "ports": "22,80,443", "sudo": False})
+        ne.apply_action(sid, "stop_service", {"ip": "10.10.10.10", "port": 80})
+        ok, _ = ne.validate_nmap_lab(sid, "open-ports")
+        self.assertTrue(ok)
+
+    def test_stop_unknown_host_errors_gracefully(self):
+        sid = "port-trans-err"
+        ne._ensure_session(sid, "open-ports")
+        res = ne.apply_action(sid, "stop_service", {"ip": "10.10.10.222", "port": 80})
+        self.assertFalse(res["ok"])

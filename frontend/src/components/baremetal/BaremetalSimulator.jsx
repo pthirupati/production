@@ -194,7 +194,11 @@ export default function BaremetalSimulator({
             <div className="space-y-3">
               <div className="flex justify-between items-center">
                 <h2 className="text-lg font-semibold">MAAS Machines</h2>
-                <button onClick={refresh} className="text-xs flex items-center gap-1 border px-2 py-1 rounded bg-white"><RefreshCw size={12} /> Refresh</button>
+                <div className="flex items-center gap-2">
+                  <button disabled={busy} onClick={() => run(() => baremetalApi.action(sessionId, 'maas_enlist', {}), 'Machine enlisted via PXE')}
+                    className="text-xs flex items-center gap-1 border px-2 py-1 rounded bg-white"><Rocket size={12} /> Enlist (PXE)</button>
+                  <button onClick={refresh} className="text-xs flex items-center gap-1 border px-2 py-1 rounded bg-white"><RefreshCw size={12} /> Refresh</button>
+                </div>
               </div>
               {machines.map((m) => (
                 <div key={m.id} className="bm-card p-3">
@@ -272,12 +276,26 @@ export default function BaremetalSimulator({
           {tab === 'ipmi' && (
             <div className="space-y-3">
               <h2 className="text-lg font-semibold">IPMI / BMC</h2>
-              {(st.ipmi?.bmc_hosts || []).map((b) => (
-                <div key={b.name} className="bm-card p-3 flex justify-between items-center gap-3">
-                  <span>{b.name}</span>
+              {(st.ipmi?.bmc_hosts || []).map((b) => {
+                const mach = machines.find((m) => m.hostname === b.name)
+                const mid = mach?.id
+                return (
+                <div key={b.name} className="bm-card p-3 flex justify-between items-center gap-3 flex-wrap">
+                  <span className="font-mono">{b.name}</span>
                   <span className={b.reachable ? 'text-green-600' : 'text-red-600'}>{b.reachable ? 'reachable' : 'unreachable'}</span>
+                  <span className="text-xs text-slate-500">chassis power: {mach?.power ?? b.power ?? 'unknown'}</span>
+                  {mid != null && b.reachable && (
+                    <div className="flex gap-1.5 ml-auto">
+                      <button disabled={busy} onClick={() => run(() => baremetalApi.action(sessionId, 'ipmi_power', { machine_id: mid, verb: 'on' }), 'Power on')}
+                        className="px-2 py-1 rounded border text-xs flex items-center gap-1"><Power size={12} /> On</button>
+                      <button disabled={busy} onClick={() => run(() => baremetalApi.action(sessionId, 'ipmi_power', { machine_id: mid, verb: 'off' }), 'Power off')}
+                        className="px-2 py-1 rounded border text-xs flex items-center gap-1 text-red-600 border-red-200"><Power size={12} /> Off</button>
+                      <button disabled={busy} onClick={() => run(() => baremetalApi.action(sessionId, 'ipmi_power', { machine_id: mid, verb: 'cycle' }), 'Power cycle')}
+                        className="px-2 py-1 rounded border text-xs flex items-center gap-1"><RefreshCw size={12} /> Cycle</button>
+                    </div>
+                  )}
                 </div>
-              ))}
+              )})}
               {broken.bmc_unreachable && (
                 <button disabled={busy} onClick={() => run(() => baremetalApi.ipmiPowerOn(sessionId), 'BMC online')}
                   className="px-3 py-1.5 rounded text-white text-sm" style={{ background: ACCENT }}>IPMI power on / restore BMC</button>
