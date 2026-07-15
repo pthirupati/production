@@ -1,4 +1,5 @@
-import { lazy, Suspense, useCallback, useEffect, useRef, useState } from 'react'
+import { Suspense, useCallback, useEffect, useRef, useState } from 'react'
+import { lazyWithRetry } from '../../utils/lazyWithRetry'
 import { MemoryRouter, Routes, Route } from 'react-router-dom'
 import { terraformApi } from '../../api/terraform'
 import toast from 'react-hot-toast'
@@ -17,7 +18,7 @@ import '../../styles/vscode-workbench.css'
 
 // Full AWS console, embedded read-only-router style so the terraform lab can show
 // exactly the resources `terraform apply` created without leaving the IDE.
-const AwsConsole = lazy(() => import('../aws/AwsConsole'))
+const AwsConsole = lazyWithRetry(() => import('../aws/AwsConsole'))
 
 const DEFAULT_FILES = ['main.tf', 'variables.tf', 'outputs.tf']
 
