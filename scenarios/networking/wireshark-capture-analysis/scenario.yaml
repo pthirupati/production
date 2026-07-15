@@ -8,36 +8,43 @@ max_score: 100
 infrastructure_type: docker
 jira_priority: Medium
 is_free: false
-description: 'CONTEXT: A team operating network operations needs you to resolve `High Packet Loss — Analyze
-  pcap and Identify Root Cause` during a realistic incident. The business impact is reduced service reliability
-  until the underlying state is repaired.
+description: 'CONTEXT: A team operating network operations has raised a ticket for `High Packet Loss —
+  Analyze pcap and Identify Root Cause`. A customer-facing workflow is degraded and the on-call engineer
+  (you) must diagnose and resolve it. Business impact: reduced service reliability and blocked users until
+  the underlying state is repaired.
 
 
-  ENVIRONMENT: You are working in FixitLab''s offline network lab with interfaces, routing tables, DNS,
-  and firewall rules. All tools run locally; no paid APIs or external cloud calls are required.
+  ENVIRONMENT: You are working in FixitLab''s offline network lab. The architecture is a single lab-primary
+  node exposing interfaces, routing tables, DNS, and firewall rules; treat it as the production host for
+  this incident. All tools run locally — no paid APIs or external cloud calls are required.
 
 
   SYMPTOM / STARTING STATE: Ubuntu 22.04 with tshark and tcpdump installed. Capture file at /tmp/capture.pcap
 
   shows ~15% packet loss. `ethtool -g eth0` shows txqueuelen=10 (very small).
 
-  The fix is to increase tx queue length: `ip link set eth0 txqueuelen 1000`. Users are reporting intermittent
-  connectivity and high packet loss affecting
-
-  a production service. A 30-second packet capture has been collected and saved
-
-  to /tmp/capture.pcap. Analyze the capture using tshark or tcpdump to identify
-
-  the root cause. The capture reveals TCP retransmissions, ICMP host unreachable
-
-  messages, and duplicate ACKs indicating a congested or misconfigured upstream
-
-  link. Document your findings in /tmp/analysis.txt and apply the identified fix.
+  The fix is to increase tx queue length: `ip link set eth0 txqueuelen 1000`.
 
 
   OBJECTIVE: Analyze the pcap file to identify packet loss patterns; Identify TCP retransmission rate
-  and duplicate ACK count; Determine the root cause (identified as a misconfigured tx queue length). Success
-  means `check.sh` exits successfully.
+  and duplicate ACK count; Determine the root cause (identified as a misconfigured tx queue length). Acceptance
+  criteria: the change is minimal and reversible, and success means `check.sh` exits successfully.
+
+
+  WORK TO DO: Required tooling is pre-installed; if a command is missing, note it and use the equivalent
+  already on the host. Make the smallest configuration change that moves the system toward the objective
+  (edit the relevant interfaces, routing tables, DNS, and firewall rules), changing one thing at a time.
+  Check your work continuously against the objective — success means `check.sh` exits successfully.
+
+
+  VERIFY: Re-run the same check the grader uses and confirm `check.sh` exits successfully. Capture the
+  before/after output as evidence. Success criteria: the objective''s healthy state holds on a repeat
+  check, not just once.
+
+
+  ROLLBACK: If a change makes things worse, revert that single change immediately (restore the original
+  config file / undo the edit / restart the affected component) and re-observe before trying another hypothesis.
+  Never stack unverified changes.
 
 
   WHAT TO AVOID: Do not apply broad destructive changes, skip evidence gathering, or fake completion with
@@ -57,28 +64,58 @@ initial_state: 'Ubuntu 22.04 with tshark and tcpdump installed. Capture file at 
 hints:
 - order: 1
   cost: 0
-  content: 'Where to look: Load the capture in Wireshark and apply a display filter matching the symptom.'
+  content: 'ORIENT — what to observe and why:
+
+    Do not touch anything yet. First observe the symptom: high packet loss — analyze pcap and identify
+    root cause is not behaving as the scenario objectives require. This lab is about high packet loss
+    — analyze pcap and identify root cause — how high packet loss — analyze pcap and identify root cause
+    behaves in a network operations environment. Read the objectives and the current state, and note precisely
+    what looks wrong versus healthy before you form any theory.'
 - order: 2
-  cost: 25
-  content: 'Diagnostic steps:
+  cost: 10
+  content: 'APPROACH — the troubleshooting method:
 
-    1. Note protocol, source/dest IP, and TCP flags on failing packets.
-
-    2. Follow TCP stream or export objects if HTTP/DNS is involved.
-
-    3. Compare timing (retransmissions, RST, TLS alerts) to the lab question.'
+    Work from evidence, not guesses. For high packet loss — analyze pcap and identify root cause problems
+    the reliable method is: (1) reproduce/observe the failure, (2) narrow from the whole system down to
+    the one component that owns the symptom, (3) change exactly one thing, (4) re-check. Fix the underlying
+    misconfiguration you identified (not just the noisy log line), changing one thing at a time.'
 - order: 3
-  cost: 50
-  content: 'Exact fix + verification:
+  cost: 25
+  content: 'WHICH TOOL — the diagnostic command(s):
 
-    1. Apply the filter or analysis steps the objectives describe.
+    1. Inspect the current state with interfaces, routing tables, DNS, and firewall rules.
 
-    2. Document the answer (host, port, flag, or root cause).
+    2. Each command above tells you something specific — status/health, recent errors, and the effective
+    configuration. Read them in that order.
 
-    3. Submit via Check Solution in the Wireshark simulator.
+    3. Compare what you see to the objectives; the gap points at the fault.'
+- order: 4
+  cost: 40
+  content: 'NARROW DOWN — isolate the subsystem:
+
+    1. From the evidence above, decide which single part of high packet loss — analyze pcap and identify
+    root cause is at fault.
+
+    2. Re-run the most relevant of interfaces, routing tables, DNS, and firewall rules focused on just
+    that part to confirm it.
+
+    3. State a one-line hypothesis: the smallest change that would move the state from ''high packet loss
+    — analyze pcap and identify root cause is not behaving as the scenario objectives require'' toward
+    ''`check.sh` exits successfully''.'
+- order: 5
+  cost: 60
+  content: 'NEAR-SOLUTION — the fix shape + verify (you still apply it):
+
+    1. Apply the smallest reversible change your hypothesis points to. Fix the underlying misconfiguration
+    you identified (not just the noisy log line), changing one thing at a time.
+
+    2. Re-run `bash check.sh` and confirm `check.sh` exits successfully.
+
+    3. If it still fails, the hypothesis was wrong — go back to the evidence, do not stack changes.
 
 
-    WHY: packet labs grade your analysis, not arbitrary shell markers.'
+    WHY: the grader validates real system state, not marker files — a fix only counts when the subsystem
+    is actually healthy.'
 summary: Complete the high packet loss — analyze pcap and identify root cause networking lab and verify
   success with the checker
 estimated_minutes: 20

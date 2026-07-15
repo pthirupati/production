@@ -11,14 +11,14 @@ max_score: 100
 is_free: false
 infrastructure_type: docker
 jira_priority: Medium
-description: 'CONTEXT: A platform team operating service mesh needs you to resolve `Workload Has No Sidecar
-  Injected` during a realistic delivery incident. The business impact is a stalled or unsafe release until
-  the underlying state is repaired.
+description: 'CONTEXT: A team operating service mesh has raised a ticket for `Workload Has No Sidecar
+  Injected`. A customer-facing workflow is degraded and the on-call engineer (you) must diagnose and resolve
+  it. Business impact: reduced service reliability and blocked users until the underlying state is repaired.
 
 
-  ENVIRONMENT: You are working in FixitLab''s offline service-mesh lab with an Istio/Linkerd control plane,
-  sidecar-injected workloads, and mesh CRDs (VirtualService, DestinationRule, AuthorizationPolicy) under
-  /mesh. The mesh runs locally; no cloud load balancer or paid APIs are required.
+  ENVIRONMENT: You are working in FixitLab''s offline FixitLab practice environment. The architecture
+  is a single lab-primary node exposing CLI and configuration files; treat it as the production host for
+  this incident. All tools run locally — no paid APIs or external cloud calls are required.
 
 
   SYMPTOM / STARTING STATE: The new `shipping` Deployment is not part of the mesh: its pods run a single
@@ -26,15 +26,30 @@ description: 'CONTEXT: A platform team operating service mesh needs you to resol
   the injection label, so the mutating webhook skipped these pods.
 
 
-  OBJECTIVE: The `shipping` namespace is missing the `istio-injection=enabled` label (or the pod has an
-  opt-out annotation), so the sidecar injector webhook never added the proxy. Remediate by labeling the
-  namespace for injection and restarting the workload so pods come up with the istio-proxy sidecar. Success
-  is graded on the real repaired state, not a manual marker.
+  OBJECTIVE: The shipping namespace is labeled for automatic sidecar injection; shipping pods come up
+  with the istio-proxy sidecar (2 containers); The missing injection label is confirmed as root cause
+  via istioctl analyze. Acceptance criteria: the change is minimal and reversible, and success means `check.sh`
+  exits successfully.
 
 
-  WHAT TO AVOID: Do not suppress the signal, disable the policy/gate, or fake completion with marker files
-  — reproduce the diagnosis, then apply the smallest fix that satisfies the objective and re-run Check
-  Solution.'
+  WORK TO DO: Required tooling is pre-installed; if a command is missing, note it and use the equivalent
+  already on the host. Make the smallest configuration change that moves the system toward the objective
+  (edit the relevant CLI and configuration files), changing one thing at a time. Check your work continuously
+  against the objective — success means `check.sh` exits successfully.
+
+
+  VERIFY: Re-run the same check the grader uses and confirm `check.sh` exits successfully. Capture the
+  before/after output as evidence. Success criteria: the objective''s healthy state holds on a repeat
+  check, not just once.
+
+
+  ROLLBACK: If a change makes things worse, revert that single change immediately (restore the original
+  config file / undo the edit / restart the affected component) and re-observe before trying another hypothesis.
+  Never stack unverified changes.
+
+
+  WHAT TO AVOID: Do not apply broad destructive changes, skip evidence gathering, or fake completion with
+  marker files — the checker validates real system state.'
 objectives:
 - The shipping namespace is labeled for automatic sidecar injection
 - shipping pods come up with the istio-proxy sidecar (2 containers)
@@ -45,23 +60,46 @@ initial_state: 'The new `shipping` Deployment is not part of the mesh: its pods 
 hints:
 - order: 1
   cost: 0
-  content: "Where to look — orient before changing anything:\n    1. `kubectl get namespace shipping --show-labels`\n\
-    \    2. `kubectl get pod -n shipping -o jsonpath='{.items[*].spec.containers[*].name}'`\n    3. `istioctl\
-    \ analyze -n shipping`\n    Write down what looks healthy versus wrong. Form one hypothesis before\
-    \ you touch anything."
+  content: 'ORIENT — what to observe and why:
+
+    Do not touch anything yet. First observe the symptom: workload has no sidecar injected is not behaving
+    as the scenario objectives require. This lab is about workload has no sidecar injected — how workload
+    has no sidecar injected behaves in a service-mesh environment. Read the objectives and the current
+    state, and note precisely what looks wrong versus healthy before you form any theory.'
 - order: 2
-  cost: 25
-  content: "Diagnostic steps:\n    1. Re-run `kubectl get namespace shipping --show-labels` and read the\
-    \ status/error carefully.\n    2. Cross-check with `kubectl get pod -n shipping -o jsonpath='{.items[*].spec.containers[*].name}'`\
-    \ to isolate the failing object.\n    3. State the single root cause in one sentence before you act."
+  cost: 10
+  content: 'APPROACH — the troubleshooting method:
+
+    Work from evidence, not guesses. For workload has no sidecar injected problems the reliable method
+    is: (1) reproduce/observe the failure, (2) narrow from the whole system down to the one component
+    that owns the symptom, (3) change exactly one thing, (4) re-check. Fix the underlying misconfiguration
+    you identified (not just the noisy log line), changing one thing at a time.'
 - order: 3
-  cost: 50
-  content: "Exact fix + verification:\n    1. The `shipping` namespace is missing the `istio-injection=enabled`\
-    \ label (or the pod has an opt-out annotation), so the sidecar injector webhook never added the proxy.\
-    \ Remediate by labeling the namespace for injection and restarting the workload so pods come up with\
-    \ the istio-proxy sidecar.\n    2. Change one thing at a time so you can roll back if the hypothesis\
-    \ was wrong.\n    3. Verify the objective is met, then click Check Solution (graded on real state,\
-    \ not a marker file)."
+  cost: 25
+  content: 'WHICH TOOL — the diagnostic command(s):
+
+    Run `docker ps -a` and `docker logs <container>` for the failing container.'
+- order: 4
+  cost: 40
+  content: 'NARROW DOWN — isolate the subsystem:
+
+    1. `docker ps -a` — note Exited status and exit code.
+
+    2. `docker logs <name>` for the startup error.
+
+    3. Inspect the Dockerfile or `docker run` flags if the image is wrong.'
+- order: 5
+  cost: 60
+  content: 'NEAR-SOLUTION — the fix shape + verify (you still apply it):
+
+    1. Fix image, port mapping, volume, or env configuration.
+
+    2. `docker start <name>` or re-run with corrected flags.
+
+    3. Confirm `bash check.sh` shows the container Up.
+
+
+    WHY: the checker validates the container is actually running.'
 summary: Diagnose and resolve workload has no sidecar injected in the service-mesh simulation lab and
   verify the healthy end state
 estimated_minutes: 25

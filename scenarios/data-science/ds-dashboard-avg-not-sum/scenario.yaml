@@ -11,13 +11,15 @@ max_score: 100
 infrastructure_type: docker
 jira_priority: Medium
 is_free: true
-description: 'CONTEXT: A team operating data science needs you to resolve `Fix the Wrong Aggregation:
-  Average, Not Sum` during a realistic incident. The business impact is reduced service reliability until
-  the underlying state is repaired.
+description: 'CONTEXT: A team operating data science has raised a ticket for `Fix the Wrong Aggregation:
+  Average, Not Sum`. A customer-facing workflow is degraded and the on-call engineer (you) must diagnose
+  and resolve it. Business impact: reduced service reliability and blocked users until the underlying
+  state is repaired.
 
 
-  ENVIRONMENT: You are working in FixitLab''s offline notebook lab with pandas/notebook workflows, joins,
-  and charts. All tools run locally; no paid APIs or external cloud calls are required.
+  ENVIRONMENT: You are working in FixitLab''s offline notebook lab. The architecture is a single lab-primary
+  node exposing pandas/notebook workflows, joins, and charts; treat it as the production host for this
+  incident. All tools run locally — no paid APIs or external cloud calls are required.
 
 
   SYMPTOM / STARTING STATE: The dashboard opens pre-configured with dimension ''subject'', measure ''score'',
@@ -26,26 +28,29 @@ description: 'CONTEXT: A team operating data science needs you to resolve `Fix t
 
   (90, 70, 80 -> avg 80), Science has 3 (60, 100, 80 -> avg 80), History has 2
 
-  (75, 85 -> avg 80). Summed they read 240/240/160, which is misleading. A colleague built a "score by
-  subject" dashboard from the exam_scores dataset,
-
-  but they summed the scores. Summing exam scores is meaningless — a subject with
-
-  more students looks better purely because it has more rows, not because students
-
-  did better. The dashboard should show the AVERAGE score per subject.
-
-
-  The dimension (subject), measure (score), and chart type (bar) are already
-
-  correct. Your only job is to fix the aggregation so the bars show the true
-
-  average score for each subject.
+  (75, 85 -> avg 80). Summed they read 240/240/160, which is misleading.
 
 
   OBJECTIVE: Inspect the pre-built dashboard and notice the aggregation is ''sum''; Change the aggregation
   to ''avg'' (average) so each bar is the mean score; Keep dimension ''subject'', measure ''score'', and
-  chart type ''bar''. Success means `check.sh` exits successfully.
+  chart type ''bar''. Acceptance criteria: the change is minimal and reversible, and success means `check.sh`
+  exits successfully.
+
+
+  WORK TO DO: Required tooling is pre-installed; if a command is missing, note it and use the equivalent
+  already on the host. Make the smallest configuration change that moves the system toward the objective
+  (edit the relevant pandas/notebook workflows, joins, and charts), changing one thing at a time. Check
+  your work continuously against the objective — success means `check.sh` exits successfully.
+
+
+  VERIFY: Re-run the same check the grader uses and confirm `check.sh` exits successfully. Capture the
+  before/after output as evidence. Success criteria: the objective''s healthy state holds on a repeat
+  check, not just once.
+
+
+  ROLLBACK: If a change makes things worse, revert that single change immediately (restore the original
+  config file / undo the edit / restart the affected component) and re-observe before trying another hypothesis.
+  Never stack unverified changes.
 
 
   WHAT TO AVOID: Do not apply broad destructive changes, skip evidence gathering, or fake completion with
@@ -66,29 +71,55 @@ initial_state: 'The dashboard opens pre-configured with dimension ''subject'', m
 hints:
 - order: 1
   cost: 0
-  content: 'Where to look: Start with read-only discovery on the notebook lab. For Fix the Wrong Aggregation:
-    Average, Not Sum, inspect pandas/notebook workflows, joins, and charts before changing anything.'
+  content: 'ORIENT — what to observe and why:
+
+    Do not touch anything yet. First observe the symptom: fix the wrong aggregation is not behaving as
+    the scenario objectives require. This lab is about fix the wrong aggregation — how fix the wrong aggregation
+    behaves in a data science environment. Read the objectives and the current state, and note precisely
+    what looks wrong versus healthy before you form any theory.'
 - order: 2
-  cost: 25
-  content: 'Diagnostic steps:
+  cost: 10
+  content: 'APPROACH — the troubleshooting method:
 
-    1. Gather evidence with pandas/notebook workflows, joins, and charts.
-
-    2. Compare current output to the scenario objectives.
-
-    3. Form a single hypothesis about the smallest fix that would restore healthy state.'
+    Work from evidence, not guesses. For fix the wrong aggregation problems the reliable method is: (1)
+    reproduce/observe the failure, (2) narrow from the whole system down to the one component that owns
+    the symptom, (3) change exactly one thing, (4) re-check. Fix the underlying misconfiguration you identified
+    (not just the noisy log line), changing one thing at a time.'
 - order: 3
-  cost: 50
-  content: 'Exact fix + verification:
+  cost: 25
+  content: 'WHICH TOOL — the diagnostic command(s):
 
-    1. Keep dimension ''subject'', measure ''score'', and chart type ''bar''.
+    1. Inspect the current state with pandas/notebook workflows, joins, and charts.
 
-    2. Re-run the lab checker (`check.sh` or Check Solution).
+    2. Each command above tells you something specific — status/health, recent errors, and the effective
+    configuration. Read them in that order.
 
-    3. Confirm every scenario objective is satisfied.
+    3. Compare what you see to the objectives; the gap points at the fault.'
+- order: 4
+  cost: 40
+  content: 'NARROW DOWN — isolate the subsystem:
+
+    1. From the evidence above, decide which single part of fix the wrong aggregation is at fault.
+
+    2. Re-run the most relevant of pandas/notebook workflows, joins, and charts focused on just that part
+    to confirm it.
+
+    3. State a one-line hypothesis: the smallest change that would move the state from ''fix the wrong
+    aggregation is not behaving as the scenario objectives require'' toward ''`check.sh` exits successfully''.'
+- order: 5
+  cost: 60
+  content: 'NEAR-SOLUTION — the fix shape + verify (you still apply it):
+
+    1. Apply the smallest reversible change your hypothesis points to. Fix the underlying misconfiguration
+    you identified (not just the noisy log line), changing one thing at a time.
+
+    2. Re-run `bash check.sh` and confirm `check.sh` exits successfully.
+
+    3. If it still fails, the hypothesis was wrong — go back to the evidence, do not stack changes.
 
 
-    WHY: the grader validates real state — marker files are ignored.'
+    WHY: the grader validates real system state, not marker files — a fix only counts when the subsystem
+    is actually healthy.'
 summary: 'Complete the fix the wrong aggregation: average, not sum data science lab and verify success
   with the checker'
 estimated_minutes: 15

@@ -574,6 +574,63 @@ class SimulationProvisioner:
                 return validate_awx_lab(str(lab_session.id), slug)
             except LabSession.DoesNotExist:
                 return False, "AWX simulation session not found"
+        # Monitoring (Grafana / Prometheus observability). Legacy simulation_type
+        # "monitoring"/"loki"/"alertmanager"/"promql" normalize to grafana/prometheus;
+        # gate on the normalized persona, the RAW scenario type, or the slug. The
+        # audit found this track was routed here but had NO validator, so "Check"
+        # fell through to the generic path and could fail-open on a fresh world.
+        _raw_mon_type = sim_type
+        if not _raw_mon_type or _raw_mon_type == "generic":
+            from apps.labs.models import LabSession
+            try:
+                _mon_session = LabSession.objects.select_related("scenario").get(container_id=resource_id)
+                _raw_mon_type = (getattr(_mon_session.scenario, "simulation_type", "") or "")
+            except LabSession.DoesNotExist:
+                _raw_mon_type = ""
+        if (
+            sim_type in ("grafana", "prometheus")
+            or _raw_mon_type in ("monitoring", "grafana", "prometheus", "loki", "alertmanager", "promql")
+            or low_slug.startswith(("monitoring-", "grafana-", "prometheus-", "promql-",
+                                    "alertmanager-", "loki-"))
+        ):
+            from apps.labs.models import LabSession
+            from apps.vmware_sim.monitoring_engine import (
+                validate_monitoring_lab, _ensure_session as mon_ensure,
+            )
+            try:
+                lab_session = LabSession.objects.get(container_id=resource_id)
+                mon_ensure(str(lab_session.id), slug)
+                return validate_monitoring_lab(str(lab_session.id), slug)
+            except LabSession.DoesNotExist:
+                return False, "Monitoring simulation session not found"
+        # CI/CD pipeline (DevOps). Raw simulation_type "devops" normalizes to
+        # itself; gate on that + a cicd/pipeline slug. The audit found the CI/CD
+        # track had no engine and no validator (the pipeline player is fully
+        # client-side), so it could not be graded server-side at all.
+        _raw_cicd_type = sim_type
+        if not _raw_cicd_type or _raw_cicd_type == "generic":
+            from apps.labs.models import LabSession
+            try:
+                _cicd_session = LabSession.objects.select_related("scenario").get(container_id=resource_id)
+                _raw_cicd_type = (getattr(_cicd_session.scenario, "simulation_type", "") or "")
+            except LabSession.DoesNotExist:
+                _raw_cicd_type = ""
+        if (
+            sim_type == "devops"
+            or _raw_cicd_type in ("devops", "cicd", "ci-cd", "ci_cd")
+            or low_slug.startswith(("cicd-", "ci-cd-", "pipeline-", "devops-", "gitlab-ci-",
+                                    "github-actions-"))
+        ):
+            from apps.labs.models import LabSession
+            from apps.vmware_sim.cicd_engine import (
+                validate_cicd_lab, _ensure_session as cicd_ensure,
+            )
+            try:
+                lab_session = LabSession.objects.get(container_id=resource_id)
+                cicd_ensure(str(lab_session.id), slug)
+                return validate_cicd_lab(str(lab_session.id), slug)
+            except LabSession.DoesNotExist:
+                return False, "CI/CD simulation session not found"
         _raw_tf_type = sim_type
         if not _raw_tf_type or _raw_tf_type == "generic":
             from apps.labs.models import LabSession
@@ -608,6 +665,25 @@ class SimulationProvisioner:
                 return validate_baremetal_lab(str(lab_session.id), slug)
             except LabSession.DoesNotExist:
                 return False, "Bare metal simulation session not found"
+        # AWS console simulator: sim_type "aws" (may normalize to "generic") or an
+        # aws-* / ec2-* / s3-* slug. Gate on the raw type read off the scenario.
+        _raw_aws_type = sim_type
+        if not _raw_aws_type or _raw_aws_type == "generic":
+            from apps.labs.models import LabSession
+            try:
+                _aws_session = LabSession.objects.select_related("scenario").get(container_id=resource_id)
+                _raw_aws_type = (getattr(_aws_session.scenario, "simulation_type", "") or "")
+            except LabSession.DoesNotExist:
+                _raw_aws_type = ""
+        if _raw_aws_type == "aws" or low_slug.startswith(("aws-", "ec2-", "s3-", "iam-")):
+            from apps.labs.models import LabSession
+            from apps.vmware_sim.aws_engine import validate_aws_lab, _ensure as aws_ensure
+            try:
+                lab_session = LabSession.objects.get(container_id=resource_id)
+                aws_ensure(str(lab_session.id), slug)
+                return validate_aws_lab(str(lab_session.id), slug)
+            except LabSession.DoesNotExist:
+                return False, "AWS simulation session not found"
         script = resolve_simulation_validation_script(slug, validation_script or "")
         if engine and hasattr(engine, "state"):
             return validate_simulation_state(engine.state, script, engine=engine)
@@ -643,6 +719,12 @@ class SimulationProvisioner:
             from apps.labs.provisioner.simulation.vmware_bridge import clear as clear_vmware_bridge
 
             clear_vmware_bridge(str(session.id))
+        except Exception:  # noqa: BLE001
+            pass
+        try:
+            from apps.vmware_sim import aws_engine as ae
+
+            ae.clear_session(str(session.id))
         except Exception:  # noqa: BLE001
             pass
         drop_sim_session(str(session.id))

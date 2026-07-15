@@ -8,14 +8,15 @@ max_score: 100
 infrastructure_type: docker
 jira_priority: High
 is_free: false
-description: 'CONTEXT: A team operating DevOps delivery needs you to resolve `Fix
-  Prometheus Scrape Configuration` during a realistic incident. The business impact
-  is reduced service reliability until the underlying state is repaired.
+description: 'CONTEXT: A team operating DevOps delivery has raised a ticket for `Fix Prometheus Scrape
+  Configuration`. A customer-facing workflow is degraded and the on-call engineer (you) must diagnose
+  and resolve it. Business impact: reduced service reliability and blocked users until the underlying
+  state is repaired.
 
 
-  ENVIRONMENT: You are working in FixitLab''s offline CI/CD lab with git repos, pipelines,
-  artifacts, and runbooks. All tools run locally; no paid APIs or external cloud calls
-  are required.
+  ENVIRONMENT: You are working in FixitLab''s offline CI/CD lab. The architecture is a single lab-primary
+  node exposing git repos, pipelines, artifacts, and runbooks; treat it as the production host for this
+  incident. All tools run locally — no paid APIs or external cloud calls are required.
 
 
   SYMPTOM / STARTING STATE: Ubuntu server running Prometheus at /etc/prometheus/prometheus.yml.
@@ -23,22 +24,31 @@ description: 'CONTEXT: A team operating DevOps delivery needs you to resolve `Fi
   The myapp service is running on port 8080 but prometheus.yml has port 9090.
 
   The service label "app: myapp-service" doesn''t match the selector "app: myapp".
-  Prometheus is showing targets as DOWN and metrics are not being scraped.
-
-  The scrape config in prometheus.yml points to the wrong port and the
-
-  service labels don''t match the scrape selector. Fix the scrape config
-
-  and service labels so Prometheus can discover and scrape the targets.
 
 
-  OBJECTIVE: Identify why Prometheus targets show as DOWN; Fix the scrape configuration
-  in prometheus.yml; Add correct service labels to match the scrape selector. Success
-  means `check.sh` exits successfully.
+  OBJECTIVE: Identify why Prometheus targets show as DOWN; Fix the scrape configuration in prometheus.yml;
+  Add correct service labels to match the scrape selector. Acceptance criteria: the change is minimal
+  and reversible, and success means `check.sh` exits successfully.
 
 
-  WHAT TO AVOID: Do not apply broad destructive changes, skip evidence gathering,
-  or fake completion with marker files — the checker validates real system state.'
+  WORK TO DO: Required tooling is pre-installed; if a command is missing, note it and use the equivalent
+  already on the host. Make the smallest configuration change that moves the system toward the objective
+  (edit the relevant git repos, pipelines, artifacts, and runbooks), changing one thing at a time. Check
+  your work continuously against the objective — success means `check.sh` exits successfully.
+
+
+  VERIFY: Re-run the same check the grader uses and confirm `check.sh` exits successfully. Capture the
+  before/after output as evidence. Success criteria: the objective''s healthy state holds on a repeat
+  check, not just once.
+
+
+  ROLLBACK: If a change makes things worse, revert that single change immediately (restore the original
+  config file / undo the edit / restart the affected component) and re-observe before trying another hypothesis.
+  Never stack unverified changes.
+
+
+  WHAT TO AVOID: Do not apply broad destructive changes, skip evidence gathering, or fake completion with
+  marker files — the checker validates real system state.'
 objectives:
 - Identify why Prometheus targets show as DOWN
 - Fix the scrape configuration in prometheus.yml
@@ -54,29 +64,53 @@ initial_state: 'Ubuntu server running Prometheus at /etc/prometheus/prometheus.y
 hints:
 - order: 1
   cost: 0
-  content: 'Where to look: Open Prometheus → Status → Targets and note which job is
-    DOWN and the last scrape error message.'
+  content: 'ORIENT — what to observe and why:
+
+    Do not touch anything yet. First observe the symptom: fix prometheus scrape configuration is not behaving
+    as the scenario objectives require. This lab is about fix prometheus scrape configuration — how fix
+    prometheus scrape configuration behaves in a DevOps delivery environment. Read the objectives and
+    the current state, and note precisely what looks wrong versus healthy before you form any theory.'
 - order: 2
+  cost: 10
+  content: 'APPROACH — the troubleshooting method:
+
+    Work from evidence, not guesses. For fix prometheus scrape configuration problems the reliable method
+    is: (1) reproduce/observe the failure, (2) narrow from the whole system down to the one component
+    that owns the symptom, (3) change exactly one thing, (4) re-check. Fix the underlying misconfiguration
+    you identified (not just the noisy log line), changing one thing at a time.'
+- order: 3
   cost: 25
-  content: 'Diagnostic steps:
+  content: 'WHICH TOOL — the diagnostic command(s):
+
+    1. Inspect the current state with git repos, pipelines, artifacts, and runbooks.
+
+    2. Each command above tells you something specific — status/health, recent errors, and the effective
+    configuration. Read them in that order.
+
+    3. Compare what you see to the objectives; the gap points at the fault.'
+- order: 4
+  cost: 40
+  content: 'NARROW DOWN — isolate the subsystem:
 
     1. Check `up` and `scrape_duration_seconds` for the failing target.
 
     2. Inspect `/etc/prometheus/prometheus.yml` for wrong host, port, or scheme.
 
     3. `curl` the exporter endpoint from the lab host to test connectivity.'
-- order: 3
-  cost: 50
-  content: 'Exact fix + verification:
+- order: 5
+  cost: 60
+  content: 'NEAR-SOLUTION — the fix shape + verify (you still apply it):
 
-    1. Correct the scrape target or relabel rule in prometheus.yml.
+    1. Apply the smallest reversible change your hypothesis points to. Fix the underlying misconfiguration
+    you identified (not just the noisy log line), changing one thing at a time.
 
-    2. Reload or restart Prometheus.
+    2. Re-run `bash check.sh` and confirm `check.sh` exits successfully.
 
-    3. Confirm the target is UP and Check Solution passes.
+    3. If it still fails, the hypothesis was wrong — go back to the evidence, do not stack changes.
 
 
-    WHY: Prometheus only collects metrics from correctly configured targets.'
+    WHY: the grader validates real system state, not marker files — a fix only counts when the subsystem
+    is actually healthy.'
 summary: Complete the fix prometheus scrape configuration devops lab and verify success
   with the checker
 estimated_minutes: 20

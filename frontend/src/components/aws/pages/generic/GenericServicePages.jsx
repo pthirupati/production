@@ -11,10 +11,165 @@ import { getResourceConfig, SERVICE_CONFIGS } from './serviceConfigs'
 function statusToBadge(status) {
   const s = String(status || '').toLowerCase()
   if (['active', 'available', 'enabled', 'issued', 'healthy', 'ok', 'deployed', 'running', 'create_complete'].includes(s)) return 'running'
-  if (['creating', 'updating', 'pending', 'in-progress'].includes(s)) return 'pending'
-  if (['disabled', 'stopped'].includes(s)) return 'stopped'
-  if (['failed', 'error', 'alarm', 'delete_failed'].includes(s)) return 'failed'
+  // Preserve transient states so they map to their own pulsing badge classes.
+  if (['creating', 'backing-up', 'rebooting', 'modifying'].includes(s)) return s
+  if (['deleting', 'delete_in_progress'].includes(s)) return 'deleting'
+  if (['create_in_progress', 'update_in_progress'].includes(s)) return 'in-progress'
+  if (['updating', 'pending', 'in-progress'].includes(s)) return 'pending'
+  if (['disabled', 'stopped', 'inactive'].includes(s)) return 'stopped'
+  if (['failed', 'error', 'alarm', 'delete_failed', 'create_failed'].includes(s)) return 'failed'
   return 'available'
+}
+
+// A row is mid-lifecycle (create walk, delete, or a reboot/modify action) when
+// the durable tick has scheduled a pending transition on it.
+function isTransientRow(row) {
+  return !!(row && (row.pendingTransition || row.stateTransitionAt))
+}
+
+const CHART_COLORS = ['#0073bb', '#1d8102', '#d13212', '#ff9900', '#8b5cf6', '#9d5025']
+
+// Resolve the per-service Monitoring/Home charts. Uses cfg.metrics when the
+// service declares them (so e.g. a DynamoDB table never shows Latency(ms)),
+// otherwise falls back to sensible request/error/cost defaults.
+function resolveMetrics(cfg, prefix) {
+  if (cfg?.metrics?.length) {
+    return cfg.metrics.map((m, i) => ({
+      title: prefix ? `${prefix} · ${m.title}` : m.title,
+      unit: m.unit ?? '',
+      color: m.color || CHART_COLORS[i % CHART_COLORS.length],
+      base: m.base ?? 60,
+      variance: m.variance ?? 40,
+    }))
+  }
+  return [
+    { title: prefix ? `${prefix} · Requests` : 'Requests', unit: '', color: '#0073bb', base: 120, variance: 400 },
+    { title: prefix ? `${prefix} · Errors` : 'Errors', unit: '', color: '#d13212', base: 0, variance: 8 },
+    { title: prefix ? `${prefix} · Estimated cost (USD)` : 'Estimated cost (USD)', unit: '', color: '#1d8102', base: 4, variance: 22 },
+  ]
+}
+
+// Render a typed create-form control from a field config.
+function FieldControl({ field, value, onChange }) {
+  const input = field.input || 'text'
+  if (input === 'select') {
+    return (
+      <select className="aws-select" value={value ?? ''} onChange={(e) => onChange(e.target.value)}>
+        {(field.options || []).map((opt) => {
+          const val = typeof opt === 'object' ? opt.value : opt
+          const label = typeof opt === 'object' ? opt.label : opt
+          return <option key={val} value={val}>{label}</option>
+        })}
+      </select>
+    )
+  }
+  if (input === 'number') {
+    return (
+      <input
+        className="aws-input"
+        type="number"
+        value={value ?? ''}
+        min={field.min}
+        max={field.max}
+        onChange={(e) => onChange(e.target.value === '' ? '' : Number(e.target.value))}
+      />
+    )
+  }
+  if (input === 'toggle') {
+    return (
+      <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer', height: 34 }}>
+        <input type="checkbox" checked={!!value} onChange={(e) => onChange(e.target.checked)} />
+        <span style={{ fontSize: 13 }}>{value ? 'Enabled' : 'Disabled'}</span>
+      </label>
+    )
+  }
+  if (input === 'radio-cards') {
+    return (
+      <div style={{ display: 'grid', gridTemplateColumns: `repeat(auto-fit, minmax(140px, 1fr))`, gap: 8 }}>
+        {(field.options || []).map((opt) => {
+          const val = typeof opt === 'object' ? opt.value : opt
+          const label = typeof opt === 'object' ? opt.label : opt
+          const selected = value === val
+          return (
+            <button
+              type="button"
+              key={val}
+              onClick={() => onChange(val)}
+              style={{
+                textAlign: 'left', padding: '10px 12px', borderRadius: 'var(--aws-radius-md)', cursor: 'pointer',
+                border: `2px solid ${selected ? 'var(--aws-text-link)' : 'var(--aws-border)'}`,
+                background: selected ? 'var(--aws-info-bg, var(--aws-page-bg))' : 'var(--aws-content-bg)',
+                display: 'flex', alignItems: 'center', gap: 8,
+              }}
+            >
+              <span style={{
+                width: 14, height: 14, borderRadius: '50%', flexShrink: 0,
+                border: `2px solid ${selected ? 'var(--aws-text-link)' : 'var(--aws-text-muted)'}`,
+                background: selected ? 'var(--aws-text-link)' : 'transparent',
+                boxShadow: selected ? 'inset 0 0 0 2px var(--aws-content-bg)' : 'none',
+              }} />
+              <span style={{ fontSize: 13, fontWeight: selected ? 600 : 400 }}>{label}</span>
+            </button>
+          )
+        })}
+      </div>
+    )
+  }
+  return <input className="aws-input" value={value ?? ''} onChange={(e) => onChange(e.target.value)} />
+}
+
+// Multi-step-feeling create wizard: the name/identifier lives in its own card,
+// then the remaining typed fields are grouped into aws-card sections by
+// field.group so it reads like a real AWS create flow instead of a text-box list.
+function CreateResourceModal({ cfg, resource, region, name, setName, draft, setDraft, validationError, onClose, onSubmit }) {
+  const fields = editableFields(cfg)
+  // Group order preserves first-seen order of field.group.
+  const groups = []
+  const byGroup = {}
+  fields.forEach((f) => {
+    const g = f.group || 'Service configuration'
+    if (!byGroup[g]) { byGroup[g] = []; groups.push(g) }
+    byGroup[g].push(f)
+  })
+  const setField = (key, value) => setDraft((d) => ({ ...d, [key]: value }))
+  return (
+    <Modal
+      title={cfg.createLabel}
+      width={720}
+      onClose={onClose}
+      footer={(
+        <>
+          <Button onClick={onClose}>Cancel</Button>
+          <Button variant="primary" disabled={!name || !!validationError} onClick={onSubmit}>{cfg.createLabel}</Button>
+        </>
+      )}
+    >
+      <div className="aws-card" style={{ marginBottom: 12 }}>
+        <SectionLabel>Basic configuration</SectionLabel>
+        <label className="aws-label" style={{ marginTop: 10 }}>{cfg.idLabel || 'Name'}</label>
+        <input className={`aws-input ${validationError ? 'aws-invalid' : ''}`} value={name} onChange={(e) => setName(e.target.value)} placeholder={`my-${resource.replace(/s$/, '')}`} autoFocus />
+        {validationError && <div className="aws-field-error">{validationError}</div>}
+        <div className="aws-hint">The resource will be created in {region} and persisted locally.</div>
+      </div>
+      {groups.map((g) => (
+        <div className="aws-card" style={{ marginBottom: 12 }} key={g}>
+          <SectionLabel>{g}</SectionLabel>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: 14, marginTop: 10 }}>
+            {byGroup[g].map((f) => (
+              <div key={f.key} style={f.input === 'radio-cards' ? { gridColumn: '1 / -1' } : undefined}>
+                <label className="aws-label">{f.label}{f.required ? ' *' : ''}</label>
+                <FieldControl field={f} value={draft[f.key]} onChange={(v) => setField(f.key, v)} />
+                {f.suffix && <div className="aws-hint">Measured in{f.suffix}.</div>}
+              </div>
+            ))}
+          </div>
+        </div>
+      ))}
+      {fields.length === 0 && (
+        <div className="aws-card"><div className="aws-hint">This resource type uses the AWS defaults for its initial configuration.</div></div>
+      )}
+    </Modal>
+  )
 }
 
 function fieldValue(row, field) {
@@ -40,13 +195,23 @@ function PageHeader({ title, action }) {
   )
 }
 
+// Editable fields = everything that isn't the name/status/badge column and
+// isn't a purely-derived display field. A field with an explicit `input` is
+// always editable; a field without one is editable only if it has a default we
+// can seed (keeps display-only counters like "items"/"running" out of the form).
+function editableFields(cfg) {
+  return cfg.fields.filter((f) => {
+    if (f.key === 'name' || f.key === 'status' || f.badge) return false
+    if (f.input) return f.input !== 'display'
+    return false
+  })
+}
+
 function createDraftFromConfig(cfg) {
   const draft = {}
-  cfg.fields
-    .filter((f) => f.key !== 'name' && f.key !== 'status')
-    .forEach((f) => {
-      draft[f.key] = cfg.defaults?.[f.key] ?? ''
-    })
+  editableFields(cfg).forEach((f) => {
+    draft[f.key] = cfg.defaults?.[f.key] ?? (f.input === 'number' ? (f.min ?? 0) : f.input === 'toggle' ? false : '')
+  })
   return draft
 }
 
@@ -91,10 +256,13 @@ export function GenericServiceHome() {
             ))}
           </div>
         </div>
+        <div className="aws-card" style={{ marginBottom: 12 }}>
+          <SectionLabel>Key metrics</SectionLabel>
+        </div>
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))', gap: 12 }}>
-          <MetricChart title={`${cfg.title} Requests`} unit="" color="#0073bb" base={120} variance={500} />
-          <MetricChart title={`${cfg.title} Errors`} unit="" color="#d13212" base={0} variance={6} />
-          <MetricChart title={`${cfg.title} Estimated cost (USD)`} unit="" color="#1d8102" base={4} variance={22} />
+          {resolveMetrics(cfg.resources[cfg.primary], '').map((m) => (
+            <MetricChart key={m.title} title={m.title} unit={m.unit} color={m.color} base={m.base} variance={m.variance} />
+          ))}
         </div>
       </div>
     </div>
@@ -141,7 +309,9 @@ export function GenericResourceList() {
       ? `${cfg.idLabel || 'Name'} already exists in ${region}.`
       : !/^[A-Za-z0-9._:/+=,@ -]{1,128}$/.test(name)
         ? 'Use 1-128 valid AWS identifier characters.'
-        : ''
+        // Honor the config-declared validator so form-level errors surface
+        // inline before the (also-guarded) store call runs.
+        : (cfg.validate ? cfg.validate(name, { ...cfg.defaults, ...draft }, rows) || '' : '')
 
   const openCreate = () => {
     setName('')
@@ -153,7 +323,12 @@ export function GenericResourceList() {
     const resolved = Object.fromEntries(
       Object.entries(draft).map(([key, value]) => [key, coerceDraftValue(value, cfg.defaults?.[key])])
     )
-    const created = createGenericResource(service, resource, { name, ...cfg.defaults, ...resolved })
+    // Merge config-declared derived values (e.g. RDS endpoint) on submit.
+    const derived = cfg.derive ? cfg.derive(name, { ...cfg.defaults, ...resolved }) : {}
+    const created = createGenericResource(service, resource, { name, ...cfg.defaults, ...resolved, ...derived })
+    // Creates can now fail (validate/guard) and return { ok:false, error } — the
+    // store already pushed the error flash, so just keep the modal open.
+    if (!created || created.ok === false) return
     pushFlash('success', `${cfg.label.replace(/s$/, '')} ${created.name} created`)
     setCreating(false)
     setName('')
@@ -199,42 +374,18 @@ export function GenericResourceList() {
         />
       </div>
       {creating && (
-        <Modal
-          title={cfg.createLabel}
+        <CreateResourceModal
+          cfg={cfg}
+          resource={resource}
+          region={region}
+          name={name}
+          setName={setName}
+          draft={draft}
+          setDraft={setDraft}
+          validationError={validationError}
           onClose={() => setCreating(false)}
-          footer={(
-            <>
-              <Button onClick={() => setCreating(false)}>Cancel</Button>
-              <Button variant="primary" disabled={!name || !!validationError} onClick={submitCreate}>{cfg.createLabel}</Button>
-            </>
-          )}
-        >
-          <div className="aws-card" style={{ marginBottom: 12 }}>
-            <SectionLabel>Basic configuration</SectionLabel>
-            <label className="aws-label" style={{ marginTop: 10 }}>{cfg.idLabel || 'Name'}</label>
-            <input className={`aws-input ${validationError ? 'aws-invalid' : ''}`} value={name} onChange={(e) => setName(e.target.value)} placeholder={`my-${resource.replace(/s$/, '')}`} />
-            {validationError && <div className="aws-field-error">{validationError}</div>}
-            <div className="aws-hint">The resource will be created in {region} and persisted locally.</div>
-          </div>
-          <div className="aws-card">
-            <SectionLabel>Service configuration</SectionLabel>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 12, marginTop: 10 }}>
-              {cfg.fields.filter((f) => f.key !== 'name' && f.key !== 'status').map((f) => (
-                <div key={f.key}>
-                  <label className="aws-label">{f.label}</label>
-                  <input
-                    className="aws-input"
-                    value={draft[f.key] ?? ''}
-                    onChange={(e) => setDraft((d) => ({ ...d, [f.key]: e.target.value }))}
-                  />
-                </div>
-              ))}
-              {cfg.fields.filter((f) => f.key !== 'name' && f.key !== 'status').length === 0 && (
-                <div className="aws-hint">This resource type uses the AWS defaults for its initial configuration.</div>
-              )}
-            </div>
-          </div>
-        </Modal>
+          onSubmit={submitCreate}
+        />
       )}
       {deleteTarget && (
         <ConfirmDialog
@@ -262,11 +413,13 @@ export function GenericResourceDetail() {
   const rows = useAwsStore((s) => s.genericResources?.[service]?.[resource] || [])
   const deleteGenericResource = useAwsStore((s) => s.deleteGenericResource)
   const updateGenericResource = useAwsStore((s) => s.updateGenericResource)
+  const transitionGenericResource = useAwsStore((s) => s.transitionGenericResource)
   const pushFlash = useAwsStore((s) => s.pushFlash)
   const serviceCfg = SERVICE_CONFIGS[service]
   const cfg = getResourceConfig(service, resource)
   const row = rows.find((r) => r.id === id)
   const [tab, setTab] = useState('overview')
+  const [rawOpen, setRawOpen] = useState(false)
 
   if (!serviceCfg || !cfg || !row) {
     return <div className="aws-page"><EmptyState title="Resource not found" action={<Button onClick={() => navigate(`${BASE}/${service}/home`)}>Back to service</Button>} /></div>
@@ -274,6 +427,9 @@ export function GenericResourceDetail() {
 
   const rowStatus = row.status || 'Active'
   const normalizedStatus = String(rowStatus).toLowerCase()
+  // While the row is mid-transition (create walk / deleting / reboot / modify)
+  // its action buttons are locked, mirroring the real console.
+  const transient = isTransientRow(row)
   const canPause = !['disabled', 'stopped', 'inactive'].includes(normalizedStatus)
   const toggleStatus = () => {
     const disabled = canPause
@@ -283,6 +439,13 @@ export function GenericResourceDetail() {
   }
 
   const simulateRun = () => {
+    // RDS declares a reboot lifecycle action — drive it through the store so the
+    // row walks rebooting -> available via the durable tick.
+    if (service === 'rds' && cfg.lifecycle?.actions?.reboot) {
+      transitionGenericResource(service, resource, row.id, 'reboot')
+      pushFlash('info', `Rebooting ${row.name}`)
+      return
+    }
     const patch = {
       lastRun: new Date().toISOString(),
       status: rowStatus,
@@ -295,6 +458,13 @@ export function GenericResourceDetail() {
     pushFlash('success', `Test action completed for ${row.name}`)
   }
 
+  const onDelete = () => {
+    const res = deleteGenericResource(service, resource, row.id)
+    if (res && res.ok === false) return
+    pushFlash('success', cfg.lifecycle?.deleteState ? `Deleting ${row.name}` : `Deleted ${row.name}`)
+    navigate(`${BASE}/${service}/${resource}`)
+  }
+
   return (
     <div>
       <Breadcrumb items={[{ label: serviceCfg.title, onClick: () => navigate(`${BASE}/${service}/home`) }, { label: cfg.label, onClick: () => navigate(`${BASE}/${service}/${resource}`) }, { label: row.name }]} />
@@ -303,12 +473,18 @@ export function GenericResourceDetail() {
           title={row.name}
           action={(
             <div style={{ display: 'flex', gap: 8 }}>
-              <Button onClick={simulateRun}>{service === 'lambda' ? 'Test' : service === 'rds' ? 'Reboot' : 'Run action'}</Button>
-              <Button onClick={toggleStatus}>{canPause ? 'Disable / stop' : 'Enable / start'}</Button>
-              <Button variant="danger" onClick={() => { deleteGenericResource(service, resource, row.id); pushFlash('success', `Deleted ${row.name}`); navigate(`${BASE}/${service}/${resource}`) }}>Delete</Button>
+              <Button disabled={transient} onClick={simulateRun}>{service === 'lambda' ? 'Test' : service === 'rds' ? 'Reboot' : 'Run action'}</Button>
+              <Button disabled={transient} onClick={toggleStatus}>{canPause ? 'Disable / stop' : 'Enable / start'}</Button>
+              <Button variant="danger" disabled={transient} onClick={onDelete}>Delete</Button>
             </div>
           )}
         />
+        {transient && (
+          <div className="aws-flash aws-flash-info" style={{ marginBottom: 12 }}>
+            <span className="aws-spinner" style={{ width: 14, height: 14 }} />
+            <div style={{ flex: 1 }}>{row.name} is {rowStatus.toLowerCase?.() || rowStatus}. Actions are unavailable until the operation completes.</div>
+          </div>
+        )}
         <div className="aws-card" style={{ marginBottom: 16 }}>
           <div className="aws-summary-grid">
             <div className="aws-kv"><span className="k">Resource ID</span><span className="v"><IDCopy value={row.id} /></span></div>
@@ -330,9 +506,29 @@ export function GenericResourceDetail() {
             </div>
           )}
           {tab === 'configuration' && (
-            <div className="aws-card">
-              <SectionLabel>Configuration JSON</SectionLabel>
-              <pre className="aws-mono" style={{ background: 'var(--aws-page-bg)', padding: 12, overflowX: 'auto', borderRadius: 4 }}>{JSON.stringify(row, null, 2)}</pre>
+            <div style={{ display: 'grid', gap: 12 }}>
+              <div className="aws-card">
+                <SectionLabel>Configuration</SectionLabel>
+                <div className="aws-summary-grid" style={{ marginTop: 8 }}>
+                  {cfg.fields.map((f) => (
+                    <div className="aws-kv" key={f.key}>
+                      <span className="k">{f.label}</span>
+                      <span className="v">{fieldValue(row, f)}</span>
+                    </div>
+                  ))}
+                  <div className="aws-kv"><span className="k">Created</span><span className="v">{row.created ? new Date(row.created).toLocaleString() : '—'}</span></div>
+                  {row.lastModified && <div className="aws-kv"><span className="k">Last modified</span><span className="v">{new Date(row.lastModified).toLocaleString()}</span></div>}
+                </div>
+              </div>
+              <div className="aws-card">
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                  <SectionLabel>Raw JSON</SectionLabel>
+                  <Button onClick={() => setRawOpen((o) => !o)}>{rawOpen ? 'Hide' : 'Show'} raw JSON</Button>
+                </div>
+                {rawOpen && (
+                  <pre className="aws-mono" style={{ background: 'var(--aws-page-bg)', padding: 12, overflowX: 'auto', borderRadius: 4, marginTop: 8 }}>{JSON.stringify(row, null, 2)}</pre>
+                )}
+              </div>
             </div>
           )}
           {tab === 'activity' && (
@@ -386,9 +582,9 @@ terraform import ${service}_${resource.replace(/-/g, '_')}.${row.name.replace(/[
           )}
           {tab === 'monitoring' && (
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))', gap: 12 }}>
-              <MetricChart title={`${row.name} Requests`} unit="" color="#0073bb" base={80} variance={400} />
-              <MetricChart title={`${row.name} Errors`} unit="" color="#d13212" base={0} variance={8} />
-              <MetricChart title={`${row.name} Latency (ms)`} unit="ms" color="#9d5025" base={30} variance={120} />
+              {resolveMetrics(cfg, row.name).map((m) => (
+                <MetricChart key={m.title} title={m.title} unit={m.unit} color={m.color} base={m.base} variance={m.variance} />
+              ))}
             </div>
           )}
           {tab === 'tags' && (

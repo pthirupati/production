@@ -100,6 +100,11 @@ def snapshot_engine(engine: UnifiedSimulationEngine) -> dict:
         "storage_disk_provisioned": st.storage_disk_provisioned,
         "pending_nic_config": st.pending_nic_config,
         "network_nic_provisioned": st.network_nic_provisioned,
+        # Installed packages + their binaries — must round-trip or a cross-worker
+        # restore mid-lab loses `which <tool>`/`rpm -q <pkg>`/unit knowledge for
+        # anything the learner installed (services already round-trip below).
+        "installed_packages": dict(getattr(st, "installed_packages", {}) or {}),
+        "installed_binaries": dict(getattr(st, "installed_binaries", {}) or {}),
         # Cross-technology VMware bridge linkage — must round-trip so a rescan or
         # reboot on a different worker still finds the hot-added disk in cache.
         "session_id": getattr(st, "session_id", ""),
@@ -173,6 +178,12 @@ def restore_engine(data: dict) -> UnifiedSimulationEngine | None:
     st.groups = data.get("groups", st.groups)
     st.services = {k: _service_from_dict(v) for k, v in data.get("services", {}).items()}
     st.processes = [_process_from_dict(p) for p in data.get("processes", [])]
+    # Overlay persisted install state onto the constructor-seeded base set so a
+    # cross-worker restore preserves both base tools and anything installed mid-lab.
+    if isinstance(data.get("installed_packages"), dict) and hasattr(st, "installed_packages"):
+        merged = dict(st.installed_packages); merged.update(data["installed_packages"]); st.installed_packages = merged
+    if isinstance(data.get("installed_binaries"), dict) and hasattr(st, "installed_binaries"):
+        merged = dict(st.installed_binaries); merged.update(data["installed_binaries"]); st.installed_binaries = merged
     st.env = data.get("env", st.env)
     st.dmesg_extra = list(data.get("dmesg_extra", []))
     st.gpu_healthy = data.get("gpu_healthy", True)

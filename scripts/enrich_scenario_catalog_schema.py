@@ -16,6 +16,7 @@ Usage:
 from __future__ import annotations
 
 import argparse
+import copy
 import re
 import sys
 from pathlib import Path
@@ -27,13 +28,23 @@ SCEN = ROOT / "scenarios"
 sys.path.insert(0, str(ROOT / "scripts"))
 
 from scenario_copy_library import (  # noqa: E402
+    HINT_LADDER,
+    HINT_LADDER_RUNGS,
     TECH_PROFILES,
+    TICKET_REQUIRED_SECTIONS,
+    _KIND_ACTION,
+    build_hint_ladder,
     enrich_scenario_data,
     parse_academy_slug,
     snippet_for,
 )
 
+# Legacy 5-section prose the older schema wrapped descriptions in. Kept for
+# back-compat detection; the richer company-ticket standard lives in
+# scenario_copy_library.TICKET_REQUIRED_SECTIONS.
 DESCRIPTION_SECTIONS = ("CONTEXT:", "ENVIRONMENT:", "SYMPTOM", "OBJECTIVE:", "WHAT TO AVOID:")
+# The company-ticket description standard (single source of truth).
+TICKET_SECTIONS_REQUIRED = TICKET_REQUIRED_SECTIONS
 SERVICE_RE = re.compile(r"systemctl\s+is-active\s+([A-Za-z0-9_.@-]+)")
 KUBECTL_POD_RE = re.compile(r"kubectl\s+get\s+pods", re.I)
 NGINX_RE = re.compile(r"nginx\s+-t", re.I)
@@ -410,9 +421,57 @@ def _verify_phrase(validation: dict, data: dict) -> str:
     return "`check.sh` exits successfully"
 
 
+# Matches any leading ticket-section label so we can recover the raw prose that
+# followed it (used to extract a clean symptom from an already-wrapped desc).
+_TICKET_LABEL_RE = re.compile(
+    r"^\s*(CONTEXT|ENVIRONMENT|SYMPTOM(?: / STARTING STATE)?|OBJECTIVE|"
+    r"WORK TO DO|VERIFY|ROLLBACK|WHAT TO AVOID)\s*:\s*",
+    re.I | re.M,
+)
+
+
+def _strip_ticket_labels(text: str) -> str:
+    """Return the SYMPTOM prose from a (possibly already-wrapped) description,
+    so re-wrapping never nests ticket sections inside each other."""
+    text = (text or "").strip()
+    if "CONTEXT:" not in text.upper():
+        return text
+    # Pull out just the SYMPTOM block if present.
+    m = re.search(r"SYMPTOM(?: / STARTING STATE)?\s*:\s*(.*?)(?=\n\s*[A-Z][A-Z /]+:|$)",
+                  text, re.S | re.I)
+    if m and m.group(1).strip():
+        return m.group(1).strip()
+    return _TICKET_LABEL_RE.sub("", text).strip()
+
+
+def _work_to_do(data: dict, profile: dict, verify: str) -> str:
+    """Concrete 'what to install / what to change / how to check' guidance."""
+    installs = [str(x).strip() for x in _as_list(data.get("required_installs")) if str(x).strip()]
+    changes = [str(x).strip() for x in _as_list(data.get("config_changes")) if str(x).strip()]
+    parts: list[str] = []
+    if installs:
+        parts.append("Install / ensure present: " + ", ".join(installs) + ".")
+    else:
+        parts.append(
+            "Required tooling is pre-installed; if a command is missing, note it "
+            "and use the equivalent already on the host."
+        )
+    if changes:
+        parts.append("Configuration changes to make: " + "; ".join(changes) + ".")
+    else:
+        parts.append(
+            "Make the smallest configuration change that moves the system toward the objective "
+            f"(edit the relevant {profile['surface']}), changing one thing at a time."
+        )
+    parts.append(f"Check your work continuously against the objective — success means {verify}.")
+    return " ".join(parts)
+
+
 def _wrap_description(data: dict, path: Path, tech_dir: str, verify: str) -> str:
     desc = str(data.get("description") or "").strip()
-    if all(section.lower() in desc.lower() for section in DESCRIPTION_SECTIONS):
+    # Idempotent: only skip when the FULL company-ticket structure is already
+    # present (checking the new required sections, not the legacy 5).
+    if all(section.lower() in desc.lower() for section in TICKET_SECTIONS_REQUIRED):
         return desc
 
     profile = TECH_PROFILES.get(tech_dir, {
@@ -425,22 +484,36 @@ def _wrap_description(data: dict, path: Path, tech_dir: str, verify: str) -> str
     objectives = [str(x).strip() for x in _as_list(data.get("objectives")) if str(x).strip()]
     objective = "; ".join(objectives[:3]) or f"restore the expected {profile['domain']} outcome"
 
-    # Preserve rich legacy prose as the symptom block.
-    legacy = desc
-    if "CONTEXT:" in legacy.upper():
-        legacy = initial or legacy
-
-    symptom = initial or legacy or f"The lab starts in a failed state for {title}."
-    if legacy and initial and legacy not in initial:
-        symptom = f"{initial} {legacy}".strip()
+    # Recover a clean symptom, whether the source desc is raw legacy prose or an
+    # already-ticket-wrapped description from a prior enrichment run.
+    legacy_symptom = _strip_ticket_labels(desc)
+    symptom = initial or legacy_symptom or f"The lab starts in a failed state for {title}."
+    if legacy_symptom and initial and legacy_symptom not in initial and initial not in legacy_symptom:
+        symptom = f"{initial} {legacy_symptom}".strip()
 
     context = (
-        f"A team operating {profile['domain']} needs you to resolve `{title}` during a realistic "
-        f"incident. The business impact is reduced service reliability until the underlying state is repaired."
+        f"A team operating {profile['domain']} has raised a ticket for `{title}`. A customer-facing "
+        f"workflow is degraded and the on-call engineer (you) must diagnose and resolve it. "
+        f"Business impact: reduced service reliability and blocked users until the underlying state is repaired."
     )
     environment = (
-        f"You are working in FixitLab's offline {profile['env']} with {profile['surface']}. "
-        "All tools run locally; no paid APIs or external cloud calls are required."
+        f"You are working in FixitLab's offline {profile['env']}. The architecture is a single "
+        f"lab-primary node exposing {profile['surface']}; treat it as the production host for this "
+        "incident. All tools run locally — no paid APIs or external cloud calls are required."
+    )
+    acceptance = (
+        f"{objective}. Acceptance criteria: the change is minimal and reversible, and success means {verify}."
+    )
+    work = _work_to_do(data, profile, verify)
+    verify_block = (
+        f"Re-run the same check the grader uses and confirm {verify}. Capture the before/after "
+        "output as evidence. Success criteria: the objective's healthy state holds on a repeat check, "
+        "not just once."
+    )
+    rollback = (
+        "If a change makes things worse, revert that single change immediately (restore the original "
+        "config file / undo the edit / restart the affected component) and re-observe before trying "
+        "another hypothesis. Never stack unverified changes."
     )
     avoid = (
         "Do not apply broad destructive changes, skip evidence gathering, or fake completion with marker files — "
@@ -450,7 +523,10 @@ def _wrap_description(data: dict, path: Path, tech_dir: str, verify: str) -> str
         f"CONTEXT: {context}\n\n"
         f"ENVIRONMENT: {environment}\n\n"
         f"SYMPTOM / STARTING STATE: {symptom}\n\n"
-        f"OBJECTIVE: {objective}. Success means {verify}.\n\n"
+        f"OBJECTIVE: {acceptance}\n\n"
+        f"WORK TO DO: {work}\n\n"
+        f"VERIFY: {verify_block}\n\n"
+        f"ROLLBACK: {rollback}\n\n"
         f"WHAT TO AVOID: {avoid}"
     )
 
@@ -1110,86 +1186,128 @@ def _academy_display_title(slug: str, tech_dir: str) -> str | None:
     return candidate if len(candidate) <= 60 else snip["label"].title()[:60].rstrip(" -")
 
 
-def _upgrade_hints(data: dict, path: Path, tech_dir: str, verify: str, validation: dict) -> None:
-    hints = sorted(_as_list(data.get("hints")), key=lambda h: int(h.get("order") or 0))
-    while len(hints) < 3:
-        hints.append({"order": len(hints) + 1, "cost": 0, "content": ""})
+def _prose_label(title: str) -> str:
+    """Turn a scenario title into a natural mid-sentence noun phrase.
 
+    "Prompt Fundamentals: Be Specific" -> "prompt fundamentals"
+    "nginx: 502 Bad Gateway"           -> "the nginx 502 bad gateway issue"? no —
+    we keep it short: drop a trailing ": subtitle", and lowercase the phrase
+    unless the leading token is an acronym (kept as-is), so it reads cleanly.
+    """
+    text = str(title or "").strip()
+    # Drop a trailing subtitle after the first colon ("Foo: Bar" -> "Foo").
+    head = text.split(":", 1)[0].strip() or text
+    words = head.split()
+    if not words:
+        return "this system"
+    out = []
+    for i, w in enumerate(words):
+        # Preserve acronyms / mixed-case product names (VLAN, DNS, PeopleSoft…).
+        if w.isupper() or (any(c.isupper() for c in w[1:])):
+            out.append(w)
+        else:
+            out.append(w.lower())
+    return " ".join(out)
+
+
+def _kind_for(data: dict, parsed: dict | None) -> str:
+    """Best-effort troubleshooting 'kind' used to pick a fix-method verb."""
+    if parsed and parsed.get("kind"):
+        k = parsed["kind"]
+        return k if k in _KIND_ACTION else "troubleshoot"
+    raw = str(data.get("scenario_type") or data.get("category") or "").lower()
+    mapping = {
+        "learn": "learn", "guided": "learn", "do": "operate", "build": "build",
+        "operate": "operate", "fix": "troubleshoot", "troubleshoot": "troubleshoot",
+        "security": "security", "harden": "security", "backup": "backup",
+        "integration": "integration", "observability": "observability",
+        "automation": "automation", "optimize": "automation",
+    }
+    return mapping.get(raw, "troubleshoot")
+
+
+def _upgrade_hints(data: dict, path: Path, tech_dir: str, verify: str, validation: dict) -> None:
+    """Emit the 5-rung HINT_LADDER, specialised to this scenario's real fault.
+
+    The topic-aware base ladder (ORIENT / APPROACH / WHICH TOOL / NARROW DOWN /
+    NEAR-SOLUTION) is built from the scenario's own snippet (label, concept,
+    inspect, symptom, verify) so the copy talks about the real subsystem. When a
+    command-specific ``_specialty_hints`` branch matches (nginx, kubectl, docker,
+    systemd, DNS, SELinux, GPU, …) its exact diagnostic + fix commands are spliced
+    into the lower three rungs, preserving that hard-won specificity.
+    """
     parsed = parse_academy_slug(str(data.get("slug") or path.parent.name))
     profile = TECH_PROFILES.get(tech_dir, {"domain": tech_dir, "env": "lab", "surface": "CLI"})
     title = _short_title(data, str(data.get("slug") or path.parent.name), tech_dir)
 
     if parsed:
         snip = snippet_for(parsed["tech"], parsed["topic"])
-        inspect = snip["inspect"]
-        label = snip["label"]
+        label, concept = snip["label"], snip["concept"]
+        inspect, symptom, snip_verify = snip["inspect"], snip["symptom"], snip["verify"]
     else:
+        label = _prose_label(title)
+        concept = f"how {label} behaves in a {profile['domain']} environment"
         inspect = _inspect_phrase(validation, tech_dir, title)
-        label = title
+        symptom = f"{label} is not behaving as the scenario objectives require"
+        snip_verify = verify
 
-    tier1 = _strip_marker_language(hints[0].get("content") or "")
-    tier2 = _strip_marker_language(hints[1].get("content") or "")
-    tier3 = _strip_marker_language(hints[2].get("content") or "")
-
-    specialty = _specialty_hints(data, validation, tech_dir) or _hints_from_learn_bullets(data)
     cmd = _grader_command(validation, data)
+    grader_cmd = f"`{cmd}`" if cmd and "`" not in cmd else (cmd or "`check.sh`")
+    kind = _kind_for(data, parsed)
+    action = _KIND_ACTION.get(kind, _KIND_ACTION["operate"]).format(label=label)
 
-    if specialty:
-        if not _hint_is_rich(tier1) or PLACEHOLDER_RE.search(tier1):
-            tier1 = specialty["tier1"]
-        if not _hint_is_rich(tier2) or PLACEHOLDER_RE.search(tier2):
-            tier2 = specialty["tier2"]
-        if not _hint_is_rich(tier3) or PLACEHOLDER_RE.search(tier3):
-            tier3 = specialty["tier3"]
+    # Topic-aware base ladder — every rung specific to this subsystem.
+    ladder = build_hint_ladder(
+        label=label,
+        concept=concept,
+        inspect=inspect,
+        symptom=symptom,
+        verify=snip_verify,
+        action=action,
+        grader=grader_cmd,
+    )
 
-    # A guiding hint must not simply restate an objective (objectives name the
-    # fix/answer). When tier-1/tier-2 echo an objective, prefer the specialty
-    # methodology hint, else blank it so the methodology fallback below runs.
-    # Tier-3 is the full-reveal tier, so leaking the fix there is intended.
+    # Splice in command-specific specialty content where it exists. Specialty
+    # tiers map naturally onto the lower rungs:
+    #   tier1 (Where to look)      -> rung 3 WHICH TOOL
+    #   tier2 (Diagnostic steps)   -> rung 4 NARROW DOWN
+    #   tier3 (Exact fix + verify) -> rung 5 NEAR-SOLUTION
+    # ORIENT / APPROACH stay as the topic teaching rungs (methodology only).
+    specialty = _specialty_hints(data, validation, tech_dir)
     objectives = [str(o) for o in _as_list(data.get("objectives"))]
+    if specialty:
+        # WHICH TOOL and NARROW DOWN are early rungs — they must not simply
+        # restate an objective (that would give the answer away). NEAR-SOLUTION
+        # is the reveal rung, so a spliced fix there is intended.
+        which = specialty.get("tier1", "")
+        narrow = specialty.get("tier2", "")
+        near = specialty.get("tier3", "")
+        if which and _hint_is_rich(which) and not _leaks_objective(which, objectives):
+            ladder[2]["content"] = _relabel_rung("WHICH TOOL", which)
+        if narrow and _hint_is_rich(narrow) and not _leaks_objective(narrow, objectives):
+            ladder[3]["content"] = _relabel_rung("NARROW DOWN", narrow)
+        if near and _hint_is_rich(near):
+            ladder[4]["content"] = _relabel_rung("NEAR-SOLUTION", near)
 
-    def _non_leaking_specialty(key: str) -> str:
-        # Only reuse a specialty hint if it does not itself echo an objective —
-        # _hints_from_learn_bullets derives hints from learn bullets that ARE the
-        # objectives, so that fallback can leak just like the original content.
-        cand = specialty.get(key) if specialty else ""
-        return cand if cand and not _leaks_objective(cand, objectives) else ""
+    data["hints"] = ladder
 
-    if objectives:
-        if _leaks_objective(tier1, objectives):
-            tier1 = _non_leaking_specialty("tier1")
-        if _leaks_objective(tier2, objectives):
-            tier2 = _non_leaking_specialty("tier2")
 
-    if not (_hint_is_rich(tier1) and HINT_TIER1_RE.search(tier1)):
-        if not HINT_TIER1_RE.search(tier1) or len(tier1) < 40:
-            tier1 = (
-                f"Where to look: Start with read-only discovery on the {profile['env']}. "
-                f"For {label}, inspect {inspect} before changing anything."
-            )
-    if not (_hint_is_rich(tier2) and HINT_TIER2_RE.search(tier2)):
-        if not HINT_TIER2_RE.search(tier2) or len(tier2) < 40 or MARKER_RE.search(tier2):
-            tier2 = (
-                f"Diagnostic steps:\n"
-                f"1. Gather evidence with {inspect}.\n"
-                f"2. Compare current output to the scenario objectives.\n"
-                f"3. Form a single hypothesis about the smallest fix that would restore healthy state."
-            )
-    if not (_hint_is_rich(tier3) and HINT_TIER3_RE.search(tier3)):
-        if not HINT_TIER3_RE.search(tier3) or len(tier3) < 40 or MARKER_RE.search(tier3):
-            tier3 = (
-                f"Exact fix + verification:\n"
-                f"1. Apply the minimal change that addresses your hypothesis.\n"
-                f"2. Re-run `{cmd}`.\n"
-                f"3. Confirm {verify}.\n\n"
-                f"WHY: the grader validates real state — marker files are ignored."
-            )
+_SPECIALTY_PREFIX_RE = re.compile(
+    r"^\s*(Where to look:|Diagnostic steps:|Exact fix[^:\n]*:)\s*", re.I
+)
 
-    data["hints"] = [
-        {"order": 1, "cost": 0, "content": tier1},
-        {"order": 2, "cost": 25, "content": tier2},
-        {"order": 3, "cost": 50, "content": tier3},
-    ]
+
+def _relabel_rung(rung_label: str, specialty_content: str) -> str:
+    """Re-badge a legacy 3-tier specialty hint under its ladder rung label,
+    preserving the command-specific body verbatim (only the leading prefix is
+    swapped so the rung reads consistently)."""
+    body = _SPECIALTY_PREFIX_RE.sub("", specialty_content.strip()).strip()
+    titles = {
+        "WHICH TOOL": "WHICH TOOL — the diagnostic command(s):",
+        "NARROW DOWN": "NARROW DOWN — isolate the subsystem:",
+        "NEAR-SOLUTION": "NEAR-SOLUTION — the fix shape + verify (you still apply it):",
+    }
+    return f"{titles[rung_label]}\n{body}"
 
 
 def _guided_mode(data: dict, validation: dict, verify: str) -> dict | None:
@@ -1311,12 +1429,87 @@ def enrich(path: Path, *, force_copy: bool = False) -> bool:
     return False
 
 
+# Matches a top-level YAML key line (column 0, no indentation).
+_TOP_KEY_RE = re.compile(r"^([A-Za-z_][A-Za-z0-9_]*):", re.M)
+
+
+def _replace_top_level_block(text: str, key: str, new_value) -> str:
+    """Replace ONLY the ``key:`` top-level block in raw YAML ``text`` with a
+    freshly-serialised value, leaving every other byte of the file untouched.
+
+    This keeps the diff limited to the narrative fields — no cosmetic scalar-
+    style churn on unrelated keys that a full re-dump would introduce.
+    """
+    # Serialise just this key so styling matches the rest of the catalog.
+    block = yaml.dump({key: new_value}, sort_keys=False, allow_unicode=True, width=100)
+    if not block.endswith("\n"):
+        block += "\n"
+
+    # Find the span of the existing top-level block for `key`.
+    start = None
+    for m in _TOP_KEY_RE.finditer(text):
+        if m.group(1) == key:
+            start = m.start()
+            break
+    if start is None:
+        return text  # key absent — leave file unchanged
+    # End is the start of the next top-level key (or EOF).
+    end = len(text)
+    nxt = _TOP_KEY_RE.search(text, m.end())
+    while nxt is not None:
+        # A match at column 0 that isn't inside the current block's value.
+        if nxt.start() > start:
+            end = nxt.start()
+            break
+        nxt = _TOP_KEY_RE.search(text, nxt.end())
+    return text[:start] + block + text[end:]
+
+
+def enrich_narrative_only(path: Path) -> bool:
+    """Rewrite ONLY the learner-facing narrative — ``hints`` and ``description``
+    (the 5-rung HINT_LADDER and company-ticket description) — leaving every
+    other byte of the file identical.
+
+    This is the DEFAULT catalog pass. It deliberately does NOT touch check.sh,
+    hidden_tests, tasks/validation, solution, initial_state, summary, title, or
+    category, so grading and the graded unit stay exactly as authored. All the
+    hint/description generators only READ the other fields, and the write is a
+    surgical block replacement so unrelated keys never even re-serialise.
+    """
+    tech_dir = path.parent.parent.name
+    raw = path.read_text(encoding="utf-8")
+    orig = yaml.safe_load(raw) or {}
+
+    # Compute new narrative from a scratch copy so helper mutations never leak.
+    work = copy.deepcopy(orig)
+    validation = _task_validation(path, work)  # read-only (reads check.sh, no write)
+    verify = _verify_phrase(validation, work)
+    new_description = _wrap_description(work, path, tech_dir, verify)
+    _upgrade_hints(work, path, tech_dir, verify, validation)  # sets work["hints"]
+
+    updated = raw
+    updated = _replace_top_level_block(updated, "description", new_description)
+    updated = _replace_top_level_block(updated, "hints", work["hints"])
+
+    if updated != raw:
+        path.write_text(updated, encoding="utf-8")
+        return True
+    return False
+
+
 def main() -> None:
-    parser = argparse.ArgumentParser(description="Enrich full scenario catalog B1 schema")
+    parser = argparse.ArgumentParser(description="Enrich scenario catalog narrative (hints + description)")
     parser.add_argument("--technology", default="", help="Comma-separated tech folders")
     parser.add_argument("--limit", type=int, default=0)
+    parser.add_argument(
+        "--full-schema",
+        action="store_true",
+        help="Legacy: run the full B1 schema rewrite (touches many fields + check.sh). "
+        "Off by default — the standard pass only rewrites hints + description.",
+    )
     args = parser.parse_args()
     tech_filter = {t.strip() for t in args.technology.split(",") if t.strip()}
+    run = enrich if args.full_schema else enrich_narrative_only
     changed = total = 0
     for tech_path in sorted(SCEN.iterdir()):
         if not tech_path.is_dir() or tech_path.name == "shared":
@@ -1325,13 +1518,13 @@ def main() -> None:
             continue
         for yaml_path in sorted(tech_path.glob("*/scenario.yaml")):
             total += 1
-            if enrich(yaml_path):
+            if run(yaml_path):
                 changed += 1
             if args.limit and total >= args.limit:
                 break
         if args.limit and total >= args.limit:
             break
-    print(f"catalog schemas enriched: {changed}/{total}")
+    print(f"catalog narrative enriched: {changed}/{total}")
 
 
 if __name__ == "__main__":

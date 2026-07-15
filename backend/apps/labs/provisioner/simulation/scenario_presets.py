@@ -3865,6 +3865,35 @@ _PRESETS: dict[str, callable] = {
     "linux-nftables-port-blocked": _preset_nftables_port_blocked,
     "linux-quota-not-enforced": _preset_quota_not_enforced,
     "linux-renice-runaway-process-priority": _preset_renice_runaway_priority,
+    # ── NVIDIA + AMD datacenter GPU scenarios (fail-closed via academy sentinel) ──
+    # Each plants /opt/fixitlab/academy/<slug>.conf with the broken-configuration
+    # sentinel. The matching check.sh probes `grep -q FIXED-OK <that file>`, so the
+    # lab is fail-closed until apply_simulation_fix's universal sentinel-clear
+    # appends FIXED-OK. These explicit entries WIN over the generic "gpu"/"nvidia"
+    # substring branch in apply_scenario_preset (which routes to gpu_fallen_off and
+    # would otherwise leave no sentinel to clear -> BROKEN_FIX).
+    "gpu-nvidia-smi-driver-not-loaded": lambda s: _plant_broken_config_sentinel("gpu-nvidia-smi-driver-not-loaded", s),
+    "gpu-h100-fallen-off-bus-pcie": lambda s: _plant_broken_config_sentinel("gpu-h100-fallen-off-bus-pcie", s),
+    "gpu-dcgmi-discovery-missing-gpu": lambda s: _plant_broken_config_sentinel("gpu-dcgmi-discovery-missing-gpu", s),
+    "gpu-dcgm-diag-r1-fail": lambda s: _plant_broken_config_sentinel("gpu-dcgm-diag-r1-fail", s),
+    "gpu-dcgm-diag-r2-fail": lambda s: _plant_broken_config_sentinel("gpu-dcgm-diag-r2-fail", s),
+    "gpu-dcgm-diag-r4-fail": lambda s: _plant_broken_config_sentinel("gpu-dcgm-diag-r4-fail", s),
+    "gpu-dcgm-exporter-no-metrics": lambda s: _plant_broken_config_sentinel("gpu-dcgm-exporter-no-metrics", s),
+    "gpu-nccl-allreduce-hang": lambda s: _plant_broken_config_sentinel("gpu-nccl-allreduce-hang", s),
+    "gpu-rccl-allreduce-hang-amd": lambda s: _plant_broken_config_sentinel("gpu-rccl-allreduce-hang-amd", s),
+    "gpu-amd-smi-mi300x-missing": lambda s: _plant_broken_config_sentinel("gpu-amd-smi-mi300x-missing", s),
+    "gpu-rocm-smi-xgmi-degraded": lambda s: _plant_broken_config_sentinel("gpu-rocm-smi-xgmi-degraded", s),
+    "gpu-h100-hbm3-ecc-uncorrectable": lambda s: _plant_broken_config_sentinel("gpu-h100-hbm3-ecc-uncorrectable", s),
+    "gpu-h200-hbm3e-row-remap-pending": lambda s: _plant_broken_config_sentinel("gpu-h200-hbm3e-row-remap-pending", s),
+    "gpu-b300-hbm-ecc-threshold": lambda s: _plant_broken_config_sentinel("gpu-b300-hbm-ecc-threshold", s),
+    "gpu-thermal-throttle-hbm-overheat": lambda s: _plant_broken_config_sentinel("gpu-thermal-throttle-hbm-overheat", s),
+    "gpu-xid-79-fell-off-bus": lambda s: _plant_broken_config_sentinel("gpu-xid-79-fell-off-bus", s),
+    "gpu-xid-48-dbe-ecc": lambda s: _plant_broken_config_sentinel("gpu-xid-48-dbe-ecc", s),
+    "gpu-driver-library-version-mismatch": lambda s: _plant_broken_config_sentinel("gpu-driver-library-version-mismatch", s),
+    "gpu-mig-instance-profile-mismatch": lambda s: _plant_broken_config_sentinel("gpu-mig-instance-profile-mismatch", s),
+    "gpu-power-cap-too-low-throttle": lambda s: _plant_broken_config_sentinel("gpu-power-cap-too-low-throttle", s),
+    "gpu-amd-mi300-rocm-driver-mismatch": lambda s: _plant_broken_config_sentinel("gpu-amd-mi300-rocm-driver-mismatch", s),
+    "gpu-nvlink-lane-down-h100": lambda s: _plant_broken_config_sentinel("gpu-nvlink-lane-down-h100", s),
 }
 
 
@@ -4702,6 +4731,104 @@ _NEW_TRACK_SENTINEL_SLUGS = (
     "mesh-retry-timeout-storm",
 )
 for _slug in _NEW_TRACK_SENTINEL_SLUGS:
+    _PRESETS[_slug] = _with_sentinel(None, _slug)
+
+# ── New-track coverage expansion (GitOps / DevSecOps / OTel / Service Mesh) ──
+# Additional simulation-only labs authored to bring these four in-demand tracks
+# toward parity with the mature technologies. Identical contract to
+# _NEW_TRACK_SENTINEL_SLUGS above: no dedicated engine validator, graded by the
+# broken-configuration sentinel. Every slug is registered EXPLICITLY (not left to
+# the keyword backstop) because "gitops-"/"devsecops-" incidentally contain the
+# PeopleSoft "ps-" marker and several slugs contain "ecr"/"helm-", which the
+# coarse keyword backstop would mis-read as engine-backed families and wrongly
+# skip the sentinel (fail-open). apply_simulation_fix's universal sentinel-clear
+# appends FIXED-OK up front, so the contract holds: unfixed -> FAIL (sentinel
+# present), fixed -> PASS.
+_NEW_TRACK_SENTINEL_SLUGS_V2 = (
+    # GitOps (ArgoCD / Flux)
+    "gitops-argocd-repo-auth-401",
+    "gitops-argocd-sync-window-blocking",
+    "gitops-argocd-pruning-disabled-orphans",
+    "gitops-kustomize-namespace-mismatch",
+    "gitops-argocd-diff-ignores-managed-fields",
+    "gitops-flux-source-timeout",
+    "gitops-flux-kustomization-dependson-cycle",
+    "gitops-argocd-helm-values-missing",
+    "gitops-argocd-resource-hook-weight-order",
+    "gitops-argocd-selfheal-off-manual-edit",
+    "gitops-argocd-appproject-restricts-source",
+    "gitops-flux-imagepolicy-no-tags",
+    "gitops-argocd-cluster-token-expired",
+    "gitops-argocd-ignore-crd-schema",
+    "gitops-argocd-parallelism-throttled",
+    "gitops-flux-decrypt-sops-key-missing",
+    "gitops-argocd-notifications-silent",
+    "gitops-argocd-multisource-ref-broken",
+    "gitops-config-repo-detached-head",
+    "gitops-argocd-degraded-healthcheck-custom",
+    # DevSecOps supply-chain
+    "devsecops-base-image-eol-distro",
+    "devsecops-cosign-key-mismatch-verify",
+    "devsecops-dockerfile-adds-secret-file",
+    "devsecops-sbom-stale-not-regenerated",
+    "devsecops-registry-tag-mutable-drift",
+    "devsecops-falco-rule-disabled-privesc",
+    "devsecops-image-runs-as-root",
+    "devsecops-slsa-builder-id-untrusted",
+    "devsecops-npm-lockfile-not-committed",
+    "devsecops-admission-policy-warn-only",
+    "devsecops-trivy-ignore-file-too-broad",
+    "devsecops-syft-catalog-misses-jars",
+    "devsecops-registry-anonymous-pull-push",
+    "devsecops-cosign-keyless-identity-wrong",
+    "devsecops-build-cache-poisoned-layer",
+    "devsecops-attestation-not-attached-digest",
+    "devsecops-secret-scanner-excludes-yaml",
+    "devsecops-image-latest-untagged-scan-skip",
+    "devsecops-cosign-tlog-upload-disabled",
+    "devsecops-dependency-confusion-public-source",
+    # OpenTelemetry
+    "otel-collector-batch-timeout-too-high",
+    "otel-collector-memorylimiter-refusing",
+    "otel-otlp-receiver-wrong-port",
+    "otel-exporter-tls-cert-invalid",
+    "otel-resource-detection-missing-servicename",
+    "otel-collector-queue-full-dropping",
+    "otel-filter-processor-drops-everything",
+    "otel-histogram-bucket-bounds-wrong",
+    "otel-attributes-processor-leaks-pii",
+    "otel-tailsampling-decision-wait-short",
+    "otel-collector-config-yaml-invalid",
+    "otel-prometheus-receiver-scrape-down",
+    "otel-spanmetrics-connector-not-wired",
+    "otel-sdk-sampler-parentbased-off",
+    "otel-collector-extension-healthcheck-down",
+    "otel-transform-processor-ottl-error",
+    "otel-loadbalancing-exporter-no-backends",
+    "otel-context-baggage-not-propagated",
+    "otel-collector-debug-exporter-flooding",
+    # Service Mesh (Istio / Linkerd)
+    "mesh-destinationrule-subset-undefined",
+    "mesh-peerauth-permissive-expected-strict",
+    "mesh-gateway-selector-no-match",
+    "mesh-authz-missing-source-principal",
+    "mesh-linkerd-proxy-not-ready-port-skip",
+    "mesh-virtualservice-header-match-typo",
+    "mesh-circuitbreaker-maxconns-too-low",
+    "mesh-serviceentry-missing-egress",
+    "mesh-envoyfilter-breaks-listener",
+    "mesh-retry-budget-amplifies-load",
+    "mesh-sidecar-egress-hosts-too-narrow",
+    "mesh-locality-lb-drains-region",
+    "mesh-requestauth-jwks-unreachable",
+    "mesh-mirror-traffic-hits-prod",
+    "mesh-outlier-detection-too-sensitive",
+    "mesh-linkerd-cert-expired-tap",
+    "mesh-timeout-shorter-than-backend",
+    "mesh-namespace-injection-revision-mismatch",
+    "mesh-authz-deny-shadow-allow",
+)
+for _slug in _NEW_TRACK_SENTINEL_SLUGS_V2:
     _PRESETS[_slug] = _with_sentinel(None, _slug)
 
 # Recovered technology-alias copies (slug de-dup): these secondary copies carried

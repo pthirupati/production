@@ -43,6 +43,9 @@ from .terraform_engine import get_state as terraform_get_state
 from .baremetal_engine import apply_action as baremetal_apply_action
 from .baremetal_engine import drop_session as baremetal_drop_session
 from .baremetal_engine import get_state as baremetal_get_state
+from .aws_engine import apply_action as aws_apply_action
+from .aws_engine import drop_session as aws_drop_session
+from .aws_engine import get_state as aws_get_state
 
 
 def _demo_session_id(user) -> str:
@@ -666,4 +669,43 @@ class BaremetalSimReleaseView(APIView):
         if not LabSession.objects.filter(pk=session_id, user=request.user).exists():
             return Response({"error": "Session not found"}, status=404)
         baremetal_drop_session(session_id)
+        return Response({"released": True})
+
+
+# ── AWS console simulator ─────────────────────────────────────────────────────
+class AwsSimStateView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request, session_id):
+        session = LabSession.objects.select_related("scenario").filter(pk=session_id, user=request.user).first()
+        if not session:
+            return Response({"error": "Session not found"}, status=404)
+        slug = session.scenario.slug if session.scenario_id else (request.query_params.get("scenario", "") or "")
+        return Response(aws_get_state(session_id, slug))
+
+
+class AwsSimActionView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request, session_id):
+        session = LabSession.objects.filter(pk=session_id, user=request.user, status="RUNNING").first()
+        if not session:
+            return Response({"error": "Lab session not running"}, status=400)
+        action = request.data.get("action", "")
+        payload = request.data.get("payload") or {}
+        slug = session.scenario.slug if session.scenario_id else ""
+        aws_get_state(session_id, slug)
+        result = aws_apply_action(session_id, action, payload)
+        if not result.get("ok"):
+            return Response(result, status=400)
+        return Response({**result, "state": aws_get_state(session_id, slug)})
+
+
+class AwsSimReleaseView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request, session_id):
+        if not LabSession.objects.filter(pk=session_id, user=request.user).exists():
+            return Response({"error": "Session not found"}, status=404)
+        aws_drop_session(session_id)
         return Response({"released": True})

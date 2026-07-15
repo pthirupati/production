@@ -2,24 +2,38 @@ title: Scan UDP services on DNS host
 slug: nmap-udp-scan
 technology: nmap
 category: Fix
-description: 'CONTEXT: A team operating network scanning needs you to resolve `Scan UDP services on DNS
-  host` during a realistic incident. The business impact is reduced service reliability until the underlying
-  state is repaired.
+description: 'CONTEXT: A team operating network scanning has raised a ticket for `Scan UDP services on
+  DNS host`. A customer-facing workflow is degraded and the on-call engineer (you) must diagnose and resolve
+  it. Business impact: reduced service reliability and blocked users until the underlying state is repaired.
 
 
-  ENVIRONMENT: You are working in FixitLab''s offline scanning lab with nmap CLI, targets, and scan output.
-  All tools run locally; no paid APIs or external cloud calls are required.
+  ENVIRONMENT: You are working in FixitLab''s offline scanning lab. The architecture is a single lab-primary
+  node exposing nmap CLI, targets, and scan output; treat it as the production host for this incident.
+  All tools run locally — no paid APIs or external cloud calls are required.
 
 
-  SYMPTOM / STARTING STATE: Discover which UDP ports are open on the nameserver. Discover which UDP ports
-  are open on the nameserver. This network scanning scenario focuses on nmap: Scan UDP services on DNS
-  host. Read the environment, form a hypothesis, apply a minimal fix, and verify behavior before closing
-  the ticket.
+  SYMPTOM / STARTING STATE: Discover which UDP ports are open on the nameserver.
 
 
   OBJECTIVE: Understand the current failure mode affecting Scan UDP services on DNS host; Restore expected
   service behavior with a minimal, documented change; Verify the fix holds under a realistic smoke test.
-  Success means `check.sh` exits successfully.
+  Acceptance criteria: the change is minimal and reversible, and success means `check.sh` exits successfully.
+
+
+  WORK TO DO: Required tooling is pre-installed; if a command is missing, note it and use the equivalent
+  already on the host. Make the smallest configuration change that moves the system toward the objective
+  (edit the relevant nmap CLI, targets, and scan output), changing one thing at a time. Check your work
+  continuously against the objective — success means `check.sh` exits successfully.
+
+
+  VERIFY: Re-run the same check the grader uses and confirm `check.sh` exits successfully. Capture the
+  before/after output as evidence. Success criteria: the objective''s healthy state holds on a repeat
+  check, not just once.
+
+
+  ROLLBACK: If a change makes things worse, revert that single change immediately (restore the original
+  config file / undo the edit / restart the affected component) and re-observe before trying another hypothesis.
+  Never stack unverified changes.
 
 
   WHAT TO AVOID: Do not apply broad destructive changes, skip evidence gathering, or fake completion with
@@ -42,29 +56,46 @@ initial_state: Discover which UDP ports are open on the nameserver.
 hints:
 - order: 1
   cost: 0
-  content: 'Where to look: Run `cat /etc/resolv.conf` and test with `dig example.com` or `getent hosts
-    example.com`.'
+  content: 'ORIENT — what to observe and why:
+
+    Do not touch anything yet. First observe the symptom: scan UDP services on DNS host is not behaving
+    as the scenario objectives require. This lab is about scan UDP services on DNS host — how scan UDP
+    services on DNS host behaves in a network scanning environment. Read the objectives and the current
+    state, and note precisely what looks wrong versus healthy before you form any theory.'
 - order: 2
+  cost: 10
+  content: 'APPROACH — the troubleshooting method:
+
+    Work from evidence, not guesses. For scan UDP services on DNS host problems the reliable method is:
+    (1) reproduce/observe the failure, (2) narrow from the whole system down to the one component that
+    owns the symptom, (3) change exactly one thing, (4) re-check. Fix the underlying misconfiguration
+    you identified (not just the noisy log line), changing one thing at a time.'
+- order: 3
   cost: 25
-  content: 'Diagnostic steps:
+  content: 'WHICH TOOL — the diagnostic command(s):
+
+    Run `cat /etc/resolv.conf` and test with `dig example.com` or `getent hosts example.com`.'
+- order: 4
+  cost: 40
+  content: 'NARROW DOWN — isolate the subsystem:
 
     1. Note the configured nameserver IP in resolv.conf.
 
     2. `ping` or `nc -zv` the nameserver — is it reachable?
 
     3. Check if NetworkManager or systemd-resolved overwrites the file.'
-- order: 3
-  cost: 50
-  content: 'Exact fix + verification:
+- order: 5
+  cost: 60
+  content: 'NEAR-SOLUTION — the fix shape + verify (you still apply it):
 
-    1. Verify the fix holds under a realistic smoke test.
+    1. Set a working `nameserver` line (e.g. 8.8.8.8 or the lab''s resolver).
 
-    2. Re-run the lab checker (`check.sh` or Check Solution).
+    2. Re-run `dig` or `getent hosts` — lookups should succeed.
 
-    3. Confirm every scenario objective is satisfied.
+    3. Confirm `check.sh` passes.
 
 
-    WHY: the grader validates real state — marker files are ignored.'
+    WHY: applications use resolv.conf for every hostname lookup.'
 summary: Complete the scan udp services on dns host nmap lab and verify success with the checker
 estimated_minutes: 20
 xp_reward: 100

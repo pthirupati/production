@@ -2,24 +2,40 @@ title: vgcreate Fails — Invalid VG Name with Hyphen
 slug: linux-vg-name-error
 difficulty: easy
 category: Fix
-description: 'CONTEXT: A team operating Linux administration needs you to resolve `vgcreate Fails — Invalid
-  VG Name with Hyphen` during a realistic incident. The business impact is reduced service reliability
-  until the underlying state is repaired.
+description: 'CONTEXT: A team operating Linux administration has raised a ticket for `vgcreate Fails —
+  Invalid VG Name with Hyphen`. A customer-facing workflow is degraded and the on-call engineer (you)
+  must diagnose and resolve it. Business impact: reduced service reliability and blocked users until the
+  underlying state is repaired.
 
 
-  ENVIRONMENT: You are working in FixitLab''s offline Linux practice server with terminal and config files
-  under /etc and /var. All tools run locally; no paid APIs or external cloud calls are required.
+  ENVIRONMENT: You are working in FixitLab''s offline Linux practice server. The architecture is a single
+  lab-primary node exposing terminal and config files under /etc and /var; treat it as the production
+  host for this incident. All tools run locally — no paid APIs or external cloud calls are required.
 
 
   SYMPTOM / STARTING STATE: Linux server where `vgcreate vg-data /dev/sdb` fails due to the hyphen in
-  the VG name (invalid for device-mapper). Creating an LVM volume group fails: `vgcreate vg-data /dev/sdb`
-  errors because the name contains a hyphen. LVM/device-mapper reserve the hyphen as a separator in /dev/mapper
-  device names, so VG and LV names can''t contain it. Recreate the volume group with a valid name (underscore
-  instead of hyphen) and verify it exists.
+  the VG name (invalid for device-mapper).
 
 
   OBJECTIVE: Read the vgcreate error and understand the naming restriction; Recreate the VG with a valid
-  name (no hyphen); Verify the volume group was created with vgs. Success means `check.sh` exits successfully.
+  name (no hyphen); Verify the volume group was created with vgs. Acceptance criteria: the change is minimal
+  and reversible, and success means `check.sh` exits successfully.
+
+
+  WORK TO DO: Required tooling is pre-installed; if a command is missing, note it and use the equivalent
+  already on the host. Make the smallest configuration change that moves the system toward the objective
+  (edit the relevant terminal and config files under /etc and /var), changing one thing at a time. Check
+  your work continuously against the objective — success means `check.sh` exits successfully.
+
+
+  VERIFY: Re-run the same check the grader uses and confirm `check.sh` exits successfully. Capture the
+  before/after output as evidence. Success criteria: the objective''s healthy state holds on a repeat
+  check, not just once.
+
+
+  ROLLBACK: If a change makes things worse, revert that single change immediately (restore the original
+  config file / undo the edit / restart the affected component) and re-observe before trying another hypothesis.
+  Never stack unverified changes.
 
 
   WHAT TO AVOID: Do not apply broad destructive changes, skip evidence gathering, or fake completion with
@@ -38,30 +54,58 @@ is_free: false
 hints:
 - order: 1
   cost: 0
-  content: 'Where to look: Start with read-only discovery on the Linux practice server. For vgcreate Fails
-    — Invalid VG Name with Hyphen, inspect terminal and config files under /etc and /var before changing
-    anything.'
+  content: 'ORIENT — what to observe and why:
+
+    Do not touch anything yet. First observe the symptom: vgcreate fails — invalid VG name with hyphen
+    is not behaving as the scenario objectives require. This lab is about vgcreate fails — invalid VG
+    name with hyphen — how vgcreate fails — invalid VG name with hyphen behaves in a Linux administration
+    environment. Read the objectives and the current state, and note precisely what looks wrong versus
+    healthy before you form any theory.'
 - order: 2
-  cost: 25
-  content: 'Diagnostic steps:
+  cost: 10
+  content: 'APPROACH — the troubleshooting method:
 
-    1. Gather evidence with terminal and config files under /etc and /var.
-
-    2. Compare current output to the scenario objectives.
-
-    3. Form a single hypothesis about the smallest fix that would restore healthy state.'
+    Work from evidence, not guesses. For vgcreate fails — invalid VG name with hyphen problems the reliable
+    method is: (1) reproduce/observe the failure, (2) narrow from the whole system down to the one component
+    that owns the symptom, (3) change exactly one thing, (4) re-check. Fix the underlying misconfiguration
+    you identified (not just the noisy log line), changing one thing at a time.'
 - order: 3
-  cost: 50
-  content: 'Exact fix + verification:
+  cost: 25
+  content: 'WHICH TOOL — the diagnostic command(s):
 
-    1. Verify the volume group was created with vgs.
+    1. Inspect the current state with terminal and config files under /etc and /var.
 
-    2. Re-run the lab checker (`check.sh` or Check Solution).
+    2. Each command above tells you something specific — status/health, recent errors, and the effective
+    configuration. Read them in that order.
 
-    3. Confirm every scenario objective is satisfied.
+    3. Compare what you see to the objectives; the gap points at the fault.'
+- order: 4
+  cost: 40
+  content: 'NARROW DOWN — isolate the subsystem:
+
+    1. From the evidence above, decide which single part of vgcreate fails — invalid VG name with hyphen
+    is at fault.
+
+    2. Re-run the most relevant of terminal and config files under /etc and /var focused on just that
+    part to confirm it.
+
+    3. State a one-line hypothesis: the smallest change that would move the state from ''vgcreate fails
+    — invalid VG name with hyphen is not behaving as the scenario objectives require'' toward ''`check.sh`
+    exits successfully''.'
+- order: 5
+  cost: 60
+  content: 'NEAR-SOLUTION — the fix shape + verify (you still apply it):
+
+    1. Apply the smallest reversible change your hypothesis points to. Fix the underlying misconfiguration
+    you identified (not just the noisy log line), changing one thing at a time.
+
+    2. Re-run `bash check.sh` and confirm `check.sh` exits successfully.
+
+    3. If it still fails, the hypothesis was wrong — go back to the evidence, do not stack changes.
 
 
-    WHY: the grader validates real state — marker files are ignored.'
+    WHY: the grader validates real system state, not marker files — a fix only counts when the subsystem
+    is actually healthy.'
 requires_companion_hosts: false
 dual_terminal: false
 jira_priority: Medium

@@ -11,22 +11,39 @@ max_score: 100
 is_free: false
 infrastructure_type: docker
 jira_priority: Medium
-description: 'CONTEXT: A team operating VMware vSphere needs you to resolve `vmware: Jinja2 Templates
-  — Automation Practice` during a realistic incident. The business impact is reduced service reliability
-  until the underlying state is repaired.
+description: 'CONTEXT: A team operating VMware vSphere has raised a ticket for `Jinja2 Templates — Automation
+  Lab`. A customer-facing workflow is degraded and the on-call engineer (you) must diagnose and resolve
+  it. Business impact: reduced service reliability and blocked users until the underlying state is repaired.
 
 
-  ENVIRONMENT: You are working in FixitLab''s offline vSphere lab with VMs, datastores, vCenter, and ESXi
-  tasks. All tools run locally; no paid APIs or external cloud calls are required.
+  ENVIRONMENT: You are working in FixitLab''s offline vSphere lab. The architecture is a single lab-primary
+  node exposing VMs, datastores, vCenter, and ESXi tasks; treat it as the production host for this incident.
+  All tools run locally — no paid APIs or external cloud calls are required.
 
 
   SYMPTOM / STARTING STATE: Operators still perform manual steps for Jinja2 templates. Automate the boring
-  parts without hiding important safety checks. Automation lab: remove toil around Jinja2 templates. Codify
-  repeatable steps for variables, filters, and conditionals in templates and prove the automation is idempotent.
+  parts without hiding important safety checks.
 
 
   OBJECTIVE: Day-2 Jinja2 templates work completes safely in this environment; Changes are verified with
-  before/after checks; The system remains stable for dependent teams. Success means `check.sh` exits successfully.
+  before/after checks; The system remains stable for dependent teams. Acceptance criteria: the change
+  is minimal and reversible, and success means `check.sh` exits successfully.
+
+
+  WORK TO DO: Required tooling is pre-installed; if a command is missing, note it and use the equivalent
+  already on the host. Make the smallest configuration change that moves the system toward the objective
+  (edit the relevant VMs, datastores, vCenter, and ESXi tasks), changing one thing at a time. Check your
+  work continuously against the objective — success means `check.sh` exits successfully.
+
+
+  VERIFY: Re-run the same check the grader uses and confirm `check.sh` exits successfully. Capture the
+  before/after output as evidence. Success criteria: the objective''s healthy state holds on a repeat
+  check, not just once.
+
+
+  ROLLBACK: If a change makes things worse, revert that single change immediately (restore the original
+  config file / undo the edit / restart the affected component) and re-observe before trying another hypothesis.
+  Never stack unverified changes.
 
 
   WHAT TO AVOID: Do not apply broad destructive changes, skip evidence gathering, or fake completion with
@@ -40,35 +57,54 @@ initial_state: Operators still perform manual steps for Jinja2 templates. Automa
 hints:
 - order: 1
   cost: 0
-  content: 'Orient yourself before changing anything:
+  content: 'ORIENT — what to observe and why:
 
-    1. Inspect the current state — template files, `--check --diff`, and rendered output.
-
-    2. Write down what looks normal versus wrong or missing for Jinja2 templates.
-
-    3. Recall the core idea: variables, filters, and conditionals in templates. Form one hypothesis before
-    you act.'
+    Do not touch anything yet. First observe the symptom: rendered config is wrong or missing values.
+    This lab is about Jinja2 templates — variables, filters, and conditionals in templates. Read the objectives
+    and the current state, and note precisely what looks wrong versus healthy before you form any theory.'
 - order: 2
-  cost: 25
-  content: 'Diagnostic steps:
+  cost: 10
+  content: 'APPROACH — the troubleshooting method:
 
-    1. Gather evidence with template files, `--check --diff`, and rendered output.
-
-    2. Compare current output to the scenario objectives.
-
-    3. Form a single hypothesis about the smallest fix that would restore healthy state.'
+    Work from evidence, not guesses. For Jinja2 templates problems the reliable method is: (1) reproduce/observe
+    the failure, (2) narrow from the whole system down to the one component that owns the symptom, (3)
+    change exactly one thing, (4) re-check. Implement the automation with dry-run / check mode, then run
+    it twice — the second run must report no changes.'
 - order: 3
-  cost: 50
-  content: 'Exact fix + verification:
+  cost: 25
+  content: 'WHICH TOOL — the diagnostic command(s):
 
-    1. Re-check the current state — template files, `--check --diff`, and rendered output.
+    1. Inspect the current state with template files, `--check --diff`, and rendered output.
 
-    2. Implement the automation with dry-run / check mode, then run it twice — the second run must report
-    no changes.
+    2. Each command above tells you something specific — status/health, recent errors, and the effective
+    configuration. Read them in that order.
 
-    3. Verify the result — the rendered file matches the intended config.
+    3. Compare what you see to the objectives; the gap points at the fault.'
+- order: 4
+  cost: 40
+  content: 'NARROW DOWN — isolate the subsystem:
 
-    4. Click Check Solution once the objective is met (graded on real state, not a marker file).'
+    1. From the evidence above, decide which single part of Jinja2 templates is at fault.
+
+    2. Re-run the most relevant of template files, `--check --diff`, and rendered output focused on just
+    that part to confirm it.
+
+    3. State a one-line hypothesis: the smallest change that would move the state from ''rendered config
+    is wrong or missing values'' toward ''the rendered file matches the intended config''.'
+- order: 5
+  cost: 60
+  content: 'NEAR-SOLUTION — the fix shape + verify (you still apply it):
+
+    1. Apply the smallest reversible change your hypothesis points to. Implement the automation with dry-run
+    / check mode, then run it twice — the second run must report no changes.
+
+    2. Re-run `bash check.sh` and confirm the rendered file matches the intended config.
+
+    3. If it still fails, the hypothesis was wrong — go back to the evidence, do not stack changes.
+
+
+    WHY: the grader validates real system state, not marker files — a fix only counts when the subsystem
+    is actually healthy.'
 vmware_link: true
 summary: Complete the jinja2 templates — automation lab vmware lab and verify success with the checker
 estimated_minutes: 20

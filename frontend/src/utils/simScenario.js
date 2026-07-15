@@ -8,6 +8,7 @@ const SIM_TYPES = {
   prometheus: { label: 'Prometheus', short: 'Prometheus', accent: '#e6522c' },
   monitoring: { label: 'Grafana + Prometheus', short: 'Monitoring', accent: '#f7913b' },
   terraform: { label: 'Terraform Cloud + VS Code IDE', short: 'Terraform', accent: '#7B42BC' },
+  aws: { label: 'AWS Management Console', short: 'AWS', accent: '#ff9900' },
   vmware: { label: 'VMware vCenter', short: 'VMware', accent: '#4fa7e8' },
   'windows-server': { label: 'Windows Server GUI', short: 'Windows', accent: '#0078d4' },
   windows: { label: 'Windows Server GUI', short: 'Windows', accent: '#0078d4' },
@@ -31,6 +32,13 @@ function slugHints(slug) {
   if (s.startsWith('ds-dashboard-')) return 'data-dashboard'
   if (s.includes('nmap')) return 'nmap'
   if (s.includes('wireshark')) return 'wireshark'
+  // Console-graded AWS objectives (EC2 / S3 / IAM console clicks) open the AWS
+  // Management Console, whose GUI actions are mirrored to the gradeable engine.
+  // These prefixes previously matched nothing, so this is additive.
+  if (s.startsWith('ec2-') || s.startsWith('s3-') || s.startsWith('iam-') || s.startsWith('aws-console-')) return 'aws'
+  // Legacy: bare aws-* labs stay on the Terraform IDE (terraform-graded) for
+  // backward compatibility. An explicit simulation_type='aws' (checked first in
+  // getScenarioSimInfo) overrides this to open the console instead.
   if (s.startsWith('aws-')) return 'terraform'
   return null
 }

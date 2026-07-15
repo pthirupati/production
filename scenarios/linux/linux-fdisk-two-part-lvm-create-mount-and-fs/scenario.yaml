@@ -3,24 +3,49 @@ slug: linux-fdisk-two-part-lvm-create-mount-and-fs
 difficulty: hard
 category: Fix
 technology: linux
-description: "CONTEXT: A team operating Linux administration needs you to resolve `Two fdisk Partitions:\
-  \ One for LVM, One Plain Filesystem` during a realistic incident. The business impact is reduced service\
-  \ reliability until the underlying state is repaired.\n\nENVIRONMENT: You are working in FixitLab's\
-  \ offline Linux practice server with terminal and config files under /etc and /var. All tools run locally;\
-  \ no paid APIs or external cloud calls are required.\n\nSYMPTOM / STARTING STATE: Simulated RHEL 9 server.\
-  \ lsblk shows /dev/sdc (30G) with no partitions. There is no\nvgdata volume group, no lvdata LV, /data\
-  \ is empty, and /mnt/data2 is empty. /etc/fstab\nhas no entries for either device. A 30G disk /dev/sdc\
-  \ is attached and raw. You must split it into TWO primary partitions\nwith fdisk and provision them\
-  \ differently:\n  - /dev/sdc1 becomes part of LVM — initialise it as a physical volume, create the\n\
-  \    volume group vgdata on it, carve a logical volume named lvdata, format it, and\n    mount it at\
-  \ /data.\n  - /dev/sdc2 becomes a plain standalone filesystem — format it directly (no LVM) and\n  \
-  \  mount it at /mnt/data2.\nBoth must end up mounted and recorded in /etc/fstab. The lab only passes\
-  \ when the LV\nlvdata exists, /data is mounted from the LV, and the plain /dev/sdc2 filesystem is\n\
-  mounted and persisted.\n\nOBJECTIVE: Create two primary partitions on /dev/sdc with fdisk (/dev/sdc1\
-  \ and /dev/sdc2); {'LVM leg': 'pvcreate /dev/sdc1; vgcreate vgdata /dev/sdc1; lvcreate -L 15G -n lvdata\
-  \ vgdata'}; {'Format and mount the LV': 'mkfs.xfs /dev/vgdata/lvdata; mount it at /data'}. Success means\
-  \ `check.sh` exits successfully.\n\nWHAT TO AVOID: Do not apply broad destructive changes, skip evidence\
-  \ gathering, or fake completion with marker files — the checker validates real system state."
+description: 'CONTEXT: A team operating Linux administration has raised a ticket for `Two fdisk Partitions:
+  One for LVM, One Plain Filesystem`. A customer-facing workflow is degraded and the on-call engineer
+  (you) must diagnose and resolve it. Business impact: reduced service reliability and blocked users until
+  the underlying state is repaired.
+
+
+  ENVIRONMENT: You are working in FixitLab''s offline Linux practice server. The architecture is a single
+  lab-primary node exposing terminal and config files under /etc and /var; treat it as the production
+  host for this incident. All tools run locally — no paid APIs or external cloud calls are required.
+
+
+  SYMPTOM / STARTING STATE: Simulated RHEL 9 server. lsblk shows /dev/sdc (30G) with no partitions. There
+  is no
+
+  vgdata volume group, no lvdata LV, /data is empty, and /mnt/data2 is empty. /etc/fstab
+
+  has no entries for either device.
+
+
+  OBJECTIVE: Create two primary partitions on /dev/sdc with fdisk (/dev/sdc1 and /dev/sdc2); {''LVM leg'':
+  ''pvcreate /dev/sdc1; vgcreate vgdata /dev/sdc1; lvcreate -L 15G -n lvdata vgdata''}; {''Format and
+  mount the LV'': ''mkfs.xfs /dev/vgdata/lvdata; mount it at /data''}. Acceptance criteria: the change
+  is minimal and reversible, and success means `check.sh` exits successfully.
+
+
+  WORK TO DO: Required tooling is pre-installed; if a command is missing, note it and use the equivalent
+  already on the host. Make the smallest configuration change that moves the system toward the objective
+  (edit the relevant terminal and config files under /etc and /var), changing one thing at a time. Check
+  your work continuously against the objective — success means `check.sh` exits successfully.
+
+
+  VERIFY: Re-run the same check the grader uses and confirm `check.sh` exits successfully. Capture the
+  before/after output as evidence. Success criteria: the objective''s healthy state holds on a repeat
+  check, not just once.
+
+
+  ROLLBACK: If a change makes things worse, revert that single change immediately (restore the original
+  config file / undo the edit / restart the affected component) and re-observe before trying another hypothesis.
+  Never stack unverified changes.
+
+
+  WHAT TO AVOID: Do not apply broad destructive changes, skip evidence gathering, or fake completion with
+  marker files — the checker validates real system state.'
 initial_state: 'Simulated RHEL 9 server. lsblk shows /dev/sdc (30G) with no partitions. There is no
 
   vgdata volume group, no lvdata LV, /data is empty, and /mnt/data2 is empty. /etc/fstab
@@ -51,19 +76,37 @@ topics_covered:
 hints:
 - order: 1
   cost: 0
-  content: 'Where to look: Run `df -h` and `du -xh /var /tmp /home | sort -h | tail -20` for large paths.'
+  content: 'ORIENT — what to observe and why:
+
+    Do not touch anything yet. First observe the symptom: two fdisk partitions is not behaving as the
+    scenario objectives require. This lab is about two fdisk partitions — how two fdisk partitions behaves
+    in a Linux administration environment. Read the objectives and the current state, and note precisely
+    what looks wrong versus healthy before you form any theory.'
 - order: 2
+  cost: 10
+  content: 'APPROACH — the troubleshooting method:
+
+    Work from evidence, not guesses. For two fdisk partitions problems the reliable method is: (1) reproduce/observe
+    the failure, (2) narrow from the whole system down to the one component that owns the symptom, (3)
+    change exactly one thing, (4) re-check. Fix the underlying misconfiguration you identified (not just
+    the noisy log line), changing one thing at a time.'
+- order: 3
   cost: 25
-  content: 'Diagnostic steps:
+  content: 'WHICH TOOL — the diagnostic command(s):
+
+    Run `df -h` and `du -xh /var /tmp /home | sort -h | tail -20` for large paths.'
+- order: 4
+  cost: 40
+  content: 'NARROW DOWN — isolate the subsystem:
 
     1. Find which mount is 100% — often `/` or `/var`.
 
     2. `journalctl --disk-usage` and old logs under `/var/log`.
 
     3. Look for core dumps, temp files, or oversized application data.'
-- order: 3
-  cost: 50
-  content: 'Exact fix + verification:
+- order: 5
+  cost: 60
+  content: 'NEAR-SOLUTION — the fix shape + verify (you still apply it):
 
     1. Remove or rotate the largest safe files (logs, caches, old packages).
 

@@ -2,13 +2,15 @@ title: Configure Device Multipath for SAN LUN
 slug: linux-multipath-setup
 difficulty: hard
 category: Fix
-description: 'CONTEXT: A team operating Linux administration needs you to resolve `Configure Device Multipath
-  for SAN LUN` during a realistic incident. The business impact is reduced service reliability until the
-  underlying state is repaired.
+description: 'CONTEXT: A team operating Linux administration has raised a ticket for `Configure Device
+  Multipath for SAN LUN`. A customer-facing workflow is degraded and the on-call engineer (you) must diagnose
+  and resolve it. Business impact: reduced service reliability and blocked users until the underlying
+  state is repaired.
 
 
-  ENVIRONMENT: You are working in FixitLab''s offline Linux practice server with terminal and config files
-  under /etc and /var. All tools run locally; no paid APIs or external cloud calls are required.
+  ENVIRONMENT: You are working in FixitLab''s offline Linux practice server. The architecture is a single
+  lab-primary node exposing terminal and config files under /etc and /var; treat it as the production
+  host for this incident. All tools run locally — no paid APIs or external cloud calls are required.
 
 
   SYMPTOM / STARTING STATE: Simulated RHEL 9 server. lsblk shows /dev/sdb and /dev/sdc, both with identical
@@ -18,21 +20,29 @@ description: 'CONTEXT: A team operating Linux administration needs you to resolv
 
   is not installed. Writing to both /dev/sdb and /dev/sdc without multipath risks
 
-  data corruption from split writes. A SAN LUN is presenting to this server through two separate FC/iSCSI
-  paths, appearing
-
-  as both /dev/sdb and /dev/sdc. Without multipath, the operating system treats these
-
-  as two separate disks, which leads to data corruption if both are written to. Device
-
-  mapper multipath must be configured to present both paths as a single logical device
-
-  with automatic failover.
+  data corruption from split writes.
 
 
   OBJECTIVE: Install device-mapper-multipath with yum install -y device-mapper-multipath; Generate a default
   multipath config with mpathconf --enable --with_multipathd y; Get the LUN WWID with /sbin/scsi_id --whitelisted
-  --device=/dev/sdb. Success means `check.sh` exits successfully.
+  --device=/dev/sdb. Acceptance criteria: the change is minimal and reversible, and success means `check.sh`
+  exits successfully.
+
+
+  WORK TO DO: Required tooling is pre-installed; if a command is missing, note it and use the equivalent
+  already on the host. Make the smallest configuration change that moves the system toward the objective
+  (edit the relevant terminal and config files under /etc and /var), changing one thing at a time. Check
+  your work continuously against the objective — success means `check.sh` exits successfully.
+
+
+  VERIFY: Re-run the same check the grader uses and confirm `check.sh` exits successfully. Capture the
+  before/after output as evidence. Success criteria: the objective''s healthy state holds on a repeat
+  check, not just once.
+
+
+  ROLLBACK: If a change makes things worse, revert that single change immediately (restore the original
+  config file / undo the edit / restart the affected component) and re-observe before trying another hypothesis.
+  Never stack unverified changes.
 
 
   WHAT TO AVOID: Do not apply broad destructive changes, skip evidence gathering, or fake completion with
@@ -61,19 +71,38 @@ is_free: false
 hints:
 - order: 1
   cost: 0
-  content: 'Where to look: Run `df -h` and `du -xh /var /tmp /home | sort -h | tail -20` for large paths.'
+  content: 'ORIENT — what to observe and why:
+
+    Do not touch anything yet. First observe the symptom: configure device multipath for SAN LUN is not
+    behaving as the scenario objectives require. This lab is about configure device multipath for SAN
+    LUN — how configure device multipath for SAN LUN behaves in a Linux administration environment. Read
+    the objectives and the current state, and note precisely what looks wrong versus healthy before you
+    form any theory.'
 - order: 2
+  cost: 10
+  content: 'APPROACH — the troubleshooting method:
+
+    Work from evidence, not guesses. For configure device multipath for SAN LUN problems the reliable
+    method is: (1) reproduce/observe the failure, (2) narrow from the whole system down to the one component
+    that owns the symptom, (3) change exactly one thing, (4) re-check. Fix the underlying misconfiguration
+    you identified (not just the noisy log line), changing one thing at a time.'
+- order: 3
   cost: 25
-  content: 'Diagnostic steps:
+  content: 'WHICH TOOL — the diagnostic command(s):
+
+    Run `df -h` and `du -xh /var /tmp /home | sort -h | tail -20` for large paths.'
+- order: 4
+  cost: 40
+  content: 'NARROW DOWN — isolate the subsystem:
 
     1. Find which mount is 100% — often `/` or `/var`.
 
     2. `journalctl --disk-usage` and old logs under `/var/log`.
 
     3. Look for core dumps, temp files, or oversized application data.'
-- order: 3
-  cost: 50
-  content: 'Exact fix + verification:
+- order: 5
+  cost: 60
+  content: 'NEAR-SOLUTION — the fix shape + verify (you still apply it):
 
     1. Remove or rotate the largest safe files (logs, caches, old packages).
 

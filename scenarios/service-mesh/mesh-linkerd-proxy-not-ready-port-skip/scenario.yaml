@@ -1,0 +1,166 @@
+title: 'Linkerd Proxy Blocks the App''s Startup Probe'
+slug: mesh-linkerd-proxy-not-ready-port-skip
+technology: service-mesh
+category: Fix
+difficulty: medium
+scenario_type: fix
+lab_mode: simulation
+simulation_type: generic
+time_limit: 1500
+max_score: 100
+is_free: false
+infrastructure_type: docker
+jira_priority: Medium
+description: 'CONTEXT: A team operating service mesh has raised a ticket for `Linkerd Proxy Blocks the
+  App''s Startup Probe`. A customer-facing workflow is degraded and the on-call engineer (you) must diagnose
+  and resolve it. Business impact: reduced service reliability and blocked users until the underlying
+  state is repaired.
+
+
+  ENVIRONMENT: You are working in FixitLab''s offline FixitLab practice environment. The architecture
+  is a single lab-primary node exposing CLI and configuration files; treat it as the production host for
+  this incident. All tools run locally — no paid APIs or external cloud calls are required.
+
+
+  SYMPTOM / STARTING STATE: A meshed pod never becomes Ready. The app''s readiness probe on port 8080
+  is intercepted by the linkerd-proxy before the proxy itself is ready, so the kubelet sees the probe
+  fail during startup.
+
+
+  OBJECTIVE: The meshed pod becomes Ready during startup; The proxy intercepting the readiness probe is
+  confirmed as root cause; The probe reaches the app after the port is skipped. Acceptance criteria: the
+  change is minimal and reversible, and success means `check.sh` exits successfully.
+
+
+  WORK TO DO: Required tooling is pre-installed; if a command is missing, note it and use the equivalent
+  already on the host. Make the smallest configuration change that moves the system toward the objective
+  (edit the relevant CLI and configuration files), changing one thing at a time. Check your work continuously
+  against the objective — success means `check.sh` exits successfully.
+
+
+  VERIFY: Re-run the same check the grader uses and confirm `check.sh` exits successfully. Capture the
+  before/after output as evidence. Success criteria: the objective''s healthy state holds on a repeat
+  check, not just once.
+
+
+  ROLLBACK: If a change makes things worse, revert that single change immediately (restore the original
+  config file / undo the edit / restart the affected component) and re-observe before trying another hypothesis.
+  Never stack unverified changes.
+
+
+  WHAT TO AVOID: Do not apply broad destructive changes, skip evidence gathering, or fake completion with
+  marker files — the checker validates real system state.'
+objectives:
+- 'The meshed pod becomes Ready during startup'
+- 'The proxy intercepting the readiness probe is confirmed as root cause'
+- 'The probe reaches the app after the port is skipped'
+initial_state: |-
+  A meshed pod never becomes Ready. The app's readiness probe on port 8080 is intercepted by the linkerd-proxy before the proxy itself is ready, so the kubelet sees the probe fail during startup.
+hints:
+- order: 1
+  cost: 0
+  content: 'ORIENT — what to observe and why:
+
+    Do not touch anything yet. First observe the symptom: linkerd proxy blocks the app''s startup probe
+    is not behaving as the scenario objectives require. This lab is about linkerd proxy blocks the app''s
+    startup probe — how linkerd proxy blocks the app''s startup probe behaves in a service-mesh environment.
+    Read the objectives and the current state, and note precisely what looks wrong versus healthy before
+    you form any theory.'
+- order: 2
+  cost: 10
+  content: 'APPROACH — the troubleshooting method:
+
+    Work from evidence, not guesses. For linkerd proxy blocks the app''s startup probe problems the reliable
+    method is: (1) reproduce/observe the failure, (2) narrow from the whole system down to the one component
+    that owns the symptom, (3) change exactly one thing, (4) re-check. Fix the underlying misconfiguration
+    you identified (not just the noisy log line), changing one thing at a time.'
+- order: 3
+  cost: 25
+  content: 'WHICH TOOL — the diagnostic command(s):
+
+    1. Inspect the current state with CLI tools for Linkerd Proxy Blocks the App''s Startup Probe.
+
+    2. Each command above tells you something specific — status/health, recent errors, and the effective
+    configuration. Read them in that order.
+
+    3. Compare what you see to the objectives; the gap points at the fault.'
+- order: 4
+  cost: 40
+  content: 'NARROW DOWN — isolate the subsystem:
+
+    1. From the evidence above, decide which single part of linkerd proxy blocks the app''s startup probe
+    is at fault.
+
+    2. Re-run the most relevant of CLI tools for Linkerd Proxy Blocks the App''s Startup Probe focused
+    on just that part to confirm it.
+
+    3. State a one-line hypothesis: the smallest change that would move the state from ''linkerd proxy
+    blocks the app''s startup probe is not behaving as the scenario objectives require'' toward ''`check.sh`
+    exits successfully''.'
+- order: 5
+  cost: 60
+  content: 'NEAR-SOLUTION — the fix shape + verify (you still apply it):
+
+    1. Apply the smallest reversible change your hypothesis points to. Fix the underlying misconfiguration
+    you identified (not just the noisy log line), changing one thing at a time.
+
+    2. Re-run `bash check.sh` and confirm `check.sh` exits successfully.
+
+    3. If it still fails, the hypothesis was wrong — go back to the evidence, do not stack changes.
+
+
+    WHY: the grader validates real system state, not marker files — a fix only counts when the subsystem
+    is actually healthy.'
+summary: |-
+  Diagnose and resolve linkerd proxy blocks the app's startup probe in the service-mesh simulation lab and verify the healthy end state
+estimated_minutes: 25
+xp_reward: 100
+prerequisites:
+- 'Basic Kubernetes networking literacy'
+tags:
+- 'service-mesh'
+- 'fix'
+- 'hands-on'
+- 'simulation'
+linked_tutorial: service-mesh-fundamentals
+what_you_will_learn:
+- 'The meshed pod becomes Ready during startup'
+- 'The proxy intercepting the readiness probe is confirmed as root cause'
+- 'Understand how Linkerd proxy port interception interacts with kubelet probes and why probe ports may need to be skipped during startup'
+environment:
+  nodes:
+  - role: primary
+    os: FixitLab service-mesh lab
+    hostname: lab-primary
+    ip: 127.0.0.1
+    specs: local offline simulation
+  pre_installed:
+  - bash
+  - coreutils
+  - kubectl
+  - istioctl
+  - linkerd
+  credentials:
+  - user: root
+    password: lab123
+tasks:
+- id: task_1
+  title: 'Linkerd Proxy Blocks the App''s Startup Probe'
+  description: |-
+    Restore healthy behavior for Linkerd Proxy Blocks the App's Startup Probe by reproducing the diagnosis from the symptom, isolating the root cause with evidence, applying the smallest safe fix, and validating the outcome with the checker.
+  background: |-
+    This service-mesh lab teaches how Linkerd proxy port interception interacts with kubelet probes and why probe ports may need to be skipped during startup through systematic troubleshooting: observe, hypothesize, change, verify.
+  validation:
+    type: custom_script
+    script: check.sh
+    error_message: |-
+      The scenario objective is not yet satisfied. Re-read hint tier 2, confirm the root cause, and apply the documented remediation so /opt/fixitlab/academy/mesh-linkerd-proxy-not-ready-port-skip.conf carries the FIXED-OK marker.
+solution:
+  summary: |-
+    The workload lacks the linkerd `config.linkerd.io/skip-inbound-ports` (or probe port annotation), so the proxy intercepts the readiness probe before it is ready, failing startup. Annotate the workload to skip the probe port (or use the proxy-aware probe config) so the kubelet reaches the app directly, then restart.
+  files_changed: []
+  commands_run:
+  - 'kubectl get pod -n web -o yaml'
+  - 'linkerd check --proxy'
+  - 'kubectl -n web logs deploy/web -c linkerd-proxy --tail=30'
+  reference_docs: service-mesh-fundamentals

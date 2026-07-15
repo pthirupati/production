@@ -414,6 +414,23 @@ class OrganizationDetailView(APIView):
         _send_member_added_email(org, user, request.user)
         return Response({"message": f"{email} added to {org.name}."}, status=201)
 
+    def delete(self, request, slug):
+        """Permanently delete the team (owner only).
+
+        Cascades remove memberships, pending invites and technology grants
+        (all FK on_delete=CASCADE to Organization).
+        """
+        org, member = self._membership(request.user, slug)
+        if not org or not member:
+            return Response({"error": "Organization not found or access denied."}, status=404)
+        if member.role != "owner":
+            return Response({"error": "Only the owner can delete the team."}, status=403)
+
+        name = org.name
+        org.delete()
+        logger.info("Organization '%s' (%s) deleted by owner %s.", name, slug, request.user.email)
+        return Response({"message": f"Team {name} deleted."})
+
 
 class OrganizationSettingsView(APIView):
     """PATCH /api/org/<slug>/settings/ — update branding and webhook (owner only)."""
@@ -495,10 +512,45 @@ class OrganizationMemberRemoveView(APIView):
         if actor.role == "admin" and target.role == "admin":
             return Response({"error": "Admins cannot remove other admins."}, status=403)
         if target.user_id == request.user.id and actor.role != "owner":
+            # Non-owners leaving should use the self-service leave endpoint; the
+            # owner never reaches here because their own role is "owner" (blocked
+            # above by the target.role == "owner" guard).
             return Response({"error": "Use leave team or ask the owner."}, status=400)
 
         target.delete()
         return Response({"message": "Member removed."})
+
+
+class OrganizationLeaveView(APIView):
+    """DELETE /api/org/<slug>/leave/ — the authenticated member leaves the team.
+
+    Any member (member/admin) may leave on their own. The owner cannot leave
+    while owning the team (they must transfer ownership or delete the team);
+    this also enforces the last-owner safeguard since ``Organization.owner`` is
+    a single field, so there is always exactly one owner membership.
+    """
+
+    permission_classes = [IsAuthenticated]
+
+    def delete(self, request, slug):
+        try:
+            org = Organization.objects.get(slug=slug, is_active=True)
+            membership = OrganizationMember.objects.get(organization=org, user=request.user)
+        except (Organization.DoesNotExist, OrganizationMember.DoesNotExist):
+            return Response({"error": "Not found"}, status=404)
+
+        if membership.role == "owner":
+            return Response(
+                {
+                    "error": "The owner cannot leave the team. Transfer ownership "
+                    "or delete the team instead.",
+                },
+                status=400,
+            )
+
+        membership.delete()
+        logger.info("User %s left organization '%s' (%s).", request.user.email, org.name, org.slug)
+        return Response({"message": f"You have left {org.name}."})
 
 
 class OrganizationInviteCancelView(APIView):

@@ -33,6 +33,68 @@ KIND_LABELS = {
     "integration": "Integration Lab",
 }
 
+# ---------------------------------------------------------------------------
+# CATALOG STANDARDS (single source of truth reused by the generator + the
+# validator). Two conventions define what "good" scenario copy looks like:
+#
+#   1. HINT_LADDER  — five graduated, teaching-oriented rungs at escalating
+#      XP cost. Each rung has an unmistakable label prefix so the validator
+#      can recognise it and so learners see the escalation. The ladder never
+#      pastes the full answer: even the final rung describes the *shape* of
+#      the fix and how to verify it, still requiring the learner to act.
+#
+#   2. TICKET_SECTIONS — the "company incident ticket" description structure.
+#      Every rich description opens with these labelled sections so a learner
+#      reads a realistic ticket (business impact, environment, symptom, the
+#      concrete work to do, how to verify) instead of a vague blurb.
+# ---------------------------------------------------------------------------
+
+# Five rungs, escalating XP cost. order/cost are stable so the seeder, scorer
+# and frontend keep working; label is the recognisable prefix for each rung.
+HINT_LADDER = (
+    {"order": 1, "cost": 0, "label": "ORIENT"},
+    {"order": 2, "cost": 10, "label": "APPROACH"},
+    {"order": 3, "cost": 25, "label": "WHICH TOOL"},
+    {"order": 4, "cost": 40, "label": "NARROW DOWN"},
+    {"order": 5, "cost": 60, "label": "NEAR-SOLUTION"},
+)
+HINT_LADDER_RUNGS = len(HINT_LADDER)
+# Human-readable name for each rung, used in the label prefix of the content.
+HINT_RUNG_TITLES = {
+    "ORIENT": "ORIENT — what to observe and why",
+    "APPROACH": "APPROACH — the troubleshooting method",
+    "WHICH TOOL": "WHICH TOOL — the diagnostic command(s)",
+    "NARROW DOWN": "NARROW DOWN — isolate the subsystem",
+    "NEAR-SOLUTION": "NEAR-SOLUTION — the fix shape + verify",
+}
+
+# The labelled sections of a company-ticket description, in order. The first
+# five (through OBJECTIVE / WHAT TO AVOID) are the legacy sections the older
+# validator + tests already look for; the remainder are the richer additions
+# (concrete work, verification, rollback) the enrichment adds on top.
+TICKET_SECTIONS = (
+    "CONTEXT",              # business background, customer, impact
+    "ENVIRONMENT",          # architecture overview + current environment
+    "SYMPTOM / STARTING STATE",
+    "OBJECTIVE",            # expected outcome + acceptance criteria
+    "WORK TO DO",           # required installs + config changes to make
+    "VERIFY",               # validation / verification steps + success criteria
+    "ROLLBACK",             # how to back out safely
+    "WHAT TO AVOID",        # anti-patterns / guard rails
+)
+# Section labels the validator MUST find for a description to count as rich.
+# Kept identical to the legacy DESCRIPTION_SECTIONS so grading-neutral, plus
+# the two new load-bearing sections that carry the "detailed requirements".
+TICKET_REQUIRED_SECTIONS = (
+    "CONTEXT:",
+    "ENVIRONMENT:",
+    "SYMPTOM",
+    "OBJECTIVE:",
+    "WORK TO DO:",
+    "VERIFY:",
+    "WHAT TO AVOID:",
+)
+
 TECH_PROFILES: dict[str, dict[str, str]] = {
     "aws": {"domain": "AWS cloud operations", "env": "AWS practice account", "surface": "AWS CLI, IAM policies, EC2/S3/VPC, security groups, and CloudFormation/Terraform"},
     "linux": {"domain": "Linux administration", "env": "Linux practice server", "surface": "terminal and config files under /etc and /var"},
@@ -684,6 +746,82 @@ def _guided_hints(
         {"order": 2, "cost": 25, "content": tier2},
         {"order": 3, "cost": 50, "content": tier3},
     ]
+
+
+def build_hint_ladder(
+    *,
+    label: str,
+    concept: str,
+    inspect: str,
+    symptom: str,
+    verify: str,
+    action: str,
+    grader: str,
+) -> list[dict[str, Any]]:
+    """Build the 5-rung graduated HINT_LADDER for a specific topic/fault.
+
+    Every rung is teaching-oriented and topic-specific — the caller passes the
+    ``inspect`` diagnostic commands, ``symptom`` and ``verify`` phrases for the
+    real subsystem, so a VLAN lab talks about VLAN/routing, not generic filler.
+    The final rung gives the fix *shape* + how to verify, never the full answer.
+
+    ``label``   short subsystem name (e.g. "VLAN routing", "the nginx service").
+    ``concept`` one-clause explanation of how the subsystem works.
+    ``inspect`` the read-only diagnostic command(s), already backtick-wrapped.
+    ``symptom`` the observable failure phrase.
+    ``verify``  the phrase describing a healthy end state.
+    ``action``  the kind-specific fix method (from _KIND_ACTION), imperative.
+    ``grader``  the verification command the checker uses, backtick-wrapped.
+    """
+    rungs = {
+        "ORIENT": (
+            f"ORIENT — what to observe and why:\n"
+            f"Do not touch anything yet. First observe the symptom: {symptom}. "
+            f"This lab is about {label} — {concept}. "
+            "Read the objectives and the current state, and note precisely what looks "
+            "wrong versus healthy before you form any theory."
+        ),
+        "APPROACH": (
+            f"APPROACH — the troubleshooting method:\n"
+            f"Work from evidence, not guesses. For {label} problems the reliable method is: "
+            "(1) reproduce/observe the failure, (2) narrow from the whole system down to the one "
+            "component that owns the symptom, (3) change exactly one thing, (4) re-check. "
+            f"{action}."
+        ),
+        "WHICH TOOL": (
+            f"WHICH TOOL — the diagnostic command(s):\n"
+            f"1. Inspect the current state with {inspect}.\n"
+            "2. Each command above tells you something specific — status/health, recent errors, "
+            "and the effective configuration. Read them in that order.\n"
+            "3. Compare what you see to the objectives; the gap points at the fault."
+        ),
+        "NARROW DOWN": (
+            f"NARROW DOWN — isolate the subsystem:\n"
+            f"1. From the evidence above, decide which single part of {label} is at fault.\n"
+            f"2. Re-run the most relevant of {inspect} focused on just that part to confirm it.\n"
+            "3. State a one-line hypothesis: the smallest change that would move the state from "
+            f"'{symptom}' toward '{verify}'."
+        ),
+        "NEAR-SOLUTION": (
+            f"NEAR-SOLUTION — the fix shape + verify (you still apply it):\n"
+            f"1. Apply the smallest reversible change your hypothesis points to. {action}.\n"
+            f"2. Re-run {grader} and confirm {verify}.\n"
+            "3. If it still fails, the hypothesis was wrong — go back to the evidence, do not "
+            "stack changes.\n\n"
+            "WHY: the grader validates real system state, not marker files — a fix only counts "
+            "when the subsystem is actually healthy."
+        ),
+    }
+    ladder: list[dict[str, Any]] = []
+    for spec in HINT_LADDER:
+        ladder.append(
+            {
+                "order": spec["order"],
+                "cost": spec["cost"],
+                "content": rungs[spec["label"]],
+            }
+        )
+    return ladder
 
 
 def build_academy_copy(
