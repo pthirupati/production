@@ -11,25 +11,41 @@ max_score: 100
 is_free: false
 infrastructure_type: docker
 jira_priority: Low
-description: 'CONTEXT: A team operating Java applications needs you to resolve `java: Gradle Builds —
-  Build From Scratch` during a realistic incident. The business impact is reduced service reliability
-  until the underlying state is repaired.
+description: 'CONTEXT: A team operating Java applications has raised a ticket for `Gradle Builds — Build
+  Lab`. A customer-facing workflow is degraded and the on-call engineer (you) must diagnose and resolve
+  it. Business impact: reduced service reliability and blocked users until the underlying state is repaired.
 
 
-  ENVIRONMENT: You are working in FixitLab''s offline Java project with Maven/Gradle, JVM logs, and Spring
-  configuration. All tools run locally; no paid APIs or external cloud calls are required.
+  ENVIRONMENT: You are working in FixitLab''s offline Java project. The architecture is a single lab-primary
+  node exposing Maven/Gradle, JVM logs, and Spring configuration; treat it as the production host for
+  this incident. All tools run locally — no paid APIs or external cloud calls are required.
 
 
   SYMPTOM / STARTING STATE: The Java project is ready but Gradle builds is not configured yet. Required
   tools may already be installed; your job is to create the configuration and bring the capability online.
-  Build Gradle builds from scratch in this java lab. You start from a minimal environment and must produce
-  a working configuration that demonstrates tasks, dependencies, and the build lifecycle. Plan, implement,
-  then prove it works.
 
 
   OBJECTIVE: A working Gradle builds setup must exist by the end of this lab; Configuration should follow
-  team conventions and be easy to audit; The result should pass validation without manual cleanup. Success
-  means `systemctl is-active nginx` returns active.
+  team conventions and be easy to audit; The result should pass validation without manual cleanup. Acceptance
+  criteria: the change is minimal and reversible, and success means `systemctl is-active nginx` returns
+  active.
+
+
+  WORK TO DO: Required tooling is pre-installed; if a command is missing, note it and use the equivalent
+  already on the host. Make the smallest configuration change that moves the system toward the objective
+  (edit the relevant Maven/Gradle, JVM logs, and Spring configuration), changing one thing at a time.
+  Check your work continuously against the objective — success means `systemctl is-active nginx` returns
+  active.
+
+
+  VERIFY: Re-run the same check the grader uses and confirm `systemctl is-active nginx` returns active.
+  Capture the before/after output as evidence. Success criteria: the objective''s healthy state holds
+  on a repeat check, not just once.
+
+
+  ROLLBACK: If a change makes things worse, revert that single change immediately (restore the original
+  config file / undo the edit / restart the affected component) and re-observe before trying another hypothesis.
+  Never stack unverified changes.
 
 
   WHAT TO AVOID: Do not apply broad destructive changes, skip evidence gathering, or fake completion with
@@ -43,35 +59,46 @@ initial_state: The Java project is ready but Gradle builds is not configured yet
 hints:
 - order: 1
   cost: 0
-  content: 'Orient yourself before changing anything:
+  content: 'ORIENT — what to observe and why:
 
-    1. Inspect the current state — build.gradle and `gradle build --info`.
-
-    2. Write down what looks normal versus wrong or missing for Gradle builds.
-
-    3. Recall the core idea: tasks, dependencies, and the build lifecycle. Form one hypothesis before
-    you act.'
+    Do not touch anything yet. First observe the symptom: builds fail on dependencies or tasks. This lab
+    is about Gradle builds — tasks, dependencies, and the build lifecycle. Read the objectives and the
+    current state, and note precisely what looks wrong versus healthy before you form any theory.'
 - order: 2
+  cost: 10
+  content: 'APPROACH — the troubleshooting method:
+
+    Work from evidence, not guesses. For Gradle builds problems the reliable method is: (1) reproduce/observe
+    the failure, (2) narrow from the whole system down to the one component that owns the symptom, (3)
+    change exactly one thing, (4) re-check. Create the smallest working slice of Gradle builds first,
+    validate it, then add the remaining pieces one at a time.'
+- order: 3
   cost: 25
-  content: 'Diagnostic steps:
+  content: 'WHICH TOOL — the diagnostic command(s):
+
+    Test the config to get the exact file and line: `nginx -t`. It prints the offending directive (e.g.
+    unknown directive "listn").'
+- order: 4
+  cost: 40
+  content: 'NARROW DOWN — isolate the subsystem:
 
     1. Run `nginx -t` and `systemctl status nginx` for config vs service errors.
 
     2. Open the cited file under `/etc/nginx/`.
 
     3. Compare listen/upstream/proxy directives to the scenario objectives.'
-- order: 3
-  cost: 50
-  content: 'Exact fix + verification:
+- order: 5
+  cost: 60
+  content: 'NEAR-SOLUTION — the fix shape + verify (you still apply it):
 
-    1. Re-check the current state — build.gradle and `gradle build --info`.
+    1. Correct the typo on the reported line and save the file.
 
-    2. Create the smallest working slice of Gradle builds first, validate it, then add the remaining pieces
-    one at a time.
+    2. Re-run `nginx -t` until it reports syntax is ok.
 
-    3. Verify the result — `gradle build` succeeds and produces artifacts.
+    3. Run `systemctl enable --now nginx`, then `curl -I http://localhost` (expect HTTP 200).
 
-    4. Click Check Solution once the objective is met (graded on real state, not a marker file).'
+
+    WHY: systemd will not start nginx until `nginx -t` passes.'
 summary: Complete the gradle builds — build lab java lab and verify success with the checker
 estimated_minutes: 15
 xp_reward: 100

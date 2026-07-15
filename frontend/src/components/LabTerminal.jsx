@@ -106,6 +106,67 @@ function makeTab(id, profileKey) {
 }
 
 /**
+ * Shared readiness/retry helper for terminal command sends.
+ *
+ * A LabTerminal only accepts commands once its xterm is mounted and the
+ * WebSocket handshake has completed (or the sim/cloud onReady fallback fires).
+ * Callers used to fire-and-forget a `sendCommand`, which returned false while
+ * the socket was still connecting and produced a spurious "Terminal not ready"
+ * toast. This helper instead polls `getTerminal().isConnected()` on a bounded
+ * loop and flushes the command the moment the shell is ready; it only reports
+ * an error after the timeout expires.
+ *
+ * It is intentionally free of React/DOM so it can be unit-tested with an
+ * injected timer. `getTerminal` is called on every tick (the terminal ref may
+ * not exist yet — e.g. a host switch or a lazily-mounted IDE panel).
+ *
+ * @returns {() => boolean} a cancel function; returns true if it stopped a
+ *   still-pending send, false if the send had already resolved.
+ */
+export function scheduleReadySend(cmd, {
+  getTerminal,
+  onSuccess,
+  onError,
+  timeoutMs = 6000,
+  intervalMs = 200,
+  initialDelayMs = 0,
+  now = () => Date.now(),
+  setTimer = (fn, ms) => setTimeout(fn, ms),
+  clearTimer = (id) => clearTimeout(id),
+} = {}) {
+  let done = false
+  let handle = null
+  const deadline = now() + timeoutMs
+  const finish = (fn, arg) => {
+    if (done) return
+    done = true
+    handle = null
+    fn?.(arg)
+  }
+  const attempt = () => {
+    if (done) return
+    const term = typeof getTerminal === 'function' ? getTerminal() : null
+    if (term?.isConnected?.() && term.sendCommand(cmd)) {
+      finish(onSuccess, cmd)
+      return
+    }
+    if (now() >= deadline) {
+      finish(onError, cmd)
+      return
+    }
+    handle = setTimer(attempt, intervalMs)
+  }
+  handle = setTimer(attempt, initialDelayMs)
+  return () => {
+    if (done) return false
+    done = true
+    if (handle != null) clearTimer(handle)
+    handle = null
+    return true
+  }
+}
+
+/**
  * Single xterm + WebSocket pane for a lab host (primary, companion, or ssh_client).
  */
 function LabTerminal({

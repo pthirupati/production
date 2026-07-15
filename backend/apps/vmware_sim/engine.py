@@ -8,6 +8,7 @@ from __future__ import annotations
 import copy
 import json
 import random
+import re
 import time
 from typing import Any
 
@@ -163,6 +164,12 @@ def _make_nic(
     connected: bool = True,
     adapter_type: str = "Vmxnet3",
     portgroup_key: str = "",
+    cable_connected: bool = True,
+    ip_mode: str = "dhcp",
+    guest_ip: str = "",
+    guest_prefix: int = 24,
+    guest_gateway: str = "",
+    net_mode: str = "bridged",
 ) -> dict:
     return {
         "id": nic_id,
@@ -177,6 +184,35 @@ def _make_nic(
         "portgroup_key": portgroup_key or f"dvportgroup-{vlan_id or 0}",
         "direct_path_io": False,
         "wake_on_lan": True,
+        # Layer-2 cable/link state — distinct from `connected` (the "Connect at
+        # power on" checkbox). A NIC can be connected in vSphere yet have its
+        # cable pulled at the virtual switch, and vice-versa.
+        "cable_connected": cable_connected,
+        # Layer-3 guest addressing the terminal renders from (ip a / ifconfig).
+        "ip_mode": ip_mode,          # dhcp | static | none
+        "guest_ip": guest_ip,
+        "guest_prefix": guest_prefix,
+        "guest_gateway": guest_gateway,
+        "net_mode": net_mode,        # bridged | nat | host-only
+    }
+
+
+def _make_cdrom(
+    cdrom_id: str,
+    iso_path: str = "",
+    connected: bool = False,
+    label: str = "",
+) -> dict:
+    """A virtual CD/DVD drive. `iso_path` empty means the drive is present but
+    has no media mounted (Client Device); a non-empty path is a mounted ISO."""
+    return {
+        "id": cdrom_id,
+        "label": label or "CD/DVD drive 1",
+        "device_type": "datastore_iso" if iso_path else "client_device",
+        "iso_path": iso_path,
+        "connected": bool(connected and iso_path),
+        "connect_at_power_on": bool(connected),
+        "controller": "IDE 0",
     }
 
 
@@ -316,6 +352,8 @@ def _enrich_inventory(state: dict) -> None:
 
         mac = vm.get("mac") or _vmware_mac(vm["id"])
         vm["mac"] = mac
+        vm_ip = vm.get("ip") if str(vm.get("ip") or "").count(".") == 3 else ""
+        vm_gw = ".".join(vm_ip.split(".")[:3] + ["1"]) if vm_ip else ""
         if not vm.get("nics"):
             vm["nics"] = [
                 _make_nic(
@@ -326,6 +364,9 @@ def _enrich_inventory(state: dict) -> None:
                     vlan_id=vlan,
                     connected=not vm.get("network_disconnected"),
                     portgroup_key=net.get("portgroup_key", ""),
+                    cable_connected=not vm.get("network_disconnected"),
+                    guest_ip=vm_ip,
+                    guest_gateway=vm_gw,
                 ),
             ]
         else:
@@ -336,11 +377,27 @@ def _enrich_inventory(state: dict) -> None:
                     n = net_by_id.get(nic["network_id"], {})
                     nic["vlan_id"] = n.get("vlan_id", n.get("vlan"))
                     nic.setdefault("network_name", n.get("name", ""))
+                # Backfill the L2/L3 fields on NICs created before these existed.
+                nic.setdefault("cable_connected", nic.get("connected", True))
+                nic.setdefault("ip_mode", "dhcp")
+                nic.setdefault("guest_prefix", 24)
+                nic.setdefault("net_mode", "bridged")
+                nic.setdefault("guest_gateway", "")
 
         if vm.get("nics"):
             primary = vm["nics"][0]
             vm["network_id"] = primary.get("network_id", net_id)
             vm["mac"] = primary.get("mac_address", mac)
+            # The primary NIC's guest IP tracks the VM's `ip` field so the
+            # terminal renders the same address the vSphere summary shows.
+            if vm_ip and not primary.get("guest_ip"):
+                primary["guest_ip"] = vm_ip
+            if vm_gw and not primary.get("guest_gateway"):
+                primary["guest_gateway"] = vm_gw
+
+        # Every VM has a virtual CD/DVD drive (empty / Client Device by default).
+        if not vm.get("cdroms"):
+            vm["cdroms"] = [_make_cdrom(f"{vm['id']}-cdrom0")]
 
 
 def _tick_performance(state: dict) -> None:
@@ -1084,14 +1141,29 @@ def apply_action(session_id: str, action: str, payload: dict | None = None) -> d
         vm = _find_vm(state, payload.get("vm_id"), payload.get("vm_name"))
         if not vm:
             return {"ok": False, "error": "VM not found"}
-        snap_name = payload.get("snapshot_name") or f"snapshot-{int(time.time())}"
+        existing = vm.setdefault("snapshots", [])
+        # Accept either the vSphere-style `snapshot_name` or a plain `name`; fall
+        # back to a sequential "Snapshot N" (matching the vSphere default) rather
+        # than a per-second timestamp so two snapshots taken in the same wall
+        # clock second no longer collide on an identical name.
+        snap_name = (payload.get("snapshot_name") or payload.get("name") or "").strip()
+        if not snap_name:
+            snap_name = f"Snapshot {len(existing) + 1}"
+        # If the chosen name already exists on this VM, disambiguate so the
+        # Snapshot Manager tree never shows two indistinguishable entries.
+        if any(s.get("name") == snap_name for s in existing):
+            base = snap_name
+            n = 2
+            while any(s.get("name") == f"{base} ({n})" for s in existing):
+                n += 1
+            snap_name = f"{base} ({n})"
         snap = {
             "id": f"snap-{int(time.time())}-{random.randint(100, 999)}",
             "name": snap_name,
             "description": payload.get("description") or "",
             "created": _now_iso(),
         }
-        vm.setdefault("snapshots", []).append(snap)
+        existing.append(snap)
         events.append(_event(f"Snapshot '{snap_name}' created on {vm['name']}", "info", vm["name"]))
         tasks.insert(0, _task("Create Snapshot", vm["name"]))
         _save_session(str(session_id), entry)
@@ -1594,10 +1666,198 @@ def apply_action(session_id: str, action: str, payload: dict | None = None) -> d
             return {"ok": False, "error": "VM not found"}
         vm.pop("network_disconnected", None)
         vm["net_mbps"] = random.randint(5, 30)
+        # Symmetric with disconnect_network: reconnecting the primary adapter
+        # flips its connected + cable state back on so the guest link comes up.
+        if vm.get("nics"):
+            vm["nics"][0]["connected"] = True
+            vm["nics"][0]["cable_connected"] = True
         events.append(_event(f"Network adapter connected on {vm['name']}", "info", vm["name"]))
         tasks.insert(0, _task("Connect Network", vm["name"]))
         _save_session(str(session_id), entry)
         return {"ok": True, "message": f"Network connected on {vm['name']}"}
+
+    if action == "disconnect_network":
+        vm = _find_vm(state, payload.get("vm_id"), payload.get("vm_name"))
+        if not vm:
+            return {"ok": False, "error": "VM not found"}
+        # Pulling the primary adapter: mark the VM disconnected AND flip the
+        # first NIC's connected/cable state off so the guest reports NO-CARRIER.
+        vm["network_disconnected"] = True
+        vm["net_mbps"] = 0
+        if vm.get("nics"):
+            vm["nics"][0]["connected"] = False
+            vm["nics"][0]["cable_connected"] = False
+        events.append(_event(f"Network adapter disconnected on {vm['name']}", "info", vm["name"]))
+        tasks.insert(0, _task("Disconnect Network", vm["name"]))
+        _save_session(str(session_id), entry)
+        return {"ok": True, "message": f"Network disconnected on {vm['name']}"}
+
+    if action == "set_nic_connected":
+        vm = _find_vm(state, payload.get("vm_id"), payload.get("vm_name"))
+        if not vm:
+            return {"ok": False, "error": "VM not found"}
+        nic_id = payload.get("nic_id")
+        nics = vm.get("nics") or []
+        nic = next((n for n in nics if n.get("id") == nic_id), None)
+        if not nic:
+            return {"ok": False, "error": "Network adapter not found"}
+        connected = bool(payload.get("connected"))
+        nic["connected"] = connected
+        nic["cable_connected"] = connected
+        # Keep the VM-level flag consistent when the *primary* NIC is toggled so
+        # the guest terminal (which keys off network_disconnected + nics[0]) and
+        # the vSphere summary stay in sync.
+        if nics and nic is nics[0]:
+            if connected:
+                vm.pop("network_disconnected", None)
+                vm["net_mbps"] = random.randint(5, 30)
+            else:
+                vm["network_disconnected"] = True
+                vm["net_mbps"] = 0
+        verb = "connected" if connected else "disconnected"
+        events.append(_event(f"{nic.get('label', 'Network adapter')} {verb} on {vm['name']}", "info", vm["name"]))
+        tasks.insert(0, _task("Edit Network Adapter", vm["name"]))
+        _save_session(str(session_id), entry)
+        return {"ok": True, "message": f"{nic.get('label', 'Network adapter')} {verb}"}
+
+    if action == "edit_nic":
+        vm = _find_vm(state, payload.get("vm_id"), payload.get("vm_name"))
+        if not vm:
+            return {"ok": False, "error": "VM not found"}
+        nic_id = payload.get("nic_id")
+        nics = vm.get("nics") or []
+        nic = next((n for n in nics if n.get("id") == nic_id), None)
+        if not nic:
+            return {"ok": False, "error": "Network adapter not found"}
+        changed = []
+        net_id = payload.get("network_id")
+        if net_id:
+            net = next((n for n in state.get("networks", []) if n["id"] == net_id), None)
+            if not net:
+                return {"ok": False, "error": "Network not found"}
+            nic["network_id"] = net_id
+            nic["network_name"] = net["name"]
+            nic["vlan_id"] = net.get("vlan_id", net.get("vlan"))
+            nic["portgroup_key"] = net.get("portgroup_key", "")
+            # Reconnecting the specified NIC to a valid port group brings its link up.
+            nic["connected"] = True
+            nic["cable_connected"] = True
+            changed.append(f"network → {net['name']}")
+            # Only the primary NIC drives the VM-level network_id / summary.
+            if nics and nic is nics[0]:
+                vm["network_id"] = net_id
+                vm.pop("network_disconnected", None)
+                vm["net_mbps"] = random.randint(5, 30)
+        adapter_type = payload.get("adapter_type")
+        if adapter_type:
+            nic["adapter_type"] = adapter_type
+            changed.append(f"adapter → {adapter_type}")
+        if not changed:
+            return {"ok": False, "error": "No changes specified"}
+        events.append(_event(f"{nic.get('label', 'Network adapter')} edited on {vm['name']}: {', '.join(changed)}", "info", vm["name"]))
+        tasks.insert(0, _task("Edit Network Adapter", vm["name"]))
+        _save_session(str(session_id), entry)
+        return {"ok": True, "message": f"{nic.get('label', 'Network adapter')} updated: {', '.join(changed)}"}
+
+    if action == "edit_disk":
+        vm = _find_vm(state, payload.get("vm_id"), payload.get("vm_name"))
+        if not vm:
+            return {"ok": False, "error": "VM not found"}
+        disks = vm.get("disks") or []
+        disk_id = payload.get("disk_id")
+        scsi_id = payload.get("scsi_id")
+        disk = next(
+            (d for d in disks if d.get("id") == disk_id or (scsi_id and d.get("scsi_id") == scsi_id)),
+            None,
+        )
+        if not disk:
+            return {"ok": False, "error": "Disk not found"}
+        new_size = int(payload.get("size_gb") or 0)
+        cur = int(disk.get("capacity_gb") or 0)
+        if new_size <= 0:
+            return {"ok": False, "error": "New size must be a positive number of GB"}
+        # Virtual disks can only be grown online; shrinking is not supported.
+        if new_size < cur:
+            return {"ok": False, "error": f"Cannot shrink a virtual disk below its current {cur} GB"}
+        if new_size == cur:
+            return {"ok": False, "error": "New size matches the current size"}
+        delta = new_size - cur
+        ds = _find_ds(state, ds_id=disk.get("datastore_id") or vm.get("datastore_id"))
+        if ds is not None and ds.get("free_gb", 0) < delta:
+            return {"ok": False, "error": f"Datastore has only {ds.get('free_gb', 0)} GB free — cannot grow by {delta} GB"}
+        disk["capacity_gb"] = new_size
+        vm["disk_gb"] = sum(d.get("capacity_gb", 0) for d in disks)
+        if ds is not None:
+            ds["free_gb"] = max(0, ds["free_gb"] - delta)
+        # A powered-on guest sees the extra capacity only after a rescan / online
+        # resize inside the OS, so flag it pending (mirrors real hot-grow).
+        if vm.get("power") == "poweredOn":
+            disk["resize_pending"] = True
+            vm["guest_disk_resize_pending"] = True
+        events.append(_event(f"Grew {disk.get('scsi_id', '')} on {vm['name']} to {new_size} GB", "info", vm["name"]))
+        tasks.insert(0, _task("Extend Virtual Disk", vm["name"]))
+        _save_session(str(session_id), entry)
+        return {"ok": True, "message": f"Disk {disk.get('scsi_id', '')} grown to {new_size} GB"}
+
+    if action == "add_cdrom":
+        vm = _find_vm(state, payload.get("vm_id"), payload.get("vm_name"))
+        if not vm:
+            return {"ok": False, "error": "VM not found"}
+        cdroms = vm.setdefault("cdroms", [])
+        idx = len(cdroms) + 1
+        cd_id = f"{vm['id']}-cdrom{idx}-{int(time.time()) % 100000}"
+        iso = (payload.get("iso_path") or "").strip()
+        cd = _make_cdrom(cd_id, iso_path=iso, connected=bool(iso), label=f"CD/DVD drive {idx}")
+        cdroms.append(cd)
+        events.append(_event(f"Added CD/DVD drive to {vm['name']}", "info", vm["name"]))
+        tasks.insert(0, _task("Add CD/DVD Drive", vm["name"]))
+        _save_session(str(session_id), entry)
+        return {"ok": True, "message": f"Added CD/DVD drive to {vm['name']}"}
+
+    if action == "remove_cdrom":
+        vm = _find_vm(state, payload.get("vm_id"), payload.get("vm_name"))
+        if not vm:
+            return {"ok": False, "error": "VM not found"}
+        cdroms = vm.get("cdroms") or []
+        cd_id = payload.get("cdrom_id")
+        cd = next((c for c in cdroms if c.get("id") == cd_id), None)
+        if not cd:
+            return {"ok": False, "error": "CD/DVD drive not found"}
+        vm["cdroms"] = [c for c in cdroms if c is not cd]
+        events.append(_event(f"Removed {cd.get('label', 'CD/DVD drive')} from {vm['name']}", "info", vm["name"]))
+        tasks.insert(0, _task("Remove CD/DVD Drive", vm["name"]))
+        _save_session(str(session_id), entry)
+        return {"ok": True, "message": f"Removed CD/DVD drive from {vm['name']}"}
+
+    if action in ("mount_iso", "unmount_iso"):
+        vm = _find_vm(state, payload.get("vm_id"), payload.get("vm_name"))
+        if not vm:
+            return {"ok": False, "error": "VM not found"}
+        cdroms = vm.get("cdroms") or []
+        cd_id = payload.get("cdrom_id")
+        cd = next((c for c in cdroms if c.get("id") == cd_id), cdroms[0] if cdroms else None)
+        if not cd:
+            return {"ok": False, "error": "CD/DVD drive not found"}
+        if action == "mount_iso":
+            iso = (payload.get("iso_path") or "").strip()
+            if not iso:
+                return {"ok": False, "error": "ISO path is required"}
+            cd["iso_path"] = iso
+            cd["device_type"] = "datastore_iso"
+            cd["connected"] = True
+            cd["connect_at_power_on"] = True
+            events.append(_event(f"Mounted {iso} on {vm['name']}", "info", vm["name"]))
+            tasks.insert(0, _task("Edit CD/DVD Drive", vm["name"]))
+            msg = f"Mounted {iso}"
+        else:
+            cd["iso_path"] = ""
+            cd["device_type"] = "client_device"
+            cd["connected"] = False
+            events.append(_event(f"Unmounted ISO on {vm['name']}", "info", vm["name"]))
+            tasks.insert(0, _task("Edit CD/DVD Drive", vm["name"]))
+            msg = "Unmounted ISO"
+        _save_session(str(session_id), entry)
+        return {"ok": True, "message": msg}
 
     if action == "reduce_cpu_contention":
         vm = _find_vm(state, payload.get("vm_id"), payload.get("vm_name"))
@@ -1916,7 +2176,15 @@ def apply_action(session_id: str, action: str, payload: dict | None = None) -> d
             connected=True, adapter_type=adapter_type,
             portgroup_key=net.get("portgroup_key", ""),
         )
-        nic["label"] = f"Network adapter {idx}"
+        # Label as the next contiguous "Network adapter N" (one past the highest
+        # existing adapter number) so a VM with "Network adapter 0" gets a
+        # "Network adapter 1" next, instead of jumping to "2" and leaving a gap.
+        next_label_num = 0
+        for existing in nics:
+            m = re.search(r"(\d+)\s*$", str(existing.get("label") or ""))
+            if m:
+                next_label_num = max(next_label_num, int(m.group(1)) + 1)
+        nic["label"] = f"Network adapter {next_label_num}"
         nics.append(nic)
         if vm.get("power") == "poweredOn" and idx > 1:
             vm["guest_nic_pending"] = True

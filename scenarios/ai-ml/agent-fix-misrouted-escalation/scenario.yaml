@@ -1,29 +1,42 @@
 title: Fix the misrouting billing-escalation agent
 slug: agent-fix-misrouted-escalation
 category: Fix
-description: 'CONTEXT: A team operating AI/ML workflows needs you to resolve `Fix the misrouting billing-escalation
-  agent` during a realistic incident. The business impact is reduced service reliability until the underlying
-  state is repaired.
+description: 'CONTEXT: A team operating AI/ML workflows has raised a ticket for `Fix the misrouting billing-escalation
+  agent`. A customer-facing workflow is degraded and the on-call engineer (you) must diagnose and resolve
+  it. Business impact: reduced service reliability and blocked users until the underlying state is repaired.
 
 
-  ENVIRONMENT: You are working in FixitLab''s offline ML practice workspace with datasets, training scripts,
-  metrics, and model artifacts. All tools run locally; no paid APIs or external cloud calls are required.
+  ENVIRONMENT: You are working in FixitLab''s offline ML practice workspace. The architecture is a single
+  lab-primary node exposing datasets, training scripts, metrics, and model artifacts; treat it as the
+  production host for this incident. All tools run locally — no paid APIs or external cloud calls are
+  required.
 
 
   SYMPTOM / STARTING STATE: The full graph already exists but is wired wrong on three counts — the LLM
   is in summarize mode, the condition compares sentiment==positive, and the send_notification tool sits
-  on the false branch while a db_query sits on the true branch. The escalation never fires. An existing
-  triage agent is supposed to escalate high-priority billing tickets, but it is broken. The "LLM" node
-  is summarising instead of classifying, the condition checks the wrong field, and the escalation is wired
-  to the wrong branch so it calls a logging query instead of paging the billing team. Debug the agent
-  in the Agent Workflow simulator and make the refund ticket escalate correctly. Everything is deterministic
-  and local.
+  on the false branch while a db_query sits on the true branch. The escalation never fires.
 
 
   OBJECTIVE: Open the Agent Workflow simulator and run the broken flow to see what it currently does;
   Reconfigure the LLM node from summarize mode to classify mode so it produces a category and priority;
-  Fix the Condition node to detect a high-priority ticket (field priority, equals high). Success means
-  `check.sh` exits successfully.
+  Fix the Condition node to detect a high-priority ticket (field priority, equals high). Acceptance criteria:
+  the change is minimal and reversible, and success means `check.sh` exits successfully.
+
+
+  WORK TO DO: Required tooling is pre-installed; if a command is missing, note it and use the equivalent
+  already on the host. Make the smallest configuration change that moves the system toward the objective
+  (edit the relevant datasets, training scripts, metrics, and model artifacts), changing one thing at
+  a time. Check your work continuously against the objective — success means `check.sh` exits successfully.
+
+
+  VERIFY: Re-run the same check the grader uses and confirm `check.sh` exits successfully. Capture the
+  before/after output as evidence. Success criteria: the objective''s healthy state holds on a repeat
+  check, not just once.
+
+
+  ROLLBACK: If a change makes things worse, revert that single change immediately (restore the original
+  config file / undo the edit / restart the affected component) and re-observe before trying another hypothesis.
+  Never stack unverified changes.
 
 
   WHAT TO AVOID: Do not apply broad destructive changes, skip evidence gathering, or fake completion with
@@ -49,31 +62,58 @@ initial_state: The full graph already exists but is wired wrong on three counts 
 hints:
 - order: 1
   cost: 0
-  content: 'Where to look: Start with read-only discovery on the ML practice workspace. For Fix the misrouting
-    billing-escalation agent, inspect datasets, training scripts, metrics, and model artifacts before
-    changing anything.'
+  content: 'ORIENT — what to observe and why:
+
+    Do not touch anything yet. First observe the symptom: fix the misrouting billing-escalation agent
+    is not behaving as the scenario objectives require. This lab is about fix the misrouting billing-escalation
+    agent — how fix the misrouting billing-escalation agent behaves in a AI/ML workflows environment.
+    Read the objectives and the current state, and note precisely what looks wrong versus healthy before
+    you form any theory.'
 - order: 2
-  cost: 25
-  content: 'Diagnostic steps:
+  cost: 10
+  content: 'APPROACH — the troubleshooting method:
 
-    1. Gather evidence with datasets, training scripts, metrics, and model artifacts.
-
-    2. Compare current output to the scenario objectives.
-
-    3. Form a single hypothesis about the smallest fix that would restore healthy state.'
+    Work from evidence, not guesses. For fix the misrouting billing-escalation agent problems the reliable
+    method is: (1) reproduce/observe the failure, (2) narrow from the whole system down to the one component
+    that owns the symptom, (3) change exactly one thing, (4) re-check. Fix the underlying misconfiguration
+    you identified (not just the noisy log line), changing one thing at a time.'
 - order: 3
-  cost: 50
-  content: 'Exact fix + verification:
+  cost: 25
+  content: 'WHICH TOOL — the diagnostic command(s):
 
-    1. Re-route the escalation so the high-priority (true) branch reaches the send_notification tool,
-    then run it so the billing refund ticket is escalated.
+    1. Inspect the current state with datasets, training scripts, metrics, and model artifacts.
 
-    2. Re-run the lab checker (`check.sh` or Check Solution).
+    2. Each command above tells you something specific — status/health, recent errors, and the effective
+    configuration. Read them in that order.
 
-    3. Confirm every scenario objective is satisfied.
+    3. Compare what you see to the objectives; the gap points at the fault.'
+- order: 4
+  cost: 40
+  content: 'NARROW DOWN — isolate the subsystem:
+
+    1. From the evidence above, decide which single part of fix the misrouting billing-escalation agent
+    is at fault.
+
+    2. Re-run the most relevant of datasets, training scripts, metrics, and model artifacts focused on
+    just that part to confirm it.
+
+    3. State a one-line hypothesis: the smallest change that would move the state from ''fix the misrouting
+    billing-escalation agent is not behaving as the scenario objectives require'' toward ''`check.sh`
+    exits successfully''.'
+- order: 5
+  cost: 60
+  content: 'NEAR-SOLUTION — the fix shape + verify (you still apply it):
+
+    1. Apply the smallest reversible change your hypothesis points to. Fix the underlying misconfiguration
+    you identified (not just the noisy log line), changing one thing at a time.
+
+    2. Re-run `bash check.sh` and confirm `check.sh` exits successfully.
+
+    3. If it still fails, the hypothesis was wrong — go back to the evidence, do not stack changes.
 
 
-    WHY: the grader validates real state — marker files are ignored.'
+    WHY: the grader validates real system state, not marker files — a fix only counts when the subsystem
+    is actually healthy.'
 summary: Complete the fix the misrouting billing-escalation agent ai ml lab and verify success with the
   checker
 estimated_minutes: 20

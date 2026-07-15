@@ -8,35 +8,44 @@ max_score: 100
 infrastructure_type: docker
 jira_priority: Medium
 is_free: false
-description: 'CONTEXT: A team operating security hardening needs you to resolve `OSSEC False Positive
-  — Tune Rules to Reduce Alert Noise` during a realistic incident. The business impact is reduced service
-  reliability until the underlying state is repaired.
+description: 'CONTEXT: A team operating security hardening has raised a ticket for `OSSEC False Positive
+  — Tune Rules to Reduce Alert Noise`. A customer-facing workflow is degraded and the on-call engineer
+  (you) must diagnose and resolve it. Business impact: reduced service reliability and blocked users until
+  the underlying state is repaired.
 
 
-  ENVIRONMENT: You are working in FixitLab''s offline hardening lab with SSH, firewall, TLS, audit logs,
-  and IAM settings. All tools run locally; no paid APIs or external cloud calls are required.
+  ENVIRONMENT: You are working in FixitLab''s offline hardening lab. The architecture is a single lab-primary
+  node exposing SSH, firewall, TLS, audit logs, and IAM settings; treat it as the production host for
+  this incident. All tools run locally — no paid APIs or external cloud calls are required.
 
 
   SYMPTOM / STARTING STATE: CentOS server running OSSEC 3.6 with file integrity monitoring enabled. The
 
   deployment script /usr/local/bin/svc-discovery.sh runs every 15 minutes and
 
-  legitimately modifies /etc/hosts. OSSEC is generating rule 550 alerts for this. The OSSEC HIDS installation
-  is generating hundreds of level-10 alerts per day
-
-  for a known-good deployment script that runs every 15 minutes via cron. The
-
-  script legitimately modifies /etc/hosts and /etc/resolv.conf as part of
-
-  service discovery. Create a local rule to suppress these specific false
-
-  positives while keeping all other file integrity alerts active.
+  legitimately modifies /etc/hosts. OSSEC is generating rule 550 alerts for this.
 
 
   OBJECTIVE: Identify the specific OSSEC rule IDs generating the false positive alerts in /var/ossec/logs/alerts/alerts.log;
   Create a local rule override in /var/ossec/rules/local_rules.xml to suppress the false positive; Restart
-  OSSEC and verify that the false positive alerts no longer appear while other alerts still fire. Success
-  means `check.sh` exits successfully.
+  OSSEC and verify that the false positive alerts no longer appear while other alerts still fire. Acceptance
+  criteria: the change is minimal and reversible, and success means `check.sh` exits successfully.
+
+
+  WORK TO DO: Required tooling is pre-installed; if a command is missing, note it and use the equivalent
+  already on the host. Make the smallest configuration change that moves the system toward the objective
+  (edit the relevant SSH, firewall, TLS, audit logs, and IAM settings), changing one thing at a time.
+  Check your work continuously against the objective — success means `check.sh` exits successfully.
+
+
+  VERIFY: Re-run the same check the grader uses and confirm `check.sh` exits successfully. Capture the
+  before/after output as evidence. Success criteria: the objective''s healthy state holds on a repeat
+  check, not just once.
+
+
+  ROLLBACK: If a change makes things worse, revert that single change immediately (restore the original
+  config file / undo the edit / restart the affected component) and re-observe before trying another hypothesis.
+  Never stack unverified changes.
 
 
   WHAT TO AVOID: Do not apply broad destructive changes, skip evidence gathering, or fake completion with
@@ -55,30 +64,47 @@ initial_state: 'CentOS server running OSSEC 3.6 with file integrity monitoring e
 hints:
 - order: 1
   cost: 0
-  content: 'Where to look: Run `cat /etc/resolv.conf` and test with `dig example.com` or `getent hosts
-    example.com`.'
+  content: 'ORIENT — what to observe and why:
+
+    Do not touch anything yet. First observe the symptom: OSSEC false positive — tune rules to reduce
+    alert noise is not behaving as the scenario objectives require. This lab is about OSSEC false positive
+    — tune rules to reduce alert noise — how OSSEC false positive — tune rules to reduce alert noise behaves
+    in a security hardening environment. Read the objectives and the current state, and note precisely
+    what looks wrong versus healthy before you form any theory.'
 - order: 2
+  cost: 10
+  content: 'APPROACH — the troubleshooting method:
+
+    Work from evidence, not guesses. For OSSEC false positive — tune rules to reduce alert noise problems
+    the reliable method is: (1) reproduce/observe the failure, (2) narrow from the whole system down to
+    the one component that owns the symptom, (3) change exactly one thing, (4) re-check. Fix the underlying
+    misconfiguration you identified (not just the noisy log line), changing one thing at a time.'
+- order: 3
   cost: 25
-  content: 'Diagnostic steps:
+  content: 'WHICH TOOL — the diagnostic command(s):
+
+    Run `cat /etc/resolv.conf` and test with `dig example.com` or `getent hosts example.com`.'
+- order: 4
+  cost: 40
+  content: 'NARROW DOWN — isolate the subsystem:
 
     1. Note the configured nameserver IP in resolv.conf.
 
     2. `ping` or `nc -zv` the nameserver — is it reachable?
 
     3. Check if NetworkManager or systemd-resolved overwrites the file.'
-- order: 3
-  cost: 50
-  content: 'Exact fix + verification:
+- order: 5
+  cost: 60
+  content: 'NEAR-SOLUTION — the fix shape + verify (you still apply it):
 
-    1. Restart OSSEC and verify that the false positive alerts no longer appear while other alerts still
-    fire.
+    1. Set a working `nameserver` line (e.g. 8.8.8.8 or the lab''s resolver).
 
-    2. Re-run the lab checker (`check.sh` or Check Solution).
+    2. Re-run `dig` or `getent hosts` — lookups should succeed.
 
-    3. Confirm every scenario objective is satisfied.
+    3. Confirm `check.sh` passes.
 
 
-    WHY: the grader validates real state — marker files are ignored.'
+    WHY: applications use resolv.conf for every hostname lookup.'
 summary: Complete the ossec false positive — tune rules to reduce alert noise security lab and verify
   success with the checker
 estimated_minutes: 15

@@ -11,23 +11,40 @@ max_score: 100
 is_free: false
 infrastructure_type: docker
 jira_priority: Medium
-description: 'CONTEXT: A team operating Docker containers needs you to resolve `docker: Container Logs
-  — Automation Practice` during a realistic incident. The business impact is reduced service reliability
-  until the underlying state is repaired.
+description: 'CONTEXT: A team operating Docker containers has raised a ticket for `Container Logs — Automation
+  Lab`. A customer-facing workflow is degraded and the on-call engineer (you) must diagnose and resolve
+  it. Business impact: reduced service reliability and blocked users until the underlying state is repaired.
 
 
-  ENVIRONMENT: You are working in FixitLab''s offline Docker host with docker CLI, images, containers,
-  and compose files. All tools run locally; no paid APIs or external cloud calls are required.
+  ENVIRONMENT: You are working in FixitLab''s offline Docker host. The architecture is a single lab-primary
+  node exposing docker CLI, images, containers, and compose files; treat it as the production host for
+  this incident. All tools run locally — no paid APIs or external cloud calls are required.
 
 
   SYMPTOM / STARTING STATE: Operators still perform manual steps for container logs. Automate the boring
-  parts without hiding important safety checks. Automation lab: remove toil around container logs. Codify
-  repeatable steps for log drivers, rotation, and stdout/stderr capture and prove the automation is idempotent.
+  parts without hiding important safety checks.
 
 
   OBJECTIVE: Day-2 container logs work completes safely in this environment; Changes are verified with
-  before/after checks; The system remains stable for dependent teams. Success means `systemctl is-active
-  docker` returns active.
+  before/after checks; The system remains stable for dependent teams. Acceptance criteria: the change
+  is minimal and reversible, and success means `systemctl is-active docker` returns active.
+
+
+  WORK TO DO: Required tooling is pre-installed; if a command is missing, note it and use the equivalent
+  already on the host. Make the smallest configuration change that moves the system toward the objective
+  (edit the relevant docker CLI, images, containers, and compose files), changing one thing at a time.
+  Check your work continuously against the objective — success means `systemctl is-active docker` returns
+  active.
+
+
+  VERIFY: Re-run the same check the grader uses and confirm `systemctl is-active docker` returns active.
+  Capture the before/after output as evidence. Success criteria: the objective''s healthy state holds
+  on a repeat check, not just once.
+
+
+  ROLLBACK: If a change makes things worse, revert that single change immediately (restore the original
+  config file / undo the edit / restart the affected component) and re-observe before trying another hypothesis.
+  Never stack unverified changes.
 
 
   WHAT TO AVOID: Do not apply broad destructive changes, skip evidence gathering, or fake completion with
@@ -41,35 +58,45 @@ initial_state: Operators still perform manual steps for container logs. Automate
 hints:
 - order: 1
   cost: 0
-  content: 'Orient yourself before changing anything:
+  content: 'ORIENT — what to observe and why:
 
-    1. Inspect the current state — `docker logs`, `docker inspect` LogConfig, and daemon.json.
-
-    2. Write down what looks normal versus wrong or missing for container logs.
-
-    3. Recall the core idea: log drivers, rotation, and stdout/stderr capture. Form one hypothesis before
-    you act.'
+    Do not touch anything yet. First observe the symptom: logs are missing or fill the disk. This lab
+    is about container logs — log drivers, rotation, and stdout/stderr capture. Read the objectives and
+    the current state, and note precisely what looks wrong versus healthy before you form any theory.'
 - order: 2
-  cost: 25
-  content: 'Diagnostic steps:
+  cost: 10
+  content: 'APPROACH — the troubleshooting method:
 
-    1. Run `systemctl status docker` — note Active/Failed and the last log lines.
-
-    2. Read `journalctl -u docker -n 50` for the root error.
-
-    3. Form a hypothesis about the smallest config or permission fix.'
+    Work from evidence, not guesses. For container logs problems the reliable method is: (1) reproduce/observe
+    the failure, (2) narrow from the whole system down to the one component that owns the symptom, (3)
+    change exactly one thing, (4) re-check. Implement the automation with dry-run / check mode, then run
+    it twice — the second run must report no changes.'
 - order: 3
-  cost: 50
-  content: 'Exact fix + verification:
+  cost: 25
+  content: 'WHICH TOOL — the diagnostic command(s):
 
-    1. Re-check the current state — `docker logs`, `docker inspect` LogConfig, and daemon.json.
+    Run `docker ps -a` and `docker logs <container>` for the failing container.'
+- order: 4
+  cost: 40
+  content: 'NARROW DOWN — isolate the subsystem:
 
-    2. Implement the automation with dry-run / check mode, then run it twice — the second run must report
-    no changes.
+    1. Identify the exited/unhealthy container and read its logs.
 
-    3. Verify the result — logs are captured and rotation caps disk usage.
+    2. Inspect the image, env vars, and volume mounts (`docker inspect`).
 
-    4. Click Check Solution once the objective is met (graded on real state, not a marker file).'
+    3. Compare container state to the scenario objectives.'
+- order: 5
+  cost: 60
+  content: 'NEAR-SOLUTION — the fix shape + verify (you still apply it):
+
+    1. Fix the Dockerfile, compose file, or runtime config.
+
+    2. Rebuild/restart the container.
+
+    3. Confirm `systemctl is-active docker` succeeds.
+
+
+    WHY: Docker labs grade real container state.'
 summary: Complete the container logs — automation lab docker lab and verify success with the checker
 estimated_minutes: 20
 xp_reward: 100

@@ -8,40 +8,47 @@ max_score: 100
 infrastructure_type: docker
 jira_priority: High
 is_free: false
-description: 'CONTEXT: A team operating DevOps delivery needs you to resolve `Fix
-  Docker Registry Push Authentication` during a realistic incident. The business impact
-  is reduced service reliability until the underlying state is repaired.
+description: 'CONTEXT: A team operating DevOps delivery has raised a ticket for `Fix Docker Registry Push
+  Authentication`. A customer-facing workflow is degraded and the on-call engineer (you) must diagnose
+  and resolve it. Business impact: reduced service reliability and blocked users until the underlying
+  state is repaired.
 
 
-  ENVIRONMENT: You are working in FixitLab''s offline CI/CD lab with git repos, pipelines,
-  artifacts, and runbooks. All tools run locally; no paid APIs or external cloud calls
-  are required.
+  ENVIRONMENT: You are working in FixitLab''s offline CI/CD lab. The architecture is a single lab-primary
+  node exposing git repos, pipelines, artifacts, and runbooks; treat it as the production host for this
+  incident. All tools run locally — no paid APIs or external cloud calls are required.
 
 
-  SYMPTOM / STARTING STATE: Ubuntu server with Docker. Private registry at registry.internal:5000
-  uses
+  SYMPTOM / STARTING STATE: Ubuntu server with Docker. Private registry at registry.internal:5000 uses
 
   self-signed TLS. /etc/docker/daemon.json is missing the insecure-registries
 
-  entry. Docker credentials for the registry: user=ci, password=cipassword123. Docker
-  image pushes to the private registry are failing with
-
-  "unauthorized: authentication required". The registry is using self-signed
-
-  TLS but Docker is not configured to trust it. Additionally, the credentials
-
-  are not configured in daemon.json. Fix the Docker daemon configuration
-
-  to allow pushes to the private registry.
+  entry. Docker credentials for the registry: user=ci, password=cipassword123.
 
 
-  OBJECTIVE: Add the private registry as an insecure-registry in daemon.json; Log
-  in to the private registry with docker login; Verify docker push succeeds. Success
-  means `systemctl is-active docker` returns active.
+  OBJECTIVE: Add the private registry as an insecure-registry in daemon.json; Log in to the private registry
+  with docker login; Verify docker push succeeds. Acceptance criteria: the change is minimal and reversible,
+  and success means `systemctl is-active docker` returns active.
 
 
-  WHAT TO AVOID: Do not apply broad destructive changes, skip evidence gathering,
-  or fake completion with marker files — the checker validates real system state.'
+  WORK TO DO: Required tooling is pre-installed; if a command is missing, note it and use the equivalent
+  already on the host. Make the smallest configuration change that moves the system toward the objective
+  (edit the relevant git repos, pipelines, artifacts, and runbooks), changing one thing at a time. Check
+  your work continuously against the objective — success means `systemctl is-active docker` returns active.
+
+
+  VERIFY: Re-run the same check the grader uses and confirm `systemctl is-active docker` returns active.
+  Capture the before/after output as evidence. Success criteria: the objective''s healthy state holds
+  on a repeat check, not just once.
+
+
+  ROLLBACK: If a change makes things worse, revert that single change immediately (restore the original
+  config file / undo the edit / restart the affected component) and re-observe before trying another hypothesis.
+  Never stack unverified changes.
+
+
+  WHAT TO AVOID: Do not apply broad destructive changes, skip evidence gathering, or fake completion with
+  marker files — the checker validates real system state.'
 objectives:
 - Add the private registry as an insecure-registry in daemon.json
 - Log in to the private registry with docker login
@@ -57,20 +64,38 @@ initial_state: 'Ubuntu server with Docker. Private registry at registry.internal
 hints:
 - order: 1
   cost: 0
-  content: 'Where to look: Start with `systemctl status docker` and `journalctl -u
-    docker -n 50 --no-pager` before changing anything.'
+  content: 'ORIENT — what to observe and why:
+
+    Do not touch anything yet. First observe the symptom: fix docker registry push authentication is not
+    behaving as the scenario objectives require. This lab is about fix docker registry push authentication
+    — how fix docker registry push authentication behaves in a DevOps delivery environment. Read the objectives
+    and the current state, and note precisely what looks wrong versus healthy before you form any theory.'
 - order: 2
+  cost: 10
+  content: 'APPROACH — the troubleshooting method:
+
+    Work from evidence, not guesses. For fix docker registry push authentication problems the reliable
+    method is: (1) reproduce/observe the failure, (2) narrow from the whole system down to the one component
+    that owns the symptom, (3) change exactly one thing, (4) re-check. Create the smallest working slice
+    of fix docker registry push authentication first, validate it, then add the remaining pieces one at
+    a time.'
+- order: 3
   cost: 25
-  content: 'Diagnostic steps:
+  content: 'WHICH TOOL — the diagnostic command(s):
+
+    Start with `systemctl status docker` and `journalctl -u docker -n 50 --no-pager` before changing anything.'
+- order: 4
+  cost: 40
+  content: 'NARROW DOWN — isolate the subsystem:
 
     1. Run `systemctl status docker` — note Active/Failed and the last log lines.
 
     2. Read `journalctl -u docker -n 50` for the root error.
 
     3. Form a hypothesis about the smallest config or permission fix.'
-- order: 3
-  cost: 50
-  content: 'Exact fix + verification:
+- order: 5
+  cost: 60
+  content: 'NEAR-SOLUTION — the fix shape + verify (you still apply it):
 
     1. Apply the minimal fix (config, unit override, or missing directory).
 

@@ -11,25 +11,41 @@ max_score: 100
 is_free: true
 infrastructure_type: docker
 jira_priority: Low
-description: 'CONTEXT: A team operating Terraform IaC needs you to resolve `terraform: Terraform Providers
-  — Fundamentals Lab` during a realistic incident. The business impact is reduced service reliability
-  until the underlying state is repaired.
+description: 'CONTEXT: A team operating Terraform IaC has raised a ticket for `Terraform Providers — Learn
+  Lab`. A customer-facing workflow is degraded and the on-call engineer (you) must diagnose and resolve
+  it. Business impact: reduced service reliability and blocked users until the underlying state is repaired.
 
 
-  ENVIRONMENT: You are working in FixitLab''s offline Terraform workspace with HCL files, state, and plan/apply
-  workflow. All tools run locally; no paid APIs or external cloud calls are required.
+  ENVIRONMENT: You are working in FixitLab''s offline Terraform workspace. The architecture is a single
+  lab-primary node exposing HCL files, state, and plan/apply workflow; treat it as the production host
+  for this incident. All tools run locally — no paid APIs or external cloud calls are required.
 
 
   SYMPTOM / STARTING STATE: The Terraform workspace is online with a starter Terraform providers setup.
   Some pieces are intentionally incomplete so you can learn how they fit together. Nothing is on fire
-  — focus on observation. This beginner-friendly terraform lab introduces Terraform providers. You will
-  explore provider blocks, versions, authentication, and resource schemas on the Terraform workspace.
-  Read the environment first, then follow the guided steps — no prior production experience required.
+  — focus on observation.
 
 
   OBJECTIVE: Understand how Terraform providers work in this lab environment; Identify the main status
   and configuration signals for Terraform providers; Confirm you can read the current state confidently
-  before changing anything. Success means `terraform validate` includes `Success`.
+  before changing anything. Acceptance criteria: the change is minimal and reversible, and success means
+  `terraform validate` includes `Success`.
+
+
+  WORK TO DO: Required tooling is pre-installed; if a command is missing, note it and use the equivalent
+  already on the host. Make the smallest configuration change that moves the system toward the objective
+  (edit the relevant HCL files, state, and plan/apply workflow), changing one thing at a time. Check your
+  work continuously against the objective — success means `terraform validate` includes `Success`.
+
+
+  VERIFY: Re-run the same check the grader uses and confirm `terraform validate` includes `Success`. Capture
+  the before/after output as evidence. Success criteria: the objective''s healthy state holds on a repeat
+  check, not just once.
+
+
+  ROLLBACK: If a change makes things worse, revert that single change immediately (restore the original
+  config file / undo the edit / restart the affected component) and re-observe before trying another hypothesis.
+  Never stack unverified changes.
 
 
   WHAT TO AVOID: Do not apply broad destructive changes, skip evidence gathering, or fake completion with
@@ -43,35 +59,46 @@ initial_state: The Terraform workspace is online with a starter Terraform provid
 hints:
 - order: 1
   cost: 0
-  content: 'Orient yourself before changing anything:
+  content: 'ORIENT — what to observe and why:
 
-    1. Inspect the current state — `terraform providers`, provider config, and `terraform validate`.
-
-    2. Write down what looks normal versus wrong or missing for Terraform providers.
-
-    3. Recall the core idea: provider blocks, versions, authentication, and resource schemas. Form one
-    hypothesis before you act.'
+    Do not touch anything yet. First observe the symptom: plans fail because provider credentials or versions
+    are wrong. This lab is about Terraform providers — provider blocks, versions, authentication, and
+    resource schemas. Read the objectives and the current state, and note precisely what looks wrong versus
+    healthy before you form any theory.'
 - order: 2
+  cost: 10
+  content: 'APPROACH — the troubleshooting method:
+
+    Work from evidence, not guesses. For Terraform providers problems the reliable method is: (1) reproduce/observe
+    the failure, (2) narrow from the whole system down to the one component that owns the symptom, (3)
+    change exactly one thing, (4) re-check. Make one small, reversible change toward the objective, re-reading
+    status after each step so you understand cause and effect.'
+- order: 3
   cost: 25
-  content: 'Diagnostic steps:
+  content: 'WHICH TOOL — the diagnostic command(s):
+
+    Run `terraform validate` in the module directory for precise error paths.'
+- order: 4
+  cost: 40
+  content: 'NARROW DOWN — isolate the subsystem:
 
     1. `terraform init` if providers are missing.
 
     2. `terraform validate` — read file:line references.
 
     3. Cross-check variable names and resource blocks against the error.'
-- order: 3
-  cost: 50
-  content: 'Exact fix + verification:
+- order: 5
+  cost: 60
+  content: 'NEAR-SOLUTION — the fix shape + verify (you still apply it):
 
-    1. Re-check the current state — `terraform providers`, provider config, and `terraform validate`.
+    1. Fix the reported syntax or reference error.
 
-    2. Make one small, reversible change toward the objective, re-reading status after each step so you
-    understand cause and effect.
+    2. Re-run `terraform validate` until it prints Success.
 
-    3. Verify the result — provider initialization succeeds and schemas resolve.
+    3. Optionally `terraform plan` to confirm no new errors.
 
-    4. Click Check Solution once the objective is met (graded on real state, not a marker file).'
+
+    WHY: validate catches config errors before any apply.'
 summary: Complete the terraform providers — learn lab terraform lab and verify success with the checker
 estimated_minutes: 15
 xp_reward: 100

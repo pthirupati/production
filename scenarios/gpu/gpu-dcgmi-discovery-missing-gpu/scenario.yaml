@@ -11,28 +11,47 @@ is_free: false
 jira_priority: High
 dual_terminal: false
 requires_companion_hosts: false
-description: 'CONTEXT: An SRE/GPU-infrastructure team running a datacenter accelerator fleet must resolve
-  `DCGM Discovery Shows a Missing GPU` during a live incident. Until the underlying hardware/driver state
-  is repaired, GPU capacity is lost and training/inference jobs fail, so throughput and SLAs are at risk.
+description: 'CONTEXT: A team operating GPU operations has raised a ticket for `DCGM Discovery Shows a
+  Missing GPU`. A customer-facing workflow is degraded and the on-call engineer (you) must diagnose and
+  resolve it. Business impact: reduced service reliability and blocked users until the underlying state
+  is repaired.
 
 
-  ENVIRONMENT: You are on a FixitLab offline GPU node with nvidia-smi, the NVIDIA driver/CUDA stack, DCGM
-  (dcgmi / nv-hostengine / dcgm-exporter), the container toolkit, and — for AMD hosts — the ROCm stack
-  (rocm-smi / amd-smi). All tools run locally; no paid APIs or external cloud calls are required.
+  ENVIRONMENT: You are working in FixitLab''s offline GPU node. The architecture is a single lab-primary
+  node exposing nvidia-smi, drivers, CUDA, and container toolkit; treat it as the production host for
+  this incident. All tools run locally — no paid APIs or external cloud calls are required.
 
 
-  SYMPTOM / STARTING STATE: `dcgmi discovery -l` reports 7 GPUs instead of 8, while `nvidia-smi` intermittently
-  shows the 8th. nv-hostengine has a stale device list and DCGM group membership is wrong.
+  SYMPTOM / STARTING STATE: A node that should expose 8 GPUs but `dcgmi discovery -l` only lists 7; the
+  fleet scheduler keeps under-allocating this host. `dcgmi discovery -l` reports 7 GPUs instead of 8,
+  while `nvidia-smi` intermittently shows the 8th. nv-hostengine has a stale device list and DCGM group
+  membership is wrong.
 
 
   OBJECTIVE: Run dcgmi discovery and confirm the GPU count mismatch versus nvidia-smi; Determine whether
   nv-hostengine has a stale topology or the GPU is genuinely unhealthy; Restore full discovery so all
-  8 GPUs are enumerated by DCGM. Success means `check.sh` exits successfully after you apply the documented
-  remediation.
+  8 GPUs are enumerated by DCGM. Acceptance criteria: the change is minimal and reversible, and success
+  means `nvidia-smi` includes `NVIDIA-SMI`.
 
 
-  WHAT TO AVOID: Do not apply broad destructive changes, disable safety limits to mask the fault, skip
-  evidence gathering, or fake completion with marker files — the checker validates real system state.'
+  WORK TO DO: Required tooling is pre-installed; if a command is missing, note it and use the equivalent
+  already on the host. Make the smallest configuration change that moves the system toward the objective
+  (edit the relevant nvidia-smi, drivers, CUDA, and container toolkit), changing one thing at a time.
+  Check your work continuously against the objective — success means `nvidia-smi` includes `NVIDIA-SMI`.
+
+
+  VERIFY: Re-run the same check the grader uses and confirm `nvidia-smi` includes `NVIDIA-SMI`. Capture
+  the before/after output as evidence. Success criteria: the objective''s healthy state holds on a repeat
+  check, not just once.
+
+
+  ROLLBACK: If a change makes things worse, revert that single change immediately (restore the original
+  config file / undo the edit / restart the affected component) and re-observe before trying another hypothesis.
+  Never stack unverified changes.
+
+
+  WHAT TO AVOID: Do not apply broad destructive changes, skip evidence gathering, or fake completion with
+  marker files — the checker validates real system state.'
 initial_state: A node that should expose 8 GPUs but `dcgmi discovery -l` only lists 7; the fleet scheduler
   keeps under-allocating this host.
 objectives:
@@ -42,32 +61,46 @@ objectives:
 hints:
 - order: 1
   cost: 0
-  content: 'Where to look: `dcgmi discovery -l` for the DCGM view and compare with `nvidia-smi -L`; check
-    `systemctl status nvidia-dcgm` / nv-hostengine.'
+  content: 'ORIENT — what to observe and why:
+
+    Do not touch anything yet. First observe the symptom: DCGM discovery shows a missing GPU is not behaving
+    as the scenario objectives require. This lab is about DCGM discovery shows a missing GPU — how DCGM
+    discovery shows a missing GPU behaves in a GPU operations environment. Read the objectives and the
+    current state, and note precisely what looks wrong versus healthy before you form any theory.'
 - order: 2
-  cost: 25
-  content: 'Diagnostic steps:
+  cost: 10
+  content: 'APPROACH — the troubleshooting method:
 
-    1. `dcgmi discovery -l` — count the GPUs DCGM sees.
-
-    2. `nvidia-smi -L` — count what the driver sees.
-
-    3. `systemctl status nvidia-dcgm nv-hostengine` — a stale or crashed hostengine explains a phantom
-    count.
-
-    4. `dcgmi group -l` to inspect the default group membership.'
+    Work from evidence, not guesses. For DCGM discovery shows a missing GPU problems the reliable method
+    is: (1) reproduce/observe the failure, (2) narrow from the whole system down to the one component
+    that owns the symptom, (3) change exactly one thing, (4) re-check. Fix the underlying misconfiguration
+    you identified (not just the noisy log line), changing one thing at a time.'
 - order: 3
-  cost: 50
-  content: 'Exact fix + verification:
+  cost: 25
+  content: 'WHICH TOOL — the diagnostic command(s):
 
-    1. Restart the host engine: `systemctl restart nvidia-dcgm` (or `nv-hostengine -t && nv-hostengine`)
-    so it re-scans the topology.
+    Run `docker ps -a` and `docker logs <container>` for the failing container.'
+- order: 4
+  cost: 40
+  content: 'NARROW DOWN — isolate the subsystem:
 
-    2. Re-run `dcgmi discovery -l` and confirm all 8 GPUs appear.
+    1. `docker ps -a` — note Exited status and exit code.
 
-    3. Apply the documented remediation in /opt/fixitlab/academy/gpu-dcgmi-discovery-missing-gpu.conf.
+    2. `docker logs <name>` for the startup error.
 
-    WHY: the checker validates DCGM genuinely re-enumerated the fleet.'
+    3. Inspect the Dockerfile or `docker run` flags if the image is wrong.'
+- order: 5
+  cost: 60
+  content: 'NEAR-SOLUTION — the fix shape + verify (you still apply it):
+
+    1. Fix image, port mapping, volume, or env configuration.
+
+    2. `docker start <name>` or re-run with corrected flags.
+
+    3. Confirm `nvidia-smi` shows the container Up.
+
+
+    WHY: the checker validates the container is actually running.'
 summary: Diagnose and fix dcgm discovery shows a missing gpu on a datacenter GPU node and verify with
   the checker
 estimated_minutes: 20

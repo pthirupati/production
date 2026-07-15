@@ -10,29 +10,46 @@ time_limit: 1200
 max_score: 100
 is_free: false
 jira_priority: Medium
-description: 'CONTEXT: A team operating prompt engineering needs you to resolve `prompt-engineering:
-  Agents — Observability Practice` during a realistic incident. The business impact
-  is reduced service reliability until the underlying state is repaired.
+description: 'CONTEXT: A team operating prompt engineering has raised a ticket for `Agents — Observability
+  Lab`. A customer-facing workflow is degraded and the on-call engineer (you) must diagnose and resolve
+  it. Business impact: reduced service reliability and blocked users until the underlying state is repaired.
 
 
-  ENVIRONMENT: You are working in FixitLab''s offline LLM practice workspace with
-  prompt templates, eval sets, and tool configs. All tools run locally; no paid APIs
-  or external cloud calls are required.
+  ENVIRONMENT: You are working in FixitLab''s offline LLM practice workspace. The architecture is a single
+  lab-primary node exposing prompt templates, eval sets, and tool configs; treat it as the production
+  host for this incident. All tools run locally — no paid APIs or external cloud calls are required.
 
 
-  SYMPTOM / STARTING STATE: The system runs, but agents lacks useful telemetry. Dashboards/alerts
-  are blank or noisy — improve signal quality. Observability task: make agents visible
-  in logs, metrics, or traces. On-call should answer ''what is broken?'' quickly using
-  signals from tool use, planning, and loops.
+  SYMPTOM / STARTING STATE: A guided AI practice console opens in your browser. It is a rule-based simulator
+  (no real model, no API cost) that scores your prompt live. The system runs, but agents lacks useful
+  telemetry. Dashboards/alerts are blank or noisy — improve signal quality. Observability task: make agents
+  visible in logs, metrics, or traces. On-call should answer ''what is broken?'' quickly using signals
+  from tool use, planning, and loops.
 
 
-  OBJECTIVE: Day-2 agents work completes safely in this environment; Changes are verified
-  with before/after checks; The system remains stable for dependent teams. Success
-  means all prompt exercises pass the rubric.
+  OBJECTIVE: Day-2 agents work completes safely in this environment; Changes are verified with before/after
+  checks; The system remains stable for dependent teams. Acceptance criteria: the change is minimal and
+  reversible, and success means all hidden tests pass.
 
 
-  WHAT TO AVOID: Do not apply broad destructive changes, skip evidence gathering,
-  or fake completion with marker files — the checker validates real system state.'
+  WORK TO DO: Required tooling is pre-installed; if a command is missing, note it and use the equivalent
+  already on the host. Make the smallest configuration change that moves the system toward the objective
+  (edit the relevant prompt templates, eval sets, and tool configs), changing one thing at a time. Check
+  your work continuously against the objective — success means all hidden tests pass.
+
+
+  VERIFY: Re-run the same check the grader uses and confirm all hidden tests pass. Capture the before/after
+  output as evidence. Success criteria: the objective''s healthy state holds on a repeat check, not just
+  once.
+
+
+  ROLLBACK: If a change makes things worse, revert that single change immediately (restore the original
+  config file / undo the edit / restart the affected component) and re-observe before trying another hypothesis.
+  Never stack unverified changes.
+
+
+  WHAT TO AVOID: Do not apply broad destructive changes, skip evidence gathering, or fake completion with
+  marker files — the checker validates real system state.'
 objectives:
 - Day-2 agents work completes safely in this environment
 - Changes are verified with before/after checks
@@ -42,14 +59,48 @@ initial_state: A guided AI practice console opens in your browser. It is a rule-
 hints:
 - order: 1
   cost: 0
-  content: Include WHO the AI should act as (role), WHAT to do (task), and HOW to
-    format the answer.
+  content: 'ORIENT — what to observe and why:
+
+    Do not touch anything yet. First observe the symptom: the agent loops or misuses tools. This lab is
+    about agents — tool use, planning, and loops. Read the objectives and the current state, and note
+    precisely what looks wrong versus healthy before you form any theory.'
 - order: 2
-  cost: 25
-  content: 'Add constraints: word count, audience, tone, or things to avoid.'
+  cost: 10
+  content: 'APPROACH — the troubleshooting method:
+
+    Work from evidence, not guesses. For agents problems the reliable method is: (1) reproduce/observe
+    the failure, (2) narrow from the whole system down to the one component that owns the symptom, (3)
+    change exactly one thing, (4) re-check. Add or fix the exporter / dashboard / alert with clear names,
+    labels, and a sensible threshold.'
 - order: 3
-  cost: 50
-  content: Use the live score panel — aim for 80+ before submitting.
+  cost: 25
+  content: 'WHICH TOOL — the diagnostic command(s):
+
+    Open `the solution file`, read the instructions, and run the visible tests to see which assertion
+    fails first.'
+- order: 4
+  cost: 40
+  content: 'NARROW DOWN — isolate the subsystem:
+
+    1. From the evidence above, decide which single part of agents is at fault.
+
+    2. Re-run the most relevant of the agent trace and tool calls focused on just that part to confirm
+    it.
+
+    3. State a one-line hypothesis: the smallest change that would move the state from ''the agent loops
+    or misuses tools'' toward ''the agent completes the task reliably''.'
+- order: 5
+  cost: 60
+  content: 'NEAR-SOLUTION — the fix shape + verify (you still apply it):
+
+    1. Edit `the solution file` with the smallest correct change.
+
+    2. Re-run visible tests, then Check Solution (includes hidden tests).
+
+    3. Confirm every test passes.
+
+
+    WHY: coding labs grade against hidden test cases, not marker files.'
 summary: Complete the agents — observability lab prompt engineering lab and verify
   success with the checker
 estimated_minutes: 20

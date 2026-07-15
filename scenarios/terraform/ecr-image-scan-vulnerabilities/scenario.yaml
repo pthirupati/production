@@ -2,25 +2,42 @@ title: ECR Image HIGH Severity Vulnerabilities
 slug: aws-ecr-image-vulnerabilities
 difficulty: medium
 category: Fix
-description: 'CONTEXT: A team operating Terraform IaC needs you to resolve `ECR Image HIGH Severity Vulnerabilities`
-  during a realistic incident. The business impact is reduced service reliability until the underlying
+description: 'CONTEXT: A team operating Terraform IaC has raised a ticket for `ECR Image HIGH Severity
+  Vulnerabilities`. A customer-facing workflow is degraded and the on-call engineer (you) must diagnose
+  and resolve it. Business impact: reduced service reliability and blocked users until the underlying
   state is repaired.
 
 
-  ENVIRONMENT: You are working in FixitLab''s offline Terraform workspace with HCL files, state, and plan/apply
-  workflow. All tools run locally; no paid APIs or external cloud calls are required.
+  ENVIRONMENT: You are working in FixitLab''s offline Terraform workspace. The architecture is a single
+  lab-primary node exposing HCL files, state, and plan/apply workflow; treat it as the production host
+  for this incident. All tools run locally — no paid APIs or external cloud calls are required.
 
 
   SYMPTOM / STARTING STATE: Simulated AWS environment with an ECR repository containing an image built
   on an outdated base image (e.g., ubuntu:18.04). Image scanning is enabled and reports multiple HIGH
-  severity vulnerabilities, causing downstream deployment checks to fail. An ECR image scan reports HIGH
-  severity CVEs in the base image, and the deployment pipeline is blocked by a policy that rejects images
-  with HIGH or CRITICAL findings. Remediate by updating the base image to a patched version.
+  severity vulnerabilities, causing downstream deployment checks to fail.
 
 
   OBJECTIVE: Run an ECR image scan and review the HIGH severity CVE findings; Update the Dockerfile base
   image to a patched version and push a new image to ECR; Confirm the new image scan shows no HIGH or
-  CRITICAL findings. Success means `check.sh` exits successfully.
+  CRITICAL findings. Acceptance criteria: the change is minimal and reversible, and success means `check.sh`
+  exits successfully.
+
+
+  WORK TO DO: Required tooling is pre-installed; if a command is missing, note it and use the equivalent
+  already on the host. Make the smallest configuration change that moves the system toward the objective
+  (edit the relevant HCL files, state, and plan/apply workflow), changing one thing at a time. Check your
+  work continuously against the objective — success means `check.sh` exits successfully.
+
+
+  VERIFY: Re-run the same check the grader uses and confirm `check.sh` exits successfully. Capture the
+  before/after output as evidence. Success criteria: the objective''s healthy state holds on a repeat
+  check, not just once.
+
+
+  ROLLBACK: If a change makes things worse, revert that single change immediately (restore the original
+  config file / undo the edit / restart the affected component) and re-observe before trying another hypothesis.
+  Never stack unverified changes.
 
 
   WHAT TO AVOID: Do not apply broad destructive changes, skip evidence gathering, or fake completion with
@@ -40,19 +57,37 @@ is_free: false
 hints:
 - order: 1
   cost: 0
-  content: 'Where to look: Run `docker ps -a` and `docker logs <container>` for the failing container.'
+  content: 'ORIENT — what to observe and why:
+
+    Do not touch anything yet. First observe the symptom: ECR image HIGH severity vulnerabilities is not
+    behaving as the scenario objectives require. This lab is about ECR image HIGH severity vulnerabilities
+    — how ECR image HIGH severity vulnerabilities behaves in a Terraform IaC environment. Read the objectives
+    and the current state, and note precisely what looks wrong versus healthy before you form any theory.'
 - order: 2
+  cost: 10
+  content: 'APPROACH — the troubleshooting method:
+
+    Work from evidence, not guesses. For ECR image HIGH severity vulnerabilities problems the reliable
+    method is: (1) reproduce/observe the failure, (2) narrow from the whole system down to the one component
+    that owns the symptom, (3) change exactly one thing, (4) re-check. Fix the underlying misconfiguration
+    you identified (not just the noisy log line), changing one thing at a time.'
+- order: 3
   cost: 25
-  content: 'Diagnostic steps:
+  content: 'WHICH TOOL — the diagnostic command(s):
+
+    Run `docker ps -a` and `docker logs <container>` for the failing container.'
+- order: 4
+  cost: 40
+  content: 'NARROW DOWN — isolate the subsystem:
 
     1. `docker ps -a` — note Exited status and exit code.
 
     2. `docker logs <name>` for the startup error.
 
     3. Inspect the Dockerfile or `docker run` flags if the image is wrong.'
-- order: 3
-  cost: 50
-  content: 'Exact fix + verification:
+- order: 5
+  cost: 60
+  content: 'NEAR-SOLUTION — the fix shape + verify (you still apply it):
 
     1. Fix image, port mapping, volume, or env configuration.
 

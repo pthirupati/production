@@ -10,21 +10,39 @@ max_score: 100
 is_free: true
 jira_priority: Medium
 dual_terminal: false
-description: 'CONTEXT: A team operating HTML and web delivery needs you to resolve `Mobile Downloads Oversized
-  Images` during a realistic incident. The business impact is reduced service reliability until the underlying
+description: 'CONTEXT: A team operating HTML and web delivery has raised a ticket for `Mobile Downloads
+  Oversized Images`. A customer-facing workflow is degraded and the on-call engineer (you) must diagnose
+  and resolve it. Business impact: reduced service reliability and blocked users until the underlying
   state is repaired.
 
 
-  ENVIRONMENT: You are working in FixitLab''s offline web server lab with HTML pages, nginx/apache config,
-  and browser devtools. All tools run locally; no paid APIs or external cloud calls are required.
+  ENVIRONMENT: You are working in FixitLab''s offline web server lab. The architecture is a single lab-primary
+  node exposing HTML pages, nginx/apache config, and browser devtools; treat it as the production host
+  for this incident. All tools run locally — no paid APIs or external cloud calls are required.
 
 
-  SYMPTOM / STARTING STATE: A page without responsive image srcset. Phones download desktop-sized images
-  because srcset isn''t used.
+  SYMPTOM / STARTING STATE: A page without responsive image srcset.
 
 
   OBJECTIVE: Confirm the issue: Oversized images on mobile; Apply the documented fix in /var/www/html/responsive.html;
-  Verify the file is corrected. Success means `check.sh` exits successfully.
+  Verify the file is corrected. Acceptance criteria: the change is minimal and reversible, and success
+  means `check.sh` exits successfully.
+
+
+  WORK TO DO: Required tooling is pre-installed; if a command is missing, note it and use the equivalent
+  already on the host. Make the smallest configuration change that moves the system toward the objective
+  (edit the relevant HTML pages, nginx/apache config, and browser devtools), changing one thing at a time.
+  Check your work continuously against the objective — success means `check.sh` exits successfully.
+
+
+  VERIFY: Re-run the same check the grader uses and confirm `check.sh` exits successfully. Capture the
+  before/after output as evidence. Success criteria: the objective''s healthy state holds on a repeat
+  check, not just once.
+
+
+  ROLLBACK: If a change makes things worse, revert that single change immediately (restore the original
+  config file / undo the edit / restart the affected component) and re-observe before trying another hypothesis.
+  Never stack unverified changes.
 
 
   WHAT TO AVOID: Do not apply broad destructive changes, skip evidence gathering, or fake completion with
@@ -37,29 +55,47 @@ objectives:
 hints:
 - order: 1
   cost: 0
-  content: 'Where to look: Test the config to get the exact file and line: `nginx -t`. It prints the offending
-    directive (e.g. unknown directive "listn").'
+  content: 'ORIENT — what to observe and why:
+
+    Do not touch anything yet. First observe the symptom: mobile downloads oversized images is not behaving
+    as the scenario objectives require. This lab is about mobile downloads oversized images — how mobile
+    downloads oversized images behaves in a HTML and web delivery environment. Read the objectives and
+    the current state, and note precisely what looks wrong versus healthy before you form any theory.'
 - order: 2
+  cost: 10
+  content: 'APPROACH — the troubleshooting method:
+
+    Work from evidence, not guesses. For mobile downloads oversized images problems the reliable method
+    is: (1) reproduce/observe the failure, (2) narrow from the whole system down to the one component
+    that owns the symptom, (3) change exactly one thing, (4) re-check. Fix the underlying misconfiguration
+    you identified (not just the noisy log line), changing one thing at a time.'
+- order: 3
   cost: 25
-  content: 'Diagnostic steps:
+  content: 'WHICH TOOL — the diagnostic command(s):
+
+    Test the config to get the exact file and line: `nginx -t`. It prints the offending directive (e.g.
+    unknown directive "listn").'
+- order: 4
+  cost: 40
+  content: 'NARROW DOWN — isolate the subsystem:
 
     1. Run `nginx -t` and `systemctl status nginx` for config vs service errors.
 
     2. Open the cited file under `/etc/nginx/`.
 
     3. Compare listen/upstream/proxy directives to the scenario objectives.'
-- order: 3
-  cost: 50
-  content: 'Exact fix + verification:
+- order: 5
+  cost: 60
+  content: 'NEAR-SOLUTION — the fix shape + verify (you still apply it):
 
-    1. Verify the file is corrected.
+    1. Correct the typo on the reported line and save the file.
 
-    2. Re-run the lab checker (`check.sh` or Check Solution).
+    2. Re-run `nginx -t` until it reports syntax is ok.
 
-    3. Confirm every scenario objective is satisfied.
+    3. Run `systemctl enable --now nginx`, then `curl -I http://localhost` (expect HTTP 200).
 
 
-    WHY: the grader validates real state — marker files are ignored.'
+    WHY: systemd will not start nginx until `nginx -t` passes.'
 summary: Complete the mobile downloads oversized images html lab and verify success with the checker
 estimated_minutes: 20
 xp_reward: 100

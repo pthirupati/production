@@ -8,13 +8,15 @@ max_score: 100
 infrastructure_type: docker
 jira_priority: High
 is_free: false
-description: 'CONTEXT: A team operating network operations needs you to resolve `WireGuard VPN Tunnel
-  Down — Fix Peer Config and Routing` during a realistic incident. The business impact is reduced service
-  reliability until the underlying state is repaired.
+description: 'CONTEXT: A team operating network operations has raised a ticket for `WireGuard VPN Tunnel
+  Down — Fix Peer Config and Routing`. A customer-facing workflow is degraded and the on-call engineer
+  (you) must diagnose and resolve it. Business impact: reduced service reliability and blocked users until
+  the underlying state is repaired.
 
 
-  ENVIRONMENT: You are working in FixitLab''s offline network lab with interfaces, routing tables, DNS,
-  and firewall rules. All tools run locally; no paid APIs or external cloud calls are required.
+  ENVIRONMENT: You are working in FixitLab''s offline network lab. The architecture is a single lab-primary
+  node exposing interfaces, routing tables, DNS, and firewall rules; treat it as the production host for
+  this incident. All tools run locally — no paid APIs or external cloud calls are required.
 
 
   SYMPTOM / STARTING STATE: Ubuntu 22.04 with WireGuard. wg0 interface is configured. Peer public key
@@ -24,23 +26,28 @@ description: 'CONTEXT: A team operating network operations needs you to resolve 
 
   /etc/wireguard/new-peer-pubkey.txt. AllowedIPs=10.8.0.0/24 (missing 10.10.0.0/16).
 
-  `wg show` shows no active handshake. Remote VPN subnet is unreachable. The WireGuard VPN tunnel between
-  the office and a cloud server is down. Remote
-
-  users cannot reach internal resources. The tunnel interface wg0 is up but the
-
-  peer handshake is failing. Investigation reveals two issues: the remote peer''s
-
-  public key was rotated last week but the local config still has the old key,
-
-  and the AllowedIPs range is missing the 10.10.0.0/16 subnet that users need.
-
-  Fix both the peer configuration and add the missing route.
+  `wg show` shows no active handshake. Remote VPN subnet is unreachable.
 
 
   OBJECTIVE: Identify the stale public key in the WireGuard peer config; Update /etc/wireguard/wg0.conf
-  with the correct peer public key; Add 10.10.0.0/16 to the AllowedIPs for the peer. Success means `check.sh`
-  exits successfully.
+  with the correct peer public key; Add 10.10.0.0/16 to the AllowedIPs for the peer. Acceptance criteria:
+  the change is minimal and reversible, and success means `check.sh` exits successfully.
+
+
+  WORK TO DO: Required tooling is pre-installed; if a command is missing, note it and use the equivalent
+  already on the host. Make the smallest configuration change that moves the system toward the objective
+  (edit the relevant interfaces, routing tables, DNS, and firewall rules), changing one thing at a time.
+  Check your work continuously against the objective — success means `check.sh` exits successfully.
+
+
+  VERIFY: Re-run the same check the grader uses and confirm `check.sh` exits successfully. Capture the
+  before/after output as evidence. Success criteria: the objective''s healthy state holds on a repeat
+  check, not just once.
+
+
+  ROLLBACK: If a change makes things worse, revert that single change immediately (restore the original
+  config file / undo the edit / restart the affected component) and re-observe before trying another hypothesis.
+  Never stack unverified changes.
 
 
   WHAT TO AVOID: Do not apply broad destructive changes, skip evidence gathering, or fake completion with
@@ -62,30 +69,60 @@ initial_state: 'Ubuntu 22.04 with WireGuard. wg0 interface is configured. Peer p
 hints:
 - order: 1
   cost: 0
-  content: 'Where to look: Start with read-only discovery on the network lab. For WireGuard VPN Tunnel
-    Down — Fix Peer Config and Routing, inspect interfaces, routing tables, DNS, and firewall rules before
-    changing anything.'
+  content: 'ORIENT — what to observe and why:
+
+    Do not touch anything yet. First observe the symptom: WireGuard VPN tunnel down — fix peer config
+    and routing is not behaving as the scenario objectives require. This lab is about WireGuard VPN tunnel
+    down — fix peer config and routing — how WireGuard VPN tunnel down — fix peer config and routing behaves
+    in a network operations environment. Read the objectives and the current state, and note precisely
+    what looks wrong versus healthy before you form any theory.'
 - order: 2
-  cost: 25
-  content: 'Diagnostic steps:
+  cost: 10
+  content: 'APPROACH — the troubleshooting method:
 
-    1. Gather evidence with interfaces, routing tables, DNS, and firewall rules.
-
-    2. Compare current output to the scenario objectives.
-
-    3. Form a single hypothesis about the smallest fix that would restore healthy state.'
+    Work from evidence, not guesses. For WireGuard VPN tunnel down — fix peer config and routing problems
+    the reliable method is: (1) reproduce/observe the failure, (2) narrow from the whole system down to
+    the one component that owns the symptom, (3) change exactly one thing, (4) re-check. Create the smallest
+    working slice of WireGuard VPN tunnel down — fix peer config and routing first, validate it, then
+    add the remaining pieces one at a time.'
 - order: 3
-  cost: 50
-  content: 'Exact fix + verification:
+  cost: 25
+  content: 'WHICH TOOL — the diagnostic command(s):
 
-    1. Bring the tunnel back up and verify the handshake succeeds.
+    1. Inspect the current state with interfaces, routing tables, DNS, and firewall rules.
 
-    2. Re-run the lab checker (`check.sh` or Check Solution).
+    2. Each command above tells you something specific — status/health, recent errors, and the effective
+    configuration. Read them in that order.
 
-    3. Confirm every scenario objective is satisfied.
+    3. Compare what you see to the objectives; the gap points at the fault.'
+- order: 4
+  cost: 40
+  content: 'NARROW DOWN — isolate the subsystem:
+
+    1. From the evidence above, decide which single part of WireGuard VPN tunnel down — fix peer config
+    and routing is at fault.
+
+    2. Re-run the most relevant of interfaces, routing tables, DNS, and firewall rules focused on just
+    that part to confirm it.
+
+    3. State a one-line hypothesis: the smallest change that would move the state from ''WireGuard VPN
+    tunnel down — fix peer config and routing is not behaving as the scenario objectives require'' toward
+    ''`check.sh` exits successfully''.'
+- order: 5
+  cost: 60
+  content: 'NEAR-SOLUTION — the fix shape + verify (you still apply it):
+
+    1. Apply the smallest reversible change your hypothesis points to. Create the smallest working slice
+    of WireGuard VPN tunnel down — fix peer config and routing first, validate it, then add the remaining
+    pieces one at a time.
+
+    2. Re-run `bash check.sh` and confirm `check.sh` exits successfully.
+
+    3. If it still fails, the hypothesis was wrong — go back to the evidence, do not stack changes.
 
 
-    WHY: the grader validates real state — marker files are ignored.'
+    WHY: the grader validates real system state, not marker files — a fix only counts when the subsystem
+    is actually healthy.'
 summary: Complete the wireguard vpn tunnel down — fix peer config and routing networking lab and verify
   success with the checker
 estimated_minutes: 20

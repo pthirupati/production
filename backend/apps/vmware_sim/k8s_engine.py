@@ -19,6 +19,13 @@ SESSION_TTL = 7200  # 2-hour TTL matching VMware sessions
 # Sessions stored in Django cache (Redis in production) for multi-worker safety
 # Key: "k8s_session:{session_id}"  Value: JSON-serialized session dict
 
+# Wall-clock durations (seconds) for graceful lifecycle transitions. Kept short
+# so a learner watches a drain / termination complete within one lab sitting.
+# A node drain evicts its pods (graceful termination) before the node reports
+# fully drained; a deleted pod's grace period elapses before it disappears.
+POD_GRACE_SECONDS = 6        # default terminationGracePeriodSeconds feel
+NODE_DRAIN_SECONDS = 12      # cordoned -> draining -> drained window
+
 
 def _session_key(session_id: str) -> str:
     return f"k8s_session:{session_id}"
@@ -33,6 +40,10 @@ def _load_session(session_id: str) -> dict | None:
 
 def _save_session(session_id: str, entry: dict) -> None:
     cache.set(_session_key(str(session_id)), json.dumps(entry, default=str), SESSION_TTL)
+
+
+def _now() -> float:
+    return time.time()
 
 
 def _now_iso() -> str:
@@ -644,12 +655,18 @@ def _ensure_session(session_id: str, scenario_slug: str = "") -> dict:
 
 def get_state(session_id: str, scenario_slug: str = "") -> dict:
     entry = _ensure_session(session_id, scenario_slug)
+    # Advance graceful termination / node drain on read so the cluster reflects
+    # wall-clock time even when no action has been taken since a drain started.
+    if _tick(entry["state"]):
+        _save_session(str(session_id), entry)
     state = copy.deepcopy(entry["state"])
 
     nodes_ready = sum(1 for n in state["nodes"] if n["status"] == "Ready")
     pods_running = sum(1 for p in state["pods"] if p["phase"] == "Running"
                        and all(c["state"] == "running" for c in p.get("containers", [])))
     pods_pending = sum(1 for p in state["pods"] if p["phase"] == "Pending")
+    pods_terminating = sum(1 for p in state["pods"] if p.get("phase") == "Terminating")
+    nodes_draining = sum(1 for n in state["nodes"] if n.get("drain_state") == "draining")
     pods_crashloop = sum(
         1 for p in state["pods"]
         if any(c.get("reason") == "CrashLoopBackOff" for c in p.get("containers", []))
@@ -668,7 +685,9 @@ def get_state(session_id: str, scenario_slug: str = "") -> dict:
             "nodes_total": len(state["nodes"]),
             "pods_running": pods_running,
             "pods_pending": pods_pending,
+            "pods_terminating": pods_terminating,
             "pods_crashloop": pods_crashloop,
+            "nodes_draining": nodes_draining,
             "pods_total": len(state["pods"]),
             "deployments_healthy": deployments_healthy,
             "deployments_total": len(state["deployments"]),
@@ -735,6 +754,62 @@ def _find_namespace(state: dict, name: str) -> dict | None:
 
 
 # ---------------------------------------------------------------------------
+# Wall-clock lifecycle advance — node drain + graceful pod termination.
+#
+# Real `kubectl drain` cordons the node, then evicts its pods, which enter
+# Terminating (respecting terminationGracePeriodSeconds) before disappearing;
+# the node reads "draining" until the eviction completes, then "SchedulingDisabled".
+# We model this on wall-clock so a maintenance scenario feels live: a pod marked
+# Terminating at t0 keeps showing (with a Terminating phase) until its grace
+# period elapses, then it is removed. A draining node flips to drained after all
+# its evicted pods are gone.
+#
+# `_tick` is called on read / action / validate (like the baremetal engine).
+# It only advances transient drain/termination bookkeeping and never alters what
+# the validators inspect (node.status, pod.phase for a *named* pod that isn't
+# being terminated, pvc.status, deployment.availableReplicas), so grading is
+# unaffected.
+# ---------------------------------------------------------------------------
+
+def _tick(state: dict, now: float | None = None) -> bool:
+    """Advance graceful termination + node drain by wall-clock. Returns True if
+    anything changed."""
+    now = _now() if now is None else now
+    changed = False
+    events = state.setdefault("events", [])
+
+    # 1) Terminating pods whose grace period elapsed are removed ("Gone").
+    survivors = []
+    for p in state.get("pods", []):
+        term_at = p.get("terminating_at")
+        if term_at is not None and now >= float(term_at):
+            events.append(_event(
+                f"Deleted pod {p['name']} (graceful termination complete)",
+                reason="Killing", involved_object=p["name"], namespace=p.get("namespace", "default")))
+            changed = True
+            continue  # drop it
+        survivors.append(p)
+    if len(survivors) != len(state.get("pods", [])):
+        state["pods"] = survivors
+
+    # 2) Draining nodes flip to drained once their evicted pods are gone AND the
+    #    drain window has elapsed.
+    for n in state.get("nodes", []):
+        if n.get("drain_state") == "draining":
+            drain_done_at = n.get("drain_done_at")
+            remaining = [p for p in state.get("pods", [])
+                         if p.get("node") == n["name"] and p.get("terminating_at") is not None]
+            if not remaining and drain_done_at is not None and now >= float(drain_done_at):
+                n["drain_state"] = "drained"
+                n.pop("drain_done_at", None)
+                events.append(_event(
+                    f"Node {n['name']} drained — all pods evicted, ready for maintenance",
+                    involved_object=n["name"]))
+                changed = True
+    return changed
+
+
+# ---------------------------------------------------------------------------
 # Action handler
 # ---------------------------------------------------------------------------
 
@@ -744,11 +819,14 @@ def apply_action(session_id: str, action: str, payload: dict | None = None) -> d
     if not entry:
         return {"ok": False, "error": "Simulation session not found"}
     state = entry["state"]
+    # Advance graceful termination / drain before handling the action so the
+    # decision is made against the up-to-date cluster state.
+    _tick(state)
     events = state.setdefault("events", [])
 
     # --- Node actions ---
 
-    if action in ("drain_node", "cordon_node"):
+    if action == "cordon_node":
         name = payload.get("node_name") or payload.get("name")
         node = _find_node(state, name)
         if not node:
@@ -756,13 +834,50 @@ def apply_action(session_id: str, action: str, payload: dict | None = None) -> d
         if node.get("unschedulable"):
             return {"ok": False, "error": f"Node '{name}' is already unschedulable"}
         node["unschedulable"] = True
+        node["drain_state"] = "cordoned"
         taint = {"key": "node.kubernetes.io/unschedulable", "effect": "NoSchedule"}
         if taint not in node.get("taints", []):
             node.setdefault("taints", []).append(taint)
-        verb = "drained" if action == "drain_node" else "cordoned"
-        events.append(_event(f"Node {name} {verb}", involved_object=name))
+        events.append(_event(f"Node {name} cordoned", involved_object=name))
         _save_session(str(session_id), entry)
-        return {"ok": True, "message": f"node/{name} {verb}"}
+        return {"ok": True, "message": f"node/{name} cordoned"}
+
+    if action == "drain_node":
+        name = payload.get("node_name") or payload.get("name")
+        node = _find_node(state, name)
+        if not node:
+            return {"ok": False, "error": f"Node '{name}' not found"}
+        # Draining implies cordon; a real drain evicts pods gracefully.
+        node["unschedulable"] = True
+        taint = {"key": "node.kubernetes.io/unschedulable", "effect": "NoSchedule"}
+        if taint not in node.get("taints", []):
+            node.setdefault("taints", []).append(taint)
+        now = _now()
+        # Mark this node's non-daemonset pods Terminating; they leave over the
+        # grace period, then the node reports drained (see _tick).
+        evicted = 0
+        for p in state.get("pods", []):
+            if p.get("node") != name:
+                continue
+            # kube-proxy / daemonset-style pods are not evicted by drain.
+            if p.get("labels", {}).get("k8s-app") in ("kube-proxy",):
+                continue
+            if p.get("terminating_at") is not None:
+                continue
+            p["phase"] = "Terminating"
+            p["terminating_at"] = now + POD_GRACE_SECONDS
+            for c in p.get("containers", []):
+                c["ready"] = False
+            evicted += 1
+            events.append(_event(
+                f"Evicting pod {p['name']}", reason="Killing",
+                involved_object=p["name"], namespace=p.get("namespace", "default")))
+        node["drain_state"] = "draining"
+        node["drain_done_at"] = now + NODE_DRAIN_SECONDS
+        events.append(_event(
+            f"Node {name} cordoned, evicting {evicted} pod(s)", involved_object=name))
+        _save_session(str(session_id), entry)
+        return {"ok": True, "message": f"node/{name} cordoned, {evicted} pod(s) evicting"}
 
     if action == "uncordon_node":
         name = payload.get("node_name") or payload.get("name")
@@ -770,6 +885,8 @@ def apply_action(session_id: str, action: str, payload: dict | None = None) -> d
         if not node:
             return {"ok": False, "error": f"Node '{name}' not found"}
         node["unschedulable"] = False
+        node["drain_state"] = None
+        node.pop("drain_done_at", None)
         node["taints"] = [t for t in node.get("taints", [])
                           if t.get("key") != "node.kubernetes.io/unschedulable"]
         if node["status"] == "NotReady":
@@ -1001,6 +1118,12 @@ def apply_action(session_id: str, action: str, payload: dict | None = None) -> d
 def validate_k8s_lab(session_id: str, scenario_slug: str = "") -> tuple[bool, str]:
     entry = _load_session(str(session_id)) or _ensure_session(session_id, scenario_slug)
     state = entry["state"]
+    # Advance the wall-clock lifecycle before grading so a drain/termination that
+    # completed between requests is scored against its settled state. This never
+    # changes the validator's inspected fields for graded targets — only transient
+    # drain/termination bookkeeping — so the grading contract is preserved.
+    if _tick(state):
+        _save_session(str(session_id), entry)
     rules = state.get("validation") or {}
 
     if rules.get("require_node_ready"):

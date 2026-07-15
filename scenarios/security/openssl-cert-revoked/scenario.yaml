@@ -8,13 +8,15 @@ max_score: 100
 infrastructure_type: docker
 jira_priority: Critical
 is_free: false
-description: 'CONTEXT: A team operating security hardening needs you to resolve `Certificate Revoked -
-  Update CRL and Reconfigure` during a realistic incident. The business impact is reduced service reliability
-  until the underlying state is repaired.
+description: 'CONTEXT: A team operating security hardening has raised a ticket for `Certificate Revoked
+  - Update CRL and Reconfigure`. A customer-facing workflow is degraded and the on-call engineer (you)
+  must diagnose and resolve it. Business impact: reduced service reliability and blocked users until the
+  underlying state is repaired.
 
 
-  ENVIRONMENT: You are working in FixitLab''s offline hardening lab with SSH, firewall, TLS, audit logs,
-  and IAM settings. All tools run locally; no paid APIs or external cloud calls are required.
+  ENVIRONMENT: You are working in FixitLab''s offline hardening lab. The architecture is a single lab-primary
+  node exposing SSH, firewall, TLS, audit logs, and IAM settings; treat it as the production host for
+  this incident. All tools run locally — no paid APIs or external cloud calls are required.
 
 
   SYMPTOM / STARTING STATE: Ubuntu 22.04 with nginx. ssl_crl=/etc/nginx/ssl/ca.crl (outdated, 30 days
@@ -22,21 +24,29 @@ description: 'CONTEXT: A team operating security hardening needs you to resolve 
 
   New CRL available at http://ca.internal/crl/latest.crl.
 
-  A test with a revoked certificate returns 200 instead of 400/403 — not being checked. The internal CA
-  has revoked a service certificate after a private key compromise.
-
-  Services that perform CRL checking are now rejecting connections from this service.
-
-  However, the CRL configured in nginx is outdated — it was last downloaded 30 days
-
-  ago and doesn''t include the revocation. Update the CRL, configure nginx to use
-
-  the fresh CRL, and ensure CRL checking is properly enforced for client certificates.
+  A test with a revoked certificate returns 200 instead of 400/403 — not being checked.
 
 
   OBJECTIVE: Download the current CRL from the internal CA; Convert the CRL to PEM format if necessary;
-  Update the ssl_crl directive in nginx to point to the new CRL. Success means `systemctl is-active --quiet`
-  returns active.
+  Update the ssl_crl directive in nginx to point to the new CRL. Acceptance criteria: the change is minimal
+  and reversible, and success means `systemctl is-active --quiet` returns active.
+
+
+  WORK TO DO: Required tooling is pre-installed; if a command is missing, note it and use the equivalent
+  already on the host. Make the smallest configuration change that moves the system toward the objective
+  (edit the relevant SSH, firewall, TLS, audit logs, and IAM settings), changing one thing at a time.
+  Check your work continuously against the objective — success means `systemctl is-active --quiet` returns
+  active.
+
+
+  VERIFY: Re-run the same check the grader uses and confirm `systemctl is-active --quiet` returns active.
+  Capture the before/after output as evidence. Success criteria: the objective''s healthy state holds
+  on a repeat check, not just once.
+
+
+  ROLLBACK: If a change makes things worse, revert that single change immediately (restore the original
+  config file / undo the edit / restart the affected component) and re-observe before trying another hypothesis.
+  Never stack unverified changes.
 
 
   WHAT TO AVOID: Do not apply broad destructive changes, skip evidence gathering, or fake completion with
@@ -56,28 +66,48 @@ initial_state: 'Ubuntu 22.04 with nginx. ssl_crl=/etc/nginx/ssl/ca.crl (outdated
 hints:
 - order: 1
   cost: 0
-  content: 'Where to look: Run `systemctl status sshd` and `ss -tlnp | grep :22` on the target host.'
+  content: 'ORIENT — what to observe and why:
+
+    Do not touch anything yet. First observe the symptom: certificate revoked - update CRL and reconfigure
+    is not behaving as the scenario objectives require. This lab is about certificate revoked - update
+    CRL and reconfigure — how certificate revoked - update CRL and reconfigure behaves in a security hardening
+    environment. Read the objectives and the current state, and note precisely what looks wrong versus
+    healthy before you form any theory.'
 - order: 2
-  cost: 25
-  content: 'Diagnostic steps:
+  cost: 10
+  content: 'APPROACH — the troubleshooting method:
 
-    1. Confirm sshd is active and listening on port 22.
-
-    2. Check `firewall-cmd` or iptables for blocked port 22.
-
-    3. Read `/var/log/secure` for auth or config errors.'
+    Work from evidence, not guesses. For certificate revoked - update CRL and reconfigure problems the
+    reliable method is: (1) reproduce/observe the failure, (2) narrow from the whole system down to the
+    one component that owns the symptom, (3) change exactly one thing, (4) re-check. Fix the underlying
+    misconfiguration you identified (not just the noisy log line), changing one thing at a time.'
 - order: 3
-  cost: 50
-  content: 'Exact fix + verification:
+  cost: 25
+  content: 'WHICH TOOL — the diagnostic command(s):
 
-    1. Fix sshd_config, firewall, or socket unit as needed.
+    Test the config to get the exact file and line: `nginx -t`. It prints the offending directive (e.g.
+    unknown directive "listn").'
+- order: 4
+  cost: 40
+  content: 'NARROW DOWN — isolate the subsystem:
 
-    2. `systemctl restart sshd`.
+    1. Run `nginx -t` and `systemctl status nginx` for config vs service errors.
 
-    3. `ssh -o BatchMode=yes user@localhost echo ok` succeeds.
+    2. Open the cited file under `/etc/nginx/`.
+
+    3. Compare listen/upstream/proxy directives to the scenario objectives.'
+- order: 5
+  cost: 60
+  content: 'NEAR-SOLUTION — the fix shape + verify (you still apply it):
+
+    1. Correct the typo on the reported line and save the file.
+
+    2. Re-run `nginx -t` until it reports syntax is ok.
+
+    3. Run `systemctl enable --now nginx`, then `curl -I http://localhost` (expect HTTP 200).
 
 
-    WHY: SSH failures are usually service, firewall, or config — not credentials alone.'
+    WHY: systemd will not start nginx until `nginx -t` passes.'
 summary: Complete the certificate revoked - update crl and reconfigure security lab and verify success
   with the checker
 estimated_minutes: 20

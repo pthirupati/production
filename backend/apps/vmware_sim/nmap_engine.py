@@ -39,6 +39,15 @@ from django.core.cache import cache
 
 SESSION_TTL = 7200  # 2-hour TTL matching the other simulator engines
 
+# Wall-clock delay (seconds) before a service state change a learner makes
+# (stop/start a listener) is reflected by the network. Stopping a daemon does
+# not instantly tear the socket down — connections drain and the kernel stops
+# accepting new SYNs a moment later — so a port a learner "closes" keeps reading
+# `open` on a scan run immediately after, then flips to `closed` on a re-scan
+# once the transition has elapsed. Kept short so the effect is observable within
+# a single lab sitting. This mirrors the baremetal/monitoring wall-clock pattern.
+PORT_TRANSITION_SECONDS = 8
+
 
 def _session_key(session_id: str) -> str:
     return f"nmap_session:{session_id}"
@@ -230,18 +239,35 @@ def _parse_flags(flags: Any) -> dict:
         "aggressive": False,
         "no_ping": False,
         "ports": None,   # None => default top-ports; list[int] => explicit
+        "fast": False,   # -F  fast (fewer ports) scan
+        "all_ports": False,  # -p 1-65535 / -p-  (full 65535-port sweep)
+        "timing": 3,     # -T<0-5> template; nmap default is T3 ("normal")
     }
 
     i = 0
     while i < len(tokens):
         tok = tokens[i]
-        # -p 22,80  OR  -p22,80  OR  -p1-100
+        # -p 22,80  OR  -p22,80  OR  -p1-100  OR  -p-  (all ports)
         if tok == "-p" and i + 1 < len(tokens):
             caps["ports"] = _parse_ports(tokens[i + 1])
+            if _is_all_ports_spec(tokens[i + 1]):
+                caps["all_ports"] = True
             i += 2
             continue
         if tok.startswith("-p") and len(tok) > 2:
             caps["ports"] = _parse_ports(tok[2:])
+            if _is_all_ports_spec(tok[2:]):
+                caps["all_ports"] = True
+            i += 1
+            continue
+        if tok == "-F":
+            caps["fast"] = True
+            i += 1
+            continue
+        # -T0 .. -T5 (paranoid .. insane). Accept "-T4" and legacy word forms.
+        tm = re.match(r"^-T([0-5])$", tok)
+        if tm:
+            caps["timing"] = int(tm.group(1))
             i += 1
             continue
         key = _FLAG_TOKENS.get(tok)
@@ -261,14 +287,54 @@ def _parse_ports(spec: str) -> list[int]:
         part = part.strip()
         if not part:
             continue
+        # bare "-" or "1-" / "-1024" => nmap "all/open-ended range" shorthand.
+        if part == "-":
+            continue
         m = re.match(r"^(\d+)-(\d+)$", part)
         if m:
             lo, hi = int(m.group(1)), int(m.group(2))
-            if hi - lo <= 2000:  # guard against silly ranges
+            if hi - lo <= 2000:  # guard against silly ranges (keeps enum loop cheap)
                 out.extend(range(lo, hi + 1))
         elif part.isdigit():
             out.append(int(part))
     return sorted(set(out))
+
+
+def _is_all_ports_spec(spec: str) -> bool:
+    """True when the port spec covers (essentially) the whole 65535-port range.
+
+    Recognises `-p-`, `-p 1-65535`, and equivalent wide ranges so the timing
+    model can charge the learner for a full-range sweep even though the enum
+    loop itself only walks the known ground-truth ports.
+    """
+    s = str(spec or "").strip()
+    if s in ("-", "0-", "1-"):
+        return True
+    m = re.match(r"^(\d+)-(\d+)$", s)
+    if m:
+        lo, hi = int(m.group(1)), int(m.group(2))
+        return (hi - lo) >= 60000
+    return False
+
+
+def _intended_port_count(caps: dict) -> int:
+    """How many ports the scan *intends* to probe, for the timing estimate.
+
+    - explicit -p list          -> its length
+    - full-range (-p-/1-65535)  -> 65535
+    - -F fast scan              -> ~100 (nmap's fast top-ports set)
+    - default                   -> len(_DEFAULT_TOP_PORTS) mapped to nmap's ~1000
+    """
+    if caps.get("all_ports"):
+        return 65535
+    ports = caps.get("ports")
+    if ports:
+        return len(ports)
+    if caps.get("fast"):
+        return 100
+    # Default nmap scans the top ~1000 ports; our engine walks a representative
+    # subset, but the wall-clock feel should reflect the ~1000-port default.
+    return 1000
 
 
 # Default "top ports" nmap probes when -p is not given (a representative subset).
@@ -338,6 +404,130 @@ def _find_host(inv: dict, ip: str) -> dict | None:
         if h["ip"] == ip:
             return h
     return None
+
+
+def _find_port(host: dict, port: int) -> dict | None:
+    for p in host.get("ports", []):
+        if p["port"] == int(port):
+            return p
+    return None
+
+
+# ---------------------------------------------------------------------------
+# Wall-clock port-state transitions
+#
+# A learner who stops a service (or starts a new listener) changes the *intrinsic*
+# state of a ground-truth port. Real networks don't flip instantly: a stopped
+# daemon keeps its socket briefly before the kernel refuses new SYNs, and a newly
+# started listener takes a beat to bind. We model this by stamping a pending
+# transition on the port with a target state + effective-at wall-clock time.
+#
+# `_advance_ports` is called on every read / action / scan / validate, exactly
+# like the baremetal `_tick`. Until the transition elapses the port keeps its
+# previous intrinsic state, so a scan run right after the change still shows the
+# old state; a re-scan after PORT_TRANSITION_SECONDS shows the new one.
+#
+# IMPORTANT: this only mutates ground-truth intrinsic `state` (open|closed) that
+# *future* scans observe. It never touches the `discovered` knowledge base that
+# validate_nmap_lab grades on, so grading is completely unaffected.
+# ---------------------------------------------------------------------------
+
+def _advance_ports(inv: dict, now: float | None = None) -> bool:
+    """Apply any pending port transitions whose effective time has arrived.
+
+    Returns True if anything changed (so callers can persist)."""
+    now = _now() if now is None else now
+    changed = False
+    for host in inv.get("hosts", []):
+        for port in host.get("ports", []):
+            pending = port.get("pending_state")
+            eff = port.get("transition_at")
+            if not pending or eff is None:
+                continue
+            if now >= float(eff):
+                port["state"] = pending
+                port.pop("pending_state", None)
+                port.pop("transition_at", None)
+                changed = True
+    return changed
+
+
+def _schedule_port_transition(host: dict, port_num: int, target_state: str,
+                              now: float | None = None,
+                              service: str = "") -> tuple[bool, str]:
+    """Queue a port to move to `target_state` (open|closed) after the delay.
+
+    If the port isn't in the ground-truth inventory yet and we're opening it, add
+    it (a newly started listener). Returns (ok, message)."""
+    now = _now() if now is None else now
+    target_state = "open" if str(target_state).lower() == "open" else "closed"
+    port = _find_port(host, port_num)
+    if port is None:
+        if target_state == "closed":
+            return False, f"port {port_num} is not listening on {host['ip']}"
+        # New listener bound by the learner.
+        port = _port(int(port_num), "closed", service or _guess_service(int(port_num)))
+        host.setdefault("ports", []).append(port)
+    # Cancel a no-op (already in / already heading to the requested state).
+    if port.get("pending_state") == target_state:
+        return True, f"port {port_num} already transitioning to {target_state}"
+    if port["state"] == target_state and not port.get("pending_state"):
+        return True, f"port {port_num} is already {target_state}"
+    port["pending_state"] = target_state
+    port["transition_at"] = now + PORT_TRANSITION_SECONDS
+    verb = "starting" if target_state == "open" else "stopping"
+    return True, (f"{verb} service on {host['ip']}:{port_num} — the port will read "
+                  f"'{target_state}' on a re-scan in ~{PORT_TRANSITION_SECONDS}s")
+
+
+# ---------------------------------------------------------------------------
+# Timing model — an authoritative, deterministic estimate of how long a scan
+# "takes", scaled by the -T template, the number of hosts, and the number of
+# ports probed. The frontend uses this to pace its progressive output so the
+# process *feels* like a real nmap run (SYN Stealth Scan Timing lines, ETC …).
+# ---------------------------------------------------------------------------
+
+# Per-template speed multipliers (T0 paranoid … T5 insane). Larger => slower.
+# T3 (normal) is the 1.0 baseline; T4 (aggressive) is the common lab default.
+_TIMING_MULTIPLIER = {
+    0: 12.0,   # paranoid  — serialized, huge inter-probe delays
+    1: 6.0,    # sneaky
+    2: 2.2,    # polite
+    3: 1.0,    # normal (default)
+    4: 0.55,   # aggressive
+    5: 0.32,   # insane
+}
+
+
+def estimate_duration(caps: dict, host_count: int) -> float:
+    """Authoritative scan duration (seconds), from timing/hosts/ports.
+
+    Deterministic given (timing template, host count, intended port count and
+    scan phases) so the backend — not the UI — owns the wall-clock feel. This
+    is display/pacing only; it never influences what the scan *discovers*.
+    """
+    hosts = max(1, int(host_count or 1))
+    timing = int(caps.get("timing", 3))
+    mult = _TIMING_MULTIPLIER.get(timing, 1.0)
+
+    if caps.get("ping_sweep") and not (caps.get("syn_scan") or caps.get("connect_scan")):
+        # Host-discovery sweep: fast, dominated by per-host probe latency.
+        base = 0.9 + 0.18 * hosts
+        return round(base * mult, 2)
+
+    ports = _intended_port_count(caps)
+    # Fixed setup + per-host overhead + per host×port probing cost. The
+    # per-probe cost is tiny but a full 65535×N sweep still adds up realistically.
+    base = 1.4 + 0.35 * hosts + hosts * ports * 0.00028
+    if caps.get("version"):
+        base += 0.6 * hosts + ports * 0.0016   # banner grabbing is expensive
+    if caps.get("os_detect"):
+        base += 1.1 * hosts                     # OS fingerprinting probe set
+    if caps.get("aggressive"):
+        base += 0.8 * hosts                     # NSE default scripts + traceroute
+    dur = base * mult
+    # Clamp to a sane, watchable window (never instantaneous, never absurd).
+    return round(max(1.2, min(dur, 240.0)), 2)
 
 
 # ---------------------------------------------------------------------------
@@ -439,7 +629,19 @@ def _run_scan(inv: dict, targets: Any, flags: Any, sudo: bool) -> dict:
     eff_caps["syn_scan"] = effective_syn
     eff_caps["os_detect"] = effective_os and sudo
 
-    ports_to_scan = caps["ports"] if caps["ports"] is not None else _DEFAULT_TOP_PORTS
+    if caps.get("all_ports"):
+        # A full-range sweep (`-p-` / `-p 1-65535`) probes every port, so it must
+        # reveal ports outside the default top-ports set. We can't enumerate all
+        # 65535 cheaply, so scan the default top-ports UNION every ground-truth
+        # port present on any candidate host — the full sweep then surfaces open
+        # ports (e.g. 8443 on the bastion) that the default scan would miss.
+        gt_ports = {p["port"] for ip in candidate_ips
+                    for p in (_find_host(inv, ip) or {}).get("ports", [])}
+        ports_to_scan = sorted(set(_DEFAULT_TOP_PORTS) | gt_ports)
+    elif caps["ports"] is not None:
+        ports_to_scan = caps["ports"]
+    else:
+        ports_to_scan = _DEFAULT_TOP_PORTS
 
     result_hosts: list[dict] = []
     hosts_up = 0
@@ -477,6 +679,18 @@ def _run_scan(inv: dict, targets: Any, flags: Any, sudo: bool) -> dict:
             result_hosts.append(entry)
             continue
 
+        # Real nmap collapses the mass of uninteresting ports into a single
+        # "Not shown: N closed/filtered tcp ports" line and lists only the
+        # interesting (open / open|filtered / filtered) ones — UNLESS the learner
+        # asked for a specific, bounded port list (e.g. `-p 22,3306`), in which
+        # case nmap prints the exact state of each requested port, closed included.
+        explicit_small_list = (
+            caps["ports"] is not None
+            and not caps.get("all_ports")
+            and len(caps["ports"]) <= 25
+        )
+        not_shown_closed = 0
+        not_shown_filtered = 0
         for pnum in ports_to_scan:
             port = next((p for p in host["ports"] if p["port"] == pnum), None)
             if port is None:
@@ -485,17 +699,29 @@ def _run_scan(inv: dict, targets: Any, flags: Any, sudo: bool) -> dict:
                     state = "filtered"
                 else:
                     state = "closed"
-                # nmap only prints open / open|filtered by default; we surface
-                # filtered explicitly (for the blocked-scan scenario) but omit
-                # plain closed to keep output readable.
                 if state == "filtered":
+                    # A drop-all firewall's filtered ports are the teaching point;
+                    # surface them (matches nmap listing many filtered ports).
                     entry["ports"].append({
                         "port": pnum, "proto": "tcp", "state": "filtered",
                         "service": _guess_service(pnum),
                     })
+                elif explicit_small_list:
+                    # Learner explicitly probed this port — show its closed state.
+                    entry["ports"].append({
+                        "port": pnum, "proto": "tcp", "state": "closed",
+                        "service": _guess_service(pnum),
+                    })
+                else:
+                    not_shown_closed += 1
                 continue
 
             state = _observed_port_state(host, port, eff_caps, sudo)
+            if state == "closed" and not explicit_small_list:
+                # Collapse a known-closed port into the "Not shown" tally rather
+                # than printing a CLOSED row (nmap default behaviour).
+                not_shown_closed += 1
+                continue
             pinfo: dict = {
                 "port": pnum, "proto": port["proto"], "state": state,
                 "service": port["service"],
@@ -504,6 +730,23 @@ def _run_scan(inv: dict, targets: Any, flags: Any, sudo: bool) -> dict:
                 pinfo["version"] = port.get("version", "")
                 pinfo["product"] = port.get("product", "")
             entry["ports"].append(pinfo)
+
+        # nmap prints e.g. "Not shown: 996 closed tcp ports (conn-refused)".
+        # For the default / -F / full-range cases the engine only walks a
+        # representative subset of ports, but the wire-feel should reflect the
+        # true probe count (~1000 default, 65535 for -p-), so pad the not-shown
+        # tally up to (intended ports − ports actually surfaced). An explicit
+        # small -p list reports exactly what was requested, so no padding.
+        if not explicit_small_list:
+            surfaced = len(entry["ports"])
+            intended = _intended_port_count(caps)
+            padded_not_shown = max(not_shown_closed, intended - surfaced - not_shown_filtered)
+            not_shown_closed = padded_not_shown
+        if not_shown_closed or not_shown_filtered:
+            entry["not_shown"] = {
+                "closed": not_shown_closed,
+                "filtered": not_shown_filtered,
+            }
 
         # OS detection only with -O (or -A) AND sudo.
         if eff_caps["os_detect"] and any(p["state"] == "open" for p in host["ports"]):
@@ -517,7 +760,12 @@ def _run_scan(inv: dict, targets: Any, flags: Any, sudo: bool) -> dict:
                  and not (caps["syn_scan"] or caps["connect_scan"]) else "port_scan")
 
     cmd = _format_command(targets, flags, sudo)
-    summary = f"Nmap done: {len(candidate_ips)} IP addresses ({hosts_up} hosts up) scanned"
+    # Authoritative, backend-owned wall-clock estimate. The UI paces its
+    # progressive reveal to this value (it does NOT compute its own).
+    duration = estimate_duration(eff_caps, len(candidate_ips))
+    port_count = _intended_port_count(caps)
+    summary = (f"Nmap done: {len(candidate_ips)} IP addresses "
+               f"({hosts_up} hosts up) scanned in {duration:.2f} seconds")
     return {
         "command": cmd,
         "scan_type": scan_type,
@@ -529,6 +777,11 @@ def _run_scan(inv: dict, targets: Any, flags: Any, sudo: bool) -> dict:
         "caps": {k: v for k, v in caps.items() if k != "ports"},
         "sudo": bool(sudo),
         "ports_spec": caps["ports"],
+        # ── timing metadata for the UI's progress animation ──
+        "duration": duration,
+        "timing": int(caps.get("timing", 3)),
+        "port_count": port_count,
+        "host_count": len(candidate_ips),
     }
 
 
@@ -704,6 +957,10 @@ def _ensure_session(session_id: str, scenario_slug: str = "") -> dict:
 
 def get_state(session_id: str, scenario_slug: str = "") -> dict:
     entry = _ensure_session(session_id, scenario_slug)
+    # Advance any pending wall-clock port transitions on read so the topology
+    # reflects real time even when no scan/action has happened since the change.
+    if _advance_ports(entry["state"]["inventory"]):
+        _save_session(str(session_id), entry)
     state = copy.deepcopy(entry["state"])
     inv = state["inventory"]
     disc = state.get("discovered", {})
@@ -741,6 +998,17 @@ def get_state(session_id: str, scenario_slug: str = "") -> dict:
             ],
         },
         "goal": goal,
+        # In-flight service transitions the learner kicked off (stop/start a
+        # listener). Display-only: lets the UI show "web01:80 stopping…" and hint
+        # that a re-scan is needed. Does not leak undiscovered ground truth — only
+        # ports the learner is actively changing appear here.
+        "pending_transitions": [
+            {"ip": h["ip"], "port": p["port"],
+             "to": p.get("pending_state"), "service": p.get("service", "")}
+            for h in inv["hosts"]
+            for p in h.get("ports", [])
+            if p.get("pending_state")
+        ],
         "scan_log": disc.get("scans", []),
         # `events` is the contract-named field (mirrors the VMware engine shape
         # {session_id, scenario_slug, inventory, summary, events}); it aliases
@@ -785,11 +1053,30 @@ def apply_action(session_id: str, action: str, payload: dict | None = None) -> d
         return {"ok": False, "error": "Nmap simulation session not found"}
     state = entry["state"]
     inv = state["inventory"]
+    # Advance any pending wall-clock port transitions before handling the action
+    # so a scan sees the up-to-date topology (a service the learner stopped long
+    # enough ago now reads closed; one stopped moments ago still reads open).
+    _advance_ports(inv)
 
     if action == "scan":
         targets = payload.get("targets") or payload.get("target") or "all"
         flags = payload.get("flags", payload.get("args", ""))
         sudo = bool(payload.get("sudo", False))
+        # The UI may carry the -p spec in a dedicated `ports` field (in addition
+        # to inlining it in flags); fold it into the flag list as `-p <spec>`
+        # unless -p is already present. This keeps the port spec authoritative
+        # for enumeration AND the timing model regardless of which channel the
+        # caller used. Backward-compatible: callers that inline -p or omit ports
+        # entirely are unaffected, and the raw-command path below is untouched.
+        ports_spec = payload.get("ports")
+        if ports_spec not in (None, "") and not payload.get("command"):
+            flag_list = (list(flags) if isinstance(flags, (list, tuple))
+                         else str(flags or "").split())
+            has_p = any(str(f) == "-p" or str(f).startswith("-p")
+                        for f in flag_list)
+            if not has_p:
+                flag_list.extend(["-p", str(ports_spec)])
+                flags = flag_list
         # Convenience: allow a full raw command string in `command`.
         raw = payload.get("command")
         if raw and not payload.get("targets") and not payload.get("flags"):
@@ -800,6 +1087,37 @@ def apply_action(session_id: str, action: str, payload: dict | None = None) -> d
         _record_discovery(state, scan)
         _save_session(str(session_id), entry)
         return {"ok": True, "message": scan["summary"], "scan": scan}
+
+    # ── Service lifecycle: stop/start a listener on a host ──────────────────
+    # These let a learner change the network they're scanning (e.g. "stop the
+    # exposed telnet service") and then confirm the change with a follow-up scan.
+    # The change takes PORT_TRANSITION_SECONDS of wall-clock to take effect, so
+    # an immediate re-scan still shows the old state — modelling real socket
+    # teardown/bind latency. Grading is untouched (it reads `discovered`).
+    if action in ("stop_service", "close_port"):
+        ip = payload.get("ip") or payload.get("target")
+        host = _find_host(inv, ip) if ip else None
+        if not host:
+            return {"ok": False, "error": f"host {ip} not found on {inv['subnet']}"}
+        port_num = payload.get("port")
+        if port_num in (None, ""):
+            return {"ok": False, "error": "a port is required"}
+        ok, msg = _schedule_port_transition(host, int(port_num), "closed")
+        _save_session(str(session_id), entry)
+        return {"ok": ok, "message": msg}
+
+    if action in ("start_service", "open_port"):
+        ip = payload.get("ip") or payload.get("target")
+        host = _find_host(inv, ip) if ip else None
+        if not host:
+            return {"ok": False, "error": f"host {ip} not found on {inv['subnet']}"}
+        port_num = payload.get("port")
+        if port_num in (None, ""):
+            return {"ok": False, "error": "a port is required"}
+        ok, msg = _schedule_port_transition(
+            host, int(port_num), "open", service=payload.get("service", ""))
+        _save_session(str(session_id), entry)
+        return {"ok": ok, "message": msg}
 
     if action == "reset":
         state["discovered"] = {

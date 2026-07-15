@@ -10,21 +10,40 @@ max_score: 100
 is_free: true
 jira_priority: High
 dual_terminal: false
-description: 'CONTEXT: A team operating Red Hat Enterprise Linux needs you to resolve `RHEL SSSD Down
-  — AD Logins Fail` during a realistic incident. The business impact is reduced service reliability until
-  the underlying state is repaired.
+description: 'CONTEXT: A team operating Red Hat Enterprise Linux has raised a ticket for `RHEL SSSD Down
+  — AD Logins Fail`. A customer-facing workflow is degraded and the on-call engineer (you) must diagnose
+  and resolve it. Business impact: reduced service reliability and blocked users until the underlying
+  state is repaired.
 
 
-  ENVIRONMENT: You are working in FixitLab''s offline RHEL practice host with dnf, subscription-manager,
-  firewalld, and SELinux. All tools run locally; no paid APIs or external cloud calls are required.
+  ENVIRONMENT: You are working in FixitLab''s offline RHEL practice host. The architecture is a single
+  lab-primary node exposing dnf, subscription-manager, firewalld, and SELinux; treat it as the production
+  host for this incident. All tools run locally — no paid APIs or external cloud calls are required.
 
 
-  SYMPTOM / STARTING STATE: A RHEL host where the sssd service is failed. Domain users can''t log in because
-  SSSD is down on a RHEL host.
+  SYMPTOM / STARTING STATE: A RHEL host where the sssd service is failed.
 
 
   OBJECTIVE: Confirm sssd is down (getent passwd domainuser fails); Resolve the cause and start sssd;
-  Verify sssd is active. Success means `systemctl is-active sssd` returns active.
+  Verify sssd is active. Acceptance criteria: the change is minimal and reversible, and success means
+  `systemctl is-active sssd` returns active.
+
+
+  WORK TO DO: Required tooling is pre-installed; if a command is missing, note it and use the equivalent
+  already on the host. Make the smallest configuration change that moves the system toward the objective
+  (edit the relevant dnf, subscription-manager, firewalld, and SELinux), changing one thing at a time.
+  Check your work continuously against the objective — success means `systemctl is-active sssd` returns
+  active.
+
+
+  VERIFY: Re-run the same check the grader uses and confirm `systemctl is-active sssd` returns active.
+  Capture the before/after output as evidence. Success criteria: the objective''s healthy state holds
+  on a repeat check, not just once.
+
+
+  ROLLBACK: If a change makes things worse, revert that single change immediately (restore the original
+  config file / undo the edit / restart the affected component) and re-observe before trying another hypothesis.
+  Never stack unverified changes.
 
 
   WHAT TO AVOID: Do not apply broad destructive changes, skip evidence gathering, or fake completion with
@@ -37,20 +56,37 @@ objectives:
 hints:
 - order: 1
   cost: 0
-  content: 'Where to look: Start with `systemctl status sssd` and `journalctl -u sssd -n 50 --no-pager`
-    before changing anything.'
+  content: 'ORIENT — what to observe and why:
+
+    Do not touch anything yet. First observe the symptom: RHEL SSSD down — AD logins fail is not behaving
+    as the scenario objectives require. This lab is about RHEL SSSD down — AD logins fail — how RHEL SSSD
+    down — AD logins fail behaves in a Red Hat Enterprise Linux environment. Read the objectives and the
+    current state, and note precisely what looks wrong versus healthy before you form any theory.'
 - order: 2
+  cost: 10
+  content: 'APPROACH — the troubleshooting method:
+
+    Work from evidence, not guesses. For RHEL SSSD down — AD logins fail problems the reliable method
+    is: (1) reproduce/observe the failure, (2) narrow from the whole system down to the one component
+    that owns the symptom, (3) change exactly one thing, (4) re-check. Create the smallest working slice
+    of RHEL SSSD down — AD logins fail first, validate it, then add the remaining pieces one at a time.'
+- order: 3
   cost: 25
-  content: 'Diagnostic steps:
+  content: 'WHICH TOOL — the diagnostic command(s):
+
+    Start with `systemctl status sssd` and `journalctl -u sssd -n 50 --no-pager` before changing anything.'
+- order: 4
+  cost: 40
+  content: 'NARROW DOWN — isolate the subsystem:
 
     1. Run `systemctl status sssd` — note Active/Failed and the last log lines.
 
     2. Read `journalctl -u sssd -n 50` for the root error.
 
     3. Form a hypothesis about the smallest config or permission fix.'
-- order: 3
-  cost: 50
-  content: 'Exact fix + verification:
+- order: 5
+  cost: 60
+  content: 'NEAR-SOLUTION — the fix shape + verify (you still apply it):
 
     1. Apply the minimal fix (config, unit override, or missing directory).
 

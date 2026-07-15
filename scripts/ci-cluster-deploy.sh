@@ -20,6 +20,7 @@ set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 DRY_RUN="${DRY_RUN:-0}"
 BUILD_SCENARIOS="${BUILD_SCENARIOS:-true}"
+MERGE_SEED_ONLY="${MERGE_SEED_ONLY:-true}"
 
 # Docker Hub image pipeline (gated, additive). When the workflow has USE_DOCKERHUB
 # on, deploy-cluster passes USE_DOCKERHUB=true + IMAGE_TAG=<git-sha> (+ optional
@@ -119,7 +120,7 @@ deploy_app() {
   # last-good .env.production. Vault stays the source of truth on the edge (deploy_edge
   # keeps ${VAULT_ENV}); the backend's runtime Vault loader still reads it when reachable.
   if ! remote "$APP_PRIVATE_IP" via-edge \
-    "${IMG_ENV} CLUSTER_ROLE=app BUILD_SCENARIOS=false ./scripts/ci-remote-platform.sh deploy"; then
+    "${IMG_ENV} CLUSTER_ROLE=app BUILD_SCENARIOS=false MERGE_SEED_ONLY=${MERGE_SEED_ONLY} ./scripts/ci-remote-platform.sh deploy"; then
     echo "===== [diagnostic] D2 backend startup logs (last 120 lines) ====="
     remote "$APP_PRIVATE_IP" via-edge \
       "docker logs fixitlab-backend-1 --tail 120 2>&1 || (cd /opt/fixitlab && docker compose -f docker-compose.app.yml logs --tail 120 backend 2>&1) || true" || true

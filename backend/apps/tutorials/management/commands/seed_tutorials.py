@@ -735,9 +735,50 @@ SHALLOW_E3_SLUGS = frozenset({
 })
 
 
+# A handful of data-authored playground_slug values name a technology that has no
+# matching playground definition. Map them onto the real playground so the "Try it"
+# CTA always deep-links a valid page (and the completeness/API tests pass).
+_PLAYGROUND_ALIASES: dict[str, str] = {
+    "shell-script": "bash",
+    "shell": "bash",
+    "sh": "bash",
+    "postgresql": "sql",
+    "postgres": "sql",
+    "mysql": "sql",
+    "database": "sql",
+    "sqlite": "sql",
+}
+
+
+def _normalize_playground(specs: list) -> list:
+    """Rewrite any playground_slug that has no live playground onto a valid one.
+
+    Prefers the static alias map; otherwise clears an unresolved slug so the CTA
+    is simply hidden rather than deep-linking a 404. Validated against the real
+    playground engine so future playgrounds are picked up automatically.
+    """
+    try:
+        from apps.labs import playground_engine as pg
+
+        def _valid(slug: str) -> bool:
+            return bool(slug) and pg.get_definition(slug) is not None
+    except Exception:
+        def _valid(slug: str) -> bool:  # pragma: no cover - import guard
+            return True
+
+    for spec in specs:
+        slug = (spec.get("playground_slug") or "").strip()
+        if not slug or _valid(slug):
+            continue
+        alias = _PLAYGROUND_ALIASES.get(slug.lower())
+        spec["playground_slug"] = alias if alias and _valid(alias) else ""
+    return specs
+
+
 def _filter_specs(specs: list) -> list:
     """Drop shallow duplicate tutorials superseded by course catalog modules."""
-    return [s for s in specs if s.get("slug") not in SHALLOW_E3_SLUGS]
+    kept = [s for s in specs if s.get("slug") not in SHALLOW_E3_SLUGS]
+    return _normalize_playground(kept)
 
 
 def _ensure_assessment_section(sections: list) -> list:

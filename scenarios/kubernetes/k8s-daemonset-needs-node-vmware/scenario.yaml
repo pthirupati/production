@@ -2,13 +2,15 @@ title: DaemonSet Pod Pending - Bring Up the Missing Node VM in
 slug: k8s-daemonset-needs-node-vmware
 category: Fix
 difficulty: medium
-description: 'CONTEXT: A team operating Kubernetes needs you to resolve `DaemonSet Pod Pending - Bring
-  Up the Missing Node VM in` during a realistic incident. The business impact is reduced service reliability
-  until the underlying state is repaired.
+description: 'CONTEXT: A team operating Kubernetes has raised a ticket for `DaemonSet Pod Pending - Bring
+  Up the Missing Node VM in`. A customer-facing workflow is degraded and the on-call engineer (you) must
+  diagnose and resolve it. Business impact: reduced service reliability and blocked users until the underlying
+  state is repaired.
 
 
-  ENVIRONMENT: You are working in FixitLab''s offline Kubernetes cluster with kubectl, manifests, and
-  cluster resources. All tools run locally; no paid APIs or external cloud calls are required.
+  ENVIRONMENT: You are working in FixitLab''s offline Kubernetes cluster. The architecture is a single
+  lab-primary node exposing kubectl, manifests, and cluster resources; treat it as the production host
+  for this incident. All tools run locally — no paid APIs or external cloud calls are required.
 
 
   SYMPTOM / STARTING STATE: A Kubernetes cluster with one worker (worker-1) running a node-agent DaemonSet
@@ -17,28 +19,29 @@ description: 'CONTEXT: A team operating Kubernetes needs you to resolve `DaemonS
 
   its VMware VM (k8s-worker-2) is powered off. The DaemonSet only becomes fully
 
-  scheduled once that node joins. The `node-agent` DaemonSet should run exactly one pod on every node,
-  but one of
-
-  its pods is stuck Pending: the node it is meant to run on does not exist yet. This
-
-  Kubernetes cluster runs ON VMware — each node is a VMware VM — and the second
-
-  worker''s VM is powered off, so the DaemonSet has nowhere to place its pod.
-
-
-  This is a CROSS-TECHNOLOGY task. Open the VMware simulator (toolbar -> Open VMware)
-
-  and power on the worker-node VM `k8s-worker-2`. Once it joins as node worker-2 the
-
-  DaemonSet controller schedules its pod there. Confirm from the terminal that the
-
-  DaemonSet is fully scheduled and all pods are Running.
+  scheduled once that node joins.
 
 
   OBJECTIVE: Confirm a node-agent DaemonSet pod is Pending (kubectl get pods, kubectl get ds); Confirm
   only one worker node exists (kubectl get nodes); Open the VMware simulator and power on the worker-node
-  VM k8s-worker-2. Success means `kubectl get pods` shows every pod Running.
+  VM k8s-worker-2. Acceptance criteria: the change is minimal and reversible, and success means `kubectl
+  get pods` shows every pod Running.
+
+
+  WORK TO DO: Required tooling is pre-installed; if a command is missing, note it and use the equivalent
+  already on the host. Make the smallest configuration change that moves the system toward the objective
+  (edit the relevant kubectl, manifests, and cluster resources), changing one thing at a time. Check your
+  work continuously against the objective — success means `kubectl get pods` shows every pod Running.
+
+
+  VERIFY: Re-run the same check the grader uses and confirm `kubectl get pods` shows every pod Running.
+  Capture the before/after output as evidence. Success criteria: the objective''s healthy state holds
+  on a repeat check, not just once.
+
+
+  ROLLBACK: If a change makes things worse, revert that single change immediately (restore the original
+  config file / undo the edit / restart the affected component) and re-observe before trying another hypothesis.
+  Never stack unverified changes.
 
 
   WHAT TO AVOID: Do not apply broad destructive changes, skip evidence gathering, or fake completion with
@@ -70,29 +73,47 @@ dual_terminal: false
 hints:
 - order: 1
   cost: 0
-  content: 'Where to look: Run `kubectl get pods -A` and `kubectl describe pod <name>` for any pod not
-    in Running state.'
+  content: 'ORIENT — what to observe and why:
+
+    Do not touch anything yet. First observe the symptom: DaemonSet pod pending - bring up the missing
+    node VM in is not behaving as the scenario objectives require. This lab is about DaemonSet pod pending
+    - bring up the missing node VM in — how DaemonSet pod pending - bring up the missing node VM in behaves
+    in a Kubernetes environment. Read the objectives and the current state, and note precisely what looks
+    wrong versus healthy before you form any theory.'
 - order: 2
-  cost: 25
-  content: 'Diagnostic steps:
+  cost: 10
+  content: 'APPROACH — the troubleshooting method:
 
-    1. `kubectl get pods` — note CrashLoopBackOff, ImagePullBackOff, or Pending.
-
-    2. `kubectl describe pod <name>` — read Events at the bottom.
-
-    3. `kubectl logs <name> [--previous]` if the container restarted.'
+    Work from evidence, not guesses. For DaemonSet pod pending - bring up the missing node VM in problems
+    the reliable method is: (1) reproduce/observe the failure, (2) narrow from the whole system down to
+    the one component that owns the symptom, (3) change exactly one thing, (4) re-check. Fix the underlying
+    misconfiguration you identified (not just the noisy log line), changing one thing at a time.'
 - order: 3
-  cost: 50
-  content: 'Exact fix + verification:
+  cost: 25
+  content: 'WHICH TOOL — the diagnostic command(s):
 
-    1. Fix the root cause (image name, env var, volume mount, or probe).
+    Run `kubectl get pods -A` and `kubectl describe pod <name>` for Events and container state.'
+- order: 4
+  cost: 40
+  content: 'NARROW DOWN — isolate the subsystem:
 
-    2. `kubectl apply -f` the corrected manifest or delete the pod to recreate.
+    1. Check pod phase, restarts, and last State reason.
 
-    3. Confirm `kubectl get pods` shows every pod Running.
+    2. `kubectl logs <pod> --previous` if it crashed.
+
+    3. Compare resource spec (probes, limits, mounts) to objectives.'
+- order: 5
+  cost: 60
+  content: 'NEAR-SOLUTION — the fix shape + verify (you still apply it):
+
+    1. Patch the Deployment/Service/ConfigMap with the minimal fix.
+
+    2. Wait for rollout (`kubectl rollout status`).
+
+    3. Confirm `kubectl get pods` succeeds.
 
 
-    WHY: Kubernetes only reports healthy when the workload actually runs.'
+    WHY: Kubernetes labs grade real cluster state.'
 requires_companion_hosts: false
 technology: kubernetes
 summary: Complete the daemonset pod pending - bring up the missing node vm in kubernetes lab and verify

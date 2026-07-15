@@ -3,8 +3,8 @@ import {
   Waves, Filter, Search, ArrowLeft, RefreshCw,
   XCircle, AlertTriangle, CheckCircle2, GitBranch, Flag, Eraser, Target,
   ArrowRight, ArrowLeftRight, FolderOpen, Save, Square, PlayCircle, ZoomIn,
-  ZoomOut, SkipBack, SkipForward, Bookmark, History, BarChart3, Network,
-  Settings, Radio, X, Download, Copy, Eye,
+  ZoomOut, SkipBack, SkipForward, BarChart3, Network,
+  Settings, Radio, X, Eye,
 } from 'lucide-react'
 import { wiresharkApi } from '../../api/wireshark'
 import { LabChromeControls } from '../lab/LabChromeBar'
@@ -224,9 +224,15 @@ const WS_MENUS = [
   ['Help', ['Contents', 'Supported Protocols', 'FAQ', 'Man Pages', 'Website', 'Sample Captures', 'About Wireshark']],
 ]
 
+// Field snippets that insert a *complete, usable* display filter for THIS
+// capture (the packet set only carries HTTP/DNS/TLS/SSH over TCP/UDP, so we
+// don't offer arp/eth/frame fields that would match nothing). Clicking a chip
+// drops a ready-to-apply term; the engine accepts these verbatim, so the filter
+// bar never goes red on a suggested field. Mirrors Wireshark's field-name
+// autocomplete but pre-filled with real values from the capture.
 const DISPLAY_AUTOCOMPLETE = [
-  'ip.addr', 'tcp.port', 'udp.port', 'http', 'dns', 'icmp', 'arp', 'eth.addr',
-  'frame.number', 'tcp.flags', 'http.request', 'http.response', 'ssl', 'tls',
+  'ip.addr==93.184.216.34', 'ip.src==10.0.0.15', 'tcp.port==80', 'udp.port==53',
+  'http.request', 'http.response', 'tcp.flags.syn==1', 'tls',
 ]
 
 function ModalShell({ title, children, onClose }) {
@@ -271,6 +277,39 @@ function conversationRows(packets) {
 }
 
 /**
+ * Re-render a Follow-Stream segment's text in the chosen Wireshark display
+ * format. Mirrors Wireshark's "Show data as" selector: ASCII/UTF-8 show the
+ * text as-is, Hex Dump lays out offset + hex bytes + ascii gutter, Raw shows
+ * the contiguous hex string, C Arrays emits a char[] initializer.
+ */
+function formatStreamData(text, format) {
+  const data = text == null ? '' : String(text)
+  switch (format) {
+    case 'Hex Dump': {
+      const lines = []
+      for (let off = 0; off < data.length; off += 16) {
+        const chunk = data.slice(off, off + 16)
+        const hex = Array.from(chunk).map((ch) => ch.charCodeAt(0).toString(16).padStart(2, '0')).join(' ')
+        const ascii = Array.from(chunk).map((ch) => {
+          const c = ch.charCodeAt(0)
+          return c >= 32 && c < 127 ? ch : '.'
+        }).join('')
+        lines.push(`${off.toString(16).padStart(8, '0')}  ${hex.padEnd(47, ' ')}  ${ascii}`)
+      }
+      return lines.join('\n')
+    }
+    case 'Raw':
+      return Array.from(data).map((ch) => ch.charCodeAt(0).toString(16).padStart(2, '0')).join('')
+    case 'C Arrays':
+      return `char stream[] = {\n${Array.from(data).map((ch) => `0x${ch.charCodeAt(0).toString(16).padStart(2, '0')}`).join(', ')}\n};`
+    case 'UTF-8':
+    case 'ASCII':
+    default:
+      return data
+  }
+}
+
+/**
  * Wireshark packet-capture simulator. Rendered INLINE by LabRunner for wireshark
  * labs (simulation_type 'wireshark' / technology.slug 'wireshark') — no new route.
  * The learner sets a capture filter (what lands on disk), narrows the view with a
@@ -292,8 +331,12 @@ export default function WiresharkSimulator({
   const [modal, setModal] = useState(null)
   const [capturing, setCapturing] = useState(true)
   const [zoom, setZoom] = useState(100)
+  const [findQuery, setFindQuery] = useState('')
+  const [findError, setFindError] = useState('')
+  const [streamFormat, setStreamFormat] = useState('ASCII')
   const pollRef = useRef(null)
   const hydrated = useRef(false)
+  const rowRefs = useRef({})
 
   const load = useCallback(async () => {
     try {
@@ -320,8 +363,25 @@ export default function WiresharkSimulator({
 
   const inv = state?.inventory || {}
   const summary = state?.summary || {}
-  const packets = inv.packets || []
+  const packets = useMemo(() => inv.packets || [], [inv.packets])
   const selected = inv.selected_packet
+
+  // Reset the Find dialog's transient search state each time it opens so a
+  // prior no-match error / stale query doesn't leak into a fresh search.
+  useEffect(() => {
+    if (modal === 'find') { setFindQuery(''); setFindError('') }
+  }, [modal])
+
+  // Scroll the selected packet's row into view (used by Find Packet and the
+  // First/Prev/Next/Last navigation toolbar). Purely a viewport nicety — no
+  // state change.
+  useEffect(() => {
+    if (selected == null) return
+    const el = rowRefs.current[selected]
+    if (el && typeof el.scrollIntoView === 'function') {
+      el.scrollIntoView({ block: 'nearest' })
+    }
+  }, [selected])
   const marked = useMemo(() => new Set((inv.marked_packets || []).map(Number)), [inv.marked_packets])
   const streamPayload = inv.stream_payload || []
   const followedStream = inv.followed_stream
@@ -381,6 +441,30 @@ export default function WiresharkSimulator({
     finally { setBusy(false) }
   }, [sessionId, displayInput, load])
 
+  // Find Packet: match query against Info / Source / Destination / Protocol
+  // (case-insensitive substring) and select the first matching displayed
+  // packet, scrolling it into view. Does NOT alter capture/grading state —
+  // it reuses the same selectPacket path as clicking a row.
+  const findPacket = useCallback(async () => {
+    const q = findQuery.trim().toLowerCase()
+    if (!q) { setFindError('Enter a search term'); return }
+    const hit = packets.find((p) => {
+      const hay = [
+        p.info,
+        p.src,
+        p.dst,
+        p.protocol,
+        p.src_port != null ? `${p.src}:${p.src_port}` : '',
+        p.dst_port != null ? `${p.dst}:${p.dst_port}` : '',
+      ].filter(Boolean).join(' ').toLowerCase()
+      return hay.includes(q)
+    })
+    if (!hit) { setFindError(`No packet matches "${findQuery.trim()}"`); return }
+    setFindError('')
+    await selectPacket(hit.no)
+    setModal(null)
+  }, [findQuery, packets, selectPacket])
+
   const DISPLAY_SAMPLES = ['http', 'dns', 'tls', 'ssh', 'tcp.flags.reset==1', 'tcp.analysis.retransmission', 'tcp.port==443']
   const CAPTURE_SAMPLES = ['tcp', 'udp', 'port 80', 'tcp port 443', 'host 10.0.0.5']
 
@@ -391,6 +475,7 @@ export default function WiresharkSimulator({
   const handleMenuItem = (menu, item) => {
     setMenuOpen(null)
     if (item === 'Options') setModal('capture-options')
+    else if (item === 'Find Packet') setModal('find')
     else if (item === 'Protocol Hierarchy') setModal('protocol-hierarchy')
     else if (item === 'Conversations') setModal('conversations')
     else if (item === 'I/O Graph') setModal('io-graph')
@@ -571,8 +656,6 @@ export default function WiresharkSimulator({
             </button>
           </div>
           <div className="flex flex-wrap gap-1.5 mt-1.5">
-            <span className="ws-chip" title="Bookmark current filter"><Bookmark size={11} /> save filter</span>
-            <span className="ws-chip" title="Filter history"><History size={11} /> history</span>
             {DISPLAY_SAMPLES.map(s => (
               <button key={s} className="ws-chip" onClick={() => { setDisplayInput(s); setDisplayBad(false) }}>{s}</button>
             ))}
@@ -610,6 +693,7 @@ export default function WiresharkSimulator({
                     return (
                       <tr
                         key={p.no}
+                        ref={(el) => { if (el) rowRefs.current[p.no] = el; else delete rowRefs.current[p.no] }}
                         onClick={() => selectPacket(p.no)}
                         className={`ws-row ${isSel ? 'ws-selected' : ''}`}
                         style={{ background: isMarked ? 'rgba(245,196,81,.12)' : rowTint(p) }}
@@ -750,19 +834,25 @@ export default function WiresharkSimulator({
       {modal === 'stream' && (
         <ModalShell title={`Follow TCP Stream${followedStream != null ? ` #${followedStream}` : ''}`} onClose={() => setModal(null)}>
           <div className="flex items-center gap-2 mb-3 flex-wrap text-xs">
-            <select className="border border-slate-300 rounded px-2 py-1 bg-white"><option>ASCII</option><option>Hex Dump</option><option>Raw</option><option>UTF-8</option><option>C Arrays</option></select>
-            <input className="border border-slate-300 rounded px-2 py-1 flex-1 min-w-[180px]" placeholder="Find in stream" />
-            <button className="px-2 py-1 rounded border border-slate-300 flex items-center gap-1"><Copy size={13} /> Copy</button>
-            <button className="px-2 py-1 rounded border border-slate-300 flex items-center gap-1"><Download size={13} /> Save As</button>
+            <label className="flex items-center gap-1.5">
+              <span className="text-slate-500">Show as</span>
+              <select
+                className="border border-slate-300 rounded px-2 py-1 bg-white"
+                value={streamFormat}
+                onChange={(e) => setStreamFormat(e.target.value)}
+              >
+                <option>ASCII</option><option>Hex Dump</option><option>Raw</option><option>UTF-8</option><option>C Arrays</option>
+              </select>
+            </label>
           </div>
-          <div className="font-mono text-xs bg-white border border-slate-300 rounded p-3 max-h-[55vh] overflow-auto leading-6">
+          <div className="font-mono text-xs bg-white border border-slate-300 rounded p-3 max-h-[55vh] overflow-auto leading-6 whitespace-pre-wrap break-words">
             {streamPayload.length === 0 ? (
               <div className="text-slate-500">No stream selected. Choose a TCP packet and click follow.</div>
             ) : streamPayload.map((seg, i) => {
               const toServer = seg.direction === 'c2s' || seg.direction === 'request' || seg.direction === 'out'
               return (
                 <div key={i} style={{ color: toServer ? '#c2410c' : '#2563eb' }}>
-                  {seg.data}
+                  {formatStreamData(seg.data, streamFormat)}
                 </div>
               )
             })}
@@ -785,15 +875,27 @@ export default function WiresharkSimulator({
 
       {modal === 'conversations' && (
         <ModalShell title="Conversations" onClose={() => setModal(null)}>
-          <div className="flex gap-1 mb-3 text-xs">
-            {['Ethernet', 'IPv4', 'IPv6', 'TCP', 'UDP'].map((t) => <button key={t} className="px-2 py-1 rounded border border-slate-300 bg-white">{t}</button>)}
-          </div>
           <table className="ws-light-table">
             <thead><tr><th>Address A</th><th>Address B</th><th>Protocol</th><th>Packets</th><th>Bytes</th><th>Duration</th><th></th></tr></thead>
             <tbody>
-              {conversations.map((c) => (
-                <tr key={`${c.a}-${c.b}`}><td>{c.a}</td><td>{c.b}</td><td>{c.proto}</td><td>{c.packets}</td><td>{c.bytes}</td><td>{c.duration.toFixed(3)}s</td><td><button className="text-blue-600">Follow Stream</button></td></tr>
-              ))}
+              {conversations.map((c) => {
+                const convPkt = packets.find((p) => {
+                  const a = `${p.src}${p.src_port ? `:${p.src_port}` : ''}`
+                  const b = `${p.dst}${p.dst_port ? `:${p.dst_port}` : ''}`
+                  return (a === c.a && b === c.b) || (a === c.b && b === c.a)
+                })
+                const canFollow = convPkt && ((c.proto || '').toUpperCase() === 'TCP' || convPkt.stream_id != null)
+                return (
+                  <tr key={`${c.a}-${c.b}`}>
+                    <td>{c.a}</td><td>{c.b}</td><td>{c.proto}</td><td>{c.packets}</td><td>{c.bytes}</td><td>{c.duration.toFixed(3)}s</td>
+                    <td>
+                      {canFollow && (
+                        <button type="button" className="text-blue-600" onClick={() => { setModal(null); follow(convPkt) }}>Follow Stream</button>
+                      )}
+                    </td>
+                  </tr>
+                )
+              })}
             </tbody>
           </table>
         </ModalShell>
@@ -812,14 +914,7 @@ export default function WiresharkSimulator({
               </div>
             ))}
           </div>
-          <div className="grid sm:grid-cols-5 gap-2 mt-4 text-xs">
-            {['Name', 'Display filter', 'Color', 'Style', 'Y Axis'].map((h) => <div key={h} className="font-semibold text-slate-500">{h}</div>)}
-            <input className="border rounded px-2 py-1" defaultValue="All packets" />
-            <input className="border rounded px-2 py-1" defaultValue={displayInput || 'frame'} />
-            <input className="border rounded px-2 py-1" type="color" defaultValue="#4c8dff" />
-            <select className="border rounded px-2 py-1"><option>Line</option><option>Impulse</option><option>Dot</option><option>FBar</option></select>
-            <select className="border rounded px-2 py-1"><option>Packets</option><option>Bytes</option><option>Bits</option><option>COUNT</option></select>
-          </div>
+          <p className="text-xs text-slate-500 mt-4">Packet counts per protocol across the current capture{displayInput ? ` (display filter: ${displayInput})` : ''}.</p>
         </ModalShell>
       )}
 
@@ -835,22 +930,37 @@ export default function WiresharkSimulator({
                     ['Ethernet0', '████████░░', 'Ethernet', true],
                     ['Wi-Fi', '███░░░░░░░', 'Ethernet', false],
                     ['Loopback', '█░░░░░░░░░', 'Null/Loopback', true],
-                  ].map(([name, spark, ll, prom]) => (
-                    <tr key={name}><td><input type="checkbox" defaultChecked={name === (inv.interface || 'Ethernet0')} /></td><td>{name}</td><td className="font-mono text-blue-600">{spark}</td><td>{ll}</td><td><input type="checkbox" defaultChecked={prom} /></td></tr>
-                  ))}
+                  ].map(([name, spark, ll, prom]) => {
+                    const active = name === (inv.interface || 'Ethernet0')
+                    return (
+                      <tr key={name} style={active ? { background: '#e6f0ff' } : undefined}>
+                        <td>
+                          <span
+                            title={active ? 'Active capture interface' : 'Inactive'}
+                            style={{
+                              display: 'inline-block', width: 9, height: 9, borderRadius: 999,
+                              background: active ? '#2563eb' : '#cbd5e1',
+                            }}
+                          />
+                        </td>
+                        <td>{name}</td>
+                        <td className="font-mono text-blue-600">{spark}</td>
+                        <td>{ll}</td>
+                        <td>{prom ? 'Yes' : 'No'}</td>
+                      </tr>
+                    )
+                  })}
                 </tbody>
               </table>
+              <p className="text-xs text-slate-500 mt-2">Capturing on <span className="font-mono">{inv.interface || 'Ethernet0'}</span> (fixed for this lab).</p>
             </div>
             <div className="space-y-3">
-              <label className="block text-xs font-semibold">Capture filter<input className="mt-1 w-full border rounded px-2 py-1 font-mono" value={captureInput} onChange={(e) => setCaptureInput(e.target.value)} /></label>
-              <label className="block text-xs font-semibold">Output file<input className="mt-1 w-full border rounded px-2 py-1" defaultValue="/captures/fixitlab-session.pcapng" /></label>
-              <div className="grid grid-cols-2 gap-2 text-xs">
-                <label><input type="checkbox" defaultChecked /> Update list of packets in real time</label>
-                <label><input type="checkbox" /> Enable monitor mode</label>
-                <label><input type="checkbox" /> Use ring buffer</label>
-                <label><input type="checkbox" /> Auto-stop after 10000 packets</label>
+              <label className="block text-xs font-semibold">Capture filter<input className="mt-1 w-full border rounded px-2 py-1 font-mono" value={captureInput} onChange={(e) => setCaptureInput(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter') { applyCaptureFilter(); setModal(null) } }} /></label>
+              <div className="text-xs">
+                <div className="font-semibold">Output file</div>
+                <div className="mt-1 font-mono text-slate-600">/captures/fixitlab-session.pcapng</div>
               </div>
-              <button className="ws-btn ws-btn-primary" onClick={() => { setCapturing(true); setModal(null) }}><Radio size={13} /> Start</button>
+              <button className="ws-btn ws-btn-primary" onClick={() => { applyCaptureFilter(); setCapturing(true); setModal(null) }}><Radio size={13} /> Start</button>
             </div>
           </div>
         </ModalShell>
@@ -861,9 +971,20 @@ export default function WiresharkSimulator({
           {modal === 'about' && <p className="text-sm">Wireshark 4.2.0 simulated for FixitLab packet analysis labs. Menus, filters, streams, statistics, and capture options are interactive mocks backed by lab state.</p>}
           {modal === 'saved' && <p className="text-sm">Capture saved as <span className="font-mono">fixitlab-session.pcapng</span>.</p>}
           {modal === 'find' && (
-            <div className="flex gap-2">
-              <input className="border rounded px-2 py-1 flex-1" placeholder="Find by packet text, hex bytes, or display filter" />
-              <button className="px-3 py-1 rounded bg-blue-600 text-white flex items-center gap-1"><Eye size={13} /> Find</button>
+            <div>
+              <div className="flex gap-2">
+                <input
+                  className="border rounded px-2 py-1 flex-1"
+                  placeholder="Find by Info, Source, Destination, or Protocol"
+                  value={findQuery}
+                  autoFocus
+                  onChange={(e) => { setFindQuery(e.target.value); setFindError('') }}
+                  onKeyDown={(e) => { if (e.key === 'Enter') findPacket() }}
+                />
+                <button type="button" className="px-3 py-1 rounded bg-blue-600 text-white flex items-center gap-1" onClick={findPacket}><Eye size={13} /> Find</button>
+              </div>
+              {findError && <p className="text-xs text-red-600 mt-2">{findError}</p>}
+              <p className="text-xs text-slate-500 mt-2">Selects the first displayed packet whose Info, addresses, or protocol contains your search text.</p>
             </div>
           )}
         </ModalShell>
