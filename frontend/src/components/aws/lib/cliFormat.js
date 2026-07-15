@@ -157,7 +157,38 @@ function splitTopLevel(s, sep) {
 function scalarText(v) {
   if (v == null) return 'None'
   if (typeof v === 'boolean') return v ? 'True' : 'False'
+  // Never render "[object Object]": nested structures collapse to compact JSON
+  // so table/text cells stay meaningful (the real CLI nests sub-tables, but
+  // compact JSON is honest and readable in a fixed-width cell).
+  if (typeof v === 'object') {
+    try { return JSON.stringify(v) } catch { return String(v) }
+  }
   return String(v)
+}
+
+// Peel single-key wrappers like { Reservations: [...] } / { Instances: [...] }
+// down to the innermost list-of-objects so `--output table` (without --query)
+// renders the rows the user cares about instead of a one-cell blob.
+function unwrapForTable(value) {
+  let cur = value
+  let guard = 0
+  while (guard < 8 && cur && typeof cur === 'object' && !Array.isArray(cur)) {
+    const keys = Object.keys(cur)
+    if (keys.length !== 1) break
+    const next = cur[keys[0]]
+    if (Array.isArray(next) || (next && typeof next === 'object')) cur = next
+    else break
+    guard += 1
+  }
+  // A list of single-object wrappers (e.g. Reservations[].Instances[0]) — flatten.
+  if (Array.isArray(cur) && cur.every((el) => el && typeof el === 'object' && !Array.isArray(el))) {
+    const singleArrayKeyed = cur.every((el) => {
+      const ks = Object.keys(el)
+      return ks.length === 1 && Array.isArray(el[ks[0]])
+    })
+    if (singleArrayKeyed) return cur.flatMap((el) => el[Object.keys(el)[0]])
+  }
+  return cur
 }
 
 // `--output text`: tab-separated rows, arrays/objects flattened depth-first.
@@ -177,7 +208,8 @@ function renderText(value) {
 }
 
 // `--output table`: fixed-width ASCII table like the real CLI.
-function renderTable(value) {
+function renderTable(rawValue) {
+  const value = unwrapForTable(rawValue)
   let list
   if (Array.isArray(value)) list = value
   else if (value && typeof value === 'object') list = [value]

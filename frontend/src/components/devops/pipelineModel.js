@@ -128,10 +128,18 @@ export function jobMap(pipeline) {
  * Full dependency set for a job: explicit `needs` plus implicit ordering from
  * the stage list (a job depends on every job in an earlier stage). Returns a
  * de-duplicated array of jobIds.
+ *
+ * GitHub Actions has no `stages:` concept — jobs run fully in parallel and order
+ * is driven ONLY by `needs`. The GitHub parser synthesizes a 1:1 stage per job
+ * purely so the graph can lay nodes out in columns; treating those synthetic
+ * stages as sequential would invent phantom dependencies (e.g. an independent
+ * `lint` job blocking `build`). So for GitHub we skip implicit stage ordering
+ * and rely on `needs` alone, matching real Actions scheduling.
  */
 export function resolveJobDeps(pipeline, job) {
   const deps = new Set(job.needs || [])
-  if (job.stage) {
+  const usesStageOrdering = pipeline?.provider !== PROVIDERS.GITHUB
+  if (usesStageOrdering && job.stage) {
     const stageOrder = (pipeline.stages || []).map((s) => s.id)
     const myStageIdx = stageOrder.indexOf(job.stage)
     if (myStageIdx > 0) {

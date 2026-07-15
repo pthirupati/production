@@ -124,8 +124,16 @@ export function createTerraform({ store, readFile, getCwd, region }) {
     // subcommand ignores onWrite and returns its array unchanged, so passing a
     // callback is always safe and fully backward-compatible.
     run(args, onWrite) {
-      const sub = args[0]
-      const rest = args.slice(1)
+      // Strip Terraform GLOBAL options that legally precede the subcommand
+      // (`terraform -chdir=DIR apply`, `terraform -help`). Without this a learner
+      // typing the documented `-chdir=` form hit a bogus "no command" error.
+      let argv = Array.isArray(args) ? args.slice() : []
+      while (argv.length && /^-/.test(argv[0]) && argv[0] !== '-help' && argv[0] !== '--help'
+        && argv[0] !== '-version' && argv[0] !== '--version') {
+        argv = argv.slice(1) // e.g. -chdir=/root (dir is irrelevant in the sim)
+      }
+      const sub = argv[0]
+      const rest = argv.slice(1)
       if (!sub || sub === '-help' || sub === '--help' || sub === 'help') {
         return [
           'Usage: terraform [global options] <subcommand> [args]',

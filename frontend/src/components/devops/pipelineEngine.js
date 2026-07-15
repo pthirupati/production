@@ -171,7 +171,7 @@ export function createPipelineRun(pipeline, opts = {}) {
 
     if (state.aborted) return { status: JOB_STATUS.CANCELED, durationMs: now() - start }
 
-    if (stepFails(fault, step, stepIndex)) {
+    if (stepFails(fault, step, stepIndex, rng)) {
       const msg = fault?.message || `Command exited with code ${fault?.exitCode ?? 1}`
       emit({ type: 'step:log', jobId: job.id, stepId: step.id, line: ansi('red', `ERROR: ${msg}`) })
       emit({ type: 'step:log', jobId: job.id, stepId: step.id, line: ansi('red', `Job failed: exit code ${fault?.exitCode ?? 1}`) })
@@ -328,10 +328,10 @@ function buildStepLog(job, step) {
 }
 
 /** Decide whether a step fails given its fault descriptor. */
-function stepFails(fault, step, stepIndex) {
+function stepFails(fault, step, stepIndex, rng = Math.random) {
   if (!fault) return false
   if (typeof fault.flaky === 'number' && fault.flaky > 0) {
-    if (Math.random() < fault.flaky) return true
+    if (rng() < fault.flaky) return true
   }
   if (fault.failAtStep == null) return Boolean(fault.always)
   if (typeof fault.failAtStep === 'number') return stepIndex === fault.failAtStep

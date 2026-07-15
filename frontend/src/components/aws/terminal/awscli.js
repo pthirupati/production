@@ -4,6 +4,7 @@
 // error so the terminal stays believable.
 import { ACCOUNT } from '../store/awsStore'
 import { arn } from '../lib/ids'
+import { AWS_REGIONS, regionAZs } from '../lib/regions'
 import { SERVICE_CONFIGS } from '../pages/generic/serviceConfigs'
 import { applyOutput, parseFilters, filterInstances, DRY_RUN_MESSAGE } from '../lib/cliFormat'
 
@@ -212,6 +213,27 @@ function pickResourceName(flags, spec) {
   return candidates.map((k) => flags[k]).find(Boolean)
 }
 
+// Internal store bookkeeping that must never leak into CLI JSON (the real APIs
+// don't return editor code, invocation history, table records, raw templates,
+// or lifecycle scheduling fields).
+const INTERNAL_ROW_KEYS = new Set([
+  'code', 'invocationHistory', 'env', 'triggers', 'records', 'template',
+  'events', 'resourceList', 'outputs', 'pendingTransition', 'stateTransitionAt',
+  'lastRun', 'subscriptions',
+  // Lowercase mirrors of the Capitalized metadata rowToGenericCli already emits;
+  // dropping them avoids the duplicate name/id/region/... blocks the real API
+  // never returns.
+  'name', 'id', 'region', 'created', 'tags', 'status',
+])
+
+function publicRow(row) {
+  const out = {}
+  for (const [k, v] of Object.entries(row || {})) {
+    if (!INTERNAL_ROW_KEYS.has(k)) out[k] = v
+  }
+  return out
+}
+
 function rowToGenericCli(serviceKey, resourceKey, row, region, cfg) {
   return {
     Name: row.name,
@@ -221,7 +243,7 @@ function rowToGenericCli(serviceKey, resourceKey, row, region, cfg) {
     Status: row.status || 'Active',
     Created: row.created,
     Tags: row.tags || {},
-    ...row,
+    ...publicRow(row),
   }
 }
 
@@ -237,6 +259,9 @@ export function awsCli(argv, store, ctx = {}) {
 function runCommand(service, command, rest, flags, region, store) {
   if (!service || service === 'help') {
     return 'usage: aws [options] <command> <subcommand> [parameters]\nTo see help text, you can run:\n  aws help\n  aws <command> help'
+  }
+  if (service === '--version' || service === 'version') {
+    return 'aws-cli/2.17.42 Python/3.12.4 Linux/6.1.0 exe/x86_64.amzn.2023'
   }
 
   // --- STS ---
@@ -537,6 +562,26 @@ function runCommand(service, command, rest, flags, region, store) {
     if (command === 'describe-images') {
       return j({ Images: store.amis.filter((a) => a.region === region).map((a) => ({ ImageId: a.id, Name: a.name, Description: a.desc, Architecture: a.arch, OwnerId: a.owner, State: 'available' })) })
     }
+    if (command === 'describe-regions') {
+      const wanted = idList(flags['region-names'])
+      const list = AWS_REGIONS.filter((r) => !r.code.startsWith('us-gov'))
+        .filter((r) => !wanted.length || wanted.includes(r.code))
+      return j({ Regions: list.map((r) => ({ RegionName: r.code, Endpoint: `ec2.${r.code}.amazonaws.com`, OptInStatus: r.code === 'us-east-1' ? 'opt-in-not-required' : 'opt-in-not-required' })) })
+    }
+    if (command === 'describe-availability-zones') {
+      return j({ AvailabilityZones: regionAZs(region).map((az, i) => ({
+        State: 'available', OptInStatus: 'opt-in-not-required', RegionName: region,
+        ZoneName: az, ZoneId: `${region.split('-').map((p) => p[0]).join('')}-az${i + 1}`,
+        GroupName: region, NetworkBorderGroup: region, ZoneType: 'availability-zone',
+      })) })
+    }
+    if (command === 'monitor-instances' || command === 'unmonitor-instances') {
+      const on = command === 'monitor-instances'
+      const guard = guardEc2(on ? 'ec2:MonitorInstances' : 'ec2:UnmonitorInstances', on ? 'MonitorInstances' : 'UnmonitorInstances')
+      if (guard) return guard
+      const ids = idList(flags['instance-ids'])
+      return j({ InstanceMonitorings: ids.map((id) => ({ InstanceId: id, Monitoring: { State: on ? 'pending' : 'disabling' } })) })
+    }
     return `\nAn error occurred (InvalidAction) when calling the ${command} operation: aws ec2 ${command} is not yet simulated.`
   }
 
@@ -750,6 +795,129 @@ function runCommand(service, command, rest, flags, region, store) {
     return `\nAn error occurred (InvalidAction) when calling the ${command} operation: aws cloudwatch ${command} is not yet simulated.`
   }
 
+  // --- CloudWatch Logs ---
+  // Log groups are derived from live resources (one per Lambda function) plus a
+  // couple of standard system groups, so `aws logs` reflects the same world the
+  // console renders without needing its own store slice.
+  if (service === 'logs') {
+    const lambdaFns = (store.genericResources?.lambda?.functions || []).filter((r) => !r.region || r.region === region)
+    const groups = [
+      ...lambdaFns.map((f) => ({ name: `/aws/lambda/${f.name}`, created: f.created })),
+      { name: '/var/log/messages', created: '2024-01-05T09:00:00Z' },
+      { name: '/ecs/web-app', created: '2024-01-10T09:00:00Z' },
+    ]
+    const nowMs = Date.now()
+    const makeEvents = (prefix) => Array.from({ length: 8 }, (_, i) => ({
+      timestamp: nowMs - (7 - i) * 15000,
+      ingestionTime: nowMs - (7 - i) * 15000 + 120,
+      message: `[INFO] ${prefix} event ${i + 1} — request handled in ${40 + i * 7}ms`,
+      eventId: `3610000000000000000${i}`,
+    }))
+    if (command === 'describe-log-groups') {
+      const prefix = flags['log-group-name-prefix'] || ''
+      return j({ logGroups: groups.filter((g) => g.name.startsWith(prefix)).map((g) => ({
+        logGroupName: g.name, creationTime: new Date(g.created).getTime(),
+        retentionInDays: 30, storedBytes: 4096,
+        arn: arn('logs', region, ACCOUNT, `log-group:${g.name}:*`),
+      })) })
+    }
+    if (command === 'describe-log-streams') {
+      const gname = flags['log-group-name']
+      if (!gname) return '\nAn error occurred (ValidationException) when calling the DescribeLogStreams operation: log-group-name is required'
+      if (!groups.some((g) => g.name === gname)) return `\nAn error occurred (ResourceNotFoundException) when calling the DescribeLogStreams operation: The specified log group does not exist.`
+      const streamName = `${new Date().toISOString().slice(0, 10)}/[$LATEST]${stableEtag(gname).replace(/[^a-f0-9]/g, '').slice(0, 32)}`
+      return j({ logStreams: [{ logStreamName: streamName, creationTime: nowMs - 3600000, firstEventTimestamp: nowMs - 3600000, lastEventTimestamp: nowMs - 15000, lastIngestionTime: nowMs - 14000, storedBytes: 2048, arn: arn('logs', region, ACCOUNT, `log-group:${gname}:log-stream:${streamName}`) }] })
+    }
+    if (command === 'get-log-events' || command === 'filter-log-events') {
+      const gname = flags['log-group-name']
+      if (!gname) return '\nAn error occurred (ValidationException) when calling the operation: log-group-name is required'
+      if (!groups.some((g) => g.name === gname)) return `\nAn error occurred (ResourceNotFoundException) when calling the operation: The specified log group does not exist.`
+      const evts = makeEvents(gname.split('/').pop())
+      if (command === 'filter-log-events') {
+        return j({ events: evts.map((e) => ({ logStreamName: 'stream-0', timestamp: e.timestamp, message: e.message, ingestionTime: e.ingestionTime, eventId: e.eventId })), searchedLogStreams: [] })
+      }
+      return j({ events: evts, nextForwardToken: 'f/36100000000000000000', nextBackwardToken: 'b/36100000000000000000' })
+    }
+    if (command === 'tail') {
+      const gname = rest.find((t) => !t.startsWith('--')) || flags['log-group-name']
+      if (!gname) return '\nusage: aws logs tail <group_name>'
+      if (!groups.some((g) => g.name === gname)) return `\nAn error occurred (ResourceNotFoundException) when calling the FilterLogEvents operation: The specified log group does not exist.`
+      const iso = (t) => new Date(t).toISOString().replace('T', ' ').replace('Z', '')
+      const stream = `${new Date().toISOString().slice(0, 10)}/[$LATEST]abc123`
+      return makeEvents(gname.split('/').pop()).map((e) => `${iso(e.timestamp)} ${stream} ${e.message}`).join('\n')
+    }
+    if (command === 'create-log-group' || command === 'delete-log-group' || command === 'put-retention-policy') {
+      return ''
+    }
+    return `\nAn error occurred (InvalidAction) when calling the ${command} operation: aws logs ${command} is not yet simulated.`
+  }
+
+  // --- Lambda data-plane (invoke) — separate from the generic control plane. ---
+  if (service === 'lambda' && command === 'invoke') {
+    const fnName = flags['function-name']
+    if (!fnName) return '\nAn error occurred (ValidationException) when calling the Invoke operation: function-name is required'
+    const fn = (store.genericResources?.lambda?.functions || []).find((f) => f.name === fnName || f.id === fnName)
+    if (!fn) return `\nAn error occurred (ResourceNotFoundException) when calling the Invoke operation: Function not found: ${arn('lambda', region, ACCOUNT, `function:${fnName}`)}`
+    let payload = null
+    if (flags.payload && flags.payload !== true) {
+      try { payload = JSON.parse(String(flags.payload)) } catch { payload = String(flags.payload) }
+    }
+    const res = store.invokeLambdaFn ? store.invokeLambdaFn(fn.id, payload) : { statusCode: 200, body: { message: 'Hello from Lambda!' } }
+    // The real CLI writes the response body to the outfile positional and prints
+    // the invocation metadata to stdout.
+    return j({ StatusCode: res.statusCode || 200, ExecutedVersion: '$LATEST' })
+  }
+
+  // --- DynamoDB data-plane (scan/query/put-item/get-item/delete-item). ---
+  if (service === 'dynamodb' && ['scan', 'query', 'put-item', 'get-item', 'delete-item'].includes(command)) {
+    const tName = flags['table-name']
+    if (!tName) return `\nAn error occurred (ValidationException) when calling the ${pascalCommand(command)} operation: table-name is required`
+    const table = (store.genericResources?.dynamodb?.tables || []).find((t) => t.name === tName || t.id === tName)
+    if (!table) return `\nAn error occurred (ResourceNotFoundException) when calling the ${pascalCommand(command)} operation: Requested resource not found`
+    // Convert a plain JS value to a DynamoDB AttributeValue.
+    const toAv = (v) => {
+      if (typeof v === 'number') return { N: String(v) }
+      if (typeof v === 'boolean') return { BOOL: v }
+      if (v == null) return { NULL: true }
+      return { S: String(v) }
+    }
+    const toItem = (rec) => Object.fromEntries(Object.entries(rec || {}).map(([k, v]) => [k, toAv(v)]))
+    // Parse a `--key '{"pk":{"S":"..."}}'` AttributeValue object back to plain.
+    const fromKey = (raw) => {
+      if (!raw || raw === true) return {}
+      let obj
+      try { obj = JSON.parse(String(raw)) } catch { return {} }
+      return Object.fromEntries(Object.entries(obj).map(([k, av]) => [k, av?.S ?? (av?.N != null ? Number(av.N) : av?.BOOL ?? av)]))
+    }
+    if (command === 'scan') {
+      const items = store.scanDynamo ? store.scanDynamo(table.id) : (table.records || [])
+      return j({ Items: items.map(toItem), Count: items.length, ScannedCount: items.length })
+    }
+    if (command === 'query') {
+      const key = fromKey(flags['key-condition-expression'] ? null : flags.key)
+      const items = store.queryDynamo ? store.queryDynamo(table.id, key) : []
+      return j({ Items: items.map(toItem), Count: items.length, ScannedCount: items.length })
+    }
+    if (command === 'get-item') {
+      const key = fromKey(flags.key)
+      const items = store.scanDynamo ? store.scanDynamo(table.id) : (table.records || [])
+      const pkField = String(table.partitionKey || 'pk').split(' ')[0]
+      const found = items.find((r) => String(r[pkField]) === String(key[pkField]))
+      return found ? j({ Item: toItem(found) }) : j({})
+    }
+    if (command === 'put-item') {
+      let item = {}
+      try { item = fromKey(flags.item) } catch { item = {} }
+      if (store.putDynamoItem) store.putDynamoItem(table.id, item)
+      return j({})
+    }
+    if (command === 'delete-item') {
+      const key = fromKey(flags.key)
+      if (store.deleteDynamoItem) store.deleteDynamoItem(table.id, key)
+      return j({})
+    }
+  }
+
   // --- Generic AWS services backed by the console store ---
   // This covers the broad service catalog (Lambda, RDS, DynamoDB, ECS/EKS,
   // SQS/SNS, CloudFormation, Glue, Kinesis, etc.) so CloudShell and Terraform
@@ -775,6 +943,36 @@ function runCommand(service, command, rest, flags, region, store) {
         if (serviceKey === 'ecs') return j({ [spec.response || resourceKey]: rows.map((r) => genericResourceArn(serviceKey, resourceKey, r, region, cfg)) })
         if (serviceKey === 'glue' && resourceKey === 'jobs') return j({ JobNames: rows.map((r) => r.name) })
         if (serviceKey === 'kinesis') return j({ StreamNames: rows.map((r) => r.name), HasMoreStreams: false })
+        // Native API shapes for the high-traffic services (real CLI field names,
+        // no internal store bookkeeping leaking through).
+        if (serviceKey === 'lambda' && resourceKey === 'functions') {
+          return j({ Functions: rows.map((f) => ({
+            FunctionName: f.name, FunctionArn: arn('lambda', region, ACCOUNT, `function:${f.name}`),
+            Runtime: f.runtime, Role: arn('iam', region, ACCOUNT, 'role/LambdaExecutionRole'),
+            Handler: f.handler, CodeSize: 1024, Description: f.desc || '', Timeout: f.timeout,
+            MemorySize: f.memory, LastModified: f.created, State: f.status,
+          })) })
+        }
+        if (serviceKey === 'rds' && resourceKey === 'databases') {
+          // describe-db-instances doubles as list + describe; honor the
+          // identifier filter (real AWS errors DBInstanceNotFound on a miss).
+          const wantId = flags['db-instance-identifier']
+          let dbRows = rows
+          if (wantId && wantId !== true) {
+            dbRows = rows.filter((db) => db.name === wantId)
+            if (!dbRows.length) return `\nAn error occurred (DBInstanceNotFound) when calling the DescribeDBInstances operation: DBInstance ${wantId} not found.`
+          }
+          return j({ DBInstances: dbRows.map((db) => ({
+            DBInstanceIdentifier: db.name, DBInstanceClass: db.class, Engine: db.engine,
+            DBInstanceStatus: db.status,
+            Endpoint: { Address: String(db.endpoint || '').split(':')[0], Port: Number(String(db.endpoint || '5432').split(':')[1] || 5432) },
+            AllocatedStorage: db.storage, MultiAZ: Boolean(db.multiAz),
+            DBInstanceArn: arn('rds', region, ACCOUNT, `db:${db.name}`),
+          })) })
+        }
+        if (serviceKey === 'sns' && resourceKey === 'topics') {
+          return j({ Topics: rows.map((t) => ({ TopicArn: genericResourceArn(serviceKey, resourceKey, t, region, cfg) })) })
+        }
         return j({ [spec.response || resourceKey]: rows.map((r) => rowToGenericCli(serviceKey, resourceKey, r, region, cfg)) })
       }
 
