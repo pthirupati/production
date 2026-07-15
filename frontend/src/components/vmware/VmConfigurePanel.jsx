@@ -132,11 +132,9 @@ export default function VmConfigurePanel({ vm, networks, datastores, acting, onS
                   <p className="text-[10px] text-[#5a6a7d] mt-0.5 m-0">Port group key: {nic.portgroup_key}</p>
                 )}
               </div>
-              {i === 0 && (
-                <button type="button" onClick={onEditNetwork} disabled={acting} className="vm-btn text-[11px] py-1 px-3">
-                  Edit
-                </button>
-              )}
+              <button type="button" onClick={() => onEditNetwork?.(nic)} disabled={acting} className="vm-btn text-[11px] py-1 px-3">
+                Edit
+              </button>
             </div>
           ))}
         </div>

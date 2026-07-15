@@ -2,24 +2,38 @@ title: Harden mysql logging (lab 19)
 slug: mysql-lab-19
 technology: mysql
 category: Fix
-description: 'CONTEXT: A team operating MySQL needs you to resolve `Harden mysql logging (lab 19)` during
-  a realistic incident. The business impact is reduced service reliability until the underlying state
-  is repaired.
+description: 'CONTEXT: A team operating MySQL has raised a ticket for `Harden mysql logging (lab 19)`.
+  A customer-facing workflow is degraded and the on-call engineer (you) must diagnose and resolve it.
+  Business impact: reduced service reliability and blocked users until the underlying state is repaired.
 
 
-  ENVIRONMENT: You are working in FixitLab''s offline MySQL instance with mysql client, InnoDB, grants,
-  and slow query log. All tools run locally; no paid APIs or external cloud calls are required.
+  ENVIRONMENT: You are working in FixitLab''s offline MySQL instance. The architecture is a single lab-primary
+  node exposing mysql client, InnoDB, grants, and slow query log; treat it as the production host for
+  this incident. All tools run locally — no paid APIs or external cloud calls are required.
 
 
-  SYMPTOM / STARTING STATE: Hands-on mysql scenario: harden logging in a simulated environment. Hands-on
-  mysql scenario: harden logging in a simulated environment. This MySQL scenario focuses on mysql: Harden
-  mysql logging (lab 19). Read the environment, form a hypothesis, apply a minimal fix, and verify behavior
-  before closing the ticket.
+  SYMPTOM / STARTING STATE: Hands-on mysql scenario: harden logging in a simulated environment.
 
 
   OBJECTIVE: Understand the current failure mode affecting Harden mysql logging (lab 19); Restore expected
   service behavior with a minimal, documented change; Verify the fix holds under a realistic smoke test.
-  Success means all hidden tests pass.
+  Acceptance criteria: the change is minimal and reversible, and success means all hidden tests pass.
+
+
+  WORK TO DO: Required tooling is pre-installed; if a command is missing, note it and use the equivalent
+  already on the host. Make the smallest configuration change that moves the system toward the objective
+  (edit the relevant mysql client, InnoDB, grants, and slow query log), changing one thing at a time.
+  Check your work continuously against the objective — success means all hidden tests pass.
+
+
+  VERIFY: Re-run the same check the grader uses and confirm all hidden tests pass. Capture the before/after
+  output as evidence. Success criteria: the objective''s healthy state holds on a repeat check, not just
+  once.
+
+
+  ROLLBACK: If a change makes things worse, revert that single change immediately (restore the original
+  config file / undo the edit / restart the affected component) and re-observe before trying another hypothesis.
+  Never stack unverified changes.
 
 
   WHAT TO AVOID: Do not apply broad destructive changes, skip evidence gathering, or fake completion with
@@ -42,28 +56,49 @@ initial_state: 'Hands-on mysql scenario: harden logging in a simulated environme
 hints:
 - order: 1
   cost: 0
-  content: 'Where to look: Run `systemctl status mysqld` and tail `/var/log/mysqld.log`.'
+  content: 'ORIENT — what to observe and why:
+
+    Do not touch anything yet. First observe the symptom: harden mysql logging (lab 19) is not behaving
+    as the scenario objectives require. This lab is about harden mysql logging (lab 19) — how harden mysql
+    logging (lab 19) behaves in a MySQL environment. Read the objectives and the current state, and note
+    precisely what looks wrong versus healthy before you form any theory.'
 - order: 2
-  cost: 25
-  content: 'Diagnostic steps:
+  cost: 10
+  content: 'APPROACH — the troubleshooting method:
 
-    1. Read the error log for InnoDB or permission failures.
-
-    2. Check disk space with `df -h`.
-
-    3. Verify `my.cnf` for bad paths or bind-address.'
+    Work from evidence, not guesses. For harden mysql logging (lab 19) problems the reliable method is:
+    (1) reproduce/observe the failure, (2) narrow from the whole system down to the one component that
+    owns the symptom, (3) change exactly one thing, (4) re-check. Fix the underlying misconfiguration
+    you identified (not just the noisy log line), changing one thing at a time.'
 - order: 3
-  cost: 50
-  content: 'Exact fix + verification:
+  cost: 25
+  content: 'WHICH TOOL — the diagnostic command(s):
 
-    1. Fix config or ownership under `/var/lib/mysql`.
+    Open `solution.py`, read the instructions, and run the visible tests to see which assertion fails
+    first.'
+- order: 4
+  cost: 40
+  content: 'NARROW DOWN — isolate the subsystem:
 
-    2. `systemctl restart mysqld`.
+    1. From the evidence above, decide which single part of harden mysql logging (lab 19) is at fault.
 
-    3. Confirm `systemctl is-active mysqld` returns active.
+    2. Re-run the most relevant of mysql client, InnoDB, grants, and slow query log focused on just that
+    part to confirm it.
+
+    3. State a one-line hypothesis: the smallest change that would move the state from ''harden mysql
+    logging (lab 19) is not behaving as the scenario objectives require'' toward ''all hidden tests pass''.'
+- order: 5
+  cost: 60
+  content: 'NEAR-SOLUTION — the fix shape + verify (you still apply it):
+
+    1. Edit `solution.py` with the smallest correct change.
+
+    2. Re-run visible tests, then Check Solution (includes hidden tests).
+
+    3. Confirm every test passes.
 
 
-    WHY: MySQL often fails silently until you read the error log.'
+    WHY: coding labs grade against hidden test cases, not marker files.'
 coding_spec:
   language: python
   entrypoint: solution.py

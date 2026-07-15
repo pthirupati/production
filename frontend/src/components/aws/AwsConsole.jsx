@@ -17,8 +17,17 @@ import { SecurityGroupList, KeyPairList, VolumeList, ElasticIpList, AmiList } fr
 import { BucketList, BucketDetail } from './pages/s3/S3Pages'
 import { IamDashboard, UserList, GroupList, RoleList, PolicyList } from './pages/iam/IamPages'
 import { VpcDashboard, VpcList, SubnetList, RouteTableList, InternetGatewayList } from './pages/vpc/VpcPages'
-import { CloudWatchOverview, AlarmList } from './pages/cloudwatch/CloudWatchPages'
+import { CloudWatchOverview, AlarmList, AlarmDetail, MetricsExplorer, DashboardList } from './pages/cloudwatch/CloudWatchPages'
 import { BillingDashboard, GenericResourceDetail, GenericResourceList, GenericServiceHome } from './pages/generic/GenericServicePages'
+import SettingsPage from './pages/SettingsPage'
+import SecurityGroupDetail from './pages/ec2/SecurityGroupDetail'
+import Snapshots from './pages/ec2/Snapshots'
+import { LoadBalancerList, LoadBalancerDetail, TargetGroupList, TargetGroupDetail } from './pages/ec2/LoadBalancing'
+import { AutoScalingGroupList, AutoScalingGroupDetail } from './pages/ec2/AutoScaling'
+import { RdsList, RdsCreate, RdsDetail } from './pages/rds/RdsPages'
+import { LambdaList, LambdaCreate, LambdaDetail } from './pages/lambda/LambdaPages'
+import { DynamoDbList, DynamoDbCreate, DynamoDbDetail } from './pages/dynamodb/DynamoDbPages'
+import { CfnList, CfnCreate, CfnDetail } from './pages/cloudformation/CfnPages'
 
 // Which service the URL belongs to (drives the left nav).
 function serviceFromPath(pathname) {
@@ -72,6 +81,7 @@ export default function AwsConsole({ embedded = false }) {
           <Routes>
             <Route index element={<Navigate to="console/home" replace />} />
             <Route path="console/home" element={<ConsoleHome />} />
+            <Route path="console/settings" element={<SettingsPage />} />
 
             <Route path="ec2/home" element={<Ec2Dashboard />} />
             <Route path="ec2/instances" element={<InstanceList />} />
@@ -79,9 +89,17 @@ export default function AwsConsole({ embedded = false }) {
             <Route path="ec2/launch" element={<LaunchWizard />} />
             <Route path="ec2/amis" element={<AmiList />} />
             <Route path="ec2/volumes" element={<VolumeList />} />
+            <Route path="ec2/snapshots" element={<Snapshots />} />
             <Route path="ec2/security-groups" element={<SecurityGroupList />} />
+            <Route path="ec2/security-groups/:id" element={<SecurityGroupDetail />} />
             <Route path="ec2/elastic-ips" element={<ElasticIpList />} />
             <Route path="ec2/key-pairs" element={<KeyPairList />} />
+            <Route path="ec2/load-balancers" element={<LoadBalancerList />} />
+            <Route path="ec2/load-balancers/:id" element={<LoadBalancerDetail />} />
+            <Route path="ec2/target-groups" element={<TargetGroupList />} />
+            <Route path="ec2/target-groups/:id" element={<TargetGroupDetail />} />
+            <Route path="ec2/auto-scaling-groups" element={<AutoScalingGroupList />} />
+            <Route path="ec2/auto-scaling-groups/:id" element={<AutoScalingGroupDetail />} />
 
             <Route path="s3" element={<BucketList />} />
             <Route path="s3/buckets/:name" element={<BucketDetail />} />
@@ -102,6 +120,23 @@ export default function AwsConsole({ embedded = false }) {
 
             <Route path="cloudwatch/home" element={<CloudWatchOverview />} />
             <Route path="cloudwatch/alarms" element={<AlarmList />} />
+            <Route path="cloudwatch/alarms/:name" element={<AlarmDetail />} />
+            <Route path="cloudwatch/metrics" element={<MetricsExplorer />} />
+            <Route path="cloudwatch/dashboards" element={<DashboardList />} />
+
+            {/* Bespoke service consoles — must precede the generic catch-all below */}
+            <Route path="rds/databases" element={<RdsList />} />
+            <Route path="rds/databases/create" element={<RdsCreate />} />
+            <Route path="rds/databases/:id" element={<RdsDetail />} />
+            <Route path="lambda/functions" element={<LambdaList />} />
+            <Route path="lambda/functions/create" element={<LambdaCreate />} />
+            <Route path="lambda/functions/:id" element={<LambdaDetail />} />
+            <Route path="dynamodb/tables" element={<DynamoDbList />} />
+            <Route path="dynamodb/tables/create" element={<DynamoDbCreate />} />
+            <Route path="dynamodb/tables/:id" element={<DynamoDbDetail />} />
+            <Route path="cloudformation/stacks" element={<CfnList />} />
+            <Route path="cloudformation/stacks/create" element={<CfnCreate />} />
+            <Route path="cloudformation/stacks/:id" element={<CfnDetail />} />
 
             <Route path="billing/home" element={<BillingDashboard />} />
             <Route path=":service/home" element={<GenericServiceHome />} />

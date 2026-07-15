@@ -8,13 +8,15 @@ max_score: 100
 infrastructure_type: docker
 jira_priority: High
 is_free: false
-description: 'CONTEXT: A team operating network operations needs you to resolve `NTP Sync Failed - Fix
-  Time Sync to Resolve Certificate` during a realistic incident. The business impact is reduced service
-  reliability until the underlying state is repaired.
+description: 'CONTEXT: A team operating network operations has raised a ticket for `NTP Sync Failed -
+  Fix Time Sync to Resolve Certificate`. A customer-facing workflow is degraded and the on-call engineer
+  (you) must diagnose and resolve it. Business impact: reduced service reliability and blocked users until
+  the underlying state is repaired.
 
 
-  ENVIRONMENT: You are working in FixitLab''s offline network lab with interfaces, routing tables, DNS,
-  and firewall rules. All tools run locally; no paid APIs or external cloud calls are required.
+  ENVIRONMENT: You are working in FixitLab''s offline network lab. The architecture is a single lab-primary
+  node exposing interfaces, routing tables, DNS, and firewall rules; treat it as the production host for
+  this incident. All tools run locally — no paid APIs or external cloud calls are required.
 
 
   SYMPTOM / STARTING STATE: Ubuntu 22.04. systemd-timesyncd configured with NTP=ntp.internal.corp which
@@ -22,21 +24,29 @@ description: 'CONTEXT: A team operating network operations needs you to resolve 
 
   unreachable. System clock shows time from 6 minutes ago. TLS connections to
 
-  public services are failing with CERTIFICATE_VERIFY_FAILED. The server''s clock has drifted over 5 minutes
-  from actual time. TLS connections
-
-  are failing because certificates appear expired from the server''s perspective.
-
-  The systemd-timesyncd service is configured to use an unreachable internal NTP
-
-  server (ntp.internal.corp). Update the NTP configuration to use public NTP
-
-  servers, force an immediate sync, and verify time is correct.
+  public services are failing with CERTIFICATE_VERIFY_FAILED.
 
 
   OBJECTIVE: Identify that NTP sync is failing due to misconfigured server; Update /etc/systemd/timesyncd.conf
-  with public NTP servers; Force an immediate time sync. Success means `systemctl is-active --quiet` returns
+  with public NTP servers; Force an immediate time sync. Acceptance criteria: the change is minimal and
+  reversible, and success means `systemctl is-active --quiet` returns active.
+
+
+  WORK TO DO: Required tooling is pre-installed; if a command is missing, note it and use the equivalent
+  already on the host. Make the smallest configuration change that moves the system toward the objective
+  (edit the relevant interfaces, routing tables, DNS, and firewall rules), changing one thing at a time.
+  Check your work continuously against the objective — success means `systemctl is-active --quiet` returns
   active.
+
+
+  VERIFY: Re-run the same check the grader uses and confirm `systemctl is-active --quiet` returns active.
+  Capture the before/after output as evidence. Success criteria: the objective''s healthy state holds
+  on a repeat check, not just once.
+
+
+  ROLLBACK: If a change makes things worse, revert that single change immediately (restore the original
+  config file / undo the edit / restart the affected component) and re-observe before trying another hypothesis.
+  Never stack unverified changes.
 
 
   WHAT TO AVOID: Do not apply broad destructive changes, skip evidence gathering, or fake completion with
@@ -56,20 +66,39 @@ initial_state: 'Ubuntu 22.04. systemd-timesyncd configured with NTP=ntp.internal
 hints:
 - order: 1
   cost: 0
-  content: 'Where to look: Start with `systemctl status --quiet` and `journalctl -u --quiet -n 50 --no-pager`
-    before changing anything.'
+  content: 'ORIENT — what to observe and why:
+
+    Do not touch anything yet. First observe the symptom: NTP sync failed - fix time sync to resolve certificate
+    is not behaving as the scenario objectives require. This lab is about NTP sync failed - fix time sync
+    to resolve certificate — how NTP sync failed - fix time sync to resolve certificate behaves in a network
+    operations environment. Read the objectives and the current state, and note precisely what looks wrong
+    versus healthy before you form any theory.'
 - order: 2
+  cost: 10
+  content: 'APPROACH — the troubleshooting method:
+
+    Work from evidence, not guesses. For NTP sync failed - fix time sync to resolve certificate problems
+    the reliable method is: (1) reproduce/observe the failure, (2) narrow from the whole system down to
+    the one component that owns the symptom, (3) change exactly one thing, (4) re-check. Fix the underlying
+    misconfiguration you identified (not just the noisy log line), changing one thing at a time.'
+- order: 3
   cost: 25
-  content: 'Diagnostic steps:
+  content: 'WHICH TOOL — the diagnostic command(s):
+
+    Start with `systemctl status --quiet` and `journalctl -u --quiet -n 50 --no-pager` before changing
+    anything.'
+- order: 4
+  cost: 40
+  content: 'NARROW DOWN — isolate the subsystem:
 
     1. Run `systemctl status --quiet` — note Active/Failed and the last log lines.
 
     2. Read `journalctl -u --quiet -n 50` for the root error.
 
     3. Form a hypothesis about the smallest config or permission fix.'
-- order: 3
-  cost: 50
-  content: 'Exact fix + verification:
+- order: 5
+  cost: 60
+  content: 'NEAR-SOLUTION — the fix shape + verify (you still apply it):
 
     1. Apply the minimal fix (config, unit override, or missing directory).
 

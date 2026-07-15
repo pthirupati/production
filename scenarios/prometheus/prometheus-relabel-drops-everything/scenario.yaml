@@ -1,25 +1,41 @@
 title: relabel_configs drop all targets
 slug: prometheus-relabel-drops-everything
 category: Fix
-description: 'CONTEXT: A team operating Prometheus monitoring needs you to resolve `relabel_configs drop
-  all targets` during a realistic incident. The business impact is reduced service reliability until the
-  underlying state is repaired.
+description: 'CONTEXT: A team operating Prometheus monitoring has raised a ticket for `relabel_configs
+  drop all targets`. A customer-facing workflow is degraded and the on-call engineer (you) must diagnose
+  and resolve it. Business impact: reduced service reliability and blocked users until the underlying
+  state is repaired.
 
 
-  ENVIRONMENT: You are working in FixitLab''s offline Prometheus stack with scrape configs, PromQL, rules,
-  and Alertmanager. All tools run locally; no paid APIs or external cloud calls are required.
+  ENVIRONMENT: You are working in FixitLab''s offline Prometheus stack. The architecture is a single lab-primary
+  node exposing scrape configs, PromQL, rules, and Alertmanager; treat it as the production host for this
+  incident. All tools run locally — no paid APIs or external cloud calls are required.
 
 
   SYMPTOM / STARTING STATE: A keep relabel rule matches nothing, dropping every target. The Prometheus
   simulator renders the broken state; the configuration file /etc/prometheus/prometheus.yml must be corrected.
-  A keep relabel rule matches nothing, dropping every target. Use the in-app Prometheus simulator to investigate,
-  then apply the documented fix to /etc/prometheus/prometheus.yml from the terminal and verify with Check
-  Solution.
 
 
   OBJECTIVE: Open the Prometheus simulator from the lab toolbar and sign in (lab_prometheus / lab_prometheus@123);
   Diagnose the fault — A keep relabel rule matches nothing, dropping every target.; Edit /etc/prometheus/prometheus.yml
-  in the terminal to apply the documented remediation. Success means `check.sh` exits successfully.
+  in the terminal to apply the documented remediation. Acceptance criteria: the change is minimal and
+  reversible, and success means `check.sh` exits successfully.
+
+
+  WORK TO DO: Required tooling is pre-installed; if a command is missing, note it and use the equivalent
+  already on the host. Make the smallest configuration change that moves the system toward the objective
+  (edit the relevant scrape configs, PromQL, rules, and Alertmanager), changing one thing at a time. Check
+  your work continuously against the objective — success means `check.sh` exits successfully.
+
+
+  VERIFY: Re-run the same check the grader uses and confirm `check.sh` exits successfully. Capture the
+  before/after output as evidence. Success criteria: the objective''s healthy state holds on a repeat
+  check, not just once.
+
+
+  ROLLBACK: If a change makes things worse, revert that single change immediately (restore the original
+  config file / undo the edit / restart the affected component) and re-observe before trying another hypothesis.
+  Never stack unverified changes.
 
 
   WHAT TO AVOID: Do not apply broad destructive changes, skip evidence gathering, or fake completion with
@@ -42,29 +58,53 @@ initial_state: A keep relabel rule matches nothing, dropping every target. The P
 hints:
 - order: 1
   cost: 0
-  content: 'Where to look: Open Prometheus → Status → Targets and note which job is DOWN and the last
-    scrape error message.'
+  content: 'ORIENT — what to observe and why:
+
+    Do not touch anything yet. First observe the symptom: relabel_configs drop all targets is not behaving
+    as the scenario objectives require. This lab is about relabel_configs drop all targets — how relabel_configs
+    drop all targets behaves in a Prometheus monitoring environment. Read the objectives and the current
+    state, and note precisely what looks wrong versus healthy before you form any theory.'
 - order: 2
+  cost: 10
+  content: 'APPROACH — the troubleshooting method:
+
+    Work from evidence, not guesses. For relabel_configs drop all targets problems the reliable method
+    is: (1) reproduce/observe the failure, (2) narrow from the whole system down to the one component
+    that owns the symptom, (3) change exactly one thing, (4) re-check. Fix the underlying misconfiguration
+    you identified (not just the noisy log line), changing one thing at a time.'
+- order: 3
   cost: 25
-  content: 'Diagnostic steps:
+  content: 'WHICH TOOL — the diagnostic command(s):
+
+    1. Inspect the current state with scrape configs, PromQL, rules, and Alertmanager.
+
+    2. Each command above tells you something specific — status/health, recent errors, and the effective
+    configuration. Read them in that order.
+
+    3. Compare what you see to the objectives; the gap points at the fault.'
+- order: 4
+  cost: 40
+  content: 'NARROW DOWN — isolate the subsystem:
 
     1. Check `up` and `scrape_duration_seconds` for the failing target.
 
     2. Inspect `/etc/prometheus/prometheus.yml` for wrong host, port, or scheme.
 
     3. `curl` the exporter endpoint from the lab host to test connectivity.'
-- order: 3
-  cost: 50
-  content: 'Exact fix + verification:
+- order: 5
+  cost: 60
+  content: 'NEAR-SOLUTION — the fix shape + verify (you still apply it):
 
-    1. Correct the scrape target or relabel rule in prometheus.yml.
+    1. Apply the smallest reversible change your hypothesis points to. Fix the underlying misconfiguration
+    you identified (not just the noisy log line), changing one thing at a time.
 
-    2. Reload or restart Prometheus.
+    2. Re-run `bash check.sh` and confirm `check.sh` exits successfully.
 
-    3. Confirm the target is UP and Check Solution passes.
+    3. If it still fails, the hypothesis was wrong — go back to the evidence, do not stack changes.
 
 
-    WHY: Prometheus only collects metrics from correctly configured targets.'
+    WHY: the grader validates real system state, not marker files — a fix only counts when the subsystem
+    is actually healthy.'
 technology: prometheus
 summary: Complete the relabel_configs drop all targets prometheus lab and verify success with the checker
 estimated_minutes: 20

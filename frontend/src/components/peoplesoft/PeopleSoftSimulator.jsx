@@ -2,13 +2,14 @@ import { useState, useEffect, useCallback } from 'react'
 import { peoplesoftApi } from '../../api/peoplesoft'
 import toast from 'react-hot-toast'
 import {
-  LogIn, Server, Users, Workflow, Network, RefreshCw, Menu, Bell, Search, HelpCircle, User,
+  LogIn, Server, Users, Workflow, Network, RefreshCw, Menu, Bell, Search, HelpCircle, User, Settings2,
 } from 'lucide-react'
 import LabChromeBar from '../lab/LabChromeBar'
 import { PS_NAV_MENU } from '../../mockData/peoplesoft'
 import {
   FluidHome, JobDataComponent, BenefitsEnrollment, PaycheckReview,
   ProcessMonitorTable, PeopleSoftNavMenu, FluidStubPage,
+  SecurityUsers, PermissionLists, ComponentConfig,
 } from './PeopleSoftFluidViews'
 import '../../styles/sim-products.css'
 
@@ -19,6 +20,7 @@ const NAV = [
   { key: 'home', label: 'Home', icon: Server },
   { key: 'process', label: 'Process Monitor', icon: Workflow },
   { key: 'security', label: 'Security', icon: Users },
+  { key: 'config', label: 'Component Config', icon: Settings2 },
   { key: 'integration', label: 'Integration Broker', icon: Network },
 ]
 
@@ -44,6 +46,16 @@ export default function PeopleSoftSimulator({
 
   useEffect(() => { refresh() }, [refresh])
 
+  // While self-service submissions are queued/running on the Process Scheduler,
+  // poll so the Process Monitor advances (queued -> running -> success) on
+  // wall-clock without the learner having to click Refresh.
+  const runningJobs = state?.summary?.process_runs_running || 0
+  useEffect(() => {
+    if (!runningJobs) return undefined
+    const id = setInterval(() => { refresh() }, 3500)
+    return () => clearInterval(id)
+  }, [runningJobs, refresh])
+
   const run = useCallback(async (fn, okMsg) => {
     if (busy) return
     setBusy(true)
@@ -60,6 +72,13 @@ export default function PeopleSoftSimulator({
   const summary = state?.summary || {}
   const goal = state?.goal || {}
   const loggedIn = w?.session?.logged_in
+  const oprid = summary.current_oprid || w?.session?.oprid || 'PS'
+  // Self-service record for the signed-in operator, keyed off current_oprid.
+  const essProfile = state?.ess_profile
+    || (w?.self_service?.profiles ? w.self_service.profiles[oprid] : null)
+    || null
+  const benefitPlans = w?.self_service?.benefit_plans
+  const benefitSteps = w?.self_service?.benefit_steps
 
   const handleFluidNav = (id) => {
     setSection('home')
@@ -160,9 +179,18 @@ export default function PeopleSoftSimulator({
 
           {loading && <div className="text-slate-400 text-sm">Loading PeopleSoft…</div>}
 
-          {!loading && fluidView === 'jobdata' && <JobDataComponent />}
-          {!loading && fluidView === 'benefits' && <BenefitsEnrollment />}
-          {!loading && fluidView === 'pay' && <PaycheckReview />}
+          {!loading && fluidView === 'jobdata' && (
+            <JobDataComponent profile={essProfile} oprid={oprid} busy={busy}
+              onSave={() => run(() => peoplesoftApi.action(sessionId, 'save_job_data', { oprid }), 'Job Data saved — process queued')} />
+          )}
+          {!loading && fluidView === 'benefits' && (
+            <BenefitsEnrollment profile={essProfile} plans={benefitPlans} steps={benefitSteps} busy={busy}
+              onSubmit={(plan) => run(() => peoplesoftApi.action(sessionId, 'submit_benefits', { oprid, plan }), 'Open Enrollment submitted — process queued')} />
+          )}
+          {!loading && fluidView === 'pay' && (
+            <PaycheckReview profile={essProfile} busy={busy}
+              onReprint={() => run(() => peoplesoftApi.action(sessionId, 'request_paycheck', { oprid }), 'Pay advice reprint queued')} />
+          )}
           {!loading && fluidView === 'time' && <FluidStubPage title="My Time" description="Report hours, view time sheets, and manager approvals." />}
           {!loading && fluidView === 'directory' && <FluidStubPage title="Company Directory" description="Search colleagues by name, department, or location." />}
           {!loading && fluidView === 'training' && <FluidStubPage title="Training" description="Browse learning catalog and assigned courses." />}
@@ -179,31 +207,36 @@ export default function PeopleSoftSimulator({
           )}
 
           {!loading && !fluidView && section === 'security' && (
-            <div className="space-y-5">
-              <Panel title="Users (Operator IDs)">
-                <Table head={['OPRID', 'Roles', 'Status', '']}>
-                  {(w?.security?.users || []).map((u) => (
-                    <tr key={u.oprid} className="border-t border-slate-100">
-                      <td className="px-3 py-2 font-mono">{u.oprid}</td>
-                      <td className="px-3 py-2 text-slate-500">{(u.roles || []).join(', ') || '—'}</td>
-                      <td className="px-3 py-2">{u.locked ? <span className="text-red-600">Locked</span> : <span className="text-green-600">Active</span>}</td>
-                      <td className="px-3 py-2 text-right">
-                        {u.locked && (
-                          <button type="button" onClick={() => run(() => peoplesoftApi.unlockUser(sessionId, u.oprid), `Unlocked ${u.oprid}`)}
-                            className="text-xs px-2 py-1 rounded bg-slate-700 text-white">Unlock</button>
-                        )}
-                      </td>
-                    </tr>
-                  ))}
-                </Table>
-              </Panel>
-              <Panel title="Roles">
-                <div className="flex flex-wrap gap-2">
-                  {(w?.security?.roles || []).map((r) => (
-                    <span key={r.name || r} className="text-xs px-2 py-1 rounded bg-slate-100 border border-slate-200">{r.name || r}</span>
-                  ))}
-                </div>
-              </Panel>
+            <div className="space-y-6">
+              <div>
+                <div className="text-sm font-semibold text-slate-700 mb-2">User Profiles</div>
+                <SecurityUsers
+                  users={w?.security?.users || []}
+                  roles={w?.security?.roles || []}
+                  busy={busy}
+                  onAssignRole={(oprid, role) => run(() => peoplesoftApi.assignRole(sessionId, oprid, role), `Assigned role to ${oprid}`)}
+                  onRemoveRole={(oprid, role) => run(() => peoplesoftApi.removeRole(sessionId, oprid, role), `Removed role from ${oprid}`)}
+                  onUnlock={(oprid) => run(() => peoplesoftApi.unlockUser(sessionId, oprid), `Unlocked ${oprid}`)} />
+              </div>
+              <div>
+                <div className="text-sm font-semibold text-slate-700 mb-2">Permission Lists</div>
+                <PermissionLists
+                  permLists={w?.security?.permission_lists || []}
+                  busy={busy}
+                  onAddPermission={(pl, perm) => run(() => peoplesoftApi.addPermission(sessionId, pl, perm), `Added ${perm} to ${pl}`)} />
+              </div>
+            </div>
+          )}
+
+          {!loading && !fluidView && section === 'config' && (
+            <div>
+              <div className="text-sm font-semibold text-slate-700 mb-2">Component Configuration</div>
+              <ComponentConfig
+                modules={w?.portal?.modules || []}
+                currentComponent={summary.current_component}
+                busy={busy}
+                onNavigate={(comp) => run(() => peoplesoftApi.navigate(sessionId, comp), `Opened ${comp}`)}
+                onSaveConfig={(comp, config) => run(() => peoplesoftApi.setComponentConfig(sessionId, comp, config), `Saved ${comp} configuration`)} />
             </div>
           )}
 

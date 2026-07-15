@@ -3,36 +3,43 @@ slug: networking-firewalld-app-reachability
 technology: networking
 category: Fix
 difficulty: medium
-description: 'CONTEXT: A team operating network operations needs you to resolve `Network ↔ Security: Firewalld
-  Blocks the App Service Port` during a realistic incident. The business impact is reduced service reliability
-  until the underlying state is repaired.
+description: 'CONTEXT: A team operating network operations has raised a ticket for `Network ↔ Security:
+  Firewalld Blocks the App Service Port`. A customer-facing workflow is degraded and the on-call engineer
+  (you) must diagnose and resolve it. Business impact: reduced service reliability and blocked users until
+  the underlying state is repaired.
 
 
-  ENVIRONMENT: You are working in FixitLab''s offline network lab with interfaces, routing tables, DNS,
-  and firewall rules. All tools run locally; no paid APIs or external cloud calls are required.
+  ENVIRONMENT: You are working in FixitLab''s offline network lab. The architecture is a single lab-primary
+  node exposing interfaces, routing tables, DNS, and firewall rules; treat it as the production host for
+  this incident. All tools run locally — no paid APIs or external cloud calls are required.
 
 
   SYMPTOM / STARTING STATE: An api-edge-01 host. /etc/firewalld/services/app8443.xml is malformed (incorrect
 
-  port/protocol, broken XML) and not enabled in any zone, so inbound 8443 is blocked. CROSS-TECHNOLOGY
-  task (Networking <-> Security). After a security review tightened
-
-  the host firewall, the app on api-edge-01 became unreachable on its TLS port 8443.
-
-  A custom firewalld service was defined at /etc/firewalld/services/app8443.xml to
-
-  open it, but the XML is malformed (wrong port/protocol and a broken element) and
-
-  was never bound to the active zone — so connections to 8443 are dropped. Fix the
-
-  firewall service definition so the app is reachable again without opening the
-
-  host wide.
+  port/protocol, broken XML) and not enabled in any zone, so inbound 8443 is blocked.
 
 
   OBJECTIVE: Confirm 8443 is blocked and the custom firewalld service XML is malformed; Correct /etc/firewalld/services/app8443.xml
   (valid port 8443/tcp definition) and bind it to the active zone; Confirm the service definition is corrected
-  so 8443 is reachable. Success means `check.sh` exits successfully.
+  so 8443 is reachable. Acceptance criteria: the change is minimal and reversible, and success means `firewall-cmd
+  --list-ports` includes `80/tcp`.
+
+
+  WORK TO DO: Required tooling is pre-installed; if a command is missing, note it and use the equivalent
+  already on the host. Make the smallest configuration change that moves the system toward the objective
+  (edit the relevant interfaces, routing tables, DNS, and firewall rules), changing one thing at a time.
+  Check your work continuously against the objective — success means `firewall-cmd --list-ports` includes
+  `80/tcp`.
+
+
+  VERIFY: Re-run the same check the grader uses and confirm `firewall-cmd --list-ports` includes `80/tcp`.
+  Capture the before/after output as evidence. Success criteria: the objective''s healthy state holds
+  on a repeat check, not just once.
+
+
+  ROLLBACK: If a change makes things worse, revert that single change immediately (restore the original
+  config file / undo the edit / restart the affected component) and re-observe before trying another hypothesis.
+  Never stack unverified changes.
 
 
   WHAT TO AVOID: Do not apply broad destructive changes, skip evidence gathering, or fake completion with
@@ -58,19 +65,40 @@ dual_terminal: false
 hints:
 - order: 1
   cost: 0
-  content: 'Where to look: Run `firewall-cmd --state` and `firewall-cmd --list-all` for active zones.'
+  content: 'ORIENT — what to observe and why:
+
+    Do not touch anything yet. First observe the symptom: network ↔ security is not behaving as the scenario
+    objectives require. This lab is about network ↔ security — how network ↔ security behaves in a network
+    operations environment. Read the objectives and the current state, and note precisely what looks wrong
+    versus healthy before you form any theory.'
 - order: 2
-  cost: 25
-  content: 'Diagnostic steps:
+  cost: 10
+  content: 'APPROACH — the troubleshooting method:
 
-    1. Identify which zone is active and which ports/services are allowed.
-
-    2. Compare to the port the scenario expects (often 80/tcp or 443/tcp).
-
-    3. Check if the service is bound but blocked externally.'
+    Work from evidence, not guesses. For network ↔ security problems the reliable method is: (1) reproduce/observe
+    the failure, (2) narrow from the whole system down to the one component that owns the symptom, (3)
+    change exactly one thing, (4) re-check. Fix the underlying misconfiguration you identified (not just
+    the noisy log line), changing one thing at a time.'
 - order: 3
-  cost: 50
-  content: 'Exact fix + verification:
+  cost: 25
+  content: 'WHICH TOOL — the diagnostic command(s):
+
+    Run `firewall-cmd --state` and `firewall-cmd --list-all` for active zones.'
+- order: 4
+  cost: 40
+  content: 'NARROW DOWN — isolate the subsystem:
+
+    1. From the evidence above, decide which single part of network ↔ security is at fault.
+
+    2. Re-run the most relevant of `firewall-cmd --list-ports` output focused on just that part to confirm
+    it.
+
+    3. State a one-line hypothesis: the smallest change that would move the state from ''network ↔ security
+    is not behaving as the scenario objectives require'' toward ''`firewall-cmd --list-ports` includes
+    `80/tcp`''.'
+- order: 5
+  cost: 60
+  content: 'NEAR-SOLUTION — the fix shape + verify (you still apply it):
 
     1. `firewall-cmd --permanent --add-service=http` (or the needed port).
 

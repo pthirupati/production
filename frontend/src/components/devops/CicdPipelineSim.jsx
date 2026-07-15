@@ -1,57 +1,53 @@
-import { useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
-  Play, RotateCcw, CheckCircle2, XCircle, Loader2, GitBranch, Package, Shield,
-  Workflow, FileCode, Settings, History, Terminal, ExternalLink,
+  Play, RotateCcw, GitBranch, GitPullRequest, Hand, CalendarClock, Workflow, FileCode,
+  Server, History, CheckCircle2, XCircle, AlertTriangle, ThumbsUp, ThumbsDown,
+  Download, Ban, ArrowUpCircle, Rocket, Zap,
 } from 'lucide-react'
 import LabChromeBar from '../lab/LabChromeBar'
 import { simPanelRoot } from '../../utils/simLayout'
+import SimStatusBadge from '../sim/shared/SimStatusBadge'
+import PipelineGraph from './PipelineGraph'
+import JobConsole from './JobConsole'
+import { createPipelineRun, JOB_STATUS } from './pipelineEngine'
+import { parsePipeline } from './pipelineParser'
+import { PROVIDERS, PROVIDER_LABELS } from './pipelineModel'
+import {
+  CICD_SEED_PIPELINES, CICD_SEED_PIPELINE_LIST, CICD_FAULTS_CATALOG,
+  faultsForScenario, pipelineForScenario,
+} from '../../mockData/cicd'
 import '../../styles/lab-chrome.css'
 import '../../styles/sim-products.css'
 
-const BROKEN_GITLAB_CI = `stages:
-  - build
-  - test
-  - deploy
+const PROVIDER_ORDER = [PROVIDERS.GITLAB, PROVIDERS.GITHUB, PROVIDERS.JENKINS]
 
-build:
-  stage: build
-  image: node:18-alpinee
-  script:
-    - npm ci
-    - npm run build
-  artifacts:
-    paths:
-      - dist/
-
-test:
-  stage: test
-  image: node:18-alpine
-  script:
-    - npm test
-
-deploy:
-  stage: deploy
-  image: alpine/k8s:1.28.0
-  script:
-    - kubectl apply -f k8s/
-  only:
-    - main
-`
-
-const FIXED_GITLAB_CI = BROKEN_GITLAB_CI.replace('node:18-alpinee', 'node:18-alpine')
-
-const DEFAULT_STAGES = [
-  { id: 'checkout', name: 'Checkout', tool: 'git', status: 'success', duration: '12s', log: ['Cloning repository…', 'Checked out main @ a1b2c3d'] },
-  { id: 'build', name: 'Build', tool: 'maven', status: 'failed', duration: '48s', log: ['mvn clean package -DskipTests', 'ERROR: Docker image node:18-alpinee not found'] },
-  { id: 'test', name: 'Unit tests', tool: 'maven', status: 'pending', duration: '—', log: [] },
-  { id: 'scan', name: 'SonarQube', tool: 'sonar', status: 'pending', duration: '—', log: [] },
-  { id: 'deploy', name: 'Deploy', tool: 'argocd', status: 'pending', duration: '—', log: [] },
+const TRIGGERS = [
+  { id: 'push', label: 'Push', icon: GitBranch },
+  { id: 'pr', label: 'Pull request', icon: GitPullRequest },
+  { id: 'manual', label: 'Manual', icon: Hand },
+  { id: 'schedule', label: 'Schedule', icon: CalendarClock },
 ]
 
-/**
- * CI/CD pipeline simulator — GitLab CI / Jenkins / GitHub Actions / Argo CD.
- * Wired with standard lab chrome (Hints, Check, timer, Stop) like AWX/Terraform.
- */
+const TABS = [
+  { id: 'pipeline', label: 'Pipeline', icon: Workflow },
+  { id: 'editor', label: 'Editor', icon: FileCode },
+  { id: 'environments', label: 'Environments', icon: Server },
+  { id: 'history', label: 'History', icon: History },
+]
+
+let _sha = 0xa1b2c3
+function nextSha() {
+  _sha = (_sha * 1103515245 + 12345) & 0xffffff
+  return _sha.toString(16).padStart(6, '0')
+}
+
+function fmtDur(ms) {
+  if (!ms) return '—'
+  const s = Math.round(ms / 1000)
+  if (s < 60) return `${s}s`
+  return `${Math.floor(s / 60)}m ${String(s % 60).padStart(2, '0')}s`
+}
+
 export default function CicdPipelineSim({
   scenario,
   onExit,
@@ -65,104 +61,282 @@ export default function CicdPipelineSim({
   embedded = true,
   vmwareHref = null,
 }) {
+  const slug = scenario?.slug || ''
+
+  // Fault set derived from the lab scenario slug (gates the old cheat button).
+  const scenarioFault = useMemo(() => faultsForScenario(slug), [slug])
+  const [activeFaultKey, setActiveFaultKey] = useState(() => {
+    const entry = faultsForScenario(slug)
+    if (!entry) return ''
+    return Object.keys(CICD_FAULTS_CATALOG).find((k) => CICD_FAULTS_CATALOG[k] === entry) || ''
+  })
+  const activeFault = activeFaultKey ? CICD_FAULTS_CATALOG[activeFaultKey] : null
+
+  // Provider + seed selection, seeded from the scenario on mount.
+  const initialSeed = useMemo(() => pipelineForScenario(slug), [slug])
+  const [provider, setProvider] = useState(initialSeed.provider)
+  const [seedSlug, setSeedSlug] = useState(initialSeed.slug)
+  const [source, setSource] = useState(initialSeed.source)
+
   const [tab, setTab] = useState('pipeline')
-  const [stages, setStages] = useState(() => DEFAULT_STAGES.map((s) => ({ ...s })))
-  const [gitlabCi, setGitlabCi] = useState(BROKEN_GITLAB_CI)
+  const [trigger, setTrigger] = useState('push')
   const [branch, setBranch] = useState('main')
-  const [imageTag, setImageTag] = useState('broken-tag')
-  const [kubeconfig, setKubeconfig] = useState('')
-  const [ciRegistry, setCiRegistry] = useState('registry.fixitlab.local')
-  const [dockerImage, setDockerImage] = useState('fixitlab/webapp')
+
+  // Parse the current source into a normalized model + lint errors on every edit.
+  const parsed = useMemo(() => parsePipeline(source, provider), [source, provider])
+  const { pipeline, errors } = parsed
+  const hasBlockingErrors = errors.some((e) => e.code !== 'empty' && e.code !== 'job-without-stage')
+
+  // ── run state ──────────────────────────────────────────────────────────────
   const [running, setRunning] = useState(false)
+  const [statuses, setStatuses] = useState(() => new Map()) // jobId -> status
+  const [durations, setDurations] = useState(() => new Map())
+  const [liveMs, setLiveMs] = useState(() => new Map())
+  const [stepState, setStepState] = useState(() => new Map()) // stepId -> {status,lines,startedAt,durationMs}
+  const [awaiting, setAwaiting] = useState(() => new Set()) // jobIds awaiting approval
+  const [selectedJob, setSelectedJob] = useState(null)
+  const [nowTick, setNowTick] = useState(0)
   const [runHistory, setRunHistory] = useState([])
-  const [fixed, setFixed] = useState(false)
+  const [environments, setEnvironments] = useState({}) // env -> {sha, at, status, runId}
+  const [artifacts, setArtifacts] = useState({}) // jobId -> [names]
 
-  const yamlOk = !/alpinee|node:18-alpinee/.test(gitlabCi) && gitlabCi.includes('node:18-alpine')
-  const buildOk = yamlOk && imageTag && imageTag !== 'broken-tag'
-  const deployOk = kubeconfig.trim().length > 10
-  const allGreen = useMemo(() => stages.every((s) => s.status === 'success'), [stages])
+  const runnerRef = useRef(null)
+  const jobStartRef = useRef(new Map())
 
-  const rerun = async () => {
-    setRunning(true)
-    setFixed(false)
-    const runId = `#${1024 + runHistory.length}`
-    const started = new Date().toISOString()
-    setStages(DEFAULT_STAGES.map((s) => ({
-      ...s,
-      status: s.id === 'checkout' ? 'success' : 'pending',
-      log: s.id === 'checkout' ? s.log : [],
-      duration: s.id === 'checkout' ? '11s' : '—',
-    })))
-    await delay(350)
+  // Tick while running so live timers advance (1s, matches store lifecycle cadence).
+  useEffect(() => {
+    if (!running && awaiting.size === 0) return undefined
+    const id = setInterval(() => setNowTick((t) => t + 1), 1000)
+    return () => clearInterval(id)
+  }, [running, awaiting.size])
 
-    const buildPass = buildOk
-    setStages((prev) => prev.map((s) => {
-      if (s.id === 'build') {
-        return {
-          ...s,
-          status: buildPass ? 'success' : 'failed',
-          duration: buildPass ? '1m 04s' : '48s',
-          log: buildPass
-            ? [
-              `Using CI_REGISTRY=${ciRegistry}`,
-              `docker pull ${ciRegistry}/${dockerImage}:${imageTag}`,
-              'mvn clean package -DskipTests',
-              'BUILD SUCCESS',
-              `artifact: app-${imageTag}.jar`,
-            ]
-            : [
-              'Checking .gitlab-ci.yml image…',
-              yamlOk ? `ERROR: image tag ${imageTag} not found in registry` : 'ERROR: invalid image node:18-alpinee in .gitlab-ci.yml',
-              'Job failed: exit code 1',
-            ],
+  // Recompute liveMs for running jobs each tick.
+  useEffect(() => {
+    if (!running && awaiting.size === 0) return
+    setLiveMs(() => {
+      const m = new Map()
+      for (const [jobId, started] of jobStartRef.current) m.set(jobId, Date.now() - started)
+      return m
+    })
+  }, [nowTick, running, awaiting.size])
+
+  const resetRunState = useCallback(() => {
+    setStatuses(new Map())
+    setDurations(new Map())
+    setLiveMs(new Map())
+    setStepState(new Map())
+    setAwaiting(new Set())
+    jobStartRef.current = new Map()
+  }, [])
+
+  const artifactsForJob = useCallback((job) => {
+    const hay = `${job.name} ${job.stage || ''}`.toLowerCase()
+    if (/build|compile|package|image/.test(hay)) return [`app-${branch}.tar.gz`, 'build.log']
+    if (/test|lint|qa/.test(hay)) return ['junit.xml', 'coverage.xml']
+    if (/scan|sonar|security/.test(hay)) return ['scan-report.json']
+    return []
+  }, [branch])
+
+  const handleEvent = useCallback((evt) => {
+    switch (evt.type) {
+      case 'run:started': {
+        setSelectedJob((prev) => prev || evt.order?.[0]?.[0] || null)
+        break
+      }
+      case 'job:queued':
+        setStatuses((m) => new Map(m).set(evt.jobId, JOB_STATUS.QUEUED))
+        break
+      case 'job:running':
+        jobStartRef.current.set(evt.jobId, Date.now())
+        setStatuses((m) => new Map(m).set(evt.jobId, JOB_STATUS.RUNNING))
+        setSelectedJob((prev) => prev || evt.jobId)
+        break
+      case 'job:awaiting_approval':
+        setStatuses((m) => new Map(m).set(evt.jobId, JOB_STATUS.AWAITING_APPROVAL))
+        setAwaiting((s) => new Set(s).add(evt.jobId))
+        setSelectedJob(evt.jobId)
+        break
+      case 'step:log':
+        setStepState((m) => {
+          const next = new Map(m)
+          const cur = next.get(evt.stepId) || { status: 'running', lines: [], startedAt: Date.now() }
+          next.set(evt.stepId, { ...cur, status: 'running', startedAt: cur.startedAt || Date.now(), lines: [...cur.lines, evt.line] })
+          return next
+        })
+        break
+      case 'step:done':
+        setStepState((m) => {
+          const next = new Map(m)
+          const cur = next.get(evt.stepId) || { lines: [] }
+          next.set(evt.stepId, { ...cur, status: evt.status, durationMs: evt.durationMs })
+          return next
+        })
+        break
+      case 'job:done': {
+        jobStartRef.current.delete(evt.jobId)
+        setStatuses((m) => new Map(m).set(evt.jobId, evt.status))
+        setDurations((m) => new Map(m).set(evt.jobId, evt.durationMs || 0))
+        setAwaiting((s) => { if (!s.has(evt.jobId)) return s; const n = new Set(s); n.delete(evt.jobId); return n })
+        setLiveMs((m) => { if (!m.has(evt.jobId)) return m; const n = new Map(m); n.delete(evt.jobId); return n })
+        // Mark queued steps of a skipped job so the console reads correctly.
+        if (evt.status === JOB_STATUS.SKIPPED) {
+          const job = pipeline.jobs.find((j) => j.id === evt.jobId)
+          if (job) {
+            setStepState((m) => {
+              const next = new Map(m)
+              for (const s of job.steps.length ? job.steps : [{ id: `${job.id}_step` }]) {
+                if (!next.has(s.id)) next.set(s.id, { status: 'skipped', lines: [] })
+              }
+              return next
+            })
+          }
+        }
+        break
+      }
+      case 'run:done':
+        break
+      default:
+        break
+    }
+  }, [pipeline])
+
+  const finalizeRun = useCallback((result, meta) => {
+    const perJob = new Map(result.jobs?.map((j) => [j.id, j]) || [])
+    // Capture the full graph+step snapshot so history can reload a past run.
+    const snapshot = {
+      statuses: Object.fromEntries([...(runnerRef.current?.getState().jobs || result.jobs || []).map((j) => [j.id, j.status])]),
+      durations: Object.fromEntries((result.jobs || []).map((j) => [j.id, j.durationMs])),
+    }
+    const entry = {
+      runId: meta.runId,
+      sha: meta.sha,
+      trigger: meta.trigger,
+      branch: meta.branch,
+      provider: meta.provider,
+      seedSlug: meta.seedSlug,
+      source: meta.source,
+      status: result.status,
+      durationMs: result.durationMs,
+      at: new Date().toISOString(),
+      snapshot,
+      // capture step logs so re-loading a past run shows its console
+      stepLogs: Object.fromEntries([...stepStateRef.current].map(([k, v]) => [k, { status: v.status, lines: v.lines, durationMs: v.durationMs }])),
+      failedJobs: (result.jobs || []).filter((j) => j.status === JOB_STATUS.FAILED || j.status === JOB_STATUS.SKIPPED).map((j) => j.id),
+      artifacts: meta.artifacts,
+    }
+    setRunHistory((h) => [entry, ...h].slice(0, 12))
+
+    // Update deployed environments for successful deploy jobs.
+    if (result.status === JOB_STATUS.SUCCESS) {
+      const envUpdates = {}
+      for (const job of pipeline.jobs) {
+        if (job.environment && perJob.get(job.id)?.status === JOB_STATUS.SUCCESS) {
+          envUpdates[job.environment] = { sha: meta.sha, at: entry.at, status: 'success', runId: meta.runId, jobId: job.id }
         }
       }
-      return s
-    }))
-    if (!buildPass) {
-      setRunning(false)
-      setRunHistory((h) => [{ id: runId, branch, status: 'failed', started, reason: yamlOk ? 'bad image tag' : 'bad CI image' }, ...h].slice(0, 8))
-      return
+      if (Object.keys(envUpdates).length) setEnvironments((e) => ({ ...e, ...envUpdates }))
+    }
+  }, [pipeline])
+
+  // Keep a ref of stepState for the finalize snapshot (avoids stale closure).
+  const stepStateRef = useRef(stepState)
+  useEffect(() => { stepStateRef.current = stepState }, [stepState])
+
+  const startRun = useCallback(async ({ onlyFailedFrom = null } = {}) => {
+    if (running || hasBlockingErrors || !pipeline.jobs.length) return
+    resetRunState()
+    setRunning(true)
+
+    // Compute artifacts up front for the graph/history.
+    const runArtifacts = {}
+    for (const job of pipeline.jobs) {
+      const a = artifactsForJob(job)
+      if (a.length) runArtifacts[job.id] = a
+    }
+    setArtifacts(runArtifacts)
+
+    // Restrict faults to only the failed jobs when re-running failed only.
+    let faults = activeFault?.faults || {}
+    if (onlyFailedFrom) {
+      const allow = new Set(onlyFailedFrom)
+      faults = Object.fromEntries(Object.entries(faults).filter(([jobId]) => allow.has(jobId)))
     }
 
-    await delay(450)
-    setStages((prev) => prev.map((s) => {
-      if (s.id === 'test') return { ...s, status: 'success', duration: '22s', log: ['npm test', 'Tests run: 42, Failures: 0', 'Coverage: 78%'] }
-      if (s.id === 'scan') return { ...s, status: 'success', duration: '31s', log: ['sonar-scanner', 'Quality Gate PASSED', 'Bugs: 0, Vulnerabilities: 0'] }
-      if (s.id === 'deploy') {
-        return {
-          ...s,
-          status: deployOk ? 'success' : 'failed',
-          duration: deployOk ? '18s' : '5s',
-          log: deployOk
-            ? [`argocd app sync webapp --revision ${imageTag}`, 'Sync status: Synced', 'Health: Healthy', `Deployed branch ${branch}`]
-            : ['kubectl apply failed: invalid kubeconfig', 'error: unable to load config file'],
-        }
-      }
-      return s
-    }))
+    const meta = {
+      runId: `#${1024 + runHistory.length}`,
+      sha: nextSha(),
+      trigger,
+      branch,
+      provider,
+      seedSlug,
+      source,
+      artifacts: runArtifacts,
+    }
 
-    const ok = deployOk
-    if (ok) setFixed(true)
-    setRunHistory((h) => [{ id: runId, branch, status: ok ? 'success' : 'failed', started, reason: ok ? 'all stages green' : 'deploy failed' }, ...h].slice(0, 8))
+    const runner = createPipelineRun(pipeline, { faults, onEvent: handleEvent })
+    runnerRef.current = runner
+    const result = await runner.start()
+    finalizeRun(result, meta)
+    runnerRef.current = null
     setRunning(false)
-  }
+  }, [running, hasBlockingErrors, pipeline, resetRunState, artifactsForJob, activeFault, runHistory.length, trigger, branch, provider, seedSlug, source, handleEvent, finalizeRun])
 
-  const tabs = [
-    { id: 'pipeline', label: 'Pipeline', icon: Workflow },
-    { id: 'gitlab', label: '.gitlab-ci.yml', icon: FileCode },
-    { id: 'variables', label: 'Variables', icon: Settings },
-    { id: 'history', label: 'Run history', icon: History },
-  ]
+  const cancelRun = useCallback(() => {
+    runnerRef.current?.cancel()
+  }, [])
+
+  const approve = useCallback((jobId) => { runnerRef.current?.approve(jobId) }, [])
+  const reject = useCallback((jobId) => { runnerRef.current?.reject(jobId) }, [])
+
+  // Re-load a past run's captured event log into the graph/console (read-only view).
+  const loadHistory = useCallback((entry) => {
+    setProvider(entry.provider)
+    setSeedSlug(entry.seedSlug)
+    setSource(entry.source)
+    setStatuses(new Map(Object.entries(entry.snapshot.statuses)))
+    setDurations(new Map(Object.entries(entry.snapshot.durations)))
+    setStepState(new Map(Object.entries(entry.stepLogs || {})))
+    setArtifacts(entry.artifacts || {})
+    setLiveMs(new Map())
+    setAwaiting(new Set())
+    setTab('pipeline')
+  }, [])
+
+  const selectProvider = useCallback((p) => {
+    const first = CICD_SEED_PIPELINES[p][0]
+    setProvider(p)
+    setSeedSlug(first.slug)
+    setSource(first.source)
+    resetRunState()
+    setSelectedJob(null)
+  }, [resetRunState])
+
+  const selectSeed = useCallback((s) => {
+    const seed = CICD_SEED_PIPELINE_LIST.find((x) => x.slug === s)
+    if (!seed) return
+    setSeedSlug(s)
+    setSource(seed.source)
+    resetRunState()
+    setSelectedJob(null)
+  }, [resetRunState])
+
+  const selectedJobModel = useMemo(
+    () => pipeline.jobs.find((j) => j.id === selectedJob) || null,
+    [pipeline, selectedJob],
+  )
+
+  const anyFailed = [...statuses.values()].some((s) => s === JOB_STATUS.FAILED)
+  const allGreen = pipeline.jobs.length > 0 && pipeline.jobs.every((j) => statuses.get(j.id) === JOB_STATUS.SUCCESS)
+  const providerSeeds = CICD_SEED_PIPELINES[provider] || []
 
   return (
-    <div className={simPanelRoot(embedded, 'cicd-sim bg-[#0d1117] text-sm text-surface-200')}>
+    <div className={simPanelRoot(embedded, 'cicd-sim text-sm')} style={{ background: 'var(--cicd-bg)', color: 'var(--cicd-text)' }}>
       <LabChromeBar
         icon={GitBranch}
         title="CI/CD Pipeline"
         subtitle={scenario?.title || 'DevOps lab'}
-        accent="#38bdf8"
-        className="lab-chrome-bar !bg-[#161b22] !border-b-surface-700"
+        accent="#388bfd"
+        className="lab-chrome-bar"
         onExit={onExit}
         onHints={onHints}
         onCheck={onCheck}
@@ -173,188 +347,286 @@ export default function CicdPipelineSim({
         extendDisabled={extendDisabled}
         backLabel="Terminal"
         vmwareHref={vmwareHref}
-      >
-        <div className="hidden sm:flex items-center gap-1 mr-2">
-          {tabs.map((t) => (
+      />
+
+      {/* Provider + trigger toolbar */}
+      <div className="cicd-toolbar flex flex-wrap items-center gap-2 px-4 py-2 shrink-0">
+        <label className="flex items-center gap-1.5 text-[11px]" style={{ color: 'var(--cicd-muted)' }}>
+          Provider
+          <select className="cicd-select" value={provider} onChange={(e) => selectProvider(e.target.value)}>
+            {PROVIDER_ORDER.map((p) => <option key={p} value={p}>{PROVIDER_LABELS[p]}</option>)}
+          </select>
+        </label>
+        <label className="flex items-center gap-1.5 text-[11px]" style={{ color: 'var(--cicd-muted)' }}>
+          Definition
+          <select className="cicd-select max-w-[240px]" value={seedSlug} onChange={(e) => selectSeed(e.target.value)}>
+            {providerSeeds.map((s) => <option key={s.slug} value={s.slug}>{s.title}</option>)}
+          </select>
+        </label>
+        <label className="flex items-center gap-1.5 text-[11px]" style={{ color: 'var(--cicd-muted)' }}>
+          <GitBranch size={12} />
+          <select className="cicd-select" value={branch} onChange={(e) => setBranch(e.target.value)}>
+            <option value="main">main</option>
+            <option value="develop">develop</option>
+            <option value="release/1.x">release/1.x</option>
+            <option value="feature/fix-pipeline">feature/fix-pipeline</option>
+          </select>
+        </label>
+
+        <div className="cicd-trigger ml-auto">
+          {TRIGGERS.map((t) => (
             <button
               key={t.id}
               type="button"
-              onClick={() => setTab(t.id)}
-              className={`text-[10px] px-2 py-1 rounded border transition-colors ${
-                tab === t.id
-                  ? 'border-sky-500/50 bg-sky-500/15 text-sky-300'
-                  : 'border-surface-700 text-surface-500 hover:text-surface-300'
-              }`}
+              className={`cicd-trigger-btn ${trigger === t.id ? 'cicd-trigger-active' : ''}`}
+              onClick={() => setTrigger(t.id)}
             >
-              <t.icon size={11} className="inline mr-1" />
-              {t.label}
+              <t.icon size={12} /> <span className="hidden sm:inline">{t.label}</span>
             </button>
           ))}
         </div>
-      </LabChromeBar>
 
-      <div className="flex sm:hidden items-center gap-1 px-4 py-2 border-b border-surface-800 overflow-x-auto shrink-0">
-        {tabs.map((t) => (
-          <button
-            key={t.id}
-            type="button"
-            onClick={() => setTab(t.id)}
-            className={`text-[10px] px-2 py-1 rounded border whitespace-nowrap ${
-              tab === t.id ? 'border-sky-500/50 bg-sky-500/15 text-sky-300' : 'border-surface-700 text-surface-500'
-            }`}
-          >
-            {t.label}
+        {running ? (
+          <button type="button" className="cicd-btn cicd-btn-danger" onClick={cancelRun}>
+            <Ban size={13} /> Cancel
           </button>
-        ))}
+        ) : (
+          <button
+            type="button"
+            className="cicd-btn cicd-btn-primary"
+            onClick={() => startRun()}
+            disabled={hasBlockingErrors || !pipeline.jobs.length}
+            title={hasBlockingErrors ? 'Fix definition errors first' : 'Run pipeline'}
+          >
+            <Play size={13} /> Run pipeline
+          </button>
+        )}
       </div>
 
-      <div className="flex-1 min-h-0 overflow-auto p-4 space-y-4 max-w-5xl mx-auto w-full">
-        <p className="text-surface-400 text-xs flex items-start gap-2">
-          <Terminal size={14} className="text-accent-cyan shrink-0 mt-0.5" />
-          Fix the pipeline in this simulator <strong className="text-surface-300">and</strong> in the lab terminal
-          (<code className="text-accent-cyan">/opt/app/.gitlab-ci.yml</code>). Correct the Docker image typo, set a valid
-          <code className="text-accent-cyan mx-1">IMAGE_TAG</code>, then re-run. Use Check Solution in the lab chrome when green.
-        </p>
-
-        {tab === 'pipeline' && (
-          <>
-            <div className="flex flex-wrap items-center gap-2">
-              <label className="text-xs text-surface-500 flex items-center gap-1">
-                Branch
-                <select value={branch} onChange={(e) => setBranch(e.target.value)} className="input text-xs py-1">
-                  <option value="main">main</option>
-                  <option value="develop">develop</option>
-                  <option value="feature/fix-pipeline">feature/fix-pipeline</option>
-                </select>
-              </label>
-              <button type="button" disabled={running} onClick={rerun} className="btn-primary text-xs flex items-center gap-1.5">
-                {running ? <Loader2 size={14} className="animate-spin" /> : <Play size={14} />}
-                Run pipeline
-              </button>
-              <button
-                type="button"
-                onClick={() => {
-                  setGitlabCi(FIXED_GITLAB_CI)
-                  setImageTag('v1.2.3')
-                  setKubeconfig('apiVersion: v1\nkind: Config\nclusters:\n- name: lab\n  cluster:\n    server: https://k8s.lab\n')
-                }}
-                className="btn-secondary text-xs flex items-center gap-1"
-              >
-                <RotateCcw size={12} /> Apply known-good fix
-              </button>
-            </div>
-
-            <div className="grid gap-2">
-              {stages.map((stage, i) => (
-                <div key={stage.id} className="rounded-lg border border-surface-700 bg-surface-900/60 overflow-hidden">
-                  <div className="flex items-center gap-2 px-3 py-2 border-b border-surface-800">
-                    <StageIcon status={stage.status} />
-                    <span className="font-medium text-white">{i + 1}. {stage.name}</span>
-                    <span className="text-[10px] text-surface-500">{stage.duration}</span>
-                    <span className="text-[10px] text-surface-500 ml-auto flex items-center gap-1">
-                      {stage.tool === 'sonar' && <Shield size={10} />}
-                      {stage.tool === 'maven' && <Package size={10} />}
-                      {stage.tool}
-                    </span>
-                  </div>
-                  {stage.log?.length > 0 && (
-                    <pre className="p-3 text-[11px] font-mono text-surface-400 whitespace-pre-wrap max-h-32 overflow-auto">{stage.log.join('\n')}</pre>
-                  )}
-                </div>
+      {/* Tabs */}
+      <div className="flex items-center gap-1 px-4 py-1.5 border-b overflow-x-auto shrink-0" style={{ borderColor: 'var(--cicd-border-soft)' }}>
+        {TABS.map((t) => (
+          <button key={t.id} type="button" className={`cicd-tab ${tab === t.id ? 'cicd-tab-active' : ''}`} onClick={() => setTab(t.id)}>
+            <t.icon size={12} /> {t.label}
+            {t.id === 'history' && runHistory.length > 0 && (
+              <span className="ml-1 opacity-70">({runHistory.length})</span>
+            )}
+          </button>
+        ))}
+        {scenarioFault && (
+          <label className="ml-auto flex items-center gap-1.5 text-[11px]" style={{ color: 'var(--cicd-amber)' }} title="Fault injected into this run, seeded from the lab scenario">
+            <Zap size={12} /> Fault
+            <select className="cicd-select" value={activeFaultKey} onChange={(e) => setActiveFaultKey(e.target.value)} disabled={running}>
+              <option value="">None</option>
+              {Object.entries(CICD_FAULTS_CATALOG).map(([key, f]) => (
+                <option key={key} value={key}>{f.label}</option>
               ))}
-            </div>
+            </select>
+          </label>
+        )}
+      </div>
 
-            {allGreen && fixed && (
-              <div className="p-3 rounded-lg bg-accent-green/10 border border-accent-green/30 text-accent-green text-xs flex items-center gap-2">
-                <CheckCircle2 size={16} />
-                Pipeline green — return to the terminal and click <strong>Check</strong> in the lab bar to validate.
+      <div className="flex-1 min-h-0 overflow-auto p-4">
+        {tab === 'pipeline' && (
+          <div className="max-w-6xl mx-auto space-y-4">
+            {allGreen && !running && (
+              <div className="cicd-card p-3 flex items-center gap-2 text-[13px]" style={{ borderColor: 'rgba(63,185,80,.35)', color: 'var(--cicd-green)' }}>
+                <CheckCircle2 size={16} /> Pipeline green — return to the lab and click <strong>Check</strong> to validate.
               </div>
             )}
-          </>
+            {anyFailed && !running && (
+              <div className="cicd-card p-3 flex items-center gap-2 text-[13px]" style={{ borderColor: 'rgba(248,81,73,.35)', color: 'var(--cicd-red)' }}>
+                <XCircle size={16} /> A job failed. Inspect its console, fix the definition or variables, then re-run.
+              </div>
+            )}
+
+            <PipelineGraph
+              pipeline={pipeline}
+              statuses={statuses}
+              durations={durations}
+              liveMs={liveMs}
+              selectedId={selectedJob}
+              onSelect={setSelectedJob}
+            />
+
+            {/* Approval gate controls */}
+            {awaiting.size > 0 && (
+              <div className="cicd-card p-3 space-y-2">
+                <div className="flex items-center gap-2 text-[12px] font-semibold" style={{ color: 'var(--cicd-amber)' }}>
+                  <AlertTriangle size={14} /> Awaiting manual approval
+                </div>
+                {[...awaiting].map((jobId) => {
+                  const job = pipeline.jobs.find((j) => j.id === jobId)
+                  return (
+                    <div key={jobId} className="flex items-center gap-2">
+                      <span className="text-[12px] flex-1">{job?.name || jobId}{job?.environment ? ` → ${job.environment}` : ''}</span>
+                      <button type="button" className="cicd-btn cicd-btn-approve" onClick={() => approve(jobId)}>
+                        <ThumbsUp size={12} /> Approve
+                      </button>
+                      <button type="button" className="cicd-btn cicd-btn-danger" onClick={() => reject(jobId)}>
+                        <ThumbsDown size={12} /> Reject
+                      </button>
+                    </div>
+                  )
+                })}
+              </div>
+            )}
+
+            <JobConsole
+              job={selectedJobModel}
+              stepState={stepState}
+              jobStatus={selectedJob ? statuses.get(selectedJob) : null}
+              nowTick={nowTick}
+            />
+
+            {selectedJobModel && artifacts[selectedJobModel.id]?.length > 0 && (
+              <div className="cicd-card p-3">
+                <div className="text-[11px] uppercase tracking-wide mb-2" style={{ color: 'var(--cicd-muted)' }}>Artifacts</div>
+                <div className="flex flex-wrap gap-2">
+                  {artifacts[selectedJobModel.id].map((a) => (
+                    <span key={a} className="cicd-artifact"><Download size={11} /> {a}</span>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
         )}
 
-        {tab === 'gitlab' && (
-          <div className="space-y-2">
-            <div className="flex items-center justify-between">
-              <span className="text-xs text-surface-500">Edit pipeline definition (mirrors terminal file)</span>
-              {!yamlOk && (
-                <span className="text-[10px] text-red-400 flex items-center gap-1">
-                  <XCircle size={12} /> Fix image typo: node:18-alpinee → node:18-alpine
+        {tab === 'editor' && (
+          <div className="max-w-5xl mx-auto space-y-3">
+            <div className="flex items-center justify-between flex-wrap gap-2">
+              <span className="text-[12px]" style={{ color: 'var(--cicd-muted)' }}>
+                Editing <code style={{ color: 'var(--cicd-accent)' }}>{providerSeeds.find((s) => s.slug === seedSlug)?.file || 'pipeline'}</code>
+                {' '}— the parsed model drives the graph live.
+              </span>
+              {errors.length === 0 ? (
+                <span className="cicd-lint-ok flex items-center gap-1.5 text-[12px]"><CheckCircle2 size={14} /> Pipeline is valid</span>
+              ) : (
+                <span className="flex items-center gap-1.5 text-[12px]" style={{ color: 'var(--cicd-red)' }}>
+                  <XCircle size={14} /> {errors.length} problem{errors.length > 1 ? 's' : ''}
                 </span>
               )}
             </div>
+
+            {errors.length > 0 && (
+              <div className="space-y-1.5">
+                {errors.map((e, i) => (
+                  <div key={i} className="cicd-lint-err">
+                    <AlertTriangle size={13} className="shrink-0 mt-0.5" />
+                    <span><span className="font-mono opacity-70">[{e.code}]</span> {e.message}</span>
+                  </div>
+                ))}
+              </div>
+            )}
+
             <textarea
-              className="input w-full font-mono text-[11px] min-h-[280px]"
-              value={gitlabCi}
-              onChange={(e) => setGitlabCi(e.target.value)}
+              className="cicd-editor"
+              value={source}
+              onChange={(e) => { setSource(e.target.value); resetRunState() }}
               spellCheck={false}
             />
           </div>
         )}
 
-        {tab === 'variables' && (
-          <div className="grid sm:grid-cols-2 gap-3">
-            <label className="block">
-              <span className="text-xs text-surface-500">IMAGE_TAG</span>
-              <input className="input w-full mt-1 font-mono text-xs" value={imageTag} onChange={(e) => setImageTag(e.target.value)} />
-            </label>
-            <label className="block">
-              <span className="text-xs text-surface-500">CI_REGISTRY</span>
-              <input className="input w-full mt-1 font-mono text-xs" value={ciRegistry} onChange={(e) => setCiRegistry(e.target.value)} />
-            </label>
-            <label className="block">
-              <span className="text-xs text-surface-500">DOCKER_IMAGE</span>
-              <input className="input w-full mt-1 font-mono text-xs" value={dockerImage} onChange={(e) => setDockerImage(e.target.value)} />
-            </label>
-            <label className="block sm:col-span-2">
-              <span className="text-xs text-surface-500">KUBECONFIG (paste for deploy stage)</span>
-              <textarea className="input w-full mt-1 font-mono text-[10px] h-24" value={kubeconfig} onChange={(e) => setKubeconfig(e.target.value)} />
-            </label>
+        {tab === 'environments' && (
+          <div className="max-w-4xl mx-auto grid sm:grid-cols-2 gap-3">
+            {['staging', 'production'].map((env) => {
+              const info = environments[env]
+              const isProd = env === 'production'
+              return (
+                <div key={env} className={`cicd-env-card p-4 ${isProd ? 'cicd-env-prod' : 'cicd-env-staging'}`}>
+                  <div className="flex items-center gap-2 mb-2">
+                    <Rocket size={15} style={{ color: isProd ? 'var(--cicd-amber)' : 'var(--cicd-accent)' }} />
+                    <span className="text-[14px] font-semibold capitalize">{env}</span>
+                    {info && <SimStatusBadge status="success" label="deployed" className="ml-auto" />}
+                  </div>
+                  {info ? (
+                    <div className="text-[12px] space-y-1" style={{ color: 'var(--cicd-muted)' }}>
+                      <div>Revision <span className="cicd-sha">{info.sha}</span></div>
+                      <div>Run {info.runId} · {new Date(info.at).toLocaleTimeString()}</div>
+                      <button
+                        type="button"
+                        className="cicd-btn mt-2"
+                        onClick={() => setEnvironments((e) => {
+                          const n = { ...e }; delete n[env]; return n
+                        })}
+                        title="Simulate a rollback (removes the deployed revision)"
+                      >
+                        <ArrowUpCircle size={12} /> Rollback
+                      </button>
+                    </div>
+                  ) : (
+                    <div className="text-[12px]" style={{ color: 'var(--cicd-muted)' }}>No deployment yet.</div>
+                  )}
+                </div>
+              )
+            })}
           </div>
         )}
 
         {tab === 'history' && (
-          <div className="rounded-lg border border-surface-700 overflow-hidden">
-            <table className="w-full text-xs">
-              <thead className="bg-surface-900 text-surface-500">
-                <tr>
-                  <th className="text-left p-2">Run</th>
-                  <th className="text-left p-2">Branch</th>
-                  <th className="text-left p-2">Status</th>
-                  <th className="text-left p-2">Started</th>
-                </tr>
-              </thead>
-              <tbody>
-                {runHistory.length === 0 ? (
-                  <tr><td colSpan={4} className="p-4 text-surface-500">No runs yet — click Run pipeline.</td></tr>
-                ) : runHistory.map((r) => (
-                  <tr key={r.id} className="border-t border-surface-800">
-                    <td className="p-2 font-mono">{r.id}</td>
-                    <td className="p-2">{r.branch}</td>
-                    <td className={`p-2 ${r.status === 'success' ? 'text-accent-green' : 'text-red-400'}`}>{r.status}</td>
-                    <td className="p-2 text-surface-500">{new Date(r.started).toLocaleTimeString()}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+          <div className="max-w-5xl mx-auto">
+            {runHistory.length === 0 ? (
+              <div className="cicd-card p-6 text-center text-[13px]" style={{ color: 'var(--cicd-muted)' }}>
+                No runs yet — click <strong>Run pipeline</strong>.
+              </div>
+            ) : (
+              <div className="cicd-card overflow-hidden">
+                <table className="w-full text-[12px]">
+                  <thead>
+                    <tr style={{ color: 'var(--cicd-muted)' }} className="text-left">
+                      <th className="p-2.5 font-medium">Run</th>
+                      <th className="p-2.5 font-medium">Commit</th>
+                      <th className="p-2.5 font-medium">Trigger</th>
+                      <th className="p-2.5 font-medium">Duration</th>
+                      <th className="p-2.5 font-medium">Status</th>
+                      <th className="p-2.5 font-medium text-right">Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {runHistory.map((r) => (
+                      <tr key={r.runId} className="cicd-row">
+                        <td className="p-2.5 font-mono">{r.runId}</td>
+                        <td className="p-2.5"><span className="cicd-sha">{r.sha}</span> <span style={{ color: 'var(--cicd-muted)' }}>{r.branch}</span></td>
+                        <td className="p-2.5 capitalize">{r.trigger}</td>
+                        <td className="p-2.5 font-mono">{fmtDur(r.durationMs)}</td>
+                        <td className="p-2.5"><SimStatusBadge status={r.status} /></td>
+                        <td className="p-2.5">
+                          <div className="flex items-center gap-1.5 justify-end flex-wrap">
+                            <button type="button" className="cicd-btn" onClick={() => loadHistory(r)} title="Reload this run into the graph">
+                              <History size={11} /> View
+                            </button>
+                            <button
+                              type="button"
+                              className="cicd-btn"
+                              disabled={running}
+                              onClick={() => { setProvider(r.provider); setSeedSlug(r.seedSlug); setSource(r.source); startRun() }}
+                              title="Re-run all jobs"
+                            >
+                              <RotateCcw size={11} /> Re-run all
+                            </button>
+                            {r.failedJobs?.length > 0 && (
+                              <button
+                                type="button"
+                                className="cicd-btn cicd-btn-danger"
+                                disabled={running}
+                                onClick={() => { setProvider(r.provider); setSeedSlug(r.seedSlug); setSource(r.source); startRun({ onlyFailedFrom: r.failedJobs }) }}
+                                title="Re-run only the jobs that failed or were skipped"
+                              >
+                                <RotateCcw size={11} /> Re-run failed
+                              </button>
+                            )}
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
           </div>
         )}
-
-        <p className="text-[10px] text-surface-600 flex items-center gap-1">
-          <ExternalLink size={10} />
-          Tip: open the lab terminal and edit <code>/opt/app/.gitlab-ci.yml</code> — the checker validates the real file there.
-        </p>
       </div>
     </div>
   )
-}
-
-function StageIcon({ status }) {
-  if (status === 'success') return <CheckCircle2 size={16} className="text-accent-green" />
-  if (status === 'failed') return <XCircle size={16} className="text-red-400" />
-  return <span className="w-4 h-4 rounded-full border-2 border-surface-600" />
-}
-
-function delay(ms) {
-  return new Promise((r) => setTimeout(r, ms))
 }

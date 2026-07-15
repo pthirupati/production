@@ -21,11 +21,34 @@ export default function InstanceList() {
   const pushFlash = useAwsStore((s) => s.pushFlash)
   const [selected, setSelected] = useState([])
   const [query, setQuery] = useState('')
+  const [stateFilter, setStateFilter] = useState('all')
   const [actionsOpen, setActionsOpen] = useState(false)
   const [connectInst, setConnectInst] = useState(null)
 
-  const visible = instances.filter((i) => i.state !== 'terminated' || true).filter((i) =>
-    !query || i.id.includes(query) || (i.name || '').toLowerCase().includes(query.toLowerCase()) || i.type.includes(query) || i.state.includes(query))
+  const STATE_CHIPS = [
+    { key: 'all', label: 'All' },
+    { key: 'running', label: 'Running' },
+    { key: 'stopped', label: 'Stopped' },
+    { key: 'pending', label: 'Pending' },
+    { key: 'terminated', label: 'Terminated' },
+  ]
+
+  // Terminated instances are hidden by default (matches the EC2 console). The
+  // "All" chip shows everything except terminated; the Terminated chip reveals
+  // them. Selecting a specific state filters to that state.
+  const visible = instances
+    .filter((i) => {
+      if (stateFilter === 'all') return i.state !== 'terminated'
+      if (stateFilter === 'pending') return ['pending', 'rebooting'].includes(i.state)
+      return i.state === stateFilter
+    })
+    .filter((i) => !query || i.id.includes(query) || (i.name || '').toLowerCase().includes(query.toLowerCase()) || i.type.includes(query) || i.state.includes(query))
+
+  const stateCount = (key) => instances.filter((i) => {
+    if (key === 'all') return i.state !== 'terminated'
+    if (key === 'pending') return ['pending', 'rebooting'].includes(i.state)
+    return i.state === key
+  }).length
 
   const doAction = (action) => {
     setActionsOpen(false)
@@ -67,8 +90,20 @@ export default function InstanceList() {
         </div>
       </div>
 
-      <div style={{ marginBottom: 12 }}>
+      <div style={{ display: 'flex', gap: 12, alignItems: 'center', marginBottom: 12, flexWrap: 'wrap' }}>
         <SearchBar value={query} onChange={setQuery} placeholder="Find instance by attribute or tag (case-sensitive)" />
+        <div style={{ display: 'flex', gap: 6 }}>
+          {STATE_CHIPS.map((c) => (
+            <button
+              key={c.key}
+              onClick={() => setStateFilter(c.key)}
+              className={`aws-btn ${stateFilter === c.key ? 'aws-btn-primary' : 'aws-btn-secondary'}`}
+              style={{ height: 30 }}
+            >
+              {c.label} ({stateCount(c.key)})
+            </button>
+          ))}
+        </div>
       </div>
 
       <DataTable

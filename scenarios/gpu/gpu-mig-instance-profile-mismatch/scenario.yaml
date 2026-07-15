@@ -11,29 +11,46 @@ is_free: false
 jira_priority: Medium
 dual_terminal: false
 requires_companion_hosts: false
-description: 'CONTEXT: An SRE/GPU-infrastructure team running a datacenter accelerator fleet must resolve
-  `MIG Instance Profile Mismatch` during a live incident. Until the underlying hardware/driver state is
-  repaired, GPU capacity is lost and training/inference jobs fail, so throughput and SLAs are at risk.
+description: 'CONTEXT: A team operating GPU operations has raised a ticket for `MIG Instance Profile Mismatch`.
+  A customer-facing workflow is degraded and the on-call engineer (you) must diagnose and resolve it.
+  Business impact: reduced service reliability and blocked users until the underlying state is repaired.
 
 
-  ENVIRONMENT: You are on a FixitLab offline GPU node with nvidia-smi, the NVIDIA driver/CUDA stack, DCGM
-  (dcgmi / nv-hostengine / dcgm-exporter), the container toolkit, and — for AMD hosts — the ROCm stack
-  (rocm-smi / amd-smi). All tools run locally; no paid APIs or external cloud calls are required.
+  ENVIRONMENT: You are working in FixitLab''s offline GPU node. The architecture is a single lab-primary
+  node exposing nvidia-smi, drivers, CUDA, and container toolkit; treat it as the production host for
+  this incident. All tools run locally — no paid APIs or external cloud calls are required.
 
 
-  SYMPTOM / STARTING STATE: `nvidia-smi mig -lgi` lists GPU instances that do not match what workloads
-  request (e.g. all 1g.10gb, none of the required 3g.40gb). The k8s device plugin advertises the wrong
-  MIG resources so pods cannot schedule.
+  SYMPTOM / STARTING STATE: An A100/H100 where MIG is enabled but partitioned into the wrong profiles;
+  a pod requesting a 3g.40gb slice stays Pending because only 1g.10gb instances exist. `nvidia-smi mig
+  -lgi` lists GPU instances that do not match what workloads request (e.g. all 1g.10gb, none of the required
+  3g.40gb). The k8s device plugin advertises the wrong MIG resources so pods cannot schedule.
 
 
   OBJECTIVE: Inspect current MIG mode and the existing GPU/compute instance profiles; Determine the profile
   the workload requires and why the current layout blocks it; Recreate the correct MIG instances and confirm
-  they are available to schedule. Success means `check.sh` exits successfully after you apply the documented
-  remediation.
+  they are available to schedule. Acceptance criteria: the change is minimal and reversible, and success
+  means `nvidia-smi` includes `NVIDIA-SMI`.
 
 
-  WHAT TO AVOID: Do not apply broad destructive changes, disable safety limits to mask the fault, skip
-  evidence gathering, or fake completion with marker files — the checker validates real system state.'
+  WORK TO DO: Required tooling is pre-installed; if a command is missing, note it and use the equivalent
+  already on the host. Make the smallest configuration change that moves the system toward the objective
+  (edit the relevant nvidia-smi, drivers, CUDA, and container toolkit), changing one thing at a time.
+  Check your work continuously against the objective — success means `nvidia-smi` includes `NVIDIA-SMI`.
+
+
+  VERIFY: Re-run the same check the grader uses and confirm `nvidia-smi` includes `NVIDIA-SMI`. Capture
+  the before/after output as evidence. Success criteria: the objective''s healthy state holds on a repeat
+  check, not just once.
+
+
+  ROLLBACK: If a change makes things worse, revert that single change immediately (restore the original
+  config file / undo the edit / restart the affected component) and re-observe before trying another hypothesis.
+  Never stack unverified changes.
+
+
+  WHAT TO AVOID: Do not apply broad destructive changes, skip evidence gathering, or fake completion with
+  marker files — the checker validates real system state.'
 initial_state: An A100/H100 where MIG is enabled but partitioned into the wrong profiles; a pod requesting
   a 3g.40gb slice stays Pending because only 1g.10gb instances exist.
 objectives:
@@ -43,29 +60,46 @@ objectives:
 hints:
 - order: 1
   cost: 0
-  content: 'Where to look: `nvidia-smi mig -lgip` (available profiles), `nvidia-smi mig -lgi` (existing
-    GPU instances), and `nvidia-smi mig -lci` (compute instances).'
+  content: 'ORIENT — what to observe and why:
+
+    Do not touch anything yet. First observe the symptom: MIG instance profile mismatch is not behaving
+    as the scenario objectives require. This lab is about MIG instance profile mismatch — how MIG instance
+    profile mismatch behaves in a GPU operations environment. Read the objectives and the current state,
+    and note precisely what looks wrong versus healthy before you form any theory.'
 - order: 2
-  cost: 25
-  content: 'Diagnostic steps:
+  cost: 10
+  content: 'APPROACH — the troubleshooting method:
 
-    1. `nvidia-smi -q | grep -i ''MIG Mode''` — confirm MIG is Enabled.
-
-    2. `nvidia-smi mig -lgi` — list current instances and compare to the requested profile.
-
-    3. `nvidia-smi mig -lgip` — confirm the target profile ID (e.g. 3g.40gb) is placeable.'
+    Work from evidence, not guesses. For MIG instance profile mismatch problems the reliable method is:
+    (1) reproduce/observe the failure, (2) narrow from the whole system down to the one component that
+    owns the symptom, (3) change exactly one thing, (4) re-check. Fix the underlying misconfiguration
+    you identified (not just the noisy log line), changing one thing at a time.'
 - order: 3
-  cost: 50
-  content: 'Exact fix + verification:
+  cost: 25
+  content: 'WHICH TOOL — the diagnostic command(s):
 
-    1. Destroy the wrong instances (`nvidia-smi mig -dci && nvidia-smi mig -dgi`) and recreate the required
-    layout (`nvidia-smi mig -cgi 3g.40gb -C`).
+    Run `docker ps -a` and `docker logs <container>` for the failing container.'
+- order: 4
+  cost: 40
+  content: 'NARROW DOWN — isolate the subsystem:
 
-    2. Confirm `nvidia-smi mig -lgi` shows the required instances and the workload schedules.
+    1. `docker ps -a` — note Exited status and exit code.
 
-    3. Apply the documented remediation in /opt/fixitlab/academy/gpu-mig-instance-profile-mismatch.conf.
+    2. `docker logs <name>` for the startup error.
 
-    WHY: the checker validates the correct MIG layout exists.'
+    3. Inspect the Dockerfile or `docker run` flags if the image is wrong.'
+- order: 5
+  cost: 60
+  content: 'NEAR-SOLUTION — the fix shape + verify (you still apply it):
+
+    1. Fix image, port mapping, volume, or env configuration.
+
+    2. `docker start <name>` or re-run with corrected flags.
+
+    3. Confirm `nvidia-smi` shows the container Up.
+
+
+    WHY: the checker validates the container is actually running.'
 summary: Diagnose and fix mig instance profile mismatch on a datacenter GPU node and verify with the checker
 estimated_minutes: 25
 xp_reward: 100

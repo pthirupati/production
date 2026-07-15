@@ -1,25 +1,40 @@
 title: Guest OS Boot Failure (initramfs)
 slug: vmware-guest-boot-failure
 category: Fix
-description: 'CONTEXT: A team operating VMware vSphere needs you to resolve `Guest OS Boot Failure (initramfs)`
-  during a realistic incident. The business impact is reduced service reliability until the underlying
-  state is repaired.
+description: 'CONTEXT: A team operating VMware vSphere has raised a ticket for `Guest OS Boot Failure
+  (initramfs)`. A customer-facing workflow is degraded and the on-call engineer (you) must diagnose and
+  resolve it. Business impact: reduced service reliability and blocked users until the underlying state
+  is repaired.
 
 
-  ENVIRONMENT: You are working in FixitLab''s offline vSphere lab with VMs, datastores, vCenter, and ESXi
-  tasks. All tools run locally; no paid APIs or external cloud calls are required.
+  ENVIRONMENT: You are working in FixitLab''s offline vSphere lab. The architecture is a single lab-primary
+  node exposing VMs, datastores, vCenter, and ESXi tasks; treat it as the production host for this incident.
+  All tools run locally — no paid APIs or external cloud calls are required.
 
 
   SYMPTOM / STARTING STATE: vCenter guest web-prod-01 that powers on but lands in the initramfs/maintenance
-  shell after a failed patch; recovery is performed from the VM console. The guest web-prod-01 powers
-  on but drops into an initramfs/recovery shell instead of booting normally — a failed patch left the
-  root filesystem needing a check (or an entry needs resolving). The fix is done from the VM web console.
-  Diagnose the boot failure and recover the boot so the OS comes up.
+  shell after a failed patch; recovery is performed from the VM console.
 
 
   OBJECTIVE: Open the web console and identify why boot drops to the recovery shell; Repair the root filesystem
-  (or resolve the failing step); Complete the boot so the guest reaches normal multi-user state. Success
-  means `check.sh` exits successfully.
+  (or resolve the failing step); Complete the boot so the guest reaches normal multi-user state. Acceptance
+  criteria: the change is minimal and reversible, and success means `check.sh` exits successfully.
+
+
+  WORK TO DO: Required tooling is pre-installed; if a command is missing, note it and use the equivalent
+  already on the host. Make the smallest configuration change that moves the system toward the objective
+  (edit the relevant VMs, datastores, vCenter, and ESXi tasks), changing one thing at a time. Check your
+  work continuously against the objective — success means `check.sh` exits successfully.
+
+
+  VERIFY: Re-run the same check the grader uses and confirm `check.sh` exits successfully. Capture the
+  before/after output as evidence. Success criteria: the objective''s healthy state holds on a repeat
+  check, not just once.
+
+
+  ROLLBACK: If a change makes things worse, revert that single change immediately (restore the original
+  config file / undo the edit / restart the affected component) and re-observe before trying another hypothesis.
+  Never stack unverified changes.
 
 
   WHAT TO AVOID: Do not apply broad destructive changes, skip evidence gathering, or fake completion with
@@ -40,29 +55,56 @@ initial_state: vCenter guest web-prod-01 that powers on but lands in the initram
 hints:
 - order: 1
   cost: 0
-  content: 'Where to look: Start with read-only discovery on the vSphere lab. For Guest OS Boot Failure
-    (initramfs), inspect VMs, datastores, vCenter, and ESXi tasks before changing anything.'
+  content: 'ORIENT — what to observe and why:
+
+    Do not touch anything yet. First observe the symptom: guest OS boot failure (initramfs) is not behaving
+    as the scenario objectives require. This lab is about guest OS boot failure (initramfs) — how guest
+    OS boot failure (initramfs) behaves in a VMware vSphere environment. Read the objectives and the current
+    state, and note precisely what looks wrong versus healthy before you form any theory.'
 - order: 2
-  cost: 25
-  content: 'Diagnostic steps:
+  cost: 10
+  content: 'APPROACH — the troubleshooting method:
 
-    1. Gather evidence with VMs, datastores, vCenter, and ESXi tasks.
-
-    2. Compare current output to the scenario objectives.
-
-    3. Form a single hypothesis about the smallest fix that would restore healthy state.'
+    Work from evidence, not guesses. For guest OS boot failure (initramfs) problems the reliable method
+    is: (1) reproduce/observe the failure, (2) narrow from the whole system down to the one component
+    that owns the symptom, (3) change exactly one thing, (4) re-check. Fix the underlying misconfiguration
+    you identified (not just the noisy log line), changing one thing at a time.'
 - order: 3
-  cost: 50
-  content: 'Exact fix + verification:
+  cost: 25
+  content: 'WHICH TOOL — the diagnostic command(s):
 
-    1. Complete the boot so the guest reaches normal multi-user state.
+    1. Inspect the current state with VMs, datastores, vCenter, and ESXi tasks.
 
-    2. Re-run the lab checker (`check.sh` or Check Solution).
+    2. Each command above tells you something specific — status/health, recent errors, and the effective
+    configuration. Read them in that order.
 
-    3. Confirm every scenario objective is satisfied.
+    3. Compare what you see to the objectives; the gap points at the fault.'
+- order: 4
+  cost: 40
+  content: 'NARROW DOWN — isolate the subsystem:
+
+    1. From the evidence above, decide which single part of guest OS boot failure (initramfs) is at fault.
+
+    2. Re-run the most relevant of VMs, datastores, vCenter, and ESXi tasks focused on just that part
+    to confirm it.
+
+    3. State a one-line hypothesis: the smallest change that would move the state from ''guest OS boot
+    failure (initramfs) is not behaving as the scenario objectives require'' toward ''`check.sh` exits
+    successfully''.'
+- order: 5
+  cost: 60
+  content: 'NEAR-SOLUTION — the fix shape + verify (you still apply it):
+
+    1. Apply the smallest reversible change your hypothesis points to. Fix the underlying misconfiguration
+    you identified (not just the noisy log line), changing one thing at a time.
+
+    2. Re-run `bash check.sh` and confirm `check.sh` exits successfully.
+
+    3. If it still fails, the hypothesis was wrong — go back to the evidence, do not stack changes.
 
 
-    WHY: the grader validates real state — marker files are ignored.'
+    WHY: the grader validates real system state, not marker files — a fix only counts when the subsystem
+    is actually healthy.'
 technology: vmware
 summary: Complete the guest os boot failure (initramfs) vmware lab and verify success with the checker
 estimated_minutes: 20

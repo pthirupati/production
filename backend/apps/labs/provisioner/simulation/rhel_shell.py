@@ -49,6 +49,24 @@ class RHELShell:
             if hd is not None:
                 return hd
         line = line.strip()
+
+        # Interactive confirm continuation: a package manager that printed
+        # "Is this ok [y/N]:" (or apt's "[Y/n]") stashed a callback in
+        # state.pending_confirm; this input line (y / n / empty) resolves it.
+        pending = getattr(self.state, "pending_confirm", None)
+        if pending is not None:
+            self.state.pending_confirm = None
+            answer = line.strip().lower()
+            default = pending.get("default", "n")
+            if answer == "":
+                answer = default
+            proceed = answer in ("y", "yes")
+            if proceed:
+                self.state.last_exit_code = 0
+                return pending["on_confirm"]()
+            self.state.last_exit_code = pending.get("abort_code", 1)
+            return pending.get("abort_message", "Operation aborted.")
+
         if not line:
             return ""
         if line.startswith("#"):
@@ -183,8 +201,34 @@ class RHELShell:
             "service": self._cmd_service,
             "ps": self._cmd_ps,
             "pgrep": self._cmd_pgrep,
+            "pidof": self._cmd_pidof,
             "kill": self._cmd_kill,
             "killall": self._cmd_killall,
+            "pkill": self._cmd_killall,
+            "top": self._cmd_top,
+            "htop": self._cmd_top,
+            "pstree": self._cmd_pstree,
+            "vmstat": self._cmd_vmstat,
+            "nice": self._cmd_nice,
+            "renice": self._cmd_nice,
+            "uniq": self._cmd_uniq,
+            "findmnt": self._cmd_findmnt,
+            "lscpu": self._cmd_lscpu,
+            "lsmod": self._cmd_lsmod,
+            "file": self._cmd_file,
+            "arp": self._cmd_arp,
+            "route": self._cmd_route,
+            "ifconfig": self._cmd_ifconfig,
+            "ethtool": self._cmd_ethtool,
+            "traceroute": self._cmd_traceroute,
+            "tracepath": self._cmd_traceroute,
+            "ping6": self._cmd_ping,
+            "who": self._cmd_who,
+            "w": self._cmd_w,
+            "last": self._cmd_last,
+            "hostnamectl": self._cmd_hostnamectl,
+            "timedatectl": self._cmd_timedatectl,
+            "chage": self._cmd_chage,
             "grep": self._cmd_grep,
             "sed": self._cmd_sed,
             "head": self._cmd_head,
@@ -200,6 +244,7 @@ class RHELShell:
             "date": self._cmd_date,
             "which": self._cmd_which,
             "type": self._cmd_which,
+            "command": self._cmd_which,
             "env": self._cmd_env,
             "export": self._cmd_export,
             "su": self._cmd_su,
@@ -223,6 +268,9 @@ class RHELShell:
             "logout": self._cmd_exit,
             "dnf": self._cmd_dnf,
             "yum": self._cmd_dnf,
+            "microdnf": self._cmd_dnf,
+            "apt": self._cmd_apt,
+            "apt-get": self._cmd_apt,
             "rpm": self._cmd_rpm,
             "docker": self._cmd_docker,
             "kubectl": self._cmd_kubectl,
@@ -877,26 +925,59 @@ class RHELShell:
         self.state.cwd = ap
         return ""
 
+    @staticmethod
+    def _mode_symbolic(octal: str) -> str:
+        """Render an octal mode string ("644", "0755") as rwx (e.g. rw-r--r--)."""
+        digits = octal.lstrip("0") or "0"
+        digits = digits[-3:].rjust(3, "0")
+        bits = {"0": "---", "1": "--x", "2": "-w-", "3": "-wx",
+                "4": "r--", "5": "r-x", "6": "rw-", "7": "rwx"}
+        return "".join(bits.get(d, "---") for d in digits)
+
     def _cmd_ls(self, p: list[str]) -> str:
-        long_fmt = "-l" in "".join(p[1:])
-        path = p[-1] if len(p) > 1 and not p[-1].startswith("-") else self.state.cwd
+        opt = "".join(a[1:] for a in p[1:] if a.startswith("-") and len(a) > 1)
+        long_fmt = "l" in opt
+        show_all = "a" in opt
+        one_per_line = "1" in opt
+        paths = [a for a in p[1:] if not a.startswith("-")]
+        path = paths[0] if paths else self.state.cwd
         entries = self.state.list_dir(path)
         if entries is None:
             content = self.state.read_file(self.state.resolve_path(path))
             if content is not None:
-                return self.state.resolve_path(path)
+                # `ls -l FILE` shows the file's own long-format line, not its path.
+                if long_fmt:
+                    return self._ls_long_line(self.state.resolve_path(path),
+                                              path.rstrip("/").split("/")[-1] or path)
+                return path
+            self.state.last_exit_code = 2
             return f"ls: cannot access '{path}': No such file or directory"
+        # -a/-A prepends the . and .. dot entries as real ls does.
+        if show_all:
+            entries = [".", ".."] + entries
         if not long_fmt:
+            if one_per_line:
+                return "\n".join(entries) if entries else ""
             return "  ".join(entries) if entries else ""
-        lines = []
+        lines = ["total " + str(max(0, len(entries) * 4))]
         for name in entries:
+            if name in (".", ".."):
+                lines.append(f"drwxr-xr-x 2 root root 4096 Jun 14 10:00 {name}")
+                continue
             fp = self.state.resolve_path(path.rstrip("/") + "/" + name)
-            node = self.state.vfs.get(fp, {})
-            mode = node.get("mode", "755") if isinstance(node, dict) else "755"
-            owner = node.get("owner", "root") if isinstance(node, dict) else "root"
-            ftype = "d" if self.state.is_dir(fp) else "-"
-            lines.append(f"{ftype}rwxr-xr-x 1 {owner} {owner} 4096 Jun 14 10:00 {name}")
+            lines.append(self._ls_long_line(fp, name))
         return "\n".join(lines)
+
+    def _ls_long_line(self, fp: str, name: str) -> str:
+        node = self.state.vfs.get(fp, {})
+        is_dir = self.state.is_dir(fp)
+        mode = node.get("mode", "755" if is_dir else "644") if isinstance(node, dict) else ("755" if is_dir else "644")
+        owner = node.get("owner", "root") if isinstance(node, dict) else "root"
+        group = node.get("group", owner) if isinstance(node, dict) else "root"
+        content = node.get("content", "") if isinstance(node, dict) else ""
+        size = 4096 if is_dir else len(content)
+        ftype = "d" if is_dir else "-"
+        return f"{ftype}{self._mode_symbolic(mode)} 1 {owner} {group} {size:>6} Jun 14 10:00 {name}"
 
     def _cmd_cat(self, p: list[str]) -> str:
         if len(p) < 2:
@@ -1067,8 +1148,21 @@ class RHELShell:
         return f"{u.username} : {' '.join(names)}"
 
     def _cmd_hostname(self, p: list[str]) -> str:
-        if len(p) > 1 and p[1] in ("-f", "--fqdn"):
+        if len(p) > 1 and p[1] in ("-f", "--fqdn", "-A", "--all-fqdns"):
             return self.state.hostname + ".fixitlab.local"
+        if len(p) > 1 and p[1] in ("-I", "--all-ip-addresses", "-i", "--ip-address"):
+            # All non-loopback IPv4 addresses, space-separated, as real hostname -I.
+            ips = []
+            for name, data in self.state.network_ifs.items():
+                if name == "lo":
+                    continue
+                for a in data.get("addrs", []):
+                    ips.append(a.split("/")[0])
+            return " ".join(ips)
+        if len(p) > 1 and p[1] in ("-s", "--short"):
+            return self.state.hostname.split(".")[0]
+        if len(p) > 1 and p[1] in ("-d", "--domain"):
+            return "fixitlab.local"
         if len(p) > 1 and not p[1].startswith("-"):
             self.state.hostname = p[1]
             self.state.env["HOSTNAME"] = p[1]
@@ -1166,11 +1260,15 @@ class RHELShell:
         return ""
 
     def _cmd_systemctl(self, p: list[str]) -> str:
-        if len(p) < 2:
-            return "Unknown operation systemctl."
-        action = p[1]
-        unit = p[2] if len(p) > 2 else ""
-        unit = unit.replace(".service", "")
+        # Separate options (--failed, --type=service, --no-pager, -a, …) from the
+        # verb and unit so `systemctl --failed`, `systemctl list-units --failed`
+        # and `systemctl status sshd.service` all parse the way systemd does.
+        opts = [a for a in p[1:] if a.startswith("-")]
+        words = [a for a in p[1:] if not a.startswith("-")]
+        want_failed = "--failed" in opts
+        action = words[0] if words else ""
+        unit = words[1] if len(words) > 1 else ""
+        unit = unit.replace(".service", "").replace(".socket", "").replace(".target", "")
 
         if action in ("emergency", "rescue"):
             self.state.emergency_mode = True
@@ -1185,46 +1283,160 @@ class RHELShell:
                 "Give root password for maintenance (or type Control-D to continue): "
             )
 
-        svc = self.state.services.get(unit)
-        if not svc and action not in ("daemon-reload", "list-units"):
-            return f"Unit {unit}.service could not be found."
-
-        if action == "status" and svc:
-            active = "active (running)" if svc.active == "active" else svc.active
-            return (
-                f"● {unit}.service - {svc.description}\n"
-                f"   Loaded: {svc.loaded} (/usr/lib/systemd/system/{unit}.service; {svc.enabled})\n"
-                f"   Active: {active} since Fri 2026-06-14 10:00:00 UTC; 1h ago\n"
-                f"   Main PID: 891 ({unit})\n"
-            )
-        if action == "start" and svc:
-            svc.active = "active"
-            svc.sub_state = "running"
-            return ""
-        if action == "stop" and svc:
-            svc.active = "inactive"
-            svc.sub_state = "dead"
-            return ""
-        if action == "restart" and svc:
-            svc.active = "active"
-            svc.sub_state = "running"
-            return ""
-        if action == "enable" and svc:
-            svc.enabled = "enabled"
-            return f"Created symlink /etc/systemd/system/multi-user.target.wants/{unit}.service"
-        if action == "disable" and svc:
-            svc.enabled = "disabled"
-            return ""
-        if action == "is-active" and svc:
-            return svc.active if svc.active == "active" else "inactive"
+        # Actions that operate on the whole system (no unit) or that we resolve
+        # before requiring a known unit.
+        if action in ("", "list-units") or (not action and want_failed):
+            return self._systemctl_list_units(failed_only=want_failed)
+        if action == "list-unit-files":
+            return self._systemctl_list_unit_files()
         if action == "daemon-reload":
             return ""
         if action == "reboot":
             return self._cmd_reboot(p)
-        if action == "list-units":
-            lines = [f"  {n}.service  {s.active}  {s.description}" for n, s in self.state.services.items()]
-            return "\n".join(lines)
+        if action == "status" and not unit:
+            # Bare `systemctl status` shows a system overview, not an error.
+            return self._systemctl_overview()
+
+        svc = self.state.services.get(unit)
+        if not svc:
+            # Query verbs on an unknown unit behave like real systemd: they print
+            # a status word and exit non-zero (so `|| echo` chains still fire),
+            # rather than the hard "could not be found" error mutating verbs use.
+            if action == "is-active":
+                self.state.last_exit_code = 3
+                return "inactive"
+            if action == "is-enabled":
+                self.state.last_exit_code = 1
+                return f"Failed to get unit file state for {unit}.service: No such file or directory"
+            if action == "is-failed":
+                self.state.last_exit_code = 1
+                return "inactive"
+            if action == "status":
+                self.state.last_exit_code = 4
+                return f"Unit {unit}.service could not be found."
+            # A masked unit still reports as not-found by name here; everything
+            # else that references a real unit needs it to exist.
+            return f"Unit {unit}.service could not be found."
+
+        if action == "status":
+            dot = "●" if svc.active in ("active", "inactive") else "×"
+            if svc.active == "active":
+                active = "active (running)"
+            elif svc.active == "failed":
+                active = "failed (Result: exit-code)"
+            else:
+                active = f"inactive (dead)"
+            main = f"   Main PID: 891 ({unit})\n" if svc.active == "active" else ""
+            self.state.last_exit_code = 0 if svc.active == "active" else 3
+            return (
+                f"{dot} {unit}.service - {svc.description}\n"
+                f"   Loaded: {svc.loaded} (/usr/lib/systemd/system/{unit}.service; {svc.enabled}; preset: enabled)\n"
+                f"   Active: {active} since Fri 2026-06-14 10:00:00 UTC; 1h ago\n"
+                f"{main}"
+            )
+        if action == "start":
+            svc.active = "active"
+            svc.sub_state = "running"
+            return ""
+        if action == "stop":
+            svc.active = "inactive"
+            svc.sub_state = "dead"
+            return ""
+        if action in ("restart", "reload-or-restart", "try-restart", "reload"):
+            # reload/reload-or-restart on a running unit just re-reads config; on a
+            # stopped one, reload fails while restart starts it.
+            if action == "reload" and svc.active != "active":
+                self.state.last_exit_code = 5
+                return (f"Failed to reload {unit}.service: Job type reload is not "
+                        f"applicable for unit {unit}.service.")
+            svc.active = "active"
+            svc.sub_state = "running"
+            return ""
+        if action == "enable":
+            svc.enabled = "enabled"
+            msg = f"Created symlink /etc/systemd/system/multi-user.target.wants/{unit}.service → /usr/lib/systemd/system/{unit}.service."
+            if "--now" in opts:
+                svc.active = "active"
+                svc.sub_state = "running"
+            return msg
+        if action == "disable":
+            svc.enabled = "disabled"
+            if "--now" in opts:
+                svc.active = "inactive"
+                svc.sub_state = "dead"
+            return f"Removed \"/etc/systemd/system/multi-user.target.wants/{unit}.service\"."
+        if action == "mask":
+            svc.enabled = "masked"
+            svc.loaded = "masked"
+            return f"Created symlink /etc/systemd/system/{unit}.service → /dev/null."
+        if action == "unmask":
+            svc.enabled = "disabled"
+            svc.loaded = "loaded"
+            return f"Removed \"/etc/systemd/system/{unit}.service\"."
+        if action == "is-active":
+            self.state.last_exit_code = 0 if svc.active == "active" else 3
+            return svc.active if svc.active == "active" else "inactive"
+        if action == "is-enabled":
+            self.state.last_exit_code = 0 if svc.enabled == "enabled" else 1
+            return svc.enabled
+        if action == "is-failed":
+            failed = svc.active == "failed"
+            self.state.last_exit_code = 0 if failed else 1
+            return "failed" if failed else "active"
+        if action == "kill":
+            svc.active = "inactive"
+            svc.sub_state = "dead"
+            return ""
+        if action == "cat":
+            return (f"# /usr/lib/systemd/system/{unit}.service\n"
+                    f"[Unit]\nDescription={svc.description}\n\n"
+                    f"[Service]\nType=notify\nExecStart=/usr/sbin/{unit}\n\n"
+                    f"[Install]\nWantedBy=multi-user.target")
+        if action == "show":
+            return (f"Id={unit}.service\nNames={unit}.service\n"
+                    f"Description={svc.description}\n"
+                    f"LoadState={svc.loaded}\nActiveState={svc.active}\nSubState={svc.sub_state}\n"
+                    f"UnitFileState={svc.enabled}\nMainPID={'891' if svc.active == 'active' else '0'}")
+        if action == "list-dependencies":
+            return f"{unit}.service\n● ├─system.slice\n● └─sysinit.target"
         return f"Unknown operation '{action}'."
+
+    def _systemctl_list_units(self, failed_only: bool = False) -> str:
+        header = ("UNIT                       LOAD   ACTIVE   SUB     DESCRIPTION")
+        rows = []
+        count = 0
+        for n, s in self.state.services.items():
+            if failed_only and s.active != "failed":
+                continue
+            if not failed_only and s.active not in ("active", "failed"):
+                continue
+            bullet = "●" if s.active == "failed" else " "
+            rows.append(f"{bullet} {n + '.service':<25} {s.loaded:<6} {s.active:<8} {s.sub_state:<7} {s.description}")
+            count += 1
+        if failed_only and count == 0:
+            return "0 loaded units listed."
+        footer = ("\n\nLEGEND omitted.\n"
+                  f"{count} loaded units listed.")
+        return header + "\n" + "\n".join(rows) + footer
+
+    def _systemctl_list_unit_files(self) -> str:
+        header = "UNIT FILE                  STATE     PRESET"
+        rows = []
+        for n, s in self.state.services.items():
+            rows.append(f"{n + '.service':<26} {s.enabled:<9} enabled")
+        return header + "\n" + "\n".join(rows) + f"\n\n{len(rows)} unit files listed."
+
+    def _systemctl_overview(self) -> str:
+        active = sum(1 for s in self.state.services.values() if s.active == "active")
+        failed = sum(1 for s in self.state.services.values() if s.active == "failed")
+        return (
+            f"● {self.state.hostname}\n"
+            f"    State: {'degraded' if failed else 'running'}\n"
+            f"    Units: {len(self.state.services)} loaded "
+            f"({active} active, {failed} failed)\n"
+            f"     Jobs: 0 queued\n"
+            f"   Failed: {failed} units\n"
+        )
 
     def _cmd_service(self, p: list[str]) -> str:
         if len(p) >= 3:
@@ -1241,8 +1453,33 @@ class RHELShell:
         return "\n".join(lines)
 
     def _cmd_pgrep(self, p: list[str]) -> str:
-        name = p[-1]
-        return "\n".join(str(pr.pid) for pr in self.state.processes if name in pr.command)
+        args = [a for a in p[1:] if not a.startswith("-")]
+        if not args:
+            self.state.last_exit_code = 1
+            return ""
+        name = args[-1]
+        want_list = "-l" in p  # -l prints "pid name"
+        hits = []
+        for pr in self.state.processes:
+            proc_name = pr.command.split()[0].split("/")[-1]
+            if name in pr.command if "-f" in p else name in proc_name:
+                hits.append(f"{pr.pid} {proc_name}" if want_list else str(pr.pid))
+        if not hits:
+            self.state.last_exit_code = 1
+        return "\n".join(hits)
+
+    def _cmd_pidof(self, p: list[str]) -> str:
+        args = [a for a in p[1:] if not a.startswith("-")]
+        if not args:
+            self.state.last_exit_code = 1
+            return ""
+        name = args[0]
+        pids = [str(pr.pid) for pr in self.state.processes
+                if pr.command.split()[0].split("/")[-1] == name or name in pr.command]
+        if not pids:
+            self.state.last_exit_code = 1
+            return ""
+        return " ".join(pids)
 
     def _cmd_kill(self, p: list[str]) -> str:
         if len(p) < 2:
@@ -1255,10 +1492,319 @@ class RHELShell:
         return ""
 
     def _cmd_killall(self, p: list[str]) -> str:
-        if len(p) < 2:
-            return "killall: missing process name"
-        name = p[1]
-        self.state.processes = [pr for pr in self.state.processes if name not in pr.command]
+        args = [a for a in p[1:] if not a.startswith("-")]
+        if not args:
+            self.state.last_exit_code = 1
+            return f"{p[0]}: missing process name"
+        name = args[0]
+        matched = [pr for pr in self.state.processes
+                   if pr.command.split()[0].split("/")[-1] == name or name in pr.command]
+        if not matched:
+            self.state.last_exit_code = 1
+            return f"{name}: no process found"
+        self.state.processes = [pr for pr in self.state.processes if pr not in matched]
+        return ""
+
+    def _cmd_top(self, p: list[str]) -> str:
+        # Only batch mode (-b -n1) produces a finite dump usable in the sim; an
+        # interactive top would block. We render a realistic single frame.
+        procs = sorted(self.state.processes, key=lambda x: (-x.cpu, x.pid))
+        total = len(procs)
+        running = sum(1 for pr in procs if pr.cpu > 0)
+        header = [
+            f"top - {time.strftime('%H:%M:%S', time.gmtime())} up  1:00,  1 user,  load average: 0.08, 0.04, 0.01",
+            f"Tasks: {total:>3} total, {running:>3} running, {total - running:>3} sleeping,   0 stopped,   0 zombie",
+            "%Cpu(s):  1.3 us,  0.7 sy,  0.0 ni, 97.8 id,  0.2 wa,  0.0 hi,  0.0 si,  0.0 st",
+            "MiB Mem :  16000.0 total,  11264.0 free,   2000.0 used,   2736.0 buff/cache",
+            "MiB Swap:   8192.0 total,   8192.0 free,      0.0 used.  13312.0 avail Mem",
+            "",
+            "    PID USER      PR  NI    VIRT    RES    SHR S  %CPU  %MEM     TIME+ COMMAND",
+        ]
+        rows = []
+        for pr in procs:
+            cmd = pr.command.split()[0].split("/")[-1]
+            rows.append(
+                f"{pr.pid:>7} {pr.user:<9} 20   0   12345   6789   4096 S {pr.cpu:>5.1f} {pr.mem:>5.1f}   0:00.10 {cmd}"
+            )
+        return "\n".join(header + rows)
+
+    def _cmd_pstree(self, p: list[str]) -> str:
+        lines = ["systemd─┬─sshd───sshd"]
+        for pr in self.state.processes:
+            cmd = pr.command.split()[0].split("/")[-1]
+            if cmd in ("systemd", "sshd"):
+                continue
+            lines.append(f"        ├─{cmd}")
+        lines.append("        └─(sd-pam)")
+        return "\n".join(lines)
+
+    def _cmd_vmstat(self, p: list[str]) -> str:
+        return (
+            "procs -----------memory---------- ---swap-- -----io---- -system-- ------cpu-----\n"
+            " r  b   swpd   free   buff  cache   si   so    bi    bo   in   cs us sy id wa st\n"
+            " 1  0      0 11534336 131072 2965504    0    0    12    18  102  201  1  1 98  0  0"
+        )
+
+    def _cmd_nice(self, p: list[str]) -> str:
+        # nice [-n N] CMD ...  /  renice N -p PID. For nice we just run the wrapped
+        # command; renice acknowledges the priority change.
+        if p[0] == "renice":
+            return f"{p[-1]}: old priority 0, new priority {p[1] if len(p) > 1 else '0'}"
+        args = p[1:]
+        i = 0
+        while i < len(args) and (args[i].startswith("-n") or args[i] == "-n" or args[i].lstrip("-").lstrip("+").isdigit()):
+            if args[i] == "-n":
+                i += 2
+            else:
+                i += 1
+        rest = args[i:]
+        if not rest:
+            return "0"  # bare `nice` prints current niceness
+        return self.run(" ".join(rest))
+
+    def _cmd_uniq(self, p: list[str]) -> str:
+        count = "-c" in p
+        only_dupes = "-d" in p
+        only_uniq = "-u" in p
+        files = [a for a in p[1:] if not a.startswith("-")]
+        lines, err = self._input_lines(files, "uniq")
+        if lines is None:
+            self.state.last_exit_code = 1
+            return err
+        out = []
+        i = 0
+        while i < len(lines):
+            j = i
+            while j + 1 < len(lines) and lines[j + 1] == lines[i]:
+                j += 1
+            n = j - i + 1
+            if (only_dupes and n < 2) or (only_uniq and n > 1):
+                i = j + 1
+                continue
+            out.append(f"{n:>7} {lines[i]}" if count else lines[i])
+            i = j + 1
+        return "\n".join(out)
+
+    def _cmd_findmnt(self, p: list[str]) -> str:
+        args = [a for a in p[1:] if not a.startswith("-")]
+        rows = []
+        rows.append(("/", "/dev/mapper/rhel-root", "xfs", "rw,relatime"))
+        rows.append(("/boot", "/dev/sda2", "xfs", "rw,relatime"))
+        for mp, info in self.state.mounts.items():
+            if mp in ("/", "/boot", "[SWAP]"):
+                continue
+            rows.append((mp, info["device"], info["fstype"], "rw,relatime"))
+        if args:
+            target = args[0]
+            rows = [r for r in rows if r[0] == target or r[1] == target]
+            if not rows:
+                self.state.last_exit_code = 1
+                return ""
+        lines = ["TARGET SOURCE                 FSTYPE OPTIONS"]
+        for mp, dev, fs, opts in rows:
+            lines.append(f"{mp:<6} {dev:<22} {fs:<6} {opts}")
+        return "\n".join(lines)
+
+    def _cmd_lscpu(self, p: list[str]) -> str:
+        return (
+            "Architecture:            x86_64\n"
+            "  CPU op-mode(s):        32-bit, 64-bit\n"
+            "  Byte Order:            Little Endian\n"
+            "CPU(s):                  4\n"
+            "  On-line CPU(s) list:   0-3\n"
+            "Vendor ID:               GenuineIntel\n"
+            "  Model name:            Intel(R) Xeon(R) Platinum 8259CL CPU @ 2.50GHz\n"
+            "    CPU family:          6\n"
+            "    Model:               85\n"
+            "    Thread(s) per core:  1\n"
+            "    Core(s) per socket:  4\n"
+            "    Socket(s):           1\n"
+            "    Stepping:            7\n"
+            "    BogoMIPS:            5000.00\n"
+            "Virtualization features:\n"
+            "  Hypervisor vendor:     VMware\n"
+            "  Virtualization type:   full\n"
+            "Caches (sum of all):\n"
+            "  L1d:                   128 KiB\n"
+            "  L2:                    4 MiB\n"
+            "  L3:                    35 MiB\n"
+            "NUMA:\n"
+            "  NUMA node(s):          1\n"
+            "  NUMA node0 CPU(s):     0-3"
+        )
+
+    def _cmd_lsmod(self, p: list[str]) -> str:
+        return (
+            "Module                  Size  Used by\n"
+            "xfs                  2166784  1\n"
+            "vmw_vsock_vmci_transport    32768  1\n"
+            "vmw_vmci               90112  2 vmw_vsock_vmci_transport\n"
+            "ext4                  962560  0\n"
+            "nf_conntrack          188416  1\n"
+            "overlay               172032  0"
+        )
+
+    def _cmd_file(self, p: list[str]) -> str:
+        args = [a for a in p[1:] if not a.startswith("-")]
+        if not args:
+            return "Usage: file [OPTION...] [FILE...]"
+        out = []
+        for f in args:
+            ap = self.state.resolve_path(f)
+            if self.state.is_dir(ap):
+                out.append(f"{f}: directory")
+                continue
+            content = self.state.read_file(ap)
+            if content is None:
+                out.append(f"{f}: cannot open `{f}' (No such file or directory)")
+                self.state.last_exit_code = 1
+                continue
+            if content.startswith("#!"):
+                interp = content.splitlines()[0][2:].strip()
+                out.append(f"{f}: a {interp} script, ASCII text executable")
+            elif content == "":
+                out.append(f"{f}: empty")
+            elif all(ord(c) < 128 for c in content[:512]):
+                out.append(f"{f}: ASCII text")
+            else:
+                out.append(f"{f}: data")
+        return "\n".join(out)
+
+    def _cmd_arp(self, p: list[str]) -> str:
+        return (
+            "Address                  HWtype  HWaddress           Flags Mask            Iface\n"
+            "10.0.0.1                 ether   00:50:56:a1:b2:c3   C                     eth0"
+        )
+
+    def _cmd_route(self, p: list[str]) -> str:
+        return (
+            "Kernel IP routing table\n"
+            "Destination     Gateway         Genmask         Flags Metric Ref    Use Iface\n"
+            "default         10.0.0.1        0.0.0.0         UG    100    0        0 eth0\n"
+            "10.0.0.0        0.0.0.0         255.255.255.0   U     100    0        0 eth0"
+        )
+
+    def _cmd_ifconfig(self, p: list[str]) -> str:
+        want = p[1] if len(p) > 1 and not p[1].startswith("-") else None
+        blocks = []
+        for name, data in self.state.network_ifs.items():
+            if want and name != want:
+                continue
+            up = data.get("up", True)
+            flags = "UP,LOOPBACK,RUNNING" if name == "lo" else ("UP,BROADCAST,RUNNING,MULTICAST" if up else "BROADCAST,MULTICAST")
+            mtu = 65536 if name == "lo" else 1500
+            lines = [f"{name}: flags=<{flags}>  mtu {mtu}"]
+            for addr in data.get("addrs", []):
+                ip, _, prefix = addr.partition("/")
+                mask = "255.0.0.0" if name == "lo" else "255.255.255.0"
+                bcast = "" if name == "lo" else f"  broadcast {ip.rsplit('.', 1)[0]}.255"
+                lines.append(f"        inet {ip}  netmask {mask}{bcast}")
+            if name != "lo":
+                lines.append(f"        ether {self._nic_mac(name)}  txqueuelen 1000  (Ethernet)")
+            else:
+                lines.append("        loop  txqueuelen 1000  (Local Loopback)")
+            lines.append("        RX packets 1024  bytes 98304 (96.0 KiB)")
+            lines.append("        TX packets 512  bytes 49152 (48.0 KiB)")
+            blocks.append("\n".join(lines))
+        if want and not blocks:
+            self.state.last_exit_code = 1
+            return f"{want}: error fetching interface information: Device not found"
+        return "\n\n".join(blocks)
+
+    def _cmd_ethtool(self, p: list[str]) -> str:
+        dev = p[-1] if len(p) > 1 else "eth0"
+        if dev not in self.state.network_ifs:
+            self.state.last_exit_code = 1
+            return f"netlink error: No device matches {dev}."
+        up = self.state.network_ifs[dev].get("up", True)
+        return (
+            f"Settings for {dev}:\n"
+            "	Supported ports: [ TP ]\n"
+            "	Supported link modes:   1000baseT/Full\n"
+            "	                        10000baseT/Full\n"
+            "	Speed: 10000Mb/s\n"
+            "	Duplex: Full\n"
+            "	Auto-negotiation: on\n"
+            "	Port: Twisted Pair\n"
+            f"	Link detected: {'yes' if up else 'no'}"
+        )
+
+    def _cmd_traceroute(self, p: list[str]) -> str:
+        args = [a for a in p[1:] if not a.startswith("-")]
+        host = args[0] if args else "8.8.8.8"
+        target = self._resolve_hostname(host) if not re.match(r"^\d", host) else host
+        return (
+            f"traceroute to {host} ({target}), 30 hops max, 60 byte packets\n"
+            f" 1  _gateway (10.0.0.1)  0.412 ms  0.388 ms  0.365 ms\n"
+            f" 2  10.0.1.1 (10.0.1.1)  1.201 ms  1.180 ms  1.150 ms\n"
+            f" 3  {target} ({target})  2.401 ms  2.380 ms  2.350 ms"
+        )
+
+    def _cmd_who(self, p: list[str]) -> str:
+        return f"{self.state.current_user}  pts/0        2026-06-14 10:00 (10.0.0.5)"
+
+    def _cmd_w(self, p: list[str]) -> str:
+        clock = time.strftime("%H:%M:%S", time.gmtime())
+        return (
+            f" {clock} up  1:00,  1 user,  load average: 0.08, 0.04, 0.01\n"
+            "USER     TTY      FROM             LOGIN@   IDLE   JCPU   PCPU WHAT\n"
+            f"{self.state.current_user:<8} pts/0    10.0.0.5         10:00    0.00s  0.05s  0.00s w"
+        )
+
+    def _cmd_last(self, p: list[str]) -> str:
+        return (
+            f"{self.state.current_user:<8} pts/0        10.0.0.5         Fri Jun 14 10:00   still logged in\n"
+            "reboot   system boot  5.14.0-362.el9.x Fri Jun 14 09:58   still running\n"
+            "\nwtmp begins Fri Jun 14 09:58:00 2026"
+        )
+
+    def _cmd_hostnamectl(self, p: list[str]) -> str:
+        if len(p) > 2 and p[1] == "set-hostname":
+            self.state.hostname = p[2]
+            self.state.env["HOSTNAME"] = p[2]
+            self.state.write_file("/etc/hostname", p[2] + "\n")
+            return ""
+        return (
+            f"   Static hostname: {self.state.hostname}\n"
+            f"         Icon name: computer-vm\n"
+            f"           Chassis: vm\n"
+            f"        Machine ID: 5d5f2c1e9b8a4f6c9d0e1a2b3c4d5e6f\n"
+            f"           Boot ID: a1b2c3d4e5f60718293a4b5c6d7e8f90\n"
+            f"    Virtualization: vmware\n"
+            f"  Operating System: {self.state.os_release}\n"
+            f"       CPE OS Name: cpe:/o:redhat:enterprise_linux:9::baseos\n"
+            f"            Kernel: Linux {self.state.kernel}\n"
+            f"      Architecture: x86-64"
+        )
+
+    def _cmd_timedatectl(self, p: list[str]) -> str:
+        if len(p) > 1 and p[1] not in ("status",):
+            return ""  # set-time / set-timezone acknowledged
+        return (
+            "               Local time: Fri 2026-06-14 10:00:00 UTC\n"
+            "           Universal time: Fri 2026-06-14 10:00:00 UTC\n"
+            "                 RTC time: Fri 2026-06-14 10:00:00\n"
+            "                Time zone: UTC (UTC, +0000)\n"
+            "System clock synchronized: yes\n"
+            "              NTP service: active\n"
+            "          RTC in local TZ: no"
+        )
+
+    def _cmd_chage(self, p: list[str]) -> str:
+        if "-l" in p:
+            user = p[-1]
+            if user not in self.state.users:
+                self.state.last_exit_code = 1
+                return f"chage: user '{user}' does not exist in /etc/passwd"
+            return (
+                "Last password change                                    : Jun 14, 2026\n"
+                "Password expires                                        : never\n"
+                "Password inactive                                       : never\n"
+                "Account expires                                         : never\n"
+                "Minimum number of days between password change          : 0\n"
+                "Maximum number of days between password change          : 99999\n"
+                "Number of days of warning before password expires       : 7"
+            )
         return ""
 
     def _cmd_grep(self, p: list[str]) -> str:
@@ -1371,29 +1917,50 @@ class RHELShell:
             return ""
         return "sed: unsupported expression (use s/old/new/ file)"
 
+    @staticmethod
+    def _head_tail_count(p: list[str], default: int = 10) -> int:
+        """Resolve the line count for head/tail, accepting `-n N`, `-nN`, and the
+        classic `-N` / `-5` shorthand (e.g. `head -2`, `tail -1`)."""
+        i = 1
+        while i < len(p):
+            tok = p[i]
+            if tok == "-n" and i + 1 < len(p):
+                return int(p[i + 1].lstrip("+"))
+            if tok.startswith("-n") and tok[2:].lstrip("+").isdigit():
+                return int(tok[2:].lstrip("+"))
+            # `-2` / `-c` style: a dash followed by digits is a line count.
+            if re.fullmatch(r"-\+?\d+", tok):
+                return int(tok.lstrip("-+"))
+            i += 1
+        return default
+
     def _cmd_head(self, p: list[str]) -> str:
-        n = 10
-        if "-n" in p:
-            n = int(p[p.index("-n") + 1])
-        files = [a for a in p[1:] if not a.startswith("-") and not a.isdigit()]
+        n = self._head_tail_count(p)
+        files = [a for a in p[1:] if not a.startswith("-")]
         if not files and self._stdin_lines() is not None:
             return "\n".join(self._stdin_lines()[:n])
-        f = files[-1] if files else p[-1]
+        if not files:
+            self.state.last_exit_code = 1
+            return "head: missing operand"
+        f = files[-1]
         content = self.state.read_file(f)
         if content is None:
+            self.state.last_exit_code = 1
             return f"head: cannot open '{f}' for reading: No such file or directory"
         return "\n".join(content.splitlines()[:n])
 
     def _cmd_tail(self, p: list[str]) -> str:
-        n = 10
-        if "-n" in p:
-            n = int(p[p.index("-n") + 1].lstrip("+"))
-        files = [a for a in p[1:] if not a.startswith("-") and not a.isdigit()]
+        n = self._head_tail_count(p)
+        files = [a for a in p[1:] if not a.startswith("-")]
         if not files and self._stdin_lines() is not None:
             return "\n".join(self._stdin_lines()[-n:])
-        f = files[-1] if files else p[-1]
+        if not files:
+            self.state.last_exit_code = 1
+            return "tail: missing operand"
+        f = files[-1]
         content = self.state.read_file(f)
         if content is None:
+            self.state.last_exit_code = 1
             return f"tail: cannot open '{f}' for reading: No such file or directory"
         return "\n".join(content.splitlines()[-n:])
 
@@ -1458,7 +2025,36 @@ class RHELShell:
         return base
 
     def _cmd_free(self, p: list[str]) -> str:
-        return "               total        used        free      shared  buff/cache   available\nMem:        16384000     2048000    12000000       64000     2336000    14000000\nSwap:        4194300           0     4194300"
+        # Base figures in KiB (16 GiB RAM, 8 GiB swap) — scaled by the unit flag.
+        mem = {"total": 16 * 1024 * 1024, "used": 2 * 1024 * 1024,
+               "free": 11 * 1024 * 1024, "shared": 64 * 1024,
+               "buffcache": 3 * 1024 * 1024, "available": 13 * 1024 * 1024}
+        swap_kb = self.state.swaps.get("/dev/mapper/rhel-swap", {}).get("size", 8 * 1024 * 1024)
+        swap = {"total": swap_kb, "used": 0, "free": swap_kb}
+        human = "-h" in p or "--human" in p
+        if "-m" in p:
+            div, unit = 1024, ""
+        elif "-g" in p:
+            div, unit = 1024 * 1024, ""
+        elif "-b" in p:
+            div, unit = 1 / 1024, ""
+        else:
+            div, unit = 1, ""  # default KiB (also used as base for -h)
+
+        def cell(kb: int) -> str:
+            if human:
+                if kb >= 1024 * 1024:
+                    return f"{kb / 1024 / 1024:.1f}Gi"
+                if kb >= 1024:
+                    return f"{kb / 1024:.0f}Mi"
+                return f"{kb}Ki"
+            return str(int(kb / div))
+
+        header = "               total        used        free      shared  buff/cache   available"
+        mline = (f"Mem:    {cell(mem['total']):>12}{cell(mem['used']):>12}{cell(mem['free']):>12}"
+                 f"{cell(mem['shared']):>12}{cell(mem['buffcache']):>12}{cell(mem['available']):>12}")
+        sline = (f"Swap:   {cell(swap['total']):>12}{cell(swap['used']):>12}{cell(swap['free']):>12}")
+        return f"{header}\n{mline}\n{sline}"
 
     def _cmd_uptime(self, p: list[str]) -> str:
         now = time.time()
@@ -1489,18 +2085,35 @@ class RHELShell:
         return "Fri Jun 14 10:00:00 UTC 2026"
 
     def _cmd_which(self, p: list[str]) -> str:
-        if len(p) < 2:
+        # Serves `which`, `command -v`, and `type`. Resolves ONLY commands that
+        # are genuinely present — base coreutils/base-system binaries plus any a
+        # package install (dnf/apt/rpm) recorded — so an un-installed tool is
+        # honestly reported as not found. `command -v` prints the bare path and
+        # `type` prints "name is /path"; plain `which` prints the path.
+        prog = p[0]
+        args = [a for a in p[1:] if not a.startswith("-")]
+        if not args:
             return ""
-        binaries = {
-            "bash": "/usr/bin/bash", "systemctl": "/usr/bin/systemctl", "nginx": "/usr/sbin/nginx",
-            "useradd": "/usr/sbin/useradd", "passwd": "/usr/bin/passwd", "python3": "/usr/bin/python3",
-            "git": "/usr/bin/git", "docker": "/usr/bin/docker", "kubectl": "/usr/local/bin/kubectl",
-            "curl": "/usr/bin/curl", "vi": "/usr/bin/vi", "vim": "/usr/bin/vim", "grep": "/usr/bin/grep",
-            "sed": "/usr/bin/sed", "awk": "/usr/bin/awk", "find": "/usr/bin/find", "tar": "/usr/bin/tar",
-        }
-        if p[1] not in binaries:
+        # `command -v name` — args after stripping options start with "-v".
+        if prog == "command":
+            args = [a for a in p[2:] if not a.startswith("-")] or args
+        results = []
+        missing = False
+        for name in args:
+            path = self.state.resolve_binary(name)
+            if path is None:
+                missing = True
+                if prog == "which":
+                    results.append(f"which: no {name} in ({self.state.env['PATH']})")
+                # command -v / type print nothing for a miss.
+                continue
+            if prog == "type":
+                results.append(f"{name} is {path}")
+            else:
+                results.append(path)
+        if missing:
             self.state.last_exit_code = 1
-        return binaries.get(p[1], f"which: no {p[1]} in ({self.state.env['PATH']})")
+        return "\n".join(results)
 
     def _cmd_env(self, p: list[str]) -> str:
         return "\n".join(f"{k}={v}" for k, v in self.state.env.items())
@@ -1526,10 +2139,68 @@ class RHELShell:
         unit = ""
         if "-u" in p:
             unit = p[p.index("-u") + 1].replace(".service", "")
-        lines = [f"Jun 14 10:00:00 {self.state.hostname} systemd[1]: Started {unit or 'system'}"]
-        svc = self.state.services.get(unit)
-        if svc and svc.active == "failed":
-            lines.append(f"Jun 14 10:00:01 {self.state.hostname} {unit}[891]: Failed to start")
+        elif "--unit" in p:
+            unit = p[p.index("--unit") + 1].replace(".service", "")
+        host = self.state.hostname
+        kernel_only = "-k" in p or "--dmesg" in p
+
+        if kernel_only:
+            return "\n".join(
+                f"Jun 14 10:00:0{i} {host} kernel: {msg}"
+                for i, msg in enumerate([
+                    f"Linux version {self.state.kernel}",
+                    "Command line: BOOT_IMAGE=/vmlinuz root=/dev/mapper/rhel-root ro",
+                    "systemd[1]: Reached target Multi-User System.",
+                ])
+            )
+
+        if unit:
+            svc = self.state.services.get(unit)
+            if svc is None:
+                # journalctl on an unknown unit prints a hint, not an error.
+                return f"-- No entries --"
+            lines = [
+                f"Jun 14 10:00:00 {host} systemd[1]: Starting {svc.description}...",
+            ]
+            if svc.active == "failed":
+                lines += [
+                    f"Jun 14 10:00:01 {host} {unit}[891]: {unit}: main process exited, code=exited, status=1/FAILURE",
+                    f"Jun 14 10:00:01 {host} systemd[1]: {unit}.service: Failed with result 'exit-code'.",
+                    f"Jun 14 10:00:01 {host} systemd[1]: Failed to start {svc.description}.",
+                ]
+            elif svc.active == "active":
+                lines += [
+                    f"Jun 14 10:00:00 {host} {unit}[891]: Server startup complete.",
+                    f"Jun 14 10:00:00 {host} systemd[1]: Started {svc.description}.",
+                ]
+            else:
+                lines.append(f"Jun 14 10:00:00 {host} systemd[1]: {unit}.service: Deactivated successfully.")
+            return self._journal_tail(lines, p)
+
+        # No -u: a system-wide view (journalctl / -b / -xe / --no-pager).
+        lines = [
+            f"Jun 14 10:00:00 {host} kernel: Linux version {self.state.kernel}",
+            f"Jun 14 10:00:00 {host} systemd[1]: Reached target Basic System.",
+            f"Jun 14 10:00:00 {host} systemd[1]: Started OpenSSH server daemon.",
+            f"Jun 14 10:00:00 {host} systemd[1]: Reached target Multi-User System.",
+            f"Jun 14 10:00:01 {host} systemd[1]: Startup finished in 2.431s (kernel) + 4.102s (userspace).",
+        ]
+        for name, svc in self.state.services.items():
+            if svc.active == "failed":
+                lines.append(f"Jun 14 10:00:01 {host} systemd[1]: Failed to start {svc.description}.")
+        return self._journal_tail(lines, p)
+
+    @staticmethod
+    def _journal_tail(lines: list[str], p: list[str]) -> str:
+        """Apply -n / --lines to trim to the last N entries, like journalctl."""
+        n = None
+        for i, tok in enumerate(p):
+            if tok in ("-n", "--lines") and i + 1 < len(p) and p[i + 1].isdigit():
+                n = int(p[i + 1])
+            elif tok.startswith("-n") and tok[2:].isdigit():
+                n = int(tok[2:])
+        if n is not None:
+            lines = lines[-n:]
         return "\n".join(lines)
 
     def _cmd_dmesg(self, p: list[str]) -> str:
@@ -1541,15 +2212,28 @@ class RHELShell:
         return "\n".join(base + extra)
 
     def _cmd_ip(self, p: list[str]) -> str:
-        if len(p) > 1 and p[1] == "addr":
-            if len(p) > 2 and p[2] == "add" and len(p) > 3:
-                addr = p[3]
-                dev = "eth0"
-                if "dev" in p:
-                    dev = p[p.index("dev") + 1]
-                # Cross-tech: a NIC added in VMware appears only after the guest
-                # discovers it (a rescan). Pull it from the bridge on demand so the
-                # operator can configure the new link they just added in VMware.
+        # Parse `ip [OPTIONS] OBJECT [COMMAND]` the way real iproute2 does: strip
+        # global options and expand the ubiquitous abbreviations everyone types
+        # (ip a / ip a s / ip a s eth0 / ip -br a / ip l / ip link / ip r).
+        brief = False
+        args: list[str] = []
+        for a in p[1:]:
+            if a in ("-br", "-brief", "-o", "-oneline"):
+                brief = True
+            elif a.startswith("-"):
+                continue  # -4/-6/-c/-color/-s/-d/-human/-json etc: accepted, ignored
+            else:
+                args.append(a)
+        obj = args[0].lower() if args else "addr"
+        rest = args[1:]
+
+        # ── addr / address (a, ad, addr, address) ──
+        if obj in ("a", "ad", "addr", "address"):
+            if rest and rest[0] in ("add",) and len(rest) >= 2:
+                addr = rest[1]
+                dev = rest[rest.index("dev") + 1] if "dev" in rest else "eth0"
+                # Cross-tech: a NIC hot-added in VMware only appears after the guest
+                # discovers it — reveal it on demand so the operator can configure it.
                 if dev not in self.state.network_ifs:
                     self.state.reveal_bridge_nic()
                 if dev not in self.state.network_ifs:
@@ -1557,23 +2241,182 @@ class RHELShell:
                 if addr not in self.state.network_ifs[dev]["addrs"]:
                     self.state.network_ifs[dev]["addrs"].append(addr)
                 return ""
-            return self.state.format_ip_addr()
-        if len(p) > 1 and p[1] == "link" and len(p) > 2:
-            if p[2] == "set" and len(p) > 3:
-                dev = p[3]
+            if rest and rest[0] in ("del", "delete") and len(rest) >= 2:
+                addr = rest[1]
+                dev = rest[rest.index("dev") + 1] if "dev" in rest else "eth0"
+                ifc = self.state.network_ifs.get(dev)
+                if ifc and addr in ifc.get("addrs", []):
+                    ifc["addrs"].remove(addr)
+                return ""
+            # listing (ip a / ip a s / ip addr show [dev] NAME): reveal a NIC the
+            # operator just added in VMware so `ip a` actually shows what they added.
+            self.state.reveal_bridge_nic()
+            dev_filter = None
+            tail = [x for x in rest if x not in ("s", "sh", "show", "list", "ls", "dev")]
+            if tail:
+                dev_filter = tail[0]
+            return self._render_ip_addr(brief=brief, dev=dev_filter)
+
+        # ── link (l, li, link) ──
+        if obj in ("l", "li", "link"):
+            if rest and rest[0] == "set":
+                devtoks = [x for x in rest[1:] if x not in ("up", "down", "dev")]
+                dev = devtoks[0] if devtoks else "eth0"
+                if dev not in self.state.network_ifs:
+                    self.state.reveal_bridge_nic()
                 if dev not in self.state.network_ifs:
                     self.state.network_ifs[dev] = {"up": True, "addrs": []}
-                if "up" in p:
+                if "up" in rest:
                     self.state.network_ifs[dev]["up"] = True
-                if "down" in p:
+                if "down" in rest:
                     self.state.network_ifs[dev]["up"] = False
                 return ""
-        if len(p) > 1 and p[1] == "route" and (len(p) < 3 or p[2] == "show"):
-            return "default via 10.0.0.1 dev eth0 proto static\n10.0.0.0/24 dev eth0 proto kernel scope link src 10.0.0.10"
-        return "Usage: ip addr | ip link set dev eth0 up | ip route show"
+            self.state.reveal_bridge_nic()
+            return self._render_ip_link(brief=brief)
+
+        # ── route (r, ro, route) ──
+        if obj in ("r", "ro", "route"):
+            return ("default via 10.0.0.1 dev eth0 proto static\n"
+                    "10.0.0.0/24 dev eth0 proto kernel scope link src 10.0.0.10")
+
+        # ── neigh / arp table (n, ne, neigh) ──
+        if obj in ("n", "ne", "neigh", "neighbor", "neighbour"):
+            return "10.0.0.1 dev eth0 lladdr 00:50:56:a1:b2:c3 REACHABLE"
+
+        return ("Usage: ip [ -br ] OBJECT { COMMAND }\n"
+                "where OBJECT := { addr | link | route | neigh }")
+
+    def _nic_mac(self, name: str) -> str:
+        if name == "lo":
+            return "00:00:00:00:00:00"
+        try:
+            n = int("".join(ch for ch in name if ch.isdigit()) or "0")
+        except ValueError:
+            n = 0
+        return f"00:50:56:a1:b2:{n:02x}"
+
+    def _render_ip_addr(self, brief: bool = False, dev: str | None = None) -> str:
+        items = list(self.state.network_ifs.items())
+        if dev:
+            items = [(n, d) for n, d in items if n == dev]
+            if not items:
+                return f'Device "{dev}" does not exist.'
+        if brief:
+            lines = []
+            for name, data in items:
+                state = "UP" if data.get("up", True) else "DOWN"
+                if name == "lo":
+                    state = "UNKNOWN"
+                addrs = " ".join(data.get("addrs", []))
+                lines.append(f"{name:<12} {state:<8} {addrs}")
+            return "\n".join(lines)
+        lines = []
+        for idx, (name, data) in enumerate(self.state.network_ifs.items(), 1):
+            if dev and name != dev:
+                continue
+            up = data.get("up", True)
+            if name == "lo":
+                flags = "LOOPBACK,UP,LOWER_UP"
+            elif up:
+                flags = "BROADCAST,MULTICAST,UP,LOWER_UP"
+            else:
+                flags = "NO-CARRIER,BROADCAST,MULTICAST,UP" if data.get("addrs") else "BROADCAST,MULTICAST"
+            mtu = 65536 if name == "lo" else 1500
+            st = "UP" if up else "DOWN"
+            lines.append(f"{idx}: {name}: <{flags}> mtu {mtu} qdisc {'noqueue' if name=='lo' else 'fq_codel'} state {'UNKNOWN' if name=='lo' else st} group default")
+            lines.append(f"    link/{'loopback' if name=='lo' else 'ether'} {self._nic_mac(name)} brd ff:ff:ff:ff:ff:ff")
+            for addr in data.get("addrs", []):
+                ip, _, prefix = addr.partition("/")
+                if name == "lo":
+                    lines.append(f"    inet {ip}/{prefix or '8'} scope host {name}")
+                else:
+                    lines.append(f"    inet {ip}/{prefix or '24'} brd {ip.rsplit('.', 1)[0]}.255 scope global {name}")
+        return "\n".join(lines)
+
+    def _render_ip_link(self, brief: bool = False) -> str:
+        lines = []
+        for idx, (name, data) in enumerate(self.state.network_ifs.items(), 1):
+            up = data.get("up", True)
+            if brief:
+                lines.append(f"{name:<12} {'UP' if up else 'DOWN'}")
+                continue
+            if name == "lo":
+                flags = "LOOPBACK,UP,LOWER_UP"
+            elif up:
+                flags = "BROADCAST,MULTICAST,UP,LOWER_UP"
+            else:
+                flags = "NO-CARRIER,BROADCAST,MULTICAST,UP"
+            mtu = 65536 if name == "lo" else 1500
+            st = "UP" if up else "DOWN"
+            lines.append(f"{idx}: {name}: <{flags}> mtu {mtu} qdisc {'noqueue' if name=='lo' else 'fq_codel'} state {'UNKNOWN' if name=='lo' else st} mode DEFAULT group default")
+            lines.append(f"    link/{'loopback' if name=='lo' else 'ether'} {self._nic_mac(name)} brd ff:ff:ff:ff:ff:ff")
+        return "\n".join(lines)
+
+    # Well-known service -> (proto, port) it listens on when active. Used by
+    # ss/netstat/lsof so the socket table reflects which services are actually
+    # running on the box, exactly as a real system does.
+    _SERVICE_PORTS: dict[str, list[tuple[str, int]]] = {
+        "sshd": [("tcp", 22)],
+        "nginx": [("tcp", 80)],
+        "httpd": [("tcp", 80)],
+        "haproxy": [("tcp", 80)],
+        "mariadb": [("tcp", 3306)],
+        "mysqld": [("tcp", 3306)],
+        "postgresql": [("tcp", 5432)],
+        "redis": [("tcp", 6379)],
+        "memcached": [("tcp", 11211)],
+        "named": [("tcp", 53), ("udp", 53)],
+        "chronyd": [("udp", 123)],
+        "vsftpd": [("tcp", 21)],
+        "docker": [("tcp", 2375)],
+        "nfs-server": [("tcp", 2049)],
+    }
+
+    def _listening_sockets(self) -> list[tuple[str, int, str]]:
+        """Derive (proto, port, process) listeners from services that are active,
+        so ss/netstat honestly reflect the running system. sshd is always up."""
+        socks: list[tuple[str, int, str]] = []
+        seen: set[tuple[str, int]] = set()
+        for name, svc in self.state.services.items():
+            if svc.active != "active":
+                continue
+            for proto, port in self._SERVICE_PORTS.get(name, []):
+                if (proto, port) not in seen:
+                    seen.add((proto, port))
+                    socks.append((proto, port, name))
+        socks.sort(key=lambda s: (s[0], s[1]))
+        return socks
 
     def _cmd_ss(self, p: list[str]) -> str:
-        return "Netid State  Recv-Q Send-Q Local Address:Port Peer Address:Port\nu_str ESTAB  0      0      * 22                * *\n"
+        flags = "".join(a[1:] for a in p[1:] if a.startswith("-") and not a.startswith("--"))
+        want_tcp = "t" in flags
+        want_udp = "u" in flags
+        # Neither -t nor -u: ss shows every family (incl. unix); default listing
+        # here focuses on the internet sockets learners care about, plus unix.
+        if not want_tcp and not want_udp:
+            want_tcp = want_udp = True
+        listen_only = "l" in flags
+        show_proc = "p" in flags
+        numeric = "n" in flags  # accepted; ports are already numeric here
+        socks = self._listening_sockets()
+        header = "Netid  State   Recv-Q  Send-Q      Local Address:Port      Peer Address:Port  Process"
+        lines = [header]
+        for proto, port, proc in socks:
+            if proto == "tcp" and not want_tcp:
+                continue
+            if proto == "udp" and not want_udp:
+                continue
+            state = "LISTEN" if proto == "tcp" else "UNCONN"
+            local = f"0.0.0.0:{port}"
+            peer = "0.0.0.0:*"
+            pid = next((pr.pid for pr in self.state.processes if proc in pr.command), 891)
+            proc_col = f'users:(("{proc}",pid={pid},fd=3))' if show_proc else ""
+            lines.append(
+                f"{proto:<6} {state:<7} {'0':<7} {'0':<11} {local:>19}      {peer:<15}  {proc_col}".rstrip()
+            )
+        # A listening UDP socket for chrony's client side is UNCONN, handled above.
+        _ = (listen_only, numeric)
+        return "\n".join(lines)
 
     def _server_state(self):
         """Canonical primary/server state for remote checks from client terminals."""
@@ -1613,12 +2456,26 @@ class RHELShell:
         return f"curl: (6) Could not resolve host: {url}"
 
     def _cmd_nginx(self, p: list[str]) -> str:
+        # nginx is only a real command once its package (or an nginx scenario
+        # preset) has put the binary on the box.
+        if self.state.resolve_binary("nginx") is None:
+            self.state.last_exit_code = 127
+            return "bash: nginx: command not found"
         if len(p) > 1 and p[1] == "-t":
-            cfg = self.state.read_file("/etc/nginx/nginx.conf") or ""
+            cfg = self.state.read_file("/etc/nginx/nginx.conf")
             sites = self.state.read_file("/etc/nginx/sites-enabled/default") or ""
+            if cfg is None:
+                # Installed but no config yet — nginx bails opening the main conf.
+                self.state.last_exit_code = 1
+                return ("nginx: [emerg] open() \"/etc/nginx/nginx.conf\" failed "
+                        "(2: No such file or directory)")
             if "listn" in sites or "listn" in cfg:
-                return "nginx: [emerg] unknown directive \"listn\" in /etc/nginx/sites-enabled/default:12\nnginx: configuration file /etc/nginx/nginx.conf test failed"
-            return "nginx: the configuration file /etc/nginx/nginx.conf syntax is ok\nnginx: configuration file /etc/nginx/nginx.conf test is successful"
+                self.state.last_exit_code = 1
+                return ("nginx: [emerg] unknown directive \"listn\" in "
+                        "/etc/nginx/sites-enabled/default:12\n"
+                        "nginx: configuration file /etc/nginx/nginx.conf test failed")
+            return ("nginx: the configuration file /etc/nginx/nginx.conf syntax is ok\n"
+                    "nginx: configuration file /etc/nginx/nginx.conf test is successful")
         return "nginx: invalid option"
 
     def _cmd_pwck(self, p: list[str]) -> str:
@@ -1682,6 +2539,11 @@ class RHELShell:
             "  Arrow keys, Home/End, and command history supported in terminal."
         )
 
+    @staticmethod
+    def _assume_yes(p: list[str]) -> bool:
+        """dnf/yum honour -y / --assumeyes / -q -y etc."""
+        return any(a in ("-y", "--assumeyes") for a in p)
+
     def _cmd_dnf(self, p: list[str]) -> str:
         line = " ".join(p)
         if any(x in line for x in ("update", "upgrade")):
@@ -1697,48 +2559,265 @@ class RHELShell:
             return "Installed Packages\n" + "\n".join(
                 f"{n}.x86_64    {self._pkg_ver(n)}    @System"
                 for n in sorted(self.state.installed_packages))
-        if "install" in line:
-            names = [a for a in p[p.index("install") + 1:] if not a.startswith("-")] if "install" in p else []
+        if "install" in p:
+            names = [a for a in p[p.index("install") + 1:] if not a.startswith("-")]
             if not names:
                 return "Error: Need to pass a list of pkgs to install"
-            db = self.state.installed_packages
-            already = [n for n in names if n in db]
-            todo = [n for n in names if n not in db]
-            if not todo:
-                msg = "\n".join(f"Package {db[n]} is already installed." for n in already)
-                return f"Last metadata expiration check: 0:00:01 ago\n{msg}\nDependencies resolved.\nNothing to do.\nComplete!"
-            for n in todo:
-                db[n] = self._rpm_nvra(n)
-                # Installing a package registers the systemd unit(s) it ships so
-                # a follow-up `systemctl start/enable/status <svc>` works.
-                self.state.register_package_service(n)
-            rows = "\n".join(f" {n}    x86_64    {self._pkg_ver(n)}    rhel-9-appstream" for n in todo)
-            return (f"Last metadata expiration check: 0:00:01 ago\nDependencies resolved.\nInstalling:\n{rows}\n"
-                    f"Transaction Summary\nInstall  {len(todo)} Package(s)\n"
-                    f"Installed:\n  " + "\n  ".join(db[n] for n in todo) + "\nComplete!")
+            return self._dnf_install(names, assume_yes=self._assume_yes(p))
         if "remove" in line or "erase" in line:
             verb = "remove" if "remove" in p else "erase"
             names = [a for a in p[p.index(verb) + 1:] if not a.startswith("-")] if verb in p else []
-            db = self.state.installed_packages
-            removed = [n for n in names if db.pop(n, None) is not None]
-            if not removed:
-                return "No match for argument: " + " ".join(names) + "\nNo packages marked for removal."
-            return ("Dependencies resolved.\nRemoving:\n" + "\n".join(f" {n}" for n in removed)
-                    + f"\nRemove  {len(removed)} Package(s)\nRemoved:\n  "
-                    + "\n  ".join(removed) + "\nComplete!")
+            return self._dnf_remove(names)
         if "repolist" in line:
-            return "repo id                    status\nrhel-9-base                enabled"
+            return ("repo id                         status\n"
+                    "rhel-9-for-x86_64-baseos-rpms   enabled\n"
+                    "rhel-9-for-x86_64-appstream-rpms enabled")
+        if "info" in p:
+            names = [a for a in p[p.index("info") + 1:] if not a.startswith("-")]
+            return self._dnf_info(names)
+        if "search" in p:
+            terms = [a for a in p[p.index("search") + 1:] if not a.startswith("-")]
+            return self._dnf_search(terms)
+        if "provides" in p or "whatprovides" in p:
+            verb = "provides" if "provides" in p else "whatprovides"
+            args = [a for a in p[p.index(verb) + 1:] if not a.startswith("-")]
+            return self._dnf_provides(args)
+        if "list" in p and ("available" in line or "all" in line):
+            from .rhel_os import PACKAGE_CATALOG
+            avail = [n for n in sorted(PACKAGE_CATALOG) if n not in self.state.installed_packages]
+            lines = ["Available Packages"]
+            lines += [f"{n}.{PACKAGE_CATALOG[n].arch:<12} {self._pkg_ver(n):<20} rhel-9-appstream" for n in avail]
+            return "\n".join(lines)
+        if "clean" in p:
+            return "0 files removed"
+        if "check-update" in p:
+            return ""
+        if "makecache" in p:
+            return "Metadata cache created."
         return "dnf: command completed (simulation)"
 
+    def _dnf_info(self, names: list[str]) -> str:
+        from .rhel_os import PACKAGE_CATALOG, resolve_package_name
+        if not names:
+            self.state.last_exit_code = 1
+            return "Error: Need to pass a package name to info"
+        out = []
+        for n in names:
+            canon = resolve_package_name(n)
+            spec = PACKAGE_CATALOG.get(canon)
+            installed = canon in self.state.installed_packages or n in self.state.installed_packages
+            if spec is None and not installed:
+                out.append(f"Error: No matching Packages to list")
+                self.state.last_exit_code = 1
+                continue
+            ver = spec.version if spec else self._pkg_ver(n)
+            rel = spec.release if spec else "1.el9"
+            arch = spec.arch if spec else "x86_64"
+            summary = (spec.summary if spec and spec.summary else f"{n} package")
+            size = (spec.size_kb if spec else 512)
+            out.append(
+                f"{'Installed' if installed else 'Available'} Packages\n"
+                f"Name         : {canon}\n"
+                f"Version      : {ver}\n"
+                f"Release      : {rel}\n"
+                f"Architecture : {arch}\n"
+                f"Size         : {self._fmt_size(size)}\n"
+                f"Source       : {canon}-{ver}-{rel}.src.rpm\n"
+                f"Repository   : {'@System' if installed else 'rhel-9-appstream'}\n"
+                f"Summary      : {summary}\n"
+                f"URL          : https://www.redhat.com\n"
+                f"License      : GPLv2+\n"
+                f"Description  : {summary}"
+            )
+        return "\n\n".join(out)
+
+    def _dnf_search(self, terms: list[str]) -> str:
+        from .rhel_os import PACKAGE_CATALOG
+        if not terms:
+            return "Error: no search terms"
+        term = terms[0].lower()
+        hits = [(n, s) for n, s in PACKAGE_CATALOG.items()
+                if term in n.lower() or term in (s.summary or "").lower()]
+        if not hits:
+            return f"No matches found for: {term}"
+        lines = [f"================ Name & Summary Matched: {term} ================"]
+        for n, s in sorted(hits):
+            lines.append(f"{n}.{s.arch} : {s.summary}")
+        return "\n".join(lines)
+
+    def _dnf_provides(self, args: list[str]) -> str:
+        from .rhel_os import PACKAGE_CATALOG
+        if not args:
+            return "Error: no arguments"
+        query = args[0]
+        bname = query.rstrip("/").split("/")[-1]
+        out = []
+        for n, spec in PACKAGE_CATALOG.items():
+            for binname, binpath in spec.binaries:
+                if binpath == query or binname == bname or query in binpath:
+                    nvra = self.state.catalog_nvra(n)
+                    repo = "@System" if n in self.state.installed_packages else "rhel-9-appstream"
+                    out.append(f"{nvra} : {spec.summary}\nRepo        : {repo}\nMatched from:\nFilename    : {binpath}")
+        if not out:
+            return f"Error: No Matches found"
+        return "\n".join(out)
+
+    def _dnf_install(self, names: list[str], assume_yes: bool) -> str:
+        """Render a realistic dnf transaction and (on confirm) really install."""
+        from .rhel_os import PACKAGE_CATALOG, resolve_package_name
+        state = self.state
+        # Build the full install plan (deps first) across every requested pkg,
+        # de-duplicated, skipping anything already installed.
+        plan: list[str] = []
+        seen: set[str] = set()
+        for name in names:
+            for step in state.resolve_install_plan(name):
+                if step not in seen:
+                    seen.add(step)
+                    plan.append(step)
+        header = "Updating Subscription Management repositories.\n" \
+                 "Last metadata expiration check: 0:00:01 ago on Fri 14 Jun 2026 10:00:00 AM UTC."
+        if not plan:
+            already = [resolve_package_name(n) for n in names]
+            msg = "\n".join(
+                f"Package {state.installed_packages.get(n, self._pkg_nvra(n))} is already installed."
+                for n in already)
+            return f"{header}\n{msg}\nDependencies resolved.\nNothing to do.\nComplete!"
+
+        def _size_kb(n: str) -> int:
+            spec = PACKAGE_CATALOG.get(n)
+            return spec.size_kb if spec else 512
+
+        def _arch(n: str) -> str:
+            spec = PACKAGE_CATALOG.get(n)
+            return spec.arch if spec else "x86_64"
+
+        # Dependency-resolution table.
+        rows = [
+            "================================================================================",
+            f" {'Package':<26} {'Arch':<6} {'Version':<17} {'Repository':<19} Size",
+            "================================================================================",
+            "Installing:",
+        ]
+        repo = "rhel-9-appstream"
+        for n in plan:
+            rows.append(
+                f" {n:<26} {_arch(n):<6} {self._pkg_ver(n):<17} {repo:<19} "
+                f"{self._fmt_size(_size_kb(n))}"
+            )
+        total_kb = sum(_size_kb(n) for n in plan)
+        installed_kb = int(total_kb * 3.4)  # unpacked footprint is larger
+        rows += [
+            "",
+            "Transaction Summary",
+            "================================================================================",
+            f"Install  {len(plan)} Package{'s' if len(plan) != 1 else ''}",
+            "",
+            f"Total download size: {self._fmt_size(total_kb)}",
+            f"Installed size: {self._fmt_size(installed_kb)}",
+        ]
+        table = "\n".join(header.split("\n")) + "\nDependencies resolved.\n" + "\n".join(rows)
+
+        def _commit() -> str:
+            newly = state.install_package(names[0])
+            for extra in names[1:]:
+                newly += [x for x in state.install_package(extra) if x not in newly]
+            # newly may differ from plan if two names shared a dep; render `plan`.
+            return self._render_transaction(plan)
+
+        if not assume_yes:
+            # The shell supports a follow-up input turn (see RHELShell.run's
+            # pending_confirm handling), so pause for a genuine [y/N] answer.
+            state.pending_confirm = {
+                "on_confirm": _commit,
+                "default": "n",
+                "abort_code": 1,
+                "abort_message": "Operation aborted.",
+            }
+            return table + "\n\nIs this ok [y/N]: "
+        return table + "\n\n" + _commit()
+
+    def _render_transaction(self, plan: list[str]) -> str:
+        """Render the download/transaction-check/install/verify tail after the
+        user confirmed (or passed -y). Assumes install_package already ran."""
+        lines = ["Downloading Packages:"]
+        n_total = len(plan)
+        for idx, name in enumerate(plan, 1):
+            nvra = self.state.installed_packages.get(name, self._pkg_nvra(name))
+            lines.append(f"({idx}/{n_total}): {nvra}.rpm{'':<20} 100% |{'█' * 10}| ")
+        lines += [
+            "--------------------------------------------------------------------------------",
+            "Running transaction check",
+            "Transaction check succeeded.",
+            "Running transaction test",
+            "Transaction test succeeded.",
+            "Running transaction",
+        ]
+        step = 1
+        steps_total = n_total * 2
+        for name in plan:
+            nvra = self.state.installed_packages.get(name, self._pkg_nvra(name))
+            body = nvra.rsplit(".", 1)[0] if "." in nvra else nvra  # strip .arch
+            lines.append(f"  Installing : {body:<50} {step}/{steps_total}")
+            step += 1
+        for name in plan:
+            nvra = self.state.installed_packages.get(name, self._pkg_nvra(name))
+            body = nvra.rsplit(".", 1)[0] if "." in nvra else nvra
+            lines.append(f"  Verifying  : {body:<50} {step}/{steps_total}")
+            step += 1
+        lines.append("")
+        lines.append("Installed:")
+        for name in plan:
+            lines.append(f"  {self.state.installed_packages.get(name, self._pkg_nvra(name))}")
+        lines.append("")
+        lines.append("Complete!")
+        return "\n".join(lines)
+
+    def _dnf_remove(self, names: list[str]) -> str:
+        from .rhel_os import resolve_package_name, PACKAGE_CATALOG
+        db = self.state.installed_packages
+        removed = []
+        for n in names:
+            canon = resolve_package_name(n)
+            key = canon if canon in db else (n if n in db else None)
+            if key is None:
+                continue
+            db.pop(key, None)
+            # Drop binaries and unit(s) the package shipped.
+            spec = PACKAGE_CATALOG.get(canon)
+            if spec:
+                for bname, _ in spec.binaries:
+                    self.state.installed_binaries.pop(bname, None)
+                for unit, _ in spec.units:
+                    self.state.services.pop(unit, None)
+            removed.append(key)
+        if not removed:
+            return "No match for argument: " + " ".join(names) + "\nNo packages marked for removal."
+        return ("Dependencies resolved.\nRemoving:\n" + "\n".join(f" {n}" for n in removed)
+                + f"\nRemove  {len(removed)} Package(s)\nRemoved:\n  "
+                + "\n  ".join(removed) + "\nComplete!")
+
+    @staticmethod
+    def _fmt_size(kb: int) -> str:
+        """Render a size the way dnf does: k for < 1 MB, M otherwise."""
+        if kb < 1024:
+            return f"{kb} k"
+        return f"{kb / 1024:.1f} M"
+
+    def _pkg_nvra(self, name: str) -> str:
+        """Full NVRA for a package (catalog version if known, else a 1.0.0 stub)."""
+        return self.state.catalog_nvra(name)
+
     def _pkg_ver(self, name: str) -> str:
-        """version-release for a package (from the DB if installed, else a stub)."""
-        nvra = self.state.installed_packages.get(name) or self._rpm_nvra(name)
+        """version-release for a package (from the DB if installed, else catalog)."""
+        nvra = self.state.installed_packages.get(name) or self._pkg_nvra(name)
         # strip leading "name-" and trailing ".arch"
         body = nvra[len(name) + 1:] if nvra.startswith(name + "-") else nvra
         return body.rsplit(".", 1)[0] if "." in body else body
 
     def _rpm_nvra(self, name: str) -> str:
-        return f"{name}-1.0.0-1.el9.x86_64"
+        # Retained for compatibility; delegates to the catalog-aware version.
+        return self._pkg_nvra(name)
 
     def _cmd_rpm(self, p: list[str]) -> str:
         db = self.state.installed_packages
@@ -1748,8 +2827,11 @@ class RHELShell:
             if name.endswith(".rpm"):
                 name = name[:-4]
             name = name.split("-")[0] or "package"
-            db.setdefault(name, self._rpm_nvra(name))
-            self.state.register_package_service(name)
+            # A real rpm -i installs just that package (no dep resolution), but
+            # we route through install_package so its config/binaries/units are
+            # materialised too — matching the honest post-state contract.
+            self.state.install_package(name)
+            db.setdefault(name, self._pkg_nvra(name))
             return f"Preparing...\n   1:{name}\nComplete!"
         if "-e" in p or "--erase" in p:
             names = [a for a in p[1:] if not a.startswith("-")]
@@ -1757,15 +2839,282 @@ class RHELShell:
             if not removed and names:
                 return f"error: package {names[0]} is not installed"
             return ""
-        # -qa : list everything; -q <pkg> : query one (real wording on miss)
-        if "-qa" in p or ("-q" in p and "-a" in p):
-            return "\n".join(sorted(db.values()))
-        if "-q" in p or "--query" in p:
-            names = [a for a in p[1:] if not a.startswith("-")]
+        # Query mode. rpm bundles query sub-selectors into one -q token
+        # (-qa, -qi, -ql, -qf, -qc, -qd, -qR) or a bare -q with a following
+        # letter flag. Collapse all leading dash-letters into one flag set.
+        qflags = ""
+        for a in p[1:]:
+            if a.startswith("-") and not a.startswith("--"):
+                qflags += a[1:]
+            elif a == "--query":
+                qflags += "q"
+        names = [a for a in p[1:] if not a.startswith("-")]
+        if "q" in qflags or "--query" in p:
+            # -qa : list every installed NVRA.
+            if "a" in qflags:
+                return "\n".join(sorted(db.values()))
             if not names:
                 return "no arguments given for query"
-            return "\n".join(db.get(n, f"package {n} is not installed") for n in names)
+            # -qf FILE : which package owns this path.
+            if "f" in qflags:
+                out = []
+                for path in names:
+                    owner = self._rpm_owner(path)
+                    if owner:
+                        out.append(db.get(owner, self._pkg_nvra(owner)))
+                    else:
+                        out.append(f"file {path} is not owned by any package")
+                        self.state.last_exit_code = 1
+                return "\n".join(out)
+            out = []
+            for n in names:
+                if n not in db and self.state.resolve_binary(n) is None:
+                    out.append(f"package {n} is not installed")
+                    self.state.last_exit_code = 1
+                    continue
+                nvra = db.get(n, self._pkg_nvra(n))
+                if "i" in qflags:      # -qi : detailed info
+                    out.append(self._rpm_info(n, nvra))
+                elif "l" in qflags:    # -ql : file list
+                    out.append("\n".join(self._rpm_filelist(n)))
+                elif "R" in qflags:    # -qR : requires
+                    out.append(self._rpm_requires(n))
+                elif "c" in qflags:    # -qc : config files
+                    out.append("\n".join(self._rpm_config_files(n)) or "(contains no files)")
+                else:                  # -q : just the NVRA
+                    out.append(nvra)
+            return "\n".join(out)
+        # -V / --verify : no discrepancies in the sim.
+        if "V" in qflags or "--verify" in p:
+            return ""
         return "rpm: OK"
+
+    def _rpm_owner(self, path: str) -> str | None:
+        """Which installed catalog package owns a binary/config path (or None)."""
+        from .rhel_os import PACKAGE_CATALOG, BASE_BINARIES
+        bname = path.rstrip("/").split("/")[-1]
+        for pkg in self.state.installed_packages:
+            spec = PACKAGE_CATALOG.get(pkg)
+            if not spec:
+                continue
+            if any(bp == path or bn == bname for bn, bp in spec.binaries):
+                return pkg
+            if path in spec.config_files:
+                return pkg
+        # Base coreutils binaries are owned by their obvious package.
+        if bname in BASE_BINARIES:
+            for owner, members in {"coreutils": ("ls", "cat", "cp", "mv", "rm", "head",
+                                                 "tail", "wc", "sort", "cut", "tr", "tee",
+                                                 "du", "df", "chmod", "chown", "whoami"),
+                                   "bash": ("bash", "sh")}.items():
+                if bname in members and owner in self.state.installed_packages:
+                    return owner
+        return None
+
+    def _rpm_filelist(self, name: str) -> list[str]:
+        from .rhel_os import PACKAGE_CATALOG
+        spec = PACKAGE_CATALOG.get(name)
+        files = []
+        if spec:
+            files += [bp for _, bp in spec.binaries]
+            files += list(spec.config_files.keys())
+            files += list(spec.log_files)
+        files.append(f"/usr/share/doc/{name}")
+        files.append(f"/usr/share/licenses/{name}/LICENSE")
+        return sorted(set(files))
+
+    def _rpm_config_files(self, name: str) -> list[str]:
+        from .rhel_os import PACKAGE_CATALOG
+        spec = PACKAGE_CATALOG.get(name)
+        return sorted(spec.config_files.keys()) if spec else []
+
+    def _rpm_requires(self, name: str) -> str:
+        from .rhel_os import PACKAGE_CATALOG
+        spec = PACKAGE_CATALOG.get(name)
+        deps = spec.deps if spec else []
+        base = ["/bin/sh", "rpmlib(CompressedFileNames) <= 3.0.4-1"]
+        return "\n".join(deps + base)
+
+    def _rpm_info(self, name: str, nvra: str) -> str:
+        from .rhel_os import PACKAGE_CATALOG
+        spec = PACKAGE_CATALOG.get(name)
+        # Prefer the real installed NVRA (name-version-release.arch) so base
+        # packages like bash report their true version rather than a stub.
+        ver, rel, arch = "1.0.0", "1.el9", "x86_64"
+        body = nvra[len(name) + 1:] if nvra.startswith(name + "-") else nvra
+        if "." in body:
+            vr, arch = body.rsplit(".", 1)
+        else:
+            vr = body
+        if "-" in vr:
+            ver, rel = vr.rsplit("-", 1)
+        if spec:
+            ver, rel, arch = spec.version, spec.release, spec.arch
+        summary = spec.summary if spec and spec.summary else f"{name} package"
+        size = (spec.size_kb if spec else 512) * 1024
+        return (
+            f"Name        : {name}\n"
+            f"Version     : {ver}\n"
+            f"Release     : {rel}\n"
+            f"Architecture: {arch}\n"
+            f"Install Date: Fri 14 Jun 2026 10:00:00 AM UTC\n"
+            f"Group       : Unspecified\n"
+            f"Size        : {size}\n"
+            f"License     : GPLv2+\n"
+            f"Signature   : RSA/SHA256, Red Hat, Inc.\n"
+            f"Source RPM  : {name}-{ver}-{rel}.src.rpm\n"
+            f"Vendor      : Red Hat, Inc.\n"
+            f"URL         : https://www.redhat.com\n"
+            f"Summary     : {summary}\n"
+            f"Description :\n{summary}"
+        )
+
+    # ── Debian/Ubuntu apt parity (shares the same package catalog) ──
+    @staticmethod
+    def _apt_assume_yes(p: list[str]) -> bool:
+        return any(a in ("-y", "--yes", "--assume-yes") for a in p)
+
+    def _cmd_apt(self, p: list[str]) -> str:
+        # Subcommand is the first non-option arg after the program name.
+        args = p[1:]
+        sub = next((a for a in args if not a.startswith("-")), "")
+        if sub in ("update",):
+            return ("Hit:1 http://archive.ubuntu.com/ubuntu jammy InRelease\n"
+                    "Reading package lists... Done")
+        if sub in ("upgrade", "dist-upgrade", "full-upgrade"):
+            return ("Reading package lists... Done\n"
+                    "Building dependency tree... Done\n"
+                    "Reading state information... Done\n"
+                    "Calculating upgrade... Done\n"
+                    "0 upgraded, 0 newly installed, 0 to remove and 0 not upgraded.")
+        if sub == "install":
+            idx = args.index("install")
+            names = [a for a in args[idx + 1:] if not a.startswith("-")]
+            if not names:
+                return "E: You must give at least one package to install"
+            return self._apt_install(names, assume_yes=self._apt_assume_yes(p))
+        if sub in ("remove", "purge", "autoremove"):
+            idx = args.index(sub)
+            names = [a for a in args[idx + 1:] if not a.startswith("-")]
+            return self._apt_remove(names, verb=sub)
+        return "Reading package lists... Done"
+
+    def _apt_install(self, names: list[str], assume_yes: bool) -> str:
+        from .rhel_os import PACKAGE_CATALOG, resolve_package_name
+        state = self.state
+        plan: list[str] = []
+        requested_canon = [resolve_package_name(n) for n in names]
+        seen: set[str] = set()
+        for name in names:
+            for step in state.resolve_install_plan(name):
+                if step not in seen:
+                    seen.add(step)
+                    plan.append(step)
+        head = ("Reading package lists... Done\n"
+                "Building dependency tree... Done\n"
+                "Reading state information... Done")
+        if not plan:
+            return f"{head}\n{names[-1]} is already the newest version.\n" \
+                   "0 upgraded, 0 newly installed, 0 to remove and 0 not upgraded."
+        # apt calls the deps (packages not explicitly requested) "additional".
+        additional = [n for n in plan if n not in requested_canon]
+        newpkgs = plan
+        lines = [head]
+        if additional:
+            lines.append("The following additional packages will be installed:")
+            lines.append("  " + " ".join(additional))
+        lines.append("The following NEW packages will be installed:")
+        lines.append("  " + " ".join(newpkgs))
+
+        def _size_kb(n: str) -> int:
+            spec = PACKAGE_CATALOG.get(n)
+            return spec.size_kb if spec else 512
+
+        total_kb = sum(_size_kb(n) for n in plan)
+        disk_kb = int(total_kb * 3.4)
+        lines.append(
+            f"0 upgraded, {len(newpkgs)} newly installed, 0 to remove and 0 not upgraded."
+        )
+        lines.append(f"Need to get {self._apt_size(total_kb)} of archives.")
+        lines.append(
+            f"After this operation, {self._apt_size(disk_kb)} of additional disk space will be used."
+        )
+        body = "\n".join(lines)
+
+        def _commit() -> str:
+            for name in names:
+                state.install_package(name)
+            return self._render_apt_transaction(plan)
+
+        if not assume_yes:
+            state.pending_confirm = {
+                "on_confirm": _commit,
+                "default": "y",           # apt defaults to Yes ([Y/n])
+                "abort_code": 1,
+                "abort_message": "Abort.",
+            }
+            return body + "\nDo you want to continue? [Y/n] "
+        return body + "\n" + _commit()
+
+    def _render_apt_transaction(self, plan: list[str]) -> str:
+        from .rhel_os import PACKAGE_CATALOG
+        lines = []
+        n_total = len(plan)
+        for idx, name in enumerate(plan, 1):
+            spec = PACKAGE_CATALOG.get(name)
+            ver = spec.version if spec else "1.0.0"
+            lines.append(
+                f"Get:{idx} http://archive.ubuntu.com/ubuntu jammy/main amd64 "
+                f"{name} amd64 {ver} [{self._apt_size((spec.size_kb if spec else 512))}]"
+            )
+        lines.append("Fetched archives in 1s")
+        for name in plan:
+            spec = PACKAGE_CATALOG.get(name)
+            ver = spec.version if spec else "1.0.0"
+            lines.append(f"Selecting previously unselected package {name}.")
+            lines.append(f"Unpacking {name} ({ver}) ...")
+        for name in plan:
+            spec = PACKAGE_CATALOG.get(name)
+            ver = spec.version if spec else "1.0.0"
+            lines.append(f"Setting up {name} ({ver}) ...")
+        lines.append("Processing triggers for man-db (2.10.2-1) ...")
+        lines.append("Processing triggers for libc-bin (2.35-0ubuntu3) ...")
+        return "\n".join(lines)
+
+    def _apt_remove(self, names: list[str], verb: str) -> str:
+        from .rhel_os import resolve_package_name, PACKAGE_CATALOG
+        db = self.state.installed_packages
+        removed = []
+        for n in names:
+            canon = resolve_package_name(n)
+            key = canon if canon in db else (n if n in db else None)
+            if key is None:
+                continue
+            db.pop(key, None)
+            spec = PACKAGE_CATALOG.get(canon)
+            if spec:
+                for bname, _ in spec.binaries:
+                    self.state.installed_binaries.pop(bname, None)
+                for unit, _ in spec.units:
+                    self.state.services.pop(unit, None)
+            removed.append(key)
+        head = ("Reading package lists... Done\n"
+                "Building dependency tree... Done\n"
+                "Reading state information... Done")
+        if not removed:
+            return f"{head}\nE: Unable to locate package {' '.join(names)}"
+        word = "purged" if verb == "purge" else "removed"
+        return (f"{head}\nThe following packages will be REMOVED:\n"
+                f"  {' '.join(removed)}\n"
+                f"0 upgraded, 0 newly installed, {len(removed)} to remove and 0 not upgraded.\n"
+                + "\n".join(f"Removing {n} ...\n({word})" for n in removed))
+
+    @staticmethod
+    def _apt_size(kb: int) -> str:
+        """apt reports sizes in kB / MB (decimal-ish, matching apt's wording)."""
+        if kb < 1000:
+            return f"{kb} kB"
+        return f"{kb / 1024:.1f} MB"
 
     def _cmd_docker(self, p: list[str]) -> str:
         if len(p) < 2:
@@ -1861,13 +3210,72 @@ class RHELShell:
         return "pip 23.2.1 from /usr/lib/python3.11/site-packages/pip"
 
     def _cmd_find(self, p: list[str]) -> str:
-        path = p[-1] if len(p) > 1 else "."
-        ap = self.state.resolve_path(path)
-        results = []
-        for fp in sorted(self.state.vfs):
-            if fp.startswith(ap.rstrip("/")) or ap == "/":
-                results.append(fp)
-        return "\n".join(results[:50])
+        # find [PATH...] [EXPR]. Parse the leading path(s), then the -name /
+        # -iname / -type / -maxdepth predicates that learners actually use.
+        import fnmatch
+        args = p[1:]
+        paths: list[str] = []
+        name_pat = None
+        iname_pat = None
+        type_filter = None
+        maxdepth = None
+        i = 0
+        # Leading operands until the first predicate (a token starting with -).
+        while i < len(args) and not args[i].startswith("-"):
+            paths.append(args[i])
+            i += 1
+        while i < len(args):
+            tok = args[i]
+            if tok in ("-name",) and i + 1 < len(args):
+                name_pat = args[i + 1]; i += 2; continue
+            if tok in ("-iname",) and i + 1 < len(args):
+                iname_pat = args[i + 1]; i += 2; continue
+            if tok == "-type" and i + 1 < len(args):
+                type_filter = args[i + 1]; i += 2; continue
+            if tok == "-maxdepth" and i + 1 < len(args):
+                maxdepth = int(args[i + 1]) if args[i + 1].isdigit() else None; i += 2; continue
+            # -print / other predicates: ignored (default action is print).
+            i += 1
+        if not paths:
+            paths = ["."]
+
+        results: list[str] = []
+        for path in paths:
+            base = self.state.resolve_path(path)
+            base_norm = base.rstrip("/") or "/"
+            # Collect every dir and file under (and including) base.
+            candidates: set[str] = set()
+            if self.state.file_exists(base_norm) or self.state.is_dir(base_norm):
+                candidates.add(base_norm)
+            prefix = base_norm + "/" if base_norm != "/" else "/"
+            for fp in self.state.vfs:
+                if fp == base_norm or fp.startswith(prefix) or base_norm == "/":
+                    candidates.add(fp)
+                    # Add implicit parent directories too.
+                    parts = fp.split("/")
+                    for k in range(1, len(parts)):
+                        candidates.add("/".join(parts[:k]) or "/")
+            for cand in candidates:
+                if base_norm != "/" and cand != base_norm and not cand.startswith(prefix):
+                    continue
+                if maxdepth is not None:
+                    depth = cand[len(base_norm):].count("/") if base_norm != "/" else cand.count("/")
+                    if depth > maxdepth:
+                        continue
+                is_dir = self.state.is_dir(cand)
+                if type_filter == "f" and is_dir:
+                    continue
+                if type_filter == "d" and not is_dir:
+                    continue
+                bname = cand.split("/")[-1] or "/"
+                if name_pat is not None and not fnmatch.fnmatch(bname, name_pat):
+                    continue
+                if iname_pat is not None and not fnmatch.fnmatch(bname.lower(), iname_pat.lower()):
+                    continue
+                results.append(cand if base_norm != "." else cand)
+        results = sorted(set(results))
+        # Real find prints nothing (exit 0) when there are no matches.
+        return "\n".join(results)
 
     def _cmd_awk(self, p: list[str]) -> str:
         """Support the common awk forms: `{print $N}`, `-F sep`, and `/pat/`.
@@ -2116,9 +3524,79 @@ class RHELShell:
         return "success"
 
     def _cmd_nmcli(self, p: list[str]) -> str:
-        if "connection" in p and "show" in p:
-            return "NAME    UUID                                  TYPE      DEVICE\neth0    abc-123                               ethernet  eth0"
-        return "nmcli: OK"
+        # Real nmcli accepts abbreviated objects (dev/device, con/connection,
+        # gen/general, net/networking) and terse `-t -f FIELD` output.
+        args = [a for a in p[1:] if not a.startswith("-")]
+        terse = "-t" in p
+        obj = args[0] if args else ""
+        sub = args[1] if len(args) > 1 else ""
+
+        def ifaces():
+            return [(n, d) for n, d in self.state.network_ifs.items() if n != "lo"]
+
+        # nmcli device / dev [status]
+        if obj in ("d", "dev", "device"):
+            if sub in ("", "status"):
+                lines = [] if terse else ["DEVICE  TYPE      STATE                   CONNECTION"]
+                lines.append("lo      loopback  connected (externally)  lo" if not terse
+                             else "lo:loopback:connected (externally):lo")
+                for name, data in ifaces():
+                    state = "connected" if data.get("up", True) else "disconnected"
+                    conn = name if data.get("up", True) else "--"
+                    if terse:
+                        lines.append(f"{name}:ethernet:{state}:{conn}")
+                    else:
+                        lines.append(f"{name:<7} ethernet  {state:<23} {conn}")
+                return "\n".join(lines)
+            if sub == "show":
+                dev = args[2] if len(args) > 2 else (ifaces()[0][0] if ifaces() else "eth0")
+                data = self.state.network_ifs.get(dev, {})
+                addr = (data.get("addrs") or ["10.0.0.10/24"])[0]
+                return (f"GENERAL.DEVICE:                         {dev}\n"
+                        f"GENERAL.TYPE:                           ethernet\n"
+                        f"GENERAL.STATE:                          100 (connected)\n"
+                        f"IP4.ADDRESS[1]:                         {addr}\n"
+                        f"IP4.GATEWAY:                            10.0.0.1")
+
+        # nmcli connection / con [show]
+        if obj in ("c", "con", "connection"):
+            if sub in ("", "show"):
+                if terse:
+                    fields = []
+                    if "-f" in p:
+                        fields = p[p.index("-f") + 1].split(",")
+                    rows = []
+                    for name, _ in ifaces():
+                        vals = {"NAME": name, "UUID": f"abc-{name}", "TYPE": "ethernet", "DEVICE": name}
+                        rows.append(":".join(vals.get(f, "") for f in fields) if fields
+                                    else f"{name}:abc-{name}:ethernet:{name}")
+                    return "\n".join(rows)
+                lines = ["NAME    UUID                                  TYPE      DEVICE"]
+                for name, _ in ifaces():
+                    lines.append(f"{name:<7} abc-{name}-0000-0000-0000-000000000000  ethernet  {name}")
+                return "\n".join(lines)
+            if sub in ("up", "down") and len(args) > 2:
+                dev = args[2]
+                if dev in self.state.network_ifs:
+                    self.state.network_ifs[dev]["up"] = (sub == "up")
+                verb = "activated" if sub == "up" else "deactivated"
+                return f"Connection successfully {verb} (D-Bus active path: /org/freedesktop/NetworkManager/ActiveConnection/1)"
+
+        # nmcli general status / gen
+        if obj in ("g", "gen", "general"):
+            if terse:
+                return "connected:full:enabled:enabled:enabled:enabled"
+            return ("STATE      CONNECTIVITY  WIFI-HW  WIFI     WWAN-HW  WWAN\n"
+                    "connected  full          enabled  enabled  enabled  enabled")
+
+        # nmcli networking / net
+        if obj in ("n", "net", "networking"):
+            return "enabled"
+
+        # bare `nmcli` prints the same overview as `nmcli general status` region + devices
+        if not obj:
+            return self._cmd_nmcli(["nmcli", "device", "status"])
+        return f"Error: object '{obj}' is unknown, try 'nmcli help'."
 
     def _cmd_dracut(self, p: list[str]) -> str:
         self.state.initramfs_fixed = True
@@ -2297,10 +3775,55 @@ class RHELShell:
         return "\n".join(lines)
 
     def _cmd_netstat(self, p: list[str]) -> str:
-        return "Active Internet connections\nProto Recv-Q Send-Q Local Address           Foreign Address         State\ntcp        0      0 0.0.0.0:22              0.0.0.0:*               LISTEN\ntcp        0      0 0.0.0.0:80              0.0.0.0:*               LISTEN"
+        flags = "".join(a[1:] for a in p[1:] if a.startswith("-") and not a.startswith("--"))
+        want_tcp = "t" in flags
+        want_udp = "u" in flags
+        if not want_tcp and not want_udp:
+            want_tcp = want_udp = True
+        show_proc = "p" in flags
+        socks = self._listening_sockets()
+        lines = [
+            "Active Internet connections (only servers)",
+            "Proto Recv-Q Send-Q Local Address           Foreign Address         State"
+            + ("       PID/Program name" if show_proc else ""),
+        ]
+        for proto, port, proc in socks:
+            if proto == "tcp" and not want_tcp:
+                continue
+            if proto == "udp" and not want_udp:
+                continue
+            state = "LISTEN" if proto == "tcp" else ""
+            local = f"0.0.0.0:{port}"
+            pid = next((pr.pid for pr in self.state.processes if proc in pr.command), 891)
+            prog = f"       {pid}/{proc}" if show_proc else ""
+            lines.append(
+                f"{proto:<6}{'0':>6}{'0':>7} {local:<23} {'0.0.0.0:*':<23} {state:<11}{prog}".rstrip()
+            )
+        return "\n".join(lines)
 
     def _cmd_lsof(self, p: list[str]) -> str:
-        return "COMMAND   PID USER   FD   TYPE DEVICE SIZE/OFF NODE NAME\nsshd      412 root    3u  IPv4  12345      0t0  TCP *:22 (LISTEN)"
+        # lsof -i / lsof -i :PORT — list the internet sockets held by running
+        # services. A bare port filter (-i :80) narrows to that port.
+        args = " ".join(p[1:])
+        port_filter = None
+        m = re.search(r":(\d+)", args)
+        if m:
+            port_filter = int(m.group(1))
+        lines = ["COMMAND   PID USER   FD   TYPE DEVICE SIZE/OFF NODE NAME"]
+        for proto, port, proc in self._listening_sockets():
+            if port_filter is not None and port != port_filter:
+                continue
+            if proto != "tcp":
+                continue
+            pid = next((pr.pid for pr in self.state.processes if proc in pr.command), 891)
+            lines.append(
+                f"{proc:<9} {pid:<4} root   3u  IPv4  {12000 + port:<5}      0t0  TCP *:{port} (LISTEN)"
+            )
+        if len(lines) == 1 and port_filter is not None:
+            # Nothing bound there — lsof -i prints nothing and exits 1.
+            self.state.last_exit_code = 1
+            return ""
+        return "\n".join(lines)
 
     def _cmd_mount(self, p: list[str]) -> str:
         if "-a" in p:
@@ -2818,14 +4341,86 @@ class RHELShell:
         return f"{p[-1]}: simulated copy complete"
 
     def _cmd_ping(self, p: list[str]) -> str:
-        host = p[1] if len(p) > 1 else "localhost"
-        if host in ("localhost", "127.0.0.1") or host in getattr(self, "_host_ips", {}):
-            return (
-                f"PING {host} ({host if host != 'localhost' else '127.0.0.1'}) 56(84) bytes of data.\n"
-                f"64 bytes from {host}: icmp_seq=1 ttl=64 time=0.3 ms\n"
-                f"--- {host} ping statistics ---\n1 packets transmitted, 1 received, 0% packet loss"
-            )
-        return f"ping: {host}: Name or service not known"
+        # Parse flags the way iputils does, accepting both `-c 3` and glued `-c3`,
+        # plus -W/-w/-i/-s/-t with values. The first non-flag token is the host.
+        count = 4
+        host = None
+        i = 1
+        while i < len(p):
+            tok = p[i]
+            if tok.startswith("-") and len(tok) > 1:
+                opt = tok[1]
+                val = tok[2:]
+                if opt in "cWwistM":
+                    if not val and i + 1 < len(p):
+                        val = p[i + 1]
+                        i += 1
+                    if opt == "c" and val.isdigit():
+                        count = int(val)
+                # -n / -q / -4 / -6 etc take no value.
+                i += 1
+                continue
+            if host is None:
+                host = tok
+            i += 1
+        if host is None:
+            self.state.last_exit_code = 2
+            return ("Usage: ping [-aAbBdCDfhLnOqrRUvV64] [-c count] [-i interval] ...\n"
+                    "            [-w deadline] [-W timeout] destination")
+
+        # Resolve the target: localhost, our own IP, a known lab peer, or a public
+        # host (in a lab the box has egress). Only garbage names fail to resolve.
+        target_ip = None
+        if host in ("localhost", "127.0.0.1", "::1"):
+            target_ip = "127.0.0.1"
+        elif host in getattr(self, "_host_ips", {}):
+            target_ip = getattr(self, "_host_ips")[host]
+        else:
+            own = []
+            for data in self.state.network_ifs.values():
+                for a in data.get("addrs", []):
+                    own.append(a.split("/")[0])
+            if host in own:
+                target_ip = host
+            elif re.match(r"^\d{1,3}(\.\d{1,3}){3}$", host):
+                target_ip = host  # any dotted-quad is reachable in the lab
+            elif "." in host and " " not in host:
+                # A hostname (google.com, gateway) resolves via DNS in the lab.
+                target_ip = self._resolve_hostname(host)
+
+        if target_ip is None:
+            self.state.last_exit_code = 2
+            return f"ping: {host}: Name or service not known"
+        lines = [f"PING {host} ({target_ip}) 56(84) bytes of data."]
+        rtts = []
+        for seq in range(1, count + 1):
+            rtt = round(0.2 + seq * 0.05, 3)
+            rtts.append(rtt)
+            lines.append(f"64 bytes from {target_ip}: icmp_seq={seq} ttl=64 time={rtt} ms")
+        lines.append(f"\n--- {host} ping statistics ---")
+        lines.append(
+            f"{count} packets transmitted, {count} received, 0% packet loss, "
+            f"time {count * 1000 - 1}ms"
+        )
+        lines.append(
+            f"rtt min/avg/max/mdev = {min(rtts):.3f}/{sum(rtts) / len(rtts):.3f}/{max(rtts):.3f}/0.020 ms"
+        )
+        return "\n".join(lines)
+
+    def _resolve_hostname(self, host: str) -> str:
+        """Best-effort DNS in the lab: known aliases -> deterministic IPs."""
+        aliases = {
+            "localhost": "127.0.0.1",
+            "google.com": "142.250.72.14",
+            "www.google.com": "142.250.72.14",
+            "redhat.com": "23.185.0.2",
+            "github.com": "140.82.112.3",
+        }
+        if host in aliases:
+            return aliases[host]
+        # Deterministic public-looking A record for anything else.
+        h = sum(ord(c) for c in host)
+        return f"93.184.{h % 256}.{(h * 7) % 254 + 1}"
 
     # ── Core coreutils / text tools ──────────────────────────────────
 
@@ -3028,10 +4623,11 @@ class RHELShell:
                     rendered = rendered.replace(k, v)
                 out.append(rendered)
             else:
+                sym = self._mode_symbolic(mode)
                 out.append(
                     f"  File: {f}\n"
                     f"  Size: {size:<15} Blocks: 8          IO Block: 4096   {ftype}\n"
-                    f"Access: (0{mode}/{'d' if is_dir else '-'}rwxr-xr-x)  Uid: (    0/{owner:>6})   Gid: (    0/{group:>6})\n"
+                    f"Access: (0{mode.lstrip('0').rjust(3, '0')}/{'d' if is_dir else '-'}{sym})  Uid: (    0/{owner:>6})   Gid: (    0/{group:>6})\n"
                     f"Access: 2026-06-14 10:00:00.000000000 +0000\n"
                     f"Modify: 2026-06-14 10:00:00.000000000 +0000\n"
                     f"Change: 2026-06-14 10:00:00.000000000 +0000"

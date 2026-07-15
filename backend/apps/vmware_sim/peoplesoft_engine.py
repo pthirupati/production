@@ -175,6 +175,144 @@ def _ib_service(name: str, *, active: bool = True, operations: list[str] | None 
     }
 
 
+# ---------------------------------------------------------------------------
+# Employee Self-Service (ESS) records — the Fluid self-service pages read these
+# keyed off the signed-in operator's OPRID. Each operator maps 1:1 to an
+# EMPLID with Job Data, an open-enrollment Benefits event, and a paycheck.
+# ---------------------------------------------------------------------------
+
+# Health plans available in the open-enrollment catalog (Benefits eBenefits).
+def _health_plan(plan_id: str, name: str, *, deductible: str, oop: str, premium: str) -> dict:
+    return {"id": plan_id, "name": name, "deductible": deductible, "oop": oop, "premium": premium}
+
+
+_BENEFITS_STEPS = [
+    {"key": "personal", "label": "Personal Information"},
+    {"key": "health", "label": "Health Benefits"},
+    {"key": "life", "label": "Life and AD&D"},
+    {"key": "disability", "label": "Disability"},
+    {"key": "savings", "label": "Savings"},
+    {"key": "review", "label": "Review and Submit"},
+]
+
+
+def _ss_profile(oprid: str, *, empl_id: str, name: str, job: dict,
+                paycheck: dict, benefits: dict) -> dict:
+    """A self-service record for one operator (OPRID -> EMPLID)."""
+    return {
+        "oprid": oprid,
+        "empl_id": empl_id,
+        "name": name,
+        "job": dict(job),
+        "paycheck": dict(paycheck),
+        "benefits": dict(benefits),
+    }
+
+
+def _base_self_service() -> dict:
+    """ESS records keyed by OPRID. Presets/actions mutate these in place."""
+    return {
+        "benefit_plans": [
+            _health_plan("ppo", "PPO Select", deductible="$1,500", oop="$6,000", premium="$142/mo"),
+            _health_plan("hdhp", "HDHP + HSA", deductible="$3,000", oop="$7,500", premium="$98/mo"),
+            _health_plan("hmo", "HMO Classic", deductible="$500", oop="$4,000", premium="$165/mo"),
+        ],
+        "benefit_steps": [dict(s) for s in _BENEFITS_STEPS],
+        "profiles": {
+            "PS": _ss_profile(
+                "PS", empl_id="00000001", name="PeopleSoft Super User",
+                job={
+                    "company": "FIXIT", "business_unit": "CORP", "department": "IT Security",
+                    "location": "Bengaluru", "job_code": "SYSADMIN", "job_title": "Systems Administrator",
+                    "reports_to": "IT Director", "fte": "1.0", "pay_group": "MONTHLY",
+                    "tax_location": "IN-BLR", "pay_frequency": "Semi-monthly", "salary_plan": "IND-IT-01",
+                    "grade": "G13", "comp_rate": "₹96,000/mo", "benefits_program": "FIXIT-IND",
+                    "status": "Active", "hire_date": "2020-01-06", "service_date": "2020-01-06",
+                    "reg_temp": "Regular", "effective_date": "2020-01-06",
+                },
+                paycheck=_paycheck_defaults(net=3620.15, ytd=48210.0),
+                benefits=_benefits_defaults(elected="ppo"),
+            ),
+            "HCMADMIN": _ss_profile(
+                "HCMADMIN", empl_id="00001234", name="HCM Admin",
+                job={
+                    "company": "FIXIT", "business_unit": "ITOPS", "department": "Infrastructure",
+                    "location": "Hyderabad", "job_code": "HRADMIN", "job_title": "HCM Administrator",
+                    "reports_to": "HR Director", "fte": "1.0", "pay_group": "MONTHLY",
+                    "tax_location": "IN-HYD", "pay_frequency": "Semi-monthly", "salary_plan": "IND-HR-01",
+                    "grade": "G12", "comp_rate": "₹85,000/mo", "benefits_program": "FIXIT-IND",
+                    "status": "Active", "hire_date": "2022-03-15", "service_date": "2022-03-15",
+                    "reg_temp": "Regular", "effective_date": "2026-01-01",
+                },
+                paycheck=_paycheck_defaults(net=3432.25, ytd=41287.5),
+                benefits=_benefits_defaults(elected="ppo"),
+            ),
+            "FINUSER": _ss_profile(
+                "FINUSER", empl_id="00002468", name="Finance User",
+                job={
+                    "company": "FIXIT", "business_unit": "FIN", "department": "Accounts Payable",
+                    "location": "Pune", "job_code": "APCLERK", "job_title": "AP Analyst",
+                    "reports_to": "Controller", "fte": "1.0", "pay_group": "BIWEEKLY",
+                    "tax_location": "IN-PUN", "pay_frequency": "Bi-weekly", "salary_plan": "IND-FIN-01",
+                    "grade": "G10", "comp_rate": "₹68,000/mo", "benefits_program": "FIXIT-IND",
+                    "status": "Active", "hire_date": "2023-07-01", "service_date": "2023-07-01",
+                    "reg_temp": "Regular", "effective_date": "2026-01-01",
+                },
+                paycheck=_paycheck_defaults(net=2810.0, ytd=33720.0),
+                benefits=_benefits_defaults(elected="hmo"),
+            ),
+        },
+    }
+
+
+def _paycheck_defaults(*, net: float, ytd: float) -> dict:
+    return {
+        "company": "FixitLab India Pvt Ltd",
+        "period_start": "2026-06-01",
+        "period_end": "2026-06-15",
+        "pay_date": "2026-06-20",
+        "earnings": [
+            {"type": "Regular Pay", "hours": 80, "amount": 4250.0},
+            {"type": "Overtime", "hours": 4, "amount": 318.75},
+        ],
+        "taxes": [
+            {"type": "Federal Income Tax", "amount": -612.0},
+            {"type": "State Income Tax", "amount": -198.5},
+        ],
+        "deductions": [
+            {"type": "401(k)", "amount": -255.0},
+            {"type": "Medical PPO", "amount": -71.0},
+        ],
+        "net_pay": net,
+        "ytd_net": ytd,
+        "deposit": "HDFC ****4821",
+    }
+
+
+def _benefits_defaults(*, elected: str) -> dict:
+    return {
+        "event": "Open Enrollment",
+        "event_status": "Open",       # Open | Submitted
+        "elected_plan": elected,       # currently elected health plan id
+        "submitted_plan": "",          # plan id captured at submit time
+        "submitted_at": "",
+    }
+
+
+def _find_profile(world: dict, oprid: str) -> dict | None:
+    """Self-service record for an OPRID, falling back to the PS super user."""
+    ss = world.get("self_service") or {}
+    profiles = ss.get("profiles") or {}
+    uid = (oprid or "").strip()
+    if uid and uid in profiles:
+        return profiles[uid]
+    # case-insensitive match
+    for key, prof in profiles.items():
+        if key.lower() == uid.lower():
+            return prof
+    return None
+
+
 def _base_world() -> dict:
     """The realistic base PeopleSoft environment used by every scenario."""
     return {
@@ -280,6 +418,8 @@ def _base_world() -> dict:
                             operations=["USER_PROFILE.VERSION_84"]),
             ],
         },
+        # Employee Self-Service (Fluid pages) — records keyed by OPRID.
+        "self_service": _base_self_service(),
         "events": [],
     }
 
@@ -385,6 +525,64 @@ def _user_permissions(world: dict, user: dict) -> set[str]:
 
 def _current_user(world: dict) -> dict | None:
     return _find_user(world, world.get("session", {}).get("oprid") or "PS")
+
+
+def _enqueue_run(world: dict, state: dict, name: str, *, status: str = "queued",
+                 server: str = "PSUNX", process_type: str = "Application Engine",
+                 run_control: str = "", message: str = "") -> dict:
+    """Enqueue a Process Scheduler run (self-service submissions land here).
+
+    Reuses the existing process.runs model + next_instance counter so the
+    Process Monitor and the rerun/cancel plumbing pick the new run up
+    automatically. Returns the created run dict.
+    """
+    proc = world["process"]
+    inst = proc["next_instance"]
+    proc["next_instance"] = inst + 1
+    run = _process_run(inst, name, status, server=server, process_type=process_type,
+                       run_control=run_control or name.lower(), message=message)
+    # Stamp a wall-clock epoch so non-terminal runs can advance queued ->
+    # running -> success over real time in get_state (see _advance_lifecycle).
+    if run["status"] in ("queued", "running"):
+        run["enqueued_epoch"] = time.time()
+    proc["runs"].insert(0, run)
+    return run
+
+
+# Wall-clock lifecycle thresholds (seconds) for self-service background jobs.
+_RUN_TO_RUNNING_S = 4
+_RUN_TO_SUCCESS_S = 9
+
+
+def _advance_lifecycle(world: dict) -> bool:
+    """Advance queued/running Process Scheduler runs on wall-clock time.
+
+    Self-service submissions enqueue runs; over real elapsed time they move
+    queued -> running -> success so the Process Monitor updates without any
+    extra learner action. Returns True if any run changed (so the caller can
+    persist). Runs without an enqueued_epoch (the preset's broken 'error' run,
+    or already-terminal seed data) are left untouched.
+    """
+    changed = False
+    now = time.time()
+    for run in world.get("process", {}).get("runs", []):
+        if run.get("status") not in ("queued", "running"):
+            continue
+        epoch = run.get("enqueued_epoch")
+        if epoch is None:
+            continue
+        elapsed = now - float(epoch)
+        if elapsed >= _RUN_TO_SUCCESS_S and run["status"] != "success":
+            run["status"] = "success"
+            run["distribution"] = "Posted"
+            run["message"] = ""
+            run["run_datetime"] = _now_iso()
+            run.pop("enqueued_epoch", None)
+            changed = True
+        elif elapsed >= _RUN_TO_RUNNING_S and run["status"] == "queued":
+            run["status"] = "running"
+            changed = True
+    return changed
 
 
 # ---------------------------------------------------------------------------
@@ -535,6 +733,10 @@ def _ensure_session(session_id: str, scenario_slug: str = "") -> dict:
 
 def get_state(session_id: str, scenario_slug: str = "") -> dict:
     entry = _ensure_session(session_id, scenario_slug)
+    # Advance any queued/running self-service jobs on wall-clock, then persist
+    # so the Process Monitor reflects the progression across polls/workers.
+    if _advance_lifecycle(entry["state"]["world"]):
+        _save_session(str(session_id), entry)
     state = copy.deepcopy(entry["state"])
     world = state["world"]
     goal = state.get("goal", {})
@@ -553,6 +755,10 @@ def get_state(session_id: str, scenario_slug: str = "") -> dict:
             req = comp.get("require_permission")
             accessible[comp["id"]] = (not req) or (req in held)
 
+    # Self-service record for the signed-in operator (Fluid pages read this).
+    current_oprid = world["session"].get("oprid", "PS")
+    ess_profile = _find_profile(world, current_oprid)
+
     return {
         "session_id": str(session_id),
         "scenario_slug": entry.get("scenario_slug") or scenario_slug,
@@ -560,11 +766,13 @@ def get_state(session_id: str, scenario_slug: str = "") -> dict:
         "goal": goal,
         "events": world.get("events", []),
         "access": accessible,
+        # Self-service record for the signed-in operator (Fluid pages read this).
+        "ess_profile": ess_profile,
         "summary": {
             "env": world["env"]["name"],
             "peopletools": world["env"]["peopletools"],
             "logged_in": world["session"].get("logged_in", False),
-            "current_oprid": world["session"].get("oprid", "PS"),
+            "current_oprid": current_oprid,
             "current_component": world["portal"].get("current_component"),
             "breadcrumb": world["portal"].get("current_path", []),
             "modules_total": len(world["portal"]["modules"]),
@@ -572,6 +780,7 @@ def get_state(session_id: str, scenario_slug: str = "") -> dict:
             "process_runs_total": len(proc["runs"]),
             "process_runs_error": sum(1 for r in proc["runs"] if r["status"] == "error"),
             "process_runs_success": sum(1 for r in proc["runs"] if r["status"] == "success"),
+            "process_runs_running": sum(1 for r in proc["runs"] if r["status"] in ("queued", "running")),
             "roles_total": len(sec["roles"]),
             "permission_lists_total": len(sec["permission_lists"]),
             "users_total": len(sec["users"]),
@@ -699,6 +908,65 @@ def _dispatch(world: dict, state: dict, action: str, payload: dict) -> dict:
         run["status"] = "cancelled"
         _event(state, f"Cancelled {run['name']} (instance {run['instance']})")
         return {"ok": True, "message": f"{run['name']} cancelled"}
+
+    # ---- Employee Self-Service (Fluid) submissions ----
+    # Each self-service submit updates the operator's ESS record and enqueues a
+    # Process Scheduler run so the Process Monitor reflects the background job.
+    if act in ("submit_benefits", "elect_benefits", "enroll_benefits"):
+        oprid = (payload.get("oprid") or payload.get("user")
+                 or world.get("session", {}).get("oprid") or "PS")
+        prof = _find_profile(world, oprid)
+        if not prof:
+            return {"ok": False, "error": f"No self-service record for operator {oprid}"}
+        plan = (payload.get("plan") or payload.get("plan_id")
+                or prof["benefits"].get("elected_plan") or "").strip()
+        plans = (world.get("self_service") or {}).get("benefit_plans") or []
+        if plan and not any(p["id"] == plan for p in plans):
+            return {"ok": False, "error": f"Health plan '{plan}' is not in the enrollment catalog"}
+        ben = prof["benefits"]
+        ben["elected_plan"] = plan or ben.get("elected_plan")
+        ben["submitted_plan"] = ben["elected_plan"]
+        ben["event_status"] = "Submitted"
+        ben["submitted_at"] = _now_iso()
+        run = _enqueue_run(world, state, "BEN_ENROLL", process_type="Application Engine",
+                           run_control=f"ben_{prof['oprid'].lower()}")
+        _event(state, f"{prof['oprid']} submitted Open Enrollment (plan {ben['submitted_plan']}) "
+                      f"— queued BEN_ENROLL (instance {run['instance']})")
+        return {"ok": True, "message": f"Open Enrollment submitted for {prof['oprid']}",
+                "instance": run["instance"], "benefits": ben}
+
+    if act in ("save_job_data", "submit_job_data", "update_job_data"):
+        oprid = (payload.get("oprid") or payload.get("user")
+                 or world.get("session", {}).get("oprid") or "PS")
+        prof = _find_profile(world, oprid)
+        if not prof:
+            return {"ok": False, "error": f"No self-service record for operator {oprid}"}
+        updates = payload.get("job") if isinstance(payload.get("job"), dict) else {}
+        if not updates:
+            key = payload.get("field") or payload.get("key")
+            if key is not None:
+                updates = {str(key): payload.get("value")}
+        if updates:
+            prof["job"].update(updates)
+        run = _enqueue_run(world, state, "PERSONAL_DATA_SYNC", process_type="Application Engine",
+                           run_control=f"persdata_{prof['oprid'].lower()}")
+        _event(state, f"{prof['oprid']} saved Job/Personal Data — queued PERSONAL_DATA_SYNC "
+                      f"(instance {run['instance']})")
+        return {"ok": True, "message": f"Job Data saved for {prof['oprid']}",
+                "instance": run["instance"], "job": prof["job"]}
+
+    if act in ("request_paycheck", "reprint_paycheck", "view_paycheck"):
+        oprid = (payload.get("oprid") or payload.get("user")
+                 or world.get("session", {}).get("oprid") or "PS")
+        prof = _find_profile(world, oprid)
+        if not prof:
+            return {"ok": False, "error": f"No self-service record for operator {oprid}"}
+        run = _enqueue_run(world, state, "PAY_ADVICE_PRINT", process_type="SQR Report",
+                           server="PSNT", run_control=f"payadv_{prof['oprid'].lower()}")
+        _event(state, f"{prof['oprid']} requested a pay advice reprint — queued PAY_ADVICE_PRINT "
+                      f"(instance {run['instance']})")
+        return {"ok": True, "message": f"Pay advice reprint queued for {prof['oprid']}",
+                "instance": run["instance"], "paycheck": prof["paycheck"]}
 
     # ---- Security: roles / permission lists / users ----
     if act in ("assign_role", "add_role", "grant_role"):
