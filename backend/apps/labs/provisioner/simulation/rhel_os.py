@@ -438,6 +438,12 @@ class RHELOSState:
         self.pid_counter = 2000
         self.last_exit_code = 0
         self.boot_time = time.time() - 3600
+        # Hardware profile. Defaults match the historical hardcoded RHEL box so
+        # pure-Linux labs are byte-for-byte unchanged; for a unified-server VMware
+        # lab these are re-seeded from the VM template (see set_hardware). nproc,
+        # lscpu, free and /proc/{cpuinfo,meminfo} all read these two fields.
+        self.cpu_count = 4
+        self.mem_mb = 16384
         self.vfs: dict[str, str | dict] = {}
         self.users: dict[str, SimUser] = {}
         self.groups: dict[str, list[int]] = {"root": [0]}
@@ -659,7 +665,8 @@ class RHELOSState:
             fstype="swap", uuid="dddd4444-swap", mountpoint="[SWAP]")
         self.swaps["/dev/mapper/rhel-swap"] = {"size": 8 * 1024 * 1024, "used": 0}
 
-    def _proc_cpuinfo(self, cores: int = 4) -> str:
+    def _proc_cpuinfo(self, cores: int | None = None) -> str:
+        cores = self.cpu_count if cores is None else cores
         blocks = []
         for i in range(cores):
             blocks.append(
@@ -677,17 +684,22 @@ class RHELOSState:
         return "\n".join(blocks)
 
     def _proc_meminfo(self) -> str:
+        total = self.mem_mb * 1024
+        free = int(total * 0.704)
+        avail = int(total * 0.832)
+        cached = int(total * 0.181)
+        swap = self.swaps.get("/dev/mapper/rhel-swap", {}).get("size", 8 * 1024 * 1024)
         return (
-            "MemTotal:       16384000 kB\n"
-            "MemFree:        11534336 kB\n"
-            "MemAvailable:   13631488 kB\n"
+            f"MemTotal:       {total:>8} kB\n"
+            f"MemFree:        {free:>8} kB\n"
+            f"MemAvailable:   {avail:>8} kB\n"
             "Buffers:          131072 kB\n"
-            "Cached:          2965504 kB\n"
+            f"Cached:         {cached:>9} kB\n"
             "SwapCached:            0 kB\n"
             "Active:          2097152 kB\n"
             "Inactive:        1048576 kB\n"
-            "SwapTotal:       8388608 kB\n"
-            "SwapFree:        8388608 kB\n"
+            f"SwapTotal:      {swap:>9} kB\n"
+            f"SwapFree:       {swap:>9} kB\n"
         )
 
     def gen_uuid(self) -> str:
@@ -1119,6 +1131,39 @@ class RHELOSState:
         other._write_file("/etc/hostname", hostname + "\n")
         other.env["HOSTNAME"] = hostname
         return other
+
+    def set_hostname(self, hostname: str) -> None:
+        """Rewrite the hostname everywhere it surfaces — the shell prompt, the
+        HOSTNAME env var, /etc/hostname and /etc/hosts. Used by the unified-server
+        model so a VMware VM's console shows that VM's hostname, not 'rhel-sim'."""
+        if not hostname:
+            return
+        short = hostname.split(".")[0]
+        self.hostname = short
+        self.env["HOSTNAME"] = short
+        self._write_file("/etc/hostname", short + "\n")
+        self._write_file(
+            "/etc/hosts",
+            "127.0.0.1 localhost localhost.localdomain\n::1 localhost\n"
+            f"127.0.1.1 {hostname} {short}\n",
+        )
+
+    def set_hardware(self, cpu: int | None = None, mem_mb: int | None = None) -> None:
+        """Seed the CPU count / RAM and refresh the /proc pseudo-files that expose
+        them, so nproc/lscpu/free/`cat /proc/{cpuinfo,meminfo}` all agree with the
+        VMware VM the learner sees."""
+        if cpu:
+            try:
+                self.cpu_count = max(1, int(cpu))
+            except (TypeError, ValueError):
+                pass
+        if mem_mb:
+            try:
+                self.mem_mb = max(256, int(mem_mb))
+            except (TypeError, ValueError):
+                pass
+        self._write_file("/proc/cpuinfo", self._proc_cpuinfo())
+        self._write_file("/proc/meminfo", self._proc_meminfo())
 
     def set_host_ip(self, ip: str, iface: str = "eth0") -> None:
         if iface not in self.network_ifs:

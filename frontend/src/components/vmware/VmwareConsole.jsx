@@ -352,12 +352,17 @@ export default function VmwareConsole({ vm, labSessionId, onClose, onGuestAction
     if (result.reboot) {
       append(result.lines)
       append(['', 'Broadcast message: The system is going down for reboot NOW!', ''])
+      // Unified server: a `reboot` inside the guest must move the VMware VM tile
+      // too (rebooting → boot_pending), so vCenter reflects what the OS just did.
+      if (vm?.id && vm?.power !== 'poweredOff') onGuestAction?.({ action: 'reboot', vm_id: vm.id, silent: true })
       later(() => startPost(), 1200)
       return
     }
     if (result.poweroff) {
       append(result.lines)
       append(['', 'The system is powering off.', ''])
+      // Unified server: powering off the guest powers off the VMware VM.
+      if (vm?.id && vm?.power !== 'poweredOff') onGuestAction?.({ action: 'power_off', vm_id: vm.id, silent: true })
       later(() => { setPhase('off'); setLines([`${vm?.name || 'Guest'} — guest OS powered off. Power on the VM to boot again.`]) }, 1400)
       return
     }
@@ -379,7 +384,7 @@ export default function VmwareConsole({ vm, labSessionId, onClose, onGuestAction
     }
     append(result.lines)
     if (result.sideEffect && onGuestAction) onGuestAction(result.sideEffect)
-  }, [append, handleClose, later, onGuestAction, startPost, streamChunks, vm?.name])
+  }, [append, handleClose, later, onGuestAction, startPost, streamChunks, vm?.name, vm?.id, vm?.power])
 
   const runCmd = useCallback((raw) => {
     if (!shell) return

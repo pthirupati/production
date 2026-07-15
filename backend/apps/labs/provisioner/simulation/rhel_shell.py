@@ -346,6 +346,8 @@ class RHELShell:
             "vmware-toolbox-cmd": self._cmd_vmware,
             "reboot": self._cmd_reboot,
             "shutdown": self._cmd_shutdown,
+            "poweroff": self._cmd_poweroff,
+            "halt": self._cmd_poweroff,
         }
 
         fn = dispatch.get(cmd)
@@ -1625,18 +1627,20 @@ class RHELShell:
         return "\n".join(lines)
 
     def _cmd_lscpu(self, p: list[str]) -> str:
+        n = max(1, int(getattr(self.state, "cpu_count", 4)))
+        online = "0" if n == 1 else f"0-{n - 1}"
         return (
             "Architecture:            x86_64\n"
             "  CPU op-mode(s):        32-bit, 64-bit\n"
             "  Byte Order:            Little Endian\n"
-            "CPU(s):                  4\n"
-            "  On-line CPU(s) list:   0-3\n"
+            f"CPU(s):                  {n}\n"
+            f"  On-line CPU(s) list:   {online}\n"
             "Vendor ID:               GenuineIntel\n"
             "  Model name:            Intel(R) Xeon(R) Platinum 8259CL CPU @ 2.50GHz\n"
             "    CPU family:          6\n"
             "    Model:               85\n"
             "    Thread(s) per core:  1\n"
-            "    Core(s) per socket:  4\n"
+            f"    Core(s) per socket:  {n}\n"
             "    Socket(s):           1\n"
             "    Stepping:            7\n"
             "    BogoMIPS:            5000.00\n"
@@ -1649,7 +1653,7 @@ class RHELShell:
             "  L3:                    35 MiB\n"
             "NUMA:\n"
             "  NUMA node(s):          1\n"
-            "  NUMA node0 CPU(s):     0-3"
+            f"  NUMA node0 CPU(s):     {online}"
         )
 
     def _cmd_lsmod(self, p: list[str]) -> str:
@@ -2044,10 +2048,12 @@ class RHELShell:
         return base
 
     def _cmd_free(self, p: list[str]) -> str:
-        # Base figures in KiB (16 GiB RAM, 8 GiB swap) — scaled by the unit flag.
-        mem = {"total": 16 * 1024 * 1024, "used": 2 * 1024 * 1024,
-               "free": 11 * 1024 * 1024, "shared": 64 * 1024,
-               "buffcache": 3 * 1024 * 1024, "available": 13 * 1024 * 1024}
+        # Base figures in KiB, derived from the seeded RAM (default 16 GiB) so
+        # `free` agrees with the VMware VM / /proc/meminfo — scaled by the unit flag.
+        mt = max(256, int(getattr(self.state, "mem_mb", 16384))) * 1024
+        mem = {"total": mt, "used": int(mt * 0.125), "free": int(mt * 0.6875),
+               "shared": 64 * 1024, "buffcache": int(mt * 0.1875),
+               "available": int(mt * 0.8125)}
         swap_kb = self.state.swaps.get("/dev/mapper/rhel-swap", {}).get("size", 8 * 1024 * 1024)
         swap = {"total": swap_kb, "used": 0, "free": swap_kb}
         human = "-h" in p or "--human" in p
@@ -5073,15 +5079,41 @@ class RHELShell:
         body = self.run(cmd)
         return f"{header}\n\n{body}" if body else header
 
+    def _notify_guest_power(self, action: str) -> None:
+        """Unified-server model: tell the VMware side that the guest OS changed
+        power state from inside the terminal, so the VM tile / console reflects a
+        reboot or power-off. Best-effort + session-gated (no-op for plain Linux
+        labs, which have no VMware session)."""
+        sid = getattr(self.state, "session_id", "") or ""
+        if not sid:
+            return
+        try:
+            from .vmware_bridge import record_guest_power
+            record_guest_power(sid, action)
+        except Exception:
+            pass
+
     def _cmd_reboot(self, p: list[str]) -> str:
         # Restart the uptime clock. The unified engine resets boot_time again in
         # _reboot_from_shell after running the boot sequence; doing it here too
         # keeps the bare-shell (no-engine) path correct and is idempotent.
         self.state.boot_time = time.time()
+        self._notify_guest_power("reboot")
         return "__REBOOT__"
 
     def _cmd_shutdown(self, p: list[str]) -> str:
-        return "System shutdown simulated."
+        # `shutdown -r` reboots; anything else (incl. bare `shutdown`, `-h`, `-P`)
+        # powers the guest off. Both propagate to the VMware VM power state.
+        if "-r" in p:
+            self.state.boot_time = time.time()
+            self._notify_guest_power("reboot")
+            return "__REBOOT__"
+        self._notify_guest_power("poweroff")
+        return "System shutdown simulated. The system is going down NOW!"
+
+    def _cmd_poweroff(self, p: list[str]) -> str:
+        self._notify_guest_power("poweroff")
+        return "Powering off."
 
     def _cmd_exit(self, p: list[str]) -> str:
         return "logout"

@@ -157,6 +157,53 @@ def _apply_initial_host_state(engine, slug: str) -> None:
         _preset_firewalld_blocked(engine.shell.state)
 
 
+def _is_vmware_lab(slug: str, raw_type: str) -> bool:
+    return raw_type == "vmware" or "vmware" in (slug or "").lower()
+
+
+def _seed_state_from_vmware_vm(engine, session_id, slug: str) -> None:
+    """Unified-server model: seed the backend RHEL shell so it IS the VMware VM
+    the learner sees — same hostname, IP, CPU and RAM. That way the VM's console
+    and the lab terminal are one server (hardware/reboots already bridge across).
+
+    VMware-only and best-effort: any failure is logged and swallowed so it can
+    never break provisioning of a lab. Pure-Linux labs never call this.
+    """
+    try:
+        from apps.vmware_sim.engine import get_state, _ensure_session
+        from apps.labs.provisioner.simulation.vmware_bridge import cross_tech_config
+
+        sid = str(session_id)
+        _ensure_session(sid, slug)
+        inv = (get_state(sid, slug) or {}).get("inventory", {}) or {}
+        vms = inv.get("vms") or []
+        if not vms:
+            return
+        # Pick the VM this terminal represents: a cross-tech-pinned VM first, then
+        # the graded target, then the first VM in the inventory.
+        pin = (cross_tech_config(slug) or {}).get("vmware_vm")
+        target = (inv.get("validation", {}) or {}).get("target_vm")
+        vm = None
+        for want in (pin, target):
+            if want:
+                vm = next((v for v in vms if v.get("name") == want), None)
+                if vm:
+                    break
+        if vm is None:
+            vm = vms[0]
+
+        state = engine.shell.state
+        host = vm.get("hostname") or vm.get("name")
+        if host:
+            state.set_hostname(host)
+        state.set_hardware(cpu=vm.get("cpu"), mem_mb=vm.get("memory_mb"))
+        ip = vm.get("ip")
+        if ip:
+            state.set_host_ip(ip)
+    except Exception:
+        logger.exception("VMware VM seed skipped for session %s", session_id)
+
+
 def ensure_sim_session(lab_session) -> dict | None:
     """Re-register in-memory simulation state after worker restart."""
     session_id = str(lab_session.id)
@@ -173,17 +220,21 @@ def ensure_sim_session(lab_session) -> dict | None:
     sim_type = normalize_sim_type(raw_type)
     slug = scenario.slug
     snapshot = getattr(lab_session, "simulation_snapshot", None) or {}
+    fresh = True
     if snapshot and snapshot.get("version") == 1:
         from .simulation.sim_persistence import restore_engine
         restored = restore_engine(snapshot)
         if restored:
             engine = restored
+            fresh = False  # keep the persisted (already-seeded) state
         else:
             engine = UnifiedSimulationEngine(scenario_slug=slug, simulation_type=sim_type)
             _apply_initial_host_state(engine, slug)
     else:
         engine = UnifiedSimulationEngine(scenario_slug=slug, simulation_type=sim_type)
         _apply_initial_host_state(engine, slug)
+    if fresh and _is_vmware_lab(slug, raw_type):
+        _seed_state_from_vmware_vm(engine, session_id, slug)
     lab_hosts = lab_session.lab_hosts or _build_lab_hosts(scenario, resource_id, sim_type)
     if _should_use_ssh_client_default(scenario, sim_type):
         lab_hosts = _attach_ssh_client_host(lab_hosts, resource_id)
@@ -279,6 +330,7 @@ class SimulationProvisioner:
         if "vmware" in slug.lower() or raw_type == "vmware":
             from apps.vmware_sim.engine import _ensure_session
             _ensure_session(str(lab_session.id), slug)
+            _seed_state_from_vmware_vm(engine, lab_session.id, slug)
 
         if slug.lower().startswith("ds-dashboard-") or raw_type == "data-dashboard":
             from apps.vmware_sim.datascience_engine import _ensure_session as _ensure_ds_session

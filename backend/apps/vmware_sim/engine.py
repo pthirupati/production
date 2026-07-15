@@ -897,6 +897,47 @@ def _apply_scenario_preset(state: dict, scenario_slug: str) -> None:
     apply_vmware_scenario_preset(state, scenario_slug)
 
 
+def _consume_guest_power(session_id: str, state: dict) -> bool:
+    """Unified-server model (terminal → VMware): drain a power event the learner
+    triggered from the guest console (`reboot`/`poweroff`) and reflect it on the
+    target VM, so the VMware VM tile follows what happened inside the OS. Returns
+    True when the VM state changed. Best-effort; never raises into a state read."""
+    try:
+        from apps.labs.provisioner.simulation.vmware_bridge import consume_guest_power
+        action = consume_guest_power(str(session_id))
+    except Exception:
+        return False
+    if not action:
+        return False
+    target = (state.get("validation", {}) or {}).get("target_vm")
+    vm = _find_vm(state, vm_name=target) if target else None
+    if vm is None and state.get("vms"):
+        vm = state["vms"][0]
+    if vm is None:
+        return False
+    events = state.setdefault("events", [])
+    tasks = state.setdefault("recent_tasks", [])
+    if action == "reboot":
+        vm["power"] = "poweredOn"
+        vm["tools"] = "ok"
+        vm.pop("guest_hung", None)
+        vm.pop("network_disconnected", None)
+        vm["boot_pending"] = True
+        events.append(_event(f"Guest OS on {vm['name']} rebooted (from console)", "info", vm["name"]))
+        tasks.insert(0, _task("Guest Reboot", vm["name"]))
+    else:  # poweroff
+        vm["power"] = "poweredOff"
+        vm["tools"] = "notRunning"
+        vm["cpu_pct"] = 0
+        vm["mem_pct"] = 0
+        vm["net_mbps"] = 0
+        vm["disk_io_mbps"] = 0
+        vm.pop("boot_pending", None)
+        events.append(_event(f"Guest OS on {vm['name']} shut down (from console)", "info", vm["name"]))
+        tasks.insert(0, _task("Guest Shutdown", vm["name"]))
+    return True
+
+
 def _ensure_session(session_id: str, scenario_slug: str = "") -> dict:
     key = str(session_id)
     entry = _load_session(key)
@@ -908,6 +949,7 @@ def _ensure_session(session_id: str, scenario_slug: str = "") -> dict:
         _save_session(key, entry)
     else:
         _enrich_inventory(entry["state"])
+        _consume_guest_power(key, entry["state"])
         _save_session(key, entry)
     return entry
 

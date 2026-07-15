@@ -131,6 +131,29 @@ def was_vm_reset(session_id: str) -> bool:
     return bool(_load(session_id).get("vm_reset"))
 
 
+def record_guest_power(session_id: str, action: str) -> None:
+    """Terminal → VMware: the guest OS changed power state from inside the shell
+    (`reboot`, `poweroff`/`halt`/`shutdown`). The VMware engine drains this on its
+    next state read and updates the VM tile (rebooting → poweredOn, or poweredOff).
+    Last-writer-wins: a later action supersedes an unconsumed earlier one."""
+    if action not in ("reboot", "poweroff"):
+        return
+    data = _load(session_id)
+    data["guest_power"] = action
+    _save(session_id, data)
+
+
+def consume_guest_power(session_id: str) -> str | None:
+    """Drain a pending guest power event (returns 'reboot' | 'poweroff' | None)."""
+    data = _load(session_id)
+    action = data.get("guest_power")
+    if not action:
+        return None
+    data.pop("guest_power", None)
+    _save(session_id, data)
+    return action
+
+
 def record_pending_nic(session_id: str, ip: str = "10.0.0.30/24") -> None:
     """VMware add_network_adapter → a NIC the guest will see (as a new link) only
     after a rescan/`ip link` brings it up (network-nic-add-vmware-rescan)."""

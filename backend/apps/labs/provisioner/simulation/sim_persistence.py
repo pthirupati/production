@@ -63,6 +63,10 @@ def snapshot_engine(engine: UnifiedSimulationEngine) -> dict:
         "hostname": st.hostname,
         "scenario_slug_state": st.scenario_slug,
         "kernel": st.kernel,
+        # Seeded hardware profile (unified-server VMware labs); nproc/lscpu/free
+        # read these live fields, so they must survive a worker restart.
+        "cpu_count": getattr(st, "cpu_count", 4),
+        "mem_mb": getattr(st, "mem_mb", 16384),
         "current_user": st.current_user,
         "cwd": st.cwd,
         "uid_counter": st.uid_counter,
@@ -167,6 +171,8 @@ def restore_engine(data: dict) -> UnifiedSimulationEngine | None:
     st.hostname = data.get("hostname", st.hostname)
     st.scenario_slug = data.get("scenario_slug_state", slug)
     st.kernel = data.get("kernel", st.kernel)
+    st.cpu_count = data.get("cpu_count", getattr(st, "cpu_count", 4))
+    st.mem_mb = data.get("mem_mb", getattr(st, "mem_mb", 16384))
     st.current_user = data.get("current_user", "root")
     st.cwd = data.get("cwd", "/root")
     st.uid_counter = data.get("uid_counter", 1000)
