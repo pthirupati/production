@@ -14,7 +14,7 @@ PyJWT>=2.13.0
 argon2-cffi>=23.1
 
 # WebSockets
-channels>=4.0
+channels>=4.3.2
 channels-redis>=4.3.0
 daphne>=4.2.2
 websockets>=16.1
