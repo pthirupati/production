@@ -148,12 +148,20 @@ function SnapshotManagerModal({ vm, onClose, onAction, acting }) {
   const snapshots = vm?.snapshots || []
   const [selectedId, setSelectedId] = useState(snapshots[snapshots.length - 1]?.id || '')
   const [busy, setBusy] = useState(false)
+  // vSphere-style sequential default name; the learner can rename before saving.
+  const [snapName, setSnapName] = useState(`Snapshot ${snapshots.length + 1}`)
   const selected = snapshots.find((s) => s.id === selectedId) || snapshots[snapshots.length - 1] || null
 
   useEffect(() => {
     if (!selectedId && snapshots.length) setSelectedId(snapshots[snapshots.length - 1].id)
     if (selectedId && !snapshots.some((s) => s.id === selectedId)) setSelectedId(snapshots[snapshots.length - 1]?.id || '')
   }, [selectedId, snapshots])
+
+  // Keep the suggested snapshot name in step with the tree size so back-to-back
+  // snapshots default to "Snapshot 1", "Snapshot 2", … instead of colliding.
+  useEffect(() => {
+    setSnapName(`Snapshot ${snapshots.length + 1}`)
+  }, [snapshots.length])
 
   const fire = async (action, payload = {}) => {
     setBusy(true)
@@ -225,10 +233,24 @@ function SnapshotManagerModal({ vm, onClose, onAction, acting }) {
                 )}
               </div>
               <div className="grid gap-2">
-                <button type="button" className="vm-btn vm-btn-blue justify-center" disabled={disabled} onClick={() => fire('take_snapshot', {
-                  snapshot_name: `snapshot-${new Date().toISOString().slice(0, 10)}`,
-                  description: 'Created from Snapshot Manager',
-                })}>Take Snapshot</button>
+                <label className="block text-[11px] text-[#8FA5B8] uppercase tracking-wider">
+                  Snapshot name
+                  <input
+                    type="text"
+                    value={snapName}
+                    onChange={(e) => setSnapName(e.target.value)}
+                    disabled={disabled}
+                    placeholder={`Snapshot ${snapshots.length + 1}`}
+                    className="vm-input mt-1 w-full normal-case"
+                  />
+                </label>
+                <button type="button" className="vm-btn vm-btn-blue justify-center" disabled={disabled} onClick={() => {
+                  const nm = snapName.trim() || `Snapshot ${snapshots.length + 1}`
+                  fire('take_snapshot', {
+                    snapshot_name: nm,
+                    description: 'Created from Snapshot Manager',
+                  })
+                }}>Take Snapshot</button>
                 <button type="button" className="vm-btn justify-center" disabled={disabled || !selected} onClick={() => fire('revert_snapshot', { snapshot_id: selected.id })}>Revert to</button>
                 <button type="button" className="vm-btn vm-btn-red justify-center" disabled={disabled || !selected} onClick={() => fire('delete_snapshot', { snapshot_id: selected.id })}>Delete</button>
                 <button type="button" className="vm-btn vm-btn-red justify-center" disabled={disabled || snapshots.length === 0} onClick={() => fire('consolidate_snapshots')}>Delete All / Consolidate</button>

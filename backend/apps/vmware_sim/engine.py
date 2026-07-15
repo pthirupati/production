@@ -8,6 +8,7 @@ from __future__ import annotations
 import copy
 import json
 import random
+import re
 import time
 from typing import Any
 
@@ -1140,14 +1141,29 @@ def apply_action(session_id: str, action: str, payload: dict | None = None) -> d
         vm = _find_vm(state, payload.get("vm_id"), payload.get("vm_name"))
         if not vm:
             return {"ok": False, "error": "VM not found"}
-        snap_name = payload.get("snapshot_name") or f"snapshot-{int(time.time())}"
+        existing = vm.setdefault("snapshots", [])
+        # Accept either the vSphere-style `snapshot_name` or a plain `name`; fall
+        # back to a sequential "Snapshot N" (matching the vSphere default) rather
+        # than a per-second timestamp so two snapshots taken in the same wall
+        # clock second no longer collide on an identical name.
+        snap_name = (payload.get("snapshot_name") or payload.get("name") or "").strip()
+        if not snap_name:
+            snap_name = f"Snapshot {len(existing) + 1}"
+        # If the chosen name already exists on this VM, disambiguate so the
+        # Snapshot Manager tree never shows two indistinguishable entries.
+        if any(s.get("name") == snap_name for s in existing):
+            base = snap_name
+            n = 2
+            while any(s.get("name") == f"{base} ({n})" for s in existing):
+                n += 1
+            snap_name = f"{base} ({n})"
         snap = {
             "id": f"snap-{int(time.time())}-{random.randint(100, 999)}",
             "name": snap_name,
             "description": payload.get("description") or "",
             "created": _now_iso(),
         }
-        vm.setdefault("snapshots", []).append(snap)
+        existing.append(snap)
         events.append(_event(f"Snapshot '{snap_name}' created on {vm['name']}", "info", vm["name"]))
         tasks.insert(0, _task("Create Snapshot", vm["name"]))
         _save_session(str(session_id), entry)
@@ -2160,7 +2176,15 @@ def apply_action(session_id: str, action: str, payload: dict | None = None) -> d
             connected=True, adapter_type=adapter_type,
             portgroup_key=net.get("portgroup_key", ""),
         )
-        nic["label"] = f"Network adapter {idx}"
+        # Label as the next contiguous "Network adapter N" (one past the highest
+        # existing adapter number) so a VM with "Network adapter 0" gets a
+        # "Network adapter 1" next, instead of jumping to "2" and leaving a gap.
+        next_label_num = 0
+        for existing in nics:
+            m = re.search(r"(\d+)\s*$", str(existing.get("label") or ""))
+            if m:
+                next_label_num = max(next_label_num, int(m.group(1)) + 1)
+        nic["label"] = f"Network adapter {next_label_num}"
         nics.append(nic)
         if vm.get("power") == "poweredOn" and idx > 1:
             vm["guest_nic_pending"] = True
