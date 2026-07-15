@@ -11,29 +11,46 @@ is_free: false
 jira_priority: High
 dual_terminal: false
 requires_companion_hosts: false
-description: 'CONTEXT: An SRE/GPU-infrastructure team running a datacenter accelerator fleet must resolve
-  `NCCL AllReduce Hangs Across Nodes` during a live incident. Until the underlying hardware/driver state
-  is repaired, GPU capacity is lost and training/inference jobs fail, so throughput and SLAs are at risk.
+description: 'CONTEXT: A team operating GPU operations has raised a ticket for `NCCL AllReduce Hangs Across
+  Nodes`. A customer-facing workflow is degraded and the on-call engineer (you) must diagnose and resolve
+  it. Business impact: reduced service reliability and blocked users until the underlying state is repaired.
 
 
-  ENVIRONMENT: You are on a FixitLab offline GPU node with nvidia-smi, the NVIDIA driver/CUDA stack, DCGM
-  (dcgmi / nv-hostengine / dcgm-exporter), the container toolkit, and — for AMD hosts — the ROCm stack
-  (rocm-smi / amd-smi). All tools run locally; no paid APIs or external cloud calls are required.
+  ENVIRONMENT: You are working in FixitLab''s offline GPU node. The architecture is a single lab-primary
+  node exposing nvidia-smi, drivers, CUDA, and container toolkit; treat it as the production host for
+  this incident. All tools run locally — no paid APIs or external cloud calls are required.
 
 
-  SYMPTOM / STARTING STATE: The job stalls in `ncclAllReduce`; with `NCCL_DEBUG=INFO` you see it fall
-  back to TCP over the wrong interface or fail IB/NVLink transport init, so the collective never completes
-  and a watchdog eventually aborts.
+  SYMPTOM / STARTING STATE: A multi-node NVIDIA training run that hangs at the first all-reduce; ranks
+  sit at 100% SM util doing nothing while NCCL retries the collective. The job stalls in `ncclAllReduce`;
+  with `NCCL_DEBUG=INFO` you see it fall back to TCP over the wrong interface or fail IB/NVLink transport
+  init, so the collective never completes and a watchdog eventually aborts.
 
 
   OBJECTIVE: Reproduce the hang and capture NCCL_DEBUG=INFO transport selection; Determine whether NCCL
   picked the wrong NIC/IB HCA or NVLink/P2P is disabled; Set the correct NCCL_SOCKET_IFNAME/NCCL_IB_HCA
-  (or re-enable P2P) so the all-reduce completes. Success means `check.sh` exits successfully after you
-  apply the documented remediation.
+  (or re-enable P2P) so the all-reduce completes. Acceptance criteria: the change is minimal and reversible,
+  and success means `nvidia-smi` includes `NVIDIA-SMI`.
 
 
-  WHAT TO AVOID: Do not apply broad destructive changes, disable safety limits to mask the fault, skip
-  evidence gathering, or fake completion with marker files — the checker validates real system state.'
+  WORK TO DO: Required tooling is pre-installed; if a command is missing, note it and use the equivalent
+  already on the host. Make the smallest configuration change that moves the system toward the objective
+  (edit the relevant nvidia-smi, drivers, CUDA, and container toolkit), changing one thing at a time.
+  Check your work continuously against the objective — success means `nvidia-smi` includes `NVIDIA-SMI`.
+
+
+  VERIFY: Re-run the same check the grader uses and confirm `nvidia-smi` includes `NVIDIA-SMI`. Capture
+  the before/after output as evidence. Success criteria: the objective''s healthy state holds on a repeat
+  check, not just once.
+
+
+  ROLLBACK: If a change makes things worse, revert that single change immediately (restore the original
+  config file / undo the edit / restart the affected component) and re-observe before trying another hypothesis.
+  Never stack unverified changes.
+
+
+  WHAT TO AVOID: Do not apply broad destructive changes, skip evidence gathering, or fake completion with
+  marker files — the checker validates real system state.'
 initial_state: A multi-node NVIDIA training run that hangs at the first all-reduce; ranks sit at 100%
   SM util doing nothing while NCCL retries the collective.
 objectives:
@@ -43,30 +60,46 @@ objectives:
 hints:
 - order: 1
   cost: 0
-  content: 'Where to look: rerun with `NCCL_DEBUG=INFO NCCL_DEBUG_SUBSYS=INIT,NET` and read which transport/interface
-    NCCL selected; check `nvidia-smi topo -m` for NVLink/P2P paths.'
+  content: 'ORIENT — what to observe and why:
+
+    Do not touch anything yet. First observe the symptom: NCCL AllReduce hangs across nodes is not behaving
+    as the scenario objectives require. This lab is about NCCL AllReduce hangs across nodes — how NCCL
+    AllReduce hangs across nodes behaves in a GPU operations environment. Read the objectives and the
+    current state, and note precisely what looks wrong versus healthy before you form any theory.'
 - order: 2
-  cost: 25
-  content: 'Diagnostic steps:
+  cost: 10
+  content: 'APPROACH — the troubleshooting method:
 
-    1. `NCCL_DEBUG=INFO` — look for ''Using network Socket'' when IB was expected, or ''NET/IB : No device
-    found''.
-
-    2. `ibstat` / `ip -o link` — confirm the intended RDMA HCA / NIC name.
-
-    3. `nvidia-smi topo -m` — verify NVLink (NV#) between local GPUs, not just PIX/SYS.'
+    Work from evidence, not guesses. For NCCL AllReduce hangs across nodes problems the reliable method
+    is: (1) reproduce/observe the failure, (2) narrow from the whole system down to the one component
+    that owns the symptom, (3) change exactly one thing, (4) re-check. Fix the underlying misconfiguration
+    you identified (not just the noisy log line), changing one thing at a time.'
 - order: 3
-  cost: 50
-  content: 'Exact fix + verification:
+  cost: 25
+  content: 'WHICH TOOL — the diagnostic command(s):
 
-    1. Pin the fabric: export `NCCL_IB_HCA=mlx5_0` and `NCCL_SOCKET_IFNAME=bond0` (or re-enable P2P/NVLink),
-    then relaunch.
+    Run `docker ps -a` and `docker logs <container>` for the failing container.'
+- order: 4
+  cost: 40
+  content: 'NARROW DOWN — isolate the subsystem:
 
-    2. Confirm `ncclAllReduce` completes and `nccl-tests all_reduce_perf` reports expected busbw.
+    1. `docker ps -a` — note Exited status and exit code.
 
-    3. Record the remediation in /opt/fixitlab/academy/gpu-nccl-allreduce-hang.conf.
+    2. `docker logs <name>` for the startup error.
 
-    WHY: the checker validates the collective genuinely completes.'
+    3. Inspect the Dockerfile or `docker run` flags if the image is wrong.'
+- order: 5
+  cost: 60
+  content: 'NEAR-SOLUTION — the fix shape + verify (you still apply it):
+
+    1. Fix image, port mapping, volume, or env configuration.
+
+    2. `docker start <name>` or re-run with corrected flags.
+
+    3. Confirm `nvidia-smi` shows the container Up.
+
+
+    WHY: the checker validates the container is actually running.'
 summary: Diagnose and fix nccl allreduce hangs across nodes on a datacenter GPU node and verify with the
   checker
 estimated_minutes: 25

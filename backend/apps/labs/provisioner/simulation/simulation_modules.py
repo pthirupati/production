@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import random
 import re
+import time
 from typing import TYPE_CHECKING
 
 from .devops_state import DevOpsState
@@ -170,6 +171,127 @@ def _modules_for_type(sim_type: str) -> set[str]:
     return {sim_type, "docker"} if sim_type == "rhel" else {sim_type}
 
 
+# Datacenter GPU box the sim models: an 8x NVIDIA H100 80GB HBM3 SXM node
+# (driver 550.90.07 / CUDA 12.4). Kept consistent across nvidia-smi, nvidia-smi
+# -q, and dcgmi so a learner never sees the model/count/driver disagree.
+_SMI_DRIVER = "550.90.07"
+_SMI_CUDA = "12.4"
+_SMI_GPU_NAME = "NVIDIA H100 80GB HBM3"
+_SMI_GPU_COUNT = 8
+_SMI_MEM_TOTAL_MIB = 81559  # H100 80GB reports 81559 MiB in nvidia-smi
+
+
+def _render_nvidia_smi_table() -> str:
+    """Render the modern (driver 5xx) nvidia-smi summary table for the full 8x
+    H100 node plus a realistic compute-process table. Values wiggle per call so
+    successive runs look live, but the topology (count/model/driver/mem) is fixed
+    so it agrees with `nvidia-smi -q` and `dcgmi discovery -l`."""
+    now = time.strftime("%a %b %d %H:%M:%S %Y")
+    lines = [
+        now,
+        "+-----------------------------------------------------------------------------------------+",
+        f"| NVIDIA-SMI {_SMI_DRIVER}              Driver Version: {_SMI_DRIVER}      CUDA Version: {_SMI_CUDA}      |",
+        "|-----------------------------------------+------------------------+----------------------+",
+        "| GPU  Name                 Persistence-M | Bus-Id          Disp.A | Volatile Uncorr. ECC |",
+        "| Fan  Temp   Perf          Pwr:Usage/Cap |           Memory-Usage | GPU-Util  Compute M. |",
+        "|                                         |                        |               MIG M. |",
+        "|=========================================+========================+======================|",
+    ]
+    busy = []  # (gpu_idx, mem_used) for the process table
+    for i in range(_SMI_GPU_COUNT):
+        active = random.random() < 0.6
+        util = random.randint(70, 100) if active else random.randint(0, 4)
+        mem_used = random.randint(40000, 78000) if active else random.randint(3, 12)
+        temp = random.randint(58, 74) if active else random.randint(28, 36)
+        pwr = random.randint(420, 690) if active else random.randint(68, 92)
+        perf = "P0"
+        bus = f"00000000:{(i + 1) * 0x10 + 1:02X}:00.0"
+        # Fixed-width cells matching the separator (41 / 24 / 22 chars).
+        c1a = f"  {i}  {_SMI_GPU_NAME}"
+        c2a = f" {bus} Off"
+        lines.append(f"|{c1a:<33}   On  |{c2a:<24}|                    0 |")
+        c1b = f" N/A   {temp:2d}C    {perf}             {pwr:3d}W / 700W"
+        c2b = f"  {mem_used:6d}MiB / {_SMI_MEM_TOTAL_MIB}MiB "
+        c3b = f"    {util:3d}%      Default"
+        lines.append(f"|{c1b:<41}|{c2b:<24}|{c3b:<22}|")
+        lines.append(f"|{'':<41}|{'':<24}|{'             Disabled':<22}|")
+        lines.append(
+            "+-----------------------------------------+------------------------+----------------------+")
+        if active:
+            busy.append((i, mem_used))
+    lines.append("")
+    lines.append(
+        "+-----------------------------------------------------------------------------------------+")
+    lines.append(
+        "| Processes:                                                                              |")
+    lines.append(
+        "|  GPU   GI   CI        PID   Type   Process name                              GPU Memory |")
+    lines.append(
+        "|        ID   ID                                                               Usage      |")
+    lines.append(
+        "|=========================================================================================|")
+    if busy:
+        for gpu_idx, mem_used in busy:
+            pid = random.randint(20000, 65000)
+            lines.append(
+                f"|    {gpu_idx}   N/A  N/A    {pid:7d}      C   /opt/conda/bin/python                     {mem_used:5d}MiB |")
+    else:
+        lines.append(
+            "|  No running processes found                                                             |")
+    lines.append(
+        "+-----------------------------------------------------------------------------------------+")
+    return "\n".join(lines)
+
+
+def _render_query_gpu(line: str) -> str:
+    """Emulate `nvidia-smi --query-gpu=<fields> --format=csv[,noheader][,nounits]`
+    across all 8 GPUs. Honors the requested field list and the csv formatting
+    modifiers so scripts that parse the output behave like on a real box."""
+    m = re.search(r"--query-gpu[= ]([^\s]+)", line)
+    fields = [f.strip() for f in (m.group(1) if m else "name").split(",") if f.strip()]
+    fmt = re.search(r"--format[= ]([^\s]+)", line)
+    fmt_opts = set(f.strip() for f in (fmt.group(1) if fmt else "csv").split(","))
+    noheader = "noheader" in fmt_opts
+    nounits = "nounits" in fmt_opts
+
+    # (value_fn, unit) per supported field. value_fn(idx) → live-ish value.
+    def _mem_used(i):
+        return random.randint(40000, 78000) if i % 2 == 0 else random.randint(3, 12)
+
+    units = {
+        "index": ("", lambda i: str(i)),
+        "name": ("", lambda i: _SMI_GPU_NAME),
+        "uuid": ("", lambda i: f"GPU-{i:08x}-1a2b-3c4d-5e6f-0011223344{i:02d}"),
+        "pci.bus_id": ("", lambda i: f"00000000:{(i + 1) * 0x10 + 1:02X}:00.0"),
+        "driver_version": ("", lambda i: _SMI_DRIVER),
+        "temperature.gpu": (" C", lambda i: str(random.randint(30, 72))),
+        "utilization.gpu": (" %", lambda i: str(random.randint(0, 100))),
+        "utilization.memory": (" %", lambda i: str(random.randint(0, 95))),
+        "memory.total": (" MiB", lambda i: str(_SMI_MEM_TOTAL_MIB)),
+        "memory.used": (" MiB", lambda i: str(_mem_used(i))),
+        "memory.free": (" MiB", lambda i: str(_SMI_MEM_TOTAL_MIB - _mem_used(i))),
+        "power.draw": (" W", lambda i: f"{random.uniform(70, 690):.2f}"),
+        "power.limit": (" W", lambda i: "700.00"),
+        "clocks.sm": (" MHz", lambda i: str(random.randint(1200, 1980))),
+        "ecc.errors.uncorrected.aggregate.total": ("", lambda i: "0"),
+        "count": ("", lambda i: str(_SMI_GPU_COUNT)),
+    }
+    header = ", ".join(
+        f + ("" if nounits or not units.get(f, ("", None))[0] else f" [{units[f][0].strip()}]")
+        for f in fields
+    )
+    rows = []
+    for i in range(_SMI_GPU_COUNT):
+        cells = []
+        for f in fields:
+            unit, fn = units.get(f, ("", lambda i: "[Not Supported]"))
+            val = fn(i)
+            cells.append(val if nounits else f"{val}{unit}")
+        rows.append(", ".join(cells))
+    out = rows if noheader else [header, *rows]
+    return "\n".join(out)
+
+
 def _register_gpu(engine: "UnifiedSimulationEngine", shell: RHELShell) -> None:
     is_gpu_focus = engine.simulation_type == "gpu" or "gpu" in engine.scenario_slug or "nvidia" in engine.scenario_slug
 
@@ -179,7 +301,9 @@ def _register_gpu(engine: "UnifiedSimulationEngine", shell: RHELShell) -> None:
         # (modprobe/lspci/lsmod/modinfo) are only intercepted when they
         # reference the NVIDIA driver, or when this is a GPU-focused sim — so
         # other scenarios keep using the normal Linux handlers.
-        gpu_tools = ("nvidia-smi", "dcgmi", "dcgm", "gpustat", "rocm-smi", "amd-smi", "nvcc")
+        gpu_tools = ("nvidia-smi", "dcgmi", "dcgm-exporter", "dcgm", "gpustat", "rocm-smi",
+                     "amd-smi", "nvcc", "all_reduce_perf", "all_gather_perf",
+                     "reduce_scatter_perf", "broadcast_perf", "nccl-tests")
         kernel_tools = ("modprobe", "rmmod", "lspci", "lsmod", "modinfo")
         if any(low.startswith(c) for c in gpu_tools):
             pass
@@ -194,7 +318,7 @@ def _register_gpu(engine: "UnifiedSimulationEngine", shell: RHELShell) -> None:
             if "--query-gpu" in low:
                 if not healthy:
                     return "NVIDIA-SMI has failed because it couldn't communicate with the NVIDIA driver."
-                return f"{GPU_NAMES[0]}, {random.randint(30, 85)}, {random.randint(2000, 38000)}, 40960"
+                return _render_query_gpu(line)
             # ── nvidia-smi sub-commands (topology / nvlink / mig / -q -d <section>) ──
             # Datacenter-realistic detail views. Cosmetic only: the healthy path
             # renders a clean view; the unhealthy path mirrors a fallen-off driver.
@@ -291,35 +415,32 @@ def _register_gpu(engine: "UnifiedSimulationEngine", shell: RHELShell) -> None:
                             "\t HW Thermal Slowdown            : Not Active\n"
                             "\t HW Power Brake Slowdown        : Not Active\n"
                             "\t SW Thermal Slowdown            : Not Active")
-                # generic `-q` dump
-                return ("==============NVSMI LOG==============\n"
-                        "Driver Version                        : 550.90.07\n"
-                        "CUDA Version                          : 12.4\n"
-                        "Attached GPUs                         : 8\n"
-                        "GPU 00000000:01:00.0\n"
-                        "\t Product Name                  : NVIDIA H100 80GB HBM3\n"
-                        "\t Persistence Mode              : Enabled\n"
-                        "\t MIG Mode\n"
-                        "\t\t Current                   : Disabled")
+                # generic `-q` dump — one block per attached GPU.
+                head = ("==============NVSMI LOG==============\n"
+                        f"Driver Version                        : {_SMI_DRIVER}\n"
+                        f"CUDA Version                          : {_SMI_CUDA}\n"
+                        f"Attached GPUs                         : {_SMI_GPU_COUNT}")
+                blocks = []
+                for i in range(_SMI_GPU_COUNT):
+                    bus = f"00000000:{(i + 1) * 0x10 + 1:02X}:00.0"
+                    blocks.append(
+                        f"GPU {bus}\n"
+                        f"\t Product Name                  : {_SMI_GPU_NAME}\n"
+                        f"\t Product Architecture          : Hopper\n"
+                        f"\t Persistence Mode              : Enabled\n"
+                        f"\t MIG Mode\n"
+                        f"\t\t Current                   : Disabled\n"
+                        f"\t\t Pending                   : Disabled\n"
+                        f"\t FB Memory Usage\n"
+                        f"\t\t Total                     : {_SMI_MEM_TOTAL_MIB} MiB\n"
+                        f"\t\t Used                      : {random.randint(3, 512)} MiB\n"
+                        f"\t\t Free                      : {_SMI_MEM_TOTAL_MIB - random.randint(3, 512)} MiB")
+                return head + "\n" + "\n".join(blocks)
             if "-pm" in parts or "-pl" in parts or low.startswith("nvidia-smi -r"):
                 # persistence-mode / power-limit set, or GPU reset — acknowledge.
                 return "All done."
             if healthy:
-                util = random.randint(0, 95)
-                mem = random.randint(1000, 38000)
-                temp = random.randint(32, 78)
-                return (
-                    "Fri Jun 14 10:00:00 2026\n"
-                    "+-----------------------------------------------------------------------------+\n"
-                    "| NVIDIA-SMI 535.54.03    Driver Version: 535.54.03    CUDA Version: 12.2     |\n"
-                    "|-------------------------------+----------------------+----------------------+\n"
-                    "| GPU  Name        Persistence-M| Bus-Id        Disp.A | Volatile Uncorr. ECC |\n"
-                    "| Fan  Temp  Perf  Pwr:Usage/Cap|         Memory-Usage | GPU-Util  Compute M. |\n"
-                    "|===============================+======================+======================|\n"
-                    f"|   0  {GPU_NAMES[0]:<18}  On | 00000000:01:00.0 Off |                    0 |\n"
-                    f"| N/A  {temp:2d}C    P0    72W / 400W |  {mem:5d}MiB / 40960MiB |   {util:3d}%      Default |\n"
-                    "+-----------------------------------------------------------------------------+"
-                )
+                return _render_nvidia_smi_table()
             return "NVIDIA-SMI has failed because it couldn't communicate with the NVIDIA driver. Make sure that the latest NVIDIA driver is installed and running."
         if low.startswith("modprobe"):
             # `modprobe nvidia` loads the driver; `modprobe -r nvidia` unloads it.
@@ -344,23 +465,66 @@ def _register_gpu(engine: "UnifiedSimulationEngine", shell: RHELShell) -> None:
             if not healthy:
                 return "modinfo: ERROR: Module nvidia not found."
             return ("filename:       /lib/modules/5.14.0/kernel/drivers/video/nvidia.ko\n"
-                    "version:        535.54.03\n"
+                    f"version:        {_SMI_DRIVER}\n"
+                    "supported:      external\n"
                     "license:        NVIDIA\n"
                     "description:    NVIDIA Linux Open GPU Kernel Module")
         if low.startswith("nvcc"):
-            return "nvcc: NVIDIA (R) Cuda compiler driver\nCuda compilation tools, release 12.2, V12.2.140"
+            return (f"nvcc: NVIDIA (R) Cuda compiler driver\n"
+                    f"Copyright (c) 2005-2024 NVIDIA Corporation\n"
+                    f"Built on Thu_Mar_28_02:18:24_PDT_2024\n"
+                    f"Cuda compilation tools, release {_SMI_CUDA}, V{_SMI_CUDA}.131\n"
+                    f"Build cuda_{_SMI_CUDA}.r{_SMI_CUDA}/compiler.34714021_0")
+        if low.startswith("dcgm-exporter"):
+            # dcgm-exporter is a Prometheus exporter, not a CLI health tool: it
+            # serves DCGM_FI_DEV_* gauges on :9400/metrics. Emit a realistic
+            # startup log + sample scrape so a learner sees what it actually does.
+            if not healthy:
+                return ("time=\"...\" level=fatal msg=\"Error watching fields: "
+                        "Failed to connect to DCGM: nv-hostengine not running / driver not loaded\"")
+            if "--version" in low or "-v" in parts:
+                return "dcgm-exporter version 3.3.5-3.4.1"
+            sample = [
+                "time=\"...\" level=info msg=\"Starting dcgm-exporter\"",
+                "time=\"...\" level=info msg=\"DCGM successfully initialized!\"",
+                "time=\"...\" level=info msg=\"Collecting DCP Metrics\"",
+                "time=\"...\" level=info msg=\"Falling back to metric file '/etc/dcgm-exporter/default-counters.csv'\"",
+                "time=\"...\" level=info msg=\"Kubernetes metrics collection disabled\"",
+                "time=\"...\" level=info msg=\"Pipeline starting\"",
+                "time=\"...\" level=info msg=\"Listening on\" address=\"[::]:9400\"",
+                "",
+                "# Sample scrape (curl -s localhost:9400/metrics):",
+                "# HELP DCGM_FI_DEV_GPU_UTIL GPU utilization (in %).",
+                "# TYPE DCGM_FI_DEV_GPU_UTIL gauge",
+            ]
+            for i in range(_SMI_GPU_COUNT):
+                uuid = f"GPU-{i:08x}-1a2b-3c4d-5e6f-0011223344{i:02d}"
+                util = random.randint(0, 100)
+                sample.append(
+                    f'DCGM_FI_DEV_GPU_UTIL{{gpu="{i}",UUID="{uuid}",'
+                    f'device="nvidia{i}",modelName="{_SMI_GPU_NAME}",Hostname="gpu-node"}} {util}')
+            sample.append("# HELP DCGM_FI_DEV_GPU_TEMP GPU temperature (in C).")
+            sample.append("# TYPE DCGM_FI_DEV_GPU_TEMP gauge")
+            for i in range(_SMI_GPU_COUNT):
+                uuid = f"GPU-{i:08x}-1a2b-3c4d-5e6f-0011223344{i:02d}"
+                sample.append(
+                    f'DCGM_FI_DEV_GPU_TEMP{{gpu="{i}",UUID="{uuid}",'
+                    f'device="nvidia{i}",modelName="{_SMI_GPU_NAME}",Hostname="gpu-node"}} {random.randint(30, 72)}')
+            return "\n".join(sample)
         if low.startswith("dcgmi") or low.startswith("dcgm"):
             if not healthy:
                 return "Error: Unable to connect to nv-hostengine. GPU driver not loaded."
             if "discovery" in low:
-                return ("8 GPUs found.\n"
-                        "+--------+----------------------------------------------------------------------+\n"
-                        "| GPU ID | Device Information                                                   |\n"
-                        "+========+======================================================================+\n"
-                        "| 0      | Name: NVIDIA H100 80GB HBM3                                          |\n"
-                        "|        | PCI Bus ID: 00000000:01:00.0                                        |\n"
-                        "| 1-7    | Name: NVIDIA H100 80GB HBM3                                          |\n"
-                        "+--------+----------------------------------------------------------------------+")
+                rows = [f"{_SMI_GPU_COUNT} GPUs found.",
+                        "+--------+----------------------------------------------------------------------+",
+                        "| GPU ID | Device Information                                                   |",
+                        "+========+======================================================================+"]
+                for i in range(_SMI_GPU_COUNT):
+                    bus = f"00000000:{(i + 1) * 0x10 + 1:02X}:00.0"
+                    rows.append(f"| {i:<6} |{(' Name: ' + _SMI_GPU_NAME):<70}|")
+                    rows.append(f"|        |{(' PCI Bus ID: ' + bus):<70}|")
+                rows.append("+--------+----------------------------------------------------------------------+")
+                return "\n".join(rows)
             if "diag" in low:
                 # `dcgmi diag -r <1|2|3|4>` — the sim renders a clean pass run.
                 level = "1"
@@ -395,9 +559,13 @@ def _register_gpu(engine: "UnifiedSimulationEngine", shell: RHELShell) -> None:
                         "| Overall Health                  | Healthy                                   |\n"
                         "+---------------------------------+-------------------------------------------+")
             if "dmon" in low:
-                return ("# Entity  GPUTL  MCUTL   TMPTR   POWER   ECCUC\n"
-                        "    GPU 0    37     22      41      118       0\n"
-                        "    GPU 1    41     25      43      126       0")
+                rows = ["# Entity  GPUTL  MCUTL   TMPTR   POWER   ECCUC",
+                        "# Id      %      %       C       W       "]
+                for i in range(_SMI_GPU_COUNT):
+                    rows.append(
+                        f"   GPU {i}   {random.randint(0, 100):3d}    {random.randint(0, 90):3d}"
+                        f"     {random.randint(30, 72):3d}     {random.randint(70, 690):3d}       0")
+                return "\n".join(rows)
             return ("+----+-----------+----------------------------------------------------------+\n"
                     "| GPU| Health    | Details                                                  |\n"
                     "+====+===========+==========================================================+\n"
@@ -406,7 +574,16 @@ def _register_gpu(engine: "UnifiedSimulationEngine", shell: RHELShell) -> None:
         if low.startswith("gpustat"):
             if not healthy:
                 return "Error: NVIDIA driver is not loaded"
-            return f"[0] {GPU_NAMES[0]} | {random.randint(35, 75)}'C, {random.randint(10, 90)} % | {random.randint(2000, 38000)} / 40960 MB"
+            hdr = f"gpu-node   {time.strftime('%a %b %d %H:%M:%S %Y')}"
+            rows = [hdr]
+            for i in range(_SMI_GPU_COUNT):
+                temp = random.randint(30, 72)
+                util = random.randint(0, 100)
+                mem = random.randint(3, 78000)
+                rows.append(
+                    f"[{i}] {_SMI_GPU_NAME} | {temp}'C, {util:3d} % | "
+                    f"{mem:5d} / {_SMI_MEM_TOTAL_MIB} MB")
+            return "\n".join(rows)
         if low.startswith("rocm-smi") or low.startswith("amd-smi"):
             if "showtopo" in low or "shownodesbw" in low or "topo" in low:
                 return ("============================ Weight between two GPUs ========================\n"
@@ -429,12 +606,88 @@ def _register_gpu(engine: "UnifiedSimulationEngine", shell: RHELShell) -> None:
             if "static" in low or "rocminfo" in low:
                 return ("Agent 2\n  Name:                    gfx942\n  Marketing Name:          AMD Instinct MI300X\n"
                         "  Device Type:             GPU\n  Wavefront Size:          64(0x40)")
-            return ("========================= ROCm System Management Interface =========================\n"
-                    "================================= Concise Info =====================================\n"
-                    "GPU  Temp   AvgPwr  SCLK     MCLK     Fan  Perf  PwrCap  VRAM%  GPU%\n"
-                    "0    45.0c  120.0W  1300Mhz  1600Mhz  0%   auto  750.0W   37%   37%\n"
-                    "1    46.0c  124.0W  1300Mhz  1600Mhz  0%   auto  750.0W   41%   40%\n"
-                    "====================================================================================")
+            # amd-smi has its own layout (monitor / metric); it is NOT rocm-smi.
+            if low.startswith("amd-smi"):
+                if "monitor" in low or "metric" in low or parts[:1] == ["amd-smi"] and len(parts) == 1:
+                    rows = ["GPU  POWER   GPU_T  MEM_T  GFX_CLK  GFX%  MEM%  VRAM_USED  VRAM_TOTAL"]
+                    for i in range(8):
+                        rows.append(
+                            f"{i:<4} {random.randint(120, 700):3d} W  {random.randint(38, 68)}°C  "
+                            f"{random.randint(40, 70)}°C  {random.randint(1300, 2100)} MHz  "
+                            f"{random.randint(0, 100):3d}%  {random.randint(0, 95):3d}%  "
+                            f"{random.randint(1000, 190000):6d} MB  196592 MB")
+                    return "\n".join(rows)
+                if "version" in low:
+                    return ("AMDSMI Tool: 24.6.2+2b02a07 | "
+                            "AMDSMI Library version: 24.6.2 | ROCm version: 6.2.0")
+                # bare `amd-smi` prints usage
+                return ("usage: amd-smi [-h] {version,list,static,firmware,bad-pages,"
+                        "metric,process,event,topology,set,reset,monitor,xgmi} ...\n"
+                        "AMD System Management Interface | Version: 24.6.2 | ROCm version: 6.2.0")
+            # rocm-smi concise info across the full 8x MI300X node.
+            rows = ["========================= ROCm System Management Interface =========================",
+                    "================================= Concise Info =====================================",
+                    "GPU  Temp   AvgPwr  SCLK     MCLK     Fan  Perf  PwrCap  VRAM%  GPU%"]
+            for i in range(8):
+                t = 44.0 + i * 0.5
+                p = 118.0 + i * 2.0
+                util = random.randint(20, 90)
+                rows.append(
+                    f"{i}    {t:.1f}c  {p:.1f}W  1300Mhz  1600Mhz  0%   auto  750.0W   "
+                    f"{random.randint(20, 90):2d}%   {util:2d}%")
+            rows.append("====================================================================================")
+            return "\n".join(rows)
+        # NCCL performance benchmarks (nccl-tests): all_reduce_perf / all_gather_perf …
+        if any(low.startswith(c) for c in ("all_reduce_perf", "all_gather_perf",
+                                           "reduce_scatter_perf", "broadcast_perf", "nccl-tests")):
+            if not healthy:
+                return ("test NCCL failure common.cu:958 'unhandled cuda error "
+                        "(run with NCCL_DEBUG=INFO for details)'")
+            op = "all_reduce_perf"
+            for c in ("all_reduce_perf", "all_gather_perf", "reduce_scatter_perf", "broadcast_perf"):
+                if low.startswith(c):
+                    op = c
+                    break
+            # nGPUs from -g N (default 8).
+            ngpus = _SMI_GPU_COUNT
+            if "-g" in parts:
+                try:
+                    ngpus = int(parts[parts.index("-g") + 1])
+                except (ValueError, IndexError):
+                    pass
+            header = (
+                f"# nThread 1 nGpus {ngpus} minBytes 8388608 maxBytes 8589934592 step: 2(factor) "
+                "warmup iters: 5 iters: 20 agg iters: 1 validation: 1 graph: 0\n"
+                "#\n"
+                f"# Using devices\n"
+                + "\n".join(
+                    f"#  Rank {i} Group  0 Pid  {random.randint(20000, 60000)} on gpu-node "
+                    f"device {i} [0x{(i + 1) * 0x10 + 1:02x}] {_SMI_GPU_NAME}"
+                    for i in range(ngpus)
+                )
+                + "\n#\n"
+                "#                                                              out-of-place                       in-place\n"
+                "#       size         count      type   redop    root     time   algbw   busbw #wrong     time   algbw   busbw #wrong\n"
+                "#        (B)    (elements)                               (us)  (GB/s)  (GB/s)            (us)  (GB/s)  (GB/s)")
+            sizes = [8388608, 16777216, 33554432, 67108864, 134217728, 268435456,
+                     536870912, 1073741824, 2147483648, 4294967296, 8589934592]
+            lines = [header]
+            peak_busbw = 0.0
+            for sz in sizes:
+                count = sz // 4
+                # Larger messages approach NVLink/NVSwitch peak (~480 GB/s busbw on H100).
+                busbw = min(480.0, 40.0 + sz / 2.0e7) * random.uniform(0.9, 1.02)
+                algbw = busbw * ngpus / (2.0 * (ngpus - 1)) if ngpus > 1 else busbw
+                t_us = (sz / (algbw * 1e9)) * 1e6
+                peak_busbw = max(peak_busbw, busbw)
+                lines.append(
+                    f"  {sz:11d} {count:13d}     float     sum      -1  "
+                    f"{t_us:8.1f} {algbw:7.2f} {busbw:7.2f}      0  "
+                    f"{t_us * 0.98:8.1f} {algbw * 1.01:7.2f} {busbw * 1.01:7.2f}      0")
+            lines.append(f"# Out of bounds values : 0 OK")
+            lines.append(f"# Avg bus bandwidth    : {peak_busbw * 0.82:.4f}")
+            lines.append("#")
+            return "\n".join(lines)
         return f"{line}: OK (GPU simulation)"
     shell.register_handler(handler)
 

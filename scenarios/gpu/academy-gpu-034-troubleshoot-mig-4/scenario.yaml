@@ -11,25 +11,39 @@ max_score: 100
 is_free: false
 infrastructure_type: docker
 jira_priority: Medium
-description: 'CONTEXT: A team operating GPU operations needs you to resolve `gpu: Mig Partitioning — Troubleshooting
-  Drill` during a realistic incident. The business impact is reduced service reliability until the underlying
-  state is repaired.
+description: 'CONTEXT: A team operating GPU operations has raised a ticket for `Mig Partitioning — Troubleshoot
+  Lab`. A customer-facing workflow is degraded and the on-call engineer (you) must diagnose and resolve
+  it. Business impact: reduced service reliability and blocked users until the underlying state is repaired.
 
 
-  ENVIRONMENT: You are working in FixitLab''s offline GPU node with nvidia-smi, drivers, CUDA, and container
-  toolkit. All tools run locally; no paid APIs or external cloud calls are required.
+  ENVIRONMENT: You are working in FixitLab''s offline GPU node. The architecture is a single lab-primary
+  node exposing nvidia-smi, drivers, CUDA, and container toolkit; treat it as the production host for
+  this incident. All tools run locally — no paid APIs or external cloud calls are required.
 
 
   SYMPTOM / STARTING STATE: The GPU node is degraded. Gpu is not partitioned for multi-tenant use. Recent
-  changes may exist around MIG partitioning, but do not restart blindly — gather evidence first. Production
-  alert: GPU is not partitioned for multi-tenant use. You are on call for gpu and must troubleshoot MIG
-  partitioning methodically — triage symptoms, isolate root cause, apply the smallest safe fix, and confirm
-  recovery.
+  changes may exist around MIG partitioning, but do not restart blindly — gather evidence first.
 
 
   OBJECTIVE: The incident symptom is clear: GPU is not partitioned for multi-tenant use; Root cause is
-  isolated with evidence, not guesswork; Service behavior returns to normal after the fix. Success means
-  `nvidia-smi` includes `NVIDIA-SMI`.
+  isolated with evidence, not guesswork; Service behavior returns to normal after the fix. Acceptance
+  criteria: the change is minimal and reversible, and success means `nvidia-smi` includes `NVIDIA-SMI`.
+
+
+  WORK TO DO: Required tooling is pre-installed; if a command is missing, note it and use the equivalent
+  already on the host. Make the smallest configuration change that moves the system toward the objective
+  (edit the relevant nvidia-smi, drivers, CUDA, and container toolkit), changing one thing at a time.
+  Check your work continuously against the objective — success means `nvidia-smi` includes `NVIDIA-SMI`.
+
+
+  VERIFY: Re-run the same check the grader uses and confirm `nvidia-smi` includes `NVIDIA-SMI`. Capture
+  the before/after output as evidence. Success criteria: the objective''s healthy state holds on a repeat
+  check, not just once.
+
+
+  ROLLBACK: If a change makes things worse, revert that single change immediately (restore the original
+  config file / undo the edit / restart the affected component) and re-observe before trying another hypothesis.
+  Never stack unverified changes.
 
 
   WHAT TO AVOID: Do not apply broad destructive changes, skip evidence gathering, or fake completion with
@@ -43,34 +57,45 @@ initial_state: The GPU node is degraded. Gpu is not partitioned for multi-tenant
 hints:
 - order: 1
   cost: 0
-  content: 'Orient yourself before changing anything:
+  content: 'ORIENT — what to observe and why:
 
-    1. Inspect the current state — `nvidia-smi mig -lgip` and instances.
-
-    2. Write down what looks normal versus wrong or missing for MIG partitioning.
-
-    3. Recall the core idea: multi-instance GPU profiles. Form one hypothesis before you act.'
+    Do not touch anything yet. First observe the symptom: GPU is not partitioned for multi-tenant use.
+    This lab is about MIG partitioning — multi-instance GPU profiles. Read the objectives and the current
+    state, and note precisely what looks wrong versus healthy before you form any theory.'
 - order: 2
+  cost: 10
+  content: 'APPROACH — the troubleshooting method:
+
+    Work from evidence, not guesses. For MIG partitioning problems the reliable method is: (1) reproduce/observe
+    the failure, (2) narrow from the whole system down to the one component that owns the symptom, (3)
+    change exactly one thing, (4) re-check. Fix the underlying misconfiguration you identified (not just
+    the noisy log line), changing one thing at a time.'
+- order: 3
   cost: 25
-  content: 'Diagnostic steps:
+  content: 'WHICH TOOL — the diagnostic command(s):
+
+    Run `docker ps -a` and `docker logs <container>` for the failing container.'
+- order: 4
+  cost: 40
+  content: 'NARROW DOWN — isolate the subsystem:
 
     1. `docker ps -a` — note Exited status and exit code.
 
     2. `docker logs <name>` for the startup error.
 
     3. Inspect the Dockerfile or `docker run` flags if the image is wrong.'
-- order: 3
-  cost: 50
-  content: 'Exact fix + verification:
+- order: 5
+  cost: 60
+  content: 'NEAR-SOLUTION — the fix shape + verify (you still apply it):
 
-    1. Re-check the current state — `nvidia-smi mig -lgip` and instances.
+    1. Fix image, port mapping, volume, or env configuration.
 
-    2. Fix the underlying misconfiguration you identified (not just the noisy log line), changing one
-    thing at a time.
+    2. `docker start <name>` or re-run with corrected flags.
 
-    3. Verify the result — MIG instances are created and schedulable.
+    3. Confirm `nvidia-smi` shows the container Up.
 
-    4. Click Check Solution once the objective is met (graded on real state, not a marker file).'
+
+    WHY: the checker validates the container is actually running.'
 summary: Complete the mig partitioning — troubleshoot lab gpu lab and verify success with the checker
 estimated_minutes: 20
 xp_reward: 100

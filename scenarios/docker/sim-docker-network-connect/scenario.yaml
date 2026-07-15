@@ -9,26 +9,42 @@ time_limit: 900
 max_score: 100
 jira_priority: Medium
 is_free: false
-description: 'CONTEXT: A team operating Docker containers needs you to resolve `Container Not on Application
-  Network` during a realistic incident. The business impact is reduced service reliability until the underlying
-  state is repaired.
+description: 'CONTEXT: A team operating Docker containers has raised a ticket for `Container Not on Application
+  Network`. A customer-facing workflow is degraded and the on-call engineer (you) must diagnose and resolve
+  it. Business impact: reduced service reliability and blocked users until the underlying state is repaired.
 
 
-  ENVIRONMENT: You are working in FixitLab''s offline Docker host with docker CLI, images, containers,
-  and compose files. All tools run locally; no paid APIs or external cloud calls are required.
+  ENVIRONMENT: You are working in FixitLab''s offline Docker host. The architecture is a single lab-primary
+  node exposing docker CLI, images, containers, and compose files; treat it as the production host for
+  this incident. All tools run locally — no paid APIs or external cloud calls are required.
 
 
   SYMPTOM / STARTING STATE: Docker host running an app container and its dependency (e.g. a database)
   on different networks. The app can''t reach the dependency by name; connections fail with name-resolution
-  or connection errors. Two containers that need to talk to each other can''t resolve or reach one another
-  because they are not on the same user-defined Docker network. On the default bridge, DNS-based service
-  discovery doesn''t work; on separate networks, there''s no connectivity at all. Put both containers
-  on a shared user-defined network so they can communicate by name.
+  or connection errors.
 
 
   OBJECTIVE: Confirm the containers cannot reach each other across networks; Identify which networks each
   container is attached to; Attach both to a shared user-defined network and verify name-based connectivity.
-  Success means `systemctl is-active docker` returns active.
+  Acceptance criteria: the change is minimal and reversible, and success means `systemctl is-active docker`
+  returns active.
+
+
+  WORK TO DO: Required tooling is pre-installed; if a command is missing, note it and use the equivalent
+  already on the host. Make the smallest configuration change that moves the system toward the objective
+  (edit the relevant docker CLI, images, containers, and compose files), changing one thing at a time.
+  Check your work continuously against the objective — success means `systemctl is-active docker` returns
+  active.
+
+
+  VERIFY: Re-run the same check the grader uses and confirm `systemctl is-active docker` returns active.
+  Capture the before/after output as evidence. Success criteria: the objective''s healthy state holds
+  on a repeat check, not just once.
+
+
+  ROLLBACK: If a change makes things worse, revert that single change immediately (restore the original
+  config file / undo the edit / restart the affected component) and re-observe before trying another hypothesis.
+  Never stack unverified changes.
 
 
   WHAT TO AVOID: Do not apply broad destructive changes, skip evidence gathering, or fake completion with
@@ -43,29 +59,47 @@ initial_state: Docker host running an app container and its dependency (e.g. a d
 hints:
 - order: 1
   cost: 0
-  content: 'Where to look: Start with `systemctl status docker` and `journalctl -u docker -n 50 --no-pager`
-    before changing anything.'
+  content: 'ORIENT — what to observe and why:
+
+    Do not touch anything yet. First observe the symptom: container not on application network is not
+    behaving as the scenario objectives require. This lab is about container not on application network
+    — how container not on application network behaves in a Docker containers environment. Read the objectives
+    and the current state, and note precisely what looks wrong versus healthy before you form any theory.'
 - order: 2
-  cost: 25
-  content: 'Diagnostic steps:
+  cost: 10
+  content: 'APPROACH — the troubleshooting method:
 
-    1. Run `systemctl status docker` — note Active/Failed and the last log lines.
-
-    2. Read `journalctl -u docker -n 50` for the root error.
-
-    3. Form a hypothesis about the smallest config or permission fix.'
+    Work from evidence, not guesses. For container not on application network problems the reliable method
+    is: (1) reproduce/observe the failure, (2) narrow from the whole system down to the one component
+    that owns the symptom, (3) change exactly one thing, (4) re-check. Create the smallest working slice
+    of container not on application network first, validate it, then add the remaining pieces one at a
+    time.'
 - order: 3
-  cost: 50
-  content: 'Exact fix + verification:
+  cost: 25
+  content: 'WHICH TOOL — the diagnostic command(s):
 
-    1. Apply the minimal fix (config, unit override, or missing directory).
+    Run `docker ps -a` and `docker logs <container>` for the failing container.'
+- order: 4
+  cost: 40
+  content: 'NARROW DOWN — isolate the subsystem:
 
-    2. Run `systemctl daemon-reload` if you edited a unit file.
+    1. Identify the exited/unhealthy container and read its logs.
 
-    3. Run `systemctl restart docker` and confirm `systemctl is-active docker` succeeds.
+    2. Inspect the image, env vars, and volume mounts (`docker inspect`).
+
+    3. Compare container state to the scenario objectives.'
+- order: 5
+  cost: 60
+  content: 'NEAR-SOLUTION — the fix shape + verify (you still apply it):
+
+    1. Fix the Dockerfile, compose file, or runtime config.
+
+    2. Rebuild/restart the container.
+
+    3. Confirm `systemctl is-active docker` succeeds.
 
 
-    WHY: the grader checks real service state, not marker files.'
+    WHY: Docker labs grade real container state.'
 summary: Complete the container not on application network docker lab and verify success with the checker
 estimated_minutes: 15
 xp_reward: 100

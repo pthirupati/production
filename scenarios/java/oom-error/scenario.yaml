@@ -10,25 +10,42 @@ simulation_type: java
 infrastructure_type: simulation
 jira_priority: Critical
 is_free: false
-description: 'CONTEXT: A team operating Java applications needs you to resolve `Container OOMKilled —
-  JVM Heap Larger Than the cgroup Limit` during a realistic incident. The business impact is reduced service
-  reliability until the underlying state is repaired.
+description: 'CONTEXT: A team operating Java applications has raised a ticket for `Container OOMKilled
+  — JVM Heap Larger Than the cgroup Limit`. A customer-facing workflow is degraded and the on-call engineer
+  (you) must diagnose and resolve it. Business impact: reduced service reliability and blocked users until
+  the underlying state is repaired.
 
 
-  ENVIRONMENT: You are working in FixitLab''s offline Java project with Maven/Gradle, JVM logs, and Spring
-  configuration. All tools run locally; no paid APIs or external cloud calls are required.
+  ENVIRONMENT: You are working in FixitLab''s offline Java project. The architecture is a single lab-primary
+  node exposing Maven/Gradle, JVM logs, and Spring configuration; treat it as the production host for
+  this incident. All tools run locally — no paid APIs or external cloud calls are required.
 
 
   SYMPTOM / STARTING STATE: JVM flags at /app/jvm.options pin a large fixed -Xmx ignoring the cgroup limit;
-  the container is OOMKilled with exit 137. The pod is OOMKilled (exit 137) even though the JVM never
-  logs an OutOfMemoryError. The JVM is not container-aware and sizes the heap from host memory, so RSS
-  exceeds the container memory limit and the kernel kills it. Make the JVM respect the cgroup limit and
-  leave headroom for non-heap memory.
+  the container is OOMKilled with exit 137.
 
 
   OBJECTIVE: Confirm the kill is OOMKilled (137) by the kernel, not a JVM heap OOM; Make the JVM honor
-  the container memory limit; Leave headroom for metaspace/threads/direct buffers (cap heap %). Success
-  means `check.sh` exits successfully.
+  the container memory limit; Leave headroom for metaspace/threads/direct buffers (cap heap %). Acceptance
+  criteria: the change is minimal and reversible, and success means `kubectl get pods` shows every pod
+  Running.
+
+
+  WORK TO DO: Required tooling is pre-installed; if a command is missing, note it and use the equivalent
+  already on the host. Make the smallest configuration change that moves the system toward the objective
+  (edit the relevant Maven/Gradle, JVM logs, and Spring configuration), changing one thing at a time.
+  Check your work continuously against the objective — success means `kubectl get pods` shows every pod
+  Running.
+
+
+  VERIFY: Re-run the same check the grader uses and confirm `kubectl get pods` shows every pod Running.
+  Capture the before/after output as evidence. Success criteria: the objective''s healthy state holds
+  on a repeat check, not just once.
+
+
+  ROLLBACK: If a change makes things worse, revert that single change immediately (restore the original
+  config file / undo the edit / restart the affected component) and re-observe before trying another hypothesis.
+  Never stack unverified changes.
 
 
   WHAT TO AVOID: Do not apply broad destructive changes, skip evidence gathering, or fake completion with
@@ -45,29 +62,47 @@ initial_state: 'JVM flags at /app/jvm.options pin a large fixed -Xmx ignoring th
 hints:
 - order: 1
   cost: 0
-  content: 'Where to look: Run `kubectl get pods -A` and `kubectl describe pod <name>` for any pod not
-    in Running state.'
+  content: 'ORIENT — what to observe and why:
+
+    Do not touch anything yet. First observe the symptom: container OOMKilled — JVM heap larger than the
+    cgroup limit is not behaving as the scenario objectives require. This lab is about container OOMKilled
+    — JVM heap larger than the cgroup limit — how container OOMKilled — JVM heap larger than the cgroup
+    limit behaves in a Java applications environment. Read the objectives and the current state, and note
+    precisely what looks wrong versus healthy before you form any theory.'
 - order: 2
-  cost: 25
-  content: 'Diagnostic steps:
+  cost: 10
+  content: 'APPROACH — the troubleshooting method:
 
-    1. `kubectl get pods` — note CrashLoopBackOff, ImagePullBackOff, or Pending.
-
-    2. `kubectl describe pod <name>` — read Events at the bottom.
-
-    3. `kubectl logs <name> [--previous]` if the container restarted.'
+    Work from evidence, not guesses. For container OOMKilled — JVM heap larger than the cgroup limit problems
+    the reliable method is: (1) reproduce/observe the failure, (2) narrow from the whole system down to
+    the one component that owns the symptom, (3) change exactly one thing, (4) re-check. Fix the underlying
+    misconfiguration you identified (not just the noisy log line), changing one thing at a time.'
 - order: 3
-  cost: 50
-  content: 'Exact fix + verification:
+  cost: 25
+  content: 'WHICH TOOL — the diagnostic command(s):
 
-    1. Fix the root cause (image name, env var, volume mount, or probe).
+    Run `kubectl get pods -A` and `kubectl describe pod <name>` for Events and container state.'
+- order: 4
+  cost: 40
+  content: 'NARROW DOWN — isolate the subsystem:
 
-    2. `kubectl apply -f` the corrected manifest or delete the pod to recreate.
+    1. Check pod phase, restarts, and last State reason.
 
-    3. Confirm `kubectl get pods` shows every pod Running.
+    2. `kubectl logs <pod> --previous` if it crashed.
+
+    3. Compare resource spec (probes, limits, mounts) to objectives.'
+- order: 5
+  cost: 60
+  content: 'NEAR-SOLUTION — the fix shape + verify (you still apply it):
+
+    1. Patch the Deployment/Service/ConfigMap with the minimal fix.
+
+    2. Wait for rollout (`kubectl rollout status`).
+
+    3. Confirm `kubectl get pods` succeeds.
 
 
-    WHY: Kubernetes only reports healthy when the workload actually runs.'
+    WHY: Kubernetes labs grade real cluster state.'
 summary: Complete the container oomkilled — jvm heap larger than the cgroup limit java lab and verify
   success with the checker
 estimated_minutes: 15

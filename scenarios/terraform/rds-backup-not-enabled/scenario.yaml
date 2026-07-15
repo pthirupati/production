@@ -2,26 +2,41 @@ title: RDS Automated Backups Disabled
 slug: aws-rds-backup-not-enabled
 difficulty: easy
 category: Fix
-description: 'CONTEXT: A team operating Terraform IaC needs you to resolve `RDS Automated Backups Disabled`
-  during a realistic incident. The business impact is reduced service reliability until the underlying
-  state is repaired.
+description: 'CONTEXT: A team operating Terraform IaC has raised a ticket for `RDS Automated Backups Disabled`.
+  A customer-facing workflow is degraded and the on-call engineer (you) must diagnose and resolve it.
+  Business impact: reduced service reliability and blocked users until the underlying state is repaired.
 
 
-  ENVIRONMENT: You are working in FixitLab''s offline Terraform workspace with HCL files, state, and plan/apply
-  workflow. All tools run locally; no paid APIs or external cloud calls are required.
+  ENVIRONMENT: You are working in FixitLab''s offline Terraform workspace. The architecture is a single
+  lab-primary node exposing HCL files, state, and plan/apply workflow; treat it as the production host
+  for this incident. All tools run locally — no paid APIs or external cloud calls are required.
 
 
   SYMPTOM / STARTING STATE: Simulated AWS environment with an RDS MySQL instance where BackupRetentionPeriod
   is 0. No automated snapshots are being taken, leaving the database unprotected against accidental data
-  loss or corruption. An RDS instance has automated backups disabled (BackupRetentionPeriod = 0), so the
-  database takes no automated snapshots and can''t be point-in-time restored — a serious data-loss and
-  compliance risk. Enable automated backups with a sensible retention period and backup window so the
-  instance is recoverable.
+  loss or corruption.
 
 
   OBJECTIVE: Identify the RDS instance with backups disabled using the AWS CLI; Enable automated backups
   with a retention period of at least 7 days; Set an appropriate backup window and confirm backups are
-  enabled. Success means `check.sh` exits successfully.
+  enabled. Acceptance criteria: the change is minimal and reversible, and success means `check.sh` exits
+  successfully.
+
+
+  WORK TO DO: Required tooling is pre-installed; if a command is missing, note it and use the equivalent
+  already on the host. Make the smallest configuration change that moves the system toward the objective
+  (edit the relevant HCL files, state, and plan/apply workflow), changing one thing at a time. Check your
+  work continuously against the objective — success means `check.sh` exits successfully.
+
+
+  VERIFY: Re-run the same check the grader uses and confirm `check.sh` exits successfully. Capture the
+  before/after output as evidence. Success criteria: the objective''s healthy state holds on a repeat
+  check, not just once.
+
+
+  ROLLBACK: If a change makes things worse, revert that single change immediately (restore the original
+  config file / undo the edit / restart the affected component) and re-observe before trying another hypothesis.
+  Never stack unverified changes.
 
 
   WHAT TO AVOID: Do not apply broad destructive changes, skip evidence gathering, or fake completion with
@@ -41,28 +56,55 @@ is_free: true
 hints:
 - order: 1
   cost: 0
-  content: 'Where to look: Run `systemctl status mysqld` and tail `/var/log/mysqld.log`.'
+  content: 'ORIENT — what to observe and why:
+
+    Do not touch anything yet. First observe the symptom: RDS automated backups disabled is not behaving
+    as the scenario objectives require. This lab is about RDS automated backups disabled — how RDS automated
+    backups disabled behaves in a Terraform IaC environment. Read the objectives and the current state,
+    and note precisely what looks wrong versus healthy before you form any theory.'
 - order: 2
-  cost: 25
-  content: 'Diagnostic steps:
+  cost: 10
+  content: 'APPROACH — the troubleshooting method:
 
-    1. Read the error log for InnoDB or permission failures.
-
-    2. Check disk space with `df -h`.
-
-    3. Verify `my.cnf` for bad paths or bind-address.'
+    Work from evidence, not guesses. For RDS automated backups disabled problems the reliable method is:
+    (1) reproduce/observe the failure, (2) narrow from the whole system down to the one component that
+    owns the symptom, (3) change exactly one thing, (4) re-check. Fix the underlying misconfiguration
+    you identified (not just the noisy log line), changing one thing at a time.'
 - order: 3
-  cost: 50
-  content: 'Exact fix + verification:
+  cost: 25
+  content: 'WHICH TOOL — the diagnostic command(s):
 
-    1. Fix config or ownership under `/var/lib/mysql`.
+    1. Inspect the current state with HCL files, state, and plan/apply workflow.
 
-    2. `systemctl restart mysqld`.
+    2. Each command above tells you something specific — status/health, recent errors, and the effective
+    configuration. Read them in that order.
 
-    3. Confirm `systemctl is-active mysqld` returns active.
+    3. Compare what you see to the objectives; the gap points at the fault.'
+- order: 4
+  cost: 40
+  content: 'NARROW DOWN — isolate the subsystem:
+
+    1. From the evidence above, decide which single part of RDS automated backups disabled is at fault.
+
+    2. Re-run the most relevant of HCL files, state, and plan/apply workflow focused on just that part
+    to confirm it.
+
+    3. State a one-line hypothesis: the smallest change that would move the state from ''RDS automated
+    backups disabled is not behaving as the scenario objectives require'' toward ''`check.sh` exits successfully''.'
+- order: 5
+  cost: 60
+  content: 'NEAR-SOLUTION — the fix shape + verify (you still apply it):
+
+    1. Apply the smallest reversible change your hypothesis points to. Fix the underlying misconfiguration
+    you identified (not just the noisy log line), changing one thing at a time.
+
+    2. Re-run `bash check.sh` and confirm `check.sh` exits successfully.
+
+    3. If it still fails, the hypothesis was wrong — go back to the evidence, do not stack changes.
 
 
-    WHY: MySQL often fails silently until you read the error log.'
+    WHY: the grader validates real system state, not marker files — a fix only counts when the subsystem
+    is actually healthy.'
 requires_companion_hosts: false
 dual_terminal: false
 jira_priority: High

@@ -138,6 +138,18 @@ def _series_for_metric(metric: str, broken: dict, t: float) -> list[dict]:
             for i in range(40):
                 emit({"instance": "api-1:8080", "job": "api-server", "code": "200",
                       "user_id": f"u{10000 + i}"}, _seeded(f"u{i}", 3, 2, t))
+    elif metric == "http_request_duration_seconds_bucket":
+        # Cumulative histogram buckets so histogram_quantile() has real data.
+        # Bucket counts are monotonic in `le`; the +Inf bucket is the total.
+        buckets = ["0.005", "0.01", "0.025", "0.05", "0.1", "0.25", "0.5", "1", "2.5", "5", "+Inf"]
+        # A distribution centered around ~120ms: fractions of total per le bound.
+        frac = {"0.005": 0.02, "0.01": 0.06, "0.025": 0.18, "0.05": 0.38, "0.1": 0.60,
+                "0.25": 0.86, "0.5": 0.95, "1": 0.985, "2.5": 0.996, "5": 0.999, "+Inf": 1.0}
+        for inst in _JOBS["api-server"]:
+            total = _seeded(f"{inst}hist", 5000, 200, t) + t / 4
+            for le in buckets:
+                emit({"instance": inst, "job": "api-server", "handler": "/api/v1/orders",
+                      "le": le}, round(total * frac[le], 4))
     elif metric == "probe_success":
         down = set(broken.get("targets_down") or [])
         for inst in _JOBS["blackbox"]:
@@ -160,8 +172,44 @@ def _series_for_metric(metric: str, broken: dict, t: float) -> list[dict]:
 
 _RANGE_RE = re.compile(r"\[(\d+)([smhd])\]")
 _FUNC_RE = re.compile(r"^(\w+)\((.*)\)$", re.DOTALL)
-_AGG_RE = re.compile(r"^(sum|avg|min|max|count|topk|bottomk)\s*(?:by\s*\(([^)]*)\))?\s*\((.*)\)$", re.DOTALL)
+_AGG_RE = re.compile(r"^(sum|avg|min|max|count|stddev|stdvar|topk|bottomk|quantile)\s*(?:by\s*\(([^)]*)\))?\s*\((.*)\)$", re.DOTALL)
 _SELECTOR_RE = re.compile(r"^([a-zA-Z_:][a-zA-Z0-9_:]*)(?:\{([^}]*)\})?")
+
+# Realistic per-second increment rate for monotonic counters. `rate()`/`irate()`
+# on a counter must yield the *slope* (small per-second number), NOT the huge
+# accumulated total. Prometheus computes (v[now]-v[now-Δ])/Δ; with a single
+# simulated sample we look up the metric's known growth-per-second here so the
+# canonical dashboard exprs (CPU-busy %, request rate, error ratio) evaluate to
+# realistic values instead of garbage. Values are per-series *base* rates; the
+# actual rate for a given label-set is derived deterministically around it.
+_COUNTER_RATES = {
+    # node_cpu_seconds_total: seconds-of-CPU accrued per wall-second. On an idle
+    # box the 'idle' mode advances ~1.0 s/s per core; busy modes are small.
+    "node_cpu_seconds_total": {"idle": 0.82, "user": 0.11, "system": 0.05, "iowait": 0.02,
+                               "_default": 0.5},
+    # http_requests_total: requests/sec by code. 200s dominate; 500/404 are rare.
+    "http_requests_total": {"200": 240.0, "404": 3.5, "500": 1.2, "_default": 10.0},
+    "http_request_duration_seconds_count": {"200": 240.0, "404": 3.5, "500": 1.2, "_default": 10.0},
+    "http_request_duration_seconds_sum": {"_default": 120.0},
+    "node_network_receive_bytes_total": {"_default": 1.4e6},
+    "node_network_transmit_bytes_total": {"_default": 9.2e5},
+    "node_disk_read_bytes_total": {"_default": 5.1e5},
+    "node_disk_written_bytes_total": {"_default": 7.3e5},
+}
+
+
+def _counter_rate_for(metric: str, labels: dict, t: float) -> float:
+    """Deterministic-ish per-second rate for a counter series (used by rate/
+    irate/increase). Falls back to a small generic slope for unknown counters."""
+    table = _COUNTER_RATES.get(metric)
+    if table is None:
+        # Unknown counter → tiny positive slope with mild wobble so panels draw.
+        return round(abs(_seeded(metric + str(sorted(labels.items())), 1.5, 0.4, t)), 4)
+    # Key the rate off the most discriminating label present (mode/code), else default.
+    key = labels.get("mode") or labels.get("code") or "_default"
+    base = table.get(key, table.get("_default", 1.0))
+    wob = _seeded(f"{metric}{key}{labels.get('instance', '')}", 0.0, base * 0.08, t)
+    return round(max(base + wob, 0.0), 4)
 
 
 def _parse_selector_labels(label_str: str) -> dict:
@@ -321,9 +369,27 @@ def eval_promql(query: str, broken: dict, t: float | None = None) -> dict:
     m = _AGG_RE.match(q)
     if m:
         agg, by_labels, inner = m.group(1), m.group(2), m.group(3)
+        # topk/bottomk/quantile take a leading scalar arg: topk(3, vector).
+        k_arg: float | None = None
+        if agg in ("topk", "bottomk", "quantile") and "," in inner:
+            head, rest = inner.split(",", 1)
+            maybe_k = _as_scalar(head.strip())
+            if maybe_k is not None:
+                k_arg = maybe_k
+                inner = rest.strip()
         inner_res = eval_promql(inner, broken, t)
         rows = inner_res.get("data", {}).get("result", [])
         by = [b.strip() for b in (by_labels or "").split(",") if b.strip()]
+
+        # topk/bottomk return the top/bottom N whole *series* (labels preserved),
+        # not an aggregated scalar — handle before the grouping reducers.
+        if agg in ("topk", "bottomk"):
+            n = int(k_arg) if k_arg is not None else len(rows)
+            ranked = sorted(rows, key=lambda r: float(r["value"][1]),
+                            reverse=(agg == "topk"))
+            return {"status": "success",
+                    "data": {"resultType": "vector", "result": ranked[:max(n, 0)]}}
+
         groups: dict[tuple, list[float]] = {}
         group_labels: dict[tuple, dict] = {}
         for r in rows:
@@ -342,7 +408,20 @@ def eval_promql(query: str, broken: dict, t: float | None = None) -> dict:
                 v = min(vals)
             elif agg == "max":
                 v = max(vals)
-            else:  # count / topk / bottomk → count-ish
+            elif agg == "count":
+                v = len(vals)
+            elif agg in ("stddev", "stdvar"):
+                mean = sum(vals) / len(vals)
+                var = sum((x - mean) ** 2 for x in vals) / len(vals)
+                v = var if agg == "stdvar" else math.sqrt(var)
+            elif agg == "quantile":
+                sv = sorted(vals)
+                phi = min(max(k_arg if k_arg is not None else 0.5, 0.0), 1.0)
+                idx = phi * (len(sv) - 1)
+                lo = int(math.floor(idx))
+                hi = min(lo + 1, len(sv) - 1)
+                v = sv[lo] + (sv[hi] - sv[lo]) * (idx - lo)
+            else:
                 v = len(vals)
             result.append({"metric": group_labels[key], "value": [t, str(round(v, 4))]})
         return {"status": "success", "data": {"resultType": "vector", "result": result}}
@@ -353,17 +432,86 @@ def eval_promql(query: str, broken: dict, t: float | None = None) -> dict:
         "max_over_time", "min_over_time", "delta", "deriv", "histogram_quantile",
         "abs", "ceil", "floor", "round",
     ):
+        func = fm.group(1)
         inner = fm.group(2)
-        # histogram_quantile(0.95, ...) — drop the quantile arg.
-        if fm.group(1) == "histogram_quantile" and "," in inner:
-            inner = inner.split(",", 1)[1]
+        # histogram_quantile(phi, <bucket vector>) — interpolate over le buckets.
+        if func == "histogram_quantile" and "," in inner:
+            phi_str, inner = inner.split(",", 1)
+            phi = _as_scalar(phi_str.strip())
+            phi = 0.95 if phi is None else min(max(phi, 0.0), 1.0)
+            inner = _RANGE_RE.sub("", inner.strip())
+            bres = eval_promql(inner, broken, t)
+            brows = bres.get("data", {}).get("result", [])
+            # Group buckets by their non-le labels, then interpolate the quantile.
+            def _bkey(labels: dict) -> tuple:
+                return tuple(sorted((k, v) for k, v in labels.items()
+                                    if k not in ("le", "__name__")))
+            grouped: dict[tuple, list[tuple]] = {}
+            glabels: dict[tuple, dict] = {}
+            for r in brows:
+                le_raw = r["metric"].get("le")
+                if le_raw is None:
+                    continue
+                le = float("inf") if le_raw in ("+Inf", "Inf") else float(le_raw)
+                key = _bkey(r["metric"])
+                grouped.setdefault(key, []).append((le, float(r["value"][1])))
+                glabels.setdefault(key, {k: v for k, v in r["metric"].items()
+                                        if k not in ("le", "__name__")})
+            out = []
+            for key, pairs in grouped.items():
+                pairs.sort(key=lambda p: p[0])
+                total = pairs[-1][1] if pairs else 0.0
+                if total <= 0:
+                    out.append({"metric": glabels[key], "value": [t, "NaN"]})
+                    continue
+                rank = phi * total
+                prev_le, prev_count = 0.0, 0.0
+                q = pairs[-1][0]
+                for le, count in pairs:
+                    if count >= rank:
+                        if math.isinf(le):
+                            q = prev_le
+                        elif count > prev_count:
+                            q = prev_le + (le - prev_le) * ((rank - prev_count) / (count - prev_count))
+                        else:
+                            q = le
+                        break
+                    prev_le, prev_count = le, count
+                out.append({"metric": glabels[key], "value": [t, str(round(q, 4))]})
+            return {"status": "success", "data": {"resultType": "vector", "result": out}}
+        # Capture the range window (e.g. [5m]) before stripping — increase() over
+        # a window is rate*window, so we need the duration in seconds.
+        window_s = 0.0
+        rm = _RANGE_RE.search(inner)
+        if rm:
+            mult = {"s": 1, "m": 60, "h": 3600, "d": 86400}.get(rm.group(2), 60)
+            window_s = float(rm.group(1)) * mult
         inner = _RANGE_RE.sub("", inner).strip()
         res = eval_promql(inner, broken, t)
-        # rate() of a counter → scale down so values look like per-second rates.
-        if fm.group(1) in ("rate", "irate", "deriv", "delta"):
-            for r in res.get("data", {}).get("result", []):
-                r["value"][1] = str(round(float(r["value"][1]) / 60.0, 4))
-        return res
+        rows = res.get("data", {}).get("result", [])
+        # rate/irate/increase/delta/deriv of a *counter*: replace the accumulated
+        # total with the counter's true per-second slope. increase() = slope*window.
+        if func in ("rate", "irate", "deriv", "delta", "increase"):
+            for r in rows:
+                name = r["metric"].get("__name__", "")
+                if name.endswith("_bucket"):
+                    # Histogram bucket counters: preserve the monotonic le-ordering
+                    # (needed for histogram_quantile) by scaling the raw cumulative
+                    # count into a per-second bucket rate rather than a flat slope.
+                    slope = float(r["value"][1]) / (window_s or 300.0)
+                else:
+                    slope = _counter_rate_for(name, r["metric"], t)
+                    if func == "increase":
+                        slope *= (window_s or 300.0)
+                r["value"][1] = str(round(slope, 4))
+        # *_over_time keep the underlying gauge value as-is (identity is fine for
+        # a single sample). abs/ceil/floor/round apply the arithmetic transform.
+        elif func in ("abs", "ceil", "floor", "round"):
+            transform = {"abs": abs, "ceil": math.ceil, "floor": math.floor,
+                         "round": round}[func]
+            for r in rows:
+                r["value"][1] = str(transform(float(r["value"][1])))
+        return {"status": "success", "data": {"resultType": "vector", "result": rows}}
 
     # Plain selector: metric{labels}
     sm = _SELECTOR_RE.match(q)
@@ -1019,3 +1167,116 @@ def apply_action(session_id: str, action: str, payload: dict | None = None) -> d
         return {"ok": True, "message": "Simulator refreshed to healthy state"}
 
     return {"ok": False, "error": f"unknown action: {action}"}
+
+
+# ---------------------------------------------------------------------------
+# Server-side grader — fail-CLOSED.
+#
+# The audit found the monitoring simulator was routed in simulation_provisioner
+# but had NO validator: "Check" fell through to the generic path, which can
+# fail-open on a fresh observability world. This grades against the *engine
+# state* the learner repaired through the simulator UI (datasource health,
+# scrape targets up, panels no longer "No data", alert rules quiet, series
+# cardinality back to normal). A freshly-seeded scenario always carries an
+# unresolved fault, so validation returns (False, reason) until the specific
+# repair action (add_datasource / reload_config / delete_scrape_target /
+# update_panel / mark_fix_applied, etc.) clears it — never before.
+# ---------------------------------------------------------------------------
+
+def validate_monitoring_lab(session_id: str, scenario_slug: str = "") -> tuple[bool, str]:
+    entry = _load_session(str(session_id))
+    if not entry:
+        # No engine state at all → cannot confirm the learner fixed anything.
+        return False, "No monitoring simulation session"
+    state = entry.get("state") or {}
+    graf = state.get("grafana") or {}
+    prom = state.get("prometheus") or {}
+    broken = state.get("broken") or {}
+    slug = (scenario_slug or entry.get("scenario_slug") or "").lower()
+
+    # If the learner explicitly reported the config fixed (UI "mark fix
+    # applied" after rewriting prometheus.yml / grafana provisioning + FIXED-OK
+    # in the terminal), honor it: mark_fix_applied clears every broken flag and
+    # brings datasources/targets back healthy, so the checks below all pass.
+    fix_applied = bool(state.get("fix_applied"))
+
+    # 1) Datasource health — a datasource-misconfig scenario fails until the
+    #    Prometheus datasource is reachable again (or a replacement was added).
+    ds_scenario = any(k in slug for k in ("datasource", "no-data", "nodata"))
+    prom_ds = [d for d in graf.get("datasources", []) if d.get("type") == "prometheus"]
+    prom_ds_ok = any(d.get("status") == "ok" for d in prom_ds)
+    if ds_scenario:
+        if not prom_ds_ok:
+            return False, "Prometheus datasource health check still failing — add/fix the datasource"
+        if broken.get("no_data_metrics"):
+            return False, "Panels still return 'No data' — reload Prometheus / fix the datasource"
+
+    # 2) Scrape targets / exporters must be up for a target-down scenario.
+    down_targets = [t for t in prom.get("targets", []) if t.get("health") == "down"]
+    target_scenario = any(
+        k in slug for k in ("target-down", "exporter-down", "node-exporter", "scrape-fail",
+                             "blackbox", "probe")
+    )
+    if target_scenario and down_targets and not fix_applied:
+        names = ", ".join(sorted(t.get("instance") or t.get("labels", {}).get("instance", "?")
+                                 for t in down_targets))
+        return False, f"Scrape target(s) still DOWN: {names}"
+
+    # 3) High-cardinality / TSDB pressure must be relieved.
+    if any(k in slug for k in ("cardinality", "high-card", "label-explosion")):
+        if broken.get("high_cardinality_metric") and not fix_applied:
+            return False, "High cardinality still present — drop the unbounded label"
+        if int(prom.get("tsdb", {}).get("head_series", 0)) > 800_000 and not fix_applied:
+            return False, "TSDB head series still elevated — reduce cardinality"
+
+    # 4) Alert misrouting / broken contact point must be resolved.
+    if any(k in slug for k in ("alert", "flap", "contact-point", "routing", "silence")):
+        if broken.get("alert_misrouted") and not fix_applied:
+            return False, "Alert routing still misconfigured — fix the contact point / route"
+        cps = graf.get("contact_points", [])
+        if any(not c.get("configured") for c in cps) and not fix_applied:
+            unconf = next(c for c in cps if not c.get("configured"))
+            return False, f"Contact point '{unconf.get('name')}' is not configured"
+
+    # 5) Recording rule must evaluate cleanly.
+    if "recording" in slug:
+        bad_rr = [r for r in prom.get("recording_rules", []) if r.get("health") not in ("ok", None)]
+        if bad_rr and not fix_applied:
+            return False, f"Recording rule {bad_rr[0].get('name')} still failing to evaluate"
+
+    # 6) remote_write / federation reachability.
+    if "remote-write" in slug or "remote_write" in slug:
+        bad_rw = [w for w in prom.get("remote_write", []) if w.get("health") == "down"]
+        if bad_rw and not fix_applied:
+            return False, "remote_write endpoint still unreachable"
+    if "federation" in slug or "federate" in slug:
+        fed = prom.get("federation") or {}
+        if fed.get("enabled") and not fed.get("match") and not fix_applied:
+            return False, "Federation scrape still misconfigured (match[] empty)"
+
+    # 7) Fail-closed backstop: for a scenario we didn't specifically key on, the
+    #    generic broken summary must have been cleared (via mark_fix_applied) or
+    #    the primary health signals must be clean. This prevents a fresh, never-
+    #    touched session (which always carries a fault summary + broken state)
+    #    from auto-passing.
+    keyed = ds_scenario or target_scenario or any(
+        k in slug for k in ("cardinality", "high-card", "label-explosion", "alert", "flap",
+                             "contact-point", "routing", "silence", "recording",
+                             "remote-write", "remote_write", "federation", "federate")
+    )
+    if not keyed:
+        has_signal_fault = (
+            bool(down_targets)
+            or bool(broken.get("no_data_metrics"))
+            or bool(broken.get("high_cardinality_metric"))
+            or bool(broken.get("panels_no_data"))
+            or bool(broken.get("alert_misrouted"))
+            or not prom_ds_ok
+        )
+        if not fix_applied and has_signal_fault:
+            return False, broken.get("summary") or "Monitoring stack still has an unresolved fault"
+        if not fix_applied and broken.get("summary"):
+            # A summary with no clearable signal → require the explicit fix marker.
+            return False, "Apply your fix in the simulator before checking"
+
+    return True, "Monitoring stack healthy — validation passed"

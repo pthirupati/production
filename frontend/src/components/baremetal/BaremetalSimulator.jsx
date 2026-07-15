@@ -1,9 +1,10 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { baremetalApi } from '../../api/baremetal'
 import toast from 'react-hot-toast'
 import {
-  LogIn, Play, Server, Box, Cpu,
-  AlertTriangle, Network, RefreshCw,
+  LogIn, Play, Square, Server, Box, Cpu,
+  AlertTriangle, Network, RefreshCw, Power, ChevronLeft,
+  HardDrive, Cable, Terminal, Rocket,
 } from 'lucide-react'
 import LabChromeBar from '../lab/LabChromeBar'
 import { simPanelRoot } from '../../utils/simLayout'
@@ -17,6 +18,41 @@ const TABS = [
   { key: 'ipmi', label: 'IPMI', icon: Network },
 ]
 
+// Machine states that are still advancing on wall-clock — while any machine is
+// in one of these, we keep polling so the UI reflects backend progress.
+const TRANSIENT = new Set(['Commissioning', 'Deploying'])
+
+const STATUS_STYLE = {
+  New: 'bg-slate-100 text-slate-600 border-slate-200',
+  Commissioning: 'bg-blue-50 text-blue-700 border-blue-200',
+  Ready: 'bg-emerald-50 text-emerald-700 border-emerald-200',
+  Allocated: 'bg-teal-50 text-teal-700 border-teal-200',
+  Deploying: 'bg-indigo-50 text-indigo-700 border-indigo-200',
+  Deployed: 'bg-green-50 text-green-700 border-green-200',
+  Failed: 'bg-red-50 text-red-700 border-red-200',
+}
+
+function StatusBadge({ status }) {
+  const cls = STATUS_STYLE[status] || 'bg-slate-100 text-slate-600 border-slate-200'
+  return (
+    <span className={`text-xs px-2 py-0.5 rounded-full border font-medium ${cls}`}>{status}</span>
+  )
+}
+
+function ProgressBar({ pct, label }) {
+  const v = Math.max(0, Math.min(100, Number(pct) || 0))
+  return (
+    <div className="mt-2">
+      <div className="flex justify-between text-xs text-slate-500 mb-1">
+        <span>{label}</span><span>{v}%</span>
+      </div>
+      <div className="h-2 rounded bg-slate-200 overflow-hidden">
+        <div className="h-full rounded transition-all duration-500" style={{ width: `${v}%`, background: ACCENT }} />
+      </div>
+    </div>
+  )
+}
+
 export default function BaremetalSimulator({
   sessionId, scenario, onExit, onStop, onHints, onCheck, onExtend,
   hintsLabel, checkDisabled, extendDisabled, embedded = false,
@@ -25,7 +61,9 @@ export default function BaremetalSimulator({
   const [loading, setLoading] = useState(true)
   const [tab, setTab] = useState('maas')
   const [busy, setBusy] = useState(false)
+  const [detailId, setDetailId] = useState(null)
   const slug = scenario?.slug || ''
+  const pollRef = useRef(null)
 
   const refresh = useCallback(async () => {
     const data = await baremetalApi.getState(sessionId, slug)
@@ -43,6 +81,29 @@ export default function BaremetalSimulator({
     else if (s.includes('maas')) setTab('maas')
   }, [slug])
 
+  const st = state?.state || {}
+  const loggedIn = st?.session?.logged_in
+  const goal = st?.goal || {}
+  const broken = st?.broken || {}
+  const machines = useMemo(() => st.maas?.machines || [], [st.maas])
+  const anyTransient = useMemo(
+    () => machines.some((m) => TRANSIENT.has(m.status)),
+    [machines],
+  )
+
+  // Poll while a machine is mid-commission/deploy so wall-clock progress shows.
+  useEffect(() => {
+    if (!loggedIn || !anyTransient) {
+      if (pollRef.current) { clearInterval(pollRef.current); pollRef.current = null }
+      return undefined
+    }
+    if (pollRef.current) return undefined
+    pollRef.current = setInterval(() => { refresh() }, 3000)
+    return () => { if (pollRef.current) { clearInterval(pollRef.current); pollRef.current = null } }
+  }, [loggedIn, anyTransient, refresh])
+
+  useEffect(() => () => { if (pollRef.current) clearInterval(pollRef.current) }, [])
+
   const run = async (fn, okMsg) => {
     if (busy) return
     setBusy(true)
@@ -54,11 +115,6 @@ export default function BaremetalSimulator({
       else await refresh()
     } finally { setBusy(false) }
   }
-
-  const st = state?.state || {}
-  const loggedIn = st?.session?.logged_in
-  const goal = st?.goal || {}
-  const broken = st?.broken || {}
 
   const chromeProps = {
     onHints, onCheck, onExtend, onStop,
@@ -86,6 +142,8 @@ export default function BaremetalSimulator({
     )
   }
 
+  const detailMachine = detailId != null ? machines.find((m) => m.id === detailId) : null
+
   return (
     <div className={simPanelRoot(embedded, 'bm-shell sim-product')}>
       <LabChromeBar title="Bare Metal · MAAS / LXD / KVM" subtitle={scenario?.title || slug} accent={ACCENT} {...chromeProps} />
@@ -100,7 +158,7 @@ export default function BaremetalSimulator({
       <div className="flex flex-1 min-h-0">
         <nav className="bm-sidebar shrink-0 py-2">
           {TABS.map(({ key, label, icon: Icon }) => (
-            <button key={key} onClick={() => setTab(key)}
+            <button key={key} onClick={() => { setTab(key); setDetailId(null) }}
               className={`bm-sidebar-item ${tab === key ? 'bm-sidebar-active' : ''}`}>
               <Icon size={15} /> {label}
             </button>
@@ -109,7 +167,7 @@ export default function BaremetalSimulator({
         <main className="flex-1 overflow-auto p-5">
           <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-4">
             {[
-              ['Machines', (st.maas?.machines || []).length],
+              ['Machines', machines.length],
               ['Containers', (st.lxd?.containers || []).length],
               ['VMs', (st.kvm?.vms || []).length],
               ['BMC', (st.ipmi?.bmc_hosts || []).length],
@@ -120,92 +178,225 @@ export default function BaremetalSimulator({
               </div>
             ))}
           </div>
-          {tab === 'maas' && (
+
+          {tab === 'maas' && detailMachine && (
+            <NodeDetail
+              machine={detailMachine}
+              busy={busy}
+              onBack={() => setDetailId(null)}
+              onCommission={() => run(() => baremetalApi.action(sessionId, 'maas_commission', { machine_id: detailMachine.id }), 'Commissioning started')}
+              onDeploy={() => run(() => baremetalApi.action(sessionId, 'maas_deploy', { machine_id: detailMachine.id }), 'Deploy started')}
+              onPower={(power) => run(() => baremetalApi.action(sessionId, 'maas_power', { machine_id: detailMachine.id, power }), 'Power toggled')}
+            />
+          )}
+
+          {tab === 'maas' && !detailMachine && (
             <div className="space-y-3">
               <div className="flex justify-between items-center">
                 <h2 className="text-lg font-semibold">MAAS Machines</h2>
-                <button onClick={refresh} className="text-xs flex items-center gap-1 border px-2 py-1 rounded bg-white"><RefreshCw size={12} /> Refresh</button>
+                <div className="flex items-center gap-2">
+                  <button disabled={busy} onClick={() => run(() => baremetalApi.action(sessionId, 'maas_enlist', {}), 'Machine enlisted via PXE')}
+                    className="text-xs flex items-center gap-1 border px-2 py-1 rounded bg-white"><Rocket size={12} /> Enlist (PXE)</button>
+                  <button onClick={refresh} className="text-xs flex items-center gap-1 border px-2 py-1 rounded bg-white"><RefreshCw size={12} /> Refresh</button>
+                </div>
               </div>
-              {(st.maas?.machines || []).map((m) => (
-                <div key={m.id} className="bm-card p-3 flex items-center justify-between gap-3">
-                  <div>
-                    <div className="font-medium">{m.hostname}</div>
-                    <div className="text-xs text-slate-500">{m.status} · {m.ip || 'no IP'} · power {m.power}</div>
+              {machines.map((m) => (
+                <div key={m.id} className="bm-card p-3">
+                  <div className="flex items-center justify-between gap-3">
+                    <button className="text-left" onClick={() => setDetailId(m.id)}>
+                      <div className="font-medium flex items-center gap-2">
+                        {m.hostname} <StatusBadge status={m.status} />
+                      </div>
+                      <div className="text-xs text-slate-500">{m.ip || 'no IP'} · power {m.power} · {m.arch || 'amd64'}</div>
+                    </button>
+                    <div className="flex gap-2 items-center">
+                      {(m.status === 'Failed' || m.status === 'New') && (
+                        <button disabled={busy} onClick={() => run(() => baremetalApi.action(sessionId, 'maas_commission', { machine_id: m.id }), 'Commissioning started')}
+                          className="px-3 py-1.5 rounded text-white text-sm" style={{ background: ACCENT }}>Commission</button>
+                      )}
+                      {(m.status === 'Ready' || m.status === 'Allocated') && (
+                        <button disabled={busy} onClick={() => run(() => baremetalApi.action(sessionId, 'maas_deploy', { machine_id: m.id }), 'Deploy started')}
+                          className="px-3 py-1.5 rounded border text-sm flex items-center gap-1"><Rocket size={13} /> Deploy</button>
+                      )}
+                      <button onClick={() => setDetailId(m.id)} className="text-xs border px-2 py-1.5 rounded bg-white">Details</button>
+                    </div>
                   </div>
-                  <div className="flex gap-2">
-                    {m.status === 'Failed commissioning' && (
-                      <button onClick={() => run(() => baremetalApi.commission(sessionId, m.id), 'Commissioned')}
-                        className="px-3 py-1.5 rounded text-white text-sm" style={{ background: ACCENT }}>Commission</button>
-                    )}
-                    {m.status === 'Ready' && (
-                      <button onClick={() => run(() => baremetalApi.deploy(sessionId, m.id), 'Deployed')}
-                        className="px-3 py-1.5 rounded border text-sm">Deploy</button>
-                    )}
-                  </div>
+                  {TRANSIENT.has(m.status) && (
+                    <ProgressBar pct={m.progress} label={m.status === 'Commissioning' ? 'Commissioning' : 'Deploying'} />
+                  )}
                 </div>
               ))}
             </div>
           )}
+
           {tab === 'lxd' && (
             <div className="space-y-3">
               <h2 className="text-lg font-semibold">LXD Containers</h2>
               {(st.lxd?.containers || []).map((c) => (
                 <div key={c.name} className="bm-card p-3 flex justify-between items-center">
-                  <div><div className="font-medium">{c.name}</div><div className="text-xs text-slate-500">{c.image} · {c.ipv4 || '—'}</div></div>
-                  {c.status !== 'Running' ? (
-                    <button onClick={() => run(() => baremetalApi.startLxd(sessionId, c.name), 'Started')}
+                  <div><div className="font-medium">{c.name}</div><div className="text-xs text-slate-500">{c.image} · {c.ipv4 || '—'} · {c.status}</div></div>
+                  {c.status === 'Running' ? (
+                    <button disabled={busy} onClick={() => run(() => baremetalApi.action(sessionId, 'lxd_stop', { name: c.name }), 'Stopped')}
+                      className="px-3 py-1.5 rounded border text-sm flex items-center gap-1 text-red-600 border-red-200">
+                      <Square size={13} /> Stop
+                    </button>
+                  ) : (
+                    <button disabled={busy} onClick={() => run(() => baremetalApi.startLxd(sessionId, c.name), 'Started')}
                       className="px-3 py-1.5 rounded text-white text-sm flex items-center gap-1" style={{ background: ACCENT }}>
                       <Play size={14} /> Start
                     </button>
-                  ) : <span className="text-green-600 text-sm">{c.status}</span>}
+                  )}
                 </div>
               ))}
             </div>
           )}
+
           {tab === 'kvm' && (
             <div className="space-y-3">
               <h2 className="text-lg font-semibold">KVM Virtual Machines</h2>
               {(st.kvm?.vms || []).map((v) => (
                 <div key={v.name} className="bm-card p-3 flex justify-between items-center">
-                  <div><div className="font-medium">{v.name}</div><div className="text-xs text-slate-500">{v.vcpu} vCPU · {v.ram_gb} GB · {v.ip || '—'}</div></div>
-                  {v.state !== 'running' ? (
-                    <button onClick={() => run(() => baremetalApi.startKvm(sessionId, v.name), 'Started')}
+                  <div><div className="font-medium">{v.name}</div><div className="text-xs text-slate-500">{v.vcpu} vCPU · {v.ram_gb} GB · {v.ip || '—'} · {v.state}</div></div>
+                  {v.state === 'running' ? (
+                    <button disabled={busy} onClick={() => run(() => baremetalApi.action(sessionId, 'kvm_stop', { name: v.name }), 'Stopped')}
+                      className="px-3 py-1.5 rounded border text-sm flex items-center gap-1 text-red-600 border-red-200">
+                      <Square size={13} /> Stop
+                    </button>
+                  ) : (
+                    <button disabled={busy} onClick={() => run(() => baremetalApi.startKvm(sessionId, v.name), 'Started')}
                       className="px-3 py-1.5 rounded text-white text-sm flex items-center gap-1" style={{ background: ACCENT }}>
                       <Play size={14} /> Start
                     </button>
-                  ) : <span className="text-green-600 text-sm">running</span>}
+                  )}
                 </div>
               ))}
             </div>
           )}
+
           {tab === 'ipmi' && (
             <div className="space-y-3">
               <h2 className="text-lg font-semibold">IPMI / BMC</h2>
-              {(st.ipmi?.bmc_hosts || []).map((b) => (
-                <div key={b.name} className="bm-card p-3 flex justify-between items-center gap-3">
-                  <span>{b.name}</span>
+              {(st.ipmi?.bmc_hosts || []).map((b) => {
+                const mach = machines.find((m) => m.hostname === b.name)
+                const mid = mach?.id
+                return (
+                <div key={b.name} className="bm-card p-3 flex justify-between items-center gap-3 flex-wrap">
+                  <span className="font-mono">{b.name}</span>
                   <span className={b.reachable ? 'text-green-600' : 'text-red-600'}>{b.reachable ? 'reachable' : 'unreachable'}</span>
+                  <span className="text-xs text-slate-500">chassis power: {mach?.power ?? b.power ?? 'unknown'}</span>
+                  {mid != null && b.reachable && (
+                    <div className="flex gap-1.5 ml-auto">
+                      <button disabled={busy} onClick={() => run(() => baremetalApi.action(sessionId, 'ipmi_power', { machine_id: mid, verb: 'on' }), 'Power on')}
+                        className="px-2 py-1 rounded border text-xs flex items-center gap-1"><Power size={12} /> On</button>
+                      <button disabled={busy} onClick={() => run(() => baremetalApi.action(sessionId, 'ipmi_power', { machine_id: mid, verb: 'off' }), 'Power off')}
+                        className="px-2 py-1 rounded border text-xs flex items-center gap-1 text-red-600 border-red-200"><Power size={12} /> Off</button>
+                      <button disabled={busy} onClick={() => run(() => baremetalApi.action(sessionId, 'ipmi_power', { machine_id: mid, verb: 'cycle' }), 'Power cycle')}
+                        className="px-2 py-1 rounded border text-xs flex items-center gap-1"><RefreshCw size={12} /> Cycle</button>
+                    </div>
+                  )}
                 </div>
-              ))}
+              )})}
               {broken.bmc_unreachable && (
-                <button onClick={() => run(() => baremetalApi.ipmiPowerOn(sessionId), 'BMC online')}
+                <button disabled={busy} onClick={() => run(() => baremetalApi.ipmiPowerOn(sessionId), 'BMC online')}
                   className="px-3 py-1.5 rounded text-white text-sm" style={{ background: ACCENT }}>IPMI power on / restore BMC</button>
               )}
               {broken.pxe_vlan_wrong && (
-                <button onClick={() => run(() => baremetalApi.fixPxeVlan(sessionId), 'PXE fixed')}
+                <button disabled={busy} onClick={() => run(() => baremetalApi.fixPxeVlan(sessionId), 'PXE fixed')}
                   className="px-3 py-1.5 rounded text-white text-sm" style={{ background: ACCENT }}>Fix PXE VLAN</button>
               )}
               {broken.thermal_alert && (
-                <button onClick={() => run(() => baremetalApi.clearThermal(sessionId), 'Thermal cleared')}
+                <button disabled={busy} onClick={() => run(() => baremetalApi.clearThermal(sessionId), 'Thermal cleared')}
                   className="px-3 py-1.5 rounded text-white text-sm" style={{ background: ACCENT }}>Clear thermal alert</button>
               )}
               {broken.commission_stuck && (
-                <button onClick={() => run(() => baremetalApi.resetCommission(sessionId, broken.commission_stuck), 'Commission reset')}
+                <button disabled={busy} onClick={() => run(() => baremetalApi.resetCommission(sessionId, broken.commission_stuck), 'Commission reset')}
                   className="px-3 py-1.5 rounded text-white text-sm" style={{ background: ACCENT }}>Reset stuck commission</button>
               )}
             </div>
           )}
         </main>
+      </div>
+    </div>
+  )
+}
+
+function NodeDetail({ machine, busy, onBack, onCommission, onDeploy, onPower }) {
+  const m = machine
+  return (
+    <div className="space-y-4">
+      <div className="flex items-center justify-between">
+        <button onClick={onBack} className="text-sm flex items-center gap-1 text-slate-600 hover:text-slate-900">
+          <ChevronLeft size={16} /> Back to machines
+        </button>
+        <div className="flex gap-2">
+          {(m.status === 'Failed' || m.status === 'New') && (
+            <button disabled={busy} onClick={onCommission}
+              className="px-3 py-1.5 rounded text-white text-sm" style={{ background: ACCENT }}>Commission</button>
+          )}
+          {(m.status === 'Ready' || m.status === 'Allocated') && (
+            <button disabled={busy} onClick={onDeploy}
+              className="px-3 py-1.5 rounded border text-sm flex items-center gap-1"><Rocket size={13} /> Deploy</button>
+          )}
+          <button disabled={busy} onClick={() => onPower(m.power === 'on' ? 'off' : 'on')}
+            className="px-3 py-1.5 rounded border text-sm flex items-center gap-1">
+            <Power size={13} /> Power {m.power === 'on' ? 'off' : 'on'}
+          </button>
+        </div>
+      </div>
+
+      <div className="bm-card p-4">
+        <div className="flex items-center gap-3">
+          <Server size={22} className="text-teal-700" />
+          <div>
+            <div className="text-lg font-semibold flex items-center gap-2">{m.hostname} <StatusBadge status={m.status} /></div>
+            <div className="text-xs text-slate-500">{m.arch || 'amd64/generic'} · {m.cpu_count || '—'} cores · {m.ram_gb || '—'} GB RAM · power {m.power}</div>
+          </div>
+        </div>
+        {TRANSIENT.has(m.status) && (
+          <ProgressBar pct={m.progress} label={m.status === 'Commissioning' ? 'Commissioning' : 'Deploying'} />
+        )}
+        {m.os && <div className="text-xs text-slate-500 mt-2">OS: {m.os} · IP {m.ip || '—'}</div>}
+      </div>
+
+      <div className="grid md:grid-cols-2 gap-4">
+        <div className="bm-card">
+          <div className="bm-card-head flex items-center gap-2"><Cable size={14} /> Interfaces</div>
+          <div className="p-3 space-y-2">
+            {(m.interfaces || []).map((iface) => (
+              <div key={iface.name} className="flex justify-between text-sm">
+                <span className="font-mono">{iface.name}</span>
+                <span className="text-slate-500 font-mono text-xs">{iface.mac}</span>
+                <span className="text-xs">vlan {iface.vlan}</span>
+                <span className={iface.link === 'up' ? 'text-green-600 text-xs' : 'text-slate-400 text-xs'}>{iface.link}</span>
+              </div>
+            ))}
+            {(m.interfaces || []).length === 0 && <div className="text-xs text-slate-400">No interfaces discovered.</div>}
+          </div>
+        </div>
+
+        <div className="bm-card">
+          <div className="bm-card-head flex items-center gap-2"><HardDrive size={14} /> Storage</div>
+          <div className="p-3 space-y-2">
+            {(m.storage || []).map((d) => (
+              <div key={d.name} className="flex justify-between text-sm">
+                <span className="font-mono">{d.name}</span>
+                <span className="text-xs">{d.size_gb} GB {d.type}</span>
+                <span className="text-xs text-slate-500">{d.role}</span>
+              </div>
+            ))}
+            {(m.storage || []).length === 0 && <div className="text-xs text-slate-400">No storage discovered.</div>}
+          </div>
+        </div>
+      </div>
+
+      <div className="bm-card">
+        <div className="bm-card-head flex items-center gap-2"><Terminal size={14} /> Commissioning / boot log</div>
+        <div className="p-3 bg-slate-900 text-slate-100 font-mono text-xs rounded-b max-h-64 overflow-auto">
+          {(m.log || []).length === 0 && <div className="text-slate-500">No log output yet.</div>}
+          {(m.log || []).map((e, i) => (
+            <div key={`${e.time}-${i}`}><span className="text-slate-500">{e.time}</span> {e.message}</div>
+          ))}
+        </div>
       </div>
     </div>
   )

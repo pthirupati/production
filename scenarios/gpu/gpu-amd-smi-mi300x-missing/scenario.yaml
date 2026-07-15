@@ -11,27 +11,46 @@ is_free: false
 jira_priority: High
 dual_terminal: false
 requires_companion_hosts: false
-description: 'CONTEXT: An SRE/GPU-infrastructure team running a datacenter accelerator fleet must resolve
-  `amd-smi Reports a Missing MI300X` during a live incident. Until the underlying hardware/driver state
-  is repaired, GPU capacity is lost and training/inference jobs fail, so throughput and SLAs are at risk.
+description: 'CONTEXT: A team operating GPU operations has raised a ticket for `amd-smi Reports a Missing
+  MI300X`. A customer-facing workflow is degraded and the on-call engineer (you) must diagnose and resolve
+  it. Business impact: reduced service reliability and blocked users until the underlying state is repaired.
 
 
-  ENVIRONMENT: You are on a FixitLab offline GPU node with nvidia-smi, the NVIDIA driver/CUDA stack, DCGM
-  (dcgmi / nv-hostengine / dcgm-exporter), the container toolkit, and — for AMD hosts — the ROCm stack
-  (rocm-smi / amd-smi). All tools run locally; no paid APIs or external cloud calls are required.
+  ENVIRONMENT: You are working in FixitLab''s offline GPU node. The architecture is a single lab-primary
+  node exposing nvidia-smi, drivers, CUDA, and container toolkit; treat it as the production host for
+  this incident. All tools run locally — no paid APIs or external cloud calls are required.
 
 
-  SYMPTOM / STARTING STATE: `amd-smi list` and `rocm-smi` enumerate 7 of 8 MI300X. dmesg shows an `amdgpu`
-  probe failure or the kfd node is missing, so one accelerator never registers with ROCm.
+  SYMPTOM / STARTING STATE: An 8x MI300X node where `amd-smi list` shows only 7 accelerators; ROCm jobs
+  schedule onto the wrong device count and OOM. `amd-smi list` and `rocm-smi` enumerate 7 of 8 MI300X.
+  dmesg shows an `amdgpu` probe failure or the kfd node is missing, so one accelerator never registers
+  with ROCm.
 
 
   OBJECTIVE: Confirm amd-smi lists fewer accelerators than physically installed; Inspect amdgpu/kfd kernel
   messages to find the device that failed to probe; Recover the missing accelerator and confirm amd-smi
-  lists all 8. Success means `check.sh` exits successfully after you apply the documented remediation.
+  lists all 8. Acceptance criteria: the change is minimal and reversible, and success means `nvidia-smi`
+  includes `NVIDIA-SMI`.
 
 
-  WHAT TO AVOID: Do not apply broad destructive changes, disable safety limits to mask the fault, skip
-  evidence gathering, or fake completion with marker files — the checker validates real system state.'
+  WORK TO DO: Required tooling is pre-installed; if a command is missing, note it and use the equivalent
+  already on the host. Make the smallest configuration change that moves the system toward the objective
+  (edit the relevant nvidia-smi, drivers, CUDA, and container toolkit), changing one thing at a time.
+  Check your work continuously against the objective — success means `nvidia-smi` includes `NVIDIA-SMI`.
+
+
+  VERIFY: Re-run the same check the grader uses and confirm `nvidia-smi` includes `NVIDIA-SMI`. Capture
+  the before/after output as evidence. Success criteria: the objective''s healthy state holds on a repeat
+  check, not just once.
+
+
+  ROLLBACK: If a change makes things worse, revert that single change immediately (restore the original
+  config file / undo the edit / restart the affected component) and re-observe before trying another hypothesis.
+  Never stack unverified changes.
+
+
+  WHAT TO AVOID: Do not apply broad destructive changes, skip evidence gathering, or fake completion with
+  marker files — the checker validates real system state.'
 initial_state: An 8x MI300X node where `amd-smi list` shows only 7 accelerators; ROCm jobs schedule onto
   the wrong device count and OOM.
 objectives:
@@ -41,29 +60,46 @@ objectives:
 hints:
 - order: 1
   cost: 0
-  content: 'Where to look: `amd-smi list` and `rocm-smi -i` for the ROCm view, then `dmesg | grep -iE
-    ''amdgpu|kfd''` to find the failed probe and `ls /sys/class/kfd/kfd/topology/nodes`.'
+  content: 'ORIENT — what to observe and why:
+
+    Do not touch anything yet. First observe the symptom: amd-smi reports a missing MI300X is not behaving
+    as the scenario objectives require. This lab is about amd-smi reports a missing MI300X — how amd-smi
+    reports a missing MI300X behaves in a GPU operations environment. Read the objectives and the current
+    state, and note precisely what looks wrong versus healthy before you form any theory.'
 - order: 2
-  cost: 25
-  content: 'Diagnostic steps:
+  cost: 10
+  content: 'APPROACH — the troubleshooting method:
 
-    1. `amd-smi list` — count accelerators and note the missing BDF.
-
-    2. `lspci -d 1002: | grep -i instinct` — confirm the card is on the bus.
-
-    3. `dmesg | grep -iE ''amdgpu.*fail|ring timeout|kfd''` for the probe/reset failure.'
+    Work from evidence, not guesses. For amd-smi reports a missing MI300X problems the reliable method
+    is: (1) reproduce/observe the failure, (2) narrow from the whole system down to the one component
+    that owns the symptom, (3) change exactly one thing, (4) re-check. Fix the underlying misconfiguration
+    you identified (not just the noisy log line), changing one thing at a time.'
 - order: 3
-  cost: 50
-  content: 'Exact fix + verification:
+  cost: 25
+  content: 'WHICH TOOL — the diagnostic command(s):
 
-    1. Recover the device: `amd-smi reset -G <id>` (GPU reset) or reload amdgpu; reseat if the probe keeps
-    failing.
+    Run `docker ps -a` and `docker logs <container>` for the failing container.'
+- order: 4
+  cost: 40
+  content: 'NARROW DOWN — isolate the subsystem:
 
-    2. Re-run `amd-smi list` and confirm all 8 MI300X enumerate.
+    1. `docker ps -a` — note Exited status and exit code.
 
-    3. Record the remediation in /opt/fixitlab/academy/gpu-amd-smi-mi300x-missing.conf.
+    2. `docker logs <name>` for the startup error.
 
-    WHY: the checker validates the accelerator genuinely came back.'
+    3. Inspect the Dockerfile or `docker run` flags if the image is wrong.'
+- order: 5
+  cost: 60
+  content: 'NEAR-SOLUTION — the fix shape + verify (you still apply it):
+
+    1. Fix image, port mapping, volume, or env configuration.
+
+    2. `docker start <name>` or re-run with corrected flags.
+
+    3. Confirm `nvidia-smi` shows the container Up.
+
+
+    WHY: the checker validates the container is actually running.'
 summary: Diagnose and fix amd-smi reports a missing mi300x on a datacenter GPU node and verify with the
   checker
 estimated_minutes: 20

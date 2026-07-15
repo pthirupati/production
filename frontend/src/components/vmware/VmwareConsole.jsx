@@ -69,6 +69,10 @@ export default function VmwareConsole({ vm, labSessionId, onClose, onGuestAction
     vm?.guest_disk_hidden, vm?.guest_disk_visible, vm?.guest_nic_pending,
     vm?.guest_pending_disks?.length, vm?.guest_pending_nics?.length,
     vm?.disks?.length, vm?.nics?.length,
+    // Network link state — a UI connect/disconnect must refresh `ip a` immediately
+    // without a power cycle, so re-sync when the cable/connected flags change.
+    vm?.network_disconnected,
+    (vm?.nics || []).map(n => (n?.connected === false || n?.cable_connected === false) ? '0' : '1').join(''),
   ])
   const grubEntries = useMemo(() => buildGrubEntries(vm), [vm?.id, vm?.guest_os, vm?.guest_os_version])
 

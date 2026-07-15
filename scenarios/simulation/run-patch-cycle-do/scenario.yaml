@@ -10,28 +10,45 @@ infrastructure_type: docker
 lab_mode: docker
 jira_priority: Low
 is_free: false
-description: 'CONTEXT: The FixitLab platform team uses this lab to teach how local simulation engines
-  model real operational failures. A learner is asked to restore a run patch cycle do workflow after the
-  backing simulation state becomes unhealthy.
+description: 'CONTEXT: A team operating FixitLab simulation has raised a ticket for `Run Simulated Patch
+  Cycle`. A customer-facing workflow is degraded and the on-call engineer (you) must diagnose and resolve
+  it. Business impact: reduced service reliability and blocked users until the underlying state is repaired.
 
 
-  ENVIRONMENT: You are working in an offline, RHEL-like FixitLab simulation shell. The host is `sim-primary`,
-  core Linux tools are installed, and the lab checker reads the in-memory service state directly through
-  the local simulation engine.
+  ENVIRONMENT: You are working in FixitLab''s offline simulation sandbox. The architecture is a single
+  lab-primary node exposing terminal state, validation hooks, and lab authoring markers; treat it as the
+  production host for this incident. All tools run locally — no paid APIs or external cloud calls are
+  required.
 
 
   SYMPTOM / STARTING STATE: RHEL host that needs patching. No pre/post checks have been run yet; you will
-  drive the full precheck -> dnf update -> reboot -> postcheck cycle. Commands that depend on the simulated
-  service cannot reach the expected healthy state.
+  drive the full precheck -> dnf update -> reboot -> postcheck cycle.
 
 
-  OBJECTIVE: Restore the service-backed simulation workflow so `check.sh` completes the precheck, update,
-  reboot, and postcheck sequence. The fix must be observable through normal system commands and must not
-  depend on a manual completion marker.
+  OBJECTIVE: Run a precheck baseline (current kernel, disk space, running services); Apply updates with
+  dnf update and reboot into the new kernel; Run a postcheck confirming the new kernel booted and services
+  are healthy. Acceptance criteria: the change is minimal and reversible, and success means `check.sh`
+  exits successfully.
 
 
-  WHAT TO AVOID: Do not write marker files, skip the diagnostic step, or make broad unrelated changes;
-  repair only the failing service state needed for this scenario.'
+  WORK TO DO: Required tooling is pre-installed; if a command is missing, note it and use the equivalent
+  already on the host. Make the smallest configuration change that moves the system toward the objective
+  (edit the relevant terminal state, validation hooks, and lab authoring markers), changing one thing
+  at a time. Check your work continuously against the objective — success means `check.sh` exits successfully.
+
+
+  VERIFY: Re-run the same check the grader uses and confirm `check.sh` exits successfully. Capture the
+  before/after output as evidence. Success criteria: the objective''s healthy state holds on a repeat
+  check, not just once.
+
+
+  ROLLBACK: If a change makes things worse, revert that single change immediately (restore the original
+  config file / undo the edit / restart the affected component) and re-observe before trying another hypothesis.
+  Never stack unverified changes.
+
+
+  WHAT TO AVOID: Do not apply broad destructive changes, skip evidence gathering, or fake completion with
+  marker files — the checker validates real system state.'
 objectives:
 - Run a precheck baseline (current kernel, disk space, running services)
 - Apply updates with dnf update and reboot into the new kernel
@@ -41,30 +58,46 @@ initial_state: RHEL host that needs patching. No pre/post checks have been run y
 hints:
 - order: 1
   cost: 0
-  content: 'Where to look: Run `df -h` and `du -xh /var /tmp /home | sort -h | tail -20` for large paths.'
+  content: 'ORIENT — what to observe and why:
+
+    Do not touch anything yet. First observe the symptom: run simulated patch cycle is not behaving as
+    the scenario objectives require. This lab is about run simulated patch cycle — how run simulated patch
+    cycle behaves in a FixitLab simulation environment. Read the objectives and the current state, and
+    note precisely what looks wrong versus healthy before you form any theory.'
 - order: 2
-  cost: 25
-  content: 'Diagnostic steps:
+  cost: 10
+  content: 'APPROACH — the troubleshooting method:
 
-    1. Run `/opt/fixitlab/precheck.sh`.
-
-    2. Apply updates with `dnf update -y`.
-
-    3. Reboot and compare `uname -r`, then run postcheck.'
+    Work from evidence, not guesses. For run simulated patch cycle problems the reliable method is: (1)
+    reproduce/observe the failure, (2) narrow from the whole system down to the one component that owns
+    the symptom, (3) change exactly one thing, (4) re-check. Execute the maintenance in small, reversible
+    steps, taking a snapshot or backup first if the change is risky.'
 - order: 3
-  cost: 50
-  content: 'Exact fix + verification:
+  cost: 25
+  content: 'WHICH TOOL — the diagnostic command(s):
 
-    1. Run `/opt/fixitlab/precheck.sh`.
+    Run `df -h` and `du -xh /var /tmp /home | sort -h | tail -20` for large paths.'
+- order: 4
+  cost: 40
+  content: 'NARROW DOWN — isolate the subsystem:
 
-    2. Run `sudo dnf update -y` and reboot.
+    1. Find which mount is 100% — often `/` or `/var`.
 
-    3. Run `/opt/fixitlab/postcheck.sh`.
+    2. `journalctl --disk-usage` and old logs under `/var/log`.
 
-    4. Verify with `check.sh` completes the precheck, update, reboot, and postcheck sequence.
+    3. Look for core dumps, temp files, or oversized application data.'
+- order: 5
+  cost: 60
+  content: 'NEAR-SOLUTION — the fix shape + verify (you still apply it):
+
+    1. Remove or rotate the largest safe files (logs, caches, old packages).
+
+    2. `df -h` should show free space on the affected mount.
+
+    3. Retry the command that failed with ''No space left on device''.
 
 
-    WHY: the checker follows the complete patch lifecycle.'
+    WHY: many services fail cryptically when disk is full.'
 summary: Complete the run simulated patch cycle simulation lab and verify success with the checker
 estimated_minutes: 15
 xp_reward: 100

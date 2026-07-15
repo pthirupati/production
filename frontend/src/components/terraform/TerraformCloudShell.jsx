@@ -204,7 +204,7 @@ export default function TerraformCloudShell({
           {wsTab === 'ide' && (
             <TerraformWorkspaceIde sessionId={sessionId} scenario={scenario} terminalSession={terminalSession}
               terminalHost={terminalHost} blockedCommands={blockedCommands} isMobile={isMobile}
-              state={state} setState={setState} onRefresh={refresh} />
+              state={state} setState={setState} onRefresh={refresh} showLabControls {...chromeProps} />
           )}
           {!['runs', 'variables', 'settings', 'ide', 'states', 'locks', 'notifications', 'team access', 'health'].includes(wsTab) && (
             <div className="p-8 text-center text-slate-500 text-sm capitalize">{wsTab} — workspace configuration view</div>
@@ -425,6 +425,8 @@ export default function TerraformCloudShell({
             setState={setState}
             onRefresh={refresh}
             standalone
+            showLabControls
+            {...chromeProps}
           />
         </div>
       </div>

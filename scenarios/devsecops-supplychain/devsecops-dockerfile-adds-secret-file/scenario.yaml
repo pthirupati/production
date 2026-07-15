@@ -11,16 +11,45 @@ max_score: 100
 is_free: false
 infrastructure_type: docker
 jira_priority: Medium
-description: |-
-  CONTEXT: A platform team operating devsecops supplychain needs you to resolve `Build Copies a .env Secret Into the Image` during a realistic delivery incident. The business impact is a stalled or unsafe release until the underlying state is repaired.
+description: 'CONTEXT: A team operating devsecops supplychain has raised a ticket for `Build Copies a
+  .env Secret Into the Image`. A customer-facing workflow is degraded and the on-call engineer (you) must
+  diagnose and resolve it. Business impact: reduced service reliability and blocked users until the underlying
+  state is repaired.
 
-  ENVIRONMENT: You are working in FixitLab's offline supply-chain security lab with a local OCI registry, Trivy scanner, cosign keys, an SBOM store, and a Falco runtime sensor under /supplychain. Everything runs locally; no external registry or paid APIs are required.
 
-  SYMPTOM / STARTING STATE: A history scan of `web:4.0` finds an intermediate layer containing a `.env` file with a live database password. The Dockerfile `COPY . .` pulls the whole context, including secrets, into the image.
+  ENVIRONMENT: You are working in FixitLab''s offline FixitLab practice environment. The architecture
+  is a single lab-primary node exposing CLI and configuration files; treat it as the production host for
+  this incident. All tools run locally — no paid APIs or external cloud calls are required.
 
-  OBJECTIVE: The Dockerfile does a broad `COPY . .` with no `.dockerignore`, so a `.env` secret is baked into a layer where it persists in history. Add a `.dockerignore` excluding secret files (and scope the COPY), then rebuild so the secret is no longer present in any layer. Success is graded on the real repaired state, not a manual marker.
 
-  WHAT TO AVOID: Do not suppress the signal, disable the policy/gate, or fake completion with marker files — reproduce the diagnosis, then apply the smallest fix that satisfies the objective and re-run Check Solution.
+  SYMPTOM / STARTING STATE: A history scan of `web:4.0` finds an intermediate layer containing a `.env`
+  file with a live database password. The Dockerfile `COPY . .` pulls the whole context, including secrets,
+  into the image.
+
+
+  OBJECTIVE: The rebuilt image contains no secret file in any layer; The broad COPY without .dockerignore
+  is confirmed as root cause; The .env is excluded from the build context after the fix. Acceptance criteria:
+  the change is minimal and reversible, and success means `check.sh` exits successfully.
+
+
+  WORK TO DO: Required tooling is pre-installed; if a command is missing, note it and use the equivalent
+  already on the host. Make the smallest configuration change that moves the system toward the objective
+  (edit the relevant CLI and configuration files), changing one thing at a time. Check your work continuously
+  against the objective — success means `check.sh` exits successfully.
+
+
+  VERIFY: Re-run the same check the grader uses and confirm `check.sh` exits successfully. Capture the
+  before/after output as evidence. Success criteria: the objective''s healthy state holds on a repeat
+  check, not just once.
+
+
+  ROLLBACK: If a change makes things worse, revert that single change immediately (restore the original
+  config file / undo the edit / restart the affected component) and re-observe before trying another hypothesis.
+  Never stack unverified changes.
+
+
+  WHAT TO AVOID: Do not apply broad destructive changes, skip evidence gathering, or fake completion with
+  marker files — the checker validates real system state.'
 objectives:
 - 'The rebuilt image contains no secret file in any layer'
 - 'The broad COPY without .dockerignore is confirmed as root cause'
@@ -30,26 +59,47 @@ initial_state: |-
 hints:
 - order: 1
   cost: 0
-  content: |-
-    Where to look — orient before changing anything:
-        1. `trivy image --scanners secret web:4.0`
-        2. `grep -n 'COPY\|ADD' Dockerfile`
-        3. `ls -a /supplychain/build-context`
-        Write down what looks healthy versus wrong. Form one hypothesis before you touch anything.
+  content: 'ORIENT — what to observe and why:
+
+    Do not touch anything yet. First observe the symptom: build copies a .env secret into the image is
+    not behaving as the scenario objectives require. This lab is about build copies a .env secret into
+    the image — how build copies a .env secret into the image behaves in a devsecops-supplychain environment.
+    Read the objectives and the current state, and note precisely what looks wrong versus healthy before
+    you form any theory.'
 - order: 2
-  cost: 25
-  content: |-
-    Diagnostic steps:
-        1. Re-run `trivy image --scanners secret web:4.0` and read the status/error carefully.
-        2. Cross-check with `grep -n 'COPY\|ADD' Dockerfile` to isolate the failing object.
-        3. State the single root cause in one sentence before you act.
+  cost: 10
+  content: 'APPROACH — the troubleshooting method:
+
+    Work from evidence, not guesses. For build copies a .env secret into the image problems the reliable
+    method is: (1) reproduce/observe the failure, (2) narrow from the whole system down to the one component
+    that owns the symptom, (3) change exactly one thing, (4) re-check. Fix the underlying misconfiguration
+    you identified (not just the noisy log line), changing one thing at a time.'
 - order: 3
-  cost: 50
-  content: |-
-    Exact fix + verification:
-        1. The Dockerfile does a broad `COPY . .` with no `.dockerignore`, so a `.env` secret is baked into a layer where it persists in history. Add a `.dockerignore` excluding secret files (and scope the COPY), then rebuild so the secret is no longer present in any layer.
-        2. Change one thing at a time so you can roll back if the hypothesis was wrong.
-        3. Verify the objective is met, then click Check Solution (graded on real state, not a marker file).
+  cost: 25
+  content: 'WHICH TOOL — the diagnostic command(s):
+
+    Run `docker ps -a` and `docker logs <container>` for the failing container.'
+- order: 4
+  cost: 40
+  content: 'NARROW DOWN — isolate the subsystem:
+
+    1. `docker ps -a` — note Exited status and exit code.
+
+    2. `docker logs <name>` for the startup error.
+
+    3. Inspect the Dockerfile or `docker run` flags if the image is wrong.'
+- order: 5
+  cost: 60
+  content: 'NEAR-SOLUTION — the fix shape + verify (you still apply it):
+
+    1. Fix image, port mapping, volume, or env configuration.
+
+    2. `docker start <name>` or re-run with corrected flags.
+
+    3. Confirm `bash check.sh` shows the container Up.
+
+
+    WHY: the checker validates the container is actually running.'
 summary: |-
   Diagnose and resolve build copies a .env secret into the image in the devsecops-supplychain simulation lab and verify the healthy end state
 estimated_minutes: 30

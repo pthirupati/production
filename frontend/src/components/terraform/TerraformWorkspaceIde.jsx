@@ -1,17 +1,24 @@
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { Suspense, useCallback, useEffect, useRef, useState } from 'react'
+import { lazyWithRetry } from '../../utils/lazyWithRetry'
+import { MemoryRouter, Routes, Route } from 'react-router-dom'
 import { terraformApi } from '../../api/terraform'
 import toast from 'react-hot-toast'
 import { useConfirm } from '../../hooks/useConfirm'
 import CodeEditor from '../ide/CodeEditor'
-import LabTerminal from '../LabTerminal'
-import AwsTerminal from '../aws/terminal/AwsTerminal'
+import LabTerminal, { scheduleReadySend } from '../LabTerminal'
+import TerraformAwsTerminal from './TerraformAwsTerminal'
 import VsCodeWorkbench, { VscFileItem, VscEditorTab, VscPanelTab, VscActivityButton } from '../ide/VsCodeWorkbench'
 import { getIacProfile } from '../../utils/iacFlavor'
-import { syncTerraformApplyToAwsConsole, awsConsoleUrlForResource } from '../../utils/terraformAwsBridge'
+import { LabChromeControls } from '../lab/LabChromeBar'
+import { syncTerraformApplyToAwsConsole } from '../../utils/terraformAwsBridge'
 import {
-  FileCode, FolderOpen, Play, Plus, Trash2, AlertTriangle, RefreshCw, Terminal, CloudCog, Files, CheckCircle2, History, ExternalLink,
+  FileCode, FolderOpen, Play, Plus, Trash2, AlertTriangle, RefreshCw, Terminal, CloudCog, Files, CheckCircle2, History, ExternalLink, LayoutDashboard,
 } from 'lucide-react'
 import '../../styles/vscode-workbench.css'
+
+// Full AWS console, embedded read-only-router style so the terraform lab can show
+// exactly the resources `terraform apply` created without leaving the IDE.
+const AwsConsole = lazyWithRetry(() => import('../aws/AwsConsole'))
 
 const DEFAULT_FILES = ['main.tf', 'variables.tf', 'outputs.tf']
 
@@ -20,6 +27,11 @@ export default function TerraformWorkspaceIde({
   sessionId, scenario, terminalSession, terminalHost = 'primary',
   blockedCommands = [], isMobile = false, state, setState, onRefresh,
   standalone = false,
+  // Lab chrome controls — rendered inline in the IDE toolbar so the standard
+  // Hints / Check / +30m / Stop buttons are always reachable in a terraform lab,
+  // even when the IDE is the standalone surface inside the Cloud shell.
+  onHints, onCheck, onExtend, onStop,
+  hintsLabel, checkDisabled, extendDisabled, showLabControls = false,
 }) {
   const { confirm, ConfirmPortal } = useConfirm()
   const profile = getIacProfile()
@@ -27,14 +39,35 @@ export default function TerraformWorkspaceIde({
   const [files, setFiles] = useState({})
   const [activeFile, setActiveFile] = useState('main.tf')
   const [bottomTab, setBottomTab] = useState('output')
-  const [lastAwsResource, setLastAwsResource] = useState(null)
   const [output, setOutput] = useState('')
   const [busy, setBusy] = useState(false)
   const [dirty, setDirty] = useState(false)
   const [showTerminal, setShowTerminal] = useState(!standalone)
+  const [terminalReady, setTerminalReady] = useState({})
   const saveTimer = useRef(null)
   const filesRef = useRef({})
   const terminalRef = useRef(null)
+  const pendingSendRef = useRef(null)
+  const sendCancelRef = useRef(null)
+
+  useEffect(() => () => { sendCancelRef.current?.() }, [])
+
+  // Fired by <LabTerminal> once its shell is ready (backend shell_ready or the
+  // sim/cloud fallback timer). Flush any command queued while the pane was
+  // still mounting its xterm + WebSocket.
+  const handleTerminalReady = useCallback((hostKey) => {
+    setTerminalReady((prev) => (prev[hostKey] ? prev : { ...prev, [hostKey]: true }))
+    const pending = pendingSendRef.current
+    if (pending) {
+      // Stop the polling loop first so it can't also fire a (spurious) error.
+      sendCancelRef.current?.()
+      sendCancelRef.current = null
+      pendingSendRef.current = null
+      if (terminalRef.current?.sendCommand(pending.line)) {
+        toast.success(`Terminal: ${pending.cmd}`, { duration: 1500 })
+      }
+    }
+  }, [])
 
   const actionPrefix = 'terraform'
 
@@ -85,7 +118,7 @@ export default function TerraformWorkspaceIde({
         setOutput(res?.output || res?.plan?.summary || JSON.stringify(res?.plan || res, null, 2) || '')
         if (action === `${actionPrefix}_apply` || action === 'terraform_apply') {
           syncTerraformApplyToAwsConsole(res?.state ? { state: res.state } : state)
-          setLastAwsResource({ type: 'instance', id: null })
+          toast.success('Resources mirrored to the AWS Console — open the AWS Console tab to verify.', { duration: 3500 })
         }
       }
       if (res?.state) setState(res.state)
@@ -107,13 +140,37 @@ export default function TerraformWorkspaceIde({
     toast.success(`Deleted ${name}`)
   }
 
+  // Readiness-driven send. The <LabTerminal> only mounts when
+  // bottomTab === 'terminal' && showTerminal, so we FIRST reveal it, then wait
+  // for its xterm dynamic-import + WebSocket handshake before flushing. The
+  // command is queued so onReady can flush it the instant the shell connects,
+  // and we only toast an error after a bounded timeout.
   const sendToTerminal = (cmd) => {
     const line = cmd.startsWith('cd ') ? cmd : `cd /root/terraform && ${cmd}`
-    if (terminalRef.current?.sendCommand(line)) {
-      setShowTerminal(true)
-      setBottomTab('terminal')
-      toast.success(`Terminal: ${cmd}`, { duration: 1500 })
-    } else toast.error('Terminal not ready — use Output panel buttons')
+    // Mount the terminal pane if it is not already visible.
+    setShowTerminal(true)
+    setBottomTab('terminal')
+    sendCancelRef.current?.()
+    pendingSendRef.current = { cmd, line }
+
+    sendCancelRef.current = scheduleReadySend(line, {
+      // Skip if handleTerminalReady already flushed this queued command.
+      getTerminal: () => (pendingSendRef.current?.line === line ? terminalRef.current : null),
+      onSuccess: () => {
+        pendingSendRef.current = null
+        sendCancelRef.current = null
+        toast.success(`Terminal: ${cmd}`, { duration: 1500 })
+      },
+      onError: () => {
+        pendingSendRef.current = null
+        sendCancelRef.current = null
+        toast.error('Terminal not ready — use Output panel buttons')
+      },
+      timeoutMs: 5000,
+      intervalMs: 150,
+      // Defer the first attempt so the terminal pane actually mounts first.
+      initialDelayMs: 150,
+    })
   }
 
   const tf = state?.state?.terraform || {}
@@ -128,7 +185,8 @@ export default function TerraformWorkspaceIde({
       return (
         <LabTerminal ref={terminalRef} sessionId={sessionId} session={terminalSession} hostKey={terminalHost}
           isMobile={isMobile} blockedCommands={blockedCommands} className="h-full min-h-[180px]"
-          welcomeHint={`cd /root/terraform — ${cli} init / plan / apply`} />
+          welcomeHint={`cd /root/terraform — ${cli} init / plan / apply`}
+          onReady={() => handleTerminalReady(terminalHost)} />
       )
     }
     if (bottomTab === 'events') {
@@ -150,21 +208,33 @@ export default function TerraformWorkspaceIde({
         <div className="h-full min-h-[200px] flex flex-col gap-2">
           <div className="flex items-center justify-between gap-2 shrink-0 px-1">
             <p className="text-[10px] text-[var(--vsc-muted)]">
-              AWS CloudShell — run <code className="text-orange-300">aws</code> and <code className="text-violet-300">terraform</code> commands in a real terminal. Resources appear in the AWS Console.
+              AWS CloudShell — <code className="text-violet-300">terraform apply</code> the files in this editor, then verify with <code className="text-orange-300">aws ec2 describe-instances</code>. Same store as the AWS Console.
             </p>
-            <a
-              href={awsConsoleUrlForResource(lastAwsResource?.type, lastAwsResource?.id)}
-              target="_blank"
-              rel="noopener noreferrer"
+            <button
+              type="button"
+              onClick={() => setBottomTab('console')}
               className="vsc-btn text-[10px] inline-flex items-center gap-1"
               style={{ borderColor: '#ff9900', color: '#ff9900' }}
             >
               <ExternalLink size={11} /> Open AWS Console
-            </a>
+            </button>
           </div>
           <div className="flex-1 min-h-[180px] rounded border border-[var(--vsc-border)] overflow-hidden">
-            <AwsTerminal cloudShell />
+            <TerraformAwsTerminal filesRef={filesRef} />
           </div>
+        </div>
+      )
+    }
+    if (bottomTab === 'console') {
+      return (
+        <div className="h-full min-h-[220px] rounded border border-[var(--vsc-border)] overflow-hidden aws-embedded-host">
+          <Suspense fallback={<div className="p-4 text-xs text-[var(--vsc-muted)]">Loading AWS Console…</div>}>
+            <MemoryRouter initialEntries={['/aws-sim/ec2/instances']}>
+              <Routes>
+                <Route path="/aws-sim/*" element={<AwsConsole embedded />} />
+              </Routes>
+            </MemoryRouter>
+          </Suspense>
         </div>
       )
     }
@@ -182,7 +252,9 @@ export default function TerraformWorkspaceIde({
           )}
           <button type="button" onClick={onRefresh} className="vsc-btn"><RefreshCw size={11} /></button>
           {canTerminal && (
-            <button type="button" onClick={() => sendToTerminal(`${cli} plan`)} className="vsc-btn"><Terminal size={11} /> Shell</button>
+            <button type="button" onClick={() => sendToTerminal(`${cli} plan`)} className="vsc-btn"
+              title={terminalReady[terminalHost] ? `Run ${cli} plan in terminal` : 'Opens the terminal and runs once connected'}>
+              <Terminal size={11} /> Shell{terminalReady[terminalHost] ? '' : ' ▸'}</button>
           )}
         </div>
         <pre className="text-xs whitespace-pre-wrap break-words flex-1 overflow-auto font-mono leading-relaxed text-[var(--vsc-text)]">{output || `Run ${cli} init, then plan and apply. Output reflects this lab scenario.`}</pre>
@@ -202,6 +274,7 @@ export default function TerraformWorkspaceIde({
         <div className="vsc-activity-bar hidden sm:flex">
           <VscActivityButton active title="Explorer"><Files size={22} /></VscActivityButton>
           <VscActivityButton active={bottomTab === 'aws'} onClick={() => setBottomTab('aws')} title="AWS CLI"><CloudCog size={22} /></VscActivityButton>
+          <VscActivityButton active={bottomTab === 'console'} onClick={() => setBottomTab('console')} title="AWS Console"><LayoutDashboard size={22} /></VscActivityButton>
           {canTerminal && (
             <VscActivityButton active={bottomTab === 'terminal'} onClick={() => { setBottomTab('terminal'); setShowTerminal(true) }} title="Terminal"><Terminal size={22} /></VscActivityButton>
           )}
@@ -241,13 +314,28 @@ export default function TerraformWorkspaceIde({
           <FileCode size={12} /> {f}{dirty && activeFile === f ? ' ●' : ''}
         </VscEditorTab>
       ))}
-      editorToolbar={!standalone && (
+      editorToolbar={(
         <>
-          {[`${cli} init`, `${cli} plan`, `${cli} apply -auto-approve`].map((cmd) => (
-            <button key={cmd} type="button" onClick={() => sendToTerminal(cmd)} className="vsc-btn">
+          {!standalone && [`${cli} init`, `${cli} plan`, `${cli} apply -auto-approve`].map((cmd) => (
+            <button key={cmd} type="button" onClick={() => sendToTerminal(cmd)} className="vsc-btn"
+              title={terminalReady[terminalHost] ? `Run: ${cmd}` : 'Opens the terminal and runs once connected'}>
               <Terminal size={11} /> {cmd}
             </button>
           ))}
+          {showLabControls && (onHints || onCheck || onExtend || onStop) && (
+            <div className="ml-auto flex items-center gap-1.5 lab-chrome-actions">
+              <LabChromeControls
+                onHints={onHints}
+                onCheck={onCheck}
+                onExtend={onExtend}
+                onStop={onStop}
+                hintsLabel={hintsLabel}
+                checkDisabled={checkDisabled}
+                extendDisabled={extendDisabled}
+                showTimer={false}
+              />
+            </div>
+          )}
         </>
       )}
       editor={(
@@ -261,6 +349,7 @@ export default function TerraformWorkspaceIde({
             <VscPanelTab active={bottomTab === 'output'} onClick={() => setBottomTab('output')}>{profile.label} Output</VscPanelTab>
             <VscPanelTab active={bottomTab === 'events'} onClick={() => setBottomTab('events')}><History size={11} /> Events</VscPanelTab>
             <VscPanelTab active={bottomTab === 'aws'} onClick={() => setBottomTab('aws')}>AWS CLI</VscPanelTab>
+            <VscPanelTab active={bottomTab === 'console'} onClick={() => setBottomTab('console')}><LayoutDashboard size={11} /> AWS Console</VscPanelTab>
             {canTerminal && showTerminal && (
               <VscPanelTab active={bottomTab === 'terminal'} onClick={() => setBottomTab('terminal')}>Terminal</VscPanelTab>
             )}

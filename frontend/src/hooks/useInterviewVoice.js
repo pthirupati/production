@@ -312,7 +312,6 @@ async function waitForBrowserVoices(maxMs = 2400) {
   const start = Date.now()
   while (Date.now() - start < maxMs) {
     if (window.speechSynthesis.getVoices().length) return
-    // eslint-disable-next-line no-await-in-loop
     await new Promise((r) => setTimeout(r, 80))
   }
 }
@@ -598,7 +597,6 @@ export function useInterviewVoice() {
         for (let i = 0; i < segments.length; i++) {
           if (speakTokenRef.current !== myToken) break
           const seg = segments[i]
-          // eslint-disable-next-line no-await-in-loop
           const started = await speakBrowserUtterance(seg, utterOpts)
           if (started) spoken = true
           if (i < segments.length - 1 && speakTokenRef.current === myToken) {
@@ -606,7 +604,6 @@ export function useInterviewVoice() {
             let gap = pauseAfter(seg)
             if (last === '?' && pauseOverrides.question) gap = pauseOverrides.question
             else if (last === '.' && pauseOverrides.period) gap = pauseOverrides.period
-            // eslint-disable-next-line no-await-in-loop
             await new Promise((resolve) => {
               speakPauseTimerRef.current = setTimeout(() => {
                 speakPauseTimerRef.current = null
@@ -622,7 +619,6 @@ export function useInterviewVoice() {
           const clean = (text || '').replace(/\s+/g, ' ').trim()
           if (clean) {
             unlockSpeech()
-            // eslint-disable-next-line no-await-in-loop
             spoken = await speakBrowserUtterance(clean.slice(0, 500), utterOpts)
           }
         }

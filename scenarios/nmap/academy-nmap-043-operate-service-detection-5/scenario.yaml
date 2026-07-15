@@ -11,24 +11,40 @@ max_score: 100
 is_free: false
 infrastructure_type: docker
 jira_priority: Medium
-description: 'CONTEXT: A team operating network scanning needs you to resolve `nmap: Service/Version Detection
-  — Daily Operations` during a realistic incident. The business impact is reduced service reliability
-  until the underlying state is repaired.
+description: 'CONTEXT: A team operating network scanning has raised a ticket for `Service/Version Detection
+  — Operate Lab`. A customer-facing workflow is degraded and the on-call engineer (you) must diagnose
+  and resolve it. Business impact: reduced service reliability and blocked users until the underlying
+  state is repaired.
 
 
-  ENVIRONMENT: You are working in FixitLab''s offline scanning lab with nmap CLI, targets, and scan output.
-  All tools run locally; no paid APIs or external cloud calls are required.
+  ENVIRONMENT: You are working in FixitLab''s offline scanning lab. The architecture is a single lab-primary
+  node exposing nmap CLI, targets, and scan output; treat it as the production host for this incident.
+  All tools run locally — no paid APIs or external cloud calls are required.
 
 
   SYMPTOM / STARTING STATE: The scanning lab is healthy enough for scheduled work on service/version detection.
-  Complete the maintenance task without unnecessary downtime. Day-2 operations: perform a routine service/version
-  detection task safely in nmap. Follow change control — inspect, change, verify — while working with
-  banner grabbing and version probes.
+  Complete the maintenance task without unnecessary downtime.
 
 
   OBJECTIVE: Day-2 service/version detection work completes safely in this environment; Changes are verified
-  with before/after checks; The system remains stable for dependent teams. Success means `check.sh` exits
-  successfully.
+  with before/after checks; The system remains stable for dependent teams. Acceptance criteria: the change
+  is minimal and reversible, and success means `check.sh` exits successfully.
+
+
+  WORK TO DO: Required tooling is pre-installed; if a command is missing, note it and use the equivalent
+  already on the host. Make the smallest configuration change that moves the system toward the objective
+  (edit the relevant nmap CLI, targets, and scan output), changing one thing at a time. Check your work
+  continuously against the objective — success means `check.sh` exits successfully.
+
+
+  VERIFY: Re-run the same check the grader uses and confirm `check.sh` exits successfully. Capture the
+  before/after output as evidence. Success criteria: the objective''s healthy state holds on a repeat
+  check, not just once.
+
+
+  ROLLBACK: If a change makes things worse, revert that single change immediately (restore the original
+  config file / undo the edit / restart the affected component) and re-observe before trying another hypothesis.
+  Never stack unverified changes.
 
 
   WHAT TO AVOID: Do not apply broad destructive changes, skip evidence gathering, or fake completion with
@@ -42,34 +58,53 @@ initial_state: The scanning lab is healthy enough for scheduled work on service/
 hints:
 - order: 1
   cost: 0
-  content: 'Orient yourself before changing anything:
+  content: 'ORIENT — what to observe and why:
 
-    1. Inspect the current state — `nmap -sV`.
-
-    2. Write down what looks normal versus wrong or missing for service/version detection.
-
-    3. Recall the core idea: banner grabbing and version probes. Form one hypothesis before you act.'
+    Do not touch anything yet. First observe the symptom: services are identified by port only. This lab
+    is about service/version detection — banner grabbing and version probes. Read the objectives and the
+    current state, and note precisely what looks wrong versus healthy before you form any theory.'
 - order: 2
-  cost: 25
-  content: 'Diagnostic steps:
+  cost: 10
+  content: 'APPROACH — the troubleshooting method:
 
-    1. Gather evidence with `nmap -sV`.
-
-    2. Compare current output to the scenario objectives.
-
-    3. Form a single hypothesis about the smallest fix that would restore healthy state.'
+    Work from evidence, not guesses. For service/version detection problems the reliable method is: (1)
+    reproduce/observe the failure, (2) narrow from the whole system down to the one component that owns
+    the symptom, (3) change exactly one thing, (4) re-check. Execute the maintenance in small, reversible
+    steps, taking a snapshot or backup first if the change is risky.'
 - order: 3
-  cost: 50
-  content: 'Exact fix + verification:
+  cost: 25
+  content: 'WHICH TOOL — the diagnostic command(s):
 
-    1. Re-check the current state — `nmap -sV`.
+    1. Inspect the current state with `nmap -sV`.
 
-    2. Execute the maintenance in small, reversible steps, taking a snapshot or backup first if the change
-    is risky.
+    2. Each command above tells you something specific — status/health, recent errors, and the effective
+    configuration. Read them in that order.
 
-    3. Verify the result — service versions are detected.
+    3. Compare what you see to the objectives; the gap points at the fault.'
+- order: 4
+  cost: 40
+  content: 'NARROW DOWN — isolate the subsystem:
 
-    4. Click Check Solution once the objective is met (graded on real state, not a marker file).'
+    1. From the evidence above, decide which single part of service/version detection is at fault.
+
+    2. Re-run the most relevant of `nmap -sV` focused on just that part to confirm it.
+
+    3. State a one-line hypothesis: the smallest change that would move the state from ''services are
+    identified by port only'' toward ''service versions are detected''.'
+- order: 5
+  cost: 60
+  content: 'NEAR-SOLUTION — the fix shape + verify (you still apply it):
+
+    1. Apply the smallest reversible change your hypothesis points to. Execute the maintenance in small,
+    reversible steps, taking a snapshot or backup first if the change is risky.
+
+    2. Re-run `bash check.sh` and confirm service versions are detected.
+
+    3. If it still fails, the hypothesis was wrong — go back to the evidence, do not stack changes.
+
+
+    WHY: the grader validates real system state, not marker files — a fix only counts when the subsystem
+    is actually healthy.'
 summary: Complete the service/version detection — operate lab nmap lab and verify success with the checker
 estimated_minutes: 20
 xp_reward: 100
