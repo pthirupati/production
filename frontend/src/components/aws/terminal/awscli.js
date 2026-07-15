@@ -5,6 +5,7 @@
 import { ACCOUNT } from '../store/awsStore'
 import { arn } from '../lib/ids'
 import { SERVICE_CONFIGS } from '../pages/generic/serviceConfigs'
+import { applyOutput, parseFilters, filterInstances, DRY_RUN_MESSAGE } from '../lib/cliFormat'
 
 function parseFlags(tokens) {
   const flags = {}
@@ -14,13 +15,120 @@ function parseFlags(tokens) {
     if (t.startsWith('--')) {
       const key = t.slice(2)
       const next = tokens[i + 1]
+      // Boolean-only flags never consume a following value.
+      if (BOOLEAN_FLAGS.has(key)) { flags[key] = true; continue }
       if (next && !next.startsWith('--')) { flags[key] = next; i += 1 } else { flags[key] = true }
     } else positional.push(t)
   }
   return { flags, positional }
 }
 
+// Flags the real CLI treats as valueless switches.
+const BOOLEAN_FLAGS = new Set(['dry-run', 'no-cli-pager', 'no-paginate', 'no-verify-ssl'])
+
+// EC2 instance-state -> numeric State.Code (matches the real API).
+const EC2_STATE_CODE = { pending: 0, running: 16, 'shutting-down': 32, terminated: 48, stopping: 64, stopped: 80, rebooting: 16 }
+
+// `create-function` -> `CreateFunction` (IAM action-suffix casing).
+function pascalCommand(cmd) {
+  return String(cmd).split('-').map((p) => p.charAt(0).toUpperCase() + p.slice(1)).join('')
+}
+
 const j = (obj) => JSON.stringify(obj, null, 4)
+
+// Deterministic 32-hex ETag keyed on a string, so put-object / list-objects-v2
+// return a stable ETag per object (real S3 ETags are the MD5 of the content).
+function stableEtag(seed) {
+  let h1 = 0x811c9dc5
+  let h2 = 0x1000193
+  const s = String(seed)
+  for (let i = 0; i < s.length; i += 1) {
+    const c = s.charCodeAt(i)
+    h1 = (h1 ^ c) >>> 0
+    h1 = (h1 * 0x01000193) >>> 0
+    h2 = ((h2 << 5) + h2 + c) >>> 0
+  }
+  const hex = (n) => (n >>> 0).toString(16).padStart(8, '0')
+  return `"${(hex(h1) + hex(h2) + hex(h1 ^ h2) + hex((h1 + h2) >>> 0)).slice(0, 32)}"`
+}
+
+// Split a space-joined `--...-ids`/`--...-groups` value into a token list.
+function idList(v) {
+  return (v == null || v === true ? '' : String(v)).split(/[\s,]+/).filter(Boolean)
+}
+
+// Parse `--tag-specifications 'ResourceType=instance,Tags=[{Key=Name,Value=web},{Key=Env,Value=dev}]'`
+// into a flat { Key: Value } map. Only the Tags portion is used.
+function parseTagSpecifications(raw) {
+  const tags = {}
+  if (!raw || raw === true) return tags
+  const re = /\{Key=([^,}]+),Value=([^}]*)\}/g
+  let m
+  while ((m = re.exec(String(raw))) != null) tags[m[1]] = m[2]
+  return tags
+}
+
+// Parse `--tags Key=k,Value=v Key=k2,Value=v2` (ec2 create-tags form).
+function parseCreateTags(raw) {
+  const tags = {}
+  if (!raw || raw === true) return tags
+  for (const chunk of String(raw).trim().split(/\s+/)) {
+    const km = chunk.match(/Key=([^,]+)/)
+    const vm = chunk.match(/Value=(.*)$/)
+    if (km) tags[km[1]] = vm ? vm[1] : ''
+  }
+  return tags
+}
+
+// Translate known create-* CLI flags into a store payload override for the
+// generic resource create path. Only sets keys the user actually passed, so
+// cfg.defaults still fill the rest. (createGenericResource merges defaults.)
+function knownCreateFlags(serviceKey, resourceKey, flags) {
+  const out = {}
+  if (serviceKey === 'lambda' && resourceKey === 'functions') {
+    if (flags.runtime) out.runtime = String(flags.runtime)
+    if (flags['memory-size'] != null && flags['memory-size'] !== true) out.memory = Number(flags['memory-size'])
+    if (flags.handler) out.handler = String(flags.handler)
+    if (flags.timeout != null && flags.timeout !== true) out.timeout = Number(flags.timeout)
+  } else if (serviceKey === 'rds' && resourceKey === 'databases') {
+    if (flags.engine) out.engine = String(flags.engine)
+    if (flags['db-instance-class']) out.class = String(flags['db-instance-class'])
+    if (flags['allocated-storage'] != null && flags['allocated-storage'] !== true) out.storage = Number(flags['allocated-storage'])
+  } else if (serviceKey === 'dynamodb' && resourceKey === 'tables') {
+    // --key-schema AttributeName=pk,KeyType=HASH AttributeName=sk,KeyType=RANGE
+    const ks = flags['key-schema']
+    if (ks && ks !== true) {
+      const parts = String(ks).trim().split(/\s+/)
+      const hash = parts.find((p) => /KeyType=HASH/i.test(p))
+      const range = parts.find((p) => /KeyType=RANGE/i.test(p))
+      const nameOf = (p) => (p && p.match(/AttributeName=([^,]+)/)?.[1]) || null
+      if (nameOf(hash)) out.partitionKey = `${nameOf(hash)} (String)`
+      if (nameOf(range)) out.sortKey = `${nameOf(range)} (String)`
+    }
+  }
+  return out
+}
+
+// Map the store's structured instance.checks -> describe-instance-status shape.
+function checkStatus(checks) {
+  const c = checks || {}
+  const norm = (v) => (v === 'passed' ? 'ok' : v === 'initializing' ? 'initializing' : v === '-' ? 'not-applicable' : (v || 'initializing'))
+  return { system: norm(c.system), instance: norm(c.instance), reachability: c.reachability === 'passed' ? 'passed' : (c.reachability === '-' ? 'failed' : 'initializing') }
+}
+
+// IAM gate for a mutating command. Returns an AWS-style denial string when the
+// current principal is not allowed to perform `action`, else null. `unauthOp`
+// (when set) yields the EC2 UnauthorizedOperation shape instead of AccessDenied.
+function iamDeny(store, action, resource, opForMessage, { unauthorized } = {}) {
+  const decision = store.can ? store.can(action, resource || '*') : { allowed: true }
+  if (decision.allowed) return null
+  const who = store.whoami ? store.whoami() : null
+  const principalArn = who?.arn || `arn:aws:iam::${ACCOUNT}:user/cli-user`
+  if (unauthorized) {
+    return `\nAn error occurred (UnauthorizedOperation) when calling the ${opForMessage} operation: You are not authorized to perform this operation. User: ${principalArn} is not authorized to perform: ${action}`
+  }
+  return `\nAn error occurred (AccessDenied) when calling the ${opForMessage} operation: User: ${principalArn} is not authorized to perform: ${action}`
+}
 
 const GENERIC_SERVICE_ALIASES = {
   lambda: 'lambda',
@@ -121,14 +229,37 @@ export function awsCli(argv, store, ctx = {}) {
   const [service, command, ...rest] = argv
   const { flags } = parseFlags(rest)
   const region = flags.region || ctx.region || store.region
+  // Run the command, then apply --query / --output as a post-processing pass.
+  const result = runCommand(service, command, rest, flags, region, store)
+  return applyOutput(result, flags)
+}
 
+function runCommand(service, command, rest, flags, region, store) {
   if (!service || service === 'help') {
     return 'usage: aws [options] <command> <subcommand> [parameters]\nTo see help text, you can run:\n  aws help\n  aws <command> help'
   }
 
   // --- STS ---
   if (service === 'sts' && command === 'get-caller-identity') {
-    return j({ UserId: `AIDAEXAMPLEUSERID`, Account: ACCOUNT, Arn: arn('iam', region, ACCOUNT, 'user/cli-user') })
+    const who = store.whoami ? store.whoami() : null
+    return j({ UserId: who?.userId || 'AIDAEXAMPLEUSERID', Account: ACCOUNT, Arn: who?.arn || arn('iam', region, ACCOUNT, 'user/cli-user') })
+  }
+  if (service === 'sts' && command === 'assume-role') {
+    const roleArn = String(flags['role-arn'] || '')
+    const roleName = roleArn.split('/').pop() || flags['role-name']
+    if (!roleName) return '\nAn error occurred (ValidationError) when calling the AssumeRole operation: Missing required parameter RoleArn'
+    const res = store.assumeRole ? store.assumeRole(roleName) : { ok: false, error: 'assumeRole unavailable' }
+    if (res && res.ok === false) return `\n${res.error}`
+    const who = store.whoami ? store.whoami() : {}
+    return j({
+      Credentials: {
+        AccessKeyId: 'ASIAIOSFODNN7EXAMPLE',
+        SecretAccessKey: 'wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY',
+        SessionToken: 'FQoGZXIvYXdzEExampleSessionToken',
+        Expiration: new Date(Date.now() + 3600000).toISOString(),
+      },
+      AssumedRoleUser: { AssumedRoleId: who?.userId || 'AROAEXAMPLE:fixitlab-session', Arn: who?.arn || res.arn },
+    })
   }
   if (service === 'configure' && command === 'list') {
     return '      Name                    Value             Type    Location\n      ----                    -----             ----    --------\n   profile                <not set>             None    None\naccess_key     ****************MPLE shared-credentials-file\nsecret_key     ****************EKEY shared-credentials-file\n    region                 ' + region + '      config-file    ~/.aws/config'
@@ -147,29 +278,243 @@ export function awsCli(argv, store, ctx = {}) {
   // --- EC2 ---
   if (service === 'ec2') {
     const instances = store.instances.filter((i) => i.region === region)
+    // Helper: apply IAM gate + --dry-run for a mutating EC2 op.
+    const guardEc2 = (action, op, resource) => {
+      const denied = iamDeny(store, action, resource, op, { unauthorized: true })
+      if (denied) return denied
+      if (flags['dry-run']) return DRY_RUN_MESSAGE(op)
+      return null
+    }
+    const instanceToApi = (i) => ({
+      InstanceId: i.id, InstanceType: i.type, State: { Code: EC2_STATE_CODE[i.state] ?? 16, Name: i.state },
+      PrivateIpAddress: i.privateIp, PublicIpAddress: i.publicIp || undefined,
+      ImageId: i.amiId, KeyName: i.keyName, LaunchTime: i.launchTime,
+      Placement: { AvailabilityZone: i.az, Tenancy: i.tenancy },
+      SubnetId: i.subnetId, VpcId: i.vpcId, Architecture: i.architecture,
+      SecurityGroups: (i.securityGroups || []).map((g) => ({ GroupId: g })),
+      Tags: Object.entries(i.tags || {}).map(([Key, Value]) => ({ Key, Value })),
+    })
+
     if (command === 'describe-instances') {
-      const reservations = instances.map((i) => ({
+      const filters = parseFilters(flags.filters)
+      let matched = filterInstances(instances, filters)
+      const idFilter = idList(flags['instance-ids'])
+      if (idFilter.length) matched = matched.filter((i) => idFilter.includes(i.id))
+      const reservations = matched.map((i) => ({
         Groups: [],
-        Instances: [{
-          InstanceId: i.id, InstanceType: i.type, State: { Code: 16, Name: i.state },
-          PrivateIpAddress: i.privateIp, PublicIpAddress: i.publicIp || undefined,
-          ImageId: i.amiId, KeyName: i.keyName, LaunchTime: i.launchTime,
-          Placement: { AvailabilityZone: i.az, Tenancy: i.tenancy },
-          SubnetId: i.subnetId, VpcId: i.vpcId, Architecture: i.architecture,
-          SecurityGroups: i.securityGroups.map((g) => ({ GroupId: g })),
-          Tags: Object.entries(i.tags).map(([Key, Value]) => ({ Key, Value })),
-        }],
+        Instances: [instanceToApi(i)],
         OwnerId: ACCOUNT, ReservationId: `r-0${Math.random().toString(16).slice(2, 18)}`,
       }))
       return j({ Reservations: reservations })
     }
+    if (command === 'describe-instance-status') {
+      const idFilter = idList(flags['instance-ids'])
+      const includeAll = flags['include-all-instances'] === true || String(flags['include-all-instances']) === 'true'
+      let matched = instances
+      if (idFilter.length) matched = matched.filter((i) => idFilter.includes(i.id))
+      if (!includeAll) matched = matched.filter((i) => i.state === 'running')
+      return j({ InstanceStatuses: matched.map((i) => {
+        const cs = checkStatus(i.checks)
+        return {
+          InstanceId: i.id, AvailabilityZone: i.az,
+          InstanceState: { Code: EC2_STATE_CODE[i.state] ?? 16, Name: i.state },
+          SystemStatus: { Status: cs.system, Details: [{ Name: 'reachability', Status: cs.reachability }] },
+          InstanceStatus: { Status: cs.instance, Details: [{ Name: 'reachability', Status: cs.reachability }] },
+        }
+      }) })
+    }
+    if (command === 'run-instances') {
+      const guard = guardEc2('ec2:RunInstances', 'RunInstances')
+      if (guard) return guard
+      const tagMap = parseTagSpecifications(flags['tag-specifications'])
+      const count = Number(flags.count) || 1
+      const created = store.launchInstances({
+        name: tagMap.Name || '',
+        amiId: flags['image-id'] || 'ami-0c02fb55956c7d316',
+        type: flags['instance-type'] || 't2.micro',
+        count,
+        keyName: flags['key-name'] || '',
+        subnetId: flags['subnet-id'] || '',
+        securityGroups: idList(flags['security-group-ids']),
+        monitoring: false,
+        tags: tagMap,
+      })
+      const rows = Array.isArray(created) ? created : []
+      return j({
+        ReservationId: `r-0${Math.random().toString(16).slice(2, 18)}`,
+        OwnerId: ACCOUNT,
+        Groups: [],
+        Instances: rows.map((i) => ({ ...instanceToApi(i), State: { Code: 0, Name: 'pending' } })),
+      })
+    }
     if (['start-instances', 'stop-instances', 'reboot-instances', 'terminate-instances'].includes(command)) {
-      const ids = (flags['instance-ids'] || '').toString().split(/\s+/).filter(Boolean)
       const action = command.replace('-instances', '')
-      store.instanceAction(ids, action)
+      const actionMap = { start: 'ec2:StartInstances', stop: 'ec2:StopInstances', reboot: 'ec2:RebootInstances', terminate: 'ec2:TerminateInstances' }
+      const opMap = { start: 'StartInstances', stop: 'StopInstances', reboot: 'RebootInstances', terminate: 'TerminateInstances' }
+      const guard = guardEc2(actionMap[action], opMap[action])
+      if (guard) return guard
+      const ids = idList(flags['instance-ids'])
+      const res = store.instanceAction(ids, action)
+      if (res && res.ok === false && res.error) return `\n${res.error}`
       const key = { start: 'StartingInstances', stop: 'StoppingInstances', reboot: null, terminate: 'TerminatingInstances' }[action]
       if (action === 'reboot') return ''
       return j({ [key]: ids.map((id) => ({ InstanceId: id, CurrentState: { Name: action === 'start' ? 'pending' : action === 'stop' ? 'stopping' : 'shutting-down' }, PreviousState: { Name: 'running' } })) })
+    }
+    if (command === 'create-tags') {
+      const guard = guardEc2('ec2:CreateTags', 'CreateTags')
+      if (guard) return guard
+      const ids = idList(flags.resources)
+      const tags = parseCreateTags(flags.tags)
+      // The store only exposes a Name-tag setter for instances (used by the
+      // console rename flow); apply Name so CLI + GUI stay in sync. Other tag
+      // keys are accepted silently, matching the real CLI's empty success.
+      if (tags.Name && store.setInstanceName) {
+        for (const id of ids) {
+          if (store.instances.find((x) => x.id === id)) store.setInstanceName(id, tags.Name)
+        }
+      }
+      return ''
+    }
+    if (command === 'create-key-pair') {
+      const guard = guardEc2('ec2:CreateKeyPair', 'CreateKeyPair')
+      if (guard) return guard
+      const name = flags['key-name']
+      if (!name) return '\nAn error occurred (MissingParameter) when calling the CreateKeyPair operation: The request must contain the parameter KeyName'
+      const kp = store.createKeyPair({ name, type: flags['key-type'] || 'rsa' })
+      const pem = ['-----BEGIN RSA PRIVATE KEY-----',
+        'MIIEowIBAAKCAQEArandomsimulatedkeymaterialforfixitlabdemoonly000000',
+        'ThisIsASimulatedKeyPairAndContainsNoRealCryptographicMaterialAtAll00',
+        '-----END RSA PRIVATE KEY-----'].join('\n')
+      return j({ KeyName: kp.name, KeyPairId: kp.id, KeyFingerprint: kp.fingerprint, KeyMaterial: pem })
+    }
+    if (command === 'create-security-group') {
+      const guard = guardEc2('ec2:CreateSecurityGroup', 'CreateSecurityGroup')
+      if (guard) return guard
+      const name = flags['group-name']
+      if (!name) return '\nAn error occurred (MissingParameter) when calling the CreateSecurityGroup operation: The request must contain the parameter GroupName'
+      const vpcId = flags['vpc-id'] || store.vpcs.find((v) => v.region === region && v.isDefault)?.id || store.vpcs[0]?.id
+      const sg = store.createSecurityGroup({ name, description: flags.description || name, vpcId, inbound: [] })
+      if (sg && sg.ok === false) return `\n${sg.error}`
+      return j({ GroupId: sg.id })
+    }
+    if (command === 'authorize-security-group-ingress' || command === 'authorize-security-group-egress') {
+      const egress = command.endsWith('egress')
+      const op = egress ? 'AuthorizeSecurityGroupEgress' : 'AuthorizeSecurityGroupIngress'
+      const guard = guardEc2(egress ? 'ec2:AuthorizeSecurityGroupEgress' : 'ec2:AuthorizeSecurityGroupIngress', op)
+      if (guard) return guard
+      const id = flags['group-id']
+      const sg = store.securityGroups.find((s) => s.id === id)
+      if (!sg) return `\nAn error occurred (InvalidGroup.NotFound) when calling the ${op} operation: The security group '${id}' does not exist`
+      const rule = {
+        type: flags.protocol === 'tcp' && String(flags.port) === '22' ? 'SSH' : 'Custom',
+        protocol: (flags.protocol || 'tcp').toUpperCase(),
+        from: Number(flags.port) || 0, to: Number(flags.port) || 0,
+        source: flags.cidr || '0.0.0.0/0', description: '',
+      }
+      store.addSgRule(id, egress ? 'outbound' : 'inbound', rule)
+      return ''
+    }
+    if (command === 'revoke-security-group-ingress' || command === 'revoke-security-group-egress') {
+      const egress = command.endsWith('egress')
+      const op = egress ? 'RevokeSecurityGroupEgress' : 'RevokeSecurityGroupIngress'
+      const guard = guardEc2(egress ? 'ec2:RevokeSecurityGroupEgress' : 'ec2:RevokeSecurityGroupIngress', op)
+      if (guard) return guard
+      const id = flags['group-id']
+      const sg = store.securityGroups.find((s) => s.id === id)
+      if (!sg) return `\nAn error occurred (InvalidGroup.NotFound) when calling the ${op} operation: The security group '${id}' does not exist`
+      const dir = egress ? 'outbound' : 'inbound'
+      const port = Number(flags.port)
+      const cidr = flags.cidr
+      const kept = (sg[dir] || []).filter((r) => !((Number.isNaN(port) || r.from === port) && (!cidr || r.source === cidr)))
+      store.setSgRules(id, dir, kept)
+      return ''
+    }
+    if (command === 'delete-security-group') {
+      const guard = guardEc2('ec2:DeleteSecurityGroup', 'DeleteSecurityGroup')
+      if (guard) return guard
+      const res = store.deleteSecurityGroup(flags['group-id'])
+      if (res && res.ok === false) return `\n${res.error}`
+      return ''
+    }
+    if (command === 'create-vpc') {
+      const guard = guardEc2('ec2:CreateVpc', 'CreateVpc')
+      if (guard) return guard
+      const vpc = store.createVpc({ cidr: flags['cidr-block'], tenancy: flags['instance-tenancy'] })
+      if (vpc && vpc.ok === false) return `\n${vpc.error}`
+      return j({ Vpc: { VpcId: vpc.id, CidrBlock: vpc.cidr, State: vpc.state, IsDefault: vpc.isDefault, InstanceTenancy: vpc.tenancy, OwnerId: ACCOUNT } })
+    }
+    if (command === 'delete-vpc') {
+      const guard = guardEc2('ec2:DeleteVpc', 'DeleteVpc')
+      if (guard) return guard
+      const res = store.deleteVpc(flags['vpc-id'])
+      if (res && res.ok === false) return `\n${res.error}`
+      return ''
+    }
+    if (command === 'create-subnet') {
+      const guard = guardEc2('ec2:CreateSubnet', 'CreateSubnet')
+      if (guard) return guard
+      const subnet = store.createSubnet({ vpcId: flags['vpc-id'], cidr: flags['cidr-block'], az: flags['availability-zone'] })
+      if (subnet && subnet.ok === false) return `\n${subnet.error}`
+      return j({ Subnet: { SubnetId: subnet.id, VpcId: subnet.vpcId, CidrBlock: subnet.cidr, AvailabilityZone: subnet.az, AvailableIpAddressCount: subnet.availableIps, MapPublicIpOnLaunch: subnet.mapPublicIp, State: 'available' } })
+    }
+    if (command === 'delete-subnet') {
+      const guard = guardEc2('ec2:DeleteSubnet', 'DeleteSubnet')
+      if (guard) return guard
+      const res = store.deleteSubnet(flags['subnet-id'])
+      if (res && res.ok === false) return `\n${res.error}`
+      return ''
+    }
+    if (command === 'allocate-address') {
+      const guard = guardEc2('ec2:AllocateAddress', 'AllocateAddress')
+      if (guard) return guard
+      const eip = store.allocateEip()
+      return j({ PublicIp: eip.publicIp, AllocationId: eip.allocationId, Domain: eip.domain })
+    }
+    if (command === 'associate-address') {
+      const guard = guardEc2('ec2:AssociateAddress', 'AssociateAddress')
+      if (guard) return guard
+      const res = store.associateEip(flags['allocation-id'], flags['instance-id'])
+      if (res && res.ok === false) return `\n${res.error}`
+      const eip = store.elasticIps.find((e) => e.allocationId === flags['allocation-id'])
+      return j({ AssociationId: eip?.associationId })
+    }
+    if (command === 'disassociate-address') {
+      const guard = guardEc2('ec2:DisassociateAddress', 'DisassociateAddress')
+      if (guard) return guard
+      const alloc = flags['allocation-id'] || store.elasticIps.find((e) => e.associationId === flags['association-id'])?.allocationId
+      store.disassociateEip(alloc)
+      return ''
+    }
+    if (command === 'release-address') {
+      const guard = guardEc2('ec2:ReleaseAddress', 'ReleaseAddress')
+      if (guard) return guard
+      const res = store.releaseEip(flags['allocation-id'])
+      if (res && res.ok === false) return `\n${res.error}`
+      return ''
+    }
+    if (command === 'describe-addresses') {
+      return j({ Addresses: (store.elasticIps || []).filter((e) => !e.region || e.region === region).map((e) => ({ PublicIp: e.publicIp, AllocationId: e.allocationId, AssociationId: e.associationId || undefined, InstanceId: e.instanceId || undefined, Domain: e.domain })) })
+    }
+    if (command === 'attach-volume') {
+      const guard = guardEc2('ec2:AttachVolume', 'AttachVolume')
+      if (guard) return guard
+      const res = store.attachVolume(flags['volume-id'], flags['instance-id'], flags.device)
+      if (res && res.ok === false) return `\n${res.error}`
+      return j({ VolumeId: flags['volume-id'], InstanceId: flags['instance-id'], Device: flags.device, State: 'attaching' })
+    }
+    if (command === 'detach-volume') {
+      const guard = guardEc2('ec2:DetachVolume', 'DetachVolume')
+      if (guard) return guard
+      const res = store.detachVolume(flags['volume-id'])
+      if (res && res.ok === false) return `\n${res.error}`
+      return j({ VolumeId: flags['volume-id'], State: 'detaching' })
+    }
+    if (command === 'create-snapshot') {
+      const guard = guardEc2('ec2:CreateSnapshot', 'CreateSnapshot')
+      if (guard) return guard
+      const snap = store.createSnapshot(flags['volume-id'], flags.description)
+      if (snap && snap.ok === false) return `\n${snap.error}`
+      return j({ SnapshotId: snap.id, VolumeId: snap.volumeId, State: snap.state, VolumeSize: snap.size, Progress: snap.progress, Description: snap.description, Encrypted: snap.encrypted, StartTime: snap.started })
     }
     if (command === 'describe-security-groups') {
       return j({ SecurityGroups: store.securityGroups.filter((s) => s.region === region).map((s) => ({ GroupId: s.id, GroupName: s.name, Description: s.description, VpcId: s.vpcId, OwnerId: ACCOUNT })) })
@@ -182,6 +527,9 @@ export function awsCli(argv, store, ctx = {}) {
     }
     if (command === 'describe-volumes') {
       return j({ Volumes: store.volumes.filter((v) => v.region === region).map((v) => ({ VolumeId: v.id, Size: v.size, VolumeType: v.type, State: v.state, AvailabilityZone: v.az, Encrypted: v.encrypted, Attachments: v.attachedTo ? [{ InstanceId: v.attachedTo, Device: v.device, State: 'attached' }] : [] })) })
+    }
+    if (command === 'describe-snapshots') {
+      return j({ Snapshots: (store.snapshots || []).filter((s) => !s.region || s.region === region).map((s) => ({ SnapshotId: s.id, VolumeId: s.volumeId, State: s.state, VolumeSize: s.size, Progress: s.progress, Description: s.description, Encrypted: s.encrypted, StartTime: s.started })) })
     }
     if (command === 'describe-key-pairs') {
       return j({ KeyPairs: store.keyPairs.filter((k) => k.region === region).map((k) => ({ KeyPairId: k.id, KeyName: k.name, KeyType: k.type, KeyFingerprint: k.fingerprint })) })
@@ -249,14 +597,14 @@ export function awsCli(argv, store, ctx = {}) {
       if (!bucket) return '\nAn error occurred (NoSuchBucket) when calling the ListObjectsV2 operation: The specified bucket does not exist'
       const prefix = flags.prefix || ''
       const contents = bucket.objects.filter((o) => o.key.startsWith(prefix)).map((o) => ({
-        Key: o.key, LastModified: o.modified, ETag: `"${Math.random().toString(16).slice(2, 34).padEnd(32, '0')}"`, Size: o.size, StorageClass: o.storageClass || 'STANDARD',
+        Key: o.key, LastModified: o.modified, ETag: o.etag || stableEtag(`${bucket.name}/${o.key}`), Size: o.size, StorageClass: o.storageClass || 'STANDARD',
       }))
       return j({ Contents: contents, Name: bucket.name, Prefix: prefix, KeyCount: contents.length, MaxKeys: 1000, IsTruncated: false })
     }
     if (command === 'put-object') {
       if (!flags.bucket || !flags.key) return '\nAn error occurred (ValidationError) when calling the PutObject operation: Missing required bucket/key'
       store.putObject(flags.bucket, flags.key, flags.body ? 1024 : 0)
-      return j({ ETag: `"${Math.random().toString(16).slice(2, 34).padEnd(32, '0')}"`, ServerSideEncryption: 'AES256' })
+      return j({ ETag: stableEtag(`${flags.bucket}/${flags.key}`), ServerSideEncryption: 'AES256' })
     }
     if (command === 'delete-object') {
       if (!flags.bucket || !flags.key) return '\nAn error occurred (ValidationError) when calling the DeleteObject operation: Missing required bucket/key'
@@ -431,7 +779,11 @@ export function awsCli(argv, store, ctx = {}) {
       }
 
       if (command === spec.describe) {
-        const row = rows.find((r) => r.name === name || r.id === name || genericResourceArn(serviceKey, resourceKey, r, region, cfg) === name) || rows[0]
+        const found = rows.find((r) => r.name === name || r.id === name || genericResourceArn(serviceKey, resourceKey, r, region, cfg) === name)
+        // A named describe that matches nothing must fail — do NOT silently fall
+        // back to the first row (which masked typos / deleted resources).
+        if (name && !found) return `\nAn error occurred (ResourceNotFoundException) when calling the ${command} operation: ${serviceCfg.title} resource '${name}' not found`
+        const row = found || rows[0]
         if (!row) return `\nAn error occurred (ResourceNotFoundException) when calling the ${command} operation: ${serviceCfg.title} resource not found`
         const body = rowToGenericCli(serviceKey, resourceKey, row, region, cfg)
         if (serviceKey === 'lambda') return j({ Configuration: { FunctionName: row.name, FunctionArn: body.Arn, Runtime: row.runtime, Handler: row.handler, MemorySize: row.memory, Timeout: row.timeout, State: row.status }, Code: { RepositoryType: 'S3', Location: 'https://awssim.local/lambda.zip' } })
@@ -442,9 +794,12 @@ export function awsCli(argv, store, ctx = {}) {
       }
 
       if (command === spec.create) {
+        const denied = iamDeny(store, `${serviceKey}:${pascalCommand(command)}`, undefined, command)
+        if (denied) return denied
         const createName = name || flags['queue-name'] || flags['topic-name'] || flags.name
         if (!createName) return `\nAn error occurred (ValidationException) when calling the ${command} operation: Missing required name parameter`
-        const created = store.createGenericResource(serviceKey, resourceKey, { name: createName, ...cfg.defaults })
+        const created = store.createGenericResource(serviceKey, resourceKey, { name: createName, ...knownCreateFlags(serviceKey, resourceKey, flags) })
+        if (created && created.ok === false) return `\n${created.error}`
         const body = rowToGenericCli(serviceKey, resourceKey, created, region, cfg)
         if (serviceKey === 'sqs') return j({ QueueUrl: `https://sqs.${region}.amazonaws.com/${ACCOUNT}/${created.name}` })
         if (serviceKey === 'sns') return j({ TopicArn: body.Arn })
@@ -454,6 +809,8 @@ export function awsCli(argv, store, ctx = {}) {
       }
 
       if (command === spec.delete) {
+        const denied = iamDeny(store, `${serviceKey}:${pascalCommand(command)}`, undefined, command)
+        if (denied) return denied
         const row = rows.find((r) => r.name === name || r.id === name || genericResourceArn(serviceKey, resourceKey, r, region, cfg) === name)
         if (!row) return `\nAn error occurred (ResourceNotFoundException) when calling the ${command} operation: ${serviceCfg.title} resource not found`
         store.deleteGenericResource(serviceKey, resourceKey, row.id)
@@ -462,7 +819,12 @@ export function awsCli(argv, store, ctx = {}) {
       }
 
       if (command === spec.action) {
-        const row = rows.find((r) => r.name === name || r.id === name) || rows[0]
+        const denied = iamDeny(store, `${serviceKey}:${pascalCommand(command)}`, undefined, command)
+        if (denied) return denied
+        const found = rows.find((r) => r.name === name || r.id === name)
+        // Same fix: a named action that matches nothing must fail explicitly.
+        if (name && !found) return `\nAn error occurred (ResourceNotFoundException) when calling the ${command} operation: ${serviceCfg.title} resource '${name}' not found`
+        const row = found || rows[0]
         if (!row) return `\nAn error occurred (ResourceNotFoundException) when calling the ${command} operation: ${serviceCfg.title} resource not found`
         store.updateGenericResource?.(serviceKey, resourceKey, row.id, { lastRun: new Date().toISOString(), status: row.status || 'Active' })
         return j({ [resourceKey.replace(/-/g, '_')]: rowToGenericCli(serviceKey, resourceKey, row, region, cfg) })

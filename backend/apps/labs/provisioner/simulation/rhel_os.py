@@ -39,43 +39,364 @@ class SimProcess:
     command: str
 
 
-# Package -> (systemd unit name, unit description) it ships. Installing the
-# package via dnf/yum/rpm registers the unit (stopped, disabled) so a follow-up
-# `systemctl start/enable/status <unit>` works the way it does on a real RHEL box.
-# A package may ship more than one unit (e.g. nfs-utils).
+@dataclass
+class PackageSpec:
+    """Everything a dnf/apt install of a package should materialise on the box.
+
+    Installing a package via the catalog (RHELOSState.install_package) resolves
+    deps recursively, records the real catalog version in installed_packages,
+    writes each config_file to the sim FS, registers the systemd unit(s) it
+    ships, creates its log files, and records its binaries so which/command -v/
+    PATH resolve. This is what makes a fresh install honestly reflected in every
+    subsequent query the way a real RHEL box behaves.
+    """
+    version: str = "1.0.0"
+    release: str = "1.el9"
+    arch: str = "x86_64"
+    summary: str = ""
+    binaries: list[tuple[str, str]] = field(default_factory=list)     # (name, path)
+    units: list[tuple[str, str]] = field(default_factory=list)        # (unit, description)
+    config_files: dict[str, str] = field(default_factory=dict)        # path -> content
+    log_files: list[str] = field(default_factory=list)                # paths to touch
+    deps: list[str] = field(default_factory=list)                     # package names
+    size_kb: int = 512                                                # download size
+
+
+# ── Package catalog ──────────────────────────────────────────────────────────
+# Installing any of these via `dnf install`, `yum install`, `apt install`, or
+# `rpm -i` materialises the package for real (see RHELOSState.install_package).
+# Dependencies list catalog package names and are resolved recursively; leaf
+# deps (openssl-libs, pcre2, apr, …) carry no unit and just record a version so
+# `rpm -q` and the dep table are honest. Common teaching packages are covered.
+PACKAGE_CATALOG: dict[str, PackageSpec] = {
+    # ── leaf / library dependencies (no service, no config) ──
+    "nginx-filesystem": PackageSpec(version="1.20.1", release="14.el9", arch="noarch",
+                                    summary="The basic directory layout for the nginx server"),
+    "openssl-libs": PackageSpec(version="3.0.7", release="24.el9",
+                                summary="A general purpose cryptography library", size_kb=2100),
+    "pcre2": PackageSpec(version="10.40", release="2.el9", summary="Perl-compatible regular expression library"),
+    "apr": PackageSpec(version="1.7.0", release="11.el9", summary="Apache Portable Runtime library"),
+    "apr-util": PackageSpec(version="1.6.1", release="23.el9", summary="Apache Portable Runtime Utility library",
+                            deps=["apr"]),
+    "mariadb-common": PackageSpec(version="10.5.22", release="1.el9", arch="noarch",
+                                  summary="MariaDB common files for both server and client"),
+    "postgresql-private-libs": PackageSpec(version="13.14", release="1.el9",
+                                           summary="The shared libraries required for PostgreSQL clients"),
+    "containerd.io": PackageSpec(version="1.6.28", release="3.1.el9",
+                                 summary="An industry-standard container runtime", size_kb=35000),
+    "docker-ce-cli": PackageSpec(version="25.0.3", release="1.el9",
+                                 summary="The open-source application container engine CLI", size_kb=15000),
+    "conmon": PackageSpec(version="2.1.10", release="1.el9", summary="OCI container runtime monitor"),
+    "criu": PackageSpec(version="3.18", release="4.el9", summary="Tool for Checkpoint/Restore in User-space"),
+
+    # ── web / proxy ──
+    "nginx": PackageSpec(
+        version="1.20.1", release="14.el9",
+        summary="A high performance web server and reverse proxy server",
+        binaries=[("nginx", "/usr/sbin/nginx")],
+        units=[("nginx", "The nginx HTTP and reverse proxy server")],
+        config_files={
+            "/etc/nginx/nginx.conf": (
+                "user nginx;\nworker_processes auto;\n"
+                "error_log /var/log/nginx/error.log;\npid /run/nginx.pid;\n"
+                "events {\n    worker_connections 1024;\n}\n"
+                "http {\n    include /etc/nginx/mime.types;\n"
+                "    default_type application/octet-stream;\n"
+                "    access_log /var/log/nginx/access.log;\n"
+                "    sendfile on;\n    keepalive_timeout 65;\n"
+                "    include /etc/nginx/conf.d/*.conf;\n"
+                "    server {\n        listen 80;\n        server_name localhost;\n"
+                "        root /usr/share/nginx/html;\n        index index.html;\n    }\n}\n"
+            ),
+        },
+        log_files=["/var/log/nginx/access.log", "/var/log/nginx/error.log"],
+        deps=["nginx-filesystem", "openssl-libs", "pcre2"], size_kb=580,
+    ),
+    "httpd": PackageSpec(
+        version="2.4.57", release="8.el9",
+        summary="Apache HTTP Server",
+        binaries=[("httpd", "/usr/sbin/httpd"), ("apachectl", "/usr/sbin/apachectl")],
+        units=[("httpd", "The Apache HTTP Server")],
+        config_files={
+            "/etc/httpd/conf/httpd.conf": (
+                "ServerRoot \"/etc/httpd\"\nListen 80\n"
+                "Include conf.modules.d/*.conf\nUser apache\nGroup apache\n"
+                "ServerAdmin root@localhost\nDocumentRoot \"/var/www/html\"\n"
+                "ErrorLog \"logs/error_log\"\nLogLevel warn\n"
+                "IncludeOptional conf.d/*.conf\n"
+            ),
+        },
+        log_files=["/var/log/httpd/access_log", "/var/log/httpd/error_log"],
+        deps=["httpd-tools", "apr", "apr-util"], size_kb=1470,
+    ),
+    "httpd-tools": PackageSpec(version="2.4.57", release="8.el9",
+                               summary="Tools for use with the Apache HTTP Server",
+                               binaries=[("ab", "/usr/bin/ab"), ("htpasswd", "/usr/bin/htpasswd")],
+                               deps=["apr", "apr-util"], size_kb=90),
+    "haproxy": PackageSpec(
+        version="2.4.22", release="3.el9",
+        summary="HAProxy reverse proxy for high availability environments",
+        binaries=[("haproxy", "/usr/sbin/haproxy")],
+        units=[("haproxy", "HAProxy Load Balancer")],
+        config_files={
+            "/etc/haproxy/haproxy.cfg": (
+                "global\n    log /dev/log local0\n    maxconn 4000\n"
+                "defaults\n    mode http\n    timeout connect 5s\n"
+                "    timeout client 30s\n    timeout server 30s\n"
+                "frontend main\n    bind *:80\n    default_backend app\n"
+                "backend app\n    server app1 127.0.0.1:8080 check\n"
+            ),
+        },
+        log_files=["/var/log/haproxy.log"],
+        deps=["openssl-libs", "pcre2"], size_kb=2100,
+    ),
+
+    # ── databases ──
+    "mariadb-server": PackageSpec(
+        version="10.5.22", release="1.el9",
+        summary="The MariaDB server and related files",
+        binaries=[("mariadbd", "/usr/sbin/mariadbd"), ("mysqld", "/usr/sbin/mariadbd"),
+                  ("mariadb-admin", "/usr/bin/mariadb-admin")],
+        units=[("mariadb", "MariaDB 10.5 database server")],
+        config_files={
+            "/etc/my.cnf.d/mariadb-server.cnf": (
+                "[mysqld]\ndatadir=/var/lib/mysql\nsocket=/var/lib/mysql/mysql.sock\n"
+                "log-error=/var/log/mariadb/mariadb.log\npid-file=/run/mariadb/mariadb.pid\n"
+            ),
+        },
+        log_files=["/var/log/mariadb/mariadb.log"],
+        deps=["mariadb", "mariadb-common"], size_kb=9800,
+    ),
+    "mariadb": PackageSpec(version="10.5.22", release="1.el9",
+                           summary="A very fast and robust SQL database server (client)",
+                           binaries=[("mariadb", "/usr/bin/mariadb"), ("mysql", "/usr/bin/mariadb")],
+                           deps=["mariadb-common"], size_kb=1600),
+    "postgresql-server": PackageSpec(
+        version="13.14", release="1.el9",
+        summary="The programs needed to create and run a PostgreSQL server",
+        binaries=[("postgres", "/usr/bin/postgres"), ("initdb", "/usr/bin/initdb"),
+                  ("pg_ctl", "/usr/bin/pg_ctl")],
+        units=[("postgresql", "PostgreSQL database server")],
+        config_files={
+            "/var/lib/pgsql/data/postgresql.conf": (
+                "listen_addresses = 'localhost'\nport = 5432\nmax_connections = 100\n"
+                "logging_collector = on\nlog_directory = 'log'\n"
+            ),
+        },
+        log_files=["/var/lib/pgsql/data/log/postgresql.log"],
+        deps=["postgresql", "postgresql-private-libs"], size_kb=5600,
+    ),
+    "postgresql": PackageSpec(version="13.14", release="1.el9",
+                              summary="PostgreSQL client programs",
+                              binaries=[("psql", "/usr/bin/psql"), ("pg_dump", "/usr/bin/pg_dump")],
+                              deps=["postgresql-private-libs"], size_kb=1600),
+    "redis": PackageSpec(
+        version="6.2.7", release="1.el9",
+        summary="A persistent key-value database",
+        binaries=[("redis-server", "/usr/bin/redis-server"), ("redis-cli", "/usr/bin/redis-cli")],
+        units=[("redis", "Redis persistent key-value database")],
+        config_files={
+            "/etc/redis/redis.conf": (
+                "bind 127.0.0.1 -::1\nport 6379\ndaemonize no\n"
+                "pidfile /run/redis/redis.pid\nlogfile /var/log/redis/redis.log\n"
+                "dir /var/lib/redis\n"
+            ),
+        },
+        log_files=["/var/log/redis/redis.log"],
+        deps=[], size_kb=1100,
+    ),
+    "memcached": PackageSpec(
+        version="1.6.9", release="4.el9",
+        summary="High Performance, Distributed Memory Object Cache",
+        binaries=[("memcached", "/usr/bin/memcached")],
+        units=[("memcached", "memcached daemon")],
+        config_files={"/etc/sysconfig/memcached": (
+            "PORT=\"11211\"\nUSER=\"memcached\"\nMAXCONN=\"1024\"\nCACHESIZE=\"64\"\n")},
+        log_files=[], deps=[], size_kb=120,
+    ),
+
+    # ── containers ──
+    "docker": PackageSpec(
+        version="25.0.3", release="1.el9",
+        summary="The open-source application container engine",
+        binaries=[("docker", "/usr/bin/docker"), ("dockerd", "/usr/bin/dockerd")],
+        units=[("docker", "Docker Application Container Engine")],
+        config_files={"/etc/docker/daemon.json": "{\n  \"log-driver\": \"json-file\"\n}\n"},
+        log_files=[], deps=["containerd.io", "docker-ce-cli"], size_kb=42000,
+    ),
+    "podman": PackageSpec(
+        version="4.9.4", release="1.el9",
+        summary="Manage Pods, Containers and Container Images",
+        binaries=[("podman", "/usr/bin/podman")],
+        units=[("podman", "Podman API Service")],
+        config_files={"/etc/containers/registries.conf":
+                      "unqualified-search-registries = [\"registry.access.redhat.com\", \"docker.io\"]\n"},
+        log_files=[], deps=["conmon", "criu"], size_kb=15000,
+    ),
+
+    # ── services / daemons ──
+    "chrony": PackageSpec(
+        version="4.3", release="1.el9",
+        summary="An NTP client/server",
+        binaries=[("chronyd", "/usr/sbin/chronyd"), ("chronyc", "/usr/bin/chronyc")],
+        units=[("chronyd", "NTP client/server")],
+        config_files={"/etc/chrony.conf":
+                      "pool 2.rhel.pool.ntp.org iburst\ndriftfile /var/lib/chrony/drift\n"
+                      "makestep 1.0 3\nrtcsync\nlogdir /var/log/chrony\n"},
+        log_files=[], deps=[], size_kb=340,
+    ),
+    "firewalld": PackageSpec(
+        version="1.2.5", release="1.el9", arch="noarch",
+        summary="A firewall daemon with D-Bus interface providing a dynamic firewall",
+        binaries=[("firewall-cmd", "/usr/bin/firewall-cmd"),
+                  ("firewall-offline-cmd", "/usr/bin/firewall-offline-cmd")],
+        units=[("firewalld", "firewalld - dynamic firewall daemon")],
+        config_files={"/etc/firewalld/firewalld.conf":
+                      "DefaultZone=public\nCleanupOnExit=yes\nFirewallBackend=nftables\n"},
+        log_files=["/var/log/firewalld"], deps=[], size_kb=430,
+    ),
+    "vsftpd": PackageSpec(
+        version="3.0.5", release="5.el9",
+        summary="Very Secure Ftp Daemon",
+        binaries=[("vsftpd", "/usr/sbin/vsftpd")],
+        units=[("vsftpd", "Vsftpd ftp daemon")],
+        config_files={"/etc/vsftpd/vsftpd.conf":
+                      "anonymous_enable=NO\nlocal_enable=YES\nwrite_enable=YES\n"
+                      "listen=YES\nlisten_ipv6=NO\npam_service_name=vsftpd\n"},
+        log_files=["/var/log/vsftpd.log"], deps=[], size_kb=180,
+    ),
+    "bind": PackageSpec(
+        version="9.16.23", release="18.el9",
+        summary="The Berkeley Internet Name Domain (BIND) DNS server",
+        binaries=[("named", "/usr/sbin/named"), ("rndc", "/usr/sbin/rndc")],
+        units=[("named", "Berkeley Internet Name Domain (DNS)")],
+        config_files={"/etc/named.conf":
+                      "options {\n    listen-on port 53 { 127.0.0.1; };\n"
+                      "    directory \"/var/named\";\n    allow-query { localhost; };\n"
+                      "    recursion yes;\n};\nzone \".\" IN {\n    type hint;\n"
+                      "    file \"named.ca\";\n};\n"},
+        log_files=["/var/named/data/named.run"], deps=["openssl-libs"], size_kb=2200,
+    ),
+    "nfs-utils": PackageSpec(
+        version="2.5.4", release="20.el9",
+        summary="NFS utilities and supporting clients and daemons for the kernel NFS server",
+        binaries=[("exportfs", "/usr/sbin/exportfs"), ("showmount", "/usr/sbin/showmount"),
+                  ("mount.nfs", "/usr/sbin/mount.nfs")],
+        units=[("nfs-server", "NFS server and services")],
+        config_files={"/etc/exports": "# /srv/nfs 192.168.0.0/24(rw,sync,no_root_squash)\n"},
+        log_files=[], deps=[], size_kb=520,
+    ),
+
+    # ── developer / cli tools (no service) ──
+    "git": PackageSpec(version="2.43.5", release="1.el9",
+                       summary="Fast Version Control System",
+                       binaries=[("git", "/usr/bin/git")], deps=[], size_kb=4600),
+    "curl": PackageSpec(version="7.76.1", release="29.el9",
+                        summary="A utility for getting files from remote servers (FTP, HTTP, and others)",
+                        binaries=[("curl", "/usr/bin/curl")], deps=["openssl-libs"], size_kb=300),
+    "wget": PackageSpec(version="1.21.1", release="8.el9",
+                        summary="A utility for retrieving files using the HTTP or FTP protocols",
+                        binaries=[("wget", "/usr/bin/wget")], deps=["openssl-libs"], size_kb=780),
+    "vim": PackageSpec(version="8.2.2637", release="20.el9",
+                       summary="The VIM version 8.2 editor (vim-enhanced)",
+                       binaries=[("vim", "/usr/bin/vim"), ("vi", "/usr/bin/vim")],
+                       config_files={"/etc/vimrc": "set nocompatible\nsyntax on\nset backspace=2\n"},
+                       deps=[], size_kb=1900),
+    "net-tools": PackageSpec(version="2.0", release="0.62.20160912git.el9",
+                             summary="Basic networking tools",
+                             binaries=[("netstat", "/usr/bin/netstat"), ("ifconfig", "/usr/sbin/ifconfig"),
+                                       ("route", "/usr/sbin/route"), ("arp", "/usr/sbin/arp")],
+                             deps=[], size_kb=310),
+    "tcpdump": PackageSpec(version="4.99.0", release="9.el9",
+                           summary="A network traffic monitoring tool",
+                           binaries=[("tcpdump", "/usr/sbin/tcpdump")],
+                           deps=[], size_kb=490),
+}
+
+# Aliases: alternate/legacy package names that map to a canonical catalog entry.
+# Includes Debian/Ubuntu names so the apt path shares the same catalog.
+PACKAGE_ALIASES: dict[str, str] = {
+    # RHEL-side alternates
+    "docker-ce": "docker",
+    "mariadb-server-utils": "mariadb-server",
+    "named": "bind",
+    "bind9": "bind",
+    "vim-enhanced": "vim",
+    # Debian / Ubuntu names -> catalog canonical
+    "apache2": "httpd",
+    "apache2-bin": "httpd",
+    "docker.io": "docker",
+    "redis-server": "redis",
+    "postgresql": "postgresql-server",
+    "postgresql-server": "postgresql-server",
+    "bind9utils": "bind",
+    "chrony": "chrony",
+    "nfs-common": "nfs-utils",
+    "nfs-kernel-server": "nfs-utils",
+    "vim-tiny": "vim",
+}
+
+
+def resolve_package_name(name: str) -> str:
+    """Map an alias (or Debian name) to its canonical catalog key; else itself."""
+    return PACKAGE_ALIASES.get(name, name)
+
+
+# Commands that ship with a base RHEL install (coreutils, bash, systemd,
+# openssh, sudo, python3, dnf, rpm, …) and therefore always resolve via
+# which/command -v/type/PATH regardless of what has been installed. Anything
+# NOT here must be installed via a package before it resolves.
+BASE_BINARIES: dict[str, str] = {
+    "bash": "/usr/bin/bash", "sh": "/usr/bin/sh", "ls": "/usr/bin/ls",
+    "cat": "/usr/bin/cat", "echo": "/usr/bin/echo", "cp": "/usr/bin/cp",
+    "mv": "/usr/bin/mv", "rm": "/usr/bin/rm", "mkdir": "/usr/bin/mkdir",
+    "touch": "/usr/bin/touch", "chmod": "/usr/bin/chmod", "chown": "/usr/bin/chown",
+    "grep": "/usr/bin/grep", "sed": "/usr/bin/sed", "awk": "/usr/bin/awk",
+    "find": "/usr/bin/find", "tar": "/usr/bin/tar", "head": "/usr/bin/head",
+    "tail": "/usr/bin/tail", "wc": "/usr/bin/wc", "sort": "/usr/bin/sort",
+    "cut": "/usr/bin/cut", "tr": "/usr/bin/tr", "tee": "/usr/bin/tee",
+    "ps": "/usr/bin/ps", "kill": "/usr/bin/kill", "df": "/usr/bin/df",
+    "du": "/usr/bin/du", "free": "/usr/bin/free", "id": "/usr/bin/id",
+    "whoami": "/usr/bin/whoami", "hostname": "/usr/bin/hostname",
+    "uname": "/usr/bin/uname", "date": "/usr/bin/date", "which": "/usr/bin/which",
+    "env": "/usr/bin/env", "su": "/usr/bin/su", "sudo": "/usr/bin/sudo",
+    "systemctl": "/usr/bin/systemctl", "journalctl": "/usr/bin/journalctl",
+    "useradd": "/usr/sbin/useradd", "userdel": "/usr/sbin/userdel",
+    "usermod": "/usr/sbin/usermod", "groupadd": "/usr/sbin/groupadd",
+    "passwd": "/usr/bin/passwd", "getent": "/usr/bin/getent",
+    "python3": "/usr/bin/python3", "python": "/usr/bin/python3",
+    "dnf": "/usr/bin/dnf", "yum": "/usr/bin/yum", "rpm": "/usr/bin/rpm",
+    "ssh": "/usr/bin/ssh", "scp": "/usr/bin/scp", "ping": "/usr/bin/ping",
+    "ip": "/usr/sbin/ip", "ss": "/usr/sbin/ss", "mount": "/usr/bin/mount",
+    "umount": "/usr/bin/umount", "lsblk": "/usr/bin/lsblk", "blkid": "/usr/sbin/blkid",
+    "dmesg": "/usr/bin/dmesg", "uptime": "/usr/bin/uptime",
+}
+
+
+# Backward-compatible view: package -> [(unit, description)] derived from the
+# catalog. register_package_service (grading contract) reads this, so existing
+# behaviour is preserved while the catalog stays the single source of truth.
 PACKAGE_SERVICES: dict[str, list[tuple[str, str]]] = {
-    "nginx": [("nginx", "The nginx HTTP and reverse proxy server")],
-    "httpd": [("httpd", "The Apache HTTP Server")],
-    "mariadb-server": [("mariadb", "MariaDB 10.5 database server")],
-    "mariadb": [("mariadb", "MariaDB 10.5 database server")],
+    name: list(spec.units) for name, spec in PACKAGE_CATALOG.items()
+}
+# Retain legacy entries the catalog does not (yet) model so any older caller of
+# register_package_service still registers the expected unit.
+PACKAGE_SERVICES.update({
     "mysql-server": [("mysqld", "MySQL Server")],
-    "postgresql-server": [("postgresql", "PostgreSQL database server")],
-    "postgresql": [("postgresql", "PostgreSQL database server")],
-    "redis": [("redis", "Redis persistent key-value database")],
-    "memcached": [("memcached", "memcached daemon")],
-    "docker": [("docker", "Docker Application Container Engine")],
     "docker-ce": [("docker", "Docker Application Container Engine")],
-    "podman": [("podman", "Podman API Service")],
-    "vsftpd": [("vsftpd", "Vsftpd ftp daemon")],
-    "httpd-tools": [],
-    "haproxy": [("haproxy", "HAProxy Load Balancer")],
     "php-fpm": [("php-fpm", "The PHP FastCGI Process Manager")],
     "mongodb-org": [("mongod", "MongoDB Database Server")],
     "mongodb": [("mongod", "MongoDB Database Server")],
     "tomcat": [("tomcat", "Apache Tomcat Web Application Container")],
     "named": [("named", "Berkeley Internet Name Domain (DNS)")],
-    "bind": [("named", "Berkeley Internet Name Domain (DNS)")],
     "dovecot": [("dovecot", "Dovecot IMAP/POP3 email server")],
     "postfix": [("postfix", "Postfix Mail Transport Agent")],
-    "nfs-utils": [("nfs-server", "NFS server and services")],
     "samba": [("smb", "Samba SMB Daemon")],
-    "chrony": [("chronyd", "NTP client/server")],
-    "firewalld": [("firewalld", "firewalld - dynamic firewall daemon")],
     "rabbitmq-server": [("rabbitmq-server", "RabbitMQ broker")],
     "elasticsearch": [("elasticsearch", "Elasticsearch")],
     "grafana": [("grafana-server", "Grafana instance")],
     "prometheus": [("prometheus", "Prometheus monitoring system")],
-}
+})
 
 
 @dataclass
@@ -190,6 +511,15 @@ class RHELOSState:
             "chrony": "chrony-4.3-1.el9.x86_64",
             "coreutils": "coreutils-8.32-34.el9.x86_64",
         }
+        # Binary registry: command name -> absolute path. `which`, `command -v`,
+        # `type` and PATH resolution consult this on top of the base coreutils
+        # already present, so only genuinely-installed binaries resolve. A
+        # catalog install (install_package) records the package's binaries here.
+        self.installed_binaries: dict[str, str] = {}
+        # Interactive confirm state: when a package manager prints "Is this ok
+        # [y/N]:" (no -y), it stashes a callback here and the next input line
+        # (y/n) resolves it. None when nothing is pending. See RHELShell.run.
+        self.pending_confirm = None
         self._init_base_system()
         self._init_block_devices()
 
@@ -211,9 +541,13 @@ class RHELOSState:
         self._mkdir("/opt/fixitlab")
         self._write_file("/opt/fixitlab/check.sh", "#!/bin/bash\nexit 0\n")
 
+        # Only the daemons a stock RHEL minimal install actually ships belong to
+        # the base system. nginx is NOT one of them — it is registered only when
+        # its package is installed (dnf/apt/rpm) or when a web/nginx scenario
+        # preset pre-installs it (see _preseed_scenario_services below), so an
+        # un-installed nginx honestly reports "command not found" / unknown unit.
         for svc, desc in (
             ("sshd", "OpenSSH server daemon"),
-            ("nginx", "The nginx HTTP and reverse proxy server"),
             ("crond", "Command Scheduler"),
             ("chronyd", "NTP client/server"),
             ("rsyslog", "System Logging Service"),
@@ -227,10 +561,60 @@ class RHELOSState:
         self.processes = [
             SimProcess(1, "root", 0.0, 0.1, "systemd"),
             SimProcess(412, "root", 0.1, 0.5, "/usr/sbin/sshd -D"),
-            SimProcess(891, "nginx", 0.0, 0.3, "nginx: master process /usr/sbin/nginx"),
-            SimProcess(892, "nginx", 0.0, 0.2, "nginx: worker process"),
         ]
         self.pid_counter = 900
+        self._register_base_installed_binaries()
+        self._preseed_scenario_services()
+
+    def _register_base_installed_binaries(self) -> None:
+        """Packages pre-installed on the seed image (firewalld, chrony, …) ship
+        real binaries and units — record them so `which firewall-cmd`,
+        `which chronyc`, and `systemctl status firewalld` behave as they would on
+        a box where those RPMs are genuinely present. chronyd's unit is already
+        registered as an active base daemon in _init_base_system."""
+        for pkg in list(self.installed_packages):
+            spec = PACKAGE_CATALOG.get(resolve_package_name(pkg))
+            if not spec:
+                continue
+            for bname, bpath in spec.binaries:
+                self.installed_binaries.setdefault(bname, bpath)
+            for unit, desc in spec.units:
+                if unit not in self.services:
+                    self.services[unit] = SimService(
+                        unit, active="inactive", enabled="disabled",
+                        description=desc, loaded="loaded", sub_state="dead",
+                        unit_file=f"[Unit]\nDescription={desc}\n",
+                    )
+
+    def _preseed_scenario_services(self) -> None:
+        """Some web/nginx scenario presets (in scenario_presets.py) mutate
+        state.services["nginx"].active directly and assume the unit already
+        exists — they represent a machine where nginx IS installed. Since those
+        presets are applied AFTER __init__ and cannot be edited here, pre-register
+        the nginx unit (active/enabled, as before) and its worker processes when
+        this state's scenario_slug routes to such a preset. This keeps existing
+        grading and tests working; every other scenario boots without nginx.
+        """
+        slug = (self.scenario_slug or "").lower()
+        nginx_scenarios = (
+            "nginx" in slug
+            or "firewalld" in slug
+            or "selinux-httpd-port" in slug
+            or "server-hung" in slug
+        )
+        if not nginx_scenarios:
+            return
+        desc = "The nginx HTTP and reverse proxy server"
+        self.services["nginx"] = SimService(
+            "nginx", active="active", enabled="enabled", description=desc,
+            sub_state="running", unit_file=f"[Unit]\nDescription={desc}\n",
+        )
+        self.installed_packages.setdefault("nginx", "nginx-1.20.1-14.el9.x86_64")
+        self.installed_binaries.setdefault("nginx", "/usr/sbin/nginx")
+        self.processes.extend([
+            SimProcess(891, "nginx", 0.0, 0.3, "nginx: master process /usr/sbin/nginx"),
+            SimProcess(892, "nginx", 0.0, 0.2, "nginx: worker process"),
+        ])
 
     def _init_block_devices(self) -> None:
         """Seed the boot disk layout (sda + LVM). Extra disks come from scenario presets or VMware hot-add."""
@@ -473,6 +857,82 @@ class RHELOSState:
             )
             registered.append(name)
         return registered
+
+    def catalog_nvra(self, name: str) -> str:
+        """version-release.arch NVRA for a catalog package (or a 1.0.0 stub)."""
+        spec = PACKAGE_CATALOG.get(resolve_package_name(name))
+        if spec:
+            return f"{name}-{spec.version}-{spec.release}.{spec.arch}"
+        return f"{name}-1.0.0-1.el9.x86_64"
+
+    def resolve_install_plan(self, pkg: str) -> list[str]:
+        """Recursively resolve `pkg` and its deps into an install order (deps
+        first), canonicalising aliases and skipping already-installed packages.
+        Returns catalog names in the order they should be installed."""
+        order: list[str] = []
+        seen: set[str] = set()
+
+        def visit(name: str) -> None:
+            canon = resolve_package_name(name)
+            if canon in seen:
+                return
+            seen.add(canon)
+            spec = PACKAGE_CATALOG.get(canon)
+            if spec:
+                for dep in spec.deps:
+                    visit(dep)
+            if canon in self.installed_packages:
+                return
+            if canon not in order:
+                order.append(canon)
+
+        visit(pkg)
+        return order
+
+    def install_package(self, pkg: str) -> list[str]:
+        """Really install `pkg`: resolve deps recursively (skipping installed
+        ones), record the catalog version in installed_packages, write each
+        config file to the sim FS, register the systemd unit(s), create the log
+        files, and record the binaries so which/command -v/PATH resolve.
+
+        Returns the list of package names newly installed (deps first, target
+        last). Packages not in the catalog still get recorded (with a stub
+        version + their unit via register_package_service) so unknown installs
+        remain queryable, matching the previous best-effort behaviour.
+        """
+        plan = self.resolve_install_plan(pkg)
+        installed: list[str] = []
+        for name in plan:
+            spec = PACKAGE_CATALOG.get(name)
+            self.installed_packages[name] = self.catalog_nvra(name)
+            if spec:
+                for path, content in spec.config_files.items():
+                    if not self.file_exists(path):
+                        self.write_file(path, content)
+                self.register_package_service(name)
+                for bname, bpath in spec.binaries:
+                    self.installed_binaries[bname] = bpath
+                for logpath in spec.log_files:
+                    if not self.file_exists(logpath):
+                        self.write_file(logpath, "")
+            else:
+                # Unknown package: keep the old best-effort unit registration so
+                # a follow-up systemctl start/status still works if it ships one.
+                self.register_package_service(name)
+            installed.append(name)
+        return installed
+
+    def is_package_installed(self, pkg: str) -> bool:
+        return resolve_package_name(pkg) in self.installed_packages or pkg in self.installed_packages
+
+    def resolve_binary(self, name: str) -> str | None:
+        """Absolute path of an installed command, or None. Consults the base
+        coreutils/base-system binaries always present plus anything a package
+        install recorded. `which`/`command -v`/`type`/PATH share this."""
+        binaries = getattr(self, "installed_binaries", None)
+        if binaries and name in binaries:
+            return binaries[name]
+        return BASE_BINARIES.get(name)
 
     def add_user(self, username: str, home: str | None = None, shell: str = "/bin/bash") -> tuple[bool, str]:
         if username in self.users:

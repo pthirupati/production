@@ -66,7 +66,10 @@ class RHELShellCommandTests(SimpleTestCase):
             self.assertLess(len(shell.state.processes), before)
 
     def test_clone_for_companion_host(self):
-        state = RHELOSState(hostname="primary")
+        # Construct with the scenario slug (as RHELShell/base_sim do in
+        # production) so the nginx web-scenario unit is pre-seeded before the
+        # preset mutates it — nginx is no longer a base-system service.
+        state = RHELOSState(hostname="primary", scenario_slug="sim-rhel-broken-nginx")
         apply_scenario_preset("sim-rhel-broken-nginx", state)
         companion = state.clone_for_host("web1")
         self.assertEqual(companion.hostname, "web1")
@@ -738,7 +741,12 @@ class NetworkingToolTests(SimpleTestCase):
         self.assertIn("OpenSSL", shell.run("openssl version"))
 
     def test_wget_success(self):
+        # nginx is no longer a base-system service, so bring up a real server
+        # first (install + start) before fetching — wget succeeds against a
+        # running web server.
         shell = RHELShell()
+        shell.run("dnf install -y nginx")
+        shell.run("systemctl start nginx")
         out = shell.run("wget http://localhost")
         self.assertIn("200 OK", out)
 
@@ -832,3 +840,214 @@ class ProvisionerTests(TestCase):
         passed, msg = prov.run_validation(resource_id, session.scenario.validation_script)
         self.assertTrue(passed, msg)
         prov.terminate(resource_id, session_id="test-session-uuid")
+
+
+class PackageInstallTests(SimpleTestCase):
+    """Realistic dnf/yum/apt package installation and its honest post-state."""
+
+    # ── base system is honest about what is NOT installed ──
+    def test_base_system_has_no_nginx(self):
+        state = RHELOSState()
+        self.assertNotIn("nginx", state.services)
+        self.assertIsNone(state.resolve_binary("nginx"))
+        # base daemons remain
+        self.assertEqual(state.services["sshd"].active, "active")
+
+    def test_nginx_command_not_found_before_install(self):
+        shell = RHELShell()
+        out = shell.run("nginx")
+        self.assertIn("command not found", out)
+        self.assertEqual(shell.state.last_exit_code, 127)
+
+    def test_which_only_resolves_installed_binaries(self):
+        shell = RHELShell()
+        # coreutils base binary always resolves
+        self.assertEqual(shell.run("which bash"), "/usr/bin/bash")
+        # not-installed tool does not
+        out = shell.run("which nginx")
+        self.assertIn("no nginx", out)
+        self.assertEqual(shell.state.last_exit_code, 1)
+
+    def test_systemctl_status_unknown_before_install(self):
+        shell = RHELShell()
+        out = shell.run("systemctl status nginx")
+        self.assertIn("could not be found", out)
+
+    def test_nginx_config_test_no_conf_before_install(self):
+        # After install but with the config removed, nginx -t emits the real
+        # open() error rather than a fake success.
+        shell = RHELShell()
+        shell.run("dnf install -y nginx")
+        shell.run("rm /etc/nginx/nginx.conf")
+        out = shell.run("nginx -t")
+        self.assertIn("open() \"/etc/nginx/nginx.conf\" failed", out)
+        self.assertIn("No such file or directory", out)
+
+    # ── realistic dnf transaction ──
+    def test_dnf_install_renders_full_transaction(self):
+        shell = RHELShell()
+        out = shell.run("dnf install -y nginx")
+        # dependency-resolution table headers
+        for token in ("Package", "Arch", "Version", "Repository", "Size"):
+            self.assertIn(token, out)
+        self.assertIn("Dependencies resolved.", out)
+        self.assertIn("Transaction Summary", out)
+        self.assertIn("Total download size:", out)
+        self.assertIn("Installed size:", out)
+        self.assertIn("Downloading Packages", out)
+        self.assertIn("Running transaction check", out)
+        self.assertIn("Running transaction test", out)
+        self.assertIn("Transaction test succeeded.", out)
+        self.assertIn("Running transaction", out)
+        self.assertIn("Installing :", out)
+        self.assertIn("Verifying  :", out)
+        self.assertIn("Installed:", out)
+        self.assertIn("Complete!", out)
+
+    def test_dnf_install_lists_dependencies(self):
+        shell = RHELShell()
+        out = shell.run("dnf install -y nginx")
+        # nginx pulls its deps into the transaction
+        self.assertIn("nginx-filesystem", out)
+        self.assertIn("openssl-libs", out)
+        self.assertIn("pcre2", out)
+        self.assertIn("Install  4 Packages", out)
+        # all deps recorded in the rpm DB
+        for pkg in ("nginx", "nginx-filesystem", "openssl-libs", "pcre2"):
+            self.assertIn(pkg, shell.state.installed_packages)
+
+    def test_dnf_install_real_post_state(self):
+        shell = RHELShell()
+        shell.run("dnf install -y nginx")
+        # binary resolves
+        self.assertEqual(shell.run("which nginx"), "/usr/sbin/nginx")
+        # config written to the FS
+        self.assertIsNotNone(shell.state.read_file("/etc/nginx/nginx.conf"))
+        # log files created
+        self.assertTrue(shell.state.file_exists("/var/log/nginx/error.log"))
+        # unit known and inactive/disabled (install does not start it)
+        svc = shell.state.services.get("nginx")
+        self.assertIsNotNone(svc)
+        self.assertEqual(svc.active, "inactive")
+        self.assertEqual(svc.enabled, "disabled")
+        # nginx -t succeeds against the real config
+        self.assertIn("test is successful", shell.run("nginx -t"))
+        # systemctl status now knows it
+        self.assertIn("nginx.service", shell.run("systemctl status nginx"))
+        # catalog version recorded (not the 1.0.0 stub)
+        self.assertIn("nginx-1.20.1", shell.state.installed_packages["nginx"])
+
+    def test_yum_shares_catalog(self):
+        shell = RHELShell()
+        out = shell.run("yum install -y httpd")
+        self.assertIn("Complete!", out)
+        self.assertEqual(shell.run("which httpd"), "/usr/sbin/httpd")
+        # httpd deps from the catalog
+        self.assertIn("httpd-tools", shell.state.installed_packages)
+        self.assertIn("apr", shell.state.installed_packages)
+
+    def test_dnf_install_already_installed(self):
+        shell = RHELShell()
+        shell.run("dnf install -y redis")
+        out = shell.run("dnf install -y redis")
+        self.assertIn("already installed", out)
+        self.assertIn("Nothing to do", out)
+
+    def test_dnf_ignores_no_flag_when_assumeyes(self):
+        shell = RHELShell()
+        out = shell.run("dnf install -y git")
+        self.assertNotIn("Is this ok", out)
+        self.assertIn("Complete!", out)
+        self.assertIsNone(shell.state.pending_confirm)
+
+    # ── interactive [y/N] confirm ──
+    def test_dnf_install_prompts_without_y(self):
+        shell = RHELShell()
+        out = shell.run("dnf install nginx")
+        self.assertIn("Is this ok [y/N]:", out)
+        # not yet installed — awaiting confirmation
+        self.assertNotIn("nginx", shell.state.installed_packages)
+        self.assertIsNotNone(shell.state.pending_confirm)
+
+    def test_dnf_confirm_yes_installs(self):
+        shell = RHELShell()
+        shell.run("dnf install nginx")
+        out = shell.run("y")
+        self.assertIn("Complete!", out)
+        self.assertIn("nginx", shell.state.installed_packages)
+        self.assertEqual(shell.run("which nginx"), "/usr/sbin/nginx")
+
+    def test_dnf_confirm_no_aborts(self):
+        shell = RHELShell()
+        shell.run("dnf install nginx")
+        out = shell.run("n")
+        self.assertNotIn("nginx", shell.state.installed_packages)
+        self.assertIn("aborted", out.lower())
+
+    def test_dnf_confirm_empty_defaults_no(self):
+        shell = RHELShell()
+        shell.run("dnf install nginx")
+        shell.run("")  # empty line = default N for dnf
+        self.assertNotIn("nginx", shell.state.installed_packages)
+
+    # ── apt parity ──
+    def test_apt_install_renders_apt_output(self):
+        shell = RHELShell()
+        out = shell.run("apt-get install -y redis-server")
+        self.assertIn("Reading package lists... Done", out)
+        self.assertIn("Building dependency tree", out)
+        self.assertIn("The following NEW packages will be installed:", out)
+        self.assertIn("additional disk space will be used", out)
+        self.assertIn("Setting up redis", out)
+        self.assertIn("Processing triggers for", out)
+
+    def test_apt_maps_debian_names_to_catalog(self):
+        shell = RHELShell()
+        # apache2 -> httpd, docker.io -> docker
+        shell.run("apt-get install -y apache2")
+        self.assertIn("httpd", shell.state.installed_packages)
+        self.assertEqual(shell.run("which httpd"), "/usr/sbin/httpd")
+
+    def test_apt_confirm_prompt_and_default_yes(self):
+        shell = RHELShell()
+        out = shell.run("apt install nginx")
+        self.assertIn("Do you want to continue? [Y/n]", out)
+        # empty enter = default Y for apt -> proceeds
+        shell.run("")
+        self.assertIn("nginx", shell.state.installed_packages)
+
+    def test_apt_confirm_no_aborts(self):
+        shell = RHELShell()
+        shell.run("apt install nginx")
+        shell.run("n")
+        self.assertNotIn("nginx", shell.state.installed_packages)
+
+    # ── rpm and remove ──
+    def test_rpm_query_after_install(self):
+        shell = RHELShell()
+        shell.run("dnf install -y mariadb-server")
+        out = shell.run("rpm -q mariadb-server")
+        self.assertIn("mariadb-server-10.5", out)
+
+    def test_dnf_remove_drops_binary_and_unit(self):
+        shell = RHELShell()
+        shell.run("dnf install -y haproxy")
+        self.assertEqual(shell.run("which haproxy"), "/usr/sbin/haproxy")
+        shell.run("dnf remove -y haproxy")
+        self.assertNotIn("haproxy", shell.state.installed_packages)
+        self.assertIn("no haproxy", shell.run("which haproxy"))
+        self.assertNotIn("haproxy", shell.state.services)
+
+    # ── every teaching package installs cleanly (no AttributeError) ──
+    def test_all_catalog_service_packages_install(self):
+        from apps.labs.provisioner.simulation.rhel_os import PACKAGE_CATALOG
+        service_pkgs = [n for n, s in PACKAGE_CATALOG.items() if s.units]
+        self.assertIn("nginx", service_pkgs)
+        for pkg in service_pkgs:
+            shell = RHELShell()
+            out = shell.run(f"dnf install -y {pkg}")
+            self.assertIn("Complete!", out, f"{pkg} did not complete")
+            self.assertIn(pkg, shell.state.installed_packages)
+            # the unit(s) the package ships are now known
+            for unit, _ in PACKAGE_CATALOG[pkg].units:
+                self.assertIn(unit, shell.state.services, f"{pkg} unit {unit} missing")

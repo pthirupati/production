@@ -44,6 +44,16 @@ export default function PeopleSoftSimulator({
 
   useEffect(() => { refresh() }, [refresh])
 
+  // While self-service submissions are queued/running on the Process Scheduler,
+  // poll so the Process Monitor advances (queued -> running -> success) on
+  // wall-clock without the learner having to click Refresh.
+  const runningJobs = state?.summary?.process_runs_running || 0
+  useEffect(() => {
+    if (!runningJobs) return undefined
+    const id = setInterval(() => { refresh() }, 3500)
+    return () => clearInterval(id)
+  }, [runningJobs, refresh])
+
   const run = useCallback(async (fn, okMsg) => {
     if (busy) return
     setBusy(true)
@@ -60,6 +70,13 @@ export default function PeopleSoftSimulator({
   const summary = state?.summary || {}
   const goal = state?.goal || {}
   const loggedIn = w?.session?.logged_in
+  const oprid = summary.current_oprid || w?.session?.oprid || 'PS'
+  // Self-service record for the signed-in operator, keyed off current_oprid.
+  const essProfile = state?.ess_profile
+    || (w?.self_service?.profiles ? w.self_service.profiles[oprid] : null)
+    || null
+  const benefitPlans = w?.self_service?.benefit_plans
+  const benefitSteps = w?.self_service?.benefit_steps
 
   const handleFluidNav = (id) => {
     setSection('home')
@@ -160,9 +177,18 @@ export default function PeopleSoftSimulator({
 
           {loading && <div className="text-slate-400 text-sm">Loading PeopleSoft…</div>}
 
-          {!loading && fluidView === 'jobdata' && <JobDataComponent />}
-          {!loading && fluidView === 'benefits' && <BenefitsEnrollment />}
-          {!loading && fluidView === 'pay' && <PaycheckReview />}
+          {!loading && fluidView === 'jobdata' && (
+            <JobDataComponent profile={essProfile} oprid={oprid} busy={busy}
+              onSave={() => run(() => peoplesoftApi.action(sessionId, 'save_job_data', { oprid }), 'Job Data saved — process queued')} />
+          )}
+          {!loading && fluidView === 'benefits' && (
+            <BenefitsEnrollment profile={essProfile} plans={benefitPlans} steps={benefitSteps} busy={busy}
+              onSubmit={(plan) => run(() => peoplesoftApi.action(sessionId, 'submit_benefits', { oprid, plan }), 'Open Enrollment submitted — process queued')} />
+          )}
+          {!loading && fluidView === 'pay' && (
+            <PaycheckReview profile={essProfile} busy={busy}
+              onReprint={() => run(() => peoplesoftApi.action(sessionId, 'request_paycheck', { oprid }), 'Pay advice reprint queued')} />
+          )}
           {!loading && fluidView === 'time' && <FluidStubPage title="My Time" description="Report hours, view time sheets, and manager approvals." />}
           {!loading && fluidView === 'directory' && <FluidStubPage title="Company Directory" description="Search colleagues by name, department, or location." />}
           {!loading && fluidView === 'training' && <FluidStubPage title="Training" description="Browse learning catalog and assigned courses." />}

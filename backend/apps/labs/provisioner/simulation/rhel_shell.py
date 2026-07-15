@@ -49,6 +49,24 @@ class RHELShell:
             if hd is not None:
                 return hd
         line = line.strip()
+
+        # Interactive confirm continuation: a package manager that printed
+        # "Is this ok [y/N]:" (or apt's "[Y/n]") stashed a callback in
+        # state.pending_confirm; this input line (y / n / empty) resolves it.
+        pending = getattr(self.state, "pending_confirm", None)
+        if pending is not None:
+            self.state.pending_confirm = None
+            answer = line.strip().lower()
+            default = pending.get("default", "n")
+            if answer == "":
+                answer = default
+            proceed = answer in ("y", "yes")
+            if proceed:
+                self.state.last_exit_code = 0
+                return pending["on_confirm"]()
+            self.state.last_exit_code = pending.get("abort_code", 1)
+            return pending.get("abort_message", "Operation aborted.")
+
         if not line:
             return ""
         if line.startswith("#"):
@@ -200,6 +218,7 @@ class RHELShell:
             "date": self._cmd_date,
             "which": self._cmd_which,
             "type": self._cmd_which,
+            "command": self._cmd_which,
             "env": self._cmd_env,
             "export": self._cmd_export,
             "su": self._cmd_su,
@@ -223,6 +242,9 @@ class RHELShell:
             "logout": self._cmd_exit,
             "dnf": self._cmd_dnf,
             "yum": self._cmd_dnf,
+            "microdnf": self._cmd_dnf,
+            "apt": self._cmd_apt,
+            "apt-get": self._cmd_apt,
             "rpm": self._cmd_rpm,
             "docker": self._cmd_docker,
             "kubectl": self._cmd_kubectl,
@@ -1489,18 +1511,35 @@ class RHELShell:
         return "Fri Jun 14 10:00:00 UTC 2026"
 
     def _cmd_which(self, p: list[str]) -> str:
-        if len(p) < 2:
+        # Serves `which`, `command -v`, and `type`. Resolves ONLY commands that
+        # are genuinely present — base coreutils/base-system binaries plus any a
+        # package install (dnf/apt/rpm) recorded — so an un-installed tool is
+        # honestly reported as not found. `command -v` prints the bare path and
+        # `type` prints "name is /path"; plain `which` prints the path.
+        prog = p[0]
+        args = [a for a in p[1:] if not a.startswith("-")]
+        if not args:
             return ""
-        binaries = {
-            "bash": "/usr/bin/bash", "systemctl": "/usr/bin/systemctl", "nginx": "/usr/sbin/nginx",
-            "useradd": "/usr/sbin/useradd", "passwd": "/usr/bin/passwd", "python3": "/usr/bin/python3",
-            "git": "/usr/bin/git", "docker": "/usr/bin/docker", "kubectl": "/usr/local/bin/kubectl",
-            "curl": "/usr/bin/curl", "vi": "/usr/bin/vi", "vim": "/usr/bin/vim", "grep": "/usr/bin/grep",
-            "sed": "/usr/bin/sed", "awk": "/usr/bin/awk", "find": "/usr/bin/find", "tar": "/usr/bin/tar",
-        }
-        if p[1] not in binaries:
+        # `command -v name` — args after stripping options start with "-v".
+        if prog == "command":
+            args = [a for a in p[2:] if not a.startswith("-")] or args
+        results = []
+        missing = False
+        for name in args:
+            path = self.state.resolve_binary(name)
+            if path is None:
+                missing = True
+                if prog == "which":
+                    results.append(f"which: no {name} in ({self.state.env['PATH']})")
+                # command -v / type print nothing for a miss.
+                continue
+            if prog == "type":
+                results.append(f"{name} is {path}")
+            else:
+                results.append(path)
+        if missing:
             self.state.last_exit_code = 1
-        return binaries.get(p[1], f"which: no {p[1]} in ({self.state.env['PATH']})")
+        return "\n".join(results)
 
     def _cmd_env(self, p: list[str]) -> str:
         return "\n".join(f"{k}={v}" for k, v in self.state.env.items())
@@ -1613,12 +1652,26 @@ class RHELShell:
         return f"curl: (6) Could not resolve host: {url}"
 
     def _cmd_nginx(self, p: list[str]) -> str:
+        # nginx is only a real command once its package (or an nginx scenario
+        # preset) has put the binary on the box.
+        if self.state.resolve_binary("nginx") is None:
+            self.state.last_exit_code = 127
+            return "bash: nginx: command not found"
         if len(p) > 1 and p[1] == "-t":
-            cfg = self.state.read_file("/etc/nginx/nginx.conf") or ""
+            cfg = self.state.read_file("/etc/nginx/nginx.conf")
             sites = self.state.read_file("/etc/nginx/sites-enabled/default") or ""
+            if cfg is None:
+                # Installed but no config yet — nginx bails opening the main conf.
+                self.state.last_exit_code = 1
+                return ("nginx: [emerg] open() \"/etc/nginx/nginx.conf\" failed "
+                        "(2: No such file or directory)")
             if "listn" in sites or "listn" in cfg:
-                return "nginx: [emerg] unknown directive \"listn\" in /etc/nginx/sites-enabled/default:12\nnginx: configuration file /etc/nginx/nginx.conf test failed"
-            return "nginx: the configuration file /etc/nginx/nginx.conf syntax is ok\nnginx: configuration file /etc/nginx/nginx.conf test is successful"
+                self.state.last_exit_code = 1
+                return ("nginx: [emerg] unknown directive \"listn\" in "
+                        "/etc/nginx/sites-enabled/default:12\n"
+                        "nginx: configuration file /etc/nginx/nginx.conf test failed")
+            return ("nginx: the configuration file /etc/nginx/nginx.conf syntax is ok\n"
+                    "nginx: configuration file /etc/nginx/nginx.conf test is successful")
         return "nginx: invalid option"
 
     def _cmd_pwck(self, p: list[str]) -> str:
@@ -1682,6 +1735,11 @@ class RHELShell:
             "  Arrow keys, Home/End, and command history supported in terminal."
         )
 
+    @staticmethod
+    def _assume_yes(p: list[str]) -> bool:
+        """dnf/yum honour -y / --assumeyes / -q -y etc."""
+        return any(a in ("-y", "--assumeyes") for a in p)
+
     def _cmd_dnf(self, p: list[str]) -> str:
         line = " ".join(p)
         if any(x in line for x in ("update", "upgrade")):
@@ -1697,48 +1755,175 @@ class RHELShell:
             return "Installed Packages\n" + "\n".join(
                 f"{n}.x86_64    {self._pkg_ver(n)}    @System"
                 for n in sorted(self.state.installed_packages))
-        if "install" in line:
-            names = [a for a in p[p.index("install") + 1:] if not a.startswith("-")] if "install" in p else []
+        if "install" in p:
+            names = [a for a in p[p.index("install") + 1:] if not a.startswith("-")]
             if not names:
                 return "Error: Need to pass a list of pkgs to install"
-            db = self.state.installed_packages
-            already = [n for n in names if n in db]
-            todo = [n for n in names if n not in db]
-            if not todo:
-                msg = "\n".join(f"Package {db[n]} is already installed." for n in already)
-                return f"Last metadata expiration check: 0:00:01 ago\n{msg}\nDependencies resolved.\nNothing to do.\nComplete!"
-            for n in todo:
-                db[n] = self._rpm_nvra(n)
-                # Installing a package registers the systemd unit(s) it ships so
-                # a follow-up `systemctl start/enable/status <svc>` works.
-                self.state.register_package_service(n)
-            rows = "\n".join(f" {n}    x86_64    {self._pkg_ver(n)}    rhel-9-appstream" for n in todo)
-            return (f"Last metadata expiration check: 0:00:01 ago\nDependencies resolved.\nInstalling:\n{rows}\n"
-                    f"Transaction Summary\nInstall  {len(todo)} Package(s)\n"
-                    f"Installed:\n  " + "\n  ".join(db[n] for n in todo) + "\nComplete!")
+            return self._dnf_install(names, assume_yes=self._assume_yes(p))
         if "remove" in line or "erase" in line:
             verb = "remove" if "remove" in p else "erase"
             names = [a for a in p[p.index(verb) + 1:] if not a.startswith("-")] if verb in p else []
-            db = self.state.installed_packages
-            removed = [n for n in names if db.pop(n, None) is not None]
-            if not removed:
-                return "No match for argument: " + " ".join(names) + "\nNo packages marked for removal."
-            return ("Dependencies resolved.\nRemoving:\n" + "\n".join(f" {n}" for n in removed)
-                    + f"\nRemove  {len(removed)} Package(s)\nRemoved:\n  "
-                    + "\n  ".join(removed) + "\nComplete!")
+            return self._dnf_remove(names)
         if "repolist" in line:
             return "repo id                    status\nrhel-9-base                enabled"
         return "dnf: command completed (simulation)"
 
+    def _dnf_install(self, names: list[str], assume_yes: bool) -> str:
+        """Render a realistic dnf transaction and (on confirm) really install."""
+        from .rhel_os import PACKAGE_CATALOG, resolve_package_name
+        state = self.state
+        # Build the full install plan (deps first) across every requested pkg,
+        # de-duplicated, skipping anything already installed.
+        plan: list[str] = []
+        seen: set[str] = set()
+        for name in names:
+            for step in state.resolve_install_plan(name):
+                if step not in seen:
+                    seen.add(step)
+                    plan.append(step)
+        header = "Updating Subscription Management repositories.\n" \
+                 "Last metadata expiration check: 0:00:01 ago on Fri 14 Jun 2026 10:00:00 AM UTC."
+        if not plan:
+            already = [resolve_package_name(n) for n in names]
+            msg = "\n".join(
+                f"Package {state.installed_packages.get(n, self._pkg_nvra(n))} is already installed."
+                for n in already)
+            return f"{header}\n{msg}\nDependencies resolved.\nNothing to do.\nComplete!"
+
+        def _size_kb(n: str) -> int:
+            spec = PACKAGE_CATALOG.get(n)
+            return spec.size_kb if spec else 512
+
+        def _arch(n: str) -> str:
+            spec = PACKAGE_CATALOG.get(n)
+            return spec.arch if spec else "x86_64"
+
+        # Dependency-resolution table.
+        rows = [
+            "================================================================================",
+            f" {'Package':<26} {'Arch':<6} {'Version':<17} {'Repository':<19} Size",
+            "================================================================================",
+            "Installing:",
+        ]
+        repo = "rhel-9-appstream"
+        for n in plan:
+            rows.append(
+                f" {n:<26} {_arch(n):<6} {self._pkg_ver(n):<17} {repo:<19} "
+                f"{self._fmt_size(_size_kb(n))}"
+            )
+        total_kb = sum(_size_kb(n) for n in plan)
+        installed_kb = int(total_kb * 3.4)  # unpacked footprint is larger
+        rows += [
+            "",
+            "Transaction Summary",
+            "================================================================================",
+            f"Install  {len(plan)} Package{'s' if len(plan) != 1 else ''}",
+            "",
+            f"Total download size: {self._fmt_size(total_kb)}",
+            f"Installed size: {self._fmt_size(installed_kb)}",
+        ]
+        table = "\n".join(header.split("\n")) + "\nDependencies resolved.\n" + "\n".join(rows)
+
+        def _commit() -> str:
+            newly = state.install_package(names[0])
+            for extra in names[1:]:
+                newly += [x for x in state.install_package(extra) if x not in newly]
+            # newly may differ from plan if two names shared a dep; render `plan`.
+            return self._render_transaction(plan)
+
+        if not assume_yes:
+            # The shell supports a follow-up input turn (see RHELShell.run's
+            # pending_confirm handling), so pause for a genuine [y/N] answer.
+            state.pending_confirm = {
+                "on_confirm": _commit,
+                "default": "n",
+                "abort_code": 1,
+                "abort_message": "Operation aborted.",
+            }
+            return table + "\n\nIs this ok [y/N]: "
+        return table + "\n\n" + _commit()
+
+    def _render_transaction(self, plan: list[str]) -> str:
+        """Render the download/transaction-check/install/verify tail after the
+        user confirmed (or passed -y). Assumes install_package already ran."""
+        lines = ["Downloading Packages:"]
+        n_total = len(plan)
+        for idx, name in enumerate(plan, 1):
+            nvra = self.state.installed_packages.get(name, self._pkg_nvra(name))
+            lines.append(f"({idx}/{n_total}): {nvra}.rpm{'':<20} 100% |{'█' * 10}| ")
+        lines += [
+            "--------------------------------------------------------------------------------",
+            "Running transaction check",
+            "Transaction check succeeded.",
+            "Running transaction test",
+            "Transaction test succeeded.",
+            "Running transaction",
+        ]
+        step = 1
+        steps_total = n_total * 2
+        for name in plan:
+            nvra = self.state.installed_packages.get(name, self._pkg_nvra(name))
+            body = nvra.rsplit(".", 1)[0] if "." in nvra else nvra  # strip .arch
+            lines.append(f"  Installing : {body:<50} {step}/{steps_total}")
+            step += 1
+        for name in plan:
+            nvra = self.state.installed_packages.get(name, self._pkg_nvra(name))
+            body = nvra.rsplit(".", 1)[0] if "." in nvra else nvra
+            lines.append(f"  Verifying  : {body:<50} {step}/{steps_total}")
+            step += 1
+        lines.append("")
+        lines.append("Installed:")
+        for name in plan:
+            lines.append(f"  {self.state.installed_packages.get(name, self._pkg_nvra(name))}")
+        lines.append("")
+        lines.append("Complete!")
+        return "\n".join(lines)
+
+    def _dnf_remove(self, names: list[str]) -> str:
+        from .rhel_os import resolve_package_name, PACKAGE_CATALOG
+        db = self.state.installed_packages
+        removed = []
+        for n in names:
+            canon = resolve_package_name(n)
+            key = canon if canon in db else (n if n in db else None)
+            if key is None:
+                continue
+            db.pop(key, None)
+            # Drop binaries and unit(s) the package shipped.
+            spec = PACKAGE_CATALOG.get(canon)
+            if spec:
+                for bname, _ in spec.binaries:
+                    self.state.installed_binaries.pop(bname, None)
+                for unit, _ in spec.units:
+                    self.state.services.pop(unit, None)
+            removed.append(key)
+        if not removed:
+            return "No match for argument: " + " ".join(names) + "\nNo packages marked for removal."
+        return ("Dependencies resolved.\nRemoving:\n" + "\n".join(f" {n}" for n in removed)
+                + f"\nRemove  {len(removed)} Package(s)\nRemoved:\n  "
+                + "\n  ".join(removed) + "\nComplete!")
+
+    @staticmethod
+    def _fmt_size(kb: int) -> str:
+        """Render a size the way dnf does: k for < 1 MB, M otherwise."""
+        if kb < 1024:
+            return f"{kb} k"
+        return f"{kb / 1024:.1f} M"
+
+    def _pkg_nvra(self, name: str) -> str:
+        """Full NVRA for a package (catalog version if known, else a 1.0.0 stub)."""
+        return self.state.catalog_nvra(name)
+
     def _pkg_ver(self, name: str) -> str:
-        """version-release for a package (from the DB if installed, else a stub)."""
-        nvra = self.state.installed_packages.get(name) or self._rpm_nvra(name)
+        """version-release for a package (from the DB if installed, else catalog)."""
+        nvra = self.state.installed_packages.get(name) or self._pkg_nvra(name)
         # strip leading "name-" and trailing ".arch"
         body = nvra[len(name) + 1:] if nvra.startswith(name + "-") else nvra
         return body.rsplit(".", 1)[0] if "." in body else body
 
     def _rpm_nvra(self, name: str) -> str:
-        return f"{name}-1.0.0-1.el9.x86_64"
+        # Retained for compatibility; delegates to the catalog-aware version.
+        return self._pkg_nvra(name)
 
     def _cmd_rpm(self, p: list[str]) -> str:
         db = self.state.installed_packages
@@ -1748,8 +1933,11 @@ class RHELShell:
             if name.endswith(".rpm"):
                 name = name[:-4]
             name = name.split("-")[0] or "package"
-            db.setdefault(name, self._rpm_nvra(name))
-            self.state.register_package_service(name)
+            # A real rpm -i installs just that package (no dep resolution), but
+            # we route through install_package so its config/binaries/units are
+            # materialised too — matching the honest post-state contract.
+            self.state.install_package(name)
+            db.setdefault(name, self._pkg_nvra(name))
             return f"Preparing...\n   1:{name}\nComplete!"
         if "-e" in p or "--erase" in p:
             names = [a for a in p[1:] if not a.startswith("-")]
@@ -1766,6 +1954,153 @@ class RHELShell:
                 return "no arguments given for query"
             return "\n".join(db.get(n, f"package {n} is not installed") for n in names)
         return "rpm: OK"
+
+    # ── Debian/Ubuntu apt parity (shares the same package catalog) ──
+    @staticmethod
+    def _apt_assume_yes(p: list[str]) -> bool:
+        return any(a in ("-y", "--yes", "--assume-yes") for a in p)
+
+    def _cmd_apt(self, p: list[str]) -> str:
+        # Subcommand is the first non-option arg after the program name.
+        args = p[1:]
+        sub = next((a for a in args if not a.startswith("-")), "")
+        if sub in ("update",):
+            return ("Hit:1 http://archive.ubuntu.com/ubuntu jammy InRelease\n"
+                    "Reading package lists... Done")
+        if sub in ("upgrade", "dist-upgrade", "full-upgrade"):
+            return ("Reading package lists... Done\n"
+                    "Building dependency tree... Done\n"
+                    "Reading state information... Done\n"
+                    "Calculating upgrade... Done\n"
+                    "0 upgraded, 0 newly installed, 0 to remove and 0 not upgraded.")
+        if sub == "install":
+            idx = args.index("install")
+            names = [a for a in args[idx + 1:] if not a.startswith("-")]
+            if not names:
+                return "E: You must give at least one package to install"
+            return self._apt_install(names, assume_yes=self._apt_assume_yes(p))
+        if sub in ("remove", "purge", "autoremove"):
+            idx = args.index(sub)
+            names = [a for a in args[idx + 1:] if not a.startswith("-")]
+            return self._apt_remove(names, verb=sub)
+        return "Reading package lists... Done"
+
+    def _apt_install(self, names: list[str], assume_yes: bool) -> str:
+        from .rhel_os import PACKAGE_CATALOG, resolve_package_name
+        state = self.state
+        plan: list[str] = []
+        requested_canon = [resolve_package_name(n) for n in names]
+        seen: set[str] = set()
+        for name in names:
+            for step in state.resolve_install_plan(name):
+                if step not in seen:
+                    seen.add(step)
+                    plan.append(step)
+        head = ("Reading package lists... Done\n"
+                "Building dependency tree... Done\n"
+                "Reading state information... Done")
+        if not plan:
+            return f"{head}\n{names[-1]} is already the newest version.\n" \
+                   "0 upgraded, 0 newly installed, 0 to remove and 0 not upgraded."
+        # apt calls the deps (packages not explicitly requested) "additional".
+        additional = [n for n in plan if n not in requested_canon]
+        newpkgs = plan
+        lines = [head]
+        if additional:
+            lines.append("The following additional packages will be installed:")
+            lines.append("  " + " ".join(additional))
+        lines.append("The following NEW packages will be installed:")
+        lines.append("  " + " ".join(newpkgs))
+
+        def _size_kb(n: str) -> int:
+            spec = PACKAGE_CATALOG.get(n)
+            return spec.size_kb if spec else 512
+
+        total_kb = sum(_size_kb(n) for n in plan)
+        disk_kb = int(total_kb * 3.4)
+        lines.append(
+            f"0 upgraded, {len(newpkgs)} newly installed, 0 to remove and 0 not upgraded."
+        )
+        lines.append(f"Need to get {self._apt_size(total_kb)} of archives.")
+        lines.append(
+            f"After this operation, {self._apt_size(disk_kb)} of additional disk space will be used."
+        )
+        body = "\n".join(lines)
+
+        def _commit() -> str:
+            for name in names:
+                state.install_package(name)
+            return self._render_apt_transaction(plan)
+
+        if not assume_yes:
+            state.pending_confirm = {
+                "on_confirm": _commit,
+                "default": "y",           # apt defaults to Yes ([Y/n])
+                "abort_code": 1,
+                "abort_message": "Abort.",
+            }
+            return body + "\nDo you want to continue? [Y/n] "
+        return body + "\n" + _commit()
+
+    def _render_apt_transaction(self, plan: list[str]) -> str:
+        from .rhel_os import PACKAGE_CATALOG
+        lines = []
+        n_total = len(plan)
+        for idx, name in enumerate(plan, 1):
+            spec = PACKAGE_CATALOG.get(name)
+            ver = spec.version if spec else "1.0.0"
+            lines.append(
+                f"Get:{idx} http://archive.ubuntu.com/ubuntu jammy/main amd64 "
+                f"{name} amd64 {ver} [{self._apt_size((spec.size_kb if spec else 512))}]"
+            )
+        lines.append("Fetched archives in 1s")
+        for name in plan:
+            spec = PACKAGE_CATALOG.get(name)
+            ver = spec.version if spec else "1.0.0"
+            lines.append(f"Selecting previously unselected package {name}.")
+            lines.append(f"Unpacking {name} ({ver}) ...")
+        for name in plan:
+            spec = PACKAGE_CATALOG.get(name)
+            ver = spec.version if spec else "1.0.0"
+            lines.append(f"Setting up {name} ({ver}) ...")
+        lines.append("Processing triggers for man-db (2.10.2-1) ...")
+        lines.append("Processing triggers for libc-bin (2.35-0ubuntu3) ...")
+        return "\n".join(lines)
+
+    def _apt_remove(self, names: list[str], verb: str) -> str:
+        from .rhel_os import resolve_package_name, PACKAGE_CATALOG
+        db = self.state.installed_packages
+        removed = []
+        for n in names:
+            canon = resolve_package_name(n)
+            key = canon if canon in db else (n if n in db else None)
+            if key is None:
+                continue
+            db.pop(key, None)
+            spec = PACKAGE_CATALOG.get(canon)
+            if spec:
+                for bname, _ in spec.binaries:
+                    self.state.installed_binaries.pop(bname, None)
+                for unit, _ in spec.units:
+                    self.state.services.pop(unit, None)
+            removed.append(key)
+        head = ("Reading package lists... Done\n"
+                "Building dependency tree... Done\n"
+                "Reading state information... Done")
+        if not removed:
+            return f"{head}\nE: Unable to locate package {' '.join(names)}"
+        word = "purged" if verb == "purge" else "removed"
+        return (f"{head}\nThe following packages will be REMOVED:\n"
+                f"  {' '.join(removed)}\n"
+                f"0 upgraded, 0 newly installed, {len(removed)} to remove and 0 not upgraded.\n"
+                + "\n".join(f"Removing {n} ...\n({word})" for n in removed))
+
+    @staticmethod
+    def _apt_size(kb: int) -> str:
+        """apt reports sizes in kB / MB (decimal-ish, matching apt's wording)."""
+        if kb < 1000:
+            return f"{kb} kB"
+        return f"{kb / 1024:.1f} MB"
 
     def _cmd_docker(self, p: list[str]) -> str:
         if len(p) < 2:

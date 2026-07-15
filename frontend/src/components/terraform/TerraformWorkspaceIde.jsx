@@ -3,7 +3,7 @@ import { terraformApi } from '../../api/terraform'
 import toast from 'react-hot-toast'
 import { useConfirm } from '../../hooks/useConfirm'
 import CodeEditor from '../ide/CodeEditor'
-import LabTerminal from '../LabTerminal'
+import LabTerminal, { scheduleReadySend } from '../LabTerminal'
 import AwsTerminal from '../aws/terminal/AwsTerminal'
 import VsCodeWorkbench, { VscFileItem, VscEditorTab, VscPanelTab, VscActivityButton } from '../ide/VsCodeWorkbench'
 import { getIacProfile } from '../../utils/iacFlavor'
@@ -32,9 +32,31 @@ export default function TerraformWorkspaceIde({
   const [busy, setBusy] = useState(false)
   const [dirty, setDirty] = useState(false)
   const [showTerminal, setShowTerminal] = useState(!standalone)
+  const [terminalReady, setTerminalReady] = useState({})
   const saveTimer = useRef(null)
   const filesRef = useRef({})
   const terminalRef = useRef(null)
+  const pendingSendRef = useRef(null)
+  const sendCancelRef = useRef(null)
+
+  useEffect(() => () => { sendCancelRef.current?.() }, [])
+
+  // Fired by <LabTerminal> once its shell is ready (backend shell_ready or the
+  // sim/cloud fallback timer). Flush any command queued while the pane was
+  // still mounting its xterm + WebSocket.
+  const handleTerminalReady = useCallback((hostKey) => {
+    setTerminalReady((prev) => (prev[hostKey] ? prev : { ...prev, [hostKey]: true }))
+    const pending = pendingSendRef.current
+    if (pending) {
+      // Stop the polling loop first so it can't also fire a (spurious) error.
+      sendCancelRef.current?.()
+      sendCancelRef.current = null
+      pendingSendRef.current = null
+      if (terminalRef.current?.sendCommand(pending.line)) {
+        toast.success(`Terminal: ${pending.cmd}`, { duration: 1500 })
+      }
+    }
+  }, [])
 
   const actionPrefix = 'terraform'
 
@@ -107,13 +129,37 @@ export default function TerraformWorkspaceIde({
     toast.success(`Deleted ${name}`)
   }
 
+  // Readiness-driven send. The <LabTerminal> only mounts when
+  // bottomTab === 'terminal' && showTerminal, so we FIRST reveal it, then wait
+  // for its xterm dynamic-import + WebSocket handshake before flushing. The
+  // command is queued so onReady can flush it the instant the shell connects,
+  // and we only toast an error after a bounded timeout.
   const sendToTerminal = (cmd) => {
     const line = cmd.startsWith('cd ') ? cmd : `cd /root/terraform && ${cmd}`
-    if (terminalRef.current?.sendCommand(line)) {
-      setShowTerminal(true)
-      setBottomTab('terminal')
-      toast.success(`Terminal: ${cmd}`, { duration: 1500 })
-    } else toast.error('Terminal not ready — use Output panel buttons')
+    // Mount the terminal pane if it is not already visible.
+    setShowTerminal(true)
+    setBottomTab('terminal')
+    sendCancelRef.current?.()
+    pendingSendRef.current = { cmd, line }
+
+    sendCancelRef.current = scheduleReadySend(line, {
+      // Skip if handleTerminalReady already flushed this queued command.
+      getTerminal: () => (pendingSendRef.current?.line === line ? terminalRef.current : null),
+      onSuccess: () => {
+        pendingSendRef.current = null
+        sendCancelRef.current = null
+        toast.success(`Terminal: ${cmd}`, { duration: 1500 })
+      },
+      onError: () => {
+        pendingSendRef.current = null
+        sendCancelRef.current = null
+        toast.error('Terminal not ready — use Output panel buttons')
+      },
+      timeoutMs: 5000,
+      intervalMs: 150,
+      // Defer the first attempt so the terminal pane actually mounts first.
+      initialDelayMs: 150,
+    })
   }
 
   const tf = state?.state?.terraform || {}
@@ -128,7 +174,8 @@ export default function TerraformWorkspaceIde({
       return (
         <LabTerminal ref={terminalRef} sessionId={sessionId} session={terminalSession} hostKey={terminalHost}
           isMobile={isMobile} blockedCommands={blockedCommands} className="h-full min-h-[180px]"
-          welcomeHint={`cd /root/terraform — ${cli} init / plan / apply`} />
+          welcomeHint={`cd /root/terraform — ${cli} init / plan / apply`}
+          onReady={() => handleTerminalReady(terminalHost)} />
       )
     }
     if (bottomTab === 'events') {
@@ -182,7 +229,9 @@ export default function TerraformWorkspaceIde({
           )}
           <button type="button" onClick={onRefresh} className="vsc-btn"><RefreshCw size={11} /></button>
           {canTerminal && (
-            <button type="button" onClick={() => sendToTerminal(`${cli} plan`)} className="vsc-btn"><Terminal size={11} /> Shell</button>
+            <button type="button" onClick={() => sendToTerminal(`${cli} plan`)} className="vsc-btn"
+              title={terminalReady[terminalHost] ? `Run ${cli} plan in terminal` : 'Opens the terminal and runs once connected'}>
+              <Terminal size={11} /> Shell{terminalReady[terminalHost] ? '' : ' ▸'}</button>
           )}
         </div>
         <pre className="text-xs whitespace-pre-wrap break-words flex-1 overflow-auto font-mono leading-relaxed text-[var(--vsc-text)]">{output || `Run ${cli} init, then plan and apply. Output reflects this lab scenario.`}</pre>
@@ -244,7 +293,8 @@ export default function TerraformWorkspaceIde({
       editorToolbar={!standalone && (
         <>
           {[`${cli} init`, `${cli} plan`, `${cli} apply -auto-approve`].map((cmd) => (
-            <button key={cmd} type="button" onClick={() => sendToTerminal(cmd)} className="vsc-btn">
+            <button key={cmd} type="button" onClick={() => sendToTerminal(cmd)} className="vsc-btn"
+              title={terminalReady[terminalHost] ? `Run: ${cmd}` : 'Opens the terminal and runs once connected'}>
               <Terminal size={11} /> {cmd}
             </button>
           ))}

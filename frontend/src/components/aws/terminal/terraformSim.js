@@ -10,126 +10,11 @@
 //            state list|show|output. Resources: aws_instance, aws_s3_bucket,
 //            aws_security_group, aws_key_pair (others are planned but no-op).
 
+import { parseHcl, parseBody } from './hclParser'
+
 const TF_VERSION = 'Terraform v1.7.5\non linux_amd64\n+ provider registry.terraform.io/hashicorp/aws v5.40.0'
 
 const TF_FILES = ['main.tf', 'variables.tf', 'outputs.tf', 'providers.tf', 'terraform.tf', 'ec2.tf', 's3.tf', 'network.tf']
-
-// Strip // and # line comments and /* */ blocks without touching strings.
-function stripComments(src) {
-  return src
-    .replace(/\/\*[\s\S]*?\*\//g, '')
-    .split('\n')
-    .map((line) => {
-      // remove trailing # or // comments (naive: ok for lab HCL)
-      const hashOutside = line.replace(/("(?:[^"\\]|\\.)*")|(#.*$)|(\/\/.*$)/g, (m, str) => (str ? str : ''))
-      return hashOutside
-    })
-    .join('\n')
-}
-
-// Extract `key = value` and `key { ... }` pairs from a block body.
-function parseBody(body) {
-  const attrs = {}
-  const blocks = []
-  let i = 0
-  const n = body.length
-  while (i < n) {
-    // skip whitespace/commas
-    while (i < n && /\s|,/.test(body[i])) i += 1
-    if (i >= n) break
-    // read identifier
-    const idMatch = /^[A-Za-z0-9_-]+/.exec(body.slice(i))
-    if (!idMatch) { i += 1; continue }
-    const key = idMatch[0]
-    i += key.length
-    while (i < n && /\s/.test(body[i])) i += 1
-    if (body[i] === '{') {
-      // nested block (ingress, tags as block-style, etc.)
-      const { inner, end } = readBraces(body, i)
-      blocks.push({ key, body: inner })
-      i = end
-    } else if (body[i] === '=') {
-      i += 1
-      while (i < n && /\s/.test(body[i])) i += 1
-      if (body[i] === '{') {
-        const { inner, end } = readBraces(body, i)
-        attrs[key] = parseBody(inner).attrs // map value e.g. tags = { Name = "x" }
-        i = end
-      } else if (body[i] === '[') {
-        const { inner, end } = readBrackets(body, i)
-        attrs[key] = inner.split(',').map((s) => unquote(s.trim())).filter(Boolean)
-        i = end
-      } else {
-        // scalar until newline
-        let j = i
-        while (j < n && body[j] !== '\n') j += 1
-        attrs[key] = unquote(body.slice(i, j).trim())
-        i = j
-      }
-    } else {
-      i += 1
-    }
-  }
-  return { attrs, blocks }
-}
-
-function readBraces(src, open) {
-  let depth = 0
-  for (let i = open; i < src.length; i += 1) {
-    if (src[i] === '{') depth += 1
-    else if (src[i] === '}') { depth -= 1; if (depth === 0) return { inner: src.slice(open + 1, i), end: i + 1 } }
-  }
-  return { inner: src.slice(open + 1), end: src.length }
-}
-function readBrackets(src, open) {
-  let depth = 0
-  for (let i = open; i < src.length; i += 1) {
-    if (src[i] === '[') depth += 1
-    else if (src[i] === ']') { depth -= 1; if (depth === 0) return { inner: src.slice(open + 1, i), end: i + 1 } }
-  }
-  return { inner: src.slice(open + 1), end: src.length }
-}
-function unquote(s) {
-  if (!s) return s
-  const m = /^"((?:[^"\\]|\\.)*)"$/.exec(s)
-  if (m) return m[1]
-  if (s === 'true') return true
-  if (s === 'false') return false
-  if (/^-?\d+$/.test(s)) return parseInt(s, 10)
-  return s
-}
-
-// Parse all resource/provider/variable/output blocks from concatenated HCL.
-function parseHcl(src) {
-  const clean = stripComments(src)
-  const resources = []
-  let provider = null
-  const outputs = []
-  const re = /\b(resource|provider|variable|output|data)\b/g
-  let m
-  while ((m = re.exec(clean))) {
-    const kind = m[1]
-    let i = m.index + kind.length
-    // read quoted labels until {
-    const labels = []
-    while (i < clean.length && clean[i] !== '{') {
-      const lm = /"((?:[^"\\]|\\.)*)"/.exec(clean.slice(i))
-      const idm = /[A-Za-z0-9_-]+/.exec(clean.slice(i))
-      if (lm && clean.slice(i).indexOf(lm[0]) <= 2) { labels.push(lm[1]); i += clean.slice(i).indexOf(lm[0]) + lm[0].length }
-      else if (clean[i] === '{') break
-      else if (idm && /\S/.test(clean[i])) { labels.push(idm[0]); i += clean.slice(i).indexOf(idm[0]) + idm[0].length }
-      else i += 1
-    }
-    if (clean[i] !== '{') continue
-    const { inner, end } = readBraces(clean, i)
-    re.lastIndex = end
-    const parsed = parseBody(inner)
-    if (kind === 'resource') resources.push({ type: labels[0], name: labels[1], ...parsed })
-    else if (kind === 'provider' && labels[0] === 'aws') provider = parsed.attrs
-    else if (kind === 'output') outputs.push({ name: labels[0], ...parsed })
-  }
-  return { resources, provider, outputs }
-}
 
 function addr(r) {
   return `${r.type}.${r.name}`
@@ -233,7 +118,12 @@ export function createTerraform({ store, readFile, getCwd, region }) {
 
   return {
     isTerraform: true,
-    run(args) {
+    // run(args) returns a string[] of output lines (current terminal-bridge
+    // contract). run(args, onWrite) is the streamed variant: `apply` pushes
+    // each line through onWrite as the work happens and returns []. Any other
+    // subcommand ignores onWrite and returns its array unchanged, so passing a
+    // callback is always safe and fully backward-compatible.
+    run(args, onWrite) {
       const sub = args[0]
       const rest = args.slice(1)
       if (!sub || sub === '-help' || sub === '--help' || sub === 'help') {
@@ -291,6 +181,28 @@ export function createTerraform({ store, readFile, getCwd, region }) {
         if (empty) return ['\x1b[31mError: No configuration files found.\x1b[0m']
         const toAdd = resources.filter((r) => !applied.has(addr(r)))
         if (!toAdd.length) return ['\x1b[1mNo changes.\x1b[0m Your infrastructure matches the configuration.', '', '\x1b[32mApply complete! Resources: 0 added, 0 changed, 0 destroyed.\x1b[0m']
+        // Streamed mode: when the terminal host passes an onWrite callback,
+        // emit each resource's "Creating..." then its "Creation complete after
+        // Ns [id=...]" line the moment the store mutation happens, mirroring a
+        // real `terraform apply`'s progressive output. Falls back to the
+        // synchronous array below when no callback is supplied.
+        //
+        // TODO(streaming): the current terminal bridges (ec2SimBridge.js /
+        // cloudShellSim.js — owned by other agents) invoke `run(args)` and hand
+        // the returned array straight to writeLines(), so they never pass
+        // onWrite and streaming stays inert. If those bridges are updated to
+        // call `run(args, onWrite)`, this path activates with zero further
+        // changes here. Kept additive/backward-compatible on purpose.
+        if (typeof onWrite === 'function') {
+          toAdd.forEach((r) => {
+            onWrite(`${fmtAddr(r)}: Creating...\r\n`)
+            applyResource(r).forEach((l) => onWrite(`${l}\r\n`))
+          })
+          onWrite('\r\n')
+          onWrite(`\x1b[32mApply complete!\x1b[0m Resources: ${toAdd.length} added, 0 changed, 0 destroyed.\r\n`)
+          onWrite('Run `aws ec2 describe-instances` or open the EC2 / S3 console to see them.\r\n')
+          return []
+        }
         const lines = []
         toAdd.forEach((r) => {
           lines.push(`${fmtAddr(r)}: Creating...`)

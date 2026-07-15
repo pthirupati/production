@@ -230,18 +230,35 @@ def _parse_flags(flags: Any) -> dict:
         "aggressive": False,
         "no_ping": False,
         "ports": None,   # None => default top-ports; list[int] => explicit
+        "fast": False,   # -F  fast (fewer ports) scan
+        "all_ports": False,  # -p 1-65535 / -p-  (full 65535-port sweep)
+        "timing": 3,     # -T<0-5> template; nmap default is T3 ("normal")
     }
 
     i = 0
     while i < len(tokens):
         tok = tokens[i]
-        # -p 22,80  OR  -p22,80  OR  -p1-100
+        # -p 22,80  OR  -p22,80  OR  -p1-100  OR  -p-  (all ports)
         if tok == "-p" and i + 1 < len(tokens):
             caps["ports"] = _parse_ports(tokens[i + 1])
+            if _is_all_ports_spec(tokens[i + 1]):
+                caps["all_ports"] = True
             i += 2
             continue
         if tok.startswith("-p") and len(tok) > 2:
             caps["ports"] = _parse_ports(tok[2:])
+            if _is_all_ports_spec(tok[2:]):
+                caps["all_ports"] = True
+            i += 1
+            continue
+        if tok == "-F":
+            caps["fast"] = True
+            i += 1
+            continue
+        # -T0 .. -T5 (paranoid .. insane). Accept "-T4" and legacy word forms.
+        tm = re.match(r"^-T([0-5])$", tok)
+        if tm:
+            caps["timing"] = int(tm.group(1))
             i += 1
             continue
         key = _FLAG_TOKENS.get(tok)
@@ -261,14 +278,54 @@ def _parse_ports(spec: str) -> list[int]:
         part = part.strip()
         if not part:
             continue
+        # bare "-" or "1-" / "-1024" => nmap "all/open-ended range" shorthand.
+        if part == "-":
+            continue
         m = re.match(r"^(\d+)-(\d+)$", part)
         if m:
             lo, hi = int(m.group(1)), int(m.group(2))
-            if hi - lo <= 2000:  # guard against silly ranges
+            if hi - lo <= 2000:  # guard against silly ranges (keeps enum loop cheap)
                 out.extend(range(lo, hi + 1))
         elif part.isdigit():
             out.append(int(part))
     return sorted(set(out))
+
+
+def _is_all_ports_spec(spec: str) -> bool:
+    """True when the port spec covers (essentially) the whole 65535-port range.
+
+    Recognises `-p-`, `-p 1-65535`, and equivalent wide ranges so the timing
+    model can charge the learner for a full-range sweep even though the enum
+    loop itself only walks the known ground-truth ports.
+    """
+    s = str(spec or "").strip()
+    if s in ("-", "0-", "1-"):
+        return True
+    m = re.match(r"^(\d+)-(\d+)$", s)
+    if m:
+        lo, hi = int(m.group(1)), int(m.group(2))
+        return (hi - lo) >= 60000
+    return False
+
+
+def _intended_port_count(caps: dict) -> int:
+    """How many ports the scan *intends* to probe, for the timing estimate.
+
+    - explicit -p list          -> its length
+    - full-range (-p-/1-65535)  -> 65535
+    - -F fast scan              -> ~100 (nmap's fast top-ports set)
+    - default                   -> len(_DEFAULT_TOP_PORTS) mapped to nmap's ~1000
+    """
+    if caps.get("all_ports"):
+        return 65535
+    ports = caps.get("ports")
+    if ports:
+        return len(ports)
+    if caps.get("fast"):
+        return 100
+    # Default nmap scans the top ~1000 ports; our engine walks a representative
+    # subset, but the wall-clock feel should reflect the ~1000-port default.
+    return 1000
 
 
 # Default "top ports" nmap probes when -p is not given (a representative subset).
@@ -338,6 +395,56 @@ def _find_host(inv: dict, ip: str) -> dict | None:
         if h["ip"] == ip:
             return h
     return None
+
+
+# ---------------------------------------------------------------------------
+# Timing model — an authoritative, deterministic estimate of how long a scan
+# "takes", scaled by the -T template, the number of hosts, and the number of
+# ports probed. The frontend uses this to pace its progressive output so the
+# process *feels* like a real nmap run (SYN Stealth Scan Timing lines, ETC …).
+# ---------------------------------------------------------------------------
+
+# Per-template speed multipliers (T0 paranoid … T5 insane). Larger => slower.
+# T3 (normal) is the 1.0 baseline; T4 (aggressive) is the common lab default.
+_TIMING_MULTIPLIER = {
+    0: 12.0,   # paranoid  — serialized, huge inter-probe delays
+    1: 6.0,    # sneaky
+    2: 2.2,    # polite
+    3: 1.0,    # normal (default)
+    4: 0.55,   # aggressive
+    5: 0.32,   # insane
+}
+
+
+def estimate_duration(caps: dict, host_count: int) -> float:
+    """Authoritative scan duration (seconds), from timing/hosts/ports.
+
+    Deterministic given (timing template, host count, intended port count and
+    scan phases) so the backend — not the UI — owns the wall-clock feel. This
+    is display/pacing only; it never influences what the scan *discovers*.
+    """
+    hosts = max(1, int(host_count or 1))
+    timing = int(caps.get("timing", 3))
+    mult = _TIMING_MULTIPLIER.get(timing, 1.0)
+
+    if caps.get("ping_sweep") and not (caps.get("syn_scan") or caps.get("connect_scan")):
+        # Host-discovery sweep: fast, dominated by per-host probe latency.
+        base = 0.9 + 0.18 * hosts
+        return round(base * mult, 2)
+
+    ports = _intended_port_count(caps)
+    # Fixed setup + per-host overhead + per host×port probing cost. The
+    # per-probe cost is tiny but a full 65535×N sweep still adds up realistically.
+    base = 1.4 + 0.35 * hosts + hosts * ports * 0.00028
+    if caps.get("version"):
+        base += 0.6 * hosts + ports * 0.0016   # banner grabbing is expensive
+    if caps.get("os_detect"):
+        base += 1.1 * hosts                     # OS fingerprinting probe set
+    if caps.get("aggressive"):
+        base += 0.8 * hosts                     # NSE default scripts + traceroute
+    dur = base * mult
+    # Clamp to a sane, watchable window (never instantaneous, never absurd).
+    return round(max(1.2, min(dur, 240.0)), 2)
 
 
 # ---------------------------------------------------------------------------
@@ -517,7 +624,12 @@ def _run_scan(inv: dict, targets: Any, flags: Any, sudo: bool) -> dict:
                  and not (caps["syn_scan"] or caps["connect_scan"]) else "port_scan")
 
     cmd = _format_command(targets, flags, sudo)
-    summary = f"Nmap done: {len(candidate_ips)} IP addresses ({hosts_up} hosts up) scanned"
+    # Authoritative, backend-owned wall-clock estimate. The UI paces its
+    # progressive reveal to this value (it does NOT compute its own).
+    duration = estimate_duration(eff_caps, len(candidate_ips))
+    port_count = _intended_port_count(caps)
+    summary = (f"Nmap done: {len(candidate_ips)} IP addresses "
+               f"({hosts_up} hosts up) scanned in {duration:.2f} seconds")
     return {
         "command": cmd,
         "scan_type": scan_type,
@@ -529,6 +641,11 @@ def _run_scan(inv: dict, targets: Any, flags: Any, sudo: bool) -> dict:
         "caps": {k: v for k, v in caps.items() if k != "ports"},
         "sudo": bool(sudo),
         "ports_spec": caps["ports"],
+        # ── timing metadata for the UI's progress animation ──
+        "duration": duration,
+        "timing": int(caps.get("timing", 3)),
+        "port_count": port_count,
+        "host_count": len(candidate_ips),
     }
 
 
@@ -790,6 +907,21 @@ def apply_action(session_id: str, action: str, payload: dict | None = None) -> d
         targets = payload.get("targets") or payload.get("target") or "all"
         flags = payload.get("flags", payload.get("args", ""))
         sudo = bool(payload.get("sudo", False))
+        # The UI may carry the -p spec in a dedicated `ports` field (in addition
+        # to inlining it in flags); fold it into the flag list as `-p <spec>`
+        # unless -p is already present. This keeps the port spec authoritative
+        # for enumeration AND the timing model regardless of which channel the
+        # caller used. Backward-compatible: callers that inline -p or omit ports
+        # entirely are unaffected, and the raw-command path below is untouched.
+        ports_spec = payload.get("ports")
+        if ports_spec not in (None, "") and not payload.get("command"):
+            flag_list = (list(flags) if isinstance(flags, (list, tuple))
+                         else str(flags or "").split())
+            has_p = any(str(f) == "-p" or str(f).startswith("-p")
+                        for f in flag_list)
+            if not has_p:
+                flag_list.extend(["-p", str(ports_spec)])
+                flags = flag_list
         # Convenience: allow a full raw command string in `command`.
         raw = payload.get("command")
         if raw and not payload.get("targets") and not payload.get("flags"):

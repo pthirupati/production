@@ -20,7 +20,7 @@ import JiraTicketPanel from '../components/JiraTicketPanel'
 import ItsmTicketPanel from '../components/itsm/ItsmTicketPanel'
 import { itsmApi } from '../api/itsm'
 import JiraTicketLink from '../components/JiraTicketLink'
-import LabTerminal from '../components/LabTerminal'
+import LabTerminal, { scheduleReadySend } from '../components/LabTerminal'
 import { LabBackendTerminalStatusBar } from '../components/linux/LinuxTerminalChrome'
 import PrimaryLabSim from '../components/lab/PrimaryLabSim'
 import LazySimPanel from '../components/lab/LazySimPanel'
@@ -399,7 +399,28 @@ export default function LabRunner() {
   const [mobileInput, setMobileInput] = useState('')
   const [showMobileInput, setShowMobileInput] = useState(false)
   const terminalRefs = useRef({})
+  const [terminalReady, setTerminalReady] = useState({})
+  const pendingSendRef = useRef({})
+  const sendCancelRef = useRef({})
   const [sshClientTarget, setSshClientTarget] = useState(null)
+
+  // A LabTerminal reports readiness (backend shell_ready or the sim/cloud
+  // fallback timer). Record it per-host and flush any command that was queued
+  // while that host's terminal was still spinning up its xterm/WebSocket.
+  const handleTerminalReady = useCallback((hostKey) => {
+    setTerminalReady((prev) => (prev[hostKey] ? prev : { ...prev, [hostKey]: true }))
+    const pending = pendingSendRef.current[hostKey]
+    if (pending) {
+      // Stop the polling loop first so it can't also fire a (spurious) error.
+      sendCancelRef.current[hostKey]?.()
+      delete sendCancelRef.current[hostKey]
+      delete pendingSendRef.current[hostKey]
+      const term = terminalRefs.current[hostKey]
+      if (term?.sendCommand?.(pending)) {
+        toast.success(`Sent: ${pending.split('\n')[0].slice(0, 42)}`, { duration: 2000 })
+      }
+    }
+  }, [])
 
   const TOAST = {}
 
@@ -1182,23 +1203,49 @@ export default function LabRunner() {
     scenario?.slug,
   ])
 
-  const sendSimCommand = useCallback((cmd, host) => {
+  // Shared readiness/retry helper for every terminal send in this page. Instead
+  // of firing once and toasting on failure, we (1) make sure the target host is
+  // the active terminal (a host switch remounts the pane, so we must wait for
+  // the fresh xterm dynamic-import + WebSocket handshake), (2) poll isConnected()
+  // on a bounded loop, (3) queue the command so it auto-flushes on the onReady
+  // callback if the socket becomes ready first, and (4) toast a single error
+  // only after the timeout expires.
+  const sendToHostTerminal = useCallback((cmd, host, { timeoutMs = 6000, intervalMs = 200 } = {}) => {
     const targetHost = host || terminalHost
-    const run = () => {
-      const term = terminalRefs.current[targetHost]
-      if (!term?.sendCommand?.(cmd)) {
+    const switching = targetHost !== terminalHost
+    if (switching) setTerminalHost(targetHost)
+
+    // Queue so onReady can flush it the moment the socket connects, even if that
+    // happens between poll ticks or before this host's terminal has mounted.
+    // Cancel any in-flight loop for this host first (last write wins).
+    sendCancelRef.current[targetHost]?.()
+    pendingSendRef.current[targetHost] = cmd
+
+    const cancel = scheduleReadySend(cmd, {
+      // Skip if handleTerminalReady already flushed this queued command.
+      getTerminal: () => (pendingSendRef.current[targetHost] === cmd ? terminalRefs.current[targetHost] : null),
+      onSuccess: () => {
+        delete pendingSendRef.current[targetHost]
+        delete sendCancelRef.current[targetHost]
+        toast.success(`Sent: ${cmd.split('\n')[0].slice(0, 42)}`, { duration: 2000 })
+      },
+      onError: () => {
+        delete pendingSendRef.current[targetHost]
+        delete sendCancelRef.current[targetHost]
         toast.error('Terminal not ready — wait for connection')
-        return
-      }
-      toast.success(`Sent: ${cmd.split('\n')[0].slice(0, 42)}`, { duration: 2000 })
-    }
-    if (targetHost !== terminalHost) {
-      setTerminalHost(targetHost)
-      setTimeout(run, 450)
-    } else {
-      run()
-    }
+      },
+      timeoutMs,
+      intervalMs,
+      // A host switch remounts the pane (cold xterm import + WS handshake), so
+      // give it a tick before the first poll; a same-host send polls immediately.
+      initialDelayMs: switching ? intervalMs : 0,
+    })
+    sendCancelRef.current[targetHost] = cancel
   }, [terminalHost])
+
+  const sendSimCommand = useCallback((cmd, host) => {
+    sendToHostTerminal(cmd, host)
+  }, [sendToHostTerminal])
 
   if (loading || provisioning) {
     const cloudSteps = [
@@ -1912,7 +1959,8 @@ export default function LabRunner() {
                               <button
                                 type="button"
                                 onClick={() => sendSimCommand(commandFromAction(action))}
-                                className="shrink-0 rounded-md border border-accent-cyan/25 bg-accent-cyan/10 px-2 py-1 text-[10px] font-semibold text-accent-cyan hover:bg-accent-cyan/20"
+                                title={terminalReady[terminalHost] ? 'Run in terminal' : 'Terminal is connecting — this will run once it is ready'}
+                                className={`shrink-0 rounded-md border px-2 py-1 text-[10px] font-semibold ${terminalReady[terminalHost] ? 'border-accent-cyan/25 bg-accent-cyan/10 text-accent-cyan hover:bg-accent-cyan/20' : 'border-surface-700 bg-surface-800/60 text-surface-400 hover:text-accent-cyan'}`}
                               >
                                 Run
                               </button>
@@ -2617,6 +2665,7 @@ export default function LabRunner() {
                   blockedCommands={blockedCmds}
                   className="h-full"
                   layoutKey={`${session?.status}-${session?.container_id || ''}-${showTerraformSim}`}
+                  onReady={() => handleTerminalReady(h.name)}
                 />
               ))}
             </div>
@@ -2636,6 +2685,7 @@ export default function LabRunner() {
               welcomeHint={terminalHost === 'ssh_client' && sshClientTarget
                 ? `Type: ssh -o StrictHostKeyChecking=no ${sshClientTarget.ssh_user || 'root'}@${sshClientTarget.ip}`
                 : ''}
+              onReady={() => handleTerminalReady(terminalHost)}
             />
           )}
           {sshClientTarget && (
@@ -2655,6 +2705,7 @@ export default function LabRunner() {
                 blockedCommands={blockedCmds}
                 className="h-[calc(100%-1.75rem)]"
                 welcomeHint={`Type: ssh -o StrictHostKeyChecking=no ${sshClientTarget.ssh_user || 'root'}@${sshClientTarget.ip}`}
+                onReady={() => handleTerminalReady('ssh_client')}
               />
             </div>
           )}
@@ -2679,9 +2730,9 @@ export default function LabRunner() {
             value={mobileInput}
             onChange={e => setMobileInput(e.target.value)}
             onKeyDown={e => {
-              if (e.key === 'Enter') {
-                const term = terminalRefs.current[terminalHost]
-                if (term?.sendCommand) { term.sendCommand(mobileInput); setMobileInput('') }
+              if (e.key === 'Enter' && mobileInput.trim()) {
+                sendToHostTerminal(mobileInput, terminalHost)
+                setMobileInput('')
               }
             }}
             placeholder="Type command and press Enter…"
@@ -2689,8 +2740,9 @@ export default function LabRunner() {
           />
           <button
             onClick={() => {
-              const term = terminalRefs.current[terminalHost]
-              if (term?.sendCommand) { term.sendCommand(mobileInput); setMobileInput('') }
+              if (!mobileInput.trim()) return
+              sendToHostTerminal(mobileInput, terminalHost)
+              setMobileInput('')
             }}
             className="px-3 py-1.5 bg-accent-cyan text-surface-950 rounded text-sm font-medium"
           >Run</button>

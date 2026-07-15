@@ -1,0 +1,188 @@
+"""Tests for the MAAS / LXD / KVM bare-metal engine lifecycle + grading.
+
+The commissioning/deploy lifecycle advances on wall-clock time.  Tests drive
+time by patching ``time.time`` (via the engine's ``_now`` helper) so they run
+instantly and deterministically rather than sleeping.
+"""
+
+from unittest import mock
+
+from django.core.cache import cache
+from django.test import TestCase
+
+from apps.vmware_sim import baremetal_engine as bm
+
+
+class BaremetalLifecycleTests(TestCase):
+    def setUp(self):
+        cache.clear()
+
+    def tearDown(self):
+        cache.clear()
+
+    def _session(self, slug: str = "maas-commission") -> str:
+        sid = f"test-bm-{slug}"
+        bm.drop_session(sid)
+        bm.get_state(sid, slug)
+        bm.apply_action(sid, "login", {"user": "admin"})
+        return sid
+
+    def _machine(self, sid, mid):
+        state = bm.get_state(sid)["state"]
+        return next(m for m in state["maas"]["machines"] if m["id"] == mid)
+
+    # ── grading contract ──────────────────────────────────────────────────
+    def test_starts_broken_and_fails_validation(self):
+        sid = self._session("maas-commission")
+        ok, _ = bm.validate_baremetal_lab(sid, "maas-commission")
+        self.assertFalse(ok)
+
+    def test_commission_action_clears_broken_and_passes(self):
+        sid = self._session("maas-commission")
+        res = bm.apply_action(sid, "maas_commission", {"machine_id": 2})
+        self.assertTrue(res["ok"], res)
+        ok, msg = bm.validate_baremetal_lab(sid, "maas-commission")
+        self.assertTrue(ok, msg)
+
+    def test_no_session_does_not_pass(self):
+        ok, _ = bm.validate_baremetal_lab("nonexistent-session", "maas-commission")
+        self.assertFalse(ok)
+
+    def test_lxd_scenario_grading(self):
+        sid = self._session("lxd-container-stopped")
+        ok, _ = bm.validate_baremetal_lab(sid, "lxd-container-stopped")
+        self.assertFalse(ok)
+        bm.apply_action(sid, "lxd_start", {"name": "batch-job"})
+        ok, msg = bm.validate_baremetal_lab(sid, "lxd-container-stopped")
+        self.assertTrue(ok, msg)
+
+    def test_kvm_scenario_grading(self):
+        sid = self._session("kvm-vm-stopped")
+        ok, _ = bm.validate_baremetal_lab(sid, "kvm-vm-stopped")
+        self.assertFalse(ok)
+        bm.apply_action(sid, "kvm_start", {"name": "train-vm-2"})
+        ok, msg = bm.validate_baremetal_lab(sid, "kvm-vm-stopped")
+        self.assertTrue(ok, msg)
+
+    # ── wall-clock commissioning lifecycle ─────────────────────────────────
+    def test_commission_advances_over_wall_clock_not_per_request(self):
+        sid = self._session("maas-commission")
+        base = 1_000_000.0
+        with mock.patch.object(bm, "_now", return_value=base):
+            bm.apply_action(sid, "maas_commission", {"machine_id": 2})
+            m = self._machine(sid, 2)
+            self.assertEqual(m["status"], "Commissioning")
+            self.assertEqual(m["progress"], 0)
+
+        # Halfway through with no additional action — pure wall-clock advance.
+        with mock.patch.object(bm, "_now", return_value=base + bm.COMMISSION_SECONDS / 2):
+            m = self._machine(sid, 2)
+            self.assertEqual(m["status"], "Commissioning")
+            self.assertGreaterEqual(m["progress"], 40)
+            self.assertLess(m["progress"], 100)
+
+        # Past the full duration — machine should be Ready.
+        with mock.patch.object(bm, "_now", return_value=base + bm.COMMISSION_SECONDS + 1):
+            m = self._machine(sid, 2)
+            self.assertEqual(m["status"], "Ready")
+            self.assertEqual(m["progress"], 100)
+            self.assertTrue(m["ip"])
+
+    def test_multiple_reads_do_not_double_advance(self):
+        """Progress is a function of wall-clock, so repeated reads at the same
+        instant must be idempotent (advance is not per-request)."""
+        sid = self._session("maas-commission")
+        base = 2_000_000.0
+        with mock.patch.object(bm, "_now", return_value=base):
+            bm.apply_action(sid, "maas_commission", {"machine_id": 2})
+        with mock.patch.object(bm, "_now", return_value=base + 5):
+            first = self._machine(sid, 2)["progress"]
+            second = self._machine(sid, 2)["progress"]
+            third = self._machine(sid, 2)["progress"]
+        self.assertEqual(first, second)
+        self.assertEqual(second, third)
+
+    def test_full_commission_then_deploy_lifecycle(self):
+        sid = self._session("maas-commission")
+        base = 3_000_000.0
+        with mock.patch.object(bm, "_now", return_value=base):
+            bm.apply_action(sid, "maas_commission", {"machine_id": 2})
+        # Finish commissioning.
+        with mock.patch.object(bm, "_now", return_value=base + bm.COMMISSION_SECONDS + 1):
+            self.assertEqual(self._machine(sid, 2)["status"], "Ready")
+            t_deploy = base + bm.COMMISSION_SECONDS + 1
+        # Kick off deploy.
+        with mock.patch.object(bm, "_now", return_value=t_deploy):
+            res = bm.apply_action(sid, "maas_deploy", {"machine_id": 2})
+            self.assertTrue(res["ok"], res)
+            self.assertEqual(self._machine(sid, 2)["status"], "Deploying")
+        # Complete deploy over wall-clock.
+        with mock.patch.object(bm, "_now", return_value=t_deploy + bm.DEPLOY_SECONDS + 1):
+            m = self._machine(sid, 2)
+            self.assertEqual(m["status"], "Deployed")
+            self.assertEqual(m["os"], "Ubuntu 22.04 LTS")
+
+    def test_deploy_rejected_before_ready(self):
+        sid = self._session("maas-commission")
+        # Machine 2 starts Failed — cannot deploy directly.
+        res = bm.apply_action(sid, "maas_deploy", {"machine_id": 2})
+        self.assertFalse(res["ok"])
+
+    def test_commission_log_populated(self):
+        sid = self._session("maas-commission")
+        base = 4_000_000.0
+        with mock.patch.object(bm, "_now", return_value=base):
+            bm.apply_action(sid, "maas_commission", {"machine_id": 2})
+        with mock.patch.object(bm, "_now", return_value=base + bm.COMMISSION_SECONDS + 1):
+            m = self._machine(sid, 2)
+        messages = " ".join(e["message"] for e in m["log"])
+        self.assertIn("Commissioning started", messages)
+        self.assertIn("Ready", messages)
+
+    # ── node detail fields ─────────────────────────────────────────────────
+    def test_machines_have_detail_fields(self):
+        sid = self._session("maas-commission")
+        m = self._machine(sid, 1)
+        self.assertIn("interfaces", m)
+        self.assertIn("storage", m)
+        self.assertTrue(m["interfaces"])
+        self.assertTrue(m["storage"])
+        self.assertIn("log", m)
+
+    # ── KVM / LXD start-stop lifecycle ─────────────────────────────────────
+    def test_kvm_start_stop_cycle(self):
+        sid = self._session("kvm-vm-stopped")
+        bm.apply_action(sid, "kvm_start", {"name": "train-vm-1"})
+        state = bm.get_state(sid)["state"]
+        vm = next(v for v in state["kvm"]["vms"] if v["name"] == "train-vm-1")
+        self.assertEqual(vm["state"], "running")
+        bm.apply_action(sid, "kvm_stop", {"name": "train-vm-1"})
+        state = bm.get_state(sid)["state"]
+        vm = next(v for v in state["kvm"]["vms"] if v["name"] == "train-vm-1")
+        self.assertEqual(vm["state"], "shut off")
+        self.assertEqual(vm["ip"], "")
+
+    def test_lxd_start_stop_cycle(self):
+        sid = self._session("lxd-container-stopped")
+        bm.apply_action(sid, "lxd_stop", {"name": "infer-svc"})
+        state = bm.get_state(sid)["state"]
+        c = next(c for c in state["lxd"]["containers"] if c["name"] == "infer-svc")
+        self.assertEqual(c["status"], "Stopped")
+        bm.apply_action(sid, "lxd_start", {"name": "infer-svc"})
+        state = bm.get_state(sid)["state"]
+        c = next(c for c in state["lxd"]["containers"] if c["name"] == "infer-svc")
+        self.assertEqual(c["status"], "Running")
+
+    def test_power_toggle(self):
+        sid = self._session("maas-commission")
+        bm.apply_action(sid, "maas_power", {"machine_id": 1, "power": "off"})
+        self.assertEqual(self._machine(sid, 1)["power"], "off")
+        bm.apply_action(sid, "maas_power", {"machine_id": 1, "power": "on"})
+        self.assertEqual(self._machine(sid, 1)["power"], "on")
+
+    def test_requires_login(self):
+        sid = f"test-bm-nologin"
+        bm.drop_session(sid)
+        bm.get_state(sid, "maas-commission")
+        res = bm.apply_action(sid, "maas_commission", {"machine_id": 2})
+        self.assertFalse(res["ok"])

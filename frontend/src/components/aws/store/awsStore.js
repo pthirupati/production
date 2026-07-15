@@ -2,11 +2,28 @@ import { create } from 'zustand'
 import { persist, createJSONStorage } from 'zustand/middleware'
 import { useAuthStore } from '../../../store/authStore'
 import {
-  newInstanceId, newVolumeId, newSgId, newKeyPairId, newAmiId, newEipAllocId,
-  newEipAssocId, newIamUserId, newIamRoleId, newIamGroupId, newAccessKeyId,
+  newInstanceId, newVolumeId, newSnapshotId, newSgId, newKeyPairId, newAmiId, newEipAllocId,
+  newEipAssocId, newIgwId, newSubnetId, newVpcId, newSgRuleId,
+  newIamUserId, newIamRoleId, newIamGroupId, newAccessKeyId,
   newSecretAccessKey, newPrivateIp, newPublicIp, publicDns, privateDns, hostnameFromIp,
 } from '../lib/ids'
 import { getAmi, getInstanceType } from '../lib/instanceTypes'
+import {
+  EC2_TIMING, GENERIC_TIMING, dueIn,
+  initializingChecks, phase1Checks, passedChecks, noChecks,
+  armLifecycleTick,
+} from '../lib/lifecycle'
+import {
+  dependencyViolation, invalidGroupInUse, invalidParameterValue,
+  bucketNotEmpty, malformedPolicyDocument, resourceNotFound,
+  operationNotPermitted, fail, ok,
+} from '../lib/errors'
+import { evaluate, policiesFromNames } from '../lib/iamEngine'
+import {
+  isValidCidr, isValidBucketName, isValidPolicyJson,
+  cidrWithinVpc, cidrsOverlap, duplicateSgNameInVpc,
+} from '../lib/validators'
+import { SERVICE_CONFIGS } from '../pages/generic/serviceConfigs'
 
 const ACCOUNT_ID = '123456789012'
 
@@ -73,18 +90,46 @@ function seedGenericResources() {
   const row = (id, region, name, extra) => ({ id, region, name, created: now, tags: { Environment: 'demo', Project: 'fixitlab' }, ...extra })
   return {
     lambda: {
-      functions: [row('fn-demo001', r, 'my-demo-function', { runtime: 'Python 3.12', memory: 128, timeout: 30, status: 'Active', handler: 'lambda_function.lambda_handler' })],
+      functions: [row('fn-demo001', r, 'my-demo-function', {
+        runtime: 'Python 3.12', memory: 128, timeout: 30, status: 'Active', handler: 'lambda_function.lambda_handler',
+        code: 'def lambda_handler(event, context):\n    return {"statusCode": 200, "body": "Hello from Lambda!"}',
+        env: { STAGE: 'prod', LOG_LEVEL: 'INFO' },
+        triggers: [{ type: 'API Gateway', detail: 'orders-api / ANY /orders' }],
+        invocationHistory: [
+          { at: '2024-03-10T14:00:00Z', statusCode: 200, durationMs: 182, billedMs: 200, memoryUsed: 74 },
+          { at: '2024-03-10T13:55:00Z', statusCode: 200, durationMs: 205, billedMs: 300, memoryUsed: 78 },
+        ],
+      })],
       layers: [row('layer-common001', r, 'shared-utils-layer', { runtime: 'Python 3.12', version: 3, status: 'Active' })],
     },
     rds: {
-      databases: [row('db-demo001', r, 'my-demo-db', { engine: 'PostgreSQL 15.4', class: 'db.t3.micro', storage: 20, status: 'available', endpoint: 'my-demo-db.c9akciq32xze.us-east-1.rds.amazonaws.com:5432' })],
+      databases: [row('db-demo001', r, 'my-demo-db', { engine: 'PostgreSQL 15.4', class: 'db.t3.micro', storage: 20, multiAz: false, status: 'available', endpoint: 'my-demo-db.c9akciq32xze.us-east-1.rds.amazonaws.com:5432' })],
       snapshots: [row('snap-rds001', r, 'my-demo-db-snapshot', { engine: 'PostgreSQL', status: 'available' })],
     },
     dynamodb: {
-      tables: [row('table-demo001', r, 'Orders', { partitionKey: 'pk (String)', sortKey: 'sk (String)', billingMode: 'On-demand', status: 'Active', items: 128 })],
+      tables: [row('table-demo001', r, 'Orders', {
+        partitionKey: 'pk (String)', sortKey: 'sk (String)', billingMode: 'On-demand', status: 'Active', items: 3,
+        records: [
+          { pk: 'ORDER#1001', sk: 'META', customer: 'acme-corp', total: 249.99, status: 'shipped' },
+          { pk: 'ORDER#1002', sk: 'META', customer: 'globex', total: 89.5, status: 'pending' },
+          { pk: 'ORDER#1003', sk: 'META', customer: 'initech', total: 1299.0, status: 'delivered' },
+        ],
+      })],
     },
     cloudformation: {
-      stacks: [row('stack-demo001', r, 'my-demo-stack', { status: 'CREATE_COMPLETE', resources: 4 })],
+      stacks: [row('stack-demo001', r, 'my-demo-stack', {
+        status: 'CREATE_COMPLETE', resources: 4,
+        events: [
+          { at: '2024-03-10T14:30:00Z', logicalId: 'my-demo-stack', type: 'AWS::CloudFormation::Stack', status: 'CREATE_COMPLETE', reason: '' },
+          { at: '2024-03-10T14:29:40Z', logicalId: 'AppSecurityGroup', type: 'AWS::EC2::SecurityGroup', status: 'CREATE_COMPLETE', reason: '' },
+          { at: '2024-03-10T14:29:20Z', logicalId: 'AppBucket', type: 'AWS::S3::Bucket', status: 'CREATE_COMPLETE', reason: '' },
+        ],
+        resourceList: [
+          { logicalId: 'AppBucket', type: 'AWS::S3::Bucket', physicalId: 'my-demo-stack-appbucket-abc123', status: 'CREATE_COMPLETE' },
+          { logicalId: 'AppSecurityGroup', type: 'AWS::EC2::SecurityGroup', physicalId: 'sg-0demo1234567890', status: 'CREATE_COMPLETE' },
+        ],
+        outputs: [{ key: 'BucketName', value: 'my-demo-stack-appbucket-abc123', description: 'Name of the app bucket' }],
+      })],
       'change-sets': [row('changeset-demo001', r, 'my-demo-stack-change-set', { status: 'CREATE_COMPLETE', changes: 2 })],
     },
     route53: {
@@ -258,7 +303,8 @@ function seedState() {
         publicIp: '54.210.123.45', privateIp: '172.31.14.52', keyName: 'demo-key-pair',
         securityGroups: ['sg-0a1b2c3web00001'], iamRole: 'EC2InstanceRole', monitoring: 'disabled',
         rootDevice: '/dev/xvda', rootVolume: 'vol-0abc123def456789a', launchTime: '2024-01-15T09:00:12Z',
-        statusChecks: '2/2', tenancy: 'default', architecture: 'x86_64',
+        statusChecks: '2/2', checks: passedChecks(), disableApiTermination: false,
+        tenancy: 'default', architecture: 'x86_64',
         tags: { Name: 'web-server-01', Environment: 'demo', Project: 'fixitlab' },
       },
       {
@@ -268,7 +314,8 @@ function seedState() {
         publicIp: '', privateIp: '172.31.28.33', keyName: 'demo-key-pair',
         securityGroups: ['sg-0a1b2c3db000002'], iamRole: '', monitoring: 'disabled',
         rootDevice: '/dev/xvda', rootVolume: 'vol-0def456abc789012b', launchTime: '2024-01-16T10:22:00Z',
-        statusChecks: '2/2', tenancy: 'default', architecture: 'x86_64',
+        statusChecks: '2/2', checks: passedChecks(), disableApiTermination: false,
+        tenancy: 'default', architecture: 'x86_64',
         tags: { Name: 'db-server-01', Environment: 'demo' },
       },
       {
@@ -278,7 +325,8 @@ function seedState() {
         publicIp: '', privateIp: '172.31.42.11', keyName: 'demo-key-pair',
         securityGroups: ['sg-0a1b2c3web00001'], iamRole: '', monitoring: 'disabled',
         rootDevice: '/dev/xvda', rootVolume: 'vol-0ghi789jkl012345c', launchTime: '2024-02-10T08:00:00Z',
-        statusChecks: '0/2', tenancy: 'default', architecture: 'x86_64',
+        statusChecks: '0/2', checks: noChecks(), disableApiTermination: false,
+        tenancy: 'default', architecture: 'x86_64',
         tags: { Name: 'app-server-01' },
       },
     ],
@@ -339,8 +387,43 @@ function seedState() {
       { name: 'DiskSpaceLow', region: 'us-east-1', metric: 'disk_used_percent', namespace: 'CWAgent', state: 'OK', threshold: '> 85%' },
       { name: 'LambdaErrors', region: 'us-east-1', metric: 'Errors', namespace: 'AWS/Lambda', state: 'OK', threshold: '> 0 for 1/1' },
     ],
+    cwDashboards: [
+      { name: 'Production-Overview', region: 'us-east-1', widgets: 6, created: '2024-02-01T09:00:00Z' },
+    ],
+
+    // ---- EBS snapshots ----
+    snapshots: [
+      { id: 'snap-0demo1234567890a', region: 'us-east-1', volumeId: 'vol-0abc123def456789a', size: 8, state: 'completed', progress: '100%', description: 'web-server-01 root', started: '2024-03-01T02:00:00Z', encrypted: true },
+    ],
+
+    // ---- ELB / target groups / ASG ----
+    loadBalancers: [
+      { id: 'elb-0demoweb00000001', region: 'us-east-1', name: 'web-alb', type: 'application', scheme: 'internet-facing', state: 'active', dnsName: 'web-alb-1234567890.us-east-1.elb.amazonaws.com', vpcId: 'vpc-0a1b2c3d4e5f67890', targetGroups: ['tg-0demoweb00000001'], created: '2024-02-01T09:00:00Z' },
+    ],
+    targetGroups: [
+      { id: 'tg-0demoweb00000001', region: 'us-east-1', name: 'web-targets', protocol: 'HTTP', port: 80, vpcId: 'vpc-0a1b2c3d4e5f67890', targetType: 'instance', targets: [{ id: 'i-0abc123def4567890', port: 80, health: 'healthy' }], created: '2024-02-01T09:00:00Z' },
+    ],
+    autoScalingGroups: [
+      { id: 'asg-0demoweb00000001', region: 'us-east-1', name: 'web-asg', min: 1, max: 4, desired: 2, instanceIds: [], launchTemplate: 'web-lt', vpcId: 'vpc-0a1b2c3d4e5f67890', status: 'active', created: '2024-02-01T09:00:00Z' },
+    ],
 
     genericResources: seedGenericResources(),
+
+    // ---- IAM engine: who am I ----
+    currentPrincipal: {
+      type: 'user',
+      name: 'admin-user',
+      arn: `arn:aws:iam::${ACCOUNT_ID}:user/admin-user`,
+      userId: 'AIDAADMIN0000000ADMIN',
+      policyNames: ['AdministratorAccess'],
+      policies: policiesFromNames(['AdministratorAccess']),
+    },
+
+    // ---- Console chrome (consumed by chrome UI agent) ----
+    favorites: [],
+    recentServices: [],
+    homeWidgets: ['recently-visited', 'welcome', 'cost-and-usage', 'health', 'trusted-advisor'],
+    settings: { region: 'us-east-1', theme: 'light' },
 
     flash: [], // {id, type, message}
     labManagedIds: [], // instance/bucket ids created during an active lab session
@@ -348,6 +431,36 @@ function seedState() {
 }
 
 let flashSeq = 1
+
+// ---------- Generic-resource lifecycle helpers ----------
+function genericCfg(service, resource) {
+  return SERVICE_CONFIGS[service]?.resources?.[resource]
+}
+
+/** Immutably map one row inside genericResources[service][resource]. */
+function mapGeneric(s, service, resource, id, fn) {
+  return {
+    genericResources: {
+      ...(s.genericResources || {}),
+      [service]: {
+        ...(s.genericResources?.[service] || {}),
+        [resource]: (s.genericResources?.[service]?.[resource] || []).map((x) => (x.id === id ? fn(x) : x)),
+      },
+    },
+  }
+}
+
+function removeGeneric(s, service, resource, id) {
+  return {
+    genericResources: {
+      ...(s.genericResources || {}),
+      [service]: {
+        ...(s.genericResources?.[service] || {}),
+        [resource]: (s.genericResources?.[service]?.[resource] || []).filter((x) => x.id !== id),
+      },
+    },
+  }
+}
 
 export const useAwsStore = create(
   persist(
@@ -406,46 +519,169 @@ export const useAwsStore = create(
             subnetId: subnet?.id || '', vpcId: subnet?.vpcId || '',
             publicIp, privateIp, keyName: keyName || '', securityGroups, iamRole: '',
             monitoring: monitoring ? 'enabled' : 'disabled', rootDevice: '/dev/xvda', rootVolume: rootVol,
-            launchTime: new Date().toISOString(), statusChecks: 'initializing', tenancy: 'default',
+            launchTime: new Date().toISOString(), statusChecks: 'initializing', checks: initializingChecks(),
+            disableApiTermination: false, tenancy: 'default',
             architecture: getInstanceType(type).arch,
             workload: ami.workload || 'linux',
             tags: { ...(name ? { Name: name } : {}), ...(tags || {}) },
+            // durable transition: pending -> running
+            stateTransitionAt: dueIn(EC2_TIMING.pendingToRunning),
+            pendingTransition: { kind: 'ec2', to: 'running', phase: 'boot' },
           })
           set((s) => ({
             volumes: [...s.volumes, { id: rootVol, region, size: volumeSize || 8, type: volumeType || 'gp3', state: 'in-use', az, encrypted: false, attachedTo: id, device: '/dev/xvda', created: new Date().toISOString() }],
           }))
         }
         set((s) => ({ instances: [...s.instances, ...created] }))
-        // pending -> running after a short delay (status checks)
-        created.forEach((inst) => {
-          setTimeout(() => {
-            set((s) => ({ instances: s.instances.map((x) => (x.id === inst.id ? { ...x, state: 'running', statusChecks: '2/2' } : x)) }))
-          }, 4000 + Math.random() * 2000)
-        })
+        get()._ensureTick()
         return created
       },
 
       instanceAction: (ids, action) => {
         const transitions = {
-          start: { interim: 'pending', final: 'running' },
-          stop: { interim: 'stopping', final: 'stopped' },
-          reboot: { interim: 'rebooting', final: 'running' },
-          terminate: { interim: 'shutting-down', final: 'terminated' },
+          start: { interim: 'pending', to: 'running', delay: EC2_TIMING.pendingToRunning, phase: 'boot' },
+          stop: { interim: 'stopping', to: 'stopped', delay: EC2_TIMING.stopping },
+          reboot: { interim: 'rebooting', to: 'running', delay: EC2_TIMING.rebooting, phase: 'boot' },
+          terminate: { interim: 'shutting-down', to: 'terminated', delay: EC2_TIMING.shuttingDown },
         }
         const t = transitions[action]
-        if (!t) return
-        set((s) => ({ instances: s.instances.map((x) => (ids.includes(x.id) ? { ...x, state: t.interim, statusChecks: action === 'stop' || action === 'terminate' ? '-' : 'initializing' } : x)) }))
-        setTimeout(() => {
-          set((s) => ({
-            instances: s.instances.map((x) => {
-              if (!ids.includes(x.id)) return x
-              if (action === 'terminate') return { ...x, state: 'terminated', statusChecks: '-', publicIp: '' }
-              if (action === 'stop') return { ...x, state: 'stopped', statusChecks: '-', publicIp: x.publicIp }
-              return { ...x, state: t.final, statusChecks: '2/2' }
-            }),
-          }))
-        }, 3000)
+        if (!t) return { ok: false }
+        // Guard: termination protection.
+        if (action === 'terminate') {
+          const { instances } = get()
+          const blocked = instances.filter((x) => ids.includes(x.id) && x.disableApiTermination)
+          if (blocked.length) {
+            const err = operationNotPermitted('TerminateInstances', `The instance '${blocked[0].id}' may not be terminated. Modify its 'disableApiTermination' instance attribute and try again.`)
+            get().pushFlash('error', err.str)
+            return fail(err)
+          }
+        }
+        set((s) => ({
+          instances: s.instances.map((x) => {
+            if (!ids.includes(x.id)) return x
+            const checks = action === 'stop' || action === 'terminate' ? noChecks() : initializingChecks()
+            return {
+              ...x,
+              state: t.interim,
+              statusChecks: action === 'stop' || action === 'terminate' ? '-' : 'initializing',
+              checks,
+              stateTransitionAt: dueIn(t.delay),
+              pendingTransition: { kind: 'ec2', to: t.to, phase: t.phase || null },
+            }
+          }),
+        }))
+        get()._ensureTick()
+        return ok()
       },
+
+      // Toggle EC2 termination protection.
+      setDisableApiTermination: (id, value) => set((s) => ({
+        instances: s.instances.map((x) => (x.id === id ? { ...x, disableApiTermination: !!value } : x)),
+      })),
+
+      // ---------- Durable lifecycle engine ----------
+      // Resolve every past-due transition (EC2 + generic + LB/TG health) and
+      // re-arm the single global tick. Safe to call repeatedly.
+      reconcile: () => {
+        const now = Date.now()
+        set((s) => {
+          let instances = s.instances || []
+          let changed = false
+          // Rescue instances left in a transient state by a pre-v3 setTimeout
+          // model (no durable pendingTransition): resolve to a settled state.
+          instances = instances.map((x) => {
+            if (!x.pendingTransition && !x.stateTransitionAt) {
+              if (x.state === 'pending' || x.state === 'rebooting') { changed = true; return { ...x, state: 'running', statusChecks: '2/2', checks: passedChecks() } }
+              if (x.state === 'stopping') { changed = true; return { ...x, state: 'stopped', statusChecks: '-', checks: noChecks() } }
+              if (x.state === 'shutting-down') { changed = true; return { ...x, state: 'terminated', statusChecks: '-', checks: noChecks(), publicIp: '', terminatedAt: now } }
+            }
+            return x
+          })
+          instances = instances.map((x) => {
+            if (!x.pendingTransition || !x.stateTransitionAt) return x
+            if (x.stateTransitionAt > now) return x
+            changed = true
+            const pt = x.pendingTransition
+            // EC2 boot: land in running with 2-phase checks staggered.
+            if (pt.to === 'running') {
+              return { ...x, state: 'running', statusChecks: '1/2', checks: phase1Checks(), stateTransitionAt: dueIn(EC2_TIMING.checkPhase2), pendingTransition: { kind: 'ec2', to: 'running', phase: 'check2' } }
+            }
+            if (pt.to === 'stopped') {
+              return { ...x, state: 'stopped', statusChecks: '-', checks: noChecks(), stateTransitionAt: null, pendingTransition: null }
+            }
+            if (pt.to === 'terminated') {
+              return { ...x, state: 'terminated', statusChecks: '-', checks: noChecks(), publicIp: '', terminatedAt: now, stateTransitionAt: null, pendingTransition: null }
+            }
+            return { ...x, stateTransitionAt: null, pendingTransition: null }
+          })
+          // Second-phase check completion: 1/2 -> 2/2.
+          instances = instances.map((x) => {
+            if (x.pendingTransition?.phase === 'check2' && x.stateTransitionAt && x.stateTransitionAt <= now) {
+              changed = true
+              return { ...x, statusChecks: '2/2', checks: passedChecks(), stateTransitionAt: null, pendingTransition: null }
+            }
+            return x
+          })
+          // Hide long-terminated instances from lists.
+          const before = instances.length
+          instances = instances.filter((x) => !(x.state === 'terminated' && x.terminatedAt && now - x.terminatedAt > EC2_TIMING.terminatedLinger))
+          if (instances.length !== before) changed = true
+
+          // Generic resources: advance create walks + action interims + deletions.
+          let generic = s.genericResources || {}
+          let gChanged = false
+          const nextGeneric = {}
+          for (const [svc, resources] of Object.entries(generic)) {
+            nextGeneric[svc] = {}
+            for (const [res, rows] of Object.entries(resources || {})) {
+              nextGeneric[svc][res] = (rows || []).flatMap((row) => {
+                if (!row.pendingTransition || !row.stateTransitionAt || row.stateTransitionAt > now) return [row]
+                gChanged = true
+                const pt = row.pendingTransition
+                if (pt.op === 'delete') return [] // remove
+                if (pt.op === 'create' && Array.isArray(pt.states) && pt.step < pt.states.length - 1) {
+                  const step = pt.step + 1
+                  const status = pt.states[step]
+                  const done = step >= pt.states.length - 1
+                  const extra = svc === 'cloudformation' && res === 'stacks' && done
+                    ? { resources: (row.resourceList || []).length || row.resources }
+                    : {}
+                  return [{ ...row, status, ...extra, stateTransitionAt: done ? null : dueIn(pt.delayMs || GENERIC_TIMING.createStep), pendingTransition: done ? null : { ...pt, step } }]
+                }
+                // action interim -> final
+                return [{ ...row, status: pt.final ?? row.status, ...(pt.patch || {}), stateTransitionAt: null, pendingTransition: null }]
+              })
+            }
+          }
+          if (gChanged) generic = nextGeneric
+
+          // Target-group health cycling (healthy/unhealthy flap for realism).
+          let tgs = s.targetGroups || []
+          let tgChanged = false
+          tgs = tgs.map((tg) => {
+            if (!tg.targets || !tg.targets.length) return tg
+            const targets = tg.targets.map((t) => {
+              if (t.health === 'initial' && Math.random() < 0.5) { tgChanged = true; return { ...t, health: 'healthy' } }
+              return t
+            })
+            return tgChanged ? { ...tg, targets } : tg
+          })
+
+          const patch = {}
+          if (changed) patch.instances = instances
+          if (gChanged) patch.genericResources = generic
+          if (tgChanged) patch.targetGroups = tgs
+          return patch
+        })
+        // Keep ticking if anything is still mid-transition.
+        const st = get()
+        const busy = (st.instances || []).some((x) => x.pendingTransition)
+          || Object.values(st.genericResources || {}).some((rs) => Object.values(rs || {}).some((rows) => (rows || []).some((r) => r.pendingTransition)))
+        if (busy) get()._ensureTick()
+      },
+
+      // Arm the single global 1s tick (module-level guarded).
+      _ensureTick: () => { armLifecycleTick(() => { try { get().reconcile() } catch { /* ignore */ } }) },
 
       setInstanceName: (id, name) => set((s) => ({
         instances: s.instances.map((x) => (x.id === id ? { ...x, name, tags: { ...x.tags, Name: name } } : x)),
@@ -462,10 +698,207 @@ export const useAwsStore = create(
 
       // ---------- Security groups ----------
       createSecurityGroup: ({ name, description, vpcId, inbound }) => {
-        const { region } = get()
+        const { region, securityGroups } = get()
+        if (duplicateSgNameInVpc(name, vpcId, securityGroups)) {
+          const err = invalidGroupInUse('CreateSecurityGroup', `The security group '${name}' already exists for VPC '${vpcId}'`)
+          get().pushFlash('error', err.str)
+          return fail(err)
+        }
         const sg = { id: newSgId(), region, name, description, vpcId, inbound: inbound || [], outbound: [{ id: 'sgr-o', type: 'All traffic', protocol: 'All', from: 0, to: 65535, source: '0.0.0.0/0', description: '' }] }
         set((s) => ({ securityGroups: [...s.securityGroups, sg] }))
         return sg
+      },
+      // Guarded: SG cannot be deleted if attached to a live instance or referenced by another SG.
+      deleteSecurityGroup: (id) => {
+        const { securityGroups, instances } = get()
+        const attached = instances.some((i) => i.state !== 'terminated' && (i.securityGroups || []).includes(id))
+        if (attached) {
+          const err = dependencyViolation('DeleteSecurityGroup', `resource ${id} has a dependent object`)
+          get().pushFlash('error', err.str)
+          return fail(err)
+        }
+        const referenced = securityGroups.some((sg) => sg.id !== id && [...(sg.inbound || []), ...(sg.outbound || [])].some((r) => r.source === id))
+        if (referenced) {
+          const err = dependencyViolation('DeleteSecurityGroup', `resource ${id} has a dependent object`)
+          get().pushFlash('error', err.str)
+          return fail(err)
+        }
+        set((s) => ({ securityGroups: s.securityGroups.filter((sg) => sg.id !== id) }))
+        return ok()
+      },
+      // SG rule CRUD. direction = 'inbound' | 'outbound'.
+      addSgRule: (id, direction, rule) => {
+        const dir = direction === 'outbound' ? 'outbound' : 'inbound'
+        const r = { id: newSgRuleId(), ...rule }
+        set((s) => ({ securityGroups: s.securityGroups.map((sg) => (sg.id === id ? { ...sg, [dir]: [...(sg[dir] || []), r] } : sg)) }))
+        return r
+      },
+      updateSgRule: (id, direction, ruleId, patch) => {
+        const dir = direction === 'outbound' ? 'outbound' : 'inbound'
+        set((s) => ({ securityGroups: s.securityGroups.map((sg) => (sg.id === id ? { ...sg, [dir]: (sg[dir] || []).map((r) => (r.id === ruleId ? { ...r, ...patch } : r)) } : sg)) }))
+        return ok()
+      },
+      deleteSgRule: (id, direction, ruleId) => {
+        const dir = direction === 'outbound' ? 'outbound' : 'inbound'
+        set((s) => ({ securityGroups: s.securityGroups.map((sg) => (sg.id === id ? { ...sg, [dir]: (sg[dir] || []).filter((r) => r.id !== ruleId) } : sg)) }))
+        return ok()
+      },
+      setSgRules: (id, direction, rules) => {
+        const dir = direction === 'outbound' ? 'outbound' : 'inbound'
+        set((s) => ({ securityGroups: s.securityGroups.map((sg) => (sg.id === id ? { ...sg, [dir]: (rules || []).map((r) => ({ id: r.id || newSgRuleId(), ...r })) } : sg)) }))
+        return ok()
+      },
+
+      // ---------- VPC ----------
+      createVpc: ({ name, cidr, tenancy }) => {
+        const { region, vpcs } = get()
+        if (!isValidCidr(cidr)) {
+          const err = invalidParameterValue('CreateVpc', `Value (${cidr}) for parameter cidrBlock is invalid. This is not a valid CIDR block.`)
+          get().pushFlash('error', err.str)
+          return fail(err)
+        }
+        if (vpcs.some((v) => v.region === region && cidrsOverlap(v.cidr, cidr))) {
+          const err = invalidParameterValue('CreateVpc', `The CIDR '${cidr}' conflicts with another VPC.`)
+          get().pushFlash('error', err.str)
+          return fail(err)
+        }
+        const vpc = { id: newVpcId(), region, name: name || '', cidr, state: 'available', isDefault: false, dnsHostnames: false, dnsSupport: true, tenancy: tenancy || 'default' }
+        set((s) => ({ vpcs: [...s.vpcs, vpc] }))
+        return vpc
+      },
+      deleteVpc: (id) => {
+        const { subnets, internetGateways, securityGroups, instances } = get()
+        const hasInstances = instances.some((i) => i.state !== 'terminated' && i.vpcId === id)
+        const hasSubnets = subnets.some((sn) => sn.vpcId === id)
+        const hasIgw = internetGateways.some((g) => g.vpcId === id)
+        const hasSg = securityGroups.some((sg) => sg.vpcId === id && sg.name !== 'default')
+        if (hasInstances || hasSubnets || hasIgw || hasSg) {
+          const err = dependencyViolation('DeleteVpc', `The vpc '${id}' has dependencies and cannot be deleted.`)
+          get().pushFlash('error', err.str)
+          return fail(err)
+        }
+        set((s) => ({ vpcs: s.vpcs.filter((v) => v.id !== id), securityGroups: s.securityGroups.filter((sg) => sg.vpcId !== id) }))
+        return ok()
+      },
+
+      // ---------- Subnets ----------
+      createSubnet: ({ vpcId, cidr, az, mapPublicIp }) => {
+        const { region, vpcs, subnets } = get()
+        const vpc = vpcs.find((v) => v.id === vpcId)
+        if (!vpc) {
+          const err = invalidParameterValue('CreateSubnet', `The vpc ID '${vpcId}' does not exist`)
+          get().pushFlash('error', err.str)
+          return fail(err)
+        }
+        if (!isValidCidr(cidr) || !cidrWithinVpc(cidr, vpc.cidr)) {
+          const err = invalidParameterValue('CreateSubnet', `The CIDR '${cidr}' is invalid or is not within the CIDR range of VPC '${vpcId}' (${vpc.cidr}).`)
+          get().pushFlash('error', err.str)
+          return fail(err)
+        }
+        if (subnets.some((sn) => sn.vpcId === vpcId && cidrsOverlap(sn.cidr, cidr))) {
+          const err = invalidParameterValue('CreateSubnet', `The CIDR '${cidr}' conflicts with another subnet`)
+          get().pushFlash('error', err.str)
+          return fail(err)
+        }
+        const subnet = { id: newSubnetId(), region, vpcId, cidr, az: az || `${region}a`, availableIps: 4091, mapPublicIp: !!mapPublicIp, isDefault: false }
+        set((s) => ({ subnets: [...s.subnets, subnet] }))
+        return subnet
+      },
+      deleteSubnet: (id) => {
+        const { instances } = get()
+        if (instances.some((i) => i.state !== 'terminated' && i.subnetId === id)) {
+          const err = dependencyViolation('DeleteSubnet', `The subnet '${id}' has dependencies and cannot be deleted.`)
+          get().pushFlash('error', err.str)
+          return fail(err)
+        }
+        set((s) => ({ subnets: s.subnets.filter((sn) => sn.id !== id) }))
+        return ok()
+      },
+
+      // ---------- Internet gateways ----------
+      createInternetGateway: ({ name } = {}) => {
+        const { region } = get()
+        const igw = { id: newIgwId(), region, vpcId: null, state: 'detached', name: name || '' }
+        set((s) => ({ internetGateways: [...s.internetGateways, igw] }))
+        return igw
+      },
+      attachInternetGateway: (id, vpcId) => {
+        const { internetGateways } = get()
+        if (internetGateways.some((g) => g.vpcId === vpcId && g.id !== id)) {
+          const err = dependencyViolation('AttachInternetGateway', `resource ${vpcId} already has an internet gateway attached`)
+          get().pushFlash('error', err.str)
+          return fail(err)
+        }
+        set((s) => ({ internetGateways: s.internetGateways.map((g) => (g.id === id ? { ...g, vpcId, state: 'attached' } : g)) }))
+        return ok()
+      },
+      detachInternetGateway: (id) => {
+        set((s) => ({ internetGateways: s.internetGateways.map((g) => (g.id === id ? { ...g, vpcId: null, state: 'detached' } : g)) }))
+        return ok()
+      },
+      deleteInternetGateway: (id) => {
+        const { internetGateways } = get()
+        const g = internetGateways.find((x) => x.id === id)
+        if (g && g.state === 'attached') {
+          const err = dependencyViolation('DeleteInternetGateway', `The internetGateway '${id}' has dependencies and cannot be deleted. Detach it first.`)
+          get().pushFlash('error', err.str)
+          return fail(err)
+        }
+        set((s) => ({ internetGateways: s.internetGateways.filter((x) => x.id !== id) }))
+        return ok()
+      },
+
+      // ---------- EBS volumes / snapshots ----------
+      attachVolume: (volId, instanceId, device) => {
+        const { volumes, instances } = get()
+        const vol = volumes.find((v) => v.id === volId)
+        const inst = instances.find((i) => i.id === instanceId)
+        if (!vol) return fail(invalidParameterValue('AttachVolume', `The volume '${volId}' does not exist.`))
+        if (!inst) return fail(invalidParameterValue('AttachVolume', `The instance ID '${instanceId}' does not exist`))
+        if (vol.state === 'in-use') {
+          const err = invalidParameterValue('AttachVolume', `Volume '${volId}' is already attached to an instance`)
+          get().pushFlash('error', err.str)
+          return fail(err)
+        }
+        set((s) => ({ volumes: s.volumes.map((v) => (v.id === volId ? { ...v, state: 'in-use', attachedTo: instanceId, device: device || '/dev/sdf' } : v)) }))
+        return ok()
+      },
+      detachVolume: (volId) => {
+        const { volumes, instances } = get()
+        const vol = volumes.find((v) => v.id === volId)
+        if (vol && instances.some((i) => i.rootVolume === volId && i.state !== 'terminated')) {
+          const err = operationNotPermitted('DetachVolume', `'${volId}' is the root device and cannot be detached while the instance is running`)
+          get().pushFlash('error', err.str)
+          return fail(err)
+        }
+        set((s) => ({ volumes: s.volumes.map((v) => (v.id === volId ? { ...v, state: 'available', attachedTo: null, device: null } : v)) }))
+        return ok()
+      },
+      createSnapshot: (volId, description) => {
+        const { region, volumes } = get()
+        const vol = volumes.find((v) => v.id === volId)
+        if (!vol) return fail(invalidParameterValue('CreateSnapshot', `The volume '${volId}' does not exist.`))
+        const snap = { id: newSnapshotId(), region, volumeId: volId, size: vol.size, state: 'completed', progress: '100%', description: description || '', started: new Date().toISOString(), encrypted: !!vol.encrypted }
+        set((s) => ({ snapshots: [...(s.snapshots || []), snap] }))
+        return snap
+      },
+      deleteSnapshot: (id) => { set((s) => ({ snapshots: (s.snapshots || []).filter((x) => x.id !== id) })); return ok() },
+      createVolume: ({ size, type, az, encrypted } = {}) => {
+        const { region } = get()
+        const vol = { id: newVolumeId(), region, size: size || 8, type: type || 'gp3', state: 'available', az: az || `${region}a`, encrypted: !!encrypted, attachedTo: null, device: null, created: new Date().toISOString() }
+        set((s) => ({ volumes: [...s.volumes, vol] }))
+        return vol
+      },
+      deleteVolume: (id) => {
+        const { volumes } = get()
+        const vol = volumes.find((v) => v.id === id)
+        if (vol && vol.state === 'in-use') {
+          const err = dependencyViolation('DeleteVolume', `Volume '${id}' is currently attached and cannot be deleted.`)
+          get().pushFlash('error', err.str)
+          return fail(err)
+        }
+        set((s) => ({ volumes: s.volumes.filter((v) => v.id !== id) }))
+        return ok()
       },
 
       // ---------- Elastic IPs ----------
@@ -475,10 +908,96 @@ export const useAwsStore = create(
         set((s) => ({ elasticIps: [...s.elasticIps, eip] }))
         return eip
       },
-      releaseEip: (allocationId) => set((s) => ({ elasticIps: s.elasticIps.filter((e) => e.allocationId !== allocationId) })),
+      associateEip: (allocationId, instanceId) => {
+        const { elasticIps, instances } = get()
+        const eip = elasticIps.find((e) => e.allocationId === allocationId)
+        const inst = instances.find((i) => i.id === instanceId)
+        if (!eip) return fail(invalidParameterValue('AssociateAddress', `The allocation ID '${allocationId}' does not exist`))
+        if (!inst) return fail(invalidParameterValue('AssociateAddress', `The instance ID '${instanceId}' does not exist`))
+        set((s) => ({
+          elasticIps: s.elasticIps.map((e) => (e.allocationId === allocationId ? { ...e, associationId: newEipAssocId(), instanceId } : e)),
+          instances: s.instances.map((i) => (i.id === instanceId ? { ...i, publicIp: eip.publicIp } : i)),
+        }))
+        return ok()
+      },
+      disassociateEip: (allocationId) => {
+        const { elasticIps } = get()
+        const eip = elasticIps.find((e) => e.allocationId === allocationId)
+        set((s) => ({
+          elasticIps: s.elasticIps.map((e) => (e.allocationId === allocationId ? { ...e, associationId: null, instanceId: null } : e)),
+          instances: eip?.instanceId ? s.instances.map((i) => (i.id === eip.instanceId ? { ...i, publicIp: '' } : i)) : s.instances,
+        }))
+        return ok()
+      },
+      releaseEip: (allocationId) => {
+        const { elasticIps } = get()
+        const eip = elasticIps.find((e) => e.allocationId === allocationId)
+        if (eip && eip.associationId) {
+          const err = invalidParameterValue('ReleaseAddress', `The address with allocation id '${allocationId}' is currently associated and cannot be released. Disassociate it first.`)
+          get().pushFlash('error', err.str)
+          return fail(err)
+        }
+        set((s) => ({ elasticIps: s.elasticIps.filter((e) => e.allocationId !== allocationId) }))
+        return ok()
+      },
+
+      // ---------- ELB / target groups / auto scaling ----------
+      createLoadBalancer: ({ name, type, scheme, vpcId } = {}) => {
+        const { region } = get()
+        const lb = { id: `elb-0${Math.random().toString(16).slice(2, 18).padEnd(16, '0')}`, region, name: name || 'my-lb', type: type || 'application', scheme: scheme || 'internet-facing', state: 'active', dnsName: `${name || 'my-lb'}-${Math.floor(Math.random() * 1e9)}.${region}.elb.amazonaws.com`, vpcId: vpcId || get().vpcs[0]?.id, targetGroups: [], created: new Date().toISOString() }
+        set((s) => ({ loadBalancers: [...(s.loadBalancers || []), lb] }))
+        return lb
+      },
+      deleteLoadBalancer: (id) => { set((s) => ({ loadBalancers: (s.loadBalancers || []).filter((x) => x.id !== id) })); return ok() },
+      createTargetGroup: ({ name, protocol, port, vpcId, targetType } = {}) => {
+        const { region } = get()
+        const tg = { id: `tg-0${Math.random().toString(16).slice(2, 18).padEnd(16, '0')}`, region, name: name || 'my-targets', protocol: protocol || 'HTTP', port: port || 80, vpcId: vpcId || get().vpcs[0]?.id, targetType: targetType || 'instance', targets: [], created: new Date().toISOString() }
+        set((s) => ({ targetGroups: [...(s.targetGroups || []), tg] }))
+        return tg
+      },
+      deleteTargetGroup: (id) => { set((s) => ({ targetGroups: (s.targetGroups || []).filter((x) => x.id !== id) })); return ok() },
+      registerTarget: (tgId, instanceId, port) => {
+        set((s) => ({ targetGroups: (s.targetGroups || []).map((tg) => (tg.id === tgId ? { ...tg, targets: [...(tg.targets || []).filter((t) => t.id !== instanceId), { id: instanceId, port: port || tg.port, health: 'initial' }] } : tg)) }))
+        get()._ensureTick()
+        return ok()
+      },
+      deregisterTarget: (tgId, instanceId) => {
+        set((s) => ({ targetGroups: (s.targetGroups || []).map((tg) => (tg.id === tgId ? { ...tg, targets: (tg.targets || []).filter((t) => t.id !== instanceId) } : tg)) }))
+        return ok()
+      },
+      createAutoScalingGroup: ({ name, min, max, desired, launchTemplate, subnetId } = {}) => {
+        const { region } = get()
+        const subnet = get().subnets.find((sn) => sn.id === subnetId) || get().subnets.find((sn) => sn.region === region)
+        const n = desired || min || 1
+        const instanceIds = []
+        for (let i = 0; i < n; i += 1) {
+          const created = get().launchInstances({ name: `${name || 'asg'}-instance`, amiId: 'ami-0c02fb55956c7d316', type: 't3.micro', count: 1, keyName: '', subnetId: subnet?.id, securityGroups: [], monitoring: false, tags: { 'aws:autoscaling:groupName': name || 'asg' } })
+          if (created && created[0]) instanceIds.push(created[0].id)
+        }
+        const asg = { id: `asg-0${Math.random().toString(16).slice(2, 18).padEnd(16, '0')}`, region, name: name || 'my-asg', min: min ?? 1, max: max ?? 4, desired: n, instanceIds, launchTemplate: launchTemplate || 'default-lt', vpcId: subnet?.vpcId, status: 'active', created: new Date().toISOString() }
+        set((s) => ({ autoScalingGroups: [...(s.autoScalingGroups || []), asg] }))
+        return asg
+      },
+      deleteAutoScalingGroup: (id) => {
+        const { autoScalingGroups } = get()
+        const asg = autoScalingGroups.find((a) => a.id === id)
+        if (asg && asg.instanceIds?.length) get().instanceAction(asg.instanceIds, 'terminate')
+        set((s) => ({ autoScalingGroups: (s.autoScalingGroups || []).filter((a) => a.id !== id) }))
+        return ok()
+      },
 
       // ---------- S3 ----------
       createBucket: ({ name, region, versioning, encryption, blockPublic }) => {
+        if (!isValidBucketName(name)) {
+          const err = invalidParameterValue('CreateBucket', `The specified bucket is not valid. Bucket name '${name}' does not follow Amazon S3 naming rules.`)
+          get().pushFlash('error', err.str)
+          return fail(err)
+        }
+        if (get().s3Buckets.some((b) => b.name === name)) {
+          const err = { code: 'BucketAlreadyExists', str: `An error occurred (BucketAlreadyExists) when calling the CreateBucket operation: The requested bucket name is not available.` }
+          get().pushFlash('error', err.str)
+          return fail(err)
+        }
         const bucket = {
           name,
           region: region || get().region,
@@ -498,7 +1017,17 @@ export const useAwsStore = create(
         set((s) => ({ s3Buckets: [...s.s3Buckets, bucket] }))
         return bucket
       },
-      deleteBucket: (name) => set((s) => ({ s3Buckets: s.s3Buckets.filter((b) => b.name !== name) })),
+      deleteBucket: (name) => {
+        const { s3Buckets } = get()
+        const bucket = s3Buckets.find((b) => b.name === name)
+        if (bucket && (bucket.objects || []).length > 0) {
+          const err = bucketNotEmpty('DeleteBucket', 'The bucket you tried to delete is not empty')
+          get().pushFlash('error', err.str)
+          return fail(err)
+        }
+        set((s) => ({ s3Buckets: s.s3Buckets.filter((b) => b.name !== name) }))
+        return ok()
+      },
       updateBucket: (name, patch) => set((s) => ({
         s3Buckets: s.s3Buckets.map((b) => (b.name === name ? { ...b, ...patch } : b)),
       })),
@@ -527,7 +1056,15 @@ export const useAwsStore = create(
         return role
       },
       createIamPolicy: ({ name, description, document }) => {
-        const policy = { name, type: 'Customer managed', attached: 0, created: new Date().toISOString(), description, document }
+        const text = typeof document === 'string' ? document : JSON.stringify(document || {})
+        const check = isValidPolicyJson(text)
+        if (!check.ok) {
+          const err = malformedPolicyDocument('CreatePolicy', check.error)
+          get().pushFlash('error', err.str)
+          return fail(err)
+        }
+        const doc = typeof document === 'string' ? JSON.parse(document) : document
+        const policy = { name, type: 'Customer managed', attached: 0, created: new Date().toISOString(), description, document: doc }
         set((s) => ({ iamPolicies: [...s.iamPolicies, policy] }))
         return policy
       },
@@ -539,13 +1076,36 @@ export const useAwsStore = create(
       // ---------- Generic services ----------
       createGenericResource: (service, resource, payload) => {
         const { region } = get()
+        const cfg = genericCfg(service, resource)
+        const draft = { ...(cfg?.defaults || {}), ...(payload || {}) }
+        // Optional cfg.validate(name, draft, rows).
+        if (cfg?.validate) {
+          const rows = get().genericResources?.[service]?.[resource] || []
+          const errMsg = cfg.validate(draft.name, draft, rows)
+          if (errMsg) {
+            const err = invalidParameterValue(`Create${resource}`, errMsg)
+            get().pushFlash('error', err.str)
+            return fail(err)
+          }
+        }
+        // Optional cfg.derive(name, draft) -> patch.
+        const derived = cfg?.derive ? cfg.derive(draft.name, draft) : {}
+        const lc = cfg?.lifecycle
+        const createStates = lc?.createStates
         const created = {
           id: newGenericId(service, resource),
           region,
           created: new Date().toISOString(),
           tags: { Environment: 'demo', Project: 'fixitlab' },
-          status: 'Active',
-          ...payload,
+          status: createStates ? createStates[0] : (draft.status || 'Active'),
+          ...draft,
+          ...derived,
+        }
+        // Schedule the create walk to the final state via the durable tick.
+        if (createStates && createStates.length > 1) {
+          created.status = createStates[0]
+          created.stateTransitionAt = dueIn(lc.createDelayMs || GENERIC_TIMING.createStep)
+          created.pendingTransition = { op: 'create', states: createStates, step: 0, delayMs: lc.createDelayMs || GENERIC_TIMING.createStep }
         }
         set((s) => ({
           genericResources: {
@@ -556,31 +1116,191 @@ export const useAwsStore = create(
             },
           },
         }))
+        if (created.pendingTransition) get()._ensureTick()
         return created
       },
-      deleteGenericResource: (service, resource, id) => set((s) => ({
-        genericResources: {
-          ...(s.genericResources || {}),
-          [service]: {
-            ...(s.genericResources?.[service] || {}),
-            [resource]: (s.genericResources?.[service]?.[resource] || []).filter((x) => x.id !== id),
-          },
-        },
+      deleteGenericResource: (service, resource, id) => {
+        const cfg = genericCfg(service, resource)
+        // Transient "deleting" state before removal, if the config declares one.
+        if (cfg?.lifecycle?.deleteState) {
+          set((s) => mapGeneric(s, service, resource, id, (x) => ({
+            ...x,
+            status: cfg.lifecycle.deleteState,
+            stateTransitionAt: dueIn(GENERIC_TIMING.deleting),
+            pendingTransition: { op: 'delete' },
+          })))
+          get()._ensureTick()
+          return ok()
+        }
+        set((s) => removeGeneric(s, service, resource, id))
+        return ok()
+      },
+      updateGenericResource: (service, resource, id, patch) => set((s) => mapGeneric(s, service, resource, id, (x) => ({ ...x, ...patch }))),
+
+      // Generic action (reboot/modify/...) driven by cfg.lifecycle.actions.
+      transitionGenericResource: (service, resource, id, action, extraPatch) => {
+        const cfg = genericCfg(service, resource)
+        const spec = cfg?.lifecycle?.actions?.[action]
+        if (!spec) return fail(resourceNotFound(`${action}`, `Action '${action}' is not supported for ${service}/${resource}.`))
+        set((s) => mapGeneric(s, service, resource, id, (x) => ({
+          ...x,
+          status: spec.interim,
+          stateTransitionAt: dueIn(spec.delayMs || GENERIC_TIMING.action),
+          pendingTransition: { op: 'action', final: spec.final, patch: extraPatch || {} },
+        })))
+        get()._ensureTick()
+        return ok()
+      },
+
+      // ---------- RDS bespoke ----------
+      rebootDb: (id) => get().transitionGenericResource('rds', 'databases', id, 'reboot'),
+      modifyDb: (id, patch) => get().transitionGenericResource('rds', 'databases', id, 'modify', patch),
+
+      // ---------- Lambda bespoke ----------
+      invokeLambdaFn: (id, payload) => {
+        const durationMs = 80 + Math.floor(Math.random() * 400)
+        const billedMs = Math.ceil(durationMs / 100) * 100
+        const memoryUsed = 60 + Math.floor(Math.random() * 40)
+        const entry = { at: new Date().toISOString(), statusCode: 200, durationMs, billedMs, memoryUsed, payload: payload ?? null }
+        set((s) => mapGeneric(s, 'lambda', 'functions', id, (fn) => ({
+          ...fn,
+          invocationHistory: [entry, ...((fn.invocationHistory) || [])].slice(0, 50),
+        })))
+        return { statusCode: 200, body: payload ?? { message: 'Hello from Lambda!' }, durationMs, billedMs, memoryUsed }
+      },
+      setLambdaCode: (id, code) => set((s) => mapGeneric(s, 'lambda', 'functions', id, (fn) => ({ ...fn, code }))),
+      setLambdaEnv: (id, env) => set((s) => mapGeneric(s, 'lambda', 'functions', id, (fn) => ({ ...fn, env: env || {} }))),
+
+      // ---------- DynamoDB bespoke ----------
+      putDynamoItem: (id, item) => set((s) => mapGeneric(s, 'dynamodb', 'tables', id, (t) => {
+        const records = [...((t.records) || [])]
+        const pkField = (t.partitionKey || 'pk').split(' ')[0]
+        const skField = (t.sortKey || '').split(' ')[0]
+        const idx = records.findIndex((r) => r[pkField] === item[pkField] && (!skField || r[skField] === item[skField]))
+        if (idx >= 0) records[idx] = { ...records[idx], ...item }
+        else records.push(item)
+        return { ...t, records, items: records.length }
       })),
-      updateGenericResource: (service, resource, id, patch) => set((s) => ({
-        genericResources: {
-          ...(s.genericResources || {}),
-          [service]: {
-            ...(s.genericResources?.[service] || {}),
-            [resource]: (s.genericResources?.[service]?.[resource] || []).map((x) => (x.id === id ? { ...x, ...patch } : x)),
-          },
-        },
+      deleteDynamoItem: (id, key) => set((s) => mapGeneric(s, 'dynamodb', 'tables', id, (t) => {
+        const pkField = (t.partitionKey || 'pk').split(' ')[0]
+        const skField = (t.sortKey || '').split(' ')[0]
+        const records = ((t.records) || []).filter((r) => !(r[pkField] === key[pkField] && (!skField || r[skField] === key[skField])))
+        return { ...t, records, items: records.length }
       })),
+      queryDynamo: (id, key) => {
+        const t = (get().genericResources?.dynamodb?.tables || []).find((x) => x.id === id)
+        if (!t) return []
+        const pkField = (t.partitionKey || 'pk').split(' ')[0]
+        return ((t.records) || []).filter((r) => r[pkField] === key[pkField])
+      },
+      scanDynamo: (id) => {
+        const t = (get().genericResources?.dynamodb?.tables || []).find((x) => x.id === id)
+        return t ? ((t.records) || []) : []
+      },
+
+      // ---------- CloudFormation bespoke ----------
+      createCfnStack: (name, template) => {
+        const { region } = get()
+        // Parse resources out of a (loosely-typed) template object/string.
+        let tmpl = template
+        if (typeof template === 'string') { try { tmpl = JSON.parse(template) } catch { tmpl = {} } }
+        const resEntries = Object.entries((tmpl && tmpl.Resources) || {})
+        const outEntries = Object.entries((tmpl && tmpl.Outputs) || {})
+        const id = newGenericId('cloudformation', 'stacks')
+        const now = new Date().toISOString()
+        const resourceList = resEntries.map(([logicalId, def]) => ({ logicalId, type: def?.Type || 'AWS::CloudFormation::CustomResource', physicalId: `${name}-${logicalId}-${Math.random().toString(16).slice(2, 8)}`, status: 'CREATE_IN_PROGRESS' }))
+        const outputs = outEntries.map(([key, def]) => ({ key, value: typeof def?.Value === 'string' ? def.Value : JSON.stringify(def?.Value ?? ''), description: def?.Description || '' }))
+        const stack = {
+          id, region, name, created: now, template: typeof template === 'string' ? template : JSON.stringify(template || {}, null, 2),
+          tags: { Environment: 'demo', Project: 'fixitlab' },
+          status: 'CREATE_IN_PROGRESS', resources: resourceList.length,
+          resourceList,
+          outputs,
+          events: [{ at: now, logicalId: name, type: 'AWS::CloudFormation::Stack', status: 'CREATE_IN_PROGRESS', reason: 'User Initiated' }],
+          stateTransitionAt: dueIn(GENERIC_TIMING.createStep),
+          pendingTransition: { op: 'create', states: ['CREATE_IN_PROGRESS', 'CREATE_COMPLETE'], step: 0, delayMs: GENERIC_TIMING.createStep },
+        }
+        set((s) => ({
+          genericResources: {
+            ...(s.genericResources || {}),
+            cloudformation: {
+              ...(s.genericResources?.cloudformation || {}),
+              stacks: [...(s.genericResources?.cloudformation?.stacks || []), stack],
+            },
+          },
+        }))
+        get()._ensureTick()
+        return stack
+      },
+
+      // ---------- CloudWatch bespoke ----------
+      createCwAlarm: ({ name, metric, namespace, threshold, region }) => {
+        const alarm = { name, region: region || get().region, metric: metric || 'CPUUtilization', namespace: namespace || 'AWS/EC2', state: 'OK', threshold: threshold || '> 80%' }
+        set((s) => ({ cwAlarms: [...(s.cwAlarms || []), alarm] }))
+        return alarm
+      },
+      deleteCwAlarm: (name) => { set((s) => ({ cwAlarms: (s.cwAlarms || []).filter((a) => a.name !== name) })); return ok() },
+      createCwDashboard: ({ name, widgets, region }) => {
+        const dash = { name, region: region || get().region, widgets: widgets || 0, created: new Date().toISOString() }
+        set((s) => ({ cwDashboards: [...(s.cwDashboards || []), dash] }))
+        return dash
+      },
+      deleteCwDashboard: (name) => { set((s) => ({ cwDashboards: (s.cwDashboards || []).filter((d) => d.name !== name) })); return ok() },
+
+      // ---------- IAM engine ----------
+      // Gate a mutating action through the current principal's policies.
+      can: (action, resource = '*') => evaluate(get().currentPrincipal, action, resource),
+      whoami: () => {
+        const p = get().currentPrincipal
+        return { name: p?.name, arn: p?.arn, userId: p?.userId, type: p?.type }
+      },
+      assumeRole: (roleName) => {
+        const { iamRoles } = get()
+        const role = iamRoles.find((r) => r.name === roleName)
+        if (!role) {
+          const err = resourceNotFound('AssumeRole', `Role with name ${roleName} cannot be found.`)
+          get().pushFlash('error', err.str)
+          return fail(err)
+        }
+        const sessionName = 'fixitlab-session'
+        set({
+          currentPrincipal: {
+            type: 'assumed-role',
+            name: `${roleName}/${sessionName}`,
+            arn: `arn:aws:sts::${ACCOUNT_ID}:assumed-role/${roleName}/${sessionName}`,
+            userId: `AROA${roleName.toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 16).padEnd(16, '0')}:${sessionName}`,
+            policyNames: role.policies || [],
+            policies: policiesFromNames(role.policies || []),
+          },
+        })
+        return ok({ arn: `arn:aws:sts::${ACCOUNT_ID}:assumed-role/${roleName}/${sessionName}` })
+      },
+      resetPrincipal: () => set({
+        currentPrincipal: {
+          type: 'user', name: 'admin-user', arn: `arn:aws:iam::${ACCOUNT_ID}:user/admin-user`,
+          userId: 'AIDAADMIN0000000ADMIN', policyNames: ['AdministratorAccess'], policies: policiesFromNames(['AdministratorAccess']),
+        },
+      }),
+
+      // ---------- Console chrome (consumed by chrome UI agent) ----------
+      toggleFavorite: (serviceKey) => set((s) => {
+        const favs = s.favorites || []
+        return { favorites: favs.includes(serviceKey) ? favs.filter((x) => x !== serviceKey) : [...favs, serviceKey] }
+      }),
+      pushRecentService: (serviceKey) => set((s) => {
+        const recents = (s.recentServices || []).filter((x) => x !== serviceKey)
+        return { recentServices: [serviceKey, ...recents].slice(0, 12) }
+      }),
+      setHomeWidgets: (widgets) => set({ homeWidgets: Array.isArray(widgets) ? widgets : [] }),
+      updateSettings: (patch) => set((s) => ({ settings: { ...(s.settings || {}), ...(patch || {}) } })),
     }),
     {
       name: 'fixitlab-aws-sim',
       storage: userScopedAwsStorage,
-      version: 2,
+      version: 3,
+      // v2 -> v3: new fields get their seeded defaults via merge(); nothing to
+      // strip. Provide migrate so zustand does not discard the older payload.
+      migrate: (persistedState) => persistedState || {},
       // Persist resource state + region, but not transient flash messages.
       partialize: (s) => {
         const { flash, ...rest } = s
@@ -593,23 +1313,52 @@ export const useAwsStore = create(
         merged.account = { ...seed.account, ...(p.account || {}) }
         merged.region = p.region || current.region || seed.region
         merged.darkMode = p.darkMode ?? current.darkMode ?? false
+        // Object-shaped chrome / principal fields: shallow-merge onto seed defaults.
+        merged.currentPrincipal = p.currentPrincipal && typeof p.currentPrincipal === 'object'
+          ? { ...seed.currentPrincipal, ...p.currentPrincipal }
+          : seed.currentPrincipal
+        merged.settings = { ...seed.settings, ...(p.settings && typeof p.settings === 'object' ? p.settings : {}) }
+        const objectKeys = new Set(['account', 'region', 'darkMode', 'flash', 'genericResources', 'currentPrincipal', 'settings'])
         for (const key of Object.keys(seed)) {
-          if (key === 'account' || key === 'region' || key === 'darkMode' || key === 'flash') continue
-          if (key === 'genericResources') {
-            merged.genericResources = p.genericResources && typeof p.genericResources === 'object'
-              ? { ...seed.genericResources, ...p.genericResources }
-              : seed.genericResources
-            continue
-          }
+          if (objectKeys.has(key)) continue
+          if (key === 'genericResources') continue
           if (Array.isArray(seed[key])) {
             merged[key] = Array.isArray(p[key]) ? p[key] : seed[key]
           }
         }
+        // genericResources: deep-merge per service so new nested seeds appear
+        // for old persisted state while user rows survive.
+        if (p.genericResources && typeof p.genericResources === 'object') {
+          const g = { ...seed.genericResources }
+          for (const svc of Object.keys(p.genericResources)) {
+            g[svc] = { ...(seed.genericResources[svc] || {}), ...(p.genericResources[svc] || {}) }
+          }
+          merged.genericResources = g
+        } else {
+          merged.genericResources = seed.genericResources
+        }
         return merged
+      },
+      // On load/rehydrate: resolve any past-due transitions immediately (no
+      // stranded mid-transition resources) and arm the single global tick.
+      onRehydrateStorage: () => (state) => {
+        if (!state) return
+        try {
+          state.reconcile()
+          state._ensureTick()
+        } catch { /* ignore */ }
       },
     },
   ),
 )
+
+// Kick the durable lifecycle engine once at module init (covers the very first
+// mount before any rehydrate event fires).
+try {
+  const s = useAwsStore.getState()
+  s.reconcile()
+  s._ensureTick()
+} catch { /* ignore */ }
 
 // ---------- Region-scoped selectors ----------
 export const ACCOUNT = ACCOUNT_ID

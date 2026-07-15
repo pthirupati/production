@@ -401,12 +401,11 @@ function CreateVmModal({ hosts, datastores, networks, onClose, onAction }) {
 }
 
 /* ─── Edit VM Modal (Virtual Hardware + VM Options tabs) ──────────────── */
-function EditVmModal({ vm, networks, onClose, onAction }) {
+function EditVmModal({ vm, networks, datastores = [], onClose, onAction, onAddDisk, onAddNic }) {
   const [tab, setTab] = useState('hardware')
   const [cpu, setCpu] = useState(String(vm.cpu))
   const [memGb, setMemGb] = useState(String(Math.round(vm.memory_mb / 1024)))
   const [annotation, setAnnotation] = useState(vm.annotation || '')
-  const [netId, setNetId] = useState(vm.network_id || '')
   // VM Options
   const [bootDelay, setBootDelay] = useState(String(vm.boot_delay_ms ?? 0))
   const [firmware, setFirmware] = useState(vm.boot_firmware || vm.firmware || 'BIOS')
@@ -414,9 +413,16 @@ function EditVmModal({ vm, networks, onClose, onAction }) {
   const [firewall, setFirewall] = useState(vm.firewall_enabled !== false)
   const [rebootAction, setRebootAction] = useState(vm.reboot_power_action || 'restart')
   const [bootOrder, setBootOrder] = useState(vm.boot_order || ['disk', 'network', 'cdrom'])
+  const [addMenuOpen, setAddMenuOpen] = useState(false)
+  const [deviceBusy, setDeviceBusy] = useState('')
   const [acting, setActing] = useState(false)
   const [error, setError] = useState('')
   const isPoweredOn = vm.power === 'poweredOn'
+
+  const disks = vm.disks?.length ? vm.disks : []
+  const nics = vm.nics?.length ? vm.nics : []
+  const cdroms = vm.cdroms?.length ? vm.cdroms : []
+  const dsName = (id) => datastores.find(d => d.id === id)?.name || id || '—'
 
   const moveBoot = (idx, dir) => {
     setBootOrder(prev => {
@@ -428,15 +434,23 @@ function EditVmModal({ vm, networks, onClose, onAction }) {
     })
   }
 
+  // Per-device actions (remove / connect toggle) apply immediately and then let
+  // the parent refresh the inventory; they are independent of the OK button.
+  const deviceAction = async (action, payload, busyKey) => {
+    setDeviceBusy(busyKey); setError('')
+    try {
+      await onAction(action, payload)
+    } catch (e) {
+      setError(e?.response?.data?.error || 'Action failed')
+    } finally { setDeviceBusy('') }
+  }
+
   const save = async () => {
     setActing(true); setError('')
     try {
       // Hardware / general
       const payload = { vm_id: vm.id, annotation }
       if (!isPoweredOn) { payload.cpu = parseInt(cpu); payload.memory_mb = parseInt(memGb) * 1024 }
-      if (netId !== vm.network_id) {
-        await onAction('change_network', { vm_id: vm.id, network_id: netId })
-      }
       await onAction('edit_vm', payload)
       // VM Options (separate action so it works even while powered on)
       await onAction('edit_vm_options', {
@@ -456,7 +470,7 @@ function EditVmModal({ vm, networks, onClose, onAction }) {
 
   return (
     <div className="vm-modal-overlay">
-      <div className="vm-modal w-[480px] max-w-[95vw]">
+      <div className="vm-modal w-[560px] max-w-[95vw]">
         <div className="vm-modal-header">
           <span>Edit Settings — {vm.name}</span>
           <button type="button" onClick={onClose} className="text-[#8fa5b8] hover:text-white">✕</button>
@@ -469,9 +483,30 @@ function EditVmModal({ vm, networks, onClose, onAction }) {
             </button>
           ))}
         </div>
-        <div className="vm-modal-body space-y-3">
+        <div className="vm-modal-body space-y-3 max-h-[65vh] overflow-y-auto">
           {tab === 'hardware' && (
             <>
+              {/* ── ADD NEW DEVICE menu ── */}
+              <div className="relative flex justify-end">
+                <button type="button" onClick={() => setAddMenuOpen(o => !o)}
+                  className="vm-btn text-[11px] py-1 px-3">ADD NEW DEVICE ▾</button>
+                {addMenuOpen && (
+                  <div className="absolute right-0 top-8 z-10 w-48 bg-[#1B2A3B] border border-[#2d3a4a] rounded shadow-lg py-1">
+                    {[
+                      ['Hard Disk', () => onAddDisk?.()],
+                      ['Network Adapter', () => onAddNic?.()],
+                      ['CD/DVD Drive', () => deviceAction('add_cdrom', { vm_id: vm.id }, 'add_cdrom')],
+                    ].map(([label, fn]) => (
+                      <button key={label} type="button"
+                        onClick={() => { setAddMenuOpen(false); fn() }}
+                        className="block w-full text-left px-3 py-1.5 text-xs text-[#E8EDF2] hover:bg-[rgba(0,200,255,.1)]">
+                        {label}
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+
               {isPoweredOn && (
                 <div className="text-[11px] text-[#F5A623] bg-[rgba(245,166,35,.12)] border border-[rgba(245,166,35,.25)] rounded p-2">
                   CPU and Memory cannot be changed while the VM is powered on.
@@ -491,15 +526,65 @@ function EditVmModal({ vm, networks, onClose, onAction }) {
                   </select>
                 </div>
                 <div className="col-span-2">
-                  <label className="block text-xs text-[#8fa5b8] mb-1">Network</label>
-                  <select value={netId} onChange={e => setNetId(e.target.value)} className="vm-input !pl-3">
-                    {networks.map(n => <option key={n.id} value={n.id}>{n.name}</option>)}
-                  </select>
-                </div>
-                <div className="col-span-2">
                   <label className="block text-xs text-[#8fa5b8] mb-1">Annotation / Notes</label>
                   <textarea value={annotation} onChange={e => setAnnotation(e.target.value)} rows={2} className="vm-input !pl-3 resize-none" />
                 </div>
+              </div>
+
+              {/* ── Full device list ── */}
+              <div className="space-y-1.5 pt-1">
+                <div className="text-[11px] font-bold text-[#8fa5b8] uppercase tracking-wide">Hard disks</div>
+                {disks.length === 0 && <p className="text-[10px] text-[#8fa5b8]">No virtual disks.</p>}
+                {disks.map((d, i) => {
+                  const isBoot = (d.scsi_unit ?? i) === 0 && (d.scsi_controller ?? 0) === 0
+                  return (
+                    <div key={d.id || i} className="flex items-center gap-2 bg-[#16222f] border border-[#2d3a4a] rounded px-2.5 py-1.5">
+                      <div className="flex-1 min-w-0">
+                        <p className="text-xs text-[#E8EDF2] m-0 truncate">{d.label || `Hard disk ${i + 1}`} · {d.capacity_gb} GB</p>
+                        <p className="text-[10px] text-[#8fa5b8] font-mono m-0">SCSI {d.scsi_id || `${d.scsi_controller || 0}:${d.scsi_unit ?? i}`} · {d.thin_provisioned ? 'Thin' : 'Thick'} · {dsName(d.datastore_id)}</p>
+                      </div>
+                      <button type="button" disabled={isBoot || !!deviceBusy}
+                        title={isBoot ? 'Cannot remove the boot disk' : 'Remove disk'}
+                        onClick={() => deviceAction('remove_disk', { vm_id: vm.id, disk_id: d.id }, `disk-${d.id}`)}
+                        className="vm-btn text-[10px] py-0.5 px-2 disabled:opacity-30">Remove</button>
+                    </div>
+                  )
+                })}
+
+                <div className="text-[11px] font-bold text-[#8fa5b8] uppercase tracking-wide pt-1">Network adapters</div>
+                {nics.length === 0 && <p className="text-[10px] text-[#8fa5b8]">No network adapters.</p>}
+                {nics.map((nic, i) => (
+                  <div key={nic.id || i} className="flex items-center gap-2 bg-[#16222f] border border-[#2d3a4a] rounded px-2.5 py-1.5">
+                    <div className="flex-1 min-w-0">
+                      <p className="text-xs text-[#E8EDF2] m-0 truncate">{nic.label || `Network adapter ${i + 1}`} · {nic.network_name || networks.find(n => n.id === nic.network_id)?.name || 'VM Network'}</p>
+                      <p className="text-[10px] text-[#8fa5b8] font-mono m-0">MAC {nic.mac_address || nic.mac} · {nic.adapter_type || 'Vmxnet3'} · VLAN {nic.vlan_id ?? '—'}</p>
+                    </div>
+                    <label className="flex items-center gap-1 text-[10px] text-[#E8EDF2] cursor-pointer whitespace-nowrap">
+                      <input type="checkbox" checked={nic.connected !== false}
+                        disabled={deviceBusy === `nic-${nic.id}`}
+                        onChange={e => deviceAction('set_nic_connected', { vm_id: vm.id, nic_id: nic.id, connected: e.target.checked }, `nic-${nic.id}`)} />
+                      Connected
+                    </label>
+                    <button type="button" disabled={nics.length <= 1 || !!deviceBusy}
+                      title={nics.length <= 1 ? 'Cannot remove the last adapter' : 'Remove adapter'}
+                      onClick={() => deviceAction('remove_nic', { vm_id: vm.id, nic_id: nic.id }, `nic-rm-${nic.id}`)}
+                      className="vm-btn text-[10px] py-0.5 px-2 disabled:opacity-30">Remove</button>
+                  </div>
+                ))}
+
+                <div className="text-[11px] font-bold text-[#8fa5b8] uppercase tracking-wide pt-1">CD/DVD drives</div>
+                {cdroms.length === 0 && <p className="text-[10px] text-[#8fa5b8]">No CD/DVD drives.</p>}
+                {cdroms.map((cd, i) => (
+                  <div key={cd.id || i} className="flex items-center gap-2 bg-[#16222f] border border-[#2d3a4a] rounded px-2.5 py-1.5">
+                    <div className="flex-1 min-w-0">
+                      <p className="text-xs text-[#E8EDF2] m-0 truncate">{cd.label || `CD/DVD drive ${i + 1}`}</p>
+                      <p className="text-[10px] text-[#8fa5b8] font-mono m-0 truncate">{cd.iso_path ? `${cd.iso_path} · ${cd.connected ? 'Connected' : 'Disconnected'}` : 'Client Device (no media)'}</p>
+                    </div>
+                    <button type="button" disabled={!!deviceBusy}
+                      onClick={() => deviceAction('remove_cdrom', { vm_id: vm.id, cdrom_id: cd.id }, `cd-${cd.id}`)}
+                      className="vm-btn text-[10px] py-0.5 px-2 disabled:opacity-30">Remove</button>
+                  </div>
+                ))}
               </div>
             </>
           )}
@@ -2719,7 +2804,9 @@ export default function VMwareSimulator() {
         />
       )}
       {showEditVmModal && selectedVm && (
-        <EditVmModal vm={selectedVm} networks={networks}
+        <EditVmModal vm={selectedVm} networks={networks} datastores={datastores}
+          onAddDisk={() => setShowAddDiskModal(true)}
+          onAddNic={() => setShowAddNicModal(true)}
           onClose={() => setShowEditVmModal(false)} onAction={runAction} />
       )}
       {showCloneVmModal && selectedVm && (

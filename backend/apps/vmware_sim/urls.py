@@ -44,6 +44,9 @@ from .views import (
     BaremetalSimActionView,
     BaremetalSimReleaseView,
     BaremetalSimStateView,
+    AwsSimActionView,
+    AwsSimReleaseView,
+    AwsSimStateView,
 )
 
 urlpatterns = [
@@ -107,4 +110,9 @@ urlpatterns = [
     path("baremetal/sessions/<uuid:session_id>/", BaremetalSimStateView.as_view(), name="baremetal-sim-state"),
     path("baremetal/sessions/<uuid:session_id>/action/", BaremetalSimActionView.as_view(), name="baremetal-sim-action"),
     path("baremetal/sessions/<uuid:session_id>/release/", BaremetalSimReleaseView.as_view(), name="baremetal-sim-release"),
+
+    # AWS console simulation
+    path("aws/sessions/<uuid:session_id>/", AwsSimStateView.as_view(), name="aws-sim-state"),
+    path("aws/sessions/<uuid:session_id>/action/", AwsSimActionView.as_view(), name="aws-sim-action"),
+    path("aws/sessions/<uuid:session_id>/release/", AwsSimReleaseView.as_view(), name="aws-sim-release"),
 ]
