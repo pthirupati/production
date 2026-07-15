@@ -11,25 +11,40 @@ max_score: 100
 is_free: true
 infrastructure_type: docker
 jira_priority: Low
-description: 'CONTEXT: A team operating Kubernetes needs you to resolve `kubernetes: Deployments — Build
-  From Scratch` during a realistic incident. The business impact is reduced service reliability until
-  the underlying state is repaired.
+description: 'CONTEXT: A team operating Kubernetes has raised a ticket for `Deployments — Build Lab`.
+  A customer-facing workflow is degraded and the on-call engineer (you) must diagnose and resolve it.
+  Business impact: reduced service reliability and blocked users until the underlying state is repaired.
 
 
-  ENVIRONMENT: You are working in FixitLab''s offline Kubernetes cluster with kubectl, manifests, and
-  cluster resources. All tools run locally; no paid APIs or external cloud calls are required.
+  ENVIRONMENT: You are working in FixitLab''s offline Kubernetes cluster. The architecture is a single
+  lab-primary node exposing kubectl, manifests, and cluster resources; treat it as the production host
+  for this incident. All tools run locally — no paid APIs or external cloud calls are required.
 
 
   SYMPTOM / STARTING STATE: The Kubernetes cluster is ready but Deployments is not configured yet. Required
   tools may already be installed; your job is to create the configuration and bring the capability online.
-  Build Deployments from scratch in this kubernetes lab. You start from a minimal environment and must
-  produce a working configuration that demonstrates replicas, rollout strategy, selectors, and revision
-  history. Plan, implement, then prove it works.
 
 
   OBJECTIVE: A working Deployments setup must exist by the end of this lab; Configuration should follow
-  team conventions and be easy to audit; The result should pass validation without manual cleanup. Success
-  means `kubectl get pods` shows every pod Running.
+  team conventions and be easy to audit; The result should pass validation without manual cleanup. Acceptance
+  criteria: the change is minimal and reversible, and success means `kubectl get pods` shows every pod
+  Running.
+
+
+  WORK TO DO: Required tooling is pre-installed; if a command is missing, note it and use the equivalent
+  already on the host. Make the smallest configuration change that moves the system toward the objective
+  (edit the relevant kubectl, manifests, and cluster resources), changing one thing at a time. Check your
+  work continuously against the objective — success means `kubectl get pods` shows every pod Running.
+
+
+  VERIFY: Re-run the same check the grader uses and confirm `kubectl get pods` shows every pod Running.
+  Capture the before/after output as evidence. Success criteria: the objective''s healthy state holds
+  on a repeat check, not just once.
+
+
+  ROLLBACK: If a change makes things worse, revert that single change immediately (restore the original
+  config file / undo the edit / restart the affected component) and re-observe before trying another hypothesis.
+  Never stack unverified changes.
 
 
   WHAT TO AVOID: Do not apply broad destructive changes, skip evidence gathering, or fake completion with
@@ -43,37 +58,46 @@ initial_state: The Kubernetes cluster is ready but Deployments is not configured
 hints:
 - order: 1
   cost: 0
-  content: 'Orient yourself before changing anything:
+  content: 'ORIENT — what to observe and why:
 
-    1. Inspect the current state — `kubectl get deploy`, `kubectl rollout status`, and `kubectl describe
-    deploy`.
-
-    2. Write down what looks normal versus wrong or missing for Deployments.
-
-    3. Recall the core idea: replicas, rollout strategy, selectors, and revision history. Form one hypothesis
-    before you act.'
+    Do not touch anything yet. First observe the symptom: a rollout is stuck or new replicas never receive
+    traffic. This lab is about Deployments — replicas, rollout strategy, selectors, and revision history.
+    Read the objectives and the current state, and note precisely what looks wrong versus healthy before
+    you form any theory.'
 - order: 2
-  cost: 25
-  content: 'Diagnostic steps:
+  cost: 10
+  content: 'APPROACH — the troubleshooting method:
 
-    1. `kubectl get pods` — note CrashLoopBackOff, ImagePullBackOff, or Pending.
-
-    2. `kubectl describe pod <name>` — read Events at the bottom.
-
-    3. `kubectl logs <name> [--previous]` if the container restarted.'
+    Work from evidence, not guesses. For Deployments problems the reliable method is: (1) reproduce/observe
+    the failure, (2) narrow from the whole system down to the one component that owns the symptom, (3)
+    change exactly one thing, (4) re-check. Create the smallest working slice of Deployments first, validate
+    it, then add the remaining pieces one at a time.'
 - order: 3
-  cost: 50
-  content: 'Exact fix + verification:
+  cost: 25
+  content: 'WHICH TOOL — the diagnostic command(s):
 
-    1. Re-check the current state — `kubectl get deploy`, `kubectl rollout status`, and `kubectl describe
-    deploy`.
+    Run `kubectl get pods -A` and `kubectl describe pod <name>` for Events and container state.'
+- order: 4
+  cost: 40
+  content: 'NARROW DOWN — isolate the subsystem:
 
-    2. Create the smallest working slice of Deployments first, validate it, then add the remaining pieces
-    one at a time.
+    1. Check pod phase, restarts, and last State reason.
 
-    3. Verify the result — desired replicas are available and the rollout completed.
+    2. `kubectl logs <pod> --previous` if it crashed.
 
-    4. Click Check Solution once the objective is met (graded on real state, not a marker file).'
+    3. Compare resource spec (probes, limits, mounts) to objectives.'
+- order: 5
+  cost: 60
+  content: 'NEAR-SOLUTION — the fix shape + verify (you still apply it):
+
+    1. Patch the Deployment/Service/ConfigMap with the minimal fix.
+
+    2. Wait for rollout (`kubectl rollout status`).
+
+    3. Confirm `kubectl get pods` succeeds.
+
+
+    WHY: Kubernetes labs grade real cluster state.'
 summary: Complete the deployments — build lab kubernetes lab and verify success with the checker
 estimated_minutes: 15
 xp_reward: 100

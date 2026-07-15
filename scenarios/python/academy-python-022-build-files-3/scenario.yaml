@@ -11,25 +11,41 @@ max_score: 100
 is_free: false
 infrastructure_type: docker
 jira_priority: Low
-description: 'CONTEXT: A team operating Python development needs you to resolve `python: File I/O — Build
-  From Scratch` during a realistic incident. The business impact is reduced service reliability until
-  the underlying state is repaired.
+description: 'CONTEXT: A team operating Python development has raised a ticket for `File I/O — Build Lab`.
+  A customer-facing workflow is degraded and the on-call engineer (you) must diagnose and resolve it.
+  Business impact: reduced service reliability and blocked users until the underlying state is repaired.
 
 
-  ENVIRONMENT: You are working in FixitLab''s offline Python project workspace with source files, venv,
-  tests, and CLI entrypoints. All tools run locally; no paid APIs or external cloud calls are required.
+  ENVIRONMENT: You are working in FixitLab''s offline Python project workspace. The architecture is a
+  single lab-primary node exposing source files, venv, tests, and CLI entrypoints; treat it as the production
+  host for this incident. All tools run locally — no paid APIs or external cloud calls are required.
 
 
   SYMPTOM / STARTING STATE: The Python project workspace is ready but file I/O is not configured yet.
   Required tools may already be installed; your job is to create the configuration and bring the capability
-  online. Build file I/O from scratch in this python lab. You start from a minimal environment and must
-  produce a working configuration that demonstrates reading/writing files, paths, and encodings. Plan,
-  implement, then prove it works.
+  online.
 
 
   OBJECTIVE: A working file I/O setup must exist by the end of this lab; Configuration should follow team
-  conventions and be easy to audit; The result should pass validation without manual cleanup. Success
-  means `systemctl is-active crond` returns active.
+  conventions and be easy to audit; The result should pass validation without manual cleanup. Acceptance
+  criteria: the change is minimal and reversible, and success means `systemctl is-active crond` returns
+  active.
+
+
+  WORK TO DO: Required tooling is pre-installed; if a command is missing, note it and use the equivalent
+  already on the host. Make the smallest configuration change that moves the system toward the objective
+  (edit the relevant source files, venv, tests, and CLI entrypoints), changing one thing at a time. Check
+  your work continuously against the objective — success means `systemctl is-active crond` returns active.
+
+
+  VERIFY: Re-run the same check the grader uses and confirm `systemctl is-active crond` returns active.
+  Capture the before/after output as evidence. Success criteria: the objective''s healthy state holds
+  on a repeat check, not just once.
+
+
+  ROLLBACK: If a change makes things worse, revert that single change immediately (restore the original
+  config file / undo the edit / restart the affected component) and re-observe before trying another hypothesis.
+  Never stack unverified changes.
 
 
   WHAT TO AVOID: Do not apply broad destructive changes, skip evidence gathering, or fake completion with
@@ -43,20 +59,36 @@ initial_state: The Python project workspace is ready but file I/O is not configu
 hints:
 - order: 1
   cost: 0
-  content: 'Where to look: Start with `systemctl status crond` and `journalctl -u crond -n 50 --no-pager`
-    before changing anything.'
+  content: 'ORIENT — what to observe and why:
+
+    Do not touch anything yet. First observe the symptom: the program errors on missing files or bad encoding.
+    This lab is about file I/O — reading/writing files, paths, and encodings. Read the objectives and
+    the current state, and note precisely what looks wrong versus healthy before you form any theory.'
 - order: 2
+  cost: 10
+  content: 'APPROACH — the troubleshooting method:
+
+    Work from evidence, not guesses. For file I/O problems the reliable method is: (1) reproduce/observe
+    the failure, (2) narrow from the whole system down to the one component that owns the symptom, (3)
+    change exactly one thing, (4) re-check. Create the smallest working slice of file I/O first, validate
+    it, then add the remaining pieces one at a time.'
+- order: 3
   cost: 25
-  content: 'Diagnostic steps:
+  content: 'WHICH TOOL — the diagnostic command(s):
+
+    Start with `systemctl status crond` and `journalctl -u crond -n 50 --no-pager` before changing anything.'
+- order: 4
+  cost: 40
+  content: 'NARROW DOWN — isolate the subsystem:
 
     1. Run `systemctl status crond` — note Active/Failed and the last log lines.
 
     2. Read `journalctl -u crond -n 50` for the root error.
 
     3. Form a hypothesis about the smallest config or permission fix.'
-- order: 3
-  cost: 50
-  content: 'Exact fix + verification:
+- order: 5
+  cost: 60
+  content: 'NEAR-SOLUTION — the fix shape + verify (you still apply it):
 
     1. Apply the minimal fix (config, unit override, or missing directory).
 

@@ -219,6 +219,21 @@ def _normalize(expr: str) -> str:
     return re.sub(r"\s+", " ", (expr or "").strip()).strip()
 
 
+def _canon_display_ops(expr: str) -> str:
+    """Canonicalise the human-typed comparison operators Wireshark accepts.
+
+    Real Wireshark treats ``eq``/``ne`` as word-synonyms for ``==``/``!=`` (and
+    ``and``/``or``/``not`` for ``&&``/``||``/``!``). Learners routinely type
+    ``ip.addr eq 10.0.0.1`` or ``tcp.port ne 22`` — canonicalise those to the
+    symbol forms this engine's grammar already understands so they parse instead
+    of turning the filter bar red. Only rewrites the operators; boolean keywords
+    (``and``/``or``/``not``) are handled by the term/split logic below."""
+    # `field eq value` -> `field == value`, `field ne value` -> `field != value`.
+    expr = re.sub(r"\s+eq\s+", " == ", expr, flags=re.IGNORECASE)
+    expr = re.sub(r"\s+ne\s+", " != ", expr, flags=re.IGNORECASE)
+    return expr
+
+
 def matches_capture_filter(pkt: dict, expr: str) -> bool:
     """Evaluate a BPF-style capture filter against an on-the-wire packet.
 
@@ -240,6 +255,13 @@ def matches_capture_filter(pkt: dict, expr: str) -> bool:
         term = term.strip()
         if not term:
             return True
+        # BPF negation: `not <primitive>` / `!<primitive>` (e.g. `not port 22`).
+        m_not = re.match(r"^(?:!|not\b)\s*(.+)$", term)
+        if m_not:
+            inner = m_not.group(1).strip()
+            if inner.startswith("(") and inner.endswith(")"):
+                inner = inner[1:-1].strip()
+            return not eval_term(inner)
         # tcp / udp / icmp
         if term in _PROTO_NUM:
             return transport == term
@@ -286,9 +308,9 @@ def matches_display_filter(pkt: dict, expr: str) -> bool:
       tcp.stream==N
       tcp.flags.reset==1 / tcp.flags.syn==1               (flag predicates)
       tcp.analysis.retransmission                         (expert info)
-      and/&&, or/||  combinations
+      and/&&, or/||, not/!  combinations; eq/ne operator words
     An empty display filter shows everything captured."""
-    expr = _normalize(expr)
+    expr = _canon_display_ops(_normalize(expr))
     if not expr:
         return True
 
@@ -296,9 +318,44 @@ def matches_display_filter(pkt: dict, expr: str) -> bool:
         t = term.strip().lower()
         if not t:
             return True
+        # Negation: `!term`, `not term`, or a leading `!(term)` wrapper. Real
+        # Wireshark negates a subexpression; we support the common single-term
+        # form a learner types to hide noise (e.g. `!ssh`, `not tcp.port==22`).
+        neg = False
+        m_not = re.match(r"^(?:!|not\b)\s*(.+)$", t)
+        if m_not:
+            neg = True
+            t = m_not.group(1).strip()
+            if t.startswith("(") and t.endswith(")"):
+                t = t[1:-1].strip()
+        if not t:
+            return True
+        result = _eval_display_atom(t, pkt)
+        return (not result) if neg else result
+
+    def _eval_display_atom(t: str, pkt: dict) -> bool:
         proto = pkt["protocol"].lower()
         info = (pkt.get("info") or "")
         flags = (pkt.get("tcp_flags") or "")
+
+        # `field != value` — invert the corresponding `==` comparison so
+        # `tcp.port != 22` / `ip.addr != 10.0.0.1` behave like Wireshark.
+        m_ne = re.match(r"^(.+?)\s*!=\s*(.+)$", t)
+        if m_ne:
+            return not _eval_display_atom(f"{m_ne.group(1).strip()} == {m_ne.group(2).strip()}", pkt)
+
+        # Bare field-presence filters (a field name with no comparison shows any
+        # packet that carries that field), matching Wireshark's semantics.
+        if t in ("tcp.port", "tcp.srcport", "tcp.dstport", "tcp.stream", "tcp.flags"):
+            return proto in ("tcp", "http", "tls", "ssh")
+        if t in ("udp.port", "udp.srcport", "udp.dstport", "udp.stream"):
+            return proto in ("udp", "dns")
+        if t in ("ip.addr", "ip.src", "ip.dst"):
+            return bool(pkt.get("src") or pkt.get("dst"))
+        if t == "http.request":
+            return proto == "http" and info.upper().startswith(("GET", "POST", "PUT", "DELETE", "HEAD", "OPTIONS", "PATCH"))
+        if t == "http.response":
+            return proto == "http" and "HTTP/1" in info and "GET" not in info.split(" ")[0].upper()
 
         # Protocol-name filters.
         if t == "http":
@@ -677,18 +734,34 @@ def _find_pkt(state: dict, no: Any) -> dict | None:
 def _display_filter_valid(expr: str) -> bool:
     """A filter is 'valid' if every term parses against our supported grammar.
     Used to mimic Wireshark's red invalid-filter bar."""
-    expr = _normalize(expr)
+    expr = _canon_display_ops(_normalize(expr))
     if not expr:
         return True
-    probe = _pkt(0, 0, "0.0.0.0", "0.0.0.0", "TCP", 0, 0, 0, "")
     for or_part in re.split(r"\bor\b|\|\|", expr):
         for term in re.split(r"\band\b|&&", or_part):
             t = term.strip().lower()
             if not t:
                 continue
+            # Strip a leading negation (`!term` / `not term` / `!(term)`).
+            m_not = re.match(r"^(?:!|not\b)\s*(.+)$", t)
+            if m_not:
+                t = m_not.group(1).strip()
+                if t.startswith("(") and t.endswith(")"):
+                    t = t[1:-1].strip()
+            if not t:
+                return False
+            # Normalise a `field != value` to `field == value` for validity.
+            m_ne = re.match(r"^(.+?)\s*!=\s*(.+)$", t)
+            if m_ne:
+                t = f"{m_ne.group(1).strip()} == {m_ne.group(2).strip()}"
             known = (
                 t in ("http", "dns", "tls", "ssl", "ssh", "icmp", "tcp", "udp",
+                       "http.request", "http.response",
                        "tcp.analysis.retransmission", "tcp.analysis.flags")
+                # Bare field-presence (a field name with no comparison).
+                or t in ("ip.addr", "ip.src", "ip.dst", "tcp.port", "tcp.srcport",
+                         "tcp.dstport", "tcp.stream", "tcp.flags", "udp.port",
+                         "udp.srcport", "udp.dstport", "udp.stream")
                 or re.match(r"^tcp\.flags\.(reset|syn|fin|ack|push)(\s*==\s*\d)?$", t)
                 or re.match(r"^(?:tcp|udp)\.stream\s*==\s*\d+$", t)
                 or re.match(r"^(tcp|udp)\.(port|srcport|dstport)\s*==\s*\d+$", t)

@@ -3,13 +3,15 @@ slug: linux-fdisk-corrupt-partition-table-disk-missing-rescan-recovery
 difficulty: hard
 category: Fix
 technology: linux
-description: 'CONTEXT: A team operating Linux administration needs you to resolve `Recover a Corrupted
-  Partition Table and Remount Data` during a realistic incident. The business impact is reduced service
-  reliability until the underlying state is repaired.
+description: 'CONTEXT: A team operating Linux administration has raised a ticket for `Recover a Corrupted
+  Partition Table and Remount Data`. A customer-facing workflow is degraded and the on-call engineer (you)
+  must diagnose and resolve it. Business impact: reduced service reliability and blocked users until the
+  underlying state is repaired.
 
 
-  ENVIRONMENT: You are working in FixitLab''s offline Linux practice server with terminal and config files
-  under /etc and /var. All tools run locally; no paid APIs or external cloud calls are required.
+  ENVIRONMENT: You are working in FixitLab''s offline Linux practice server. The architecture is a single
+  lab-primary node exposing terminal and config files under /etc and /var; treat it as the production
+  host for this incident. All tools run locally — no paid APIs or external cloud calls are required.
 
 
   SYMPTOM / STARTING STATE: Simulated RHEL 9 server. fdisk -l /dev/sdc shows the disk but NO partitions
@@ -17,23 +19,28 @@ description: 'CONTEXT: A team operating Linux administration needs you to resolv
 
   is gone. /data is not mounted. /etc/fstab references the old partition. The application
 
-  that depends on /data is failing. After a botched dd, the partition table on /dev/sdc was wiped. The
-  disk still exists but
-
-  its single data partition /dev/sdc1 vanished, so the /data filesystem can no longer be
-
-  mounted and the application is down. You must recreate the partition with the SAME layout
-
-  (one primary partition spanning the disk), restore the filesystem onto it, remount it at
-
-  /data, repair /etc/fstab, and record the recovery. (In a real incident you might recover
-
-  the table with testdisk or a sgdisk backup; here you rebuild it cleanly.)
+  that depends on /data is failing.
 
 
   OBJECTIVE: Inspect the damage with fdisk -l /dev/sdc (no partition present); Recreate the primary partition
-  with fdisk /dev/sdc; {''Lay a filesystem back down'': ''mkfs.xfs /dev/sdc1''}. Success means `check.sh`
-  exits successfully.
+  with fdisk /dev/sdc; {''Lay a filesystem back down'': ''mkfs.xfs /dev/sdc1''}. Acceptance criteria:
+  the change is minimal and reversible, and success means `check.sh` exits successfully.
+
+
+  WORK TO DO: Required tooling is pre-installed; if a command is missing, note it and use the equivalent
+  already on the host. Make the smallest configuration change that moves the system toward the objective
+  (edit the relevant terminal and config files under /etc and /var), changing one thing at a time. Check
+  your work continuously against the objective — success means `check.sh` exits successfully.
+
+
+  VERIFY: Re-run the same check the grader uses and confirm `check.sh` exits successfully. Capture the
+  before/after output as evidence. Success criteria: the objective''s healthy state holds on a repeat
+  check, not just once.
+
+
+  ROLLBACK: If a change makes things worse, revert that single change immediately (restore the original
+  config file / undo the edit / restart the affected component) and re-observe before trying another hypothesis.
+  Never stack unverified changes.
 
 
   WHAT TO AVOID: Do not apply broad destructive changes, skip evidence gathering, or fake completion with
@@ -66,19 +73,38 @@ topics_covered:
 hints:
 - order: 1
   cost: 0
-  content: 'Where to look: Run `df -h` and `du -xh /var /tmp /home | sort -h | tail -20` for large paths.'
+  content: 'ORIENT — what to observe and why:
+
+    Do not touch anything yet. First observe the symptom: recover a corrupted partition table and remount
+    data is not behaving as the scenario objectives require. This lab is about recover a corrupted partition
+    table and remount data — how recover a corrupted partition table and remount data behaves in a Linux
+    administration environment. Read the objectives and the current state, and note precisely what looks
+    wrong versus healthy before you form any theory.'
 - order: 2
+  cost: 10
+  content: 'APPROACH — the troubleshooting method:
+
+    Work from evidence, not guesses. For recover a corrupted partition table and remount data problems
+    the reliable method is: (1) reproduce/observe the failure, (2) narrow from the whole system down to
+    the one component that owns the symptom, (3) change exactly one thing, (4) re-check. Fix the underlying
+    misconfiguration you identified (not just the noisy log line), changing one thing at a time.'
+- order: 3
   cost: 25
-  content: 'Diagnostic steps:
+  content: 'WHICH TOOL — the diagnostic command(s):
+
+    Run `df -h` and `du -xh /var /tmp /home | sort -h | tail -20` for large paths.'
+- order: 4
+  cost: 40
+  content: 'NARROW DOWN — isolate the subsystem:
 
     1. Find which mount is 100% — often `/` or `/var`.
 
     2. `journalctl --disk-usage` and old logs under `/var/log`.
 
     3. Look for core dumps, temp files, or oversized application data.'
-- order: 3
-  cost: 50
-  content: 'Exact fix + verification:
+- order: 5
+  cost: 60
+  content: 'NEAR-SOLUTION — the fix shape + verify (you still apply it):
 
     1. Remove or rotate the largest safe files (logs, caches, old packages).
 

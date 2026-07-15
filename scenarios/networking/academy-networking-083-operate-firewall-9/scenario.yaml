@@ -11,24 +11,40 @@ max_score: 100
 is_free: false
 infrastructure_type: docker
 jira_priority: Medium
-description: 'CONTEXT: A team operating network operations needs you to resolve `networking: Host Firewall
-  — Daily Operations` during a realistic incident. The business impact is reduced service reliability
-  until the underlying state is repaired.
+description: 'CONTEXT: A team operating network operations has raised a ticket for `Host Firewall — Operate
+  Lab`. A customer-facing workflow is degraded and the on-call engineer (you) must diagnose and resolve
+  it. Business impact: reduced service reliability and blocked users until the underlying state is repaired.
 
 
-  ENVIRONMENT: You are working in FixitLab''s offline network lab with interfaces, routing tables, DNS,
-  and firewall rules. All tools run locally; no paid APIs or external cloud calls are required.
+  ENVIRONMENT: You are working in FixitLab''s offline network lab. The architecture is a single lab-primary
+  node exposing interfaces, routing tables, DNS, and firewall rules; treat it as the production host for
+  this incident. All tools run locally — no paid APIs or external cloud calls are required.
 
 
   SYMPTOM / STARTING STATE: The network lab is healthy enough for scheduled work on host firewall. Complete
-  the maintenance task without unnecessary downtime. Day-2 operations: perform a routine host firewall
-  task safely in networking. Follow change control — inspect, change, verify — while working with allow/deny
-  rules, zones, services, and rule persistence.
+  the maintenance task without unnecessary downtime.
 
 
   OBJECTIVE: Day-2 host firewall work completes safely in this environment; Changes are verified with
-  before/after checks; The system remains stable for dependent teams. Success means `systemctl is-active
-  haproxy` returns active.
+  before/after checks; The system remains stable for dependent teams. Acceptance criteria: the change
+  is minimal and reversible, and success means `systemctl is-active haproxy` returns active.
+
+
+  WORK TO DO: Required tooling is pre-installed; if a command is missing, note it and use the equivalent
+  already on the host. Make the smallest configuration change that moves the system toward the objective
+  (edit the relevant interfaces, routing tables, DNS, and firewall rules), changing one thing at a time.
+  Check your work continuously against the objective — success means `systemctl is-active haproxy` returns
+  active.
+
+
+  VERIFY: Re-run the same check the grader uses and confirm `systemctl is-active haproxy` returns active.
+  Capture the before/after output as evidence. Success criteria: the objective''s healthy state holds
+  on a repeat check, not just once.
+
+
+  ROLLBACK: If a change makes things worse, revert that single change immediately (restore the original
+  config file / undo the edit / restart the affected component) and re-observe before trying another hypothesis.
+  Never stack unverified changes.
 
 
   WHAT TO AVOID: Do not apply broad destructive changes, skip evidence gathering, or fake completion with
@@ -42,37 +58,47 @@ initial_state: The network lab is healthy enough for scheduled work on host fire
 hints:
 - order: 1
   cost: 0
-  content: 'Orient yourself before changing anything:
+  content: 'ORIENT — what to observe and why:
 
-    1. Inspect the current state — `firewall-cmd --list-all`, `iptables -S`, `ufw status`, or Windows
-    firewall cmdlets.
-
-    2. Write down what looks normal versus wrong or missing for host firewall.
-
-    3. Recall the core idea: allow/deny rules, zones, services, and rule persistence. Form one hypothesis
-    before you act.'
+    Do not touch anything yet. First observe the symptom: valid traffic is blocked or unexpected ports
+    are exposed. This lab is about host firewall — allow/deny rules, zones, services, and rule persistence.
+    Read the objectives and the current state, and note precisely what looks wrong versus healthy before
+    you form any theory.'
 - order: 2
+  cost: 10
+  content: 'APPROACH — the troubleshooting method:
+
+    Work from evidence, not guesses. For host firewall problems the reliable method is: (1) reproduce/observe
+    the failure, (2) narrow from the whole system down to the one component that owns the symptom, (3)
+    change exactly one thing, (4) re-check. Execute the maintenance in small, reversible steps, taking
+    a snapshot or backup first if the change is risky.'
+- order: 3
   cost: 25
-  content: 'Diagnostic steps:
+  content: 'WHICH TOOL — the diagnostic command(s):
+
+    Start with `systemctl status haproxy` and `journalctl -u haproxy -n 50 --no-pager` before changing
+    anything.'
+- order: 4
+  cost: 40
+  content: 'NARROW DOWN — isolate the subsystem:
 
     1. Run `systemctl status haproxy` — note Active/Failed and the last log lines.
 
     2. Read `journalctl -u haproxy -n 50` for the root error.
 
     3. Form a hypothesis about the smallest config or permission fix.'
-- order: 3
-  cost: 50
-  content: 'Exact fix + verification:
+- order: 5
+  cost: 60
+  content: 'NEAR-SOLUTION — the fix shape + verify (you still apply it):
 
-    1. Re-check the current state — `firewall-cmd --list-all`, `iptables -S`, `ufw status`, or Windows
-    firewall cmdlets.
+    1. Apply the minimal fix (config, unit override, or missing directory).
 
-    2. Execute the maintenance in small, reversible steps, taking a snapshot or backup first if the change
-    is risky.
+    2. Run `systemctl daemon-reload` if you edited a unit file.
 
-    3. Verify the result — only the intended ports and sources are permitted.
+    3. Run `systemctl restart haproxy` and confirm `systemctl is-active haproxy` succeeds.
 
-    4. Click Check Solution once the objective is met (graded on real state, not a marker file).'
+
+    WHY: the grader checks real service state, not marker files.'
 summary: Complete the host firewall — operate lab networking lab and verify success with the checker
 estimated_minutes: 20
 xp_reward: 100

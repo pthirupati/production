@@ -1278,6 +1278,9 @@ jobs:
           # cluster NEVER pulls — create-cluster emits no USE_DOCKERHUB/IMAGE_TAG into
           # cluster_ips.env, so ci-cluster-deploy.sh leaves IMG_ENV empty → on-node build.
           BUILD_SCENARIOS: ${{ inputs.build_scenarios }}
+          # merge_seed_only=true (default) only adds NEW scenarios; false re-seeds
+          # existing scenario content (hints/descriptions) via update_or_create.
+          MERGE_SEED_ONLY: ${{ inputs.merge_seed_only }}
           # Hand the freshly-bootstrapped Vault AppRole to the deploy so the app
           # node renders .env.production FROM Vault (correct rotated DB password),
           # not the stale baked env. From the vault-cluster job's outputs; falls

@@ -11,24 +11,40 @@ max_score: 100
 is_free: false
 infrastructure_type: docker
 jira_priority: Medium
-description: 'CONTEXT: A team operating GPU operations needs you to resolve `gpu: Nvidia Container Toolkit
-  — Security Practice` during a realistic incident. The business impact is reduced service reliability
-  until the underlying state is repaired.
+description: 'CONTEXT: A team operating GPU operations has raised a ticket for `Nvidia Container Toolkit
+  — Security Lab`. A customer-facing workflow is degraded and the on-call engineer (you) must diagnose
+  and resolve it. Business impact: reduced service reliability and blocked users until the underlying
+  state is repaired.
 
 
-  ENVIRONMENT: You are working in FixitLab''s offline GPU node with nvidia-smi, drivers, CUDA, and container
-  toolkit. All tools run locally; no paid APIs or external cloud calls are required.
+  ENVIRONMENT: You are working in FixitLab''s offline GPU node. The architecture is a single lab-primary
+  node exposing nvidia-smi, drivers, CUDA, and container toolkit; treat it as the production host for
+  this incident. All tools run locally — no paid APIs or external cloud calls are required.
 
 
   SYMPTOM / STARTING STATE: The environment is functional but overly permissive around NVIDIA container
-  toolkit. Assume an auditor or pen test is next week — tighten controls with evidence. Security review:
-  harden NVIDIA container toolkit on this gpu system. Close unsafe defaults, enforce least privilege,
-  and ensure GPU passthrough to containers cannot be abused — without breaking legitimate use.
+  toolkit. Assume an auditor or pen test is next week — tighten controls with evidence.
 
 
   OBJECTIVE: Unsafe defaults related to NVIDIA container toolkit are removed or constrained; Access follows
-  least privilege and is auditable; Security checks pass without breaking required functionality. Success
-  means `nvidia-smi` includes `NVIDIA-SMI`.
+  least privilege and is auditable; Security checks pass without breaking required functionality. Acceptance
+  criteria: the change is minimal and reversible, and success means `nvidia-smi` includes `NVIDIA-SMI`.
+
+
+  WORK TO DO: Required tooling is pre-installed; if a command is missing, note it and use the equivalent
+  already on the host. Make the smallest configuration change that moves the system toward the objective
+  (edit the relevant nvidia-smi, drivers, CUDA, and container toolkit), changing one thing at a time.
+  Check your work continuously against the objective — success means `nvidia-smi` includes `NVIDIA-SMI`.
+
+
+  VERIFY: Re-run the same check the grader uses and confirm `nvidia-smi` includes `NVIDIA-SMI`. Capture
+  the before/after output as evidence. Success criteria: the objective''s healthy state holds on a repeat
+  check, not just once.
+
+
+  ROLLBACK: If a change makes things worse, revert that single change immediately (restore the original
+  config file / undo the edit / restart the affected component) and re-observe before trying another hypothesis.
+  Never stack unverified changes.
 
 
   WHAT TO AVOID: Do not apply broad destructive changes, skip evidence gathering, or fake completion with
@@ -42,34 +58,45 @@ initial_state: The environment is functional but overly permissive around NVIDIA
 hints:
 - order: 1
   cost: 0
-  content: 'Orient yourself before changing anything:
+  content: 'ORIENT — what to observe and why:
 
-    1. Inspect the current state — runtime config and `docker run --gpus`.
-
-    2. Write down what looks normal versus wrong or missing for NVIDIA container toolkit.
-
-    3. Recall the core idea: GPU passthrough to containers. Form one hypothesis before you act.'
+    Do not touch anything yet. First observe the symptom: containers cannot see the GPU. This lab is about
+    NVIDIA container toolkit — GPU passthrough to containers. Read the objectives and the current state,
+    and note precisely what looks wrong versus healthy before you form any theory.'
 - order: 2
+  cost: 10
+  content: 'APPROACH — the troubleshooting method:
+
+    Work from evidence, not guesses. For NVIDIA container toolkit problems the reliable method is: (1)
+    reproduce/observe the failure, (2) narrow from the whole system down to the one component that owns
+    the symptom, (3) change exactly one thing, (4) re-check. Apply least privilege: remove the unsafe
+    default, then grant only the explicit access the workload actually needs.'
+- order: 3
   cost: 25
-  content: 'Diagnostic steps:
+  content: 'WHICH TOOL — the diagnostic command(s):
+
+    Run `docker ps -a` and `docker logs <container>` for the failing container.'
+- order: 4
+  cost: 40
+  content: 'NARROW DOWN — isolate the subsystem:
 
     1. `docker ps -a` — note Exited status and exit code.
 
     2. `docker logs <name>` for the startup error.
 
     3. Inspect the Dockerfile or `docker run` flags if the image is wrong.'
-- order: 3
-  cost: 50
-  content: 'Exact fix + verification:
+- order: 5
+  cost: 60
+  content: 'NEAR-SOLUTION — the fix shape + verify (you still apply it):
 
-    1. Re-check the current state — runtime config and `docker run --gpus`.
+    1. Fix image, port mapping, volume, or env configuration.
 
-    2. Apply least privilege: remove the unsafe default, then grant only the explicit access the workload
-    actually needs.
+    2. `docker start <name>` or re-run with corrected flags.
 
-    3. Verify the result — a container runs a GPU workload.
+    3. Confirm `nvidia-smi` shows the container Up.
 
-    4. Click Check Solution once the objective is met (graded on real state, not a marker file).'
+
+    WHY: the checker validates the container is actually running.'
 summary: Complete the nvidia container toolkit — security lab gpu lab and verify success with the checker
 estimated_minutes: 20
 xp_reward: 100

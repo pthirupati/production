@@ -1,0 +1,166 @@
+title: 'Circuit Breaker Trips Under Normal Load'
+slug: mesh-circuitbreaker-maxconns-too-low
+technology: service-mesh
+category: Fix
+difficulty: hard
+scenario_type: fix
+lab_mode: simulation
+simulation_type: generic
+time_limit: 1800
+max_score: 100
+is_free: false
+infrastructure_type: docker
+jira_priority: Medium
+description: 'CONTEXT: A team operating service mesh has raised a ticket for `Circuit Breaker Trips Under
+  Normal Load`. A customer-facing workflow is degraded and the on-call engineer (you) must diagnose and
+  resolve it. Business impact: reduced service reliability and blocked users until the underlying state
+  is repaired.
+
+
+  ENVIRONMENT: You are working in FixitLab''s offline FixitLab practice environment. The architecture
+  is a single lab-primary node exposing CLI and configuration files; treat it as the production host for
+  this incident. All tools run locally — no paid APIs or external cloud calls are required.
+
+
+  SYMPTOM / STARTING STATE: The `catalog` service returns 503 UO (upstream overflow) during ordinary traffic.
+  Its DestinationRule connection pool caps `maxConnections` at 1 and pending requests at 1, so Envoy sheds
+  normal concurrency as overflow.
+
+
+  OBJECTIVE: catalog stops returning 503 upstream-overflow under normal load; The too-low connection-pool
+  limits are confirmed as root cause; Concurrent requests succeed after the pool is right-sized. Acceptance
+  criteria: the change is minimal and reversible, and success means `check.sh` exits successfully.
+
+
+  WORK TO DO: Required tooling is pre-installed; if a command is missing, note it and use the equivalent
+  already on the host. Make the smallest configuration change that moves the system toward the objective
+  (edit the relevant CLI and configuration files), changing one thing at a time. Check your work continuously
+  against the objective — success means `check.sh` exits successfully.
+
+
+  VERIFY: Re-run the same check the grader uses and confirm `check.sh` exits successfully. Capture the
+  before/after output as evidence. Success criteria: the objective''s healthy state holds on a repeat
+  check, not just once.
+
+
+  ROLLBACK: If a change makes things worse, revert that single change immediately (restore the original
+  config file / undo the edit / restart the affected component) and re-observe before trying another hypothesis.
+  Never stack unverified changes.
+
+
+  WHAT TO AVOID: Do not apply broad destructive changes, skip evidence gathering, or fake completion with
+  marker files — the checker validates real system state.'
+objectives:
+- 'catalog stops returning 503 upstream-overflow under normal load'
+- 'The too-low connection-pool limits are confirmed as root cause'
+- 'Concurrent requests succeed after the pool is right-sized'
+initial_state: |-
+  The `catalog` service returns 503 UO (upstream overflow) during ordinary traffic. Its DestinationRule connection pool caps `maxConnections` at 1 and pending requests at 1, so Envoy sheds normal concurrency as overflow.
+hints:
+- order: 1
+  cost: 0
+  content: 'ORIENT — what to observe and why:
+
+    Do not touch anything yet. First observe the symptom: circuit breaker trips under normal load is not
+    behaving as the scenario objectives require. This lab is about circuit breaker trips under normal
+    load — how circuit breaker trips under normal load behaves in a service-mesh environment. Read the
+    objectives and the current state, and note precisely what looks wrong versus healthy before you form
+    any theory.'
+- order: 2
+  cost: 10
+  content: 'APPROACH — the troubleshooting method:
+
+    Work from evidence, not guesses. For circuit breaker trips under normal load problems the reliable
+    method is: (1) reproduce/observe the failure, (2) narrow from the whole system down to the one component
+    that owns the symptom, (3) change exactly one thing, (4) re-check. Fix the underlying misconfiguration
+    you identified (not just the noisy log line), changing one thing at a time.'
+- order: 3
+  cost: 25
+  content: 'WHICH TOOL — the diagnostic command(s):
+
+    1. Inspect the current state with CLI tools for Circuit Breaker Trips Under Normal Load.
+
+    2. Each command above tells you something specific — status/health, recent errors, and the effective
+    configuration. Read them in that order.
+
+    3. Compare what you see to the objectives; the gap points at the fault.'
+- order: 4
+  cost: 40
+  content: 'NARROW DOWN — isolate the subsystem:
+
+    1. From the evidence above, decide which single part of circuit breaker trips under normal load is
+    at fault.
+
+    2. Re-run the most relevant of CLI tools for Circuit Breaker Trips Under Normal Load focused on just
+    that part to confirm it.
+
+    3. State a one-line hypothesis: the smallest change that would move the state from ''circuit breaker
+    trips under normal load is not behaving as the scenario objectives require'' toward ''`check.sh` exits
+    successfully''.'
+- order: 5
+  cost: 60
+  content: 'NEAR-SOLUTION — the fix shape + verify (you still apply it):
+
+    1. Apply the smallest reversible change your hypothesis points to. Fix the underlying misconfiguration
+    you identified (not just the noisy log line), changing one thing at a time.
+
+    2. Re-run `bash check.sh` and confirm `check.sh` exits successfully.
+
+    3. If it still fails, the hypothesis was wrong — go back to the evidence, do not stack changes.
+
+
+    WHY: the grader validates real system state, not marker files — a fix only counts when the subsystem
+    is actually healthy.'
+summary: |-
+  Diagnose and resolve circuit breaker trips under normal load in the service-mesh simulation lab and verify the healthy end state
+estimated_minutes: 30
+xp_reward: 100
+prerequisites:
+- 'Basic Kubernetes networking literacy'
+tags:
+- 'service-mesh'
+- 'fix'
+- 'hands-on'
+- 'simulation'
+linked_tutorial: service-mesh-fundamentals
+what_you_will_learn:
+- 'catalog stops returning 503 upstream-overflow under normal load'
+- 'The too-low connection-pool limits are confirmed as root cause'
+- 'Understand how DestinationRule connection-pool limits implement circuit breaking in Envoy and why under-sized limits shed healthy traffic'
+environment:
+  nodes:
+  - role: primary
+    os: FixitLab service-mesh lab
+    hostname: lab-primary
+    ip: 127.0.0.1
+    specs: local offline simulation
+  pre_installed:
+  - bash
+  - coreutils
+  - kubectl
+  - istioctl
+  - linkerd
+  credentials:
+  - user: root
+    password: lab123
+tasks:
+- id: task_1
+  title: 'Circuit Breaker Trips Under Normal Load'
+  description: |-
+    Restore healthy behavior for Circuit Breaker Trips Under Normal Load by reproducing the diagnosis from the symptom, isolating the root cause with evidence, applying the smallest safe fix, and validating the outcome with the checker.
+  background: |-
+    This service-mesh lab teaches how DestinationRule connection-pool limits implement circuit breaking in Envoy and why under-sized limits shed healthy traffic through systematic troubleshooting: observe, hypothesize, change, verify.
+  validation:
+    type: custom_script
+    script: check.sh
+    error_message: |-
+      The scenario objective is not yet satisfied. Re-read hint tier 2, confirm the root cause, and apply the documented remediation so /opt/fixitlab/academy/mesh-circuitbreaker-maxconns-too-low.conf carries the FIXED-OK marker.
+solution:
+  summary: |-
+    The DestinationRule `trafficPolicy.connectionPool` limits are set far below real concurrency (maxConnections/http1MaxPendingRequests of 1), so Envoy trips the circuit breaker under normal load. Raise the connection-pool limits to match expected concurrency so legitimate traffic is not shed.
+  files_changed: []
+  commands_run:
+  - 'kubectl get destinationrule catalog -o yaml'
+  - 'istioctl proxy-config cluster deploy/catalog --fqdn catalog.default.svc.cluster.local -o json'
+  - 'curl -s http://catalog/ -o /dev/null -w ''%{http_code}\n'''
+  reference_docs: service-mesh-fundamentals

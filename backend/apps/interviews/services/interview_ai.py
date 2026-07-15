@@ -1217,7 +1217,7 @@ _UNCLEAR_AUDIO_REPLIES = [
     "Sorry — I didn't catch that clearly. Could be the line or a bit of background noise on my end.",
     "I'm having trouble hearing you on that one — that's on the audio, not your answer. Could you try once more?",
     "I lost you there for a second — no worries at all. Mind saying that again?",
-    "The audio cut out a little — I don't want to mark you wrong when I simply didn't hear you. One more time?",
+    "The audio cut out a little — that's on my end, not your answer. Mind running through it once more?",
 ]
 
 

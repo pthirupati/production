@@ -51,7 +51,11 @@ jobs:
         run: |
           cd backend
           python manage.py migrate --run-syncdb
-          python manage.py test tests --verbosity=1
+          # Run BOTH the top-level tests/ suite AND every app-level test package
+          # (apps/*/tests/). CI previously ran only `tests`, so the 34 app-level
+          # test files — including all the sim-engine tests — never ran in CI and
+          # regressions in them shipped green. `tests apps` closes that blind spot.
+          python manage.py test tests apps --verbosity=1
 
   frontend:
     runs-on: ubuntu-latest

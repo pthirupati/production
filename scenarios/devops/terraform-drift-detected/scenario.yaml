@@ -8,38 +8,47 @@ max_score: 100
 infrastructure_type: docker
 jira_priority: Medium
 is_free: false
-description: 'CONTEXT: A team operating DevOps delivery needs you to resolve `Detect
-  and Plan Terraform Infrastructure Drift` during a realistic incident. The business
-  impact is reduced service reliability until the underlying state is repaired.
+description: 'CONTEXT: A team operating DevOps delivery has raised a ticket for `Detect and Plan Terraform
+  Infrastructure Drift`. A customer-facing workflow is degraded and the on-call engineer (you) must diagnose
+  and resolve it. Business impact: reduced service reliability and blocked users until the underlying
+  state is repaired.
 
 
-  ENVIRONMENT: You are working in FixitLab''s offline CI/CD lab with git repos, pipelines,
-  artifacts, and runbooks. All tools run locally; no paid APIs or external cloud calls
-  are required.
+  ENVIRONMENT: You are working in FixitLab''s offline CI/CD lab. The architecture is a single lab-primary
+  node exposing git repos, pipelines, artifacts, and runbooks; treat it as the production host for this
+  incident. All tools run locally — no paid APIs or external cloud calls are required.
 
 
-  SYMPTOM / STARTING STATE: Ubuntu server with Terraform installed. Working directory
-  is /opt/terraform/infra.
+  SYMPTOM / STARTING STATE: Ubuntu server with Terraform installed. Working directory is /opt/terraform/infra.
 
   A security group rule was manually added outside of Terraform. The drift
 
-  is captured in a mock state at /opt/terraform/infra/terraform.tfstate. Infrastructure
-  drift has been detected — resources in the cloud no longer match
-
-  the Terraform state. Someone manually changed a security group rule outside of
-
-  Terraform. You need to run terraform plan to identify the drift, then decide
-
-  whether to apply the Terraform config to reconcile the infrastructure.
+  is captured in a mock state at /opt/terraform/infra/terraform.tfstate.
 
 
-  OBJECTIVE: Run terraform plan to detect infrastructure drift; Identify which resources
-  have drifted from the desired state; Apply terraform to reconcile the drift. Success
-  means `check.sh` exits successfully.
+  OBJECTIVE: Run terraform plan to detect infrastructure drift; Identify which resources have drifted
+  from the desired state; Apply terraform to reconcile the drift. Acceptance criteria: the change is minimal
+  and reversible, and success means `check.sh` exits successfully.
 
 
-  WHAT TO AVOID: Do not apply broad destructive changes, skip evidence gathering,
-  or fake completion with marker files — the checker validates real system state.'
+  WORK TO DO: Required tooling is pre-installed; if a command is missing, note it and use the equivalent
+  already on the host. Make the smallest configuration change that moves the system toward the objective
+  (edit the relevant git repos, pipelines, artifacts, and runbooks), changing one thing at a time. Check
+  your work continuously against the objective — success means `check.sh` exits successfully.
+
+
+  VERIFY: Re-run the same check the grader uses and confirm `check.sh` exits successfully. Capture the
+  before/after output as evidence. Success criteria: the objective''s healthy state holds on a repeat
+  check, not just once.
+
+
+  ROLLBACK: If a change makes things worse, revert that single change immediately (restore the original
+  config file / undo the edit / restart the affected component) and re-observe before trying another hypothesis.
+  Never stack unverified changes.
+
+
+  WHAT TO AVOID: Do not apply broad destructive changes, skip evidence gathering, or fake completion with
+  marker files — the checker validates real system state.'
 objectives:
 - Run terraform plan to detect infrastructure drift
 - Identify which resources have drifted from the desired state
@@ -55,31 +64,58 @@ initial_state: 'Ubuntu server with Terraform installed. Working directory is /op
 hints:
 - order: 1
   cost: 0
-  content: 'Where to look: Start with read-only discovery on the CI/CD lab. For Detect
-    and Plan Terraform Infrastructure Drift, inspect git repos, pipelines, artifacts,
-    and runbooks before changing anything.'
+  content: 'ORIENT — what to observe and why:
+
+    Do not touch anything yet. First observe the symptom: detect and plan terraform infrastructure drift
+    is not behaving as the scenario objectives require. This lab is about detect and plan terraform infrastructure
+    drift — how detect and plan terraform infrastructure drift behaves in a DevOps delivery environment.
+    Read the objectives and the current state, and note precisely what looks wrong versus healthy before
+    you form any theory.'
 - order: 2
-  cost: 25
-  content: 'Diagnostic steps:
+  cost: 10
+  content: 'APPROACH — the troubleshooting method:
 
-    1. Gather evidence with git repos, pipelines, artifacts, and runbooks.
-
-    2. Compare current output to the scenario objectives.
-
-    3. Form a single hypothesis about the smallest fix that would restore healthy
-    state.'
+    Work from evidence, not guesses. For detect and plan terraform infrastructure drift problems the reliable
+    method is: (1) reproduce/observe the failure, (2) narrow from the whole system down to the one component
+    that owns the symptom, (3) change exactly one thing, (4) re-check. Fix the underlying misconfiguration
+    you identified (not just the noisy log line), changing one thing at a time.'
 - order: 3
-  cost: 50
-  content: 'Exact fix + verification:
+  cost: 25
+  content: 'WHICH TOOL — the diagnostic command(s):
 
-    1. Verify terraform plan shows no changes after reconciliation.
+    1. Inspect the current state with git repos, pipelines, artifacts, and runbooks.
 
-    2. Re-run the lab checker (`check.sh` or Check Solution).
+    2. Each command above tells you something specific — status/health, recent errors, and the effective
+    configuration. Read them in that order.
 
-    3. Confirm every scenario objective is satisfied.
+    3. Compare what you see to the objectives; the gap points at the fault.'
+- order: 4
+  cost: 40
+  content: 'NARROW DOWN — isolate the subsystem:
+
+    1. From the evidence above, decide which single part of detect and plan terraform infrastructure drift
+    is at fault.
+
+    2. Re-run the most relevant of git repos, pipelines, artifacts, and runbooks focused on just that
+    part to confirm it.
+
+    3. State a one-line hypothesis: the smallest change that would move the state from ''detect and plan
+    terraform infrastructure drift is not behaving as the scenario objectives require'' toward ''`check.sh`
+    exits successfully''.'
+- order: 5
+  cost: 60
+  content: 'NEAR-SOLUTION — the fix shape + verify (you still apply it):
+
+    1. Apply the smallest reversible change your hypothesis points to. Fix the underlying misconfiguration
+    you identified (not just the noisy log line), changing one thing at a time.
+
+    2. Re-run `bash check.sh` and confirm `check.sh` exits successfully.
+
+    3. If it still fails, the hypothesis was wrong — go back to the evidence, do not stack changes.
 
 
-    WHY: the grader validates real state — marker files are ignored.'
+    WHY: the grader validates real system state, not marker files — a fix only counts when the subsystem
+    is actually healthy.'
 summary: Complete the detect and plan terraform infrastructure drift devops lab and
   verify success with the checker
 estimated_minutes: 20

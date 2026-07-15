@@ -10,34 +10,43 @@ simulation_type: vmware
 infrastructure_type: simulation
 jira_priority: Critical
 is_free: false
-description: 'CONTEXT: A team operating VMware vSphere needs you to resolve `vCenter Certificate Expired
-  - Authentication and API` during a realistic incident. The business impact is reduced service reliability
-  until the underlying state is repaired.
+description: 'CONTEXT: A team operating VMware vSphere has raised a ticket for `vCenter Certificate Expired
+  - Authentication and API`. A customer-facing workflow is degraded and the on-call engineer (you) must
+  diagnose and resolve it. Business impact: reduced service reliability and blocked users until the underlying
+  state is repaired.
 
 
-  ENVIRONMENT: You are working in FixitLab''s offline vSphere lab with VMs, datastores, vCenter, and ESXi
-  tasks. All tools run locally; no paid APIs or external cloud calls are required.
+  ENVIRONMENT: You are working in FixitLab''s offline vSphere lab. The architecture is a single lab-primary
+  node exposing VMs, datastores, vCenter, and ESXi tasks; treat it as the production host for this incident.
+  All tools run locally — no paid APIs or external cloud calls are required.
 
 
   SYMPTOM / STARTING STATE: VMware vCenter simulation. vCenter at vcenter.lab.local.
 
   SSL cert expired 3 days ago. SSH to VCSA available as root.
 
-  certificate-manager utility available at /usr/lib/vmware-vmca/bin/certificate-manager. vCenter Server
-  certificates have expired, causing: HTTPS connections to show
-
-  certificate errors, vSphere Client authentication failures, and API calls from
-
-  automation scripts failing with SSL certificate verification errors. The Machine
-
-  SSL certificate and STS signing certificates in VMCA expired simultaneously.
-
-  Engineers must renew the certificates using the vSphere Certificate Manager.
+  certificate-manager utility available at /usr/lib/vmware-vmca/bin/certificate-manager.
 
 
   OBJECTIVE: Confirm certificate expiry using openssl and the vCenter management UI; Access the vCenter
-  appliance via SSH; Use certificate-manager to regenerate and replace expired certificates. Success means
-  `check.sh` exits successfully.
+  appliance via SSH; Use certificate-manager to regenerate and replace expired certificates. Acceptance
+  criteria: the change is minimal and reversible, and success means `check.sh` exits successfully.
+
+
+  WORK TO DO: Required tooling is pre-installed; if a command is missing, note it and use the equivalent
+  already on the host. Make the smallest configuration change that moves the system toward the objective
+  (edit the relevant VMs, datastores, vCenter, and ESXi tasks), changing one thing at a time. Check your
+  work continuously against the objective — success means `check.sh` exits successfully.
+
+
+  VERIFY: Re-run the same check the grader uses and confirm `check.sh` exits successfully. Capture the
+  before/after output as evidence. Success criteria: the objective''s healthy state holds on a repeat
+  check, not just once.
+
+
+  ROLLBACK: If a change makes things worse, revert that single change immediately (restore the original
+  config file / undo the edit / restart the affected component) and re-observe before trying another hypothesis.
+  Never stack unverified changes.
 
 
   WHAT TO AVOID: Do not apply broad destructive changes, skip evidence gathering, or fake completion with
@@ -57,19 +66,38 @@ initial_state: 'VMware vCenter simulation. vCenter at vcenter.lab.local.
 hints:
 - order: 1
   cost: 0
-  content: 'Where to look: Run `systemctl status sshd` and `ss -tlnp | grep :22` on the target host.'
+  content: 'ORIENT — what to observe and why:
+
+    Do not touch anything yet. First observe the symptom: vCenter certificate expired - authentication
+    and API is not behaving as the scenario objectives require. This lab is about vCenter certificate
+    expired - authentication and API — how vCenter certificate expired - authentication and API behaves
+    in a VMware vSphere environment. Read the objectives and the current state, and note precisely what
+    looks wrong versus healthy before you form any theory.'
 - order: 2
+  cost: 10
+  content: 'APPROACH — the troubleshooting method:
+
+    Work from evidence, not guesses. For vCenter certificate expired - authentication and API problems
+    the reliable method is: (1) reproduce/observe the failure, (2) narrow from the whole system down to
+    the one component that owns the symptom, (3) change exactly one thing, (4) re-check. Fix the underlying
+    misconfiguration you identified (not just the noisy log line), changing one thing at a time.'
+- order: 3
   cost: 25
-  content: 'Diagnostic steps:
+  content: 'WHICH TOOL — the diagnostic command(s):
+
+    Run `systemctl status sshd` and `ss -tlnp | grep :22` on the target host.'
+- order: 4
+  cost: 40
+  content: 'NARROW DOWN — isolate the subsystem:
 
     1. Confirm sshd is active and listening on port 22.
 
     2. Check `firewall-cmd` or iptables for blocked port 22.
 
     3. Read `/var/log/secure` for auth or config errors.'
-- order: 3
-  cost: 50
-  content: 'Exact fix + verification:
+- order: 5
+  cost: 60
+  content: 'NEAR-SOLUTION — the fix shape + verify (you still apply it):
 
     1. Fix sshd_config, firewall, or socket unit as needed.
 

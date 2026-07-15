@@ -2,25 +2,41 @@ title: Application Unreachable — Firewall Blocking Port 8080
 slug: linux-iptables-allow-port
 difficulty: easy
 category: Fix
-description: 'CONTEXT: A team operating Linux administration needs you to resolve `Application Unreachable
-  — Firewall Blocking Port 8080` during a realistic incident. The business impact is reduced service reliability
-  until the underlying state is repaired.
+description: 'CONTEXT: A team operating Linux administration has raised a ticket for `Application Unreachable
+  — Firewall Blocking Port 8080`. A customer-facing workflow is degraded and the on-call engineer (you)
+  must diagnose and resolve it. Business impact: reduced service reliability and blocked users until the
+  underlying state is repaired.
 
 
-  ENVIRONMENT: You are working in FixitLab''s offline Linux practice server with terminal and config files
-  under /etc and /var. All tools run locally; no paid APIs or external cloud calls are required.
+  ENVIRONMENT: You are working in FixitLab''s offline Linux practice server. The architecture is a single
+  lab-primary node exposing terminal and config files under /etc and /var; treat it as the production
+  host for this incident. All tools run locally — no paid APIs or external cloud calls are required.
 
 
   SYMPTOM / STARTING STATE: Linux server where an app listens on 8080 (confirmed by ss) but firewalld
-  blocks inbound traffic to that port, so remote clients can''t connect. A web application is up and listening
-  on port 8080 locally but is unreachable from external clients because the active firewall (firewalld)
-  does not permit that port. The service binds fine; the firewall drops inbound connections. Add and persist
-  a rule allowing 8080/tcp, reload the firewall, and confirm external access.
+  blocks inbound traffic to that port, so remote clients can''t connect.
 
 
   OBJECTIVE: Confirm the service listens locally (ss -tlnp) and that the firewall blocks 8080; Add a permanent
-  firewalld rule for 8080/tcp and reload; Verify the rule is active and the port is reachable. Success
-  means `check.sh` exits successfully.
+  firewalld rule for 8080/tcp and reload; Verify the rule is active and the port is reachable. Acceptance
+  criteria: the change is minimal and reversible, and success means `firewall-cmd --list-ports` includes
+  `80/tcp`.
+
+
+  WORK TO DO: Required tooling is pre-installed; if a command is missing, note it and use the equivalent
+  already on the host. Make the smallest configuration change that moves the system toward the objective
+  (edit the relevant terminal and config files under /etc and /var), changing one thing at a time. Check
+  your work continuously against the objective — success means `firewall-cmd --list-ports` includes `80/tcp`.
+
+
+  VERIFY: Re-run the same check the grader uses and confirm `firewall-cmd --list-ports` includes `80/tcp`.
+  Capture the before/after output as evidence. Success criteria: the objective''s healthy state holds
+  on a repeat check, not just once.
+
+
+  ROLLBACK: If a change makes things worse, revert that single change immediately (restore the original
+  config file / undo the edit / restart the affected component) and re-observe before trying another hypothesis.
+  Never stack unverified changes.
 
 
   WHAT TO AVOID: Do not apply broad destructive changes, skip evidence gathering, or fake completion with
@@ -39,19 +55,42 @@ is_free: false
 hints:
 - order: 1
   cost: 0
-  content: 'Where to look: Run `firewall-cmd --state` and `firewall-cmd --list-all` for active zones.'
+  content: 'ORIENT — what to observe and why:
+
+    Do not touch anything yet. First observe the symptom: application unreachable — firewall blocking
+    port 8080 is not behaving as the scenario objectives require. This lab is about application unreachable
+    — firewall blocking port 8080 — how application unreachable — firewall blocking port 8080 behaves
+    in a Linux administration environment. Read the objectives and the current state, and note precisely
+    what looks wrong versus healthy before you form any theory.'
 - order: 2
-  cost: 25
-  content: 'Diagnostic steps:
+  cost: 10
+  content: 'APPROACH — the troubleshooting method:
 
-    1. Identify which zone is active and which ports/services are allowed.
-
-    2. Compare to the port the scenario expects (often 80/tcp or 443/tcp).
-
-    3. Check if the service is bound but blocked externally.'
+    Work from evidence, not guesses. For application unreachable — firewall blocking port 8080 problems
+    the reliable method is: (1) reproduce/observe the failure, (2) narrow from the whole system down to
+    the one component that owns the symptom, (3) change exactly one thing, (4) re-check. Fix the underlying
+    misconfiguration you identified (not just the noisy log line), changing one thing at a time.'
 - order: 3
-  cost: 50
-  content: 'Exact fix + verification:
+  cost: 25
+  content: 'WHICH TOOL — the diagnostic command(s):
+
+    Run `firewall-cmd --state` and `firewall-cmd --list-all` for active zones.'
+- order: 4
+  cost: 40
+  content: 'NARROW DOWN — isolate the subsystem:
+
+    1. From the evidence above, decide which single part of application unreachable — firewall blocking
+    port 8080 is at fault.
+
+    2. Re-run the most relevant of `firewall-cmd --list-ports` output focused on just that part to confirm
+    it.
+
+    3. State a one-line hypothesis: the smallest change that would move the state from ''application unreachable
+    — firewall blocking port 8080 is not behaving as the scenario objectives require'' toward ''`firewall-cmd
+    --list-ports` includes `80/tcp`''.'
+- order: 5
+  cost: 60
+  content: 'NEAR-SOLUTION — the fix shape + verify (you still apply it):
 
     1. `firewall-cmd --permanent --add-service=http` (or the needed port).
 
