@@ -28,6 +28,7 @@ case "$ACTION" in
   deploy)
     export COMPOSE_FILE ENV_FILE CLUSTER_ROLE
     export BUILD_SCENARIOS="${BUILD_SCENARIOS:-true}"
+    export MERGE_SEED_ONLY="${MERGE_SEED_ONLY:-true}"
     # Edge gateway needs APP_PRIVATE_IP to render the cluster nginx upstream.
     [ -n "${APP_PRIVATE_IP:-}" ] && export APP_PRIVATE_IP
     # Docker Hub image pipeline (gated). When the workflow has USE_DOCKERHUB on it
