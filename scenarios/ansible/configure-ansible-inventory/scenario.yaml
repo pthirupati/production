@@ -10,24 +10,42 @@ infrastructure_type: docker
 lab_mode: docker
 jira_priority: Low
 is_free: false
-description: 'CONTEXT: A team operating Ansible automation needs you to resolve `Configure Ansible Inventory
-  Host` during a realistic incident. The business impact is reduced service reliability until the underlying
+description: 'CONTEXT: A team operating Ansible automation has raised a ticket for `Configure Ansible
+  Inventory Host`. A customer-facing workflow is degraded and the on-call engineer (you) must diagnose
+  and resolve it. Business impact: reduced service reliability and blocked users until the underlying
   state is repaired.
 
 
-  ENVIRONMENT: You are working in FixitLab''s offline Ansible control node with inventory, playbooks,
-  roles, and ansible-playbook. All tools run locally; no paid APIs or external cloud calls are required.
+  ENVIRONMENT: You are working in FixitLab''s offline Ansible control node. The architecture is a single
+  lab-primary node exposing inventory, playbooks, roles, and ansible-playbook; treat it as the production
+  host for this incident. All tools run locally — no paid APIs or external cloud calls are required.
 
 
   SYMPTOM / STARTING STATE: Ansible control node with a default/empty inventory. No managed webserver
-  host is defined yet. Build task: register a new webserver host in the Ansible inventory and confirm
-  Ansible can see it. Starting from an empty inventory, add the host under an appropriate group with its
-  connection details, then verify it appears via ansible-inventory and responds to a ping.
+  host is defined yet.
 
 
   OBJECTIVE: Add a webserver host (with ansible_host/user) under a [webservers] group in the inventory;
   List the inventory and confirm the host and group are present; Verify Ansible can reach the host with
-  the ping module. Success means `check.sh` exits successfully.
+  the ping module. Acceptance criteria: the change is minimal and reversible, and success means `ansible
+  webservers -m ping` includes `SUCCESS`.
+
+
+  WORK TO DO: Required tooling is pre-installed; if a command is missing, note it and use the equivalent
+  already on the host. Make the smallest configuration change that moves the system toward the objective
+  (edit the relevant inventory, playbooks, roles, and ansible-playbook), changing one thing at a time.
+  Check your work continuously against the objective — success means `ansible webservers -m ping` includes
+  `SUCCESS`.
+
+
+  VERIFY: Re-run the same check the grader uses and confirm `ansible webservers -m ping` includes `SUCCESS`.
+  Capture the before/after output as evidence. Success criteria: the objective''s healthy state holds
+  on a repeat check, not just once.
+
+
+  ROLLBACK: If a change makes things worse, revert that single change immediately (restore the original
+  config file / undo the edit / restart the affected component) and re-observe before trying another hypothesis.
+  Never stack unverified changes.
 
 
   WHAT TO AVOID: Do not apply broad destructive changes, skip evidence gathering, or fake completion with
@@ -41,28 +59,47 @@ initial_state: Ansible control node with a default/empty inventory. No managed w
 hints:
 - order: 1
   cost: 0
-  content: 'Where to look: Run `ansible webservers -m ping -vvv` to see SSH and inventory errors.'
+  content: 'ORIENT — what to observe and why:
+
+    Do not touch anything yet. First observe the symptom: configure ansible inventory host is not behaving
+    as the scenario objectives require. This lab is about configure ansible inventory host — how configure
+    ansible inventory host behaves in a Ansible automation environment. Read the objectives and the current
+    state, and note precisely what looks wrong versus healthy before you form any theory.'
 - order: 2
-  cost: 25
-  content: 'Diagnostic steps:
+  cost: 10
+  content: 'APPROACH — the troubleshooting method:
 
-    1. Verify `inventory` hostnames resolve and SSH keys work.
-
-    2. Check `ansible.cfg` for remote_user and privilege escalation.
-
-    3. Test manual `ssh user@host` from the control node.'
+    Work from evidence, not guesses. For configure ansible inventory host problems the reliable method
+    is: (1) reproduce/observe the failure, (2) narrow from the whole system down to the one component
+    that owns the symptom, (3) change exactly one thing, (4) re-check. Execute the maintenance in small,
+    reversible steps, taking a snapshot or backup first if the change is risky.'
 - order: 3
-  cost: 50
-  content: 'Exact fix + verification:
+  cost: 25
+  content: 'WHICH TOOL — the diagnostic command(s):
 
-    1. Fix inventory, SSH key, or `ansible_user` in group_vars.
+    Run `ansible-playbook site.yml -vv` (or the scenario playbook) and read the first FAILED task — note
+    host, task name, and error message.'
+- order: 4
+  cost: 40
+  content: 'NARROW DOWN — isolate the subsystem:
 
-    2. Re-run `ansible webservers -m ping`.
+    1. Re-run with `-vvv` on the failing host only (`--limit <host>`).
 
-    3. Confirm every host returns SUCCESS.
+    2. Check inventory, SSH connectivity, and `ansible.cfg` privilege settings.
+
+    3. Compare the failed module output to the scenario objectives.'
+- order: 5
+  cost: 60
+  content: 'NEAR-SOLUTION — the fix shape + verify (you still apply it):
+
+    1. Apply the minimal fix on the failing host (config, service, or variable).
+
+    2. Re-run the playbook to a clean PLAY RECAP (failed=0).
+
+    3. Confirm `ansible webservers -m ping` succeeds.
 
 
-    WHY: Ansible cannot manage hosts it cannot reach.'
+    WHY: Ansible labs grade real playbook outcomes, not marker files.'
 summary: Complete the configure ansible inventory host ansible lab and verify success with the checker
 estimated_minutes: 15
 xp_reward: 100

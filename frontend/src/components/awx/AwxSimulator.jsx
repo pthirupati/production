@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { awxApi } from '../../api/awx'
 import toast from 'react-hot-toast'
 import LabChromeBar from '../lab/LabChromeBar'
@@ -57,6 +57,17 @@ export default function AwxSimulator({
   const [scheduleModal, setScheduleModal] = useState(false)
   const [scheduleName, setScheduleName] = useState('Nightly patch')
   const [scheduleTemplate, setScheduleTemplate] = useState('Patch Linux')
+  const [hostModal, setHostModal] = useState(false)
+  const [hostName, setHostName] = useState('app01.fixitlab.local')
+  const [hostInventory, setHostInventory] = useState('Production')
+  const [orgModal, setOrgModal] = useState(false)
+  const [orgName, setOrgName] = useState('New Organization')
+  const [orgDesc, setOrgDesc] = useState('')
+  const [teamModal, setTeamModal] = useState(false)
+  const [teamName, setTeamName] = useState('New Team')
+  const [teamOrg, setTeamOrg] = useState('Default')
+  const [userModal, setUserModal] = useState(false)
+  const [userName, setUserName] = useState('new-user')
   const [loginUser, setLoginUser] = useState('')
   const [loginPass, setLoginPass] = useState('')
   const [loginError, setLoginError] = useState('')
@@ -64,6 +75,24 @@ export default function AwxSimulator({
   const inv = state?.inventory || {}
   const loggedIn = inv?.session?.logged_in
   const goal = state?.goal || {}
+  const jobs = inv.jobs || []
+  // A job is "live" until it reaches a terminal status. While any job is live,
+  // poll get_state so the wall-clock status/stdout advance shows up in the UI.
+  const TERMINAL = ['successful', 'failed', 'canceled', 'error']
+  const hasLiveJob = jobs.some((j) => !TERMINAL.includes(j.status))
+  // Always re-derive the selected job from live state (by id) so its status
+  // badge and streamed stdout re-render as polling advances the job.
+  const liveSelectedJob = selectedJob
+    ? (jobs.find((j) => j.id === selectedJob.id) || selectedJob)
+    : null
+
+  const refreshRef = useRef(refresh)
+  refreshRef.current = refresh
+  useEffect(() => {
+    if (!loggedIn || !hasLiveJob) return undefined
+    const t = setInterval(() => { refreshRef.current?.() }, 1200)
+    return () => clearInterval(t)
+  }, [loggedIn, hasLiveJob])
   const chromeProps = {
     onHints, onCheck, onExtend, onStop,
     onBackToTerminal: embedded ? undefined : onExit,
@@ -157,26 +186,26 @@ export default function AwxSimulator({
             { key: 'name', label: 'Job', sortable: true },
             { key: 'status', label: 'Status', sortable: true, render: (r) => <SimStatusBadge status={r.status} /> },
             { key: 'id', label: 'ID', sortable: true },
-          ]} rows={inv.jobs || []} searchKeys={['name', 'status']} onRowClick={(j) => setSelectedJob(j)} />
-          {selectedJob && (
+          ]} rows={jobs} searchKeys={['name', 'status']} onRowClick={(j) => setSelectedJob(j)} />
+          {liveSelectedJob && (
             <div className="awx-widget space-y-3">
               <div className="flex justify-between items-center flex-wrap gap-2">
-                <h3 className="font-semibold">{selectedJob.name} <span className="text-xs text-slate-400 font-mono">#{selectedJob.id}</span></h3>
+                <h3 className="font-semibold">{liveSelectedJob.name} <span className="text-xs text-slate-400 font-mono">#{liveSelectedJob.id}</span></h3>
                 <div className="flex items-center gap-2">
-                  <SimStatusBadge status={selectedJob.status} />
+                  <SimStatusBadge status={liveSelectedJob.status} />
                   <button type="button" className="awx-btn-launch text-[11px] py-1 px-2 flex items-center gap-1" disabled={busy}
-                    onClick={() => { run(() => awxApi.relaunchJob(sessionId, selectedJob.id), 'Job relaunched'); }}>
+                    onClick={() => { run(() => awxApi.relaunchJob(sessionId, liveSelectedJob.id), 'Job relaunched').then((r) => { if (r?.job_id) setSelectedJob({ id: r.job_id }) }) }}>
                     <RefreshCw size={12} /> Relaunch
                   </button>
-                  {['running', 'pending', 'waiting'].includes(selectedJob.status) && (
+                  {['running', 'pending', 'waiting'].includes(liveSelectedJob.status) && (
                     <button type="button" className="px-2 py-1 border border-red-300 text-red-600 rounded text-[11px]" disabled={busy}
-                      onClick={() => { run(() => awxApi.cancelJob(sessionId, selectedJob.id), 'Job canceled'); }}>
+                      onClick={() => { run(() => awxApi.cancelJob(sessionId, liveSelectedJob.id), 'Job canceled'); }}>
                       Cancel
                     </button>
                   )}
                 </div>
               </div>
-              <SimTerminalLog lines={AWX_JOB_LOG} title={`Output — ${selectedJob.name} (${selectedJob.status})`} />
+              <SimTerminalLog lines={liveSelectedJob.stdout || AWX_JOB_LOG} title={`Output — ${liveSelectedJob.name} (${liveSelectedJob.status})`} />
             </div>
           )}
         </div>
@@ -245,19 +274,29 @@ export default function AwxSimulator({
       )
     }
     if (nav === 'hosts') {
-      return <SimDataTable columns={[
-        { key: 'name', label: 'Host', sortable: true },
-        { key: 'inventory', label: 'Inventory', sortable: true },
-        { key: 'status', label: 'Status', render: (r) => <SimStatusBadge status={r.status} /> },
-        { key: 'source', label: 'Source', sortable: true },
-        { key: 'ip', label: 'IP' },
-        { key: 'enabled', label: 'Enabled', render: (r) => (
-          <button type="button" className="px-2 py-1 border rounded text-[10px]" disabled={busy}
-            onClick={(e) => { e.stopPropagation(); run(() => awxApi.toggleHost(sessionId, r.id), (r.enabled !== false) ? 'Host disabled' : 'Host enabled') }}>
-            {(r.enabled !== false) ? 'Enabled' : 'Disabled'}
-          </button>
-        ) },
-      ]} rows={inv.hosts || AWX_HOSTS} searchKeys={['name', 'inventory', 'source', 'ip']} />
+      return (
+        <div className="space-y-3">
+          <div className="flex justify-between items-center flex-wrap gap-2">
+            <h2 className="text-lg font-semibold">Hosts</h2>
+            <button type="button" className="awx-btn-launch flex items-center gap-1" onClick={() => setHostModal(true)}>
+              <Plus size={14} /> Add host
+            </button>
+          </div>
+          <SimDataTable columns={[
+            { key: 'name', label: 'Host', sortable: true },
+            { key: 'inventory', label: 'Inventory', sortable: true },
+            { key: 'status', label: 'Status', render: (r) => <SimStatusBadge status={r.status} /> },
+            { key: 'source', label: 'Source', sortable: true },
+            { key: 'ip', label: 'IP' },
+            { key: 'enabled', label: 'Enabled', render: (r) => (
+              <button type="button" className="px-2 py-1 border rounded text-[10px]" disabled={busy}
+                onClick={(e) => { e.stopPropagation(); run(() => awxApi.toggleHost(sessionId, r.id), (r.enabled !== false) ? 'Host disabled' : 'Host enabled') }}>
+                {(r.enabled !== false) ? 'Enabled' : 'Disabled'}
+              </button>
+            ) },
+          ]} rows={inv.hosts || AWX_HOSTS} searchKeys={['name', 'inventory', 'source', 'ip']} />
+        </div>
+      )
     }
     if (nav === 'credentials') {
       return (
@@ -307,11 +346,21 @@ export default function AwxSimulator({
       )
     }
     if (nav === 'users') {
-      return <SimDataTable columns={[
-        { key: 'username', label: 'Username', sortable: true },
-        { key: 'name', label: 'Name', sortable: true },
-        { key: 'role', label: 'Role', sortable: true },
-      ]} rows={AWX_USERS} searchKeys={['username', 'name']} />
+      return (
+        <div className="space-y-3">
+          <div className="flex justify-between items-center flex-wrap gap-2">
+            <h2 className="text-lg font-semibold">Users</h2>
+            <button type="button" className="awx-btn-launch flex items-center gap-1" onClick={() => setUserModal(true)}>
+              <Plus size={14} /> Add user
+            </button>
+          </div>
+          <SimDataTable columns={[
+            { key: 'username', label: 'Username', sortable: true },
+            { key: 'name', label: 'Name', sortable: true },
+            { key: 'role', label: 'Role', sortable: true },
+          ]} rows={inv.users || AWX_USERS} searchKeys={['username', 'name']} />
+        </div>
+      )
     }
     if (nav === 'workflow-templates') {
       return (
@@ -334,7 +383,7 @@ export default function AwxSimulator({
             { key: 'user', label: 'User', sortable: true },
             { key: 'action', label: 'Action', sortable: true },
             { key: 'object', label: 'Object', sortable: true },
-          ]} rows={AWX_ACTIVITY} searchKeys={['user', 'action']} />
+          ]} rows={inv.activity || AWX_ACTIVITY} searchKeys={['user', 'action']} />
         </div>
       )
     }
@@ -353,20 +402,40 @@ export default function AwxSimulator({
       )
     }
     if (nav === 'organizations') {
-      return <SimDataTable columns={[
-        { key: 'name', label: 'Organization', sortable: true },
-        { key: 'description', label: 'Description', sortable: true },
-        { key: 'inventories', label: 'Inventories', sortable: true },
-        { key: 'users', label: 'Users', sortable: true },
-      ]} rows={AWX_ORGANIZATIONS} searchKeys={['name']} />
+      return (
+        <div className="space-y-3">
+          <div className="flex justify-between items-center flex-wrap gap-2">
+            <h2 className="text-lg font-semibold">Organizations</h2>
+            <button type="button" className="awx-btn-launch flex items-center gap-1" onClick={() => setOrgModal(true)}>
+              <Plus size={14} /> Add organization
+            </button>
+          </div>
+          <SimDataTable columns={[
+            { key: 'name', label: 'Organization', sortable: true },
+            { key: 'description', label: 'Description', sortable: true },
+            { key: 'inventories', label: 'Inventories', sortable: true },
+            { key: 'users', label: 'Users', sortable: true },
+          ]} rows={inv.organizations || AWX_ORGANIZATIONS} searchKeys={['name']} />
+        </div>
+      )
     }
     if (nav === 'teams') {
-      return <SimDataTable columns={[
-        { key: 'name', label: 'Team', sortable: true },
-        { key: 'organization', label: 'Organization', sortable: true },
-        { key: 'members', label: 'Members', sortable: true },
-        { key: 'role', label: 'Role', sortable: true },
-      ]} rows={AWX_TEAMS} searchKeys={['name']} />
+      return (
+        <div className="space-y-3">
+          <div className="flex justify-between items-center flex-wrap gap-2">
+            <h2 className="text-lg font-semibold">Teams</h2>
+            <button type="button" className="awx-btn-launch flex items-center gap-1" onClick={() => setTeamModal(true)}>
+              <Plus size={14} /> Add team
+            </button>
+          </div>
+          <SimDataTable columns={[
+            { key: 'name', label: 'Team', sortable: true },
+            { key: 'organization', label: 'Organization', sortable: true },
+            { key: 'members', label: 'Members', sortable: true },
+            { key: 'role', label: 'Role', sortable: true },
+          ]} rows={inv.teams || AWX_TEAMS} searchKeys={['name']} />
+        </div>
+      )
     }
     if (nav === 'instance-groups') {
       return <SimDataTable columns={[
@@ -551,6 +620,73 @@ export default function AwxSimulator({
             {(inv.job_templates || []).map((jt) => <option key={jt.id} value={jt.name}>{jt.name}</option>)}
             {!(inv.job_templates || []).length && <option value="Patch Linux">Patch Linux</option>}
           </select>
+        </label>
+      </SimModal>
+
+      <SimModal open={hostModal} onClose={() => setHostModal(false)} title="Add Host"
+        footer={<>
+          <button type="button" className="text-sm px-3" onClick={() => setHostModal(false)}>Cancel</button>
+          <button type="button" className="awx-btn-launch" disabled={busy} onClick={() => {
+            run(() => awxApi.action(sessionId, 'create_host', { name: hostName, inventory: hostInventory }), 'Host created')
+            setHostModal(false)
+          }}>Add</button>
+        </>}>
+        <label className="block text-sm">Host name
+          <input className="w-full mt-1 border rounded px-2 py-1.5" value={hostName} onChange={(e) => setHostName(e.target.value)} />
+        </label>
+        <label className="block text-sm mt-3">Inventory
+          <select className="w-full mt-1 border rounded px-2 py-1.5" value={hostInventory} onChange={(e) => setHostInventory(e.target.value)}>
+            {(inv.inventories || []).map((i) => <option key={i.id} value={i.name}>{i.name}</option>)}
+            {!(inv.inventories || []).length && <option value="Production">Production</option>}
+          </select>
+        </label>
+      </SimModal>
+
+      <SimModal open={orgModal} onClose={() => setOrgModal(false)} title="Add Organization"
+        footer={<>
+          <button type="button" className="text-sm px-3" onClick={() => setOrgModal(false)}>Cancel</button>
+          <button type="button" className="awx-btn-launch" disabled={busy} onClick={() => {
+            run(() => awxApi.action(sessionId, 'create_organization', { name: orgName, description: orgDesc }), 'Organization created')
+            setOrgModal(false)
+          }}>Add</button>
+        </>}>
+        <label className="block text-sm">Organization name
+          <input className="w-full mt-1 border rounded px-2 py-1.5" value={orgName} onChange={(e) => setOrgName(e.target.value)} />
+        </label>
+        <label className="block text-sm mt-3">Description
+          <input className="w-full mt-1 border rounded px-2 py-1.5" value={orgDesc} onChange={(e) => setOrgDesc(e.target.value)} />
+        </label>
+      </SimModal>
+
+      <SimModal open={teamModal} onClose={() => setTeamModal(false)} title="Add Team"
+        footer={<>
+          <button type="button" className="text-sm px-3" onClick={() => setTeamModal(false)}>Cancel</button>
+          <button type="button" className="awx-btn-launch" disabled={busy} onClick={() => {
+            run(() => awxApi.action(sessionId, 'create_team', { name: teamName, organization: teamOrg }), 'Team created')
+            setTeamModal(false)
+          }}>Add</button>
+        </>}>
+        <label className="block text-sm">Team name
+          <input className="w-full mt-1 border rounded px-2 py-1.5" value={teamName} onChange={(e) => setTeamName(e.target.value)} />
+        </label>
+        <label className="block text-sm mt-3">Organization
+          <select className="w-full mt-1 border rounded px-2 py-1.5" value={teamOrg} onChange={(e) => setTeamOrg(e.target.value)}>
+            {(inv.organizations || []).map((o) => <option key={o.id} value={o.name}>{o.name}</option>)}
+            {!(inv.organizations || []).length && <option value="Default">Default</option>}
+          </select>
+        </label>
+      </SimModal>
+
+      <SimModal open={userModal} onClose={() => setUserModal(false)} title="Add User"
+        footer={<>
+          <button type="button" className="text-sm px-3" onClick={() => setUserModal(false)}>Cancel</button>
+          <button type="button" className="awx-btn-launch" disabled={busy} onClick={() => {
+            run(() => awxApi.action(sessionId, 'create_user', { username: userName }), 'User created')
+            setUserModal(false)
+          }}>Add</button>
+        </>}>
+        <label className="block text-sm">Username
+          <input className="w-full mt-1 border rounded px-2 py-1.5" value={userName} onChange={(e) => setUserName(e.target.value)} />
         </label>
       </SimModal>
     </div>

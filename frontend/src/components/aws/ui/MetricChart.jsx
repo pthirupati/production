@@ -3,7 +3,7 @@ import { useMemo, useState } from 'react'
 // Lightweight offline SVG time-series chart (CloudWatch-style). Generates a
 // deterministic-ish 168-point (7d x 24h) series with a hover tooltip. Avoids
 // pulling a chart lib so the sim stays 100% offline.
-export default function MetricChart({ title, unit = '%', color = '#0073bb', base = 20, variance = 40, points = 168 }) {
+export default function MetricChart({ title, unit = '%', color = '#0073bb', base = 20, variance = 40, points = 168, threshold = null }) {
   const data = useMemo(() => {
     const arr = []
     let v = base
@@ -22,7 +22,8 @@ export default function MetricChart({ title, unit = '%', color = '#0073bb', base
   const W = 320
   const H = 120
   const pad = 24
-  const max = Math.max(...data, base + variance) * 1.1
+  const max = Math.max(...data, base + variance, threshold != null ? threshold : 0) * 1.1
+  const thresholdY = threshold != null && max > 0 ? H - pad - (threshold / max) * (H - pad * 2) : null
   const stepX = (W - pad * 2) / (data.length - 1)
   const path = data.map((d, i) => `${i === 0 ? 'M' : 'L'} ${pad + i * stepX} ${H - pad - (d / max) * (H - pad * 2)}`).join(' ')
 
@@ -42,6 +43,12 @@ export default function MetricChart({ title, unit = '%', color = '#0073bb', base
         ))}
         <path d={`${path} L ${pad + (data.length - 1) * stepX} ${H - pad} L ${pad} ${H - pad} Z`} fill={color} opacity="0.08" />
         <path d={path} fill="none" stroke={color} strokeWidth="1.5" />
+        {thresholdY != null && (
+          <>
+            <line x1={pad} x2={W - pad} y1={thresholdY} y2={thresholdY} stroke="#d13212" strokeWidth="1" strokeDasharray="4 3" />
+            <text x={W - pad} y={thresholdY - 3} fontSize="9" fill="#d13212" textAnchor="end">Threshold {threshold}{unit}</text>
+          </>
+        )}
         {hover && (
           <>
             <line x1={pad + hover.idx * stepX} x2={pad + hover.idx * stepX} y1={pad} y2={H - pad} stroke={color} strokeDasharray="3 3" opacity="0.5" />

@@ -48,15 +48,21 @@ const LEVEL_CLASS = {
 // Group the lesson's many sections into four readable phases so a long lesson
 // scans like a structured course instead of a flat wall of cards.
 const PHASES = [
-  { label: 'Learn', hint: 'Concepts & architecture', match: ['theory', 'architecture', 'concept', 'use case', 'overview', 'prerequisite'] },
-  { label: 'Practice', hint: 'Hands-on & projects', match: ['lab', 'hands-on', 'simulation', 'project', 'worked example'] },
-  { label: 'Operate', hint: 'Run it in production', match: ['troubleshoot', 'best practice', 'security', 'performance', 'monitor', 'incident', 'root cause', 'rca', 'enterprise', 'production'] },
-  { label: 'Assess', hint: 'Prove mastery', match: ['interview', 'scenario question', 'assessment', 'certification', 'quiz', 'notes', 'takeaway', 'summary', 'cheat'] },
+  { label: 'Learn', hint: 'Concepts & architecture', match: ['overview', 'key concept', 'concept', 'theory', 'architecture', 'use case', 'prerequisite'] },
+  { label: 'Practice', hint: 'Hands-on walkthrough', match: ['walkthrough', 'hands-on', 'lab', 'simulation', 'project', 'worked example'] },
+  { label: 'Operate', hint: 'Pitfalls & production', match: ['pitfall', 'troubleshoot', 'best practice', 'security', 'performance', 'monitor', 'incident', 'root cause', 'rca', 'enterprise', 'production'] },
+  { label: 'Assess', hint: 'Prove mastery', match: ['practice & assess', 'assess', 'key takeaway', 'takeaway', 'interview', 'scenario question', 'assessment', 'certification', 'quiz', 'notes', 'summary', 'cheat'] },
 ]
+
+// Order matters: check Assess ("practice & assess") before Practice ("practice")
+// so the assess section is not swallowed by the Practice phase.
+const PHASE_ORDER = [0, 1, 2, 3]
 
 function phaseFor(heading) {
   const h = (heading || '').toLowerCase()
-  for (let p = 0; p < PHASES.length; p++) {
+  // "Practice & assess" contains both "practice" and "assess"; match Assess first.
+  if (h.includes('assess')) return 3
+  for (const p of PHASE_ORDER) {
     if (PHASES[p].match.some((m) => h.includes(m))) return p
   }
   return 0

@@ -1,0 +1,155 @@
+title: 'Perpetual OutOfSync From a Mutating Webhook'
+slug: gitops-argocd-diff-ignores-managed-fields
+technology: gitops
+category: Fix
+difficulty: hard
+scenario_type: fix
+lab_mode: simulation
+simulation_type: generic
+time_limit: 1800
+max_score: 100
+is_free: false
+infrastructure_type: docker
+jira_priority: Medium
+description: 'CONTEXT: A team operating gitops has raised a ticket for `Perpetual OutOfSync From a Mutating
+  Webhook`. A customer-facing workflow is degraded and the on-call engineer (you) must diagnose and resolve
+  it. Business impact: reduced service reliability and blocked users until the underlying state is repaired.
+
+
+  ENVIRONMENT: You are working in FixitLab''s offline FixitLab practice environment. The architecture
+  is a single lab-primary node exposing CLI and configuration files; treat it as the production host for
+  this incident. All tools run locally — no paid APIs or external cloud calls are required.
+
+
+  SYMPTOM / STARTING STATE: The `api-gateway` Application flips to OutOfSync seconds after every sync.
+  `argocd app diff` shows a `sidecar.istio.io/status` annotation and an injected container that Git does
+  not declare — a mutating webhook adds them at admission.
+
+
+  OBJECTIVE: api-gateway stops flapping between Synced and OutOfSync; The mutating-webhook-injected fields
+  are identified as the drift source; ignoreDifferences is scoped to only the webhook-owned fields. Acceptance
+  criteria: the change is minimal and reversible, and success means `check.sh` exits successfully.
+
+
+  WORK TO DO: Required tooling is pre-installed; if a command is missing, note it and use the equivalent
+  already on the host. Make the smallest configuration change that moves the system toward the objective
+  (edit the relevant CLI and configuration files), changing one thing at a time. Check your work continuously
+  against the objective — success means `check.sh` exits successfully.
+
+
+  VERIFY: Re-run the same check the grader uses and confirm `check.sh` exits successfully. Capture the
+  before/after output as evidence. Success criteria: the objective''s healthy state holds on a repeat
+  check, not just once.
+
+
+  ROLLBACK: If a change makes things worse, revert that single change immediately (restore the original
+  config file / undo the edit / restart the affected component) and re-observe before trying another hypothesis.
+  Never stack unverified changes.
+
+
+  WHAT TO AVOID: Do not apply broad destructive changes, skip evidence gathering, or fake completion with
+  marker files — the checker validates real system state.'
+objectives:
+- 'api-gateway stops flapping between Synced and OutOfSync'
+- 'The mutating-webhook-injected fields are identified as the drift source'
+- 'ignoreDifferences is scoped to only the webhook-owned fields'
+initial_state: |-
+  The `api-gateway` Application flips to OutOfSync seconds after every sync. `argocd app diff` shows a `sidecar.istio.io/status` annotation and an injected container that Git does not declare — a mutating webhook adds them at admission.
+hints:
+- order: 1
+  cost: 0
+  content: 'ORIENT — what to observe and why:
+
+    Do not touch anything yet. First observe the symptom: perpetual OutOfSync from a mutating webhook
+    is not behaving as the scenario objectives require. This lab is about perpetual OutOfSync from a mutating
+    webhook — how perpetual OutOfSync from a mutating webhook behaves in a gitops environment. Read the
+    objectives and the current state, and note precisely what looks wrong versus healthy before you form
+    any theory.'
+- order: 2
+  cost: 10
+  content: 'APPROACH — the troubleshooting method:
+
+    Work from evidence, not guesses. For perpetual OutOfSync from a mutating webhook problems the reliable
+    method is: (1) reproduce/observe the failure, (2) narrow from the whole system down to the one component
+    that owns the symptom, (3) change exactly one thing, (4) re-check. Fix the underlying misconfiguration
+    you identified (not just the noisy log line), changing one thing at a time.'
+- order: 3
+  cost: 25
+  content: 'WHICH TOOL — the diagnostic command(s):
+
+    Run `docker ps -a` and `docker logs <container>` for the failing container.'
+- order: 4
+  cost: 40
+  content: 'NARROW DOWN — isolate the subsystem:
+
+    1. `docker ps -a` — note Exited status and exit code.
+
+    2. `docker logs <name>` for the startup error.
+
+    3. Inspect the Dockerfile or `docker run` flags if the image is wrong.'
+- order: 5
+  cost: 60
+  content: 'NEAR-SOLUTION — the fix shape + verify (you still apply it):
+
+    1. Fix image, port mapping, volume, or env configuration.
+
+    2. `docker start <name>` or re-run with corrected flags.
+
+    3. Confirm `bash check.sh` shows the container Up.
+
+
+    WHY: the checker validates the container is actually running.'
+summary: |-
+  Diagnose and resolve perpetual outofsync from a mutating webhook in the gitops simulation lab and verify the healthy end state
+estimated_minutes: 30
+xp_reward: 100
+prerequisites:
+- 'Basic Kubernetes and Git literacy'
+tags:
+- 'gitops'
+- 'fix'
+- 'hands-on'
+- 'simulation'
+linked_tutorial: gitops-fundamentals
+what_you_will_learn:
+- 'api-gateway stops flapping between Synced and OutOfSync'
+- 'The mutating-webhook-injected fields are identified as the drift source'
+- 'Understand how ArgoCD ignoreDifferences and managed-field ownership prevent false drift from mutating admission webhooks'
+environment:
+  nodes:
+  - role: primary
+    os: FixitLab GitOps practice cluster
+    hostname: lab-primary
+    ip: 127.0.0.1
+    specs: local offline simulation
+  pre_installed:
+  - bash
+  - coreutils
+  - kubectl
+  - argocd
+  - flux
+  - git
+  credentials:
+  - user: root
+    password: lab123
+tasks:
+- id: task_1
+  title: 'Perpetual OutOfSync From a Mutating Webhook'
+  description: |-
+    Restore healthy behavior for Perpetual OutOfSync From a Mutating Webhook by reproducing the diagnosis from the symptom, isolating the root cause with evidence, applying the smallest safe fix, and validating the outcome with the checker.
+  background: |-
+    This gitops lab teaches how ArgoCD ignoreDifferences and managed-field ownership prevent false drift from mutating admission webhooks through systematic troubleshooting: observe, hypothesize, change, verify.
+  validation:
+    type: custom_script
+    script: check.sh
+    error_message: |-
+      The scenario objective is not yet satisfied. Re-read hint tier 2, confirm the root cause, and apply the documented remediation so /opt/fixitlab/academy/gitops-argocd-diff-ignores-managed-fields.conf carries the FIXED-OK marker.
+solution:
+  summary: |-
+    A mutating admission webhook (sidecar injector) adds fields ArgoCD then treats as drift, causing perpetual OutOfSync. Add the injected fields to the Application's `ignoreDifferences` (jsonPointers/managedFieldsManagers) so ArgoCD ignores the webhook-owned mutations and the app stays Synced.
+  files_changed: []
+  commands_run:
+  - 'argocd app diff api-gateway'
+  - 'kubectl get deploy api-gateway -o yaml'
+  - 'kubectl get mutatingwebhookconfigurations'
+  reference_docs: gitops-fundamentals

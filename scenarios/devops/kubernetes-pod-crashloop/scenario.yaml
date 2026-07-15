@@ -7,32 +7,44 @@ time_limit: 1200
 max_score: 100
 infrastructure_type: docker
 jira_priority: High
-description: 'CONTEXT: A team operating DevOps delivery needs you to resolve `Kubernetes
-  Pod CrashLoopBackOff` during a realistic incident. The business impact is reduced
-  service reliability until the underlying state is repaired.
+description: 'CONTEXT: A team operating DevOps delivery has raised a ticket for `Kubernetes Pod CrashLoopBackOff`.
+  A customer-facing workflow is degraded and the on-call engineer (you) must diagnose and resolve it.
+  Business impact: reduced service reliability and blocked users until the underlying state is repaired.
 
 
-  ENVIRONMENT: You are working in FixitLab''s offline CI/CD lab with git repos, pipelines,
-  artifacts, and runbooks. All tools run locally; no paid APIs or external cloud calls
-  are required.
+  ENVIRONMENT: You are working in FixitLab''s offline CI/CD lab. The architecture is a single lab-primary
+  node exposing git repos, pipelines, artifacts, and runbooks; treat it as the production host for this
+  incident. All tools run locally — no paid APIs or external cloud calls are required.
 
 
-  SYMPTOM / STARTING STATE: Simulated Kubernetes environment on Ubuntu with a manifest
-  at /opt/k8s/deployment.yaml. The Service targetPort (8080) doesn''t match nginx''s
-  containerPort (80), and nginx isn''t serving, so the app is down. Production pods
-  backing an nginx web service are in CrashLoopBackOff and the site is unreachable.
-  In this manifest the Service''s targetPort doesn''t match nginx''s containerPort,
-  and the web server isn''t actually serving — so traffic never reaches a working
-  backend. Fix the manifest port mapping and get nginx responding.
+  SYMPTOM / STARTING STATE: Simulated Kubernetes environment on Ubuntu with a manifest at /opt/k8s/deployment.yaml.
+  The Service targetPort (8080) doesn''t match nginx''s containerPort (80), and nginx isn''t serving,
+  so the app is down.
 
 
-  OBJECTIVE: Analyze /opt/k8s/deployment.yaml for the port mismatch; Align the Service
-  targetPort with nginx''s containerPort (80); Verify the web server responds on the
-  correct port. Success means `check.sh` exits successfully.
+  OBJECTIVE: Analyze /opt/k8s/deployment.yaml for the port mismatch; Align the Service targetPort with
+  nginx''s containerPort (80); Verify the web server responds on the correct port. Acceptance criteria:
+  the change is minimal and reversible, and success means `check.sh` exits successfully.
 
 
-  WHAT TO AVOID: Do not apply broad destructive changes, skip evidence gathering,
-  or fake completion with marker files — the checker validates real system state.'
+  WORK TO DO: Required tooling is pre-installed; if a command is missing, note it and use the equivalent
+  already on the host. Make the smallest configuration change that moves the system toward the objective
+  (edit the relevant git repos, pipelines, artifacts, and runbooks), changing one thing at a time. Check
+  your work continuously against the objective — success means `check.sh` exits successfully.
+
+
+  VERIFY: Re-run the same check the grader uses and confirm `check.sh` exits successfully. Capture the
+  before/after output as evidence. Success criteria: the objective''s healthy state holds on a repeat
+  check, not just once.
+
+
+  ROLLBACK: If a change makes things worse, revert that single change immediately (restore the original
+  config file / undo the edit / restart the affected component) and re-observe before trying another hypothesis.
+  Never stack unverified changes.
+
+
+  WHAT TO AVOID: Do not apply broad destructive changes, skip evidence gathering, or fake completion with
+  marker files — the checker validates real system state.'
 objectives:
 - Analyze /opt/k8s/deployment.yaml for the port mismatch
 - Align the Service targetPort with nginx's containerPort (80)
@@ -43,29 +55,47 @@ initial_state: Simulated Kubernetes environment on Ubuntu with a manifest at /op
 hints:
 - order: 1
   cost: 0
-  content: 'Where to look: Run `kubectl get pods -A` and `kubectl describe pod <name>`
-    for any pod not in Running state.'
+  content: 'ORIENT — what to observe and why:
+
+    Do not touch anything yet. First observe the symptom: kubernetes pod CrashLoopBackOff is not behaving
+    as the scenario objectives require. This lab is about kubernetes pod CrashLoopBackOff — how kubernetes
+    pod CrashLoopBackOff behaves in a DevOps delivery environment. Read the objectives and the current
+    state, and note precisely what looks wrong versus healthy before you form any theory.'
 - order: 2
-  cost: 25
-  content: 'Diagnostic steps:
+  cost: 10
+  content: 'APPROACH — the troubleshooting method:
 
-    1. `kubectl get pods` — note CrashLoopBackOff, ImagePullBackOff, or Pending.
-
-    2. `kubectl describe pod <name>` — read Events at the bottom.
-
-    3. `kubectl logs <name> [--previous]` if the container restarted.'
+    Work from evidence, not guesses. For kubernetes pod CrashLoopBackOff problems the reliable method
+    is: (1) reproduce/observe the failure, (2) narrow from the whole system down to the one component
+    that owns the symptom, (3) change exactly one thing, (4) re-check. Fix the underlying misconfiguration
+    you identified (not just the noisy log line), changing one thing at a time.'
 - order: 3
-  cost: 50
-  content: 'Exact fix + verification:
+  cost: 25
+  content: 'WHICH TOOL — the diagnostic command(s):
 
-    1. Fix the root cause (image name, env var, volume mount, or probe).
+    Test the config to get the exact file and line: `nginx -t`. It prints the offending directive (e.g.
+    unknown directive "listn").'
+- order: 4
+  cost: 40
+  content: 'NARROW DOWN — isolate the subsystem:
 
-    2. `kubectl apply -f` the corrected manifest or delete the pod to recreate.
+    1. Run `nginx -t` and `systemctl status nginx` for config vs service errors.
 
-    3. Confirm `kubectl get pods` shows every pod Running.
+    2. Open the cited file under `/etc/nginx/`.
+
+    3. Compare listen/upstream/proxy directives to the scenario objectives.'
+- order: 5
+  cost: 60
+  content: 'NEAR-SOLUTION — the fix shape + verify (you still apply it):
+
+    1. Correct the typo on the reported line and save the file.
+
+    2. Re-run `nginx -t` until it reports syntax is ok.
+
+    3. Run `systemctl enable --now nginx`, then `curl -I http://localhost` (expect HTTP 200).
 
 
-    WHY: Kubernetes only reports healthy when the workload actually runs.'
+    WHY: systemd will not start nginx until `nginx -t` passes.'
 summary: Complete the kubernetes pod crashloopbackoff devops lab and verify success
   with the checker
 estimated_minutes: 20

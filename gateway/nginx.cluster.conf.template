@@ -153,6 +153,14 @@ server {
         access_log off;
         expires 30d;
         add_header Cache-Control "public, immutable";
+        # Security headers must be repeated per-location: nginx does NOT inherit
+        # server-level add_header into a location that sets its own add_header.
+        add_header Strict-Transport-Security "max-age=63072000; includeSubDomains; preload" always;
+        add_header X-Content-Type-Options "nosniff" always;
+        add_header X-Frame-Options "DENY" always;
+        add_header Referrer-Policy "strict-origin-when-cross-origin" always;
+        add_header Permissions-Policy "camera=(self), microphone=(self), geolocation=()" always;
+        add_header Content-Security-Policy "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval' https://checkout.razorpay.com; worker-src 'self' blob:; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https://lh3.googleusercontent.com; connect-src 'self' wss://fixitlab.in wss://www.fixitlab.in wss://*.fixitlab.in https://api.github.com https://accounts.google.com https://oauth2.googleapis.com https://api.razorpay.com https://lumberjack.razorpay.com; font-src 'self' data: https://fonts.googleapis.com https://fonts.gstatic.com; frame-src https://api.razorpay.com https://checkout.razorpay.com; frame-ancestors 'none';" always;
     }
 
     # ── FRONTEND SPA entry — never cache ──
@@ -166,6 +174,12 @@ server {
         add_header Cache-Control "no-cache, no-store, must-revalidate" always;
         add_header Pragma "no-cache" always;
         expires -1;
+        add_header Strict-Transport-Security "max-age=63072000; includeSubDomains; preload" always;
+        add_header X-Content-Type-Options "nosniff" always;
+        add_header X-Frame-Options "DENY" always;
+        add_header Referrer-Policy "strict-origin-when-cross-origin" always;
+        add_header Permissions-Policy "camera=(self), microphone=(self), geolocation=()" always;
+        add_header Content-Security-Policy "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval' https://checkout.razorpay.com; worker-src 'self' blob:; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https://lh3.googleusercontent.com; connect-src 'self' wss://fixitlab.in wss://www.fixitlab.in wss://*.fixitlab.in https://api.github.com https://accounts.google.com https://oauth2.googleapis.com https://api.razorpay.com https://lumberjack.razorpay.com; font-src 'self' data: https://fonts.googleapis.com https://fonts.gstatic.com; frame-src https://api.razorpay.com https://checkout.razorpay.com; frame-ancestors 'none';" always;
     }
 
     location /assets/ {
@@ -174,6 +188,12 @@ server {
         proxy_set_header Host $host;
         add_header Cache-Control "public, max-age=31536000, immutable" always;
         expires 1y;
+        add_header Strict-Transport-Security "max-age=63072000; includeSubDomains; preload" always;
+        add_header X-Content-Type-Options "nosniff" always;
+        add_header X-Frame-Options "DENY" always;
+        add_header Referrer-Policy "strict-origin-when-cross-origin" always;
+        add_header Permissions-Policy "camera=(self), microphone=(self), geolocation=()" always;
+        add_header Content-Security-Policy "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval' https://checkout.razorpay.com; worker-src 'self' blob:; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https://lh3.googleusercontent.com; connect-src 'self' wss://fixitlab.in wss://www.fixitlab.in wss://*.fixitlab.in https://api.github.com https://accounts.google.com https://oauth2.googleapis.com https://api.razorpay.com https://lumberjack.razorpay.com; font-src 'self' data: https://fonts.googleapis.com https://fonts.gstatic.com; frame-src https://api.razorpay.com https://checkout.razorpay.com; frame-ancestors 'none';" always;
     }
 
     # ── FRONTEND (production build served locally on the edge node) ──
@@ -185,6 +205,12 @@ server {
         proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
         proxy_set_header X-Forwarded-Proto $scheme;
         add_header Cache-Control "no-cache, no-store, must-revalidate" always;
+        add_header Strict-Transport-Security "max-age=63072000; includeSubDomains; preload" always;
+        add_header X-Content-Type-Options "nosniff" always;
+        add_header X-Frame-Options "DENY" always;
+        add_header Referrer-Policy "strict-origin-when-cross-origin" always;
+        add_header Permissions-Policy "camera=(self), microphone=(self), geolocation=()" always;
+        add_header Content-Security-Policy "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval' https://checkout.razorpay.com; worker-src 'self' blob:; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https://lh3.googleusercontent.com; connect-src 'self' wss://fixitlab.in wss://www.fixitlab.in wss://*.fixitlab.in https://api.github.com https://accounts.google.com https://oauth2.googleapis.com https://api.razorpay.com https://lumberjack.razorpay.com; font-src 'self' data: https://fonts.googleapis.com https://fonts.gstatic.com; frame-src https://api.razorpay.com https://checkout.razorpay.com; frame-ancestors 'none';" always;
     }
 
     location /api/admin/ {
@@ -313,9 +339,23 @@ server {
         proxy_set_header X-Forwarded-Proto $scheme;
     }
 
-    # ── UPLOADED MEDIA (synced from D2 to the shared volume) ──
+    # ── UPLOADED MEDIA ──
+    # The media volume (uploaded thread images etc.) is written by the backend on
+    # the App droplet (D2). Docker named volumes are per-HOST, so the edge node's
+    # (D1) `media_volume` is a DIFFERENT, empty volume — serving /media/ from a
+    # local `alias` here returned 404 for every uploaded image (community thread
+    # screenshots in particular). There is no cross-node volume sync, so instead
+    # proxy /media/ across the VPC to the App backend (D2), which serves it via
+    # Django when SERVE_MEDIA is enabled for the cluster. nginx still adds the
+    # long-lived cache headers on the way back out.
     location /media/ {
-        alias /media/;
+        proxy_pass http://backend_pool/media/;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_connect_timeout 30s;
+        proxy_read_timeout    60s;
         access_log off;
         expires 7d;
         add_header Cache-Control "public";

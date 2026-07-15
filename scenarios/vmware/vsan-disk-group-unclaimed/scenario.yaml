@@ -1,22 +1,38 @@
 title: vSAN Disk Group Unclaimed
 slug: vsan-disk-group-unclaimed
 category: Fix
-description: 'CONTEXT: A team operating VMware vSphere needs you to resolve `vSAN Disk Group Unclaimed`
-  during a realistic incident. The business impact is reduced service reliability until the underlying
-  state is repaired.
+description: 'CONTEXT: A team operating VMware vSphere has raised a ticket for `vSAN Disk Group Unclaimed`.
+  A customer-facing workflow is degraded and the on-call engineer (you) must diagnose and resolve it.
+  Business impact: reduced service reliability and blocked users until the underlying state is repaired.
 
 
-  ENVIRONMENT: You are working in FixitLab''s offline vSphere lab with VMs, datastores, vCenter, and ESXi
-  tasks. All tools run locally; no paid APIs or external cloud calls are required.
+  ENVIRONMENT: You are working in FixitLab''s offline vSphere lab. The architecture is a single lab-primary
+  node exposing VMs, datastores, vCenter, and ESXi tasks; treat it as the production host for this incident.
+  All tools run locally — no paid APIs or external cloud calls are required.
 
 
-  SYMPTOM / STARTING STATE: vCenter shows unclaimed vSAN disks on a host. vSAN capacity is reduced because
-  a host''s disks are unclaimed and not contributing to the datastore. Claim the disks and confirm vSAN
-  is healthy.
+  SYMPTOM / STARTING STATE: vCenter shows unclaimed vSAN disks on a host.
 
 
   OBJECTIVE: Confirm vSAN disks are unclaimed; Claim the disks into the disk group; Verify all vSAN disks
-  are claimed. Success means `check.sh` exits successfully.
+  are claimed. Acceptance criteria: the change is minimal and reversible, and success means `check.sh`
+  exits successfully.
+
+
+  WORK TO DO: Required tooling is pre-installed; if a command is missing, note it and use the equivalent
+  already on the host. Make the smallest configuration change that moves the system toward the objective
+  (edit the relevant VMs, datastores, vCenter, and ESXi tasks), changing one thing at a time. Check your
+  work continuously against the objective — success means `check.sh` exits successfully.
+
+
+  VERIFY: Re-run the same check the grader uses and confirm `check.sh` exits successfully. Capture the
+  before/after output as evidence. Success criteria: the objective''s healthy state holds on a repeat
+  check, not just once.
+
+
+  ROLLBACK: If a change makes things worse, revert that single change immediately (restore the original
+  config file / undo the edit / restart the affected component) and re-observe before trying another hypothesis.
+  Never stack unverified changes.
 
 
   WHAT TO AVOID: Do not apply broad destructive changes, skip evidence gathering, or fake completion with
@@ -37,19 +53,37 @@ initial_state: vCenter shows unclaimed vSAN disks on a host.
 hints:
 - order: 1
   cost: 0
-  content: 'Where to look: Run `df -h` and `du -xh /var /tmp /home | sort -h | tail -20` for large paths.'
+  content: 'ORIENT — what to observe and why:
+
+    Do not touch anything yet. First observe the symptom: vSAN disk group unclaimed is not behaving as
+    the scenario objectives require. This lab is about vSAN disk group unclaimed — how vSAN disk group
+    unclaimed behaves in a VMware vSphere environment. Read the objectives and the current state, and
+    note precisely what looks wrong versus healthy before you form any theory.'
 - order: 2
+  cost: 10
+  content: 'APPROACH — the troubleshooting method:
+
+    Work from evidence, not guesses. For vSAN disk group unclaimed problems the reliable method is: (1)
+    reproduce/observe the failure, (2) narrow from the whole system down to the one component that owns
+    the symptom, (3) change exactly one thing, (4) re-check. Fix the underlying misconfiguration you identified
+    (not just the noisy log line), changing one thing at a time.'
+- order: 3
   cost: 25
-  content: 'Diagnostic steps:
+  content: 'WHICH TOOL — the diagnostic command(s):
+
+    Run `df -h` and `du -xh /var /tmp /home | sort -h | tail -20` for large paths.'
+- order: 4
+  cost: 40
+  content: 'NARROW DOWN — isolate the subsystem:
 
     1. Find which mount is 100% — often `/` or `/var`.
 
     2. `journalctl --disk-usage` and old logs under `/var/log`.
 
     3. Look for core dumps, temp files, or oversized application data.'
-- order: 3
-  cost: 50
-  content: 'Exact fix + verification:
+- order: 5
+  cost: 60
+  content: 'NEAR-SOLUTION — the fix shape + verify (you still apply it):
 
     1. Remove or rotate the largest safe files (logs, caches, old packages).
 

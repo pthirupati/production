@@ -1,0 +1,153 @@
+title: 'Memory Limiter Refuses All Data'
+slug: otel-collector-memorylimiter-refusing
+technology: opentelemetry
+category: Fix
+difficulty: hard
+scenario_type: fix
+lab_mode: simulation
+simulation_type: generic
+time_limit: 1800
+max_score: 100
+is_free: false
+infrastructure_type: docker
+jira_priority: Medium
+description: 'CONTEXT: A team operating opentelemetry has raised a ticket for `Memory Limiter Refuses
+  All Data`. A customer-facing workflow is degraded and the on-call engineer (you) must diagnose and resolve
+  it. Business impact: reduced service reliability and blocked users until the underlying state is repaired.
+
+
+  ENVIRONMENT: You are working in FixitLab''s offline FixitLab practice environment. The architecture
+  is a single lab-primary node exposing CLI and configuration files; treat it as the production host for
+  this incident. All tools run locally — no paid APIs or external cloud calls are required.
+
+
+  SYMPTOM / STARTING STATE: The Collector logs `data refused due to high memory usage` continuously and
+  no telemetry reaches the backend. `otelcol_processor_refused_spans` climbs steadily even though the
+  host has plenty of free RAM.
+
+
+  OBJECTIVE: otelcol_processor_refused_spans stops climbing; The too-low memory_limiter limit_mib is confirmed
+  as root cause; Telemetry flows to the backend after the limiter is right-sized. Acceptance criteria:
+  the change is minimal and reversible, and success means `check.sh` exits successfully.
+
+
+  WORK TO DO: Required tooling is pre-installed; if a command is missing, note it and use the equivalent
+  already on the host. Make the smallest configuration change that moves the system toward the objective
+  (edit the relevant CLI and configuration files), changing one thing at a time. Check your work continuously
+  against the objective — success means `check.sh` exits successfully.
+
+
+  VERIFY: Re-run the same check the grader uses and confirm `check.sh` exits successfully. Capture the
+  before/after output as evidence. Success criteria: the objective''s healthy state holds on a repeat
+  check, not just once.
+
+
+  ROLLBACK: If a change makes things worse, revert that single change immediately (restore the original
+  config file / undo the edit / restart the affected component) and re-observe before trying another hypothesis.
+  Never stack unverified changes.
+
+
+  WHAT TO AVOID: Do not apply broad destructive changes, skip evidence gathering, or fake completion with
+  marker files — the checker validates real system state.'
+objectives:
+- 'otelcol_processor_refused_spans stops climbing'
+- 'The too-low memory_limiter limit_mib is confirmed as root cause'
+- 'Telemetry flows to the backend after the limiter is right-sized'
+initial_state: |-
+  The Collector logs `data refused due to high memory usage` continuously and no telemetry reaches the backend. `otelcol_processor_refused_spans` climbs steadily even though the host has plenty of free RAM.
+hints:
+- order: 1
+  cost: 0
+  content: 'ORIENT — what to observe and why:
+
+    Do not touch anything yet. First observe the symptom: memory limiter refuses all data is not behaving
+    as the scenario objectives require. This lab is about memory limiter refuses all data — how memory
+    limiter refuses all data behaves in a opentelemetry environment. Read the objectives and the current
+    state, and note precisely what looks wrong versus healthy before you form any theory.'
+- order: 2
+  cost: 10
+  content: 'APPROACH — the troubleshooting method:
+
+    Work from evidence, not guesses. For memory limiter refuses all data problems the reliable method
+    is: (1) reproduce/observe the failure, (2) narrow from the whole system down to the one component
+    that owns the symptom, (3) change exactly one thing, (4) re-check. Fix the underlying misconfiguration
+    you identified (not just the noisy log line), changing one thing at a time.'
+- order: 3
+  cost: 25
+  content: 'WHICH TOOL — the diagnostic command(s):
+
+    Run `docker ps -a` and `docker logs <container>` for the failing container.'
+- order: 4
+  cost: 40
+  content: 'NARROW DOWN — isolate the subsystem:
+
+    1. `docker ps -a` — note Exited status and exit code.
+
+    2. `docker logs <name>` for the startup error.
+
+    3. Inspect the Dockerfile or `docker run` flags if the image is wrong.'
+- order: 5
+  cost: 60
+  content: 'NEAR-SOLUTION — the fix shape + verify (you still apply it):
+
+    1. Fix image, port mapping, volume, or env configuration.
+
+    2. `docker start <name>` or re-run with corrected flags.
+
+    3. Confirm `bash check.sh` shows the container Up.
+
+
+    WHY: the checker validates the container is actually running.'
+summary: |-
+  Diagnose and resolve memory limiter refuses all data in the opentelemetry simulation lab and verify the healthy end state
+estimated_minutes: 30
+xp_reward: 100
+prerequisites:
+- 'Basic distributed-systems and HTTP literacy'
+tags:
+- 'opentelemetry'
+- 'fix'
+- 'hands-on'
+- 'simulation'
+linked_tutorial: opentelemetry-fundamentals
+what_you_will_learn:
+- 'otelcol_processor_refused_spans stops climbing'
+- 'The too-low memory_limiter limit_mib is confirmed as root cause'
+- 'Understand how the memory_limiter processor sheds load to prevent OOM and why a misconfigured limit refuses all data'
+environment:
+  nodes:
+  - role: primary
+    os: FixitLab OpenTelemetry observability lab
+    hostname: lab-primary
+    ip: 127.0.0.1
+    specs: local offline simulation
+  pre_installed:
+  - bash
+  - coreutils
+  - otelcol
+  - curl
+  - jq
+  credentials:
+  - user: root
+    password: lab123
+tasks:
+- id: task_1
+  title: 'Memory Limiter Refuses All Data'
+  description: |-
+    Restore healthy behavior for Memory Limiter Refuses All Data by reproducing the diagnosis from the symptom, isolating the root cause with evidence, applying the smallest safe fix, and validating the outcome with the checker.
+  background: |-
+    This opentelemetry lab teaches how the memory_limiter processor sheds load to prevent OOM and why a misconfigured limit refuses all data through systematic troubleshooting: observe, hypothesize, change, verify.
+  validation:
+    type: custom_script
+    script: check.sh
+    error_message: |-
+      The scenario objective is not yet satisfied. Re-read hint tier 2, confirm the root cause, and apply the documented remediation so /opt/fixitlab/academy/otel-collector-memorylimiter-refusing.conf carries the FIXED-OK marker.
+solution:
+  summary: |-
+    The `memory_limiter` processor's `limit_mib` is set far below the Collector's actual working set (or below GOMEMLIMIT), so it trips immediately and refuses everything. Raise `limit_mib`/`spike_limit_mib` to match the container memory limit so the limiter protects rather than starves the pipeline.
+  files_changed: []
+  commands_run:
+  - 'cat /otel/collector/config.yaml'
+  - 'curl -s localhost:8888/metrics | grep refused'
+  - 'otelcol validate --config /otel/collector/config.yaml'
+  reference_docs: opentelemetry-fundamentals

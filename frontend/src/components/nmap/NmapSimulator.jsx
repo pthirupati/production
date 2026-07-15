@@ -187,6 +187,16 @@ const SCOPED_CSS = `
 .nmap-sim .nm-modal-body { padding: .85rem; overflow: auto; }
 `
 
+// The engine's version string usually already embeds the product name (e.g.
+// "nginx 1.18.0"), so naively joining product + version double-prints it
+// ("nginx nginx 1.18.0"). Only prefix the product when it isn't already there.
+function fmtVersion(p) {
+  const ver = String(p?.version || '').trim()
+  const prod = String(p?.product || '').trim()
+  if (prod && !ver.toLowerCase().includes(prod.toLowerCase())) return `${prod} ${ver}`.trim()
+  return ver
+}
+
 function StateBadge({ state }) {
   const cls = state === 'open' ? 'nm-b-open' : state === 'filtered' ? 'nm-b-filtered' : 'nm-b-closed'
   return <span className={`nm-badge ${cls}`}>{(state || 'closed').toUpperCase()}</span>
@@ -219,15 +229,23 @@ function nmapOutput(scan, activeHost) {
   const hosts = scan.hosts || []
   const blocks = hosts.map((h) => {
     const ports = (h.ports || []).map((p) => {
-      const version = [p.product, p.version].filter(Boolean).join(' ')
-      return `${String(p.port).padEnd(8)}/${(p.proto || 'tcp').padEnd(4)} ${String(p.state || 'closed').padEnd(9)} ${String(p.service || 'unknown').padEnd(12)} ${version}`.trimEnd()
+      // nmap renders the port as "22/tcp" as one column, then pads.
+      return `${`${p.port}/${p.proto || 'tcp'}`.padEnd(9)} ${String(p.state || 'closed').padEnd(9)} ${String(p.service || 'unknown').padEnd(12)} ${fmtVersion(p)}`.trimEnd()
     }).join('\n')
     const selected = activeHost?.ip === h.ip ? ' [selected]' : ''
+    // Real nmap collapses the uninteresting ports into a single "Not shown:" line
+    // (e.g. "Not shown: 997 closed tcp ports (conn-refused)") above the table.
+    const ns = h.not_shown || {}
+    const nsParts = []
+    if (ns.closed) nsParts.push(`${ns.closed} closed tcp ports (conn-refused)`)
+    if (ns.filtered) nsParts.push(`${ns.filtered} filtered tcp ports (no-response)`)
+    const notShownLine = nsParts.length ? `Not shown: ${nsParts.join(', ')}` : null
     return [
       `Nmap scan report for ${h.hostname ? `${h.hostname} (${h.ip})` : h.ip}${selected}`,
       `Host is ${h.state || 'up'} (${h.latency || '0.0032s'} latency).`,
       h.mac ? `MAC Address: ${h.mac}${h.vendor ? ` (${h.vendor})` : ''}` : null,
-      ports ? 'PORT      STATE     SERVICE      VERSION' : 'All 1000 scanned ports are closed or filtered',
+      ports ? notShownLine : null,
+      ports ? 'PORT      STATE     SERVICE      VERSION' : (notShownLine || 'All 1000 scanned ports are in ignored states.'),
       ports || null,
       h.os ? `OS details: ${h.os}${h.os_accuracy ? ` (${h.os_accuracy}% accuracy)` : ''}` : null,
       'Network Distance: 1 hop',
@@ -268,7 +286,13 @@ export default function NmapSimulator({
   const [modal, setModal] = useState(null)
   const [scriptCategory, setScriptCategory] = useState('default')
   const [selectedHost, setSelectedHost] = useState(null)
+  const [progressLines, setProgressLines] = useState([]) // live nmap progress feed while scanning
+  const [scanProgress, setScanProgress] = useState(0)     // 0..100 for the progress bar
+  const [portFilter, setPortFilter] = useState('')        // Search Scan Results → filters the ports table
+  const [topoZoom, setTopoZoom] = useState(1)             // functional topology zoom (replaces decorative buttons)
   const pollRef = useRef(null)
+  const streamTimersRef = useRef([])   // setTimeout ids for the progressive reveal
+  const streamingRef = useRef(false)   // true while a scan animation is in flight (pauses poll clobber)
 
   const load = useCallback(async () => {
     try {
@@ -285,9 +309,18 @@ export default function NmapSimulator({
 
   useEffect(() => {
     load()
-    pollRef.current = setInterval(load, 20000)
+    // The 20s aggregate poll must NOT clobber an in-progress scan reveal, so it
+    // no-ops while the progressive stream is running (streamScan calls load()
+    // itself once the reveal completes).
+    pollRef.current = setInterval(() => { if (!streamingRef.current) load() }, 20000)
     return () => clearInterval(pollRef.current)
   }, [load])
+
+  // Abort any pending reveal timers if the component unmounts mid-scan.
+  useEffect(() => () => {
+    streamTimersRef.current.forEach(clearTimeout)
+    streamTimersRef.current = []
+  }, [])
 
   const toggleFlag = (f) => {
     setFlags(prev => {
@@ -315,11 +348,100 @@ export default function NmapSimulator({
     return parts.join(' ')
   }, [flags, ports, sudo, targets])
 
+  // Cancel any in-flight progressive-reveal timers and stop the streaming state.
+  const clearStream = useCallback(() => {
+    streamTimersRef.current.forEach(clearTimeout)
+    streamTimersRef.current = []
+    streamingRef.current = false
+  }, [])
+
+  // Build the sequence of realistic nmap "process" log lines for a scan result,
+  // scaled by the backend-authoritative duration. Returns [{ text }] steps that
+  // the reveal loop paces out; the final host output is appended by the caller.
+  const buildProgressPlan = useCallback((scan) => {
+    const caps = scan?.caps || {}
+    const hostCount = scan?.host_count ?? (scan?.addresses_scanned || 1)
+    const upCount = scan?.hosts_up ?? (scan?.hosts || []).length
+    const ts = new Date().toTimeString().slice(0, 5)
+    const isPing = scan?.scan_type === 'ping_sweep'
+    const isSyn = !!(caps.syn_scan) && !!scan?.sudo
+    const isConnect = !!caps.connect_scan
+    const scanLabel = isSyn ? 'SYN Stealth Scan' : isConnect ? 'Connect Scan' : 'SYN Stealth Scan'
+
+    const lines = []
+    lines.push(`Starting Nmap 7.94SVN ( https://nmap.org ) at ${ts}`)
+    lines.push(`Initiating Ping Scan at ${ts}`)
+    lines.push(`Scanning ${hostCount} host${hostCount === 1 ? '' : 's'} [${isPing ? '2' : '1'} port${isPing ? 's' : ''}/host]`)
+    lines.push(`Completed Ping Scan at ${ts}, ${(scan?.duration ? Math.max(0.4, scan.duration * 0.12) : 0.6).toFixed(2)}s elapsed (${hostCount} total hosts)`)
+    if (!isPing) {
+      lines.push(`Initiating Parallel DNS resolution of ${hostCount} host${hostCount === 1 ? '' : 's'}.`)
+      lines.push(`Initiating ${scanLabel} at ${ts}`)
+      lines.push(`Scanning ${upCount || hostCount} host${(upCount || hostCount) === 1 ? '' : 's'} [${scan?.port_count ?? 1000} ports]`)
+      // Mid-scan timing estimates (the "About X% done; ETC ..." heartbeat).
+      lines.push({ pct: 33, text: `${scanLabel} Timing: About 33.00% done; ETC: ${ts} (${(scan?.duration ? scan.duration * 0.66 : 5).toFixed(0)}s remaining)` })
+      lines.push({ pct: 68, text: `${scanLabel} Timing: About 68.00% done; ETC: ${ts} (${(scan?.duration ? scan.duration * 0.31 : 2).toFixed(0)}s remaining)` })
+      lines.push(`Completed ${scanLabel} at ${ts}, ${(scan?.duration ? scan.duration * 0.7 : 4).toFixed(2)}s elapsed`)
+      if (caps.version) {
+        lines.push(`Initiating Service scan at ${ts}`)
+        lines.push(`Scanning ${scan?.port_count ?? 'several'} services on ${upCount || hostCount} host${(upCount || hostCount) === 1 ? '' : 's'}`)
+      }
+      if (caps.os_detect && scan?.sudo) {
+        lines.push(`Initiating OS detection (try #1) against ${upCount || hostCount} host${(upCount || hostCount) === 1 ? '' : 's'}`)
+      }
+    }
+    if (scan?.warning) lines.push(scan.warning)
+    return lines.map((l) => (typeof l === 'string' ? { text: l } : l))
+  }, [])
+
+  // Progressively reveal the scan: stream the process log lines paced to the
+  // backend duration, then flip lastScan on so the tables/output render. This
+  // is DISPLAY ONLY — the engine already recorded discovery when scan() resolved.
+  const streamScan = useCallback((scan) => {
+    clearStream()
+    streamingRef.current = true
+    setProgressLines([])
+    setScanProgress(0)
+    setTab('output')
+
+    const plan = buildProgressPlan(scan)
+    // Total wall-clock the animation should span, capped so the UI never feels
+    // stuck (a 4-minute full-range sweep animates in a watchable ~8s window).
+    const total = Math.min(Math.max((scan?.duration || 2) * 1000, 900), 8000)
+    const step = total / (plan.length + 1)
+
+    plan.forEach((entry, idx) => {
+      const t = setTimeout(() => {
+        setProgressLines((prev) => [...prev, entry.text])
+        setScanProgress(entry.pct != null ? entry.pct : Math.round(((idx + 1) / (plan.length + 1)) * 100))
+      }, Math.round(step * (idx + 1)))
+      streamTimersRef.current.push(t)
+    })
+
+    // Final tick: reveal the parsed results and end the "process".
+    const done = setTimeout(() => {
+      setScanProgress(100)
+      setLastScan(scan)
+      const firstUp = (scan.hosts || []).find(h => h.state === 'up') || scan.hosts?.[0]
+      setSelectedHost(firstUp?.ip || null)
+      streamingRef.current = false
+      setScanning(false)
+      // Refresh aggregate KPIs/history now that the reveal is complete (deferred
+      // so an early poll can't clobber the in-progress stream).
+      load()
+    }, Math.round(total))
+    streamTimersRef.current.push(done)
+  }, [buildProgressPlan, clearStream, load])
+
   const runScan = useCallback(async () => {
     if (scanning) return
     if (!targets.trim()) { setError('Enter a target (IP, CIDR, range, hostname, or "all")'); return }
+    clearStream()
     setScanning(true)
     setError('')
+    setLastScan(null)      // clear the previous result so the stream reads as a fresh run
+    setProgressLines(['Starting Nmap 7.94SVN ...'])
+    setScanProgress(0)
+    setTab('output')
     try {
       const res = await nmapApi.scan(sessionId, {
         targets: targets.trim(),
@@ -329,37 +451,104 @@ export default function NmapSimulator({
       })
       if (res?.ok === false) {
         setError(res.error || res.message || 'Scan rejected')
+        setScanning(false)
+        clearStream()
       } else if (res?.scan) {
-        setLastScan(res.scan)
-        setTab('output')
-        const firstUp = (res.scan.hosts || []).find(h => h.state === 'up') || res.scan.hosts?.[0]
-        setSelectedHost(firstUp?.ip || null)
+        // The engine has already recorded discovery; now defer the DISPLAY,
+        // streaming the process feel paced to the backend-authoritative duration.
+        streamScan(res.scan)
+      } else {
+        setScanning(false)
+        clearStream()
+        load()
       }
-      // Refresh aggregate state so summary / scan history update.
-      load()
     } catch {
       setError('Scan failed — try again')
-    } finally {
       setScanning(false)
+      clearStream()
     }
-  }, [scanning, targets, flags, ports, sudo, sessionId, load])
+  }, [scanning, targets, flags, ports, sudo, sessionId, load, clearStream, streamScan])
+
+  // Cancel an in-flight scan: abort the reveal timers (nmap's Ctrl-C feel).
+  const cancelScan = useCallback(() => {
+    clearStream()
+    setScanning(false)
+    setProgressLines((prev) => [...prev, '', 'Scan aborted by user (caught SIGINT).'])
+    setScanProgress(0)
+  }, [clearStream])
 
   const resetSession = useCallback(async () => {
+    clearStream()
+    setScanning(false)
+    setProgressLines([])
+    setScanProgress(0)
+    setPortFilter('')
     try { await nmapApi.action(sessionId, 'reset', {}) } catch { /* ignore */ }
     setLastScan(null)
     setSelectedHost(null)
+    load()
+  }, [sessionId, load, clearStream])
+
+  // Stop/start a listening service on a host. The port's state changes on the
+  // network after a short wall-clock delay (modelled server-side), so a re-scan
+  // is required to observe it — mirroring real socket teardown/bind latency.
+  const serviceControl = useCallback(async (ip, port, action) => {
+    try {
+      await nmapApi.action(sessionId, action, { ip, port })
+    } catch { /* ignore — surfaced via reload */ }
     load()
   }, [sessionId, load])
 
   const summary = state?.summary || {}
   const inventory = state?.inventory || {}
   const goal = state?.goal || {}
+  const pendingTransitions = state?.pending_transitions || []
   const firewall = inventory.firewall
-  const scanHosts = lastScan?.hosts || []
+  const scanHosts = useMemo(() => lastScan?.hosts || [], [lastScan])
   const activeHost = scanHosts.find(h => h.ip === selectedHost) || scanHosts[0] || null
   const allPorts = scanHosts.flatMap((h) => (h.ports || []).map((p) => ({ ...p, host: h.ip, hostname: h.hostname })))
   const services = [...new Set(allPorts.map((p) => p.service).filter(Boolean))]
+  // Search Scan Results → substring match across host/port/state/service/version.
+  const filteredPorts = useMemo(() => {
+    const q = portFilter.trim().toLowerCase()
+    if (!q) return allPorts
+    return allPorts.filter((p) => [
+      p.host, p.hostname, String(p.port), p.proto, p.state, p.service, p.product, p.version,
+    ].filter(Boolean).some((v) => String(v).toLowerCase().includes(q)))
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [portFilter, lastScan, selectedHost])
   const rawOutput = nmapOutput(lastScan, activeHost)
+
+  // Render the scan output in a given format (shared by the on-screen console
+  // and the Save Output download so both stay identical).
+  const formatOutput = useCallback((mode) => {
+    if (mode === 'xml') {
+      return `<nmaprun scanner="nmap" args="${command}">\n${scanHosts.map((h) => `  <host><status state="${h.state || 'up'}"/><address addr="${h.ip}" addrtype="ipv4"/></host>`).join('\n')}\n</nmaprun>`
+    }
+    if (mode === 'grepable') {
+      return scanHosts.map((h) => `Host: ${h.ip} (${h.hostname || ''})\tStatus: ${h.state || 'up'}\tPorts: ${(h.ports || []).map((p) => `${p.port}/${p.state}/${p.proto || 'tcp'}/${p.service || ''}/`).join(', ')}`).join('\n')
+    }
+    if (mode === 'script-kiddie') {
+      return rawOutput.replace(/[aeios]/gi, (m) => ({ a: '4', e: '3', i: '1', o: '0', s: '5' }[m.toLowerCase()] || m))
+    }
+    return rawOutput
+  }, [command, scanHosts, rawOutput])
+
+  // Save Output → actually download the current scan via a Blob (no server round
+  // trip). File extension mirrors nmap's -oN/-oX/-oG/-oS output selectors.
+  const downloadOutput = useCallback((mode) => {
+    const ext = mode === 'xml' ? 'xml' : mode === 'grepable' ? 'gnmap' : 'nmap'
+    const body = formatOutput(mode)
+    const blob = new Blob([body], { type: mode === 'xml' ? 'application/xml' : 'text/plain' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = `nmap-scan-${new Date().toISOString().slice(0, 19).replace(/[:T]/g, '')}.${ext}`
+    document.body.appendChild(a)
+    a.click()
+    document.body.removeChild(a)
+    URL.revokeObjectURL(url)
+  }, [formatOutput])
 
   const FLAG_OPTS = [
     ['-sn', 'Ping sweep'], ['-sS', 'SYN (sudo)'], ['-sT', 'Connect'],
@@ -501,8 +690,8 @@ export default function NmapSimulator({
             <button className="nm-btn nm-btn-primary justify-center" disabled={scanning} onClick={runScan}>
               {scanning ? <RefreshCw size={14} className="animate-spin" /> : <Play size={14} />} Scan
             </button>
-            <button className="nm-btn justify-center" disabled={!scanning} onClick={() => setScanning(false)}>
-              Cancel
+            <button className="nm-btn justify-center" disabled={!scanning} onClick={cancelScan}>
+              <XCircle size={14} /> Cancel
             </button>
           </div>
           <div className="flex flex-col lg:flex-row gap-3">
@@ -566,14 +755,31 @@ export default function NmapSimulator({
           ))}
         </div>
 
-        {!lastScan && tab !== 'scans' ? (
+        {!lastScan && !scanning && tab !== 'scans' ? (
           <div className="nm-card p-10 text-center text-sm" style={{ color: 'var(--nm-muted)' }}>
             <Radar size={26} className="mx-auto mb-2 opacity-50" />
             Build a scan above and press <b>Scan</b> to discover the network.
           </div>
         ) : null}
 
-        {lastScan && tab === 'output' && (
+        {/* live scan process — progressive nmap log while the scan runs */}
+        {scanning && tab === 'output' && (
+          <div className="space-y-3">
+            <div className="flex items-center gap-3">
+              <RefreshCw size={14} className="animate-spin" style={{ color: 'var(--nm-green)' }} />
+              <div className="flex-1 h-2 rounded-full overflow-hidden" style={{ background: '#0c140c', border: '1px solid var(--nm-border)' }}>
+                <div className="h-full transition-all duration-300" style={{ width: `${scanProgress}%`, background: 'var(--nm-green)' }} />
+              </div>
+              <span className="nm-mono text-xs" style={{ color: 'var(--nm-muted)' }}>{scanProgress}%</span>
+              <button className="nm-btn !py-1 !text-xs" onClick={cancelScan}><XCircle size={12} /> Cancel</button>
+            </div>
+            <div className="nm-console min-h-[360px] overflow-auto">
+              {progressLines.join('\n')}
+            </div>
+          </div>
+        )}
+
+        {!scanning && lastScan && tab === 'output' && (
           <div className="space-y-3">
             <div className="flex items-center gap-2 flex-wrap">
               {['normal', 'xml', 'script-kiddie', 'grepable'].map((mode) => (
@@ -582,23 +788,30 @@ export default function NmapSimulator({
                 </button>
               ))}
               <span className="flex-1" />
-              <button className="nm-btn" onClick={() => navigator.clipboard?.writeText(rawOutput)}><Copy size={13} /> Copy output</button>
-              <button className="nm-btn" onClick={() => setModal('save')}><Download size={13} /> Save output</button>
+              <button className="nm-btn" onClick={() => navigator.clipboard?.writeText(formatOutput(outputMode))}><Copy size={13} /> Copy output</button>
+              <button className="nm-btn" onClick={() => downloadOutput(outputMode)}><Download size={13} /> Save output</button>
             </div>
             <div className="nm-console min-h-[360px] overflow-auto">
-              {outputMode === 'xml'
-                ? `<nmaprun scanner="nmap" args="${command}">\n${scanHosts.map((h) => `  <host><status state="${h.state || 'up'}"/><address addr="${h.ip}" addrtype="ipv4"/></host>`).join('\n')}\n</nmaprun>`
-                : outputMode === 'grepable'
-                  ? scanHosts.map((h) => `Host: ${h.ip} (${h.hostname || ''})\tStatus: ${h.state || 'up'}\tPorts: ${(h.ports || []).map((p) => `${p.port}/${p.state}/${p.proto || 'tcp'}/${p.service || ''}/`).join(', ')}`).join('\n')
-                  : outputMode === 'script-kiddie'
-                    ? rawOutput.replace(/[aeios]/gi, (m) => ({ a: '4', e: '3', i: '1', o: '0', s: '5' }[m.toLowerCase()] || m))
-                    : rawOutput}
+              {formatOutput(outputMode)}
             </div>
           </div>
         )}
 
         {lastScan && tab === 'ports' && (
           <div className="grid grid-cols-1 lg:grid-cols-[260px_1fr] gap-3">
+            {pendingTransitions.length > 0 && (
+              <div className="lg:col-span-2 nm-card p-2 text-[12px] flex items-center gap-2 flex-wrap"
+                   style={{ borderColor: 'rgba(240,200,80,.5)', background: 'rgba(240,200,80,.08)' }}>
+                <Radar size={13} style={{ color: 'var(--nm-muted)' }} />
+                <span style={{ color: 'var(--nm-muted)' }}>Service change in progress —</span>
+                {pendingTransitions.map((t) => (
+                  <span key={`${t.ip}-${t.port}`} className="nm-mono">
+                    {t.ip}:{t.port} → {t.to}
+                  </span>
+                ))}
+                <span style={{ color: 'var(--nm-muted)' }}>· re-scan to confirm the new state.</span>
+              </div>
+            )}
             <div className="nm-sidebar">
               <div className="nm-sidebar-head">Hosts</div>
               {scanHosts.map((h) => {
@@ -613,15 +826,48 @@ export default function NmapSimulator({
               {services.map((s) => <div key={s} className="nm-side-row"><Cpu size={13} /> {s}</div>)}
             </div>
             <div className="nm-card overflow-hidden">
+              <div className="flex items-center gap-2 p-2 border-b" style={{ borderColor: 'var(--nm-border)' }}>
+                <Search size={14} style={{ color: 'var(--nm-muted)' }} />
+                <input
+                  className="nm-input flex-1 !py-1.5 !text-[13px]"
+                  value={portFilter}
+                  spellCheck={false}
+                  placeholder="Filter ports — host, port, state, service, or version"
+                  onChange={(e) => setPortFilter(e.target.value)}
+                />
+                {portFilter && (
+                  <button className="nm-btn !py-1 !text-xs" onClick={() => setPortFilter('')}><X size={12} /> Clear</button>
+                )}
+                <span className="text-[11px] nm-mono" style={{ color: 'var(--nm-muted)' }}>{filteredPorts.length}/{allPorts.length}</span>
+              </div>
               <table className="nm-table">
-                <thead><tr><th>Host</th><th>Port</th><th>Protocol</th><th>State</th><th>Service</th><th>Version</th></tr></thead>
+                <thead><tr><th>Host</th><th>Port</th><th>Protocol</th><th>State</th><th>Service</th><th>Version</th><th>Service control</th></tr></thead>
                 <tbody>
-                  {allPorts.map((p) => (
+                  {filteredPorts.length === 0 ? (
+                    <tr><td colSpan={7} className="text-center py-6" style={{ color: 'var(--nm-muted)' }}>No ports match “{portFilter}”.</td></tr>
+                  ) : filteredPorts.map((p) => {
+                    const pending = pendingTransitions.find((t) => t.ip === p.host && t.port === p.port)
+                    return (
                     <tr key={`${p.host}-${p.port}-${p.proto}`} onClick={() => setSelectedHost(p.host)}>
                       <td className="nm-mono">{p.host}</td><td className="nm-mono">{p.port}</td><td>{p.proto || 'tcp'}</td><td><StateBadge state={p.state} /></td><td>{p.service || '—'}</td>
-                      <td className="nm-mono text-[11px]" style={{ color: 'var(--nm-muted)' }}>{[p.product, p.version].filter(Boolean).join(' ') || '—'}</td>
+                      <td className="nm-mono text-[11px]" style={{ color: 'var(--nm-muted)' }}>{fmtVersion(p) || '—'}</td>
+                      <td>
+                        {pending ? (
+                          <span className="text-[11px] nm-mono" style={{ color: 'var(--nm-muted)' }}>→ {pending.to}…</span>
+                        ) : p.state === 'open' ? (
+                          <button className="nm-btn !py-0.5 !px-2 !text-[11px]"
+                                  onClick={(e) => { e.stopPropagation(); serviceControl(p.host, p.port, 'stop_service') }}>
+                            Stop service
+                          </button>
+                        ) : p.state === 'closed' ? (
+                          <button className="nm-btn !py-0.5 !px-2 !text-[11px]"
+                                  onClick={(e) => { e.stopPropagation(); serviceControl(p.host, p.port, 'start_service') }}>
+                            Start service
+                          </button>
+                        ) : <span style={{ color: 'var(--nm-muted)' }}>—</span>}
+                      </td>
                     </tr>
-                  ))}
+                  )})}
                 </tbody>
               </table>
             </div>
@@ -631,10 +877,13 @@ export default function NmapSimulator({
         {lastScan && tab === 'topology' && (
           <div className="nm-card p-3">
             <div className="flex items-center gap-2 mb-3">
-              <button className="nm-btn !text-xs">Zoom +</button><button className="nm-btn !text-xs">Zoom -</button>
-              <button className="nm-btn !text-xs">Fisheye</button><button className="nm-btn !text-xs">Interpolation</button>
+              <button className="nm-btn !text-xs" onClick={() => setTopoZoom((z) => Math.min(2, +(z + 0.2).toFixed(2)))} disabled={topoZoom >= 2}>Zoom +</button>
+              <button className="nm-btn !text-xs" onClick={() => setTopoZoom((z) => Math.max(0.6, +(z - 0.2).toFixed(2)))} disabled={topoZoom <= 0.6}>Zoom -</button>
+              <button className="nm-btn !text-xs" onClick={() => setTopoZoom(1)} disabled={topoZoom === 1}>Reset</button>
+              <span className="text-[11px] nm-mono ml-1" style={{ color: 'var(--nm-muted)' }}>{Math.round(topoZoom * 100)}%</span>
             </div>
             <div className="nm-topology">
+              <div style={{ position: 'absolute', inset: 0, transform: `scale(${topoZoom})`, transformOrigin: 'center center', transition: 'transform 0.2s ease' }}>
               <div className="nm-node" style={{ left: '50%', top: '50%' }}>
                 <div className="nm-node-icon"><Radar size={18} /></div><div>Nmap</div>
               </div>
@@ -651,6 +900,7 @@ export default function NmapSimulator({
                   </button>
                 )
               })}
+              </div>
             </div>
           </div>
         )}
@@ -785,18 +1035,34 @@ export default function NmapSimulator({
       {modal === 'search' && (
         <NmapModal title="Search Scan Results" onClose={() => setModal(null)}>
           <div className="flex gap-2">
-            <input className="border rounded px-2 py-1 flex-1" placeholder="Search hosts, services, versions, or output" />
-            <button className="px-3 py-1 rounded bg-green-600 text-white flex items-center gap-1"><Search size={13} /> Search</button>
+            <input
+              className="border rounded px-2 py-1 flex-1"
+              autoFocus
+              value={portFilter}
+              placeholder="Search hosts, services, versions, or ports"
+              onChange={(e) => setPortFilter(e.target.value)}
+              onKeyDown={(e) => { if (e.key === 'Enter') { setTab('ports'); setModal(null) } }}
+            />
+            <button className="px-3 py-1 rounded bg-green-600 text-white flex items-center gap-1" onClick={() => { setTab('ports'); setModal(null) }}><Search size={13} /> Search</button>
           </div>
+          <p className="text-xs text-slate-500 mt-2">Filters the Ports/Hosts table by any field.</p>
         </NmapModal>
       )}
 
       {modal === 'save' && (
         <NmapModal title="Save Output" onClose={() => setModal(null)}>
           <p className="text-sm mb-3">Save current scan as normal, XML, script kiddie, or grepable output.</p>
-          <div className="grid sm:grid-cols-4 gap-2">
-            {['Normal', 'XML', 'S|<rIpt kIddi3', 'Grepable'].map((m) => <button key={m} className="border rounded px-3 py-2 hover:bg-green-50"><Download size={13} className="inline mr-1" /> {m}</button>)}
-          </div>
+          {!lastScan ? (
+            <p className="text-sm text-slate-500">Run a scan first — there is no output to save yet.</p>
+          ) : (
+            <div className="grid sm:grid-cols-4 gap-2">
+              {[['Normal', 'normal'], ['XML', 'xml'], ['S|<rIpt kIddi3', 'script-kiddie'], ['Grepable', 'grepable']].map(([label, mode]) => (
+                <button key={mode} className="border rounded px-3 py-2 hover:bg-green-50" onClick={() => { downloadOutput(mode); setModal(null) }}>
+                  <Download size={13} className="inline mr-1" /> {label}
+                </button>
+              ))}
+            </div>
+          )}
         </NmapModal>
       )}
 

@@ -461,14 +461,21 @@ def _run_line_check(
 
     if "getent passwd" in stripped:
         parts = stripped.split()
-        user = parts[-1] if parts else ""
-        if user in ("passwd", "group", "shadow"):
-            user = ""
-        if not user:
-            for tok in parts:
-                if tok not in ("getent", "passwd", "group", "shadow") and not tok.startswith("-"):
-                    user = tok
-                    break
+        # The username is the first token after the db keyword that isn't a
+        # flag, a getent database keyword, or a shell redirect/operator token.
+        # A trailing redirect like `getent passwd appuser 2>&1` must NOT be
+        # mistaken for the username (that produced spurious "user '2>&1' not
+        # found" grader failures).
+        user = ""
+        for tok in parts:
+            if tok in ("getent", "passwd", "group", "shadow"):
+                continue
+            if tok.startswith("-"):
+                continue
+            if any(c in tok for c in "<>|&;") or tok in ("2>&1", "1>&2"):
+                continue
+            user = tok
+            break
         if user:
             passwd = state.read_file("/etc/passwd") or ""
             if not any(line.startswith(f"{user}:") for line in passwd.splitlines()):

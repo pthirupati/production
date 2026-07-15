@@ -12,26 +12,43 @@ dual_terminal: true
 infrastructure_type: docker
 jira_priority: Medium
 is_free: false
-description: 'CONTEXT: A team operating Ansible automation needs you to resolve `RHEL Simulation: Ansible
-  SSH Key Failure` during a realistic incident. The business impact is reduced service reliability until
-  the underlying state is repaired.
+description: 'CONTEXT: A team operating Ansible automation has raised a ticket for `RHEL Simulation: Ansible
+  SSH Key Failure`. A customer-facing workflow is degraded and the on-call engineer (you) must diagnose
+  and resolve it. Business impact: reduced service reliability and blocked users until the underlying
+  state is repaired.
 
 
-  ENVIRONMENT: You are working in FixitLab''s offline Ansible control node with inventory, playbooks,
-  roles, and ansible-playbook. All tools run locally; no paid APIs or external cloud calls are required.
+  ENVIRONMENT: You are working in FixitLab''s offline Ansible control node. The architecture is a single
+  lab-primary node exposing inventory, playbooks, roles, and ansible-playbook; treat it as the production
+  host for this incident. All tools run locally — no paid APIs or external cloud calls are required.
 
 
   SYMPTOM / STARTING STATE: Simulated ansible-control node with inventory at /etc/ansible/hosts. web1
   is reachable over SSH key auth; web2 rejects publickey authentication because the control node''s key
-  isn''t authorized there. The Ansible control node cannot reach managed host web2 over SSH — `ansible
-  webservers -m ping` returns web2 UNREACHABLE with a publickey/permission-denied error, while web1 succeeds.
-  The control node''s public key is not installed in web2''s authorized_keys. Distribute the key to web2
-  and confirm all hosts ping.
+  isn''t authorized there.
 
 
   OBJECTIVE: Run the ping and identify that web2 is UNREACHABLE on publickey auth; Install the control
   node''s public key into web2''s authorized_keys; Verify every host in the group responds to the Ansible
-  ping. Success means `check.sh` exits successfully.
+  ping. Acceptance criteria: the change is minimal and reversible, and success means `ansible webservers
+  -m ping` includes `SUCCESS`.
+
+
+  WORK TO DO: Required tooling is pre-installed; if a command is missing, note it and use the equivalent
+  already on the host. Make the smallest configuration change that moves the system toward the objective
+  (edit the relevant inventory, playbooks, roles, and ansible-playbook), changing one thing at a time.
+  Check your work continuously against the objective — success means `ansible webservers -m ping` includes
+  `SUCCESS`.
+
+
+  VERIFY: Re-run the same check the grader uses and confirm `ansible webservers -m ping` includes `SUCCESS`.
+  Capture the before/after output as evidence. Success criteria: the objective''s healthy state holds
+  on a repeat check, not just once.
+
+
+  ROLLBACK: If a change makes things worse, revert that single change immediately (restore the original
+  config file / undo the edit / restart the affected component) and re-observe before trying another hypothesis.
+  Never stack unverified changes.
 
 
   WHAT TO AVOID: Do not apply broad destructive changes, skip evidence gathering, or fake completion with
@@ -46,28 +63,47 @@ initial_state: Simulated ansible-control node with inventory at /etc/ansible/hos
 hints:
 - order: 1
   cost: 0
-  content: 'Where to look: Run `ansible webservers -m ping -vvv` to see SSH and inventory errors.'
+  content: 'ORIENT — what to observe and why:
+
+    Do not touch anything yet. First observe the symptom: RHEL simulation is not behaving as the scenario
+    objectives require. This lab is about RHEL simulation — how RHEL simulation behaves in a Ansible automation
+    environment. Read the objectives and the current state, and note precisely what looks wrong versus
+    healthy before you form any theory.'
 - order: 2
-  cost: 25
-  content: 'Diagnostic steps:
+  cost: 10
+  content: 'APPROACH — the troubleshooting method:
 
-    1. Verify `inventory` hostnames resolve and SSH keys work.
-
-    2. Check `ansible.cfg` for remote_user and privilege escalation.
-
-    3. Test manual `ssh user@host` from the control node.'
+    Work from evidence, not guesses. For RHEL simulation problems the reliable method is: (1) reproduce/observe
+    the failure, (2) narrow from the whole system down to the one component that owns the symptom, (3)
+    change exactly one thing, (4) re-check. Fix the underlying misconfiguration you identified (not just
+    the noisy log line), changing one thing at a time.'
 - order: 3
-  cost: 50
-  content: 'Exact fix + verification:
+  cost: 25
+  content: 'WHICH TOOL — the diagnostic command(s):
 
-    1. Fix inventory, SSH key, or `ansible_user` in group_vars.
+    Run `ansible-playbook site.yml -vv` (or the scenario playbook) and read the first FAILED task — note
+    host, task name, and error message.'
+- order: 4
+  cost: 40
+  content: 'NARROW DOWN — isolate the subsystem:
 
-    2. Re-run `ansible webservers -m ping`.
+    1. Re-run with `-vvv` on the failing host only (`--limit <host>`).
 
-    3. Confirm every host returns SUCCESS.
+    2. Check inventory, SSH connectivity, and `ansible.cfg` privilege settings.
+
+    3. Compare the failed module output to the scenario objectives.'
+- order: 5
+  cost: 60
+  content: 'NEAR-SOLUTION — the fix shape + verify (you still apply it):
+
+    1. Apply the minimal fix on the failing host (config, service, or variable).
+
+    2. Re-run the playbook to a clean PLAY RECAP (failed=0).
+
+    3. Confirm `ansible webservers -m ping` succeeds.
 
 
-    WHY: Ansible cannot manage hosts it cannot reach.'
+    WHY: Ansible labs grade real playbook outcomes, not marker files.'
 summary: 'Complete the rhel simulation: ansible ssh key failure ansible lab and verify success with the
   checker'
 estimated_minutes: 20

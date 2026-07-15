@@ -1,0 +1,155 @@
+title: 'Manual Edit Survives Because Self-Heal Is Off'
+slug: gitops-argocd-selfheal-off-manual-edit
+technology: gitops
+category: Fix
+difficulty: easy
+scenario_type: fix
+lab_mode: simulation
+simulation_type: generic
+time_limit: 1200
+max_score: 100
+is_free: false
+infrastructure_type: docker
+jira_priority: Medium
+description: 'CONTEXT: A team operating gitops has raised a ticket for `Manual Edit Survives Because Self-Heal
+  Is Off`. A customer-facing workflow is degraded and the on-call engineer (you) must diagnose and resolve
+  it. Business impact: reduced service reliability and blocked users until the underlying state is repaired.
+
+
+  ENVIRONMENT: You are working in FixitLab''s offline FixitLab practice environment. The architecture
+  is a single lab-primary node exposing CLI and configuration files; treat it as the production host for
+  this incident. All tools run locally — no paid APIs or external cloud calls are required.
+
+
+  SYMPTOM / STARTING STATE: Someone `kubectl edit`ed a Deployment''s image to a hotfix tag. ArgoCD shows
+  the app OutOfSync but the manual image change persists across reconciles because the live edit is never
+  reverted.
+
+
+  OBJECTIVE: The out-of-band image edit is reverted to the Git-declared tag; selfHeal:false is confirmed
+  as the reason the manual edit survived; The Application returns to Synced and stays there after edits.
+  Acceptance criteria: the change is minimal and reversible, and success means `check.sh` exits successfully.
+
+
+  WORK TO DO: Required tooling is pre-installed; if a command is missing, note it and use the equivalent
+  already on the host. Make the smallest configuration change that moves the system toward the objective
+  (edit the relevant CLI and configuration files), changing one thing at a time. Check your work continuously
+  against the objective — success means `check.sh` exits successfully.
+
+
+  VERIFY: Re-run the same check the grader uses and confirm `check.sh` exits successfully. Capture the
+  before/after output as evidence. Success criteria: the objective''s healthy state holds on a repeat
+  check, not just once.
+
+
+  ROLLBACK: If a change makes things worse, revert that single change immediately (restore the original
+  config file / undo the edit / restart the affected component) and re-observe before trying another hypothesis.
+  Never stack unverified changes.
+
+
+  WHAT TO AVOID: Do not apply broad destructive changes, skip evidence gathering, or fake completion with
+  marker files — the checker validates real system state.'
+objectives:
+- 'The out-of-band image edit is reverted to the Git-declared tag'
+- 'selfHeal:false is confirmed as the reason the manual edit survived'
+- 'The Application returns to Synced and stays there after edits'
+initial_state: |-
+  Someone `kubectl edit`ed a Deployment's image to a hotfix tag. ArgoCD shows the app OutOfSync but the manual image change persists across reconciles because the live edit is never reverted.
+hints:
+- order: 1
+  cost: 0
+  content: 'ORIENT — what to observe and why:
+
+    Do not touch anything yet. First observe the symptom: manual edit survives because Self-Heal is off
+    is not behaving as the scenario objectives require. This lab is about manual edit survives because
+    Self-Heal is off — how manual edit survives because Self-Heal is off behaves in a gitops environment.
+    Read the objectives and the current state, and note precisely what looks wrong versus healthy before
+    you form any theory.'
+- order: 2
+  cost: 10
+  content: 'APPROACH — the troubleshooting method:
+
+    Work from evidence, not guesses. For manual edit survives because Self-Heal is off problems the reliable
+    method is: (1) reproduce/observe the failure, (2) narrow from the whole system down to the one component
+    that owns the symptom, (3) change exactly one thing, (4) re-check. Fix the underlying misconfiguration
+    you identified (not just the noisy log line), changing one thing at a time.'
+- order: 3
+  cost: 25
+  content: 'WHICH TOOL — the diagnostic command(s):
+
+    Run `kubectl get pods -A` and `kubectl describe pod <name>` for any pod not in Running state.'
+- order: 4
+  cost: 40
+  content: 'NARROW DOWN — isolate the subsystem:
+
+    1. `kubectl get pods` — note CrashLoopBackOff, ImagePullBackOff, or Pending.
+
+    2. `kubectl describe pod <name>` — read Events at the bottom.
+
+    3. `kubectl logs <name> [--previous]` if the container restarted.'
+- order: 5
+  cost: 60
+  content: 'NEAR-SOLUTION — the fix shape + verify (you still apply it):
+
+    1. Fix the root cause (image name, env var, volume mount, or probe).
+
+    2. `kubectl apply -f` the corrected manifest or delete the pod to recreate.
+
+    3. Confirm `kubectl get pods` shows every pod Running.
+
+
+    WHY: Kubernetes only reports healthy when the workload actually runs.'
+summary: |-
+  Diagnose and resolve manual edit survives because self-heal is off in the gitops simulation lab and verify the healthy end state
+estimated_minutes: 20
+xp_reward: 100
+prerequisites:
+- 'Basic Kubernetes and Git literacy'
+tags:
+- 'gitops'
+- 'fix'
+- 'hands-on'
+- 'simulation'
+linked_tutorial: gitops-fundamentals
+what_you_will_learn:
+- 'The out-of-band image edit is reverted to the Git-declared tag'
+- 'selfHeal:false is confirmed as the reason the manual edit survived'
+- 'Understand the difference between automated sync and self-heal in ArgoCD and why self-heal is required to reject manual drift'
+environment:
+  nodes:
+  - role: primary
+    os: FixitLab GitOps practice cluster
+    hostname: lab-primary
+    ip: 127.0.0.1
+    specs: local offline simulation
+  pre_installed:
+  - bash
+  - coreutils
+  - kubectl
+  - argocd
+  - flux
+  - git
+  credentials:
+  - user: root
+    password: lab123
+tasks:
+- id: task_1
+  title: 'Manual Edit Survives Because Self-Heal Is Off'
+  description: |-
+    Restore healthy behavior for Manual Edit Survives Because Self-Heal Is Off by reproducing the diagnosis from the symptom, isolating the root cause with evidence, applying the smallest safe fix, and validating the outcome with the checker.
+  background: |-
+    This gitops lab teaches the difference between automated sync and self-heal in ArgoCD and why self-heal is required to reject manual drift through systematic troubleshooting: observe, hypothesize, change, verify.
+  validation:
+    type: custom_script
+    script: check.sh
+    error_message: |-
+      The scenario objective is not yet satisfied. Re-read hint tier 2, confirm the root cause, and apply the documented remediation so /opt/fixitlab/academy/gitops-argocd-selfheal-off-manual-edit.conf carries the FIXED-OK marker.
+solution:
+  summary: |-
+    Automated sync is enabled but `selfHeal` is false, so ArgoCD reports drift from a manual edit yet does not revert it. Enable `automated.selfHeal=true` so out-of-band changes are reverted to the Git-declared state, then sync.
+  files_changed: []
+  commands_run:
+  - 'argocd app get web-frontend'
+  - 'argocd app diff web-frontend'
+  - 'kubectl get deploy web-frontend -o jsonpath=''{.spec.template.spec.containers[0].image}'''
+  reference_docs: gitops-fundamentals

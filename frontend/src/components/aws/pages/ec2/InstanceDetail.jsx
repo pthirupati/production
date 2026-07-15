@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
-import { ChevronDown } from 'lucide-react'
+import { ChevronDown, Info } from 'lucide-react'
 import { useAwsStore } from '../../store/awsStore'
 import { Button, Badge, Tabs, IDCopy, Breadcrumb, EmptyState } from '../../ui/primitives'
 import MetricChart from '../../ui/MetricChart'
@@ -11,6 +11,14 @@ import { BASE } from '../../layout/serviceNav'
 
 function KV({ k, children }) {
   return <div className="aws-kv" style={{ marginBottom: 10 }}><span className="k">{k}</span><span className="v">{children}</span></div>
+}
+
+// Map a single structured check value to a labeled badge.
+function checkDisplay(v) {
+  if (v === 'passed') return <Badge state="running">Passed</Badge>
+  if (v === 'initializing') return <Badge state="initializing">Initializing</Badge>
+  if (v === '1/2') return <Badge state="initializing">1/2</Badge>
+  return <span style={{ color: 'var(--aws-text-muted)' }}>— (not running)</span>
 }
 
 function consoleOutput(instance, ami) {
@@ -60,6 +68,11 @@ export default function InstanceDetail() {
   const sgs = securityGroups.filter((s) => instance.securityGroups.includes(s.id))
   const vols = volumes.filter((v) => v.attachedTo === instance.id)
   const isWindows = instance.os?.includes('windows')
+  // Structured two-phase checks (system/instance/reachability/summary).
+  const checks = instance.checks || { system: '-', instance: '-', reachability: '-', summary: instance.statusChecks || '-' }
+  const isActive = instance.state === 'running'
+  // Re-key charts on state change so the flat/no-data series regenerate.
+  const monKey = instance.state
   const defaultUser = isWindows ? 'Administrator' : (ami.user || 'ec2-user')
   const host = instance.publicIp ? publicDns(instance.publicIp, instance.region) : instance.privateIp
   const sshCommand = `ssh -i "${instance.keyName || 'demo-key-pair'}.pem" ${defaultUser}@${host}`
@@ -133,11 +146,17 @@ export default function InstanceDetail() {
               <KV k="IAM role">{instance.iamRole || '—'}</KV>
               <div className="aws-section-label" style={{ marginTop: 12 }}>Security groups</div>
               {sgs.map((sg) => (
-                <div key={sg.id} style={{ marginTop: 8 }}>
-                  <strong>{sg.name}</strong> (<span className="aws-mono">{sg.id}</span>)
+                <div key={sg.id} style={{ marginTop: 12 }}>
+                  <strong>{sg.name}</strong> (<a className="aws-mono" onClick={() => navigate(`${BASE}/ec2/security-groups/${sg.id}`)}>{sg.id}</a>)
+                  <div className="aws-hint" style={{ marginTop: 6 }}>Inbound rules</div>
                   <table className="aws-table" style={{ marginTop: 4 }}>
                     <thead><tr><th>Type</th><th>Protocol</th><th>Port range</th><th>Source</th></tr></thead>
-                    <tbody>{sg.inbound.map((r) => <tr key={r.id}><td>{r.type}</td><td>{r.protocol}</td><td>{r.from === r.to ? r.from : `${r.from}-${r.to}`}</td><td className="aws-mono">{r.source}</td></tr>)}</tbody>
+                    <tbody>{(sg.inbound || []).map((r) => <tr key={r.id}><td>{r.type}</td><td>{r.protocol}</td><td>{r.from === r.to ? r.from : `${r.from}-${r.to}`}</td><td className="aws-mono">{r.source}</td></tr>)}</tbody>
+                  </table>
+                  <div className="aws-hint" style={{ marginTop: 8 }}>Outbound rules</div>
+                  <table className="aws-table" style={{ marginTop: 4 }}>
+                    <thead><tr><th>Type</th><th>Protocol</th><th>Port range</th><th>Destination</th></tr></thead>
+                    <tbody>{(sg.outbound || []).map((r) => <tr key={r.id}><td>{r.type}</td><td>{r.protocol}</td><td>{r.from === r.to ? r.from : `${r.from}-${r.to}`}</td><td className="aws-mono">{r.source}</td></tr>)}</tbody>
                   </table>
                 </div>
               ))}
@@ -187,21 +206,40 @@ ${terraformImport}`}</pre>
 
           {tab === 'status' && (
             <div className="aws-card">
-              <KV k="System status checks">{instance.state === 'running' ? '✓ Passed' : '— (instance not running)'}</KV>
-              <KV k="Instance status checks">{instance.state === 'running' ? '✓ Passed' : '— (instance not running)'}</KV>
-              <KV k="Combined">{instance.statusChecks}</KV>
+              <div className="aws-hint" style={{ marginBottom: 12 }}>Status checks run automatically. After launch, a new instance shows <strong>initializing</strong> and completes a two-phase check (system reachability, then instance reachability) before reaching 2/2.</div>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 16 }}>
+                <KV k="System reachability check">{checkDisplay(checks.system)}</KV>
+                <KV k="Instance reachability check">{checkDisplay(checks.instance)}</KV>
+                <KV k="Reachability">{checkDisplay(checks.reachability)}</KV>
+                <KV k="Combined summary">
+                  {checks.summary === '2/2'
+                    ? <Badge state="running">2/2 checks passed</Badge>
+                    : checks.summary === '-'
+                      ? <span style={{ color: 'var(--aws-text-muted)' }}>Not running</span>
+                      : <Badge state="initializing">{checks.summary === '1/2' ? '1/2 checks passed' : 'Initializing'}</Badge>}
+                </KV>
+              </div>
             </div>
           )}
 
           {tab === 'monitoring' && (
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))', gap: 12 }}>
-              <MetricChart title="CPU Utilization (%)" unit="%" color="#0073bb" base={8} variance={20} />
-              <MetricChart title="Network In (Bytes)" unit="" color="#1d8102" base={50000} variance={400000} />
-              <MetricChart title="Network Out (Bytes)" unit="" color="#9d5025" base={40000} variance={300000} />
-              <MetricChart title="Disk Read Ops (Count)" unit="" color="#d13212" base={5} variance={40} />
-              <MetricChart title="Disk Write Ops (Count)" unit="" color="#7d3ac1" base={10} variance={60} />
-              <MetricChart title="Status Check Failed (Count)" unit="" color="#545b64" base={0} variance={1} />
-            </div>
+            <>
+              {!isActive && (
+                <div className="aws-flash aws-flash-info" style={{ marginBottom: 12 }}>
+                  <Info size={18} style={{ marginTop: 1, flexShrink: 0 }} />
+                  <div>Instance is <strong>{instance.state}</strong>. CloudWatch reports no data for a non-running instance — series are flat at zero.</div>
+                </div>
+              )}
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))', gap: 12 }}>
+                {/* When not running, base/variance collapse to 0 so the chart is flat (no data). */}
+                <MetricChart key={`cpu-${monKey}`} title="CPU Utilization (%)" unit="%" color="#0073bb" base={isActive ? 8 : 0} variance={isActive ? 20 : 0} />
+                <MetricChart key={`ni-${monKey}`} title="Network In (Bytes)" unit="" color="#1d8102" base={isActive ? 50000 : 0} variance={isActive ? 400000 : 0} />
+                <MetricChart key={`no-${monKey}`} title="Network Out (Bytes)" unit="" color="#9d5025" base={isActive ? 40000 : 0} variance={isActive ? 300000 : 0} />
+                <MetricChart key={`dr-${monKey}`} title="Disk Read Ops (Count)" unit="" color="#d13212" base={isActive ? 5 : 0} variance={isActive ? 40 : 0} />
+                <MetricChart key={`dw-${monKey}`} title="Disk Write Ops (Count)" unit="" color="#7d3ac1" base={isActive ? 10 : 0} variance={isActive ? 60 : 0} />
+                <MetricChart key={`scf-${monKey}`} title="Status Check Failed (Count)" unit="" color="#545b64" base={0} variance={isActive ? 1 : 0} />
+              </div>
+            </>
           )}
 
           {tab === 'console' && (

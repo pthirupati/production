@@ -1,0 +1,164 @@
+title: 'Flux GitRepository Source Times Out'
+slug: gitops-flux-source-timeout
+technology: gitops
+category: Fix
+difficulty: medium
+scenario_type: fix
+lab_mode: simulation
+simulation_type: generic
+time_limit: 1500
+max_score: 100
+is_free: false
+infrastructure_type: docker
+jira_priority: Medium
+description: 'CONTEXT: A team operating gitops has raised a ticket for `Flux GitRepository Source Times
+  Out`. A customer-facing workflow is degraded and the on-call engineer (you) must diagnose and resolve
+  it. Business impact: reduced service reliability and blocked users until the underlying state is repaired.
+
+
+  ENVIRONMENT: You are working in FixitLab''s offline FixitLab practice environment. The architecture
+  is a single lab-primary node exposing CLI and configuration files; treat it as the production host for
+  this incident. All tools run locally — no paid APIs or external cloud calls are required.
+
+
+  SYMPTOM / STARTING STATE: `flux get sources git` shows the `apps` GitRepository stuck in `Failed: context
+  deadline exceeded`. No Kustomizations reconcile because the source artifact is never produced. The repo
+  URL points at an unreachable host.
+
+
+  OBJECTIVE: The apps GitRepository reaches Ready=True; The unreachable source URL is confirmed as root
+  cause via flux logs; Downstream Kustomizations begin reconciling once the source is healthy. Acceptance
+  criteria: the change is minimal and reversible, and success means `check.sh` exits successfully.
+
+
+  WORK TO DO: Required tooling is pre-installed; if a command is missing, note it and use the equivalent
+  already on the host. Make the smallest configuration change that moves the system toward the objective
+  (edit the relevant CLI and configuration files), changing one thing at a time. Check your work continuously
+  against the objective — success means `check.sh` exits successfully.
+
+
+  VERIFY: Re-run the same check the grader uses and confirm `check.sh` exits successfully. Capture the
+  before/after output as evidence. Success criteria: the objective''s healthy state holds on a repeat
+  check, not just once.
+
+
+  ROLLBACK: If a change makes things worse, revert that single change immediately (restore the original
+  config file / undo the edit / restart the affected component) and re-observe before trying another hypothesis.
+  Never stack unverified changes.
+
+
+  WHAT TO AVOID: Do not apply broad destructive changes, skip evidence gathering, or fake completion with
+  marker files — the checker validates real system state.'
+objectives:
+- 'The apps GitRepository reaches Ready=True'
+- 'The unreachable source URL is confirmed as root cause via flux logs'
+- 'Downstream Kustomizations begin reconciling once the source is healthy'
+initial_state: |-
+  `flux get sources git` shows the `apps` GitRepository stuck in `Failed: context deadline exceeded`. No Kustomizations reconcile because the source artifact is never produced. The repo URL points at an unreachable host.
+hints:
+- order: 1
+  cost: 0
+  content: 'ORIENT — what to observe and why:
+
+    Do not touch anything yet. First observe the symptom: flux GitRepository source times out is not behaving
+    as the scenario objectives require. This lab is about flux GitRepository source times out — how flux
+    GitRepository source times out behaves in a gitops environment. Read the objectives and the current
+    state, and note precisely what looks wrong versus healthy before you form any theory.'
+- order: 2
+  cost: 10
+  content: 'APPROACH — the troubleshooting method:
+
+    Work from evidence, not guesses. For flux GitRepository source times out problems the reliable method
+    is: (1) reproduce/observe the failure, (2) narrow from the whole system down to the one component
+    that owns the symptom, (3) change exactly one thing, (4) re-check. Fix the underlying misconfiguration
+    you identified (not just the noisy log line), changing one thing at a time.'
+- order: 3
+  cost: 25
+  content: 'WHICH TOOL — the diagnostic command(s):
+
+    1. Inspect the current state with CLI tools for Flux GitRepository Source Times Out.
+
+    2. Each command above tells you something specific — status/health, recent errors, and the effective
+    configuration. Read them in that order.
+
+    3. Compare what you see to the objectives; the gap points at the fault.'
+- order: 4
+  cost: 40
+  content: 'NARROW DOWN — isolate the subsystem:
+
+    1. From the evidence above, decide which single part of flux GitRepository source times out is at
+    fault.
+
+    2. Re-run the most relevant of CLI tools for Flux GitRepository Source Times Out focused on just that
+    part to confirm it.
+
+    3. State a one-line hypothesis: the smallest change that would move the state from ''flux GitRepository
+    source times out is not behaving as the scenario objectives require'' toward ''`check.sh` exits successfully''.'
+- order: 5
+  cost: 60
+  content: 'NEAR-SOLUTION — the fix shape + verify (you still apply it):
+
+    1. Apply the smallest reversible change your hypothesis points to. Fix the underlying misconfiguration
+    you identified (not just the noisy log line), changing one thing at a time.
+
+    2. Re-run `bash check.sh` and confirm `check.sh` exits successfully.
+
+    3. If it still fails, the hypothesis was wrong — go back to the evidence, do not stack changes.
+
+
+    WHY: the grader validates real system state, not marker files — a fix only counts when the subsystem
+    is actually healthy.'
+summary: |-
+  Diagnose and resolve flux gitrepository source times out in the gitops simulation lab and verify the healthy end state
+estimated_minutes: 25
+xp_reward: 100
+prerequisites:
+- 'Basic Kubernetes and Git literacy'
+tags:
+- 'gitops'
+- 'fix'
+- 'hands-on'
+- 'simulation'
+linked_tutorial: gitops-fundamentals
+what_you_will_learn:
+- 'The apps GitRepository reaches Ready=True'
+- 'The unreachable source URL is confirmed as root cause via flux logs'
+- 'Understand how the Flux source-controller produces artifacts from a GitRepository and why an unreachable URL blocks the whole reconcile chain'
+environment:
+  nodes:
+  - role: primary
+    os: FixitLab GitOps practice cluster
+    hostname: lab-primary
+    ip: 127.0.0.1
+    specs: local offline simulation
+  pre_installed:
+  - bash
+  - coreutils
+  - kubectl
+  - argocd
+  - flux
+  - git
+  credentials:
+  - user: root
+    password: lab123
+tasks:
+- id: task_1
+  title: 'Flux GitRepository Source Times Out'
+  description: |-
+    Restore healthy behavior for Flux GitRepository Source Times Out by reproducing the diagnosis from the symptom, isolating the root cause with evidence, applying the smallest safe fix, and validating the outcome with the checker.
+  background: |-
+    This gitops lab teaches how the Flux source-controller produces artifacts from a GitRepository and why an unreachable URL blocks the whole reconcile chain through systematic troubleshooting: observe, hypothesize, change, verify.
+  validation:
+    type: custom_script
+    script: check.sh
+    error_message: |-
+      The scenario objective is not yet satisfied. Re-read hint tier 2, confirm the root cause, and apply the documented remediation so /opt/fixitlab/academy/gitops-flux-source-timeout.conf carries the FIXED-OK marker.
+solution:
+  summary: |-
+    The GitRepository `spec.url` was changed to an internal host that the source-controller cannot resolve, so every fetch hits the timeout. Point the URL back at the reachable Git source (and set a sane `spec.timeout`) so the source-controller produces an artifact and Kustomizations reconcile.
+  files_changed: []
+  commands_run:
+  - 'flux get sources git'
+  - 'flux logs --kind=GitRepository --name=apps'
+  - 'kubectl -n flux-system get gitrepository apps -o yaml'
+  reference_docs: gitops-fundamentals

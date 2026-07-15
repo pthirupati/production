@@ -172,6 +172,33 @@ function devMatchesExtraDisk(dev, vm, shared) {
   })
 }
 
+/* Is the guest's primary NIC (eth0) carrying a link right now?  This is the
+   single source of truth every guest network command renders from — a VM-level
+   `network_disconnected` flag OR the first NIC's `connected`/`cable_connected`
+   being false pulls the (virtual) cable, so the guest reports NO-CARRIER. */
+function primaryNicUp(vm) {
+  if (vm?.network_disconnected) return false
+  const n0 = (vm?.nics || [])[0]
+  if (!n0) return true
+  if (n0.connected === false) return false
+  if (n0.cable_connected === false) return false
+  return true
+}
+
+/* Layer-3 addressing for the primary NIC as the guest sees it: honours the
+   NIC's ip_mode / guest_ip / gateway when present, else falls back to the VM's
+   summary IP. Returns { ip, gw, prefix, mac, hasIp }. */
+function primaryNicL3(vm, fallbackIp, fallbackGw) {
+  const n0 = (vm?.nics || [])[0] || {}
+  const ip = n0.guest_ip || vm?.ip || fallbackIp || '10.20.30.41'
+  const prefix = n0.guest_prefix || 24
+  const gw = n0.guest_gateway || fallbackGw || (ip.split('.').slice(0, 3).join('.') + '.1')
+  const mac = n0.mac_address || n0.mac || '00:50:56:a1:b2:c3'
+  // ip_mode "none" means the interface has no L3 config (link may still be up).
+  const hasIp = n0.ip_mode !== 'none'
+  return { ip, gw, prefix, mac, hasIp }
+}
+
 function guestExtraNics(vm, shared) {
   const pending = vm?.guest_pending_nics || []
   if (!shared.nicRescanned && vm?.guest_nic_pending) return []
@@ -1977,41 +2004,74 @@ export function createLinuxShell(vm, opts = {}) {
     /* =================== networking =================== */
     else if (lc === 'ip') {
       const sub = positional[0]
-      const extraNics = guestExtraNics(vm, shared)
+      const netVm = vmRef.current
+      const extraNics = guestExtraNics(netVm, shared)
+      const linkUp = primaryNicUp(netVm)
+      const { ip: nIp, gw: nGw, prefix, mac: nMac, hasIp } = primaryNicL3(netVm, ip, gw)
+      const net3 = nIp.split('.').slice(0, 3).join('.')
       if (sub === 'addr' || sub === 'a' || sub === 'address' || !sub) {
         const lines = [
           '1: lo: <LOOPBACK,UP,LOWER_UP> mtu 65536 qdisc noqueue state UNKNOWN group default qlen 1000',
           '    inet 127.0.0.1/8 scope host lo',
-          '2: eth0: <BROADCAST,MULTICAST,UP,LOWER_UP> mtu 1500 qdisc fq_codel state UP group default qlen 1000',
-          '    link/ether 00:50:56:a1:b2:c3 brd ff:ff:ff:ff:ff:ff',
-          `    inet ${ip}/24 brd ${ip.split('.').slice(0, 3).join('.')}.255 scope global noprefixroute eth0`,
         ]
+        if (linkUp) {
+          lines.push('2: eth0: <BROADCAST,MULTICAST,UP,LOWER_UP> mtu 1500 qdisc fq_codel state UP group default qlen 1000')
+          lines.push(`    link/ether ${nMac} brd ff:ff:ff:ff:ff:ff`)
+          if (hasIp) lines.push(`    inet ${nIp}/${prefix} brd ${net3}.255 scope global noprefixroute eth0`)
+        } else {
+          // Cable unplugged: NO-CARRIER, interface DOWN, and — crucially — NO inet line.
+          lines.push('2: eth0: <NO-CARRIER,BROADCAST,MULTICAST,UP> mtu 1500 qdisc fq_codel state DOWN group default qlen 1000')
+          lines.push(`    link/ether ${nMac} brd ff:ff:ff:ff:ff:ff`)
+        }
         extraNics.forEach((nic, i) => {
           const oct = 20 + i
           lines.push(`${3 + i}: ${nic.name}: <BROADCAST,MULTICAST,UP,LOWER_UP> mtu 1500 qdisc fq_codel state UP group default qlen 1000`)
           lines.push(`    link/ether ${nic.mac || '00:50:56:a1:c3:d4'} brd ff:ff:ff:ff:ff:ff`)
-          lines.push(`    inet ${ip.split('.').slice(0, 3).join('.')}.${oct}/24 brd ${ip.split('.').slice(0, 3).join('.')}.255 scope global noprefixroute ${nic.name}`)
+          lines.push(`    inet ${net3}.${oct}/24 brd ${net3}.255 scope global noprefixroute ${nic.name}`)
         })
         emit(lines)
       } else if (sub === 'route' || sub === 'r') {
-        emit([`default via ${gw} dev eth0 proto static metric 100`, `${ip.split('.').slice(0, 3).join('.')}.0/24 dev eth0 proto kernel scope link src ${ip}`])
+        // With the cable pulled there is no default route (nothing to route through).
+        if (linkUp && hasIp) emit([`default via ${nGw} dev eth0 proto static metric 100`, `${net3}.0/${prefix} dev eth0 proto kernel scope link src ${nIp}`])
+        else emit('')
       } else if (sub === 'link') {
-        emit(['1: lo: <LOOPBACK,UP,LOWER_UP> mtu 65536', '2: eth0: <BROADCAST,MULTICAST,UP,LOWER_UP> mtu 1500', '    link/ether 00:50:56:a1:b2:c3 brd ff:ff:ff:ff:ff:ff'])
+        emit([
+          '1: lo: <LOOPBACK,UP,LOWER_UP> mtu 65536',
+          linkUp
+            ? '2: eth0: <BROADCAST,MULTICAST,UP,LOWER_UP> mtu 1500'
+            : '2: eth0: <NO-CARRIER,BROADCAST,MULTICAST,UP> mtu 1500 state DOWN',
+          `    link/ether ${nMac} brd ff:ff:ff:ff:ff:ff`,
+        ])
       } else if (sub === 'neigh' || sub === 'n') {
-        emit(`${gw} dev eth0 lladdr 00:50:56:fe:00:01 REACHABLE`)
+        emit(linkUp ? `${nGw} dev eth0 lladdr 00:50:56:fe:00:01 REACHABLE` : '')
       } else emit('Object "' + sub + '" is unknown, try "ip help".')
     }
     else if (lc === 'ifconfig') {
-      emit([
-        `eth0: flags=4163<UP,BROADCAST,RUNNING,MULTICAST>  mtu 1500`,
-        `        inet ${ip}  netmask 255.255.255.0  broadcast ${ip.split('.').slice(0, 3).join('.')}.255`,
-        `        ether 00:50:56:a1:b2:c3  txqueuelen 1000  (Ethernet)`,
-        `        RX packets 1284411  bytes 982734411 (937.2 MiB)`,
-        `        TX packets 884102  bytes 122874410 (117.1 MiB)`,
-        ``,
-        `lo: flags=73<UP,LOOPBACK,RUNNING>  mtu 65536`,
-        `        inet 127.0.0.1  netmask 255.0.0.0`,
-      ])
+      const netVm = vmRef.current
+      const linkUp = primaryNicUp(netVm)
+      const { ip: nIp, mac: nMac, hasIp } = primaryNicL3(netVm, ip, gw)
+      const net3 = nIp.split('.').slice(0, 3).join('.')
+      if (linkUp) {
+        emit([
+          `eth0: flags=4163<UP,BROADCAST,RUNNING,MULTICAST>  mtu 1500`,
+          ...(hasIp ? [`        inet ${nIp}  netmask 255.255.255.0  broadcast ${net3}.255`] : []),
+          `        ether ${nMac}  txqueuelen 1000  (Ethernet)`,
+          `        RX packets 1284411  bytes 982734411 (937.2 MiB)`,
+          `        TX packets 884102  bytes 122874410 (117.1 MiB)`,
+          ``,
+          `lo: flags=73<UP,LOOPBACK,RUNNING>  mtu 65536`,
+          `        inet 127.0.0.1  netmask 255.0.0.0`,
+        ])
+      } else {
+        // Cable out: interface present but no RUNNING flag, no inet, no RX/TX counters.
+        emit([
+          `eth0: flags=4099<UP,BROADCAST,MULTICAST>  mtu 1500`,
+          `        ether ${nMac}  txqueuelen 1000  (Ethernet)`,
+          ``,
+          `lo: flags=73<UP,LOOPBACK,RUNNING>  mtu 65536`,
+          `        inet 127.0.0.1  netmask 255.0.0.0`,
+        ])
+      }
     }
     else if (lc === 'ping' || lc === 'ping6') {
       const host = positional[0] || '8.8.8.8'
@@ -2028,11 +2088,15 @@ export function createLinuxShell(vm, opts = {}) {
       ])
     }
     else if (lc === 'ss' || lc === 'netstat') {
+      const netVm = vmRef.current
+      const linkUp = primaryNicUp(netVm)
+      const { ip: nIp, gw: nGw } = primaryNicL3(netVm, ip, gw)
       emit([
         'Netid State  Recv-Q Send-Q  Local Address:Port   Peer Address:Port Process',
         'tcp   LISTEN 0      128           0.0.0.0:22          0.0.0.0:*     users:(("sshd",pid=890))',
         'tcp   LISTEN 0      128         127.0.0.1:3306        0.0.0.0:*     users:(("mysqld",pid=1502))',
-        `tcp   ESTAB  0      0            ${ip}:22         ${gw}:51022   users:(("sshd",pid=1201))`,
+        // The established SSH session over eth0 only exists while the link is up.
+        ...(linkUp ? [`tcp   ESTAB  0      0            ${nIp}:22         ${nGw}:51022   users:(("sshd",pid=1201))`] : []),
         ...(services.nginx.active === 'active' ? ['tcp   LISTEN 0      511           0.0.0.0:80          0.0.0.0:*     users:(("nginx",pid=3300))'] : []),
       ])
     }
@@ -2053,15 +2117,26 @@ export function createLinuxShell(vm, opts = {}) {
     else if (lc === 'nc' || lc === 'ncat' || lc === 'telnet') emit(`Connected to ${positional[0] || 'host'}.`)
     else if (lc === 'nmcli') {
       const sub = positional[0]
-      if (sub === 'device' || sub === 'dev') emit(['DEVICE  TYPE      STATE      CONNECTION', 'eth0    ethernet  connected  eth0', 'lo      loopback  unmanaged  --'])
-      else if (sub === 'connection' || sub === 'con' || sub === 'c') emit(['NAME  UUID                                  TYPE      DEVICE', 'eth0  5fb06bd0-0bb0-7ffb-45f1-d6edd65f3e03  ethernet  eth0'])
-      else if (sub === 'general' || sub === 'g') emit('STATE      CONNECTIVITY  WIFI-HW  WIFI     WWAN-HW  WWAN\nconnected  full          enabled  enabled  enabled  enabled')
-      else emit(`eth0: connected to eth0\n\t"Intel 82540EM"\n\tinet4 ${ip}/24`)
+      const netVm = vmRef.current
+      const linkUp = primaryNicUp(netVm)
+      const { ip: nIp, prefix } = primaryNicL3(netVm, ip, gw)
+      if (sub === 'device' || sub === 'dev') emit(['DEVICE  TYPE      STATE          CONNECTION', `eth0    ethernet  ${linkUp ? 'connected     ' : 'unavailable   '} ${linkUp ? 'eth0' : '--'}`, 'lo      loopback  unmanaged      --'])
+      else if (sub === 'connection' || sub === 'con' || sub === 'c') emit(['NAME  UUID                                  TYPE      DEVICE', `eth0  5fb06bd0-0bb0-7ffb-45f1-d6edd65f3e03  ethernet  ${linkUp ? 'eth0' : '--'}`])
+      else if (sub === 'general' || sub === 'g') emit(`STATE      CONNECTIVITY  WIFI-HW  WIFI     WWAN-HW  WWAN\n${linkUp ? 'connected  full        ' : 'disconnected  none        '}  enabled  enabled  enabled  enabled`)
+      else if (linkUp) emit(`eth0: connected to eth0\n\t"Intel 82540EM"\n\tinet4 ${nIp}/${prefix}`)
+      else emit(`eth0: unavailable\n\t"Intel 82540EM"\n\tcarrier: off`)
     }
     else if (lc === 'nmtui' || lc === 'ethtool' || lc === 'arp' || lc === 'route') {
-      if (lc === 'route') emit(['Kernel IP routing table', 'Destination     Gateway         Genmask         Flags Metric Ref    Use Iface', `0.0.0.0         ${gw}     0.0.0.0         UG    100    0        0 eth0`])
-      else if (lc === 'arp') emit(['Address                  HWtype  HWaddress           Flags Mask            Iface', `${gw}              ether   00:50:56:fe:00:01   C                     eth0`])
-      else if (lc === 'ethtool') emit(`Settings for eth0:\n\tSpeed: 10000Mb/s\n\tDuplex: Full\n\tLink detected: yes`)
+      const netVm = vmRef.current
+      const linkUp = primaryNicUp(netVm)
+      const { gw: nGw } = primaryNicL3(netVm, ip, gw)
+      if (lc === 'route') {
+        // No default route while the cable is out.
+        if (linkUp) emit(['Kernel IP routing table', 'Destination     Gateway         Genmask         Flags Metric Ref    Use Iface', `0.0.0.0         ${nGw}     0.0.0.0         UG    100    0        0 eth0`])
+        else emit(['Kernel IP routing table', 'Destination     Gateway         Genmask         Flags Metric Ref    Use Iface'])
+      }
+      else if (lc === 'arp') emit(linkUp ? ['Address                  HWtype  HWaddress           Flags Mask            Iface', `${nGw}              ether   00:50:56:fe:00:01   C                     eth0`] : ['Address                  HWtype  HWaddress           Flags Mask            Iface'])
+      else if (lc === 'ethtool') emit(`Settings for eth0:\n\tSpeed: 10000Mb/s\n\tDuplex: Full\n\tLink detected: ${linkUp ? 'yes' : 'no'}`)
       else emit('')
     }
     else if (lc === 'ssh') {

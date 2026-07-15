@@ -134,6 +134,12 @@ export default function InterviewRoom() {
   const speakRef = useRef(speak)
   const cancelSpeechRef = useRef(cancelSpeech)
   const speakThenListenRef = useRef(null)
+  // Stable handle to the LATEST voiceAnswer closure. The hands-free loop and
+  // barge-in handler call through this ref so they never capture a stale
+  // closure AND never need voiceAnswer in their dependency arrays (which would
+  // otherwise re-subscribe every render — the churn that cancelled in-flight
+  // TTS/STT each cycle and made the room feel like it was "refreshing").
+  const voiceAnswerRef = useRef(null)
   speakRef.current = speak
   cancelSpeechRef.current = cancelSpeech
 
@@ -219,6 +225,15 @@ export default function InterviewRoom() {
   useEffect(() => { isSpeakingRef.current = isSpeaking }, [isSpeaking])
   useEffect(() => { isListeningRef.current = isListening }, [isListening])
   useEffect(() => { answerRef.current = answer }, [answer])
+  // Mirror practical mode + the persona voice so the host-sync poll can read the
+  // latest value WITHOUT listing them as effect deps. Previously `practicalMode`
+  // (which toggles mid-interview) was a dependency of the 3s poll, so every
+  // practical question tore down and rebuilt the interval — and each rebuild
+  // fired an extra immediate getRound + could cancel/re-speak the current line.
+  const practicalModeRef = useRef(false)
+  useEffect(() => { practicalModeRef.current = practicalMode }, [practicalMode])
+  const personaVoiceIdRef = useRef(round?.persona_voice_id)
+  useEffect(() => { personaVoiceIdRef.current = round?.persona_voice_id }, [round?.persona_voice_id])
   // WS1 — never leave a stale "still listening" countdown on screen once the
   // mic closes (skip, end, barge-in, or a finalized turn).
   useEffect(() => { if (!isListening) setSilenceCountdown(null) }, [isListening])
@@ -1000,6 +1015,7 @@ export default function InterviewRoom() {
       setAnswer('')
     }
   }
+  voiceAnswerRef.current = voiceAnswer
 
   // WS5 — explicit "Ask a question" / "Repeat that" control. Arms ask-mode and
   // opens the mic; the captured utterance is sent with input_type:'question'.
@@ -1098,11 +1114,11 @@ export default function InterviewRoom() {
           if (isWelcome && m.content) {
             cancelSpeechRef.current()
             setAiCaption((prev) => (prev === m.content ? prev : m.content))
-            await speakRef.current(m.content, round?.persona_voice_id)
+            await speakRef.current(m.content, personaVoiceIdRef.current)
           } else if (isHandoff && m.content) {
             cancelSpeechRef.current()
             setAiCaption((prev) => (prev === m.content ? prev : m.content))
-            await speakThenListenRef.current?.(m.content, { autoListen: false, voiceId: round?.persona_voice_id })
+            await speakThenListenRef.current?.(m.content, { autoListen: false, voiceId: personaVoiceIdRef.current })
           } else if (isNewQuestion && m.content) {
             cancelSpeechRef.current()
             const hostLabel = hs?.display_name || meta.asked_by || 'Guest interviewer'
@@ -1111,8 +1127,8 @@ export default function InterviewRoom() {
             setAiCaption((prev) => (prev === caption ? prev : caption))
             awaitingAnswerRef.current = true
             await speakThenListenRef.current?.(m.content, {
-              autoListen: !practicalMode,
-              voiceId: round?.persona_voice_id,
+              autoListen: !practicalModeRef.current,
+              voiceId: personaVoiceIdRef.current,
             })
           }
         }
@@ -1123,7 +1139,10 @@ export default function InterviewRoom() {
     syncHost()
     const iv = setInterval(syncHost, 3000)
     return () => clearInterval(iv)
-  }, [started, observerMode, roundId, round?.persona_voice_id, practicalMode])
+    // Deps are intentionally minimal: the poll interval is created ONCE per
+    // interview and reads the latest practicalMode / persona voice from refs, so
+    // it never tears down + double-fires mid-interview (the "refresh" symptom).
+  }, [started, observerMode, roundId])
 
   // Toggle interviewer TTS. When muting mid-sentence, cut the current utterance.
   const toggleInterviewerMute = () => {
@@ -1172,8 +1191,6 @@ export default function InterviewRoom() {
     submitAnswer('', { forceAdvance: true })
   }
 
-  const skipQuestion = nextQuestion
-
   // In-room voice switch: persist the choice (handled by the hook) and give a
   // short spoken preview so the candidate hears the new voice immediately.
   const changeVoice = (voiceURI) => {
@@ -1192,12 +1209,12 @@ export default function InterviewRoom() {
   // capturing their answer immediately.
   useEffect(() => {
     bargeInHandlerRef.current = () => {
-      cancelSpeech()
+      cancelSpeechRef.current()
       if (!isListeningRef.current) {
-        voiceAnswer() // self-arms skip-on-silence
+        voiceAnswerRef.current?.() // self-arms skip-on-silence
       }
     }
-  }) // eslint-disable-line react-hooks/exhaustive-deps
+  })
 
   useEffect(() => {
     if (!started || !practicalMode || practicalLab?.session_id || labLoading) return
@@ -1212,10 +1229,13 @@ export default function InterviewRoom() {
     if (!awaitingAnswerRef.current || !micOn) return
     const t = setTimeout(() => {
       if (!isSpeakingRef.current && !isListeningRef.current && awaitingAnswerRef.current) {
-        voiceAnswer()
+        voiceAnswerRef.current?.()
       }
     }, 400)
     return () => clearTimeout(t)
+    // voiceAnswer is called via voiceAnswerRef (always latest), so it is
+    // deliberately not a dependency — listing it would re-arm this timer every
+    // render and fight the hands-free loop.
   }, [started, preflight, observerMode, practicalMode, typingAnswer, isSpeaking, isListening, micOn])
 
   const startRecording = (stream) => {
@@ -1794,7 +1814,7 @@ export default function InterviewRoom() {
             </button>
           </div>
         )}
-        {browserVoices.length > 0 && (
+        {ttsSupported && (
           <div className="space-y-1.5">
             <p className="text-xs text-surface-400 flex items-center gap-1.5">
               <Volume2 size={12} className="text-indigo-400" />
@@ -1814,6 +1834,11 @@ export default function InterviewRoom() {
               <button
                 type="button"
                 onClick={() => {
+                  // ALWAYS produce sound on Test — even before the async
+                  // voiceschanged event has populated getVoices(). unlockSpeech()
+                  // primes the (possibly paused) engine after this user gesture,
+                  // and speak() falls back to the browser default voice when the
+                  // list is still empty, so the candidate always hears something.
                   unlockSpeech()
                   speak('Hi, this is how I will sound during your interview.', round.persona_voice_id)
                 }}
@@ -1824,7 +1849,9 @@ export default function InterviewRoom() {
               </button>
             </div>
             <p className="text-[10px] text-surface-600">
-              Voices are free and run in your browser. Pick a “Natural”/“Neural” one if available — they sound the most human.
+              {browserVoices.length > 0
+                ? 'Voices are free and run in your browser. Pick a “Natural”/“Neural” one if available — they sound the most human.'
+                : 'Voices are free and run in your browser. Tap Test to hear your device’s default voice — more options appear here once your browser finishes loading them.'}
             </p>
           </div>
         )}

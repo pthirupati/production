@@ -1,22 +1,29 @@
 /**
  * Lazy-loaded lab simulators — keeps LabRunner chunk small until a sim is needed.
+ *
+ * Use lazyWithRetry (NOT plain React.lazy): a returning user with a cached
+ * index.html references the PREVIOUS deploy's hashed chunks, so opening a lab
+ * 404s the sim chunk. Plain lazy() throws ChunkLoadError straight into
+ * SimErrorBoundary ("Something went wrong loading this simulator") — which no
+ * store reset can fix. lazyWithRetry retries, then does ONE hard reload to
+ * fetch the current index.html, exactly like the route chunks in AppRouter.
  */
-import { lazy } from 'react'
+import { lazyWithRetry } from '../../utils/lazyWithRetry'
 
-export const LazyAwsLabOverlay = lazy(() => import('../aws/AwsLabOverlay'))
-export const LazyTerraformSimulator = lazy(() => import('../terraform/TerraformSimulator'))
-export const LazyAwxSimulator = lazy(() => import('../awx/AwxSimulator'))
-export const LazyMonitoringSimulator = lazy(() => import('../monitoring/MonitoringSimulator'))
-export const LazyWindowsServerSimulator = lazy(() => import('../windows/WindowsServerSimulator'))
-export const LazyPeopleSoftSimulator = lazy(() => import('../peoplesoft/PeopleSoftSimulator'))
-export const LazyBaremetalSimulator = lazy(() => import('../baremetal/BaremetalSimulator'))
-export const LazyDataDashboardSimulator = lazy(() => import('../datascience/DataDashboardSimulator'))
-export const LazyAgentWorkflowSimulator = lazy(() => import('../aiml/AgentWorkflowSimulator'))
-export const LazyNmapSimulator = lazy(() => import('../nmap/NmapSimulator'))
-export const LazyWiresharkSimulator = lazy(() => import('../wireshark/WiresharkSimulator'))
-export const LazyCicdPipelineSim = lazy(() => import('../devops/CicdPipelineSim'))
-export const LazyCodingIDE = lazy(() => import('../ide/CodingIDE'))
-export const LazyPromptPlayground = lazy(() => import('../promptlab/PromptPlayground'))
+export const LazyAwsLabOverlay = lazyWithRetry(() => import('../aws/AwsLabOverlay'))
+export const LazyTerraformSimulator = lazyWithRetry(() => import('../terraform/TerraformSimulator'))
+export const LazyAwxSimulator = lazyWithRetry(() => import('../awx/AwxSimulator'))
+export const LazyMonitoringSimulator = lazyWithRetry(() => import('../monitoring/MonitoringSimulator'))
+export const LazyWindowsServerSimulator = lazyWithRetry(() => import('../windows/WindowsServerSimulator'))
+export const LazyPeopleSoftSimulator = lazyWithRetry(() => import('../peoplesoft/PeopleSoftSimulator'))
+export const LazyBaremetalSimulator = lazyWithRetry(() => import('../baremetal/BaremetalSimulator'))
+export const LazyDataDashboardSimulator = lazyWithRetry(() => import('../datascience/DataDashboardSimulator'))
+export const LazyAgentWorkflowSimulator = lazyWithRetry(() => import('../aiml/AgentWorkflowSimulator'))
+export const LazyNmapSimulator = lazyWithRetry(() => import('../nmap/NmapSimulator'))
+export const LazyWiresharkSimulator = lazyWithRetry(() => import('../wireshark/WiresharkSimulator'))
+export const LazyCicdPipelineSim = lazyWithRetry(() => import('../devops/CicdPipelineSim'))
+export const LazyCodingIDE = lazyWithRetry(() => import('../ide/CodingIDE'))
+export const LazyPromptPlayground = lazyWithRetry(() => import('../promptlab/PromptPlayground'))
 
 export const PRIMARY_SIM_COMPONENTS = {
   aws: LazyAwsLabOverlay,

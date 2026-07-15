@@ -10,21 +10,39 @@ max_score: 100
 is_free: true
 jira_priority: High
 dual_terminal: false
-description: 'CONTEXT: A team operating GPU operations needs you to resolve `Multi-GPU Training Slow (NCCL
-  not using IB)` during a realistic incident. The business impact is reduced service reliability until
-  the underlying state is repaired.
+description: 'CONTEXT: A team operating GPU operations has raised a ticket for `Multi-GPU Training Slow
+  (NCCL not using IB)`. A customer-facing workflow is degraded and the on-call engineer (you) must diagnose
+  and resolve it. Business impact: reduced service reliability and blocked users until the underlying
+  state is repaired.
 
 
-  ENVIRONMENT: You are working in FixitLab''s offline GPU node with nvidia-smi, drivers, CUDA, and container
-  toolkit. All tools run locally; no paid APIs or external cloud calls are required.
+  ENVIRONMENT: You are working in FixitLab''s offline GPU node. The architecture is a single lab-primary
+  node exposing nvidia-smi, drivers, CUDA, and container toolkit; treat it as the production host for
+  this incident. All tools run locally — no paid APIs or external cloud calls are required.
 
 
-  SYMPTOM / STARTING STATE: A multi-node GPU host where NCCL isn''t using IB. Distributed training is
-  slow because NCCL falls back to TCP instead of InfiniBand.
+  SYMPTOM / STARTING STATE: A multi-node GPU host where NCCL isn''t using IB.
 
 
   OBJECTIVE: Confirm the issue: NCCL uses slow TCP transport; Apply the documented fix in /etc/nccl.conf;
-  Verify the configuration is corrected. Success means `check.sh` exits successfully.
+  Verify the configuration is corrected. Acceptance criteria: the change is minimal and reversible, and
+  success means `nvidia-smi` includes `NVIDIA-SMI`.
+
+
+  WORK TO DO: Required tooling is pre-installed; if a command is missing, note it and use the equivalent
+  already on the host. Make the smallest configuration change that moves the system toward the objective
+  (edit the relevant nvidia-smi, drivers, CUDA, and container toolkit), changing one thing at a time.
+  Check your work continuously against the objective — success means `nvidia-smi` includes `NVIDIA-SMI`.
+
+
+  VERIFY: Re-run the same check the grader uses and confirm `nvidia-smi` includes `NVIDIA-SMI`. Capture
+  the before/after output as evidence. Success criteria: the objective''s healthy state holds on a repeat
+  check, not just once.
+
+
+  ROLLBACK: If a change makes things worse, revert that single change immediately (restore the original
+  config file / undo the edit / restart the affected component) and re-observe before trying another hypothesis.
+  Never stack unverified changes.
 
 
   WHAT TO AVOID: Do not apply broad destructive changes, skip evidence gathering, or fake completion with
@@ -37,19 +55,38 @@ objectives:
 hints:
 - order: 1
   cost: 0
-  content: 'Where to look: Run `docker ps -a` and `docker logs <container>` for the failing container.'
+  content: 'ORIENT — what to observe and why:
+
+    Do not touch anything yet. First observe the symptom: Multi-GPU training slow (NCCL not using IB)
+    is not behaving as the scenario objectives require. This lab is about Multi-GPU training slow (NCCL
+    not using IB) — how Multi-GPU training slow (NCCL not using IB) behaves in a GPU operations environment.
+    Read the objectives and the current state, and note precisely what looks wrong versus healthy before
+    you form any theory.'
 - order: 2
+  cost: 10
+  content: 'APPROACH — the troubleshooting method:
+
+    Work from evidence, not guesses. For Multi-GPU training slow (NCCL not using IB) problems the reliable
+    method is: (1) reproduce/observe the failure, (2) narrow from the whole system down to the one component
+    that owns the symptom, (3) change exactly one thing, (4) re-check. Fix the underlying misconfiguration
+    you identified (not just the noisy log line), changing one thing at a time.'
+- order: 3
   cost: 25
-  content: 'Diagnostic steps:
+  content: 'WHICH TOOL — the diagnostic command(s):
+
+    Run `docker ps -a` and `docker logs <container>` for the failing container.'
+- order: 4
+  cost: 40
+  content: 'NARROW DOWN — isolate the subsystem:
 
     1. `docker ps -a` — note Exited status and exit code.
 
     2. `docker logs <name>` for the startup error.
 
     3. Inspect the Dockerfile or `docker run` flags if the image is wrong.'
-- order: 3
-  cost: 50
-  content: 'Exact fix + verification:
+- order: 5
+  cost: 60
+  content: 'NEAR-SOLUTION — the fix shape + verify (you still apply it):
 
     1. Fix image, port mapping, volume, or env configuration.
 
