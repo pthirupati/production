@@ -300,6 +300,31 @@ def _seed_state_from_aws_ec2(engine, session_id, slug: str) -> None:
         logger.exception("AWS EC2 seed skipped for session %s", session_id)
 
 
+def _seed_gpu_identity_if_needed(engine, session_id, slug: str, sim_type: str) -> None:
+    """Register a virtualized GPU node in ServerIdentity for GPU-track labs."""
+    low = (slug or "").lower()
+    if sim_type != "gpu" and "gpu" not in low and "nvidia" not in low:
+        return
+    try:
+        from .simulation import server_identity as si
+        healthy = bool(getattr(getattr(engine, "shell", None), "state", None) and engine.shell.state.gpu_healthy)
+        hostname = getattr(engine.shell.state, "hostname", None) or "gpu-node-01"
+        primary_ip = "10.20.40.10"
+        for nic in getattr(engine.shell.state, "nics", []) or []:
+            if getattr(nic, "ip", None) or (isinstance(nic, dict) and nic.get("ip")):
+                primary_ip = getattr(nic, "ip", None) or nic.get("ip")
+                break
+        si.seed_gpu_node(
+            str(session_id),
+            hostname=hostname,
+            primary_ip=primary_ip,
+            healthy=healthy,
+        )
+        engine.lab_session_id = str(session_id)
+    except Exception:
+        logger.exception("GPU identity seed skipped for session %s", session_id)
+
+
 def ensure_sim_session(lab_session) -> dict | None:
     """Re-register in-memory simulation state after worker restart."""
     session_id = str(lab_session.id)
@@ -329,10 +354,13 @@ def ensure_sim_session(lab_session) -> dict | None:
     else:
         engine = UnifiedSimulationEngine(scenario_slug=slug, simulation_type=sim_type)
         _apply_initial_host_state(engine, slug)
+    engine.lab_session_id = session_id
     if fresh and _is_vmware_lab(slug, raw_type):
         _seed_state_from_vmware_vm(engine, session_id, slug)
     elif fresh and _is_aws_lab(slug, raw_type):
         _seed_state_from_aws_ec2(engine, session_id, slug)
+    if fresh:
+        _seed_gpu_identity_if_needed(engine, session_id, slug, sim_type)
     lab_hosts = lab_session.lab_hosts or _build_lab_hosts(scenario, resource_id, sim_type)
     if _should_use_ssh_client_default(scenario, sim_type):
         lab_hosts = _attach_ssh_client_host(lab_hosts, resource_id)
@@ -397,6 +425,7 @@ class SimulationProvisioner:
         slug = scenario.slug
 
         engine = UnifiedSimulationEngine(scenario_slug=slug, simulation_type=sim_type)
+        engine.lab_session_id = str(lab_session.id)
         _apply_initial_host_state(engine, slug)
         resource_id = f"sim-{uuid.uuid4().hex[:12]}"
 
@@ -435,6 +464,7 @@ class SimulationProvisioner:
             _seed_state_from_aws_ec2(engine, lab_session.id, slug)
         else:
             _seed_hostname_for_persona(engine, slug, raw_type)
+            _seed_gpu_identity_if_needed(engine, lab_session.id, slug, sim_type)
 
         if slug.lower().startswith("ds-dashboard-") or raw_type == "data-dashboard":
             from apps.vmware_sim.datascience_engine import _ensure_session as _ensure_ds_session
@@ -456,7 +486,7 @@ class SimulationProvisioner:
         client_state._mkdir("/home/labuser/.ssh")
         client_state._write_file(
             "/home/labuser/.ssh/id_rsa",
-            "-----BEGIN OPENSSH PRIVATE KEY-----\n(simulated-key)\n-----END OPENSSH PRIVATE KEY-----\n",
+            "-----BEGIN OPENSSH PRIVATE KEY-----\n(lab-training-key)\n-----END OPENSSH PRIVATE KEY-----\n",
         )
         client_state.set_prompt_user("labuser")
         shell = RHELShell(

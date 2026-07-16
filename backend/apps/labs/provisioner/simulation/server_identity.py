@@ -66,6 +66,8 @@ def _blank(
         "physical_location": None,  # {room, rack, u_position}
         "bmc": None,  # {endpoint, protocol, power, sensors}
         "network_port": None,  # {switch, port, vlan}
+        # Virtualized GPU/accelerator facet — never backed by real silicon.
+        "gpu": None,  # {present, model, driver_loaded, health, driver_version, mig_enabled}
         "updated_at": _now_iso(),
     }
 
@@ -136,7 +138,7 @@ def upsert_server(session_id: str, patch: dict, *, source: str = "api") -> dict:
 
     for key in (
         "hostname", "fqdn", "primary_ip", "cpu", "mem_mb", "power", "os",
-        "install_state", "physical_location", "bmc", "network_port",
+        "install_state", "physical_location", "bmc", "network_port", "gpu",
     ):
         if key in patch and patch[key] is not None:
             server[key] = patch[key]
@@ -255,6 +257,78 @@ def drop_session(session_id: str) -> None:
         cache.delete(_identity_key(sid, server_id))
     cache.delete(_index_key(sid))
     cache.delete(_events_key(sid))
+
+
+def set_gpu(
+    session_id: str,
+    server_id: str,
+    *,
+    present: bool = True,
+    model: str = "NVIDIA H100 80GB HBM3",
+    driver_loaded: bool = False,
+    health: str = "failed",
+    driver_version: str = "550.90.07",
+    mig_enabled: bool = False,
+    source: str = "gpu",
+) -> dict | None:
+    """Update the virtualized GPU facet on a server (never real accelerator hardware)."""
+    server = get_server(session_id, server_id)
+    if not server:
+        return None
+    server["gpu"] = {
+        "present": present,
+        "model": model,
+        "driver_loaded": driver_loaded,
+        "health": health,  # healthy | failed | missing
+        "driver_version": driver_version,
+        "mig_enabled": mig_enabled,
+    }
+    if source and source not in server.get("sources", []):
+        server.setdefault("sources", []).append(source)
+    tags = dict(server.get("tags") or {})
+    tags["has_gpu"] = True
+    server["tags"] = tags
+    saved = _save(session_id, server)
+    publish_event(
+        session_id,
+        "server.gpu_updated",
+        {"server_id": server_id, "gpu": saved["gpu"], "source": source},
+    )
+    return saved
+
+
+def seed_gpu_node(
+    session_id: str,
+    *,
+    hostname: str = "gpu-node-01",
+    primary_ip: str = "10.20.40.10",
+    healthy: bool = False,
+    role: str = "primary",
+) -> dict:
+    """Seed a GPU training node into ServerIdentity for gpu-track labs."""
+    server = upsert_server(
+        session_id,
+        {
+            "id": f"gpu-{hostname}",
+            "hostname": hostname,
+            "primary_ip": primary_ip,
+            "cpu": 64,
+            "mem_mb": 524288,
+            "power": "on",
+            "os": "rhel-9",
+            "tags": {"role": role, "track": "gpu"},
+            "gpu": {
+                "present": True,
+                "model": "NVIDIA H100 80GB HBM3",
+                "driver_loaded": bool(healthy),
+                "health": "healthy" if healthy else "failed",
+                "driver_version": "550.90.07",
+                "mig_enabled": False,
+            },
+        },
+        source="gpu",
+    )
+    return server
 
 
 def seed_from_vmware_vm(session_id: str, vm: dict, *, role: str = "primary") -> dict:

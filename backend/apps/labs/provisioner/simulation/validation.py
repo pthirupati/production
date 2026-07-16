@@ -627,8 +627,17 @@ def _run_line_check(
                     if "FIXED-OK" not in content:
                         failures.append(f"{path} not corrected — apply the documented fix")
                     return True
-        if engine and not getattr(engine, "_ssh_key_fixed", False):
-            failures.append("ansible hosts unreachable")
+        # Fail-closed: without an engine we cannot prove SSH keys were distributed.
+        if engine is None:
+            failures.append("ansible lab engine unavailable — cannot verify host reachability")
+            return True
+        if not getattr(engine, "_ssh_key_fixed", False):
+            failures.append("ansible hosts unreachable — distribute SSH keys first")
+            return True
+        # Playbook-oriented labs must actually succeed a playbook run, not just ping.
+        if "playbook" in stripped or getattr(engine, "_ansible_requires_playbook", False):
+            if not getattr(engine, "_ansible_playbook_ok", False):
+                failures.append("ansible-playbook has not completed successfully yet")
         return True
 
     if "firewall-cmd --list-ports" in stripped or ("80/tcp" in stripped and "firewall" in stripped):

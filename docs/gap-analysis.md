@@ -48,8 +48,8 @@ Last updated: 2026-07-16.
 | G-01 | No `ServerIdentity` | Each engine owns private JSON | all engines | Central service + Redis event bus | **Partial** — module + VMware/AWS seed + aws_bridge hooks |
 | G-02 | AWS FE store ≠ backend | Zustand localStorage is SoT | awsStore, aws_engine | Make backend authoritative; FE thin cache | Partial (`aws_bridge`) |
 | G-03 | Learner sees “simulation” | Copy in LabRunner, AWS, VMware, errors | frontend | Purge user-facing strings | **Done** (marketing + consoles; internal code/comments OK) |
-| G-04 | GPU labs auto-pass | No engine; check.sh `exit 0` | scenarios/gpu | Mock GPU in ServerIdentity + real validate | Open |
-| G-05 | Ansible terminal labs auto-pass | No validate_ansible_lab | scenarios/ansible | Wire grading to shell state / AWX | Open |
+| G-04 | GPU labs auto-pass | No engine; check.sh `exit 0` | scenarios/gpu | Mock GPU in ServerIdentity + real validate | **Partial** — ServerIdentity GPU facet + seed; grader still uses `gpu_healthy` |
+| G-05 | Ansible terminal labs auto-pass | No validate_ansible_lab; engine=None fail-open | scenarios/ansible | Wire grading to shell state / AWX | **Partial** — engine=None fail-open fixed; ssh-key still primary objective |
 | G-06 | CI/CD is a toy | FE mock; cicd_engine not session-wired | CicdPipelineSim | Real sandbox job runner | Open |
 | G-07 | K8s dual engines | GUI engine orphaned | k8s_engine, k8s_cluster | Unify under kind + ServerIdentity | Open |
 
@@ -89,8 +89,10 @@ Last updated: 2026-07-16.
 | NetApp | Facade default; real vsim **opt-in entitlement flag** only |
 | Terminal | Facade shell now → real container later |
 | GPU | Always **virtualized/mocked** device — never real GPU |
-| Datacenter / BMC | Facade now → VirtualBMC/sushy/MAAS later |
+| Datacenter / BMC | Facade now → VirtualBMC / sushy-tools / qemu-bmc + MAAS later (zero real hardware) |
 | SOC | Facade now → real IDS/SIEM stack later |
+
+Research note (Phase 7 path): OpenStack **sushy-emulator** (Redfish over libvirt) and **VirtualBMC** (IPMI) remain the standard free backends; **qemu-bmc** is a newer single-binary Redfish+IPMI option suited to containerized MAAS labs. Default build stays in-memory facade until a feature-flagged emulator pool ships.
 
 ---
 

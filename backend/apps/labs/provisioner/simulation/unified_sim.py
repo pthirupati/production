@@ -38,6 +38,9 @@ class UnifiedSimulationEngine(BaseRHELSimulator):
         self.networking: NetworkingState | None = None
         self.docker: DockerState | None = None
         self._ssh_key_fixed = False
+        self._ansible_playbook_ok = False
+        self._ansible_requires_playbook = False
+        self.lab_session_id = None
         self._container_running = False
         self._power_state = "on"
         self.boot: BootState | None = None
