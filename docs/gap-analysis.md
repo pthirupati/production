@@ -65,7 +65,7 @@ Last updated: 2026-07-16.
 
 | ID | Gap | Proposed fix | Done? |
 |---|---|---|---|
-| G-10 | Thin scenario YAML | Schema + linter (Phase 3.1) | Open |
+| G-10 | Thin scenario YAML | Schema + linter (Phase 3.1) | **Partial** — `docs/scenario-schema.md` + `scripts/lint_scenarios.py` (CI `--strict-heroes`); hero labs declare `consoles`/`lab_servers`; catalog-wide enrich still open |
 | G-11 | Jira coach shallow | Acceptance-criteria coach (started) | Partial |
 | G-12 | Windows no SCCM/patching | Add SCCM console + scenarios | **Done** |
 | G-13 | Datacenter not cross-tech | Show Open Datacenter + shared ServerIdentity | **Done** (UI link; facility rooms/BMC/PUE; deeper merge still open) |
@@ -124,11 +124,13 @@ Not yet measured. Target after containerization: document CPU/RAM/disk per sessi
 - Learner copy purge: Demo/Mock/Simulator → lab console / AI Interview / sample labs / practice exam
 - Datacenter facility: Data Hall / MDF / Mechanical / Electrical rooms, power chain + PUE, CRAC/ASHRAE, switches, BMC power menu, ServerIdentity sync, PDU breaker → chaos
 - Shared `chaos_engine` (`drop_nic`, `fill_disk`, `stop_service`, `trip_pdu`, `raise_temp`) + tests
+- Phase 3.1: scenario schema doc + hero YAML linter in CI; heroes declare `lab_servers`/`consoles`; seed materializes YAML LabServers per session
+- Scenario-scoped LabServer architecture doc (`docs/architecture-lab-servers.md`)
 
 ## Recommended next priorities after this commit
 
-1. Finish ServerIdentity adoption in VMware + AWS + Datacenter + Windows (read/write).
+1. Finish ServerIdentity read/write in AWX / Grafana / K8s / Windows beyond YAML seed.
 2. Fix GPU + Ansible grading (correctness) — highest P0 correctness debt.
 3. Wire CI/CD to a real sandbox runner.
 4. Introduce vcsim behind a feature flag for VMware.
-5. Expand academy content + scenario linter; grow Commvault/NetApp/Dell/SOC packs beyond hero labs.
+5. Catalog-wide scenario enrich + `lint_scenarios.py --all` warn mode; grow Commvault/NetApp/Dell/SOC packs beyond heroes.

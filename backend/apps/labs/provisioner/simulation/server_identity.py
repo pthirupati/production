@@ -13,11 +13,15 @@ from __future__ import annotations
 
 import copy
 import json
+import logging
 import time
 import uuid
+from pathlib import Path
 from typing import Any
 
 from django.core.cache import cache
+
+logger = logging.getLogger(__name__)
 
 IDENTITY_TTL = 7200
 EVENTS_TTL = 7200
@@ -388,6 +392,7 @@ _PERSONA_DEFAULTS: dict[str, dict[str, Any]] = {
     "commvault": {"hostname": "cv-mediaagent-01", "primary_ip": "10.20.130.10", "os": "rhel-9", "source": "commvault"},
     "netapp": {"hostname": "ontap-cluster-01", "primary_ip": "10.20.140.10", "os": "ontap", "source": "netapp"},
     "dellemc": {"hostname": "powermax-array-01", "primary_ip": "10.20.150.10", "os": "powermax-os", "source": "dellemc"},
+    "storage": {"hostname": "storage-array-01", "primary_ip": "10.20.160.10", "os": "storage-os", "source": "storage"},
 }
 
 
@@ -410,6 +415,105 @@ def _infer_persona(sim_type: str, slug: str) -> str:
     return "linux"
 
 
+def _scenarios_root() -> Path:
+    # backend/apps/labs/provisioner/simulation/server_identity.py → repo root
+    return Path(__file__).resolve().parents[5] / "scenarios"
+
+
+def load_scenario_lab_server_decls(slug: str) -> list[dict[str, Any]]:
+    """Load ``lab_servers`` from scenarios/**/<slug>/scenario.yaml when present."""
+    if not slug:
+        return []
+    root = _scenarios_root()
+    if not root.is_dir():
+        return []
+    path = None
+    for candidate in root.rglob("scenario.yaml"):
+        if candidate.parent.name == slug:
+            path = candidate
+            break
+    if path is None:
+        return []
+    try:
+        import yaml  # local optional; scenarios already require PyYAML in tooling
+        data = yaml.safe_load(path.read_text(encoding="utf-8")) or {}
+    except Exception:
+        logger.debug("Could not parse scenario YAML for %s", slug, exc_info=True)
+        return []
+    decls = data.get("lab_servers") or []
+    return [d for d in decls if isinstance(d, dict)]
+
+
+def _seed_from_lab_server_decls(
+    session_id: str,
+    decls: list[dict[str, Any]],
+    *,
+    slug: str = "",
+    engine=None,
+) -> dict | None:
+    """Materialize YAML-declared LabServers into this session."""
+    sid = str(session_id)
+    primary: dict | None = None
+    for decl in decls:
+        persona = str(decl.get("persona") or "linux").lower()
+        defaults = dict(_PERSONA_DEFAULTS.get(persona, _PERSONA_DEFAULTS["linux"]))
+        hostname = str(decl.get("hostname") or defaults["hostname"])
+        role = str(decl.get("role") or "secondary")
+        server_id = str(decl.get("id") or f"{defaults['source']}-{hostname}")
+        primary_ip = str(decl.get("primary_ip") or defaults["primary_ip"])
+        # Prefer explicit YAML hostname; only pull IP from the live shell for primary.
+        if role == "primary" and engine and getattr(engine, "shell", None):
+            st = engine.shell.state
+            if not decl.get("hostname"):
+                hostname = getattr(st, "hostname", None) or hostname
+            nics = getattr(st, "nics", None) or []
+            for nic in nics:
+                ip = getattr(nic, "ip", None) if not isinstance(nic, dict) else nic.get("ip")
+                if ip:
+                    primary_ip = str(ip).split("/")[0]
+                    break
+        patch: dict[str, Any] = {
+            "id": server_id,
+            "hostname": hostname,
+            "primary_ip": primary_ip,
+            "os": decl.get("os") or defaults.get("os", "rhel-9"),
+            "cpu": decl.get("cpu") or defaults.get("cpu", 4),
+            "mem_mb": decl.get("mem_mb") or defaults.get("mem_mb", 8192),
+            "tags": {
+                "role": role if role != "secondary" else ("primary" if primary is None else role),
+                "persona": persona,
+                "scenario": slug or "",
+                "appears_in": decl.get("appears_in") or [],
+            },
+        }
+        loc = decl.get("physical_location")
+        if isinstance(loc, dict):
+            patch["physical_location"] = loc
+        elif persona in ("baremetal", "datacenter"):
+            patch["physical_location"] = {
+                "room": "Data Hall A",
+                "rack": "R12",
+                "u_position": 10,
+            }
+        if persona in ("baremetal", "datacenter") or patch.get("physical_location"):
+            patch.setdefault(
+                "bmc",
+                {
+                    "endpoint": f"https://bmc-{hostname}.corp.local",
+                    "protocol": "redfish",
+                    "power": "on",
+                    "sensors": {"inlet_c": 22.0},
+                },
+            )
+        rec = upsert_server(sid, patch, source=defaults.get("source", "lab"))
+        if role == "primary" or primary is None:
+            if role == "primary":
+                primary = rec
+            elif primary is None:
+                primary = rec
+    return primary or get_primary(sid)
+
+
 def seed_scenario_lab_servers(
     session_id: str,
     *,
@@ -417,11 +521,14 @@ def seed_scenario_lab_servers(
     slug: str = "",
     engine=None,
     force: bool = False,
+    lab_servers: list[dict[str, Any]] | None = None,
 ) -> dict | None:
-    """Ensure this lab session has a primary LabServer for the scenario persona.
+    """Ensure this lab session has LabServer(s) for the scenario persona.
 
-    Skips if VMware/AWS/GPU dedicated seeders already created a primary, unless
-    ``force`` is True. Never creates a platform-global server.
+    Prefer ``lab_servers`` from the scenario YAML (scenario-scoped hosts). Falls
+    back to a single persona default. Skips if VMware/AWS/GPU dedicated seeders
+    already created a primary, unless ``force`` is True. Never creates a
+    platform-global server.
     """
     sid = str(session_id)
     if not force and get_primary(sid):
@@ -437,6 +544,10 @@ def seed_scenario_lab_servers(
         if engine and getattr(engine, "shell", None):
             hostname = getattr(engine.shell.state, "hostname", None) or hostname
         return seed_gpu_node(sid, hostname=hostname, healthy=healthy)
+
+    decls = lab_servers if lab_servers is not None else load_scenario_lab_server_decls(slug)
+    if decls:
+        return _seed_from_lab_server_decls(sid, decls, slug=slug, engine=engine)
 
     defaults = dict(_PERSONA_DEFAULTS.get(persona, _PERSONA_DEFAULTS["linux"]))
     hostname = defaults["hostname"]

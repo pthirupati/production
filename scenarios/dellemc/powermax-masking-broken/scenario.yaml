@@ -1,4 +1,4 @@
-title: "PowerMax: Database Host Can't See Its LUN — Masking View Missing"
+title: 'PowerMax: Database Host Can''t See Its LUN — Masking View Missing'
 slug: powermax-masking-broken
 technology: dellemc
 category: Fix
@@ -11,25 +11,24 @@ max_score: 100
 is_free: true
 jira_priority: Critical
 dual_terminal: false
-description: >-
-  CONTEXT: The DBA team opened a Sev-1 ticket: db01 was supposed to receive a new 500GB volume from
-  the PowerMax array for a database expansion, but the host still shows no new disk after a reboot and
-  a rescan. Storage says the volume exists and is provisioned. Server team says the host sees nothing.
+description: 'CONTEXT: The DBA team opened a Sev-1 ticket: db01 was supposed to receive a new 500GB volume
+  from the PowerMax array for a database expansion, but the host still shows no new disk after a reboot
+  and a rescan. Storage says the volume exists and is provisioned. Server team says the host sees nothing.
   Both are right — and that gap is exactly what a masking view exists to close.
 
 
-  ENVIRONMENT: You are working in Unisphere for PowerMax against array 000297900123 (PowerMax 2500).
-  The array already has two storage groups — SG_web_prod (volumes 0001, 0002) and SG_db_prod (volume
-  0003) — each with an existing masking view binding it to its host and a front-end port group
-  (MV_web01 binds SG_web_prod to host web01 via PG_web). db01 is a registered host with its own FC
-  initiator, and PG_db is an existing, unused port group on FA-2D:4.
+  ENVIRONMENT: You are working in Unisphere for PowerMax against array 000297900123 (PowerMax 2500). The
+  array already has two storage groups — SG_web_prod (volumes 0001, 0002) and SG_db_prod (volume 0003)
+  — each with an existing masking view binding it to its host and a front-end port group (MV_web01 binds
+  SG_web_prod to host web01 via PG_web). db01 is a registered host with its own FC initiator, and PG_db
+  is an existing, unused port group on FA-2D:4.
 
 
   SYMPTOM / STARTING STATE: Volume 0003 lives inside SG_db_prod, and SG_db_prod has no masking view at
-  all — unlike SG_web_prod, which is fully masked to web01. In PowerMax, a storage group being
-  provisioned is necessary but not sufficient: without a masking view tying the storage group to a
-  specific host and port group, the array never presents the LUN down the fabric, so db01's HBA never
-  sees it no matter how many times it rescans.
+  all — unlike SG_web_prod, which is fully masked to web01. In PowerMax, a storage group being provisioned
+  is necessary but not sufficient: without a masking view tying the storage group to a specific host and
+  port group, the array never presents the LUN down the fabric, so db01''s HBA never sees it no matter
+  how many times it rescans.
 
 
   IMPACT: The database expansion is blocked and the maintenance window is burning. Until db01 can see
@@ -37,13 +36,12 @@ description: >-
   provisioning failure.
 
 
-  OBJECTIVE: Sign in to Unisphere, open Storage Groups, confirm SG_db_prod holds volume 0003 but has
-  no masking view, then create a masking view binding SG_db_prod, host db01, and port group PG_db so
-  db01 can finally see its LUN.
-initial_state: >-
-  Unisphere for PowerMax showing SG_db_prod provisioned with volume 0003 but with zero masking views,
-  while the sibling storage group SG_web_prod is fully masked to web01 via PG_web. Host db01 and port
-  group PG_db already exist and are unused.
+  OBJECTIVE: Sign in to Unisphere, open Storage Groups, confirm SG_db_prod holds volume 0003 but has no
+  masking view, then create a masking view binding SG_db_prod, host db01, and port group PG_db so db01
+  can finally see its LUN.'
+initial_state: Unisphere for PowerMax showing SG_db_prod provisioned with volume 0003 but with zero masking
+  views, while the sibling storage group SG_web_prod is fully masked to web01 via PG_web. Host db01 and
+  port group PG_db already exist and are unused.
 objectives:
 - Sign in to Unisphere for PowerMax
 - Open Storage Groups and confirm SG_db_prod holds volume 0003 with no masking view
@@ -53,41 +51,36 @@ objectives:
 hints:
 - order: 1
   cost: 0
-  content: >-
-    ORIENT — what to observe and why: Do not create anything yet. Open Storage Groups and compare
-    SG_web_prod (which works) against SG_db_prod (which doesn't). The difference isn't the volume or
-    the host — it's a third object. Open Masking Views and note that SG_web_prod already has one
-    (MV_web01) and SG_db_prod has none.
+  content: 'ORIENT — what to observe and why: Do not create anything yet. Open Storage Groups and compare
+    SG_web_prod (which works) against SG_db_prod (which doesn''t). The difference isn''t the volume or
+    the host — it''s a third object. Open Masking Views and note that SG_web_prod already has one (MV_web01)
+    and SG_db_prod has none.'
 - order: 2
   cost: 10
-  content: >-
-    APPROACH — the troubleshooting method: In PowerMax, a host can only see a LUN through the triangle
-    of storage group + host + port group, bound together by a masking view. A volume sitting "Ready"
-    inside a storage group is fully provisioned on the array side but invisible to any server until
-    that triangle exists — this is not a zoning or HBA problem, it is a missing masking view.
+  content: 'APPROACH — the troubleshooting method: In PowerMax, a host can only see a LUN through the
+    triangle of storage group + host + port group, bound together by a masking view. A volume sitting
+    "Ready" inside a storage group is fully provisioned on the array side but invisible to any server
+    until that triangle exists — this is not a zoning or HBA problem, it is a missing masking view.'
 - order: 3
   cost: 25
-  content: >-
-    WHICH TOOL — the diagnostic command(s): 1. In Hosts, confirm db01 is already registered with an FC
-    initiator — nothing to create there. 2. In Port Groups, confirm PG_db exists on FA-2D:4 and is not
-    already bound to another masking view. 3. You have all three ingredients already (storage group,
-    host, port group) — the only missing piece is the masking view that ties them together.
+  content: 'WHICH TOOL — the diagnostic command(s): 1. In Hosts, confirm db01 is already registered with
+    an FC initiator — nothing to create there. 2. In Port Groups, confirm PG_db exists on FA-2D:4 and
+    is not already bound to another masking view. 3. You have all three ingredients already (storage group,
+    host, port group) — the only missing piece is the masking view that ties them together.'
 - order: 4
   cost: 40
-  content: >-
-    NARROW DOWN — isolate the subsystem: Use the "Create Masking View" action, and fill in exactly the
-    three names already confirmed: storage group SG_db_prod, host db01, port group PG_db. This mirrors
-    how MV_web01 binds SG_web_prod + web01 + PG_web — same shape, different objects.
+  content: 'NARROW DOWN — isolate the subsystem: Use the "Create Masking View" action, and fill in exactly
+    the three names already confirmed: storage group SG_db_prod, host db01, port group PG_db. This mirrors
+    how MV_web01 binds SG_web_prod + web01 + PG_web — same shape, different objects.'
 - order: 5
   cost: 60
-  content: >-
-    NEAR-SOLUTION — the fix shape + verify (you still apply it): Open Create Masking View, set storage
-    group SG_db_prod, host db01, port group PG_db, give it a name, and submit. Refresh Masking Views and
-    confirm the new entry appears next to MV_web01. WHY: the grader checks that a masking view now binds
-    SG_db_prod in the simulated array state — a storage group or host created without a matching masking
-    view does not clear the incident.
-summary: Create the missing masking view that finally lets db01 see the volume 0003 LUN already
-  provisioned for it inside SG_db_prod.
+  content: 'NEAR-SOLUTION — the fix shape + verify (you still apply it): Open Create Masking View, set
+    storage group SG_db_prod, host db01, port group PG_db, give it a name, and submit. Refresh Masking
+    Views and confirm the new entry appears next to MV_web01. WHY: the grader checks that a masking view
+    now binds SG_db_prod in the array session state — a storage group or host created without a matching
+    masking view does not clear the incident.'
+summary: Create the missing masking view that finally lets db01 see the volume 0003 LUN already provisioned
+  for it inside SG_db_prod.
 estimated_minutes: 15
 xp_reward: 120
 prerequisites:
@@ -106,10 +99,10 @@ what_you_will_learn:
 environment:
   nodes:
   - role: primary
-    os: FixitLab Unisphere for PowerMax simulation
+    os: FixitLab Unisphere for PowerMax environment
     hostname: lab-primary
     ip: 127.0.0.1
-    specs: local offline simulation
+    specs: local offline lab environment
   pre_installed:
   - unisphere-for-powermax
   credentials:
@@ -118,22 +111,36 @@ environment:
 tasks:
 - id: task_1
   title: Create the missing masking view for SG_db_prod
-  description: >-
-    Bind SG_db_prod, host db01, and port group PG_db together with a new masking view so db01 can see
-    the volume already provisioned in SG_db_prod.
-  background: >-
-    This lab teaches the PowerMax masking triangle: storage group + host + port group, bound by a
-    masking view, is what actually presents a LUN to a server.
+  description: Bind SG_db_prod, host db01, and port group PG_db together with a new masking view so db01
+    can see the volume already provisioned in SG_db_prod.
+  background: 'This lab teaches the PowerMax masking triangle: storage group + host + port group, bound
+    by a masking view, is what actually presents a LUN to a server.'
   validation:
     type: custom_script
     script: check.sh
-    error_message: >-
-      Validation did not pass. Create a masking view binding SG_db_prod, db01, and PG_db from Create
-      Masking View.
+    error_message: Validation did not pass. Create a masking view binding SG_db_prod, db01, and PG_db
+      from Create Masking View.
 solution:
   summary: Create a masking view named e.g. MV_db01 binding SG_db_prod, db01, and PG_db.
   files_changed: []
   commands_run:
-  - "Unisphere: Storage Groups -> confirm SG_db_prod has no masking view"
-  - "Unisphere: Create Masking View -> SG_db_prod + db01 + PG_db -> Create"
+  - 'Unisphere: Storage Groups -> confirm SG_db_prod has no masking view'
+  - 'Unisphere: Create Masking View -> SG_db_prod + db01 + PG_db -> Create'
   reference_docs: dellemc-fundamentals
+consoles:
+- dellemc
+- terminal
+lab_servers:
+- id: db01
+  role: primary
+  hostname: db01
+  persona: linux
+  appears_in:
+  - terminal
+  - dellemc
+- id: powermax
+  role: array
+  hostname: powermax-000297900123
+  persona: storage
+  appears_in:
+  - dellemc

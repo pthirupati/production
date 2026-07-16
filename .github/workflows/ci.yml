@@ -40,6 +40,8 @@ jobs:
           cache-dependency-path: backend/requirements.txt
       - name: Install backend deps
         run: pip install -r backend/requirements.txt
+      - name: Lint hero scenario YAML
+        run: python scripts/lint_scenarios.py --strict-heroes
       - name: Django tests
         env:
           DATABASE_URL: postgres://fixitlab:fixitlab@localhost:5432/fixitlab_test

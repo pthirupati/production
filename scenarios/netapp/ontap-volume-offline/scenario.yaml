@@ -1,4 +1,4 @@
-title: "ONTAP Volume Nearing Capacity — Grow Before It Goes Read-Only"
+title: ONTAP Volume Nearing Capacity — Grow Before It Goes Read-Only
 slug: ontap-volume-offline
 technology: netapp
 category: Fix
@@ -11,37 +11,35 @@ max_score: 100
 is_free: true
 jira_priority: High
 dual_terminal: false
-description: >-
-  CONTEXT: The on-call storage rotation just paged you about vol_web_data on the fixitlab-cluster
+description: 'CONTEXT: The on-call storage rotation just paged you about vol_web_data on the fixitlab-cluster
   ONTAP system. A capacity-monitoring alert fired at 95% utilization, one autosize step away from the
-  volume hitting its space guarantee limit and forcing itself read-only — which would take the
-  production web tier's uploads directory down mid-shift.
+  volume hitting its space guarantee limit and forcing itself read-only — which would take the production
+  web tier''s uploads directory down mid-shift.
 
 
-  ENVIRONMENT: You are working in NetApp ONTAP System Manager against a two-node cluster
-  (fixitlab-cluster) hosting svm-prod (NFS/CIFS/iSCSI) and svm-dr (NFS, for disaster recovery). Volumes
-  live on aggr1 (svm-prod) and aggr2 (svm-dr). vol_web_data sits on aggr1, which itself has 3.2TB of
-  headroom free — the aggregate is nowhere near full, only the volume's own size cap is the problem.
+  ENVIRONMENT: You are working in NetApp ONTAP System Manager against a two-node cluster (fixitlab-cluster)
+  hosting svm-prod (NFS/CIFS/iSCSI) and svm-dr (NFS, for disaster recovery). Volumes live on aggr1 (svm-prod)
+  and aggr2 (svm-dr). vol_web_data sits on aggr1, which itself has 3.2TB of headroom free — the aggregate
+  is nowhere near full, only the volume''s own size cap is the problem.
 
 
   SYMPTOM / STARTING STATE: In Storage > Volumes, vol_web_data shows 100GB provisioned with 95GB used
-  (95% utilized) — the red zone on the usage bar. vol_db_data on the same SVM sits at a comfortable
-  60% and is not part of this incident. The aggregate hosting both volumes has ample free space, so
-  the fix is a volume-level resize, not an aggregate-level rebalance.
+  (95% utilized) — the red zone on the usage bar. vol_db_data on the same SVM sits at a comfortable 60%
+  and is not part of this incident. The aggregate hosting both volumes has ample free space, so the fix
+  is a volume-level resize, not an aggregate-level rebalance.
 
 
-  IMPACT: Once a FlexVol crosses its configured space-full threshold, ONTAP forces it read-only to
-  protect data integrity — every write from the web tier (image uploads, session cache writes) would
-  start failing. This is a proactive-fix ticket: the volume is not offline yet, but will be within
-  hours at current write rate if nobody grows it.
+  IMPACT: Once a FlexVol crosses its configured space-full threshold, ONTAP forces it read-only to protect
+  data integrity — every write from the web tier (image uploads, session cache writes) would start failing.
+  This is a proactive-fix ticket: the volume is not offline yet, but will be within hours at current write
+  rate if nobody grows it.
 
 
-  OBJECTIVE: Sign in to ONTAP System Manager, open Storage > Volumes, find vol_web_data's 95%-full
-  usage bar, and resize the volume upward (to at least double its current size) so it has real
-  headroom again before it hits the read-only threshold.
-initial_state: >-
-  ONTAP System Manager showing vol_web_data at 95GB used / 100GB provisioned (95% utilization) on
-  aggr1, which itself has plenty of free space. No other volume in the cluster is near capacity.
+  OBJECTIVE: Sign in to ONTAP System Manager, open Storage > Volumes, find vol_web_data''s 95%-full usage
+  bar, and resize the volume upward (to at least double its current size) so it has real headroom again
+  before it hits the read-only threshold.'
+initial_state: ONTAP System Manager showing vol_web_data at 95GB used / 100GB provisioned (95% utilization)
+  on aggr1, which itself has plenty of free space. No other volume in the cluster is near capacity.
 objectives:
 - Sign in to ONTAP System Manager
 - Open Storage > Volumes and locate vol_web_data's 95%-utilized usage bar
@@ -50,41 +48,35 @@ objectives:
 hints:
 - order: 1
   cost: 0
-  content: >-
-    ORIENT — what to observe and why: Don't touch anything yet. Open Storage > Volumes and look at
-    the usage bar (used/provisioned) for every volume in the list. Exactly one volume is in the red —
-    note its name, its current size, and which aggregate it lives on before deciding on a fix.
+  content: 'ORIENT — what to observe and why: Don''t touch anything yet. Open Storage > Volumes and look
+    at the usage bar (used/provisioned) for every volume in the list. Exactly one volume is in the red
+    — note its name, its current size, and which aggregate it lives on before deciding on a fix.'
 - order: 2
   cost: 10
-  content: >-
-    APPROACH — the troubleshooting method: A volume near its space-full threshold has two possible
+  content: 'APPROACH — the troubleshooting method: A volume near its space-full threshold has two possible
     fixes in real ONTAP — grow the volume (if the aggregate has headroom) or free space inside it. Check
-    the aggregate's own free capacity first: if the aggregate has plenty of room (it does here), growing
-    the volume is the correct, minimal, reversible fix — you are not migrating data or touching the
-    aggregate.
+    the aggregate''s own free capacity first: if the aggregate has plenty of room (it does here), growing
+    the volume is the correct, minimal, reversible fix — you are not migrating data or touching the aggregate.'
 - order: 3
   cost: 25
-  content: >-
-    WHICH TOOL — the diagnostic command(s): 1. In Storage > Aggregates, confirm aggr1 has multiple TB
-    of free space — this rules out an aggregate-capacity problem. 2. Back in Storage > Volumes, use the
-    "Resize" action on the volume showing the 95% usage bar. 3. A resize only ever needs to move the
+  content: 'WHICH TOOL — the diagnostic command(s): 1. In Storage > Aggregates, confirm aggr1 has multiple
+    TB of free space — this rules out an aggregate-capacity problem. 2. Back in Storage > Volumes, use
+    the "Resize" action on the volume showing the 95% usage bar. 3. A resize only ever needs to move the
     provisioned size up, never touch used_gb — used space is what it is until the application deletes
-    data.
+    data.'
 - order: 4
   cost: 40
-  content: >-
-    NARROW DOWN — isolate the subsystem: The volume at risk is vol_web_data, currently provisioned at
-    100GB with 95GB used. Doubling it to 200GB brings utilization down to roughly 47% — comfortably
+  content: 'NARROW DOWN — isolate the subsystem: The volume at risk is vol_web_data, currently provisioned
+    at 100GB with 95GB used. Doubling it to 200GB brings utilization down to roughly 47% — comfortably
     healthy — without needing to guess an exact number. Any new size strictly larger than the current
-    provisioned size will clear the "near full" condition the console is tracking.
+    provisioned size will clear the "near full" condition the console is tracking.'
 - order: 5
   cost: 60
-  content: >-
-    NEAR-SOLUTION — the fix shape + verify (you still apply it): Click "Resize" on vol_web_data, enter a
-    new size larger than 100GB (200GB is a safe, realistic choice), and confirm. Refresh Storage >
-    Volumes and check the usage bar has dropped out of the red zone. WHY: the grader checks that
-    vol_web_data's provisioned size increased and the "volume near full" flag cleared in the simulated
-    ONTAP state — a UI click without submitting a larger size does not count.
+  content: 'NEAR-SOLUTION — the fix shape + verify (you still apply it): Click "Resize" on vol_web_data,
+    enter a new size larger than 100GB (200GB is a safe, realistic choice), and confirm. Refresh Storage
+    > Volumes and check the usage bar has dropped out of the red zone. WHY: the grader checks that vol_web_data''s
+    provisioned size increased and the "volume near full" flag cleared in the session ONTAP state — a
+    UI click without submitting a larger size does not count.'
 summary: Resize the ONTAP volume that is about to hit its space-full threshold before it forces itself
   read-only and breaks production writes.
 estimated_minutes: 10
@@ -105,10 +97,10 @@ what_you_will_learn:
 environment:
   nodes:
   - role: primary
-    os: FixitLab NetApp ONTAP System Manager simulation
+    os: FixitLab NetApp ONTAP System Manager environment
     hostname: lab-primary
     ip: 127.0.0.1
-    specs: local offline simulation
+    specs: local offline lab environment
   pre_installed:
   - ontap-system-manager
   credentials:
@@ -117,20 +109,28 @@ environment:
 tasks:
 - id: task_1
   title: Resize vol_web_data before it goes read-only
-  description: >-
-    Grow vol_web_data's provisioned size so its utilization drops out of the space-full danger zone,
-    using the aggregate's existing free capacity.
-  background: >-
-    This lab teaches the standard ONTAP capacity-management response: confirm the aggregate has
-    headroom, then resize the volume rather than migrating or deleting data.
+  description: Grow vol_web_data's provisioned size so its utilization drops out of the space-full danger
+    zone, using the aggregate's existing free capacity.
+  background: 'This lab teaches the standard ONTAP capacity-management response: confirm the aggregate
+    has headroom, then resize the volume rather than migrating or deleting data.'
   validation:
     type: custom_script
     script: check.sh
-    error_message: >-
-      Validation did not pass. Resize vol_web_data to a larger provisioned size from Storage > Volumes.
+    error_message: Validation did not pass. Resize vol_web_data to a larger provisioned size from Storage
+      > Volumes.
 solution:
   summary: Resize vol_web_data upward (e.g. to 200GB) so its usage percentage returns to a healthy range.
   files_changed: []
   commands_run:
-  - "ONTAP System Manager: Storage > Volumes -> vol_web_data -> Resize -> 200GB"
+  - 'ONTAP System Manager: Storage > Volumes -> vol_web_data -> Resize -> 200GB'
   reference_docs: netapp-fundamentals
+consoles:
+- netapp
+- terminal
+lab_servers:
+- id: ontap-cluster
+  role: primary
+  hostname: fixitlab-cluster
+  persona: storage
+  appears_in:
+  - netapp

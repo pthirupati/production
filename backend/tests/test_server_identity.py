@@ -65,3 +65,27 @@ class ServerIdentityTests(SimpleTestCase):
         )
         self.addCleanup(si.drop_session, "sess-bm")
         self.assertEqual(bm["physical_location"]["rack"], "R12")
+
+    def test_hero_yaml_lab_servers_seed_multiple(self):
+        """Hero scenarios declare lab_servers; seed should materialize them."""
+        sid = "sess-cv"
+        primary = si.seed_scenario_lab_servers(
+            sid, sim_type="commvault", slug="cv-vm-backup-missing-client",
+        )
+        self.addCleanup(si.drop_session, sid)
+        self.assertIsNotNone(primary)
+        hosts = {s["hostname"] for s in si.list_servers(sid)}
+        self.assertIn("db01", hosts)
+        self.assertIn("app-migrated-01", hosts)
+        self.assertEqual(primary["hostname"], "db01")
+        self.assertEqual(primary["tags"]["role"], "primary")
+
+    def test_dc_yaml_physical_location(self):
+        sid = "sess-dc"
+        primary = si.seed_scenario_lab_servers(
+            sid, sim_type="datacenter", slug="dc-failed-nic-reseat",
+        )
+        self.addCleanup(si.drop_session, sid)
+        self.assertEqual(primary["hostname"], "db-prod-01")
+        self.assertEqual(primary["physical_location"]["rack"], "R02")
+        self.assertEqual(primary["physical_location"]["u_position"], 10)

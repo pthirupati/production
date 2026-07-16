@@ -33,8 +33,8 @@ description: 'CONTEXT: A team operating Windows Server has raised a ticket for `
 
 
   IMPACT: The server is missing a critical security patch, monthly compliance reporting is inaccurate,
-  and repeated failed retries from the site server continue to fail until the underlying client-side
-  issue is cleared through Software Center.
+  and repeated failed retries from the site server continue to fail until the underlying client-side issue
+  is cleared through Software Center.
 
 
   OBJECTIVE: Open Software Center, locate the Required deployment that shows Failed with error 0x87D00664,
@@ -59,8 +59,8 @@ description: 'CONTEXT: A team operating Windows Server has raised a ticket for `
   Never stack unverified changes.
 
 
-  WHAT TO AVOID: Do not apply broad destructive changes, skip evidence gathering, or fake completion with
-  marker files — the checker validates real system state.'
+  WHAT TO AVOID: Do not apply broad destructive changes, skip evidence gathering, or fabricated completion
+  with marker files — the checker validates real system state.'
 initial_state: 'A domain-joined Windows Server 2022 with the Configuration Manager (SCCM/MECM) client
 
   installed and active, site code FIX. In Software Center, a Required deployment for
@@ -83,18 +83,18 @@ hints:
   content: 'ORIENT — what to observe and why:
 
     Do not touch anything yet. First observe the symptom: the SCCM/MECM client is not behaving as the
-    scenario objectives require. This lab is about the Configuration Manager Software Center — how a
-    required deployment behaves when it fails on a managed Windows Server. Read the objectives and the
-    current state, and note precisely what looks wrong versus healthy before you form any theory.'
+    scenario objectives require. This lab is about the Configuration Manager Software Center — how a required
+    deployment behaves when it fails on a managed Windows Server. Read the objectives and the current
+    state, and note precisely what looks wrong versus healthy before you form any theory.'
 - order: 2
   cost: 10
   content: 'APPROACH — the troubleshooting method:
 
     Work from evidence, not guesses. For Configuration Manager patch problems the reliable method is:
     (1) reproduce/observe the failure in Software Center, (2) narrow from the whole compliance report
-    down to the one deployment that owns the symptom, (3) change exactly one thing, (4) re-check. Fix the
-    underlying deployment failure you identified (not just the noisy compliance line), changing one thing
-    at a time.'
+    down to the one deployment that owns the symptom, (3) change exactly one thing, (4) re-check. Fix
+    the underlying deployment failure you identified (not just the noisy compliance line), changing one
+    thing at a time.'
 - order: 3
   cost: 25
   content: 'WHICH TOOL — the diagnostic command(s):
@@ -156,7 +156,7 @@ environment:
     os: FixitLab Windows Server host
     hostname: lab-primary
     ip: 127.0.0.1
-    specs: local offline simulation
+    specs: local offline lab environment
   pre_installed:
   - bash
   - coreutils
@@ -169,8 +169,9 @@ environment:
 tasks:
 - id: task_1
   title: 'Windows GUI: Recover a Failed SCCM/MECM Patch Deployment'
-  description: 'Restore healthy behavior for Windows GUI: Recover a Failed SCCM/MECM Patch Deployment by
-    investigating the failure in Software Center, applying the smallest safe fix, and validating the outcome.'
+  description: 'Restore healthy behavior for Windows GUI: Recover a Failed SCCM/MECM Patch Deployment
+    by investigating the failure in Software Center, applying the smallest safe fix, and validating the
+    outcome.'
   background: 'This windows lab teaches systematic troubleshooting of Microsoft Endpoint Configuration
     Manager (SCCM/MECM) patch deployments: observe, hypothesize, change, verify.'
   validation:
@@ -196,7 +197,8 @@ guided_mode:
     next_on: command_success
   - step: 2
     title: Apply the minimal fix
-    instruction: Open Software Center, find the Required deployment showing Failed, and install/retry it.
+    instruction: Open Software Center, find the Required deployment showing Failed, and install/retry
+      it.
     command: '# your fix command here'
     expected_output: State moves toward the objective
     explanation: Small changes make rollback easy if the hypothesis was wrong.
@@ -208,3 +210,14 @@ guided_mode:
     expected_output: '`check.sh` exits successfully'
     explanation: The lab passes only when real state is healthy.
     next_on: command_success
+consoles:
+- windows
+- terminal
+lab_servers:
+- id: primary
+  role: primary
+  hostname: lab-primary
+  persona: windows
+  appears_in:
+  - windows
+  - terminal
