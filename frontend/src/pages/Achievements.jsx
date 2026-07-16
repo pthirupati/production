@@ -187,12 +187,12 @@ export default function Achievements() {
           <Award size={18} className="text-indigo-400" /> Interview Certificates (FIXIT-INT)
         </h2>
         <p className="text-sm text-surface-400 mb-4">
-          Earned by clearing all rounds in an AI mock interview campaign. Verifiable and shareable on LinkedIn.
+          Earned by clearing all rounds in an AI interview campaign. Verifiable and shareable on LinkedIn.
         </p>
         {interviewCerts.length === 0 ? (
           <div className="glass-card p-6 text-center border border-dashed border-surface-700">
             <p className="text-surface-400 text-sm">No interview certificates yet.</p>
-            <a href="/interviews" className="text-xs text-indigo-400 hover:underline mt-2 inline-block">Start a mock interview →</a>
+            <a href="/interviews" className="text-xs text-indigo-400 hover:underline mt-2 inline-block">Start an AI interview →</a>
           </div>
         ) : (
           <div className="grid sm:grid-cols-2 gap-4">

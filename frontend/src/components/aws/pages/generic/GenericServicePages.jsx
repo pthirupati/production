@@ -390,7 +390,7 @@ export function GenericResourceList() {
       {deleteTarget && (
         <ConfirmDialog
           title={`Delete ${deleteTarget.label}?`}
-          body={`This permanently removes ${deleteTarget.label} from the local ${serviceCfg.title} simulation state in ${region}. This action cannot be undone.`}
+          body={`This permanently removes ${deleteTarget.label} from the local ${serviceCfg.title} environment in ${region}. This action cannot be undone.`}
           confirmLabel="Delete"
           confirmText={deleteTarget.confirmText}
           onCancel={() => setDeleteTarget(null)}
@@ -542,7 +542,7 @@ export function GenericResourceDetail() {
                   { key: 'source', label: 'Source' },
                 ]}
                 rows={[
-                  { time: row.lastRun ? new Date(row.lastRun).toLocaleString() : 'Just now', event: service === 'lambda' ? 'Test invocation' : 'Describe resource', status: row.lastResult || row.status || 'Succeeded', source: 'FixitLab simulation' },
+                  { time: row.lastRun ? new Date(row.lastRun).toLocaleString() : 'Just now', event: service === 'lambda' ? 'Test invocation' : 'Describe resource', status: row.lastResult || row.status || 'Succeeded', source: 'FixItLab console' },
                   { time: new Date(row.created).toLocaleString(), event: 'Create resource', status: 'Succeeded', source: 'AWS Console' },
                 ]}
                 getRowKey={(r) => `${r.time}:${r.event}`}
@@ -555,7 +555,7 @@ export function GenericResourceDetail() {
               <div className="aws-card">
                 <SectionLabel>CLI and SDK integration</SectionLabel>
                 <div className="aws-hint" style={{ margin: '8px 0 12px' }}>
-                  These commands mirror the shape used by the real AWS CLI and operate against the local simulation where implemented.
+                  These commands mirror the shape used by the real AWS CLI and operate against the local lab environment where implemented.
                 </div>
                 <pre className="aws-mono" style={{ background: 'var(--aws-page-bg)', padding: 12, overflowX: 'auto', borderRadius: 4, margin: 0 }}>{`aws ${serviceCfg.title.toLowerCase().replace(/[^a-z0-9]+/g, '-')} list-${resource}
 aws ${serviceCfg.title.toLowerCase().replace(/[^a-z0-9]+/g, '-')} describe-${resource.replace(/s$/, '')} --${cfg.idLabel || 'name'} ${row.name}
@@ -567,7 +567,7 @@ terraform import ${service}_${resource.replace(/-/g, '_')}.${row.name.replace(/[
                   columns={[
                     { key: 'workflow', label: 'Workflow' },
                     { key: 'purpose', label: 'Purpose' },
-                    { key: 'status', label: 'Simulation support', render: (r) => <Badge state={r.status}>{r.status}</Badge> },
+                    { key: 'status', label: 'Lab support', render: (r) => <Badge state={r.status}>{r.status}</Badge> },
                   ]}
                   rows={[
                     { workflow: 'Create / update resource', purpose: 'Exercise resource lifecycle controls from the console', status: 'Supported' },
@@ -591,7 +591,7 @@ terraform import ${service}_${resource.replace(/-/g, '_')}.${row.name.replace(/[
             <div className="aws-card">
               <DataTable
                 columns={[{ key: 'key', label: 'Key' }, { key: 'value', label: 'Value' }]}
-                rows={Object.entries(row.tags || { Environment: 'demo', Project: 'fixitlab' }).map(([key, value]) => ({ key, value }))}
+                rows={Object.entries(row.tags || { Environment: 'lab', Project: 'fixitlab' }).map(([key, value]) => ({ key, value }))}
                 getRowKey={(r) => r.key}
                 emptyTitle="No tags"
               />

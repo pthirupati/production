@@ -22,7 +22,7 @@ const STATUS_COLORS = {
 export default function InterviewHub() {
   const navigate = useNavigate()
   const { isAuthenticated } = useAuthStore()
-  usePageTitle('Interview Studio', 'AI mock interviews with voice, scheduling, and certificates.')
+  usePageTitle('Interview Studio', 'AI interviews with voice, scheduling, and certificates.')
   const plansRef = useRef(null)
   const [campaigns, setCampaigns] = useState([])
   const [entitlement, setEntitlement] = useState(null)
@@ -150,7 +150,7 @@ export default function InterviewHub() {
       if (!gateway.available && !gateway.razorpay_configured) {
         if (import.meta.env.DEV) {
           await interviewsApi.demoActivatePlan(plan.code)
-          toast.success(`${plan.name} activated (demo)`)
+          toast.success(`${plan.name} activated`)
           load()
           return
         }
@@ -191,7 +191,7 @@ export default function InterviewHub() {
     <div className="max-w-5xl mx-auto space-y-8 animate-fade-in">
       <PageHeader
         eyebrow="AI Interview Studio"
-        title="Mock interviews that feel real"
+        title="AI interviews that feel real"
         subtitle="Multi-round voice interviews with resume-aware questions, scheduling, and certificates."
         actions={
           <Link

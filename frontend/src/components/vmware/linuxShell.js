@@ -2380,7 +2380,7 @@ export function createLinuxShell(vm, opts = {}) {
     }
     else if (lc === 'apt-cache') {
       if (positional[0] === 'policy') { const r = pkgs.get(positional[1]); emit([`${positional[1] || 'package'}:`, `  Installed: ${r ? r.ver + (r.rel ? '-' + r.rel : '') : '(none)'}`, `  Candidate: ${pkgInfo(positional[1] || '').ver.replace(/^[0-9]+:/, '')}`]) }
-      else emit(`${positional[1] || 'package'} - simulated package description`)
+      else emit(`${positional[1] || 'package'} - package description`)
     }
     else if (lc === 'rpm') {
       // -qa / -q -a : list every installed package (reads the live DB)
@@ -2750,7 +2750,7 @@ export function createLinuxShell(vm, opts = {}) {
       else emit(`/usr/bin/${t}`)
     }
     else if (lc === 'man' || lc === 'info' || lc === 'apropos') emit(`What manual page do you want?\n(try '${positional[0] || 'command'} --help')`)
-    else if (lc === 'tldr') emit(`# ${positional[0] || 'command'}\n(simulated tldr page)`)
+    else if (lc === 'tldr') emit(`# ${positional[0] || 'command'}\n(tldr page)`)
     else if (lc === 'sleep' || lc === 'true' || lc === ':' ) emit('')
     else if (lc === 'false') return { lines: [''], prompt: prompt() }
     else if (lc === 'test' || lc === '[') emit('')
@@ -2785,9 +2785,9 @@ export function createLinuxShell(vm, opts = {}) {
 
     /* =================== interpreters / containers / IaC =================== */
     else if (lc === 'python' || lc === 'python3') emit(positional.length ? '' : 'Python 3.9.18 (main, Jan 24 2024, 00:00:00)\n[GCC 11.4.0] on linux\nType "help", "copyright", "credits" or "license" for more information.\n(non-interactive)')
-    else if (lc === 'node') emit(positional.length ? '' : 'Welcome to Node.js v18.19.0.\nType ".help" for more information. (simulated)')
+    else if (lc === 'node') emit(positional.length ? '' : 'Welcome to Node.js v18.19.0.\nType ".help" for more information. ')
     else if (['perl', 'ruby', 'php', 'go', 'java', 'gcc', 'make', 'cc', 'javac'].includes(lc)) emit(positional.length ? '' : `${lc}: interpreter/compiler`)
-    else if (lc === 'pip' || lc === 'pip3' || lc === 'npm' || lc === 'yarn' || lc === 'gem' || lc === 'cargo') emit(positional[0] === 'install' ? `Successfully installed ${positional[1] || 'package'}` : `${lc} ${positional[0] || ''} (simulated)`)
+    else if (lc === 'pip' || lc === 'pip3' || lc === 'npm' || lc === 'yarn' || lc === 'gem' || lc === 'cargo') emit(positional[0] === 'install' ? `Successfully installed ${positional[1] || 'package'}` : `${lc} ${positional[0] || ''} `)
     else if (lc === 'docker') {
       const sub = positional[0]
       if (sub === 'ps') emit(['CONTAINER ID   IMAGE          COMMAND                  CREATED       STATUS       PORTS                  NAMES', 'a1b2c3d4e5f6   nginx:1.25     "/docker-entrypoint.…"   2 hours ago   Up 2 hours   0.0.0.0:8080->80/tcp   web', 'f6e5d4c3b2a1   mysql:8.0      "docker-entrypoint.s…"   2 hours ago   Up 2 hours   3306/tcp               db'])
@@ -2892,7 +2892,7 @@ export function createLinuxShell(vm, opts = {}) {
         else if (op === 'start-instances') emit('{\n    "StartingInstances": [\n        { "InstanceId": "i-0abcd1234efgh5678", "CurrentState": { "Name": "pending" } }\n    ]\n}')
         else if (op === 'stop-instances') emit('{\n    "StoppingInstances": [\n        { "InstanceId": "i-0abcd1234efgh5678", "CurrentState": { "Name": "stopping" } }\n    ]\n}')
         else if (op === 'describe-regions') emit('{\n    "Regions": [\n        { "RegionName": "us-east-1" },\n        { "RegionName": "us-west-2" },\n        { "RegionName": "eu-west-1" }\n    ]\n}')
-        else emit(`aws: ec2: simulated (${op || 'no subcommand'}) in ${region}`)
+        else emit(`aws: ec2: (${op || 'no subcommand'}) in ${region}`)
       }
       else if (svc === 's3') {
         if (op === 'ls') {
@@ -2911,16 +2911,16 @@ export function createLinuxShell(vm, opts = {}) {
         if (op === 'list-users') emit('{\n    "Users": [\n        { "UserName": "devops", "Arn": "arn:aws:iam::123456789012:user/devops" }\n    ]\n}')
         else if (op === 'get-user') emit('{\n    "User": { "UserName": "devops", "UserId": "AIDAEXAMPLE1234567890" }\n}')
         else if (op === 'list-roles') emit('{\n    "Roles": [\n        { "RoleName": "eks-node-role", "Arn": "arn:aws:iam::123456789012:role/eks-node-role" }\n    ]\n}')
-        else emit(`aws: iam: simulated (${op || 'no subcommand'})`)
+        else emit(`aws: iam: (${op || 'no subcommand'})`)
       }
       else if (svc === 'eks') {
         if (op === 'list-clusters') emit('{\n    "clusters": [\n        "prod-cluster"\n    ]\n}')
         else if (op === 'update-kubeconfig') emit(`Updated context arn:aws:eks:${region}:123456789012:cluster/${fv('--name') || 'prod-cluster'} in ~/.kube/config`)
         else if (op === 'describe-cluster') emit('{\n    "cluster": { "name": "prod-cluster", "status": "ACTIVE", "version": "1.29" }\n}')
-        else emit(`aws: eks: simulated (${op || 'no subcommand'})`)
+        else emit(`aws: eks: (${op || 'no subcommand'})`)
       }
       else if (svc === 'logs' && op === 'describe-log-groups') emit('{\n    "logGroups": [\n        { "logGroupName": "/aws/eks/prod-cluster/cluster" }\n    ]\n}')
-      else emit(`aws: ${svc}: simulated (${[op, ...pos.slice(2)].filter(Boolean).join(' ') || 'no subcommand'}) in ${region}`)
+      else emit(`aws: ${svc}: (${[op, ...pos.slice(2)].filter(Boolean).join(' ') || 'no subcommand'}) in ${region}`)
     }
     else if (lc === 'helm') {
       const sub = positional[0] || ''
@@ -2941,7 +2941,7 @@ export function createLinuxShell(vm, opts = {}) {
     }
     else if (['ansible', 'ansible-playbook', 'terraform', 'packer', 'vagrant'].includes(lc)) {
       if (lc === 'terraform' && positional[0] === 'version') emit('Terraform v1.7.4\non linux_amd64')
-      else emit(`${lc}: simulated (${positional.join(' ') || 'no args'})`)
+      else emit(`${lc}: (${positional.join(' ') || 'no args'})`)
     }
 
     /* =================== power =================== */

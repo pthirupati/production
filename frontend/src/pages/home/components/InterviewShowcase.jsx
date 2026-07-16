@@ -21,11 +21,11 @@ export default function InterviewShowcase() {
   const timer = `${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, '0')}`
 
   return (
-    <Link to="/mock-interviews" className="fx-interview-showcase-wrap block no-underline group" aria-label="Open mock interview demo">
+    <Link to="/mock-interviews" className="fx-interview-showcase-wrap block no-underline group" aria-label="Open AI interview studio">
       <div className="fx-interview-showcase-glow" aria-hidden="true" />
       <div className="fx-interview-showcase relative">
         <div className="absolute top-3 right-3 z-10 flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-black/50 border border-white/15 text-[10px] font-semibold text-white/90 group-hover:bg-indigo-600/80 transition-colors">
-          <Play size={10} fill="currentColor" stroke="none" /> Live demo
+          <Play size={10} fill="currentColor" stroke="none" /> Try now
         </div>
         <div className="fx-interview-showcase-header">
           <div className="fx-interview-rec">

@@ -101,10 +101,10 @@ function newGenericId(service, resource) {
 function seedGenericResources() {
   const now = '2024-03-10T14:32:01Z'
   const r = 'us-east-1'
-  const row = (id, region, name, extra) => ({ id, region, name, created: now, tags: { Environment: 'demo', Project: 'fixitlab' }, ...extra })
+  const row = (id, region, name, extra) => ({ id, region, name, created: now, tags: { Environment: 'lab', Project: 'fixitlab' }, ...extra })
   return {
     lambda: {
-      functions: [row('fn-demo001', r, 'my-demo-function', {
+      functions: [row('fn-lab001', r, 'my-lab-function', {
         runtime: 'Python 3.12', memory: 128, timeout: 30, status: 'Active', handler: 'lambda_function.lambda_handler',
         code: 'def lambda_handler(event, context):\n    return {"statusCode": 200, "body": "Hello from Lambda!"}',
         env: { STAGE: 'prod', LOG_LEVEL: 'INFO' },
@@ -117,8 +117,8 @@ function seedGenericResources() {
       layers: [row('layer-common001', r, 'shared-utils-layer', { runtime: 'Python 3.12', version: 3, status: 'Active' })],
     },
     rds: {
-      databases: [row('db-demo001', r, 'my-demo-db', { engine: 'PostgreSQL 15.4', class: 'db.t3.micro', storage: 20, multiAz: false, status: 'available', endpoint: 'my-demo-db.c9akciq32xze.us-east-1.rds.amazonaws.com:5432' })],
-      snapshots: [row('snap-rds001', r, 'my-demo-db-snapshot', { engine: 'PostgreSQL', status: 'available' })],
+      databases: [row('db-lab001', r, 'my-lab-db', { engine: 'PostgreSQL 15.4', class: 'db.t3.micro', storage: 20, multiAz: false, status: 'available', endpoint: 'my-lab-db.c9akciq32xze.us-east-1.rds.amazonaws.com:5432' })],
+      snapshots: [row('snap-rds001', r, 'my-lab-db-snapshot', { engine: 'PostgreSQL', status: 'available' })],
     },
     dynamodb: {
       tables: [row('table-demo001', r, 'Orders', {
@@ -131,20 +131,20 @@ function seedGenericResources() {
       })],
     },
     cloudformation: {
-      stacks: [row('stack-demo001', r, 'my-demo-stack', {
+      stacks: [row('stack-lab001', r, 'my-lab-stack', {
         status: 'CREATE_COMPLETE', resources: 4,
         events: [
-          { at: '2024-03-10T14:30:00Z', logicalId: 'my-demo-stack', type: 'AWS::CloudFormation::Stack', status: 'CREATE_COMPLETE', reason: '' },
+          { at: '2024-03-10T14:30:00Z', logicalId: 'my-lab-stack', type: 'AWS::CloudFormation::Stack', status: 'CREATE_COMPLETE', reason: '' },
           { at: '2024-03-10T14:29:40Z', logicalId: 'AppSecurityGroup', type: 'AWS::EC2::SecurityGroup', status: 'CREATE_COMPLETE', reason: '' },
           { at: '2024-03-10T14:29:20Z', logicalId: 'AppBucket', type: 'AWS::S3::Bucket', status: 'CREATE_COMPLETE', reason: '' },
         ],
         resourceList: [
-          { logicalId: 'AppBucket', type: 'AWS::S3::Bucket', physicalId: 'my-demo-stack-appbucket-abc123', status: 'CREATE_COMPLETE' },
+          { logicalId: 'AppBucket', type: 'AWS::S3::Bucket', physicalId: 'my-lab-stack-appbucket-abc123', status: 'CREATE_COMPLETE' },
           { logicalId: 'AppSecurityGroup', type: 'AWS::EC2::SecurityGroup', physicalId: 'sg-0demo1234567890', status: 'CREATE_COMPLETE' },
         ],
-        outputs: [{ key: 'BucketName', value: 'my-demo-stack-appbucket-abc123', description: 'Name of the app bucket' }],
+        outputs: [{ key: 'BucketName', value: 'my-lab-stack-appbucket-abc123', description: 'Name of the app bucket' }],
       })],
-      'change-sets': [row('changeset-demo001', r, 'my-demo-stack-change-set', { status: 'CREATE_COMPLETE', changes: 2 })],
+      'change-sets': [row('changeset-lab001', r, 'my-lab-stack-change-set', { status: 'CREATE_COMPLETE', changes: 2 })],
     },
     route53: {
       'hosted-zones': [row('Z1234567890ABC', '', 'example.internal', { type: 'Private', records: 7, status: 'available' })],
@@ -167,11 +167,11 @@ function seedGenericResources() {
       distributions: [row('E1234567890ABC', '', 'web-assets-cdn', { domainName: 'd111111abcdef8.cloudfront.net', status: 'Deployed', priceClass: 'Use all edge locations' })],
     },
     eks: {
-      clusters: [row('cluster-demo001', r, 'demo-eks-cluster', { version: '1.30', nodes: 3, status: 'Active' })],
+      clusters: [row('cluster-lab001', r, 'lab-eks-cluster', { version: '1.30', nodes: 3, status: 'Active' })],
       'node-groups': [row('ng-demo001', r, 'general-workers', { instanceType: 't3.medium', desired: 3, status: 'Active' })],
     },
     ecs: {
-      clusters: [row('ecscluster-demo001', r, 'default', { services: 1, tasks: 2, status: 'Active' })],
+      clusters: [row('ecscluster-lab001', r, 'default', { services: 1, tasks: 2, status: 'Active' })],
       services: [row('ecsservice-demo001', r, 'web-service', { desired: 2, running: 2, status: 'Active' })],
       tasks: [row('ecstask-demo001', r, 'web-task', { launchType: 'FARGATE', status: 'RUNNING' })],
     },
@@ -222,7 +222,7 @@ function seedGenericResources() {
     },
     glue: {
       jobs: [row('glue-job-demo001', r, 'daily-partition-loader', { type: 'Spark', runs: 8, status: 'Active' })],
-      databases: [row('glue-db-demo001', r, 'lakehouse', { tables: 6, status: 'Active' })],
+      databases: [row('glue-db-lab001', r, 'lakehouse', { tables: 6, status: 'Active' })],
     },
     athena: {
       workgroups: [row('athena-demo001', r, 'primary', { queries: 18, bytesScanned: '1.2 GB', status: 'Enabled' })],
@@ -259,7 +259,7 @@ function seedState() {
   return {
     account: {
       id: ACCOUNT_ID,
-      alias: 'my-aws-simulation',
+      alias: 'my-aws-lab',
       email: 'admin@example.com',
       rootEmail: 'root@example.com',
     },
@@ -293,7 +293,7 @@ function seedState() {
       { id: 'sg-0a1b2c3default03', region: 'us-east-1', name: 'default', description: 'default VPC security group', vpcId: 'vpc-0a1b2c3d4e5f67890', inbound: [{ id: 'sgr-d', type: 'All traffic', protocol: 'All', from: 0, to: 65535, source: 'self', description: '' }], outbound: [{ id: 'sgr-od', type: 'All traffic', protocol: 'All', from: 0, to: 65535, source: '0.0.0.0/0', description: '' }] },
     ],
     keyPairs: [
-      { id: 'key-0aa11demo000001', region: 'us-east-1', name: 'demo-key-pair', type: 'rsa', fingerprint: 'a1:b2:c3:d4:e5:f6:01:02:03:04:05:06:07:08:09:0a', created: '2024-01-15T09:00:00Z' },
+      { id: 'key-0aa11lab000001', region: 'us-east-1', name: 'lab-key-pair', type: 'rsa', fingerprint: 'a1:b2:c3:d4:e5:f6:01:02:03:04:05:06:07:08:09:0a', created: '2024-01-15T09:00:00Z' },
       { id: 'key-0bb22prod000002', region: 'us-east-1', name: 'production-key', type: 'ed25519', fingerprint: 'SHA256:Zm9vYmFyMTIzNDU2Nzg5MGFiY2RlZmdoaWprbA', created: '2024-02-20T11:30:00Z' },
     ],
     volumes: [
@@ -314,29 +314,29 @@ function seedState() {
         id: 'i-0abc123def4567890', region: 'us-east-1', name: 'web-server-01', state: 'running',
         amiId: 'ami-0c02fb55956c7d316', os: 'amazon-linux-2023', type: 't2.micro', az: 'us-east-1a',
         subnetId: 'subnet-0a1b2c3d4e5f10001', vpcId: 'vpc-0a1b2c3d4e5f67890',
-        publicIp: '54.210.123.45', privateIp: '172.31.14.52', keyName: 'demo-key-pair',
+        publicIp: '54.210.123.45', privateIp: '172.31.14.52', keyName: 'lab-key-pair',
         securityGroups: ['sg-0a1b2c3web00001'], iamRole: 'EC2InstanceRole', monitoring: 'disabled',
         rootDevice: '/dev/xvda', rootVolume: 'vol-0abc123def456789a', launchTime: '2024-01-15T09:00:12Z',
         statusChecks: '2/2', checks: passedChecks(), disableApiTermination: false,
         tenancy: 'default', architecture: 'x86_64',
-        tags: { Name: 'web-server-01', Environment: 'demo', Project: 'fixitlab' },
+        tags: { Name: 'web-server-01', Environment: 'lab', Project: 'fixitlab' },
       },
       {
         id: 'i-0def456abc7890123', region: 'us-east-1', name: 'db-server-01', state: 'running',
         amiId: 'ami-0557a15b87f6559cf', os: 'ubuntu-22.04', type: 't3.small', az: 'us-east-1b',
         subnetId: 'subnet-0a1b2c3d4e5f10002', vpcId: 'vpc-0a1b2c3d4e5f67890',
-        publicIp: '', privateIp: '172.31.28.33', keyName: 'demo-key-pair',
+        publicIp: '', privateIp: '172.31.28.33', keyName: 'lab-key-pair',
         securityGroups: ['sg-0a1b2c3db000002'], iamRole: '', monitoring: 'disabled',
         rootDevice: '/dev/xvda', rootVolume: 'vol-0def456abc789012b', launchTime: '2024-01-16T10:22:00Z',
         statusChecks: '2/2', checks: passedChecks(), disableApiTermination: false,
         tenancy: 'default', architecture: 'x86_64',
-        tags: { Name: 'db-server-01', Environment: 'demo' },
+        tags: { Name: 'db-server-01', Environment: 'lab' },
       },
       {
         id: 'i-0ghi789jkl0123456', region: 'us-east-1', name: 'app-server-01', state: 'stopped',
         amiId: 'ami-026ebd4cfe2c043b2', os: 'rhel-9', type: 't3.medium', az: 'us-east-1c',
         subnetId: 'subnet-0a1b2c3d4e5f10003', vpcId: 'vpc-0a1b2c3d4e5f67890',
-        publicIp: '', privateIp: '172.31.42.11', keyName: 'demo-key-pair',
+        publicIp: '', privateIp: '172.31.42.11', keyName: 'lab-key-pair',
         securityGroups: ['sg-0a1b2c3web00001'], iamRole: '', monitoring: 'disabled',
         rootDevice: '/dev/xvda', rootVolume: 'vol-0ghi789jkl012345c', launchTime: '2024-02-10T08:00:00Z',
         statusChecks: '0/2', checks: noChecks(), disableApiTermination: false,
@@ -1338,7 +1338,7 @@ export const useAwsStore = create(
           id: newGenericId(service, resource),
           region,
           created: new Date().toISOString(),
-          tags: { Environment: 'demo', Project: 'fixitlab' },
+          tags: { Environment: 'lab', Project: 'fixitlab' },
           status: createStates ? createStates[0] : (draft.status || 'Active'),
           ...draft,
           ...derived,
@@ -1454,7 +1454,7 @@ export const useAwsStore = create(
         const outputs = outEntries.map(([key, def]) => ({ key, value: typeof def?.Value === 'string' ? def.Value : JSON.stringify(def?.Value ?? ''), description: def?.Description || '' }))
         const stack = {
           id, region, name, created: now, template: typeof template === 'string' ? template : JSON.stringify(template || {}, null, 2),
-          tags: { Environment: 'demo', Project: 'fixitlab' },
+          tags: { Environment: 'lab', Project: 'fixitlab' },
           status: 'CREATE_IN_PROGRESS', resources: resourceList.length,
           resourceList,
           outputs,

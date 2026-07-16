@@ -60,7 +60,7 @@ export default function InterviewInvite() {
       <PageHeader
         eyebrow="You're invited"
         title={invite.role_title || 'Interview invitation'}
-        subtitle={isAsync ? 'One-way video interview — record your answers on your own time.' : 'Live AI mock interview with voice and scoring.'}
+        subtitle={isAsync ? 'One-way video interview — record your answers on your own time.' : 'Live AI interview with voice and scoring.'}
       />
 
       <div className="glass-card p-6 border border-indigo-500/20 space-y-4">

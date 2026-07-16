@@ -25,7 +25,7 @@ export default function SimulatorLauncher() {
     <div className="max-w-6xl mx-auto px-4 py-8">
       <PageHeader
         title="Enterprise Lab Consoles"
-        subtitle="Pixel-faithful, fully interactive mocks of production UIs — launch a scenario from each technology to practice hands-on."
+        subtitle="Interactive production-style consoles — launch a lab from each technology to work hands-on."
       />
       <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4 mt-8">
         {SIMULATORS.map((sim) => {
@@ -47,7 +47,7 @@ export default function SimulatorLauncher() {
         })}
       </div>
       <p className="text-xs text-surface-500 mt-8 text-center">
-        Simulators open inside lab sessions with Hints, Check, +30m, and Stop controls. VMware vCenter is available from VM-backed labs (Linux, Windows, monitoring, AWX, Terraform, and cross-tech scenarios).
+        Lab consoles open inside sessions with Hints, Check, +30m, and Stop controls. VMware vCenter is available from VM-backed labs (Linux, Windows, monitoring, AWX, Terraform, and cross-tech scenarios).
       </p>
     </div>
   )

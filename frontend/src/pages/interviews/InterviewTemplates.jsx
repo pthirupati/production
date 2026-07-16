@@ -7,7 +7,7 @@ import { Briefcase, ChevronLeft, Play, Video, Layers, Loader2 } from 'lucide-rea
 import toast from 'react-hot-toast'
 
 export default function InterviewTemplates() {
-  usePageTitle('Interview Templates', 'Job-role interview templates — launch a tailored mock in one click.')
+  usePageTitle('Interview Templates', 'Job-role interview templates — launch a tailored interview in one click.')
   const navigate = useNavigate()
   const [templates, setTemplates] = useState([])
   const [loading, setLoading] = useState(true)
@@ -47,7 +47,7 @@ export default function InterviewTemplates() {
       <PageHeader
         eyebrow="AI Interview Studio"
         title="Job-role templates"
-        subtitle="Pick a role to launch a tailored multi-round mock — resume-aware questions, scoring, and a scorecard."
+        subtitle="Pick a role to launch a tailored multi-round interview — resume-aware questions, scoring, and a scorecard."
       />
 
       {loading ? (

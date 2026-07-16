@@ -1,7 +1,7 @@
 import { ExternalLink } from 'lucide-react'
 
 /**
- * Jira issue key — opens in-app Jira simulation in a new tab.
+ * Jira issue key — opens in-app Jira in a new tab.
  */
 export default function JiraTicketLink({
   issueKey,

@@ -4,6 +4,8 @@ import LabChromeBar from '../lab/LabChromeBar'
 import {
   LogIn, Server, AlertTriangle, Terminal, X, Power, Network, HardDrive,
   CircuitBoard, Cpu, Zap, Wrench, RotateCcw, Snowflake, Gauge, Move,
+  Building2, Router, Thermometer, Fuel, BatteryCharging, Plug, ShieldCheck,
+  RefreshCw, MonitorCog, Database, Boxes,
 } from 'lucide-react'
 import { simPanelRoot } from '../../utils/simLayout'
 import { useSimSession } from '../sim/shared'
@@ -23,6 +25,15 @@ const COMPONENT_META = {
   gpu: { label: 'GPU', icon: Zap },
 }
 
+const ROOM_ICONS = { data_hall: Building2, network: Router, mechanical: Thermometer, electrical: Plug }
+
+const ROLE_META = {
+  esxi_host: { label: 'ESXi Host', icon: Boxes },
+  gpu_node: { label: 'GPU Node', icon: Zap },
+  storage: { label: 'Storage', icon: HardDrive },
+  db: { label: 'Database', icon: Database },
+}
+
 function ComponentPill({ name, status }) {
   const meta = COMPONENT_META[name] || { label: name, icon: Wrench }
   const Icon = meta.icon
@@ -33,6 +44,17 @@ function ComponentPill({ name, status }) {
       <span>{meta.label}</span>
       <span className="dc-comp-dot" />
     </div>
+  )
+}
+
+function RoleBadge({ role }) {
+  const meta = ROLE_META[role]
+  if (!meta) return null
+  const Icon = meta.icon
+  return (
+    <span className="dc-role-badge">
+      <Icon size={10} /> {meta.label}
+    </span>
   )
 }
 
@@ -61,6 +83,12 @@ export default function DatacenterSimulator({
   const servers = st.servers || []
   const pdus = st.pdus || []
   const cooling = st.cooling || []
+  const rooms = st.rooms || []
+  const network = st.network || { switches: [], topology: [] }
+  const powerChain = st.power_chain || {}
+  const facility = st.facility || {}
+  const currentRoomId = st.current_room || 'data-hall-a'
+  const currentRoom = rooms.find((r) => r.id === currentRoomId) || rooms[0] || { type: 'data_hall', racks: [] }
 
   const serversByRack = useMemo(() => {
     const m = {}
@@ -68,6 +96,11 @@ export default function DatacenterSimulator({
     for (const rid of Object.keys(m)) m[rid].sort((a, b) => b.u_slot - a.u_slot)
     return m
   }, [servers])
+
+  const roomRacks = useMemo(
+    () => racks.filter((r) => (currentRoom.racks || []).includes(r.id)),
+    [racks, currentRoom],
+  )
 
   const selectedServer = selectedServerId ? servers.find((s) => s.id === selectedServerId) : null
 
@@ -102,6 +135,11 @@ export default function DatacenterSimulator({
 
   const doAction = (fn, okMsg, assetId) => {
     run(fn, okMsg).then(() => { if (assetId) flash(assetId) })
+  }
+
+  const enterRoom = (room) => {
+    if (room.id === currentRoomId) return
+    run(() => datacenterApi.enterRoom(sessionId, room.id), `Entered ${room.name}`)
   }
 
   if (!loading && state && !loggedIn) {
@@ -178,11 +216,30 @@ export default function DatacenterSimulator({
         </div>
       )}
 
+      {/* Room switcher */}
+      <div className="dc-room-tabs">
+        {rooms.map((room) => {
+          const RoomIcon = ROOM_ICONS[room.type] || Building2
+          const active = room.id === currentRoomId
+          return (
+            <button key={room.id} type="button"
+              className={`dc-room-tab ${active ? 'dc-room-tab-active' : ''}`}
+              onClick={() => enterRoom(room)}>
+              <RoomIcon size={13} /> {room.name}
+            </button>
+          )
+        })}
+        <span className="dc-pue-pill">
+          <Gauge size={12} /> PUE {facility.pue ?? '—'}
+          <span className={`dc-ashrae-dot ${facility.ashrae_ok === false ? 'dc-ashrae-bad' : 'dc-ashrae-ok'}`} />
+        </span>
+      </div>
+
       {/* PDU / cooling status strip */}
       <div className="dc-status-strip">
         <div className="dc-status-group">
           <Gauge size={13} className="opacity-70" />
-          {pdus.map((p) => (
+          {pdus.slice(0, 6).map((p) => (
             <span key={p.id} className={`dc-status-chip ${p.status === 'online' ? 'dc-chip-ok' : 'dc-chip-bad'}`}>
               {p.id} · {p.load_pct}%
             </span>
@@ -199,70 +256,95 @@ export default function DatacenterSimulator({
         <div className="dc-status-hint"><Move size={12} /> Drag floor to pan</div>
       </div>
 
-      <div
-        className="dc-floor-viewport"
-        onMouseDown={onFloorMouseDown}
-        onMouseMove={onFloorMouseMove}
-        onMouseUp={onFloorMouseUp}
-        onMouseLeave={onFloorMouseUp}
-      >
-        <div className="dc-floor-plane" style={{ transform: `translate(${pan.x * 0.4}px, ${pan.y * 0.4}px) rotateX(55deg) rotateZ(-45deg)` }} />
-        <div className="dc-racks-row" style={{ transform: `translate(${pan.x}px, ${pan.y}px)` }}>
-          {racks.map((rack) => {
-            const rackServers = serversByRack[rack.id] || []
-            const anyFailed = rackServers.some((s) => Object.values(s.components).some((c) => c !== 'healthy'))
-            const isOpen = expandedRack === rack.id
-            return (
-              <div key={rack.id} className={`dc-rack ${isOpen ? 'dc-rack-open' : ''}`}
-                onClick={() => { if (!movedRef.current) setExpandedRack(isOpen ? null : rack.id) }}>
-                <div className="dc-rack-top" />
-                <div className={`dc-rack-front ${anyFailed ? 'dc-rack-alert' : ''}`}>
-                  <div className="dc-rack-head">
-                    <span className="dc-rack-id">{rack.id}</span>
-                    <span className={`dc-rack-led ${anyFailed ? 'dc-led-red' : 'dc-led-green'}`} />
+      {currentRoom.type === 'data_hall' && (
+        <div
+          className="dc-floor-viewport"
+          onMouseDown={onFloorMouseDown}
+          onMouseMove={onFloorMouseMove}
+          onMouseUp={onFloorMouseUp}
+          onMouseLeave={onFloorMouseUp}
+        >
+          <div className="dc-floor-plane" style={{ transform: `translate(${pan.x * 0.4}px, ${pan.y * 0.4}px) rotateX(55deg) rotateZ(-45deg)` }} />
+          <div className="dc-racks-row" style={{ transform: `translate(${pan.x}px, ${pan.y}px)` }}>
+            {roomRacks.map((rack) => {
+              const rackServers = serversByRack[rack.id] || []
+              const anyFailed = rackServers.some((s) => Object.values(s.components).some((c) => c !== 'healthy'))
+              const isOpen = expandedRack === rack.id
+              return (
+                <div key={rack.id} className={`dc-rack ${isOpen ? 'dc-rack-open' : ''}`}
+                  onClick={() => { if (!movedRef.current) setExpandedRack(isOpen ? null : rack.id) }}>
+                  <div className="dc-rack-top" />
+                  <div className={`dc-rack-front ${anyFailed ? 'dc-rack-alert' : ''}`}>
+                    <div className="dc-rack-head">
+                      <span className="dc-rack-id">{rack.id}</span>
+                      <span className={`dc-rack-led ${anyFailed ? 'dc-led-red' : 'dc-led-green'}`} />
+                    </div>
+                    <div className="dc-rack-pdu">{rack.pdu}</div>
+                    {!isOpen && (
+                      <div className="dc-rack-mini">
+                        {rackServers.length === 0 && <span className="dc-rack-empty">empty</span>}
+                        {rackServers.map((s) => (
+                          <span key={s.id} className={`dc-mini-slot ${s.power_state === 'on' ? 'dc-mini-on' : 'dc-mini-off'} ${Object.values(s.components).some((c) => c !== 'healthy') ? 'dc-mini-fail' : ''}`} />
+                        ))}
+                      </div>
+                    )}
+                    {isOpen && (
+                      <div className="dc-rack-uslots">
+                        {rackServers.length === 0 && <div className="dc-rack-empty">No servers installed</div>}
+                        {rackServers.map((s) => {
+                          const hasFailure = Object.values(s.components).some((c) => c !== 'healthy')
+                          return (
+                            <button key={s.id} type="button"
+                              className={`dc-server-card ${flashId === s.id ? 'dc-flash' : ''} ${hasFailure ? 'dc-server-alert' : ''}`}
+                              onClick={(e) => { e.stopPropagation(); setSelectedServerId(s.id) }}>
+                              <span className="dc-server-u">U{s.u_slot}</span>
+                              <span className="dc-server-host">{s.hostname}</span>
+                              <span className={`dc-server-power ${s.power_state === 'on' ? 'dc-power-on' : 'dc-power-off'}`}>
+                                <Power size={10} /> {s.power_state}
+                              </span>
+                              {hasFailure && <AlertTriangle size={12} className="dc-server-warn" />}
+                            </button>
+                          )
+                        })}
+                      </div>
+                    )}
                   </div>
-                  <div className="dc-rack-pdu">{rack.pdu}</div>
-                  {!isOpen && (
-                    <div className="dc-rack-mini">
-                      {rackServers.length === 0 && <span className="dc-rack-empty">empty</span>}
-                      {rackServers.map((s) => (
-                        <span key={s.id} className={`dc-mini-slot ${s.power_state === 'on' ? 'dc-mini-on' : 'dc-mini-off'} ${Object.values(s.components).some((c) => c !== 'healthy') ? 'dc-mini-fail' : ''}`} />
-                      ))}
-                    </div>
-                  )}
-                  {isOpen && (
-                    <div className="dc-rack-uslots">
-                      {rackServers.length === 0 && <div className="dc-rack-empty">No servers installed</div>}
-                      {rackServers.map((s) => {
-                        const hasFailure = Object.values(s.components).some((c) => c !== 'healthy')
-                        return (
-                          <button key={s.id} type="button"
-                            className={`dc-server-card ${flashId === s.id ? 'dc-flash' : ''} ${hasFailure ? 'dc-server-alert' : ''}`}
-                            onClick={(e) => { e.stopPropagation(); setSelectedServerId(s.id) }}>
-                            <span className="dc-server-u">U{s.u_slot}</span>
-                            <span className="dc-server-host">{s.hostname}</span>
-                            <span className={`dc-server-power ${s.power_state === 'on' ? 'dc-power-on' : 'dc-power-off'}`}>
-                              <Power size={10} /> {s.power_state}
-                            </span>
-                            {hasFailure && <AlertTriangle size={12} className="dc-server-warn" />}
-                          </button>
-                        )
-                      })}
-                    </div>
-                  )}
                 </div>
-              </div>
-            )
-          })}
+              )
+            })}
+          </div>
         </div>
-      </div>
+      )}
+
+      {currentRoom.type === 'network' && (
+        <div className="dc-room-body">
+          <NetworkRoomView network={network} servers={servers} onSelectServer={setSelectedServerId} />
+        </div>
+      )}
+
+      {currentRoom.type === 'mechanical' && (
+        <div className="dc-room-body">
+          <MechanicalRoomView cooling={cooling} busy={busy}
+            onRestore={(cracId) => doAction(() => datacenterApi.restoreCrac(sessionId, cracId), 'CRAC restored')} />
+        </div>
+      )}
+
+      {currentRoom.type === 'electrical' && (
+        <div className="dc-room-body">
+          <ElectricalRoomView powerChain={powerChain} facility={facility} busy={busy}
+            onTrip={(pduId) => doAction(() => datacenterApi.tripPduBreaker(sessionId, pduId), 'Breaker tripped')}
+            onRestore={(pduId) => doAction(() => datacenterApi.restorePdu(sessionId, pduId), 'Breaker restored')} />
+        </div>
+      )}
 
       {selectedServer && (
         <div className="dc-drawer-backdrop" onClick={() => setSelectedServerId(null)}>
           <div className="dc-drawer" onClick={(e) => e.stopPropagation()}>
             <div className="dc-drawer-head">
               <div>
-                <div className="dc-drawer-title">{selectedServer.hostname}</div>
+                <div className="dc-drawer-title">
+                  {selectedServer.hostname} <RoleBadge role={selectedServer.role} />
+                </div>
                 <div className="dc-drawer-sub">{selectedServer.rack} · U{selectedServer.u_slot} · power {selectedServer.power_state}</div>
               </div>
               <button type="button" onClick={() => setSelectedServerId(null)} className="dc-drawer-close"><X size={16} /></button>
@@ -314,9 +396,214 @@ export default function DatacenterSimulator({
                 </div>
               )}
             </div>
+
+            {selectedServer.bmc && (
+              <div className="dc-drawer-section">
+                <div className="dc-drawer-label"><MonitorCog size={12} className="inline mr-1" />BMC remote console</div>
+                <div className="dc-bmc-panel">
+                  <div className="dc-bmc-row">
+                    <span className="dc-bmc-key">Endpoint</span>
+                    <span className="dc-bmc-val dc-bmc-mono">{selectedServer.bmc.endpoint}</span>
+                  </div>
+                  <div className="dc-bmc-row">
+                    <span className="dc-bmc-key">Protocol</span>
+                    <span className="dc-bmc-val">{selectedServer.bmc.protocol?.toUpperCase()}</span>
+                  </div>
+                  <div className="dc-bmc-sensors">
+                    <span>Inlet {selectedServer.bmc.sensors?.inlet_c}°C</span>
+                    <span>Exhaust {selectedServer.bmc.sensors?.exhaust_c}°C</span>
+                    <span>Fans {selectedServer.bmc.sensors?.fans_rpm} RPM</span>
+                  </div>
+                  <div className="dc-action-row">
+                    <button type="button" disabled={busy} className="dc-btn-outline"
+                      onClick={() => doAction(() => datacenterApi.bmcPower(sessionId, selectedServer.id, 'on'), 'BMC power on', selectedServer.id)}>
+                      <Power size={13} /> Power On
+                    </button>
+                    <button type="button" disabled={busy} className="dc-btn-outline"
+                      onClick={() => doAction(() => datacenterApi.bmcPower(sessionId, selectedServer.id, 'off'), 'BMC power off', selectedServer.id)}>
+                      <Power size={13} /> Power Off
+                    </button>
+                    <button type="button" disabled={busy} className="dc-btn-outline"
+                      onClick={() => doAction(() => datacenterApi.bmcPower(sessionId, selectedServer.id, 'reset'), 'BMC reset issued', selectedServer.id)}>
+                      <RefreshCw size={13} /> Reset
+                    </button>
+                    <button type="button" disabled={busy} className="dc-btn-outline"
+                      onClick={() => doAction(() => datacenterApi.bmcPower(sessionId, selectedServer.id, 'cycle'), 'BMC power cycle issued', selectedServer.id)}>
+                      <RotateCcw size={13} /> Cycle
+                    </button>
+                  </div>
+                  {selectedServer.bmc.sel?.length > 0 && (
+                    <div className="dc-bmc-sel">
+                      {selectedServer.bmc.sel.slice(0, 3).map((entry, i) => (
+                        <div key={i} className="dc-bmc-sel-row">
+                          <span className="dc-bmc-sel-time">{entry.time}</span> {entry.message}
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
           </div>
         </div>
       )}
+    </div>
+  )
+}
+
+function NetworkRoomView({ network, servers, onSelectServer }) {
+  const hostnameById = useMemo(() => {
+    const m = {}
+    for (const s of servers) m[s.id] = s.hostname
+    return m
+  }, [servers])
+
+  return (
+    <div className="dc-network-room">
+      {(network.switches || []).map((sw) => (
+        <div key={sw.id} className="dc-switch-card">
+          <div className="dc-switch-head">
+            <Router size={14} />
+            <span className="dc-switch-name">{sw.hostname}</span>
+            <span className="dc-switch-loc">{sw.rack} · U{sw.u_slot}</span>
+            <span className="dc-switch-model">{sw.model}</span>
+          </div>
+          <table className="dc-port-table">
+            <thead>
+              <tr><th>Port</th><th>Status</th><th>Speed</th><th>VLAN</th><th>Connected to</th></tr>
+            </thead>
+            <tbody>
+              {(sw.ports || []).map((p) => (
+                <tr key={p.port}>
+                  <td>{p.port}</td>
+                  <td><span className={`dc-port-badge ${p.status === 'up' ? 'dc-port-up' : 'dc-port-down'}`}>{p.status}</span></td>
+                  <td>{p.speed}</td>
+                  <td>{p.vlan ?? '—'}</td>
+                  <td>
+                    {p.connected_to ? (
+                      <button type="button" className="dc-port-link"
+                        onClick={() => hostnameById[p.connected_to] && onSelectServer(p.connected_to)}>
+                        {hostnameById[p.connected_to] || p.connected_to}
+                      </button>
+                    ) : '—'}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      ))}
+      {(network.topology || []).length > 0 && (
+        <div className="dc-topology-strip">
+          <span className="dc-topology-label">Uplinks:</span>
+          {network.topology.map((link, i) => (
+            <span key={i} className="dc-topology-chip">{link.from} → {link.to} ({link.speed})</span>
+          ))}
+        </div>
+      )}
+    </div>
+  )
+}
+
+function MechanicalRoomView({ cooling, busy, onRestore }) {
+  return (
+    <div className="dc-crac-grid">
+      {(cooling || []).map((c) => (
+        <div key={c.id} className={`dc-crac-card ${c.status !== 'running' ? 'dc-crac-alert' : ''}`}>
+          <div className="dc-crac-head">
+            <Thermometer size={14} />
+            <span className="dc-crac-id">{c.id}</span>
+            <span className={`dc-ashrae-badge ${c.ashrae_ok ? 'dc-ashrae-badge-ok' : 'dc-ashrae-badge-bad'}`}>
+              {c.ashrae_ok ? 'ASHRAE OK' : 'OUT OF RANGE'}
+            </span>
+          </div>
+          <div className="dc-crac-zone">{c.zone}</div>
+          <div className="dc-crac-metrics">
+            <div><span className="dc-crac-metric-label">Temp</span><span className="dc-crac-metric-val">{c.temp_c}°C</span></div>
+            <div><span className="dc-crac-metric-label">Humidity</span><span className="dc-crac-metric-val">{c.humidity_pct}%</span></div>
+            <div><span className="dc-crac-metric-label">Load</span><span className="dc-crac-metric-val">{c.load_kw}/{c.capacity_kw} kW</span></div>
+          </div>
+          <div className="dc-crac-status">
+            Status: <span className={c.status === 'running' ? 'dc-text-ok' : 'dc-text-bad'}>{c.status}</span>
+          </div>
+          {c.status !== 'running' && (
+            <button type="button" disabled={busy} className="dc-btn-outline w-full justify-center mt-2"
+              onClick={() => onRestore(c.id)}>
+              <RefreshCw size={13} /> Restore unit
+            </button>
+          )}
+        </div>
+      ))}
+    </div>
+  )
+}
+
+function ElectricalRoomView({ powerChain, facility, busy, onTrip, onRestore }) {
+  const ups = powerChain.ups || []
+  const rackPdus = powerChain.rack_pdus || []
+  return (
+    <div className="dc-electrical-room">
+      <div className="dc-power-diagram">
+        <div className="dc-power-node">
+          <ShieldCheck size={16} />
+          <span>Utility</span>
+          <span className={`dc-power-node-status ${powerChain.utility?.status === 'online' ? 'dc-text-ok' : 'dc-text-bad'}`}>
+            {powerChain.utility?.status} · {powerChain.utility?.voltage_v}V
+          </span>
+        </div>
+        <div className="dc-power-arrow">→</div>
+        <div className="dc-power-node">
+          <Plug size={16} />
+          <span>ATS</span>
+          <span className="dc-power-node-status dc-text-ok">{powerChain.ats?.status}</span>
+        </div>
+        <div className="dc-power-arrow">→</div>
+        <div className="dc-power-node">
+          <Fuel size={16} />
+          <span>Generator</span>
+          <span className="dc-power-node-status">{powerChain.generator?.status} · {powerChain.generator?.fuel_pct}% fuel</span>
+        </div>
+        <div className="dc-power-arrow">→</div>
+        <div className="dc-power-node">
+          <BatteryCharging size={16} />
+          <span>UPS ({ups.length})</span>
+          <span className="dc-power-node-status dc-text-ok">
+            {ups.length ? `${Math.round(ups.reduce((a, u) => a + u.load_pct, 0) / ups.length)}% load` : '—'}
+          </span>
+        </div>
+        <div className="dc-power-arrow">→</div>
+        <div className="dc-power-node">
+          <Power size={16} />
+          <span>Floor PDUs</span>
+          <span className="dc-power-node-status dc-text-ok">
+            {(powerChain.floor_pdus || []).reduce((a, p) => a + (p.load_kw || 0), 0).toFixed(1)} kW
+          </span>
+        </div>
+      </div>
+
+      <div className="dc-facility-metrics">
+        <div className="dc-facility-metric"><span>IT Load</span><strong>{facility.it_kw} kW</strong></div>
+        <div className="dc-facility-metric"><span>Cooling Load</span><strong>{facility.cooling_kw} kW</strong></div>
+        <div className="dc-facility-metric"><span>Total Facility</span><strong>{facility.total_kw} kW</strong></div>
+        <div className="dc-facility-metric dc-facility-pue"><span>PUE</span><strong>{facility.pue}</strong></div>
+      </div>
+
+      <div className="dc-drawer-label mt-2">Rack PDUs</div>
+      <div className="dc-pdu-grid">
+        {rackPdus.map((p) => (
+          <div key={p.id} className={`dc-pdu-card ${p.status !== 'online' ? 'dc-pdu-tripped' : ''}`}>
+            <div className="dc-pdu-card-head">
+              <span className="dc-pdu-id">{p.id}</span>
+              <span className={`dc-status-chip ${p.status === 'online' ? 'dc-chip-ok' : 'dc-chip-bad'}`}>{p.status}</span>
+            </div>
+            <div className="dc-pdu-card-meta">{p.rack} · breaker {p.breaker} · {p.load_kw} kW</div>
+            <button type="button" disabled={busy} className="dc-btn-outline w-full justify-center mt-1"
+              onClick={() => (p.status === 'online' ? onTrip(p.id) : onRestore(p.id))}>
+              {p.status === 'online' ? 'Trip breaker' : 'Close breaker'}
+            </button>
+          </div>
+        ))}
+      </div>
     </div>
   )
 }

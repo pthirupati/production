@@ -109,7 +109,7 @@ export default function InterviewLanding() {
   const [activeTestimonial, setActiveTestimonial] = useState(0)
 
   usePageTitle(
-    'AI Mock Interview Studio',
+    'AI AI Interview Studio',
     'Multi-round face-to-face AI video interviews with resume-aware questions, voice, STAR scoring, scheduling, and LinkedIn certificates.',
   )
 

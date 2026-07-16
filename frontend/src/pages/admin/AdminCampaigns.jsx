@@ -439,9 +439,9 @@ export default function AdminCampaigns() {
 // ── Social post generator tab ──
 
 const DEFAULT_CURRENT = [
-  'VMware vSphere break/fix simulator (vMotion, HA, datastores)',
+  'VMware vSphere break/fix console (vMotion, HA, datastores)',
   'Linux, Kubernetes & Docker troubleshooting labs',
-  'AI mock interviews with live feedback',
+  'AI interviews with live feedback',
 ]
 const DEFAULT_UPCOMING = [
   'GPU & bare-metal labs',

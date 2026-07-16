@@ -13,7 +13,7 @@ export default function CertificateVerify() {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
 
-  usePageTitle('Verify Certificate', 'Verify FixitLab technology or AI mock interview certificates by ID.')
+  usePageTitle('Verify Certificate', 'Verify FixitLab technology or AI interview certificates by ID.')
 
   const verifyId = async (id) => {
     const trimmed = (id || '').trim()
@@ -63,7 +63,7 @@ export default function CertificateVerify() {
         subtitle={
           <>
             Authenticate any FixitLab certificate — technology labs{' '}
-            <span className="text-surface-300 font-mono text-sm">FIXIT-*</span> or mock interviews{' '}
+            <span className="text-surface-300 font-mono text-sm">FIXIT-*</span> or AI interviews{' '}
             <span className="text-surface-300 font-mono text-sm">FIXIT-INT-*</span>
           </>
         }
@@ -156,7 +156,7 @@ export default function CertificateVerify() {
                   <div className="mb-5 p-3.5 rounded-xl border border-accent-purple/25 bg-accent-purple/8 flex items-center gap-3">
                     <Star size={18} className="text-accent-purple shrink-0" fill="currentColor" />
                     <div>
-                      <p className="text-xs text-accent-purple font-bold uppercase tracking-wide">AI Mock Interview Certificate</p>
+                      <p className="text-xs text-accent-purple font-bold uppercase tracking-wide">AI Interview Certificate</p>
                       <p className="text-sm text-white font-medium mt-0.5">{result.rounds_cleared} Rounds Cleared{result.level ? ` · ${result.level}` : ''}</p>
                     </div>
                   </div>

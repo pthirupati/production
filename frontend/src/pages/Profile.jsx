@@ -524,7 +524,7 @@ export default function Profile() {
           <Mic2 size={18} className="text-indigo-400" /> Interview Data & Privacy
         </h2>
         <p className="text-sm text-surface-400 mb-4">
-          Manage resume and transcript data stored for AI mock interviews.
+          Manage resume and transcript data stored for AI interviews.
         </p>
         <div className="space-y-3">
           <div className="flex items-center justify-between p-3 rounded-lg bg-surface-800/50 border border-surface-700/40 gap-3">
@@ -560,7 +560,7 @@ export default function Profile() {
           <div className="flex items-center justify-between p-3 rounded-lg bg-surface-800/50 border border-surface-700/40 gap-3">
             <div>
               <p className="text-sm text-white">Interview transcripts</p>
-              <p className="text-xs text-surface-500">Export all Q&A from mock interviews as JSON</p>
+              <p className="text-xs text-surface-500">Export all Q&A from AI interviews as JSON</p>
             </div>
             <button
               type="button"

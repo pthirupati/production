@@ -62,7 +62,7 @@ export default function InterviewSection({ isAuthenticated }) {
               className="fx-btn-primary"
               style={{ background: 'linear-gradient(135deg, var(--fx-ac2), var(--fx-ac))', boxShadow: '0 10px 34px rgba(178,102,224,.38)' }}
             >
-              Start a mock interview <ArrowRight size={16} />
+              Start an AI interview <ArrowRight size={16} />
             </Link>
             <Link to="/mock-interviews" className="fx-btn-secondary">
               <Play size={14} fill="currentColor" stroke="none" /> Watch Demo

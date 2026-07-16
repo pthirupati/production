@@ -10,7 +10,7 @@ import api from '../api/client'
 
 const SUBJECT_PRESETS = [
   { label: 'General support',              value: 'General support' },
-  { label: 'Interview Studio / mock interviews', value: 'Interview Studio support' },
+  { label: 'Interview Studio / AI interviews', value: 'Interview Studio support' },
   { label: 'Billing & subscriptions',      value: 'Billing question' },
   { label: 'Interview billing / refunds',  value: 'Interview plan billing' },
   { label: 'Certificate verification',     value: 'Certificate verification' },
@@ -121,7 +121,7 @@ export default function Contact() {
           </div>
           <div className="flex-1">
             <p className="text-sm font-medium text-white">AI Interview Studio</p>
-            <p className="text-xs text-surface-500">Questions about mock interviews, voice, certificates (FIXIT-INT), or interview plans.</p>
+            <p className="text-xs text-surface-500">Questions about AI interviews, voice, certificates (FIXIT-INT), or interview plans.</p>
           </div>
           <Link to="/mock-interviews" className="text-xs text-accent-purple hover:text-accent-purple/80 inline-flex items-center gap-1 whitespace-nowrap transition-colors">
             Learn more <ArrowRight size={12} />

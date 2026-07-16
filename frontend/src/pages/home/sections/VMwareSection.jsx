@@ -71,13 +71,13 @@ export default function VMwareSection({ isAuthenticated }) {
               className="fx-btn-primary inline-flex"
               style={{ background: 'linear-gradient(135deg, #2a6ab5, #5b9bd5)', boxShadow: '0 10px 34px rgba(91,155,213,.4)' }}
             >
-              {isAuthenticated ? 'Open VMware simulator' : 'Try VMware scenarios'} <ArrowRight size={16} />
+              {isAuthenticated ? 'Open vCenter' : 'Try VMware scenarios'} <ArrowRight size={16} />
             </Link>
             <Link
               to={isAuthenticated ? '/simulators' : '/register'}
               className="fx-btn-secondary inline-flex items-center gap-2"
             >
-              All enterprise simulators
+              All enterprise consoles
             </Link>
           </div>
         </motion.div>

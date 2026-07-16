@@ -7,8 +7,8 @@ Last updated: 2026-07-16.
 
 1. **One server, many consoles.** `ServerIdentity` is the canonical record (hostname, IP, CPU, RAM, disks, NICs, power, OS, install state, optional physical_location / BMC / network_port). Every console reads/writes that record via an event bus.
 2. **Prefer a real free/self-hosted engine over a hand-rolled mock** when one exists and runs at zero external cloud spend (Phase 1.5 / 1.6). Otherwise build an API-faithful facade and label it.
-3. **Never show learners the word “simulation / simulator.”** Internal code/docs may keep those terms; UI copy must read as company infra (console, environment, lab, vCenter, Command Center, etc.).
-4. **Zero real cloud / vendor spend / physical GPU.** Emulators only; quotas + default-deny egress + idle teardown are mandatory.
+3. **Never show learners:** Simulation, Simulator, Simulated, Demo, Mock, Fake, Practice Environment. Internal code/docs may keep those terms; UI must read as Fortune-100 company infra (console, environment, lab, vCenter, Command Center, AI Interview Studio, sample labs, practice exam).
+4. **Zero real cloud / vendor spend / physical GPU.** In-memory facades and future self-hosted emulators only; quotas + default-deny egress + idle teardown are mandatory.
 
 ---
 
@@ -30,7 +30,7 @@ Last updated: 2026-07-16.
 | Commvault | `commvault_engine.py` | CommvaultSimulator | Partial VM discovery | **Facade-only** (no public simulator) | Hero labs exist |
 | NetApp | `netapp_engine.py` | NetAppSimulator | Isolated | Facade vs ONTAP REST (vsim entitlement-gated opt-in later) | Hero lab |
 | Dell EMC | `dellemc_engine.py` | DellEmcSimulator | Isolated | **High-fidelity facade** (no redistributable sim) | Hero lab |
-| Datacenter | `datacenter_engine.py` | DatacenterSimulator | Isolated | Facade (physical always simulated). **Target:** VirtualBMC + sushy + MAAS later | Isometric UI |
+| Datacenter | `datacenter_engine.py` | DatacenterSimulator | Partial (ServerIdentity sync + BMC) | Facade (physical always in-memory). **Target:** VirtualBMC + sushy + MAAS later | Multi-room facility + PUE/ASHRAE + BMC + chaos |
 | SOC | `soc_engine.py` | SocSimulator | Isolated | **Target:** Suricata/Zeek + OpenSearch + Juice Shop. Today: facade | Hero labs |
 | Baremetal | `baremetal_engine.py` | BaremetalSimulator | Isolated | **Target:** MAAS + VirtualBMC. Today: facade | |
 | Nmap / Wireshark | engines | inline sims | Isolated | Target: real nmap/tshark in sandbox | Facades |
@@ -47,7 +47,7 @@ Last updated: 2026-07-16.
 |---|---|---|---|---|---|
 | G-01 | No `ServerIdentity` | Each engine owns private JSON | all engines | Central service + Redis event bus | **Partial** — module + VMware/AWS seed + aws_bridge hooks |
 | G-02 | AWS FE store ≠ backend | Zustand localStorage is SoT | awsStore, aws_engine | Make backend authoritative; FE thin cache | Partial (`aws_bridge`) |
-| G-03 | Learner sees “simulation” | Copy in LabRunner, AWS, VMware, errors | frontend | Purge user-facing strings | **Done** (learner-facing pass) |
+| G-03 | Learner sees “simulation” | Copy in LabRunner, AWS, VMware, errors | frontend | Purge user-facing strings | **Done** (marketing + consoles; internal code/comments OK) |
 | G-04 | GPU labs auto-pass | No engine; check.sh `exit 0` | scenarios/gpu | Mock GPU in ServerIdentity + real validate | Open |
 | G-05 | Ansible terminal labs auto-pass | No validate_ansible_lab | scenarios/ansible | Wire grading to shell state / AWX | Open |
 | G-06 | CI/CD is a toy | FE mock; cicd_engine not session-wired | CicdPipelineSim | Real sandbox job runner | Open |
@@ -60,8 +60,9 @@ Last updated: 2026-07-16.
 | G-10 | Thin scenario YAML | Schema + linter (Phase 3.1) | Open |
 | G-11 | Jira coach shallow | Acceptance-criteria coach (started) | Partial |
 | G-12 | Windows no SCCM/patching | Add SCCM console + scenarios | **Done** |
-| G-13 | Datacenter not cross-tech | Show Open Datacenter + shared ServerIdentity | **Done** (UI link; deeper identity merge still open) |
+| G-13 | Datacenter not cross-tech | Show Open Datacenter + shared ServerIdentity | **Done** (UI link; facility rooms/BMC/PUE; deeper merge still open) |
 | G-14 | Monitoring cosmetic | Real Prom/Grafana or feed validation | Open |
+| G-15 | No shared chaos/fault layer | Per-engine one-off flags | `chaos_engine.py` + DC trip_pdu | **Done** (foundation; wire more engines next) |
 
 ### P2 / multi-sprint (real engines)
 
@@ -108,10 +109,16 @@ Not yet measured. Target after containerization: document CPU/RAM/disk per sessi
 
 ---
 
+## Shipped this pass (verify before marking done)
+
+- Learner copy purge: Demo/Mock/Simulator → lab console / AI Interview / sample labs / practice exam
+- Datacenter facility: Data Hall / MDF / Mechanical / Electrical rooms, power chain + PUE, CRAC/ASHRAE, switches, BMC power menu, ServerIdentity sync, PDU breaker → chaos
+- Shared `chaos_engine` (`drop_nic`, `fill_disk`, `stop_service`, `trip_pdu`, `raise_temp`) + tests
+
 ## Recommended next priorities after this commit
 
 1. Finish ServerIdentity adoption in VMware + AWS + Datacenter + Windows (read/write).
-2. Fix GPU + Ansible grading (correctness).
+2. Fix GPU + Ansible grading (correctness) — highest P0 correctness debt.
 3. Wire CI/CD to a real sandbox runner.
 4. Introduce vcsim behind a feature flag for VMware.
-5. Expand academy content + scenario linter.
+5. Expand academy content + scenario linter; grow Commvault/NetApp/Dell/SOC packs beyond hero labs.

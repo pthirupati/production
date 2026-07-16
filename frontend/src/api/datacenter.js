@@ -37,6 +37,24 @@ export const datacenterApi = {
   updateFirmware(sessionId, assetId, version) {
     return datacenterApi.action(sessionId, 'update_firmware', { asset_id: assetId, version })
   },
+  enterRoom(sessionId, roomId) {
+    return datacenterApi.action(sessionId, 'enter_room', { room_id: roomId })
+  },
+  openBmc(sessionId, assetId) {
+    return datacenterApi.action(sessionId, 'open_bmc', { asset_id: assetId })
+  },
+  bmcPower(sessionId, assetId, mode) {
+    return datacenterApi.action(sessionId, 'bmc_power', { asset_id: assetId, mode })
+  },
+  tripPduBreaker(sessionId, pduId) {
+    return datacenterApi.action(sessionId, 'trip_pdu_breaker', { pdu_id: pduId })
+  },
+  restorePdu(sessionId, pduId) {
+    return datacenterApi.action(sessionId, 'restore_pdu', { pdu_id: pduId })
+  },
+  restoreCrac(sessionId, cracId) {
+    return datacenterApi.action(sessionId, 'restore_crac', { crac_id: cracId })
+  },
 }
 
 export default datacenterApi
