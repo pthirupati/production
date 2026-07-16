@@ -146,7 +146,7 @@ export function createGitSim({ vfs, cwd, abs, username = 'root' }) {
       const target = abs(name)
       const repo = newRepo()
       repo.remotes.origin = url
-      const readme = `# ${name}\n\nCloned from ${url} in the FixitLab simulation.\n`
+      const readme = `# ${name}\n\nCloned from ${url} in the FixItLab lab environment.\n`
       const appFile = '#!/usr/bin/env python3\nprint("hello from ' + name + '")\n'
       vfs.writeFile(`${target}/README.md`, readme)
       vfs.writeFile(`${target}/app.py`, appFile)
