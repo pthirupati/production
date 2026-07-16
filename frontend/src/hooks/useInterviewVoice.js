@@ -284,6 +284,7 @@ function stopAudio() {
 // Keep one AudioContext alive — creating+closing on every unlock can leave
 // Chrome/Safari without a primed audio graph after an await (startRound).
 let _unlockAudioCtx = null
+let _primeCooldownUntil = 0
 
 // Chrome/Safari often start with speechSynthesis paused or stuck until a user
 // gesture primes it. Call this on Join / Begin AND again right before speak()
@@ -316,13 +317,31 @@ export function unlockSpeech() {
   } catch { /* non-fatal */ }
   try {
     if (window.speechSynthesis) {
+      // Avoid stacking silent primes — that fills Chrome's queue and starves
+      // the real interviewer utterance. Resume is enough between primes.
+      const now = Date.now()
+      if (now < _primeCooldownUntil) return
+      _primeCooldownUntil = now + 400
       // Do NOT cancel immediately after speak — that leaves Chrome's queue stuck
       // and the next real utterance never starts. Use a near-silent priming utterance.
-      const u = new SpeechSynthesisUtterance('\u200B')
+      const u = new SpeechSynthesisUtterance(' ')
       u.volume = 0.01
       u.rate = 2
       u.pitch = 1
       window.speechSynthesis.speak(u)
+    }
+  } catch { /* non-fatal */ }
+}
+
+/** Resume TTS that Chrome paused while the tab was backgrounded / after awaits. */
+export function resumeSpeechSynthesis() {
+  if (typeof window === 'undefined') return
+  try {
+    if (window.speechSynthesis?.paused) window.speechSynthesis.resume()
+  } catch { /* non-fatal */ }
+  try {
+    if (_unlockAudioCtx?.state === 'suspended') {
+      _unlockAudioCtx.resume().catch(() => {})
     }
   } catch { /* non-fatal */ }
 }
@@ -588,7 +607,13 @@ export function useInterviewVoice() {
       if (!window.speechSynthesis) return { spoken: false }
       const profile = resolveVoiceProfile(voiceCode)
       await waitForBrowserVoices()
-      window.speechSynthesis.cancel()
+      // Chrome: cancel() then immediate speak() often drops the utterance.
+      // Clear the queue, wait a tick, resume, then speak.
+      try { window.speechSynthesis.cancel() } catch { /* */ }
+      await new Promise((r) => setTimeout(r, 40))
+      try {
+        if (window.speechSynthesis.paused) window.speechSynthesis.resume()
+      } catch { /* */ }
 
       const voice = pickBrowserVoice(
         profile.browser_voice_hint, profile.locale, selectedVoiceRef.current,
@@ -611,7 +636,7 @@ export function useInterviewVoice() {
         try {
           if (window.speechSynthesis?.paused) window.speechSynthesis.resume()
         } catch { /* non-fatal */ }
-      }, 5000)
+      }, 2500)
 
       try {
         for (let i = 0; i < segments.length; i++) {
@@ -1054,6 +1079,7 @@ export function useInterviewVoice() {
     interimTranscript,
     speak,
     unlockSpeech,
+    resumeSpeechSynthesis,
     cancelSpeech,
     listen,
     listenLive,

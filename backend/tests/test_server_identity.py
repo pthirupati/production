@@ -39,3 +39,29 @@ class ServerIdentityTests(SimpleTestCase):
         self.assertEqual(s["hostname"], "ip-172-31-14-52")
         si.set_power(self.sid, s["id"], "off", source="aws")
         self.assertEqual(si.get_server(self.sid, s["id"])["power"], "off")
+
+    def test_scenario_lab_servers_are_session_scoped(self):
+        """Different sessions must not share LabServers (no platform-global host)."""
+        a = si.seed_scenario_lab_servers("sess-a", sim_type="linux", slug="linux-sshd-down")
+        b = si.seed_scenario_lab_servers("sess-b", sim_type="linux", slug="linux-sshd-down")
+        self.addCleanup(si.drop_session, "sess-a")
+        self.addCleanup(si.drop_session, "sess-b")
+        self.assertIsNotNone(a)
+        self.assertIsNotNone(b)
+        self.assertEqual(len(si.list_servers("sess-a")), 1)
+        self.assertEqual(len(si.list_servers("sess-b")), 1)
+        # Same hostname shape is fine; ids live in different session keys.
+        self.assertEqual(si.get_primary("sess-a")["hostname"], a["hostname"])
+
+    def test_windows_and_k8s_personas_seed(self):
+        w = si.seed_scenario_lab_servers("sess-win", sim_type="windows", slug="win-sccm-patch-failed")
+        k = si.seed_scenario_lab_servers("sess-k8s", sim_type="kubernetes", slug="k8s-pod-crashloop")
+        self.addCleanup(si.drop_session, "sess-win")
+        self.addCleanup(si.drop_session, "sess-k8s")
+        self.assertEqual(w["os"], "windows-server-2022")
+        self.assertEqual(k["tags"]["persona"], "kubernetes")
+        bm = si.seed_scenario_lab_servers(
+            "sess-bm", sim_type="baremetal", slug="maas-ipmi-bmc-unreachable",
+        )
+        self.addCleanup(si.drop_session, "sess-bm")
+        self.assertEqual(bm["physical_location"]["rack"], "R12")

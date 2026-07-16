@@ -361,6 +361,11 @@ def ensure_sim_session(lab_session) -> dict | None:
         _seed_state_from_aws_ec2(engine, session_id, slug)
     if fresh:
         _seed_gpu_identity_if_needed(engine, session_id, slug, sim_type)
+        try:
+            from .simulation.server_identity import seed_scenario_lab_servers
+            seed_scenario_lab_servers(session_id, sim_type=sim_type, slug=slug, engine=engine)
+        except Exception:
+            logger.exception("LabServer seed skipped for session %s", session_id)
     lab_hosts = lab_session.lab_hosts or _build_lab_hosts(scenario, resource_id, sim_type)
     if _should_use_ssh_client_default(scenario, sim_type):
         lab_hosts = _attach_ssh_client_host(lab_hosts, resource_id)
@@ -465,6 +470,18 @@ class SimulationProvisioner:
         else:
             _seed_hostname_for_persona(engine, slug, raw_type)
             _seed_gpu_identity_if_needed(engine, lab_session.id, slug, sim_type)
+
+        # Scenario-scoped LabServer: terminal OS identity for this session only.
+        try:
+            from .simulation.server_identity import seed_scenario_lab_servers
+            seed_scenario_lab_servers(
+                str(lab_session.id),
+                sim_type=sim_type,
+                slug=slug,
+                engine=engine,
+            )
+        except Exception:
+            logger.exception("LabServer seed skipped for session %s", lab_session.id)
 
         if slug.lower().startswith("ds-dashboard-") or raw_type == "data-dashboard":
             from apps.vmware_sim.datascience_engine import _ensure_session as _ensure_ds_session

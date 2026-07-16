@@ -5,10 +5,18 @@ Last updated: 2026-07-16.
 
 ## North-star rules
 
-1. **One server, many consoles.** `ServerIdentity` is the canonical record (hostname, IP, CPU, RAM, disks, NICs, power, OS, install state, optional physical_location / BMC / network_port). Every console reads/writes that record via an event bus.
+1. **Scenario-scoped Lab Servers (not one global server).** Each lab session owns its own LabServer graph (`ServerIdentity` keyed by `session_id`). Cross-tech consoles in the *same* scenario share those servers; AWS EC2 never appears in a physical rack, and VMware guests never leak into unrelated AWS labs. See `docs/architecture-lab-servers.md`.
 2. **Prefer a real free/self-hosted engine over a hand-rolled mock** when one exists and runs at zero external cloud spend (Phase 1.5 / 1.6). Otherwise build an API-faithful facade and label it.
 3. **Never show learners:** Simulation, Simulator, Simulated, Demo, Mock, Fake, Practice Environment. Internal code/docs may keep those terms; UI must read as Fortune-100 company infra (console, environment, lab, vCenter, Command Center, AI Interview Studio, sample labs, practice exam).
 4. **Zero real cloud / vendor spend / physical GPU.** In-memory facades and future self-hosted emulators only; quotas + default-deny egress + idle teardown are mandatory.
+
+### Recommended build order (consolidated)
+
+1. Finish scenario LabServer seeding + bridges for every existing tech (this pass).
+2. Scenario YAML schema + linter + richer Jira coach content.
+3. Deepen Commvault / NetApp / Dell / Datacenter / SOC beyond hero labs.
+4. Azure / GCP / OpenStack / OpenShift as **new scenario-scoped console packs** (facades first) — not one shared cloud VM.
+5. Optional free emulators behind feature flags (vcsim, LocalStack CE if license OK, kind, VirtualBMC/sushy) — still zero real-cloud cost.
 
 ---
 
@@ -45,7 +53,7 @@ Last updated: 2026-07-16.
 
 | ID | Gap | Root cause | Affected | Proposed fix | Done? |
 |---|---|---|---|---|---|
-| G-01 | No `ServerIdentity` | Each engine owns private JSON | all engines | Central service + Redis event bus | **Partial** — module + VMware/AWS seed + aws_bridge hooks |
+| G-01 | No scenario LabServer registry | Each engine owns private JSON | all engines | Session-scoped ServerIdentity + bridges | **Partial** — VMware/AWS/GPU + `seed_scenario_lab_servers` for other personas |
 | G-02 | AWS FE store ≠ backend | Zustand localStorage is SoT | awsStore, aws_engine | Make backend authoritative; FE thin cache | Partial (`aws_bridge`) |
 | G-03 | Learner sees “simulation” | Copy in LabRunner, AWS, VMware, errors | frontend | Purge user-facing strings | **Done** (marketing + consoles; internal code/comments OK) |
 | G-04 | GPU labs auto-pass | No engine; check.sh `exit 0` | scenarios/gpu | Mock GPU in ServerIdentity + real validate | **Partial** — ServerIdentity GPU facet + seed; grader still uses `gpu_healthy` |

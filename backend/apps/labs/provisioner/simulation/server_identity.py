@@ -1,12 +1,12 @@
-"""Canonical ServerIdentity — one server record shared across consoles.
+"""Scenario-scoped LabServer identity — one server graph per lab session.
 
-Every technology console (VMware, AWS, lab terminal, Commvault, Datacenter, …)
-should read/write through this module rather than inventing a parallel host
-identity. Hardware and power changes publish events on a Redis-backed bus so
-subscribers can refresh.
+IMPORTANT: There is NO platform-global server. Each LabSession owns its own
+LabServer records (hostname, IP, CPU, RAM, disks, NICs, power, OS, optional
+physical_location / BMC / GPU). Cross-tech consoles in the *same* session
+read/write those records; a different scenario gets a different graph.
 
-This is the Phase 1 foundation. Engines adopt it incrementally; bridges already
-feed the lab terminal and are mirrored here.
+Hardware and power changes publish events on a Redis-backed bus so subscribers
+in this session can refresh.
 """
 
 from __future__ import annotations
@@ -70,6 +70,7 @@ def _blank(
         "gpu": None,  # {present, model, driver_loaded, health, driver_version, mig_enabled}
         "updated_at": _now_iso(),
     }
+
 
 
 def list_servers(session_id: str) -> list[dict]:
@@ -368,3 +369,108 @@ def seed_from_aws_instance(session_id: str, inst: dict, *, role: str = "primary"
         },
         source="aws",
     )
+
+
+# Persona defaults for scenario-scoped LabServer seeding (terminal = this host).
+_PERSONA_DEFAULTS: dict[str, dict[str, Any]] = {
+    "linux": {"hostname": "lab-server", "primary_ip": "10.20.30.41", "os": "rhel-9", "source": "linux"},
+    "ansible": {"hostname": "ansible-control", "primary_ip": "10.20.30.50", "os": "rhel-9", "source": "ansible"},
+    "gpu": {"hostname": "gpu-node-01", "primary_ip": "10.20.40.10", "os": "rhel-9", "source": "gpu", "cpu": 64, "mem_mb": 524288},
+    "kubernetes": {"hostname": "k8s-master", "primary_ip": "10.20.50.10", "os": "rhel-9", "source": "kubernetes"},
+    "windows": {"hostname": "WIN-DC01", "primary_ip": "10.20.60.10", "os": "windows-server-2022", "source": "windows"},
+    "grafana": {"hostname": "mon-grafana-01", "primary_ip": "10.20.70.10", "os": "rhel-9", "source": "monitoring"},
+    "prometheus": {"hostname": "mon-prom-01", "primary_ip": "10.20.70.11", "os": "rhel-9", "source": "monitoring"},
+    "awx": {"hostname": "awx-controller", "primary_ip": "10.20.80.10", "os": "rhel-9", "source": "awx"},
+    "terraform": {"hostname": "iac-runner", "primary_ip": "10.20.90.10", "os": "rhel-9", "source": "terraform"},
+    "baremetal": {"hostname": "bm-node-01", "primary_ip": "10.20.100.10", "os": "rhel-9", "source": "baremetal"},
+    "datacenter": {"hostname": "dc-srv-r12u10", "primary_ip": "10.20.110.10", "os": "rhel-9", "source": "datacenter"},
+    "soc": {"hostname": "soc-sensor-01", "primary_ip": "10.20.120.10", "os": "rhel-9", "source": "soc"},
+    "commvault": {"hostname": "cv-mediaagent-01", "primary_ip": "10.20.130.10", "os": "rhel-9", "source": "commvault"},
+    "netapp": {"hostname": "ontap-cluster-01", "primary_ip": "10.20.140.10", "os": "ontap", "source": "netapp"},
+    "dellemc": {"hostname": "powermax-array-01", "primary_ip": "10.20.150.10", "os": "powermax-os", "source": "dellemc"},
+}
+
+
+def _infer_persona(sim_type: str, slug: str) -> str:
+    low = (slug or "").lower()
+    st = (sim_type or "").lower()
+    if st in _PERSONA_DEFAULTS:
+        return st
+    for key in _PERSONA_DEFAULTS:
+        if key in low or key in st:
+            return key
+    if "nvidia" in low or "cuda" in low:
+        return "gpu"
+    if "k8s" in low or "kube" in low:
+        return "kubernetes"
+    if "awx" in low or "tower" in low:
+        return "awx"
+    if "win-" in low or "windows" in low:
+        return "windows"
+    return "linux"
+
+
+def seed_scenario_lab_servers(
+    session_id: str,
+    *,
+    sim_type: str = "generic",
+    slug: str = "",
+    engine=None,
+    force: bool = False,
+) -> dict | None:
+    """Ensure this lab session has a primary LabServer for the scenario persona.
+
+    Skips if VMware/AWS/GPU dedicated seeders already created a primary, unless
+    ``force`` is True. Never creates a platform-global server.
+    """
+    sid = str(session_id)
+    if not force and get_primary(sid):
+        return get_primary(sid)
+
+    persona = _infer_persona(sim_type, slug)
+    # Dedicated paths already ran for these.
+    if persona in ("aws",) or (sim_type or "").lower() == "aws":
+        return get_primary(sid)
+    if persona == "gpu" or "gpu" in (slug or "").lower():
+        healthy = bool(getattr(getattr(engine, "shell", None), "state", None) and getattr(engine.shell.state, "gpu_healthy", False))
+        hostname = "gpu-node-01"
+        if engine and getattr(engine, "shell", None):
+            hostname = getattr(engine.shell.state, "hostname", None) or hostname
+        return seed_gpu_node(sid, hostname=hostname, healthy=healthy)
+
+    defaults = dict(_PERSONA_DEFAULTS.get(persona, _PERSONA_DEFAULTS["linux"]))
+    hostname = defaults["hostname"]
+    primary_ip = defaults["primary_ip"]
+    if engine and getattr(engine, "shell", None):
+        st = engine.shell.state
+        hostname = getattr(st, "hostname", None) or hostname
+        # Prefer first NIC IP from the shell if present.
+        nics = getattr(st, "nics", None) or []
+        for nic in nics:
+            ip = getattr(nic, "ip", None) if not isinstance(nic, dict) else nic.get("ip")
+            if ip:
+                primary_ip = str(ip).split("/")[0]
+                break
+
+    patch: dict[str, Any] = {
+        "id": f"{defaults['source']}-{hostname}",
+        "hostname": hostname,
+        "primary_ip": primary_ip,
+        "os": defaults.get("os", "rhel-9"),
+        "cpu": defaults.get("cpu", 4),
+        "mem_mb": defaults.get("mem_mb", 8192),
+        "tags": {"role": "primary", "persona": persona, "scenario": slug or ""},
+    }
+    if persona == "baremetal" or persona == "datacenter":
+        patch["physical_location"] = {
+            "room": "Data Hall A",
+            "rack": "R12",
+            "u_position": 10,
+        }
+        patch["bmc"] = {
+            "endpoint": f"https://bmc-{hostname}.corp.local",
+            "protocol": "redfish",
+            "power": "on",
+            "sensors": {"inlet_c": 22.0},
+        }
+    return upsert_server(sid, patch, source=defaults.get("source", "lab"))
