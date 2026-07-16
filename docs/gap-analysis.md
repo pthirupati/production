@@ -1,7 +1,9 @@
 # FixItLab Gap Analysis — Production-Grade Company Infra
 
 Living document for the platform hardening pass on `chore/vault-diagnose`.
-Last updated: 2026-07-16.
+Last updated: 2026-07-16 (Health Check issues:write + AWX/Monitoring/Windows LabServer sync).
+
+See also: `docs/master-execution-todo.md` (full Phase 0–9 checklist).
 
 ## North-star rules
 
@@ -53,7 +55,7 @@ Last updated: 2026-07-16.
 
 | ID | Gap | Root cause | Affected | Proposed fix | Done? |
 |---|---|---|---|---|---|
-| G-01 | No scenario LabServer registry | Each engine owns private JSON | all engines | Session-scoped ServerIdentity + bridges | **Partial** — VMware/AWS/GPU + `seed_scenario_lab_servers` for other personas |
+| G-01 | No scenario LabServer registry | Each engine owns private JSON | all engines | Session-scoped ServerIdentity + bridges | **Partial** — VMware/AWS/GPU + YAML seed + AWX/Monitoring/Windows inventory sync on get_state |
 | G-02 | AWS FE store ≠ backend | Zustand localStorage is SoT | awsStore, aws_engine | Make backend authoritative; FE thin cache | Partial (`aws_bridge`) |
 | G-03 | Learner sees “simulation” | Copy in LabRunner, AWS, VMware, errors | frontend | Purge user-facing strings | **Done** (marketing + consoles; internal code/comments OK) |
 | G-04 | GPU labs auto-pass | No engine; check.sh `exit 0` | scenarios/gpu | Mock GPU in ServerIdentity + real validate | **Partial** — ServerIdentity GPU facet + seed; grader still uses `gpu_healthy` |

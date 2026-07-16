@@ -375,6 +375,112 @@ def seed_from_aws_instance(session_id: str, inst: dict, *, role: str = "primary"
     )
 
 
+def sync_awx_inventory(session_id: str, hosts: list[dict] | None) -> None:
+    """Mirror AWX inventory hosts into this session's LabServer registry."""
+    for host in hosts or []:
+        if not isinstance(host, dict):
+            continue
+        name = (host.get("name") or "").strip()
+        if not name:
+            continue
+        hid = host.get("id") or name
+        enabled = host.get("enabled", True)
+        status = (host.get("status") or "ok").lower()
+        power = "on" if enabled and status in ("ok", "ready", "successful") else "off"
+        upsert_server(
+            session_id,
+            {
+                "id": f"awx-{hid}",
+                "hostname": name.split(".")[0] if "." in name else name,
+                "fqdn": name if "." in name else f"{name}.corp.local",
+                "primary_ip": host.get("ip") or "",
+                "power": power,
+                "os": host.get("guest_os") or "rhel-9",
+                "tags": {
+                    "role": "inventory",
+                    "persona": "awx",
+                    "inventory": host.get("inventory") or "",
+                    "appears_in": ["awx", "terminal"],
+                    "source_label": host.get("source") or "AWX",
+                },
+            },
+            source="awx",
+        )
+
+
+def sync_monitoring_targets(session_id: str, targets: list[dict] | None) -> None:
+    """Mirror Prometheus scrape targets into this session's LabServer registry."""
+    for target in targets or []:
+        if not isinstance(target, dict):
+            continue
+        labels = target.get("labels") or {}
+        instance = (target.get("instance") or labels.get("instance") or "").strip()
+        host_label = (labels.get("host") or labels.get("hostname") or "").strip()
+        if not instance and not host_label:
+            continue
+        ip = instance.split(":")[0] if instance else ""
+        hostname = host_label or (f"ip-{ip.replace('.', '-')}" if ip else instance)
+        health = (target.get("health") or "up").lower()
+        upsert_server(
+            session_id,
+            {
+                "id": f"mon-{hostname}",
+                "hostname": hostname,
+                "primary_ip": ip,
+                "power": "on" if health == "up" else "off",
+                "os": "rhel-9",
+                "tags": {
+                    "role": "monitored",
+                    "persona": "prometheus",
+                    "job": target.get("job") or labels.get("job") or "",
+                    "appears_in": ["grafana", "prometheus", "terminal"],
+                },
+            },
+            source="monitoring",
+        )
+
+
+def sync_windows_host(session_id: str, world: dict | None) -> dict | None:
+    """Mirror the Windows Server console host into LabServer identity."""
+    if not isinstance(world, dict):
+        return None
+    computer = (world.get("computer_name") or "WIN-DC01").strip()
+    session = world.get("session") or {}
+    locked = bool(session.get("locked"))
+    logged_in = bool(session.get("logged_in", True))
+    power = "off" if locked and not logged_in else "on"
+    nics = []
+    for iface in (world.get("network") or {}).get("adapters") or []:
+        if isinstance(iface, dict) and iface.get("name"):
+            nics.append({
+                "name": iface.get("name"),
+                "mac": iface.get("mac") or "",
+                "connected": bool(iface.get("connected", True)),
+                "ip": iface.get("ip") or "",
+            })
+    primary_ip = ""
+    for nic in nics:
+        if nic.get("ip"):
+            primary_ip = str(nic["ip"]).split("/")[0]
+            break
+    patch: dict[str, Any] = {
+        "id": f"windows-{computer}",
+        "hostname": computer,
+        "primary_ip": primary_ip or "10.20.60.10",
+        "power": power,
+        "os": world.get("os") or "windows-server-2022",
+        "tags": {
+            "role": "primary",
+            "persona": "windows",
+            "appears_in": ["windows", "terminal"],
+            "domain": ((world.get("domain") or {}).get("name") or ""),
+        },
+    }
+    if nics:
+        patch["nics"] = nics
+    return upsert_server(session_id, patch, source="windows")
+
+
 # Persona defaults for scenario-scoped LabServer seeding (terminal = this host).
 _PERSONA_DEFAULTS: dict[str, dict[str, Any]] = {
     "linux": {"hostname": "lab-server", "primary_ip": "10.20.30.41", "os": "rhel-9", "source": "linux"},

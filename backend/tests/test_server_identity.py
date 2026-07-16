@@ -89,3 +89,38 @@ class ServerIdentityTests(SimpleTestCase):
         self.assertEqual(primary["hostname"], "db-prod-01")
         self.assertEqual(primary["physical_location"]["rack"], "R02")
         self.assertEqual(primary["physical_location"]["u_position"], 10)
+
+    def test_sync_awx_and_monitoring_and_windows(self):
+        sid = "sess-sync-multi"
+        self.addCleanup(si.drop_session, sid)
+        si.sync_awx_inventory(sid, [
+            {"id": "h1", "name": "web01.fixitlab.local", "inventory": "Production",
+             "enabled": True, "status": "ok", "ip": "10.1.1.10"},
+            {"id": "h2", "name": "db01", "inventory": "Production",
+             "enabled": False, "status": "ok", "ip": "10.1.1.20"},
+        ])
+        hosts = {s["hostname"]: s for s in si.list_servers(sid)}
+        self.assertEqual(hosts["web01"]["power"], "on")
+        self.assertEqual(hosts["db01"]["power"], "off")
+        self.assertIn("awx", hosts["web01"]["sources"])
+
+        si.sync_monitoring_targets(sid, [
+            {"job": "node", "instance": "10.2.2.5:9100", "health": "up",
+             "labels": {"host": "mon-web", "job": "node"}},
+            {"job": "node", "instance": "10.2.2.6:9100", "health": "down",
+             "labels": {"host": "mon-db", "job": "node"}},
+        ])
+        hosts = {s["hostname"]: s for s in si.list_servers(sid)}
+        self.assertEqual(hosts["mon-web"]["power"], "on")
+        self.assertEqual(hosts["mon-db"]["power"], "off")
+
+        w = si.sync_windows_host(sid, {
+            "computer_name": "WIN-APP01",
+            "os": "windows-server-2022",
+            "domain": {"name": "CORP", "joined": True},
+            "session": {"logged_in": True, "locked": False},
+            "network": {"adapters": [{"name": "Ethernet0", "ip": "10.20.60.55", "connected": True}]},
+        })
+        self.assertEqual(w["hostname"], "WIN-APP01")
+        self.assertEqual(w["primary_ip"], "10.20.60.55")
+        self.assertEqual(w["power"], "on")

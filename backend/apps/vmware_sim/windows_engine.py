@@ -762,6 +762,11 @@ def get_state(session_id: str, scenario_slug: str = "") -> dict:
     state = copy.deepcopy(entry["state"])
     world = state["world"]
     _overlay_vmware_bridge(world, session_id)
+    try:
+        from apps.labs.provisioner.simulation.server_identity import sync_windows_host
+        sync_windows_host(session_id, world)
+    except Exception:
+        pass
     goal = state.get("goal", {})
 
     installed_roles = sum(1 for r in world["roles"] if r["installed"])
@@ -842,6 +847,11 @@ def apply_action(session_id: str, action: str, payload: dict | None = None) -> d
                           "disconnect_rdp", "disconnect_session"):
             _touch_session(world)
         _save_session(str(session_id), entry)
+        try:
+            from apps.labs.provisioner.simulation.server_identity import sync_windows_host
+            sync_windows_host(session_id, world)
+        except Exception:
+            pass
     return result
 
 
