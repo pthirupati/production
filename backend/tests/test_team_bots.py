@@ -49,6 +49,19 @@ class TeamMentionTests(SimpleTestCase):
         actions = resolve_team_actions(text, teams, "sim-rhel-network-nic")
         self.assertEqual(actions[0][1], "network_nic_added")
 
+    def test_network_configure_eth1(self):
+        text = "@network team configure eth1"
+        teams = parse_team_mentions(text)
+        actions = resolve_team_actions(text, teams, "linux-nic-add-vmware-rescan")
+        self.assertEqual(actions[0][1], "network_nic_added")
+
+    def test_security_approve_firewall(self):
+        text = "@security team approve firewall change"
+        teams = parse_team_mentions(text)
+        self.assertIn("security", teams)
+        actions = resolve_team_actions(text, teams, "sim-rhel-firewall")
+        self.assertEqual(actions[0][1], "security_approved")
+
     def test_mount_failure_reply(self):
         from apps.jira_integration.team_bots import build_mount_failure_reply
 

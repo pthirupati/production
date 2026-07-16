@@ -56,17 +56,43 @@ def _is_start_request(text: str) -> bool:
 
 def _is_backup_request(text: str) -> bool:
     low = text.lower()
-    return "backup" in low and any(w in low for w in ("take", "create", "full", "snapshot", "please"))
+    return "backup" in low and any(
+        w in low for w in ("take", "create", "full", "snapshot", "please", "before", "patch")
+    )
 
 
 def _is_disk_request(text: str) -> bool:
     low = text.lower()
-    return any(w in low for w in ("add disk", "attach disk", "provision disk", "new disk", "allocate disk"))
+    return any(
+        w in low
+        for w in (
+            "add disk", "attach disk", "attach new disk", "provision disk",
+            "new disk", "allocate disk", "attach", "provision",
+        )
+    ) and "disk" in low
 
 
 def _is_nic_request(text: str) -> bool:
     low = text.lower()
-    return any(w in low for w in ("add nic", "add ip", "secondary ip", "network interface", "vlan", "attach nic"))
+    return any(
+        w in low
+        for w in (
+            "add nic", "add ip", "secondary ip", "network interface", "vlan",
+            "attach nic", "configure eth", "eth0", "eth1", "nic", "ip address",
+            "firewall", "routing",
+        )
+    )
+
+
+def _is_security_request(text: str) -> bool:
+    low = text.lower()
+    return any(
+        w in low
+        for w in (
+            "approve", "approval", "firewall", "access", "sign-off", "sign off",
+            "change window", "allow", "permit",
+        )
+    )
 
 
 def resolve_team_actions(text: str, teams: list[str], scenario_slug: str = "") -> list[tuple[str, str]]:
@@ -77,24 +103,32 @@ def resolve_team_actions(text: str, teams: list[str], scenario_slug: str = "") -
 
     if "backup" in teams and (_is_backup_request(text) or _is_stop_request(text) or "patch" in low):
         actions.append(("backup", "backup_taken"))
+    elif "backup" in teams and ("please" in low or "team" in low):
+        # Bare "@backup team please …" still completes the backup hand-off.
+        actions.append(("backup", "backup_taken"))
 
     if "database" in teams:
         if _is_start_request(text):
             actions.append(("database", "database_started"))
-        elif _is_stop_request(text) or "patch" in low:
+        elif _is_stop_request(text) or "patch" in low or "maintenance" in low or "please" in low:
             actions.append(("database", "database_stopped"))
 
     if "application" in teams:
         if _is_start_request(text):
             actions.append(("application", "application_started"))
-        elif _is_stop_request(text) or "patch" in low:
+        elif _is_stop_request(text) or "patch" in low or "please" in low:
             actions.append(("application", "application_stopped"))
 
-    if "storage" in teams and (_is_disk_request(text) or "disk" in low or "lvm" in slug):
+    if "storage" in teams and (_is_disk_request(text) or "disk" in low or "lvm" in slug or "please" in low):
         actions.append(("storage", "storage_disk_added"))
 
-    if "network" in teams and (_is_nic_request(text) or "network" in slug or "nic" in low):
+    if "network" in teams and (
+        _is_nic_request(text) or "network" in slug or "nic" in low or "eth" in low or "please" in low
+    ):
         actions.append(("network", "network_nic_added"))
+
+    if "security" in teams and (_is_security_request(text) or "please" in low or "firewall" in slug):
+        actions.append(("security", "security_approved"))
 
     return actions
 
@@ -143,6 +177,11 @@ def build_team_reply(
             f"✓ Secondary NIC/IP configured: **{ip}** on eth0.\n"
             f"Verify with `ip addr show dev eth0` on the server."
         )
+    if "security_approved" in action_ids:
+        lines.append(
+            "✓ Security review complete — firewall / access change **approved** for this change window.\n"
+            "You may proceed with the documented remediation."
+        )
 
     if not lines:
         if "patch" in slug:
@@ -159,7 +198,8 @@ def build_team_reply(
             )
         return (
             TEAM_AUTHORS["changemgmt"],
-            "Mention a team: @backup team, @database team, @application team, @storage team, or @network team.",
+            "Mention a team: @backup team, @database team, @application team, "
+            "@storage team, @network team, or @security team.",
         )
 
     if len(teams) > 1 and any(a[1].endswith("_stopped") or a[1] == "backup_taken" for a in actions):

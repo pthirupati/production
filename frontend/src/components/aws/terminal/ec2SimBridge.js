@@ -59,9 +59,9 @@ function writeLines(onWrite, lines) {
  * @param {{ store?: object, user?: string, onExit?: () => void }} opts
  */
 export function createEc2SimShell(instance, opts = {}) {
+  const store = opts.store
   const workload = resolveEc2Workload(instance)
   const vm = instanceToVm(instance, store)
-  const store = opts.store
   const onExit = opts.onExit
 
   if (workload === 'windows') {

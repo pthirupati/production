@@ -475,6 +475,7 @@ class RHELOSState:
         self.ops_db_started: bool = True
         self.ops_app_started: bool = True
         self.ops_services_restarted: bool = False
+        self.ops_security_approved: bool = False
         self.mount_issue_after_reboot: bool = False
         self.mount_filesystems_fixed: bool = False
         self.pending_storage_device: str = "/dev/sdb"

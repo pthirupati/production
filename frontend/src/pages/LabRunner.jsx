@@ -2297,18 +2297,73 @@ export default function LabRunner() {
 
         <div className="flex-1 flex flex-col min-h-0 min-w-0 overflow-hidden relative">
         {isSimPrimaryLab ? (
-          <SimWithTerminal
-            open={simTerminalOpen}
-            onToggle={() => setSimTerminalOpen((v) => !v)}
-            sessionId={sessionId}
-            terminalSession={terminalSession}
-            terminalHost={terminalHost}
-            blockedCommands={blockedCmds}
-            isMobile={isMobile}
-            welcomeHint={primarySimProps.welcomeHint}
-          >
-            {renderPrimarySim()}
-          </SimWithTerminal>
+          <>
+            {/* Companion tool strip — primary GUI labs previously hid Open AWX /
+                AWS / VMware / Terminal controls that live on the non-primary
+                terminal action bar. Keep a compact always-visible strip. */}
+            <div className="shrink-0 flex flex-wrap items-center gap-1.5 px-2 py-1.5 bg-surface-900 border-b border-surface-800 text-[10px]">
+              <button
+                type="button"
+                onClick={() => setSimTerminalOpen((v) => !v)}
+                className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-md border border-surface-600 text-surface-200 hover:border-accent-cyan hover:text-accent-cyan"
+                title="Toggle lab terminal"
+              >
+                <Terminal size={12} /> {simTerminalOpen ? 'Hide terminal' : 'Lab terminal'}
+              </button>
+              {showSimVmwareLink && (
+                <a
+                  href={vmwareServerHref}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-md border border-[#4fa7e8]/50 text-[#4fa7e8] bg-[#4fa7e8]/10 hover:bg-[#4fa7e8]/20 font-semibold"
+                  title="Same server in VMware — add disk/NIC, then return and rescan"
+                >
+                  <ExternalLink size={12} /> Open VMware
+                </a>
+              )}
+              {showAwxLink && (
+                <button
+                  type="button"
+                  onClick={() => setShowAwxSim(true)}
+                  className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-md border font-semibold"
+                  style={{ borderColor: 'rgba(238,0,0,.45)', color: '#ff6b6b', background: 'rgba(238,0,0,.12)' }}
+                >
+                  <ExternalLink size={12} /> Open AWX
+                </button>
+              )}
+              {(isTerraformSimLab || isDevOpsPipelineLab) && (
+                <button
+                  type="button"
+                  onClick={() => setShowAwsSim(true)}
+                  className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-md border font-semibold"
+                  style={{ borderColor: 'rgba(255,153,0,.5)', color: '#ff9900', background: 'rgba(255,153,0,.12)' }}
+                >
+                  <ExternalLink size={12} /> AWS Console
+                </button>
+              )}
+              {isMonitoringLab && (
+                <button
+                  type="button"
+                  onClick={() => setShowMonitoringSim(true)}
+                  className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-md border border-accent-amber/40 text-accent-amber bg-accent-amber/10 font-semibold"
+                >
+                  <ExternalLink size={12} /> Monitoring
+                </button>
+              )}
+            </div>
+            <SimWithTerminal
+              open={simTerminalOpen}
+              onToggle={() => setSimTerminalOpen((v) => !v)}
+              sessionId={sessionId}
+              terminalSession={terminalSession}
+              terminalHost={terminalHost}
+              blockedCommands={blockedCmds}
+              isMobile={isMobile}
+              welcomeHint={primarySimProps.welcomeHint}
+            >
+              {renderPrimarySim()}
+            </SimWithTerminal>
+          </>
         ) : (
         <>
         {isCrossTechMonitoringSplit && (

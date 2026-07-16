@@ -201,7 +201,10 @@ function primaryNicL3(vm, fallbackIp, fallbackGw) {
 
 function guestExtraNics(vm, shared) {
   const pending = vm?.guest_pending_nics || []
-  if (!shared.nicRescanned && vm?.guest_nic_pending) return []
+  // Match backend RHELShell: once the guest has rescanned (or auto-revealed on
+  // `ip a`), pending NICs become visible. Before that, hide them so the learner
+  // must rescan — unless autoReveal is set by the listing path.
+  if (!shared.nicRescanned && vm?.guest_nic_pending && !shared.nicAutoReveal) return []
   if (pending.length) {
     return pending.map((n, i) => ({
       name: n.name || `eth${i + 1}`,
@@ -216,6 +219,19 @@ function guestExtraNics(vm, shared) {
     mac: n.mac || n.mac_address || `00:50:56:${(i + 1).toString(16).padStart(2, '0')}:c3:d4`,
     label: n.label || `Network adapter ${i + 2}`,
   }))
+}
+
+/** Reveal hot-added NICs the way the backend does on `ip a` / PCI rescan. */
+function revealPendingNics(vm, shared) {
+  if (!vm?.guest_nic_pending && !(vm?.guest_pending_nics || []).length && (vm?.nics || []).length <= 1) {
+    return null
+  }
+  shared.nicAutoReveal = true
+  shared.nicRescanned = true
+  if (vm?.guest_nic_pending) {
+    return { action: 'guest_rescan_scsi', vm_id: vm?.id }
+  }
+  return null
 }
 
 function triggerGuestRescan(vm, shared) {
@@ -1575,9 +1591,13 @@ export function createLinuxShell(vm, opts = {}) {
       ])
     }
     else if (lc === 'echo') {
-      // guest disk rescan side-effect: echo "- - -" > /sys/class/scsi_host/.../scan
-      if (line.includes('scsi_host') && line.includes('scan')) {
-        const effect = triggerGuestRescan(vm, shared)
+      // guest disk/NIC rescan: scsi_host scan OR PCI bus rescan
+      if (
+        (line.includes('scsi_host') && line.includes('scan'))
+        || line.includes('/sys/bus/pci/rescan')
+        || (line.includes('/sys/devices') && line.includes('rescan'))
+      ) {
+        const effect = triggerGuestRescan(vm, shared) || revealPendingNics(vm, shared)
         if (effect) sideEffect = effect
         out.push('')
       } else {
@@ -2005,6 +2025,12 @@ export function createLinuxShell(vm, opts = {}) {
     else if (lc === 'ip') {
       const sub = positional[0]
       const netVm = vmRef.current
+      // Match backend: listing addresses auto-reveals a hot-added NIC that was
+      // attached in VMware (after the hypervisor side completed).
+      if (sub === 'addr' || sub === 'a' || sub === 'address' || !sub || sub === 'link') {
+        const effect = revealPendingNics(netVm, shared)
+        if (effect) sideEffect = effect
+      }
       const extraNics = guestExtraNics(netVm, shared)
       const linkUp = primaryNicUp(netVm)
       const { ip: nIp, gw: nGw, prefix, mac: nMac, hasIp } = primaryNicL3(netVm, ip, gw)
@@ -2035,13 +2061,18 @@ export function createLinuxShell(vm, opts = {}) {
         if (linkUp && hasIp) emit([`default via ${nGw} dev eth0 proto static metric 100`, `${net3}.0/${prefix} dev eth0 proto kernel scope link src ${nIp}`])
         else emit('')
       } else if (sub === 'link') {
-        emit([
+        const linkLines = [
           '1: lo: <LOOPBACK,UP,LOWER_UP> mtu 65536',
           linkUp
             ? '2: eth0: <BROADCAST,MULTICAST,UP,LOWER_UP> mtu 1500'
             : '2: eth0: <NO-CARRIER,BROADCAST,MULTICAST,UP> mtu 1500 state DOWN',
           `    link/ether ${nMac} brd ff:ff:ff:ff:ff:ff`,
-        ])
+        ]
+        extraNics.forEach((nic, i) => {
+          linkLines.push(`${3 + i}: ${nic.name}: <BROADCAST,MULTICAST,UP,LOWER_UP> mtu 1500`)
+          linkLines.push(`    link/ether ${nic.mac || '00:50:56:a1:c3:d4'} brd ff:ff:ff:ff:ff:ff`)
+        })
+        emit(linkLines)
       } else if (sub === 'neigh' || sub === 'n') {
         emit(linkUp ? `${nGw} dev eth0 lladdr 00:50:56:fe:00:01 REACHABLE` : '')
       } else emit('Object "' + sub + '" is unknown, try "ip help".')

@@ -2,6 +2,9 @@
 import { createLinuxShell } from '../../vmware/linuxShell'
 import { awsCli } from './awscli'
 import { createTerraform } from './terraformSim'
+import { createEc2SimShell } from './ec2SimBridge'
+import { defaultUser } from './vfs'
+import { findInstanceByHost, instanceAllowsInbound } from './sgReachability'
 
 function writeLines(onWrite, lines) {
   ;(lines || []).forEach((line) => onWrite(`${line}\r\n`))
@@ -50,6 +53,18 @@ resource "aws_instance" "web" {
   }
 }
 
+function parseSshTarget(line) {
+  // ssh [-i key] user@host  OR  ssh host
+  const parts = line.trim().split(/\s+/).slice(1).filter((p) => p && !p.startsWith('-'))
+  const target = parts[0] || ''
+  if (!target) return null
+  if (target.includes('@')) {
+    const [user, host] = target.split('@')
+    return { user: user || '', host: host || '' }
+  }
+  return { user: '', host: target }
+}
+
 /**
  * @param {{ store: object, region?: string }} opts
  */
@@ -68,16 +83,29 @@ export function createCloudShellShell(opts = {}) {
     region,
   })
 
-  return {
+  let nested = null // active SSH session into an EC2 instance
+
+  const shell = {
     workload: 'linux',
     workloadLabel: 'AWS CloudShell',
-    prompt: () => linux.prompt(),
+    prompt: () => (nested ? nested.prompt() : linux.prompt()),
     history: linux.history,
     saveFile: linux.saveFile?.bind(linux),
     readFile: linux.readFile?.bind(linux),
     run(rawLine, onWrite) {
       const line = rawLine.trim()
       if (!line) return
+
+      // Inside an SSH session — `exit` returns to CloudShell.
+      if (nested) {
+        if (line === 'exit' || line === 'logout') {
+          writeLines(onWrite, ['Connection to instance closed.'])
+          nested = null
+          return
+        }
+        nested.run(line, onWrite)
+        return
+      }
 
       if (line === 'aws' || line.startsWith('aws ')) {
         const args = line.split(/\s+/).slice(1)
@@ -94,6 +122,53 @@ export function createCloudShellShell(opts = {}) {
         return
       }
 
+      if (line === 'ssh' || line.startsWith('ssh ')) {
+        const parsed = parseSshTarget(line)
+        if (!parsed?.host) {
+          writeLines(onWrite, ['usage: ssh [-i key] [user@]hostname'])
+          linux.history.push(line)
+          return
+        }
+        const liveStore = store || opts.store
+        const instance = findInstanceByHost(liveStore, parsed.host)
+        if (!instance) {
+          writeLines(onWrite, [
+            `ssh: Could not resolve hostname ${parsed.host}: Name or service not known`,
+          ])
+          linux.history.push(line)
+          return
+        }
+        if (instance.state !== 'running') {
+          writeLines(onWrite, [
+            `ssh: connect to host ${parsed.host} port 22: Connection refused`,
+            `(instance ${instance.id} is ${instance.state})`,
+          ])
+          linux.history.push(line)
+          return
+        }
+        if (!instanceAllowsInbound(liveStore, instance, 22, 'TCP')) {
+          writeLines(onWrite, [
+            `ssh: connect to host ${parsed.host} port 22: Connection timed out`,
+            `(security group does not allow inbound TCP/22 from 0.0.0.0/0 — open SSH in the instance SG)`,
+          ])
+          linux.history.push(line)
+          return
+        }
+        const user = parsed.user || defaultUser(instance.os)
+        nested = createEc2SimShell(instance, {
+          store: liveStore,
+          user,
+          labSessionId: `cloudshell-ssh-${instance.id}`,
+          onExit: () => { nested = null },
+        })
+        writeLines(onWrite, [
+          `Connecting to ${instance.id} (${parsed.host}) as ${user}…`,
+          `Last login: ${new Date().toUTCString()} from cloudshell`,
+        ])
+        linux.history.push(line)
+        return
+      }
+
       const result = linux.run(line)
       if (result.clear) onWrite('\x1b[2J\x1b[H')
       if (result.editor) {
@@ -104,4 +179,5 @@ export function createCloudShellShell(opts = {}) {
       writeLines(onWrite, result.lines)
     },
   }
+  return shell
 }
