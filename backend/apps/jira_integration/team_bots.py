@@ -222,6 +222,80 @@ def build_mount_failure_reply(ticket) -> tuple[str, str]:
     )
 
 
+def is_help_request(text: str) -> bool:
+    low = (text or "").lower()
+    return any(
+        w in low
+        for w in (
+            "need help", "need a hint", "stuck", "hint please", "any hint",
+            "how do i", "what should i", "next step", "guide me", "coach me",
+            "help me", "not sure", "where do i start",
+        )
+    )
+
+
+def build_coach_reply(ticket) -> tuple[str, str]:
+    """Scenario-aware coaching from the ticket body / scenario objectives."""
+    scenario = getattr(ticket, "scenario", None)
+    objectives = []
+    if scenario is not None:
+        try:
+            from apps.question_bank.scenario_copy import public_objectives
+            objectives = list(public_objectives(scenario.objectives or []) or [])
+        except Exception:
+            objectives = list(scenario.objectives or []) if isinstance(scenario.objectives, list) else []
+
+    desc = (getattr(ticket, "description", None) or "")[:4000]
+    # Prefer acceptance-criteria section from the generated ticket body.
+    criteria = []
+    if "### Acceptance criteria" in desc:
+        chunk = desc.split("### Acceptance criteria", 1)[1]
+        chunk = chunk.split("###", 1)[0]
+        for line in chunk.splitlines():
+            line = line.strip()
+            if line.startswith("- "):
+                criteria.append(line[2:].strip())
+    if not criteria and objectives:
+        criteria = [str(o) for o in objectives[:6]]
+
+    tools = ""
+    if "### Lab tools for this scenario" in desc:
+        tools = desc.split("### Lab tools for this scenario", 1)[1].split("###", 1)[0].strip()
+
+    lines = [
+        "I'm the Change Management coach on this incident. Here's how to unblock yourself "
+        "without spoiling the root cause:",
+        "",
+        "**1. Re-read the ticket** — Summary, Impact, and Acceptance criteria are your "
+        "definition of done.",
+    ]
+    if criteria:
+        lines += ["", "**Acceptance criteria to hit:**"]
+        for c in criteria[:6]:
+            lines.append(f"- {c}")
+    lines += [
+        "",
+        "**2. Use the right console** — Lab terminal is the production-like server; "
+        "technology GUIs (VMware / AWS / AWX / Commvault / storage / SOC / datacenter) "
+        "are ops consoles onto the same infra.",
+    ]
+    if tools:
+        lines += ["", "**Tools for this ticket:**", tools]
+    lines += [
+        "",
+        "**3. Collaborate** — If you need a disk, NIC, backup, or firewall change, "
+        "@mention `@storage team`, `@network team`, `@backup team`, or `@security team` "
+        "in a comment. They will reply and unlock the change window.",
+        "",
+        "**4. Verify** — After the fix, confirm against acceptance criteria, add a "
+        "resolution comment with root cause, then mark the lab complete.",
+        "",
+        "Reply with what you already tried (commands / console actions) if you want a "
+        "narrower nudge.",
+    ]
+    return TEAM_AUTHORS["changemgmt"], "\n".join(lines)
+
+
 def schedule_team_replies(ticket, user_text: str, session=None) -> dict:
     """
     Parse mentions, schedule delayed Jira replies, return metadata for API response.

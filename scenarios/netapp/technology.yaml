@@ -1,0 +1,17 @@
+name: NetApp ONTAP Storage
+slug: netapp
+description: >-
+  Operate a NetApp ONTAP cluster through an authentic System Manager
+  simulator — clusters, SVMs, aggregates, volumes, LUNs, SnapMirror
+  replication, and NFS/CIFS export policies. Grow a volume before it fills up,
+  map an unmounted iSCSI LUN to a host initiator, stand up a new SnapMirror
+  relationship for disaster recovery, break a mirror to promote a DR copy
+  during a failover drill, and open the export policy an application team
+  needs. Mirrors the day-to-day work of a NetApp storage administrator
+  keeping production volumes healthy and replicated.
+icon: hard-drive
+color: teal
+order: 40
+price: 499
+is_active: true
+coming_soon: false

@@ -329,6 +329,14 @@ export default function CicdPipelineSim({
   const allGreen = pipeline.jobs.length > 0 && pipeline.jobs.every((j) => statuses.get(j.id) === JOB_STATUS.SUCCESS)
   const providerSeeds = CICD_SEED_PIPELINES[provider] || []
 
+  // At-a-glance pipeline status pill for the header — mirrors the badge every
+  // real CI/CD tool shows next to the project/branch name.
+  const headerStatus = running
+    ? 'running'
+    : allGreen ? 'success'
+      : anyFailed ? 'failed'
+        : runHistory[0]?.status || null
+
   return (
     <div className={simPanelRoot(embedded, 'cicd-sim text-sm')} style={{ background: 'var(--cicd-bg)', color: 'var(--cicd-text)' }}>
       <LabChromeBar
@@ -347,7 +355,14 @@ export default function CicdPipelineSim({
         extendDisabled={extendDisabled}
         backLabel="Terminal"
         vmwareHref={vmwareHref}
-      />
+      >
+        {headerStatus && (
+          <span className={`cicd-status-pill cicd-status-pill-${headerStatus === 'running' ? 'running' : headerStatus === 'success' ? 'success' : headerStatus === 'failed' ? 'failed' : ''}`.trim()}>
+            <span className="cicd-status-dot" />
+            {headerStatus === 'running' ? 'Running' : headerStatus === 'success' ? 'Passing' : headerStatus === 'failed' ? 'Failed' : headerStatus}
+          </span>
+        )}
+      </LabChromeBar>
 
       {/* Provider + trigger toolbar */}
       <div className="cicd-toolbar flex flex-wrap items-center gap-2 px-4 py-2 shrink-0">

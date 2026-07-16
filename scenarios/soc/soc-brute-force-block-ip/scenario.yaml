@@ -1,0 +1,133 @@
+title: "SOC Tier-1: Brute-Force SSH Login Storm Against web01"
+slug: soc-brute-force-block-ip
+technology: soc
+category: Fix
+difficulty: easy
+lab_mode: simulation
+simulation_type: soc
+infrastructure_type: docker
+time_limit: 600
+max_score: 100
+is_free: false
+jira_priority: Medium
+dual_terminal: false
+description: >-
+  CONTEXT: The SIEM correlates a run of failed SSH logins against web01 — several failed root and
+  admin attempts from the same external address in under a minute — and fires a medium-severity alert
+  (AL-1002, "Multiple failed SSH logins"). It hasn't succeeded yet, but a sustained brute-force run is
+  exactly the kind of noise that eventually finds a weak password if it isn't shut down.
+
+
+  ENVIRONMENT: You are working the alert queue in the SOC/SIEM console. AL-1002 is open against web01,
+  sourced from IP 198.51.100.23. The log search panel indexes the underlying sshd failures for that
+  host, and the Brute Force Response playbook (pb-brute-force: block source IP, force password reset,
+  review auth logs) documents the standard response — but for this alert, the SIEM console's own
+  "Block IP" action is the concrete step that actually needs to happen.
+
+
+  SYMPTOM / STARTING STATE: AL-1002 is "new" and unacknowledged, and 198.51.100.23 is not yet on the
+  blocked-IP list — every SSH attempt from that address is still reaching web01's sshd.
+
+
+  IMPACT: A brute-force run against a public-facing web host is a credential-compromise risk, not just
+  log noise — if any account on web01 has a weak or reused password, this is how an attacker gets a
+  foothold. The longer 198.51.100.23 stays unblocked, the more attempts it gets.
+
+
+  OBJECTIVE: Acknowledge AL-1002, confirm the source IP via log search, block 198.51.100.23 at the
+  firewall from the console, and close the incident once the block is confirmed.
+initial_state: >-
+  SOC console with a new, unacknowledged alert (AL-1002) reporting repeated failed SSH logins against
+  web01 from 198.51.100.23, which is not yet blocked.
+objectives:
+- Acknowledge alert AL-1002
+- Search the logs for 198.51.100.23 to confirm the failed-login pattern against web01
+- Block 198.51.100.23 at the firewall
+- Close out AL-1002 once the block is confirmed
+hints:
+- order: 1
+  cost: 0
+  content: >-
+    ORIENT — what to observe and why: Do not block anything yet. Open AL-1002, note its source IP
+    (198.51.100.23) and target asset (web01), then use Log Search to look for that IP and confirm the
+    repeated "Failed password" sshd entries that triggered the alert.
+- order: 2
+  cost: 10
+  content: >-
+    APPROACH — the troubleshooting method: A brute-force alert follows a short triage loop — acknowledge
+    the alert (claim it), confirm the pattern in the underlying logs (evidence, not just the alert
+    title), then block the offending source at the firewall. Blocking the wrong IP or skipping
+    confirmation is how you accidentally block a legitimate client.
+- order: 3
+  cost: 25
+  content: >-
+    WHICH TOOL — the diagnostic command(s): 1. Use "Acknowledge" on AL-1002. 2. In Log Search, query
+    198.51.100.23 and confirm multiple "Failed password" entries against web01's sshd. 3. Use the
+    "Block IP" action against that same source address.
+- order: 4
+  cost: 40
+  content: >-
+    NARROW DOWN — isolate the subsystem: The only asset involved is web01 and the only offending
+    address is 198.51.100.23 — this is a single-IP block, not a broader containment response (there is
+    no host to quarantine here, unlike a malware alert).
+- order: 5
+  cost: 60
+  content: >-
+    NEAR-SOLUTION — the fix shape + verify (you still apply it): Block 198.51.100.23, confirm it now
+    appears on the blocked-IP list, then use "Close" on AL-1002 to finish the response. WHY: the grader
+    checks that 198.51.100.23 is blocked and AL-1002 is closed in the simulated SOC state — blocking the
+    IP without closing the alert leaves the incident open.
+summary: Confirm a brute-force SSH pattern against web01 in the logs, block the attacking source IP at
+  the firewall, and close out the alert.
+estimated_minutes: 8
+xp_reward: 90
+prerequisites:
+- Basic SOC/SIEM triage concepts (alert acknowledgment, log correlation)
+tags:
+- fix
+- hands-on
+- soc
+- siem
+- security
+linked_tutorial: soc-fundamentals
+what_you_will_learn:
+- Correlating a SIEM alert against its underlying raw log evidence
+- Confirming a brute-force pattern before taking containment action
+- Blocking a malicious source IP at the firewall from the SOC console
+- Closing out an alert once remediation is confirmed
+environment:
+  nodes:
+  - role: primary
+    os: FixitLab SOC / SIEM console simulation
+    hostname: lab-primary
+    ip: 127.0.0.1
+    specs: local offline simulation
+  pre_installed:
+  - soc-siem-console
+  credentials:
+  - user: analyst
+    password: lab123
+tasks:
+- id: task_1
+  title: Block the brute-force source IP and close the alert
+  description: >-
+    Acknowledge AL-1002, confirm the attack pattern in the logs, block 198.51.100.23, and close the
+    alert.
+  background: >-
+    This lab teaches the short SOC triage loop for a single-source brute-force alert: acknowledge,
+    confirm via logs, block, close.
+  validation:
+    type: custom_script
+    script: check.sh
+    error_message: >-
+      Validation did not pass. Block 198.51.100.23 and close out AL-1002.
+solution:
+  summary: Acknowledge AL-1002, confirm the pattern via Log Search, block 198.51.100.23, then close the
+    alert.
+  files_changed: []
+  commands_run:
+  - "SOC console: Alerts -> AL-1002 -> Acknowledge"
+  - "SOC console: Log Search -> query 198.51.100.23"
+  - "SOC console: AL-1002 -> Block IP"
+  - "SOC console: AL-1002 -> Close"
+  reference_docs: soc-fundamentals

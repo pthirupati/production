@@ -25,6 +25,7 @@ import {
 } from '../lib/validators'
 import { SERVICE_CONFIGS } from '../pages/generic/serviceConfigs'
 import { awsSimApi } from '../../../api/awsSim'
+import { notifyAwsBridge } from '../../../api/awsBridge'
 
 const ACCOUNT_ID = '123456789012'
 
@@ -440,6 +441,11 @@ function seedState() {
 
     flash: [], // {id, type, message}
     labManagedIds: [], // instance/bucket ids created during an active lab session
+    // Session id of the active LabRunner session, when this console is embedded
+    // in a lab (set by AwsLabOverlay on mount). Lets mutating actions (attach
+    // volume, power ops) notify the cross-tech bridge in addition to the
+    // normal _syncAction grading mirror. Never persisted — see partialize.
+    labSessionId: null,
   }
 }
 
@@ -604,6 +610,12 @@ export const useAwsStore = create(
       isLabSyncArmed: () => Boolean(_labSync.sessionId),
       _syncAction: (action, payload) => { labSyncEnqueue(action, payload) },
 
+      // Cross-tech bridge session id — set by AwsLabOverlay alongside armLabSync
+      // so attachVolume/instanceAction can additionally notify the shared
+      // AWS/Linux bridge (bridge_attach_volume / bridge_power) for labs where
+      // the EC2 instance is also visible from a Linux terminal or VMware sim.
+      setLabSessionId: (sessionId) => set({ labSessionId: sessionId || null }),
+
       markLabManaged: (ids) => set((s) => ({
         labManagedIds: [...new Set([...(s.labManagedIds || []), ...(ids || [])])],
       })),
@@ -715,6 +727,13 @@ export const useAwsStore = create(
           return inst?.tags?.Name || inst?.name || id
         })
         get()._syncAction('instance_action', { op: action, instance_ids: idents })
+        // Power ops (not terminate — the bridge only tracks a running/stopped
+        // guest, not deletion) additionally notify the cross-tech bridge so a
+        // Linux terminal / VMware sim sharing this lab session sees the guest
+        // power state change without a separate manual step.
+        if (get().labSessionId && ['start', 'stop', 'reboot'].includes(action)) {
+          notifyAwsBridge(get().labSessionId, 'bridge_power', { op: action, instance_ids: idents })
+        }
         return ok()
       },
 
@@ -1061,7 +1080,13 @@ export const useAwsStore = create(
           get().pushFlash('error', err.str)
           return fail(err)
         }
-        set((s) => ({ volumes: s.volumes.map((v) => (v.id === volId ? { ...v, state: 'in-use', attachedTo: instanceId, device: device || '/dev/sdf' } : v)) }))
+        const finalDevice = device || '/dev/sdf'
+        set((s) => ({ volumes: s.volumes.map((v) => (v.id === volId ? { ...v, state: 'in-use', attachedTo: instanceId, device: finalDevice } : v)) }))
+        if (get().labSessionId) {
+          notifyAwsBridge(get().labSessionId, 'bridge_attach_volume', {
+            volume_id: volId, instance_id: instanceId, device: finalDevice, size_gb: vol.size,
+          })
+        }
         return ok()
       },
       detachVolume: (volId) => {
@@ -1524,9 +1549,11 @@ export const useAwsStore = create(
           ? persistedState
           : {}
       ),
-      // Persist resource state + region, but not transient flash messages.
+      // Persist resource state + region, but not transient flash messages or
+      // the active lab session id (that's re-armed fresh by AwsLabOverlay on
+      // every mount, never something a stale persisted blob should carry).
       partialize: (s) => {
-        const { flash, ...rest } = s
+        const { flash, labSessionId, ...rest } = s
         return rest
       },
       merge: (persisted, current) => {

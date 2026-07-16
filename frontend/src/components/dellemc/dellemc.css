@@ -1,0 +1,21 @@
+/* Dell EMC Unisphere / PowerMax */
+.de-shell { background: #f2f5f9; color: #0b1d33; }
+.de-sidebar { border-right: 1px solid #06192e; }
+.de-sidebar .sim-sidebar-item { color: #a9c6e3; }
+.de-sidebar .sim-sidebar-item:hover { background: rgba(255, 255, 255, 0.06); color: #fff; }
+.de-sidebar .sim-sidebar-active { background: rgba(0, 114, 198, 0.4) !important; color: #fff !important; border-left-color: #4fc3f7 !important; }
+
+.de-panel { background: #fff; border: 1px solid #d7e0ec; border-radius: 6px; }
+
+.de-btn-primary {
+  background: #0072c6; color: #fff; border-radius: 4px; padding: 0.4rem 0.85rem;
+  font-size: 0.8rem; font-weight: 600; display: inline-flex; align-items: center; gap: 0.35rem;
+}
+.de-btn-primary:hover { background: #005ea3; }
+.de-btn-primary:disabled { opacity: 0.5; cursor: not-allowed; }
+
+.de-btn-sm {
+  display: inline-flex; align-items: center; gap: 0.25rem; font-size: 0.68rem; font-weight: 600;
+  padding: 0.25rem 0.5rem; border-radius: 4px; background: #0072c6; color: #fff;
+}
+.de-btn-sm:hover { background: #005ea3; }

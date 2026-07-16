@@ -1,0 +1,163 @@
+/* Physical Data Center floor — CSS-only pseudo-isometric view (no 3D engine deps) */
+
+.dc-shell { background: #0b0e14; color: #e6e9f0; }
+
+.dc-btn-primary {
+  background: #f97316; color: #0b0e14; border-radius: 4px; padding: 0.4rem 0.85rem;
+  font-size: 0.8rem; font-weight: 700; display: inline-flex; align-items: center; gap: 0.35rem;
+}
+.dc-btn-primary:hover { background: #ea6a0d; }
+.dc-btn-primary:disabled { opacity: 0.5; cursor: not-allowed; }
+
+.dc-btn-outline, .dc-btn-danger {
+  display: inline-flex; align-items: center; gap: 0.35rem; font-size: 0.75rem; font-weight: 600;
+  padding: 0.4rem 0.7rem; border-radius: 6px; border: 1px solid #313a4d; background: #171b26; color: #dbe1ee;
+}
+.dc-btn-outline:hover { border-color: #f97316; color: #f97316; }
+.dc-btn-danger { border-color: rgba(239, 68, 68, 0.45); color: #f87171; background: rgba(239, 68, 68, 0.08); }
+.dc-btn-danger:hover { background: rgba(239, 68, 68, 0.16); }
+.dc-btn-outline:disabled, .dc-btn-danger:disabled { opacity: 0.5; cursor: not-allowed; }
+
+/* ── PDU / cooling status strip ── */
+.dc-status-strip {
+  display: flex; align-items: center; gap: 1.25rem; flex-wrap: wrap;
+  padding: 0.5rem 1rem; background: #12151f; border-bottom: 1px solid #232838;
+  font-size: 0.7rem; color: #97a2b8;
+}
+.dc-status-group { display: flex; align-items: center; gap: 0.4rem; flex-wrap: wrap; }
+.dc-status-chip {
+  padding: 0.15rem 0.5rem; border-radius: 999px; font-weight: 600; font-family: 'JetBrains Mono', monospace;
+  border: 1px solid transparent;
+}
+.dc-chip-ok { background: rgba(52, 211, 153, 0.12); color: #34d399; border-color: rgba(52,211,153,.3); }
+.dc-chip-bad { background: rgba(239, 68, 68, 0.14); color: #f87171; border-color: rgba(239,68,68,.35); }
+.dc-status-hint { margin-left: auto; display: flex; align-items: center; gap: 0.3rem; color: #64748b; font-style: italic; }
+
+/* ── Floor viewport — pannable pseudo-3D scene ── */
+.dc-floor-viewport {
+  position: relative; flex: 1; min-height: 0; overflow: hidden;
+  background: radial-gradient(ellipse at 50% 20%, #161a26 0%, #0b0e14 70%);
+  cursor: grab; user-select: none;
+}
+.dc-floor-viewport:active { cursor: grabbing; }
+
+.dc-floor-plane {
+  position: absolute; inset: -20% -20%;
+  background-image:
+    linear-gradient(#1c2131 1px, transparent 1px),
+    linear-gradient(90deg, #1c2131 1px, transparent 1px);
+  background-size: 42px 42px;
+  opacity: 0.55;
+  transform-origin: center;
+  pointer-events: none;
+}
+
+.dc-racks-row {
+  position: relative; height: 100%; display: flex; align-items: flex-end; gap: 1.1rem;
+  padding: 2.5rem 2.5rem 1.5rem; overflow: visible;
+  perspective: 1400px;
+}
+
+.dc-rack {
+  position: relative; flex-shrink: 0; width: 118px; cursor: pointer;
+  transform: perspective(900px) rotateX(10deg);
+  transform-origin: bottom center;
+  transition: transform 0.18s ease, width 0.22s ease;
+}
+.dc-rack:hover { transform: perspective(900px) rotateX(6deg) translateY(-4px); }
+.dc-rack-open { width: 220px; z-index: 5; }
+.dc-rack-open:hover { transform: perspective(900px) rotateX(4deg) translateY(-2px); }
+
+.dc-rack-top {
+  height: 8px; margin: 0 4px; border-radius: 3px 3px 0 0;
+  background: linear-gradient(180deg, #3a4258, #262c3d);
+  box-shadow: 0 -2px 6px rgba(0,0,0,0.35);
+}
+
+.dc-rack-front {
+  background: linear-gradient(180deg, #1a1e2b 0%, #12151f 100%);
+  border: 1px solid #2a3040; border-top: none;
+  border-radius: 0 0 6px 6px;
+  padding: 0.5rem 0.55rem 0.7rem;
+  box-shadow: 0 12px 24px rgba(0,0,0,0.45), inset 0 1px 0 rgba(255,255,255,0.03);
+  min-height: 150px;
+}
+.dc-rack-front.dc-rack-alert { border-color: rgba(239, 68, 68, 0.55); box-shadow: 0 0 0 1px rgba(239,68,68,.25), 0 12px 24px rgba(0,0,0,0.45); }
+
+.dc-rack-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 0.15rem; }
+.dc-rack-id { font-family: 'JetBrains Mono', monospace; font-weight: 700; font-size: 0.78rem; color: #f1f5f9; }
+.dc-rack-led { width: 7px; height: 7px; border-radius: 50%; box-shadow: 0 0 6px currentColor; }
+.dc-led-green { background: #34d399; color: #34d399; }
+.dc-led-red { background: #f87171; color: #f87171; animation: dc-blink 1.1s ease-in-out infinite; }
+.dc-rack-pdu { font-size: 0.6rem; color: #5b6580; margin-bottom: 0.45rem; font-family: 'JetBrains Mono', monospace; }
+
+.dc-rack-mini { display: flex; flex-direction: column; gap: 3px; }
+.dc-mini-slot { height: 5px; border-radius: 2px; background: #2a3142; }
+.dc-mini-on { background: #2d5f4a; }
+.dc-mini-off { background: #3a3126; }
+.dc-mini-fail { background: #5f2d2d; animation: dc-blink 1.1s ease-in-out infinite; }
+.dc-rack-empty { font-size: 0.62rem; color: #4b5468; font-style: italic; padding: 0.4rem 0; }
+
+.dc-rack-uslots { display: flex; flex-direction: column; gap: 4px; max-height: 260px; overflow-y: auto; }
+.dc-server-card {
+  display: flex; align-items: center; gap: 0.4rem; width: 100%; text-align: left;
+  background: #1f2433; border: 1px solid #2c3346; border-radius: 5px; padding: 0.3rem 0.45rem;
+  font-size: 0.68rem; color: #cbd3e3; transition: border-color 0.15s, background 0.15s;
+}
+.dc-server-card:hover { border-color: #f97316; background: #262c3f; }
+.dc-server-card.dc-server-alert { border-color: rgba(239, 68, 68, 0.5); }
+.dc-server-u { font-family: 'JetBrains Mono', monospace; color: #64748b; font-size: 0.6rem; flex-shrink: 0; }
+.dc-server-host { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 600; }
+.dc-server-power { display: inline-flex; align-items: center; gap: 0.15rem; font-size: 0.6rem; flex-shrink: 0; }
+.dc-power-on { color: #34d399; }
+.dc-power-off { color: #64748b; }
+.dc-server-warn { color: #f87171; flex-shrink: 0; }
+
+@keyframes dc-blink { 0%, 100% { opacity: 1; } 50% { opacity: 0.35; } }
+
+/* Replace/repair pulse animation */
+@keyframes dc-flash-pulse {
+  0% { box-shadow: 0 0 0 0 rgba(52, 211, 153, 0.7); background: rgba(52, 211, 153, 0.25); }
+  70% { box-shadow: 0 0 0 10px rgba(52, 211, 153, 0); background: #1f2433; }
+  100% { box-shadow: 0 0 0 0 rgba(52, 211, 153, 0); background: #1f2433; }
+}
+.dc-flash { animation: dc-flash-pulse 0.9s ease-out; }
+
+/* ── Server detail drawer ── */
+.dc-drawer-backdrop {
+  position: fixed; inset: 0; background: rgba(3, 5, 10, 0.55); z-index: 80;
+  display: flex; justify-content: flex-end;
+  backdrop-filter: blur(1px);
+}
+.dc-drawer {
+  width: min(380px, 92vw); height: 100%; background: #12151f; border-left: 1px solid #232838;
+  box-shadow: -12px 0 30px rgba(0,0,0,0.5); overflow-y: auto; animation: dc-drawer-in 0.18s ease-out;
+}
+@keyframes dc-drawer-in { from { transform: translateX(24px); opacity: 0.4; } to { transform: translateX(0); opacity: 1; } }
+
+.dc-drawer-head { display: flex; justify-content: space-between; align-items: flex-start; padding: 1rem 1.1rem; border-bottom: 1px solid #232838; }
+.dc-drawer-title { font-weight: 700; font-size: 0.95rem; color: #f8fafc; }
+.dc-drawer-sub { font-size: 0.7rem; color: #8891a5; margin-top: 0.15rem; }
+.dc-drawer-close { color: #8891a5; padding: 0.25rem; border-radius: 4px; }
+.dc-drawer-close:hover { color: #fff; background: rgba(255,255,255,0.06); }
+
+.dc-drawer-section { padding: 0.9rem 1.1rem; border-bottom: 1px solid #1c2130; }
+.dc-drawer-label { font-size: 0.65rem; text-transform: uppercase; letter-spacing: 0.05em; color: #64748b; font-weight: 700; margin-bottom: 0.55rem; }
+
+.dc-component-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 0.5rem; }
+.dc-component-pill {
+  display: flex; align-items: center; gap: 0.35rem; font-size: 0.72rem; font-weight: 600;
+  padding: 0.4rem 0.55rem; border-radius: 6px; border: 1px solid #262c3d; background: #171b26; color: #cbd3e3;
+}
+.dc-comp-ok { border-color: rgba(52,211,153,.3); }
+.dc-comp-fail { border-color: rgba(239,68,68,.4); background: rgba(239,68,68,0.08); }
+.dc-comp-dot { width: 7px; height: 7px; border-radius: 50%; margin-left: auto; background: #34d399; }
+.dc-comp-fail .dc-comp-dot { background: #f87171; animation: dc-blink 1.1s ease-in-out infinite; }
+
+.dc-action-row { display: flex; flex-wrap: wrap; gap: 0.5rem; }
+.dc-all-healthy { font-size: 0.75rem; color: #34d399; font-weight: 600; }
+.dc-objective-note {
+  margin-top: 0.6rem; display: flex; gap: 0.4rem; align-items: flex-start; font-size: 0.72rem;
+  color: #fbbf24; background: rgba(251, 191, 36, 0.08); border: 1px solid rgba(251,191,36,.3);
+  border-radius: 6px; padding: 0.45rem 0.6rem;
+}

@@ -807,8 +807,12 @@ export default function InterviewRoom() {
           startPracticalLabInline().catch(() => {})
         }
       }
+      // startRound() is async — the original click gesture is gone. Re-prime TTS
+      // immediately before the first spoken line or Chrome stays silent.
+      unlockSpeech()
       if (introText) await speakThenListen(introText, { autoListen: false, voiceId })
       if (firstQ?.content) {
+        unlockSpeech()
         await speakThenListen(firstQ.content, {
           autoListen: !isPracticalMessage(firstQ), voiceId,
         })
@@ -1073,6 +1077,9 @@ export default function InterviewRoom() {
       pauseQuestionMs: sp.pause_question_ms,
       pausePeriodMs: sp.pause_period_ms,
     } : {}
+    // Re-prime before every speak — long thinking delays / awaits drop the
+    // browser's user-gesture unlock and leave speechSynthesis paused.
+    unlockSpeech()
     const { spoken } = await speak(text, voiceId ?? round?.persona_voice_id, speechOpts) || {}
     if (spoken === false && !voiceUnavailableToastRef.current) {
       voiceUnavailableToastRef.current = true

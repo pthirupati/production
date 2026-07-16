@@ -1,0 +1,23 @@
+/* NetApp ONTAP System Manager */
+.na-shell { background: #f2f7f6; color: #0f2b26; }
+.na-sidebar { border-right: 1px solid #0d2b25; }
+.na-sidebar .sim-sidebar-item { color: #a9d6cb; }
+.na-sidebar .sim-sidebar-item:hover { background: rgba(255, 255, 255, 0.06); color: #fff; }
+.na-sidebar .sim-sidebar-active { background: rgba(15, 109, 92, 0.4) !important; color: #fff !important; border-left-color: #2dd4bf !important; }
+
+.na-panel { background: #fff; border: 1px solid #d7e8e4; border-radius: 6px; }
+
+.na-btn-primary {
+  background: #0f6d5c; color: #fff; border-radius: 4px; padding: 0.4rem 0.85rem;
+  font-size: 0.8rem; font-weight: 600; display: inline-flex; align-items: center; gap: 0.35rem;
+}
+.na-btn-primary:hover { background: #0c5a4b; }
+.na-btn-primary:disabled { opacity: 0.5; cursor: not-allowed; }
+
+.na-btn-sm {
+  display: inline-flex; align-items: center; gap: 0.25rem; font-size: 0.68rem; font-weight: 600;
+  padding: 0.25rem 0.5rem; border-radius: 4px; background: #0f6d5c; color: #fff;
+}
+.na-btn-sm:hover { background: #0c5a4b; }
+.na-btn-sm.na-btn-outline { background: transparent; color: #0f6d5c; border: 1px solid #0f6d5c; }
+.na-btn-sm.na-btn-outline:hover { background: rgba(15, 109, 92, 0.08); }

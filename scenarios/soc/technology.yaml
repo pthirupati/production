@@ -1,0 +1,17 @@
+name: SOC / SIEM Analyst
+slug: soc
+description: >-
+  Triage real security incidents through an authentic SOC/SIEM console —
+  alert queue with severity badges, incident escalation, full-text log
+  search, response playbooks, and monitored assets. Acknowledge a critical
+  alert, escalate it into a tracked incident, run a containment playbook,
+  quarantine a compromised host from the network, block an attacker's source
+  IP at the firewall, and close the incident out. Mirrors the Tier-1/Tier-2
+  SOC analyst triage loop: detect, acknowledge, investigate, contain,
+  eradicate, and close — under the same time pressure as a live shift.
+icon: shield
+color: red
+order: 43
+price: 499
+is_active: true
+coming_soon: false

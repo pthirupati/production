@@ -216,6 +216,25 @@ _EC2_TYPE_HW = {
 }
 
 
+def _seed_hostname_for_persona(engine, slug: str, raw_type: str) -> None:
+    """Light-touch hostname seed for personas with no dedicated seed function.
+
+    Best-effort: gives the AWX / monitoring lab terminal a hostname matching
+    the console it is paired with (control-node / monitoring-node style)
+    instead of the generic rhel-sim default, without changing CPU/RAM/IP.
+    """
+    low = (slug or "").lower()
+    try:
+        if "awx" in low or "tower" in low or raw_type == "ansible-awx":
+            engine.shell.state.set_hostname("ansible-control")
+        elif raw_type in ("monitoring", "grafana", "prometheus") or low.startswith(
+            ("monitoring-", "grafana-", "prometheus-", "promql-", "alertmanager-", "loki-")
+        ):
+            engine.shell.state.set_hostname("monitoring-node")
+    except Exception:
+        logger.exception("Hostname seed skipped for slug %s", slug)
+
+
 def _is_aws_lab(slug: str, raw_type: str) -> bool:
     low = (slug or "").lower()
     return (raw_type or "").lower() == "aws" or low.startswith(
@@ -404,6 +423,8 @@ class SimulationProvisioner:
             from apps.vmware_sim.aws_engine import _ensure as aws_ensure
             aws_ensure(str(lab_session.id), slug)
             _seed_state_from_aws_ec2(engine, lab_session.id, slug)
+        else:
+            _seed_hostname_for_persona(engine, slug, raw_type)
 
         if slug.lower().startswith("ds-dashboard-") or raw_type == "data-dashboard":
             from apps.vmware_sim.datascience_engine import _ensure_session as _ensure_ds_session
@@ -699,6 +720,97 @@ class SimulationProvisioner:
                 return validate_awx_lab(str(lab_session.id), slug)
             except LabSession.DoesNotExist:
                 return False, "AWX simulation session not found"
+        # Commvault CommCell (backup/restore). Raw simulation_type "commvault"
+        # may normalize to "generic"; gate on that OR a commvault-* slug.
+        _raw_cv_type = sim_type
+        if not _raw_cv_type or _raw_cv_type == "generic":
+            from apps.labs.models import LabSession
+            try:
+                _cv_session = LabSession.objects.select_related("scenario").get(container_id=resource_id)
+                _raw_cv_type = (getattr(_cv_session.scenario, "simulation_type", "") or "")
+            except LabSession.DoesNotExist:
+                _raw_cv_type = ""
+        if _raw_cv_type == "commvault" or low_slug.startswith(("commvault-", "cv-")):
+            from apps.labs.models import LabSession
+            from apps.vmware_sim.commvault_engine import validate_commvault_lab, _ensure as cv_ensure
+            try:
+                lab_session = LabSession.objects.get(container_id=resource_id)
+                cv_ensure(str(lab_session.id), slug)
+                return validate_commvault_lab(str(lab_session.id), slug)
+            except LabSession.DoesNotExist:
+                return False, "Commvault simulation session not found"
+        # NetApp ONTAP System Manager.
+        _raw_na_type = sim_type
+        if not _raw_na_type or _raw_na_type == "generic":
+            from apps.labs.models import LabSession
+            try:
+                _na_session = LabSession.objects.select_related("scenario").get(container_id=resource_id)
+                _raw_na_type = (getattr(_na_session.scenario, "simulation_type", "") or "")
+            except LabSession.DoesNotExist:
+                _raw_na_type = ""
+        if _raw_na_type == "netapp" or low_slug.startswith(("netapp-", "ontap-")):
+            from apps.labs.models import LabSession
+            from apps.vmware_sim.netapp_engine import validate_netapp_lab, _ensure as na_ensure
+            try:
+                lab_session = LabSession.objects.get(container_id=resource_id)
+                na_ensure(str(lab_session.id), slug)
+                return validate_netapp_lab(str(lab_session.id), slug)
+            except LabSession.DoesNotExist:
+                return False, "NetApp simulation session not found"
+        # Dell EMC Unisphere / PowerMax.
+        _raw_de_type = sim_type
+        if not _raw_de_type or _raw_de_type == "generic":
+            from apps.labs.models import LabSession
+            try:
+                _de_session = LabSession.objects.select_related("scenario").get(container_id=resource_id)
+                _raw_de_type = (getattr(_de_session.scenario, "simulation_type", "") or "")
+            except LabSession.DoesNotExist:
+                _raw_de_type = ""
+        if _raw_de_type == "dellemc" or low_slug.startswith(("dellemc-", "powermax-")):
+            from apps.labs.models import LabSession
+            from apps.vmware_sim.dellemc_engine import validate_dellemc_lab, _ensure as de_ensure
+            try:
+                lab_session = LabSession.objects.get(container_id=resource_id)
+                de_ensure(str(lab_session.id), slug)
+                return validate_dellemc_lab(str(lab_session.id), slug)
+            except LabSession.DoesNotExist:
+                return False, "Dell EMC simulation session not found"
+        # Physical datacenter (DCIM) break/fix.
+        _raw_dc_type = sim_type
+        if not _raw_dc_type or _raw_dc_type == "generic":
+            from apps.labs.models import LabSession
+            try:
+                _dc_session = LabSession.objects.select_related("scenario").get(container_id=resource_id)
+                _raw_dc_type = (getattr(_dc_session.scenario, "simulation_type", "") or "")
+            except LabSession.DoesNotExist:
+                _raw_dc_type = ""
+        if _raw_dc_type == "datacenter" or low_slug.startswith(("datacenter-", "dc-")):
+            from apps.labs.models import LabSession
+            from apps.vmware_sim.datacenter_engine import validate_datacenter_lab, _ensure as dc_ensure
+            try:
+                lab_session = LabSession.objects.get(container_id=resource_id)
+                dc_ensure(str(lab_session.id), slug)
+                return validate_datacenter_lab(str(lab_session.id), slug)
+            except LabSession.DoesNotExist:
+                return False, "Datacenter simulation session not found"
+        # SOC / SIEM (cybersecurity) triage.
+        _raw_soc_type = sim_type
+        if not _raw_soc_type or _raw_soc_type == "generic":
+            from apps.labs.models import LabSession
+            try:
+                _soc_session = LabSession.objects.select_related("scenario").get(container_id=resource_id)
+                _raw_soc_type = (getattr(_soc_session.scenario, "simulation_type", "") or "")
+            except LabSession.DoesNotExist:
+                _raw_soc_type = ""
+        if _raw_soc_type == "soc" or low_slug.startswith("soc-"):
+            from apps.labs.models import LabSession
+            from apps.vmware_sim.soc_engine import validate_soc_lab, _ensure as soc_ensure
+            try:
+                lab_session = LabSession.objects.get(container_id=resource_id)
+                soc_ensure(str(lab_session.id), slug)
+                return validate_soc_lab(str(lab_session.id), slug)
+            except LabSession.DoesNotExist:
+                return False, "SOC simulation session not found"
         # Monitoring (Grafana / Prometheus observability). Legacy simulation_type
         # "monitoring"/"loki"/"alertmanager"/"promql" normalize to grafana/prometheus;
         # gate on the normalized persona, the RAW scenario type, or the slug. The
@@ -852,4 +964,17 @@ class SimulationProvisioner:
             ae.clear_session(str(session.id))
         except Exception:  # noqa: BLE001
             pass
+        try:
+            from apps.labs.provisioner.simulation.aws_bridge import clear as clear_aws_bridge
+
+            clear_aws_bridge(str(session.id))
+        except Exception:  # noqa: BLE001
+            pass
+        for engine_module in ("commvault_engine", "netapp_engine", "dellemc_engine",
+                               "datacenter_engine", "soc_engine"):
+            try:
+                mod = __import__(f"apps.vmware_sim.{engine_module}", fromlist=["drop_session"])
+                mod.drop_session(str(session.id))
+            except Exception:  # noqa: BLE001
+                pass
         drop_sim_session(str(session.id))

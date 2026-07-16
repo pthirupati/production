@@ -38,6 +38,14 @@ export default function TranscriptPlayer({ data }) {
   // Walk the transcript line by line, pacing roughly to content length.
   const playFrom = (start) => {
     if (timerRef.current) clearTimeout(timerRef.current)
+    // Same autoplay unlock as the live interview room — first Play click is the gesture.
+    try {
+      if (window.speechSynthesis?.paused) window.speechSynthesis.resume()
+      const u = new SpeechSynthesisUtterance('\u200B')
+      u.volume = 0.01
+      u.rate = 2
+      window.speechSynthesis?.speak(u)
+    } catch { /* ignore */ }
     const step = (i) => {
       if (i >= transcript.length) { stop(); return }
       setPlayingIdx(i)
@@ -47,8 +55,10 @@ export default function TranscriptPlayer({ data }) {
       // Optional free re-speak of interviewer lines.
       try {
         if (line.role === 'interviewer' && window.speechSynthesis) {
+          window.speechSynthesis.resume?.()
           const u = new SpeechSynthesisUtterance((line.content || '').slice(0, 240))
           u.rate = 1.05
+          u.volume = 1
           window.speechSynthesis.cancel()
           window.speechSynthesis.speak(u)
         }

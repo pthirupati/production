@@ -156,6 +156,11 @@ class Scenario(models.Model):
         ("terraform", "Terraform / AWS CLI Simulation"),
         ("python", "Python Simulation"),
         ("java", "Java Development Simulation"),
+        ("commvault", "Commvault Backup Simulation"),
+        ("netapp", "NetApp ONTAP Storage Simulation"),
+        ("dellemc", "Dell EMC Unisphere / PowerMax Simulation"),
+        ("datacenter", "Physical Datacenter (DCIM) Simulation"),
+        ("soc", "SOC / SIEM Cybersecurity Simulation"),
     ]
 
     requires_companion_hosts = models.BooleanField(

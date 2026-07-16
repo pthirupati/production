@@ -1,0 +1,17 @@
+name: Dell EMC Unisphere / PowerMax
+slug: dellemc
+description: >-
+  Provision enterprise block storage on a Dell EMC PowerMax array through an
+  authentic Unisphere simulator — storage groups, volumes, hosts, front-end
+  ports/port groups, and masking views. Provision an orphaned volume into a
+  storage group, register a new host with its FC initiator, build a new
+  storage group for an application team, and wire up a masking view that
+  finally lets a host see its LUN. Mirrors the real PowerMax provisioning
+  workflow, where a volume is invisible to its intended server until the
+  storage group, host, and port group are correctly masked together.
+icon: server
+color: blue
+order: 41
+price: 499
+is_active: true
+coming_soon: false

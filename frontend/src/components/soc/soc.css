@@ -1,0 +1,77 @@
+/* SOC / SIEM console */
+.soc-shell { background: #0a0c12; color: #dbe1ee; }
+.soc-sidebar { border-right: 1px solid #1c2130; }
+.soc-sidebar .sim-sidebar-item { color: #97a2b8; }
+.soc-sidebar .sim-sidebar-item:hover { background: rgba(255, 255, 255, 0.05); color: #fff; }
+.soc-sidebar .sim-sidebar-active { background: rgba(239, 68, 68, 0.16) !important; color: #fff !important; border-left-color: #ef4444 !important; }
+
+.soc-h { font-size: 1.05rem; font-weight: 700; color: #f1f5f9; margin-bottom: 0.5rem; }
+.soc-panel { background: #12141c; border: 1px solid #232838; border-radius: 8px; }
+
+.soc-btn-primary {
+  background: #ef4444; color: #fff; border-radius: 5px; padding: 0.4rem 0.8rem;
+  font-size: 0.78rem; font-weight: 600; display: inline-flex; align-items: center; gap: 0.35rem;
+}
+.soc-btn-primary:hover { background: #dc2626; }
+.soc-btn-primary:disabled { opacity: 0.5; cursor: not-allowed; }
+
+.soc-btn-outline {
+  display: inline-flex; align-items: center; gap: 0.35rem; font-size: 0.72rem; font-weight: 600;
+  padding: 0.4rem 0.7rem; border-radius: 6px; border: 1px solid #2b3142; background: #171a24; color: #dbe1ee;
+}
+.soc-btn-outline:hover { border-color: #ef4444; color: #fca5a5; }
+.soc-btn-outline:disabled { opacity: 0.5; cursor: not-allowed; }
+
+.soc-btn-danger {
+  display: inline-flex; align-items: center; gap: 0.35rem; font-size: 0.72rem; font-weight: 700;
+  padding: 0.4rem 0.7rem; border-radius: 6px; border: 1px solid rgba(52,211,153,.4);
+  background: rgba(52,211,153,.12); color: #34d399;
+}
+.soc-btn-danger:hover { background: rgba(52,211,153,.2); }
+.soc-btn-danger:disabled { opacity: 0.5; cursor: not-allowed; }
+
+.soc-input {
+  background: #12141c; border: 1px solid #2b3142; border-radius: 6px; padding: 0.45rem 0.7rem;
+  color: #dbe1ee; font-size: 0.78rem;
+}
+.soc-input:focus { outline: none; border-color: #ef4444; }
+
+/* Severity badges */
+.soc-sev-badge {
+  display: inline-flex; align-items: center; padding: 0.15rem 0.5rem; border-radius: 4px;
+  font-size: 0.65rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.03em;
+  border: 1px solid transparent;
+}
+.soc-sev-critical { background: rgba(239, 68, 68, 0.18); color: #fca5a5; border-color: rgba(239,68,68,.4); animation: soc-crit-pulse 1.6s ease-in-out infinite; }
+.soc-sev-high { background: rgba(249, 115, 22, 0.16); color: #fdba74; border-color: rgba(249,115,22,.4); }
+.soc-sev-medium { background: rgba(234, 179, 8, 0.14); color: #fde047; border-color: rgba(234,179,8,.35); }
+.soc-sev-low { background: rgba(100, 116, 139, 0.16); color: #94a3b8; border-color: rgba(100,116,139,.3); }
+@keyframes soc-crit-pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.65; } }
+
+/* Alerts split view */
+.soc-split { display: grid; grid-template-columns: 1fr; gap: 1rem; }
+@media (min-width: 1024px) { .soc-split { grid-template-columns: 1.4fr 1fr; } }
+.soc-detail-col { background: #12141c; border: 1px solid #232838; border-radius: 8px; padding: 1rem; align-self: start; }
+.soc-detail-head { display: flex; align-items: center; gap: 0.5rem; margin-bottom: 0.75rem; }
+.soc-detail-title { font-weight: 700; color: #f1f5f9; font-size: 0.92rem; }
+.soc-detail-meta { display: flex; flex-direction: column; gap: 0.35rem; font-size: 0.78rem; color: #cbd3e3; margin-bottom: 0.9rem; }
+.soc-meta-k { color: #64748b; margin-right: 0.4rem; }
+.soc-action-row { display: flex; flex-wrap: wrap; gap: 0.5rem; }
+.soc-incident-note { margin-top: 0.75rem; font-size: 0.72rem; color: #94a3b8; }
+
+/* Log search */
+.soc-log-panel {
+  background: #090a0f; border: 1px solid #1c2130; border-radius: 8px; max-height: 360px; overflow-y: auto;
+  font-family: 'JetBrains Mono', monospace; font-size: 0.68rem;
+}
+.soc-log-row { display: flex; gap: 0.6rem; padding: 0.35rem 0.7rem; border-bottom: 1px solid #171a24; }
+.soc-log-row:hover { background: #12141c; }
+.soc-log-time { color: #5b6580; flex-shrink: 0; }
+.soc-log-source { color: #60a5fa; flex-shrink: 0; width: 60px; }
+.soc-log-host { color: #34d399; flex-shrink: 0; width: 110px; overflow: hidden; text-overflow: ellipsis; }
+.soc-log-msg { color: #cbd3e3; }
+
+.soc-ip-chip {
+  font-size: 0.68rem; padding: 0.2rem 0.55rem; border-radius: 999px;
+  background: rgba(239,68,68,.12); color: #fca5a5; border: 1px solid rgba(239,68,68,.3);
+}

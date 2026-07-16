@@ -217,3 +217,25 @@ class TeamReplyDeliveryTests(TestCase):
         self.session.refresh_from_db()
         self.assertFalse(bool(self.session.simulation_snapshot))
         shell_mod._SIM_SESSIONS.clear()
+
+
+class CoachHelpRequestTests(SimpleTestCase):
+    def test_help_phrases_detected(self):
+        self.assertTrue(team_bots.is_help_request("I'm stuck — need a hint"))
+        self.assertTrue(team_bots.is_help_request("where do I start?"))
+        self.assertFalse(team_bots.is_help_request("@backup team please take backup"))
+
+    def test_coach_reply_includes_collaboration(self):
+        class FakeTicket:
+            description = (
+                "## Incident\n\n### Acceptance criteria (definition of done)\n"
+                "- Quarantine the host\n- Close the alert\n\n"
+                "### Lab tools for this scenario\n- **Lab terminal**\n- **SOC console**\n"
+            )
+            scenario = None
+
+        author, msg = team_bots.build_coach_reply(FakeTicket())
+        self.assertEqual(author, "Change Management Bot")
+        self.assertIn("Acceptance criteria", msg)
+        self.assertIn("@security team", msg)
+        self.assertIn("SOC console", msg)

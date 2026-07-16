@@ -1428,10 +1428,44 @@ export default function LabRunner() {
     scenario?.simulation_type === 'baremetal'
     && /maas|lxd|lxc|kvm|virsh|ipmi|pxe/.test((scenario?.slug || '').toLowerCase())
   )
+  // Enterprise storage / DC / SOC simulators — each is a dedicated technology
+  // (see scenarios/<tech>/technology.yaml) with a matching backend engine under
+  // apps/vmware_sim/. Gate on simulation_type OR technology slug OR slug prefix,
+  // mirroring every other dedicated-tech sim detection above.
+  const isCommvaultLab = !isCrossTech && (
+    scenario?.simulation_type === 'commvault'
+    || scenario?.technology?.slug === 'commvault'
+    || (scenario?.slug || '').startsWith('cv-')
+    || (scenario?.slug || '').startsWith('commvault-')
+  )
+  const isNetappLab = !isCrossTech && (
+    scenario?.simulation_type === 'netapp'
+    || scenario?.technology?.slug === 'netapp'
+    || (scenario?.slug || '').startsWith('netapp-')
+    || (scenario?.slug || '').startsWith('ontap-')
+  )
+  const isDellemcLab = !isCrossTech && (
+    scenario?.simulation_type === 'dellemc'
+    || scenario?.technology?.slug === 'dellemc'
+    || (scenario?.slug || '').startsWith('dellemc-')
+    || (scenario?.slug || '').startsWith('powermax-')
+  )
+  const isDatacenterLab = !isCrossTech && (
+    scenario?.simulation_type === 'datacenter'
+    || scenario?.technology?.slug === 'datacenter'
+    || (scenario?.slug || '').startsWith('datacenter-')
+    || (scenario?.slug || '').startsWith('dc-')
+  )
+  const isSocLab = !isCrossTech && (
+    scenario?.simulation_type === 'soc'
+    || scenario?.technology?.slug === 'soc'
+    || (scenario?.slug || '').startsWith('soc-')
+  )
   const isSimPrimaryLab = !isCrossTech && (
     isAwsLab || isDevOpsPipelineLab || isTerraformSimLab || isAwxLab || isMonitoringLab || isWindowsGuiLab
     || isPeopleSoftLab || isBaremetalGuiLab || isDataDashboardLab || isAgentLab
     || isNmapLab || isWiresharkLab
+    || isCommvaultLab || isNetappLab || isDellemcLab || isDatacenterLab || isSocLab
   )
   const simOverlayOpen = !isSimPrimaryLab && (
     showMonitoringSim || showNmapSim || showWiresharkSim
@@ -1450,6 +1484,11 @@ export default function LabRunner() {
     : isAgentLab ? 'agent'
     : isNmapLab ? 'nmap'
     : isWiresharkLab ? 'wireshark'
+    : isCommvaultLab ? 'commvault'
+    : isNetappLab ? 'netapp'
+    : isDellemcLab ? 'dellemc'
+    : isDatacenterLab ? 'datacenter'
+    : isSocLab ? 'soc'
     : null
   const solved = validationResult?.passed
   const expired = validationResult?.expired
@@ -1495,7 +1534,7 @@ export default function LabRunner() {
   const scenarioSlug = scenario?.slug || ''
   const explicitVmwareScenario = scenario?.vmware_link === true || /vmware|vcenter|vsphere/i.test(scenarioSlug)
   const vmwareServerHref = `/vmware/${sessionId}?scenario=${scenario?.slug || ''}`
-  const showSimVmwareLink = isAwxLab || isMonitoringLab || isWindowsGuiLab || (isTerraformSimLab && explicitVmwareScenario)
+  const showSimVmwareLink = isAwxLab || isMonitoringLab || isWindowsGuiLab || isCommvaultLab || (isTerraformSimLab && explicitVmwareScenario)
   const showTerminalVmwareLink = isVmBackedTerminalLab || (!isCrossTech && !isVmwareLab && explicitVmwareScenario)
   const showCrossTechVmwareLink = isCrossTech
   // Ansible terminal labs run playbooks from the shell, so the terminal stays

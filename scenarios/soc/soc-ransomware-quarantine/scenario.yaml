@@ -1,0 +1,143 @@
+title: "SOC Tier-1: C2 Beacon on ws-finance-07 — Contain Before It Spreads"
+slug: soc-ransomware-quarantine
+technology: soc
+category: Fix
+difficulty: hard
+lab_mode: simulation
+simulation_type: soc
+infrastructure_type: docker
+time_limit: 900
+max_score: 100
+is_free: true
+jira_priority: Critical
+dual_terminal: false
+description: >-
+  CONTEXT: Ten minutes into your shift, the SIEM fires a critical alert (AL-1003): an outbound
+  connection from ws-finance-07 to a known command-and-control domain. Two minutes earlier, a
+  medium-severity EDR alert already logged suspicious PowerShell — encoded command, spawned from
+  winword.exe — on the same host. This is the classic macro-malware-to-C2 chain, and finance's
+  quarter-end file share sits on the same subnet as ws-finance-07.
+
+
+  ENVIRONMENT: You are working the alert queue in the SOC/SIEM console. The critical alert AL-1003
+  ("Outbound connection to known C2 domain") is open and unacknowledged against asset ws-finance-07,
+  which is flagged "critical" risk. The Malware Containment playbook (pb-malware-contain: isolate
+  host, collect forensics, remove artifact) already exists and has never been run this session.
+
+
+  SYMPTOM / STARTING STATE: AL-1003 sits in the queue with status "new" — nobody has acknowledged it
+  yet, ws-finance-07 is still fully connected to the network, and the attacker's C2 channel (source IP
+  203.0.113.55) is still open. Every minute this stays open is a minute the attacker can pull more data
+  out or push a second-stage payload in.
+
+
+  IMPACT: An active C2 beacon from a finance workstation is a live breach in progress, not a
+  theoretical risk. If this host isn't isolated quickly, the incident could escalate to lateral
+  movement across finance's shared drives during quarter-end close — the worst possible timing for a
+  ransomware-style event.
+
+
+  OBJECTIVE: Acknowledge AL-1003, escalate it into a tracked incident, run the Malware Containment
+  playbook, quarantine ws-finance-07 from the network, and close the incident once containment is
+  confirmed.
+initial_state: >-
+  SOC console with a new, unacknowledged critical alert (AL-1003) reporting a C2 beacon from
+  ws-finance-07, which remains connected to the network with no containment actions taken yet.
+objectives:
+- Acknowledge critical alert AL-1003
+- Escalate AL-1003 into a tracked incident
+- Run the Malware Containment playbook (pb-malware-contain)
+- Quarantine ws-finance-07 from the network
+- Close the incident once containment is confirmed
+hints:
+- order: 1
+  cost: 0
+  content: >-
+    ORIENT — what to observe and why: Do not act yet. Open the Alerts queue, click AL-1003, and read
+    its severity (critical), asset (ws-finance-07), and source IP (203.0.113.55). Cross-reference the log
+    search panel for that host to see the PowerShell-to-C2 chain that led here before you start the
+    response.
+- order: 2
+  cost: 10
+  content: >-
+    APPROACH — the troubleshooting method: A live C2 alert follows a fixed Tier-1/Tier-2 triage order —
+    acknowledge (claim it so nobody double-works it), escalate (create a tracked incident record),
+    contain (playbook + quarantine the host), then close. Skipping straight to quarantine without
+    acknowledging/escalating leaves no incident record for the postmortem.
+- order: 3
+  cost: 25
+  content: >-
+    WHICH TOOL — the diagnostic command(s): 1. Use "Acknowledge" on AL-1003 to claim it. 2. Use
+    "Escalate" to open a formal incident (you'll get an INC-##### ID). 3. In the Playbooks panel, run
+    pb-malware-contain against ws-finance-07 to execute the containment steps (isolate host, collect
+    forensics, remove artifact).
+- order: 4
+  cost: 40
+  content: >-
+    NARROW DOWN — isolate the subsystem: Playbook execution alone doesn't disconnect the host in this
+    console — you still need the explicit "Quarantine ws-finance-07" action from the alert detail panel
+    to actually pull the asset off the network. Confirm the asset's network column flips to
+    "Quarantined" afterward.
+- order: 5
+  cost: 60
+  content: >-
+    NEAR-SOLUTION — the fix shape + verify (you still apply it): With the alert acknowledged, escalated,
+    playbook run, and ws-finance-07 quarantined, use "Close" on the incident/alert to finish the
+    response. WHY: the grader checks that AL-1003 is closed and ws-finance-07 is quarantined in the
+    simulated SOC state — quarantining the host without closing out the alert leaves the incident open.
+summary: Run the full Tier-1 malware-containment loop on a live C2 beacon — acknowledge, escalate,
+  contain, quarantine, and close — before it can spread across the finance subnet.
+estimated_minutes: 15
+xp_reward: 130
+prerequisites:
+- Basic SOC/SIEM triage concepts (alert severity, escalation, containment)
+tags:
+- fix
+- hands-on
+- soc
+- siem
+- security
+- incident-response
+linked_tutorial: soc-fundamentals
+what_you_will_learn:
+- Triaging a critical SIEM alert against real supporting log evidence
+- Escalating an alert into a formally tracked incident
+- Running a response playbook and quarantining a compromised host
+- Closing out an incident once containment is verified
+environment:
+  nodes:
+  - role: primary
+    os: FixitLab SOC / SIEM console simulation
+    hostname: lab-primary
+    ip: 127.0.0.1
+    specs: local offline simulation
+  pre_installed:
+  - soc-siem-console
+  credentials:
+  - user: analyst
+    password: lab123
+tasks:
+- id: task_1
+  title: Contain the C2 beacon on ws-finance-07
+  description: >-
+    Acknowledge and escalate AL-1003, run the malware containment playbook, quarantine ws-finance-07,
+    and close the incident.
+  background: >-
+    This lab teaches the Tier-1/Tier-2 SOC triage loop end to end: detect, acknowledge, escalate,
+    contain, and close — under the same pressure as a live shift.
+  validation:
+    type: custom_script
+    script: check.sh
+    error_message: >-
+      Validation did not pass. Quarantine ws-finance-07 and close out AL-1003 / its incident.
+solution:
+  summary: Acknowledge AL-1003, escalate to an incident, run pb-malware-contain, quarantine
+    ws-finance-07, then close the incident.
+  files_changed: []
+  commands_run:
+  - "SOC console: Alerts -> AL-1003 -> Acknowledge"
+  - "SOC console: AL-1003 -> Escalate"
+  - "SOC console: Playbooks -> Run pb-malware-contain"
+  - "SOC console: AL-1003 -> Quarantine ws-finance-07"
+  - "SOC console: AL-1003 -> Close"
+  reference_docs: soc-fundamentals

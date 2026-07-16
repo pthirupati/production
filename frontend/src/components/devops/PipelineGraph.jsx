@@ -148,7 +148,10 @@ export default function PipelineGraph({
       <div className="relative flex gap-8 min-w-max" style={{ zIndex: 1 }}>
         {columns.map((col) => (
           <div key={col.id} className="flex flex-col gap-3 min-w-[176px]">
-            <div className="cicd-graph-stage-title">{col.name}</div>
+            <div className="cicd-graph-stage-title">
+              {col.name}
+              <span className="cicd-graph-stage-count">{col.jobs.length} job{col.jobs.length > 1 ? 's' : ''}</span>
+            </div>
             {col.jobs.map((job) => {
               const st = statusOf(job.id)
               const Icon = jobIcon(job)

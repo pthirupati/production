@@ -1,0 +1,17 @@
+name: Physical Data Center (DCIM)
+slug: datacenter
+description: >-
+  Walk a physical data center floor as a field technician through an
+  interactive rack-row simulator — pan across racks, expand a rack to see its
+  servers by U position, and open a component-health drawer for NIC, disk,
+  motherboard, CPU, GPU, and power supply. Replace a failed power supply,
+  reseat a loose network cable, swap a dead disk or GPU, and power-cycle a
+  server after hands-on repair — with PDU load and CRAC cooling telemetry
+  visible the whole time. Mirrors real remote-hands break/fix work: no SSH,
+  no GUI console — just physical diagnosis and component replacement.
+icon: server
+color: orange
+order: 42
+price: 499
+is_active: true
+coming_soon: false

@@ -46,6 +46,21 @@ from .baremetal_engine import get_state as baremetal_get_state
 from .aws_engine import apply_action as aws_apply_action
 from .aws_engine import drop_session as aws_drop_session
 from .aws_engine import get_state as aws_get_state
+from .commvault_engine import apply_action as commvault_apply_action
+from .commvault_engine import drop_session as commvault_drop_session
+from .commvault_engine import get_state as commvault_get_state
+from .netapp_engine import apply_action as netapp_apply_action
+from .netapp_engine import drop_session as netapp_drop_session
+from .netapp_engine import get_state as netapp_get_state
+from .dellemc_engine import apply_action as dellemc_apply_action
+from .dellemc_engine import drop_session as dellemc_drop_session
+from .dellemc_engine import get_state as dellemc_get_state
+from .datacenter_engine import apply_action as datacenter_apply_action
+from .datacenter_engine import drop_session as datacenter_drop_session
+from .datacenter_engine import get_state as datacenter_get_state
+from .soc_engine import apply_action as soc_apply_action
+from .soc_engine import drop_session as soc_drop_session
+from .soc_engine import get_state as soc_get_state
 
 
 def _demo_session_id(user) -> str:
@@ -695,9 +710,50 @@ class AwsSimActionView(APIView):
         payload = request.data.get("payload") or {}
         slug = session.scenario.slug if session.scenario_id else ""
         aws_get_state(session_id, slug)
+
+        # Bridge actions: the frontend AWS console can't reach the Linux lab
+        # terminal directly, so these variants update aws_engine state AND
+        # publish the intended end-state to the shared AWS/Linux bridge (see
+        # apps.labs.provisioner.simulation.aws_bridge) for the terminal to reveal.
+        if action == "bridge_attach_volume":
+            return self._bridge_attach_volume(session_id, payload, slug)
+        if action == "bridge_power":
+            return self._bridge_power(session_id, payload, slug)
+
         result = aws_apply_action(session_id, action, payload)
         if not result.get("ok"):
             return Response(result, status=400)
+        return Response({**result, "state": aws_get_state(session_id, slug)})
+
+    def _bridge_attach_volume(self, session_id, payload, slug):
+        from apps.labs.provisioner.simulation import aws_bridge
+
+        result = aws_apply_action(session_id, "attach_volume", payload)
+        if not result.get("ok"):
+            return Response(result, status=400)
+        try:
+            aws_bridge.record_volume_attach(
+                str(session_id),
+                result.get("volume_id") or payload.get("volume_id") or "",
+                size_gb=int(payload.get("size_gb") or 20),
+                device=result.get("device") or payload.get("device"),
+                instance_id=payload.get("instance_id"),
+            )
+        except Exception:
+            pass
+        return Response({**result, "state": aws_get_state(session_id, slug)})
+
+    def _bridge_power(self, session_id, payload, slug):
+        from apps.labs.provisioner.simulation import aws_bridge
+
+        op = payload.get("op") or payload.get("action") or "start"
+        result = aws_apply_action(session_id, "instance_action", {**payload, "op": op})
+        if not result.get("ok"):
+            return Response(result, status=400)
+        try:
+            aws_bridge.record_instance_power(str(session_id), op)
+        except Exception:
+            pass
         return Response({**result, "state": aws_get_state(session_id, slug)})
 
 
@@ -708,4 +764,199 @@ class AwsSimReleaseView(APIView):
         if not LabSession.objects.filter(pk=session_id, user=request.user).exists():
             return Response({"error": "Session not found"}, status=404)
         aws_drop_session(session_id)
+        return Response({"released": True})
+
+
+# ── Commvault CommCell simulator ──────────────────────────────────────────────
+class CommvaultSimStateView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request, session_id):
+        session = LabSession.objects.select_related("scenario").filter(pk=session_id, user=request.user).first()
+        if not session:
+            return Response({"error": "Session not found"}, status=404)
+        slug = session.scenario.slug if session.scenario_id else (request.query_params.get("scenario", "") or "")
+        return Response(commvault_get_state(session_id, slug))
+
+
+class CommvaultSimActionView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request, session_id):
+        session = LabSession.objects.filter(pk=session_id, user=request.user, status="RUNNING").first()
+        if not session:
+            return Response({"error": "Lab session not running"}, status=400)
+        action = request.data.get("action", "")
+        payload = request.data.get("payload") or {}
+        slug = session.scenario.slug if session.scenario_id else ""
+        commvault_get_state(session_id, slug)
+        result = commvault_apply_action(session_id, action, payload)
+        if not result.get("ok"):
+            return Response(result, status=400)
+        return Response({**result, "state": commvault_get_state(session_id, slug)})
+
+
+class CommvaultSimReleaseView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request, session_id):
+        if not LabSession.objects.filter(pk=session_id, user=request.user).exists():
+            return Response({"error": "Session not found"}, status=404)
+        commvault_drop_session(session_id)
+        return Response({"released": True})
+
+
+# ── NetApp ONTAP System Manager simulator ─────────────────────────────────────
+class NetappSimStateView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request, session_id):
+        session = LabSession.objects.select_related("scenario").filter(pk=session_id, user=request.user).first()
+        if not session:
+            return Response({"error": "Session not found"}, status=404)
+        slug = session.scenario.slug if session.scenario_id else (request.query_params.get("scenario", "") or "")
+        return Response(netapp_get_state(session_id, slug))
+
+
+class NetappSimActionView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request, session_id):
+        session = LabSession.objects.filter(pk=session_id, user=request.user, status="RUNNING").first()
+        if not session:
+            return Response({"error": "Lab session not running"}, status=400)
+        action = request.data.get("action", "")
+        payload = request.data.get("payload") or {}
+        slug = session.scenario.slug if session.scenario_id else ""
+        netapp_get_state(session_id, slug)
+        result = netapp_apply_action(session_id, action, payload)
+        if not result.get("ok"):
+            return Response(result, status=400)
+        return Response({**result, "state": netapp_get_state(session_id, slug)})
+
+
+class NetappSimReleaseView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request, session_id):
+        if not LabSession.objects.filter(pk=session_id, user=request.user).exists():
+            return Response({"error": "Session not found"}, status=404)
+        netapp_drop_session(session_id)
+        return Response({"released": True})
+
+
+# ── Dell EMC Unisphere / PowerMax simulator ───────────────────────────────────
+class DellemcSimStateView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request, session_id):
+        session = LabSession.objects.select_related("scenario").filter(pk=session_id, user=request.user).first()
+        if not session:
+            return Response({"error": "Session not found"}, status=404)
+        slug = session.scenario.slug if session.scenario_id else (request.query_params.get("scenario", "") or "")
+        return Response(dellemc_get_state(session_id, slug))
+
+
+class DellemcSimActionView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request, session_id):
+        session = LabSession.objects.filter(pk=session_id, user=request.user, status="RUNNING").first()
+        if not session:
+            return Response({"error": "Lab session not running"}, status=400)
+        action = request.data.get("action", "")
+        payload = request.data.get("payload") or {}
+        slug = session.scenario.slug if session.scenario_id else ""
+        dellemc_get_state(session_id, slug)
+        result = dellemc_apply_action(session_id, action, payload)
+        if not result.get("ok"):
+            return Response(result, status=400)
+        return Response({**result, "state": dellemc_get_state(session_id, slug)})
+
+
+class DellemcSimReleaseView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request, session_id):
+        if not LabSession.objects.filter(pk=session_id, user=request.user).exists():
+            return Response({"error": "Session not found"}, status=404)
+        dellemc_drop_session(session_id)
+        return Response({"released": True})
+
+
+# ── Physical Datacenter (DCIM) simulator ──────────────────────────────────────
+class DatacenterSimStateView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request, session_id):
+        session = LabSession.objects.select_related("scenario").filter(pk=session_id, user=request.user).first()
+        if not session:
+            return Response({"error": "Session not found"}, status=404)
+        slug = session.scenario.slug if session.scenario_id else (request.query_params.get("scenario", "") or "")
+        return Response(datacenter_get_state(session_id, slug))
+
+
+class DatacenterSimActionView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request, session_id):
+        session = LabSession.objects.filter(pk=session_id, user=request.user, status="RUNNING").first()
+        if not session:
+            return Response({"error": "Lab session not running"}, status=400)
+        action = request.data.get("action", "")
+        payload = request.data.get("payload") or {}
+        slug = session.scenario.slug if session.scenario_id else ""
+        datacenter_get_state(session_id, slug)
+        result = datacenter_apply_action(session_id, action, payload)
+        if not result.get("ok"):
+            return Response(result, status=400)
+        return Response({**result, "state": datacenter_get_state(session_id, slug)})
+
+
+class DatacenterSimReleaseView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request, session_id):
+        if not LabSession.objects.filter(pk=session_id, user=request.user).exists():
+            return Response({"error": "Session not found"}, status=404)
+        datacenter_drop_session(session_id)
+        return Response({"released": True})
+
+
+# ── SOC / SIEM simulator (cybersecurity) ──────────────────────────────────────
+class SocSimStateView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request, session_id):
+        session = LabSession.objects.select_related("scenario").filter(pk=session_id, user=request.user).first()
+        if not session:
+            return Response({"error": "Session not found"}, status=404)
+        slug = session.scenario.slug if session.scenario_id else (request.query_params.get("scenario", "") or "")
+        return Response(soc_get_state(session_id, slug))
+
+
+class SocSimActionView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request, session_id):
+        session = LabSession.objects.filter(pk=session_id, user=request.user, status="RUNNING").first()
+        if not session:
+            return Response({"error": "Lab session not running"}, status=400)
+        action = request.data.get("action", "")
+        payload = request.data.get("payload") or {}
+        slug = session.scenario.slug if session.scenario_id else ""
+        soc_get_state(session_id, slug)
+        result = soc_apply_action(session_id, action, payload)
+        if not result.get("ok"):
+            return Response(result, status=400)
+        return Response({**result, "state": soc_get_state(session_id, slug)})
+
+
+class SocSimReleaseView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request, session_id):
+        if not LabSession.objects.filter(pk=session_id, user=request.user).exists():
+            return Response({"error": "Session not found"}, status=404)
+        soc_drop_session(session_id)
         return Response({"released": True})

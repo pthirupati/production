@@ -756,6 +756,25 @@ class RHELOSState:
             self.block_devices[dev] = SimBlockDevice(dev, size, "disk", present=True)
             self.hidden_block_devices.pop(dev, None)
             revealed.append(dev)
+        revealed.extend(self._reveal_aws_bridge_volumes())
+        return revealed
+
+    def _reveal_aws_bridge_volumes(self) -> list[str]:
+        """Pull EBS volumes attached in the AWS console for this lab session
+        (AWS console → Linux terminal chain, mirrors the VMware disk train)."""
+        if not self.session_id:
+            return []
+        try:
+            from .aws_bridge import consume_volume_events
+        except Exception:
+            return []
+        revealed = []
+        for event in consume_volume_events(self.session_id):
+            dev = event.get("device") or "/dev/sdf"
+            size = f"{int(event.get('size_gb', 20))}G"
+            self.block_devices[dev] = SimBlockDevice(dev, size, "disk", present=True)
+            self.hidden_block_devices.pop(dev, None)
+            revealed.append(dev)
         return revealed
 
     def reveal_bridge_nic(self) -> bool:

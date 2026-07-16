@@ -1,0 +1,138 @@
+title: "Field Tech: db-prod-01 Drops Off the Network — Cable or Card?"
+slug: dc-failed-nic-reseat
+technology: datacenter
+category: Fix
+difficulty: medium
+lab_mode: simulation
+simulation_type: datacenter
+infrastructure_type: docker
+time_limit: 900
+max_score: 100
+is_free: true
+jira_priority: Critical
+dual_terminal: false
+description: >-
+  CONTEXT: NOC paged you as the on-site field technician: db-prod-01 in rack R02 has dropped off the
+  network. Monitoring shows the host itself is still up (ping to its out-of-band management IP
+  succeeds) but its primary data NIC link is down. Remote hands can't fix this from a keyboard — you
+  have to walk the floor.
+
+
+  ENVIRONMENT: You are walking the physical data center floor through the DCIM console — pan across
+  rack row R01 through R12, click a rack to expand its servers by U position, and click a server to
+  open its component-health drawer (power, NIC, disk, motherboard, CPU, GPU). db-prod-01 lives in
+  R02-U10. The rack's PDU (PDU-R02) and the floor's cooling units are both healthy and not part of this
+  incident.
+
+
+  SYMPTOM / STARTING STATE: db-prod-01's component drawer shows every other component healthy except
+  the NIC, which reads "Failed". The obvious first move for a dropped link is to check the physical
+  cabling before assuming hardware failure — but this one turns out to be the card itself, not the
+  cable.
+
+
+  IMPACT: db-prod-01 is a production database node; with its primary NIC down it cannot serve queries
+  or replicate, and the standby failover is one more fault away from being the only copy. This is a
+  Sev-1 hardware incident until the NIC is restored.
+
+
+  OBJECTIVE: Pan the floor to rack R02, expand it, click db-prod-01 in U10 to open its component
+  drawer. Try reseating the network cable first (the low-risk move) — if the NIC still reads "Failed"
+  afterward, the fault is the card itself, so replace the NIC and confirm every component in the drawer
+  reads "Healthy".
+initial_state: >-
+  DCIM floor view with db-prod-01 (R02-U10) reporting a failed NIC while every other component on the
+  server, and every other server on the floor, reads healthy.
+objectives:
+- Pan the datacenter floor to rack R02 and expand it to see servers by U position
+- Click db-prod-01 (R02-U10) to open its component-health drawer
+- Reseat the network cable as the first, lower-risk troubleshooting step
+- Recognize the NIC still reads "Failed" after the reseat and replace the NIC card
+- Confirm every component on db-prod-01 reads "Healthy" and its power state is "On"
+hints:
+- order: 1
+  cost: 0
+  content: >-
+    ORIENT — what to observe and why: Do not replace anything yet. Pan to rack R02, expand it, and open
+    db-prod-01's component drawer. Read every row — power, NIC, disk, motherboard, CPU, GPU — and
+    confirm the NIC is the only component flagged "Failed" before deciding what physical action to take.
+- order: 2
+  cost: 10
+  content: >-
+    APPROACH — the troubleshooting method: For a dropped network link, real field-tech procedure is
+    cheapest-fix-first: reseat the cable before swapping hardware, because a loose connector is far more
+    common (and free to fix) than a dead NIC card. Try that first, then re-check the component drawer
+    before escalating to a card swap.
+- order: 3
+  cost: 25
+  content: >-
+    WHICH TOOL — the diagnostic command(s): 1. Use "Reseat Cable" in the component drawer and watch
+    for its confirmation animation. 2. Re-read the NIC row in the drawer immediately after — if it's
+    still "Failed", the cable was never the problem. 3. That result is your evidence the fault is
+    inside the NIC card itself, not the connection to it.
+- order: 4
+  cost: 40
+  content: >-
+    NARROW DOWN — isolate the subsystem: Since the reseat didn't clear the fault, use "Replace NIC" on
+    db-prod-01. This is the same drawer, same server — you're just escalating from a cable-level fix to
+    a component-level replacement once the cheaper fix is ruled out.
+- order: 5
+  cost: 60
+  content: >-
+    NEAR-SOLUTION — the fix shape + verify (you still apply it): Click "Replace NIC" in db-prod-01's
+    drawer and watch the brief replace animation. Confirm the NIC row now reads "Healthy" and the
+    server's power state shows "On". WHY: the grader checks that db-prod-01's NIC component is healthy
+    in the simulated DCIM state — reseating the cable alone does not clear a failed-card fault.
+summary: Diagnose a dropped network link on db-prod-01 by trying the low-risk cable reseat first, then
+  replacing the failed NIC card when that doesn't clear the fault.
+estimated_minutes: 15
+xp_reward: 110
+prerequisites:
+- Basic hardware troubleshooting (cable vs. component fault isolation)
+tags:
+- fix
+- hands-on
+- datacenter
+- hardware
+- physical
+linked_tutorial: datacenter-fundamentals
+what_you_will_learn:
+- Panning and navigating a physical data center floor by rack and U position
+- Reading per-component server health in a DCIM console
+- Field-tech triage order: reseat/cable-check before hardware replacement
+- Replacing a failed NIC and verifying the fix in the component drawer
+environment:
+  nodes:
+  - role: primary
+    os: FixitLab Physical Data Center (DCIM) simulation
+    hostname: lab-primary
+    ip: 127.0.0.1
+    specs: local offline simulation
+  pre_installed:
+  - dcim-floor-console
+  credentials:
+  - user: tech
+    password: lab123
+tasks:
+- id: task_1
+  title: Restore db-prod-01's network link
+  description: >-
+    Reseat db-prod-01's network cable, confirm the NIC is still failed, then replace the NIC and verify
+    every component reads healthy.
+  background: >-
+    This lab teaches physical break/fix triage order: try the cheap, reversible fix (reseat) before the
+    expensive one (component replacement), and always verify against the full component drawer.
+  validation:
+    type: custom_script
+    script: check.sh
+    error_message: >-
+      Validation did not pass. Replace the NIC in db-prod-01 (R02-U10) and confirm it reads "Healthy".
+solution:
+  summary: Reseat the cable (rules out the cheap fix), then replace the NIC in db-prod-01 to clear the
+    fault.
+  files_changed: []
+  commands_run:
+  - "DCIM: pan to R02 -> expand rack -> click db-prod-01 (U10)"
+  - "DCIM: component drawer -> Reseat Cable"
+  - "DCIM: component drawer -> Replace NIC"
+  reference_docs: datacenter-fundamentals
