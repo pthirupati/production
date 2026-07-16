@@ -126,3 +126,26 @@ class SnapshotRoundTripTests(SimpleTestCase):
         restored = sim_persistence.restore_engine(snap)
         self.assertEqual(restored.shell.run("nproc").strip(), "8")
         self.assertEqual(restored.shell.state.hostname, "db-prod-01")
+
+
+class SeedFromAwsEc2Tests(SimpleTestCase):
+    def setUp(self):
+        from apps.vmware_sim import aws_engine as ae
+
+        self.ae = ae
+        self.sid = "unified-aws-seed-test"
+        ae.drop_session(self.sid)
+        self.addCleanup(ae.drop_session, self.sid)
+
+    def test_seed_makes_shell_match_primary_ec2(self):
+        from apps.labs.provisioner.simulation_provisioner import _seed_state_from_aws_ec2
+
+        engine = UnifiedSimulationEngine(scenario_slug="aws-ec2-stop-instance", simulation_type="aws")
+        _seed_state_from_aws_ec2(engine, self.sid, "aws-ec2-stop-instance")
+        sh = engine.shell
+        # Default inventory seeds web-server-01 at 172.31.14.52 / t2.micro (1 vCPU, 1 GiB).
+        self.assertEqual(sh.state.hostname, "ip-172-31-14-52")
+        self.assertIn("root@ip-172-31-14-52", sh.prompt)
+        self.assertEqual(sh.run("nproc").strip(), "1")
+        self.assertIn("1024", _mem_line(sh))
+        self.assertIn("172.31.14.52", sh.run("ip a"))

@@ -204,6 +204,73 @@ def _seed_state_from_vmware_vm(engine, session_id, slug: str) -> None:
         logger.exception("VMware VM seed skipped for session %s", session_id)
 
 
+_EC2_TYPE_HW = {
+    "t2.micro": (1, 1024),
+    "t2.small": (1, 2048),
+    "t3.micro": (2, 1024),
+    "t3.small": (2, 2048),
+    "t3.medium": (2, 4096),
+    "t3.large": (2, 8192),
+    "m5.large": (2, 8192),
+    "m5.xlarge": (4, 16384),
+}
+
+
+def _is_aws_lab(slug: str, raw_type: str) -> bool:
+    low = (slug or "").lower()
+    return (raw_type or "").lower() == "aws" or low.startswith(
+        ("aws-", "ec2-", "s3-", "iam-", "academy-aws-")
+    )
+
+
+def _seed_state_from_aws_ec2(engine, session_id, slug: str) -> None:
+    """Unified-server model (AWS): seed the lab terminal so it IS the primary EC2
+    guest — hostname/IP/CPU/RAM match the instance the learner SSHs to from the
+    AWS console. Best-effort; never breaks provisioning.
+    """
+    try:
+        from apps.vmware_sim.aws_engine import get_state, _ensure
+
+        sid = str(session_id)
+        _ensure(sid, slug)
+        state_inv = get_state(sid, slug) or {}
+        # aws_engine.get_state wraps inventory under "state" (not top-level).
+        inventory = state_inv.get("state") or state_inv
+        instances = inventory.get("instances") or []
+        if not instances:
+            return
+        # Prefer a running instance named in broken/goal hints, else first running, else first.
+        want_names = set()
+        broken = inventory.get("broken") or {}
+        for key in ("require_stopped", "require_running"):
+            if isinstance(broken.get(key), str):
+                want_names.add(broken[key])
+        tag = broken.get("require_tag") or {}
+        if isinstance(tag, dict) and tag.get("name"):
+            want_names.add(tag["name"])
+
+        inst = None
+        for name in want_names:
+            inst = next((i for i in instances if i.get("name") == name), None)
+            if inst:
+                break
+        if inst is None:
+            inst = next((i for i in instances if i.get("state") == "running"), None) or instances[0]
+
+        private_ip = inst.get("privateIp") or ""
+        hostname = f"ip-{private_ip.replace('.', '-')}" if private_ip else (inst.get("name") or "ec2-sim")
+        itype = (inst.get("type") or "t3.micro").lower()
+        cpu, mem_mb = _EC2_TYPE_HW.get(itype, (2, 1024))
+
+        shell_state = engine.shell.state
+        shell_state.set_hostname(hostname)
+        shell_state.set_hardware(cpu=cpu, mem_mb=mem_mb)
+        if private_ip:
+            shell_state.set_host_ip(private_ip)
+    except Exception:
+        logger.exception("AWS EC2 seed skipped for session %s", session_id)
+
+
 def ensure_sim_session(lab_session) -> dict | None:
     """Re-register in-memory simulation state after worker restart."""
     session_id = str(lab_session.id)
@@ -235,6 +302,8 @@ def ensure_sim_session(lab_session) -> dict | None:
         _apply_initial_host_state(engine, slug)
     if fresh and _is_vmware_lab(slug, raw_type):
         _seed_state_from_vmware_vm(engine, session_id, slug)
+    elif fresh and _is_aws_lab(slug, raw_type):
+        _seed_state_from_aws_ec2(engine, session_id, slug)
     lab_hosts = lab_session.lab_hosts or _build_lab_hosts(scenario, resource_id, sim_type)
     if _should_use_ssh_client_default(scenario, sim_type):
         lab_hosts = _attach_ssh_client_host(lab_hosts, resource_id)
@@ -331,6 +400,10 @@ class SimulationProvisioner:
             from apps.vmware_sim.engine import _ensure_session
             _ensure_session(str(lab_session.id), slug)
             _seed_state_from_vmware_vm(engine, lab_session.id, slug)
+        elif _is_aws_lab(slug, raw_type):
+            from apps.vmware_sim.aws_engine import _ensure as aws_ensure
+            aws_ensure(str(lab_session.id), slug)
+            _seed_state_from_aws_ec2(engine, lab_session.id, slug)
 
         if slug.lower().startswith("ds-dashboard-") or raw_type == "data-dashboard":
             from apps.vmware_sim.datascience_engine import _ensure_session as _ensure_ds_session

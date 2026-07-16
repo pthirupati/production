@@ -134,21 +134,80 @@ def _build_issue_body(session=None, user=None, scenario=None) -> str:
         parts += ["", "### Reported symptoms", symptom]
     if env_text:
         parts += ["", "### Environment & current state", env_text]
+    tools = _lab_tools_for_scenario(scenario)
     parts += [
         "",
         "### Steps to reproduce",
-        "1. Connect to the affected environment for this lab.",
-        "2. Inspect the relevant service/configuration/logs.",
+        "1. Open this ticket’s lab — use the Terminal / console buttons for the "
+        f"{scenario.technology.name} environment.",
+        "2. Inspect the relevant service, configuration, and logs on the affected server.",
         "3. Observe the failure described above.",
         "",
         "### Acceptance criteria (definition of done)",
         outcome_text,
         "",
+        "### How to complete this ticket",
+        "1. Work the incident from this Jira ticket — it is your source of truth.",
+        "2. Use the lab terminal and technology consoles (they are the same servers "
+        "you would SSH to in production).",
+        "3. When you need another team (disk, NIC, backup, firewall), @mention them "
+        "in a comment — they will reply and unlock the change window.",
+        "4. Apply the smallest safe fix, verify against the acceptance criteria, then "
+        "add a resolution comment and mark the lab complete.",
+        "",
+        "### Collaboration (mention teams in comments)",
+        "- `@backup team` — stop services / take backup before patching",
+        "- `@database team` / `@application team` — stop or start DB/app services",
+        "- `@storage team` — attach or expand disks (LVM / EBS-style)",
+        "- `@network team` — add NICs / VLAN / routing changes",
+        "- `@security team` — approve firewall / access changes",
+        "",
+        "### Lab tools for this scenario",
+        tools,
+        "",
         "### Notes",
         "Investigate from first principles, apply the smallest safe fix, and add a "
-        "resolution comment describing the root cause before you close this ticket.",
+        "resolution comment describing the root cause before you close this ticket. "
+        "If you are stuck, comment with what you tried — @mention a team or ask for "
+        "a hint; the ticket bots will coach you toward the acceptance criteria.",
     ]
     return "\n".join(parts)
+
+
+def _lab_tools_for_scenario(scenario) -> str:
+    """Describe which consoles/terminals the learner should open for this tech."""
+    tech = ""
+    if getattr(scenario, "technology", None):
+        tech = (scenario.technology.slug or scenario.technology.name or "").lower()
+    sim = (getattr(scenario, "simulation_type", "") or "").lower()
+    slug = (getattr(scenario, "slug", "") or "").lower()
+    blob = f"{tech} {sim} {slug}"
+
+    lines = [
+        "- **Lab terminal** — the production-like server for this incident "
+        "(same host identity as the VMware VM or AWS EC2 guest when those apply).",
+    ]
+    if any(k in blob for k in ("vmware", "esxi", "vcenter")):
+        lines.append("- **VMware console** — power, hardware (CPU/RAM/NIC/disk), guest console.")
+    if any(k in blob for k in ("aws", "ec2", "s3", "iam", "terraform", "cloud")):
+        lines.append(
+            "- **AWS console** — EC2 / VPC / SG / EBS; SSH via Instance Connect "
+            "(security groups must allow port 22)."
+        )
+    if any(k in blob for k in ("awx", "ansible", "tower")):
+        lines.append("- **AWX GUI** — job templates, inventories, credentials; Terminal for the control node.")
+    if any(k in blob for k in ("grafana", "prometheus", "monitor", "alertmanager")):
+        lines.append("- **Monitoring GUI** — Grafana / Prometheus dashboards; Terminal for scrape targets.")
+    if any(k in blob for k in ("k8s", "kubernetes", "openshift", "gpu")):
+        lines.append("- **Cluster / GPU console** — nodes and workloads; Terminal for kubectl / host OS.")
+    if any(k in blob for k in ("windows", "ad", "active-directory")):
+        lines.append("- **Windows console** — RDP-style desktop / PowerShell on the affected host.")
+    if len(lines) == 1:
+        lines.append(
+            "- Open any technology-specific GUI from the lab action bar when the "
+            "scenario provides one; otherwise work entirely in the lab terminal."
+        )
+    return "\n".join(lines)
 
 
 def _naturalize_context(context: str | None, scenario) -> str | None:

@@ -2979,7 +2979,15 @@ export function createLinuxShell(vm, opts = {}) {
     saveFile,
     readFile,
     syncVm: (nextVm) => {
-      if (nextVm) vmRef.current = nextVm
+      // Mutate the original vm object in place so closed-over `vm` references
+      // (lsblk, ip, etc.) see hardware changes from VMware/AWS consoles.
+      if (nextVm) {
+        Object.keys(vm).forEach((k) => {
+          if (!(k in nextVm)) delete vm[k]
+        })
+        Object.assign(vm, nextVm)
+        vmRef.current = vm
+      }
       getOrCreateGuestShared(vmRef.current, labSessionId)
     },
     pkgManager: () => pkgManager(vmRef.current),

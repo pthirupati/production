@@ -246,3 +246,60 @@ class InterviewStudioTests(TestCase):
         res = admin_client.get("/api/admin/interviews/settings/")
         self.assertEqual(res.status_code, 200)
         self.assertIn("enabled", res.json())
+
+    def test_delete_finished_round(self):
+        from apps.interviews.models import InterviewRound
+
+        campaign = InterviewCampaign.objects.create(
+            user=self.user,
+            title="Delete round campaign",
+            round_count=2,
+            status="completed",
+            profile_snapshot={"experience_level": "mid"},
+            primary_technology=self.tech,
+            experience_level="mid",
+        )
+        r0 = InterviewRound.objects.create(
+            campaign=campaign,
+            round_number=1,
+            round_type="technical",
+            title="Round 1",
+            status="passed",
+        )
+        InterviewRound.objects.create(
+            campaign=campaign,
+            round_number=2,
+            round_type="technical",
+            title="Round 2",
+            status="locked",
+        )
+        before = InterviewRound.objects.filter(campaign=campaign).count()
+        self.assertEqual(before, 2)
+        res = self.client.delete(f"/api/interviews/rounds/{r0.id}/")
+        self.assertEqual(res.status_code, 200, res.content)
+        self.assertTrue(res.json().get("deleted"))
+        self.assertFalse(InterviewRound.objects.filter(id=r0.id).exists())
+        self.assertEqual(InterviewRound.objects.filter(campaign=campaign).count(), 1)
+
+    def test_delete_in_progress_round_blocked(self):
+        from apps.interviews.models import InterviewRound
+
+        campaign = InterviewCampaign.objects.create(
+            user=self.user,
+            title="Live round campaign",
+            round_count=1,
+            status="in_progress",
+            profile_snapshot={"experience_level": "mid"},
+            primary_technology=self.tech,
+            experience_level="mid",
+        )
+        r0 = InterviewRound.objects.create(
+            campaign=campaign,
+            round_number=1,
+            round_type="technical",
+            title="Live round",
+            status="in_progress",
+        )
+        res = self.client.delete(f"/api/interviews/rounds/{r0.id}/")
+        self.assertEqual(res.status_code, 409, res.content)
+        self.assertTrue(InterviewRound.objects.filter(id=r0.id).exists())

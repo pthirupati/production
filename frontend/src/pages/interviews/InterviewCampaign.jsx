@@ -18,7 +18,7 @@ export default function InterviewCampaign() {
   const [confirmDeleteRoundId, setConfirmDeleteRoundId] = useState(null)
   const [deletingRoundId, setDeletingRoundId] = useState(null)
 
-  const DELETABLE_ROUND_STATUSES = ['completed', 'cancelled', 'failed']
+  const DELETABLE_ROUND_STATUSES = ['completed', 'passed', 'failed', 'abandoned', 'locked', 'schedulable', 'ready']
 
   const deleteRound = async (roundId) => {
     setDeletingRoundId(roundId)
