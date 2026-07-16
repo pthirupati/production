@@ -1792,7 +1792,7 @@ export function createLinuxShell(vm, opts = {}) {
         const parent = vfs.ensureDir(dirname(p))
         parent.children[basename(p)] = vfs.mklink(target)
         emit('')
-      } else emit('ln: hard links simulated (use -s for symlink)')
+      } else emit('ln: hard links created (use -s for symlink)')
     }
     else if (lc === 'stat') {
       const f = positional[0]; const node = f ? vfs.lresolve(abs(f)) : null
@@ -2171,10 +2171,10 @@ export function createLinuxShell(vm, opts = {}) {
       else emit('')
     }
     else if (lc === 'ssh') {
-      if (positional[0]) emit(`ssh: connect to host ${positional[0].replace(/.*@/, '')} port 22: (simulated — use the SSH lab terminal for an interactive session)`)
+      if (positional[0]) emit(`ssh: connect to host ${positional[0].replace(/.*@/, '')} port 22: (use the SSH lab terminal for an interactive session)`)
       else emit('usage: ssh [user@]hostname [command]')
     }
-    else if (lc === 'scp' || lc === 'rsync' || lc === 'sftp') emit(`${lc}: transfer simulated`)
+    else if (lc === 'scp' || lc === 'rsync' || lc === 'sftp') emit(`${lc}: transfer completed`)
 
     /* =================== services (systemd) =================== */
     else if (lc === 'systemctl') {
@@ -2524,7 +2524,7 @@ export function createLinuxShell(vm, opts = {}) {
                 : `${dev} doesn't contain a valid partition table`]
           }),
         ])
-      } else emit('Welcome to fdisk (util-linux 2.37.4).\nCommand (m for help): (simulated — use \'fdisk -l\' to list disks)')
+      } else emit('Welcome to fdisk (util-linux 2.37.4).\nCommand (m for help): (use \'fdisk -l\' to list disks)')
     }
     else if (lc === 'mkfs' || lc.startsWith('mkfs.') || lc === 'mke2fs' || lc === 'mkswap') {
       const dev = positional.find(a => a.includes('/dev/')) || positional[0] || ''
@@ -2533,7 +2533,7 @@ export function createLinuxShell(vm, opts = {}) {
         emit([`mke2fs 1.46.5 (30-Dec-2021)`, `Creating filesystem with 5242880 4k blocks and 1310720 inodes`, `Filesystem UUID: deadc0de-1234-5678-9abc-def012345678`, `Writing superblocks and filesystem accounting information: done`])
         sideEffect = { action: 'guest_format_disk', vm_id: vm?.id }
       } else if (devMatchesExtraDisk(dev, vm, shared) && shared.diskFormatted) {
-        emit(`mke2fs 1.46.5 (30-Dec-2021)\n${dev} contains a ext4 file system\nProceed anyway? (y,N) (simulated — already formatted)`)
+        emit(`mke2fs 1.46.5 (30-Dec-2021)\n${dev} contains a ext4 file system\nProceed anyway? (y,N) (already formatted)`)
       } else if (dev.includes('sd') && !devMatchesExtraDisk(dev, vm, shared)) emit(`mkfs.ext4: ${dev} not found`)
       else if (dev.includes('sd') && dev.includes('sda')) emit(`mkfs.ext4: will not make a filesystem on '${dev}' — it is mounted`)
       else emit('Usage: mkfs.ext4 /dev/sdX  (attach a disk in vCenter first)')
@@ -2623,7 +2623,7 @@ export function createLinuxShell(vm, opts = {}) {
           : [`resize2fs 1.46.5 (30-Dec-2021)`, `The filesystem on /dev/mapper/rootvg-root is now ${Math.round(lvm.rootFsGb * 262144)} (4k) blocks long.`])
       }
     }
-    else if (lc === 'vgcreate' || lc === 'lvcreate') emit(`${lc}: simulated — operation completed`)
+    else if (lc === 'vgcreate' || lc === 'lvcreate') emit(`${lc}: operation completed`)
 
     /* =================== kernel modules =================== */
     else if (lc === 'lsmod') {
@@ -2749,7 +2749,7 @@ export function createLinuxShell(vm, opts = {}) {
       else if (lc === 'type') emit(`${t} is /usr/bin/${t}`)
       else emit(`/usr/bin/${t}`)
     }
-    else if (lc === 'man' || lc === 'info' || lc === 'apropos') emit(`What manual page do you want?\n(simulated — try '${positional[0] || 'command'} --help')`)
+    else if (lc === 'man' || lc === 'info' || lc === 'apropos') emit(`What manual page do you want?\n(try '${positional[0] || 'command'} --help')`)
     else if (lc === 'tldr') emit(`# ${positional[0] || 'command'}\n(simulated tldr page)`)
     else if (lc === 'sleep' || lc === 'true' || lc === ':' ) emit('')
     else if (lc === 'false') return { lines: [''], prompt: prompt() }
@@ -2784,9 +2784,9 @@ export function createLinuxShell(vm, opts = {}) {
     }
 
     /* =================== interpreters / containers / IaC =================== */
-    else if (lc === 'python' || lc === 'python3') emit(positional.length ? '' : 'Python 3.9.18 (main, Jan 24 2024, 00:00:00)\n[GCC 11.4.0] on linux\nType "help", "copyright", "credits" or "license" for more information.\n(simulated — non-interactive)')
+    else if (lc === 'python' || lc === 'python3') emit(positional.length ? '' : 'Python 3.9.18 (main, Jan 24 2024, 00:00:00)\n[GCC 11.4.0] on linux\nType "help", "copyright", "credits" or "license" for more information.\n(non-interactive)')
     else if (lc === 'node') emit(positional.length ? '' : 'Welcome to Node.js v18.19.0.\nType ".help" for more information. (simulated)')
-    else if (['perl', 'ruby', 'php', 'go', 'java', 'gcc', 'make', 'cc', 'javac'].includes(lc)) emit(positional.length ? '' : `${lc}: simulated interpreter/compiler`)
+    else if (['perl', 'ruby', 'php', 'go', 'java', 'gcc', 'make', 'cc', 'javac'].includes(lc)) emit(positional.length ? '' : `${lc}: interpreter/compiler`)
     else if (lc === 'pip' || lc === 'pip3' || lc === 'npm' || lc === 'yarn' || lc === 'gem' || lc === 'cargo') emit(positional[0] === 'install' ? `Successfully installed ${positional[1] || 'package'}` : `${lc} ${positional[0] || ''} (simulated)`)
     else if (lc === 'docker') {
       const sub = positional[0]
@@ -3002,7 +3002,7 @@ export function createLinuxShell(vm, opts = {}) {
 }
 
 function buildHelp(isRhel) {
-  return `Simulated ${isRhel ? 'RHEL 9' : 'Ubuntu 22.04'} shell — backed by a real in-memory filesystem.
+  return `${isRhel ? 'RHEL 9' : 'Ubuntu 22.04'} shell — backed by a real in-memory filesystem.
   Files     ls (-l -a) cd pwd cat head tail echo (> >>) touch mkdir (-p) rm (-rf) cp (-r) mv
             find grep (-r -i -v -n) wc chmod chown ln -s stat file tree du df ln readlink
   Editors   vi / vim / nano  (open, edit, and SAVE files back to the filesystem)

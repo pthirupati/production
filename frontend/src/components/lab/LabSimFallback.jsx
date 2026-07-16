@@ -1,5 +1,5 @@
 /** Lightweight placeholder while a lazy lab simulator chunk loads. */
-export default function LabSimFallback({ label = 'Loading simulator…' }) {
+export default function LabSimFallback({ label = 'Loading lab console…' }) {
   return (
     <div className="flex flex-1 min-h-[200px] items-center justify-center bg-surface-950 text-surface-400 text-sm">
       <div className="flex flex-col items-center gap-3">

@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 /**
- * REPRODUCTION harness for BUG A: AWS labs show "Lab simulator error /
+ * REPRODUCTION harness for BUG A: AWS labs show "Lab environment error /
  * Something went wrong loading this simulator" on load.
  *
  * This renders the REAL mount path a returning learner hits:
@@ -62,8 +62,8 @@ function renderOverlay() {
   return render(
     <SimErrorBoundary
       name="aws"
-      title="Simulator error"
-      message="Something went wrong loading this simulator. Try resetting or reload the page."
+      title="Lab console error"
+      message="Something went wrong loading this lab console. Try resetting or reload the page."
       resetStorageKey={KEY}
     >
       <AwsLabOverlay
@@ -77,8 +77,8 @@ function renderOverlay() {
 }
 
 function expectNoBoundaryError() {
-  // The SimErrorBoundary fallback heading is "Simulator error".
-  const errored = screen.queryByText('Something went wrong loading this simulator. Try resetting or reload the page.')
+  // The SimErrorBoundary fallback heading is "Lab console error".
+  const errored = screen.queryByText('Something went wrong loading this lab console. Try resetting or reload the page.')
   if (errored) {
     // Surface the real stack that the boundary swallowed.
     console.warn('CAUGHT BY BOUNDARY:\n', caught.map((a) => a.map(String).join(' ')).join('\n'))

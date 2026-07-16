@@ -73,7 +73,7 @@ const TECH_TUTORIAL_TOPICS = {
   nmap: ['Nmap'],
   wireshark: ['Wireshark'],
   peoplesoft: ['PeopleSoft'],
-  simulation: ['Simulation'],
+  simulation: ['Lab environment'],
 }
 
 const DIFF_RANK = { easy: 0, medium: 1, hard: 2 }

@@ -1132,7 +1132,7 @@ export default function VMwareSimulator() {
       case '__disconnect_host__': runAction('reconnect_host', { host_id: payload.id }); break // toggles connection (sim only reconnects)
       case '__host_power_on__': setVmToast({ message: `${payload.name} is already powered on`, kind: 'info' }); break
       case '__host_shutdown__': runAction('enter_maintenance', { host_id: payload.id }); break
-      case '__host_reboot__': setVmToast({ message: `Reboot of ${payload.name} simulated — host will reconnect`, kind: 'success' }); break
+      case '__host_reboot__': setVmToast({ message: `Reboot of ${payload.name} — host will reconnect`, kind: 'success' }); break
       case '__attach_host_profile__': runAction('extract_host_profile', { host_id: payload.id }); break
       case '__host_settings__': setSelectedNode({ type: 'host', id: payload.id }); setActiveTab('configure'); break
       // ── datacenter sentinels ──
@@ -1170,7 +1170,7 @@ export default function VMwareSimulator() {
       <div className="vmware-sim vm-loading">
         <div className="text-center">
           <div className="vm-loading-spinner mx-auto mb-3" />
-          <p className="text-[#8fa5b8] text-sm">Loading VMware Simulator…</p>
+          <p className="text-[#8fa5b8] text-sm">Loading vCenter…</p>
         </div>
       </div>
     )
@@ -1180,7 +1180,7 @@ export default function VMwareSimulator() {
     return (
       <div className="vmware-sim vm-loading">
         <div className="text-center max-w-sm px-6">
-          <p className="text-[#e6edf3] text-base font-semibold mb-2">Could not reach the VMware simulator</p>
+          <p className="text-[#e6edf3] text-base font-semibold mb-2">Could not reach vCenter</p>
           <p className="text-[#8fa5b8] text-sm mb-4">
             The lab service didn’t respond. Check your connection and try again — your progress is preserved.
           </p>
@@ -3070,7 +3070,7 @@ function PermissionsPanel({ entityName, definedIn }) {
   return (
     <ContentPanel title={`Roles & Permissions — ${entityName}`}>
       <div className="flex justify-end mb-2">
-        <button type="button" onClick={() => toast('Add permission simulated')} className="vm-btn vm-btn-blue text-[11px]">Add permission…</button>
+        <button type="button" onClick={() => toast('Permission added')} className="vm-btn vm-btn-blue text-[11px]">Add permission…</button>
       </div>
       <table className="vm-table">
         <thead>

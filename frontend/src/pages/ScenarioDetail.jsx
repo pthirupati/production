@@ -344,7 +344,7 @@ export default function ScenarioDetail() {
             <span
               className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs border font-medium"
               style={{ borderColor: `${simInfo.accent}55`, color: simInfo.accent, backgroundColor: `${simInfo.accent}14` }}
-              title={`Starts the ${simInfo.label} in-app simulator with optional lab terminal`}
+              title={`Starts the ${simInfo.label} console with optional lab terminal`}
             >
               <Monitor size={11} /> Opens {simInfo.short} simulator
             </span>

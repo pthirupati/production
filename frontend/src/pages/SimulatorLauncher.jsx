@@ -24,7 +24,7 @@ export default function SimulatorLauncher() {
   return (
     <div className="max-w-6xl mx-auto px-4 py-8">
       <PageHeader
-        title="Enterprise Lab Simulators"
+        title="Enterprise Lab Consoles"
         subtitle="Pixel-faithful, fully interactive mocks of production UIs — launch a scenario from each technology to practice hands-on."
       />
       <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4 mt-8">

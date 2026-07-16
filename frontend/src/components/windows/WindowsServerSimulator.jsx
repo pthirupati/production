@@ -4,7 +4,7 @@ import {
   Lightbulb, XCircle, CheckCircle2, AlertTriangle, Lock, Server,
   ShieldCheck, Network, Globe, HardDrive, Cpu, ChevronRight, Plus,
   Play, Square, RotateCw, Download, UserCog, FolderTree, Power, Trash2,
-  FolderOpen, Wifi, Monitor, Terminal, Settings, User, KeyRound,
+  FolderOpen, Wifi, Monitor, Terminal, Settings, User, KeyRound, Package,
 } from 'lucide-react'
 import { windowsApi } from '../../api/windows'
 import { LabChromeControls } from '../lab/LabChromeBar'
@@ -789,6 +789,81 @@ function GroupPolicyEditor({ state, busy, onAction }) {
   )
 }
 
+/* ── Software Center (Microsoft Endpoint Configuration Manager / SCCM / MECM) ── */
+function SoftwareCenter({ state, busy, onAction }) {
+  const sccm = state.sccm || {}
+  const deployments = sccm.deployments || []
+  const clientActive = sccm.client_status === 'active'
+
+  return (
+    <div>
+      <div className="win-h1">Software Center</div>
+      <div className="win-sub mb-4">Microsoft Endpoint Configuration Manager — Software Center</div>
+
+      <div className={`win-banner ${clientActive ? 'win-banner-ok' : 'win-banner-err'}`}>
+        {clientActive ? <CheckCircle2 size={15} className="shrink-0 mt-0.5" /> : <AlertTriangle size={15} className="shrink-0 mt-0.5" />}
+        <span>
+          Site code <b>{sccm.site_code || '—'}</b> ({sccm.site_name || 'Configuration Manager'}) ·
+          {' '}Client: <b>{sccm.client_installed ? 'Installed' : 'Not installed'}</b> ·
+          {' '}Status: <b className="capitalize">{sccm.client_status || 'unknown'}</b>
+        </span>
+      </div>
+
+      <div className="flex flex-wrap gap-2 mb-4">
+        <button className="win-light-btn" disabled={busy} onClick={() => onAction('sccm_open_software_center', {})}>
+          <Package size={13} /> Open Software Center
+        </button>
+        <button className="win-light-btn" disabled={busy} onClick={() => onAction('sccm_sync_updates', {})}>
+          <RefreshCw size={13} /> Sync software updates
+        </button>
+        <button className="win-light-btn" disabled={busy} onClick={() => onAction('sccm_machine_policy_cycle', {})}>
+          <RotateCw size={13} /> Machine Policy Retrieval &amp; Evaluation Cycle
+        </button>
+      </div>
+
+      <div className="win-card overflow-hidden">
+        <div className="win-card-head"><Package size={15} className="text-[#0078D4]" /> Deployments</div>
+        <table className="win-table">
+          <thead><tr><th>Name</th><th>Status</th><th>Deadline</th><th className="text-right">Action</th></tr></thead>
+          <tbody>
+            {deployments.length === 0 ? (
+              <tr><td colSpan={4} className="text-center text-[#616161] py-5">No deployments targeted at this device.</td></tr>
+            ) : deployments.map((d) => {
+              const failed = d.status === 'Failed'
+              const needsAction = d.status === 'Required' || failed
+              return (
+                <tr key={d.id}>
+                  <td>
+                    <div className="font-medium">{d.name}</div>
+                    <div className="text-[11px] text-[#616161]">
+                      {d.kb}{failed && d.error ? ` · error ${d.error}` : ''}
+                    </div>
+                  </td>
+                  <td>
+                    {d.status === 'Installed' ? <Badge kind="ok"><CheckCircle2 size={11} /> Installed</Badge>
+                      : failed ? <Badge kind="bad"><AlertTriangle size={11} /> Failed</Badge>
+                      : d.status === 'Required' ? <Badge kind="warn">Required</Badge>
+                      : <Badge kind="muted">Available</Badge>}
+                  </td>
+                  <td className="text-[#616161]">{d.deadline ? d.deadline.replace('T', ' ').replace('Z', '') : '—'}</td>
+                  <td className="text-right">
+                    {!needsAction ? <span className="text-[#616161] text-[0.78rem]">—</span> : (
+                      <button className="win-light-btn win-primary !text-white" disabled={busy}
+                        onClick={() => onAction(failed ? 'sccm_retry_deployment' : 'sccm_install_deployment', { deployment_id: d.id })}>
+                        {failed ? <><RotateCw size={12} /> Retry</> : <><Download size={12} /> Install</>}
+                      </button>
+                    )}
+                  </td>
+                </tr>
+              )
+            })}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  )
+}
+
 const NAV = [
   { key: 'dashboard', label: 'Server Manager', icon: LayoutDashboard },
   { key: 'explorer', label: 'File Explorer', icon: FolderOpen },
@@ -799,6 +874,7 @@ const NAV = [
   { key: 'ad', label: 'Active Directory', icon: Users },
   { key: 'gpo', label: 'Group Policy', icon: FolderTree },
   { key: 'update', label: 'Windows Update', icon: Download },
+  { key: 'sccm', label: 'Software Center', icon: Package },
   { key: 'services', label: 'Services', icon: Settings2 },
   { key: 'system', label: 'System (Domain)', icon: Globe },
 ]
@@ -1087,7 +1163,7 @@ export default function WindowsServerSimulator({
       // Reflect the engine's own session/lock flags into the gate the first time.
       if (data?.session?.logged_in) setSignedIn(true)
     } catch {
-      setError('Could not load the Windows Server simulator')
+      setError('Could not load Windows Server Manager')
     }
   }, [sessionId, slug])
 
@@ -1244,6 +1320,7 @@ export default function WindowsServerSimulator({
               {view === 'ad' && <ActiveDirectory state={state} busy={busy} onAction={runAction} />}
               {view === 'gpo' && <GroupPolicyEditor state={state} busy={busy} onAction={runAction} />}
               {view === 'update' && <WindowsUpdate state={state} busy={busy} onAction={runAction} />}
+              {view === 'sccm' && <SoftwareCenter state={state} busy={busy} onAction={runAction} />}
               {view === 'services' && <ServicesConsole state={state} busy={busy} onAction={runAction} />}
               {view === 'system' && <SystemPanel state={state} busy={busy} onAction={runAction} />}
 

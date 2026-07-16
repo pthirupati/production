@@ -79,6 +79,16 @@ def record_volume_attach(
             "instance_id": instance_id or "",
         })
         _save(session_id, data)
+    try:
+        from .server_identity import attach_disk, get_primary, upsert_server
+        primary = get_primary(session_id)
+        if primary:
+            letter = (dev or "/dev/sdf").rstrip("0123456789").split("/")[-1]
+            attach_disk(session_id, primary["id"], name=letter or "sdf", size_gb=int(size_gb), source="aws")
+        elif instance_id:
+            upsert_server(session_id, {"id": f"aws-{instance_id}", "hostname": instance_id}, source="aws")
+    except Exception:
+        pass
     return dev
 
 
@@ -113,6 +123,14 @@ def record_instance_power(session_id: str, action: str) -> None:
     data = _load(session_id)
     data["instance_power"] = action
     _save(session_id, data)
+    try:
+        from .server_identity import get_primary, set_power
+        primary = get_primary(session_id)
+        if primary:
+            power = "on" if action == "start" else ("reboot_pending" if action == "reboot" else "off")
+            set_power(session_id, primary["id"], power, source="aws")
+    except Exception:
+        pass
 
 
 def consume_power(session_id: str) -> str | None:

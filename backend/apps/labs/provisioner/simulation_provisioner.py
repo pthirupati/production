@@ -200,6 +200,11 @@ def _seed_state_from_vmware_vm(engine, session_id, slug: str) -> None:
         ip = vm.get("ip")
         if ip:
             state.set_host_ip(ip)
+        try:
+            from .simulation.server_identity import seed_from_vmware_vm
+            seed_from_vmware_vm(sid, vm, role="primary")
+        except Exception:
+            logger.exception("ServerIdentity VMware seed skipped for session %s", session_id)
     except Exception:
         logger.exception("VMware VM seed skipped for session %s", session_id)
 
@@ -286,6 +291,11 @@ def _seed_state_from_aws_ec2(engine, session_id, slug: str) -> None:
         shell_state.set_hardware(cpu=cpu, mem_mb=mem_mb)
         if private_ip:
             shell_state.set_host_ip(private_ip)
+        try:
+            from .simulation.server_identity import seed_from_aws_instance
+            seed_from_aws_instance(sid, inst, role="primary")
+        except Exception:
+            logger.exception("ServerIdentity AWS seed skipped for session %s", session_id)
     except Exception:
         logger.exception("AWS EC2 seed skipped for session %s", session_id)
 

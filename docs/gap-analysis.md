@@ -1,0 +1,117 @@
+# FixItLab Gap Analysis — Production-Grade Company Infra
+
+Living document for the platform hardening pass on `chore/vault-diagnose`.
+Last updated: 2026-07-16.
+
+## North-star rules
+
+1. **One server, many consoles.** `ServerIdentity` is the canonical record (hostname, IP, CPU, RAM, disks, NICs, power, OS, install state, optional physical_location / BMC / network_port). Every console reads/writes that record via an event bus.
+2. **Prefer a real free/self-hosted engine over a hand-rolled mock** when one exists and runs at zero external cloud spend (Phase 1.5 / 1.6). Otherwise build an API-faithful facade and label it.
+3. **Never show learners the word “simulation / simulator.”** Internal code/docs may keep those terms; UI copy must read as company infra (console, environment, lab, vCenter, Command Center, etc.).
+4. **Zero real cloud / vendor spend / physical GPU.** Emulators only; quotas + default-deny egress + idle teardown are mandatory.
+
+---
+
+## Technology inventory (Phase 0)
+
+| Tech | Backend | Frontend | Shared identity today | Real-engine vs facade | Status |
+|---|---|---|---|---|---|
+| VMware | `vmware_sim/engine.py` | `VMwareSimulator.jsx` | Partial (`vmware_bridge`) | **Target:** `vcsim` (govmomi). Today: facade | Bridge to terminal works for NIC/disk/power |
+| AWS | `aws_engine.py` + Zustand store | `AwsLabOverlay` | Partial (`aws_bridge`) | **Target:** LocalStack CE / OSS successor (verify license). Today: facade; FE store still often SoT | Bridge attach/power → terminal |
+| Linux terminal | `unified_sim` / `rhel_shell` | LabTerminal WS | Hub for bridges | **Target:** real per-session container/microVM. Today: Python shell facade | High fidelity facade |
+| AWX | `awx_engine.py` | `AwxSimulator.jsx` | Partial (ansible bridge) | Facade (no Tower API) | OK as facade |
+| Grafana/Prom | `monitoring_engine.py` | `MonitoringSimulator.jsx` | Cosmetic only | **Target:** real Prometheus+Grafana containers. Today: facade | Health not graded |
+| CI/CD | `cicd_engine.py` (grading) + FE mock | `CicdPipelineSim.jsx` | Isolated | **Target:** real job runner in sandbox. Today: toy | P0 rebuild |
+| Kubernetes | `k8s_engine.py` + `k8s_cluster.py` | No GUI wired to engine | Partial VMware↔kubectl | **Target:** kind/k3s. Today: dual unsynced facades | Orphan GUI engine |
+| GPU | none | terminal only | N/A | **Target:** mocked PCI/`nvidia-smi` via ServerIdentity. Today: broken grading | 87% check.sh auto-pass |
+| Windows | `windows_engine.py` | `WindowsServerSimulator` | Isolated | Facade + **SCCM patching (done)** | SCCM Software Center + scenario added |
+| Terraform | `terraform_engine.py` | TerraformSimulator | Partial file sync | Facade (no real terraform binary) | |
+| PeopleSoft | `peoplesoft_engine.py` | PeopleSoftSimulator | Isolated | Facade-only (no OSS) | |
+| Commvault | `commvault_engine.py` | CommvaultSimulator | Partial VM discovery | **Facade-only** (no public simulator) | Hero labs exist |
+| NetApp | `netapp_engine.py` | NetAppSimulator | Isolated | Facade vs ONTAP REST (vsim entitlement-gated opt-in later) | Hero lab |
+| Dell EMC | `dellemc_engine.py` | DellEmcSimulator | Isolated | **High-fidelity facade** (no redistributable sim) | Hero lab |
+| Datacenter | `datacenter_engine.py` | DatacenterSimulator | Isolated | Facade (physical always simulated). **Target:** VirtualBMC + sushy + MAAS later | Isometric UI |
+| SOC | `soc_engine.py` | SocSimulator | Isolated | **Target:** Suricata/Zeek + OpenSearch + Juice Shop. Today: facade | Hero labs |
+| Baremetal | `baremetal_engine.py` | BaremetalSimulator | Isolated | **Target:** MAAS + VirtualBMC. Today: facade | |
+| Nmap / Wireshark | engines | inline sims | Isolated | Target: real nmap/tshark in sandbox | Facades |
+| Jira | `jira_integration` | JiraUi | Yes (ops_state) | Real Jira Cloud optional; sim default | Coach bots OK |
+| Coding IDE | — | CodingIDE | N/A | Pyodide real for Python/JS | |
+
+---
+
+## Gap ledger
+
+### P0 — must finish for “real company infra” feel
+
+| ID | Gap | Root cause | Affected | Proposed fix | Done? |
+|---|---|---|---|---|---|
+| G-01 | No `ServerIdentity` | Each engine owns private JSON | all engines | Central service + Redis event bus | **Partial** — module + VMware/AWS seed + aws_bridge hooks |
+| G-02 | AWS FE store ≠ backend | Zustand localStorage is SoT | awsStore, aws_engine | Make backend authoritative; FE thin cache | Partial (`aws_bridge`) |
+| G-03 | Learner sees “simulation” | Copy in LabRunner, AWS, VMware, errors | frontend | Purge user-facing strings | **Done** (learner-facing pass) |
+| G-04 | GPU labs auto-pass | No engine; check.sh `exit 0` | scenarios/gpu | Mock GPU in ServerIdentity + real validate | Open |
+| G-05 | Ansible terminal labs auto-pass | No validate_ansible_lab | scenarios/ansible | Wire grading to shell state / AWX | Open |
+| G-06 | CI/CD is a toy | FE mock; cicd_engine not session-wired | CicdPipelineSim | Real sandbox job runner | Open |
+| G-07 | K8s dual engines | GUI engine orphaned | k8s_engine, k8s_cluster | Unify under kind + ServerIdentity | Open |
+
+### P1
+
+| ID | Gap | Proposed fix | Done? |
+|---|---|---|---|
+| G-10 | Thin scenario YAML | Schema + linter (Phase 3.1) | Open |
+| G-11 | Jira coach shallow | Acceptance-criteria coach (started) | Partial |
+| G-12 | Windows no SCCM/patching | Add SCCM console + scenarios | **Done** |
+| G-13 | Datacenter not cross-tech | Show Open Datacenter + shared ServerIdentity | **Done** (UI link; deeper identity merge still open) |
+| G-14 | Monitoring cosmetic | Real Prom/Grafana or feed validation | Open |
+
+### P2 / multi-sprint (real engines)
+
+| ID | Gap | Notes |
+|---|---|---|
+| G-20 | vcsim under VMware | Pool per session; ServerIdentity listens |
+| G-21 | Local AWS emulator | CI lint blocks real amazonaws.com |
+| G-22 | kind/k3s per session | Quotas + tear-down |
+| G-23 | Cyber range real tools | Juice Shop + Suricata + OpenSearch |
+| G-24 | Physical: VirtualBMC + sushy + MAAS | Phase 7 sequence |
+| G-25 | Three.js facility + 2D fallback | After 7.1–7.7 data model |
+| G-26 | Session pool / golden images | Cost control Phase 1.6 |
+
+---
+
+## Real vs facade decisions (locked for this pass)
+
+| Tech | Decision |
+|---|---|
+| VMware | Facade now → **vcsim** next sprint |
+| AWS | Facade + bridge now → **LocalStack/OSS** next (license check) |
+| Commvault | **Faithful facade** permanently (no public sim) |
+| Dell EMC | **High-fidelity facade** (published API shapes) |
+| NetApp | Facade default; real vsim **opt-in entitlement flag** only |
+| Terminal | Facade shell now → real container later |
+| GPU | Always **virtualized/mocked** device — never real GPU |
+| Datacenter / BMC | Facade now → VirtualBMC/sushy/MAAS later |
+| SOC | Facade now → real IDS/SIEM stack later |
+
+---
+
+## Baseline already verified (do not regress)
+
+- Interview round DELETE; interview TTS unlock
+- Lab companion strip; SimErrorBoundary
+- CloudShell SSH + SG; VMware NIC/disk bridge; AWS seed + Instance Connect sync
+- Jira @security / coach help; enterprise hero sims (Commvault/NetApp/Dell/DC/SOC)
+
+---
+
+## Resource footprint (Phase 1.6 — measured later)
+
+Not yet measured. Target after containerization: document CPU/RAM/disk per session type and concurrent capacity per host.
+
+---
+
+## Recommended next priorities after this commit
+
+1. Finish ServerIdentity adoption in VMware + AWS + Datacenter + Windows (read/write).
+2. Fix GPU + Ansible grading (correctness).
+3. Wire CI/CD to a real sandbox runner.
+4. Introduce vcsim behind a feature flag for VMware.
+5. Expand academy content + scenario linter.

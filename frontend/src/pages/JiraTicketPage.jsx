@@ -110,7 +110,7 @@ export default function JiraTicketPage() {
             </svg>
           </div>
           <span className="font-semibold text-sm tracking-tight">Jira</span>
-          <span className="hidden sm:inline text-[10px] uppercase tracking-wider text-[#DEEBFF]/70 ml-1">Simulation</span>
+          <span className="hidden sm:inline text-[10px] uppercase tracking-wider text-[#DEEBFF]/70 ml-1">Lab Jira</span>
         </div>
         <div className="flex-1 max-w-xl">
           <div className="relative">

@@ -15,7 +15,7 @@ export function createWindowsShell(vm) {
     const out = []
 
     if (lower === 'help') {
-      out.push('Windows PowerShell simulated shell')
+      out.push('Windows PowerShell')
       out.push('Get-Service, Get-Process, ipconfig, ping, hostname, systeminfo, sfc /scannow, chkdsk')
     } else if (lower === 'clear' || lower === 'cls') {
       return { lines: [], clear: true, prompt: prompt() }
@@ -43,7 +43,7 @@ export function createWindowsShell(vm) {
     } else if (lower.startsWith('get-eventlog')) {
       out.push('Index Time          EntryType   Source', '----- ----          ---------   ------', '  123 6/5/2026 8:01  Information Service Control Manager')
     } else if (lower.startsWith('restart-computer') || lower.startsWith('shutdown')) {
-      out.push('Simulated reboot initiated...')
+      out.push('Reboot initiated...')
     } else {
       out.push(`'${line.split(/\s+/)[0]}' is not recognized as an internal or external command,`, 'operable program or batch file.')
     }

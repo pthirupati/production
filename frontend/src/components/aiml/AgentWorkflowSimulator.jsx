@@ -310,9 +310,9 @@ export default function AgentWorkflowSimulator({
     try {
       const data = await aimlApi.getState(sessionId, slug)
       if (data) { setState(data); setError('') }
-      else setError('Could not load the agent workflow simulator')
+      else setError('Could not load the agent workflow console')
     } catch {
-      setError('Could not load the agent workflow simulator')
+      setError('Could not load the agent workflow console')
     }
   }, [sessionId, slug])
 

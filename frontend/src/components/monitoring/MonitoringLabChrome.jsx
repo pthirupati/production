@@ -23,7 +23,7 @@ export default function MonitoringLabChrome({
     <LabChromeBar
       className="mon-topbar"
       icon={Activity}
-      title={`${product} simulator`}
+      title={`${product} console`}
       subtitle={subtitle}
       accent={accent}
       onExit={onExit}

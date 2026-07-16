@@ -38,6 +38,11 @@ import {
   LazyNmapSimulator,
   LazyWiresharkSimulator,
   LazyCicdPipelineSim,
+  LazyCommvaultSimulator,
+  LazyNetAppSimulator,
+  LazyDellEmcSimulator,
+  LazyDatacenterSimulator,
+  LazySocSimulator,
   LazyCodingIDE,
   LazyPromptPlayground,
 } from '../components/lab/labSimLoader'
@@ -168,7 +173,7 @@ function buildGuidedSteps(scenario = {}) {
       commands: [],
       actions: [
         'Read the Jira ticket and scenario briefing.',
-        'Identify whether the work belongs in the terminal, simulator UI, or both.',
+        'Identify whether the work belongs in the terminal, the technology console, or both.',
         'Note the expected healthy state before changing anything.',
       ],
       verifyLabel: 'I understand the incident',
@@ -191,7 +196,7 @@ function buildGuidedSteps(scenario = {}) {
       commands: commands.slice(0, 2),
       actions: [
         'Re-run the same checks from the inspection step and confirm the unhealthy signal changed.',
-        'If this lab has a simulator, refresh it and confirm the UI now reflects the repaired state.',
+        'If this lab has a technology console, refresh it and confirm the UI now reflects the repaired state.',
         'Click Check Solution. If it fails, use the failed-objective feedback to return to the matching step.',
       ],
       verifyLabel: 'Run Check Solution',
@@ -396,6 +401,7 @@ export default function LabRunner() {
   const [showCicdSim, setShowCicdSim] = useState(false)
   const [simTerminalOpen, setSimTerminalOpen] = useState(false)
   const [showBaremetalSim, setShowBaremetalSim] = useState(false)
+  const [showDatacenterSim, setShowDatacenterSim] = useState(false)
   // Bumped by the sim error-boundary "Reset saved state" action to force a
   // clean remount of the primary simulator subtree after re-seeding its store.
   const [simResetNonce, setSimResetNonce] = useState(0)
@@ -681,7 +687,7 @@ export default function LabRunner() {
           }
           setSession(sessionData)
 
-          // Redirect pure VMware simulation labs to the dedicated vSphere simulator
+          // Redirect pure VMware labs to the dedicated vSphere simulator
           // UI. Cross-technology labs are NOT redirected — they open the Linux
           // terminal and merely surface an "Open VMware" link (handled below), since
           // the fix happens in the terminal after the VMware-side hardware change.
@@ -1471,6 +1477,7 @@ export default function LabRunner() {
     showMonitoringSim || showNmapSim || showWiresharkSim
     || showDataDashboardSim || showAgentSim || showWindowsSim || showPeopleSoftSim
     || showAwxSim || showBaremetalSim || showTerraformSim || showAwsSim || showCicdSim
+    || showDatacenterSim
   )
   const primarySimKind = isAwsLab ? 'aws'
     : isDevOpsPipelineLab ? 'cicd'
@@ -1535,6 +1542,23 @@ export default function LabRunner() {
   const explicitVmwareScenario = scenario?.vmware_link === true || /vmware|vcenter|vsphere/i.test(scenarioSlug)
   const vmwareServerHref = `/vmware/${sessionId}?scenario=${scenario?.slug || ''}`
   const showSimVmwareLink = isAwxLab || isMonitoringLab || isWindowsGuiLab || isCommvaultLab || (isTerraformSimLab && explicitVmwareScenario)
+  // Physical / rack work: open the datacenter floor for the same server when the
+  // scenario is physical-backed or the technology routinely needs rack ops.
+  const DC_CROSS_TECHS = new Set([
+    'baremetal', 'gpu', 'windows', 'vmware', 'commvault', 'netapp', 'dellemc',
+    'datacenter', 'linux', 'rhel', 'kubernetes',
+  ])
+  const explicitDatacenterScenario = scenario?.datacenter_link === true
+    || /datacenter|rack|physical|dc-|bmc|ipmi|pdu/.test(scenarioSlug)
+  const showDatacenterLink = !isDatacenterLab && (
+    explicitDatacenterScenario
+    || DC_CROSS_TECHS.has(scenario?.technology?.slug)
+    || isBaremetalGuiLab
+    || isWindowsGuiLab
+    || isCommvaultLab
+    || isNetappLab
+    || isDellemcLab
+  )
   const showTerminalVmwareLink = isVmBackedTerminalLab || (!isCrossTech && !isVmwareLab && explicitVmwareScenario)
   const showCrossTechVmwareLink = isCrossTech
   // Ansible terminal labs run playbooks from the shell, so the terminal stays
@@ -1574,7 +1598,7 @@ export default function LabRunner() {
         // stale in-memory state survives into the retry.
         key={`${primarySimKind}:${simResetNonce}`}
         name={primarySimKind}
-        title="Lab simulator error"
+        title="Lab environment error"
         resetStorageKey={isAws ? awsSimStorageKey(useAuthStore.getState().user?.id) : undefined}
         // AWS: wipe persisted blob AND re-seed the live store, then remount.
         onResetStorage={isAws ? () => { hardResetAwsSim(); setSimResetNonce((n) => n + 1) } : undefined}
@@ -2360,6 +2384,17 @@ export default function LabRunner() {
                   <ExternalLink size={12} /> Open VMware
                 </a>
               )}
+              {showDatacenterLink && (
+                <button
+                  type="button"
+                  onClick={() => setShowDatacenterSim(true)}
+                  className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-md border font-semibold"
+                  style={{ borderColor: 'rgba(249,115,22,.5)', color: '#fb923c', background: 'rgba(249,115,22,.12)' }}
+                  title="Same server in the data center — reseat NIC/disk, power, firmware"
+                >
+                  <ExternalLink size={12} /> Open Datacenter
+                </button>
+              )}
               {showAwxLink && (
                 <button
                   type="button"
@@ -2458,7 +2493,7 @@ export default function LabRunner() {
               rel="noopener noreferrer"
               className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-md border border-[#4fa7e8]/40 text-[#4fa7e8] bg-[#4fa7e8]/10 hover:bg-[#4fa7e8]/20 text-[10px] font-medium"
             >
-              <ExternalLink size={12} /> vCenter Simulator
+              <ExternalLink size={12} /> Open vCenter
             </Link>
           )}
           {showCrossTechVmwareLink && (
@@ -2467,11 +2502,22 @@ export default function LabRunner() {
               target="_blank"
               rel="noopener noreferrer"
               onClick={() => toast('After changing VMware hardware, return to the terminal and rescan or reboot so the guest sees it.', { icon: 'i', duration: 7000, ...TOAST })}
-              title="This server also lives in VMware. Open the vCenter simulator to perform the hypervisor-side step (e.g. add a disk), then return here and rescan/reboot."
+              title="This server also lives in VMware. Open vCenter to perform the hypervisor-side step (e.g. add a disk), then return here and rescan/reboot."
               className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-md border border-[#4fa7e8]/50 text-[#4fa7e8] bg-[#4fa7e8]/10 hover:bg-[#4fa7e8]/20 text-[10px] font-semibold"
             >
               <ExternalLink size={12} /> Open VMware (same server)
             </Link>
+          )}
+          {showDatacenterLink && (
+            <button
+              type="button"
+              onClick={() => setShowDatacenterSim(true)}
+              className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-md border text-[10px] font-semibold"
+              style={{ borderColor: 'rgba(249,115,22,.5)', color: '#fb923c', background: 'rgba(249,115,22,.12)' }}
+              title="Same server in the data center — reseat NIC/disk, power, firmware"
+            >
+              <ExternalLink size={12} /> Open Datacenter
+            </button>
           )}
           {showTerminalVmwareLink && (
             <Link
@@ -2479,7 +2525,7 @@ export default function LabRunner() {
               target="_blank"
               rel="noopener noreferrer"
               onClick={() => toast('After changing VMware hardware, return to the terminal and rescan or reboot so the guest sees it.', { icon: 'i', duration: 7000, ...TOAST })}
-              title="This server is hosted in VMware. Open the vCenter simulator to perform hypervisor-side steps (add a disk, snapshot, reboot), then return here and rescan."
+              title="This server is hosted in VMware. Open vCenter to perform hypervisor-side steps (add a disk, snapshot, reboot), then return here and rescan."
               className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-md border border-[#4fa7e8]/40 text-[#4fa7e8] bg-[#4fa7e8]/10 hover:bg-[#4fa7e8]/20 text-[10px] font-medium"
             >
               <ExternalLink size={12} /> VMware Server
@@ -2504,7 +2550,7 @@ export default function LabRunner() {
             <button
               type="button"
               onClick={() => setShowMonitoringSim(true)}
-              title="Open the in-app Grafana + Prometheus simulator to investigate dashboards, panels, targets, alert rules, and run PromQL. Apply the fix in the terminal, then Check Solution."
+              title="Open Grafana + Prometheus to investigate dashboards, panels, targets, alert rules, and run PromQL. Apply the fix in the terminal, then Check Solution."
               className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-md border text-[10px] font-semibold"
               style={{ borderColor: `${monitoringFlavor === 'prometheus' ? '#e6522c' : '#f7913b'}66`,
                        color: monitoringFlavor === 'prometheus' ? '#e6522c' : '#f7913b',
@@ -2605,7 +2651,7 @@ export default function LabRunner() {
             <button
               type="button"
               onClick={() => setShowTerraformSim(true)}
-              title="Open Terraform + AWS CLI simulator"
+              title="Open Terraform + AWS CLI"
               className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-md border text-[10px] font-semibold"
               style={{ borderColor: 'rgba(124,58,237,.45)', color: '#a78bfa', background: 'rgba(124,58,237,.14)' }}
             >
@@ -2616,7 +2662,7 @@ export default function LabRunner() {
             <button
               type="button"
               onClick={() => setShowAwsSim(true)}
-              title="Open the AWS Management Console simulator — EC2, S3, IAM, VPC, RDS, Lambda and more"
+              title="Open the AWS Management Console — EC2, S3, IAM, VPC, RDS, Lambda and more"
               className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-md border text-[10px] font-semibold"
               style={{ borderColor: 'rgba(255,153,0,.5)', color: '#ff9900', background: 'rgba(255,153,0,.12)' }}
             >
@@ -2627,7 +2673,7 @@ export default function LabRunner() {
             <button
               type="button"
               onClick={() => setShowCicdSim(true)}
-              title="Open CI/CD pipeline simulator — build, test, SonarQube, Argo CD deploy"
+              title="Open CI/CD pipeline — build, test, SonarQube, Argo CD deploy"
               className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-md border text-[10px] font-semibold"
               style={{ borderColor: 'rgba(56,189,248,.45)', color: '#38bdf8', background: 'rgba(56,189,248,.12)' }}
             >
@@ -3011,6 +3057,16 @@ export default function LabRunner() {
 
       {isBaremetalGuiLab && !isSimPrimaryLab && showBaremetalSim && (
         <LazySimPanel Sim={LazyBaremetalSimulator} label="bare metal" sessionId={sessionId} scenario={scenario} onExit={() => setShowBaremetalSim(false)} {...simChromeProps} />
+      )}
+      {showDatacenterLink && showDatacenterSim && (
+        <LazySimPanel
+          Sim={LazyDatacenterSimulator}
+          label="datacenter"
+          sessionId={sessionId}
+          scenario={scenario}
+          onExit={() => setShowDatacenterSim(false)}
+          {...simChromeProps}
+        />
       )}
 
       {isTerraformSimLab && !isSimPrimaryLab && showTerraformSim && (

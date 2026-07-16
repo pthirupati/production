@@ -87,7 +87,7 @@ export default function ConnectModal({ instance, onClose }) {
             </div>
             <label className="aws-label">User name</label>
             <input className="aws-input" value={user} onChange={(e) => setUser(e.target.value)} />
-            <div className="aws-hint">Suggested user for {instance.os}: {defaultUser(instance.os)}. This simulation creates the matching home directory and prompt.</div>
+            <div className="aws-hint">Suggested user for {instance.os}: {defaultUser(instance.os)}. This lab creates the matching home directory and prompt.</div>
             <div className="aws-hint" style={{ marginTop: 8 }}><strong>Lab engine:</strong> {workloadHint(workload)}</div>
           </div>
         )}
@@ -118,7 +118,7 @@ export default function ConnectModal({ instance, onClose }) {
           <div style={{ color: 'var(--aws-text-secondary)', lineHeight: 1.6 }}>
             <p>EC2 Serial Console connects to the instance serial port for boot and network troubleshooting.</p>
             <div className="aws-card" style={{ marginTop: 12 }}>
-              <div><strong>Serial console access:</strong> Enabled in simulation</div>
+              <div><strong>Serial console access:</strong> Enabled for this lab</div>
               <div><strong>Port:</strong> ttyS0</div>
               <div><strong>Login user:</strong> {user}</div>
             </div>
