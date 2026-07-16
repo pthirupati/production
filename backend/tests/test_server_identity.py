@@ -124,3 +124,19 @@ class ServerIdentityTests(SimpleTestCase):
         self.assertEqual(w["hostname"], "WIN-APP01")
         self.assertEqual(w["primary_ip"], "10.20.60.55")
         self.assertEqual(w["power"], "on")
+
+    def test_sync_k8s_nodes(self):
+        sid = "sess-k8s-sync"
+        self.addCleanup(si.drop_session, sid)
+        si.sync_k8s_nodes(sid, [
+            {"name": "node1", "status": "Ready", "roles": ["control-plane"],
+             "cpu_capacity": "8", "mem_capacity": "16Gi"},
+            {"name": "node3", "status": "NotReady", "roles": ["worker"],
+             "cpu_capacity": "4", "mem_capacity": "8Gi"},
+        ])
+        hosts = {s["hostname"]: s for s in si.list_servers(sid)}
+        self.assertEqual(hosts["node1"]["power"], "on")
+        self.assertEqual(hosts["node1"]["cpu"], 8)
+        self.assertEqual(hosts["node1"]["mem_mb"], 16384)
+        self.assertEqual(hosts["node3"]["power"], "off")
+        self.assertEqual(hosts["node1"]["tags"]["role"], "control-plane")

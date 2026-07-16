@@ -481,6 +481,64 @@ def sync_windows_host(session_id: str, world: dict | None) -> dict | None:
     return upsert_server(session_id, patch, source="windows")
 
 
+def _parse_k8s_cpu(value: str | None) -> int:
+    raw = (value or "4").strip().lower()
+    try:
+        if raw.endswith("m"):
+            return max(1, int(raw[:-1]) // 1000)
+        return max(1, int(float(raw)))
+    except (TypeError, ValueError):
+        return 4
+
+
+def _parse_k8s_mem_mb(value: str | None) -> int:
+    raw = (value or "8192Mi").strip()
+    try:
+        if raw.endswith("Gi"):
+            return int(float(raw[:-2]) * 1024)
+        if raw.endswith("Mi"):
+            return int(float(raw[:-2]))
+        if raw.endswith("Ki"):
+            return max(1, int(float(raw[:-2]) / 1024))
+        return int(float(raw))
+    except (TypeError, ValueError):
+        return 8192
+
+
+def sync_k8s_nodes(session_id: str, nodes: list[dict] | None) -> None:
+    """Mirror Kubernetes cluster nodes into this session's LabServer registry."""
+    for node in nodes or []:
+        if not isinstance(node, dict):
+            continue
+        name = (node.get("name") or "").strip()
+        if not name:
+            continue
+        status = (node.get("status") or "Unknown").lower()
+        roles = node.get("roles") or []
+        role = "control-plane" if any("control" in str(r) or r == "master" for r in roles) else "worker"
+        power = "on" if status == "ready" else "off"
+        upsert_server(
+            session_id,
+            {
+                "id": f"k8s-{name}",
+                "hostname": name,
+                "primary_ip": node.get("internal_ip") or node.get("ip") or "",
+                "cpu": _parse_k8s_cpu(node.get("cpu_capacity")),
+                "mem_mb": _parse_k8s_mem_mb(node.get("mem_capacity")),
+                "power": power,
+                "os": "rhel-9",
+                "tags": {
+                    "role": role,
+                    "persona": "kubernetes",
+                    "k8s_status": node.get("status") or "",
+                    "drain_state": node.get("drain_state") or "",
+                    "appears_in": ["kubernetes", "terminal"],
+                },
+            },
+            source="kubernetes",
+        )
+
+
 # Persona defaults for scenario-scoped LabServer seeding (terminal = this host).
 _PERSONA_DEFAULTS: dict[str, dict[str, Any]] = {
     "linux": {"hostname": "lab-server", "primary_ip": "10.20.30.41", "os": "rhel-9", "source": "linux"},
