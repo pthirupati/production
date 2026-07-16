@@ -19,11 +19,11 @@ Legend: `[x]` done · `[~]` partial · `[ ]` open
 - [x] VMware ↔ terminal NIC/disk/power bridge
 - [~] AWS ↔ terminal bridge (exists; FE Zustand still often SoT)
 - [x] `seed_scenario_lab_servers` + YAML `lab_servers` for heroes
-- [ ] Bidirectional sync: AWX
-- [ ] Bidirectional sync: Grafana / Prometheus
-- [ ] Bidirectional sync: Kubernetes
-- [ ] Bidirectional sync: GPU
-- [ ] Bidirectional sync: Windows
+- [x] Bidirectional sync: AWX
+- [x] Bidirectional sync: Grafana / Prometheus
+- [x] Bidirectional sync: Kubernetes
+- [~] Bidirectional sync: GPU (seed + set_gpu on modprobe; deepen grading next)
+- [x] Bidirectional sync: Windows
 - [ ] Bidirectional sync: Commvault / NetApp / Dell / SOC / Datacenter (beyond seed)
 - [ ] `physical_location` / `bmc` / `network_port` on every physical LabServer path
 - [ ] Event bus correlation/trace ID on every mutation
@@ -134,9 +134,10 @@ Legend: `[x]` done · `[~]` partial · `[ ]` open
 - [ ] Expand networking / identity / backup (Veeam) / Hyper-V as needed
 
 ## Ops / CI
-- [ ] Fix Health Check resolve job 403 (`issues: write`) — in progress
+- [x] Fix Health Check resolve job 403 (`issues: write`)
 - [ ] Interview TTS verified in prod after deploy
 - [ ] `migrate` + `seed_scenarios` for new techs in prod
+- [ ] Push `chore/vault-diagnose` (or merge) so health-check fix reaches production repo
 
 ---
 
