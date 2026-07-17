@@ -1,0 +1,122 @@
+title: Attach the Pending Persistent Disk Before the Data Import Job Runs
+slug: gcp-attach-persistent-disk
+technology: gcp
+category: Build
+difficulty: easy
+lab_mode: simulation
+simulation_type: gcp
+infrastructure_type: docker
+time_limit: 600
+max_score: 100
+is_free: true
+jira_priority: Medium
+dual_terminal: false
+description: 'CONTEXT: The data team provisioned a 100GB persistent disk last week for a one-time import
+  job that runs tonight, but nobody ever attached it to the instance that will run the job — the ticket
+  just says "disk-data-unattached is sitting there, please wire it up before the cron kicks off."
+
+  ENVIRONMENT: You are working in the Google Cloud Console against the FixItLab Enterprise Project.
+  web01 is the target instance; disk-data-unattached is a pd-ssd persistent disk currently not attached
+  to any instance.
+
+  SYMPTOM / STARTING STATE: Compute Engine > Disks shows disk-data-unattached with no instance listed
+  under "In use by". web01''s details page shows only its boot disk under Disks.
+
+  IMPACT: Tonight''s import job will fail immediately with "no such device" if the disk is not attached
+  and visible to the guest before the cron fires.
+
+  OBJECTIVE: In the Google Cloud Console, attach disk-data-unattached to web01 and confirm it now shows
+  as in use by web01.'
+initial_state: disk-data-unattached (100GB, pd-ssd) shows no instance under "In use by" and is not listed
+  under any instance's disks.
+objectives:
+- Sign in to the Google Cloud Console
+- Open Compute Engine > Disks and locate disk-data-unattached
+- Attach it to web01
+- Confirm the disk shows web01 as "In use by"
+hints:
+- order: 1
+  cost: 0
+  content: 'ORIENT — what to observe and why: Open Disks in the left nav and look at the "In use by"
+    column for every disk. Exactly one disk has no instance attached — note its size and type before
+    deciding where it should go.'
+- order: 2
+  cost: 10
+  content: 'APPROACH — the troubleshooting method: An unattached persistent disk with a job that needs it
+    tonight is a straightforward attach operation — you do not need to create a new disk, just wire the
+    existing one to the right instance.'
+- order: 3
+  cost: 25
+  content: 'WHICH TOOL — the diagnostic command(s): From web01''s details page -> Edit -> Additional
+    disks -> Attach existing disk -> select disk-data-unattached, or from the Disks list select the disk
+    and use "Attach to instance" -> choose web01 as the target.'
+- order: 4
+  cost: 40
+  content: 'NARROW DOWN — isolate the subsystem: There is only one instance (web01) and one unattached
+    disk (disk-data-unattached) in this project, so there is no ambiguity about which disk goes to which
+    instance.'
+- order: 5
+  cost: 60
+  content: 'NEAR-SOLUTION — the fix shape + verify (you still apply it): Attach disk-data-unattached to
+    web01 and confirm the Disks list now shows web01 under "In use by". WHY: the grader checks the
+    session''s GCP disk state, not just that you opened the attach dialog — you must complete the attach
+    action.'
+summary: Attach the pending persistent disk to the instance that needs it before tonight's import job
+  runs.
+estimated_minutes: 8
+xp_reward: 100
+prerequisites:
+- Basic cloud storage concepts (block storage vs. object storage)
+tags:
+- build
+- hands-on
+- gcp
+- storage
+linked_tutorial: gcp-fundamentals
+what_you_will_learn:
+- Attaching an existing GCP persistent disk to a running instance
+- Reading disk attachment state in the Cloud Console
+- Why data disks and boot disks are managed independently in GCP
+environment:
+  nodes:
+  - role: primary
+    os: Debian GNU/Linux 12
+    hostname: web01
+    ip: 10.128.0.4
+    specs: e2-medium (2 vCPU / 4 GiB) with a pending 100GB persistent disk to attach
+  pre_installed:
+  - gcp-console
+  credentials:
+  - user: admin@fixitlab.io
+    password: lab123
+tasks:
+- id: task_1
+  title: Attach disk-data-unattached to web01
+  description: Attach the unattached persistent disk to web01 from the Google Cloud Console and confirm
+    it shows as in use by web01.
+  background: 'This lab teaches the standard GCP persistent-disk workflow: disks and instances are
+    separate resources, and a disk provisioned ahead of time must be explicitly attached before the guest
+    can see it.'
+  validation:
+    type: custom_script
+    script: check.sh
+    error_message: Validation did not pass. Attach disk-data-unattached to web01 from the Cloud Console
+      Disks page.
+solution:
+  summary: Attach disk-data-unattached to web01 from either the instance's Disks section or the Disks
+    list directly.
+  files_changed: []
+  commands_run:
+  - 'Google Cloud Console: Compute Engine -> Disks -> disk-data-unattached -> Attach to instance -> web01'
+  reference_docs: gcp-fundamentals
+consoles:
+- gcp
+- terminal
+lab_servers:
+- id: web01
+  role: primary
+  hostname: web01
+  persona: gcp
+  appears_in:
+  - gcp
+  - terminal

@@ -53,6 +53,7 @@ TECH_META = {
     "datacenter": {"slug": "datacenter", "name": "Physical Data Center (DCIM)", "icon": "server", "color": "orange", "order": 42},
     "soc": {"slug": "soc", "name": "SOC / SIEM Analyst", "icon": "shield", "color": "red", "order": 43},
     "azure": {"slug": "azure", "name": "Microsoft Azure", "icon": "cloud", "color": "blue", "order": 44},
+    "gcp": {"slug": "gcp", "name": "Google Cloud Platform", "icon": "cloud", "color": "yellow", "order": 45},
 }
 
 

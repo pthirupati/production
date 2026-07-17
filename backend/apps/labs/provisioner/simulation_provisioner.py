@@ -340,6 +340,47 @@ def _seed_state_from_azure_vm(engine, session_id, slug: str) -> None:
         logger.exception("Azure VM seed skipped for session %s", session_id)
 
 
+def _is_gcp_lab(slug: str, raw_type: str) -> bool:
+    low = (slug or "").lower()
+    return (raw_type or "").lower() == "gcp" or low.startswith(("gcp-", "academy-gcp-"))
+
+
+def _seed_state_from_gcp_instance(engine, session_id, slug: str) -> None:
+    """Unified-server model (GCP): seed the lab terminal so it IS the primary
+    Compute Engine instance — hostname/IP/vCPU/RAM match whatever the learner
+    sees in the console (and stay in sync on later machine-type change via
+    gcp_bridge).
+    """
+    try:
+        from apps.vmware_sim.gcp_engine import get_state, _ensure, MACHINE_TYPES
+
+        sid = str(session_id)
+        _ensure(sid, slug)
+        state_inv = get_state(sid, slug) or {}
+        state = state_inv.get("state") or state_inv
+        instances = state.get("instances") or []
+        if not instances:
+            return
+        inst = instances[0]
+        size_info = MACHINE_TYPES.get(inst.get("machine_type") or "", {})
+        cpu = size_info.get("vcpus") or 2
+        mem_mb = int(size_info.get("ram_gb") or 4) * 1024
+        internal_ip = inst.get("internal_ip") or ""
+
+        shell_state = engine.shell.state
+        shell_state.set_hostname(inst.get("name") or "web01")
+        shell_state.set_hardware(cpu=cpu, mem_mb=mem_mb)
+        if internal_ip:
+            shell_state.set_host_ip(internal_ip)
+        try:
+            from .simulation.server_identity import sync_gcp_instance
+            sync_gcp_instance(sid, inst, machine_types=MACHINE_TYPES)
+        except Exception:
+            logger.exception("ServerIdentity GCP seed skipped for session %s", session_id)
+    except Exception:
+        logger.exception("GCP instance seed skipped for session %s", session_id)
+
+
 def _seed_gpu_identity_if_needed(engine, session_id, slug: str, sim_type: str) -> None:
     """Register a virtualized GPU node in ServerIdentity for GPU-track labs."""
     low = (slug or "").lower()
@@ -401,6 +442,8 @@ def ensure_sim_session(lab_session) -> dict | None:
         _seed_state_from_aws_ec2(engine, session_id, slug)
     elif fresh and _is_azure_lab(slug, raw_type):
         _seed_state_from_azure_vm(engine, session_id, slug)
+    elif fresh and _is_gcp_lab(slug, raw_type):
+        _seed_state_from_gcp_instance(engine, session_id, slug)
     if fresh:
         _seed_gpu_identity_if_needed(engine, session_id, slug, sim_type)
         try:
@@ -513,6 +556,10 @@ class SimulationProvisioner:
             from apps.vmware_sim.azure_engine import _ensure as azure_ensure
             azure_ensure(str(lab_session.id), slug)
             _seed_state_from_azure_vm(engine, lab_session.id, slug)
+        elif _is_gcp_lab(slug, raw_type):
+            from apps.vmware_sim.gcp_engine import _ensure as gcp_ensure
+            gcp_ensure(str(lab_session.id), slug)
+            _seed_state_from_gcp_instance(engine, lab_session.id, slug)
         else:
             _seed_hostname_for_persona(engine, slug, raw_type)
             _seed_gpu_identity_if_needed(engine, lab_session.id, slug, sim_type)
@@ -932,6 +979,24 @@ class SimulationProvisioner:
                 return validate_azure_lab(str(lab_session.id), slug)
             except LabSession.DoesNotExist:
                 return False, "Azure simulation session not found"
+        # Google Cloud Console (Compute Engine, VPC firewall, Persistent Disks).
+        _raw_gcp_type = sim_type
+        if not _raw_gcp_type or _raw_gcp_type == "generic":
+            from apps.labs.models import LabSession
+            try:
+                _gcp_session = LabSession.objects.select_related("scenario").get(container_id=resource_id)
+                _raw_gcp_type = (getattr(_gcp_session.scenario, "simulation_type", "") or "")
+            except LabSession.DoesNotExist:
+                _raw_gcp_type = ""
+        if _raw_gcp_type == "gcp" or low_slug.startswith("gcp-"):
+            from apps.labs.models import LabSession
+            from apps.vmware_sim.gcp_engine import validate_gcp_lab, _ensure as gcp_ensure
+            try:
+                lab_session = LabSession.objects.get(container_id=resource_id)
+                gcp_ensure(str(lab_session.id), slug)
+                return validate_gcp_lab(str(lab_session.id), slug)
+            except LabSession.DoesNotExist:
+                return False, "GCP simulation session not found"
         # Monitoring (Grafana / Prometheus observability). Legacy simulation_type
         # "monitoring"/"loki"/"alertmanager"/"promql" normalize to grafana/prometheus;
         # gate on the normalized persona, the RAW scenario type, or the slug. The
@@ -1088,7 +1153,7 @@ class SimulationProvisioner:
         except Exception:  # noqa: BLE001
             pass
         for engine_module in ("commvault_engine", "netapp_engine", "dellemc_engine",
-                               "datacenter_engine", "soc_engine", "azure_engine"):
+                               "datacenter_engine", "soc_engine", "azure_engine", "gcp_engine"):
             try:
                 mod = __import__(f"apps.vmware_sim.{engine_module}", fromlist=["drop_session"])
                 mod.drop_session(str(session.id))
@@ -1098,6 +1163,12 @@ class SimulationProvisioner:
             from apps.labs.provisioner.simulation.azure_bridge import clear as clear_azure_bridge
 
             clear_azure_bridge(str(session.id))
+        except Exception:  # noqa: BLE001
+            pass
+        try:
+            from apps.labs.provisioner.simulation.gcp_bridge import clear as clear_gcp_bridge
+
+            clear_gcp_bridge(str(session.id))
         except Exception:  # noqa: BLE001
             pass
         drop_sim_session(str(session.id))

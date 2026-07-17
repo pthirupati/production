@@ -681,6 +681,33 @@ def sync_azure_vm(session_id: str, vm: dict | None, *, vm_sizes: dict | None = N
     return upsert_server(session_id, patch, source="azure")
 
 
+def sync_gcp_instance(session_id: str, instance: dict | None, *, machine_types: dict | None = None) -> dict | None:
+    """Mirror the GCP console's primary Compute Engine instance into this
+    session's LabServer registry — same one-server-per-session model as
+    AWS/Azure/VMware."""
+    if not isinstance(instance, dict):
+        return None
+    size_info = (machine_types or {}).get(instance.get("machine_type") or "", {})
+    status = instance.get("status") or "RUNNING"
+    patch: dict[str, Any] = {
+        "id": f"gcp-{instance.get('name') or 'vm'}",
+        "hostname": instance.get("name") or "gcp-vm",
+        "primary_ip": instance.get("internal_ip") or "",
+        "cpu": size_info.get("vcpus") or 2,
+        "mem_mb": int(size_info.get("ram_gb") or 4) * 1024,
+        "power": "on" if status in ("RUNNING", "PROVISIONING") else ("reboot_pending" if status == "REPAIRING" else "off"),
+        "os": instance.get("os") or "linux",
+        "tags": {
+            "role": "primary",
+            "persona": "gcp",
+            "machine_type": instance.get("machine_type") or "",
+            "zone": instance.get("zone") or "",
+            "appears_in": ["gcp", "terminal"],
+        },
+    }
+    return upsert_server(session_id, patch, source="gcp")
+
+
 def sync_k8s_nodes(session_id: str, nodes: list[dict] | None) -> None:
     """Mirror Kubernetes cluster nodes into this session's LabServer registry."""
     for node in nodes or []:
@@ -734,6 +761,7 @@ _PERSONA_DEFAULTS: dict[str, dict[str, Any]] = {
     "dellemc": {"hostname": "powermax-array-01", "primary_ip": "10.20.150.10", "os": "powermax-os", "source": "dellemc"},
     "storage": {"hostname": "storage-array-01", "primary_ip": "10.20.160.10", "os": "storage-os", "source": "storage"},
     "azure": {"hostname": "vm-web01", "primary_ip": "10.10.1.4", "os": "linux", "source": "azure"},
+    "gcp": {"hostname": "web01", "primary_ip": "10.128.0.4", "os": "linux", "source": "gcp"},
 }
 
 

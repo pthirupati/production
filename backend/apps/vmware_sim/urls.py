@@ -5,6 +5,9 @@ from .views import (
     AzureSimActionView,
     AzureSimReleaseView,
     AzureSimStateView,
+    GcpSimActionView,
+    GcpSimReleaseView,
+    GcpSimStateView,
     AimlSimActionView,
     AimlSimReleaseView,
     AimlSimStateView,
@@ -158,6 +161,11 @@ urlpatterns = [
     path("azure/sessions/<uuid:session_id>/", AzureSimStateView.as_view(), name="azure-sim-state"),
     path("azure/sessions/<uuid:session_id>/action/", AzureSimActionView.as_view(), name="azure-sim-action"),
     path("azure/sessions/<uuid:session_id>/release/", AzureSimReleaseView.as_view(), name="azure-sim-release"),
+
+    # Google Cloud Console simulation
+    path("gcp/sessions/<uuid:session_id>/", GcpSimStateView.as_view(), name="gcp-sim-state"),
+    path("gcp/sessions/<uuid:session_id>/action/", GcpSimActionView.as_view(), name="gcp-sim-action"),
+    path("gcp/sessions/<uuid:session_id>/release/", GcpSimReleaseView.as_view(), name="gcp-sim-release"),
 
     # Physical datacenter (DCIM) simulation
     path("datacenter/sessions/<uuid:session_id>/", DatacenterSimStateView.as_view(), name="datacenter-sim-state"),

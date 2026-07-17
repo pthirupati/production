@@ -1,0 +1,129 @@
+title: GCP Instance Undersized for Its Workload — Change Machine Type Before the Next Batch Run
+slug: gcp-instance-undersized-resize
+technology: gcp
+category: Fix
+difficulty: easy
+lab_mode: simulation
+simulation_type: gcp
+infrastructure_type: docker
+time_limit: 600
+max_score: 100
+is_free: true
+jira_priority: High
+dual_terminal: true
+description: 'CONTEXT: The application team paged on-call because web01 keeps getting OOM-killed during
+  the nightly batch job and `top` shows sustained CPU saturation. The ticket says the instance was
+  provisioned months ago on a shared-core machine type that never got revisited as traffic grew.
+
+  ENVIRONMENT: You are working in the Google Cloud Console against the FixItLab Enterprise Project.
+  web01 lives in vpc-prod / subnet-us-central1 / us-central1-a. The SAME web01 is also the host you SSH
+  into over the lab terminal for this session — whatever machine type you pick in the console is what
+  `nproc` and `free -h` report on that terminal, exactly like a real Compute Engine instance.
+
+  SYMPTOM / STARTING STATE: web01 is running on e2-micro (2 shared vCPU / 1 GiB RAM) — a machine type
+  meant for light, intermittent load, not a nightly batch job. Running `nproc` and `free -h` on the
+  terminal confirms only a couple of shared cores and ~1GiB are available to the guest right now.
+
+  IMPACT: Every night the batch job OOM-kills and the on-call gets paged again. This will keep happening
+  until the instance is changed to a machine type with more dedicated vCPU and RAM headroom.
+
+  OBJECTIVE: In the Google Cloud Console, stop web01, change its machine type to one with more vCPU and
+  RAM (e2-standard-2 or larger), start it back up, and confirm on the lab terminal that `nproc` and
+  `free -h` now report the new, larger vCPU/RAM allocation.'
+initial_state: Google Cloud Console showing web01 on e2-micro (2 shared vCPU / 1 GiB), RUNNING. Terminal
+  `nproc` reports 2 and `free -h` reports ~1GiB total.
+objectives:
+- Sign in to the Google Cloud Console
+- Open Compute Engine > VM instances and select web01
+- Stop web01, change its machine type to one with more vCPU and RAM (e2-standard-2 or larger), and start it again
+- Confirm on the lab terminal that nproc and free -h now report the new machine type's allocation
+hints:
+- order: 1
+  cost: 0
+  content: 'ORIENT — what to observe and why: Before touching anything, run `nproc` and `free -h` on the
+    lab terminal and note the current vCPU/RAM. Then open the Cloud Console, go to Compute Engine > VM
+    instances > web01, and confirm the "Machine type" field matches what the terminal is reporting.'
+- order: 2
+  cost: 10
+  content: 'APPROACH — the troubleshooting method: An OOM-killed nightly job on sustained CPU saturation
+    is a capacity problem, not a configuration bug — the fix is changing the instance to a machine type
+    with more vCPU/RAM, not tuning the application. GCP requires the instance to be STOPPED before its
+    machine type can be changed.'
+- order: 3
+  cost: 25
+  content: 'WHICH TOOL — the diagnostic command(s): In the console, select web01 -> Stop -> once
+    TERMINATED, open Edit -> Machine type -> pick a type with more vCPU/RAM (e.g. e2-standard-2: 2 vCPU
+    / 8 GiB) -> Save -> Start. On the terminal, `nproc` and `free -h` (or `cat /proc/cpuinfo` /
+    `cat /proc/meminfo`) will show the new allocation the next time you run them.'
+- order: 4
+  cost: 40
+  content: 'NARROW DOWN — isolate the subsystem: Any machine type strictly larger than e2-micro clears
+    the "undersized" condition — e2-standard-2 (2 vCPU / 8 GiB) is a safe, realistic pick for a web/batch
+    workload. Don''t change any other instance; there is only one instance in this project.'
+- order: 5
+  cost: 60
+  content: 'NEAR-SOLUTION — the fix shape + verify (you still apply it): Stop web01, set its machine type
+    to e2-standard-2 (or larger), start it again, and wait for RUNNING. Then on the terminal run `nproc`
+    (expect 2 or more dedicated vCPU) and `free -h` (expect several GiB total). WHY: the grader checks
+    that the session''s GCP instance machine type actually changed AND that the guest hardware reflects
+    it — picking a type in the dropdown without saving and restarting does not count.'
+summary: Change the machine type of the undersized GCP instance before the next nightly batch job
+  OOM-kills it again, and confirm the new vCPU/RAM inside the guest.
+estimated_minutes: 10
+xp_reward: 100
+prerequisites:
+- Basic Linux (nproc, free)
+tags:
+- fix
+- hands-on
+- gcp
+- compute-engine
+- cloud
+linked_tutorial: gcp-fundamentals
+what_you_will_learn:
+- Changing a Compute Engine instance's machine type from the Cloud Console
+- Reading vCPU/RAM allocation from nproc and free -h
+- Recognizing a capacity problem vs. a configuration problem
+environment:
+  nodes:
+  - role: primary
+    os: Debian GNU/Linux 12
+    hostname: web01
+    ip: 10.128.0.4
+    specs: e2-micro (2 shared vCPU / 1 GiB) -> resize target e2-standard-2 (2 vCPU / 8 GiB)
+  pre_installed:
+  - gcp-console
+  credentials:
+  - user: admin@fixitlab.io
+    password: lab123
+tasks:
+- id: task_1
+  title: Change web01's machine type and confirm the guest sees the new size
+  description: Stop web01, change its machine type to one with more vCPU/RAM from the Cloud Console,
+    start it again, then confirm nproc and free -h on the terminal report the new allocation.
+  background: 'This lab teaches the standard GCP capacity-management response: identify the undersized
+    instance, change its machine type in the console, and confirm the change from inside the guest — the
+    same workflow used across every cloud provider.'
+  validation:
+    type: custom_script
+    script: check.sh
+    error_message: Validation did not pass. Stop web01, change its machine type to one with more
+      vCPU/RAM, and start it again.
+solution:
+  summary: Stop web01, change its machine type from e2-micro to e2-standard-2 (or larger), and start it
+    again.
+  files_changed: []
+  commands_run:
+  - 'Google Cloud Console: Compute Engine -> VM instances -> web01 -> Stop -> Edit -> Machine type -> e2-standard-2 -> Save -> Start'
+  reference_docs: gcp-fundamentals
+consoles:
+- gcp
+- terminal
+lab_servers:
+- id: web01
+  role: primary
+  hostname: web01
+  persona: gcp
+  appears_in:
+  - gcp
+  - terminal

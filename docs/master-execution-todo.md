@@ -77,6 +77,17 @@ Legend: `[x]` done · `[~]` partial · `[ ]` open
 ## Phase 3 — Cross-cutting systems
 - [x] 3.1 Scenario schema + hero linter in CI
 - [ ] 3.1 Catalog migration + enricher at scale
+- [~] CI/CD real sandbox runner — investigated in depth. `cicd_engine.py` is a complete, well-tested,
+      fail-closed backend (derives outcome from job image/needs/manual-gate state, never a free
+      green/red toggle) but is genuinely orphaned: no scenario opts into it, and the frontend
+      `CicdPipelineSim.jsx` (647 lines + PipelineGraph/JobConsole/pipelineEngine/pipelineParser, ~2000
+      more) is a rich, already-working, YAML-driven multi-provider (GitLab/GitHub/Jenkins) pipeline UI
+      with its OWN parsed-model execution — not a fake toggle either, just not backend-authoritative.
+      Wiring them together risks a bad mapping between "arbitrary parsed YAML" and cicd_engine's fixed
+      3-job shape, which could make a *valid* learner fix grade as failing — worse than today's status
+      quo. Decision: leave both exactly as they are (zero regression risk) until a dedicated pass can
+      afford to either (a) constrain new hero labs to cicd_engine's exact job shape with a purpose-built
+      thin UI, or (b) extend cicd_engine to accept an arbitrary parsed-YAML job graph as input.
 - [x] 3.2 Chaos engine foundation
 - [x] 3.2 Wire chaos into VMware / Windows / NetApp / AWX / SOC (drop_nic/stop_service/fill_disk).
       AWS and Dell EMC intentionally left unwired — audited both engines' actual `broken` marker
@@ -90,7 +101,13 @@ Legend: `[x]` done · `[~]` partial · `[ ]` open
       ServerIdentity sync (`sync_azure_vm`), 3 hero labs (resize-undersized-VM, NSG-blocks-SSH with real
       priority-ordered rule evaluation, attach-pending-managed-disk), fail-closed grading, full dispatch wiring,
       and a real frontend console (`AzureConsole.jsx`) with zero local state duplication (every action round-trips
-      to the backend — avoids the AWS Zustand-drift gap by construction). GCP/OpenStack/OpenShift packs still open.
+      to the backend — avoids the AWS Zustand-drift gap by construction).
+- [x] New pack: Google Cloud Platform — Console (VPC/Firewall rules with real priority-ordered allow/deny
+      evaluation/VM instances/Persistent Disks), server-authoritative backend (`gcp_engine.py`) + cross-tech
+      bridge (`gcp_bridge.py` — machine-type change really changes `nproc`/`free -h` in the SAME session's
+      guest) + `sync_gcp_instance` + full dispatch/seed wiring + `GcpConsole.jsx` (zero local state
+      duplication, same pattern as Azure). 3 hero labs, 22 new backend tests, full catalog lint clean.
+      OpenStack/OpenShift packs still open.
 - [ ] 3.3 Learner SSO identity + RBAC across consoles
 - [ ] 3.4 Cross-engine trace IDs
 - [ ] 3.5 Session lifecycle manager
