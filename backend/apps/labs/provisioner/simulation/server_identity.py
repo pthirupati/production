@@ -655,6 +655,32 @@ def sync_soc_assets(session_id: str, assets: list[dict] | None) -> None:
         )
 
 
+def sync_azure_vm(session_id: str, vm: dict | None, *, vm_sizes: dict | None = None) -> dict | None:
+    """Mirror the Azure console's primary VM into this session's LabServer
+    registry — same one-server-per-session model as AWS/VMware."""
+    if not isinstance(vm, dict):
+        return None
+    size_info = (vm_sizes or {}).get(vm.get("size") or "", {})
+    power = vm.get("power_state") or "running"
+    patch: dict[str, Any] = {
+        "id": f"azure-{vm.get('name') or 'vm'}",
+        "hostname": vm.get("name") or "azure-vm",
+        "primary_ip": vm.get("private_ip") or "",
+        "cpu": size_info.get("vcpus") or 2,
+        "mem_mb": int(size_info.get("ram_gb") or 4) * 1024,
+        "power": "on" if power in ("running", "starting") else ("reboot_pending" if power == "restarting" else "off"),
+        "os": vm.get("os") or "linux",
+        "tags": {
+            "role": "primary",
+            "persona": "azure",
+            "size": vm.get("size") or "",
+            "resource_group": vm.get("resource_group") or "",
+            "appears_in": ["azure", "terminal"],
+        },
+    }
+    return upsert_server(session_id, patch, source="azure")
+
+
 def sync_k8s_nodes(session_id: str, nodes: list[dict] | None) -> None:
     """Mirror Kubernetes cluster nodes into this session's LabServer registry."""
     for node in nodes or []:
@@ -707,6 +733,7 @@ _PERSONA_DEFAULTS: dict[str, dict[str, Any]] = {
     "netapp": {"hostname": "ontap-cluster-01", "primary_ip": "10.20.140.10", "os": "ontap", "source": "netapp"},
     "dellemc": {"hostname": "powermax-array-01", "primary_ip": "10.20.150.10", "os": "powermax-os", "source": "dellemc"},
     "storage": {"hostname": "storage-array-01", "primary_ip": "10.20.160.10", "os": "storage-os", "source": "storage"},
+    "azure": {"hostname": "vm-web01", "primary_ip": "10.10.1.4", "os": "linux", "source": "azure"},
 }
 
 

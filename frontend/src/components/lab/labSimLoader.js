@@ -29,6 +29,7 @@ export const LazyNetAppSimulator = lazyWithRetry(() => import('../netapp/NetAppS
 export const LazyDellEmcSimulator = lazyWithRetry(() => import('../dellemc/DellEmcSimulator'))
 export const LazyDatacenterSimulator = lazyWithRetry(() => import('../datacenter/DatacenterSimulator'))
 export const LazySocSimulator = lazyWithRetry(() => import('../soc/SocSimulator'))
+export const LazyAzureConsole = lazyWithRetry(() => import('../azure/AzureConsole'))
 
 export const PRIMARY_SIM_COMPONENTS = {
   aws: LazyAwsLabOverlay,
@@ -48,4 +49,5 @@ export const PRIMARY_SIM_COMPONENTS = {
   dellemc: LazyDellEmcSimulator,
   datacenter: LazyDatacenterSimulator,
   soc: LazySocSimulator,
+  azure: LazyAzureConsole,
 }

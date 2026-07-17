@@ -1467,11 +1467,17 @@ export default function LabRunner() {
     || scenario?.technology?.slug === 'soc'
     || (scenario?.slug || '').startsWith('soc-')
   )
+  const isAzureLab = !isCrossTech && (
+    scenario?.simulation_type === 'azure'
+    || scenario?.technology?.slug === 'azure'
+    || (scenario?.slug || '').startsWith('azure-')
+    || (scenario?.slug || '').startsWith('academy-azure-')
+  )
   const isSimPrimaryLab = !isCrossTech && (
     isAwsLab || isDevOpsPipelineLab || isTerraformSimLab || isAwxLab || isMonitoringLab || isWindowsGuiLab
     || isPeopleSoftLab || isBaremetalGuiLab || isDataDashboardLab || isAgentLab
     || isNmapLab || isWiresharkLab
-    || isCommvaultLab || isNetappLab || isDellemcLab || isDatacenterLab || isSocLab
+    || isCommvaultLab || isNetappLab || isDellemcLab || isDatacenterLab || isSocLab || isAzureLab
   )
   const simOverlayOpen = !isSimPrimaryLab && (
     showMonitoringSim || showNmapSim || showWiresharkSim
@@ -1496,6 +1502,7 @@ export default function LabRunner() {
     : isDellemcLab ? 'dellemc'
     : isDatacenterLab ? 'datacenter'
     : isSocLab ? 'soc'
+    : isAzureLab ? 'azure'
     : null
   const solved = validationResult?.passed
   const expired = validationResult?.expired

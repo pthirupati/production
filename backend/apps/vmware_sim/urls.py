@@ -2,6 +2,9 @@ from django.urls import path
 
 from .views import (
     ActiveFaultsView,
+    AzureSimActionView,
+    AzureSimReleaseView,
+    AzureSimStateView,
     AimlSimActionView,
     AimlSimReleaseView,
     AimlSimStateView,
@@ -150,6 +153,11 @@ urlpatterns = [
     # Cross-console fault ledger (Phase 3.2/3.4) — any console for a session
     # can list what's currently broken, regardless of which engine caused it.
     path("sessions/<uuid:session_id>/faults/", ActiveFaultsView.as_view(), name="active-faults"),
+
+    # Microsoft Azure Portal simulation
+    path("azure/sessions/<uuid:session_id>/", AzureSimStateView.as_view(), name="azure-sim-state"),
+    path("azure/sessions/<uuid:session_id>/action/", AzureSimActionView.as_view(), name="azure-sim-action"),
+    path("azure/sessions/<uuid:session_id>/release/", AzureSimReleaseView.as_view(), name="azure-sim-release"),
 
     # Physical datacenter (DCIM) simulation
     path("datacenter/sessions/<uuid:session_id>/", DatacenterSimStateView.as_view(), name="datacenter-sim-state"),

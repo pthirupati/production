@@ -72,6 +72,20 @@ class RHELShell:
         if line.startswith("#"):
             return ""
 
+        # Cross-tech: apply any Azure Portal VM resize queued for this session
+        # before running the command, so nproc/free/lscpu always reflect the
+        # size currently selected in the portal (master-prompt canonical
+        # example: "Resize VM -> CPU and RAM change inside Linux").
+        session_id = getattr(self.state, "session_id", None)
+        if session_id:
+            try:
+                from .azure_bridge import consume_pending_resize
+                resize = consume_pending_resize(session_id)
+                if resize:
+                    self.state.set_hardware(cpu=resize.get("vcpus"), mem_mb=int(resize.get("ram_gb", 4)) * 1024)
+            except Exception:
+                pass
+
         # Command-list operators. A real shell splits on `;` (run sequentially,
         # ignoring exit codes), `&&` (run next only on success) and `||` (run
         # next only on failure). We handle them here — before dispatch — so any

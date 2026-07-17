@@ -1,0 +1,130 @@
+title: Network Security Group Silently Blocking SSH to a Production VM
+slug: azure-nsg-blocks-ssh
+technology: azure
+category: Troubleshoot
+difficulty: medium
+lab_mode: simulation
+simulation_type: azure
+infrastructure_type: docker
+time_limit: 900
+max_score: 100
+is_free: true
+jira_priority: Critical
+dual_terminal: true
+description: 'CONTEXT: A deploy engineer opened a ticket saying `ssh vm-web01` has been timing out for
+  the last hour with no changes to their SSH key or client — "connection timed out", not "connection
+  refused" or "permission denied". That distinction matters: a timeout at the network layer, not the
+  application layer.
+
+
+  ENVIRONMENT: vm-web01 sits in rg-fixitlab-prod / vnet-prod / snet-web, protected by nsg-web. The
+  Network Security Groups blade in the Azure Portal evaluates inbound rules in priority order (lowest
+  number first) — the first rule that matches a port wins, exactly like production Azure.
+
+
+  SYMPTOM / STARTING STATE: vm-web01 is Running and reachable on the network, but nsg-web has no rule
+  explicitly allowing inbound TCP/22 — only AllowHTTP (TCP/80) and the built-in DenyAllInbound catch-all
+  at priority 4096. Every inbound SSH attempt falls through to that deny rule and times out.
+
+
+  IMPACT: The on-call deploy engineer cannot SSH in to roll back a bad release. Every minute this stays
+  broken is a minute the bad release keeps serving production traffic.
+
+
+  OBJECTIVE: Open nsg-web in the Azure Portal, add an inbound rule allowing TCP/22 from the internet with
+  a priority lower (more urgent) than the DenyAllInbound catch-all, and confirm SSH reachability returns.'
+initial_state: nsg-web has AllowHTTP (priority 100, TCP/80) and DenyAllInbound (priority 4096, all ports)
+  but no rule for TCP/22 — SSH times out.
+objectives:
+- Sign in to the Azure Portal
+- Open Network security groups and select nsg-web
+- Add an inbound rule allowing TCP/22 with a priority below 4096
+- Confirm SSH reachability to vm-web01 is restored
+hints:
+- order: 1
+  cost: 0
+  content: 'ORIENT — what to observe and why: A "connection timed out" (not "refused" or "permission
+    denied") on SSH almost always means a network ACL/firewall is silently dropping the packets before
+    they ever reach sshd — check the NSG attached to the VM''s subnet before touching anything on the
+    guest itself.'
+- order: 2
+  cost: 10
+  content: 'APPROACH — the troubleshooting method: Open Network security groups -> nsg-web -> Inbound
+    security rules. Azure evaluates these in priority order, lowest number first, and stops at the first
+    match. List every rule and its priority/port before deciding what''s missing.'
+- order: 3
+  cost: 25
+  content: 'WHICH TOOL — the diagnostic command(s): You will see AllowHTTP (priority 100, TCP/80) and
+    DenyAllInbound (priority 4096, all ports, built-in — cannot be deleted). There is no rule for TCP/22
+    in between, so every SSH attempt falls through to the deny at 4096.'
+- order: 4
+  cost: 40
+  content: 'NARROW DOWN — isolate the subsystem: Add a new inbound rule — name it AllowSSH, protocol TCP,
+    destination port 22, source *, action Allow — with a priority number LOWER than 4096 (e.g. 110) so it
+    is evaluated before the catch-all deny.'
+- order: 5
+  cost: 60
+  content: 'NEAR-SOLUTION — the fix shape + verify (you still apply it): In nsg-web -> Add inbound rule,
+    set port 22, priority 110, action Allow, and save. WHY: the grader checks that nsg-web now has an
+    Allow rule for port 22 at a priority below the deny catch-all — the console''s own rule evaluation
+    (not a scripted flag) is what determines whether SSH is reachable, so the priority number matters,
+    not just adding "a" rule.'
+summary: Add the missing inbound NSG rule for SSH/22 before the deny-all catch-all blocks it, restoring
+  SSH access to vm-web01.
+estimated_minutes: 12
+xp_reward: 100
+prerequisites:
+- Basic networking (ACLs, firewall rule ordering)
+tags:
+- troubleshoot
+- hands-on
+- azure
+- networking
+- security
+linked_tutorial: azure-fundamentals
+what_you_will_learn:
+- How Azure NSG inbound rules are evaluated by priority
+- Diagnosing a network-layer block vs. an application-layer auth failure
+- Adding a correctly-prioritized NSG rule without breaking the deny-all baseline
+environment:
+  nodes:
+  - role: primary
+    os: Ubuntu 22.04 LTS
+    hostname: vm-web01
+    ip: 10.10.1.4
+    specs: Standard_B2s (2 vCPU / 4 GiB) behind nsg-web with no inbound rule for TCP/22
+  pre_installed:
+  - azure-portal
+  credentials:
+  - user: admin@fixitlab.onmicrosoft.com
+    password: lab123
+tasks:
+- id: task_1
+  title: Open inbound SSH on nsg-web
+  description: Add an inbound NSG rule allowing TCP/22 at a priority below the deny-all catch-all, and
+    confirm SSH reachability returns.
+  background: 'This lab teaches real Azure NSG rule evaluation: rules are processed in priority order,
+    lowest number first, and the first match wins — a missing allow rule silently falls through to the
+    deny-all baseline every subnet gets by default.'
+  validation:
+    type: custom_script
+    script: check.sh
+    error_message: Validation did not pass. Add an inbound rule on nsg-web allowing TCP/22 at a priority
+      below 4096.
+solution:
+  summary: Add an inbound rule (AllowSSH, TCP/22, priority 110, Allow) to nsg-web.
+  files_changed: []
+  commands_run:
+  - 'Azure Portal: Network security groups -> nsg-web -> Add inbound security rule -> TCP/22, priority 110, Allow'
+  reference_docs: azure-fundamentals
+consoles:
+- azure
+- terminal
+lab_servers:
+- id: vm-web01
+  role: primary
+  hostname: vm-web01
+  persona: azure
+  appears_in:
+  - azure
+  - terminal

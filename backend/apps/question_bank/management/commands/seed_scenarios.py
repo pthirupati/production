@@ -52,6 +52,7 @@ TECH_META = {
     "dellemc": {"slug": "dellemc", "name": "Dell EMC Unisphere / PowerMax", "icon": "server", "color": "blue", "order": 41},
     "datacenter": {"slug": "datacenter", "name": "Physical Data Center (DCIM)", "icon": "server", "color": "orange", "order": 42},
     "soc": {"slug": "soc", "name": "SOC / SIEM Analyst", "icon": "shield", "color": "red", "order": 43},
+    "azure": {"slug": "azure", "name": "Microsoft Azure", "icon": "cloud", "color": "blue", "order": 44},
 }
 
 

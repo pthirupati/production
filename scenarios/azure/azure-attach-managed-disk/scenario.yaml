@@ -1,0 +1,125 @@
+title: Attach the Pending Managed Disk Before the Data Import Job Runs
+slug: azure-attach-managed-disk
+technology: azure
+category: Build
+difficulty: easy
+lab_mode: simulation
+simulation_type: azure
+infrastructure_type: docker
+time_limit: 600
+max_score: 100
+is_free: true
+jira_priority: Medium
+dual_terminal: false
+description: 'CONTEXT: The data team provisioned a 128GB managed disk last week for a one-time import
+  job that runs tonight, but nobody ever attached it to the VM that will run the job — the ticket just
+  says "disk-data-unattached is sitting there, please wire it up before the cron kicks off."
+
+
+  ENVIRONMENT: You are working in the Azure Portal against rg-fixitlab-prod. vm-web01 is the target VM;
+  disk-data-unattached is a Standard_SSD_LRS managed disk currently in the "Unattached" state, not
+  associated with any VM.
+
+
+  SYMPTOM / STARTING STATE: Disks blade shows disk-data-unattached with State = Unattached. vm-web01''s
+  Overview shows only its OS disk under Disks.
+
+
+  IMPACT: Tonight''s import job will fail immediately with "no such device" if the disk is not attached
+  and visible to the guest before the cron fires.
+
+
+  OBJECTIVE: In the Azure Portal, attach disk-data-unattached to vm-web01 and confirm it now shows as
+  Attached and appears under vm-web01''s data disks.'
+initial_state: disk-data-unattached (128GB, Standard_SSD_LRS) shows State = Unattached and is not listed
+  under any VM's disks.
+objectives:
+- Sign in to the Azure Portal
+- Open Disks and locate disk-data-unattached
+- Attach it to vm-web01
+- Confirm the disk shows State = Attached under vm-web01
+hints:
+- order: 1
+  cost: 0
+  content: 'ORIENT — what to observe and why: Open Disks in the left nav and look at the State column
+    for every disk. Exactly one disk is Unattached — note its size and SKU before deciding where it
+    should go.'
+- order: 2
+  cost: 10
+  content: 'APPROACH — the troubleshooting method: An unattached managed disk with a job that needs it
+    tonight is a straightforward attach operation — you do not need to create a new disk, just wire the
+    existing one to the right VM.'
+- order: 3
+  cost: 25
+  content: 'WHICH TOOL — the diagnostic command(s): From vm-web01''s Overview -> Disks, use "Attach
+    existing disks" and select disk-data-unattached, or from the Disks blade select the disk and use
+    "Attach" -> choose vm-web01 as the target VM.'
+- order: 4
+  cost: 40
+  content: 'NARROW DOWN — isolate the subsystem: There is only one VM (vm-web01) and one unattached disk
+    (disk-data-unattached) in this subscription, so there is no ambiguity about which disk goes to which
+    VM.'
+- order: 5
+  cost: 60
+  content: 'NEAR-SOLUTION — the fix shape + verify (you still apply it): Attach disk-data-unattached to
+    vm-web01 and confirm the Disks blade now shows State = Attached with vm-web01 as the owner. WHY: the
+    grader checks the session''s Azure disk state, not just that you opened the attach dialog — you must
+    complete the attach action.'
+summary: Attach the pending managed disk to the VM that needs it before tonight's import job runs.
+estimated_minutes: 8
+xp_reward: 100
+prerequisites:
+- Basic cloud storage concepts (block storage vs. object storage)
+tags:
+- build
+- hands-on
+- azure
+- storage
+linked_tutorial: azure-fundamentals
+what_you_will_learn:
+- Attaching an existing Azure managed disk to a running VM
+- Reading disk state (Attached/Unattached) in the Azure Portal
+- Why data disks and OS disks are managed independently in Azure
+environment:
+  nodes:
+  - role: primary
+    os: Ubuntu 22.04 LTS
+    hostname: vm-web01
+    ip: 10.10.1.4
+    specs: Standard_B2s (2 vCPU / 4 GiB) with a pending 128GB managed disk to attach
+  pre_installed:
+  - azure-portal
+  credentials:
+  - user: admin@fixitlab.onmicrosoft.com
+    password: lab123
+tasks:
+- id: task_1
+  title: Attach disk-data-unattached to vm-web01
+  description: Attach the unattached managed disk to vm-web01 from the Azure Portal and confirm it
+    shows State = Attached.
+  background: 'This lab teaches the standard Azure managed-disk workflow: disks and VMs are separate
+    resources, and a disk provisioned ahead of time must be explicitly attached before the guest can
+    see it.'
+  validation:
+    type: custom_script
+    script: check.sh
+    error_message: Validation did not pass. Attach disk-data-unattached to vm-web01 from the Azure
+      Portal Disks blade.
+solution:
+  summary: Attach disk-data-unattached to vm-web01 from either the VM's Disks blade or the Disks blade
+    directly.
+  files_changed: []
+  commands_run:
+  - 'Azure Portal: Disks -> disk-data-unattached -> Attach -> vm-web01'
+  reference_docs: azure-fundamentals
+consoles:
+- azure
+- terminal
+lab_servers:
+- id: vm-web01
+  role: primary
+  hostname: vm-web01
+  persona: azure
+  appears_in:
+  - azure
+  - terminal

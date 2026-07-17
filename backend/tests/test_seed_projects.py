@@ -38,12 +38,13 @@ MIN_PROJECTS_PER_TECH = 5
 # buckets whose scenarios were merged elsewhere.
 #
 # The enterprise incident-simulation technologies (Commvault, NetApp, Dell EMC,
-# physical Datacenter, SOC/SIEM) ship exclusively through the Labs/Scenarios
-# system — each is a live break/fix console simulator (see apps/vmware_sim/
-# *_engine.py) rather than a from-scratch "build a project" subject like AWS,
-# React, or MySQL. They are intentionally excluded from the guided-Projects
-# zero-to-hero guarantee until/unless that content type is authored for them.
-NON_SUBJECT_SLUGS = {"shared", "commvault", "netapp", "dellemc", "datacenter", "soc"}
+# physical Datacenter, SOC/SIEM, Azure) ship exclusively through the
+# Labs/Scenarios system — each is a live break/fix console simulator (see
+# apps/vmware_sim/*_engine.py) rather than a from-scratch "build a project"
+# subject like AWS, React, or MySQL. They are intentionally excluded from the
+# guided-Projects zero-to-hero guarantee until/unless that content type is
+# authored for them.
+NON_SUBJECT_SLUGS = {"shared", "commvault", "netapp", "dellemc", "datacenter", "soc", "azure"}
 
 # Cross-technology capstones that must exist (slug -> primary technology slug).
 EXPECTED_CAPSTONES = {

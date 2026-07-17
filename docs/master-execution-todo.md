@@ -75,6 +75,13 @@ Legend: `[x]` done · `[~]` partial · `[ ]` open
 - [x] 3.2 Chaos engine foundation
 - [x] 3.2 Wire chaos into VMware / Windows / NetApp (drop_nic/stop_service/fill_disk); AWS/SOC/DellEMC still open
 - [x] 3.4 Cross-console fault ledger API (`GET /api/vmware/sessions/<id>/faults/`) — any console can see what's broken
+- [x] New pack: Microsoft Azure — Portal console (Resource groups/VMs/VNets/NSGs/Managed disks), server-authoritative
+      backend (`azure_engine.py`), cross-tech bridge to the Linux terminal (`azure_bridge.py` — VM resize really
+      changes `nproc`/`free -h` in the SAME session's guest, matching the master-prompt canonical example),
+      ServerIdentity sync (`sync_azure_vm`), 3 hero labs (resize-undersized-VM, NSG-blocks-SSH with real
+      priority-ordered rule evaluation, attach-pending-managed-disk), fail-closed grading, full dispatch wiring,
+      and a real frontend console (`AzureConsole.jsx`) with zero local state duplication (every action round-trips
+      to the backend — avoids the AWS Zustand-drift gap by construction). GCP/OpenStack/OpenShift packs still open.
 - [ ] 3.3 Learner SSO identity + RBAC across consoles
 - [ ] 3.4 Cross-engine trace IDs
 - [ ] 3.5 Session lifecycle manager
