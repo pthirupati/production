@@ -2,7 +2,7 @@ name: Dell EMC Unisphere / PowerMax
 slug: dellemc
 description: >-
   Provision enterprise block storage on a Dell EMC PowerMax array through an
-  authentic Unisphere simulator — storage groups, volumes, hosts, front-end
+  authentic Unisphere console — storage groups, volumes, hosts, front-end
   ports/port groups, and masking views. Provision an orphaned volume into a
   storage group, register a new host with its FC initiator, build a new
   storage group for an application team, and wire up a masking view that

@@ -2,7 +2,7 @@ name: NetApp ONTAP Storage
 slug: netapp
 description: >-
   Operate a NetApp ONTAP cluster through an authentic System Manager
-  simulator — clusters, SVMs, aggregates, volumes, LUNs, SnapMirror
+  console — clusters, SVMs, aggregates, volumes, LUNs, SnapMirror
   replication, and NFS/CIFS export policies. Grow a volume before it fills up,
   map an unmounted iSCSI LUN to a host initiator, stand up a new SnapMirror
   relationship for disaster recovery, break a mirror to promote a DR copy

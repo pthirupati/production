@@ -2,7 +2,7 @@ name: Commvault Backup & Recovery
 slug: commvault
 description: >-
   Administer a Commvault CommCell environment through an authentic CommCell
-  Console / Command Center simulator — client computers, storage policies,
+  Console / Command Center — client computers, storage policies,
   subclients, the job controller, media agents, and disk libraries. Diagnose
   overdue backup protection, run full backups and restores against a
   wall-clock job timeline, enable disabled storage policies, and register new

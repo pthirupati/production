@@ -33,6 +33,17 @@ BANNED_LEARNER = re.compile(
     r"\b(simulation|simulator|simulated|demo|mock|fake|practice environment)\b",
     re.I,
 )
+# Legitimate anti-cheating guidance ("don't fake your fix with a marker file")
+# uses these words to warn the LEARNER against gaming the grader — unrelated
+# to the platform-framing concern (learner must never feel THEY are in a
+# simulation). Strip these known-safe phrases before scanning so the linter
+# doesn't drown real findings in thousands of false positives.
+_SAFE_PHRASES = re.compile(
+    r"fake completion|fabricate(d)? completion|fake (your|the) (fix|solution|result)|"
+    r"fake it|mock (data|marker)\b|mock (state|provider)\b|"
+    r"IAM policy simulator",  # real AWS product name (policysim.aws.amazon.com)
+    re.I,
+)
 # Internal keys / lab_mode values are OK; we only scan learner-visible fields.
 LEARNER_FIELDS = (
     "title",
@@ -123,10 +134,10 @@ def lint_file(path: Path) -> list[str]:
     # Learner-facing banned words (internal lab_mode: simulation is OK).
     for field in LEARNER_FIELDS:
         text = _flatten_text(data.get(field))
-        # Allow "Microsoft" / product names; ban framing words.
-        for m in BANNED_LEARNER.finditer(text):
+        # Strip known-safe anti-cheating phrasing before scanning.
+        scan_text = _SAFE_PHRASES.sub("", text)
+        for m in BANNED_LEARNER.finditer(scan_text):
             word = m.group(0)
-            # SCCM "Failed" etc. — already not matched. "demo" in hostname rare.
             errors.append(f"learner-facing `{field}` contains banned word `{word}`")
 
     # Scenario-scoped infrastructure declaration (recommended → required for heroes).

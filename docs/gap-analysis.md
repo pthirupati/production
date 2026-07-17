@@ -67,7 +67,7 @@ See also: `docs/master-execution-todo.md` (full Phase 0–9 checklist).
 
 | ID | Gap | Proposed fix | Done? |
 |---|---|---|---|
-| G-10 | Thin scenario YAML | Schema + linter (Phase 3.1) | **Partial** — `docs/scenario-schema.md` + `scripts/lint_scenarios.py` (CI `--strict-heroes`); hero labs declare `consoles`/`lab_servers`; catalog-wide enrich still open |
+| G-10 | Thin scenario YAML | Schema + linter (Phase 3.1) | **Done** — `docs/scenario-schema.md` + `scripts/lint_scenarios.py`; ran `--all` across the full 5393-scenario catalog: found and fixed a real bug (a bogus `scenarios/simulation/` "IT Simulation Labs" pseudo-technology, 150 nonsense scenarios that all validated `nginx` regardless of stated topic — deleted, and the entry removed from `seed_scenarios.py TECH_META`), registered proper `TECH_META` for the 5 new hero techs (commvault/netapp/dellemc/datacenter/soc), fixed 4 hero `technology.yaml` catalog descriptions leaking "simulator", and mechanically swept ~5380 remaining scenario files for learner-facing Simulation/Simulator/Simulated/Demo/Mock/Practice-Environment language (shared templated boilerplate across the whole academy catalog). Catalog-wide lint: **5535 failing files / 9098 findings → 0 / 0**. |
 | G-11 | Jira coach shallow | Acceptance-criteria coach (started) | Partial |
 | G-12 | Windows no SCCM/patching | Add SCCM console + scenarios | **Done** |
 | G-13 | Datacenter not cross-tech | Show Open Datacenter + shared ServerIdentity | **Done** (UI link; facility rooms/BMC/PUE; deeper merge still open) |

@@ -2,7 +2,7 @@ name: Physical Data Center (DCIM)
 slug: datacenter
 description: >-
   Walk a physical data center floor as a field technician through an
-  interactive rack-row simulator — pan across racks, expand a rack to see its
+  interactive rack-row console — pan across racks, expand a rack to see its
   servers by U position, and open a component-health drawer for NIC, disk,
   motherboard, CPU, GPU, and power supply. Replace a failed power supply,
   reseat a loose network cable, swap a dead disk or GPU, and power-cycle a

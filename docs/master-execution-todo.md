@@ -118,8 +118,8 @@ Legend: `[x]` done · `[~]` partial · `[ ]` open
 
 ## Phase 8 — Content & quality
 - [x] Banned-word purge (major surfaces)
-- [ ] Zero banned learner words remaining (full audit)
-- [ ] Every scenario: objective, AC, progressive hints (linter enforced)
+- [x] Zero banned learner words remaining — full `lint_scenarios.py --all` sweep across all 5393 scenarios: 0 findings (was 9098 across 5535 files); also found + deleted a bogus "IT Simulation Labs" pseudo-technology (150 nonsense scenarios) and registered TECH_META for the 5 new hero techs
+- [~] Every scenario: objective, AC, progressive hints — required-field schema already enforced catalog-wide by the existing enricher; `consoles`/`lab_servers` metadata still hero-only
 - [ ] Jira tickets as playbooks everywhere
 - [ ] No dead buttons / blank panels / console errors
 

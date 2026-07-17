@@ -40,7 +40,6 @@ TECH_META = {
     "nmap": {"slug": "nmap", "name": "Nmap Network Scanning", "icon": "globe", "color": "green", "order": 30},
     "wireshark": {"slug": "wireshark", "name": "Wireshark Packet Analysis", "icon": "activity", "color": "blue", "order": 31},
     "peoplesoft": {"slug": "peoplesoft", "name": "PeopleSoft Administration", "icon": "server", "color": "orange", "order": 32},
-    "simulation": {"slug": "simulation", "name": "IT Simulation Labs", "icon": "layers", "color": "purple", "order": 33},
     "ai-ml": {"slug": "ai-ml", "name": "AI & Machine Learning", "icon": "sparkles", "color": "purple", "order": 2},
     "data-science": {"slug": "data-science", "name": "Data Science", "icon": "activity", "color": "pink", "order": 3},
     "windows": {"slug": "windows", "name": "Windows Server", "icon": "server", "color": "blue", "order": 9},
@@ -48,6 +47,11 @@ TECH_META = {
     "devsecops-supplychain": {"slug": "devsecops-supplychain", "name": "DevSecOps Supply Chain", "icon": "shield", "color": "red", "order": 36, "description": "Software supply-chain security — image CVE scanning, SBOMs, cosign signing, SLSA provenance, and Falco runtime detection"},
     "opentelemetry": {"slug": "opentelemetry", "name": "OpenTelemetry", "icon": "activity", "color": "indigo", "order": 37, "description": "Distributed tracing, metrics, and logs — Collector pipelines, context propagation, sampling, and cardinality control"},
     "service-mesh": {"slug": "service-mesh", "name": "Service Mesh (Istio & Linkerd)", "icon": "network", "color": "purple", "order": 38, "description": "mTLS, traffic routing, and resilience with Istio and Linkerd — sidecar injection, VirtualServices, outlier detection, and authorization policies"},
+    "commvault": {"slug": "commvault", "name": "Commvault Backup & Recovery", "icon": "database", "color": "blue", "order": 39},
+    "netapp": {"slug": "netapp", "name": "NetApp ONTAP Storage", "icon": "hard-drive", "color": "teal", "order": 40},
+    "dellemc": {"slug": "dellemc", "name": "Dell EMC Unisphere / PowerMax", "icon": "server", "color": "blue", "order": 41},
+    "datacenter": {"slug": "datacenter", "name": "Physical Data Center (DCIM)", "icon": "server", "color": "orange", "order": 42},
+    "soc": {"slug": "soc", "name": "SOC / SIEM Analyst", "icon": "shield", "color": "red", "order": 43},
 }
 
 
@@ -83,7 +87,7 @@ class Command(BaseCommand):
         defaults = {
             "icon": meta.get("icon", "terminal"),
             "color": meta.get("color", "cyan"),
-            "description": meta.get("description", f"{name} hands-on simulation scenarios"),
+            "description": meta.get("description", f"{name} hands-on lab scenarios"),
             "price": meta.get("price", 499),
             "order": meta.get("order", 50),
             "coming_soon": meta.get("coming_soon", False),

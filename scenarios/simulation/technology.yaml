@@ -1,6 +1,0 @@
-name: Simulation Labs
-slug: simulation
-description: "Simulation Labs — scenarios moved to respective technologies"
-icon: monitor
-order: 99
-is_active: false
