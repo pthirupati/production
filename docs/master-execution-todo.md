@@ -119,12 +119,22 @@ Legend: `[x]` done · `[~]` partial · `[ ]` open
 - [ ] 3.5 Session lifecycle manager
 
 ## Phase 4 — Cybersecurity course + range
-- [~] SOC console + hero labs (ransomware, brute-force)
-- [ ] SIEM / EDR / firewall / pcap / vuln scanner / attacker terminal (full)
-- [ ] Scenario types: SOC L1/L2, IR, hunting, vuln assess, red vs blue
-- [ ] MITRE ATT&CK + NIST-NICE on all cyber scenarios
+- [x] SOC console + 6 hero labs, covering 4 of the 5 scenario types with real (not relabeled) fits:
+      SOC Analyst triage (`soc-brute-force-block-ip`), Incident Response (`soc-escalate-critical-alert`,
+      `soc-execute-containment-playbook`), Threat Hunting (`soc-threat-hunt-attacker-ip`), Red vs Blue
+      (`soc-red-vs-blue-dual-containment` — a genuinely new dual-vector preset requiring BOTH block_ip
+      AND quarantine_host, added as a new `_apply_preset` branch with zero changes to existing branches).
+      Every existing/new preset now has dedicated engine tests (`apps/vmware_sim/tests/test_soc_engine.py`,
+      14 tests) plus dispatch-integration tests (4 tests) — closing the "no test_soc*.py" gap found during
+      the audit. All 6 labs carry real MITRE ATT&CK technique IDs + NIST-NICE work role codes.
+- [ ] Vulnerability Assessment scenario type — deliberately NOT built this pass: soc_engine has no
+      vuln-scanning concept, and relabeling an existing action (block/quarantine) as "vulnerability
+      assessment" would be dishonest content. Needs a real (even if small) vuln-scan engine+action first.
+- [ ] SIEM / EDR / firewall / pcap / vuln scanner / attacker terminal (full standalone consoles) — pcap
+      exists today only as the separate Wireshark track, not integrated into the cyber range narrative.
+- [x] MITRE ATT&CK + NIST-NICE — present on all 6 SOC hero labs (was 2/2 before this pass, now 6/6)
 - [ ] @security as incident coordinator with acceptance hints
-- [ ] LabServers for every cyber host
+- [ ] LabServers for every cyber host (web01/ws-finance-07 already wired; db01 not yet)
 
 ## Phase 5 — Commvault + VMware
 - [~] Hero: cv-vm-backup-missing-client + VMware discovery
