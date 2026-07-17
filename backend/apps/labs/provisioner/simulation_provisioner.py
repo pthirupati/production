@@ -897,34 +897,30 @@ class SimulationProvisioner:
                 return validate_monitoring_lab(str(lab_session.id), slug)
             except LabSession.DoesNotExist:
                 return False, "Monitoring simulation session not found"
-        # CI/CD pipeline (DevOps). Raw simulation_type "devops" normalizes to
-        # itself; gate on that + a cicd/pipeline slug. The audit found the CI/CD
-        # track had no engine and no validator (the pipeline player is fully
-        # client-side), so it could not be graded server-side at all.
-        _raw_cicd_type = sim_type
-        if not _raw_cicd_type or _raw_cicd_type == "generic":
-            from apps.labs.models import LabSession
-            try:
-                _cicd_session = LabSession.objects.select_related("scenario").get(container_id=resource_id)
-                _raw_cicd_type = (getattr(_cicd_session.scenario, "simulation_type", "") or "")
-            except LabSession.DoesNotExist:
-                _raw_cicd_type = ""
-        if (
-            sim_type == "devops"
-            or _raw_cicd_type in ("devops", "cicd", "ci-cd", "ci_cd")
-            or low_slug.startswith(("cicd-", "ci-cd-", "pipeline-", "devops-", "gitlab-ci-",
-                                    "github-actions-"))
-        ):
-            from apps.labs.models import LabSession
-            from apps.vmware_sim.cicd_engine import (
-                validate_cicd_lab, _ensure_session as cicd_ensure,
-            )
-            try:
-                lab_session = LabSession.objects.get(container_id=resource_id)
-                cicd_ensure(str(lab_session.id), slug)
-                return validate_cicd_lab(str(lab_session.id), slug)
-            except LabSession.DoesNotExist:
-                return False, "CI/CD simulation session not found"
+        # CI/CD pipeline (DevOps) — `cicd_engine` intentionally NOT dispatched
+        # here. It models a GUI-driven job DAG (image/needs/manual-gate/
+        # failing-job faults) that only the CicdPipelineSim frontend can clear
+        # via its own apply_action calls — and CicdPipelineSim is 100% local
+        # React state today; it never calls the backend (see
+        # docs/gap-analysis.md G-06). A previous version of this dispatcher
+        # intercepted every scenario whose simulation_type=="devops" OR whose
+        # slug started with devops-/cicd-/pipeline-/gitlab-ci-/github-actions-
+        # and routed it to validate_cicd_lab — but EVERY scenario in the devops
+        # catalog (the entire simulation_type=="devops" set, ~30 hero-style
+        # labs like cicd-pipeline-broken/gitlab-ci-runner-stuck, AND the
+        # simulation_type=="generic" devops-*/academy-devops-* set, 150+ labs)
+        # is actually terminal-only: it seeds a real git repo / gitlab-runner
+        # config / Helm state via the separate in-memory DevOpsState object
+        # (`glab ci`, `helm rollback`, `export KUBECONFIG`, ...) and is graded
+        # by check.sh against real terminal state via validate_simulation_state
+        # below (see CANONICAL_DEVOPS_CHECK). Intercepting them here meant
+        # check.sh never ran and the lab could never pass no matter what the
+        # learner did in the terminal — a fail-permanently regression, the
+        # opposite failure mode from an auto-pass but just as broken. Until
+        # CicdPipelineSim is wired to this engine AND a scenario explicitly
+        # opts in (new dedicated simulation_type, not the already-overloaded
+        # "devops" value), this branch stays disabled and every devops-track
+        # scenario falls through to the terminal-based validator.
         _raw_tf_type = sim_type
         if not _raw_tf_type or _raw_tf_type == "generic":
             from apps.labs.models import LabSession
