@@ -717,6 +717,8 @@ class AwsSimActionView(APIView):
         # apps.labs.provisioner.simulation.aws_bridge) for the terminal to reveal.
         if action == "bridge_attach_volume":
             return self._bridge_attach_volume(session_id, payload, slug)
+        if action == "bridge_detach_volume":
+            return self._bridge_detach_volume(session_id, payload, slug)
         if action == "bridge_power":
             return self._bridge_power(session_id, payload, slug)
 
@@ -737,6 +739,22 @@ class AwsSimActionView(APIView):
                 result.get("volume_id") or payload.get("volume_id") or "",
                 size_gb=int(payload.get("size_gb") or 20),
                 device=result.get("device") or payload.get("device"),
+                instance_id=payload.get("instance_id"),
+            )
+        except Exception:
+            pass
+        return Response({**result, "state": aws_get_state(session_id, slug)})
+
+    def _bridge_detach_volume(self, session_id, payload, slug):
+        from apps.labs.provisioner.simulation import aws_bridge
+
+        result = aws_apply_action(session_id, "detach_volume", payload)
+        if not result.get("ok"):
+            return Response(result, status=400)
+        try:
+            aws_bridge.record_volume_detach(
+                str(session_id),
+                result.get("device") or payload.get("device") or "",
                 instance_id=payload.get("instance_id"),
             )
         except Exception:

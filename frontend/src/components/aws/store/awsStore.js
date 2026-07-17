@@ -909,6 +909,7 @@ export const useAwsStore = create(
           return fail(err)
         }
         set((s) => ({ securityGroups: s.securityGroups.filter((sg) => sg.id !== id) }))
+        get()._syncAction('delete_security_group', { group_id: id })
         return ok()
       },
       // SG rule CRUD. direction = 'inbound' | 'outbound'.
@@ -1097,7 +1098,14 @@ export const useAwsStore = create(
           get().pushFlash('error', err.str)
           return fail(err)
         }
+        const device = vol?.device || null
+        const instanceId = vol?.attachedTo || null
         set((s) => ({ volumes: s.volumes.map((v) => (v.id === volId ? { ...v, state: 'available', attachedTo: null, device: null } : v)) }))
+        if (get().labSessionId) {
+          notifyAwsBridge(get().labSessionId, 'bridge_detach_volume', {
+            volume_id: volId, instance_id: instanceId, device,
+          })
+        }
         return ok()
       },
       createSnapshot: (volId, description) => {

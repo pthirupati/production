@@ -38,10 +38,11 @@ def _key(session_id: str) -> str:
 def _load(session_id: str) -> dict:
     raw = cache.get(_key(str(session_id)))
     if raw is None:
-        return {"pending_volumes": [], "revealed_volumes": []}
+        return {"pending_volumes": [], "revealed_volumes": [], "removed_volumes": []}
     data = json.loads(raw) if isinstance(raw, str) else raw
     data.setdefault("pending_volumes", [])
     data.setdefault("revealed_volumes", [])
+    data.setdefault("removed_volumes", [])
     return data
 
 
@@ -90,6 +91,45 @@ def record_volume_attach(
     except Exception:
         pass
     return dev
+
+
+def record_volume_detach(
+    session_id: str,
+    device: str,
+    *,
+    instance_id: str | None = None,
+) -> None:
+    """AWS console EBS detach → the guest should stop seeing this block device
+    on its next disk inspection (mirrors record_volume_attach in reverse)."""
+    data = _load(session_id)
+    # A device that never made it out of "pending" (never revealed) just gets
+    # dropped from the queue instead of round-tripping through "removed".
+    data["pending_volumes"] = [e for e in data["pending_volumes"] if e.get("device") != device]
+    if device in data.get("revealed_volumes", []):
+        data["revealed_volumes"] = [d for d in data["revealed_volumes"] if d != device]
+        if device not in data["removed_volumes"]:
+            data["removed_volumes"].append(device)
+    _save(session_id, data)
+    try:
+        from .server_identity import detach_disk, get_primary
+        primary = get_primary(session_id)
+        if primary:
+            letter = (device or "").rstrip("0123456789").split("/")[-1]
+            detach_disk(session_id, primary["id"], name=letter or "sdf", source="aws")
+    except Exception:
+        pass
+
+
+def consume_removed_volume_events(session_id: str) -> list[str]:
+    """Drain every volume detach event the guest should now see (device
+    disappears from lsblk on the terminal's next disk inspection)."""
+    data = _load(session_id)
+    removed = data.get("removed_volumes", [])
+    if not removed:
+        return []
+    data["removed_volumes"] = []
+    _save(session_id, data)
+    return removed
 
 
 def has_pending_volumes(session_id: str) -> bool:

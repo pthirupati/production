@@ -201,6 +201,29 @@ def attach_disk(
     return saved
 
 
+def detach_disk(
+    session_id: str,
+    server_id: str,
+    *,
+    name: str,
+    source: str = "api",
+) -> dict | None:
+    """Remove a data disk (e.g. an AWS EBS volume detach) from this server's
+    identity so `lsblk`/inventory views stop showing it — mirrors attach_disk."""
+    server = get_server(session_id, server_id)
+    if not server:
+        return None
+    disks = [d for d in (server.get("disks") or []) if d.get("name") != name]
+    server["disks"] = disks
+    saved = _save(session_id, server)
+    publish_event(
+        session_id,
+        "server.disk_detached",
+        {"server_id": server_id, "name": name, "source": source},
+    )
+    return saved
+
+
 def attach_nic(
     session_id: str,
     server_id: str,
@@ -503,6 +526,133 @@ def _parse_k8s_mem_mb(value: str | None) -> int:
         return int(float(raw))
     except (TypeError, ValueError):
         return 8192
+
+
+def sync_commvault_clients(session_id: str, clients: list[dict] | None) -> None:
+    """Mirror CommCell clients into this session's LabServer registry.
+
+    A client's backup protection status is metadata (tags), not power — the
+    client's online/offline status IS its power, since a client that's offline
+    to Commvault is the same underlying host being unreachable everywhere else.
+    """
+    for client in clients or []:
+        if not isinstance(client, dict):
+            continue
+        name = (client.get("name") or "").strip()
+        if not name:
+            continue
+        status = (client.get("status") or "online").lower()
+        upsert_server(
+            session_id,
+            {
+                "id": f"cv-{name}",
+                "hostname": name,
+                "primary_ip": client.get("ip") or "",
+                "power": "on" if status == "online" else "off",
+                "os": client.get("os") or "rhel-9",
+                "tags": {
+                    "role": "protected_client",
+                    "persona": "commvault",
+                    "backup_health": client.get("backup_health") or "",
+                    "appears_in": ["commvault", "terminal"],
+                },
+            },
+            source="commvault",
+        )
+
+
+def sync_netapp_storage(session_id: str, state: dict | None) -> None:
+    """Mirror the ONTAP cluster's capacity/health facts onto its LabServer.
+
+    NetApp's LabServer represents the storage controller itself (seeded via
+    the "netapp" persona); volumes/aggregates are storage facts about that
+    one server, not separate LabServers — a volume is not a host.
+    """
+    if not isinstance(state, dict):
+        return
+    cluster = (state.get("clusters") or [{}])[0] if state.get("clusters") else {}
+    volumes = state.get("volumes") or []
+    near_full = [v.get("name") for v in volumes if isinstance(v, dict)
+                 and v.get("size_gb") and v.get("used_gb", 0) / max(1, v["size_gb"]) >= 0.9]
+    upsert_server(
+        session_id,
+        {
+            "id": "netapp-storage",
+            "hostname": (state.get("summary") or {}).get("cluster") or "fixitlab-cluster",
+            "power": "on" if (cluster or {}).get("health", "ok") != "down" else "off",
+            "os": "ontap",
+            "tags": {
+                "role": "storage_controller",
+                "persona": "netapp",
+                "volumes_total": len(volumes),
+                "volumes_near_full": ",".join(v for v in near_full if v) or "",
+                "appears_in": ["netapp"],
+            },
+        },
+        source="netapp",
+    )
+
+
+def sync_dellemc_storage(session_id: str, state: dict | None) -> None:
+    """Mirror the PowerMax/Unisphere array's capacity/masking facts onto its LabServer."""
+    if not isinstance(state, dict):
+        return
+    array = (state.get("arrays") or [{}])[0] if state.get("arrays") else {}
+    volumes = state.get("volumes") or []
+    unmapped = [v.get("id") for v in volumes if isinstance(v, dict) and not v.get("storage_group")]
+    upsert_server(
+        session_id,
+        {
+            "id": "dellemc-storage",
+            "hostname": array.get("id") or "powermax-array",
+            "power": "on" if (array or {}).get("health", "normal") != "critical" else "off",
+            "os": "powermax-os",
+            "tags": {
+                "role": "storage_array",
+                "persona": "dellemc",
+                "volumes_total": len(volumes),
+                "volumes_unmapped": ",".join(v for v in unmapped if v) or "",
+                "masking_views": len(state.get("masking_views") or []),
+                "appears_in": ["dellemc"],
+            },
+        },
+        source="dellemc",
+    )
+
+
+def sync_soc_assets(session_id: str, assets: list[dict] | None) -> None:
+    """Mirror SOC-monitored assets into this session's LabServer registry.
+
+    Quarantining a host in the SOC console is a real network-isolation event —
+    it flips the SAME underlying host's power/reachability, consistent with
+    how a real EDR network-isolate action would look from every other console
+    (terminal, monitoring) reading that host's state.
+    """
+    for asset in assets or []:
+        if not isinstance(asset, dict):
+            continue
+        name = (asset.get("name") or "").strip()
+        if not name:
+            continue
+        quarantined = bool(asset.get("quarantined"))
+        upsert_server(
+            session_id,
+            {
+                "id": f"soc-{name}",
+                "hostname": name,
+                "primary_ip": asset.get("ip") or "",
+                "power": "off" if quarantined else "on",
+                "os": "rhel-9",
+                "tags": {
+                    "role": "monitored_asset",
+                    "persona": "soc",
+                    "risk": asset.get("risk") or "",
+                    "quarantined": quarantined,
+                    "appears_in": ["soc", "terminal"],
+                },
+            },
+            source="soc",
+        )
 
 
 def sync_k8s_nodes(session_id: str, nodes: list[dict] | None) -> None:

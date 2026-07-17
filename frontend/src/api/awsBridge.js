@@ -7,9 +7,9 @@ import api from './client'
  * attaching an EBS volume should surface as a new block device in a Linux lab
  * terminal sharing the same session, and starting/stopping/rebooting an EC2
  * instance should reflect in that terminal's simulated power state. The
- * backend already understands these two intents as the `bridge_attach_volume`
- * and `bridge_power` action variants on the AWS session endpoint (see
- * apps/vmware_sim/views.py AwsSimActionView) — this helper is a thin,
+ * backend already understands these intents as the `bridge_attach_volume`,
+ * `bridge_detach_volume`, and `bridge_power` action variants on the AWS
+ * session endpoint (see apps/vmware_sim/views.py AwsSimActionView) — this helper is a thin,
  * fire-and-forget wrapper so awsStore can call it right alongside its normal
  * optimistic local state update, without ever blocking or rejecting the UI.
  */
