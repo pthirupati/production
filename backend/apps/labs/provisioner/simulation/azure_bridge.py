@@ -41,18 +41,23 @@ def _save(session_id: str, data: dict) -> None:
     cache.set(_key(str(session_id)), json.dumps(data, default=str), BRIDGE_TTL)
 
 
-def record_vm_resize(session_id: str, size: dict) -> None:
+def record_vm_resize(session_id: str, size: dict, *, trace_id: str | None = None) -> None:
     """Azure console resize -> queue a pending vCPU/RAM change for the Linux
-    guest terminal to apply on its next command (see consume_pending_resize)."""
+    guest terminal to apply on its next command (see consume_pending_resize).
+    Carries the originating trace_id so the terminal-side apply (see
+    rhel_shell.py) can publish a correlated `server.hardware_resized` event —
+    closing the loop: console click -> bridge queued -> terminal applied."""
     data = _load(session_id)
-    data["pending_resize"] = {"vcpus": int(size.get("vcpus", 2)), "ram_gb": int(size.get("ram_gb", 4))}
+    data["pending_resize"] = {
+        "vcpus": int(size.get("vcpus", 2)), "ram_gb": int(size.get("ram_gb", 4)), "trace_id": trace_id,
+    }
     _save(session_id, data)
 
 
 def consume_pending_resize(session_id: str) -> dict | None:
-    """Drain a pending vCPU/RAM change (returns {"vcpus", "ram_gb"} or None).
-    Called by the Linux terminal shell before each command so hardware
-    inspection commands always reflect the latest Azure Portal size."""
+    """Drain a pending vCPU/RAM change (returns {"vcpus", "ram_gb", "trace_id"}
+    or None). Called by the Linux terminal shell before each command so
+    hardware inspection commands always reflect the latest Azure Portal size."""
     data = _load(session_id)
     resize = data.get("pending_resize")
     if not resize:
@@ -62,7 +67,7 @@ def consume_pending_resize(session_id: str) -> dict | None:
     return resize
 
 
-def record_vm_power(session_id: str, action: str) -> None:
+def record_vm_power(session_id: str, action: str, *, trace_id: str | None = None) -> None:
     """Azure console -> terminal: the VM changed power state (start/stop/restart)."""
     if action not in ("start", "stop", "restart"):
         return
@@ -74,7 +79,7 @@ def record_vm_power(session_id: str, action: str) -> None:
         primary = get_primary(session_id)
         if primary:
             power = "off" if action == "stop" else ("reboot_pending" if action == "restart" else "on")
-            set_power(session_id, primary["id"], power, source="azure")
+            set_power(session_id, primary["id"], power, source="azure", trace_id=trace_id)
     except Exception:
         pass
 
@@ -89,14 +94,14 @@ def consume_power(session_id: str) -> str | None:
     return action
 
 
-def record_disk_attach(session_id: str, disk_name: str, *, size_gb: int = 128) -> None:
+def record_disk_attach(session_id: str, disk_name: str, *, size_gb: int = 128, trace_id: str | None = None) -> None:
     """Azure console managed-disk attach -> also mirrored into ServerIdentity
     so the terminal's disk inventory (and any other open console) agrees."""
     try:
         from .server_identity import attach_disk, get_primary
         primary = get_primary(session_id)
         if primary:
-            attach_disk(session_id, primary["id"], name=disk_name, size_gb=int(size_gb), source="azure")
+            attach_disk(session_id, primary["id"], name=disk_name, size_gb=int(size_gb), source="azure", trace_id=trace_id)
     except Exception:
         pass
 

@@ -42,11 +42,15 @@ def _save(session_id: str, data: dict) -> None:
     cache.set(_key(str(session_id)), json.dumps(data, default=str), BRIDGE_TTL)
 
 
-def record_instance_resize(session_id: str, machine_type: dict) -> None:
+def record_instance_resize(session_id: str, machine_type: dict, *, trace_id: str | None = None) -> None:
     """GCP console machine-type change -> queue a pending vCPU/RAM change for
-    the Linux guest terminal to apply on its next command."""
+    the Linux guest terminal to apply on its next command. Carries the
+    originating trace_id so the terminal-side apply can publish a correlated
+    `server.hardware_resized` event (see rhel_shell.py)."""
     data = _load(session_id)
-    data["pending_resize"] = {"vcpus": int(machine_type.get("vcpus", 2)), "ram_gb": int(machine_type.get("ram_gb", 4))}
+    data["pending_resize"] = {
+        "vcpus": int(machine_type.get("vcpus", 2)), "ram_gb": int(machine_type.get("ram_gb", 4)), "trace_id": trace_id,
+    }
     _save(session_id, data)
 
 
@@ -62,7 +66,7 @@ def consume_pending_resize(session_id: str) -> dict | None:
     return resize
 
 
-def record_instance_power(session_id: str, action: str) -> None:
+def record_instance_power(session_id: str, action: str, *, trace_id: str | None = None) -> None:
     """GCP console -> terminal: the instance changed power state."""
     if action not in ("start", "stop", "reset"):
         return
@@ -74,7 +78,7 @@ def record_instance_power(session_id: str, action: str) -> None:
         primary = get_primary(session_id)
         if primary:
             power = "off" if action == "stop" else ("reboot_pending" if action == "reset" else "on")
-            set_power(session_id, primary["id"], power, source="gcp")
+            set_power(session_id, primary["id"], power, source="gcp", trace_id=trace_id)
     except Exception:
         pass
 
@@ -89,12 +93,12 @@ def consume_power(session_id: str) -> str | None:
     return action
 
 
-def record_disk_attach(session_id: str, disk_name: str, *, size_gb: int = 100) -> None:
+def record_disk_attach(session_id: str, disk_name: str, *, size_gb: int = 100, trace_id: str | None = None) -> None:
     try:
         from .server_identity import attach_disk, get_primary
         primary = get_primary(session_id)
         if primary:
-            attach_disk(session_id, primary["id"], name=disk_name, size_gb=int(size_gb), source="gcp")
+            attach_disk(session_id, primary["id"], name=disk_name, size_gb=int(size_gb), source="gcp", trace_id=trace_id)
     except Exception:
         pass
 

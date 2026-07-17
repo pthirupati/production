@@ -117,7 +117,7 @@ def _save(session_id: str, server: dict) -> dict:
     return server
 
 
-def upsert_server(session_id: str, patch: dict, *, source: str = "api") -> dict:
+def upsert_server(session_id: str, patch: dict, *, source: str = "api", trace_id: str | None = None) -> dict:
     """Create or merge a server identity. Returns the saved record."""
     sid = str(session_id)
     server_id = patch.get("id") or patch.get("server_id")
@@ -161,11 +161,16 @@ def upsert_server(session_id: str, patch: dict, *, source: str = "api") -> dict:
         server.setdefault("tags", {}).update(patch["tags"])
 
     saved = _save(sid, server)
-    publish_event(sid, "server.upserted", {"server_id": saved["id"], "source": source, "server": saved})
+    publish_event(
+        sid, "server.upserted", {"server_id": saved["id"], "source": source, "server": saved},
+        trace_id=trace_id,
+    )
     return saved
 
 
-def set_power(session_id: str, server_id: str, power: str, *, source: str = "api") -> dict | None:
+def set_power(
+    session_id: str, server_id: str, power: str, *, source: str = "api", trace_id: str | None = None,
+) -> dict | None:
     server = get_server(session_id, server_id)
     if not server:
         return None
@@ -173,7 +178,10 @@ def set_power(session_id: str, server_id: str, power: str, *, source: str = "api
     if source and source not in server.get("sources", []):
         server.setdefault("sources", []).append(source)
     saved = _save(session_id, server)
-    publish_event(session_id, "server.power", {"server_id": server_id, "power": power, "source": source})
+    publish_event(
+        session_id, "server.power", {"server_id": server_id, "power": power, "source": source},
+        trace_id=trace_id,
+    )
     return saved
 
 
@@ -184,6 +192,7 @@ def attach_disk(
     name: str,
     size_gb: int,
     source: str = "api",
+    trace_id: str | None = None,
 ) -> dict | None:
     server = get_server(session_id, server_id)
     if not server:
@@ -197,6 +206,7 @@ def attach_disk(
         session_id,
         "server.disk_attached",
         {"server_id": server_id, "name": name, "size_gb": size_gb, "source": source},
+        trace_id=trace_id,
     )
     return saved
 
@@ -207,6 +217,7 @@ def detach_disk(
     *,
     name: str,
     source: str = "api",
+    trace_id: str | None = None,
 ) -> dict | None:
     """Remove a data disk (e.g. an AWS EBS volume detach) from this server's
     identity so `lsblk`/inventory views stop showing it — mirrors attach_disk."""
@@ -220,6 +231,7 @@ def detach_disk(
         session_id,
         "server.disk_detached",
         {"server_id": server_id, "name": name, "source": source},
+        trace_id=trace_id,
     )
     return saved
 
@@ -231,6 +243,7 @@ def attach_nic(
     name: str,
     mac: str | None = None,
     source: str = "api",
+    trace_id: str | None = None,
 ) -> dict | None:
     server = get_server(session_id, server_id)
     if not server:
@@ -245,18 +258,45 @@ def attach_nic(
         })
     server["nics"] = nics
     saved = _save(session_id, server)
-    publish_event(session_id, "server.nic_attached", {"server_id": server_id, "name": name, "source": source})
+    publish_event(
+        session_id, "server.nic_attached", {"server_id": server_id, "name": name, "source": source},
+        trace_id=trace_id,
+    )
     return saved
 
 
-def publish_event(session_id: str, event_type: str, payload: dict | None = None) -> dict:
+def new_trace_id() -> str:
+    """A single logical learner action (e.g. one "resize VM" click) that
+    fans out across multiple engines/consoles (the console's own event log,
+    the cross-tech bridge, ServerIdentity, and eventually the terminal)
+    should carry ONE trace_id through every hop, so
+    `events_for_trace(session_id, trace_id)` can reconstruct the whole
+    cross-engine story for a single support/debug question: "what actually
+    happened when the learner clicked this button?" Call this ONCE at the
+    top of the action and thread the returned id through every downstream
+    `publish_event`/bridge call.
+    """
+    return uuid.uuid4().hex[:16]
+
+
+def publish_event(
+    session_id: str,
+    event_type: str,
+    payload: dict | None = None,
+    *,
+    trace_id: str | None = None,
+) -> dict:
     sid = str(session_id)
+    payload = payload or {}
     event = {
         "id": uuid.uuid4().hex,
         "type": event_type,
-        "payload": payload or {},
+        "payload": payload,
         "ts": _now_iso(),
-        "trace_id": (payload or {}).get("trace_id") or uuid.uuid4().hex[:16],
+        # Explicit trace_id kwarg wins; falls back to one embedded in the
+        # payload (older call sites), else a fresh id so every event still
+        # has SOME trace_id even when the caller has nothing to correlate.
+        "trace_id": trace_id or payload.get("trace_id") or uuid.uuid4().hex[:16],
     }
     raw = cache.get(_events_key(sid))
     events = json.loads(raw) if isinstance(raw, str) else (raw or [])
@@ -277,6 +317,15 @@ def consume_events(session_id: str, after_id: str | None = None) -> list[dict]:
             break
         out.append(ev)
     return out
+
+
+def events_for_trace(session_id: str, trace_id: str) -> list[dict]:
+    """Every LabServer event recorded under a given trace_id, oldest first —
+    reconstructs the full cross-engine story for one logical learner action."""
+    raw = cache.get(_events_key(str(session_id)))
+    events = json.loads(raw) if isinstance(raw, str) else (raw or [])
+    matched = [ev for ev in events if ev.get("trace_id") == trace_id]
+    return list(reversed(matched))
 
 
 def drop_session(session_id: str) -> None:

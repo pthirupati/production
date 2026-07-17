@@ -32,7 +32,13 @@ Legend: `[x]` done · `[~]` partial · `[ ]` open
 - [x] Bidirectional sync: Commvault (clients) / NetApp (storage) / Dell EMC (storage) / SOC (assets, quarantine=power)
 - [~] Datacenter (already had deeper sync from earlier pass; see G-13)
 - [ ] `physical_location` / `bmc` / `network_port` on every physical LabServer path
-- [ ] Event bus correlation/trace ID on every mutation
+- [x] Event bus correlation/trace ID — `server_identity.new_trace_id()` / `events_for_trace()` added;
+      threaded through `upsert_server`/`set_power`/`attach_disk`/`detach_disk`/`attach_nic` (optional
+      kwarg, fully backward compatible). Wired end-to-end for Azure/GCP (console click -> engine's own
+      event log -> bridge queue -> terminal apply, all sharing one trace_id, closed via a new
+      `RHELShell._publish_resize_applied` hook) and AWS bridge (volume attach/detach, instance power).
+      9 new tests prove the full chain reconstructs via `events_for_trace()`. VMware/Windows/other
+      bridges still emit untraced events — same additive kwarg pattern, just not wired yet.
 
 ## Phase 1.5 — Prefer real free engines (feature-flagged)
 - [ ] VMware → `vcsim` (flag)

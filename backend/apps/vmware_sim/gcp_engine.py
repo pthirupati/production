@@ -69,8 +69,11 @@ def _now() -> float:
     return time.time()
 
 
-def _event(state: dict, message: str, severity: str = "info") -> None:
-    state.setdefault("events", []).insert(0, {"time": _now_iso(), "message": message, "severity": severity})
+def _event(state: dict, message: str, severity: str = "info", *, trace_id: str | None = None) -> None:
+    entry = {"time": _now_iso(), "message": message, "severity": severity}
+    if trace_id:
+        entry["trace_id"] = trace_id
+    state.setdefault("events", []).insert(0, entry)
 
 
 def _find_instance(state: dict, ident: str) -> dict | None:
@@ -287,11 +290,16 @@ def apply_action(session_id: str, action: str, payload: dict | None = None) -> d
         elif op == "reset":
             inst["status"] = "PROVISIONING"
             inst["_transition"] = {"target": "RUNNING", "started_ts": _now()}
-        _event(state, f"{op.title()} requested for {inst['name']}", "info")
+        try:
+            from apps.labs.provisioner.simulation.server_identity import new_trace_id
+            trace_id = new_trace_id()
+        except Exception:
+            trace_id = None
+        _event(state, f"{op.title()} requested for {inst['name']}", "info", trace_id=trace_id)
         _save(session_id, entry)
         try:
             from apps.labs.provisioner.simulation import gcp_bridge
-            gcp_bridge.record_instance_power(str(session_id), op)
+            gcp_bridge.record_instance_power(str(session_id), op, trace_id=trace_id)
         except Exception:
             pass
         return {"ok": True, "message": f"{op.title()} requested", "status": inst["status"]}
@@ -310,11 +318,16 @@ def apply_action(session_id: str, action: str, payload: dict | None = None) -> d
         inst["machine_type"] = new_type
         if broken.get("vm_undersized") == inst["name"]:
             broken.pop("vm_undersized", None)
-        _event(state, f"Changed machine type of {inst['name']} from {old_type} to {new_type}", "success")
+        try:
+            from apps.labs.provisioner.simulation.server_identity import new_trace_id
+            trace_id = new_trace_id()
+        except Exception:
+            trace_id = None
+        _event(state, f"Changed machine type of {inst['name']} from {old_type} to {new_type}", "success", trace_id=trace_id)
         _save(session_id, entry)
         try:
             from apps.labs.provisioner.simulation import gcp_bridge
-            gcp_bridge.record_instance_resize(str(session_id), MACHINE_TYPES[new_type])
+            gcp_bridge.record_instance_resize(str(session_id), MACHINE_TYPES[new_type], trace_id=trace_id)
         except Exception:
             pass
         return {"ok": True, "message": "Machine type changed", "machine_type": new_type}
@@ -361,11 +374,16 @@ def apply_action(session_id: str, action: str, payload: dict | None = None) -> d
         inst.setdefault("extra_disks", []).append(disk["name"])
         if broken.get("disk_unattached") == disk["name"]:
             broken.pop("disk_unattached", None)
-        _event(state, f"Attached disk {disk['name']} to {inst['name']}", "success")
+        try:
+            from apps.labs.provisioner.simulation.server_identity import new_trace_id
+            trace_id = new_trace_id()
+        except Exception:
+            trace_id = None
+        _event(state, f"Attached disk {disk['name']} to {inst['name']}", "success", trace_id=trace_id)
         _save(session_id, entry)
         try:
             from apps.labs.provisioner.simulation import gcp_bridge
-            gcp_bridge.record_disk_attach(str(session_id), disk["name"], size_gb=disk.get("size_gb", 100))
+            gcp_bridge.record_disk_attach(str(session_id), disk["name"], size_gb=disk.get("size_gb", 100), trace_id=trace_id)
         except Exception:
             pass
         return {"ok": True, "message": "Disk attached"}
