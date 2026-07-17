@@ -22,7 +22,7 @@ Legend: `[x]` done · `[~]` partial · `[ ]` open
 - [x] Bidirectional sync: AWX
 - [x] Bidirectional sync: Grafana / Prometheus
 - [x] Bidirectional sync: Kubernetes
-- [~] Bidirectional sync: GPU (seed + set_gpu on modprobe; deepen grading next)
+- [x] Bidirectional sync: GPU (seed + set_gpu on modprobe); grading verified fail-closed across all academy-gpu-* slugs (G-04)
 - [x] Bidirectional sync: Windows
 - [x] Bidirectional sync: Commvault (clients) / NetApp (storage) / Dell EMC (storage) / SOC (assets, quarantine=power)
 - [~] Datacenter (already had deeper sync from earlier pass; see G-13)
@@ -148,7 +148,7 @@ Legend: `[x]` done · `[~]` partial · `[ ]` open
 ## Execution order (do not skip)
 1. CI health perms + master todo (this doc)
 2. P0 LabServer sync packs (AWX→Grafana→Windows→K8s→GPU) + AWS SoT
-3. GPU/Ansible grading + CI/CD sandbox runner
+3. ~~GPU/Ansible grading~~ (verified fail-closed, done) + CI/CD sandbox runner
 4. Chaos wiring + scenario catalog enrich + Jira coach
 5. Commvault/NetApp/Dell depth + cyber range expansion
 6. Datacenter 7.x deepening (data model before Three.js)
