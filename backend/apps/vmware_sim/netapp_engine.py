@@ -112,6 +112,11 @@ _ensure_session = _ensure
 def get_state(session_id: str, scenario_slug: str = "") -> dict:
     entry = _ensure(session_id, scenario_slug)
     state = copy.deepcopy(entry["state"])
+    try:
+        from apps.labs.provisioner.simulation.server_identity import sync_netapp_storage
+        sync_netapp_storage(session_id, state)
+    except Exception:
+        pass
     return {
         "session_id": str(session_id),
         "scenario_slug": entry.get("scenario_slug") or scenario_slug,

@@ -125,6 +125,46 @@ class ServerIdentityTests(SimpleTestCase):
         self.assertEqual(w["primary_ip"], "10.20.60.55")
         self.assertEqual(w["power"], "on")
 
+    def test_sync_commvault_netapp_dellemc_soc(self):
+        sid = "sess-storage-sync"
+        self.addCleanup(si.drop_session, sid)
+
+        si.sync_commvault_clients(sid, [
+            {"name": "web01", "ip": "10.0.0.11", "status": "online", "backup_health": "protected"},
+            {"name": "app01", "ip": "10.0.0.13", "status": "offline", "backup_health": "unprotected"},
+        ])
+        hosts = {s["hostname"]: s for s in si.list_servers(sid)}
+        self.assertEqual(hosts["web01"]["power"], "on")
+        self.assertEqual(hosts["app01"]["power"], "off")
+        self.assertEqual(hosts["web01"]["tags"]["backup_health"], "protected")
+
+        si.sync_netapp_storage(sid, {
+            "summary": {"cluster": "fixitlab-cluster"},
+            "clusters": [{"name": "fixitlab-cluster", "health": "ok"}],
+            "volumes": [{"name": "vol_web_data", "size_gb": 100, "used_gb": 95}],
+        })
+        netapp = next(s for s in si.list_servers(sid) if s["tags"].get("persona") == "netapp")
+        self.assertEqual(netapp["power"], "on")
+        self.assertIn("vol_web_data", netapp["tags"]["volumes_near_full"])
+
+        si.sync_dellemc_storage(sid, {
+            "arrays": [{"id": "000297900123", "health": "normal"}],
+            "volumes": [{"id": "0004", "storage_group": None}],
+            "masking_views": [{"name": "MV_web01"}],
+        })
+        dell = next(s for s in si.list_servers(sid) if s["tags"].get("persona") == "dellemc")
+        self.assertEqual(dell["power"], "on")
+        self.assertIn("0004", dell["tags"]["volumes_unmapped"])
+
+        si.sync_soc_assets(sid, [
+            {"name": "ws-finance-07", "ip": "10.0.5.42", "risk": "critical", "quarantined": True},
+            {"name": "web01", "ip": "10.0.0.11", "risk": "medium", "quarantined": False},
+        ])
+        soc_hosts = {s["hostname"]: s for s in si.list_servers(sid) if s["tags"].get("persona") == "soc"}
+        self.assertEqual(soc_hosts["ws-finance-07"]["power"], "off")
+        self.assertTrue(soc_hosts["ws-finance-07"]["tags"]["quarantined"])
+        self.assertEqual(soc_hosts["web01"]["power"], "on")
+
     def test_sync_k8s_nodes(self):
         sid = "sess-k8s-sync"
         self.addCleanup(si.drop_session, sid)

@@ -56,14 +56,15 @@ Legend: `[x]` done · `[~]` partial · `[ ]` open
 - [x] CloudShell SSH + SG; Instance Connect SG gate
 - [x] VMware hot-add bridge + console ip a / PCI rescan
 - [x] AWS lab terminal seed + Instance Connect re-sync
+- [x] AWS EBS detach round-trips through engine/bridge/ServerIdentity (was attach-only)
 - [x] Jira @security / @network keywords + engine lookup
 - [x] Windows SCCM patching
-- [~] AWS FE ↔ backend authority
-- [ ] AWX/Grafana/Prom/K8s/GPU/Windows shared identity (full)
+- [x] **CI/CD grading regression**: dispatcher no longer shadows the terminal-only devops/cicd/pipeline catalog with the orphaned `cicd_engine` (found + fixed this pass; see G-06)
+- [~] AWX/Grafana/Prom/K8s LabServer sync done; GPU/Windows partial — deeper bidirectional writes still open
 - [~] Scenario YAML quality (heroes linted; catalog open)
 - [~] Jira bot coaching depth
 - [ ] GUI polish per every scenario type
-- [ ] CI/CD rebuilt on real runner
+- [ ] CI/CD rebuilt on real runner (FE CicdPipelineSim ↔ backend cicd_engine still disconnected; engine itself unused by any scenario today)
 
 ## Phase 3 — Cross-cutting systems
 - [x] 3.1 Scenario schema + hero linter in CI

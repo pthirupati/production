@@ -215,6 +215,11 @@ def get_state(session_id: str, scenario_slug: str = "") -> dict:
         _save(session_id, entry)
     state = copy.deepcopy(entry["state"])
     _merge_vmware_clients(state, session_id)
+    try:
+        from apps.labs.provisioner.simulation.server_identity import sync_commvault_clients
+        sync_commvault_clients(session_id, state.get("clients") or [])
+    except Exception:
+        pass
     return {
         "session_id": str(session_id),
         "scenario_slug": entry.get("scenario_slug") or scenario_slug,

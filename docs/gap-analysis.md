@@ -60,7 +60,7 @@ See also: `docs/master-execution-todo.md` (full Phase 0–9 checklist).
 | G-03 | Learner sees “simulation” | Copy in LabRunner, AWS, VMware, errors | frontend | Purge user-facing strings | **Done** (marketing + consoles; internal code/comments OK) |
 | G-04 | GPU labs auto-pass | No engine; check.sh `exit 0` | scenarios/gpu | Mock GPU in ServerIdentity + real validate | **Partial** — ServerIdentity GPU facet + seed; grader still uses `gpu_healthy` |
 | G-05 | Ansible terminal labs auto-pass | No validate_ansible_lab; engine=None fail-open | scenarios/ansible | Wire grading to shell state / AWX | **Partial** — engine=None fail-open fixed; ssh-key still primary objective |
-| G-06 | CI/CD is a toy | FE mock; cicd_engine not session-wired | CicdPipelineSim | Real sandbox job runner | Open |
+| G-06 | CI/CD is a toy + **grading regression** | FE mock never calls `cicd_engine`; AND `run_validation` was blanket-routing every `devops`/`cicd`/`pipeline`/`gitlab-ci`/`github-actions` scenario (~180 files, both `simulation_type: devops` hero-style and `simulation_type: generic` academy-style) to `cicd_engine.validate_cicd_lab` — which nothing in the terminal or GUI ever updates — so `check.sh` never ran and these labs could never pass. | CicdPipelineSim, simulation_provisioner.py dispatch | **Fixed dispatch**: cicd_engine routing removed until a scenario explicitly opts in + the GUI is wired (regression test: `test_cicd_dispatch_regression.py`). Real sandbox job runner + FE↔BE wiring still open. |
 | G-07 | K8s dual engines | GUI engine orphaned | k8s_engine, k8s_cluster | Unify under kind + ServerIdentity | Open |
 
 ### P1
@@ -128,6 +128,10 @@ Not yet measured. Target after containerization: document CPU/RAM/disk per sessi
 - Shared `chaos_engine` (`drop_nic`, `fill_disk`, `stop_service`, `trip_pdu`, `raise_temp`) + tests
 - Phase 3.1: scenario schema doc + hero YAML linter in CI; heroes declare `lab_servers`/`consoles`; seed materializes YAML LabServers per session
 - Scenario-scoped LabServer architecture doc (`docs/architecture-lab-servers.md`)
+- Health-check workflow `issues: write` permission fix (403 on alert recovery)
+- LabServer sync: AWX inventory, Prometheus/Grafana targets, Kubernetes nodes, Windows host — all upsert into the session's ServerIdentity registry on console read/mutate
+- AWS EBS **detach** now round-trips through `aws_engine` + `aws_bridge` + `ServerIdentity` (mirrors the existing attach path); FE `detachVolume`/`deleteSecurityGroup` now sync to backend
+- **G-06 grading regression fixed**: `cicd_engine` dispatch no longer shadows the ~180-scenario devops/cicd/pipeline/gitlab-ci/github-actions catalog's real terminal (`check.sh`) grading
 
 ## Recommended next priorities after this commit
 
