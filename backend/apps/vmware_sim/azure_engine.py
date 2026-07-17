@@ -76,8 +76,11 @@ def _now() -> float:
     return time.time()
 
 
-def _event(state: dict, message: str, severity: str = "info") -> None:
-    state.setdefault("events", []).insert(0, {"time": _now_iso(), "message": message, "severity": severity})
+def _event(state: dict, message: str, severity: str = "info", *, trace_id: str | None = None) -> None:
+    entry = {"time": _now_iso(), "message": message, "severity": severity}
+    if trace_id:
+        entry["trace_id"] = trace_id
+    state.setdefault("events", []).insert(0, entry)
 
 
 def _find_vm(state: dict, ident: str) -> dict | None:
@@ -302,11 +305,16 @@ def apply_action(session_id: str, action: str, payload: dict | None = None) -> d
         elif op == "restart":
             vm["power_state"] = "starting"
             vm["_transition"] = {"target": "running", "started_ts": _now()}
-        _event(state, f"{op.title()} requested for {vm['name']}", "info")
+        try:
+            from apps.labs.provisioner.simulation.server_identity import new_trace_id
+            trace_id = new_trace_id()
+        except Exception:
+            trace_id = None
+        _event(state, f"{op.title()} requested for {vm['name']}", "info", trace_id=trace_id)
         _save(session_id, entry)
         try:
             from apps.labs.provisioner.simulation import azure_bridge
-            azure_bridge.record_vm_power(str(session_id), op)
+            azure_bridge.record_vm_power(str(session_id), op, trace_id=trace_id)
         except Exception:
             pass
         return {"ok": True, "message": f"{op.title()} requested", "power_state": vm["power_state"]}
@@ -325,11 +333,16 @@ def apply_action(session_id: str, action: str, payload: dict | None = None) -> d
         vm["size"] = new_size
         if broken.get("vm_undersized") == vm["name"]:
             broken.pop("vm_undersized", None)
-        _event(state, f"Resized {vm['name']} from {old_size} to {new_size}", "success")
+        try:
+            from apps.labs.provisioner.simulation.server_identity import new_trace_id
+            trace_id = new_trace_id()
+        except Exception:
+            trace_id = None
+        _event(state, f"Resized {vm['name']} from {old_size} to {new_size}", "success", trace_id=trace_id)
         _save(session_id, entry)
         try:
             from apps.labs.provisioner.simulation import azure_bridge
-            azure_bridge.record_vm_resize(str(session_id), VM_SIZES[new_size])
+            azure_bridge.record_vm_resize(str(session_id), VM_SIZES[new_size], trace_id=trace_id)
         except Exception:
             pass
         return {"ok": True, "message": "Resize completed", "size": new_size}
@@ -381,11 +394,16 @@ def apply_action(session_id: str, action: str, payload: dict | None = None) -> d
         vm.setdefault("data_disks", []).append(disk["name"])
         if broken.get("disk_unattached") == disk["name"]:
             broken.pop("disk_unattached", None)
-        _event(state, f"Attached disk {disk['name']} to {vm['name']}", "success")
+        try:
+            from apps.labs.provisioner.simulation.server_identity import new_trace_id
+            trace_id = new_trace_id()
+        except Exception:
+            trace_id = None
+        _event(state, f"Attached disk {disk['name']} to {vm['name']}", "success", trace_id=trace_id)
         _save(session_id, entry)
         try:
             from apps.labs.provisioner.simulation import azure_bridge
-            azure_bridge.record_disk_attach(str(session_id), disk["name"], size_gb=disk.get("size_gb", 128))
+            azure_bridge.record_disk_attach(str(session_id), disk["name"], size_gb=disk.get("size_gb", 128), trace_id=trace_id)
         except Exception:
             pass
         return {"ok": True, "message": "Disk attached"}

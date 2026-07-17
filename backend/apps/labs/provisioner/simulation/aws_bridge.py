@@ -67,6 +67,7 @@ def record_volume_attach(
     size_gb: int = 20,
     device: str | None = None,
     instance_id: str | None = None,
+    trace_id: str | None = None,
 ) -> str:
     """AWS console EBS attach → register a hot-attached volume the guest cannot
     yet see. Returns the /dev path the volume will appear as once revealed."""
@@ -85,9 +86,9 @@ def record_volume_attach(
         primary = get_primary(session_id)
         if primary:
             letter = (dev or "/dev/sdf").rstrip("0123456789").split("/")[-1]
-            attach_disk(session_id, primary["id"], name=letter or "sdf", size_gb=int(size_gb), source="aws")
+            attach_disk(session_id, primary["id"], name=letter or "sdf", size_gb=int(size_gb), source="aws", trace_id=trace_id)
         elif instance_id:
-            upsert_server(session_id, {"id": f"aws-{instance_id}", "hostname": instance_id}, source="aws")
+            upsert_server(session_id, {"id": f"aws-{instance_id}", "hostname": instance_id}, source="aws", trace_id=trace_id)
     except Exception:
         pass
     return dev
@@ -98,6 +99,7 @@ def record_volume_detach(
     device: str,
     *,
     instance_id: str | None = None,
+    trace_id: str | None = None,
 ) -> None:
     """AWS console EBS detach → the guest should stop seeing this block device
     on its next disk inspection (mirrors record_volume_attach in reverse)."""
@@ -115,7 +117,7 @@ def record_volume_detach(
         primary = get_primary(session_id)
         if primary:
             letter = (device or "").rstrip("0123456789").split("/")[-1]
-            detach_disk(session_id, primary["id"], name=letter or "sdf", source="aws")
+            detach_disk(session_id, primary["id"], name=letter or "sdf", source="aws", trace_id=trace_id)
     except Exception:
         pass
 
@@ -154,7 +156,7 @@ def consume_volume_events(session_id: str) -> list[dict]:
     return pending
 
 
-def record_instance_power(session_id: str, action: str) -> None:
+def record_instance_power(session_id: str, action: str, *, trace_id: str | None = None) -> None:
     """AWS console → terminal: the EC2 instance changed power state from the
     console (`start` | `stop` | `reboot`). Drained by the terminal side the
     next time it checks guest power/uptime. Last-writer-wins semantics."""
@@ -168,7 +170,7 @@ def record_instance_power(session_id: str, action: str) -> None:
         primary = get_primary(session_id)
         if primary:
             power = "on" if action == "start" else ("reboot_pending" if action == "reboot" else "off")
-            set_power(session_id, primary["id"], power, source="aws")
+            set_power(session_id, primary["id"], power, source="aws", trace_id=trace_id)
     except Exception:
         pass
 

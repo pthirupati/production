@@ -26,6 +26,26 @@ class RHELShell:
     def register_handler(self, handler: Callable[[list[str], str], str | None]) -> None:
         self._extra_handlers.append(handler)
 
+    @staticmethod
+    def _publish_resize_applied(session_id: str, resize: dict) -> None:
+        """Close the trace_id loop for a cross-tech resize: console click ->
+        bridge queued -> terminal applied, all sharing one trace_id so
+        `server_identity.events_for_trace()` can reconstruct the whole story."""
+        trace_id = resize.get("trace_id")
+        if not trace_id:
+            return
+        try:
+            from .server_identity import get_primary, publish_event
+            primary = get_primary(session_id)
+            server_id = primary["id"] if primary else None
+            publish_event(
+                session_id, "server.hardware_resized",
+                {"server_id": server_id, "vcpus": resize.get("vcpus"), "ram_gb": resize.get("ram_gb"), "source": "terminal"},
+                trace_id=trace_id,
+            )
+        except Exception:
+            pass
+
     @property
     def prompt(self) -> str:
         u = self.state.current_user
@@ -84,6 +104,7 @@ class RHELShell:
                 resize = _azure_consume_resize(session_id)
                 if resize:
                     self.state.set_hardware(cpu=resize.get("vcpus"), mem_mb=int(resize.get("ram_gb", 4)) * 1024)
+                    self._publish_resize_applied(session_id, resize)
             except Exception:
                 pass
             try:
@@ -91,6 +112,7 @@ class RHELShell:
                 resize = _gcp_consume_resize(session_id)
                 if resize:
                     self.state.set_hardware(cpu=resize.get("vcpus"), mem_mb=int(resize.get("ram_gb", 4)) * 1024)
+                    self._publish_resize_applied(session_id, resize)
             except Exception:
                 pass
 
