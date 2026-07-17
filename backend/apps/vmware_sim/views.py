@@ -903,6 +903,24 @@ class DellemcSimReleaseView(APIView):
 
 
 # ── Physical Datacenter (DCIM) simulator ──────────────────────────────────────
+class ActiveFaultsView(APIView):
+    """Cross-console fault ledger (Phase 3.2/3.4). Any lab session's open
+    consoles can call this to answer "what is currently broken here" without
+    each engine needing to know about every other engine — a VMware NIC drop,
+    a Windows service stop, and a NetApp volume-near-full all show up here
+    for the same session, with a correlating fault id and timestamp."""
+
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request, session_id):
+        if not LabSession.objects.filter(pk=session_id, user=request.user).exists():
+            return Response({"error": "Session not found"}, status=404)
+        from apps.labs.provisioner.simulation.chaos_engine import list_faults
+
+        active_only = request.query_params.get("active", "true").lower() != "false"
+        return Response({"faults": list_faults(str(session_id), active_only=active_only)})
+
+
 class DatacenterSimStateView(APIView):
     permission_classes = [IsAuthenticated]
 

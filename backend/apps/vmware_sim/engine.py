@@ -1721,6 +1721,11 @@ def apply_action(session_id: str, action: str, payload: dict | None = None) -> d
         events.append(_event(f"Network adapter connected on {vm['name']}", "info", vm["name"]))
         tasks.insert(0, _task("Connect Network", vm["name"]))
         _save_session(str(session_id), entry)
+        try:
+            from apps.labs.provisioner.simulation.chaos_engine import clear_faults as _chaos_clear
+            _chaos_clear(session_id, fault_type="drop_nic", target=vm.get("name") or "")
+        except Exception:  # pragma: no cover
+            pass
         return {"ok": True, "message": f"Network connected on {vm['name']}"}
 
     if action == "disconnect_network":
@@ -1737,6 +1742,14 @@ def apply_action(session_id: str, action: str, payload: dict | None = None) -> d
         events.append(_event(f"Network adapter disconnected on {vm['name']}", "info", vm["name"]))
         tasks.insert(0, _task("Disconnect Network", vm["name"]))
         _save_session(str(session_id), entry)
+        # Record into the shared cross-console fault ledger (Phase 3.2) so any
+        # other open console for this session can see "drop_nic" is active —
+        # mirrors the datacenter_engine trip_pdu_breaker pattern.
+        try:
+            from apps.labs.provisioner.simulation.chaos_engine import inject as _chaos_inject
+            _chaos_inject(session_id, "drop_nic", vm.get("name") or "", detail={"vm_id": vm.get("id")})
+        except Exception:  # pragma: no cover
+            pass
         return {"ok": True, "message": f"Network disconnected on {vm['name']}"}
 
     if action == "set_nic_connected":

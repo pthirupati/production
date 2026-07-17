@@ -1,6 +1,7 @@
 from django.urls import path
 
 from .views import (
+    ActiveFaultsView,
     AimlSimActionView,
     AimlSimReleaseView,
     AimlSimStateView,
@@ -145,6 +146,10 @@ urlpatterns = [
     path("dellemc/sessions/<uuid:session_id>/", DellemcSimStateView.as_view(), name="dellemc-sim-state"),
     path("dellemc/sessions/<uuid:session_id>/action/", DellemcSimActionView.as_view(), name="dellemc-sim-action"),
     path("dellemc/sessions/<uuid:session_id>/release/", DellemcSimReleaseView.as_view(), name="dellemc-sim-release"),
+
+    # Cross-console fault ledger (Phase 3.2/3.4) — any console for a session
+    # can list what's currently broken, regardless of which engine caused it.
+    path("sessions/<uuid:session_id>/faults/", ActiveFaultsView.as_view(), name="active-faults"),
 
     # Physical datacenter (DCIM) simulation
     path("datacenter/sessions/<uuid:session_id>/", DatacenterSimStateView.as_view(), name="datacenter-sim-state"),

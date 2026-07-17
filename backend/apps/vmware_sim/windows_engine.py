@@ -1149,6 +1149,14 @@ def _dispatch(world: dict, state: dict, action: str, payload: dict) -> dict:
                               "Disabled. Set startup to Automatic or Manual first.")}
         svc["status"] = "running"
         _event(state, f"Started service: {svc['display']}")
+        try:
+            from apps.labs.provisioner.simulation.chaos_engine import clear_faults as _chaos_clear
+            _chaos_clear(
+                payload.get("session_id") or "", fault_type="stop_service",
+                target=svc.get("display") or svc.get("name", ""),
+            )
+        except Exception:  # pragma: no cover
+            pass
         return {"ok": True, "message": f"Started {svc['display']}"}
 
     if act in ("stop_service",):
@@ -1157,6 +1165,14 @@ def _dispatch(world: dict, state: dict, action: str, payload: dict) -> dict:
             return {"ok": False, "error": "Service not found"}
         svc["status"] = "stopped"
         _event(state, f"Stopped service: {svc['display']}")
+        try:
+            from apps.labs.provisioner.simulation.chaos_engine import inject as _chaos_inject
+            _chaos_inject(
+                payload.get("session_id") or "", "stop_service", svc.get("display") or svc.get("name", ""),
+                detail={"host": world.get("computer_name")},
+            )
+        except Exception:  # pragma: no cover
+            pass
         return {"ok": True, "message": f"Stopped {svc['display']}"}
 
     if act in ("restart_service",):
@@ -1168,6 +1184,14 @@ def _dispatch(world: dict, state: dict, action: str, payload: dict) -> dict:
                     "error": f"Cannot start {svc['display']}: startup type is Disabled."}
         svc["status"] = "running"
         _event(state, f"Restarted service: {svc['display']}")
+        try:
+            from apps.labs.provisioner.simulation.chaos_engine import clear_faults as _chaos_clear
+            _chaos_clear(
+                payload.get("session_id") or "", fault_type="stop_service",
+                target=svc.get("display") or svc.get("name", ""),
+            )
+        except Exception:  # pragma: no cover
+            pass
         return {"ok": True, "message": f"Restarted {svc['display']}"}
 
     if act in ("set_startup", "set_service_startup"):

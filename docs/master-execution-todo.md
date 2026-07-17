@@ -73,7 +73,8 @@ Legend: `[x]` done · `[~]` partial · `[ ]` open
 - [x] 3.1 Scenario schema + hero linter in CI
 - [ ] 3.1 Catalog migration + enricher at scale
 - [x] 3.2 Chaos engine foundation
-- [ ] 3.2 Wire chaos into all engines
+- [x] 3.2 Wire chaos into VMware / Windows / NetApp (drop_nic/stop_service/fill_disk); AWS/SOC/DellEMC still open
+- [x] 3.4 Cross-console fault ledger API (`GET /api/vmware/sessions/<id>/faults/`) — any console can see what's broken
 - [ ] 3.3 Learner SSO identity + RBAC across consoles
 - [ ] 3.4 Cross-engine trace IDs
 - [ ] 3.5 Session lifecycle manager

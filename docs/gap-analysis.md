@@ -72,7 +72,7 @@ See also: `docs/master-execution-todo.md` (full Phase 0–9 checklist).
 | G-12 | Windows no SCCM/patching | Add SCCM console + scenarios | **Done** |
 | G-13 | Datacenter not cross-tech | Show Open Datacenter + shared ServerIdentity | **Done** (UI link; facility rooms/BMC/PUE; deeper merge still open) |
 | G-14 | Monitoring cosmetic | Real Prom/Grafana or feed validation | Open |
-| G-15 | No shared chaos/fault layer | Per-engine one-off flags | `chaos_engine.py` + DC trip_pdu | **Done** (foundation; wire more engines next) |
+| G-15 | No shared chaos/fault layer | Per-engine one-off flags | `chaos_engine.py` + DC trip_pdu | **Done** — wired into VMware (`disconnect_network`/`connect_network` → `drop_nic`), Windows (`stop_service`/`start_service`/`restart_service` → `stop_service`), NetApp (seed-time near-full volume + `resize_volume` → `fill_disk`); new cross-console `GET /api/vmware/sessions/<id>/faults/` lets any open console ask "what's broken here" regardless of which engine caused it |
 
 ### P2 / multi-sprint (real engines)
 

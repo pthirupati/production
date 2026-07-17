@@ -103,6 +103,13 @@ def _ensure(session_id: str, slug: str = "") -> dict:
         _apply_preset(state, slug)
         entry = {"session_id": str(session_id), "scenario_slug": slug, "state": state}
         _save(session_id, entry)
+        near_full = state.get("broken", {}).get("volume_near_full")
+        if near_full:
+            try:
+                from apps.labs.provisioner.simulation.chaos_engine import inject as _chaos_inject
+                _chaos_inject(session_id, "fill_disk", near_full, detail={"console": "netapp"})
+            except Exception:  # pragma: no cover
+                pass
     return entry
 
 
@@ -180,6 +187,11 @@ def apply_action(session_id: str, action: str, payload: dict | None = None) -> d
             broken.pop("volume_near_full", None)
         _event(state, f"Volume {name} resized to {new_size}GB", "success")
         _save(session_id, entry)
+        try:
+            from apps.labs.provisioner.simulation.chaos_engine import clear_faults as _chaos_clear
+            _chaos_clear(session_id, fault_type="fill_disk", target=name)
+        except Exception:  # pragma: no cover
+            pass
         return {"ok": True, "message": "Volume resized"}
 
     if action == "create_snapmirror":
