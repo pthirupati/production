@@ -1500,7 +1500,7 @@ export default function MonitoringSimulator({
       setState(data)
       setError('')
     } catch (e) {
-      setError('Could not load the monitoring simulator')
+      setError('Could not load the monitoring console')
     }
   }, [sessionId, slug])
 

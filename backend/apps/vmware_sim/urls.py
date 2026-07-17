@@ -1,6 +1,10 @@
 from django.urls import path
 
 from .views import (
+    ActiveFaultsView,
+    AzureSimActionView,
+    AzureSimReleaseView,
+    AzureSimStateView,
     AimlSimActionView,
     AimlSimReleaseView,
     AimlSimStateView,
@@ -47,6 +51,21 @@ from .views import (
     AwsSimActionView,
     AwsSimReleaseView,
     AwsSimStateView,
+    CommvaultSimActionView,
+    CommvaultSimReleaseView,
+    CommvaultSimStateView,
+    NetappSimActionView,
+    NetappSimReleaseView,
+    NetappSimStateView,
+    DellemcSimActionView,
+    DellemcSimReleaseView,
+    DellemcSimStateView,
+    DatacenterSimActionView,
+    DatacenterSimReleaseView,
+    DatacenterSimStateView,
+    SocSimActionView,
+    SocSimReleaseView,
+    SocSimStateView,
 )
 
 urlpatterns = [
@@ -115,4 +134,38 @@ urlpatterns = [
     path("aws/sessions/<uuid:session_id>/", AwsSimStateView.as_view(), name="aws-sim-state"),
     path("aws/sessions/<uuid:session_id>/action/", AwsSimActionView.as_view(), name="aws-sim-action"),
     path("aws/sessions/<uuid:session_id>/release/", AwsSimReleaseView.as_view(), name="aws-sim-release"),
+
+    # Commvault CommCell simulation
+    path("commvault/sessions/<uuid:session_id>/", CommvaultSimStateView.as_view(), name="commvault-sim-state"),
+    path("commvault/sessions/<uuid:session_id>/action/", CommvaultSimActionView.as_view(), name="commvault-sim-action"),
+    path("commvault/sessions/<uuid:session_id>/release/", CommvaultSimReleaseView.as_view(), name="commvault-sim-release"),
+
+    # NetApp ONTAP System Manager simulation
+    path("netapp/sessions/<uuid:session_id>/", NetappSimStateView.as_view(), name="netapp-sim-state"),
+    path("netapp/sessions/<uuid:session_id>/action/", NetappSimActionView.as_view(), name="netapp-sim-action"),
+    path("netapp/sessions/<uuid:session_id>/release/", NetappSimReleaseView.as_view(), name="netapp-sim-release"),
+
+    # Dell EMC Unisphere / PowerMax simulation
+    path("dellemc/sessions/<uuid:session_id>/", DellemcSimStateView.as_view(), name="dellemc-sim-state"),
+    path("dellemc/sessions/<uuid:session_id>/action/", DellemcSimActionView.as_view(), name="dellemc-sim-action"),
+    path("dellemc/sessions/<uuid:session_id>/release/", DellemcSimReleaseView.as_view(), name="dellemc-sim-release"),
+
+    # Cross-console fault ledger (Phase 3.2/3.4) — any console for a session
+    # can list what's currently broken, regardless of which engine caused it.
+    path("sessions/<uuid:session_id>/faults/", ActiveFaultsView.as_view(), name="active-faults"),
+
+    # Microsoft Azure Portal simulation
+    path("azure/sessions/<uuid:session_id>/", AzureSimStateView.as_view(), name="azure-sim-state"),
+    path("azure/sessions/<uuid:session_id>/action/", AzureSimActionView.as_view(), name="azure-sim-action"),
+    path("azure/sessions/<uuid:session_id>/release/", AzureSimReleaseView.as_view(), name="azure-sim-release"),
+
+    # Physical datacenter (DCIM) simulation
+    path("datacenter/sessions/<uuid:session_id>/", DatacenterSimStateView.as_view(), name="datacenter-sim-state"),
+    path("datacenter/sessions/<uuid:session_id>/action/", DatacenterSimActionView.as_view(), name="datacenter-sim-action"),
+    path("datacenter/sessions/<uuid:session_id>/release/", DatacenterSimReleaseView.as_view(), name="datacenter-sim-release"),
+
+    # SOC / SIEM (cybersecurity) simulation
+    path("soc/sessions/<uuid:session_id>/", SocSimStateView.as_view(), name="soc-sim-state"),
+    path("soc/sessions/<uuid:session_id>/action/", SocSimActionView.as_view(), name="soc-sim-action"),
+    path("soc/sessions/<uuid:session_id>/release/", SocSimReleaseView.as_view(), name="soc-sim-release"),
 ]

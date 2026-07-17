@@ -19,7 +19,7 @@ description: 'CONTEXT: A team operating Kubernetes has raised a ticket for `Depl
   for this incident. All tools run locally — no paid APIs or external cloud calls are required.
 
 
-  SYMPTOM / STARTING STATE: Simulated Kubernetes cluster. The api deployment uses image api:missing-tag,
+  SYMPTOM / STARTING STATE: Kubernetes cluster. The api deployment uses image api:missing-tag,
   which the registry does not have. Pods report ErrImagePull then ImagePullBackOff.
 
 
@@ -50,7 +50,7 @@ objectives:
 - Describe a failing api pod and confirm the bad image tag
 - Set the api deployment to a valid image (api:v1)
 - Verify the api pods reach Running state
-initial_state: Simulated Kubernetes cluster. The api deployment uses image api:missing-tag, which the
+initial_state: Kubernetes cluster. The api deployment uses image api:missing-tag, which the
   registry does not have. Pods report ErrImagePull then ImagePullBackOff.
 hints:
 - order: 1
@@ -115,7 +115,7 @@ environment:
     os: FixitLab Kubernetes cluster
     hostname: lab-primary
     ip: 127.0.0.1
-    specs: local offline simulation
+    specs: local offline lab environment
   pre_installed:
   - bash
   - coreutils

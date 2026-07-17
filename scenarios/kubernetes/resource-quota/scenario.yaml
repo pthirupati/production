@@ -12,7 +12,7 @@ description: 'CONTEXT: A team operating Kubernetes has raised a ticket for `Pod 
   for this incident. All tools run locally — no paid APIs or external cloud calls are required.
 
 
-  SYMPTOM / STARTING STATE: Simulated Kubernetes cluster. A namespace ResourceQuota caps total CPU/memory
+  SYMPTOM / STARTING STATE: Kubernetes cluster. A namespace ResourceQuota caps total CPU/memory
   requests and pod count. New replicas are rejected with "exceeded quota" and stay Pending.
 
 
@@ -40,7 +40,7 @@ description: 'CONTEXT: A team operating Kubernetes has raised a ticket for `Pod 
 
   WHAT TO AVOID: Do not apply broad destructive changes, skip evidence gathering, or fake completion with
   marker files — the checker validates real system state.'
-initial_state: Simulated Kubernetes cluster. A namespace ResourceQuota caps total CPU/memory requests
+initial_state: Kubernetes cluster. A namespace ResourceQuota caps total CPU/memory requests
   and pod count. New replicas are rejected with "exceeded quota" and stay Pending.
 lab_mode: simulation
 simulation_type: kubernetes
@@ -118,7 +118,7 @@ environment:
     os: FixitLab Kubernetes cluster
     hostname: lab-primary
     ip: 127.0.0.1
-    specs: local offline simulation
+    specs: local offline lab environment
   pre_installed:
   - bash
   - coreutils

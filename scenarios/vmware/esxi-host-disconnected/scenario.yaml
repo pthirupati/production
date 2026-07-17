@@ -21,7 +21,7 @@ description: 'CONTEXT: A team operating VMware vSphere has raised a ticket for `
   All tools run locally — no paid APIs or external cloud calls are required.
 
 
-  SYMPTOM / STARTING STATE: VMware vCenter simulation. esxi-02.lab.local shows Disconnected in vCenter.
+  SYMPTOM / STARTING STATE: VMware vCenter. esxi-02.lab.local shows Disconnected in vCenter.
 
   Host IP: 192.168.10.12. Port 902 is blocked by a firewall rule change.
 
@@ -56,7 +56,7 @@ objectives:
 - Check if the hostd service is running on the ESXi host
 - Restore firewall access on port 902 between vCenter and ESXi
 - Reconnect the host from vCenter and verify VMs become manageable
-initial_state: 'VMware vCenter simulation. esxi-02.lab.local shows Disconnected in vCenter.
+initial_state: 'VMware vCenter. esxi-02.lab.local shows Disconnected in vCenter.
 
   Host IP: 192.168.10.12. Port 902 is blocked by a firewall rule change.
 
@@ -129,7 +129,7 @@ environment:
     os: FixitLab vSphere lab
     hostname: lab-primary
     ip: 127.0.0.1
-    specs: local offline simulation
+    specs: local offline lab environment
   pre_installed:
   - bash
   - coreutils

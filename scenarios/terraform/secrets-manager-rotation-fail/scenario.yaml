@@ -13,7 +13,7 @@ description: 'CONTEXT: A team operating Terraform IaC has raised a ticket for `S
   for this incident. All tools run locally — no paid APIs or external cloud calls are required.
 
 
-  SYMPTOM / STARTING STATE: Simulated AWS environment with a Secrets Manager secret configured for automatic
+  SYMPTOM / STARTING STATE: AWS environment with a Secrets Manager secret configured for automatic
   rotation via a Lambda function. The Lambda execution role is missing the required Secrets Manager permissions,
   causing rotation to fail with AccessDenied errors in CloudWatch Logs.
 
@@ -42,7 +42,7 @@ description: 'CONTEXT: A team operating Terraform IaC has raised a ticket for `S
 
   WHAT TO AVOID: Do not apply broad destructive changes, skip evidence gathering, or fake completion with
   marker files — the checker validates real system state.'
-initial_state: Simulated AWS environment with a Secrets Manager secret configured for automatic rotation
+initial_state: AWS environment with a Secrets Manager secret configured for automatic rotation
   via a Lambda function. The Lambda execution role is missing the required Secrets Manager permissions,
   causing rotation to fail with AccessDenied errors in CloudWatch Logs.
 objectives:
@@ -133,7 +133,7 @@ environment:
     os: FixitLab Terraform workspace
     hostname: lab-primary
     ip: 127.0.0.1
-    specs: local offline simulation
+    specs: local offline lab environment
   pre_installed:
   - bash
   - coreutils

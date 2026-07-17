@@ -432,6 +432,11 @@ def get_state(session_id: str, scenario_slug: str = "") -> dict:
         _save(session_id, entry)
     state = copy.deepcopy(entry["state"])
     _merge_vmware_hosts(state, session_id)
+    try:
+        from apps.labs.provisioner.simulation.server_identity import sync_awx_inventory
+        sync_awx_inventory(session_id, state.get("hosts") or [])
+    except Exception:
+        pass
     return {
         "session_id": str(session_id),
         "scenario_slug": entry.get("scenario_slug") or scenario_slug,
@@ -612,11 +617,28 @@ def apply_action(session_id: str, action: str, payload: dict | None = None) -> d
 
     if action == "toggle_host":
         hid = str(payload.get("host_id") or "")
+        toggled = None
         for h in state.get("hosts", []):
             if str(h.get("id")) == hid:
                 h["enabled"] = not h.get("enabled", True)
                 state["events"].insert(0, {"time": _now_iso(), "message": f"Host {h.get('name')} {'enabled' if h['enabled'] else 'disabled'}", "severity": "info"})
+                toggled = h
         _save(session_id, entry)
+        try:
+            from apps.labs.provisioner.simulation.server_identity import sync_awx_inventory
+            sync_awx_inventory(session_id, state.get("hosts") or [])
+        except Exception:
+            pass
+        if toggled is not None:
+            try:
+                from apps.labs.provisioner.simulation.chaos_engine import inject as _chaos_inject
+                from apps.labs.provisioner.simulation.chaos_engine import clear_faults as _chaos_clear
+                if toggled.get("enabled"):
+                    _chaos_clear(session_id, fault_type="drop_nic", target=toggled.get("name") or "")
+                else:
+                    _chaos_inject(session_id, "drop_nic", toggled.get("name") or "", detail={"console": "awx", "host_id": hid})
+            except Exception:  # pragma: no cover
+                pass
         return {"ok": True, "message": "Host updated"}
 
     if action == "create_host":
@@ -629,6 +651,11 @@ def apply_action(session_id: str, action: str, payload: dict | None = None) -> d
         state["events"].insert(0, {"time": _now_iso(), "message": f"Host {name} added to {inventory}", "severity": "success"})
         _activity(state, "Created host", name)
         _save(session_id, entry)
+        try:
+            from apps.labs.provisioner.simulation.server_identity import sync_awx_inventory
+            sync_awx_inventory(session_id, state.get("hosts") or [])
+        except Exception:
+            pass
         return {"ok": True, "message": "Host created"}
 
     if action == "create_organization":

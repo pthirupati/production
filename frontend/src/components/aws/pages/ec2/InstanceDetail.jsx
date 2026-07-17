@@ -75,7 +75,7 @@ export default function InstanceDetail() {
   const monKey = instance.state
   const defaultUser = isWindows ? 'Administrator' : (ami.user || 'ec2-user')
   const host = instance.publicIp ? publicDns(instance.publicIp, instance.region) : instance.privateIp
-  const sshCommand = `ssh -i "${instance.keyName || 'demo-key-pair'}.pem" ${defaultUser}@${host}`
+  const sshCommand = `ssh -i "${instance.keyName || 'lab-key-pair'}.pem" ${defaultUser}@${host}`
   const rdpCommand = `mstsc /v:${host}`
   const terraformImport = `terraform import aws_instance.${(instance.name || instance.id).replace(/[^A-Za-z0-9_]/g, '_')} ${instance.id}`
 
@@ -253,7 +253,7 @@ ${terraformImport}`}</pre>
                 <div className="aws-section-label">Full-stack lab path</div>
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 12, marginTop: 10 }}>
                   <KV k="1. Provision">Launch wizard, CloudShell AWS CLI, or Terraform apply</KV>
-                  <KV k="2. Connect">{isWindows ? 'RDP / PowerShell simulation' : 'EC2 Instance Connect / SSH simulation'}</KV>
+                  <KV k="2. Connect">{isWindows ? 'RDP / PowerShell' : 'EC2 Instance Connect / SSH'}</KV>
                   <KV k="3. Operate">Run Linux, Windows, Kubernetes, Docker, or Terraform commands</KV>
                 </div>
               </div>

@@ -12,7 +12,7 @@ description: 'CONTEXT: A team operating Kubernetes has raised a ticket for `Serv
   for this incident. All tools run locally — no paid APIs or external cloud calls are required.
 
 
-  SYMPTOM / STARTING STATE: Simulated Kubernetes cluster. Pods are Running, but connecting to the Service''s
+  SYMPTOM / STARTING STATE: Kubernetes cluster. Pods are Running, but connecting to the Service''s
   ClusterIP from another pod times out or is refused. Endpoints may be empty or the ports may not line
   up.
 
@@ -41,7 +41,7 @@ description: 'CONTEXT: A team operating Kubernetes has raised a ticket for `Serv
 
   WHAT TO AVOID: Do not apply broad destructive changes, skip evidence gathering, or fake completion with
   marker files — the checker validates real system state.'
-initial_state: Simulated Kubernetes cluster. Pods are Running, but connecting to the Service's ClusterIP
+initial_state: Kubernetes cluster. Pods are Running, but connecting to the Service's ClusterIP
   from another pod times out or is refused. Endpoints may be empty or the ports may not line up.
 objectives:
 - Reproduce the failed connection to the Service ClusterIP
@@ -119,7 +119,7 @@ environment:
     os: FixitLab Kubernetes cluster
     hostname: lab-primary
     ip: 127.0.0.1
-    specs: local offline simulation
+    specs: local offline lab environment
   pre_installed:
   - bash
   - coreutils

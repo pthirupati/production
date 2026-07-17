@@ -344,9 +344,9 @@ export default function ScenarioDetail() {
             <span
               className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs border font-medium"
               style={{ borderColor: `${simInfo.accent}55`, color: simInfo.accent, backgroundColor: `${simInfo.accent}14` }}
-              title={`Starts the ${simInfo.label} in-app simulator with optional lab terminal`}
+              title={`Starts the ${simInfo.label} console with optional lab terminal`}
             >
-              <Monitor size={11} /> Opens {simInfo.short} simulator
+              <Monitor size={11} /> Opens {simInfo.short} console
             </span>
           )}
           {userCompleted && (
@@ -429,11 +429,11 @@ export default function ScenarioDetail() {
         <div className="glass-card p-5 border-l-4" style={{ borderLeftColor: simInfo.accent }}>
           <h2 className="text-sm font-semibold text-white mb-1 flex items-center gap-2">
             <Monitor size={16} style={{ color: simInfo.accent }} />
-            In-app simulator
+            Lab console
           </h2>
           <p className="text-sm text-surface-400 leading-relaxed">
             This challenge opens the <strong className="text-surface-200">{simInfo.label}</strong> inside the lab.
-            Use the <strong className="text-surface-200">Terminal</strong> button in the simulator toolbar to run shell commands
+            Use the <strong className="text-surface-200">Terminal</strong> button in the console toolbar to run shell commands
             (e.g. <code className="text-accent-cyan">terraform apply</code>, edit configs under <code className="text-accent-cyan">/etc</code>).
             Terraform labs default to the VS Code IDE with HCL editor and integrated terminal.
           </p>

@@ -13,7 +13,7 @@ description: 'CONTEXT: A team operating Linux administration has raised a ticket
   host for this incident. All tools run locally — no paid APIs or external cloud calls are required.
 
 
-  SYMPTOM / STARTING STATE: Simulated RHEL 9 server. An rsync job has been running for 3 hours copying
+  SYMPTOM / STARTING STATE: RHEL 9 server. An rsync job has been running for 3 hours copying
   50GB of data.
 
   The server feels sluggish. Running df -h shows /dev/sda is the target disk. dmesg output
@@ -46,7 +46,7 @@ description: 'CONTEXT: A team operating Linux administration has raised a ticket
 
   WHAT TO AVOID: Do not apply broad destructive changes, skip evidence gathering, or fake completion with
   marker files — the checker validates real system state.'
-initial_state: 'Simulated RHEL 9 server. An rsync job has been running for 3 hours copying 50GB of data.
+initial_state: 'RHEL 9 server. An rsync job has been running for 3 hours copying 50GB of data.
 
   The server feels sluggish. Running df -h shows /dev/sda is the target disk. dmesg output
 
@@ -137,7 +137,7 @@ environment:
     os: FixitLab Linux practice server
     hostname: lab-primary
     ip: 127.0.0.1
-    specs: local offline simulation
+    specs: local offline lab environment
   pre_installed:
   - bash
   - coreutils

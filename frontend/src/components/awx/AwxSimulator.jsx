@@ -95,7 +95,7 @@ export default function AwxSimulator({
   }, [loggedIn, hasLiveJob])
   const chromeProps = {
     onHints, onCheck, onExtend, onStop,
-    onBackToTerminal: embedded ? undefined : onExit,
+    onBackToTerminal: embedded ? (onToggleTerminal || undefined) : onExit,
     hintsLabel, checkDisabled, extendDisabled,
     backLabel: simTerminalOpen ? 'Hide terminal' : 'Terminal',
     vmwareHref,

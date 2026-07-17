@@ -19,7 +19,7 @@ description: 'CONTEXT: A team operating prompt engineering has raised a ticket f
 
   OBJECTIVE: Split durable behavior (system prompt) from per-turn input (user messages); Plan how to keep
   a long conversation within the context window via summarizing or pruning; Pass both graded exercises
-  (the simulator re-checks your prompt server-side). Acceptance criteria: the change is minimal and reversible,
+  (the grader re-checks your prompt server-side). Acceptance criteria: the change is minimal and reversible,
   and success means all hidden tests pass.
 
 
@@ -54,7 +54,7 @@ dual_terminal: false
 objectives:
 - Split durable behavior (system prompt) from per-turn input (user messages)
 - Plan how to keep a long conversation within the context window via summarizing or pruning
-- Pass both graded exercises (the simulator re-checks your prompt server-side)
+- Pass both graded exercises (the grader re-checks your prompt server-side)
 initial_state: The guided AI practice console opens with two graded exercises on multi-turn design. Decide
   what goes in the system prompt vs each user turn, then plan how to keep a long chat bounded. Rule-based
   and free — strong answers pass, vague ones fail.
@@ -214,14 +214,14 @@ linked_tutorial: prompt-engineering-fundamentals
 what_you_will_learn:
 - Split durable behavior (system prompt) from per-turn input (user messages)
 - Plan how to keep a long conversation within the context window via summarizing or pruning
-- Pass both graded exercises (the simulator re-checks your prompt server-side)
+- Pass both graded exercises (the grader re-checks your prompt server-side)
 environment:
   nodes:
   - role: primary
     os: FixitLab LLM practice workspace
     hostname: lab-primary
     ip: 127.0.0.1
-    specs: local offline simulation
+    specs: local offline lab environment
   pre_installed:
   - bash
   - coreutils

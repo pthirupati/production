@@ -14,7 +14,7 @@ export default function Privacy() {
         'Username and profile information you choose to provide',
         'Lab session activity, including commands entered and results',
         'Resume uploads and parsed career data for AI Interview Studio',
-        'Interview transcripts, scores, and session metadata from mock interviews',
+        'Interview transcripts, scores, and session metadata from AI interviews',
         'Camera and microphone status during interviews (not stored as video by default)',
         'Browser speech recognition text when you use voice answers',
         'Subscription and payment information (processed securely)',
@@ -28,7 +28,7 @@ export default function Privacy() {
       items: [
         'To provide and improve our platform services',
         'To personalize your learning experience and tailor interview questions',
-        'To run AI mock interviews using our own rule-based engine (no third-party LLM APIs)',
+        'To run AI interviews using our own rule-based engine (no third-party LLM APIs)',
         'To process voice answers via your browser\'s Speech API (audio stays on your device)',
         'To process payments and manage subscriptions',
         'To send important account notifications',
@@ -105,7 +105,7 @@ export default function Privacy() {
           <FixitPanel padding="p-8" className="border-indigo-500/20 animate-fade-in">
             <h2 className="text-xl font-bold text-white mb-4">AI Interview Studio</h2>
             <ul className="space-y-2 text-surface-300 text-sm">
-              <li>Mock interviews require camera and microphone; you must consent before each session.</li>
+              <li>AI interviews require camera and microphone; you must consent before each session.</li>
               <li>We store text transcripts and scores. Video is not recorded on our servers unless explicitly stated.</li>
               <li>Voice uses your browser&apos;s built-in speech APIs — no paid third-party TTS/STT services.</li>
               <li>Admins may request to observe a live session; you must approve before they can view the transcript.</li>

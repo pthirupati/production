@@ -13,7 +13,7 @@ description: 'CONTEXT: A team operating Linux administration has raised a ticket
   host for this incident. All tools run locally — no paid APIs or external cloud calls are required.
 
 
-  SYMPTOM / STARTING STATE: Simulated RHEL 9 server acting as both NFS server and client for this lab.
+  SYMPTOM / STARTING STATE: RHEL 9 server acting as both NFS server and client for this lab.
   The directory
 
   /srv/shared exists and contains sample files. The nfs-utils package is not installed.
@@ -47,7 +47,7 @@ description: 'CONTEXT: A team operating Linux administration has raised a ticket
 
   WHAT TO AVOID: Do not apply broad destructive changes, skip evidence gathering, or fake completion with
   marker files — the checker validates real system state.'
-initial_state: 'Simulated RHEL 9 server acting as both NFS server and client for this lab. The directory
+initial_state: 'RHEL 9 server acting as both NFS server and client for this lab. The directory
 
   /srv/shared exists and contains sample files. The nfs-utils package is not installed.
 
@@ -145,7 +145,7 @@ environment:
     os: FixitLab Linux practice server
     hostname: lab-primary
     ip: 127.0.0.1
-    specs: local offline simulation
+    specs: local offline lab environment
   pre_installed:
   - bash
   - coreutils

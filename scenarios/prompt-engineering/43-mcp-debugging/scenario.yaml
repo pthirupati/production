@@ -19,7 +19,7 @@ description: 'CONTEXT: A team operating prompt engineering has raised a ticket f
 
   OBJECTIVE: Enumerate the layers an MCP call passes through and check them in order; Diagnose the classic
   failures — auth, schema/validation, networking, the model not calling the tool; Pass both graded exercises
-  (the simulator re-checks your prompt server-side). Acceptance criteria: the change is minimal and reversible,
+  (the grader re-checks your prompt server-side). Acceptance criteria: the change is minimal and reversible,
   and success means all hidden tests pass.
 
 
@@ -54,7 +54,7 @@ dual_terminal: false
 objectives:
 - Enumerate the layers an MCP call passes through and check them in order
 - Diagnose the classic failures — auth, schema/validation, networking, the model not calling the tool
-- Pass both graded exercises (the simulator re-checks your prompt server-side)
+- Pass both graded exercises (the grader re-checks your prompt server-side)
 initial_state: The guided AI practice console opens with two graded MCP-debugging exercises. Walk a connection
   failure layer by layer, then diagnose why a tool never fires. Rule-based and free — a methodical answer
   passes, a vague one fails.
@@ -222,14 +222,14 @@ linked_tutorial: prompt-engineering-fundamentals
 what_you_will_learn:
 - Enumerate the layers an MCP call passes through and check them in order
 - Diagnose the classic failures — auth, schema/validation, networking, the model not calling the tool
-- Pass both graded exercises (the simulator re-checks your prompt server-side)
+- Pass both graded exercises (the grader re-checks your prompt server-side)
 environment:
   nodes:
   - role: primary
     os: FixitLab LLM practice workspace
     hostname: lab-primary
     ip: 127.0.0.1
-    specs: local offline simulation
+    specs: local offline lab environment
   pre_installed:
   - bash
   - coreutils

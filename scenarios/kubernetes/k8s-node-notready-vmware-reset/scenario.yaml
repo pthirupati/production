@@ -23,7 +23,7 @@ description: 'CONTEXT: A team operating Kubernetes has raised a ticket for `Work
 
 
   OBJECTIVE: Confirm worker-1 is NotReady (kubectl get nodes) and a pod is Pending (kubectl get pods);
-  Recognise the node VM is hung — kubectl cannot revive a dead kubelet; Open the VMware simulator and
+  Recognise the node VM is hung — kubectl cannot revive a dead kubelet; Open the VMware console and
   Reset the node VM k8s-worker-1 (Power -> Reset). Acceptance criteria: the change is minimal and reversible,
   and success means `kubectl get pods` shows every pod Running.
 
@@ -58,7 +58,7 @@ initial_state: 'A Kubernetes cluster whose worker-1 node is NotReady because its
 objectives:
 - Confirm worker-1 is NotReady (kubectl get nodes) and a pod is Pending (kubectl get pods)
 - Recognise the node VM is hung — kubectl cannot revive a dead kubelet
-- Open the VMware simulator and Reset the node VM k8s-worker-1 (Power -> Reset)
+- Open the VMware console and Reset the node VM k8s-worker-1 (Power -> Reset)
 - Confirm worker-1 returns to Ready (kubectl get nodes)
 - Verify the stranded pod reschedules and all pods are Running (kubectl get pods)
 lab_mode: simulation
@@ -130,7 +130,7 @@ linked_tutorial: kubernetes-fundamentals
 what_you_will_learn:
 - Confirm worker-1 is NotReady (kubectl get nodes) and a pod is Pending (kubectl get pods)
 - Recognise the node VM is hung — kubectl cannot revive a dead kubelet
-- Open the VMware simulator and Reset the node VM k8s-worker-1 (Power -> Reset)
+- Open the VMware console and Reset the node VM k8s-worker-1 (Power -> Reset)
 - Confirm worker-1 returns to Ready (kubectl get nodes)
 - Verify the stranded pod reschedules and all pods are Running (kubectl get pods)
 environment:
@@ -139,7 +139,7 @@ environment:
     os: FixitLab Kubernetes cluster
     hostname: lab-primary
     ip: 127.0.0.1
-    specs: local offline simulation
+    specs: local offline lab environment
   pre_installed:
   - bash
   - coreutils

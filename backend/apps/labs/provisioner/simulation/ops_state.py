@@ -136,6 +136,9 @@ def apply_team_ops_action(engine: UnifiedSimulationEngine | None, action: str, s
         # The NIC hand-off is the documented remediation for the network-nic
         # sentinel labs; clear the planted sentinel so validation passes.
         clear_broken_config_sentinel(state, slug)
+    elif action == "security_approved":
+        state.ops_security_approved = True
+        clear_broken_config_sentinel(state, slug)
     elif action == "mount_issue_reported":
         state.mount_issue_after_reboot = True
 
@@ -146,4 +149,8 @@ def get_simulation_engine_for_session(session_id: str):
     entry = get_sim_session(str(session_id))
     if not entry:
         return None
+    # Live engines are nested under entry["state"]["engine"] (see register_sim_session).
+    state = entry.get("state")
+    if isinstance(state, dict) and state.get("engine") is not None:
+        return state["engine"]
     return entry.get("engine")

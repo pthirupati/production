@@ -207,23 +207,51 @@
 .cicd-graph { position: relative; overflow: auto; }
 .cicd-graph-stage-title {
   font-size: 0.62rem; text-transform: uppercase; letter-spacing: 0.06em;
-  color: var(--cicd-muted); font-weight: 700; padding-bottom: 0.4rem;
+  color: var(--cicd-muted); font-weight: 700; padding-bottom: 0.55rem;
+  display: flex; align-items: center; gap: 0.4rem;
+}
+.cicd-graph-stage-title::before {
+  content: ''; width: 6px; height: 6px; border-radius: 50%;
+  background: var(--cicd-accent); box-shadow: 0 0 0 3px var(--cicd-accent-soft);
+  flex-shrink: 0;
+}
+.cicd-graph-stage-count {
+  font-weight: 600; color: var(--cicd-muted); opacity: 0.75; letter-spacing: 0;
+  text-transform: none; font-size: 0.65rem;
 }
 .cicd-node {
-  position: relative; background: var(--cicd-panel); border: 1px solid var(--cicd-border);
-  border-radius: 8px; padding: 0.5rem 0.65rem; min-width: 168px; cursor: pointer;
-  transition: border-color 0.12s, background 0.12s, box-shadow 0.12s;
+  position: relative; background: linear-gradient(180deg, var(--cicd-panel), var(--cicd-panel-2));
+  border: 1px solid var(--cicd-border);
+  border-radius: 9px; padding: 0.55rem 0.7rem; min-width: 168px; cursor: pointer;
+  box-shadow: 0 1px 2px rgba(0,0,0,.25);
+  transition: border-color 0.12s, background 0.12s, box-shadow 0.15s, transform 0.12s;
 }
-.cicd-node:hover { border-color: #3d4451; background: #1b2129; }
-.cicd-node-selected { border-color: var(--cicd-accent); box-shadow: 0 0 0 1px var(--cicd-accent); }
-.cicd-node-running { border-color: rgba(56,139,253,.5); }
-.cicd-node-failed { border-color: rgba(248, 81, 73, 0.5); }
+.cicd-node:hover { border-color: #3d4451; background: #1b2129; transform: translateY(-1px); box-shadow: 0 4px 10px rgba(0,0,0,.3); }
+.cicd-node-selected { border-color: var(--cicd-accent); box-shadow: 0 0 0 1px var(--cicd-accent), 0 4px 12px rgba(56,139,253,.2); }
+.cicd-node-running { border-color: rgba(56,139,253,.6); box-shadow: 0 0 0 1px rgba(56,139,253,.35), 0 0 14px rgba(56,139,253,.25); animation: cicd-node-glow 1.6s ease-in-out infinite; }
+.cicd-node-failed { border-color: rgba(248, 81, 73, 0.5); box-shadow: 0 0 0 1px rgba(248,81,73,.18); }
 .cicd-node-success { border-color: rgba(63, 185, 80, 0.4); }
-.cicd-node-awaiting { border-color: rgba(210, 153, 34, 0.55); }
+.cicd-node-awaiting { border-color: rgba(210, 153, 34, 0.55); box-shadow: 0 0 0 1px rgba(210,153,34,.22); }
 .cicd-node-name { font-size: 0.78rem; font-weight: 600; color: var(--cicd-text); }
 .cicd-node-meta { font-size: 0.63rem; color: var(--cicd-muted); font-variant-numeric: tabular-nums; }
 .cicd-edge { stroke: var(--cicd-border); stroke-width: 1.5; fill: none; }
-.cicd-edge-active { stroke: var(--cicd-accent); }
+.cicd-edge-active { stroke: var(--cicd-accent); stroke-width: 2; }
+@keyframes cicd-node-glow {
+  0%, 100% { box-shadow: 0 0 0 1px rgba(56,139,253,.35), 0 0 14px rgba(56,139,253,.25); }
+  50% { box-shadow: 0 0 0 1px rgba(56,139,253,.55), 0 0 20px rgba(56,139,253,.4); }
+}
+
+/* Overall pipeline status pill, shown in the header next to the lab title */
+.cicd-status-pill {
+  display: inline-flex; align-items: center; gap: 0.35rem; font-size: 0.68rem; font-weight: 700;
+  padding: 0.2rem 0.55rem; border-radius: 999px; border: 1px solid var(--cicd-border);
+  background: var(--cicd-panel); color: var(--cicd-muted); text-transform: uppercase; letter-spacing: 0.03em;
+}
+.cicd-status-pill-running { color: var(--cicd-accent); border-color: rgba(56,139,253,.4); background: var(--cicd-accent-soft); }
+.cicd-status-pill-success { color: var(--cicd-green); border-color: rgba(63,185,80,.4); background: rgba(63,185,80,.1); }
+.cicd-status-pill-failed { color: var(--cicd-red); border-color: rgba(248,81,73,.4); background: rgba(248,81,73,.1); }
+.cicd-status-dot { width: 6px; height: 6px; border-radius: 50%; background: currentColor; flex-shrink: 0; }
+.cicd-status-pill-running .cicd-status-dot { animation: cicd-pulse 1s ease-in-out infinite; }
 
 /* Job console */
 .cicd-console { background: #0a0e14; border: 1px solid var(--cicd-border-soft); border-radius: 8px; }

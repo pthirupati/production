@@ -236,7 +236,7 @@ export default function Tutorials() {
             <Terminal size={20} className="text-accent-purple mt-0.5 shrink-0" />
             <div>
               <h2 className="font-display font-semibold text-white">Preparing for a certification?</h2>
-              <p className="text-sm text-surface-400">Follow an objective-mapped track with hands-on labs and a timed mock exam.</p>
+              <p className="text-sm text-surface-400">Follow an objective-mapped track with hands-on labs and a timed practice exam.</p>
             </div>
           </div>
           <Link to="/certifications" className="btn-secondary text-sm shrink-0">Browse Certifications</Link>

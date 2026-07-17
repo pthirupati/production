@@ -36,7 +36,7 @@ export default function InterviewReport() {
 
   const linkedInUrl = () => {
     const text = r.certificate?.linkedin_share_text
-      || `I completed a mock interview round on FixitLab — score ${Math.round(r.overall_score || 0)}/100.`
+      || `I completed an AI interview round on FixItLab — score ${Math.round(r.overall_score || 0)}/100.`
     const url = `${window.location.origin}/verify-certificate`
     return `https://www.linkedin.com/sharing/share-offsite/?url=${encodeURIComponent(url)}&summary=${encodeURIComponent(text)}`
   }

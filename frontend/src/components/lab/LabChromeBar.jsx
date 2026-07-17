@@ -52,7 +52,7 @@ export function LabChromeControls({
           rel="noopener noreferrer"
           className={buttonClass}
           style={{ textDecoration: 'none', color: 'inherit' }}
-          title="This server also lives in VMware. Open the vCenter simulator to perform hypervisor-side steps (add a disk, snapshot, reboot), then return here and rescan."
+          title="This server also lives in VMware. Open vCenter to perform hypervisor-side steps (add a disk, snapshot, reboot), then return here and rescan."
         >
           <Server size={13} className="text-[#4fa7e8]" /> {vmwareLabel}
         </a>
@@ -92,7 +92,7 @@ export function LabChromeControls({
  */
 export default function LabChromeBar({
   icon: Icon = Activity,
-  title = 'Simulator',
+  title = 'Console',
   subtitle = '',
   accent = '#0891b2',
   className = 'lab-chrome-bar',

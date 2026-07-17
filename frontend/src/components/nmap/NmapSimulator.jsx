@@ -302,7 +302,7 @@ export default function NmapSimulator({
       // Seed the targets box with the subnet so the learner has a sensible start.
       if (!targets && data?.inventory?.subnet) setTargets(data.inventory.subnet)
     } catch {
-      setError('Could not load the Nmap simulator')
+      setError('Could not load Nmap')
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [sessionId, slug])
@@ -1070,7 +1070,7 @@ export default function NmapSimulator({
         <NmapModal title="About Nmap / Zenmap" onClose={() => setModal(null)}>
           <div className="flex items-start gap-3 text-sm">
             <HelpCircle size={22} className="text-green-700 shrink-0" />
-            <p>FixitLab Nmap simulation with Zenmap-style profiles, output tabs, topology, host details, scan history, NSE script browser, and command builder.</p>
+            <p>Nmap with Zenmap-style profiles, output tabs, topology, host details, scan history, NSE script browser, and command builder.</p>
           </div>
         </NmapModal>
       )}

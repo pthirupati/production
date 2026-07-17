@@ -13,7 +13,7 @@ description: 'CONTEXT: A team operating Linux administration has raised a ticket
   host for this incident. All tools run locally — no paid APIs or external cloud calls are required.
 
 
-  SYMPTOM / STARTING STATE: Simulated RHEL 9 server. lsblk shows an unused /dev/sdc (4G). swapon --show
+  SYMPTOM / STARTING STATE: RHEL 9 server. lsblk shows an unused /dev/sdc (4G). swapon --show
   returns
 
   no output and free -h shows 0B of swap. The database process was recently OOM-killed.
@@ -42,7 +42,7 @@ description: 'CONTEXT: A team operating Linux administration has raised a ticket
 
   WHAT TO AVOID: Do not apply broad destructive changes, skip evidence gathering, or fake completion with
   marker files — the checker validates real system state.'
-initial_state: 'Simulated RHEL 9 server. lsblk shows an unused /dev/sdc (4G). swapon --show returns
+initial_state: 'RHEL 9 server. lsblk shows an unused /dev/sdc (4G). swapon --show returns
 
   no output and free -h shows 0B of swap. The database process was recently OOM-killed.
 
@@ -127,7 +127,7 @@ environment:
     os: FixitLab Linux practice server
     hostname: lab-primary
     ip: 127.0.0.1
-    specs: local offline simulation
+    specs: local offline lab environment
   pre_installed:
   - bash
   - coreutils

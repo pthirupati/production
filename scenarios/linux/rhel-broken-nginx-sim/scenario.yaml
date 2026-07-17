@@ -9,7 +9,7 @@ description: 'CONTEXT: A team operating Linux administration has raised a ticket
   host for this incident. All tools run locally — no paid APIs or external cloud calls are required.
 
 
-  SYMPTOM / STARTING STATE: Simulated RHEL 9 server. nginx is installed but the active site config contains
+  SYMPTOM / STARTING STATE: RHEL 9 server. nginx is installed but the active site config contains
   a typo, so `systemctl start nginx` fails and `nginx -t` reports a syntax error. The website is unreachable.
 
 
@@ -82,7 +82,7 @@ hints:
 
 
     WHY: systemd will not start nginx until `nginx -t` passes.'
-initial_state: Simulated RHEL 9 server. nginx is installed but the active site config contains a typo,
+initial_state: RHEL 9 server. nginx is installed but the active site config contains a typo,
   so `systemctl start nginx` fails and `nginx -t` reports a syntax error. The website is unreachable.
 is_free: false
 jira_priority: Medium
@@ -118,7 +118,7 @@ environment:
     os: FixitLab Linux practice server
     hostname: lab-primary
     ip: 127.0.0.1
-    specs: local offline simulation
+    specs: local offline lab environment
   pre_installed:
   - bash
   - coreutils

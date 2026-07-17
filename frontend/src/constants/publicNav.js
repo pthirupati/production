@@ -8,13 +8,13 @@ export const PUBLIC_NAV_PRIMARY = [
   { to: '/pricing', label: 'Pricing' },
   { to: '/tutorials', label: 'Tutorials' },
   { to: '/certifications', label: 'Certifications' },
-  { to: '/mock-interviews', label: 'Mock Interviews' },
+  { to: '/mock-interviews', label: 'AI Interviews' },
   { to: '/verify-certificate', label: 'Verify Certificate' },
   { to: '/#tech', label: 'Technologies' },
 ]
 
 export const PUBLIC_NAV_SECONDARY = [
-  { to: '/simulators', label: 'Simulators' },
+  { to: '/simulators', label: 'Lab Consoles' },
   { to: '/about', label: 'About' },
   { to: '/blog', label: 'Blog' },
   { to: '/changelog', label: 'Changelog' },

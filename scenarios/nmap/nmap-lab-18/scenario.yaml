@@ -12,7 +12,7 @@ description: 'CONTEXT: A team operating network scanning has raised a ticket for
   All tools run locally — no paid APIs or external cloud calls are required.
 
 
-  SYMPTOM / STARTING STATE: Hands-on nmap scenario: migrate storage in a simulated environment.
+  SYMPTOM / STARTING STATE: Hands-on nmap scenario: migrate storage on this host.
 
 
   OBJECTIVE: Understand the current failure mode affecting Migrate nmap storage (lab 18); Restore expected
@@ -52,7 +52,7 @@ objectives:
 - Understand the current failure mode affecting Migrate nmap storage (lab 18)
 - Restore expected service behavior with a minimal, documented change
 - Verify the fix holds under a realistic smoke test
-initial_state: 'Hands-on nmap scenario: migrate storage in a simulated environment.'
+initial_state: 'Hands-on nmap scenario: migrate storage on this host.'
 hints:
 - order: 1
   cost: 0
@@ -125,7 +125,7 @@ environment:
     os: FixitLab scanning lab
     hostname: lab-primary
     ip: 127.0.0.1
-    specs: local offline simulation
+    specs: local offline lab environment
   pre_installed:
   - bash
   - coreutils

@@ -18,7 +18,7 @@ description: 'CONTEXT: A team operating prompt engineering has raised a ticket f
 
   OBJECTIVE: Explain what an MCP server exposes (tools, resources, prompts) and why it standardizes integration;
   Design a focused MCP tool with a clear purpose, a trigger, and a typed input schema; Pass both graded
-  exercises (the simulator re-checks your prompt server-side). Acceptance criteria: the change is minimal
+  exercises (the grader re-checks your prompt server-side). Acceptance criteria: the change is minimal
   and reversible, and success means all hidden tests pass.
 
 
@@ -53,7 +53,7 @@ dual_terminal: false
 objectives:
 - Explain what an MCP server exposes (tools, resources, prompts) and why it standardizes integration
 - Design a focused MCP tool with a clear purpose, a trigger, and a typed input schema
-- Pass both graded exercises (the simulator re-checks your prompt server-side)
+- Pass both graded exercises (the grader re-checks your prompt server-side)
 initial_state: The guided AI practice console opens with two graded exercises on MCP server design. Describe
   what a server exposes, then design a focused tool with a typed schema. Rule-based and free — strong
   designs pass, vague ones fail.
@@ -219,14 +219,14 @@ linked_tutorial: prompt-engineering-fundamentals
 what_you_will_learn:
 - Explain what an MCP server exposes (tools, resources, prompts) and why it standardizes integration
 - Design a focused MCP tool with a clear purpose, a trigger, and a typed input schema
-- Pass both graded exercises (the simulator re-checks your prompt server-side)
+- Pass both graded exercises (the grader re-checks your prompt server-side)
 environment:
   nodes:
   - role: primary
     os: FixitLab LLM practice workspace
     hostname: lab-primary
     ip: 127.0.0.1
-    specs: local offline simulation
+    specs: local offline lab environment
   pre_installed:
   - bash
   - coreutils

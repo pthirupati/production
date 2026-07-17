@@ -53,7 +53,7 @@ const defaultColor = {
 }
 
 const freeFeatures = [
-  'Demo scenarios for every technology',
+  'Sample labs for every technology',
   'Community forum with screenshot attachments',
   'Global leaderboard & achievements',
   'Basic hints system',
@@ -78,11 +78,11 @@ const FAQ_ITEMS = [
   },
   {
     q: 'How do interview plans work?',
-    a: 'Interview Studio plans are billed yearly. Pro and Premium include 10 full mock interview attempts per year with multi-round voice interviews and detailed feedback reports.',
+    a: 'Interview Studio plans are billed yearly. Pro and Premium include 10 full AI interview attempts per year with multi-round voice interviews and detailed feedback reports.',
   },
   {
     q: 'What can I access for free?',
-    a: 'Free users get demo scenarios for every technology, one interview sample, community forum, leaderboard, and basic progress tracking.',
+    a: 'Free users get sample labs for every technology, one interview sample, community forum, leaderboard, and basic progress tracking.',
   },
   {
     q: 'Can I subscribe to multiple technologies at once?',
@@ -97,8 +97,8 @@ const FAQ_ITEMS = [
     a: 'All subscriptions are yearly (1-year access from purchase). Interview plan prices shown are per year, not per month.',
   },
   {
-    q: 'Do paid plans include mock interview attempts?',
-    a: 'Yes. Pro and Premium interview plans include 10 full mock interview attempts per year with multi-round voice interviews and detailed STAR-scored feedback reports.',
+    q: 'Do paid plans include AI interview attempts?',
+    a: 'Yes. Pro and Premium interview plans include 10 full AI interview attempts per year with multi-round voice interviews and detailed STAR-scored feedback reports.',
   },
 ]
 
@@ -810,7 +810,7 @@ export default function Pricing() {
             <Mic2 className="text-indigo-400" size={22} /> AI Interview Studio
           </h2>
           <p className="text-sm text-surface-400 max-w-xl mx-auto">
-            Yearly mock interview plans with AI-powered voice interviews and detailed feedback. 10 full interview attempts per year on paid tiers.
+            Yearly AI interview plans with AI-powered voice interviews and detailed feedback. 10 full interview attempts per year on paid tiers.
           </p>
         </div>
 

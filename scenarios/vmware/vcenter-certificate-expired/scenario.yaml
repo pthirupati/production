@@ -21,7 +21,7 @@ description: 'CONTEXT: A team operating VMware vSphere has raised a ticket for `
   All tools run locally — no paid APIs or external cloud calls are required.
 
 
-  SYMPTOM / STARTING STATE: VMware vCenter simulation. vCenter at vcenter.lab.local.
+  SYMPTOM / STARTING STATE: VMware vCenter. vCenter at vcenter.lab.local.
 
   SSL cert expired 3 days ago. SSH to VCSA available as root.
 
@@ -56,7 +56,7 @@ objectives:
 - Access the vCenter appliance via SSH
 - Use certificate-manager to regenerate and replace expired certificates
 - Verify vSphere Client loads without certificate errors and API calls succeed
-initial_state: 'VMware vCenter simulation. vCenter at vcenter.lab.local.
+initial_state: 'VMware vCenter. vCenter at vcenter.lab.local.
 
   SSL cert expired 3 days ago. SSH to VCSA available as root.
 
@@ -129,7 +129,7 @@ environment:
     os: FixitLab vSphere lab
     hostname: lab-primary
     ip: 127.0.0.1
-    specs: local offline simulation
+    specs: local offline lab environment
   pre_installed:
   - bash
   - coreutils

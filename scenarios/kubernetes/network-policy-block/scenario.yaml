@@ -12,7 +12,7 @@ description: 'CONTEXT: A team operating Kubernetes has raised a ticket for `Netw
   for this incident. All tools run locally — no paid APIs or external cloud calls are required.
 
 
-  SYMPTOM / STARTING STATE: Simulated Kubernetes cluster with NetworkPolicies enforced. A NetworkPolicy
+  SYMPTOM / STARTING STATE: Kubernetes cluster with NetworkPolicies enforced. A NetworkPolicy
   on the backend denies ingress from the frontend pods, so frontend-to-backend calls time out.
 
 
@@ -92,7 +92,7 @@ hints:
 
 
     WHY: Kubernetes labs grade real cluster state.'
-initial_state: Simulated Kubernetes cluster with NetworkPolicies enforced. A NetworkPolicy on the backend
+initial_state: Kubernetes cluster with NetworkPolicies enforced. A NetworkPolicy on the backend
   denies ingress from the frontend pods, so frontend-to-backend calls time out.
 technology: kubernetes
 summary: Complete the networkpolicy blocks backend traffic kubernetes lab and verify success with the
@@ -116,7 +116,7 @@ environment:
     os: FixitLab Kubernetes cluster
     hostname: lab-primary
     ip: 127.0.0.1
-    specs: local offline simulation
+    specs: local offline lab environment
   pre_installed:
   - bash
   - coreutils

@@ -12,7 +12,7 @@ description: 'CONTEXT: A team operating React frontends has raised a ticket for 
   for this incident. All tools run locally — no paid APIs or external cloud calls are required.
 
 
-  SYMPTOM / STARTING STATE: Hands-on react scenario: harden logging in a simulated environment.
+  SYMPTOM / STARTING STATE: Hands-on react scenario: harden logging on this host.
 
 
   OBJECTIVE: Understand the current failure mode affecting Harden react logging (lab 19); Restore expected
@@ -52,7 +52,7 @@ objectives:
 - Understand the current failure mode affecting Harden react logging (lab 19)
 - Restore expected service behavior with a minimal, documented change
 - Verify the fix holds under a realistic smoke test
-initial_state: 'Hands-on react scenario: harden logging in a simulated environment.'
+initial_state: 'Hands-on react scenario: harden logging on this host.'
 hints:
 - order: 1
   cost: 0
@@ -103,7 +103,7 @@ coding_spec:
   language: python
   entrypoint: solution.py
   kind: fix
-  instructions: 'Hands-on react scenario: harden logging in a simulated environment.'
+  instructions: 'Hands-on react scenario: harden logging on this host.'
   files:
   - path: solution.py
     content: "def solution():\n    raise NotImplementedError('Apply the fix')\n"
@@ -135,7 +135,7 @@ environment:
     os: FixitLab React application
     hostname: lab-primary
     ip: 127.0.0.1
-    specs: local offline simulation
+    specs: local offline lab environment
   pre_installed:
   - bash
   - coreutils

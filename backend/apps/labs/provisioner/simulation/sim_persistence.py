@@ -152,6 +152,7 @@ def snapshot_engine(engine: UnifiedSimulationEngine) -> dict:
         "docker": engine.docker.to_dict() if getattr(engine, "docker", None) else None,
         "engine_flags": {
             "ssh_key_fixed": getattr(engine, "_ssh_key_fixed", False),
+            "ansible_playbook_ok": getattr(engine, "_ansible_playbook_ok", False),
             "power_state": getattr(engine, "_power_state", "on"),
             "container_running": getattr(engine, "_container_running", False),
             "patch_hint_shown": getattr(engine, "_patch_hint_shown", False),
@@ -263,6 +264,7 @@ def restore_engine(data: dict) -> UnifiedSimulationEngine | None:
 
     flags = data.get("engine_flags", {})
     engine._ssh_key_fixed = flags.get("ssh_key_fixed", False)
+    engine._ansible_playbook_ok = flags.get("ansible_playbook_ok", False)
     engine._power_state = flags.get("power_state", "on")
     engine._container_running = flags.get("container_running", False)
     engine._patch_hint_shown = flags.get("patch_hint_shown", False)

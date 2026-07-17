@@ -12,7 +12,7 @@ description: 'CONTEXT: A team operating Kubernetes has raised a ticket for `Depl
   for this incident. All tools run locally — no paid APIs or external cloud calls are required.
 
 
-  SYMPTOM / STARTING STATE: Simulated Kubernetes cluster. A deployment''s container image points to a
+  SYMPTOM / STARTING STATE: Kubernetes cluster. A deployment''s container image points to a
   tag that does not exist in the registry. Pods cycle through ErrImagePull and ImagePullBackOff.
 
 
@@ -40,7 +40,7 @@ description: 'CONTEXT: A team operating Kubernetes has raised a ticket for `Depl
 
   WHAT TO AVOID: Do not apply broad destructive changes, skip evidence gathering, or fake completion with
   marker files — the checker validates real system state.'
-initial_state: Simulated Kubernetes cluster. A deployment's container image points to a tag that does
+initial_state: Kubernetes cluster. A deployment's container image points to a tag that does
   not exist in the registry. Pods cycle through ErrImagePull and ImagePullBackOff.
 objectives:
 - Describe a failing pod and read the exact image-pull error
@@ -118,7 +118,7 @@ environment:
     os: FixitLab Kubernetes cluster
     hostname: lab-primary
     ip: 127.0.0.1
-    specs: local offline simulation
+    specs: local offline lab environment
   pre_installed:
   - bash
   - coreutils

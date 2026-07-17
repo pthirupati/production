@@ -292,11 +292,11 @@ export default function DataDashboardSimulator({
   const load = useCallback(async () => {
     try {
       const data = await datascienceApi.getState(sessionId, slug)
-      if (data?.ok === false) { setError(data.error || 'Could not load the dashboard simulator'); return }
+      if (data?.ok === false) { setError(data.error || 'Could not load the dashboard console'); return }
       setState(data)
       setError('')
     } catch {
-      setError('Could not load the dashboard simulator')
+      setError('Could not load the dashboard console')
     }
   }, [sessionId, slug])
 

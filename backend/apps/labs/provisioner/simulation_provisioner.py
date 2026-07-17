@@ -200,8 +200,169 @@ def _seed_state_from_vmware_vm(engine, session_id, slug: str) -> None:
         ip = vm.get("ip")
         if ip:
             state.set_host_ip(ip)
+        try:
+            from .simulation.server_identity import seed_from_vmware_vm
+            seed_from_vmware_vm(sid, vm, role="primary")
+        except Exception:
+            logger.exception("ServerIdentity VMware seed skipped for session %s", session_id)
     except Exception:
         logger.exception("VMware VM seed skipped for session %s", session_id)
+
+
+_EC2_TYPE_HW = {
+    "t2.micro": (1, 1024),
+    "t2.small": (1, 2048),
+    "t3.micro": (2, 1024),
+    "t3.small": (2, 2048),
+    "t3.medium": (2, 4096),
+    "t3.large": (2, 8192),
+    "m5.large": (2, 8192),
+    "m5.xlarge": (4, 16384),
+}
+
+
+def _seed_hostname_for_persona(engine, slug: str, raw_type: str) -> None:
+    """Light-touch hostname seed for personas with no dedicated seed function.
+
+    Best-effort: gives the AWX / monitoring lab terminal a hostname matching
+    the console it is paired with (control-node / monitoring-node style)
+    instead of the generic rhel-sim default, without changing CPU/RAM/IP.
+    """
+    low = (slug or "").lower()
+    try:
+        if "awx" in low or "tower" in low or raw_type == "ansible-awx":
+            engine.shell.state.set_hostname("ansible-control")
+        elif raw_type in ("monitoring", "grafana", "prometheus") or low.startswith(
+            ("monitoring-", "grafana-", "prometheus-", "promql-", "alertmanager-", "loki-")
+        ):
+            engine.shell.state.set_hostname("monitoring-node")
+    except Exception:
+        logger.exception("Hostname seed skipped for slug %s", slug)
+
+
+def _is_aws_lab(slug: str, raw_type: str) -> bool:
+    low = (slug or "").lower()
+    return (raw_type or "").lower() == "aws" or low.startswith(
+        ("aws-", "ec2-", "s3-", "iam-", "academy-aws-")
+    )
+
+
+def _seed_state_from_aws_ec2(engine, session_id, slug: str) -> None:
+    """Unified-server model (AWS): seed the lab terminal so it IS the primary EC2
+    guest — hostname/IP/CPU/RAM match the instance the learner SSHs to from the
+    AWS console. Best-effort; never breaks provisioning.
+    """
+    try:
+        from apps.vmware_sim.aws_engine import get_state, _ensure
+
+        sid = str(session_id)
+        _ensure(sid, slug)
+        state_inv = get_state(sid, slug) or {}
+        # aws_engine.get_state wraps inventory under "state" (not top-level).
+        inventory = state_inv.get("state") or state_inv
+        instances = inventory.get("instances") or []
+        if not instances:
+            return
+        # Prefer a running instance named in broken/goal hints, else first running, else first.
+        want_names = set()
+        broken = inventory.get("broken") or {}
+        for key in ("require_stopped", "require_running"):
+            if isinstance(broken.get(key), str):
+                want_names.add(broken[key])
+        tag = broken.get("require_tag") or {}
+        if isinstance(tag, dict) and tag.get("name"):
+            want_names.add(tag["name"])
+
+        inst = None
+        for name in want_names:
+            inst = next((i for i in instances if i.get("name") == name), None)
+            if inst:
+                break
+        if inst is None:
+            inst = next((i for i in instances if i.get("state") == "running"), None) or instances[0]
+
+        private_ip = inst.get("privateIp") or ""
+        hostname = f"ip-{private_ip.replace('.', '-')}" if private_ip else (inst.get("name") or "ec2-sim")
+        itype = (inst.get("type") or "t3.micro").lower()
+        cpu, mem_mb = _EC2_TYPE_HW.get(itype, (2, 1024))
+
+        shell_state = engine.shell.state
+        shell_state.set_hostname(hostname)
+        shell_state.set_hardware(cpu=cpu, mem_mb=mem_mb)
+        if private_ip:
+            shell_state.set_host_ip(private_ip)
+        try:
+            from .simulation.server_identity import seed_from_aws_instance
+            seed_from_aws_instance(sid, inst, role="primary")
+        except Exception:
+            logger.exception("ServerIdentity AWS seed skipped for session %s", session_id)
+    except Exception:
+        logger.exception("AWS EC2 seed skipped for session %s", session_id)
+
+
+def _is_azure_lab(slug: str, raw_type: str) -> bool:
+    low = (slug or "").lower()
+    return (raw_type or "").lower() == "azure" or low.startswith(("azure-", "academy-azure-"))
+
+
+def _seed_state_from_azure_vm(engine, session_id, slug: str) -> None:
+    """Unified-server model (Azure): seed the lab terminal so it IS the
+    primary Azure VM — hostname/IP/vCPU/RAM match whatever the learner sees
+    in the portal (and stay in sync on later resize via azure_bridge).
+    """
+    try:
+        from apps.vmware_sim.azure_engine import get_state, _ensure, VM_SIZES
+
+        sid = str(session_id)
+        _ensure(sid, slug)
+        state_inv = get_state(sid, slug) or {}
+        state = state_inv.get("state") or state_inv
+        vms = state.get("vms") or []
+        if not vms:
+            return
+        vm = vms[0]
+        size_info = VM_SIZES.get(vm.get("size") or "", {})
+        cpu = size_info.get("vcpus") or 2
+        mem_mb = int(size_info.get("ram_gb") or 4) * 1024
+        private_ip = vm.get("private_ip") or ""
+
+        shell_state = engine.shell.state
+        shell_state.set_hostname(vm.get("name") or "vm-web01")
+        shell_state.set_hardware(cpu=cpu, mem_mb=mem_mb)
+        if private_ip:
+            shell_state.set_host_ip(private_ip)
+        try:
+            from .simulation.server_identity import sync_azure_vm
+            sync_azure_vm(sid, vm, vm_sizes=VM_SIZES)
+        except Exception:
+            logger.exception("ServerIdentity Azure seed skipped for session %s", session_id)
+    except Exception:
+        logger.exception("Azure VM seed skipped for session %s", session_id)
+
+
+def _seed_gpu_identity_if_needed(engine, session_id, slug: str, sim_type: str) -> None:
+    """Register a virtualized GPU node in ServerIdentity for GPU-track labs."""
+    low = (slug or "").lower()
+    if sim_type != "gpu" and "gpu" not in low and "nvidia" not in low:
+        return
+    try:
+        from .simulation import server_identity as si
+        healthy = bool(getattr(getattr(engine, "shell", None), "state", None) and engine.shell.state.gpu_healthy)
+        hostname = getattr(engine.shell.state, "hostname", None) or "gpu-node-01"
+        primary_ip = "10.20.40.10"
+        for nic in getattr(engine.shell.state, "nics", []) or []:
+            if getattr(nic, "ip", None) or (isinstance(nic, dict) and nic.get("ip")):
+                primary_ip = getattr(nic, "ip", None) or nic.get("ip")
+                break
+        si.seed_gpu_node(
+            str(session_id),
+            hostname=hostname,
+            primary_ip=primary_ip,
+            healthy=healthy,
+        )
+        engine.lab_session_id = str(session_id)
+    except Exception:
+        logger.exception("GPU identity seed skipped for session %s", session_id)
 
 
 def ensure_sim_session(lab_session) -> dict | None:
@@ -233,8 +394,20 @@ def ensure_sim_session(lab_session) -> dict | None:
     else:
         engine = UnifiedSimulationEngine(scenario_slug=slug, simulation_type=sim_type)
         _apply_initial_host_state(engine, slug)
+    engine.lab_session_id = session_id
     if fresh and _is_vmware_lab(slug, raw_type):
         _seed_state_from_vmware_vm(engine, session_id, slug)
+    elif fresh and _is_aws_lab(slug, raw_type):
+        _seed_state_from_aws_ec2(engine, session_id, slug)
+    elif fresh and _is_azure_lab(slug, raw_type):
+        _seed_state_from_azure_vm(engine, session_id, slug)
+    if fresh:
+        _seed_gpu_identity_if_needed(engine, session_id, slug, sim_type)
+        try:
+            from .simulation.server_identity import seed_scenario_lab_servers
+            seed_scenario_lab_servers(session_id, sim_type=sim_type, slug=slug, engine=engine)
+        except Exception:
+            logger.exception("LabServer seed skipped for session %s", session_id)
     lab_hosts = lab_session.lab_hosts or _build_lab_hosts(scenario, resource_id, sim_type)
     if _should_use_ssh_client_default(scenario, sim_type):
         lab_hosts = _attach_ssh_client_host(lab_hosts, resource_id)
@@ -299,6 +472,7 @@ class SimulationProvisioner:
         slug = scenario.slug
 
         engine = UnifiedSimulationEngine(scenario_slug=slug, simulation_type=sim_type)
+        engine.lab_session_id = str(lab_session.id)
         _apply_initial_host_state(engine, slug)
         resource_id = f"sim-{uuid.uuid4().hex[:12]}"
 
@@ -331,6 +505,29 @@ class SimulationProvisioner:
             from apps.vmware_sim.engine import _ensure_session
             _ensure_session(str(lab_session.id), slug)
             _seed_state_from_vmware_vm(engine, lab_session.id, slug)
+        elif _is_aws_lab(slug, raw_type):
+            from apps.vmware_sim.aws_engine import _ensure as aws_ensure
+            aws_ensure(str(lab_session.id), slug)
+            _seed_state_from_aws_ec2(engine, lab_session.id, slug)
+        elif _is_azure_lab(slug, raw_type):
+            from apps.vmware_sim.azure_engine import _ensure as azure_ensure
+            azure_ensure(str(lab_session.id), slug)
+            _seed_state_from_azure_vm(engine, lab_session.id, slug)
+        else:
+            _seed_hostname_for_persona(engine, slug, raw_type)
+            _seed_gpu_identity_if_needed(engine, lab_session.id, slug, sim_type)
+
+        # Scenario-scoped LabServer: terminal OS identity for this session only.
+        try:
+            from .simulation.server_identity import seed_scenario_lab_servers
+            seed_scenario_lab_servers(
+                str(lab_session.id),
+                sim_type=sim_type,
+                slug=slug,
+                engine=engine,
+            )
+        except Exception:
+            logger.exception("LabServer seed skipped for session %s", lab_session.id)
 
         if slug.lower().startswith("ds-dashboard-") or raw_type == "data-dashboard":
             from apps.vmware_sim.datascience_engine import _ensure_session as _ensure_ds_session
@@ -352,7 +549,7 @@ class SimulationProvisioner:
         client_state._mkdir("/home/labuser/.ssh")
         client_state._write_file(
             "/home/labuser/.ssh/id_rsa",
-            "-----BEGIN OPENSSH PRIVATE KEY-----\n(simulated-key)\n-----END OPENSSH PRIVATE KEY-----\n",
+            "-----BEGIN OPENSSH PRIVATE KEY-----\n(lab-training-key)\n-----END OPENSSH PRIVATE KEY-----\n",
         )
         client_state.set_prompt_user("labuser")
         shell = RHELShell(
@@ -626,6 +823,115 @@ class SimulationProvisioner:
                 return validate_awx_lab(str(lab_session.id), slug)
             except LabSession.DoesNotExist:
                 return False, "AWX simulation session not found"
+        # Commvault CommCell (backup/restore). Raw simulation_type "commvault"
+        # may normalize to "generic"; gate on that OR a commvault-* slug.
+        _raw_cv_type = sim_type
+        if not _raw_cv_type or _raw_cv_type == "generic":
+            from apps.labs.models import LabSession
+            try:
+                _cv_session = LabSession.objects.select_related("scenario").get(container_id=resource_id)
+                _raw_cv_type = (getattr(_cv_session.scenario, "simulation_type", "") or "")
+            except LabSession.DoesNotExist:
+                _raw_cv_type = ""
+        if _raw_cv_type == "commvault" or low_slug.startswith(("commvault-", "cv-")):
+            from apps.labs.models import LabSession
+            from apps.vmware_sim.commvault_engine import validate_commvault_lab, _ensure as cv_ensure
+            try:
+                lab_session = LabSession.objects.get(container_id=resource_id)
+                cv_ensure(str(lab_session.id), slug)
+                return validate_commvault_lab(str(lab_session.id), slug)
+            except LabSession.DoesNotExist:
+                return False, "Commvault simulation session not found"
+        # NetApp ONTAP System Manager.
+        _raw_na_type = sim_type
+        if not _raw_na_type or _raw_na_type == "generic":
+            from apps.labs.models import LabSession
+            try:
+                _na_session = LabSession.objects.select_related("scenario").get(container_id=resource_id)
+                _raw_na_type = (getattr(_na_session.scenario, "simulation_type", "") or "")
+            except LabSession.DoesNotExist:
+                _raw_na_type = ""
+        if _raw_na_type == "netapp" or low_slug.startswith(("netapp-", "ontap-")):
+            from apps.labs.models import LabSession
+            from apps.vmware_sim.netapp_engine import validate_netapp_lab, _ensure as na_ensure
+            try:
+                lab_session = LabSession.objects.get(container_id=resource_id)
+                na_ensure(str(lab_session.id), slug)
+                return validate_netapp_lab(str(lab_session.id), slug)
+            except LabSession.DoesNotExist:
+                return False, "NetApp simulation session not found"
+        # Dell EMC Unisphere / PowerMax.
+        _raw_de_type = sim_type
+        if not _raw_de_type or _raw_de_type == "generic":
+            from apps.labs.models import LabSession
+            try:
+                _de_session = LabSession.objects.select_related("scenario").get(container_id=resource_id)
+                _raw_de_type = (getattr(_de_session.scenario, "simulation_type", "") or "")
+            except LabSession.DoesNotExist:
+                _raw_de_type = ""
+        if _raw_de_type == "dellemc" or low_slug.startswith(("dellemc-", "powermax-")):
+            from apps.labs.models import LabSession
+            from apps.vmware_sim.dellemc_engine import validate_dellemc_lab, _ensure as de_ensure
+            try:
+                lab_session = LabSession.objects.get(container_id=resource_id)
+                de_ensure(str(lab_session.id), slug)
+                return validate_dellemc_lab(str(lab_session.id), slug)
+            except LabSession.DoesNotExist:
+                return False, "Dell EMC simulation session not found"
+        # Physical datacenter (DCIM) break/fix.
+        _raw_dc_type = sim_type
+        if not _raw_dc_type or _raw_dc_type == "generic":
+            from apps.labs.models import LabSession
+            try:
+                _dc_session = LabSession.objects.select_related("scenario").get(container_id=resource_id)
+                _raw_dc_type = (getattr(_dc_session.scenario, "simulation_type", "") or "")
+            except LabSession.DoesNotExist:
+                _raw_dc_type = ""
+        if _raw_dc_type == "datacenter" or low_slug.startswith(("datacenter-", "dc-")):
+            from apps.labs.models import LabSession
+            from apps.vmware_sim.datacenter_engine import validate_datacenter_lab, _ensure as dc_ensure
+            try:
+                lab_session = LabSession.objects.get(container_id=resource_id)
+                dc_ensure(str(lab_session.id), slug)
+                return validate_datacenter_lab(str(lab_session.id), slug)
+            except LabSession.DoesNotExist:
+                return False, "Datacenter simulation session not found"
+        # SOC / SIEM (cybersecurity) triage.
+        _raw_soc_type = sim_type
+        if not _raw_soc_type or _raw_soc_type == "generic":
+            from apps.labs.models import LabSession
+            try:
+                _soc_session = LabSession.objects.select_related("scenario").get(container_id=resource_id)
+                _raw_soc_type = (getattr(_soc_session.scenario, "simulation_type", "") or "")
+            except LabSession.DoesNotExist:
+                _raw_soc_type = ""
+        if _raw_soc_type == "soc" or low_slug.startswith("soc-"):
+            from apps.labs.models import LabSession
+            from apps.vmware_sim.soc_engine import validate_soc_lab, _ensure as soc_ensure
+            try:
+                lab_session = LabSession.objects.get(container_id=resource_id)
+                soc_ensure(str(lab_session.id), slug)
+                return validate_soc_lab(str(lab_session.id), slug)
+            except LabSession.DoesNotExist:
+                return False, "SOC simulation session not found"
+        # Microsoft Azure Portal (VMs, NSGs, Managed Disks).
+        _raw_az_type = sim_type
+        if not _raw_az_type or _raw_az_type == "generic":
+            from apps.labs.models import LabSession
+            try:
+                _az_session = LabSession.objects.select_related("scenario").get(container_id=resource_id)
+                _raw_az_type = (getattr(_az_session.scenario, "simulation_type", "") or "")
+            except LabSession.DoesNotExist:
+                _raw_az_type = ""
+        if _raw_az_type == "azure" or low_slug.startswith("azure-"):
+            from apps.labs.models import LabSession
+            from apps.vmware_sim.azure_engine import validate_azure_lab, _ensure as az_ensure
+            try:
+                lab_session = LabSession.objects.get(container_id=resource_id)
+                az_ensure(str(lab_session.id), slug)
+                return validate_azure_lab(str(lab_session.id), slug)
+            except LabSession.DoesNotExist:
+                return False, "Azure simulation session not found"
         # Monitoring (Grafana / Prometheus observability). Legacy simulation_type
         # "monitoring"/"loki"/"alertmanager"/"promql" normalize to grafana/prometheus;
         # gate on the normalized persona, the RAW scenario type, or the slug. The
@@ -655,34 +961,30 @@ class SimulationProvisioner:
                 return validate_monitoring_lab(str(lab_session.id), slug)
             except LabSession.DoesNotExist:
                 return False, "Monitoring simulation session not found"
-        # CI/CD pipeline (DevOps). Raw simulation_type "devops" normalizes to
-        # itself; gate on that + a cicd/pipeline slug. The audit found the CI/CD
-        # track had no engine and no validator (the pipeline player is fully
-        # client-side), so it could not be graded server-side at all.
-        _raw_cicd_type = sim_type
-        if not _raw_cicd_type or _raw_cicd_type == "generic":
-            from apps.labs.models import LabSession
-            try:
-                _cicd_session = LabSession.objects.select_related("scenario").get(container_id=resource_id)
-                _raw_cicd_type = (getattr(_cicd_session.scenario, "simulation_type", "") or "")
-            except LabSession.DoesNotExist:
-                _raw_cicd_type = ""
-        if (
-            sim_type == "devops"
-            or _raw_cicd_type in ("devops", "cicd", "ci-cd", "ci_cd")
-            or low_slug.startswith(("cicd-", "ci-cd-", "pipeline-", "devops-", "gitlab-ci-",
-                                    "github-actions-"))
-        ):
-            from apps.labs.models import LabSession
-            from apps.vmware_sim.cicd_engine import (
-                validate_cicd_lab, _ensure_session as cicd_ensure,
-            )
-            try:
-                lab_session = LabSession.objects.get(container_id=resource_id)
-                cicd_ensure(str(lab_session.id), slug)
-                return validate_cicd_lab(str(lab_session.id), slug)
-            except LabSession.DoesNotExist:
-                return False, "CI/CD simulation session not found"
+        # CI/CD pipeline (DevOps) — `cicd_engine` intentionally NOT dispatched
+        # here. It models a GUI-driven job DAG (image/needs/manual-gate/
+        # failing-job faults) that only the CicdPipelineSim frontend can clear
+        # via its own apply_action calls — and CicdPipelineSim is 100% local
+        # React state today; it never calls the backend (see
+        # docs/gap-analysis.md G-06). A previous version of this dispatcher
+        # intercepted every scenario whose simulation_type=="devops" OR whose
+        # slug started with devops-/cicd-/pipeline-/gitlab-ci-/github-actions-
+        # and routed it to validate_cicd_lab — but EVERY scenario in the devops
+        # catalog (the entire simulation_type=="devops" set, ~30 hero-style
+        # labs like cicd-pipeline-broken/gitlab-ci-runner-stuck, AND the
+        # simulation_type=="generic" devops-*/academy-devops-* set, 150+ labs)
+        # is actually terminal-only: it seeds a real git repo / gitlab-runner
+        # config / Helm state via the separate in-memory DevOpsState object
+        # (`glab ci`, `helm rollback`, `export KUBECONFIG`, ...) and is graded
+        # by check.sh against real terminal state via validate_simulation_state
+        # below (see CANONICAL_DEVOPS_CHECK). Intercepting them here meant
+        # check.sh never ran and the lab could never pass no matter what the
+        # learner did in the terminal — a fail-permanently regression, the
+        # opposite failure mode from an auto-pass but just as broken. Until
+        # CicdPipelineSim is wired to this engine AND a scenario explicitly
+        # opts in (new dedicated simulation_type, not the already-overloaded
+        # "devops" value), this branch stays disabled and every devops-track
+        # scenario falls through to the terminal-based validator.
         _raw_tf_type = sim_type
         if not _raw_tf_type or _raw_tf_type == "generic":
             from apps.labs.models import LabSession
@@ -777,6 +1079,25 @@ class SimulationProvisioner:
             from apps.vmware_sim import aws_engine as ae
 
             ae.clear_session(str(session.id))
+        except Exception:  # noqa: BLE001
+            pass
+        try:
+            from apps.labs.provisioner.simulation.aws_bridge import clear as clear_aws_bridge
+
+            clear_aws_bridge(str(session.id))
+        except Exception:  # noqa: BLE001
+            pass
+        for engine_module in ("commvault_engine", "netapp_engine", "dellemc_engine",
+                               "datacenter_engine", "soc_engine", "azure_engine"):
+            try:
+                mod = __import__(f"apps.vmware_sim.{engine_module}", fromlist=["drop_session"])
+                mod.drop_session(str(session.id))
+            except Exception:  # noqa: BLE001
+                pass
+        try:
+            from apps.labs.provisioner.simulation.azure_bridge import clear as clear_azure_bridge
+
+            clear_azure_bridge(str(session.id))
         except Exception:  # noqa: BLE001
             pass
         drop_sim_session(str(session.id))

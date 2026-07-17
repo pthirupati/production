@@ -21,7 +21,7 @@ description: 'CONTEXT: A team operating VMware vSphere has raised a ticket for `
   All tools run locally — no paid APIs or external cloud calls are required.
 
 
-  SYMPTOM / STARTING STATE: VMware vCenter simulation. 3-host cluster. DRS: Disabled.
+  SYMPTOM / STARTING STATE: VMware vCenter. 3-host cluster. DRS: Disabled.
 
   esxi-01: 95% CPU. esxi-02: 28% CPU. esxi-03: 32% CPU.
 
@@ -56,7 +56,7 @@ objectives:
 - Enable DRS in "Fully Automated" mode with a medium migration threshold
 - Run an initial DRS recommendation to balance the cluster
 - Verify VMs begin migrating from esxi-01 to less-loaded hosts
-initial_state: 'VMware vCenter simulation. 3-host cluster. DRS: Disabled.
+initial_state: 'VMware vCenter. 3-host cluster. DRS: Disabled.
 
   esxi-01: 95% CPU. esxi-02: 28% CPU. esxi-03: 32% CPU.
 
@@ -140,7 +140,7 @@ environment:
     os: FixitLab vSphere lab
     hostname: lab-primary
     ip: 127.0.0.1
-    specs: local offline simulation
+    specs: local offline lab environment
   pre_installed:
   - bash
   - coreutils

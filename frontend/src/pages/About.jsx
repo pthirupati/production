@@ -105,7 +105,7 @@ const platformFeatures = [
     icon: Brain,
     title: 'AI Interview Studio',
     color: 'indigo',
-    desc: 'Full mock interview cycles — voice Q&A, resume-aware questions, 3–5 rounds, and FIXIT-INT certificates.',
+    desc: 'Full AI interview cycles — voice Q&A, resume-aware questions, 3–5 rounds, and FIXIT-INT certificates.',
     bullets: [
       'Technical, manager, HR, deep-dive, and leadership panels',
       'Camera/mic required with adaptive scoring and post-round reports',
@@ -119,7 +119,7 @@ const platformFeatures = [
     color: 'purple',
     desc: 'Interview-mode scenarios disable spoiler hints and offer AI coaching that nudges you toward the right area without giving away the answer.',
     bullets: [
-      'Directional guidance for hiring prep and mock on-call drills',
+      'Directional guidance for hiring prep and on-call drills',
       'Standard progressive hints still available on learning scenarios',
       'Hint usage tracked and reflected in your score',
     ],
@@ -184,7 +184,7 @@ const platformFeatures = [
 
 const whoItsFor = [
   { icon: GraduationCap, title: 'Students & career switchers', desc: 'Build muscle memory on real shells instead of only watching videos.', color: 'text-accent-cyan', bg: 'bg-accent-cyan/10' },
-  { icon: Target, title: 'Interview candidates', desc: 'Mock Interview Studio for voice panels, plus timed Fix / Build / Hack labs and Jira tickets for on-call prep.', color: 'text-accent-purple', bg: 'bg-accent-purple/10' },
+  { icon: Target, title: 'Interview candidates', desc: 'AI Interview Studio for voice panels, plus timed Fix / Build / Hack labs and Jira tickets for on-call prep.', color: 'text-accent-purple', bg: 'bg-accent-purple/10' },
   { icon: Server, title: 'DevOps & SRE teams', desc: 'Run team drills on broken Nginx, DNS, K8s, or cloud misconfigs in minutes.', color: 'text-accent-green', bg: 'bg-accent-green/10' },
   { icon: Layers, title: 'Hiring managers', desc: 'Assign scenarios, review completion data, and optionally sync incidents to Jira.', color: 'text-accent-amber', bg: 'bg-accent-amber/10' },
 ]

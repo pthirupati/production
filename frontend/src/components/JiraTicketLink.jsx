@@ -1,7 +1,7 @@
 import { ExternalLink } from 'lucide-react'
 
 /**
- * Jira issue key — opens in-app Jira simulation in a new tab.
+ * Jira issue key — opens in-app Jira in a new tab.
  */
 export default function JiraTicketLink({
   issueKey,
@@ -63,7 +63,7 @@ export default function JiraTicketLink({
       rel={openInNewTab ? 'noopener noreferrer' : undefined}
       onClick={scrollToPanel}
       className={`inline-flex items-center gap-1 ${baseClass}`}
-      title="Open incident ticket (Jira simulation)"
+      title="Open incident ticket (Jira)"
     >
       {issueKey}
       {showIcon && openInNewTab && <ExternalLink size={12} className="opacity-70" />}

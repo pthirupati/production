@@ -1,0 +1,23 @@
+/* Commvault CommCell Console */
+.cv-shell { background: #f4f6fa; color: #1e293b; }
+.cv-sidebar { border-right: 1px solid #1a2f4d; }
+.cv-sidebar .sim-sidebar-item { color: #b9c6db; }
+.cv-sidebar .sim-sidebar-item:hover { background: rgba(255, 255, 255, 0.06); color: #fff; }
+.cv-sidebar .sim-sidebar-active { background: rgba(11, 61, 120, 0.35) !important; color: #fff !important; border-left-color: #4fa7e8 !important; }
+
+.cv-panel { background: #fff; border: 1px solid #dbe3ee; border-radius: 6px; }
+
+.cv-btn-primary {
+  background: #0b3d78; color: #fff; border-radius: 4px; padding: 0.4rem 0.85rem;
+  font-size: 0.8rem; font-weight: 600; display: inline-flex; align-items: center; gap: 0.35rem;
+}
+.cv-btn-primary:hover { background: #0a3568; }
+.cv-btn-primary:disabled { opacity: 0.5; cursor: not-allowed; }
+
+.cv-btn-sm {
+  display: inline-flex; align-items: center; gap: 0.25rem; font-size: 0.68rem; font-weight: 600;
+  padding: 0.25rem 0.5rem; border-radius: 4px; background: #0b3d78; color: #fff;
+}
+.cv-btn-sm:hover { background: #0a3568; }
+.cv-btn-sm.cv-btn-outline { background: transparent; color: #0b3d78; border: 1px solid #0b3d78; }
+.cv-btn-sm.cv-btn-outline:hover { background: rgba(11, 61, 120, 0.08); }

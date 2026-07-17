@@ -36,7 +36,7 @@ export function resolveEc2Workload(instance) {
 export function workloadHint(workload) {
   switch (workload) {
     case 'kubernetes':
-      return 'kubectl, systemctl, and container runtime commands are simulated (same engine as FixitLab Kubernetes labs).'
+      return 'kubectl, systemctl, and container runtime commands are (same engine as FixitLab Kubernetes labs).'
     case 'windows':
       return 'PowerShell session — Get-Service, ipconfig, and Windows admin cmdlets (same engine as FixitLab Windows labs).'
     default:

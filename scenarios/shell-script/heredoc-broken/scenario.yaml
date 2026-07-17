@@ -7,12 +7,12 @@ description: 'CONTEXT: A team operating shell scripting has raised a ticket for 
   Business impact: reduced service reliability and blocked users until the underlying state is repaired.
 
 
-  ENVIRONMENT: You are working in FixitLab''s offline bash practice environment. The architecture is a
+  ENVIRONMENT: You are working in FixitLab''s offline bash lab environment. The architecture is a
   single lab-primary node exposing scripts, cron, logs, and shellcheck; treat it as the production host
   for this incident. All tools run locally — no paid APIs or external cloud calls are required.
 
 
-  SYMPTOM / STARTING STATE: Simulated RHEL 9 server. Running gen-config.sh produces an empty nginx.conf
+  SYMPTOM / STARTING STATE: RHEL 9 server. Running gen-config.sh produces an empty nginx.conf
   file. No errors are printed because the heredoc silently consumes the issue.
 
 
@@ -40,7 +40,7 @@ description: 'CONTEXT: A team operating shell scripting has raised a ticket for 
 
   WHAT TO AVOID: Do not apply broad destructive changes, skip evidence gathering, or fake completion with
   marker files — the checker validates real system state.'
-initial_state: 'Simulated RHEL 9 server. Running gen-config.sh produces an empty nginx.conf file. No errors
+initial_state: 'RHEL 9 server. Running gen-config.sh produces an empty nginx.conf file. No errors
   are printed because the heredoc silently consumes the issue.
 
   '
@@ -118,10 +118,10 @@ what_you_will_learn:
 environment:
   nodes:
   - role: primary
-    os: FixitLab bash practice environment
+    os: FixitLab bash lab
     hostname: lab-primary
     ip: 127.0.0.1
-    specs: local offline simulation
+    specs: local offline lab environment
   pre_installed:
   - bash
   - coreutils

@@ -21,7 +21,7 @@ description: 'CONTEXT: A team operating VMware vSphere has raised a ticket for `
   All tools run locally — no paid APIs or external cloud calls are required.
 
 
-  SYMPTOM / STARTING STATE: VMware vCenter simulation. golden-image-ubuntu22 has 1 snapshot: "pre-sysprep-backup".
+  SYMPTOM / STARTING STATE: VMware vCenter. golden-image-ubuntu22 has 1 snapshot: "pre-sysprep-backup".
 
   VM is powered off. Template conversion fails with snapshot error.
 
@@ -57,7 +57,7 @@ objectives:
 - Open Snapshot Manager for golden-image-ubuntu22 and review existing snapshots
 - Delete the backup snapshot to consolidate the disk
 - Convert the VM to a template successfully and verify it appears in VM Templates
-initial_state: 'VMware vCenter simulation. golden-image-ubuntu22 has 1 snapshot: "pre-sysprep-backup".
+initial_state: 'VMware vCenter. golden-image-ubuntu22 has 1 snapshot: "pre-sysprep-backup".
 
   VM is powered off. Template conversion fails with snapshot error.
 
@@ -130,7 +130,7 @@ environment:
     os: FixitLab vSphere lab
     hostname: lab-primary
     ip: 127.0.0.1
-    specs: local offline simulation
+    specs: local offline lab environment
   pre_installed:
   - bash
   - coreutils

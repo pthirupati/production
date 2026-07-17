@@ -24,7 +24,7 @@ description: 'CONTEXT: A team operating Kubernetes has raised a ticket for `HPA 
 
 
   OBJECTIVE: Inspect the Pending pods and the HPA (kubectl get pods, kubectl describe hpa web); Confirm
-  the cluster is out of schedulable capacity (kubectl get nodes shows one worker); Open the VMware simulator
+  the cluster is out of schedulable capacity (kubectl get nodes shows one worker); Open the VMware console
   and power on the worker-node VM k8s-worker-2. Acceptance criteria: the change is minimal and reversible,
   and success means `kubectl get pods` shows every pod Running.
 
@@ -59,7 +59,7 @@ initial_state: 'A Kubernetes cluster with one control-plane and one worker (work
 objectives:
 - Inspect the Pending pods and the HPA (kubectl get pods, kubectl describe hpa web)
 - Confirm the cluster is out of schedulable capacity (kubectl get nodes shows one worker)
-- Open the VMware simulator and power on the worker-node VM k8s-worker-2
+- Open the VMware console and power on the worker-node VM k8s-worker-2
 - Confirm worker-2 is Ready (kubectl get nodes) and the Pending pods schedule
 - Verify the HPA is satisfied and all web pods are Running (kubectl get hpa, kubectl get pods)
 lab_mode: simulation
@@ -131,7 +131,7 @@ linked_tutorial: kubernetes-fundamentals
 what_you_will_learn:
 - Inspect the Pending pods and the HPA (kubectl get pods, kubectl describe hpa web)
 - Confirm the cluster is out of schedulable capacity (kubectl get nodes shows one worker)
-- Open the VMware simulator and power on the worker-node VM k8s-worker-2
+- Open the VMware console and power on the worker-node VM k8s-worker-2
 - Confirm worker-2 is Ready (kubectl get nodes) and the Pending pods schedule
 - Verify the HPA is satisfied and all web pods are Running (kubectl get hpa, kubectl get pods)
 environment:
@@ -140,7 +140,7 @@ environment:
     os: FixitLab Kubernetes cluster
     hostname: lab-primary
     ip: 127.0.0.1
-    specs: local offline simulation
+    specs: local offline lab environment
   pre_installed:
   - bash
   - coreutils

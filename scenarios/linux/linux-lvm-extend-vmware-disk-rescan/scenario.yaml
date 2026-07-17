@@ -13,19 +13,19 @@ description: 'CONTEXT: A team operating Linux administration has raised a ticket
   host for this incident. All tools run locally — no paid APIs or external cloud calls are required.
 
 
-  SYMPTOM / STARTING STATE: Simulated RHEL 9 server (web-prod-01), also present in the vCenter simulator
+  SYMPTOM / STARTING STATE: RHEL 9 server (web-prod-01), also present in the vCenter console
   for
 
   this lab. /data is an XFS filesystem on /dev/mapper/vgdata-lvdata (VG vgdata, on
 
   /dev/sdb) and is out of space. The volume group has 0 free extents and there is
 
-  no spare disk attached yet. Open the VMware simulator from the lab toolbar to add
+  no spare disk attached yet. Open the VMware console from the lab toolbar to add
 
   one.
 
 
-  OBJECTIVE: Open the VMware simulator for this server (toolbar link) and add a new Hard Disk to web-prod-01;
+  OBJECTIVE: Open the VMware console for this server (toolbar link) and add a new Hard Disk to web-prod-01;
   Back in the terminal, rescan the SCSI bus so the kernel sees /dev/sdc (echo "- - -" > /sys/class/scsi_host/host0/scan,
   or rescan-scsi-bus.sh); Initialise the new disk as a PV (pvcreate /dev/sdc) and add it to the volume
   group (vgextend vgdata /dev/sdc). Acceptance criteria: the change is minimal and reversible, and success
@@ -50,19 +50,19 @@ description: 'CONTEXT: A team operating Linux administration has raised a ticket
 
   WHAT TO AVOID: Do not apply broad destructive changes, skip evidence gathering, or fake completion with
   marker files — the checker validates real system state.'
-initial_state: 'Simulated RHEL 9 server (web-prod-01), also present in the vCenter simulator for
+initial_state: 'RHEL 9 server (web-prod-01), also present in the vCenter console for
 
   this lab. /data is an XFS filesystem on /dev/mapper/vgdata-lvdata (VG vgdata, on
 
   /dev/sdb) and is out of space. The volume group has 0 free extents and there is
 
-  no spare disk attached yet. Open the VMware simulator from the lab toolbar to add
+  no spare disk attached yet. Open the VMware console from the lab toolbar to add
 
   one.
 
   '
 objectives:
-- Open the VMware simulator for this server (toolbar link) and add a new Hard Disk to web-prod-01
+- Open the VMware console for this server (toolbar link) and add a new Hard Disk to web-prod-01
 - Back in the terminal, rescan the SCSI bus so the kernel sees /dev/sdc (echo "- - -" > /sys/class/scsi_host/host0/scan,
   or rescan-scsi-bus.sh)
 - Initialise the new disk as a PV (pvcreate /dev/sdc) and add it to the volume group (vgextend vgdata
@@ -136,7 +136,7 @@ tags:
 - linux
 linked_tutorial: linux-fundamentals
 what_you_will_learn:
-- Open the VMware simulator for this server (toolbar link) and add a new Hard Disk to web-prod-01
+- Open the VMware console for this server (toolbar link) and add a new Hard Disk to web-prod-01
 - Back in the terminal, rescan the SCSI bus so the kernel sees /dev/sdc (echo "- - -" > /sys/class/scsi_host/host0/scan,
   or rescan-scsi-bus.sh)
 - Initialise the new disk as a PV (pvcreate /dev/sdc) and add it to the volume group (vgextend vgdata
@@ -149,7 +149,7 @@ environment:
     os: FixitLab Linux practice server
     hostname: lab-primary
     ip: 127.0.0.1
-    specs: local offline simulation
+    specs: local offline lab environment
   pre_installed:
   - bash
   - coreutils

@@ -12,7 +12,7 @@ description: 'CONTEXT: A team operating Kubernetes has raised a ticket for `PVC 
   for this incident. All tools run locally — no paid APIs or external cloud calls are required.
 
 
-  SYMPTOM / STARTING STATE: Simulated Kubernetes cluster. A PVC specifies storageClassName: fast-ssd,
+  SYMPTOM / STARTING STATE: Kubernetes cluster. A PVC specifies storageClassName: fast-ssd,
   but no such StorageClass exists. The PVC remains Pending and its pod stays ContainerCreating.
 
 
@@ -39,7 +39,7 @@ description: 'CONTEXT: A team operating Kubernetes has raised a ticket for `PVC 
 
   WHAT TO AVOID: Do not apply broad destructive changes, skip evidence gathering, or fake completion with
   marker files — the checker validates real system state.'
-initial_state: 'Simulated Kubernetes cluster. A PVC specifies storageClassName: fast-ssd, but no such
+initial_state: 'Kubernetes cluster. A PVC specifies storageClassName: fast-ssd, but no such
   StorageClass exists. The PVC remains Pending and its pod stays ContainerCreating.'
 lab_mode: simulation
 simulation_type: kubernetes
@@ -117,7 +117,7 @@ environment:
     os: FixitLab Kubernetes cluster
     hostname: lab-primary
     ip: 127.0.0.1
-    specs: local offline simulation
+    specs: local offline lab environment
   pre_installed:
   - bash
   - coreutils

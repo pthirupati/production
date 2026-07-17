@@ -676,6 +676,12 @@ def get_state(session_id: str, scenario_slug: str = "") -> dict:
         if d["readyReplicas"] == d["replicas"]
     )
 
+    try:
+        from apps.labs.provisioner.simulation.server_identity import sync_k8s_nodes
+        sync_k8s_nodes(session_id, state.get("nodes") or [])
+    except Exception:
+        pass
+
     return {
         "session_id": str(session_id),
         "scenario_slug": entry.get("scenario_slug") or scenario_slug,

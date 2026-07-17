@@ -56,7 +56,7 @@ function OnboardingChecklist({ subscriptions, progress, jiraTickets, interviewEn
     },
     {
       label: 'Start an interview',
-      desc: 'Practice with AI mock interview questions',
+      desc: 'Practice with AI interview questions',
       to: '/interviews',
       done: hasInterview,
     },

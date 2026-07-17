@@ -139,6 +139,22 @@ def _update(kb: str, title: str, status: str, *, severity: str = "Important",
     }
 
 
+_SCCM_DEPLOYMENT_STATUSES = ("Available", "Required", "Failed", "Installed")
+
+
+def _sccm_deployment(dep_id: str, name: str, collection_id: str, kb: str,
+                      status: str, *, deadline: str = "", error: str = "") -> dict:
+    return {
+        "id": dep_id,
+        "name": name,
+        "collection_id": collection_id,
+        "kb": kb,
+        "status": status if status in _SCCM_DEPLOYMENT_STATUSES else "Available",
+        "deadline": deadline,
+        "error": error,
+    }
+
+
 def _gpo_setting(key: str, value: str, *, enabled: bool = True, category: str = "Security Settings") -> dict:
     return {"key": key, "value": value, "enabled": bool(enabled), "category": category}
 
@@ -324,6 +340,26 @@ def _base_world() -> dict:
             "time_zone": "UTC",
             "remote_desktop": True,
         },
+        # Microsoft Endpoint Configuration Manager (SCCM / MECM) client + site
+        # view. Deployments target this server through a collection and mirror
+        # a subset of `updates` (the same KB can be tracked by both Windows
+        # Update and a required SCCM deployment, exactly like a real client).
+        "sccm": {
+            "site_code": "FIX",
+            "site_name": "FixItLab Primary Site",
+            "client_installed": True,
+            "client_status": "active",  # active | inactive | unknown
+            "collections": [
+                {"id": "COL001", "name": "All Systems", "member_count": 12},
+                {"id": "COL002", "name": "Servers - Production", "member_count": 4},
+            ],
+            "deployments": [
+                _sccm_deployment("DEP001",
+                                 "2024-09 Cumulative Update for Windows Server 2022",
+                                 "COL002", "KB5031356", "Installed"),
+            ],
+            "software_updates": [],
+        },
     }
 
 
@@ -430,6 +466,42 @@ def _preset_start_service(world: dict) -> dict:
     }
 
 
+def _preset_sccm_patch_failed(world: dict) -> dict:
+    """An SCCM-required deployment failed to install (client-side error). The
+    matching Windows Update is left in the failed state too, mirroring a real
+    client where WUAgent and the ConfigMgr client report the same failure."""
+    kb = "KB5034763"
+    error = "0x87D00664"
+    world["updates"].append(_update(
+        kb, "2025-02 Cumulative Update for Windows Server 2022",
+        "failed", severity="Critical", reboot=True))
+    for upd in world["updates"]:
+        if upd["kb"] == kb:
+            upd["error_code"] = error
+
+    sccm = world.setdefault("sccm", {})
+    sccm["client_installed"] = True
+    sccm["client_status"] = "active"
+    deployments = sccm.setdefault("deployments", [])
+    deployments.append(_sccm_deployment(
+        "DEP002", "2025-02 Cumulative Update for Windows Server 2022",
+        "COL002", kb, "Failed", deadline="2025-02-18T20:00:00Z", error=error))
+
+    return {
+        "kind": "sccm_deployment_installed",
+        "title": "Recover the failed SCCM patch deployment",
+        "target_deployment_id": "DEP002",
+        "target_kb": kb,
+        "objective": (
+            "Configuration Manager (SCCM/MECM) pushed a Required deployment for the "
+            f"February 2025 cumulative update ({kb}) to this server, but the client "
+            f"failed to install it with error {error}. Open Software Center, find the "
+            "Required deployment, and retry/install it so compliance shows Installed."
+        ),
+        "require": {"status": "Installed"},
+    }
+
+
 def _preset_join_domain(world: dict) -> dict:
     """The server is in a workgroup and must be joined to the domain."""
     world["domain"]["joined"] = False
@@ -463,6 +535,10 @@ _PRESETS = {
     "retry-windows-update": _preset_retry_update,
     "start-critical-service": _preset_start_service,
     "join-domain": _preset_join_domain,
+    "sccm-patch-failed": _preset_sccm_patch_failed,
+    "mecm-patch-failed": _preset_sccm_patch_failed,
+    "software-center-deployment-failed": _preset_sccm_patch_failed,
+    "patch-deployment-failed": _preset_sccm_patch_failed,
 }
 
 
@@ -479,7 +555,9 @@ def _apply_preset(world: dict, slug: str) -> dict:
 
     builder = _PRESETS.get(s)
     if builder is None:
-        if "unlock" in s or ("user" in s and "group" not in s):
+        if "sccm" in s or "mecm" in s or "software-center" in s or "patch-deployment" in s:
+            builder = _preset_sccm_patch_failed
+        elif "unlock" in s or ("user" in s and "group" not in s):
             builder = _preset_unlock_user
         elif "group" in s or "member" in s or "rdp" in s:
             builder = _preset_add_to_group
@@ -537,6 +615,14 @@ def _find_update(world: dict, kb: str) -> dict | None:
 def _group_exists(world: dict, name: str) -> bool:
     target = (name or "").lower()
     return any(g["name"].lower() == target for g in world["ad"]["groups"])
+
+
+def _find_deployment(world: dict, dep_id: str) -> dict | None:
+    target = (dep_id or "").lower()
+    for d in world.get("sccm", {}).get("deployments", []):
+        if d["id"].lower() == target or d.get("kb", "").lower() == target:
+            return d
+    return None
 
 
 # ---------------------------------------------------------------------------
@@ -676,6 +762,11 @@ def get_state(session_id: str, scenario_slug: str = "") -> dict:
     state = copy.deepcopy(entry["state"])
     world = state["world"]
     _overlay_vmware_bridge(world, session_id)
+    try:
+        from apps.labs.provisioner.simulation.server_identity import sync_windows_host
+        sync_windows_host(session_id, world)
+    except Exception:
+        pass
     goal = state.get("goal", {})
 
     installed_roles = sum(1 for r in world["roles"] if r["installed"])
@@ -700,6 +791,7 @@ def get_state(session_id: str, scenario_slug: str = "") -> dict:
         "devices": world.get("devices", []),
         "explorer": world.get("explorer", {}),
         "settings": world.get("settings", {}),
+        "sccm": world.get("sccm", {}),
         # Human-readable goal (objective/title) — never leaks the answer beyond
         # what the objective already tells the learner.
         "goal": {
@@ -755,6 +847,11 @@ def apply_action(session_id: str, action: str, payload: dict | None = None) -> d
                           "disconnect_rdp", "disconnect_session"):
             _touch_session(world)
         _save_session(str(session_id), entry)
+        try:
+            from apps.labs.provisioner.simulation.server_identity import sync_windows_host
+            sync_windows_host(session_id, world)
+        except Exception:
+            pass
     return result
 
 
@@ -1001,6 +1098,46 @@ def _dispatch(world: dict, state: dict, action: str, payload: dict) -> dict:
         return {"ok": True, "message": "Checked for updates",
                 "pending": pending}
 
+    # ---- Microsoft Endpoint Configuration Manager (SCCM/MECM) Software Center ----
+    if act in ("sccm_open_software_center",):
+        # Purely a UI-navigation verb — opening Software Center has no state
+        # effect of its own (noop), but it's a real, loggable client action.
+        _event(state, "Opened Software Center")
+        return {"ok": True, "message": "Software Center opened"}
+
+    if act in ("sccm_install_deployment", "sccm_retry_deployment"):
+        dep_id = payload.get("deployment_id") or payload.get("id")
+        dep = _find_deployment(world, dep_id)
+        if not dep:
+            return {"ok": False, "error": f"Deployment '{dep_id}' not found"}
+        dep["status"] = "Installed"
+        dep["error"] = ""
+        # A successful ConfigMgr deployment also reconciles the matching
+        # Windows Update entry, mirroring how WUAgent reports back to the site.
+        upd = _find_update(world, dep.get("kb"))
+        if upd:
+            upd["status"] = "installed"
+            upd["error_code"] = ""
+        _event(state, f"Installed deployment via Software Center: {dep['name']}")
+        return {"ok": True, "message": f"Installed {dep['name']}"}
+
+    if act in ("sccm_sync_updates",):
+        sccm = world.setdefault("sccm", {})
+        sccm["software_updates"] = [
+            {"kb": u["kb"], "title": u["title"], "status": u["status"],
+             "error_code": u.get("error_code", "")}
+            for u in world["updates"]
+        ]
+        _event(state, "Synced software updates from Configuration Manager")
+        return {"ok": True, "message": "Software update list synced"}
+
+    if act in ("sccm_machine_policy_cycle",):
+        sccm = world.setdefault("sccm", {})
+        sccm["client_status"] = "active"
+        sccm["client_installed"] = True
+        _event(state, "Ran Machine Policy Retrieval & Evaluation Cycle")
+        return {"ok": True, "message": "Machine policy cycle completed — client is active"}
+
     # ---- Services console ----
     if act in ("start_service",):
         svc = _find_service(world, payload.get("service") or payload.get("name"))
@@ -1012,6 +1149,14 @@ def _dispatch(world: dict, state: dict, action: str, payload: dict) -> dict:
                               "Disabled. Set startup to Automatic or Manual first.")}
         svc["status"] = "running"
         _event(state, f"Started service: {svc['display']}")
+        try:
+            from apps.labs.provisioner.simulation.chaos_engine import clear_faults as _chaos_clear
+            _chaos_clear(
+                payload.get("session_id") or "", fault_type="stop_service",
+                target=svc.get("display") or svc.get("name", ""),
+            )
+        except Exception:  # pragma: no cover
+            pass
         return {"ok": True, "message": f"Started {svc['display']}"}
 
     if act in ("stop_service",):
@@ -1020,6 +1165,14 @@ def _dispatch(world: dict, state: dict, action: str, payload: dict) -> dict:
             return {"ok": False, "error": "Service not found"}
         svc["status"] = "stopped"
         _event(state, f"Stopped service: {svc['display']}")
+        try:
+            from apps.labs.provisioner.simulation.chaos_engine import inject as _chaos_inject
+            _chaos_inject(
+                payload.get("session_id") or "", "stop_service", svc.get("display") or svc.get("name", ""),
+                detail={"host": world.get("computer_name")},
+            )
+        except Exception:  # pragma: no cover
+            pass
         return {"ok": True, "message": f"Stopped {svc['display']}"}
 
     if act in ("restart_service",):
@@ -1031,6 +1184,14 @@ def _dispatch(world: dict, state: dict, action: str, payload: dict) -> dict:
                     "error": f"Cannot start {svc['display']}: startup type is Disabled."}
         svc["status"] = "running"
         _event(state, f"Restarted service: {svc['display']}")
+        try:
+            from apps.labs.provisioner.simulation.chaos_engine import clear_faults as _chaos_clear
+            _chaos_clear(
+                payload.get("session_id") or "", fault_type="stop_service",
+                target=svc.get("display") or svc.get("name", ""),
+            )
+        except Exception:  # pragma: no cover
+            pass
         return {"ok": True, "message": f"Restarted {svc['display']}"}
 
     if act in ("set_startup", "set_service_startup"):
@@ -1335,6 +1496,15 @@ def validate_windows_lab(session_id: str, scenario_slug: str = "") -> tuple[bool
                            f"{req['startup'].title()} so it starts after a reboot.")
         return True, (f"The {svc['display']} service is running and set to "
                       f"{svc['startup'].title()} — validation passed.")
+
+    if kind == "sccm_deployment_installed":
+        dep = _find_deployment(world, goal.get("target_deployment_id") or goal.get("target_kb"))
+        if not dep:
+            return False, f"Deployment {goal.get('target_deployment_id')} not found"
+        if dep["status"] != req.get("status", "Installed"):
+            return False, (f"The '{dep['name']}' deployment is still {dep['status']} in "
+                           "Software Center — install or retry the deployment.")
+        return True, (f"The '{dep['name']}' deployment is Installed — validation passed.")
 
     if kind == "domain_joined":
         dom = world["domain"]

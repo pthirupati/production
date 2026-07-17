@@ -416,7 +416,7 @@ export default function VmwareConsole({ vm, labSessionId, onClose, onGuestAction
       append([
         `Last login: ${new Date().toUTCString()} on tty1`,
         LOGIN_HINT,
-        `Welcome to FixitLab simulated ${vm?.guest_os_version || 'Linux'}.`,
+        `Welcome to ${vm?.guest_os_version || 'Linux'}.`,
         '',
       ])
       setPhase('shell')
@@ -507,7 +507,7 @@ export default function VmwareConsole({ vm, labSessionId, onClose, onGuestAction
         e.preventDefault()
         clearTimers()
         // last entry = firmware settings; index 1 = rescue/recovery -> single-user
-        if (grubSel === grubEntries.length - 1) { append('Entering UEFI Firmware Settings… (no settings in simulation) — rebooting'); later(() => startPost(), 1200); return }
+        if (grubSel === grubEntries.length - 1) { append('Entering UEFI Firmware Settings… — rebooting'); later(() => startPost(), 1200); return }
         runBootStages(grubSel === 1)
       } else if (e.key !== 'Escape') {
         // any other key pauses the countdown (real GRUB behaviour)

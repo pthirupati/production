@@ -124,7 +124,7 @@ environment:
     os: FixitLab physical server lab
     hostname: lab-primary
     ip: 127.0.0.1
-    specs: local offline simulation
+    specs: local offline lab environment
   pre_installed:
   - baremetal
   - bash

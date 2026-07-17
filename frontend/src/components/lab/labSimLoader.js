@@ -24,6 +24,12 @@ export const LazyWiresharkSimulator = lazyWithRetry(() => import('../wireshark/W
 export const LazyCicdPipelineSim = lazyWithRetry(() => import('../devops/CicdPipelineSim'))
 export const LazyCodingIDE = lazyWithRetry(() => import('../ide/CodingIDE'))
 export const LazyPromptPlayground = lazyWithRetry(() => import('../promptlab/PromptPlayground'))
+export const LazyCommvaultSimulator = lazyWithRetry(() => import('../commvault/CommvaultSimulator'))
+export const LazyNetAppSimulator = lazyWithRetry(() => import('../netapp/NetAppSimulator'))
+export const LazyDellEmcSimulator = lazyWithRetry(() => import('../dellemc/DellEmcSimulator'))
+export const LazyDatacenterSimulator = lazyWithRetry(() => import('../datacenter/DatacenterSimulator'))
+export const LazySocSimulator = lazyWithRetry(() => import('../soc/SocSimulator'))
+export const LazyAzureConsole = lazyWithRetry(() => import('../azure/AzureConsole'))
 
 export const PRIMARY_SIM_COMPONENTS = {
   aws: LazyAwsLabOverlay,
@@ -38,4 +44,10 @@ export const PRIMARY_SIM_COMPONENTS = {
   nmap: LazyNmapSimulator,
   wireshark: LazyWiresharkSimulator,
   cicd: LazyCicdPipelineSim,
+  commvault: LazyCommvaultSimulator,
+  netapp: LazyNetAppSimulator,
+  dellemc: LazyDellEmcSimulator,
+  datacenter: LazyDatacenterSimulator,
+  soc: LazySocSimulator,
+  azure: LazyAzureConsole,
 }

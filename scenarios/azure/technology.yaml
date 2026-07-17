@@ -1,0 +1,18 @@
+name: Microsoft Azure
+slug: azure
+description: >-
+  Operate a Microsoft Azure subscription through an authentic Azure Portal
+  console — resource groups, virtual networks and subnets, network security
+  groups with real priority-ordered allow/deny rule evaluation, virtual
+  machines (size/vCPU/RAM, power lifecycle), and managed disks. Resize a
+  VM and watch its vCPU/RAM change inside the very same Linux guest over the
+  lab terminal, open an NSG rule that is silently blocking inbound SSH/RDP,
+  and attach a pending managed disk to the host that needs it. Mirrors the
+  day-to-day work of an Azure infrastructure engineer keeping production
+  workloads sized, reachable, and provisioned correctly.
+icon: cloud
+color: blue
+order: 44
+price: 499
+is_active: true
+coming_soon: false

@@ -21,7 +21,7 @@ description: 'CONTEXT: A team operating VMware vSphere has raised a ticket for `
   All tools run locally — no paid APIs or external cloud calls are required.
 
 
-  SYMPTOM / STARTING STATE: VMware vCenter simulation. DVS "Production-DVS" MTU: 1500.
+  SYMPTOM / STARTING STATE: VMware vCenter. DVS "Production-DVS" MTU: 1500.
 
   vmk2 (NFS): MTU 1500. vmk3 (vSAN): MTU 1500. Physical switches: MTU 9000.
 
@@ -56,7 +56,7 @@ objectives:
 - Check the vmkernel adapters (vmk) MTU settings for NFS and vSAN
 - Change the DVS MTU to 9000 (jumbo frames)
 - Update vmkernel adapter MTUs to 9000 and verify NFS/vSAN connectivity
-initial_state: 'VMware vCenter simulation. DVS "Production-DVS" MTU: 1500.
+initial_state: 'VMware vCenter. DVS "Production-DVS" MTU: 1500.
 
   vmk2 (NFS): MTU 1500. vmk3 (vSAN): MTU 1500. Physical switches: MTU 9000.
 
@@ -140,7 +140,7 @@ environment:
     os: FixitLab vSphere lab
     hostname: lab-primary
     ip: 127.0.0.1
-    specs: local offline simulation
+    specs: local offline lab environment
   pre_installed:
   - bash
   - coreutils

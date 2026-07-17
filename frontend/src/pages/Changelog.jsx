@@ -34,7 +34,7 @@ const FALLBACK_RELEASES = [
     title: 'AI Interview Studio',
     dotColor: '#b266e0',
     items: [
-      'Multi-round voice mock interviews (technical, manager, HR, leadership)',
+      'Multi-round voice interviews (technical, manager, HR, leadership)',
       'Resume-aware questions with adaptive STAR scoring and reports',
       'FIXIT-INT certificates with public verification',
       'Pro and Premium interview plans, separate from lab subscriptions',

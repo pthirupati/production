@@ -1,0 +1,223 @@
+slug: win-sccm-patch-failed
+title: 'Windows GUI: Recover a Failed SCCM/MECM Patch Deployment'
+technology: windows
+category: Fix
+difficulty: medium
+lab_mode: simulation
+simulation_type: windows-server
+infrastructure_type: docker
+time_limit: 900
+max_score: 100
+is_free: true
+jira_priority: High
+dual_terminal: false
+description: 'CONTEXT: A team operating Windows Server has raised a ticket for `Windows GUI: Recover a
+  Failed SCCM/MECM Patch Deployment`. This server is managed by Microsoft Endpoint Configuration Manager
+  (SCCM/MECM), and the monthly patch compliance report shows this device as non-compliant. Business impact:
+  the server is missing a critical security update, patch compliance reporting to the security team is
+  wrong, and the change window for this deployment is about to close.
+
+
+  ENVIRONMENT: You are working in FixitLab''s offline Windows Server host. The architecture is a single
+  lab-primary node acting as a Configuration Manager (ConfigMgr) client enrolled in site FIX (FixItLab
+  Primary Site), targeted by deployments through the "Servers - Production" collection; treat it as the
+  production host for this incident. All tools run locally — no paid APIs or external cloud calls are
+  required.
+
+
+  SYMPTOM / STARTING STATE: A domain-joined Windows Server 2022 with the Configuration Manager client
+  installed and active. In Software Center, a Required deployment for the 2025-02 Cumulative Update for
+  Windows Server 2022 (KB5034763) shows a status of Failed with client-side error 0x87D00664. The matching
+  entry in Windows Update history is also Failed. The deployment deadline has passed and the device is
+  reporting non-compliant to the site.
+
+
+  IMPACT: The server is missing a critical security patch, monthly compliance reporting is inaccurate,
+  and repeated failed retries from the site server continue to fail until the underlying client-side issue
+  is cleared through Software Center.
+
+
+  OBJECTIVE: Open Software Center, locate the Required deployment that shows Failed with error 0x87D00664,
+  and install/retry it so it reaches Installed and the matching Windows Update entry reconciles to installed.
+  Acceptance criteria: the change is minimal and reversible, and success means `check.sh` exits successfully.
+
+
+  WORK TO DO: Required tooling is pre-installed; if a command is missing, note it and use the equivalent
+  already on the host. Make the smallest configuration change that moves the system toward the objective
+  (open Software Center, review the failed deployment''s status and error code, then install/retry it),
+  changing one thing at a time. Check your work continuously against the objective — success means `check.sh`
+  exits successfully.
+
+
+  VERIFY: Re-run the same check the grader uses and confirm `check.sh` exits successfully. Capture the
+  before/after output as evidence. Success criteria: the objective''s healthy state holds on a repeat
+  check, not just once.
+
+
+  ROLLBACK: If a change makes things worse, revert that single change immediately (restore the original
+  config file / undo the edit / restart the affected component) and re-observe before trying another hypothesis.
+  Never stack unverified changes.
+
+
+  WHAT TO AVOID: Do not apply broad destructive changes, skip evidence gathering, or fabricated completion
+  with marker files — the checker validates real system state.'
+initial_state: 'A domain-joined Windows Server 2022 with the Configuration Manager (SCCM/MECM) client
+
+  installed and active, site code FIX. In Software Center, a Required deployment for
+
+  the 2025-02 Cumulative Update for Windows Server 2022 (KB5034763) shows Failed with
+
+  client-side error 0x87D00664. The matching Windows Update entry is also Failed. The
+
+  learner passes once the deployment reaches Installed.
+
+  '
+objectives:
+- Open Software Center and review the deployment list
+- Identify the Required deployment showing Failed with error 0x87D00664
+- Install/retry the failed deployment so it reaches Installed
+- Confirm the matching Windows Update KB5034763 reconciles to installed
+hints:
+- order: 1
+  cost: 0
+  content: 'ORIENT — what to observe and why:
+
+    Do not touch anything yet. First observe the symptom: the SCCM/MECM client is not behaving as the
+    scenario objectives require. This lab is about the Configuration Manager Software Center — how a required
+    deployment behaves when it fails on a managed Windows Server. Read the objectives and the current
+    state, and note precisely what looks wrong versus healthy before you form any theory.'
+- order: 2
+  cost: 10
+  content: 'APPROACH — the troubleshooting method:
+
+    Work from evidence, not guesses. For Configuration Manager patch problems the reliable method is:
+    (1) reproduce/observe the failure in Software Center, (2) narrow from the whole compliance report
+    down to the one deployment that owns the symptom, (3) change exactly one thing, (4) re-check. Fix
+    the underlying deployment failure you identified (not just the noisy compliance line), changing one
+    thing at a time.'
+- order: 3
+  cost: 25
+  content: 'WHICH TOOL — the diagnostic command(s):
+
+    1. Open Software Center and inspect the Updates / Application list for this device.
+
+    2. Note the deployment''s status (Required/Failed), its deadline, and its error code — each tells
+    you something specific about why the client-side install did not complete.
+
+    3. Compare what you see to the objectives; the gap points at the fault.'
+- order: 4
+  cost: 40
+  content: 'NARROW DOWN — isolate the subsystem:
+
+    1. Confirm the Configuration Manager client is installed and its status is active before retrying
+    anything.
+
+    2. Check the deployment''s target collection and matching KB in Windows Update — a failed ConfigMgr
+    deployment and a failed Windows Update entry for the same KB usually share one root cause.
+
+    3. Note the error code (0x87D00664) associated with the failed deployment.'
+- order: 5
+  cost: 60
+  content: 'NEAR-SOLUTION — the fix shape + verify (you still apply it):
+
+    1. In Software Center, select the Required deployment showing Failed and choose Install (or Retry).
+    This should also reconcile the matching Windows Update entry to Installed.
+
+    2. Re-run `bash check.sh` and confirm `check.sh` exits successfully.
+
+    3. If it still fails, the hypothesis was wrong — go back to the evidence, do not stack changes.
+
+
+    WHY: the grader validates real system state, not marker files — a fix only counts when the deployment
+    is actually Installed.'
+summary: 'Complete the windows gui: recover a failed sccm/mecm patch deployment windows lab and verify
+  success with the checker'
+estimated_minutes: 15
+xp_reward: 100
+prerequisites:
+- Basic windows literacy
+- Familiarity with patch management concepts
+tags:
+- fix
+- hands-on
+- windows
+- sccm
+- mecm
+- patch-management
+linked_tutorial: windows-fundamentals
+what_you_will_learn:
+- Open Software Center and review the deployment list
+- Identify the Required deployment showing Failed with error 0x87D00664
+- Install/retry the failed deployment so it reaches Installed
+- Confirm the matching Windows Update KB5034763 reconciles to installed
+environment:
+  nodes:
+  - role: primary
+    os: FixitLab Windows Server host
+    hostname: lab-primary
+    ip: 127.0.0.1
+    specs: local offline lab environment
+  pre_installed:
+  - bash
+  - coreutils
+  - journalctl
+  - systemctl
+  - windows
+  credentials:
+  - user: root
+    password: lab123
+tasks:
+- id: task_1
+  title: 'Windows GUI: Recover a Failed SCCM/MECM Patch Deployment'
+  description: 'Restore healthy behavior for Windows GUI: Recover a Failed SCCM/MECM Patch Deployment
+    by investigating the failure in Software Center, applying the smallest safe fix, and validating the
+    outcome.'
+  background: 'This windows lab teaches systematic troubleshooting of Microsoft Endpoint Configuration
+    Manager (SCCM/MECM) patch deployments: observe, hypothesize, change, verify.'
+  validation:
+    type: custom_script
+    script: check.sh
+    error_message: Validation did not pass. Re-read the objectives and Hint 2 diagnostic steps.
+solution:
+  summary: Identify the failed SCCM/MECM deployment affecting this windows lab and install/retry it via
+    Software Center.
+  files_changed: []
+  commands_run:
+  - bash check.sh
+  reference_docs: windows-fundamentals
+guided_mode:
+  enabled: true
+  steps:
+  - step: 1
+    title: Inspect current state
+    instruction: Run a read-only diagnostic before changing anything.
+    command: check.sh
+    expected_output: Output shows the current failure mode
+    explanation: Evidence-first troubleshooting avoids guessing.
+    next_on: command_success
+  - step: 2
+    title: Apply the minimal fix
+    instruction: Open Software Center, find the Required deployment showing Failed, and install/retry
+      it.
+    command: '# your fix command here'
+    expected_output: State moves toward the objective
+    explanation: Small changes make rollback easy if the hypothesis was wrong.
+    next_on: command_success
+  - step: 3
+    title: Verify with the grader
+    instruction: Run the same verification the checker uses.
+    command: check.sh
+    expected_output: '`check.sh` exits successfully'
+    explanation: The lab passes only when real state is healthy.
+    next_on: command_success
+consoles:
+- windows
+- terminal
+lab_servers:
+- id: primary
+  role: primary
+  hostname: lab-primary
+  persona: windows
+  appears_in:
+  - windows
+  - terminal

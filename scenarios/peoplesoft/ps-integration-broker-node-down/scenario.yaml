@@ -17,7 +17,7 @@ description: 'CONTEXT: A team operating PeopleSoft administration has raised a t
   HR publish/subscribe message delivery.
 
 
-  OBJECTIVE: Open the PeopleSoft (PIA) simulator from the lab toolbar; Navigate to PeopleTools > Integration
+  OBJECTIVE: Open the PeopleSoft (PIA) console from the lab toolbar; Navigate to PeopleTools > Integration
   Broker > Nodes; Identify the PSFT_HR node that is Down. Acceptance criteria: the change is minimal and
   reversible, and success means `check.sh` exits successfully.
 
@@ -50,7 +50,7 @@ max_score: 100
 is_free: true
 dual_terminal: false
 objectives:
-- Open the PeopleSoft (PIA) simulator from the lab toolbar
+- Open the PeopleSoft (PIA) console from the lab toolbar
 - Navigate to PeopleTools > Integration Broker > Nodes
 - Identify the PSFT_HR node that is Down
 - Restart/ping the node so its status returns to Active
@@ -125,7 +125,7 @@ tags:
 - peoplesoft
 linked_tutorial: peoplesoft-fundamentals
 what_you_will_learn:
-- Open the PeopleSoft (PIA) simulator from the lab toolbar
+- Open the PeopleSoft (PIA) console from the lab toolbar
 - Navigate to PeopleTools > Integration Broker > Nodes
 - Identify the PSFT_HR node that is Down
 - Restart/ping the node so its status returns to Active
@@ -135,7 +135,7 @@ environment:
     os: FixitLab PeopleSoft app server lab
     hostname: lab-primary
     ip: 127.0.0.1
-    specs: local offline simulation
+    specs: local offline lab environment
   pre_installed:
   - bash
   - coreutils

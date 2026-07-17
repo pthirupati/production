@@ -101,7 +101,7 @@ export default function JiraTicketPage() {
 
   return (
     <div className="fx-jira-page font-sans antialiased">
-      {/* Jira top navigation — authentic simulation chrome */}
+      {/* Jira top navigation — authentic Jira chrome */}
       <header className="bg-[#0747A6] text-white h-12 flex items-center px-4 gap-4 shadow-sm">
         <div className="flex items-center gap-2 shrink-0">
           <div className="w-7 h-7 bg-white rounded flex items-center justify-center">
@@ -110,7 +110,7 @@ export default function JiraTicketPage() {
             </svg>
           </div>
           <span className="font-semibold text-sm tracking-tight">Jira</span>
-          <span className="hidden sm:inline text-[10px] uppercase tracking-wider text-[#DEEBFF]/70 ml-1">Simulation</span>
+          <span className="hidden sm:inline text-[10px] uppercase tracking-wider text-[#DEEBFF]/70 ml-1">Lab Jira</span>
         </div>
         <div className="flex-1 max-w-xl">
           <div className="relative">
@@ -343,7 +343,7 @@ export default function JiraTicketPage() {
             </div>
 
             <p className="mt-3 text-[10px] text-surface-600 text-center px-2">
-              FixitLab live incident environment — Jira Cloud simulation. No external Atlassian account required.
+              FixitLab live incident environment — Jira Cloud for this lab. No external Atlassian account required.
             </p>
           </aside>
         </div>

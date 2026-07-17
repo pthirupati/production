@@ -20,7 +20,7 @@ const FOOTER_SECTIONS = [
     title: 'Product',
     links: [
       { to: '/#tech', label: 'Technologies' },
-      { to: '/mock-interviews', label: 'Mock Interviews' },
+      { to: '/mock-interviews', label: 'AI Interviews' },
       { to: '/pricing', label: 'Pricing' },
       { to: '/register', label: 'Get Started' },
     ],
@@ -140,7 +140,7 @@ export default function PublicLayout({ children }) {
             <div className="col-span-2 md:col-span-4 lg:col-span-1 mb-2 lg:mb-0">
               <FixitLogo to="/" size="sm" className="mb-3" />
               <p className="text-sm text-surface-400 leading-relaxed max-w-xs">
-                Hands-on labs, AI mock interviews, and verifiable certificates — learn by fixing real systems.
+                Hands-on labs, AI interviews, and verifiable certificates — learn by fixing real systems.
               </p>
             </div>
             {FOOTER_SECTIONS.map(({ title, links }) => (

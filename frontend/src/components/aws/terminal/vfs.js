@@ -67,7 +67,7 @@ export function createVfs(os, hostname, privateIp, preferredUser) {
   file(`${home}/.bashrc`, `# .bashrc\nalias ll='ls -la'\nalias la='ls -A'\nalias l='ls -CF'\nalias grep='grep --color=auto'\nexport PS1='[\\u@\\h \\W]\\$ '\n`)
   file(`${home}/.bash_profile`, '# .bash_profile\nif [ -f ~/.bashrc ]; then . ~/.bashrc; fi\nexport PATH=$PATH:$HOME/.local/bin:$HOME/bin\n')
   file(`${home}/.bash_history`, '')
-  file(`${home}/.ssh/authorized_keys`, 'ssh-rsa AAAAB3NzaC1yc2EAAAADAQAB...demo-key-pair\n', user, '-rw-------')
+  file(`${home}/.ssh/authorized_keys`, 'ssh-rsa AAAAB3NzaC1yc2EAAAADAQAB...lab-key-pair\n', user, '-rw-------')
   fs[`${home}/.ssh`].mode = 'drwx------'
   fs[`${home}/.ssh`].owner = user
   fs[home].owner = user

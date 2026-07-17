@@ -25,7 +25,7 @@ export default function PricingCTASection() {
           </div>
           <h2 className="fx-home-title text-[clamp(2rem,5vw,52px)] mb-5">Ready to prove your skills?</h2>
           <p className="fx-home-sub mx-auto mb-10 max-w-[560px]">
-            Free demo always available. Subscribe per technology at prices that keep hands-on practice affordable.
+            Free labs always available. Subscribe per technology at prices that keep hands-on practice affordable.
             Promo codes apply automatically at checkout. Your lab is yours alone — fully isolated from every other user.
           </p>
 
@@ -40,7 +40,7 @@ export default function PricingCTASection() {
 
           <div className="flex justify-center gap-7 flex-wrap text-sm text-white/55">
             {[
-              'Free demo — no card required',
+              'Try free — no card required',
               'Isolated lab in 30 seconds',
               'Coupons auto-apply at checkout',
             ].map(text => (

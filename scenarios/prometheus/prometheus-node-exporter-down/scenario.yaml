@@ -12,11 +12,11 @@ description: 'CONTEXT: A team operating Prometheus monitoring has raised a ticke
   incident. All tools run locally — no paid APIs or external cloud calls are required.
 
 
-  SYMPTOM / STARTING STATE: The node_exporter job is DOWN; fix the target/port. The Prometheus simulator
+  SYMPTOM / STARTING STATE: The node_exporter job is DOWN; fix the target/port. The Prometheus console
   renders the broken state; the configuration file /etc/prometheus/prometheus.yml must be corrected.
 
 
-  OBJECTIVE: Open the Prometheus simulator from the lab toolbar and sign in (lab_prometheus / lab_prometheus@123);
+  OBJECTIVE: Open the Prometheus console from the lab toolbar and sign in (lab_prometheus / lab_prometheus@123);
   Diagnose the fault — The node_exporter job is DOWN; fix the target/port.; Edit /etc/prometheus/prometheus.yml
   in the terminal to apply the documented remediation. Acceptance criteria: the change is minimal and
   reversible, and success means `check.sh` exits successfully.
@@ -49,11 +49,11 @@ max_score: 100
 is_free: false
 dual_terminal: false
 objectives:
-- Open the Prometheus simulator from the lab toolbar and sign in (lab_prometheus / lab_prometheus@123)
+- Open the Prometheus console from the lab toolbar and sign in (lab_prometheus / lab_prometheus@123)
 - Diagnose the fault — The node_exporter job is DOWN; fix the target/port.
 - Edit /etc/prometheus/prometheus.yml in the terminal to apply the documented remediation
 - Run Check Solution to confirm the configuration is corrected
-initial_state: The node_exporter job is DOWN; fix the target/port. The Prometheus simulator renders the
+initial_state: The node_exporter job is DOWN; fix the target/port. The Prometheus console renders the
   broken state; the configuration file /etc/prometheus/prometheus.yml must be corrected.
 hints:
 - order: 1
@@ -117,7 +117,7 @@ tags:
 - prometheus
 linked_tutorial: prometheus-fundamentals
 what_you_will_learn:
-- Open the Prometheus simulator from the lab toolbar and sign in (lab_prometheus / lab_prometheus@123)
+- Open the Prometheus console from the lab toolbar and sign in (lab_prometheus / lab_prometheus@123)
 - Diagnose the fault — The node_exporter job is DOWN; fix the target/port.
 - Edit /etc/prometheus/prometheus.yml in the terminal to apply the documented remediation
 - Run Check Solution to confirm the configuration is corrected
@@ -127,7 +127,7 @@ environment:
     os: FixitLab Prometheus stack
     hostname: lab-primary
     ip: 127.0.0.1
-    specs: local offline simulation
+    specs: local offline lab environment
   pre_installed:
   - bash
   - coreutils

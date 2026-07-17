@@ -948,6 +948,11 @@ def _ensure_session(session_id: str, scenario_slug: str = "") -> dict:
         entry = {"session_id": key, "scenario_slug": scenario_slug, "state": state, "created_at": _now_iso()}
         _save_session(key, entry)
     else:
+        # Refresh slug when the lab opens VMware with ?scenario=… — otherwise
+        # hot-add bridge writes are gated on an empty/stale scenario_slug from
+        # the first _ensure_session call (often before the lab slug was known).
+        if scenario_slug and entry.get("scenario_slug") != scenario_slug:
+            entry["scenario_slug"] = scenario_slug
         _enrich_inventory(entry["state"])
         _consume_guest_power(key, entry["state"])
         _save_session(key, entry)
@@ -1716,6 +1721,11 @@ def apply_action(session_id: str, action: str, payload: dict | None = None) -> d
         events.append(_event(f"Network adapter connected on {vm['name']}", "info", vm["name"]))
         tasks.insert(0, _task("Connect Network", vm["name"]))
         _save_session(str(session_id), entry)
+        try:
+            from apps.labs.provisioner.simulation.chaos_engine import clear_faults as _chaos_clear
+            _chaos_clear(session_id, fault_type="drop_nic", target=vm.get("name") or "")
+        except Exception:  # pragma: no cover
+            pass
         return {"ok": True, "message": f"Network connected on {vm['name']}"}
 
     if action == "disconnect_network":
@@ -1732,6 +1742,14 @@ def apply_action(session_id: str, action: str, payload: dict | None = None) -> d
         events.append(_event(f"Network adapter disconnected on {vm['name']}", "info", vm["name"]))
         tasks.insert(0, _task("Disconnect Network", vm["name"]))
         _save_session(str(session_id), entry)
+        # Record into the shared cross-console fault ledger (Phase 3.2) so any
+        # other open console for this session can see "drop_nic" is active —
+        # mirrors the datacenter_engine trip_pdu_breaker pattern.
+        try:
+            from apps.labs.provisioner.simulation.chaos_engine import inject as _chaos_inject
+            _chaos_inject(session_id, "drop_nic", vm.get("name") or "", detail={"vm_id": vm.get("id")})
+        except Exception:  # pragma: no cover
+            pass
         return {"ok": True, "message": f"Network disconnected on {vm['name']}"}
 
     if action == "set_nic_connected":
@@ -2156,17 +2174,22 @@ def apply_action(session_id: str, action: str, payload: dict | None = None) -> d
         # forces a SCSI rescan (or, for the reboot scenario, a reboot). Record a
         # pending hot-added disk keyed by this lab session id so the terminal
         # engine (a different worker) can reveal it. Harmless for VMware-only labs.
+        # Always record a pending hot-add for powered-on guests so the lab
+        # terminal (and any cross-tech scenario) can reveal the disk after
+        # rescan/reboot. Gating only on scenario_slug left Linux terminals
+        # blind when the VMware session was created without a slug.
         bridge_msg = ""
-        cfg = _cross_tech_config(entry.get("scenario_slug"))
-        if cfg and cfg.get("action") == "add_disk":
+        if vm.get("power") == "poweredOn":
             from apps.labs.provisioner.simulation.vmware_bridge import record_pending_disk
+            cfg = _cross_tech_config(entry.get("scenario_slug"))
+            requires_reboot = bool(cfg.get("requires_reboot")) if cfg else False
             dev = record_pending_disk(
-                str(session_id), add_gb, requires_reboot=bool(cfg.get("requires_reboot")),
+                str(session_id), add_gb, requires_reboot=requires_reboot,
             )
-            reveal = "reboot the guest" if cfg.get("requires_reboot") else "rescan the SCSI bus in the terminal"
+            reveal = "reboot the guest" if requires_reboot else "rescan the SCSI bus in the terminal"
             bridge_msg = f" The guest will not see {dev} until you {reveal}."
             events.append(_event(
-                f"Hot-add propagated to guest {vm['name']} as {dev} (pending {('reboot' if cfg.get('requires_reboot') else 'SCSI rescan')})",
+                f"Hot-add propagated to guest {vm['name']} as {dev} (pending {('reboot' if requires_reboot else 'SCSI rescan')})",
                 "info", vm["name"],
             ))
         _save_session(str(session_id), entry)
@@ -2238,11 +2261,13 @@ def apply_action(session_id: str, action: str, payload: dict | None = None) -> d
         events.append(_event(f"Added {adapter_type} network adapter on {net.get('name')} to {vm['name']}", "info", vm["name"]))
         tasks.insert(0, _task("Add Network Adapter", vm["name"]))
         nic_msg = ""
-        cfg = _cross_tech_config(entry.get("scenario_slug"))
-        if cfg and cfg.get("action") == "add_nic":
+        # Always bridge hot-added NICs for powered-on guests (same as disks).
+        # Cross-tech labs previously required scenario_slug == nic-add action,
+        # which silently no-op'd when the VMware session lacked that slug.
+        if vm.get("power") == "poweredOn" and idx > 1:
             from apps.labs.provisioner.simulation.vmware_bridge import record_pending_nic
             record_pending_nic(str(session_id))
-            nic_msg = " The guest sees the new link only after a rescan / ip link set up."
+            nic_msg = " The guest sees the new link after a SCSI/PCI rescan or `ip a` in the lab terminal."
         _save_session(str(session_id), entry)
         return {"ok": True, "message": f"Added network adapter (MAC {mac}) to {vm['name']}.{nic_msg}"}
 

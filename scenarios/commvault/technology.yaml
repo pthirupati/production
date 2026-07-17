@@ -1,0 +1,17 @@
+name: Commvault Backup & Recovery
+slug: commvault
+description: >-
+  Administer a Commvault CommCell environment through an authentic CommCell
+  Console / Command Center — client computers, storage policies,
+  subclients, the job controller, media agents, and disk libraries. Diagnose
+  overdue backup protection, run full backups and restores against a
+  wall-clock job timeline, enable disabled storage policies, and register new
+  clients discovered from a companion VMware vCenter lab so their VMs can be
+  protected. Mirrors real enterprise backup-admin on-call work: an overdue or
+  failed job is a business-continuity risk until it is diagnosed and rerun.
+icon: database
+color: blue
+order: 39
+price: 499
+is_active: true
+coming_soon: false

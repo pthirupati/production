@@ -192,7 +192,7 @@ environment:
     os: FixitLab JavaScript practice project
     hostname: lab-primary
     ip: 127.0.0.1
-    specs: local offline simulation
+    specs: local offline lab environment
   pre_installed:
   - bash
   - coreutils

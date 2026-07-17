@@ -40,7 +40,7 @@ const FAQ_ITEMS = [
     items: [
       {
         q: 'How does pricing work?',
-        a: 'Subscriptions are per-technology. You only pay for the technologies you want to learn. Free users can access demo scenarios to try the platform.',
+        a: 'Subscriptions are per-technology. You only pay for the technologies you want to learn. Free users can access sample labs to try the platform.',
       },
       {
         q: 'Can I get a refund?',
@@ -86,7 +86,7 @@ const FAQ_ITEMS = [
     items: [
       {
         q: 'What is AI Interview Studio?',
-        a: 'A multi-round mock interview product on FixitLab. Upload your resume, pick 3–5 rounds (technical, manager, HR, etc.), and practice with voice Q&A in your browser.',
+        a: 'A multi-round AI interview product on FixitLab. Upload your resume, pick 3–5 rounds (technical, manager, HR, etc.), and practice with voice Q&A in your browser.',
       },
       {
         q: 'Do I need camera and microphone?',

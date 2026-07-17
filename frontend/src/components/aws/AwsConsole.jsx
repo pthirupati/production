@@ -146,7 +146,7 @@ export default function AwsConsole({ embedded = false }) {
             <Route path="*" element={<Navigate to="console/home" replace />} />
           </Routes>
           <footer style={{ padding: '16px 20px', borderTop: '1px solid var(--aws-border-light)', fontSize: 12, color: 'var(--aws-text-secondary)', display: 'flex', justifyContent: 'space-between', flexWrap: 'wrap', gap: 8 }}>
-            <span>© 2024, Amazon Web Services, Inc. or its affiliates. (FixitLab simulation)</span>
+            <span>© 2024, Amazon Web Services, Inc. or its affiliates. </span>
             <span style={{ display: 'flex', gap: 16 }}>
               <span style={{ cursor: 'pointer' }}>Privacy</span>
               <span style={{ cursor: 'pointer' }}>Terms</span>

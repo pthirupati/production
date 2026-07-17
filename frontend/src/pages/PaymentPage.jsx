@@ -1007,7 +1007,7 @@ export default function PaymentPage() {
             </h2>
             <p className="text-surface-400 text-sm mb-8 text-center max-w-md">
               {isInterviewProduct
-                ? `Your ${techName} plan is active. Start a multi-round mock interview with free browser voice.`
+                ? `Your ${techName} plan is active. Start a multi-round AI interview with free browser voice.`
                 : `Your ${techName} subscription is now active for 1 year. You have full access to all ${techName} scenarios, hints, and certificates.`}
             </p>
 

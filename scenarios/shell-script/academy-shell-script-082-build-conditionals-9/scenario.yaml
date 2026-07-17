@@ -16,12 +16,12 @@ description: 'CONTEXT: A team operating shell scripting has raised a ticket for 
   it. Business impact: reduced service reliability and blocked users until the underlying state is repaired.
 
 
-  ENVIRONMENT: You are working in FixitLab''s offline bash practice environment. The architecture is a
+  ENVIRONMENT: You are working in FixitLab''s offline bash lab environment. The architecture is a
   single lab-primary node exposing scripts, cron, logs, and shellcheck; treat it as the production host
   for this incident. All tools run locally — no paid APIs or external cloud calls are required.
 
 
-  SYMPTOM / STARTING STATE: The bash practice environment is ready but conditionals is not configured
+  SYMPTOM / STARTING STATE: The bash lab environment is ready but conditionals is not configured
   yet. Required tools may already be installed; your job is to create the configuration and bring the
   capability online.
 
@@ -54,7 +54,7 @@ objectives:
 - A working conditionals setup must exist by the end of this lab
 - Configuration should follow team conventions and be easy to audit
 - The result should pass validation without manual cleanup
-initial_state: The bash practice environment is ready but conditionals is not configured yet. Required
+initial_state: The bash lab environment is ready but conditionals is not configured yet. Required
   tools may already be installed; your job is to create the configuration and bring the capability online.
 hints:
 - order: 1
@@ -116,10 +116,10 @@ what_you_will_learn:
 environment:
   nodes:
   - role: primary
-    os: FixitLab bash practice environment
+    os: FixitLab bash lab
     hostname: lab-primary
     ip: 127.0.0.1
-    specs: local offline simulation
+    specs: local offline lab environment
   pre_installed:
   - bash
   - coreutils

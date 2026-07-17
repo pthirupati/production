@@ -21,7 +21,7 @@ description: 'CONTEXT: A team operating VMware vSphere has raised a ticket for `
   All tools run locally — no paid APIs or external cloud calls are required.
 
 
-  SYMPTOM / STARTING STATE: VMware vCenter simulation. datastore-prod-01 at 95% (950 GB / 1 TB).
+  SYMPTOM / STARTING STATE: VMware vCenter. datastore-prod-01 at 95% (950 GB / 1 TB).
 
   Orphaned VMDK files: ~40 GB. Old ISO files in /ISOs folder: ~30 GB.
 
@@ -57,7 +57,7 @@ objectives:
 - Browse the datastore to identify large orphaned files, snapshots, and ISOs
 - Delete orphaned VMDKs and old ISO files to recover at least 100 GB
 - Verify datastore drops below 85% capacity and alarm clears
-initial_state: 'VMware vCenter simulation. datastore-prod-01 at 95% (950 GB / 1 TB).
+initial_state: 'VMware vCenter. datastore-prod-01 at 95% (950 GB / 1 TB).
 
   Orphaned VMDK files: ~40 GB. Old ISO files in /ISOs folder: ~30 GB.
 
@@ -130,7 +130,7 @@ environment:
     os: FixitLab vSphere lab
     hostname: lab-primary
     ip: 127.0.0.1
-    specs: local offline simulation
+    specs: local offline lab environment
   pre_installed:
   - bash
   - coreutils

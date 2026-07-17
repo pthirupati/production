@@ -1,0 +1,35 @@
+/* Microsoft Azure Portal */
+.az-shell { background: #f5f7fa; color: #201f1e; }
+.az-sidebar { border-right: 1px solid #04223f; }
+.az-sidebar .sim-sidebar-item { color: #9fc4e8; }
+.az-sidebar .sim-sidebar-item:hover { background: rgba(255, 255, 255, 0.06); color: #fff; }
+.az-sidebar .sim-sidebar-active { background: rgba(0, 120, 212, 0.4) !important; color: #fff !important; border-left-color: #50b0ff !important; }
+
+.az-panel { background: #fff; border: 1px solid #d8dde3; border-radius: 6px; padding: 0.75rem; }
+
+.az-banner {
+  display: flex; align-items: center; gap: 0.5rem; font-size: 0.85rem; color: #7a4a00;
+  background: #fff4ce; border: 1px solid #f0c33c; border-radius: 4px; padding: 0.5rem 0.75rem;
+}
+
+.az-tile {
+  display: flex; align-items: center; gap: 0.6rem; background: #fff; border: 1px solid #d8dde3;
+  border-radius: 6px; padding: 0.75rem 0.9rem;
+}
+.az-tile-num { font-size: 1.15rem; font-weight: 700; line-height: 1.1; }
+.az-tile-label { font-size: 0.72rem; color: #605e5c; }
+
+.az-btn-primary {
+  background: #0078d4; color: #fff; border-radius: 4px; padding: 0.4rem 0.85rem;
+  font-size: 0.8rem; font-weight: 600; display: inline-flex; align-items: center; gap: 0.35rem;
+}
+.az-btn-primary:hover { background: #005ea2; }
+.az-btn-primary:disabled { opacity: 0.5; cursor: not-allowed; }
+
+.az-btn-sm {
+  display: inline-flex; align-items: center; gap: 0.25rem; font-size: 0.68rem; font-weight: 600;
+  padding: 0.25rem 0.5rem; border-radius: 4px; background: #0078d4; color: #fff;
+}
+.az-btn-sm:hover { background: #005ea2; }
+.az-btn-sm.az-btn-outline { background: transparent; color: #0078d4; border: 1px solid #0078d4; }
+.az-btn-sm.az-btn-outline:hover { background: rgba(0, 120, 212, 0.08); }

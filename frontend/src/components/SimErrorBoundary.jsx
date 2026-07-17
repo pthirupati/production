@@ -77,10 +77,10 @@ export default class SimErrorBoundary extends Component {
           <AlertTriangle className="text-amber-400" size={36} aria-hidden />
           <div>
             <h2 className="text-base font-semibold text-white mb-1">
-              {this.props.title || 'Simulator error'}
+              {this.props.title || 'Lab console error'}
             </h2>
             <p className="text-sm text-surface-400 max-w-md">
-              {this.props.message || 'Something went wrong loading this simulator. Try resetting or reload the page.'}
+              {this.props.message || 'Something went wrong loading this lab console. Try resetting or reload the page.'}
             </p>
           </div>
           <div className="flex flex-wrap gap-2 justify-center">

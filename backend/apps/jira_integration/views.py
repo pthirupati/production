@@ -294,7 +294,17 @@ class JiraIssueCommentView(APIView):
             if any(w in text.lower() for w in ("customer", "reporter", "impact", "when was")):
                 add_customer_reply(ticket, text, session=ticket.last_session)
         else:
-            add_customer_reply(ticket, text, session=ticket.last_session)
+            from .team_bots import is_help_request, build_coach_reply, deliver_team_reply_now
+
+            if is_help_request(text):
+                author, message = build_coach_reply(ticket)
+                session_id = str(ticket.last_session_id) if ticket.last_session_id else ""
+                deliver_team_reply_now(
+                    ticket.issue_key, session_id, author, message, [], scenario_slug=ticket.scenario.slug if ticket.scenario_id else "",
+                )
+                team_meta = {"scheduled": False, "teams": ["changemgmt"], "coached": True, "delivered": True}
+            else:
+                add_customer_reply(ticket, text, session=ticket.last_session)
 
         payload = ticket_detail_payload(ticket)
         payload["team_reply"] = team_meta

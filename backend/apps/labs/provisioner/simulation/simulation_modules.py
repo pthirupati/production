@@ -20,6 +20,33 @@ if TYPE_CHECKING:
 GPU_NAMES = ["NVIDIA A100-SXM4-40GB", "NVIDIA H100 80GB HBM3", "NVIDIA RTX 4090"]
 
 
+def _sync_gpu_identity(engine: "UnifiedSimulationEngine", *, healthy: bool) -> None:
+    """Mirror driver health into ServerIdentity (virtualized GPU only)."""
+    session_id = getattr(engine, "lab_session_id", None) or getattr(engine, "session_id", None)
+    if not session_id:
+        return
+    try:
+        from . import server_identity as si
+        primary = si.get_primary(str(session_id))
+        if not primary:
+            primary = si.seed_gpu_node(
+                str(session_id),
+                hostname=getattr(engine.shell.state, "hostname", None) or "gpu-node-01",
+                healthy=healthy,
+            )
+        else:
+            si.set_gpu(
+                str(session_id),
+                primary["id"],
+                driver_loaded=healthy,
+                health="healthy" if healthy else "failed",
+                source="terminal",
+            )
+    except Exception:
+        # Identity sync must never break the shell facade.
+        pass
+
+
 def apply_simulation_context(engine: "UnifiedSimulationEngine") -> None:
     """Configure hostname, services, and flags for the simulation persona."""
     sim_type = engine.simulation_type
@@ -445,11 +472,14 @@ def _register_gpu(engine: "UnifiedSimulationEngine", shell: RHELShell) -> None:
         if low.startswith("modprobe"):
             # `modprobe nvidia` loads the driver; `modprobe -r nvidia` unloads it.
             if "nvidia" in low:
-                engine.shell.state.gpu_healthy = "-r" not in parts and "--remove" not in low
+                loaded = "-r" not in parts and "--remove" not in low
+                engine.shell.state.gpu_healthy = loaded
+                _sync_gpu_identity(engine, healthy=loaded)
             return ""
         if low.startswith("rmmod"):
             if "nvidia" in low:
                 engine.shell.state.gpu_healthy = False
+                _sync_gpu_identity(engine, healthy=False)
             return ""
         if low.startswith("lspci"):
             out = "01:00.0 3D controller: NVIDIA Corporation GA100 [A100 SXM4 40GB] (rev a1)"
@@ -1202,6 +1232,7 @@ def _register_ansible(engine: "UnifiedSimulationEngine", shell: RHELShell) -> No
             )
         if "ansible-playbook" in low:
             if engine._ssh_key_fixed:
+                engine._ansible_playbook_ok = True
                 return "PLAY RECAP *****\nweb1 : ok=2 changed=1\nweb2 : ok=2 changed=1"
             return "fatal: [web2]: FAILED! => Unable to start service nginx"
         if "ansible-inventory" in low:

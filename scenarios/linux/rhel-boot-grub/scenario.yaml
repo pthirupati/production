@@ -1,5 +1,5 @@
 category: Fix
-description: 'CONTEXT: A team operating Linux administration has raised a ticket for `RHEL Simulation:
+description: 'CONTEXT: A team operating Linux administration has raised a ticket for `RHEL Lab:
   GRUB Boot & Rescue`. A customer-facing workflow is degraded and the on-call engineer (you) must diagnose
   and resolve it. Business impact: reduced service reliability and blocked users until the underlying
   state is repaired.
@@ -10,7 +10,7 @@ description: 'CONTEXT: A team operating Linux administration has raised a ticket
   host for this incident. All tools run locally — no paid APIs or external cloud calls are required.
 
 
-  SYMPTOM / STARTING STATE: Simulated RHEL system paused at the GRUB boot menu. Boot the default entry
+  SYMPTOM / STARTING STATE: RHEL system paused at the GRUB boot menu. Boot the default entry
   to proceed to login, then operate as root in the full shell.
 
 
@@ -43,15 +43,15 @@ hints:
   cost: 0
   content: 'ORIENT — what to observe and why:
 
-    Do not touch anything yet. First observe the symptom: RHEL simulation is not behaving as the scenario
-    objectives require. This lab is about RHEL simulation — how RHEL simulation behaves in a Linux administration
+    Do not touch anything yet. First observe the symptom: RHEL is not behaving as the scenario
+    objectives require. This lab is about RHEL — how RHEL behaves in a Linux administration
     environment. Read the objectives and the current state, and note precisely what looks wrong versus
     healthy before you form any theory.'
 - order: 2
   cost: 10
   content: 'APPROACH — the troubleshooting method:
 
-    Work from evidence, not guesses. For RHEL simulation problems the reliable method is: (1) reproduce/observe
+    Work from evidence, not guesses. For RHEL problems the reliable method is: (1) reproduce/observe
     the failure, (2) narrow from the whole system down to the one component that owns the symptom, (3)
     change exactly one thing, (4) re-check. Fix the underlying misconfiguration you identified (not just
     the noisy log line), changing one thing at a time.'
@@ -69,12 +69,12 @@ hints:
   cost: 40
   content: 'NARROW DOWN — isolate the subsystem:
 
-    1. From the evidence above, decide which single part of RHEL simulation is at fault.
+    1. From the evidence above, decide which single part of RHEL is at fault.
 
     2. Re-run the most relevant of terminal and config files under /etc and /var focused on just that
     part to confirm it.
 
-    3. State a one-line hypothesis: the smallest change that would move the state from ''RHEL simulation
+    3. State a one-line hypothesis: the smallest change that would move the state from ''RHEL
     is not behaving as the scenario objectives require'' toward ''`check.sh` exits successfully''.'
 - order: 5
   cost: 60
@@ -91,7 +91,7 @@ hints:
     WHY: the grader validates real system state, not marker files — a fix only counts when the subsystem
     is actually healthy.'
 infrastructure_type: docker
-initial_state: Simulated RHEL system paused at the GRUB boot menu. Boot the default entry to proceed to
+initial_state: RHEL system paused at the GRUB boot menu. Boot the default entry to proceed to
   login, then operate as root in the full shell.
 is_free: true
 jira_priority: Medium
@@ -105,8 +105,8 @@ simulation_type: rhel
 slug: linux-rhel-boot-grub-lab
 technology: linux
 time_limit: 900
-title: 'RHEL Simulation: GRUB Boot & Rescue'
-summary: 'Complete the rhel simulation: grub boot & rescue linux lab and verify success with the checker'
+title: 'RHEL Lab: GRUB Boot & Rescue'
+summary: 'Complete the rhel: grub boot & rescue linux lab and verify success with the checker'
 estimated_minutes: 15
 xp_reward: 100
 prerequisites:
@@ -126,7 +126,7 @@ environment:
     os: FixitLab Linux practice server
     hostname: lab-primary
     ip: 127.0.0.1
-    specs: local offline simulation
+    specs: local offline lab environment
   pre_installed:
   - bash
   - coreutils
@@ -138,8 +138,8 @@ environment:
     password: lab123
 tasks:
 - id: task_1
-  title: 'RHEL Simulation: GRUB Boot & Rescue'
-  description: 'Restore healthy behavior for RHEL Simulation: GRUB Boot & Rescue by investigating the
+  title: 'RHEL Lab: GRUB Boot & Rescue'
+  description: 'Restore healthy behavior for RHEL Lab: GRUB Boot & Rescue by investigating the
     failure, applying the smallest safe fix, and validating the outcome.'
   background: 'This linux lab teaches systematic troubleshooting: observe, hypothesize, change, verify.'
   validation:

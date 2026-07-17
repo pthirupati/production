@@ -60,7 +60,7 @@ describe('SimErrorBoundary chunk-load recovery', () => {
     // "stuck on the error screen" state the learner used to see).
     sessionStorage.setItem('fixitlab-chunk-reload', '1')
     render(
-      <SimErrorBoundary name="aws" title="Lab simulator error">
+      <SimErrorBoundary name="aws" title="Lab environment error">
         <LazyThatChunkFails />
       </SimErrorBoundary>,
     )
@@ -73,7 +73,7 @@ describe('SimErrorBoundary chunk-load recovery', () => {
     // Simulate that the BOUNDARY reload already happened moments ago this session.
     sessionStorage.setItem('fixitlab-sim-chunk-reload', String(Date.now()))
     render(
-      <SimErrorBoundary name="aws" title="Lab simulator error">
+      <SimErrorBoundary name="aws" title="Lab environment error">
         <LazyThatChunkFails />
       </SimErrorBoundary>,
     )
@@ -86,7 +86,7 @@ describe('SimErrorBoundary chunk-load recovery', () => {
 
   it('ordinary render error: "Try again" recovers in place and does NOT hard reload', () => {
     render(
-      <SimErrorBoundary name="aws" title="Lab simulator error">
+      <SimErrorBoundary name="aws" title="Lab environment error">
         <ThrowsPlainRenderError />
       </SimErrorBoundary>,
     )

@@ -179,7 +179,7 @@ export default function InterviewSetup() {
     try {
       const campaign = await interviewsApi.createCampaign({
         round_count: form.round_count,
-        title: `${form.target_role || 'Mock Interview'} — ${form.experience_level}`,
+        title: `${form.target_role || 'AI Interview'} — ${form.experience_level}`,
       })
       toast.success('Interview created — schedule round 1')
       navigate(`/interviews/campaign/${campaign.id}`)

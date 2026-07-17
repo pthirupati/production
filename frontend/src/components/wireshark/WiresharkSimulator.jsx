@@ -351,7 +351,7 @@ export default function WiresharkSimulator({
         hydrated.current = true
       }
     } catch {
-      setError('Could not load the Wireshark simulator')
+      setError('Could not load Wireshark')
     }
   }, [sessionId, slug])
 
@@ -968,7 +968,7 @@ export default function WiresharkSimulator({
 
       {['about', 'saved', 'find'].includes(modal) && (
         <ModalShell title={modal === 'about' ? 'About Wireshark' : modal === 'saved' ? 'Save Capture File' : 'Find Packet'} onClose={() => setModal(null)}>
-          {modal === 'about' && <p className="text-sm">Wireshark 4.2.0 simulated for FixitLab packet analysis labs. Menus, filters, streams, statistics, and capture options are interactive mocks backed by lab state.</p>}
+          {modal === 'about' && <p className="text-sm">Wireshark 4.2.0 for FixitLab packet analysis labs. Menus, filters, streams, statistics, and capture options are interactive capture analysis backed by lab state.</p>}
           {modal === 'saved' && <p className="text-sm">Capture saved as <span className="font-mono">fixitlab-session.pcapng</span>.</p>}
           {modal === 'find' && (
             <div>

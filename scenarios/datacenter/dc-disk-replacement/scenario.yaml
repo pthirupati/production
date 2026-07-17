@@ -1,0 +1,138 @@
+title: 'Field Tech: Predictive Failure Alert on db-prod-01''s Disk'
+slug: dc-disk-replacement
+technology: datacenter
+category: Fix
+difficulty: easy
+lab_mode: simulation
+simulation_type: datacenter
+infrastructure_type: docker
+time_limit: 600
+max_score: 100
+is_free: false
+jira_priority: High
+dual_terminal: false
+description: 'CONTEXT: The storage monitoring platform fired a predictive-failure SMART alert on db-prod-01
+  in rack R02. The disk hasn''t failed outright yet, but its error-correction counters have crossed the
+  replace-now threshold — waiting for a full failure would risk an unplanned outage on a production database
+  node, so hardware operations dispatched a proactive replacement ticket to the floor.
+
+
+  ENVIRONMENT: You are walking the physical data center floor through the DCIM console — pan across the
+  rack row, click rack R02 to expand its servers by U position, and click db-prod-01 (U10) to open its
+  component-health drawer showing power, NIC, disk, motherboard, CPU, and GPU status individually.
+
+
+  SYMPTOM / STARTING STATE: db-prod-01''s component drawer shows the disk flagged "Failed" while every
+  other component — power, NIC, motherboard, CPU, GPU — reads "Healthy". The server itself is still powered
+  on and serving traffic; this is a live hot-swap, not a full outage.
+
+
+  IMPACT: Running on a degraded/failing disk risks silent data corruption or an unplanned crash mid- transaction
+  on a production database host. Hardware ops treats predictive-failure disk alerts as same-shift replacements,
+  before the drive actually dies.
+
+
+  OBJECTIVE: Pan to rack R02, expand it, open db-prod-01''s component drawer, and use the disk''s "Replace
+  Disk" action to swap the failing drive. Confirm the disk reads "Healthy" afterward and the server stays
+  powered on throughout.'
+initial_state: DCIM floor view with db-prod-01 (R02-U10) showing a failed disk while every other component
+  on the server reads healthy and the server remains powered on.
+objectives:
+- Pan the datacenter floor to rack R02 and expand it
+- Click db-prod-01 (R02-U10) to open its component-health drawer
+- Locate the disk component flagged "Failed"
+- Replace the failing disk
+- Confirm the disk reads "Healthy" and the server's power state stays "On"
+hints:
+- order: 1
+  cost: 0
+  content: 'ORIENT — what to observe and why: Do not replace anything yet. Pan to rack R02, expand it,
+    click db-prod-01, and read every row in its component drawer. Exactly one component is flagged "Failed"
+    — confirm it''s the disk, and note that the server''s power state is still "On" (this is a hot-swap,
+    not a downed host).'
+- order: 2
+  cost: 10
+  content: 'APPROACH — the troubleshooting method: A predictive-failure disk alert has one correct response
+    — replace the drive proactively before it fails outright. There is no diagnostic ambiguity here (unlike
+    the NIC-vs-cable case): the component drawer already tells you exactly which part is failing.'
+- order: 3
+  cost: 25
+  content: 'WHICH TOOL — the diagnostic command(s): 1. In db-prod-01''s component drawer, confirm the
+    disk row reads "Failed" and every other row reads "Healthy". 2. Use the "Replace Disk" action directly
+    on that row — no cable-reseat or power-cycle step applies to a disk swap.'
+- order: 4
+  cost: 40
+  content: 'NARROW DOWN — isolate the subsystem: Because only the disk is flagged and the rest of the
+    server is healthy, this is a single-component fix — replace the disk, watch the brief replace animation
+    play, and re-check the drawer.'
+- order: 5
+  cost: 60
+  content: 'NEAR-SOLUTION — the fix shape + verify (you still apply it): Click "Replace Disk" on db-prod-01,
+    let the replace animation finish, and confirm the disk row now reads "Healthy" with the server''s
+    power state still "On". WHY: the grader checks that db-prod-01''s disk component is healthy in the
+    DCIM session state.'
+summary: Replace the predictively-failing disk in db-prod-01 before it fails outright, without taking
+  the production database host offline.
+estimated_minutes: 8
+xp_reward: 90
+prerequisites:
+- Basic hardware troubleshooting concepts
+tags:
+- fix
+- hands-on
+- datacenter
+- hardware
+- physical
+linked_tutorial: datacenter-fundamentals
+what_you_will_learn:
+- Interpreting predictive-failure (SMART) disk alerts on a DCIM floor
+- Performing a proactive hot-swap disk replacement
+- Verifying a component-level fix without disrupting server power state
+environment:
+  nodes:
+  - role: primary
+    os: FixitLab Physical Data Center (DCIM) environment
+    hostname: lab-primary
+    ip: 127.0.0.1
+    specs: local offline lab environment
+  pre_installed:
+  - dcim-floor-console
+  credentials:
+  - user: tech
+    password: lab123
+tasks:
+- id: task_1
+  title: Replace the failing disk in db-prod-01
+  description: Swap the predictively-failing disk in db-prod-01 for a healthy one via the component drawer,
+    without powering the server down.
+  background: 'This lab teaches proactive hardware maintenance: replace a disk flagged by predictive-failure
+    monitoring before it fails outright, and verify the fix without disrupting the running host.'
+  validation:
+    type: custom_script
+    script: check.sh
+    error_message: Validation did not pass. Replace the disk in db-prod-01 (R02-U10) and confirm it reads
+      "Healthy".
+solution:
+  summary: Replace the disk in db-prod-01's component drawer.
+  files_changed: []
+  commands_run:
+  - 'DCIM: pan to R02 -> expand rack -> click db-prod-01 (U10)'
+  - 'DCIM: component drawer -> Replace Disk'
+  reference_docs: datacenter-fundamentals
+consoles:
+- datacenter
+- terminal
+- bmc
+lab_servers:
+- id: db-prod-01
+  role: primary
+  hostname: db-prod-01
+  persona: baremetal
+  physical_location:
+    room: Data Hall A
+    rack: R02
+    u_position: 10
+  appears_in:
+  - datacenter
+  - terminal
+  - bmc

@@ -201,7 +201,10 @@ function primaryNicL3(vm, fallbackIp, fallbackGw) {
 
 function guestExtraNics(vm, shared) {
   const pending = vm?.guest_pending_nics || []
-  if (!shared.nicRescanned && vm?.guest_nic_pending) return []
+  // Match backend RHELShell: once the guest has rescanned (or auto-revealed on
+  // `ip a`), pending NICs become visible. Before that, hide them so the learner
+  // must rescan — unless autoReveal is set by the listing path.
+  if (!shared.nicRescanned && vm?.guest_nic_pending && !shared.nicAutoReveal) return []
   if (pending.length) {
     return pending.map((n, i) => ({
       name: n.name || `eth${i + 1}`,
@@ -216,6 +219,19 @@ function guestExtraNics(vm, shared) {
     mac: n.mac || n.mac_address || `00:50:56:${(i + 1).toString(16).padStart(2, '0')}:c3:d4`,
     label: n.label || `Network adapter ${i + 2}`,
   }))
+}
+
+/** Reveal hot-added NICs the way the backend does on `ip a` / PCI rescan. */
+function revealPendingNics(vm, shared) {
+  if (!vm?.guest_nic_pending && !(vm?.guest_pending_nics || []).length && (vm?.nics || []).length <= 1) {
+    return null
+  }
+  shared.nicAutoReveal = true
+  shared.nicRescanned = true
+  if (vm?.guest_nic_pending) {
+    return { action: 'guest_rescan_scsi', vm_id: vm?.id }
+  }
+  return null
 }
 
 function triggerGuestRescan(vm, shared) {
@@ -1575,9 +1591,13 @@ export function createLinuxShell(vm, opts = {}) {
       ])
     }
     else if (lc === 'echo') {
-      // guest disk rescan side-effect: echo "- - -" > /sys/class/scsi_host/.../scan
-      if (line.includes('scsi_host') && line.includes('scan')) {
-        const effect = triggerGuestRescan(vm, shared)
+      // guest disk/NIC rescan: scsi_host scan OR PCI bus rescan
+      if (
+        (line.includes('scsi_host') && line.includes('scan'))
+        || line.includes('/sys/bus/pci/rescan')
+        || (line.includes('/sys/devices') && line.includes('rescan'))
+      ) {
+        const effect = triggerGuestRescan(vm, shared) || revealPendingNics(vm, shared)
         if (effect) sideEffect = effect
         out.push('')
       } else {
@@ -1772,7 +1792,7 @@ export function createLinuxShell(vm, opts = {}) {
         const parent = vfs.ensureDir(dirname(p))
         parent.children[basename(p)] = vfs.mklink(target)
         emit('')
-      } else emit('ln: hard links simulated (use -s for symlink)')
+      } else emit('ln: hard links created (use -s for symlink)')
     }
     else if (lc === 'stat') {
       const f = positional[0]; const node = f ? vfs.lresolve(abs(f)) : null
@@ -2005,6 +2025,12 @@ export function createLinuxShell(vm, opts = {}) {
     else if (lc === 'ip') {
       const sub = positional[0]
       const netVm = vmRef.current
+      // Match backend: listing addresses auto-reveals a hot-added NIC that was
+      // attached in VMware (after the hypervisor side completed).
+      if (sub === 'addr' || sub === 'a' || sub === 'address' || !sub || sub === 'link') {
+        const effect = revealPendingNics(netVm, shared)
+        if (effect) sideEffect = effect
+      }
       const extraNics = guestExtraNics(netVm, shared)
       const linkUp = primaryNicUp(netVm)
       const { ip: nIp, gw: nGw, prefix, mac: nMac, hasIp } = primaryNicL3(netVm, ip, gw)
@@ -2035,13 +2061,18 @@ export function createLinuxShell(vm, opts = {}) {
         if (linkUp && hasIp) emit([`default via ${nGw} dev eth0 proto static metric 100`, `${net3}.0/${prefix} dev eth0 proto kernel scope link src ${nIp}`])
         else emit('')
       } else if (sub === 'link') {
-        emit([
+        const linkLines = [
           '1: lo: <LOOPBACK,UP,LOWER_UP> mtu 65536',
           linkUp
             ? '2: eth0: <BROADCAST,MULTICAST,UP,LOWER_UP> mtu 1500'
             : '2: eth0: <NO-CARRIER,BROADCAST,MULTICAST,UP> mtu 1500 state DOWN',
           `    link/ether ${nMac} brd ff:ff:ff:ff:ff:ff`,
-        ])
+        ]
+        extraNics.forEach((nic, i) => {
+          linkLines.push(`${3 + i}: ${nic.name}: <BROADCAST,MULTICAST,UP,LOWER_UP> mtu 1500`)
+          linkLines.push(`    link/ether ${nic.mac || '00:50:56:a1:c3:d4'} brd ff:ff:ff:ff:ff:ff`)
+        })
+        emit(linkLines)
       } else if (sub === 'neigh' || sub === 'n') {
         emit(linkUp ? `${nGw} dev eth0 lladdr 00:50:56:fe:00:01 REACHABLE` : '')
       } else emit('Object "' + sub + '" is unknown, try "ip help".')
@@ -2140,10 +2171,10 @@ export function createLinuxShell(vm, opts = {}) {
       else emit('')
     }
     else if (lc === 'ssh') {
-      if (positional[0]) emit(`ssh: connect to host ${positional[0].replace(/.*@/, '')} port 22: (simulated — use the SSH lab terminal for an interactive session)`)
+      if (positional[0]) emit(`ssh: connect to host ${positional[0].replace(/.*@/, '')} port 22: (use the SSH lab terminal for an interactive session)`)
       else emit('usage: ssh [user@]hostname [command]')
     }
-    else if (lc === 'scp' || lc === 'rsync' || lc === 'sftp') emit(`${lc}: transfer simulated`)
+    else if (lc === 'scp' || lc === 'rsync' || lc === 'sftp') emit(`${lc}: transfer completed`)
 
     /* =================== services (systemd) =================== */
     else if (lc === 'systemctl') {
@@ -2349,7 +2380,7 @@ export function createLinuxShell(vm, opts = {}) {
     }
     else if (lc === 'apt-cache') {
       if (positional[0] === 'policy') { const r = pkgs.get(positional[1]); emit([`${positional[1] || 'package'}:`, `  Installed: ${r ? r.ver + (r.rel ? '-' + r.rel : '') : '(none)'}`, `  Candidate: ${pkgInfo(positional[1] || '').ver.replace(/^[0-9]+:/, '')}`]) }
-      else emit(`${positional[1] || 'package'} - simulated package description`)
+      else emit(`${positional[1] || 'package'} - package description`)
     }
     else if (lc === 'rpm') {
       // -qa / -q -a : list every installed package (reads the live DB)
@@ -2493,7 +2524,7 @@ export function createLinuxShell(vm, opts = {}) {
                 : `${dev} doesn't contain a valid partition table`]
           }),
         ])
-      } else emit('Welcome to fdisk (util-linux 2.37.4).\nCommand (m for help): (simulated — use \'fdisk -l\' to list disks)')
+      } else emit('Welcome to fdisk (util-linux 2.37.4).\nCommand (m for help): (use \'fdisk -l\' to list disks)')
     }
     else if (lc === 'mkfs' || lc.startsWith('mkfs.') || lc === 'mke2fs' || lc === 'mkswap') {
       const dev = positional.find(a => a.includes('/dev/')) || positional[0] || ''
@@ -2502,7 +2533,7 @@ export function createLinuxShell(vm, opts = {}) {
         emit([`mke2fs 1.46.5 (30-Dec-2021)`, `Creating filesystem with 5242880 4k blocks and 1310720 inodes`, `Filesystem UUID: deadc0de-1234-5678-9abc-def012345678`, `Writing superblocks and filesystem accounting information: done`])
         sideEffect = { action: 'guest_format_disk', vm_id: vm?.id }
       } else if (devMatchesExtraDisk(dev, vm, shared) && shared.diskFormatted) {
-        emit(`mke2fs 1.46.5 (30-Dec-2021)\n${dev} contains a ext4 file system\nProceed anyway? (y,N) (simulated — already formatted)`)
+        emit(`mke2fs 1.46.5 (30-Dec-2021)\n${dev} contains a ext4 file system\nProceed anyway? (y,N) (already formatted)`)
       } else if (dev.includes('sd') && !devMatchesExtraDisk(dev, vm, shared)) emit(`mkfs.ext4: ${dev} not found`)
       else if (dev.includes('sd') && dev.includes('sda')) emit(`mkfs.ext4: will not make a filesystem on '${dev}' — it is mounted`)
       else emit('Usage: mkfs.ext4 /dev/sdX  (attach a disk in vCenter first)')
@@ -2592,7 +2623,7 @@ export function createLinuxShell(vm, opts = {}) {
           : [`resize2fs 1.46.5 (30-Dec-2021)`, `The filesystem on /dev/mapper/rootvg-root is now ${Math.round(lvm.rootFsGb * 262144)} (4k) blocks long.`])
       }
     }
-    else if (lc === 'vgcreate' || lc === 'lvcreate') emit(`${lc}: simulated — operation completed`)
+    else if (lc === 'vgcreate' || lc === 'lvcreate') emit(`${lc}: operation completed`)
 
     /* =================== kernel modules =================== */
     else if (lc === 'lsmod') {
@@ -2718,8 +2749,8 @@ export function createLinuxShell(vm, opts = {}) {
       else if (lc === 'type') emit(`${t} is /usr/bin/${t}`)
       else emit(`/usr/bin/${t}`)
     }
-    else if (lc === 'man' || lc === 'info' || lc === 'apropos') emit(`What manual page do you want?\n(simulated — try '${positional[0] || 'command'} --help')`)
-    else if (lc === 'tldr') emit(`# ${positional[0] || 'command'}\n(simulated tldr page)`)
+    else if (lc === 'man' || lc === 'info' || lc === 'apropos') emit(`What manual page do you want?\n(try '${positional[0] || 'command'} --help')`)
+    else if (lc === 'tldr') emit(`# ${positional[0] || 'command'}\n(tldr page)`)
     else if (lc === 'sleep' || lc === 'true' || lc === ':' ) emit('')
     else if (lc === 'false') return { lines: [''], prompt: prompt() }
     else if (lc === 'test' || lc === '[') emit('')
@@ -2753,10 +2784,10 @@ export function createLinuxShell(vm, opts = {}) {
     }
 
     /* =================== interpreters / containers / IaC =================== */
-    else if (lc === 'python' || lc === 'python3') emit(positional.length ? '' : 'Python 3.9.18 (main, Jan 24 2024, 00:00:00)\n[GCC 11.4.0] on linux\nType "help", "copyright", "credits" or "license" for more information.\n(simulated — non-interactive)')
-    else if (lc === 'node') emit(positional.length ? '' : 'Welcome to Node.js v18.19.0.\nType ".help" for more information. (simulated)')
-    else if (['perl', 'ruby', 'php', 'go', 'java', 'gcc', 'make', 'cc', 'javac'].includes(lc)) emit(positional.length ? '' : `${lc}: simulated interpreter/compiler`)
-    else if (lc === 'pip' || lc === 'pip3' || lc === 'npm' || lc === 'yarn' || lc === 'gem' || lc === 'cargo') emit(positional[0] === 'install' ? `Successfully installed ${positional[1] || 'package'}` : `${lc} ${positional[0] || ''} (simulated)`)
+    else if (lc === 'python' || lc === 'python3') emit(positional.length ? '' : 'Python 3.9.18 (main, Jan 24 2024, 00:00:00)\n[GCC 11.4.0] on linux\nType "help", "copyright", "credits" or "license" for more information.\n(non-interactive)')
+    else if (lc === 'node') emit(positional.length ? '' : 'Welcome to Node.js v18.19.0.\nType ".help" for more information. ')
+    else if (['perl', 'ruby', 'php', 'go', 'java', 'gcc', 'make', 'cc', 'javac'].includes(lc)) emit(positional.length ? '' : `${lc}: interpreter/compiler`)
+    else if (lc === 'pip' || lc === 'pip3' || lc === 'npm' || lc === 'yarn' || lc === 'gem' || lc === 'cargo') emit(positional[0] === 'install' ? `Successfully installed ${positional[1] || 'package'}` : `${lc} ${positional[0] || ''} `)
     else if (lc === 'docker') {
       const sub = positional[0]
       if (sub === 'ps') emit(['CONTAINER ID   IMAGE          COMMAND                  CREATED       STATUS       PORTS                  NAMES', 'a1b2c3d4e5f6   nginx:1.25     "/docker-entrypoint.…"   2 hours ago   Up 2 hours   0.0.0.0:8080->80/tcp   web', 'f6e5d4c3b2a1   mysql:8.0      "docker-entrypoint.s…"   2 hours ago   Up 2 hours   3306/tcp               db'])
@@ -2861,7 +2892,7 @@ export function createLinuxShell(vm, opts = {}) {
         else if (op === 'start-instances') emit('{\n    "StartingInstances": [\n        { "InstanceId": "i-0abcd1234efgh5678", "CurrentState": { "Name": "pending" } }\n    ]\n}')
         else if (op === 'stop-instances') emit('{\n    "StoppingInstances": [\n        { "InstanceId": "i-0abcd1234efgh5678", "CurrentState": { "Name": "stopping" } }\n    ]\n}')
         else if (op === 'describe-regions') emit('{\n    "Regions": [\n        { "RegionName": "us-east-1" },\n        { "RegionName": "us-west-2" },\n        { "RegionName": "eu-west-1" }\n    ]\n}')
-        else emit(`aws: ec2: simulated (${op || 'no subcommand'}) in ${region}`)
+        else emit(`aws: ec2: (${op || 'no subcommand'}) in ${region}`)
       }
       else if (svc === 's3') {
         if (op === 'ls') {
@@ -2880,16 +2911,16 @@ export function createLinuxShell(vm, opts = {}) {
         if (op === 'list-users') emit('{\n    "Users": [\n        { "UserName": "devops", "Arn": "arn:aws:iam::123456789012:user/devops" }\n    ]\n}')
         else if (op === 'get-user') emit('{\n    "User": { "UserName": "devops", "UserId": "AIDAEXAMPLE1234567890" }\n}')
         else if (op === 'list-roles') emit('{\n    "Roles": [\n        { "RoleName": "eks-node-role", "Arn": "arn:aws:iam::123456789012:role/eks-node-role" }\n    ]\n}')
-        else emit(`aws: iam: simulated (${op || 'no subcommand'})`)
+        else emit(`aws: iam: (${op || 'no subcommand'})`)
       }
       else if (svc === 'eks') {
         if (op === 'list-clusters') emit('{\n    "clusters": [\n        "prod-cluster"\n    ]\n}')
         else if (op === 'update-kubeconfig') emit(`Updated context arn:aws:eks:${region}:123456789012:cluster/${fv('--name') || 'prod-cluster'} in ~/.kube/config`)
         else if (op === 'describe-cluster') emit('{\n    "cluster": { "name": "prod-cluster", "status": "ACTIVE", "version": "1.29" }\n}')
-        else emit(`aws: eks: simulated (${op || 'no subcommand'})`)
+        else emit(`aws: eks: (${op || 'no subcommand'})`)
       }
       else if (svc === 'logs' && op === 'describe-log-groups') emit('{\n    "logGroups": [\n        { "logGroupName": "/aws/eks/prod-cluster/cluster" }\n    ]\n}')
-      else emit(`aws: ${svc}: simulated (${[op, ...pos.slice(2)].filter(Boolean).join(' ') || 'no subcommand'}) in ${region}`)
+      else emit(`aws: ${svc}: (${[op, ...pos.slice(2)].filter(Boolean).join(' ') || 'no subcommand'}) in ${region}`)
     }
     else if (lc === 'helm') {
       const sub = positional[0] || ''
@@ -2910,7 +2941,7 @@ export function createLinuxShell(vm, opts = {}) {
     }
     else if (['ansible', 'ansible-playbook', 'terraform', 'packer', 'vagrant'].includes(lc)) {
       if (lc === 'terraform' && positional[0] === 'version') emit('Terraform v1.7.4\non linux_amd64')
-      else emit(`${lc}: simulated (${positional.join(' ') || 'no args'})`)
+      else emit(`${lc}: (${positional.join(' ') || 'no args'})`)
     }
 
     /* =================== power =================== */
@@ -2948,7 +2979,15 @@ export function createLinuxShell(vm, opts = {}) {
     saveFile,
     readFile,
     syncVm: (nextVm) => {
-      if (nextVm) vmRef.current = nextVm
+      // Mutate the original vm object in place so closed-over `vm` references
+      // (lsblk, ip, etc.) see hardware changes from VMware/AWS consoles.
+      if (nextVm) {
+        Object.keys(vm).forEach((k) => {
+          if (!(k in nextVm)) delete vm[k]
+        })
+        Object.assign(vm, nextVm)
+        vmRef.current = vm
+      }
       getOrCreateGuestShared(vmRef.current, labSessionId)
     },
     pkgManager: () => pkgManager(vmRef.current),
@@ -2963,7 +3002,7 @@ export function createLinuxShell(vm, opts = {}) {
 }
 
 function buildHelp(isRhel) {
-  return `Simulated ${isRhel ? 'RHEL 9' : 'Ubuntu 22.04'} shell — backed by a real in-memory filesystem.
+  return `${isRhel ? 'RHEL 9' : 'Ubuntu 22.04'} shell — backed by a real in-memory filesystem.
   Files     ls (-l -a) cd pwd cat head tail echo (> >>) touch mkdir (-p) rm (-rf) cp (-r) mv
             find grep (-r -i -v -n) wc chmod chown ln -s stat file tree du df ln readlink
   Editors   vi / vim / nano  (open, edit, and SAVE files back to the filesystem)

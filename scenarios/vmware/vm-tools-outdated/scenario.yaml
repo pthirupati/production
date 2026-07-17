@@ -21,7 +21,7 @@ description: 'CONTEXT: A team operating VMware vSphere has raised a ticket for `
   All tools run locally — no paid APIs or external cloud calls are required.
 
 
-  SYMPTOM / STARTING STATE: VMware vCenter simulation. 8 VMs showing "VMware Tools: Outdated" status.
+  SYMPTOM / STARTING STATE: VMware vCenter. 8 VMs showing "VMware Tools: Outdated" status.
 
   Mix of Windows Server 2019 and Ubuntu 22.04 VMs.
 
@@ -57,7 +57,7 @@ objectives:
 - Update VMware Tools on a Windows VM using the automatic upgrade mechanism
 - Update VMware Tools on a Linux VM using open-vm-tools package manager
 - Verify all target VMs show "VMware Tools: OK (Current)" status
-initial_state: 'VMware vCenter simulation. 8 VMs showing "VMware Tools: Outdated" status.
+initial_state: 'VMware vCenter. 8 VMs showing "VMware Tools: Outdated" status.
 
   Mix of Windows Server 2019 and Ubuntu 22.04 VMs.
 
@@ -141,7 +141,7 @@ environment:
     os: FixitLab vSphere lab
     hostname: lab-primary
     ip: 127.0.0.1
-    specs: local offline simulation
+    specs: local offline lab environment
   pre_installed:
   - bash
   - coreutils

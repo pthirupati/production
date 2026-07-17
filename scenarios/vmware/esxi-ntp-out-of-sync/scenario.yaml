@@ -21,7 +21,7 @@ description: 'CONTEXT: A team operating VMware vSphere has raised a ticket for `
   All tools run locally — no paid APIs or external cloud calls are required.
 
 
-  SYMPTOM / STARTING STATE: VMware vCenter simulation. esxi-02 clock is 8 minutes ahead of UTC.
+  SYMPTOM / STARTING STATE: VMware vCenter. esxi-02 clock is 8 minutes ahead of UTC.
 
   NTP service is not configured or running on esxi-02.
 
@@ -56,7 +56,7 @@ objectives:
 - Configure the NTP service with reliable NTP servers
 - Enable and start the NTP service daemon (ntpd)
 - Verify clock synchronization and that the skew is under 1 second
-initial_state: 'VMware vCenter simulation. esxi-02 clock is 8 minutes ahead of UTC.
+initial_state: 'VMware vCenter. esxi-02 clock is 8 minutes ahead of UTC.
 
   NTP service is not configured or running on esxi-02.
 
@@ -140,7 +140,7 @@ environment:
     os: FixitLab vSphere lab
     hostname: lab-primary
     ip: 127.0.0.1
-    specs: local offline simulation
+    specs: local offline lab environment
   pre_installed:
   - bash
   - coreutils

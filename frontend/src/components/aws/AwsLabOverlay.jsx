@@ -45,7 +45,11 @@ export default function AwsLabOverlay({
     if (!sessionId) return undefined
     try { useAwsStore.getState().resetSimulation() } catch { /* ignore */ }
     try { useAwsStore.getState().armLabSync(sessionId) } catch { /* ignore */ }
-    return () => { try { useAwsStore.getState().disarmLabSync() } catch { /* ignore */ } }
+    try { useAwsStore.getState().setLabSessionId(sessionId) } catch { /* ignore */ }
+    return () => {
+      try { useAwsStore.getState().disarmLabSync() } catch { /* ignore */ }
+      try { useAwsStore.getState().setLabSessionId(null) } catch { /* ignore */ }
+    }
   }, [sessionId])
 
   return (

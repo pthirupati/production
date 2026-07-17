@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import { interviewsApi } from '../../api/interviews'
 import { adminApi } from '../../api/admin'
-import { useInterviewVoice, unlockSpeech, detectSpeechCapabilities } from '../../hooks/useInterviewVoice'
+import { useInterviewVoice, unlockSpeech, resumeSpeechSynthesis, detectSpeechCapabilities } from '../../hooks/useInterviewVoice'
 import {
   getMediaErrorMessage,
   isMediaDevicesSupported,
@@ -774,6 +774,26 @@ export default function InterviewRoom() {
     return () => clearInterval(iv)
   }, [started, preflight, micOn, cameraOn, roundId, navigate])
 
+  // Keep Chrome speechSynthesis from staying paused after awaits / tab blur.
+  useEffect(() => {
+    if (!started || preflight) return undefined
+    const tick = () => resumeSpeechSynthesis()
+    const iv = setInterval(tick, 3000)
+    const onVis = () => {
+      if (document.visibilityState === 'visible') {
+        unlockSpeech()
+        resumeSpeechSynthesis()
+      }
+    }
+    document.addEventListener('visibilitychange', onVis)
+    window.addEventListener('focus', onVis)
+    return () => {
+      clearInterval(iv)
+      document.removeEventListener('visibilitychange', onVis)
+      window.removeEventListener('focus', onVis)
+    }
+  }, [started, preflight])
+
   const beginInterview = async () => {
     if (!micOn || !cameraOn) {
       toast.error('Enable microphone and camera first')
@@ -807,8 +827,14 @@ export default function InterviewRoom() {
           startPracticalLabInline().catch(() => {})
         }
       }
+      // startRound() is async — the original click gesture is gone. Re-prime TTS
+      // immediately before the first spoken line or Chrome stays silent.
+      unlockSpeech()
+      resumeSpeechSynthesis()
       if (introText) await speakThenListen(introText, { autoListen: false, voiceId })
       if (firstQ?.content) {
+        unlockSpeech()
+        resumeSpeechSynthesis()
         await speakThenListen(firstQ.content, {
           autoListen: !isPracticalMessage(firstQ), voiceId,
         })
@@ -1073,6 +1099,10 @@ export default function InterviewRoom() {
       pauseQuestionMs: sp.pause_question_ms,
       pausePeriodMs: sp.pause_period_ms,
     } : {}
+    // Re-prime before every speak — long thinking delays / awaits drop the
+    // browser's user-gesture unlock and leave speechSynthesis paused.
+    unlockSpeech()
+    resumeSpeechSynthesis()
     const { spoken } = await speak(text, voiceId ?? round?.persona_voice_id, speechOpts) || {}
     if (spoken === false && !voiceUnavailableToastRef.current) {
       voiceUnavailableToastRef.current = true

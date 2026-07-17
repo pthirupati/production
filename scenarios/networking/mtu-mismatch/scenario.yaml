@@ -13,7 +13,7 @@ description: 'CONTEXT: A team operating network operations has raised a ticket f
   this incident. All tools run locally — no paid APIs or external cloud calls are required.
 
 
-  SYMPTOM / STARTING STATE: Simulated RHEL 9 server with a VPN tunnel. ping with small packets succeeds
+  SYMPTOM / STARTING STATE: RHEL 9 server with a VPN tunnel. ping with small packets succeeds
   but ping -s 1400 -M do to the remote end times out. Large file transfers hang indefinitely.
 
 
@@ -41,7 +41,7 @@ description: 'CONTEXT: A team operating network operations has raised a ticket f
 
   WHAT TO AVOID: Do not apply broad destructive changes, skip evidence gathering, or fake completion with
   marker files — the checker validates real system state.'
-initial_state: 'Simulated RHEL 9 server with a VPN tunnel. ping with small packets succeeds but ping -s
+initial_state: 'RHEL 9 server with a VPN tunnel. ping with small packets succeeds but ping -s
   1400 -M do to the remote end times out. Large file transfers hang indefinitely.
 
   '
@@ -131,7 +131,7 @@ environment:
     os: FixitLab network lab
     hostname: lab-primary
     ip: 127.0.0.1
-    specs: local offline simulation
+    specs: local offline lab environment
   pre_installed:
   - bash
   - coreutils

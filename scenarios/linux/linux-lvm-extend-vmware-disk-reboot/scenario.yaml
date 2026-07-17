@@ -13,7 +13,7 @@ description: 'CONTEXT: A team operating Linux administration has raised a ticket
   host for this incident. All tools run locally — no paid APIs or external cloud calls are required.
 
 
-  SYMPTOM / STARTING STATE: Simulated RHEL 9 server (web-prod-01), also present in the vCenter simulator.
+  SYMPTOM / STARTING STATE: RHEL 9 server (web-prod-01), also present in the vCenter console.
   /data
 
   is full (XFS on /dev/mapper/vgdata-lvdata, VG vgdata has 0 free extents). After you
@@ -21,7 +21,7 @@ description: 'CONTEXT: A team operating Linux administration has raised a ticket
   add a disk in VMware, a SCSI rescan will NOT reveal it — only a reboot will.
 
 
-  OBJECTIVE: Open the VMware simulator (toolbar link) and add a new Hard Disk to web-prod-01; Try a SCSI
+  OBJECTIVE: Open the VMware console (toolbar link) and add a new Hard Disk to web-prod-01; Try a SCSI
   rescan and observe the disk does NOT appear (the controller needs a re-enumeration); Reboot the server
   from the terminal so the kernel discovers /dev/sdc at boot. Acceptance criteria: the change is minimal
   and reversible, and success means `check.sh` exits successfully.
@@ -45,7 +45,7 @@ description: 'CONTEXT: A team operating Linux administration has raised a ticket
 
   WHAT TO AVOID: Do not apply broad destructive changes, skip evidence gathering, or fake completion with
   marker files — the checker validates real system state.'
-initial_state: 'Simulated RHEL 9 server (web-prod-01), also present in the vCenter simulator. /data
+initial_state: 'RHEL 9 server (web-prod-01), also present in the vCenter console. /data
 
   is full (XFS on /dev/mapper/vgdata-lvdata, VG vgdata has 0 free extents). After you
 
@@ -53,7 +53,7 @@ initial_state: 'Simulated RHEL 9 server (web-prod-01), also present in the vCent
 
   '
 objectives:
-- Open the VMware simulator (toolbar link) and add a new Hard Disk to web-prod-01
+- Open the VMware console (toolbar link) and add a new Hard Disk to web-prod-01
 - Try a SCSI rescan and observe the disk does NOT appear (the controller needs a re-enumeration)
 - Reboot the server from the terminal so the kernel discovers /dev/sdc at boot
 - After reboot, add /dev/sdc to LVM (pvcreate /dev/sdc; vgextend vgdata /dev/sdc)
@@ -125,7 +125,7 @@ tags:
 - linux
 linked_tutorial: linux-fundamentals
 what_you_will_learn:
-- Open the VMware simulator (toolbar link) and add a new Hard Disk to web-prod-01
+- Open the VMware console (toolbar link) and add a new Hard Disk to web-prod-01
 - Try a SCSI rescan and observe the disk does NOT appear (the controller needs a re-enumeration)
 - Reboot the server from the terminal so the kernel discovers /dev/sdc at boot
 - After reboot, add /dev/sdc to LVM (pvcreate /dev/sdc; vgextend vgdata /dev/sdc)
@@ -136,7 +136,7 @@ environment:
     os: FixitLab Linux practice server
     hostname: lab-primary
     ip: 127.0.0.1
-    specs: local offline simulation
+    specs: local offline lab environment
   pre_installed:
   - bash
   - coreutils

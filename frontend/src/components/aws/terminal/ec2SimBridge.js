@@ -22,10 +22,16 @@ function guestOsLabel(os) {
   return map[os] || os || 'Linux'
 }
 
+function resolveLiveInstance(instance, store) {
+  if (!store?.instances || !instance?.id) return instance
+  return store.instances.find((i) => i.id === instance.id) || instance
+}
+
 function instanceToVm(instance, store) {
-  const it = getInstanceType(instance.type)
-  const hostname = `ip-${(instance.privateIp || '172.31.14.52').replace(/\./g, '-')}`
-  const attached = (store?.volumes || []).filter((v) => v.attachedTo === instance.id)
+  const live = resolveLiveInstance(instance, store)
+  const it = getInstanceType(live.type)
+  const hostname = `ip-${(live.privateIp || '172.31.14.52').replace(/\./g, '-')}`
+  const attached = (store?.volumes || []).filter((v) => v.attachedTo === live.id)
   const rootVol = attached.find((v) => (v.device || '').includes('xvda') || (v.device || '').includes('sda')) || attached[0]
   const diskGb = rootVol?.size || 30
   const disks = attached.map((v, i) => ({
@@ -33,20 +39,32 @@ function instanceToVm(instance, store) {
     capacity_gb: v.size || 8,
     label: i === 0 ? 'Root volume' : `EBS volume ${i + 1}`,
     scsi_id: `0:${i}`,
+    device: v.device || (i === 0 ? '/dev/xvda' : `/dev/xvd${String.fromCharCode(98 + i)}`),
   }))
+  // Extra ENIs (beyond eth0) show as additional NICs when present on the instance.
+  const enis = live.networkInterfaces || []
+  const nics = [{ label: 'Eth0', mac_address: '02:00:00:00:00:01', connected: true }]
+  enis.slice(1).forEach((eni, idx) => {
+    nics.push({
+      label: `Eth${idx + 1}`,
+      mac_address: eni.macAddress || `02:00:00:00:00:${String(idx + 2).padStart(2, '0')}`,
+      connected: eni.status !== 'detached',
+      pending: false,
+    })
+  })
   return {
-    id: instance.id,
-    name: instance.name || instance.id,
+    id: live.id,
+    name: live.name || live.id,
     hostname,
-    ip: instance.privateIp || '172.31.14.52',
-    guest_os: guestOsLabel(instance.os),
-    guest_os_version: guestOsLabel(instance.os),
+    ip: live.privateIp || '172.31.14.52',
+    guest_os: guestOsLabel(live.os),
+    guest_os_version: guestOsLabel(live.os),
     disk_gb: diskGb,
     disks,
-    nics: [{ label: 'Eth0', mac_address: '02:00:00:00:00:01', connected: true }],
+    nics,
     memory_mb: Math.max(512, Math.round((it.memGiB || 1) * 1024)),
     cpu: it.vcpu || 1,
-    workload: resolveEc2Workload(instance),
+    workload: resolveEc2Workload(live),
   }
 }
 
@@ -59,9 +77,9 @@ function writeLines(onWrite, lines) {
  * @param {{ store?: object, user?: string, onExit?: () => void }} opts
  */
 export function createEc2SimShell(instance, opts = {}) {
+  const store = opts.store
   const workload = resolveEc2Workload(instance)
   const vm = instanceToVm(instance, store)
-  const store = opts.store
   const onExit = opts.onExit
 
   if (workload === 'windows') {
@@ -96,6 +114,14 @@ export function createEc2SimShell(instance, opts = {}) {
     region: instance.region,
   })
 
+  const syncHardwareFromStore = () => {
+    // EBS attach/detach and instance-type changes in the AWS console must appear
+    // on the next shell command — same host identity as a real EC2 guest.
+    if (typeof linux.syncVm === 'function') {
+      linux.syncVm(instanceToVm(instance, store))
+    }
+  }
+
   return {
     workload,
     workloadLabel: WORKLOAD_LABELS[workload] || WORKLOAD_LABELS.linux,
@@ -106,6 +132,8 @@ export function createEc2SimShell(instance, opts = {}) {
     run(rawLine, onWrite) {
       const line = rawLine.trim()
       if (!line) return
+
+      syncHardwareFromStore()
 
       // Keep AWS CLI in the EC2 context (linuxShell does not implement `aws`).
       if (line === 'aws' || line.startsWith('aws ')) {
@@ -138,4 +166,4 @@ export function createEc2SimShell(instance, opts = {}) {
   }
 }
 
-export { resolveEc2Workload, WORKLOAD_LABELS }
+export { resolveEc2Workload, WORKLOAD_LABELS, instanceToVm }

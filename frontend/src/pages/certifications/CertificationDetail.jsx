@@ -138,7 +138,7 @@ export default function CertificationDetail() {
     } catch (err) {
       const data = err?.response?.data
       if (data?.code === 'CERT_SUBSCRIPTION_REQUIRED') {
-        toast.error('Purchase cert track access to start the mock exam')
+        toast.error('Purchase cert track access to start the practice exam')
         navigate(data.payment_url || `/payment?cert=${slug}`)
       } else {
         toast.error(data?.error || 'Could not start the exam.')
@@ -241,7 +241,7 @@ export default function CertificationDetail() {
                 </span>
               ) : (
                 <button onClick={startExam} disabled={busy} className="btn-primary text-sm disabled:opacity-60">
-                  {busy ? 'Starting…' : 'Start timed mock exam'}
+                  {busy ? 'Starting…' : 'Start timed practice exam'}
                 </button>
               )}
             </div>

@@ -15,7 +15,7 @@ description: 'CONTEXT: A team operating VMware vSphere has raised a ticket for `
   via the GUI until the host is reconnected.
 
 
-  OBJECTIVE: Open the vCenter simulator from the Jira ticket and find the disconnected host; Reconnect
+  OBJECTIVE: Open the vCenter console from the Jira ticket and find the disconnected host; Reconnect
   esxi-01 to vCenter; Verify the host and cluster return to a healthy connected state. Acceptance criteria:
   the change is minimal and reversible, and success means `check.sh` exits successfully.
 
@@ -47,7 +47,7 @@ max_score: 100
 is_free: false
 dual_terminal: false
 objectives:
-- Open the vCenter simulator from the Jira ticket and find the disconnected host
+- Open the vCenter console from the Jira ticket and find the disconnected host
 - Reconnect esxi-01 to vCenter
 - Verify the host and cluster return to a healthy connected state
 initial_state: vCenter shows esxi-01.fixitlab.local as disconnected; its VMs are unmanageable via the
@@ -116,7 +116,7 @@ tags:
 - vmware
 linked_tutorial: vmware-fundamentals
 what_you_will_learn:
-- Open the vCenter simulator from the Jira ticket and find the disconnected host
+- Open the vCenter console from the Jira ticket and find the disconnected host
 - Reconnect esxi-01 to vCenter
 - Verify the host and cluster return to a healthy connected state
 environment:
@@ -125,7 +125,7 @@ environment:
     os: FixitLab vSphere lab
     hostname: lab-primary
     ip: 127.0.0.1
-    specs: local offline simulation
+    specs: local offline lab environment
   pre_installed:
   - bash
   - coreutils

@@ -357,8 +357,8 @@ export default function VmwareLabChrome({
       {panel === 'info' && (
         <SidePanel title="Lab information" onClose={() => setPanel(null)}>
           <div className="space-y-2 text-sm">
-            <p className="text-white font-semibold">{scenario.title || 'VMware simulation lab'}</p>
-            <p className="text-[#8fa5b8]">{scenario.description || 'Practice vSphere troubleshooting in a simulated environment.'}</p>
+            <p className="text-white font-semibold">{scenario.title || 'VMware lab'}</p>
+            <p className="text-[#8fa5b8]">{scenario.description || 'Practice vSphere troubleshooting in a hands-on lab environment.'}</p>
             {scenario.difficulty && (
               <p className="text-xs"><span className="text-[#8fa5b8]">Difficulty:</span> {scenario.difficulty}</p>
             )}

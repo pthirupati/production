@@ -12,7 +12,7 @@ description: 'CONTEXT: A team operating bare metal operations has raised a ticke
   for this incident. All tools run locally — no paid APIs or external cloud calls are required.
 
 
-  SYMPTOM / STARTING STATE: Simulated bare-metal RHEL host. mdadm reports /dev/md0 (RAID-1) as degraded:
+  SYMPTOM / STARTING STATE: bare-metal RHEL host. mdadm reports /dev/md0 (RAID-1) as degraded:
   one member is [F]/removed, the array is active on the remaining disk, and redundancy is lost.
 
 
@@ -39,7 +39,7 @@ description: 'CONTEXT: A team operating bare metal operations has raised a ticke
 
   WHAT TO AVOID: Do not apply broad destructive changes, skip evidence gathering, or fake completion with
   marker files — the checker validates real system state.'
-initial_state: 'Simulated bare-metal RHEL host. mdadm reports /dev/md0 (RAID-1) as degraded: one member
+initial_state: 'bare-metal RHEL host. mdadm reports /dev/md0 (RAID-1) as degraded: one member
   is [F]/removed, the array is active on the remaining disk, and redundancy is lost.'
 lab_mode: simulation
 simulation_type: baremetal
@@ -117,7 +117,7 @@ environment:
     os: FixitLab physical server lab
     hostname: lab-primary
     ip: 127.0.0.1
-    specs: local offline simulation
+    specs: local offline lab environment
   pre_installed:
   - baremetal
   - bash

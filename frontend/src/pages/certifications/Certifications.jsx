@@ -44,7 +44,7 @@ export default function Certifications() {
 
   usePageTitle(
     'Certification Prep Tracks',
-    'Objective-mapped, hands-on preparation for RHCSA and more — every exam objective backed by live break-fix labs and a timed mock exam.',
+    'Objective-mapped, hands-on preparation for RHCSA and more — every exam objective backed by live break-fix labs and a timed practice exam.',
   )
 
   useEffect(() => {
@@ -69,7 +69,7 @@ export default function Certifications() {
       <MarketingPageShell
         eyebrow="Get certified"
         title="Certification Prep Tracks"
-        subtitle="Each track maps every published exam objective to live, hands-on labs you already have access to — then a timed mock exam scores you the way the real one does."
+        subtitle="Each track maps every published exam objective to live, hands-on labs you already have access to — then a timed practice exam scores you the way the real one does."
       >
         <FixitPanel className="mb-8 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4" padding="p-5">
           <div className="flex items-start gap-3">
@@ -77,7 +77,7 @@ export default function Certifications() {
             <div>
               <h2 className="font-display font-semibold text-white">Objective-mapped, performance-based</h2>
               <p className="text-sm text-surface-400">
-                Track your progress per exam objective, then take a timed mock exam graded on real lab completion.
+                Track your progress per exam objective, then take a timed practice exam graded on real lab completion.
               </p>
             </div>
           </div>

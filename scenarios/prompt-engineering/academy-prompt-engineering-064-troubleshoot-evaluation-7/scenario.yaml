@@ -21,7 +21,7 @@ description: 'CONTEXT: A team operating prompt engineering has raised a ticket f
   host for this incident. All tools run locally — no paid APIs or external cloud calls are required.
 
 
-  SYMPTOM / STARTING STATE: A guided AI practice console opens in your browser. It is a rule-based simulator
+  SYMPTOM / STARTING STATE: A guided AI practice console opens in your browser. It is a rule-based tool responder
   (no real model, no API cost) that scores your prompt live. The LLM practice workspace is degraded. Prompt
   changes regress quietly. Recent changes may exist around prompt evaluation, but do not restart blindly
   — gather evidence first. Production alert: prompt changes regress quietly. You are on call for prompt-engineering
@@ -56,8 +56,7 @@ objectives:
 - 'The incident symptom is clear: prompt changes regress quietly'
 - Root cause is isolated with evidence, not guesswork
 - Service behavior returns to normal after the fix
-initial_state: A guided AI practice console opens in your browser. It is a rule-based
-  simulator (no real model, no API cost) that scores your prompt live.
+initial_state: A guided AI practice console opens in your browser. It is a rule-based tool responder (no real model, no API cost) that scores your prompt live.
 hints:
 - order: 1
   cost: 0
@@ -123,7 +122,7 @@ environment:
     os: FixitLab LLM practice workspace
     hostname: lab-primary
     ip: 127.0.0.1
-    specs: local offline simulation
+    specs: local offline lab environment
   pre_installed:
   - bash
   - coreutils

@@ -936,6 +936,18 @@ class InterviewRoundEndView(APIView):
 class InterviewRoundDetailView(APIView):
     permission_classes = [IsAuthenticated]
 
+    # Finished / abandoned rounds can be removed from a campaign. Live rounds
+    # (scheduled / in progress) must be cancelled at the campaign level first.
+    DELETABLE_STATUSES = (
+        "completed",
+        "passed",
+        "failed",
+        "abandoned",
+        "locked",
+        "schedulable",
+        "ready",
+    )
+
     def get(self, request, round_id):
         round_obj = get_object_or_404(
             InterviewRound.objects.prefetch_related("messages", "report").select_related("campaign"),
@@ -962,6 +974,32 @@ class InterviewRoundDetailView(APIView):
                 },
                 status=200,
             )
+
+    def delete(self, request, round_id):
+        round_obj = get_object_or_404(
+            InterviewRound.objects.select_related("campaign"),
+            id=round_id,
+            campaign__user=request.user,
+        )
+        if round_obj.status in ("in_progress", "scheduled"):
+            return Response(
+                {
+                    "error": (
+                        "Cannot delete a scheduled or in-progress round. "
+                        "Cancel the interview or finish the round first."
+                    ),
+                    "status": round_obj.status,
+                },
+                status=status.HTTP_409_CONFLICT,
+            )
+        if round_obj.status not in self.DELETABLE_STATUSES:
+            return Response(
+                {"error": f"Round cannot be deleted (status={round_obj.status})"},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        deleted_id = str(round_obj.id)
+        round_obj.delete()
+        return Response({"deleted": True, "id": deleted_id}, status=status.HTTP_200_OK)
 
 
 class InterviewRoundJoinView(APIView):

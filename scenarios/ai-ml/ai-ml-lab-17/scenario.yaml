@@ -13,7 +13,7 @@ description: 'CONTEXT: A team operating AI/ML workflows has raised a ticket for 
   required.
 
 
-  SYMPTOM / STARTING STATE: Hands-on ai-ml scenario: configure performance in a simulated environment.
+  SYMPTOM / STARTING STATE: Hands-on ai-ml scenario: configure performance on this host.
 
 
   OBJECTIVE: Understand the current failure mode affecting Configure ai-ml performance (lab 17); Restore
@@ -54,7 +54,7 @@ objectives:
 - Understand the current failure mode affecting Configure ai-ml performance (lab 17)
 - Restore expected service behavior with a minimal, documented change
 - Verify the fix holds under a realistic smoke test
-initial_state: 'Hands-on ai-ml scenario: configure performance in a simulated environment.'
+initial_state: 'Hands-on ai-ml scenario: configure performance on this host.'
 hints:
 - order: 1
   cost: 0
@@ -107,7 +107,7 @@ coding_spec:
   language: python
   entrypoint: solution.py
   kind: fix
-  instructions: 'Hands-on ai-ml scenario: configure performance in a simulated environment.'
+  instructions: 'Hands-on ai-ml scenario: configure performance on this host.'
   files:
   - path: solution.py
     content: "def solution():\n    raise NotImplementedError('Apply the fix')\n"
@@ -139,7 +139,7 @@ environment:
     os: FixitLab ML practice workspace
     hostname: lab-primary
     ip: 127.0.0.1
-    specs: local offline simulation
+    specs: local offline lab environment
   pre_installed:
   - ai ml
   - bash

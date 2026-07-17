@@ -124,7 +124,7 @@ environment:
     os: FixitLab GPU node
     hostname: gpu-node-01
     ip: 127.0.0.1
-    specs: local offline simulation (NVIDIA + AMD datacenter GPUs)
+    specs: local offline lab environment (NVIDIA + AMD datacenter GPUs)
   pre_installed:
   - bash
   - coreutils

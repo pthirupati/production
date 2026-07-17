@@ -13,7 +13,7 @@ description: 'CONTEXT: A team operating prompt engineering has raised a ticket f
 
 
   SYMPTOM / STARTING STATE: The guided AI practice console opens with a flagship JSON-extraction exercise.
-  Write a prompt that makes the simulator return clean JSON and nothing else. Rule-based and free.
+  Write a prompt that makes the tool responder return clean JSON and nothing else. Rule-based and free.
 
 
   OBJECTIVE: List the techniques that reliably produce parseable structured output; Write a prompt that
@@ -55,7 +55,7 @@ objectives:
 - Write a prompt that returns ONLY valid JSON matching a given schema
 - Pass the flagship exercise — a prompt that extracts fields into JSON with no extra prose
 initial_state: The guided AI practice console opens with a flagship JSON-extraction exercise. Write a
-  prompt that makes the simulator return clean JSON and nothing else. Rule-based and free.
+  prompt that makes the tool responder return clean JSON and nothing else. Rule-based and free.
 solution_explanation: 'Reliable structured output comes from four habits: (1) state the EXACT schema with
   field names and types; (2) show ONE example of the desired JSON; (3) explicitly forbid extra text ("Return
   ONLY the JSON, no prose, no markdown fences"); (4) optionally prefill the assistant turn with "{" so
@@ -214,7 +214,7 @@ environment:
     os: FixitLab LLM practice workspace
     hostname: lab-primary
     ip: 127.0.0.1
-    specs: local offline simulation
+    specs: local offline lab environment
   pre_installed:
   - bash
   - coreutils

@@ -12,7 +12,7 @@ description: 'CONTEXT: A team operating Kubernetes has raised a ticket for `Gate
   for this incident. All tools run locally — no paid APIs or external cloud calls are required.
 
 
-  SYMPTOM / STARTING STATE: Simulated Kubernetes cluster with Gateway API installed. A Gateway and HTTPRoute
+  SYMPTOM / STARTING STATE: Kubernetes cluster with Gateway API installed. A Gateway and HTTPRoute
   exist, but requests return 404 because the HTTPRoute does not correctly bind to the Gateway or target
   the backend Service.
 
@@ -92,7 +92,7 @@ hints:
 
 
     WHY: Kubernetes labs grade real cluster state.'
-initial_state: Simulated Kubernetes cluster with Gateway API installed. A Gateway and HTTPRoute exist,
+initial_state: Kubernetes cluster with Gateway API installed. A Gateway and HTTPRoute exist,
   but requests return 404 because the HTTPRoute does not correctly bind to the Gateway or target the backend
   Service.
 technology: kubernetes
@@ -116,7 +116,7 @@ environment:
     os: FixitLab Kubernetes cluster
     hostname: lab-primary
     ip: 127.0.0.1
-    specs: local offline simulation
+    specs: local offline lab environment
   pre_installed:
   - bash
   - coreutils

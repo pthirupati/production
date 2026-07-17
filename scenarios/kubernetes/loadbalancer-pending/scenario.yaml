@@ -12,7 +12,7 @@ description: 'CONTEXT: A team operating Kubernetes has raised a ticket for `Load
   for this incident. All tools run locally — no paid APIs or external cloud calls are required.
 
 
-  SYMPTOM / STARTING STATE: Simulated Kubernetes cluster without a cloud LoadBalancer controller. A Service
+  SYMPTOM / STARTING STATE: Kubernetes cluster without a cloud LoadBalancer controller. A Service
   of type LoadBalancer shows EXTERNAL-IP <pending> indefinitely and the app is unreachable externally.
 
 
@@ -91,7 +91,7 @@ hints:
 
 
     WHY: Kubernetes labs grade real cluster state.'
-initial_state: Simulated Kubernetes cluster without a cloud LoadBalancer controller. A Service of type
+initial_state: Kubernetes cluster without a cloud LoadBalancer controller. A Service of type
   LoadBalancer shows EXTERNAL-IP <pending> indefinitely and the app is unreachable externally.
 technology: kubernetes
 summary: Complete the loadbalancer service pending kubernetes lab and verify success with the checker
@@ -114,7 +114,7 @@ environment:
     os: FixitLab Kubernetes cluster
     hostname: lab-primary
     ip: 127.0.0.1
-    specs: local offline simulation
+    specs: local offline lab environment
   pre_installed:
   - bash
   - coreutils

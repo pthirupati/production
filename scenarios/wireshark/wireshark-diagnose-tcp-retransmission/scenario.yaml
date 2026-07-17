@@ -17,7 +17,7 @@ description: 'CONTEXT: A team operating packet analysis has raised a ticket for 
   server.
 
 
-  OBJECTIVE: Open the Wireshark simulator from the lab toolbar (toolbar -> Open Wireshark); Apply a display
+  OBJECTIVE: Open the Wireshark console from the lab toolbar (toolbar -> Open Wireshark); Apply a display
   filter that surfaces the TCP retransmissions and the RST on port 8080; Identify the packet where the
   server reset the connection (the TCP RST). Acceptance criteria: the change is minimal and reversible,
   and success means `check.sh` exits successfully.
@@ -51,7 +51,7 @@ max_score: 100
 is_free: true
 dual_terminal: false
 objectives:
-- Open the Wireshark simulator from the lab toolbar (toolbar -> Open Wireshark)
+- Open the Wireshark console from the lab toolbar (toolbar -> Open Wireshark)
 - Apply a display filter that surfaces the TCP retransmissions and the RST on port 8080
 - Identify the packet where the server reset the connection (the TCP RST)
 - Mark that RST packet, then run Check Solution
@@ -124,7 +124,7 @@ tags:
 - wireshark
 linked_tutorial: wireshark-fundamentals
 what_you_will_learn:
-- Open the Wireshark simulator from the lab toolbar (toolbar -> Open Wireshark)
+- Open the Wireshark console from the lab toolbar (toolbar -> Open Wireshark)
 - Apply a display filter that surfaces the TCP retransmissions and the RST on port 8080
 - Identify the packet where the server reset the connection (the TCP RST)
 - Mark that RST packet, then run Check Solution
@@ -134,7 +134,7 @@ environment:
     os: FixitLab capture lab
     hostname: lab-primary
     ip: 127.0.0.1
-    specs: local offline simulation
+    specs: local offline lab environment
   pre_installed:
   - bash
   - coreutils

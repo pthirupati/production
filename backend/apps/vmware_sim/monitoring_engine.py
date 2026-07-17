@@ -911,6 +911,11 @@ def get_state(session_id: str, scenario_slug: str = "") -> dict:
     state = copy.deepcopy(entry["state"])
     _merge_lab_hosts(state, session_id)
     _merge_bridge_workloads(state, session_id)
+    try:
+        from apps.labs.provisioner.simulation.server_identity import sync_monitoring_targets
+        sync_monitoring_targets(session_id, (state.get("prometheus") or {}).get("targets") or [])
+    except Exception:
+        pass
     graf = state["grafana"]
     prom = state["prometheus"]
     broken = state["broken"]

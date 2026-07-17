@@ -17,7 +17,7 @@ description: 'CONTEXT: A team operating service mesh has raised a ticket for `Ou
   is repaired.
 
 
-  ENVIRONMENT: You are working in FixitLab''s offline FixitLab practice environment. The architecture
+  ENVIRONMENT: You are working in FixitLab''s offline FixitLab lab environment. The architecture
   is a single lab-primary node exposing CLI and configuration files; treat it as the production host for
   this incident. All tools run locally — no paid APIs or external cloud calls are required.
 
@@ -113,7 +113,7 @@ hints:
 
     WHY: the grader validates real system state, not marker files — a fix only counts when the subsystem
     is actually healthy.'
-summary: Diagnose and resolve outlier detection ejecting healthy pods in the service-mesh simulation lab
+summary: Diagnose and resolve outlier detection ejecting healthy pods in the service-mesh lab
   and verify the healthy end state
 estimated_minutes: 25
 xp_reward: 100
@@ -136,7 +136,7 @@ environment:
     os: FixitLab service-mesh lab
     hostname: lab-primary
     ip: 127.0.0.1
-    specs: local offline simulation
+    specs: local offline lab environment
   pre_installed:
   - bash
   - coreutils

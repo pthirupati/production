@@ -17,16 +17,16 @@ const INFRA_TYPES = [
 ]
 
 const SIMULATION_TYPES = [
-  { value: 'generic', label: 'Normal Simulation (full RHEL — all tech)' },
-  { value: 'rhel', label: 'RHEL Linux Simulation' },
-  { value: 'kubernetes', label: 'Kubernetes Simulation' },
-  { value: 'gpu', label: 'GPU / NVIDIA Simulation' },
+  { value: 'generic', label: 'Normal lab environment (full RHEL — all tech)' },
+  { value: 'rhel', label: 'RHEL Linux lab' },
+  { value: 'kubernetes', label: 'Kubernetes lab' },
+  { value: 'gpu', label: 'GPU / NVIDIA lab' },
   { value: 'baremetal', label: 'Bare Metal / IPMI / VMware' },
-  { value: 'database', label: 'Database Simulation' },
-  { value: 'ansible', label: 'Ansible Simulation' },
-  { value: 'ansible-awx', label: 'Ansible AWX / Tower Simulation' },
-  { value: 'terraform', label: 'Terraform / AWS CLI Simulation' },
-  { value: 'python', label: 'Python Simulation' },
+  { value: 'database', label: 'Database lab' },
+  { value: 'ansible', label: 'Ansible lab' },
+  { value: 'ansible-awx', label: 'Ansible AWX / Tower lab' },
+  { value: 'terraform', label: 'Terraform / AWS CLI lab' },
+  { value: 'python', label: 'Python lab' },
 ]
 
 /** Map legacy DB values to unified admin options */
@@ -40,7 +40,7 @@ const normalizeSimType = (t) => {
 
 const LAB_MODES = [
   { value: 'docker', label: 'Docker Container', infra: 'docker' },
-  { value: 'simulation', label: 'Simulation (unified RHEL engine)', infra: null },
+  { value: 'simulation', label: 'Lab environment (unified RHEL engine)', infra: null },
   { value: 'aws_ec2', label: 'AWS EC2 Instance', infra: 'aws_ec2' },
   { value: 'digitalocean', label: 'DigitalOcean Droplet', infra: 'digitalocean' },
 ]
@@ -291,7 +291,7 @@ export default function AdminScenarios() {
                   {INFRA_TYPES.map(t => <option key={t.value} value={t.value}>{t.label}</option>)}
                 </select>
                 {form.lab_mode === 'simulation' && (
-                  <p className="text-xs text-accent-cyan mt-1">Simulation mode — no Docker/AWS/DO required</p>
+                  <p className="text-xs text-accent-cyan mt-1">Lab environment mode — no Docker/AWS/DO required</p>
                 )}
               </div>
               <div>
@@ -316,7 +316,7 @@ export default function AdminScenarios() {
                 )}
               </div>
               <div>
-                <label className="block text-xs text-surface-400 mb-1 uppercase tracking-wider">Simulation persona</label>
+                <label className="block text-xs text-surface-400 mb-1 uppercase tracking-wider">Lab persona</label>
                 <select value={form.simulation_type} onChange={(e) => setForm(f => ({ ...f, lab_mode: 'simulation', simulation_type: e.target.value }))} className="input-field" disabled={form.lab_mode !== 'simulation'}>
                   {SIMULATION_TYPES.map(t => <option key={t.value} value={t.value}>{t.label}</option>)}
                 </select>
@@ -567,7 +567,7 @@ export default function AdminScenarios() {
                       s.infrastructure_type === 'digitalocean' ? 'bg-blue-500/10 text-blue-400 border border-blue-500/20' :
                       'bg-surface-700 text-surface-400'
                     }`}>{
-                      s.lab_mode === 'simulation' ? `Sim/${s.simulation_type || 'generic'}` :
+                      s.lab_mode === 'simulation' ? `Lab/${s.simulation_type || 'generic'}` :
                       s.infrastructure_type === 'aws_ec2' ? 'EC2' :
                       s.infrastructure_type === 'digitalocean' ? 'DO' : 'Docker'
                     }</span>

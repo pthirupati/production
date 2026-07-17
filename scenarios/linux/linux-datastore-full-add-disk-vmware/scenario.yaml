@@ -13,7 +13,7 @@ description: 'CONTEXT: A team operating Linux administration has raised a ticket
   host for this incident. All tools run locally — no paid APIs or external cloud calls are required.
 
 
-  SYMPTOM / STARTING STATE: Simulated RHEL 9 server (web-prod-01), also present in the vCenter simulator.
+  SYMPTOM / STARTING STATE: RHEL 9 server (web-prod-01), also present in the vCenter console.
   /data
 
   is a full XFS filesystem on /dev/mapper/vgdata-lvdata; vgdata has 0 free extents and
@@ -21,7 +21,7 @@ description: 'CONTEXT: A team operating Linux administration has raised a ticket
   no spare disk is attached. /var/lib/docker lives on /data.
 
 
-  OBJECTIVE: Open the VMware simulator (toolbar link) and add a new Hard Disk to web-prod-01; Rescan the
+  OBJECTIVE: Open the VMware console (toolbar link) and add a new Hard Disk to web-prod-01; Rescan the
   SCSI bus in the terminal so /dev/sdc is discovered; Add the disk to LVM (pvcreate /dev/sdc; vgextend
   vgdata /dev/sdc). Acceptance criteria: the change is minimal and reversible, and success means `check.sh`
   exits successfully.
@@ -45,7 +45,7 @@ description: 'CONTEXT: A team operating Linux administration has raised a ticket
 
   WHAT TO AVOID: Do not apply broad destructive changes, skip evidence gathering, or fake completion with
   marker files — the checker validates real system state.'
-initial_state: 'Simulated RHEL 9 server (web-prod-01), also present in the vCenter simulator. /data
+initial_state: 'RHEL 9 server (web-prod-01), also present in the vCenter console. /data
 
   is a full XFS filesystem on /dev/mapper/vgdata-lvdata; vgdata has 0 free extents and
 
@@ -53,7 +53,7 @@ initial_state: 'Simulated RHEL 9 server (web-prod-01), also present in the vCent
 
   '
 objectives:
-- Open the VMware simulator (toolbar link) and add a new Hard Disk to web-prod-01
+- Open the VMware console (toolbar link) and add a new Hard Disk to web-prod-01
 - Rescan the SCSI bus in the terminal so /dev/sdc is discovered
 - Add the disk to LVM (pvcreate /dev/sdc; vgextend vgdata /dev/sdc)
 - Extend the data LV and filesystem (lvextend -r -l +100%FREE /dev/vgdata/lvdata)
@@ -125,7 +125,7 @@ tags:
 - linux
 linked_tutorial: linux-fundamentals
 what_you_will_learn:
-- Open the VMware simulator (toolbar link) and add a new Hard Disk to web-prod-01
+- Open the VMware console (toolbar link) and add a new Hard Disk to web-prod-01
 - Rescan the SCSI bus in the terminal so /dev/sdc is discovered
 - Add the disk to LVM (pvcreate /dev/sdc; vgextend vgdata /dev/sdc)
 - Extend the data LV and filesystem (lvextend -r -l +100%FREE /dev/vgdata/lvdata)
@@ -136,7 +136,7 @@ environment:
     os: FixitLab Linux practice server
     hostname: lab-primary
     ip: 127.0.0.1
-    specs: local offline simulation
+    specs: local offline lab environment
   pre_installed:
   - bash
   - coreutils

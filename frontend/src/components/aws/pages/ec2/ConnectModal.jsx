@@ -5,6 +5,8 @@ import Ec2RdpSession from './Ec2RdpSession'
 import { defaultUser } from '../../terminal/vfs'
 import { resolveEc2Workload, workloadHint } from '../../terminal/ec2Workload'
 import { publicDns } from '../../lib/ids'
+import { useAwsStore } from '../../store/awsStore'
+import { instanceAllowsInbound } from '../../terminal/sgReachability'
 
 export default function ConnectModal({ instance, onClose }) {
   const workload = resolveEc2Workload(instance)
@@ -14,10 +16,15 @@ export default function ConnectModal({ instance, onClose }) {
   const [tab, setTab] = useState(isWindows ? 'rdp' : 'eic')
   const [connected, setConnected] = useState(false)
   const [user, setUser] = useState(defaultUser(instance.os))
+  const store = useAwsStore.getState()
   const dns = instance.publicIp ? publicDns(instance.publicIp, instance.region) : `${instance.privateIp} (private)`
   const sshHost = instance.publicIp ? publicDns(instance.publicIp, instance.region) : instance.privateIp
   const sshCommand = `ssh -i "${instance.keyName || 'my-key'}.pem" ${user}@${sshHost}`
-  const canConnect = instance.state === 'running'
+  const port = isWindows ? 3389 : 22
+  const sgOpen = instanceAllowsInbound(store, instance, port, 'TCP')
+  // Session Manager does not need inbound SSH/RDP — match real AWS.
+  const needsInbound = tab !== 'ssm' && tab !== 'serial'
+  const canConnect = instance.state === 'running' && (!needsInbound || sgOpen)
   const useRdpDesktop = isWindows && tab === 'rdp'
 
   if (connected && useRdpDesktop) {
@@ -58,7 +65,11 @@ export default function ConnectModal({ instance, onClose }) {
       <div style={{ marginTop: 16 }}>
         {!canConnect && (
           <div className="aws-flash aws-flash-warning" style={{ marginBottom: 12 }}>
-            Instance state is <strong>{instance.state}</strong>. Start the instance before opening a browser terminal.
+            {instance.state !== 'running' ? (
+              <>Instance state is <strong>{instance.state}</strong>. Start the instance before opening a browser terminal.</>
+            ) : (
+              <>Security group does not allow inbound TCP/{port} from 0.0.0.0/0. Add an SSH/RDP rule, or use Session Manager.</>
+            )}
           </div>
         )}
         {tab === 'eic' && (
@@ -76,7 +87,7 @@ export default function ConnectModal({ instance, onClose }) {
             </div>
             <label className="aws-label">User name</label>
             <input className="aws-input" value={user} onChange={(e) => setUser(e.target.value)} />
-            <div className="aws-hint">Suggested user for {instance.os}: {defaultUser(instance.os)}. This simulation creates the matching home directory and prompt.</div>
+            <div className="aws-hint">Suggested user for {instance.os}: {defaultUser(instance.os)}. This lab creates the matching home directory and prompt.</div>
             <div className="aws-hint" style={{ marginTop: 8 }}><strong>Lab engine:</strong> {workloadHint(workload)}</div>
           </div>
         )}
@@ -107,7 +118,7 @@ export default function ConnectModal({ instance, onClose }) {
           <div style={{ color: 'var(--aws-text-secondary)', lineHeight: 1.6 }}>
             <p>EC2 Serial Console connects to the instance serial port for boot and network troubleshooting.</p>
             <div className="aws-card" style={{ marginTop: 12 }}>
-              <div><strong>Serial console access:</strong> Enabled in simulation</div>
+              <div><strong>Serial console access:</strong> Enabled for this lab</div>
               <div><strong>Port:</strong> ttyS0</div>
               <div><strong>Login user:</strong> {user}</div>
             </div>

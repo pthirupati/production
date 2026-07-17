@@ -49,6 +49,19 @@ class TeamMentionTests(SimpleTestCase):
         actions = resolve_team_actions(text, teams, "sim-rhel-network-nic")
         self.assertEqual(actions[0][1], "network_nic_added")
 
+    def test_network_configure_eth1(self):
+        text = "@network team configure eth1"
+        teams = parse_team_mentions(text)
+        actions = resolve_team_actions(text, teams, "linux-nic-add-vmware-rescan")
+        self.assertEqual(actions[0][1], "network_nic_added")
+
+    def test_security_approve_firewall(self):
+        text = "@security team approve firewall change"
+        teams = parse_team_mentions(text)
+        self.assertIn("security", teams)
+        actions = resolve_team_actions(text, teams, "sim-rhel-firewall")
+        self.assertEqual(actions[0][1], "security_approved")
+
     def test_mount_failure_reply(self):
         from apps.jira_integration.team_bots import build_mount_failure_reply
 
@@ -204,3 +217,25 @@ class TeamReplyDeliveryTests(TestCase):
         self.session.refresh_from_db()
         self.assertFalse(bool(self.session.simulation_snapshot))
         shell_mod._SIM_SESSIONS.clear()
+
+
+class CoachHelpRequestTests(SimpleTestCase):
+    def test_help_phrases_detected(self):
+        self.assertTrue(team_bots.is_help_request("I'm stuck — need a hint"))
+        self.assertTrue(team_bots.is_help_request("where do I start?"))
+        self.assertFalse(team_bots.is_help_request("@backup team please take backup"))
+
+    def test_coach_reply_includes_collaboration(self):
+        class FakeTicket:
+            description = (
+                "## Incident\n\n### Acceptance criteria (definition of done)\n"
+                "- Quarantine the host\n- Close the alert\n\n"
+                "### Lab tools for this scenario\n- **Lab terminal**\n- **SOC console**\n"
+            )
+            scenario = None
+
+        author, msg = team_bots.build_coach_reply(FakeTicket())
+        self.assertEqual(author, "Change Management Bot")
+        self.assertIn("Acceptance criteria", msg)
+        self.assertIn("@security team", msg)
+        self.assertIn("SOC console", msg)

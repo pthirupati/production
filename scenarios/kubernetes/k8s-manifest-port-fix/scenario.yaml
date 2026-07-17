@@ -20,7 +20,7 @@ description: 'CONTEXT: A team operating Kubernetes has raised a ticket for `Fix 
   for this incident. All tools run locally — no paid APIs or external cloud calls are required.
 
 
-  SYMPTOM / STARTING STATE: Simulated Kubernetes cluster. A Service routes to healthy pods, but its targetPort
+  SYMPTOM / STARTING STATE: Kubernetes cluster. A Service routes to healthy pods, but its targetPort
   (e.g. 8080) doesn''t match the container''s listening port (e.g. 80), so requests are refused.
 
 
@@ -51,7 +51,7 @@ objectives:
 - Confirm the pods are Ready but Service requests are refused
 - Compare the Service targetPort with the container's listening port
 - Fix the targetPort so the Service reaches the application
-initial_state: Simulated Kubernetes cluster. A Service routes to healthy pods, but its targetPort (e.g.
+initial_state: Kubernetes cluster. A Service routes to healthy pods, but its targetPort (e.g.
   8080) doesn't match the container's listening port (e.g. 80), so requests are refused.
 hints:
 - order: 1
@@ -117,7 +117,7 @@ environment:
     os: FixitLab Kubernetes cluster
     hostname: lab-primary
     ip: 127.0.0.1
-    specs: local offline simulation
+    specs: local offline lab environment
   pre_installed:
   - bash
   - coreutils

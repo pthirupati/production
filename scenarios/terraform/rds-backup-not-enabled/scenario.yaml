@@ -12,7 +12,7 @@ description: 'CONTEXT: A team operating Terraform IaC has raised a ticket for `R
   for this incident. All tools run locally — no paid APIs or external cloud calls are required.
 
 
-  SYMPTOM / STARTING STATE: Simulated AWS environment with an RDS MySQL instance where BackupRetentionPeriod
+  SYMPTOM / STARTING STATE: AWS environment with an RDS MySQL instance where BackupRetentionPeriod
   is 0. No automated snapshots are being taken, leaving the database unprotected against accidental data
   loss or corruption.
 
@@ -41,7 +41,7 @@ description: 'CONTEXT: A team operating Terraform IaC has raised a ticket for `R
 
   WHAT TO AVOID: Do not apply broad destructive changes, skip evidence gathering, or fake completion with
   marker files — the checker validates real system state.'
-initial_state: Simulated AWS environment with an RDS MySQL instance where BackupRetentionPeriod is 0.
+initial_state: AWS environment with an RDS MySQL instance where BackupRetentionPeriod is 0.
   No automated snapshots are being taken, leaving the database unprotected against accidental data loss
   or corruption.
 objectives:
@@ -129,7 +129,7 @@ environment:
     os: FixitLab Terraform workspace
     hostname: lab-primary
     ip: 127.0.0.1
-    specs: local offline simulation
+    specs: local offline lab environment
   pre_installed:
   - bash
   - coreutils

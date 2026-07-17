@@ -8,7 +8,7 @@ const HOME_HTML = {
     <div style={{ fontFamily: 'Segoe UI, system-ui, sans-serif', padding: 32, maxWidth: 720, margin: '0 auto' }}>
       <h1 style={{ fontSize: 28, fontWeight: 600, color: '#1b1b1b', marginBottom: 8 }}>FixitLab Lab Environment</h1>
       <p style={{ color: '#444', lineHeight: 1.6, marginBottom: 16 }}>
-        This Microsoft Edge session runs inside the Windows Server 2022 simulation. Use it to browse lab documentation,
+        This Microsoft Edge session runs inside the Windows Server 2022 lab. Use it to browse lab documentation,
         internal portals, and certificate endpoints configured in your scenario.
       </p>
       <div style={{ display: 'grid', gap: 12 }}>
@@ -76,7 +76,7 @@ export default function Edge() {
       <div style={{ padding: 32, textAlign: 'center', color: '#666' }}>
         <div style={{ fontSize: 48, marginBottom: 12 }}>🌐</div>
         <div style={{ fontWeight: 600, marginBottom: 8 }}>{url}</div>
-        <p style={{ fontSize: 13 }}>Simulated page — external sites are not fetched in the lab sandbox.</p>
+        <p style={{ fontSize: 13 }}>Lab page — external sites are not fetched in the lab sandbox.</p>
       </div>
     ),
   }

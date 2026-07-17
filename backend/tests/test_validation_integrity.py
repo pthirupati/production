@@ -9,6 +9,7 @@ from django.test import TestCase
 from apps.labs.provisioner.simulation.rhel_os import RHELOSState
 from apps.labs.provisioner.simulation.rhel_shell import RHELShell
 from apps.labs.provisioner.simulation.validation import (
+    CANONICAL_ANSIBLE_CHECK,
     CANONICAL_GPU_CHECK,
     CANONICAL_GRUB_CHECK,
     CANONICAL_TERRAFORM_CHECK,
@@ -26,6 +27,37 @@ class ValidationIntegrityTests(TestCase):
         """State after the scenario's broken preset has been applied (real path)."""
         shell = RHELShell(scenario_slug=slug)
         return shell.state
+
+    def test_ansible_fails_without_engine(self):
+        """Ansible ping must not auto-pass when the lab engine is missing."""
+        state = RHELOSState("academy-ansible-001-learn-inventory")
+        state.scenario_slug = "academy-ansible-001-learn-inventory"
+        ok, msg = validate_simulation_state(state, CANONICAL_ANSIBLE_CHECK, engine=None)
+        self.assertFalse(ok, f"ansible auto-passed without engine: {msg}")
+
+    def test_ansible_fails_until_ssh_keys_distributed(self):
+        from apps.labs.provisioner.simulation.unified_sim import UnifiedSimulationEngine
+        engine = UnifiedSimulationEngine(
+            scenario_slug="academy-ansible-001-learn-inventory",
+            simulation_type="ansible",
+        )
+        ok, _ = validate_simulation_state(engine.state, CANONICAL_ANSIBLE_CHECK, engine=engine)
+        self.assertFalse(ok, "ansible passed before ssh-copy-id")
+        engine._ssh_key_fixed = True
+        ok, msg = validate_simulation_state(engine.state, CANONICAL_ANSIBLE_CHECK, engine=engine)
+        self.assertTrue(ok, msg)
+
+    def test_gpu_identity_facet(self):
+        from apps.labs.provisioner.simulation import server_identity as si
+        sid = "gpu-identity-test"
+        si.drop_session(sid)
+        self.addCleanup(si.drop_session, sid)
+        node = si.seed_gpu_node(sid, healthy=False)
+        self.assertEqual(node["gpu"]["health"], "failed")
+        si.set_gpu(sid, node["id"], driver_loaded=True, health="healthy", source="test")
+        again = si.get_server(sid, node["id"])
+        self.assertEqual(again["gpu"]["health"], "healthy")
+        self.assertTrue(again["gpu"]["driver_loaded"])
 
     def test_trivial_scripts_never_pass(self):
         for script in ("", "exit 0", "#!/bin/bash\n# todo\nexit 0", "true\n:", None):

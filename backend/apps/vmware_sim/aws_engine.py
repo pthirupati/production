@@ -538,6 +538,46 @@ def apply_action(session_id: str, action: str, payload: dict | None = None) -> d
         _save(session_id, entry)
         return {"ok": True, "message": "CreateTags succeeded"}
 
+    # ── EBS volume attach (also used by the bridge_attach_volume API action) ──
+    if action == "attach_volume":
+        vol_id = payload.get("volume_id") or payload.get("id")
+        inst_id = payload.get("instance_id") or payload.get("instance") or ""
+        device = payload.get("device") or "/dev/sdf"
+        inst = _find_instance(state, inst_id) if inst_id else None
+        vol = next((v for v in state.get("volumes", []) if v.get("id") == vol_id), None)
+        if vol is None:
+            vol = {
+                "id": vol_id or new_volume_id(), "region": region,
+                "size": int(payload.get("size_gb") or 20), "type": payload.get("volume_type") or "gp3",
+                "state": "available", "az": (inst or {}).get("az") or f"{region}a",
+                "encrypted": bool(payload.get("encrypted")), "attachedTo": None, "device": None,
+                "created": _now_iso(),
+            }
+            state.setdefault("volumes", []).append(vol)
+        vol["state"] = "in-use"
+        vol["attachedTo"] = inst_id or vol.get("attachedTo")
+        vol["device"] = device
+        _event(state, f"Volume {vol['id']} attached to {inst_id or 'instance'} at {device}", "success")
+        _save(session_id, entry)
+        return {"ok": True, "message": "AttachVolume succeeded", "volume_id": vol["id"], "device": device}
+
+    # ── EBS volume detach (also used by the bridge_detach_volume API action) ──
+    if action == "detach_volume":
+        vol_id = payload.get("volume_id") or payload.get("id")
+        vol = next((v for v in state.get("volumes", []) if v.get("id") == vol_id), None)
+        if not vol:
+            return {"ok": False, "error": f"The volume '{vol_id}' does not exist."}
+        inst = _find_instance(state, vol.get("attachedTo")) if vol.get("attachedTo") else None
+        if inst and inst.get("rootVolume") == vol_id and inst.get("state") != "terminated":
+            return {"ok": False, "error": f"'{vol_id}' is the root device and cannot be detached while the instance is running"}
+        device = vol.get("device")
+        vol["state"] = "available"
+        vol["attachedTo"] = None
+        vol["device"] = None
+        _event(state, f"Volume {vol_id} detached", "info")
+        _save(session_id, entry)
+        return {"ok": True, "message": "DetachVolume succeeded", "volume_id": vol_id, "device": device}
+
     # ── Security group ingress/egress rules ───────────────────────────────────
     if action in ("add_sg_rule", "remove_sg_rule"):
         sg_ident = payload.get("group_id") or payload.get("group_name") or payload.get("sg")

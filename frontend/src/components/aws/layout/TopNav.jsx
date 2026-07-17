@@ -96,7 +96,7 @@ export default function TopNav({ onToggleSidebar, onToggleCloudShell }) {
   const navigate = useNavigate()
   const region = useAwsStore((s) => s.region)
   const setRegion = useAwsStore((s) => s.setRegion)
-  const account = useAwsStore((s) => s.account) || { id: '123456789012', alias: 'my-aws-simulation', email: 'admin@example.com' }
+  const account = useAwsStore((s) => s.account) || { id: '123456789012', alias: 'my-aws-lab', email: 'admin@example.com' }
   const darkMode = useAwsStore((s) => s.darkMode)
   const toggleDark = useAwsStore((s) => s.toggleDarkMode)
   const alarms = useAwsStore((s) => s.cwAlarms) || []
@@ -193,8 +193,8 @@ export default function TopNav({ onToggleSidebar, onToggleCloudShell }) {
 
   const notifications = [
     ...alarms.filter((a) => a.state === 'ALARM').map((a) => ({ type: 'error', title: `Alarm: ${a.name}`, body: `${a.metric} ${a.threshold}` })),
-    { type: 'success', title: 'Welcome to the AWS console simulation', body: 'Explore services, launch resources, and complete guided labs.' },
-    { type: 'info', title: 'Free tier usage', body: 'You are within the simulated Free Tier limits this month.' },
+    { type: 'success', title: 'Welcome to the AWS Management Console', body: 'Explore services, launch resources, and complete guided labs.' },
+    { type: 'info', title: 'Free tier usage', body: 'You are within Free Tier limits this month.' },
   ]
   const notifIcon = { error: AlertTriangle, success: CheckCircle2, info: Info }
 

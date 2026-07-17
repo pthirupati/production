@@ -20,7 +20,7 @@ description: 'CONTEXT: A team operating prompt engineering has raised a ticket f
   host for this incident. All tools run locally — no paid APIs or external cloud calls are required.
 
 
-  SYMPTOM / STARTING STATE: A guided AI practice console opens in your browser. It is a rule-based simulator
+  SYMPTOM / STARTING STATE: A guided AI practice console opens in your browser. It is a rule-based tool responder
   (no real model, no API cost) that scores your prompt live. A feature fix works in dev, but tool use
   is not production ready — missing guardrails, runbooks, or capacity checks. Production readiness for
   tool use. Harden, document, and validate function calling and schemas so the change is safe to run during
@@ -54,8 +54,7 @@ objectives:
 - Day-2 tool use work completes safely in this environment
 - Changes are verified with before/after checks
 - The system remains stable for dependent teams
-initial_state: A guided AI practice console opens in your browser. It is a rule-based
-  simulator (no real model, no API cost) that scores your prompt live.
+initial_state: A guided AI practice console opens in your browser. It is a rule-based tool responder (no real model, no API cost) that scores your prompt live.
 hints:
 - order: 1
   cost: 0
@@ -121,7 +120,7 @@ environment:
     os: FixitLab LLM practice workspace
     hostname: lab-primary
     ip: 127.0.0.1
-    specs: local offline simulation
+    specs: local offline lab environment
   pre_installed:
   - bash
   - coreutils

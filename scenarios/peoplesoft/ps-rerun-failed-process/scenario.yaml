@@ -17,7 +17,7 @@ description: 'CONTEXT: A team operating PeopleSoft administration has raised a t
   1009) is sitting in Error in Process Monitor.
 
 
-  OBJECTIVE: Open the PeopleSoft (PIA) simulator from the lab toolbar; Navigate to PeopleTools > Process
+  OBJECTIVE: Open the PeopleSoft (PIA) console from the lab toolbar; Navigate to PeopleTools > Process
   Scheduler > Process Monitor; Find the GL_JOURNAL_POST run (instance 1009) that ended in Error. Acceptance
   criteria: the change is minimal and reversible, and success means `check.sh` exits successfully.
 
@@ -50,7 +50,7 @@ max_score: 100
 is_free: true
 dual_terminal: false
 objectives:
-- Open the PeopleSoft (PIA) simulator from the lab toolbar
+- Open the PeopleSoft (PIA) console from the lab toolbar
 - Navigate to PeopleTools > Process Scheduler > Process Monitor
 - Find the GL_JOURNAL_POST run (instance 1009) that ended in Error
 - Rerun the process so its Run Status shows Success
@@ -123,7 +123,7 @@ tags:
 - peoplesoft
 linked_tutorial: peoplesoft-fundamentals
 what_you_will_learn:
-- Open the PeopleSoft (PIA) simulator from the lab toolbar
+- Open the PeopleSoft (PIA) console from the lab toolbar
 - Navigate to PeopleTools > Process Scheduler > Process Monitor
 - Find the GL_JOURNAL_POST run (instance 1009) that ended in Error
 - Rerun the process so its Run Status shows Success
@@ -133,7 +133,7 @@ environment:
     os: FixitLab PeopleSoft app server lab
     hostname: lab-primary
     ip: 127.0.0.1
-    specs: local offline simulation
+    specs: local offline lab environment
   pre_installed:
   - bash
   - coreutils

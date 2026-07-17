@@ -21,7 +21,7 @@ description: 'CONTEXT: A team operating VMware vSphere has raised a ticket for `
   All tools run locally — no paid APIs or external cloud calls are required.
 
 
-  SYMPTOM / STARTING STATE: VMware vCenter simulation. test-lab-07 shows a question/warning badge in vCenter.
+  SYMPTOM / STARTING STATE: VMware vCenter. test-lab-07 shows a question/warning badge in vCenter.
 
   The VM cannot be powered on or migrated. A question dialog is blocking operations.
 
@@ -57,7 +57,7 @@ objectives:
 - Answer the question appropriately (Yes to keep UUID or No to generate a new one)
 - Verify the VM can be powered on after answering the question
 - Document why this happens and how to prevent it during VM cloning
-initial_state: 'VMware vCenter simulation. test-lab-07 shows a question/warning badge in vCenter.
+initial_state: 'VMware vCenter. test-lab-07 shows a question/warning badge in vCenter.
 
   The VM cannot be powered on or migrated. A question dialog is blocking operations.
 
@@ -141,7 +141,7 @@ environment:
     os: FixitLab vSphere lab
     hostname: lab-primary
     ip: 127.0.0.1
-    specs: local offline simulation
+    specs: local offline lab environment
   pre_installed:
   - bash
   - coreutils

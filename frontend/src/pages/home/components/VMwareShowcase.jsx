@@ -9,11 +9,11 @@ const HOSTS = [
 
 export default function VMwareShowcase({ demoHref = '/vmware-sim' }) {
   return (
-    <Link to={demoHref} className="fx-vmware-showcase-wrap block no-underline group" aria-label="Open VMware simulator demo">
+    <Link to={demoHref} className="fx-vmware-showcase-wrap block no-underline group" aria-label="Open vCenter">
       <div className="fx-vmware-showcase-glow" aria-hidden="true" />
       <div className="fx-vmware-showcase relative">
         <div className="absolute top-3 right-3 z-10 flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-black/50 border border-white/15 text-[10px] font-semibold text-white/90 group-hover:bg-[#2a6ab5]/90 transition-colors">
-          <Play size={10} fill="currentColor" stroke="none" /> Open simulator
+          <Play size={10} fill="currentColor" stroke="none" /> Open vCenter
         </div>
         <div className="fx-vmware-header">
           <span className="fx-vmware-header-title">

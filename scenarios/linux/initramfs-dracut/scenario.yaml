@@ -9,7 +9,7 @@ description: 'CONTEXT: A team operating Linux administration has raised a ticket
   host for this incident. All tools run locally — no paid APIs or external cloud calls are required.
 
 
-  SYMPTOM / STARTING STATE: Simulated RHEL 9 server. Boot stalls at the dracut initqueue and times out
+  SYMPTOM / STARTING STATE: RHEL 9 server. Boot stalls at the dracut initqueue and times out
   into the dracut emergency shell; the root device isn''t being found by the current initramfs.
 
 
@@ -91,7 +91,7 @@ hints:
 
     WHY: the grader validates real system state, not marker files — a fix only counts when the subsystem
     is actually healthy.'
-initial_state: Simulated RHEL 9 server. Boot stalls at the dracut initqueue and times out into the dracut
+initial_state: RHEL 9 server. Boot stalls at the dracut initqueue and times out into the dracut
   emergency shell; the root device isn't being found by the current initramfs.
 is_free: false
 jira_priority: Medium
@@ -127,7 +127,7 @@ environment:
     os: FixitLab Linux practice server
     hostname: lab-primary
     ip: 127.0.0.1
-    specs: local offline simulation
+    specs: local offline lab environment
   pre_installed:
   - bash
   - coreutils
