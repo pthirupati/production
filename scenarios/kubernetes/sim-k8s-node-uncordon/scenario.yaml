@@ -19,7 +19,7 @@ description: 'CONTEXT: A team operating Kubernetes has raised a ticket for `Kube
   for this incident. All tools run locally — no paid APIs or external cloud calls are required.
 
 
-  SYMPTOM / STARTING STATE: Simulated Kubernetes cluster. A worker node is marked SchedulingDisabled (cordoned).
+  SYMPTOM / STARTING STATE: Kubernetes cluster. A worker node is marked SchedulingDisabled (cordoned).
   It is otherwise healthy, but the scheduler won''t place pods on it and capacity is reduced.
 
 
@@ -50,7 +50,7 @@ objectives:
 - Identify the cordoned node and confirm it is otherwise healthy
 - Verify the kubelet/node conditions are Ready
 - Uncordon the node so it accepts pods again
-initial_state: Simulated Kubernetes cluster. A worker node is marked SchedulingDisabled (cordoned). It
+initial_state: Kubernetes cluster. A worker node is marked SchedulingDisabled (cordoned). It
   is otherwise healthy, but the scheduler won't place pods on it and capacity is reduced.
 hints:
 - order: 1
@@ -115,7 +115,7 @@ environment:
     os: FixitLab Kubernetes cluster
     hostname: lab-primary
     ip: 127.0.0.1
-    specs: local offline simulation
+    specs: local offline lab environment
   pre_installed:
   - bash
   - coreutils

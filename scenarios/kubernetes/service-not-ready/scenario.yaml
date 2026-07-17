@@ -9,7 +9,7 @@ description: 'CONTEXT: A team operating Kubernetes has raised a ticket for `Kube
   for this incident. All tools run locally — no paid APIs or external cloud calls are required.
 
 
-  SYMPTOM / STARTING STATE: Simulated Kubernetes cluster. A Service has zero ready endpoints because its
+  SYMPTOM / STARTING STATE: Kubernetes cluster. A Service has zero ready endpoints because its
   pods fail their readiness probe (wrong path/port or the app isn''t actually serving).
 
 
@@ -82,7 +82,7 @@ hints:
 
 
     WHY: Kubernetes labs grade real cluster state.'
-initial_state: Simulated Kubernetes cluster. A Service has zero ready endpoints because its pods fail
+initial_state: Kubernetes cluster. A Service has zero ready endpoints because its pods fail
   their readiness probe (wrong path/port or the app isn't actually serving).
 is_free: false
 jira_priority: Medium
@@ -118,7 +118,7 @@ environment:
     os: FixitLab Kubernetes cluster
     hostname: lab-primary
     ip: 127.0.0.1
-    specs: local offline simulation
+    specs: local offline lab environment
   pre_installed:
   - bash
   - coreutils

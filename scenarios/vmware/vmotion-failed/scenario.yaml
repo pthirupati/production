@@ -21,7 +21,7 @@ description: 'CONTEXT: A team operating VMware vSphere has raised a ticket for `
   All tools run locally — no paid APIs or external cloud calls are required.
 
 
-  SYMPTOM / STARTING STATE: VMware vCenter simulation. Cluster has no EVC baseline set.
+  SYMPTOM / STARTING STATE: VMware vCenter. Cluster has no EVC baseline set.
 
   esxi-01: Intel Haswell (4th gen). esxi-03: Intel Sandy Bridge (2nd gen).
 
@@ -56,7 +56,7 @@ objectives:
 - Check the EVC baseline configured on the cluster
 - Enable EVC on the cluster at the Sandy Bridge baseline
 - Retry the vMotion migration and verify it succeeds
-initial_state: 'VMware vCenter simulation. Cluster has no EVC baseline set.
+initial_state: 'VMware vCenter. Cluster has no EVC baseline set.
 
   esxi-01: Intel Haswell (4th gen). esxi-03: Intel Sandy Bridge (2nd gen).
 
@@ -141,7 +141,7 @@ environment:
     os: FixitLab vSphere lab
     hostname: lab-primary
     ip: 127.0.0.1
-    specs: local offline simulation
+    specs: local offline lab environment
   pre_installed:
   - bash
   - coreutils

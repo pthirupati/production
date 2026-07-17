@@ -13,7 +13,7 @@ description: 'CONTEXT: A team operating prompt engineering has raised a ticket f
 
 
   SYMPTOM / STARTING STATE: The guided AI practice console opens. Try the same task with zero examples,
-  then with two examples, and compare how consistent the simulated output becomes. Rule-based and free.
+  then with two examples, and compare how consistent the output becomes. Rule-based and free.
 
 
   OBJECTIVE: Describe the trade-off between zero-shot and few-shot prompting; Write a few-shot prompt
@@ -55,7 +55,7 @@ objectives:
 - Write a few-shot prompt with at least two input -> output examples
 - Pass the exercise where examples lock the output into a fixed shape
 initial_state: The guided AI practice console opens. Try the same task with zero examples, then with two
-  examples, and compare how consistent the simulated output becomes. Rule-based and free.
+  examples, and compare how consistent the output becomes. Rule-based and free.
 solution_explanation: 'Zero-shot ("classify this review as positive or negative") is great when the task
   is common and the format is obvious. Few-shot — adding 2-3 labeled examples — wins when you need a precise,
   consistent format or you''re handling an unusual labeling scheme. Examples act as a template the model
@@ -208,7 +208,7 @@ environment:
     os: FixitLab LLM practice workspace
     hostname: lab-primary
     ip: 127.0.0.1
-    specs: local offline simulation
+    specs: local offline lab environment
   pre_installed:
   - bash
   - coreutils

@@ -10,7 +10,7 @@ description: 'CONTEXT: A team operating Red Hat Enterprise Linux has raised a ti
   host for this incident. All tools run locally — no paid APIs or external cloud calls are required.
 
 
-  SYMPTOM / STARTING STATE: Simulated RHEL 9 server in a change window. Use the Jira ticket to request
+  SYMPTOM / STARTING STATE: RHEL 9 server in a change window. Use the Jira ticket to request
   change-window actions from the @backup, @database, and @application teams (~30s replies), then patch
   and reboot in the terminal.
 
@@ -89,7 +89,7 @@ hints:
 
 
     WHY: a running service behind a closed firewall still fails health checks.'
-initial_state: Simulated RHEL 9 server in a change window. Use the Jira ticket to request change-window
+initial_state: RHEL 9 server in a change window. Use the Jira ticket to request change-window
   actions from the @backup, @database, and @application teams (~30s replies), then patch and reboot in
   the terminal.
 is_free: false
@@ -127,7 +127,7 @@ environment:
     os: FixitLab RHEL practice host
     hostname: lab-primary
     ip: 127.0.0.1
-    specs: local offline simulation
+    specs: local offline lab environment
   pre_installed:
   - bash
   - coreutils

@@ -10,7 +10,7 @@ description: 'CONTEXT: A team operating Red Hat Enterprise Linux has raised a ti
   host for this incident. All tools run locally — no paid APIs or external cloud calls are required.
 
 
-  SYMPTOM / STARTING STATE: Simulated RHEL 9 server. GRUB fails early with a stage1.5 / error-15 message;
+  SYMPTOM / STARTING STATE: RHEL 9 server. GRUB fails early with a stage1.5 / error-15 message;
   the MBR bootloader is corrupt and the OS does not load.
 
 
@@ -87,7 +87,7 @@ hints:
 
 
     WHY: a running service behind a closed firewall still fails health checks.'
-initial_state: Simulated RHEL 9 server. GRUB fails early with a stage1.5 / error-15 message; the MBR bootloader
+initial_state: RHEL 9 server. GRUB fails early with a stage1.5 / error-15 message; the MBR bootloader
   is corrupt and the OS does not load.
 is_free: false
 jira_priority: Medium
@@ -123,7 +123,7 @@ environment:
     os: FixitLab RHEL practice host
     hostname: lab-primary
     ip: 127.0.0.1
-    specs: local offline simulation
+    specs: local offline lab environment
   pre_installed:
   - bash
   - coreutils

@@ -17,7 +17,7 @@ description: 'CONTEXT: A team operating DevOps delivery has raised a ticket for 
   incident. All tools run locally — no paid APIs or external cloud calls are required.
 
 
-  SYMPTOM / STARTING STATE: Simulated Kubernetes environment on Ubuntu with a manifest at /opt/k8s/deployment.yaml.
+  SYMPTOM / STARTING STATE: Kubernetes environment on Ubuntu with a manifest at /opt/k8s/deployment.yaml.
   The Service targetPort (8080) doesn''t match nginx''s containerPort (80), and nginx isn''t serving,
   so the app is down.
 
@@ -49,7 +49,7 @@ objectives:
 - Analyze /opt/k8s/deployment.yaml for the port mismatch
 - Align the Service targetPort with nginx's containerPort (80)
 - Verify the web server responds on the correct port
-initial_state: Simulated Kubernetes environment on Ubuntu with a manifest at /opt/k8s/deployment.yaml.
+initial_state: Kubernetes environment on Ubuntu with a manifest at /opt/k8s/deployment.yaml.
   The Service targetPort (8080) doesn't match nginx's containerPort (80), and nginx
   isn't serving, so the app is down.
 hints:
@@ -117,7 +117,7 @@ environment:
     os: FixitLab CI/CD lab
     hostname: lab-primary
     ip: 127.0.0.1
-    specs: local offline simulation
+    specs: local offline lab environment
   pre_installed:
   - bash
   - coreutils

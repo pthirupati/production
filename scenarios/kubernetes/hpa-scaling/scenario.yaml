@@ -12,7 +12,7 @@ description: 'CONTEXT: A team operating Kubernetes has raised a ticket for `HPA 
   for this incident. All tools run locally — no paid APIs or external cloud calls are required.
 
 
-  SYMPTOM / STARTING STATE: Simulated Kubernetes cluster with an HPA targeting a Deployment. The HPA''s
+  SYMPTOM / STARTING STATE: Kubernetes cluster with an HPA targeting a Deployment. The HPA''s
   TARGETS column shows <unknown>/50% and replica count stays at the minimum despite sustained CPU load.
 
 
@@ -92,7 +92,7 @@ hints:
 
 
     WHY: Kubernetes labs grade real cluster state.'
-initial_state: Simulated Kubernetes cluster with an HPA targeting a Deployment. The HPA's TARGETS column
+initial_state: Kubernetes cluster with an HPA targeting a Deployment. The HPA's TARGETS column
   shows <unknown>/50% and replica count stays at the minimum despite sustained CPU load.
 technology: kubernetes
 summary: Complete the hpa not scaling under load kubernetes lab and verify success with the checker
@@ -115,7 +115,7 @@ environment:
     os: FixitLab Kubernetes cluster
     hostname: lab-primary
     ip: 127.0.0.1
-    specs: local offline simulation
+    specs: local offline lab environment
   pre_installed:
   - bash
   - coreutils

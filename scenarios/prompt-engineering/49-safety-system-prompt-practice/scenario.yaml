@@ -19,7 +19,7 @@ description: 'CONTEXT: A team operating prompt engineering has raised a ticket f
 
   OBJECTIVE: Write a system prompt that sets a role, a scope, and a clear refusal rule; Add a rule that
   resists override attempts ("ignore your instructions") and protects the system prompt; Pass both graded
-  exercises (the simulator re-checks your prompt server-side). Acceptance criteria: the change is minimal
+  exercises (the grader re-checks your prompt server-side). Acceptance criteria: the change is minimal
   and reversible, and success means all hidden tests pass.
 
 
@@ -54,7 +54,7 @@ dual_terminal: false
 objectives:
 - Write a system prompt that sets a role, a scope, and a clear refusal rule
 - Add a rule that resists override attempts ("ignore your instructions") and protects the system prompt
-- Pass both graded exercises (the simulator re-checks your prompt server-side)
+- Pass both graded exercises (the grader re-checks your prompt server-side)
 initial_state: The guided AI practice console opens with two graded safety exercises. Write a safety-minded
   system prompt, then a rule that resists override/injection attempts. Rule-based and free — a strong,
   specific prompt passes; a vague one fails.
@@ -232,14 +232,14 @@ linked_tutorial: prompt-engineering-fundamentals
 what_you_will_learn:
 - Write a system prompt that sets a role, a scope, and a clear refusal rule
 - Add a rule that resists override attempts ("ignore your instructions") and protects the system prompt
-- Pass both graded exercises (the simulator re-checks your prompt server-side)
+- Pass both graded exercises (the grader re-checks your prompt server-side)
 environment:
   nodes:
   - role: primary
     os: FixitLab LLM practice workspace
     hostname: lab-primary
     ip: 127.0.0.1
-    specs: local offline simulation
+    specs: local offline lab environment
   pre_installed:
   - bash
   - coreutils

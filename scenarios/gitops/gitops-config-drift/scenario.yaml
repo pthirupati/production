@@ -16,7 +16,7 @@ description: 'CONTEXT: A team operating gitops has raised a ticket for `Self-Hea
   Business impact: reduced service reliability and blocked users until the underlying state is repaired.
 
 
-  ENVIRONMENT: You are working in FixitLab''s offline FixitLab practice environment. The architecture
+  ENVIRONMENT: You are working in FixitLab''s offline FixitLab lab environment. The architecture
   is a single lab-primary node exposing CLI and configuration files; treat it as the production host for
   this incident. All tools run locally — no paid APIs or external cloud calls are required.
 
@@ -100,7 +100,7 @@ hints:
 
 
     WHY: Kubernetes only reports healthy when the workload actually runs.'
-summary: Diagnose and resolve self-heal fights live config drift in the gitops simulation lab and verify
+summary: Diagnose and resolve self-heal fights live config drift in the gitops lab and verify
   the healthy end state
 estimated_minutes: 25
 xp_reward: 100
@@ -123,7 +123,7 @@ environment:
     os: FixitLab GitOps practice cluster
     hostname: lab-primary
     ip: 127.0.0.1
-    specs: local offline simulation
+    specs: local offline lab environment
   pre_installed:
   - bash
   - coreutils

@@ -1,4 +1,4 @@
-title: 'RHEL Simulation: SSH Service Down'
+title: 'RHEL Lab: SSH Service Down'
 slug: linux-rhel-ssh-stop-lab
 technology: linux
 category: Fix
@@ -11,7 +11,7 @@ dual_terminal: true
 infrastructure_type: docker
 jira_priority: Medium
 is_free: false
-description: 'CONTEXT: A team operating Linux administration has raised a ticket for `RHEL Simulation:
+description: 'CONTEXT: A team operating Linux administration has raised a ticket for `RHEL Lab:
   SSH Service Down`. A customer-facing workflow is degraded and the on-call engineer (you) must diagnose
   and resolve it. Business impact: reduced service reliability and blocked users until the underlying
   state is repaired.
@@ -64,15 +64,15 @@ hints:
   cost: 0
   content: 'ORIENT — what to observe and why:
 
-    Do not touch anything yet. First observe the symptom: RHEL simulation is not behaving as the scenario
-    objectives require. This lab is about RHEL simulation — how RHEL simulation behaves in a Linux administration
+    Do not touch anything yet. First observe the symptom: RHEL is not behaving as the scenario
+    objectives require. This lab is about RHEL — how RHEL behaves in a Linux administration
     environment. Read the objectives and the current state, and note precisely what looks wrong versus
     healthy before you form any theory.'
 - order: 2
   cost: 10
   content: 'APPROACH — the troubleshooting method:
 
-    Work from evidence, not guesses. For RHEL simulation problems the reliable method is: (1) reproduce/observe
+    Work from evidence, not guesses. For RHEL problems the reliable method is: (1) reproduce/observe
     the failure, (2) narrow from the whole system down to the one component that owns the symptom, (3)
     change exactly one thing, (4) re-check. Fix the underlying misconfiguration you identified (not just
     the noisy log line), changing one thing at a time.'
@@ -102,7 +102,7 @@ hints:
 
 
     WHY: SSH failures are usually service, firewall, or config — not credentials alone.'
-summary: 'Complete the rhel simulation: ssh service down linux lab and verify success with the checker'
+summary: 'Complete the rhel: ssh service down linux lab and verify success with the checker'
 estimated_minutes: 15
 xp_reward: 100
 prerequisites:
@@ -122,7 +122,7 @@ environment:
     os: FixitLab Linux practice server
     hostname: lab-primary
     ip: 127.0.0.1
-    specs: local offline simulation
+    specs: local offline lab environment
   pre_installed:
   - bash
   - coreutils
@@ -134,8 +134,8 @@ environment:
     password: lab123
 tasks:
 - id: task_1
-  title: 'RHEL Simulation: SSH Service Down'
-  description: 'Restore healthy behavior for RHEL Simulation: SSH Service Down by investigating the failure,
+  title: 'RHEL Lab: SSH Service Down'
+  description: 'Restore healthy behavior for RHEL Lab: SSH Service Down by investigating the failure,
     applying the smallest safe fix, and validating the outcome.'
   background: 'This linux lab teaches systematic troubleshooting: observe, hypothesize, change, verify.'
   validation:

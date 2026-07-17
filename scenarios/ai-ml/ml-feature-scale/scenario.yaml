@@ -136,7 +136,7 @@ environment:
     os: FixitLab ML practice workspace
     hostname: lab-primary
     ip: 127.0.0.1
-    specs: local offline simulation
+    specs: local offline lab environment
   pre_installed:
   - ai ml
   - bash

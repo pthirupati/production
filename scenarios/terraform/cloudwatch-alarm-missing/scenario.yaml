@@ -12,7 +12,7 @@ description: 'CONTEXT: A team operating Terraform IaC has raised a ticket for `C
   for this incident. All tools run locally — no paid APIs or external cloud calls are required.
 
 
-  SYMPTOM / STARTING STATE: Simulated AWS environment with a CloudWatch alarm attached to an EC2 instance
+  SYMPTOM / STARTING STATE: AWS environment with a CloudWatch alarm attached to an EC2 instance
   metric. The alarm threshold is set to an unreachable value (e.g., 99999) or the metric name does not
   match the actual emitted metric, so ALARM is never triggered.
 
@@ -41,7 +41,7 @@ description: 'CONTEXT: A team operating Terraform IaC has raised a ticket for `C
 
   WHAT TO AVOID: Do not apply broad destructive changes, skip evidence gathering, or fake completion with
   marker files — the checker validates real system state.'
-initial_state: Simulated AWS environment with a CloudWatch alarm attached to an EC2 instance metric. The
+initial_state: AWS environment with a CloudWatch alarm attached to an EC2 instance metric. The
   alarm threshold is set to an unreachable value (e.g., 99999) or the metric name does not match the actual
   emitted metric, so ALARM is never triggered.
 objectives:
@@ -129,7 +129,7 @@ environment:
     os: FixitLab Terraform workspace
     hostname: lab-primary
     ip: 127.0.0.1
-    specs: local offline simulation
+    specs: local offline lab environment
   pre_installed:
   - bash
   - coreutils

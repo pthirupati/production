@@ -13,7 +13,7 @@ description: 'CONTEXT: A team operating Terraform IaC has raised a ticket for `A
   for this incident. All tools run locally — no paid APIs or external cloud calls are required.
 
 
-  SYMPTOM / STARTING STATE: Simulated AWS environment with an Auto Scaling group, a CloudWatch alarm,
+  SYMPTOM / STARTING STATE: AWS environment with an Auto Scaling group, a CloudWatch alarm,
   and EC2 instances. The alarm metric namespace or dimension is misconfigured, preventing it from detecting
   high CPU and triggering scale-out.
 
@@ -42,7 +42,7 @@ description: 'CONTEXT: A team operating Terraform IaC has raised a ticket for `A
 
   WHAT TO AVOID: Do not apply broad destructive changes, skip evidence gathering, or fake completion with
   marker files — the checker validates real system state.'
-initial_state: Simulated AWS environment with an Auto Scaling group, a CloudWatch alarm, and EC2 instances.
+initial_state: AWS environment with an Auto Scaling group, a CloudWatch alarm, and EC2 instances.
   The alarm metric namespace or dimension is misconfigured, preventing it from detecting high CPU and
   triggering scale-out.
 objectives:
@@ -131,7 +131,7 @@ environment:
     os: FixitLab Terraform workspace
     hostname: lab-primary
     ip: 127.0.0.1
-    specs: local offline simulation
+    specs: local offline lab environment
   pre_installed:
   - bash
   - coreutils

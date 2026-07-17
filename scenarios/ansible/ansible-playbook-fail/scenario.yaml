@@ -9,7 +9,7 @@ description: 'CONTEXT: A team operating Ansible automation has raised a ticket f
   host for this incident. All tools run locally — no paid APIs or external cloud calls are required.
 
 
-  SYMPTOM / STARTING STATE: Simulated Ansible control node with an inventory including web1 and web2.
+  SYMPTOM / STARTING STATE: Ansible control node with an inventory including web1 and web2.
   Running ansible-playbook site.yml fails on web2 (a task errors there); web1 completes successfully.
 
 
@@ -84,7 +84,7 @@ hints:
 
 
     WHY: Ansible labs grade real playbook outcomes, not marker files.'
-initial_state: Simulated Ansible control node with an inventory including web1 and web2. Running ansible-playbook
+initial_state: Ansible control node with an inventory including web1 and web2. Running ansible-playbook
   site.yml fails on web2 (a task errors there); web1 completes successfully.
 is_free: false
 jira_priority: Medium
@@ -120,7 +120,7 @@ environment:
     os: FixitLab Ansible control node
     hostname: lab-primary
     ip: 127.0.0.1
-    specs: local offline simulation
+    specs: local offline lab environment
   pre_installed:
   - ansible
   - ansible-playbook

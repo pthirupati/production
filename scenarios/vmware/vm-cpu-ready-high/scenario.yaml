@@ -21,7 +21,7 @@ description: 'CONTEXT: A team operating VMware vSphere has raised a ticket for `
   All tools run locally — no paid APIs or external cloud calls are required.
 
 
-  SYMPTOM / STARTING STATE: VMware vCenter simulation. db-prod-01 on esxi-01 showing 22% CPU ready.
+  SYMPTOM / STARTING STATE: VMware vCenter. db-prod-01 on esxi-01 showing 22% CPU ready.
 
   esxi-01: 16 pCPU threads, 32 vCPUs allocated across all VMs (2:1 overcommit).
 
@@ -56,7 +56,7 @@ objectives:
 - Identify the host-level CPU utilization and overcommitment ratio
 - Use vMotion to migrate db-prod-01 to esxi-02.lab.local
 - Verify CPU ready time drops below 5% after migration
-initial_state: 'VMware vCenter simulation. db-prod-01 on esxi-01 showing 22% CPU ready.
+initial_state: 'VMware vCenter. db-prod-01 on esxi-01 showing 22% CPU ready.
 
   esxi-01: 16 pCPU threads, 32 vCPUs allocated across all VMs (2:1 overcommit).
 
@@ -140,7 +140,7 @@ environment:
     os: FixitLab vSphere lab
     hostname: lab-primary
     ip: 127.0.0.1
-    specs: local offline simulation
+    specs: local offline lab environment
   pre_installed:
   - bash
   - coreutils

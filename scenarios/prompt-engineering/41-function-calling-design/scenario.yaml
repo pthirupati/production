@@ -17,8 +17,7 @@ description: 'CONTEXT: A team operating prompt engineering has raised a ticket f
 
 
   OBJECTIVE: Write a tool description that says clearly WHEN to call it, not just what it does; Specify
-  an argument schema with names, types, and which arguments are required; Pass both graded exercises (the
-  simulator re-checks your prompt server-side). Acceptance criteria: the change is minimal and reversible,
+  an argument schema with names, types, and which arguments are required; Pass both graded exercises (the tool responder re-checks your prompt server-side). Acceptance criteria: the change is minimal and reversible,
   and success means all hidden tests pass.
 
 
@@ -53,7 +52,7 @@ dual_terminal: false
 objectives:
 - Write a tool description that says clearly WHEN to call it, not just what it does
 - Specify an argument schema with names, types, and which arguments are required
-- Pass both graded exercises (the simulator re-checks your prompt server-side)
+- Pass both graded exercises (the grader re-checks your prompt server-side)
 initial_state: The guided AI practice console opens with two graded exercises on tool design. Write a
   tool description with a clear trigger condition, then an argument schema with typed parameters. Rule-based
   and free — strong definitions pass, vague ones fail.
@@ -224,14 +223,14 @@ linked_tutorial: prompt-engineering-fundamentals
 what_you_will_learn:
 - Write a tool description that says clearly WHEN to call it, not just what it does
 - Specify an argument schema with names, types, and which arguments are required
-- Pass both graded exercises (the simulator re-checks your prompt server-side)
+- Pass both graded exercises (the grader re-checks your prompt server-side)
 environment:
   nodes:
   - role: primary
     os: FixitLab LLM practice workspace
     hostname: lab-primary
     ip: 127.0.0.1
-    specs: local offline simulation
+    specs: local offline lab environment
   pre_installed:
   - bash
   - coreutils

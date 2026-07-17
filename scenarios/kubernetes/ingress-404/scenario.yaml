@@ -12,7 +12,7 @@ description: 'CONTEXT: A team operating Kubernetes has raised a ticket for `Ingr
   for this incident. All tools run locally — no paid APIs or external cloud calls are required.
 
 
-  SYMPTOM / STARTING STATE: Simulated Kubernetes cluster with an ingress controller. An Ingress resource
+  SYMPTOM / STARTING STATE: Kubernetes cluster with an ingress controller. An Ingress resource
   routes the app hostname, but the backend Service name or port is wrong, producing 404s for every request
   to that host.
 
@@ -40,7 +40,7 @@ description: 'CONTEXT: A team operating Kubernetes has raised a ticket for `Ingr
 
   WHAT TO AVOID: Do not apply broad destructive changes, skip evidence gathering, or fake completion with
   marker files — the checker validates real system state.'
-initial_state: Simulated Kubernetes cluster with an ingress controller. An Ingress resource routes the
+initial_state: Kubernetes cluster with an ingress controller. An Ingress resource routes the
   app hostname, but the backend Service name or port is wrong, producing 404s for every request to that
   host.
 lab_mode: simulation
@@ -119,7 +119,7 @@ environment:
     os: FixitLab Kubernetes cluster
     hostname: lab-primary
     ip: 127.0.0.1
-    specs: local offline simulation
+    specs: local offline lab environment
   pre_installed:
   - bash
   - coreutils

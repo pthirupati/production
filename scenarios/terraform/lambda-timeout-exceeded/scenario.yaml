@@ -12,7 +12,7 @@ description: 'CONTEXT: A team operating Terraform IaC has raised a ticket for `L
   for this incident. All tools run locally — no paid APIs or external cloud calls are required.
 
 
-  SYMPTOM / STARTING STATE: Simulated AWS environment with a Lambda function configured with a 3-second
+  SYMPTOM / STARTING STATE: AWS environment with a Lambda function configured with a 3-second
   timeout and 128 MB memory. Processing a large S3 object or complex computation consistently exceeds
   the timeout, resulting in Task timed out errors in CloudWatch Logs.
 
@@ -41,7 +41,7 @@ description: 'CONTEXT: A team operating Terraform IaC has raised a ticket for `L
 
   WHAT TO AVOID: Do not apply broad destructive changes, skip evidence gathering, or fake completion with
   marker files — the checker validates real system state.'
-initial_state: Simulated AWS environment with a Lambda function configured with a 3-second timeout and
+initial_state: AWS environment with a Lambda function configured with a 3-second timeout and
   128 MB memory. Processing a large S3 object or complex computation consistently exceeds the timeout,
   resulting in Task timed out errors in CloudWatch Logs.
 objectives:
@@ -129,7 +129,7 @@ environment:
     os: FixitLab Terraform workspace
     hostname: lab-primary
     ip: 127.0.0.1
-    specs: local offline simulation
+    specs: local offline lab environment
   pre_installed:
   - bash
   - coreutils

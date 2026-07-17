@@ -9,7 +9,7 @@ description: 'CONTEXT: A team operating bare metal operations has raised a ticke
   for this incident. All tools run locally — no paid APIs or external cloud calls are required.
 
 
-  SYMPTOM / STARTING STATE: Simulated bare-metal host reachable only via its BMC/IPMI interface. The operating
+  SYMPTOM / STARTING STATE: bare-metal host reachable only via its BMC/IPMI interface. The operating
   system is hung and unreachable in-band; power must be managed through ipmitool.
 
 
@@ -90,7 +90,7 @@ hints:
 
     WHY: the grader validates real system state, not marker files — a fix only counts when the subsystem
     is actually healthy.'
-initial_state: Simulated bare-metal host reachable only via its BMC/IPMI interface. The operating system
+initial_state: bare-metal host reachable only via its BMC/IPMI interface. The operating system
   is hung and unreachable in-band; power must be managed through ipmitool.
 is_free: false
 jira_priority: Medium
@@ -126,7 +126,7 @@ environment:
     os: FixitLab physical server lab
     hostname: lab-primary
     ip: 127.0.0.1
-    specs: local offline simulation
+    specs: local offline lab environment
   pre_installed:
   - baremetal
   - bash

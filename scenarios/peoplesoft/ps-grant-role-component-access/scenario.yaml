@@ -17,7 +17,7 @@ description: 'CONTEXT: A team operating PeopleSoft administration has raised a t
   and is missing the AP_PROCESSOR role needed to open Voucher Entry.
 
 
-  OBJECTIVE: Open the PeopleSoft (PIA) simulator from the lab toolbar; Navigate to PeopleTools > Security
+  OBJECTIVE: Open the PeopleSoft (PIA) console from the lab toolbar; Navigate to PeopleTools > Security
   > User Profiles for FINUSER; Identify which role grants the FIN_AP_VOUCHER permission for Voucher Entry.
   Acceptance criteria: the change is minimal and reversible, and success means `check.sh` exits successfully.
 
@@ -50,7 +50,7 @@ max_score: 100
 is_free: true
 dual_terminal: false
 objectives:
-- Open the PeopleSoft (PIA) simulator from the lab toolbar
+- Open the PeopleSoft (PIA) console from the lab toolbar
 - Navigate to PeopleTools > Security > User Profiles for FINUSER
 - Identify which role grants the FIN_AP_VOUCHER permission for Voucher Entry
 - Assign the Accounts Payable Processor role to FINUSER
@@ -123,7 +123,7 @@ tags:
 - peoplesoft
 linked_tutorial: peoplesoft-fundamentals
 what_you_will_learn:
-- Open the PeopleSoft (PIA) simulator from the lab toolbar
+- Open the PeopleSoft (PIA) console from the lab toolbar
 - Navigate to PeopleTools > Security > User Profiles for FINUSER
 - Identify which role grants the FIN_AP_VOUCHER permission for Voucher Entry
 - Assign the Accounts Payable Processor role to FINUSER
@@ -133,7 +133,7 @@ environment:
     os: FixitLab PeopleSoft app server lab
     hostname: lab-primary
     ip: 127.0.0.1
-    specs: local offline simulation
+    specs: local offline lab environment
   pre_installed:
   - bash
   - coreutils

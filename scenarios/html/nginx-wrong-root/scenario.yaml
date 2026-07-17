@@ -9,7 +9,7 @@ description: 'CONTEXT: A team operating HTML and web delivery has raised a ticke
   for this incident. All tools run locally — no paid APIs or external cloud calls are required.
 
 
-  SYMPTOM / STARTING STATE: Simulated RHEL host running nginx. The active server block''s `root` points
+  SYMPTOM / STARTING STATE: RHEL host running nginx. The active server block''s `root` points
   to a directory that doesn''t contain the intended site files, so the wrong page (or an error) is returned
   on port 80.
 
@@ -83,7 +83,7 @@ hints:
 
 
     WHY: systemd will not start nginx until `nginx -t` passes.'
-initial_state: Simulated RHEL host running nginx. The active server block's `root` points to a directory
+initial_state: RHEL host running nginx. The active server block's `root` points to a directory
   that doesn't contain the intended site files, so the wrong page (or an error) is returned on port 80.
 is_free: false
 jira_priority: Medium
@@ -119,7 +119,7 @@ environment:
     os: FixitLab web server lab
     hostname: lab-primary
     ip: 127.0.0.1
-    specs: local offline simulation
+    specs: local offline lab environment
   pre_installed:
   - bash
   - coreutils

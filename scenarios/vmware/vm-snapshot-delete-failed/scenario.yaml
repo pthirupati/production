@@ -21,7 +21,7 @@ description: 'CONTEXT: A team operating VMware vSphere has raised a ticket for `
   All tools run locally — no paid APIs or external cloud calls are required.
 
 
-  SYMPTOM / STARTING STATE: VMware vCenter simulation. VM "app-prod-01" on datastore1 has a 3-week-old
+  SYMPTOM / STARTING STATE: VMware vCenter. VM "app-prod-01" on datastore1 has a 3-week-old
   snapshot.
 
   Datastore1 is at 94% (950 GB / 1 TB). Snapshot delta files are ~55 GB.
@@ -57,7 +57,7 @@ objectives:
 - Check datastore free space and identify large delta VMDK files
 - Free at least 60 GB of datastore space by migrating or deleting unused VMs
 - Delete the snapshot using Snapshot Manager and verify datastore space increases
-initial_state: 'VMware vCenter simulation. VM "app-prod-01" on datastore1 has a 3-week-old snapshot.
+initial_state: 'VMware vCenter. VM "app-prod-01" on datastore1 has a 3-week-old snapshot.
 
   Datastore1 is at 94% (950 GB / 1 TB). Snapshot delta files are ~55 GB.
 
@@ -130,7 +130,7 @@ environment:
     os: FixitLab vSphere lab
     hostname: lab-primary
     ip: 127.0.0.1
-    specs: local offline simulation
+    specs: local offline lab environment
   pre_installed:
   - bash
   - coreutils

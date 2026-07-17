@@ -9,7 +9,7 @@ description: 'CONTEXT: A team operating Red Hat Enterprise Linux has raised a ti
   host for this incident. All tools run locally — no paid APIs or external cloud calls are required.
 
 
-  SYMPTOM / STARTING STATE: Simulated RHEL 9 server. Boot ends in a kernel panic: "VFS: Unable to mount
+  SYMPTOM / STARTING STATE: RHEL 9 server. Boot ends in a kernel panic: "VFS: Unable to mount
   root fs on unknown-block". The root device can''t be found/mounted as currently configured.
 
 
@@ -86,7 +86,7 @@ hints:
 
 
     WHY: a running service behind a closed firewall still fails health checks.'
-initial_state: 'Simulated RHEL 9 server. Boot ends in a kernel panic: "VFS: Unable to mount root fs on
+initial_state: 'RHEL 9 server. Boot ends in a kernel panic: "VFS: Unable to mount root fs on
   unknown-block". The root device can''t be found/mounted as currently configured.'
 is_free: false
 jira_priority: Medium
@@ -122,7 +122,7 @@ environment:
     os: FixitLab RHEL practice host
     hostname: lab-primary
     ip: 127.0.0.1
-    specs: local offline simulation
+    specs: local offline lab environment
   pre_installed:
   - bash
   - coreutils

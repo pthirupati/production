@@ -12,7 +12,7 @@ description: 'CONTEXT: A team operating prompt engineering has raised a ticket f
 
 
   SYMPTOM / STARTING STATE: The guided AI practice console opens. Practice asking for a precise output
-  format — a table, exactly three bullets, or a one-line answer — and watch the simulated reply snap to
+  format — a table, exactly three bullets, or a one-line answer — and watch the reply snap to
   the shape you named. Rule-based and free.
 
 
@@ -55,7 +55,7 @@ objectives:
 - Write a prompt that specifies an exact format and forbids extra text
 - Pass the exercise that demands a fixed-shape answer
 initial_state: The guided AI practice console opens. Practice asking for a precise output format — a table,
-  exactly three bullets, or a one-line answer — and watch the simulated reply snap to the shape you named.
+  exactly three bullets, or a one-line answer — and watch the reply snap to the shape you named.
   Rule-based and free.
 solution_explanation: Models default to prose unless told otherwise. To control the shape - (1) name the
   FORMAT explicitly (markdown table with columns X and Y; numbered list; JSON; one word); (2) pin the
@@ -222,7 +222,7 @@ environment:
     os: FixitLab LLM practice workspace
     hostname: lab-primary
     ip: 127.0.0.1
-    specs: local offline simulation
+    specs: local offline lab environment
   pre_installed:
   - bash
   - coreutils

@@ -13,11 +13,11 @@ description: 'CONTEXT: A team operating Grafana observability has raised a ticke
 
 
   SYMPTOM / STARTING STATE: The Prometheus datasource points at a wrong host so every panel renders ''No
-  data''. The Grafana simulator renders the broken state; the configuration file /etc/grafana/provisioning/datasources/prometheus.yaml
+  data''. The Grafana console renders the broken state; the configuration file /etc/grafana/provisioning/datasources/prometheus.yaml
   must be corrected.
 
 
-  OBJECTIVE: Open the Grafana simulator from the lab toolbar and sign in (lab_grafana / lab_grafana@123);
+  OBJECTIVE: Open the Grafana console from the lab toolbar and sign in (lab_grafana / lab_grafana@123);
   Diagnose the fault — The Prometheus datasource points at a wrong host so every panel renders ''No data''.;
   Edit /etc/grafana/provisioning/datasources/prometheus.yaml in the terminal to apply the documented remediation.
   Acceptance criteria: the change is minimal and reversible, and success means HTTP 200 from http://localhost:3000/api/health.
@@ -50,12 +50,11 @@ max_score: 100
 is_free: true
 dual_terminal: false
 objectives:
-- Open the Grafana simulator from the lab toolbar and sign in (lab_grafana / lab_grafana@123)
+- Open the Grafana console from the lab toolbar and sign in (lab_grafana / lab_grafana@123)
 - Diagnose the fault — The Prometheus datasource points at a wrong host so every panel renders 'No data'.
 - Edit /etc/grafana/provisioning/datasources/prometheus.yaml in the terminal to apply the documented remediation
 - Run Check Solution to confirm the configuration is corrected
-initial_state: The Prometheus datasource points at a wrong host so every panel renders 'No data'. The
-  Grafana simulator renders the broken state; the configuration file /etc/grafana/provisioning/datasources/prometheus.yaml
+initial_state: The Prometheus datasource points at a wrong host so every panel renders 'No data'. The Grafana console renders the broken state; the configuration file /etc/grafana/provisioning/datasources/prometheus.yaml
   must be corrected.
 hints:
 - order: 1
@@ -126,7 +125,7 @@ tags:
 - hands-on
 linked_tutorial: grafana-fundamentals
 what_you_will_learn:
-- Open the Grafana simulator from the lab toolbar and sign in (lab_grafana / lab_grafana@123)
+- Open the Grafana console from the lab toolbar and sign in (lab_grafana / lab_grafana@123)
 - Diagnose the fault — The Prometheus datasource points at a wrong host so every panel renders 'No data'.
 - Edit /etc/grafana/provisioning/datasources/prometheus.yaml in the terminal to apply the documented remediation
 - Run Check Solution to confirm the configuration is corrected
@@ -136,7 +135,7 @@ environment:
     os: FixitLab Grafana stack
     hostname: lab-primary
     ip: 127.0.0.1
-    specs: local offline simulation
+    specs: local offline lab environment
   pre_installed:
   - bash
   - coreutils

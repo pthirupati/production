@@ -16,7 +16,7 @@ description: 'CONTEXT: A team operating packet analysis has raised a ticket for 
   applied, so all protocols are interleaved in the packet list.
 
 
-  OBJECTIVE: Open the Wireshark simulator from the lab toolbar (toolbar -> Open Wireshark); Inspect the
+  OBJECTIVE: Open the Wireshark console from the lab toolbar (toolbar -> Open Wireshark); Inspect the
   packet list — note the mix of DNS, HTTP, TLS and SSH protocols; Apply a display filter so the packet
   list shows ONLY HTTP packets. Acceptance criteria: the change is minimal and reversible, and success
   means `check.sh` exits successfully.
@@ -50,7 +50,7 @@ max_score: 100
 is_free: true
 dual_terminal: false
 objectives:
-- Open the Wireshark simulator from the lab toolbar (toolbar -> Open Wireshark)
+- Open the Wireshark console from the lab toolbar (toolbar -> Open Wireshark)
 - Inspect the packet list — note the mix of DNS, HTTP, TLS and SSH protocols
 - Apply a display filter so the packet list shows ONLY HTTP packets
 - Run Check Solution to confirm the HTTP request to example.com is isolated
@@ -119,7 +119,7 @@ tags:
 - wireshark
 linked_tutorial: wireshark-fundamentals
 what_you_will_learn:
-- Open the Wireshark simulator from the lab toolbar (toolbar -> Open Wireshark)
+- Open the Wireshark console from the lab toolbar (toolbar -> Open Wireshark)
 - Inspect the packet list — note the mix of DNS, HTTP, TLS and SSH protocols
 - Apply a display filter so the packet list shows ONLY HTTP packets
 - Run Check Solution to confirm the HTTP request to example.com is isolated
@@ -129,7 +129,7 @@ environment:
     os: FixitLab capture lab
     hostname: lab-primary
     ip: 127.0.0.1
-    specs: local offline simulation
+    specs: local offline lab environment
   pre_installed:
   - bash
   - coreutils

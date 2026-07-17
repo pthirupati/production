@@ -16,7 +16,7 @@ description: 'CONTEXT: A team operating network scanning has raised a ticket for
   "http". A version-detection scan is required to reveal the underlying server product and version.
 
 
-  OBJECTIVE: Open the Nmap simulator from the lab toolbar (Open Nmap); Run service/version detection against
+  OBJECTIVE: Open the Nmap console from the lab toolbar (Open Nmap); Run service/version detection against
   web01 port 80 (nmap -sV -p 80 10.10.10.10); Identify the HTTP server software (nginx) and its version.
   Acceptance criteria: the change is minimal and reversible, and success means HTTP 200 from http://localhost.
 
@@ -49,7 +49,7 @@ max_score: 100
 is_free: true
 dual_terminal: false
 objectives:
-- Open the Nmap simulator from the lab toolbar (Open Nmap)
+- Open the Nmap console from the lab toolbar (Open Nmap)
 - Run service/version detection against web01 port 80 (nmap -sV -p 80 10.10.10.10)
 - Identify the HTTP server software (nginx) and its version
 initial_state: web01:80 is known to be open but its service is reported only as the generic "http". A
@@ -111,7 +111,7 @@ tags:
 - nmap
 linked_tutorial: nmap-fundamentals
 what_you_will_learn:
-- Open the Nmap simulator from the lab toolbar (Open Nmap)
+- Open the Nmap console from the lab toolbar (Open Nmap)
 - Run service/version detection against web01 port 80 (nmap -sV -p 80 10.10.10.10)
 - Identify the HTTP server software (nginx) and its version
 environment:
@@ -120,7 +120,7 @@ environment:
     os: FixitLab scanning lab
     hostname: lab-primary
     ip: 127.0.0.1
-    specs: local offline simulation
+    specs: local offline lab environment
   pre_installed:
   - bash
   - coreutils

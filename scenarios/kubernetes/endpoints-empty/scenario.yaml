@@ -9,7 +9,7 @@ description: 'CONTEXT: A team operating Kubernetes has raised a ticket for `Fix 
   for this incident. All tools run locally — no paid APIs or external cloud calls are required.
 
 
-  SYMPTOM / STARTING STATE: Simulated Kubernetes cluster. A Service is defined with a selector that matches
+  SYMPTOM / STARTING STATE: Kubernetes cluster. A Service is defined with a selector that matches
   no pods. `kubectl get endpoints <svc>` returns <none> and requests to the Service hang.
 
 
@@ -80,7 +80,7 @@ hints:
 
 
     WHY: Kubernetes labs grade real cluster state.'
-initial_state: Simulated Kubernetes cluster. A Service is defined with a selector that matches no pods.
+initial_state: Kubernetes cluster. A Service is defined with a selector that matches no pods.
   `kubectl get endpoints <svc>` returns <none> and requests to the Service hang.
 is_free: false
 lab_mode: simulation
@@ -112,7 +112,7 @@ environment:
     os: FixitLab Kubernetes cluster
     hostname: lab-primary
     ip: 127.0.0.1
-    specs: local offline simulation
+    specs: local offline lab environment
   pre_installed:
   - bash
   - coreutils

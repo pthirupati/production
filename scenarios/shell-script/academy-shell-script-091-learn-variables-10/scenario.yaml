@@ -17,12 +17,12 @@ description: 'CONTEXT: A team operating shell scripting has raised a ticket for 
   is repaired.
 
 
-  ENVIRONMENT: You are working in FixitLab''s offline bash practice environment. The architecture is a
+  ENVIRONMENT: You are working in FixitLab''s offline bash lab environment. The architecture is a
   single lab-primary node exposing scripts, cron, logs, and shellcheck; treat it as the production host
   for this incident. All tools run locally — no paid APIs or external cloud calls are required.
 
 
-  SYMPTOM / STARTING STATE: The bash practice environment is online with a starter Terraform variables
+  SYMPTOM / STARTING STATE: The bash lab environment is online with a starter Terraform variables
   setup. Some pieces are intentionally incomplete so you can learn how they fit together. Nothing is on
   fire — focus on observation.
 
@@ -55,7 +55,7 @@ objectives:
 - Understand how Terraform variables work in this lab environment
 - Identify the main status and configuration signals for Terraform variables
 - Confirm you can read the current state confidently before changing anything
-initial_state: The bash practice environment is online with a starter Terraform variables setup. Some
+initial_state: The bash lab environment is online with a starter Terraform variables setup. Some
   pieces are intentionally incomplete so you can learn how they fit together. Nothing is on fire — focus
   on observation.
 hints:
@@ -119,10 +119,10 @@ what_you_will_learn:
 environment:
   nodes:
   - role: primary
-    os: FixitLab bash practice environment
+    os: FixitLab bash lab
     hostname: lab-primary
     ip: 127.0.0.1
-    specs: local offline simulation
+    specs: local offline lab environment
   pre_installed:
   - bash
   - coreutils

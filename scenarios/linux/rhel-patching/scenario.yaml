@@ -10,7 +10,7 @@ description: 'CONTEXT: A team operating Linux administration has raised a ticket
   host for this incident. All tools run locally — no paid APIs or external cloud calls are required.
 
 
-  SYMPTOM / STARTING STATE: Simulated RHEL 9 server in a change window. Use the Jira ticket to request
+  SYMPTOM / STARTING STATE: RHEL 9 server in a change window. Use the Jira ticket to request
   change-window actions from the @backup, @database, and @application teams (~30s replies), then patch
   and reboot in the terminal.
 
@@ -96,7 +96,7 @@ hints:
 
     WHY: the grader validates real system state, not marker files — a fix only counts when the subsystem
     is actually healthy.'
-initial_state: Simulated RHEL 9 server in a change window. Use the Jira ticket to request change-window
+initial_state: RHEL 9 server in a change window. Use the Jira ticket to request change-window
   actions from the @backup, @database, and @application teams (~30s replies), then patch and reboot in
   the terminal.
 is_free: false
@@ -134,7 +134,7 @@ environment:
     os: FixitLab Linux practice server
     hostname: lab-primary
     ip: 127.0.0.1
-    specs: local offline simulation
+    specs: local offline lab environment
   pre_installed:
   - bash
   - coreutils

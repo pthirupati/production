@@ -21,7 +21,7 @@ description: 'CONTEXT: A team operating VMware vSphere has raised a ticket for `
   All tools run locally — no paid APIs or external cloud calls are required.
 
 
-  SYMPTOM / STARTING STATE: VMware vCenter simulation. VCSA at vcenter.lab.local. DB at 92% (18.4 GB /
+  SYMPTOM / STARTING STATE: VMware vCenter. VCSA at vcenter.lab.local. DB at 92% (18.4 GB /
   20 GB).
 
   Event retention: 365 days (misconfigured). Task retention: 365 days.
@@ -57,7 +57,7 @@ objectives:
 - Access the embedded PostgreSQL and check database table sizes
 - Reduce the event and task retention period to reclaim database space
 - Run a database cleanup to archive old records and verify space is recovered
-initial_state: 'VMware vCenter simulation. VCSA at vcenter.lab.local. DB at 92% (18.4 GB / 20 GB).
+initial_state: 'VMware vCenter. VCSA at vcenter.lab.local. DB at 92% (18.4 GB / 20 GB).
 
   Event retention: 365 days (misconfigured). Task retention: 365 days.
 
@@ -130,7 +130,7 @@ environment:
     os: FixitLab vSphere lab
     hostname: lab-primary
     ip: 127.0.0.1
-    specs: local offline simulation
+    specs: local offline lab environment
   pre_installed:
   - bash
   - coreutils

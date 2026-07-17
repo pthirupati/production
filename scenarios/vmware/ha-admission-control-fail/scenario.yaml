@@ -21,7 +21,7 @@ description: 'CONTEXT: A team operating VMware vSphere has raised a ticket for `
   All tools run locally — no paid APIs or external cloud calls are required.
 
 
-  SYMPTOM / STARTING STATE: VMware vCenter simulation. 3-host cluster: esxi-01 (active), esxi-02 (active),
+  SYMPTOM / STARTING STATE: VMware vCenter. 3-host cluster: esxi-01 (active), esxi-02 (active),
 
   esxi-03 (maintenance mode). HA admission control: slot-based, 2 host failures.
 
@@ -57,7 +57,7 @@ objectives:
 - Understand why power-on is being rejected given current host count
 - Adjust the admission control policy to "1 host failure" to match current capacity
 - Successfully power on analytics-01 and verify HA is still protecting the cluster
-initial_state: 'VMware vCenter simulation. 3-host cluster: esxi-01 (active), esxi-02 (active),
+initial_state: 'VMware vCenter. 3-host cluster: esxi-01 (active), esxi-02 (active),
 
   esxi-03 (maintenance mode). HA admission control: slot-based, 2 host failures.
 
@@ -141,7 +141,7 @@ environment:
     os: FixitLab vSphere lab
     hostname: lab-primary
     ip: 127.0.0.1
-    specs: local offline simulation
+    specs: local offline lab environment
   pre_installed:
   - bash
   - coreutils

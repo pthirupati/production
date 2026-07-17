@@ -15,7 +15,7 @@ description: 'CONTEXT: A team operating VMware vSphere has raised a ticket for `
   healthy; the production service is down until the VM is started.
 
 
-  OBJECTIVE: Open the vCenter simulator from the Jira ticket; Identify the powered-off VM (web-prod-01);
+  OBJECTIVE: Open the vCenter console from the Jira ticket; Identify the powered-off VM (web-prod-01);
   Power on the VM and verify it returns to service. Acceptance criteria: the change is minimal and reversible,
   and success means `check.sh` exits successfully.
 
@@ -47,7 +47,7 @@ max_score: 100
 is_free: false
 dual_terminal: false
 objectives:
-- Open the vCenter simulator from the Jira ticket
+- Open the vCenter console from the Jira ticket
 - Identify the powered-off VM (web-prod-01)
 - Power on the VM and verify it returns to service
 initial_state: vCenter shows web-prod-01 powered off while the ESXi hosts are connected and healthy; the
@@ -116,7 +116,7 @@ tags:
 - vmware
 linked_tutorial: vmware-fundamentals
 what_you_will_learn:
-- Open the vCenter simulator from the Jira ticket
+- Open the vCenter console from the Jira ticket
 - Identify the powered-off VM (web-prod-01)
 - Power on the VM and verify it returns to service
 environment:
@@ -125,7 +125,7 @@ environment:
     os: FixitLab vSphere lab
     hostname: lab-primary
     ip: 127.0.0.1
-    specs: local offline simulation
+    specs: local offline lab environment
   pre_installed:
   - bash
   - coreutils

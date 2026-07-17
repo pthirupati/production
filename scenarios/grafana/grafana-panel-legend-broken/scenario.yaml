@@ -11,12 +11,12 @@ description: 'CONTEXT: A team operating Grafana observability has raised a ticke
   for this incident. All tools run locally — no paid APIs or external cloud calls are required.
 
 
-  SYMPTOM / STARTING STATE: Legend template references a missing label. The Grafana simulator renders
+  SYMPTOM / STARTING STATE: Legend template references a missing label. The Grafana console renders
   the broken state; the configuration file /etc/grafana/provisioning/dashboards/node-overview.json must
   be corrected.
 
 
-  OBJECTIVE: Open the Grafana simulator from the lab toolbar and sign in (lab_grafana / lab_grafana@123);
+  OBJECTIVE: Open the Grafana console from the lab toolbar and sign in (lab_grafana / lab_grafana@123);
   Diagnose the fault — Legend template references a missing label.; Edit /etc/grafana/provisioning/dashboards/node-overview.json
   in the terminal to apply the documented remediation. Acceptance criteria: the change is minimal and
   reversible, and success means `check.sh` exits successfully.
@@ -49,12 +49,12 @@ max_score: 100
 is_free: false
 dual_terminal: false
 objectives:
-- Open the Grafana simulator from the lab toolbar and sign in (lab_grafana / lab_grafana@123)
+- Open the Grafana console from the lab toolbar and sign in (lab_grafana / lab_grafana@123)
 - Diagnose the fault — Legend template references a missing label.
 - Edit /etc/grafana/provisioning/dashboards/node-overview.json in the terminal to apply the documented
   remediation
 - Run Check Solution to confirm the configuration is corrected
-initial_state: Legend template references a missing label. The Grafana simulator renders the broken state;
+initial_state: Legend template references a missing label. The Grafana console renders the broken state;
   the configuration file /etc/grafana/provisioning/dashboards/node-overview.json must be corrected.
 hints:
 - order: 1
@@ -120,7 +120,7 @@ tags:
 - hands-on
 linked_tutorial: grafana-fundamentals
 what_you_will_learn:
-- Open the Grafana simulator from the lab toolbar and sign in (lab_grafana / lab_grafana@123)
+- Open the Grafana console from the lab toolbar and sign in (lab_grafana / lab_grafana@123)
 - Diagnose the fault — Legend template references a missing label.
 - Edit /etc/grafana/provisioning/dashboards/node-overview.json in the terminal to apply the documented
   remediation
@@ -131,7 +131,7 @@ environment:
     os: FixitLab Grafana stack
     hostname: lab-primary
     ip: 127.0.0.1
-    specs: local offline simulation
+    specs: local offline lab environment
   pre_installed:
   - bash
   - coreutils

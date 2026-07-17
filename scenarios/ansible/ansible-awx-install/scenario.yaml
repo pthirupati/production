@@ -24,7 +24,7 @@ description: 'CONTEXT: A team operating Ansible automation has raised a ticket f
   web UI is not yet available.
 
 
-  OBJECTIVE: Open the AWX simulator from the lab toolbar and sign in; Run the AWX operator install action;
+  OBJECTIVE: Open the AWX console from the lab toolbar and sign in; Run the AWX operator install action;
   Verify the dashboard shows AWX as installed with no blocking errors. Acceptance criteria: the change
   is minimal and reversible, and success means `check.sh` exits successfully.
 
@@ -48,7 +48,7 @@ description: 'CONTEXT: A team operating Ansible automation has raised a ticket f
   WHAT TO AVOID: Do not apply broad destructive changes, skip evidence gathering, or fake completion with
   marker files — the checker validates real system state.'
 objectives:
-- Open the AWX simulator from the lab toolbar and sign in
+- Open the AWX console from the lab toolbar and sign in
 - Run the AWX operator install action
 - Verify the dashboard shows AWX as installed with no blocking errors
 initial_state: Kubernetes cluster with AWX operator manifest staged but not applied. AWX web UI is not
@@ -108,7 +108,7 @@ tags:
 - hands-on
 linked_tutorial: ansible-fundamentals
 what_you_will_learn:
-- Open the AWX simulator from the lab toolbar and sign in
+- Open the AWX console from the lab toolbar and sign in
 - Run the AWX operator install action
 - Verify the dashboard shows AWX as installed with no blocking errors
 environment:
@@ -117,7 +117,7 @@ environment:
     os: FixitLab Ansible control node
     hostname: lab-primary
     ip: 127.0.0.1
-    specs: local offline simulation
+    specs: local offline lab environment
   pre_installed:
   - ansible
   - ansible-playbook

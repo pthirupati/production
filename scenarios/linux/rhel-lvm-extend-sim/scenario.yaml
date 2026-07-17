@@ -10,7 +10,7 @@ description: 'CONTEXT: A team operating Linux administration has raised a ticket
   host for this incident. All tools run locally — no paid APIs or external cloud calls are required.
 
 
-  SYMPTOM / STARTING STATE: Simulated RHEL 9 server. The ''rhel'' volume group is out of free extents
+  SYMPTOM / STARTING STATE: RHEL 9 server. The ''rhel'' volume group is out of free extents
   and / is full. A new disk is NOT attached until the @storage team confirms in Jira; after ~30s, /dev/sdb
   appears and you can extend LVM.
 
@@ -83,7 +83,7 @@ hints:
 
 
     WHY: many services fail cryptically when disk is full.'
-initial_state: Simulated RHEL 9 server. The 'rhel' volume group is out of free extents and / is full.
+initial_state: RHEL 9 server. The 'rhel' volume group is out of free extents and / is full.
   A new disk is NOT attached until the @storage team confirms in Jira; after ~30s, /dev/sdb appears and
   you can extend LVM.
 is_free: false
@@ -118,7 +118,7 @@ environment:
     os: FixitLab Linux practice server
     hostname: lab-primary
     ip: 127.0.0.1
-    specs: local offline simulation
+    specs: local offline lab environment
   pre_installed:
   - bash
   - coreutils

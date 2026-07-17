@@ -18,7 +18,7 @@ description: 'CONTEXT: A team operating AI/ML workflows has raised a ticket for 
   the agent.
 
 
-  OBJECTIVE: Open the Agent Workflow simulator from the lab toolbar; Add an LLM node in classify mode
+  OBJECTIVE: Open the Agent Workflow console from the lab toolbar; Add an LLM node in classify mode
   and feed it the ticket text from the trigger; Add a condition node that detects a high-priority ticket
   and route the true branch to a send_notification tool, then connect the notification to the output.
   Acceptance criteria: the change is minimal and reversible, and success means `check.sh` exits successfully.
@@ -52,7 +52,7 @@ max_score: 100
 is_free: true
 dual_terminal: false
 objectives:
-- Open the Agent Workflow simulator from the lab toolbar
+- Open the Agent Workflow console from the lab toolbar
 - Add an LLM node in classify mode and feed it the ticket text from the trigger
 - Add a condition node that detects a high-priority ticket and route the true branch to a send_notification
   tool, then connect the notification to the output
@@ -123,7 +123,7 @@ tags:
 - hands-on
 linked_tutorial: ai-ml-fundamentals
 what_you_will_learn:
-- Open the Agent Workflow simulator from the lab toolbar
+- Open the Agent Workflow console from the lab toolbar
 - Add an LLM node in classify mode and feed it the ticket text from the trigger
 - Add a condition node that detects a high-priority ticket and route the true branch to a send_notification
   tool, then connect the notification to the output
@@ -134,7 +134,7 @@ environment:
     os: FixitLab ML practice workspace
     hostname: lab-primary
     ip: 127.0.0.1
-    specs: local offline simulation
+    specs: local offline lab environment
   pre_installed:
   - ai ml
   - bash

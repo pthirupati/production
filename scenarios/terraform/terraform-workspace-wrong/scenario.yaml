@@ -13,7 +13,7 @@ description: 'CONTEXT: A team operating Terraform IaC has raised a ticket for `T
   for this incident. All tools run locally — no paid APIs or external cloud calls are required.
 
 
-  SYMPTOM / STARTING STATE: Simulated Terraform project with multiple workspaces (default, staging, production).
+  SYMPTOM / STARTING STATE: Terraform project with multiple workspaces (default, staging, production).
   The shell session is currently in the production workspace. Running terraform plan would target production
   resources instead of the intended staging environment.
 
@@ -41,7 +41,7 @@ description: 'CONTEXT: A team operating Terraform IaC has raised a ticket for `T
 
   WHAT TO AVOID: Do not apply broad destructive changes, skip evidence gathering, or fake completion with
   marker files — the checker validates real system state.'
-initial_state: Simulated Terraform project with multiple workspaces (default, staging, production). The
+initial_state: Terraform project with multiple workspaces (default, staging, production). The
   shell session is currently in the production workspace. Running terraform plan would target production
   resources instead of the intended staging environment.
 objectives:
@@ -133,7 +133,7 @@ environment:
     os: FixitLab Terraform workspace
     hostname: lab-primary
     ip: 127.0.0.1
-    specs: local offline simulation
+    specs: local offline lab environment
   pre_installed:
   - bash
   - coreutils

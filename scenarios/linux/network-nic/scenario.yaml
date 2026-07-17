@@ -10,7 +10,7 @@ description: 'CONTEXT: A team operating Linux administration has raised a ticket
   host for this incident. All tools run locally — no paid APIs or external cloud calls are required.
 
 
-  SYMPTOM / STARTING STATE: Simulated RHEL 9 server. eth0 has only 10.0.0.10; a secondary IP (10.0.0.20/24)
+  SYMPTOM / STARTING STATE: RHEL 9 server. eth0 has only 10.0.0.10; a secondary IP (10.0.0.20/24)
   is required for the application VIP. Request the @network team in Jira, wait for confirmation (~30s),
   then verify in the terminal.
 
@@ -94,7 +94,7 @@ hints:
 
     WHY: the grader validates real system state, not marker files — a fix only counts when the subsystem
     is actually healthy.'
-initial_state: Simulated RHEL 9 server. eth0 has only 10.0.0.10; a secondary IP (10.0.0.20/24) is required
+initial_state: RHEL 9 server. eth0 has only 10.0.0.10; a secondary IP (10.0.0.20/24) is required
   for the application VIP. Request the @network team in Jira, wait for confirmation (~30s), then verify
   in the terminal.
 is_free: false
@@ -128,7 +128,7 @@ environment:
     os: FixitLab Linux practice server
     hostname: lab-primary
     ip: 127.0.0.1
-    specs: local offline simulation
+    specs: local offline lab environment
   pre_installed:
   - bash
   - coreutils

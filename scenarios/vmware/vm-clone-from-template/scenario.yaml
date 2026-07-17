@@ -21,7 +21,7 @@ description: 'CONTEXT: A team operating VMware vSphere has raised a ticket for `
   All tools run locally — no paid APIs or external cloud calls are required.
 
 
-  SYMPTOM / STARTING STATE: VMware vCenter simulation. Template: ubuntu-22-04-template.
+  SYMPTOM / STARTING STATE: VMware vCenter. Template: ubuntu-22-04-template.
 
   Customization spec: linux-static-ip-spec has hostname set to "APP_SERVER_01" (invalid).
 
@@ -57,7 +57,7 @@ objectives:
 - Identify the invalid hostname configuration in the Linux spec
 - Fix the hostname format to be RFC 1123 compliant (lowercase, hyphens only)
 - Redeploy the clone and verify successful customization and guest OS startup
-initial_state: 'VMware vCenter simulation. Template: ubuntu-22-04-template.
+initial_state: 'VMware vCenter. Template: ubuntu-22-04-template.
 
   Customization spec: linux-static-ip-spec has hostname set to "APP_SERVER_01" (invalid).
 
@@ -141,7 +141,7 @@ environment:
     os: FixitLab vSphere lab
     hostname: lab-primary
     ip: 127.0.0.1
-    specs: local offline simulation
+    specs: local offline lab environment
   pre_installed:
   - bash
   - coreutils

@@ -13,7 +13,7 @@ description: 'CONTEXT: A team operating database administration has raised a tic
   this incident. All tools run locally — no paid APIs or external cloud calls are required.
 
 
-  SYMPTOM / STARTING STATE: Simulated RHEL 9 database server. The postgresql service is down (it crashed
+  SYMPTOM / STARTING STATE: RHEL 9 database server. The postgresql service is down (it crashed
   under the
 
   connection storm). /var/lib/pgsql/data/postgresql.conf has max_connections = 20. psql
@@ -46,7 +46,7 @@ description: 'CONTEXT: A team operating database administration has raised a tic
 
   WHAT TO AVOID: Do not apply broad destructive changes, skip evidence gathering, or fake completion with
   marker files — the checker validates real system state.'
-initial_state: 'Simulated RHEL 9 database server. The postgresql service is down (it crashed under the
+initial_state: 'RHEL 9 database server. The postgresql service is down (it crashed under the
 
   connection storm). /var/lib/pgsql/data/postgresql.conf has max_connections = 20. psql
 
@@ -134,7 +134,7 @@ environment:
     os: FixitLab database server
     hostname: lab-primary
     ip: 127.0.0.1
-    specs: local offline simulation
+    specs: local offline lab environment
   pre_installed:
   - bash
   - coreutils

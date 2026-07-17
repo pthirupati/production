@@ -20,7 +20,7 @@ description: 'CONTEXT: A team operating Kubernetes has raised a ticket for `Depl
   for this incident. All tools run locally — no paid APIs or external cloud calls are required.
 
 
-  SYMPTOM / STARTING STATE: Simulated Kubernetes cluster with kubectl configured against the default namespace.
+  SYMPTOM / STARTING STATE: Kubernetes cluster with kubectl configured against the default namespace.
   No nginx Deployment or Service exists yet.
 
 
@@ -51,7 +51,7 @@ objectives:
 - Create an nginx Deployment with at least one replica
 - Expose the Deployment with a Service on port 80
 - Verify the pods are Running/Ready and the Service has endpoints
-initial_state: Simulated Kubernetes cluster with kubectl configured against the default namespace. No
+initial_state: Kubernetes cluster with kubectl configured against the default namespace. No
   nginx Deployment or Service exists yet.
 hints:
 - order: 1
@@ -116,7 +116,7 @@ environment:
     os: FixitLab Kubernetes cluster
     hostname: lab-primary
     ip: 127.0.0.1
-    specs: local offline simulation
+    specs: local offline lab environment
   pre_installed:
   - bash
   - coreutils

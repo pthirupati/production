@@ -24,7 +24,7 @@ description: 'CONTEXT: A team operating Kubernetes has raised a ticket for `Scal
 
 
   OBJECTIVE: Confirm 2 api pods are Pending due to FailedScheduling (kubectl get pods, kubectl describe
-  pod); Confirm the cluster has only one worker node (kubectl get nodes); Open the VMware simulator and
+  pod); Confirm the cluster has only one worker node (kubectl get nodes); Open the VMware console and
   power on the worker-node VM k8s-worker-2. Acceptance criteria: the change is minimal and reversible,
   and success means `kubectl get pods` shows every pod Running.
 
@@ -59,7 +59,7 @@ initial_state: 'A Kubernetes cluster with one control-plane and one worker (work
 objectives:
 - Confirm 2 api pods are Pending due to FailedScheduling (kubectl get pods, kubectl describe pod)
 - Confirm the cluster has only one worker node (kubectl get nodes)
-- Open the VMware simulator and power on the worker-node VM k8s-worker-2
+- Open the VMware console and power on the worker-node VM k8s-worker-2
 - Confirm worker-2 is Ready and the Pending pods schedule onto it
 - Verify all api pods are Running (kubectl get pods -o wide)
 lab_mode: simulation
@@ -131,7 +131,7 @@ linked_tutorial: kubernetes-fundamentals
 what_you_will_learn:
 - Confirm 2 api pods are Pending due to FailedScheduling (kubectl get pods, kubectl describe pod)
 - Confirm the cluster has only one worker node (kubectl get nodes)
-- Open the VMware simulator and power on the worker-node VM k8s-worker-2
+- Open the VMware console and power on the worker-node VM k8s-worker-2
 - Confirm worker-2 is Ready and the Pending pods schedule onto it
 - Verify all api pods are Running (kubectl get pods -o wide)
 environment:
@@ -140,7 +140,7 @@ environment:
     os: FixitLab Kubernetes cluster
     hostname: lab-primary
     ip: 127.0.0.1
-    specs: local offline simulation
+    specs: local offline lab environment
   pre_installed:
   - bash
   - coreutils

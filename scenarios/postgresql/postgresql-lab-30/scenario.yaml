@@ -12,7 +12,7 @@ description: 'CONTEXT: A team operating PostgreSQL has raised a ticket for `Debu
   incident. All tools run locally — no paid APIs or external cloud calls are required.
 
 
-  SYMPTOM / STARTING STATE: Hands-on postgresql scenario: debug performance in a simulated environment.
+  SYMPTOM / STARTING STATE: Hands-on postgresql scenario: debug performance on this host.
 
 
   OBJECTIVE: Understand the current failure mode affecting Debug postgresql performance (lab 30); Restore
@@ -53,7 +53,7 @@ objectives:
 - Understand the current failure mode affecting Debug postgresql performance (lab 30)
 - Restore expected service behavior with a minimal, documented change
 - Verify the fix holds under a realistic smoke test
-initial_state: 'Hands-on postgresql scenario: debug performance in a simulated environment.'
+initial_state: 'Hands-on postgresql scenario: debug performance on this host.'
 hints:
 - order: 1
   cost: 0
@@ -106,7 +106,7 @@ coding_spec:
   language: python
   entrypoint: solution.py
   kind: fix
-  instructions: 'Hands-on postgresql scenario: debug performance in a simulated environment.'
+  instructions: 'Hands-on postgresql scenario: debug performance on this host.'
   files:
   - path: solution.py
     content: "def solution():\n    raise NotImplementedError('Apply the fix')\n"
@@ -139,7 +139,7 @@ environment:
     os: FixitLab PostgreSQL cluster
     hostname: lab-primary
     ip: 127.0.0.1
-    specs: local offline simulation
+    specs: local offline lab environment
   pre_installed:
   - bash
   - coreutils

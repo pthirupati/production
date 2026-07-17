@@ -12,7 +12,7 @@ description: 'CONTEXT: A team operating Terraform IaC has raised a ticket for `C
   for this incident. All tools run locally — no paid APIs or external cloud calls are required.
 
 
-  SYMPTOM / STARTING STATE: Simulated AWS environment with a CloudFront distribution configured. The origin
+  SYMPTOM / STARTING STATE: AWS environment with a CloudFront distribution configured. The origin
   domain is set to an invalid ALB or S3 endpoint, resulting in 502 errors for all requests through the
   CDN.
 
@@ -41,7 +41,7 @@ description: 'CONTEXT: A team operating Terraform IaC has raised a ticket for `C
 
   WHAT TO AVOID: Do not apply broad destructive changes, skip evidence gathering, or fake completion with
   marker files — the checker validates real system state.'
-initial_state: Simulated AWS environment with a CloudFront distribution configured. The origin domain
+initial_state: AWS environment with a CloudFront distribution configured. The origin domain
   is set to an invalid ALB or S3 endpoint, resulting in 502 errors for all requests through the CDN.
 objectives:
 - Inspect the CloudFront distribution origin configuration and identify the incorrect domain
@@ -128,7 +128,7 @@ environment:
     os: FixitLab Terraform workspace
     hostname: lab-primary
     ip: 127.0.0.1
-    specs: local offline simulation
+    specs: local offline lab environment
   pre_installed:
   - bash
   - coreutils

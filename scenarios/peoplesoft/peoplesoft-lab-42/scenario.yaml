@@ -14,7 +14,7 @@ description: 'CONTEXT: A team operating PeopleSoft administration has raised a t
   calls are required.
 
 
-  SYMPTOM / STARTING STATE: Hands-on peoplesoft scenario: diagnose authentication in a simulated environment.
+  SYMPTOM / STARTING STATE: Hands-on peoplesoft scenario: diagnose authentication on this host.
 
 
   OBJECTIVE: Understand the current failure mode affecting Diagnose peoplesoft authentication (lab 42);
@@ -55,7 +55,7 @@ objectives:
 - Understand the current failure mode affecting Diagnose peoplesoft authentication (lab 42)
 - Restore expected service behavior with a minimal, documented change
 - Verify the fix holds under a realistic smoke test
-initial_state: 'Hands-on peoplesoft scenario: diagnose authentication in a simulated environment.'
+initial_state: 'Hands-on peoplesoft scenario: diagnose authentication on this host.'
 hints:
 - order: 1
   cost: 0
@@ -132,7 +132,7 @@ environment:
     os: FixitLab PeopleSoft app server lab
     hostname: lab-primary
     ip: 127.0.0.1
-    specs: local offline simulation
+    specs: local offline lab environment
   pre_installed:
   - bash
   - coreutils

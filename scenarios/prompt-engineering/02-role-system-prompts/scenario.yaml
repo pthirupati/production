@@ -12,7 +12,7 @@ description: 'CONTEXT: A team operating prompt engineering has raised a ticket f
 
 
   SYMPTOM / STARTING STATE: The guided AI practice console opens. Set a role for the assistant and watch
-  how the simulated reply changes tone and depth. Everything is rule-based and free — no API key required.
+  how the reply changes tone and depth. Everything is rule-based and free — no API key required.
 
 
   OBJECTIVE: Explain how a system prompt differs from a user message; Write a role/persona instruction
@@ -53,8 +53,7 @@ objectives:
 - Explain how a system prompt differs from a user message
 - Write a role/persona instruction that sets expertise, audience, and tone
 - Pass the exercise that requires a clear persona plus behavioral rules
-initial_state: The guided AI practice console opens. Set a role for the assistant and watch how the simulated
-  reply changes tone and depth. Everything is rule-based and free — no API key required.
+initial_state: The guided AI practice console opens. Set a role for the assistant and watch how the reply changes tone and depth. Everything is rule-based and free — no API key required.
 solution_explanation: System prompts set durable behavior ("You are a senior SRE. Always show the command
   first, then a one-line why."). They persist across the conversation, unlike a one-off user message.
   A good role specifies expertise level, the audience, the tone, and any always/never rules. With Claude,
@@ -212,7 +211,7 @@ environment:
     os: FixitLab LLM practice workspace
     hostname: lab-primary
     ip: 127.0.0.1
-    specs: local offline simulation
+    specs: local offline lab environment
   pre_installed:
   - bash
   - coreutils

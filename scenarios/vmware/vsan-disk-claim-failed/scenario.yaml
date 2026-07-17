@@ -21,7 +21,7 @@ description: 'CONTEXT: A team operating VMware vSphere has raised a ticket for `
   All tools run locally — no paid APIs or external cloud calls are required.
 
 
-  SYMPTOM / STARTING STATE: VMware vCenter simulation. vSAN cluster with 4 hosts. New NVMe disk /dev/nvme1n1
+  SYMPTOM / STARTING STATE: VMware vCenter. vSAN cluster with 4 hosts. New NVMe disk /dev/nvme1n1
 
   added to esxi-04 but failing to claim. Disk has GPT partition table from previous use.
 
@@ -56,7 +56,7 @@ objectives:
 - SSH into the ESXi host and verify the existing partition table
 - Wipe the partition table using partedUtil or dd
 - Retry the vSAN disk claim and verify the disk is successfully added
-initial_state: 'VMware vCenter simulation. vSAN cluster with 4 hosts. New NVMe disk /dev/nvme1n1
+initial_state: 'VMware vCenter. vSAN cluster with 4 hosts. New NVMe disk /dev/nvme1n1
 
   added to esxi-04 but failing to claim. Disk has GPT partition table from previous use.
 
@@ -129,7 +129,7 @@ environment:
     os: FixitLab vSphere lab
     hostname: lab-primary
     ip: 127.0.0.1
-    specs: local offline simulation
+    specs: local offline lab environment
   pre_installed:
   - bash
   - coreutils

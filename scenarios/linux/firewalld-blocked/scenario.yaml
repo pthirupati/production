@@ -9,7 +9,7 @@ description: 'CONTEXT: A team operating Linux administration has raised a ticket
   host for this incident. All tools run locally — no paid APIs or external cloud calls are required.
 
 
-  SYMPTOM / STARTING STATE: Simulated RHEL host. nginx is active and answers on localhost, but firewalld
+  SYMPTOM / STARTING STATE: RHEL host. nginx is active and answers on localhost, but firewalld
   does not permit inbound HTTP, so external access to port 80 is blocked.
 
 
@@ -81,7 +81,7 @@ hints:
 
 
     WHY: systemd will not start nginx until `nginx -t` passes.'
-initial_state: Simulated RHEL host. nginx is active and answers on localhost, but firewalld does not permit
+initial_state: RHEL host. nginx is active and answers on localhost, but firewalld does not permit
   inbound HTTP, so external access to port 80 is blocked.
 is_free: false
 lab_mode: simulation
@@ -113,7 +113,7 @@ environment:
     os: FixitLab Linux practice server
     hostname: lab-primary
     ip: 127.0.0.1
-    specs: local offline simulation
+    specs: local offline lab environment
   pre_installed:
   - bash
   - coreutils

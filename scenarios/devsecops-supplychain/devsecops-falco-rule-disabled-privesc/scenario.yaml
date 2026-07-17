@@ -17,7 +17,7 @@ description: 'CONTEXT: A team operating devsecops supplychain has raised a ticke
   state is repaired.
 
 
-  ENVIRONMENT: You are working in FixitLab''s offline FixitLab practice environment. The architecture
+  ENVIRONMENT: You are working in FixitLab''s offline FixitLab lab environment. The architecture
   is a single lab-primary node exposing CLI and configuration files; treat it as the production host for
   this incident. All tools run locally — no paid APIs or external cloud calls are required.
 
@@ -101,7 +101,7 @@ hints:
 
     WHY: the checker validates the container is actually running.'
 summary: |-
-  Diagnose and resolve falco misses a privilege-escalation event in the devsecops-supplychain simulation lab and verify the healthy end state
+  Diagnose and resolve falco misses a privilege-escalation event in the devsecops-supplychain lab and verify the healthy end state
 estimated_minutes: 30
 xp_reward: 100
 prerequisites:
@@ -122,7 +122,7 @@ environment:
     os: FixitLab supply-chain security lab
     hostname: lab-primary
     ip: 127.0.0.1
-    specs: local offline simulation
+    specs: local offline lab environment
   pre_installed:
   - bash
   - coreutils

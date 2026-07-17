@@ -9,7 +9,7 @@ description: 'CONTEXT: A team operating bare metal operations has raised a ticke
   for this incident. All tools run locally — no paid APIs or external cloud calls are required.
 
 
-  SYMPTOM / STARTING STATE: Simulated RHEL host running libvirt/KVM. A defined guest domain is in the
+  SYMPTOM / STARTING STATE: RHEL host running libvirt/KVM. A defined guest domain is in the
   "shut off" state and needs to be started; the application it hosts is currently down.
 
 
@@ -90,7 +90,7 @@ hints:
 
     WHY: the grader validates real system state, not marker files — a fix only counts when the subsystem
     is actually healthy.'
-initial_state: Simulated RHEL host running libvirt/KVM. A defined guest domain is in the "shut off" state
+initial_state: RHEL host running libvirt/KVM. A defined guest domain is in the "shut off" state
   and needs to be started; the application it hosts is currently down.
 is_free: false
 jira_priority: Medium
@@ -126,7 +126,7 @@ environment:
     os: FixitLab physical server lab
     hostname: lab-primary
     ip: 127.0.0.1
-    specs: local offline simulation
+    specs: local offline lab environment
   pre_installed:
   - baremetal
   - bash

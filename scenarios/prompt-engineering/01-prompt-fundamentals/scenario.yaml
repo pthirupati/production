@@ -12,7 +12,7 @@ description: 'CONTEXT: A team operating prompt engineering has raised a ticket f
   host for this incident. All tools run locally — no paid APIs or external cloud calls are required.
 
 
-  SYMPTOM / STARTING STATE: A guided AI practice console opens in your browser. It is a rule-based simulator
+  SYMPTOM / STARTING STATE: A guided AI practice console opens in your browser. It is a rule-based tool responder
   (no real model, no API cost) that scores your prompt and replies with a representative answer so you
   can feel the difference specificity makes.
 
@@ -55,7 +55,7 @@ objectives:
 - Understand the five ingredients of a strong prompt (role, context, task, constraints, format)
 - Rewrite a vague prompt so the practice console scores it 80+ /100
 - Complete the guided exercise that asks for a specific, constrained answer
-initial_state: A guided AI practice console opens in your browser. It is a rule-based simulator (no real
+initial_state: A guided AI practice console opens in your browser. It is a rule-based tool responder (no real
   model, no API cost) that scores your prompt and replies with a representative answer so you can feel
   the difference specificity makes.
 solution_explanation: 'Strong prompts almost always include: WHO the AI should act as, the CONTEXT it
@@ -212,7 +212,7 @@ environment:
     os: FixitLab LLM practice workspace
     hostname: lab-primary
     ip: 127.0.0.1
-    specs: local offline simulation
+    specs: local offline lab environment
   pre_installed:
   - bash
   - coreutils

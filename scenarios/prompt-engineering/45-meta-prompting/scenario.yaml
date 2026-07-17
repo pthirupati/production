@@ -19,7 +19,7 @@ description: 'CONTEXT: A team operating prompt engineering has raised a ticket f
 
   OBJECTIVE: Ask the model to draft a strong prompt from a rough goal, specifying the criteria; Ask the
   model to critique a prompt against role, context, task, constraints, and format; Pass both graded exercises
-  (the simulator re-checks your prompt server-side). Acceptance criteria: the change is minimal and reversible,
+  (the grader re-checks your prompt server-side). Acceptance criteria: the change is minimal and reversible,
   and success means all hidden tests pass.
 
 
@@ -54,7 +54,7 @@ dual_terminal: false
 objectives:
 - Ask the model to draft a strong prompt from a rough goal, specifying the criteria
 - Ask the model to critique a prompt against role, context, task, constraints, and format
-- Pass both graded exercises (the simulator re-checks your prompt server-side)
+- Pass both graded exercises (the grader re-checks your prompt server-side)
 initial_state: The guided AI practice console opens with two graded meta-prompting exercises. Write a
   prompt that asks the model to draft a prompt, then one that asks it to critique a prompt. Rule-based
   and free — strong meta-prompts pass, vague ones fail.
@@ -221,14 +221,14 @@ linked_tutorial: prompt-engineering-fundamentals
 what_you_will_learn:
 - Ask the model to draft a strong prompt from a rough goal, specifying the criteria
 - Ask the model to critique a prompt against role, context, task, constraints, and format
-- Pass both graded exercises (the simulator re-checks your prompt server-side)
+- Pass both graded exercises (the grader re-checks your prompt server-side)
 environment:
   nodes:
   - role: primary
     os: FixitLab LLM practice workspace
     hostname: lab-primary
     ip: 127.0.0.1
-    specs: local offline simulation
+    specs: local offline lab environment
   pre_installed:
   - bash
   - coreutils

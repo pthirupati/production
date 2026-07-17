@@ -1,4 +1,4 @@
-title: 'RHEL Simulation: Ansible SSH Key Failure'
+title: 'RHEL Lab: Ansible SSH Key Failure'
 slug: ansible-rhel-ansible-ssh-lab
 technology: ansible
 category: Fix
@@ -12,7 +12,7 @@ dual_terminal: true
 infrastructure_type: docker
 jira_priority: Medium
 is_free: false
-description: 'CONTEXT: A team operating Ansible automation has raised a ticket for `RHEL Simulation: Ansible
+description: 'CONTEXT: A team operating Ansible automation has raised a ticket for `RHEL Lab: Ansible
   SSH Key Failure`. A customer-facing workflow is degraded and the on-call engineer (you) must diagnose
   and resolve it. Business impact: reduced service reliability and blocked users until the underlying
   state is repaired.
@@ -23,7 +23,7 @@ description: 'CONTEXT: A team operating Ansible automation has raised a ticket f
   host for this incident. All tools run locally — no paid APIs or external cloud calls are required.
 
 
-  SYMPTOM / STARTING STATE: Simulated ansible-control node with inventory at /etc/ansible/hosts. web1
+  SYMPTOM / STARTING STATE: ansible-control node with inventory at /etc/ansible/hosts. web1
   is reachable over SSH key auth; web2 rejects publickey authentication because the control node''s key
   isn''t authorized there.
 
@@ -57,7 +57,7 @@ objectives:
 - Run the ping and identify that web2 is UNREACHABLE on publickey auth
 - Install the control node's public key into web2's authorized_keys
 - Verify every host in the group responds to the Ansible ping
-initial_state: Simulated ansible-control node with inventory at /etc/ansible/hosts. web1 is reachable
+initial_state: ansible-control node with inventory at /etc/ansible/hosts. web1 is reachable
   over SSH key auth; web2 rejects publickey authentication because the control node's key isn't authorized
   there.
 hints:
@@ -65,15 +65,15 @@ hints:
   cost: 0
   content: 'ORIENT — what to observe and why:
 
-    Do not touch anything yet. First observe the symptom: RHEL simulation is not behaving as the scenario
-    objectives require. This lab is about RHEL simulation — how RHEL simulation behaves in a Ansible automation
+    Do not touch anything yet. First observe the symptom: RHEL is not behaving as the scenario
+    objectives require. This lab is about RHEL — how RHEL behaves in a Ansible automation
     environment. Read the objectives and the current state, and note precisely what looks wrong versus
     healthy before you form any theory.'
 - order: 2
   cost: 10
   content: 'APPROACH — the troubleshooting method:
 
-    Work from evidence, not guesses. For RHEL simulation problems the reliable method is: (1) reproduce/observe
+    Work from evidence, not guesses. For RHEL problems the reliable method is: (1) reproduce/observe
     the failure, (2) narrow from the whole system down to the one component that owns the symptom, (3)
     change exactly one thing, (4) re-check. Fix the underlying misconfiguration you identified (not just
     the noisy log line), changing one thing at a time.'
@@ -104,7 +104,7 @@ hints:
 
 
     WHY: Ansible labs grade real playbook outcomes, not marker files.'
-summary: 'Complete the rhel simulation: ansible ssh key failure ansible lab and verify success with the
+summary: 'Complete the rhel: ansible ssh key failure ansible lab and verify success with the
   checker'
 estimated_minutes: 20
 xp_reward: 100
@@ -125,7 +125,7 @@ environment:
     os: FixitLab Ansible control node
     hostname: lab-primary
     ip: 127.0.0.1
-    specs: local offline simulation
+    specs: local offline lab environment
   pre_installed:
   - ansible
   - ansible-playbook
@@ -136,8 +136,8 @@ environment:
     password: lab123
 tasks:
 - id: task_1
-  title: 'RHEL Simulation: Ansible SSH Key Failure'
-  description: 'Restore healthy behavior for RHEL Simulation: Ansible SSH Key Failure by investigating
+  title: 'RHEL Lab: Ansible SSH Key Failure'
+  description: 'Restore healthy behavior for RHEL Lab: Ansible SSH Key Failure by investigating
     the failure, applying the smallest safe fix, and validating the outcome.'
   background: 'This ansible lab teaches systematic troubleshooting: observe, hypothesize, change, verify.'
   validation:

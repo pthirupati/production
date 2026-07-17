@@ -12,7 +12,7 @@ description: 'CONTEXT: A team operating Node.js backends has raised a ticket for
   for this incident. All tools run locally — no paid APIs or external cloud calls are required.
 
 
-  SYMPTOM / STARTING STATE: Hands-on nodejs scenario: monitor replication in a simulated environment.
+  SYMPTOM / STARTING STATE: Hands-on nodejs scenario: monitor replication on this host.
 
 
   OBJECTIVE: Understand the current failure mode affecting Monitor nodejs replication (lab 27); Restore
@@ -53,7 +53,7 @@ objectives:
 - Understand the current failure mode affecting Monitor nodejs replication (lab 27)
 - Restore expected service behavior with a minimal, documented change
 - Verify the fix holds under a realistic smoke test
-initial_state: 'Hands-on nodejs scenario: monitor replication in a simulated environment.'
+initial_state: 'Hands-on nodejs scenario: monitor replication on this host.'
 hints:
 - order: 1
   cost: 0
@@ -106,7 +106,7 @@ coding_spec:
   language: python
   entrypoint: solution.py
   kind: fix
-  instructions: 'Hands-on nodejs scenario: monitor replication in a simulated environment.'
+  instructions: 'Hands-on nodejs scenario: monitor replication on this host.'
   files:
   - path: solution.py
     content: "def solution():\n    raise NotImplementedError('Apply the fix')\n"
@@ -138,7 +138,7 @@ environment:
     os: FixitLab Node.js application
     hostname: lab-primary
     ip: 127.0.0.1
-    specs: local offline simulation
+    specs: local offline lab environment
   pre_installed:
   - bash
   - coreutils

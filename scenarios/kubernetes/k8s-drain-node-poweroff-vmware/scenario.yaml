@@ -23,7 +23,7 @@ description: 'CONTEXT: A team operating Kubernetes has raised a ticket for `Node
   down for maintenance.
 
 
-  OBJECTIVE: Confirm worker-1 hosts all billing pods (kubectl get pods -o wide); Open the VMware simulator
+  OBJECTIVE: Confirm worker-1 hosts all billing pods (kubectl get pods -o wide); Open the VMware console
   and power on the replacement worker VM k8s-worker-2; Confirm worker-2 is Ready (kubectl get nodes).
   Acceptance criteria: the change is minimal and reversible, and success means `kubectl get pods` shows
   every pod Running.
@@ -58,7 +58,7 @@ initial_state: 'A Kubernetes cluster with one worker (worker-1) hosting all 3 bi
   '
 objectives:
 - Confirm worker-1 hosts all billing pods (kubectl get pods -o wide)
-- Open the VMware simulator and power on the replacement worker VM k8s-worker-2
+- Open the VMware console and power on the replacement worker VM k8s-worker-2
 - Confirm worker-2 is Ready (kubectl get nodes)
 - Cordon and drain worker-1 so its pods reschedule (kubectl drain worker-1 --ignore-daemonsets)
 - Verify worker-1 is unschedulable with no pods and all billing pods Running on worker-2
@@ -130,7 +130,7 @@ tags:
 linked_tutorial: kubernetes-fundamentals
 what_you_will_learn:
 - Confirm worker-1 hosts all billing pods (kubectl get pods -o wide)
-- Open the VMware simulator and power on the replacement worker VM k8s-worker-2
+- Open the VMware console and power on the replacement worker VM k8s-worker-2
 - Confirm worker-2 is Ready (kubectl get nodes)
 - Cordon and drain worker-1 so its pods reschedule (kubectl drain worker-1 --ignore-daemonsets)
 - Verify worker-1 is unschedulable with no pods and all billing pods Running on worker-2
@@ -140,7 +140,7 @@ environment:
     os: FixitLab Kubernetes cluster
     hostname: lab-primary
     ip: 127.0.0.1
-    specs: local offline simulation
+    specs: local offline lab environment
   pre_installed:
   - bash
   - coreutils

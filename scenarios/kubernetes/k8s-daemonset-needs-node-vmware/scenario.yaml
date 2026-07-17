@@ -23,7 +23,7 @@ description: 'CONTEXT: A team operating Kubernetes has raised a ticket for `Daem
 
 
   OBJECTIVE: Confirm a node-agent DaemonSet pod is Pending (kubectl get pods, kubectl get ds); Confirm
-  only one worker node exists (kubectl get nodes); Open the VMware simulator and power on the worker-node
+  only one worker node exists (kubectl get nodes); Open the VMware console and power on the worker-node
   VM k8s-worker-2. Acceptance criteria: the change is minimal and reversible, and success means `kubectl
   get pods` shows every pod Running.
 
@@ -58,7 +58,7 @@ initial_state: 'A Kubernetes cluster with one worker (worker-1) running a node-a
 objectives:
 - Confirm a node-agent DaemonSet pod is Pending (kubectl get pods, kubectl get ds)
 - Confirm only one worker node exists (kubectl get nodes)
-- Open the VMware simulator and power on the worker-node VM k8s-worker-2
+- Open the VMware console and power on the worker-node VM k8s-worker-2
 - Confirm worker-2 is Ready and the DaemonSet schedules its pod there
 - Verify the DaemonSet is fully scheduled and all pods Running (kubectl get ds, kubectl get pods)
 lab_mode: simulation
@@ -130,7 +130,7 @@ linked_tutorial: kubernetes-fundamentals
 what_you_will_learn:
 - Confirm a node-agent DaemonSet pod is Pending (kubectl get pods, kubectl get ds)
 - Confirm only one worker node exists (kubectl get nodes)
-- Open the VMware simulator and power on the worker-node VM k8s-worker-2
+- Open the VMware console and power on the worker-node VM k8s-worker-2
 - Confirm worker-2 is Ready and the DaemonSet schedules its pod there
 - Verify the DaemonSet is fully scheduled and all pods Running (kubectl get ds, kubectl get pods)
 environment:
@@ -139,7 +139,7 @@ environment:
     os: FixitLab Kubernetes cluster
     hostname: lab-primary
     ip: 127.0.0.1
-    specs: local offline simulation
+    specs: local offline lab environment
   pre_installed:
   - bash
   - coreutils

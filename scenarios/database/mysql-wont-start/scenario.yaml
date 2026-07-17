@@ -10,7 +10,7 @@ description: 'CONTEXT: A team operating database administration has raised a tic
   this incident. All tools run locally — no paid APIs or external cloud calls are required.
 
 
-  SYMPTOM / STARTING STATE: Simulated RHEL host. `systemctl start mysqld` fails and the unit is in a failed
+  SYMPTOM / STARTING STATE: RHEL host. `systemctl start mysqld` fails and the unit is in a failed
   state; the MySQL error log records why startup aborted (config error or permission/lock issue).
 
 
@@ -83,7 +83,7 @@ hints:
 
 
     WHY: MySQL often fails silently until you read the error log.'
-initial_state: Simulated RHEL host. `systemctl start mysqld` fails and the unit is in a failed state;
+initial_state: RHEL host. `systemctl start mysqld` fails and the unit is in a failed state;
   the MySQL error log records why startup aborted (config error or permission/lock issue).
 is_free: false
 jira_priority: Medium
@@ -119,7 +119,7 @@ environment:
     os: FixitLab database server
     hostname: lab-primary
     ip: 127.0.0.1
-    specs: local offline simulation
+    specs: local offline lab environment
   pre_installed:
   - bash
   - coreutils

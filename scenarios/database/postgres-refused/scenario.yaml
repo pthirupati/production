@@ -9,7 +9,7 @@ description: 'CONTEXT: A team operating database administration has raised a tic
   this incident. All tools run locally — no paid APIs or external cloud calls are required.
 
 
-  SYMPTOM / STARTING STATE: Simulated RHEL host. PostgreSQL is not accepting connections — the service
+  SYMPTOM / STARTING STATE: RHEL host. PostgreSQL is not accepting connections — the service
   is stopped or failed. Connection attempts return "could not connect ... Connection refused".
 
 
@@ -81,7 +81,7 @@ hints:
 
 
     WHY: the database must accept connections, not just start.'
-initial_state: Simulated RHEL host. PostgreSQL is not accepting connections — the service is stopped or
+initial_state: RHEL host. PostgreSQL is not accepting connections — the service is stopped or
   failed. Connection attempts return "could not connect ... Connection refused".
 is_free: false
 jira_priority: Medium
@@ -117,7 +117,7 @@ environment:
     os: FixitLab database server
     hostname: lab-primary
     ip: 127.0.0.1
-    specs: local offline simulation
+    specs: local offline lab environment
   pre_installed:
   - bash
   - coreutils
