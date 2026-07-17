@@ -13,6 +13,8 @@ from apps.labs.provisioner.simulation import chaos_engine as ce
 from apps.vmware_sim import engine as vmware_engine
 from apps.vmware_sim import windows_engine
 from apps.vmware_sim import netapp_engine
+from apps.vmware_sim import awx_engine
+from apps.vmware_sim import soc_engine
 
 
 class VmwareChaosLedgerTests(TestCase):
@@ -106,3 +108,54 @@ class NetAppChaosLedgerTests(TestCase):
         res = netapp_engine.apply_action(self.sid, "resize_volume", {"name": near_full})
         self.assertTrue(res["ok"], res)
         self.assertEqual(ce.list_faults(self.sid, active_only=True), [])
+
+
+class AwxChaosLedgerTests(TestCase):
+    def setUp(self):
+        cache.clear()
+        self.sid = "chaos-cross-awx"
+        awx_engine.drop_session(self.sid)
+        self.addCleanup(awx_engine.drop_session, self.sid)
+        self.addCleanup(cache.clear)
+
+    def _first_host(self):
+        state = awx_engine.get_state(self.sid)["inventory"]
+        return state["hosts"][0]
+
+    def test_disabling_a_host_publishes_drop_nic_fault(self):
+        host = self._first_host()
+        awx_engine.apply_action(self.sid, "login", {"user": "admin"})
+        res = awx_engine.apply_action(self.sid, "toggle_host", {"host_id": host["id"]})
+        self.assertTrue(res["ok"], res)
+        active = ce.list_faults(self.sid, active_only=True)
+        self.assertEqual(len(active), 1)
+        self.assertEqual(active[0]["fault_type"], "drop_nic")
+        self.assertEqual(active[0]["target"], host["name"])
+
+    def test_re_enabling_a_host_clears_drop_nic_fault(self):
+        host = self._first_host()
+        awx_engine.apply_action(self.sid, "login", {"user": "admin"})
+        r1 = awx_engine.apply_action(self.sid, "toggle_host", {"host_id": host["id"]})
+        self.assertTrue(r1["ok"], r1)
+        r2 = awx_engine.apply_action(self.sid, "toggle_host", {"host_id": host["id"]})
+        self.assertTrue(r2["ok"], r2)
+        self.assertEqual(ce.list_faults(self.sid, active_only=True), [])
+
+
+class SocChaosLedgerTests(TestCase):
+    def setUp(self):
+        cache.clear()
+        self.sid = "chaos-cross-soc"
+        soc_engine.drop_session(self.sid)
+        self.addCleanup(soc_engine.drop_session, self.sid)
+        self.addCleanup(cache.clear)
+
+    def test_quarantine_host_publishes_drop_nic_fault(self):
+        soc_engine.get_state(self.sid, "soc-quarantine-malware")
+        soc_engine.apply_action(self.sid, "login", {"user": "analyst"})
+        res = soc_engine.apply_action(self.sid, "quarantine_host", {"asset": "ws-finance-07"})
+        self.assertTrue(res["ok"], res)
+        active = ce.list_faults(self.sid, active_only=True)
+        self.assertEqual(len(active), 1)
+        self.assertEqual(active[0]["fault_type"], "drop_nic")
+        self.assertEqual(active[0]["target"], "ws-finance-07")

@@ -17,7 +17,12 @@ Legend: `[x]` done · `[~]` partial · `[ ]` open
 ## Phase 1 — Scenario-scoped LabServer identity + event bus
 - [x] ServerIdentity keyed by `session_id`
 - [x] VMware ↔ terminal NIC/disk/power bridge
-- [~] AWS ↔ terminal bridge (exists; FE Zustand still often SoT)
+- [x] AWS ↔ terminal bridge — audited every awsStore.js action against aws_engine.py's 8 graded
+      `broken` marker types; every action that can satisfy one already syncs to the backend
+      (`GuiSyncContractTests` + this session's detachVolume/deleteSecurityGroup fixes). 30/30 green.
+      Non-core AWS services (RDS/Lambda/DynamoDB/CloudFormation/CloudWatch/ELB/ASG) intentionally
+      remain frontend-only — aws_engine doesn't model or grade them today, so backend-authority there
+      is moot until/unless per-service grading is authored (see new backlog item below).
 - [x] `seed_scenario_lab_servers` + YAML `lab_servers` for heroes
 - [x] Bidirectional sync: AWX
 - [x] Bidirectional sync: Grafana / Prometheus
@@ -73,7 +78,11 @@ Legend: `[x]` done · `[~]` partial · `[ ]` open
 - [x] 3.1 Scenario schema + hero linter in CI
 - [ ] 3.1 Catalog migration + enricher at scale
 - [x] 3.2 Chaos engine foundation
-- [x] 3.2 Wire chaos into VMware / Windows / NetApp (drop_nic/stop_service/fill_disk); AWS/SOC/DellEMC still open
+- [x] 3.2 Wire chaos into VMware / Windows / NetApp / AWX / SOC (drop_nic/stop_service/fill_disk).
+      AWS and Dell EMC intentionally left unwired — audited both engines' actual `broken` marker
+      shapes (EBS/SG for AWS; unmapped-volume/masking-view for Dell EMC) and neither has a clean
+      semantic fit with the current 5 fault types (drop_nic/fill_disk/stop_service/trip_pdu/raise_temp);
+      forcing a mismatched label would hurt the ledger's signal quality more than help it.
 - [x] 3.4 Cross-console fault ledger API (`GET /api/vmware/sessions/<id>/faults/`) — any console can see what's broken
 - [x] New pack: Microsoft Azure — Portal console (Resource groups/VMs/VNets/NSGs/Managed disks), server-authoritative
       backend (`azure_engine.py`), cross-tech bridge to the Linux terminal (`azure_bridge.py` — VM resize really
@@ -139,11 +148,26 @@ Legend: `[x]` done · `[~]` partial · `[ ]` open
 - [ ] Health Check workflow permissions fixed (issues:write)
 
 ## New technology packs (scenario-scoped facades first)
-- [ ] Azure Portal pack + heroes + LabServer (Azure VM ≠ physical rack)
+- [x] Azure Portal pack + heroes + LabServer — Resource Groups/VNets/NSGs (real priority-ordered rule
+      eval)/VMs/Managed Disks, `azure_engine.py` + `azure_bridge.py` (VM resize really changes
+      nproc/free in the same-session Linux terminal — the master-prompt canonical example) +
+      `sync_azure_vm` + full provisioner dispatch/seed wiring + `AzureConsole.jsx`. 3 hero labs, 23 new
+      backend tests, full catalog lint clean.
 - [ ] GCP Console pack + heroes
 - [ ] OpenStack Horizon pack + heroes
 - [ ] OpenShift Console pack + heroes
 - [ ] Expand networking / identity / backup (Veeam) / Hyper-V as needed
+
+## Grading depth (new backlog item — found during the AWS SoT audit)
+- [ ] ~350 `academy-aws-*` scenarios (EKS/SSM/Kinesis/ELB/Route53/Cognito/RDS/Lambda/DynamoDB/
+      CloudFormation/CloudWatch/ASG/...) ship a generic `check.sh` stub with no topic-specific
+      `broken` marker in `aws_engine._apply_preset`, so they grade via the fail-closed-until-any-
+      activity fallback (`validate_aws_lab`'s final `if not events: fail` branch) rather than checking
+      the actual topic. Not a regression — it is at minimum fail-closed on a fresh session — but it is
+      not rigorous. Fixing this means authoring a `broken` preset + a specific check per AWS service
+      (a large content project, comparable in size to a new tech pack per service) plus, for the
+      services aws_engine does not model at all yet (RDS/Lambda/DynamoDB/CloudFormation/CloudWatch/
+      ELB/ASG), extending the engine's state model first.
 
 ## Ops / CI
 - [x] Fix Health Check resolve job 403 (`issues: write`)

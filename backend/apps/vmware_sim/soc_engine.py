@@ -208,6 +208,11 @@ def apply_action(session_id: str, action: str, payload: dict | None = None) -> d
         broken.pop("needs_quarantine", None)
         _event(state, f"Host {name} quarantined from network", "success")
         _save(session_id, entry)
+        try:
+            from apps.labs.provisioner.simulation.chaos_engine import inject as _chaos_inject
+            _chaos_inject(session_id, "drop_nic", name, detail={"console": "soc", "reason": "quarantined"})
+        except Exception:  # pragma: no cover
+            pass
         return {"ok": True, "message": "Host quarantined"}
 
     if action == "block_ip":
