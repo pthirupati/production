@@ -220,15 +220,12 @@ def main() -> int:
         f"{total_errs} findings."
     )
 
-    if args.strict_heroes and hero_fail:
-        return 1
-    if other_fail > args.max_failures and not args.strict_heroes:
-        # Default mode: only fail hard on heroes when --strict-heroes
-        pass
-    if args.strict_heroes:
-        return 1 if hero_fail else 0
-    # Non-strict: exit 0 if heroes clean (when scanning default roots)
+    # Heroes are always held to zero-tolerance regardless of --strict-heroes
+    # (that flag only controls whether the CALLER additionally wants a hard
+    # failure signal; heroes failing is always reported and always fails).
     if hero_fail:
+        return 1
+    if other_fail > args.max_failures:
         return 1
     return 0
 

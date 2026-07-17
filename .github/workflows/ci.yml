@@ -42,6 +42,8 @@ jobs:
         run: pip install -r backend/requirements.txt
       - name: Lint hero scenario YAML
         run: python scripts/lint_scenarios.py --strict-heroes
+      - name: Lint full scenario catalog (no banned learner-facing words)
+        run: python scripts/lint_scenarios.py --all --max-failures 0
       - name: Django tests
         env:
           DATABASE_URL: postgres://fixitlab:fixitlab@localhost:5432/fixitlab_test
