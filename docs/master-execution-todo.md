@@ -24,7 +24,8 @@ Legend: `[x]` done · `[~]` partial · `[ ]` open
 - [x] Bidirectional sync: Kubernetes
 - [~] Bidirectional sync: GPU (seed + set_gpu on modprobe; deepen grading next)
 - [x] Bidirectional sync: Windows
-- [ ] Bidirectional sync: Commvault / NetApp / Dell / SOC / Datacenter (beyond seed)
+- [x] Bidirectional sync: Commvault (clients) / NetApp (storage) / Dell EMC (storage) / SOC (assets, quarantine=power)
+- [~] Datacenter (already had deeper sync from earlier pass; see G-13)
 - [ ] `physical_location` / `bmc` / `network_port` on every physical LabServer path
 - [ ] Event bus correlation/trace ID on every mutation
 
@@ -64,7 +65,9 @@ Legend: `[x]` done · `[~]` partial · `[ ]` open
 - [~] Scenario YAML quality (heroes linted; catalog open)
 - [~] Jira bot coaching depth
 - [ ] GUI polish per every scenario type
-- [ ] CI/CD rebuilt on real runner (FE CicdPipelineSim ↔ backend cicd_engine still disconnected; engine itself unused by any scenario today)
+- [x] CI/CD grading regression fixed (dispatcher no longer shadows terminal catalog)
+- [ ] CI/CD rebuilt on real runner (FE CicdPipelineSim ↔ backend cicd_engine still disconnected; engine itself unused by any scenario today — deliberately, until FE wiring + explicit opt-in exist)
+- [x] AWS EBS detach round-trips through engine/bridge/ServerIdentity (was attach-only)
 
 ## Phase 3 — Cross-cutting systems
 - [x] 3.1 Scenario schema + hero linter in CI
