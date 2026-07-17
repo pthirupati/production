@@ -1,0 +1,18 @@
+name: Google Cloud Platform
+slug: gcp
+description: >-
+  Operate a Google Cloud project through an authentic Cloud Console —
+  VPC networks and subnets, firewall rules with real priority-ordered
+  allow/deny evaluation, Compute Engine instances (machine type/vCPU/RAM,
+  power lifecycle), and persistent disks. Change an instance's machine type
+  and watch its vCPU/RAM change inside the very same Linux guest over the
+  lab terminal, open a firewall rule that is silently blocking inbound SSH,
+  and attach a pending persistent disk to the host that needs it. Mirrors
+  the day-to-day work of a GCP infrastructure engineer keeping production
+  workloads sized, reachable, and provisioned correctly.
+icon: cloud
+color: yellow
+order: 45
+price: 499
+is_active: true
+coming_soon: false

@@ -1,0 +1,126 @@
+title: Firewall Rule Removed — SSH to a Production Instance Times Out
+slug: gcp-firewall-blocks-ssh
+technology: gcp
+category: Troubleshoot
+difficulty: medium
+lab_mode: simulation
+simulation_type: gcp
+infrastructure_type: docker
+time_limit: 900
+max_score: 100
+is_free: true
+jira_priority: Critical
+dual_terminal: true
+description: 'CONTEXT: A deploy engineer opened a ticket saying `ssh web01` has been timing out for the
+  last hour with no changes to their SSH key or client — "connection timed out", not "connection refused"
+  or "permission denied". That distinction matters: a timeout at the network layer, not the application
+  layer.
+
+  ENVIRONMENT: web01 sits in vpc-prod / subnet-us-central1, tagged `web`. The VPC Firewall rules blade in
+  the Cloud Console evaluates ingress rules in priority order (lowest number first) — the first matching
+  rule wins, exactly like production GCP.
+
+  SYMPTOM / STARTING STATE: web01 is RUNNING and reachable on the network, but the VPC has no rule
+  explicitly allowing ingress TCP/22 — only allow-http (TCP/80) and the implied default-deny-ingress at
+  priority 65534. Every inbound SSH attempt falls through to that deny rule and times out.
+
+  IMPACT: The on-call deploy engineer cannot SSH in to roll back a bad release. Every minute this stays
+  broken is a minute the bad release keeps serving production traffic.
+
+  OBJECTIVE: Open VPC network > Firewall in the Cloud Console, add an ingress rule allowing TCP/22 from
+  the internet with a priority lower (more urgent) than the default-deny rule, and confirm SSH
+  reachability returns.'
+initial_state: The VPC has allow-http (priority 1000, TCP/80) and default-deny-ingress (priority 65534,
+  all protocols) but no rule for TCP/22 — SSH times out.
+objectives:
+- Sign in to the Google Cloud Console
+- Open VPC network > Firewall and review the ingress rules
+- Add an ingress rule allowing TCP/22 with a priority below 65534
+- Confirm SSH reachability to web01 is restored
+hints:
+- order: 1
+  cost: 0
+  content: 'ORIENT — what to observe and why: A "connection timed out" (not "refused" or "permission
+    denied") on SSH almost always means a network ACL/firewall is silently dropping the packets before
+    they ever reach sshd — check the VPC firewall rules before touching anything on the guest itself.'
+- order: 2
+  cost: 10
+  content: 'APPROACH — the troubleshooting method: Open VPC network > Firewall. GCP evaluates ingress
+    rules in priority order, lowest number first, and stops at the first match. List every rule and its
+    priority/protocol/port before deciding what is missing.'
+- order: 3
+  cost: 25
+  content: 'WHICH TOOL — the diagnostic command(s): You will see allow-http (priority 1000, TCP/80) and
+    default-deny-ingress (priority 65534, all protocols, implied — cannot be deleted). There is no rule
+    for TCP/22 in between, so every SSH attempt falls through to the deny at 65534.'
+- order: 4
+  cost: 40
+  content: 'NARROW DOWN — isolate the subsystem: Create a new firewall rule — name it allow-ssh, network
+    vpc-prod, direction INGRESS, targets tag `web`, source range 0.0.0.0/0, protocol TCP port 22, action
+    Allow — with a priority number LOWER than 65534 (e.g. 1000) so it is evaluated before the deny.'
+- order: 5
+  cost: 60
+  content: 'NEAR-SOLUTION — the fix shape + verify (you still apply it): In Firewall -> Create firewall
+    rule, set protocol/port tcp:22, priority 1000, action Allow, target tag web, and create it. WHY: the
+    grader checks that the VPC now has an Allow rule for port 22 at a priority below the default-deny —
+    the console''s own rule evaluation (not a scripted flag) determines whether SSH is reachable, so the
+    priority number matters, not just adding "a" rule.'
+summary: Add the missing ingress firewall rule for SSH/22 before the default-deny catch-all blocks it,
+  restoring SSH access to web01.
+estimated_minutes: 12
+xp_reward: 100
+prerequisites:
+- Basic networking (ACLs, firewall rule ordering)
+tags:
+- troubleshoot
+- hands-on
+- gcp
+- networking
+- security
+linked_tutorial: gcp-fundamentals
+what_you_will_learn:
+- How GCP VPC firewall rules are evaluated by priority
+- Diagnosing a network-layer block vs. an application-layer auth failure
+- Adding a correctly-prioritized firewall rule without breaking the default-deny baseline
+environment:
+  nodes:
+  - role: primary
+    os: Debian GNU/Linux 12
+    hostname: web01
+    ip: 10.128.0.4
+    specs: e2-medium (2 vCPU / 4 GiB) in vpc-prod with no ingress rule for TCP/22
+  pre_installed:
+  - gcp-console
+  credentials:
+  - user: admin@fixitlab.io
+    password: lab123
+tasks:
+- id: task_1
+  title: Open ingress SSH on the VPC firewall
+  description: Add an ingress firewall rule allowing TCP/22 at a priority below the default-deny
+    catch-all, and confirm SSH reachability returns.
+  background: 'This lab teaches real GCP firewall rule evaluation: rules are processed in priority order,
+    lowest number first, and the first match wins — a missing allow rule silently falls through to the
+    implied default-deny every VPC gets by default.'
+  validation:
+    type: custom_script
+    script: check.sh
+    error_message: Validation did not pass. Add an ingress rule allowing TCP/22 at a priority below
+      65534.
+solution:
+  summary: Add an ingress rule (allow-ssh, TCP/22, priority 1000, Allow) to the VPC.
+  files_changed: []
+  commands_run:
+  - 'Google Cloud Console: VPC network -> Firewall -> Create firewall rule -> TCP/22, priority 1000, Allow'
+  reference_docs: gcp-fundamentals
+consoles:
+- gcp
+- terminal
+lab_servers:
+- id: web01
+  role: primary
+  hostname: web01
+  persona: gcp
+  appears_in:
+  - gcp
+  - terminal

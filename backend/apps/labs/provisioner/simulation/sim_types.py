@@ -27,6 +27,7 @@ UNIFIED_SIM_TYPES = {
     "datacenter": "Physical Data Center (DCIM) Simulation",
     "soc": "SOC / SIEM Analyst Simulation",
     "azure": "Microsoft Azure Portal Simulation",
+    "gcp": "Google Cloud Console Simulation",
 }
 
 _LEGACY_MAP = {
@@ -77,6 +78,7 @@ def hostname_for_type(sim_type: str, slug: str = "") -> str:
         "datacenter": "dcim-console",
         "soc": "soc-siem",
         "azure": "vm-web01",
+        "gcp": "web01",
     }
     if "ansible" in slug:
         return "ansible-control"
@@ -98,7 +100,7 @@ def boot_console_for(scenario_slug: str, sim_type: str) -> bool:
     s = (scenario_slug or "").lower()
     if sim_type in (
         "windows", "terraform", "devops", "networking",
-        "commvault", "netapp", "dellemc", "datacenter", "soc", "azure",
+        "commvault", "netapp", "dellemc", "datacenter", "soc", "azure", "gcp",
     ):
         # These personas have their own surfaces and never use the RHEL boot flow.
         return False

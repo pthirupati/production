@@ -72,15 +72,23 @@ class RHELShell:
         if line.startswith("#"):
             return ""
 
-        # Cross-tech: apply any Azure Portal VM resize queued for this session
-        # before running the command, so nproc/free/lscpu always reflect the
-        # size currently selected in the portal (master-prompt canonical
-        # example: "Resize VM -> CPU and RAM change inside Linux").
+        # Cross-tech: apply any Azure Portal VM resize / GCP machine-type
+        # change queued for this session before running the command, so
+        # nproc/free/lscpu always reflect the size currently selected in the
+        # console (master-prompt canonical example: "Resize VM -> CPU and RAM
+        # change inside Linux").
         session_id = getattr(self.state, "session_id", None)
         if session_id:
             try:
-                from .azure_bridge import consume_pending_resize
-                resize = consume_pending_resize(session_id)
+                from .azure_bridge import consume_pending_resize as _azure_consume_resize
+                resize = _azure_consume_resize(session_id)
+                if resize:
+                    self.state.set_hardware(cpu=resize.get("vcpus"), mem_mb=int(resize.get("ram_gb", 4)) * 1024)
+            except Exception:
+                pass
+            try:
+                from .gcp_bridge import consume_pending_resize as _gcp_consume_resize
+                resize = _gcp_consume_resize(session_id)
                 if resize:
                     self.state.set_hardware(cpu=resize.get("vcpus"), mem_mb=int(resize.get("ram_gb", 4)) * 1024)
             except Exception:

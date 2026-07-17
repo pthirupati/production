@@ -1473,11 +1473,17 @@ export default function LabRunner() {
     || (scenario?.slug || '').startsWith('azure-')
     || (scenario?.slug || '').startsWith('academy-azure-')
   )
+  const isGcpLab = !isCrossTech && (
+    scenario?.simulation_type === 'gcp'
+    || scenario?.technology?.slug === 'gcp'
+    || (scenario?.slug || '').startsWith('gcp-')
+    || (scenario?.slug || '').startsWith('academy-gcp-')
+  )
   const isSimPrimaryLab = !isCrossTech && (
     isAwsLab || isDevOpsPipelineLab || isTerraformSimLab || isAwxLab || isMonitoringLab || isWindowsGuiLab
     || isPeopleSoftLab || isBaremetalGuiLab || isDataDashboardLab || isAgentLab
     || isNmapLab || isWiresharkLab
-    || isCommvaultLab || isNetappLab || isDellemcLab || isDatacenterLab || isSocLab || isAzureLab
+    || isCommvaultLab || isNetappLab || isDellemcLab || isDatacenterLab || isSocLab || isAzureLab || isGcpLab
   )
   const simOverlayOpen = !isSimPrimaryLab && (
     showMonitoringSim || showNmapSim || showWiresharkSim
@@ -1503,6 +1509,7 @@ export default function LabRunner() {
     : isDatacenterLab ? 'datacenter'
     : isSocLab ? 'soc'
     : isAzureLab ? 'azure'
+    : isGcpLab ? 'gcp'
     : null
   const solved = validationResult?.passed
   const expired = validationResult?.expired

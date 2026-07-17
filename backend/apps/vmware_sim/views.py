@@ -49,6 +49,9 @@ from .aws_engine import get_state as aws_get_state
 from .azure_engine import apply_action as azure_apply_action
 from .azure_engine import drop_session as azure_drop_session
 from .azure_engine import get_state as azure_get_state
+from .gcp_engine import apply_action as gcp_apply_action
+from .gcp_engine import drop_session as gcp_drop_session
+from .gcp_engine import get_state as gcp_get_state
 from .commvault_engine import apply_action as commvault_apply_action
 from .commvault_engine import drop_session as commvault_drop_session
 from .commvault_engine import get_state as commvault_get_state
@@ -960,6 +963,43 @@ class ActiveFaultsView(APIView):
 
         active_only = request.query_params.get("active", "true").lower() != "false"
         return Response({"faults": list_faults(str(session_id), active_only=active_only)})
+
+
+class GcpSimStateView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request, session_id):
+        session = LabSession.objects.select_related("scenario").filter(pk=session_id, user=request.user).first()
+        if not session:
+            return Response({"error": "Session not found"}, status=404)
+        slug = session.scenario.slug if session.scenario_id else (request.query_params.get("scenario", "") or "")
+        return Response(gcp_get_state(session_id, slug))
+
+
+class GcpSimActionView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request, session_id):
+        session = LabSession.objects.filter(pk=session_id, user=request.user, status="RUNNING").first()
+        if not session:
+            return Response({"error": "Lab session not running"}, status=400)
+        action = request.data.get("action", "")
+        payload = request.data.get("payload") or {}
+        slug = session.scenario.slug if session.scenario_id else ""
+        result = gcp_apply_action(session_id, action, payload)
+        if not result.get("ok"):
+            return Response(result, status=400)
+        return Response({**result, "state": gcp_get_state(session_id, slug)})
+
+
+class GcpSimReleaseView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request, session_id):
+        if not LabSession.objects.filter(pk=session_id, user=request.user).exists():
+            return Response({"error": "Session not found"}, status=404)
+        gcp_drop_session(session_id)
+        return Response({"released": True})
 
 
 class DatacenterSimStateView(APIView):
