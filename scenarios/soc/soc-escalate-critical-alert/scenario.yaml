@@ -1,0 +1,122 @@
+title: 'Incident Response: Escalate the C2 Alert Before It Falls Through the Cracks'
+slug: soc-escalate-critical-alert
+technology: soc
+category: Fix
+difficulty: easy
+lab_mode: simulation
+simulation_type: soc
+infrastructure_type: docker
+time_limit: 600
+max_score: 100
+is_free: false
+jira_priority: High
+dual_terminal: false
+description: 'CONTEXT: AL-1003 (outbound connection from ws-finance-07 to a known command-and-control
+  domain) has been sitting in the alert queue for ten minutes. It is a critical-severity alert with clear
+  IOCs, but nobody has formally escalated it into a tracked incident yet — it is still just a queue entry,
+  invisible to the incident dashboard the on-call manager watches.
+
+  ENVIRONMENT: You are working the SOC/SIEM console alert queue. AL-1003 is critical severity, targets
+  ws-finance-07, and has a matching C2 source IP (203.0.113.55) already visible in the alert details.
+  This is the Incident Response track: the objective here is the escalation and tracking step itself, not
+  the containment action (that is a separate lab).
+
+  SYMPTOM / STARTING STATE: AL-1003 is open in the alert queue with no linked incident — the Incidents
+  tab is empty.
+
+  IMPACT: An alert that never gets escalated never gets tracked, never gets a timeline, and never shows up
+  in the shift handoff report. Formal incident tracking is what turns "an alert someone saw" into "an
+  incident someone owns."
+
+  OBJECTIVE: Escalate AL-1003 into a formally tracked incident from the SOC console.'
+initial_state: SOC console with critical alert AL-1003 open against ws-finance-07 and no linked incident
+  in the Incidents tab.
+objectives:
+- Sign in to the SOC console
+- Open AL-1003 in the alert queue
+- Escalate AL-1003 into a formal incident
+- Confirm the new incident appears in the Incidents tab
+hints:
+- order: 1
+  cost: 0
+  content: 'ORIENT — what to observe and why: Open the Incidents tab first and confirm it is empty, then
+    open AL-1003 in the Alerts queue and read its severity/asset/source details before escalating —
+    escalation should always be a deliberate decision, not a reflex click.'
+- order: 2
+  cost: 10
+  content: 'APPROACH — the troubleshooting method: Escalation is a tracking step, not a remediation step —
+    it creates a formal incident record linked to the alert so the response has a timeline and an owner.
+    It does not quarantine anything or block anything by itself.'
+- order: 3
+  cost: 25
+  content: 'WHICH TOOL — the diagnostic command(s): Open AL-1003 and use the "Escalate" action. This
+    creates a new incident (INC-#) linked to AL-1003''s asset and severity, and flips the alert''s status
+    to "escalated".'
+- order: 4
+  cost: 40
+  content: 'NARROW DOWN — isolate the subsystem: There is exactly one qualifying alert (AL-1003) — the
+    other two alerts in the queue are not part of this objective.'
+- order: 5
+  cost: 60
+  content: 'NEAR-SOLUTION — the fix shape + verify (you still apply it): Click Escalate on AL-1003 and
+    confirm the new incident (INC-#) now appears in the Incidents tab, linked to ws-finance-07. WHY: the
+    grader checks that AL-1003 has been escalated in the session state — opening the alert without
+    clicking Escalate does not count.'
+summary: Escalate the open critical C2 alert into a formally tracked incident from the SOC console.
+estimated_minutes: 6
+xp_reward: 80
+prerequisites:
+- Basic SOC/SIEM triage concepts (alert queues, incident tracking)
+tags:
+- fix
+- hands-on
+- soc
+- siem
+- incident-response
+linked_tutorial: soc-fundamentals
+what_you_will_learn:
+- Why formal incident escalation matters beyond just seeing an alert
+- How an escalated alert links to a tracked incident record
+- The difference between triage (seeing) and incident response (tracking/owning)
+environment:
+  nodes:
+  - role: primary
+    os: FixitLab SOC / SIEM console environment
+    hostname: lab-primary
+    ip: 127.0.0.1
+    specs: local offline lab environment
+  pre_installed:
+  - soc-siem-console
+  credentials:
+  - user: analyst
+    password: lab123
+tasks:
+- id: task_1
+  title: Escalate AL-1003 into a tracked incident
+  description: Open AL-1003 and use the Escalate action to create a formally tracked incident.
+  background: 'This lab teaches the Incident Response track''s first real step: turning an open alert
+    into a tracked incident with an owner and a timeline.'
+  validation:
+    type: custom_script
+    script: check.sh
+    error_message: Validation did not pass. Escalate AL-1003 into a formal incident from the SOC console.
+solution:
+  summary: Open AL-1003 and click Escalate to create a linked incident.
+  files_changed: []
+  commands_run:
+  - 'SOC console: Alerts -> AL-1003 -> Escalate'
+  reference_docs: soc-fundamentals
+consoles:
+- soc
+- terminal
+lab_servers:
+- id: ws-finance-07
+  role: primary
+  hostname: ws-finance-07
+  persona: windows
+  appears_in:
+  - soc
+  - terminal
+mitre_attack:
+- T1071.001
+nist_nice: PR-CIR-001

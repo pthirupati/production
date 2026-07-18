@@ -1,0 +1,122 @@
+title: 'Threat Hunting: Confirm the C2 Source Actually Touched Your Environment'
+slug: soc-threat-hunt-attacker-ip
+technology: soc
+category: Fix
+difficulty: medium
+lab_mode: simulation
+simulation_type: soc
+infrastructure_type: docker
+time_limit: 900
+max_score: 100
+is_free: true
+jira_priority: Medium
+dual_terminal: false
+description: 'CONTEXT: Threat intel just shared a fresh IOC — 203.0.113.55, associated with a known C2
+  infrastructure cluster — and asked every SOC to hunt for it proactively, not wait for an alert to fire.
+  This is the Threat Hunting track: you are not responding to an existing alert, you are actively
+  searching raw logs for evidence that this indicator has already touched your environment.
+
+  ENVIRONMENT: You are working in the SOC/SIEM console''s Log Search panel, which indexes raw
+  EDR/firewall/sshd events across every monitored asset. The IOC feed gave you the indicator
+  (203.0.113.55) but not a specific host or timeframe — you have to hunt for it.
+
+  SYMPTOM / STARTING STATE: No alert currently references 203.0.113.55 by name in this session''s queue —
+  the only way to find it is a proactive log search, exactly like a real threat hunt.
+
+  IMPACT: Threat intel indicators are only useful if someone actually checks for them. If 203.0.113.55
+  already reached a host and nobody hunts for it, that foothold sits undetected until it escalates into
+  something louder (and harder to contain).
+
+  OBJECTIVE: Search the log index for 203.0.113.55 and confirm which host(s) it has already touched.'
+initial_state: SOC console Log Search panel with no active search yet; the raw log index contains
+  evidence of 203.0.113.55 touching ws-finance-07, but nothing has surfaced it yet.
+objectives:
+- Sign in to the SOC console
+- Open Log Search
+- Search for the threat-intel indicator 203.0.113.55
+- Confirm which host the indicator touched from the search results
+hints:
+- order: 1
+  cost: 0
+  content: 'ORIENT — what to observe and why: This is a hunt, not a response to an open alert — start
+    from the indicator itself (203.0.113.55) and search the raw logs directly, rather than waiting for
+    the alert queue to surface something.'
+- order: 2
+  cost: 10
+  content: 'APPROACH — the troubleshooting method: A proactive threat hunt starts from an indicator (an
+    IP, a hash, a domain) and searches broadly across every asset''s logs — you do not yet know which
+    host, if any, was touched.'
+- order: 3
+  cost: 25
+  content: 'WHICH TOOL — the diagnostic command(s): In Log Search, query 203.0.113.55. The results will
+    show every log entry across every source (EDR, Firewall, sshd) that mentions that address.'
+- order: 4
+  cost: 40
+  content: 'NARROW DOWN — isolate the subsystem: The indicator you were given is 203.0.113.55 specifically
+    — searching for a different address (like the unrelated brute-force source 198.51.100.23) will not
+    satisfy this hunt.'
+- order: 5
+  cost: 60
+  content: 'NEAR-SOLUTION — the fix shape + verify (you still apply it): Run the search for 203.0.113.55
+    and confirm the results show ws-finance-07''s EDR/Firewall entries (PowerShell spawn + outbound C2
+    connection). WHY: the grader checks that a search for this specific indicator was actually executed
+    in the session state — searching for something else, or not searching at all, does not count.'
+summary: Proactively hunt the log index for a fresh threat-intel indicator and confirm which host it has
+  already touched.
+estimated_minutes: 10
+xp_reward: 90
+prerequisites:
+- Basic SOC/SIEM triage concepts (log search, IOC-based hunting)
+tags:
+- fix
+- hands-on
+- soc
+- siem
+- threat-hunting
+linked_tutorial: soc-fundamentals
+what_you_will_learn:
+- The difference between alert-driven triage and proactive indicator-based threat hunting
+- Searching a raw log index for a specific threat-intel indicator
+- Confirming indicator-to-asset scope before deciding on a response
+environment:
+  nodes:
+  - role: primary
+    os: FixitLab SOC / SIEM console environment
+    hostname: lab-primary
+    ip: 127.0.0.1
+    specs: local offline lab environment
+  pre_installed:
+  - soc-siem-console
+  credentials:
+  - user: analyst
+    password: lab123
+tasks:
+- id: task_1
+  title: Hunt for the threat-intel indicator in the logs
+  description: Search the log index for 203.0.113.55 and confirm which host it touched.
+  background: 'This lab teaches proactive threat hunting: starting from an indicator rather than an
+    alert, and confirming scope before response.'
+  validation:
+    type: custom_script
+    script: check.sh
+    error_message: Validation did not pass. Search the SOC console log index for 203.0.113.55.
+solution:
+  summary: Open Log Search and query 203.0.113.55 to confirm it touched ws-finance-07.
+  files_changed: []
+  commands_run:
+  - 'SOC console: Log Search -> query 203.0.113.55'
+  reference_docs: soc-fundamentals
+consoles:
+- soc
+- terminal
+lab_servers:
+- id: ws-finance-07
+  role: primary
+  hostname: ws-finance-07
+  persona: windows
+  appears_in:
+  - soc
+  - terminal
+mitre_attack:
+- T1071.001
+nist_nice: PR-CDA-001

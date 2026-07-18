@@ -79,7 +79,17 @@ def _base_state() -> dict:
 
 def _apply_preset(state: dict, slug: str) -> None:
     slug = (slug or "").lower()
-    if "quarantine" in slug or "malware" in slug or "c2" in slug:
+    if "red-vs-blue" in slug or "red-blue" in slug or "dual-containment" in slug or "multi-vector" in slug:
+        # Checked FIRST so a red-vs-blue slug never gets misrouted into the
+        # single-fix quarantine/block branches below.
+        state["goal"] = {
+            "title": "Contain the multi-vector intrusion",
+            "objective": "The attacker used two footholds at once: quarantine ws-finance-07 AND block "
+                         "the brute-force source IP 198.51.100.23 — clearing only one leaves the other "
+                         "vector open.",
+        }
+        state["broken"] = {"needs_quarantine": "ws-finance-07", "needs_block_ip": "198.51.100.23"}
+    elif "quarantine" in slug or "malware" in slug or "c2" in slug:
         state["goal"] = {"title": "Contain malware", "objective": "Acknowledge AL-1003, run the containment playbook, and quarantine ws-finance-07."}
         state["broken"] = {"open_critical_alert": "AL-1003", "needs_quarantine": "ws-finance-07"}
     elif "brute" in slug or "ssh" in slug or "block" in slug:

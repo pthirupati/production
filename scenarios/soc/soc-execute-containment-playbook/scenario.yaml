@@ -1,0 +1,121 @@
+title: 'Incident Response: Execute the Malware Containment Playbook'
+slug: soc-execute-containment-playbook
+technology: soc
+category: Fix
+difficulty: easy
+lab_mode: simulation
+simulation_type: soc
+infrastructure_type: docker
+time_limit: 600
+max_score: 100
+is_free: false
+jira_priority: High
+dual_terminal: false
+description: 'CONTEXT: The SOC has a documented Malware Containment playbook (pb-malware-contain: isolate
+  host, collect forensics, remove artifact) for exactly this situation — a host showing C2 activity — but
+  documented is not the same as executed. The on-call lead wants to see the playbook actually run against
+  ws-finance-07, not just referenced in a ticket comment.
+
+  ENVIRONMENT: You are working in the SOC/SIEM console''s Playbooks tab. pb-malware-contain exists with
+  three documented steps. This is the Incident Response / SOAR track: the objective is running the
+  documented response procedure itself, distinct from the standalone quarantine action.
+
+  SYMPTOM / STARTING STATE: pb-malware-contain has never been executed for this incident — the console
+  has no record of it running.
+
+  IMPACT: A playbook that exists but never runs provides zero actual containment and zero audit trail. If
+  an auditor or incident review asks "what was done and when," an un-run playbook has no answer.
+
+  OBJECTIVE: Run the pb-malware-contain playbook from the SOC console against the affected host.'
+initial_state: SOC console Playbooks tab showing pb-malware-contain (Isolate host / Collect forensics /
+  Remove artifact) with no execution record for this session.
+objectives:
+- Sign in to the SOC console
+- Open the Playbooks tab
+- Run pb-malware-contain
+- Confirm the playbook execution is recorded in the event log
+hints:
+- order: 1
+  cost: 0
+  content: 'ORIENT — what to observe and why: Open the Playbooks tab and read pb-malware-contain''s three
+    steps (Isolate host, Collect forensics, Remove artifact) before running it, so you understand what
+    the automated response actually does on your behalf.'
+- order: 2
+  cost: 10
+  content: 'APPROACH — the troubleshooting method: A documented playbook only has value once it is
+    executed — this lab is specifically about closing that documented-vs-executed gap, not about the
+    underlying quarantine/forensics actions themselves (those are covered by their own labs).'
+- order: 3
+  cost: 25
+  content: 'WHICH TOOL — the diagnostic command(s): In Playbooks, select pb-malware-contain and use the
+    "Run" action. The console records the execution and returns the step list that was carried out.'
+- order: 4
+  cost: 40
+  content: 'NARROW DOWN — isolate the subsystem: There are two playbooks available (pb-malware-contain
+    and pb-brute-force) — this objective is specifically about the malware containment one, since the
+    active incident here is C2-related, not a brute-force login attempt.'
+- order: 5
+  cost: 60
+  content: 'NEAR-SOLUTION — the fix shape + verify (you still apply it): Run pb-malware-contain and check
+    the event log for a "Playbook Malware Containment executed" entry. WHY: the grader checks that the
+    playbook was actually executed in the session state — reading the playbook''s steps without clicking
+    Run does not count.'
+summary: Run the documented malware containment playbook against the affected host from the SOC console.
+estimated_minutes: 6
+xp_reward: 80
+prerequisites:
+- Basic SOC/SIEM triage concepts (documented response procedures)
+tags:
+- fix
+- hands-on
+- soc
+- siem
+- incident-response
+- soar
+linked_tutorial: soc-fundamentals
+what_you_will_learn:
+- Running a documented incident-response playbook from a SOC console
+- Why an executed response leaves an audit trail that a documented-only procedure does not
+- Choosing the correct playbook for the active incident type
+environment:
+  nodes:
+  - role: primary
+    os: FixitLab SOC / SIEM console environment
+    hostname: lab-primary
+    ip: 127.0.0.1
+    specs: local offline lab environment
+  pre_installed:
+  - soc-siem-console
+  credentials:
+  - user: analyst
+    password: lab123
+tasks:
+- id: task_1
+  title: Run the malware containment playbook
+  description: Execute pb-malware-contain from the SOC console's Playbooks tab.
+  background: 'This lab teaches the SOAR-adjacent half of incident response: a playbook only provides
+    value once it is actually run, with a recorded execution trail.'
+  validation:
+    type: custom_script
+    script: check.sh
+    error_message: Validation did not pass. Run pb-malware-contain from the SOC console Playbooks tab.
+solution:
+  summary: Open Playbooks, select pb-malware-contain, and click Run.
+  files_changed: []
+  commands_run:
+  - 'SOC console: Playbooks -> pb-malware-contain -> Run'
+  reference_docs: soc-fundamentals
+consoles:
+- soc
+- terminal
+lab_servers:
+- id: ws-finance-07
+  role: primary
+  hostname: ws-finance-07
+  persona: windows
+  appears_in:
+  - soc
+  - terminal
+mitre_attack:
+- T1486
+nist_nice: PR-CIR-001
