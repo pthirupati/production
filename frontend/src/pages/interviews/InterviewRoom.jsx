@@ -710,17 +710,27 @@ export default function InterviewRoom() {
   }, [endsAt, round?.paused_at])
 
   // Pause timer when tab is hidden; resume (extends ends_at) when user returns.
+  // Debounced — brief focus blips must not spam pause/resume (felt like a 1s refresh).
   useEffect(() => {
     if (!roundId || !started || observerMode) return
+    let t = null
     const onVis = () => {
-      if (document.hidden) {
-        interviewsApi.pauseRound(roundId).then((r) => setRound((prev) => ({ ...prev, ...r }))).catch(() => {})
-      } else {
-        interviewsApi.resumeRound(roundId).then((r) => setRound((prev) => ({ ...prev, ...r }))).catch(() => {})
-      }
+      clearTimeout(t)
+      t = setTimeout(() => {
+        if (document.hidden) {
+          interviewsApi.pauseRound(roundId).then((r) => setRound((prev) => ({ ...prev, ...r }))).catch(() => {})
+        } else {
+          interviewsApi.resumeRound(roundId).then((r) => setRound((prev) => ({ ...prev, ...r }))).catch(() => {})
+          unlockSpeech({ soft: true })
+          resumeSpeechSynthesis()
+        }
+      }, 400)
     }
     document.addEventListener('visibilitychange', onVis)
-    return () => document.removeEventListener('visibilitychange', onVis)
+    return () => {
+      clearTimeout(t)
+      document.removeEventListener('visibilitychange', onVis)
+    }
   }, [roundId, started, observerMode])
 
   const cancelInterview = async () => {
@@ -816,17 +826,13 @@ export default function InterviewRoom() {
       toast.error('Enable microphone and camera first')
       return
     }
-    // User gesture — prime audio/TTS so the first interviewer line is heard.
-    // Hard unlock (silent prime) is OK here: we are still inside the click handler.
+    // User gesture — hard-unlock TTS and hold the synth queue across startRound().
     unlockSpeech()
-    // Speak a short bridge DURING the gesture so Chrome keeps synthesis unlocked
-    // across the startRound() network await (autoplay policy).
-    const bridgePromise = speak("Alright — let's begin.")
     setPreflight(false)
     setPendingHearText(null)
+    voiceUnavailableToastRef.current = false
     try {
       const data = await interviewsApi.startRound(roundId)
-      await bridgePromise.catch(() => {})
       setRound(data)
       const msgs = [...(data.messages || [])]
       if (data.intro) msgs.push(data.intro)
@@ -837,7 +843,6 @@ export default function InterviewRoom() {
         speechProfileRef.current = data.speech_profile
         setPersonaTitle(data.speech_profile.persona_title || '')
       }
-      // Start recording once the interview is live
       if (streamRef.current) startRecording(streamRef.current)
       const voiceId = data.persona_voice_id
       const introText = data.intro?.content || ''
@@ -850,18 +855,16 @@ export default function InterviewRoom() {
           startPracticalLabInline().catch(() => {})
         }
       }
-      // startRound() is async — the original click gesture is gone. Soft-prime
-      // and skip the "thinking…" delay on bootstrap lines so TTS starts ASAP.
+      // Re-prime softly — do NOT cancel (keeps gesture unlock from Join click).
       unlockSpeech({ soft: true })
       resumeSpeechSynthesis()
-      if (introText) {
-        await speakThenListen(introText, { autoListen: false, voiceId, thinking: false })
-      }
-      if (firstQ?.content) {
-        unlockSpeech({ soft: true })
-        resumeSpeechSynthesis()
-        await speakThenListen(firstQ.content, {
-          autoListen: !isPracticalMessage(firstQ), voiceId, thinking: false,
+      // Speak intro+first Q as one block when possible so we only need one unlock.
+      const bootstrap = [introText, firstQ?.content].filter(Boolean).join(' ')
+      if (bootstrap) {
+        await speakThenListen(bootstrap, {
+          autoListen: !isPracticalMessage(firstQ),
+          voiceId,
+          thinking: false,
         })
       }
     } catch (e) {
@@ -2024,9 +2027,12 @@ export default function InterviewRoom() {
                 const text = pendingHearText
                 const vid = pendingHearVoiceRef.current ?? round?.persona_voice_id
                 const { spoken } = await speak(text, vid) || {}
-                if (spoken) setPendingHearText(null)
+                if (spoken) {
+                  setPendingHearText(null)
+                  voiceUnavailableToastRef.current = false
+                }
               }}
-              className="text-xs inline-flex items-center gap-1 px-2 py-1 rounded-lg bg-indigo-500/20 text-indigo-200 border border-indigo-400/40 hover:bg-indigo-500/30"
+              className="text-xs inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-indigo-500 text-white border border-indigo-300/40 hover:bg-indigo-400 animate-pulse"
               title="Browser blocked autoplay — tap to hear the interviewer"
             >
               <Volume2 size={12} /> Hear interviewer

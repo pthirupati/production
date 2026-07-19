@@ -102,7 +102,7 @@ export function RdsList() {
       {deleteTarget && (
         <ConfirmDialog
           title={`Delete ${deleteTarget.name}?`}
-          body={`This permanently removes DB instance ${deleteTarget.name} from the local RDS simulation. In real AWS you would be prompted to create a final snapshot first.`}
+          body={`This permanently removes DB instance ${deleteTarget.name} from this RDS environment. In real AWS you would be prompted to create a final snapshot first.`}
           confirmLabel="Delete"
           confirmText={deleteTarget.name}
           onCancel={() => setDeleteTarget(null)}
@@ -445,7 +445,7 @@ export function RdsDetail() {
       {deleteOpen && (
         <ConfirmDialog
           title={`Delete ${db.name}?`}
-          body={`This permanently removes DB instance ${db.name} from the local RDS simulation.`}
+          body={`This permanently removes DB instance ${db.name} from this RDS environment.`}
           confirmLabel="Delete"
           confirmText={db.name}
           onCancel={() => setDeleteOpen(false)}

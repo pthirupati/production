@@ -3,13 +3,14 @@ import { AlertTriangle, RefreshCw } from 'lucide-react'
 import { isChunkLoadError } from '../utils/lazyWithRetry'
 
 /**
- * Localized error boundary for heavy simulators (AWS, VMware, Interview, labs).
- * Prevents one simulator crash from taking down the entire app shell.
+ * Localized error boundary for heavy lab consoles (AWS, VMware, Interview, labs).
+ * Prevents one console crash from taking down the entire app shell.
  */
 export default class SimErrorBoundary extends Component {
   constructor(props) {
     super(props)
     this.state = { error: null }
+    this._autoResetDone = false
   }
 
   static getDerivedStateFromError(error) {
@@ -17,21 +18,28 @@ export default class SimErrorBoundary extends Component {
   }
 
   componentDidCatch(error, info) {
-    console.error(`SimErrorBoundary [${this.props.name || 'sim'}]:`, error, info)
-    // A missing-chunk failure cannot be recovered in place, so auto-reload once
-    // (loop-guarded) the moment we catch it — the learner never has to click
-    // "Try again" on an error that a click could never fix.
-    if (isChunkLoadError(error)) this.hardReloadForChunk()
+    console.error(`SimErrorBoundary [${this.props.name || 'lab'}]:`, error, info)
+    // Missing-chunk failures cannot be recovered in place — auto-reload once.
+    if (isChunkLoadError(error)) {
+      this.hardReloadForChunk()
+      return
+    }
+    // AWS/Terraform often crash from a corrupt persisted Zustand blob after a
+    // deploy. Clear storage once and remount in place before asking the learner
+    // to click anything. Guarded so a non-storage crash cannot loop forever.
+    if (this.props.autoResetStorageOnError && !this._autoResetDone) {
+      this._autoResetDone = true
+      try { this.props.onResetStorage?.() } catch { /* ignore */ }
+      try {
+        if (this.props.resetStorageKey) localStorage.removeItem(this.props.resetStorageKey)
+      } catch { /* ignore */ }
+      setTimeout(() => {
+        try { this.props.onReset?.() } catch { /* ignore */ }
+        this.setState({ error: null })
+      }, 0)
+    }
   }
 
-  // A ChunkLoadError means the lazy sim chunk itself could not be fetched
-  // (stale deploy: the cached index.html references hashed chunks that no longer
-  // exist). This is the documented cause of "Something went wrong loading this
-  // simulator" — and neither re-rendering the SAME failed lazy component ("Try
-  // again") nor clearing the persisted store ("Reset saved state") can fix it:
-  // the module is simply missing. The ONLY recovery is a hard reload so the
-  // browser revalidates index.html and fetches the current chunk. Detect this
-  // and reload once (loop-guarded) instead of leaving the learner stuck.
   get isChunkError() {
     return isChunkLoadError(this.state.error)
   }
@@ -40,8 +48,6 @@ export default class SimErrorBoundary extends Component {
     const KEY = 'fixitlab-sim-chunk-reload'
     try {
       const last = Number(sessionStorage.getItem(KEY) || 0)
-      // Loop guard: only auto-reload once per 15s so a genuinely broken deploy
-      // can't trap the tab in a reload cycle.
       if (Date.now() - last < 15000) return false
       sessionStorage.setItem(KEY, String(Date.now()))
     } catch { /* sessionStorage unavailable — fall through to reload anyway */ }
@@ -50,23 +56,16 @@ export default class SimErrorBoundary extends Component {
   }
 
   handleReset = () => {
-    // For a missing-chunk error, re-rendering the same lazy component just
-    // re-throws — force a hard reload to fetch the current assets instead.
     if (this.isChunkError && this.hardReloadForChunk()) return
     try { this.props.onReset?.() } catch { /* ignore */ }
     this.setState({ error: null })
   }
 
   handleResetStorage = () => {
-    // 1) Clear the persisted blob so a corrupt/old payload can't rehydrate again.
     if (this.props.resetStorageKey) {
       try { localStorage.removeItem(this.props.resetStorageKey) } catch { /* ignore */ }
     }
-    // 2) Re-seed the live in-memory store. Without this, "Try again" would
-    //    re-render the same broken in-memory state and crash immediately —
-    //    clearing localStorage alone only helps after a full reload.
     try { this.props.onResetStorage?.() } catch { /* ignore */ }
-    // 3) Recover in place (no full reload needed).
     this.handleReset()
   }
 
@@ -100,6 +99,22 @@ export default class SimErrorBoundary extends Component {
                 Reset saved state
               </button>
             )}
+            <button
+              type="button"
+              onClick={() => {
+                try {
+                  sessionStorage.removeItem('fixitlab-sim-chunk-reload')
+                  sessionStorage.removeItem('fixitlab-chunk-reload')
+                  sessionStorage.removeItem('fixitlab:chunk-reload')
+                } catch { /* */ }
+                const u = new URL(window.location.href)
+                u.searchParams.set('_r', String(Date.now()))
+                window.location.replace(u.toString())
+              }}
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md border border-surface-600 text-surface-300 text-sm hover:bg-surface-800"
+            >
+              Reload page
+            </button>
           </div>
         </div>
       )

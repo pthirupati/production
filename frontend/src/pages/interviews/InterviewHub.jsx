@@ -208,7 +208,7 @@ export default function InterviewHub() {
         <Link to="/interviews/templates" className="glass-card p-4 border border-surface-800 hover:border-indigo-500/30 transition-colors">
           <Briefcase size={18} className="text-indigo-400 mb-2" />
           <p className="text-sm font-medium text-white">Job-role templates</p>
-          <p className="text-xs text-surface-500 mt-1">Launch a tailored mock in one click</p>
+          <p className="text-xs text-surface-500 mt-1">Launch a tailored interview in one click</p>
         </Link>
         <Link to="/interviews/setup" className="glass-card p-4 border border-surface-800 hover:border-indigo-500/30 transition-colors">
           <Plus size={18} className="text-cyan-400 mb-2" />

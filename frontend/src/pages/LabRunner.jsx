@@ -1616,6 +1616,8 @@ export default function LabRunner() {
         resetStorageKey={isAws ? awsSimStorageKey(useAuthStore.getState().user?.id) : undefined}
         // AWS: wipe persisted blob AND re-seed the live store, then remount.
         onResetStorage={isAws ? () => { hardResetAwsSim(); setSimResetNonce((n) => n + 1) } : undefined}
+        onReset={() => setSimResetNonce((n) => n + 1)}
+        autoResetStorageOnError={isAws}
       >
         <PrimaryLabSim
           kind={primarySimKind}

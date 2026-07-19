@@ -86,7 +86,7 @@ export function LambdaList() {
       {deleteTarget && (
         <ConfirmDialog
           title={`Delete ${deleteTarget.name}?`}
-          body={`This permanently removes function ${deleteTarget.name} from the local Lambda simulation.`}
+          body={`This permanently removes function ${deleteTarget.name} from this Lambda environment.`}
           confirmLabel="Delete"
           confirmText={deleteTarget.name}
           onCancel={() => setDeleteTarget(null)}
@@ -358,7 +358,7 @@ export function LambdaDetail() {
       {deleteOpen && (
         <ConfirmDialog
           title={`Delete ${fn.name}?`}
-          body={`This permanently removes function ${fn.name} from the local Lambda simulation.`}
+          body={`This permanently removes function ${fn.name} from this Lambda environment.`}
           confirmLabel="Delete"
           confirmText={fn.name}
           onCancel={() => setDeleteOpen(false)}

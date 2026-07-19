@@ -79,7 +79,7 @@ export function DynamoDbList() {
       {deleteTarget && (
         <ConfirmDialog
           title={`Delete ${deleteTarget.name}?`}
-          body={`This permanently removes table ${deleteTarget.name} and all its items from the local DynamoDB simulation.`}
+          body={`This permanently removes table ${deleteTarget.name} and all its items from this DynamoDB environment.`}
           confirmLabel="Delete"
           confirmText={deleteTarget.name}
           onCancel={() => setDeleteTarget(null)}
@@ -366,7 +366,7 @@ export function DynamoDbDetail() {
       {deleteOpen && (
         <ConfirmDialog
           title={`Delete ${table.name}?`}
-          body={`This permanently removes table ${table.name} and all its items from the local DynamoDB simulation.`}
+          body={`This permanently removes table ${table.name} and all its items from this DynamoDB environment.`}
           confirmLabel="Delete"
           confirmText={table.name}
           onCancel={() => setDeleteOpen(false)}

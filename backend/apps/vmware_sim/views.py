@@ -70,8 +70,26 @@ from .soc_engine import get_state as soc_get_state
 
 
 def _demo_session_id(user) -> str:
-    """Stable sandbox key for standalone VMware simulator (no lab session)."""
+    """Stable per-user key for standalone VMware console (no lab session)."""
     return f"demo-{user.pk}"
+
+
+def _require_tech_access(request, technology_slug: str):
+    """403 when the user lacks a subscription for a standalone console."""
+    from apps.billing.subscription_utils import technology_access_denied_response
+
+    return technology_access_denied_response(request.user, technology_slug)
+
+
+def _require_any_tech_access(request, *technology_slugs: str):
+    """Allow if the user has access to any of the listed technologies."""
+    last = None
+    for slug in technology_slugs:
+        denied = _require_tech_access(request, slug)
+        if denied is None:
+            return None
+        last = denied
+    return last
 
 
 # ---------------------------------------------------------------------------
@@ -79,10 +97,13 @@ def _demo_session_id(user) -> str:
 # ---------------------------------------------------------------------------
 
 class VMwareSimDemoStateView(APIView):
-    """Standalone VMware sandbox — no LabSession required (e.g. /vmware-sim)."""
+    """Standalone VMware console — no LabSession required (e.g. /vmware-sim)."""
     permission_classes = [IsAuthenticated]
 
     def get(self, request):
+        denied = _require_tech_access(request, "vmware")
+        if denied:
+            return denied
         slug = request.query_params.get("scenario", "") or ""
         sid = _demo_session_id(request.user)
         return Response(get_state(sid, slug))
@@ -92,6 +113,9 @@ class VMwareSimDemoActionView(APIView):
     permission_classes = [IsAuthenticated]
 
     def post(self, request):
+        denied = _require_tech_access(request, "vmware")
+        if denied:
+            return denied
         action = request.data.get("action", "")
         payload = request.data.get("payload") or {}
         sid = _demo_session_id(request.user)
@@ -241,15 +265,18 @@ class DockerSimReleaseView(APIView):
 # ---------------------------------------------------------------------------
 
 def _monitoring_demo_session_id(user) -> str:
-    """Stable sandbox key for the standalone monitoring simulator (no lab session)."""
+    """Stable per-user key for standalone monitoring console (no lab session)."""
     return f"mon-demo-{user.pk}"
 
 
 class MonitoringSimDemoStateView(APIView):
-    """Standalone monitoring sandbox — no LabSession required."""
+    """Standalone monitoring console — no LabSession required."""
     permission_classes = [IsAuthenticated]
 
     def get(self, request):
+        denied = _require_any_tech_access(request, "grafana", "prometheus", "monitoring")
+        if denied:
+            return denied
         slug = request.query_params.get("scenario", "") or ""
         sid = _monitoring_demo_session_id(request.user)
         return Response(monitoring_get_state(sid, slug))
@@ -259,6 +286,9 @@ class MonitoringSimDemoActionView(APIView):
     permission_classes = [IsAuthenticated]
 
     def post(self, request):
+        denied = _require_any_tech_access(request, "grafana", "prometheus", "monitoring")
+        if denied:
+            return denied
         action = request.data.get("action", "")
         payload = request.data.get("payload") or {}
         sid = _monitoring_demo_session_id(request.user)

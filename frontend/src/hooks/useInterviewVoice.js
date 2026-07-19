@@ -288,6 +288,9 @@ let _primeCooldownUntil = 0
 // True while speak() owns the synthesis queue — skip silent primes that steal
 // the queue / cancel race with the real interviewer line.
 let _speakInFlight = false
+// Set during a real user gesture (Test / Join / Hear interviewer). Survives
+// awaits so post-startRound TTS does not call cancel() and drop the unlock.
+let _speechGestureUnlocked = false
 
 function ensureAudioGraph() {
   try {
@@ -324,6 +327,7 @@ export function unlockSpeech({ soft = false } = {}) {
     if (window.speechSynthesis?.paused) window.speechSynthesis.resume()
   } catch { /* non-fatal */ }
   ensureAudioGraph()
+  if (!soft) _speechGestureUnlocked = true
   if (soft || _speakInFlight) return
   try {
     if (window.speechSynthesis) {
@@ -332,8 +336,8 @@ export function unlockSpeech({ soft = false } = {}) {
       const now = Date.now()
       if (now < _primeCooldownUntil) return
       _primeCooldownUntil = now + 800
-      const u = new SpeechSynthesisUtterance(' ')
-      u.volume = 0.01
+      const u = new SpeechSynthesisUtterance('\u200b')
+      u.volume = 0
       u.rate = 2
       u.pitch = 1
       window.speechSynthesis.speak(u)
@@ -621,14 +625,14 @@ export function useInterviewVoice() {
       // Voices are usually already loaded after preflight Test. Only wait briefly
       // when empty — long awaits after Join drop Chrome's user-gesture unlock.
       if (!window.speechSynthesis.getVoices().length) {
-        await waitForBrowserVoices(900)
+        await waitForBrowserVoices(600)
       }
 
-      // Chrome: cancel() then immediate speak() often drops the next utterance.
-      // Only clear the queue when something is already playing/pending (e.g. a
-      // leftover silent prime from unlockSpeech on the Start click).
+      // Chrome: cancel() after an await often kills the gesture unlock and the
+      // next utterance never starts. If Join/Test already unlocked speech, leave
+      // the queue alone (the near-silent hold utterance drains quickly).
       const synth = window.speechSynthesis
-      if (synth.speaking || synth.pending) {
+      if (!_speechGestureUnlocked && (synth.speaking || synth.pending)) {
         try { synth.cancel() } catch { /* */ }
         await new Promise((r) => setTimeout(r, 35))
       }

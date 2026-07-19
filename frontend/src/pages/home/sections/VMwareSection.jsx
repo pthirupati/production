@@ -22,7 +22,7 @@ export default function VMwareSection({ isAuthenticated }) {
           viewport={viewportOnce}
           variants={fadeLeft}
         >
-          <VMwareShowcase demoHref={isAuthenticated ? '/vmware-sim' : '/register'} />
+          <VMwareShowcase demoHref={isAuthenticated ? '/technologies/vmware' : '/register'} />
         </motion.div>
 
         <motion.div
@@ -66,18 +66,18 @@ export default function VMwareSection({ isAuthenticated }) {
 
           <div className="flex flex-col sm:flex-row gap-3">
             <Link
-              to={isAuthenticated ? '/vmware-sim' : '/register'}
+              to={isAuthenticated ? '/technologies/vmware' : '/register'}
               data-magnetic
               className="fx-btn-primary inline-flex"
               style={{ background: 'linear-gradient(135deg, #2a6ab5, #5b9bd5)', boxShadow: '0 10px 34px rgba(91,155,213,.4)' }}
             >
-              {isAuthenticated ? 'Open vCenter' : 'Try VMware scenarios'} <ArrowRight size={16} />
+              {isAuthenticated ? 'Open VMware labs' : 'Try VMware scenarios'} <ArrowRight size={16} />
             </Link>
             <Link
-              to={isAuthenticated ? '/simulators' : '/register'}
+              to={isAuthenticated ? '/technologies' : '/register'}
               className="fx-btn-secondary inline-flex items-center gap-2"
             >
-              All enterprise consoles
+              All technologies
             </Link>
           </div>
         </motion.div>
