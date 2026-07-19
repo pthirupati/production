@@ -8,6 +8,9 @@ from .views import (
     GcpSimActionView,
     GcpSimReleaseView,
     GcpSimStateView,
+    OpenStackSimActionView,
+    OpenStackSimReleaseView,
+    OpenStackSimStateView,
     AimlSimActionView,
     AimlSimReleaseView,
     AimlSimStateView,
@@ -166,6 +169,11 @@ urlpatterns = [
     path("gcp/sessions/<uuid:session_id>/", GcpSimStateView.as_view(), name="gcp-sim-state"),
     path("gcp/sessions/<uuid:session_id>/action/", GcpSimActionView.as_view(), name="gcp-sim-action"),
     path("gcp/sessions/<uuid:session_id>/release/", GcpSimReleaseView.as_view(), name="gcp-sim-release"),
+
+    # OpenStack Horizon
+    path("openstack/sessions/<uuid:session_id>/", OpenStackSimStateView.as_view(), name="openstack-sim-state"),
+    path("openstack/sessions/<uuid:session_id>/action/", OpenStackSimActionView.as_view(), name="openstack-sim-action"),
+    path("openstack/sessions/<uuid:session_id>/release/", OpenStackSimReleaseView.as_view(), name="openstack-sim-release"),
 
     # Physical datacenter (DCIM) simulation
     path("datacenter/sessions/<uuid:session_id>/", DatacenterSimStateView.as_view(), name="datacenter-sim-state"),

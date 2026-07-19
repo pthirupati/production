@@ -18,6 +18,7 @@ const SIMULATORS = [
   { id: 'aiml', name: 'AI Agent Builder', desc: 'n8n-style workflow canvas and execution trace', icon: Bot, color: '#a78bfa', path: '/technologies/ai-ml' },
   { id: 'datascience', name: 'Data Dashboard', desc: 'BI builder with charts and aggregations', icon: BarChart3, color: '#34d399', path: '/technologies/data-science' },
   { id: 'baremetal', name: 'Bare Metal', desc: 'MAAS, LXD, KVM, IPMI consoles', icon: Cpu, color: '#0d9488', path: '/technologies/baremetal' },
+  { id: 'openstack', name: 'OpenStack Horizon', desc: 'Nova instances, Neutron networks, Cinder volumes', icon: Cloud, color: '#cf2a27', path: '/technologies/openstack' },
 ]
 
 export default function SimulatorLauncher() {

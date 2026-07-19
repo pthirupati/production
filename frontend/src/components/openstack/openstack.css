@@ -1,0 +1,9 @@
+/* OpenStack Horizon–inspired chrome (scoped). */
+.os-btn-primary {
+  background: #cf2a27;
+  color: #fff;
+  border-radius: 3px;
+  font-weight: 600;
+}
+.os-btn-primary:hover { background: #b12320; }
+.os-btn-primary:disabled { opacity: 0.55; cursor: not-allowed; }

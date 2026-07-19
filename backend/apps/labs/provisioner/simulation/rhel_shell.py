@@ -115,6 +115,14 @@ class RHELShell:
                     self._publish_resize_applied(session_id, resize)
             except Exception:
                 pass
+            try:
+                from .openstack_bridge import consume_pending_resize as _os_consume_resize
+                resize = _os_consume_resize(session_id)
+                if resize:
+                    self.state.set_hardware(cpu=resize.get("vcpus"), mem_mb=int(resize.get("ram_gb", 4)) * 1024)
+                    self._publish_resize_applied(session_id, resize)
+            except Exception:
+                pass
 
         # Command-list operators. A real shell splits on `;` (run sequentially,
         # ignoring exit codes), `&&` (run next only on success) and `||` (run

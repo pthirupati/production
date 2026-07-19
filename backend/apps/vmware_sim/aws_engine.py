@@ -564,6 +564,17 @@ def apply_action(session_id: str, action: str, payload: dict | None = None) -> d
         vol["device"] = device
         _event(state, f"Volume {vol['id']} attached to {inst_id or 'instance'} at {device}", "success")
         _save(session_id, entry)
+        try:
+            from apps.labs.provisioner.simulation import aws_bridge
+            aws_bridge.record_volume_attach(
+                str(session_id),
+                vol["id"],
+                size_gb=int(vol.get("size") or 20),
+                device=device,
+                instance_id=inst_id or None,
+            )
+        except Exception:
+            pass
         return {"ok": True, "message": "AttachVolume succeeded", "volume_id": vol["id"], "device": device}
 
     # ── EBS volume detach (also used by the bridge_detach_volume API action) ──
@@ -581,6 +592,12 @@ def apply_action(session_id: str, action: str, payload: dict | None = None) -> d
         vol["device"] = None
         _event(state, f"Volume {vol_id} detached", "info")
         _save(session_id, entry)
+        try:
+            from apps.labs.provisioner.simulation import aws_bridge
+            if device:
+                aws_bridge.record_volume_detach(str(session_id), device, instance_id=inst.get("id") if inst else None)
+        except Exception:
+            pass
         return {"ok": True, "message": "DetachVolume succeeded", "volume_id": vol_id, "device": device}
 
     # ── Security group ingress/egress rules ───────────────────────────────────

@@ -1,0 +1,12 @@
+name: OpenStack
+slug: openstack
+description: >-
+  Operate an OpenStack cloud through Horizon — Nova instances, Neutron networks,
+  Cinder volumes, and Glance images. Launch and resize instances, attach volumes,
+  and confirm changes in the lab terminal for the same Lab Server.
+icon: cloud
+color: red
+order: 46
+price: 499
+is_active: true
+coming_soon: false
