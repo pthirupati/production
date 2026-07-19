@@ -823,7 +823,7 @@ def apply_action(session_id: str, action: str, payload: dict | None = None) -> d
     payload = payload or {}
     entry = _load_session(str(session_id))
     if not entry:
-        return {"ok": False, "error": "Simulation session not found"}
+        return {"ok": False, "error": "Kubernetes session not found"}
     state = entry["state"]
     # Advance graceful termination / drain before handling the action so the
     # decision is made against the up-to-date cluster state.

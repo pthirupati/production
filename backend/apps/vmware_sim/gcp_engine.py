@@ -257,6 +257,8 @@ def check_port_reachable(session_id: str, port: str = "22") -> bool:
 def apply_action(session_id: str, action: str, payload: dict | None = None) -> dict:
     payload = payload or {}
     entry = _load(session_id)
+    if entry is None and action == "create_instance":
+        entry = _ensure(session_id, payload.get("scenario_slug") or "")
     if not entry:
         return {"ok": False, "error": "GCP session not found"}
     state = entry["state"]
@@ -269,8 +271,48 @@ def apply_action(session_id: str, action: str, payload: dict | None = None) -> d
         _save(session_id, entry)
         return {"ok": True, "message": "Signed in"}
 
+    if action == "create_instance" and not state.get("session", {}).get("logged_in"):
+        state["session"] = {"logged_in": True, "user": "admin@fixitlab.io"}
+
     if not state.get("session", {}).get("logged_in"):
         return {"ok": False, "error": "Sign in to the Google Cloud Console first"}
+
+    if action == "create_instance":
+        name = (payload.get("name") or f"vm-{_hex(4)}").strip()
+        if any(i.get("name") == name for i in state.get("instances") or []):
+            return {"ok": True, "message": "Instance already exists",
+                    "instance": next(i for i in state["instances"] if i["name"] == name)}
+        machine_type = payload.get("machine_type") or "e2-medium"
+        if machine_type not in MACHINE_TYPES:
+            machine_type = "e2-medium"
+        zone = payload.get("zone") or "us-central1-a"
+        network = (state.get("networks") or [{}])[0].get("name") or "default"
+        subnet = ((state.get("networks") or [{}])[0].get("subnets") or [{}])[0].get("name") or "default"
+        inst = {
+            "id": f"vm-{_hex(8)}", "name": name, "zone": zone,
+            "machine_type": machine_type, "os": payload.get("os") or "Debian GNU/Linux 12",
+            "status": "RUNNING",
+            "internal_ip": payload.get("internal_ip") or f"10.128.0.{random.randint(10, 250)}",
+            "external_ip": payload.get("external_ip") or f"34.{random.randint(1, 200)}.{random.randint(1, 200)}.{random.randint(1, 200)}",
+            "network": network, "subnet": subnet, "tags": payload.get("tags") or ["web"],
+            "boot_disk": name, "extra_disks": [], "_transition": None,
+            "lab_managed": True,
+        }
+        state.setdefault("disks", []).append({
+            "id": f"disk-{_hex(8)}", "name": name, "zone": zone,
+            "size_gb": int(payload.get("boot_disk_gb") or 20), "type": "pd-balanced",
+            "state": "READY", "attached_to": name, "boot": True,
+        })
+        state.setdefault("instances", []).append(inst)
+        try:
+            from apps.labs.provisioner.simulation.server_identity import new_trace_id, sync_gcp_instance
+            trace_id = new_trace_id()
+            sync_gcp_instance(session_id, inst, machine_types=MACHINE_TYPES)
+        except Exception:
+            trace_id = None
+        _event(state, f"Created instance {name}", "success", trace_id=trace_id)
+        _save(session_id, entry)
+        return {"ok": True, "message": "Instance created", "instance": inst}
 
     if action in ("start_instance", "stop_instance", "reset_instance", "instance_action"):
         op = payload.get("op") or {

@@ -955,7 +955,7 @@ def apply_action(session_id: str, action: str, payload: dict | None = None) -> d
     payload = payload or {}
     entry = _load_session(str(session_id))
     if not entry:
-        return {"ok": False, "error": "Monitoring simulation session not found"}
+        return {"ok": False, "error": "Monitoring session not found"}
     state = entry["state"]
     broken = state["broken"]
 
@@ -1231,7 +1231,7 @@ def apply_action(session_id: str, action: str, payload: dict | None = None) -> d
             t["health"] = "up"
             t.pop("last_error", None)
         _save_session(str(session_id), entry)
-        return {"ok": True, "message": "Simulator refreshed to healthy state"}
+        return {"ok": True, "message": "Environment refreshed to healthy state"}
 
     return {"ok": False, "error": f"unknown action: {action}"}
 
@@ -1254,7 +1254,7 @@ def validate_monitoring_lab(session_id: str, scenario_slug: str = "") -> tuple[b
     entry = _load_session(str(session_id))
     if not entry:
         # No engine state at all → cannot confirm the learner fixed anything.
-        return False, "No monitoring simulation session"
+        return False, "No monitoring session"
     state = entry.get("state") or {}
     graf = state.get("grafana") or {}
     prom = state.get("prometheus") or {}
@@ -1344,6 +1344,6 @@ def validate_monitoring_lab(session_id: str, scenario_slug: str = "") -> tuple[b
             return False, broken.get("summary") or "Monitoring stack still has an unresolved fault"
         if not fix_applied and broken.get("summary"):
             # A summary with no clearable signal → require the explicit fix marker.
-            return False, "Apply your fix in the simulator before checking"
+            return False, "Apply your fix in the console before checking"
 
     return True, "Monitoring stack healthy — validation passed"

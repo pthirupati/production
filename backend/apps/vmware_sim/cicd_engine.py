@@ -382,7 +382,7 @@ def apply_action(session_id: str, action: str, payload: dict | None = None) -> d
     payload = payload or {}
     entry = _load(session_id)
     if not entry:
-        return {"ok": False, "error": "CI/CD simulation session not found"}
+        return {"ok": False, "error": "CI/CD session not found"}
     state = entry["state"]
     fault = state.setdefault("fault", {"kind": None, "job": None, "summary": ""})
 

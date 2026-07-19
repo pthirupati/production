@@ -830,7 +830,7 @@ def apply_action(session_id: str, action: str, payload: dict | None = None) -> d
     payload.setdefault("session_id", str(session_id))
     entry = _load_session(str(session_id))
     if not entry:
-        return {"ok": False, "error": "Windows Server simulation session not found"}
+        return {"ok": False, "error": "Windows Server session not found"}
     state = entry["state"]
     world = state["world"]
 

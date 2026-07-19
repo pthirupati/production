@@ -48,6 +48,9 @@ export const azureApi = {
   createDisk(sessionId, name, sizeGb, sku = 'Standard_SSD_LRS') {
     return azureApi.action(sessionId, 'create_disk', { name, size_gb: sizeGb, sku })
   },
+  createVm(sessionId, payload = {}) {
+    return azureApi.action(sessionId, 'create_vm', payload)
+  },
 }
 
 export default azureApi

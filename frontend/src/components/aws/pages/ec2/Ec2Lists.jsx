@@ -108,7 +108,7 @@ export function KeyPairList() {
       {deleteTarget && (
         <ConfirmDialog
           title={`Delete key pair ${deleteTarget}?`}
-          body="Deleting a key pair removes it from this region in the local simulation. Existing instances keep their key pair name, but this key can no longer be selected for new launches."
+          body="Deleting a key pair removes it from this region. Existing instances keep their key pair name, but this key can no longer be selected for new launches."
           confirmLabel="Delete"
           confirmText={deleteTarget}
           onCancel={() => setDeleteTarget(null)}

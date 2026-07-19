@@ -45,7 +45,7 @@ export default function AwsTerminal({ instance, username, cloudShell = false }) 
     if (cloudShell) {
       term.writeln('Welcome to AWS CloudShell!')
       term.writeln('')
-      term.writeln('Type "aws help" for AWS CLI or "terraform -help" for IaC against this simulation.')
+      term.writeln('Type "aws help" for AWS CLI or "terraform -help" for IaC against this account.')
       term.writeln('Starter template: ~/main.tf')
       term.writeln('')
     } else {

@@ -1,5 +1,5 @@
 /**
- * Sync Terraform apply results into the AWS console simulator store so learners
+ * Sync Terraform apply results into the AWS console store so learners
  * can verify resources visually after `terraform apply` in the lab IDE.
  *
  * This delegates to the same HCL tokenizer the terminal engine uses
@@ -7,10 +7,15 @@
  * the same accurate resources as the terminal `terraform apply` path — honoring
  * multiple resources, count, real key names / security groups, and full ingress
  * rules — instead of the old single-regex parser that hardcoded most values.
+ *
+ * Azure (azurerm_*) and GCP (google_*) resources are mirrored into the
+ * server-authoritative Azure/GCP portal engines for the same lab sessionId.
  */
 import { useAwsStore } from '../components/aws/store/awsStore'
 import { parseHcl, parseBody } from '../components/aws/terminal/hclParser'
 import { awsCli } from '../components/aws/terminal/awscli'
+import { azureApi } from '../api/azure'
+import { gcpApi } from '../api/gcp'
 
 // Resource addresses already mirrored into the console this page session, so a
 // re-apply of an unchanged config does not duplicate instances/buckets/SGs.
@@ -130,7 +135,7 @@ function renderResourceState(store, r) {
 }
 
 /** After terraform apply (backend or terminal), mirror resources into AWS GUI. */
-export function syncTerraformApplyToAwsConsole(state) {
+export function syncTerraformApplyToAwsConsole(state, { sessionId } = {}) {
   const tf = state?.state?.terraform || state?.terraform || {}
   if (!tf?.last_apply) return
 
@@ -152,6 +157,46 @@ export function syncTerraformApplyToAwsConsole(state) {
   if (created.length) {
     store.markLabManaged?.(created)
     store.pushFlash('success', `${created.length} resource(s) from Terraform apply — open AWS Console to verify.`)
+  }
+
+  // Fire-and-forget Azure/GCP portal mirrors (same lab session).
+  if (sessionId) {
+    syncTerraformApplyToAzureGcp(resources, sessionId).catch(() => {})
+  }
+}
+
+/**
+ * Mirror azurerm_* / google_* resources into the Azure Portal / GCP Console
+ * engines for this lab session so learners can open those consoles and see VMs.
+ */
+export async function syncTerraformApplyToAzureGcp(resources, sessionId) {
+  if (!sessionId || !resources?.length) return
+  for (const r of resources) {
+    const address = `${r.type}.${r.name}`
+    if (syncedAddresses.has(`cloud:${address}`)) continue
+    const attrs = r.attrs || {}
+    try {
+      if (r.type === 'azurerm_linux_virtual_machine' || r.type === 'azurerm_windows_virtual_machine'
+          || r.type === 'azurerm_virtual_machine') {
+        const name = attrs.name || r.name
+        await azureApi.createVm(sessionId, {
+          name,
+          size: attrs.size || attrs.vm_size || 'Standard_B2s',
+          location: attrs.location || 'eastus',
+        })
+        syncedAddresses.add(`cloud:${address}`)
+      } else if (r.type === 'google_compute_instance') {
+        const name = attrs.name || r.name
+        await gcpApi.createInstance(sessionId, {
+          name,
+          machine_type: attrs.machine_type || 'e2-medium',
+          zone: attrs.zone || 'us-central1-a',
+        })
+        syncedAddresses.add(`cloud:${address}`)
+      }
+    } catch {
+      // Portal session may be unavailable for pure-AWS terraform labs — non-fatal.
+    }
   }
 }
 

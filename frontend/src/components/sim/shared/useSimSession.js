@@ -14,7 +14,7 @@ export function useSimSession(sessionId, scenarioSlug, api) {
       const data = await api.getState(sessionId, scenarioSlug)
       setState(data)
     } catch {
-      setError('Could not load simulator state')
+      setError('Could not load console state')
     } finally {
       setLoading(false)
     }

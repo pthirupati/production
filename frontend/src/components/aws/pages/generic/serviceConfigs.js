@@ -58,7 +58,7 @@ export const SERVICE_CONFIGS = {
           { key: 'multiAz', label: 'Multi-AZ deployment', input: 'toggle', group: 'Availability & durability' },
           { key: 'status', label: 'Status', badge: true },
         ],
-        defaults: { engine: 'PostgreSQL 15.4', class: 'db.t3.micro', storage: 20, multiAz: false, status: 'creating', endpoint: 'simulated.cluster.us-east-1.rds.amazonaws.com:5432' },
+        defaults: { engine: 'PostgreSQL 15.4', class: 'db.t3.micro', storage: 20, multiAz: false, status: 'creating', endpoint: 'app-db.cluster-a1b2c3d4e5f6.us-east-1.rds.amazonaws.com:5432' },
         lifecycle: {
           createStates: ['creating', 'backing-up', 'available'],
           createDelayMs: 5000,
@@ -681,14 +681,14 @@ export const SERVICE_CONFIGS = {
     category: 'Management & Governance',
     desc: 'Personalized AWS service health alerts',
     primary: 'events',
-    resources: { events: { label: 'Events', createLabel: 'Create simulated event', idLabel: 'Event title', arnService: 'health', arnResource: (r) => `event/${r.id}`, fields: [{ key: 'name', label: 'Event' }, { key: 'service', label: 'Service' }, { key: 'impact', label: 'Impact' }, { key: 'status', label: 'Status', badge: true }], defaults: { service: 'EC2', impact: 'Informational', status: 'open' } } },
+    resources: { events: { label: 'Events', createLabel: 'Create event', idLabel: 'Event title', arnService: 'health', arnResource: (r) => `event/${r.id}`, fields: [{ key: 'name', label: 'Event' }, { key: 'service', label: 'Service' }, { key: 'impact', label: 'Impact' }, { key: 'status', label: 'Status', badge: true }], defaults: { service: 'EC2', impact: 'Informational', status: 'open' } } },
   },
   trustedadvisor: {
     title: 'Trusted Advisor',
     category: 'Management & Governance',
     desc: 'Best-practice checks and recommendations',
     primary: 'checks',
-    resources: { checks: { label: 'Checks', createLabel: 'Add simulated check', idLabel: 'Check name', arnService: 'trustedadvisor', arnResource: (r) => `check/${r.id}`, fields: [{ key: 'name', label: 'Check' }, { key: 'category', label: 'Category' }, { key: 'affected', label: 'Affected resources' }, { key: 'status', label: 'Status', badge: true }], defaults: { category: 'Security', affected: 0, status: 'OK' } } },
+    resources: { checks: { label: 'Checks', createLabel: 'Add check', idLabel: 'Check name', arnService: 'trustedadvisor', arnResource: (r) => `check/${r.id}`, fields: [{ key: 'name', label: 'Check' }, { key: 'category', label: 'Category' }, { key: 'affected', label: 'Affected resources' }, { key: 'status', label: 'Status', badge: true }], defaults: { category: 'Security', affected: 0, status: 'OK' } } },
   },
   wellarchitected: {
     title: 'Well-Architected Tool',

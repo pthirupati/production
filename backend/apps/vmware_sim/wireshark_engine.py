@@ -635,7 +635,7 @@ def apply_action(session_id: str, action: str, payload: dict | None = None) -> d
     payload = payload or {}
     entry = _load_session(str(session_id))
     if not entry:
-        return {"ok": False, "error": "Wireshark simulation session not found"}
+        return {"ok": False, "error": "Wireshark session not found"}
     state = entry["state"]
     events = entry.setdefault("events", [])
 

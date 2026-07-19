@@ -206,3 +206,15 @@ class AzureBridgePowerTests(AzureEngineBase):
         self.assertEqual(ab.consume_power(self.sid), "stop")
         # Second drain returns None (already consumed).
         self.assertIsNone(ab.consume_power(self.sid))
+
+    def test_create_vm_from_terraform_without_prior_login(self):
+        # Cold session — mirrors terraform apply hitting Azure before portal open.
+        res = ae.apply_action(self.sid, "create_vm", {"name": "tf-web", "size": "Standard_D2s_v5"})
+        self.assertTrue(res["ok"], res)
+        names = [v["name"] for v in ae.get_state(self.sid)["state"]["vms"]]
+        self.assertIn("tf-web", names)
+        self.assertIn("vm-web01", names)  # seeded default still present
+        # Idempotent on re-apply.
+        res2 = ae.apply_action(self.sid, "create_vm", {"name": "tf-web"})
+        self.assertTrue(res2["ok"])
+        self.assertEqual(len([v for v in ae.get_state(self.sid)["state"]["vms"] if v["name"] == "tf-web"]), 1)

@@ -197,7 +197,7 @@ def _base_state() -> dict:
     return {
         "account": {
             "id": ACCOUNT_ID,
-            "alias": "my-aws-simulation",
+            "alias": "fixitlab-enterprise",
             "email": "admin@example.com",
             "rootEmail": "root@example.com",
         },

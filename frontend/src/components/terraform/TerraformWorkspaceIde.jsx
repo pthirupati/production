@@ -117,8 +117,8 @@ export default function TerraformWorkspaceIde({
         if (okMsg) toast.success(res?.message || okMsg, { duration: 2000 })
         setOutput(res?.output || res?.plan?.summary || JSON.stringify(res?.plan || res, null, 2) || '')
         if (action === `${actionPrefix}_apply` || action === 'terraform_apply') {
-          syncTerraformApplyToAwsConsole(res?.state ? { state: res.state } : state)
-          toast.success('Resources mirrored to the AWS Console — open the AWS Console tab to verify.', { duration: 3500 })
+          syncTerraformApplyToAwsConsole(res?.state ? { state: res.state } : state, { sessionId })
+          toast.success('Resources mirrored to cloud consoles — open AWS / Azure / GCP tabs to verify.', { duration: 3500 })
         }
       }
       if (res?.state) setState(res.state)

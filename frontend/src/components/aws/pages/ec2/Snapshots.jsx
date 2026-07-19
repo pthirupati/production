@@ -62,7 +62,7 @@ export default function Snapshots() {
       {deleteTarget && (
         <ConfirmDialog
           title={`Delete ${deleteTarget.id}?`}
-          body="Deleting a snapshot is permanent in this simulation and cannot be undone."
+          body="Deleting a snapshot is permanent and cannot be undone."
           confirmLabel="Delete"
           confirmText={deleteTarget.id}
           onCancel={() => setDeleteTarget(null)}

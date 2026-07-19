@@ -232,3 +232,13 @@ class GcpBridgePowerTests(GcpEngineBase):
         ge.apply_action(self.sid, "stop_instance", {"instance_name": "web01"})
         self.assertEqual(gb.consume_power(self.sid), "stop")
         self.assertIsNone(gb.consume_power(self.sid))
+
+    def test_create_instance_from_terraform_without_prior_login(self):
+        res = ge.apply_action(self.sid, "create_instance", {"name": "tf-web", "machine_type": "e2-standard-2"})
+        self.assertTrue(res["ok"], res)
+        names = [i["name"] for i in ge.get_state(self.sid)["state"]["instances"]]
+        self.assertIn("tf-web", names)
+        self.assertIn("web01", names)
+        res2 = ge.apply_action(self.sid, "create_instance", {"name": "tf-web"})
+        self.assertTrue(res2["ok"])
+        self.assertEqual(len([i for i in ge.get_state(self.sid)["state"]["instances"] if i["name"] == "tf-web"]), 1)
