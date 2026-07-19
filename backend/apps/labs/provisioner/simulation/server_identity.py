@@ -858,6 +858,39 @@ def sync_gcp_instance(session_id: str, instance: dict | None, *, machine_types: 
     return server
 
 
+def sync_openstack_instance(session_id: str, instance: dict | None, *, flavors: dict | None = None) -> dict | None:
+    """Mirror a Nova instance into this session's LabServer registry and
+    make it SSH-reachable from the lab terminal."""
+    if not isinstance(instance, dict):
+        return None
+    size_info = (flavors or {}).get(instance.get("flavor") or "", {})
+    status = (instance.get("status") or "ACTIVE").upper()
+    hostname = instance.get("name") or "openstack-vm"
+    private_ip = instance.get("private_ip") or ""
+    power_on = status in ("ACTIVE", "BUILD", "REBOOT") or instance.get("power_state") == "Running"
+    patch: dict[str, Any] = {
+        "id": f"openstack-{hostname}",
+        "hostname": hostname,
+        "primary_ip": private_ip,
+        "cpu": size_info.get("vcpus") or 2,
+        "mem_mb": int(size_info.get("ram_gb") or 4) * 1024,
+        "power": "on" if power_on else "off",
+        "os": "linux",
+        "tags": {
+            "role": "primary" if not instance.get("lab_managed") else "cloud-vm",
+            "persona": "openstack",
+            "flavor": instance.get("flavor") or "",
+            "appears_in": ["openstack", "terminal"],
+        },
+    }
+    server = upsert_server(session_id, patch, source="openstack")
+    if private_ip and power_on:
+        register_terminal_ssh_host(
+            session_id, hostname=hostname, ip=private_ip, ssh_user="ubuntu", source="openstack",
+        )
+    return server
+
+
 def sync_k8s_nodes(session_id: str, nodes: list[dict] | None) -> None:
     """Mirror Kubernetes cluster nodes into this session's LabServer registry."""
     for node in nodes or []:

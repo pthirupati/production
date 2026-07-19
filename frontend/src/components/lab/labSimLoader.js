@@ -31,6 +31,7 @@ export const LazyDatacenterSimulator = lazyWithRetry(() => import('../datacenter
 export const LazySocSimulator = lazyWithRetry(() => import('../soc/SocSimulator'))
 export const LazyAzureConsole = lazyWithRetry(() => import('../azure/AzureConsole'))
 export const LazyGcpConsole = lazyWithRetry(() => import('../gcp/GcpConsole'))
+export const LazyOpenStackConsole = lazyWithRetry(() => import('../openstack/OpenStackConsole'))
 
 export const PRIMARY_SIM_COMPONENTS = {
   aws: LazyAwsLabOverlay,
@@ -52,4 +53,5 @@ export const PRIMARY_SIM_COMPONENTS = {
   soc: LazySocSimulator,
   azure: LazyAzureConsole,
   gcp: LazyGcpConsole,
+  openstack: LazyOpenStackConsole,
 }

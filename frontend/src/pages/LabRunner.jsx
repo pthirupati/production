@@ -1479,11 +1479,17 @@ export default function LabRunner() {
     || (scenario?.slug || '').startsWith('gcp-')
     || (scenario?.slug || '').startsWith('academy-gcp-')
   )
+  const isOpenStackLab = !isCrossTech && (
+    scenario?.simulation_type === 'openstack'
+    || scenario?.technology?.slug === 'openstack'
+    || (scenario?.slug || '').startsWith('openstack-')
+  )
   const isSimPrimaryLab = !isCrossTech && (
     isAwsLab || isDevOpsPipelineLab || isTerraformSimLab || isAwxLab || isMonitoringLab || isWindowsGuiLab
     || isPeopleSoftLab || isBaremetalGuiLab || isDataDashboardLab || isAgentLab
     || isNmapLab || isWiresharkLab
     || isCommvaultLab || isNetappLab || isDellemcLab || isDatacenterLab || isSocLab || isAzureLab || isGcpLab
+    || isOpenStackLab
   )
   const simOverlayOpen = !isSimPrimaryLab && (
     showMonitoringSim || showNmapSim || showWiresharkSim
@@ -1510,6 +1516,7 @@ export default function LabRunner() {
     : isSocLab ? 'soc'
     : isAzureLab ? 'azure'
     : isGcpLab ? 'gcp'
+    : isOpenStackLab ? 'openstack'
     : null
   const solved = validationResult?.passed
   const expired = validationResult?.expired

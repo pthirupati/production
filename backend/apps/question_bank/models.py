@@ -161,6 +161,11 @@ class Scenario(models.Model):
         ("dellemc", "Dell EMC Unisphere / PowerMax Simulation"),
         ("datacenter", "Physical Datacenter (DCIM) Simulation"),
         ("soc", "SOC / SIEM Cybersecurity Simulation"),
+        ("aws", "AWS Console"),
+        ("azure", "Microsoft Azure Portal"),
+        ("gcp", "Google Cloud Console"),
+        ("openstack", "OpenStack Horizon"),
+        ("vmware", "VMware vSphere"),
     ]
 
     requires_companion_hosts = models.BooleanField(

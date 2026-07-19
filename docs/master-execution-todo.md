@@ -188,6 +188,7 @@ Legend: `[x]` done · `[~]` partial · `[ ]` open
       backend tests, full catalog lint clean.
 - [ ] GCP Console pack + heroes
 - [ ] OpenStack Horizon pack + heroes
++ [x] OpenStack Horizon pack foundation (engine + console + attach-volume scenario + SSH/disk bridge)
 - [ ] OpenShift Console pack + heroes
 - [ ] Expand networking / identity / backup (Veeam) / Hyper-V as needed
 

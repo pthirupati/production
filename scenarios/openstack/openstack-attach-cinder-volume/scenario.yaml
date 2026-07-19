@@ -1,0 +1,50 @@
+title: Attach the Pending Cinder Volume Before the Import Job Runs
+slug: openstack-attach-cinder-volume
+technology: openstack
+category: Build
+difficulty: easy
+lab_mode: simulation
+simulation_type: openstack
+infrastructure_type: docker
+time_limit: 600
+max_score: 100
+is_free: true
+jira_priority: Medium
+dual_terminal: false
+description: 'CONTEXT: The platform team created vol-web-data for tonight''s import job on web-01,
+  but the volume was never attached. The ticket asks you to finish the attach from Horizon before
+  the cron runs.
+
+
+  ENVIRONMENT: You are working in OpenStack Horizon against the fixitlab-prod project. Instance
+  web-01 is ACTIVE on the private network. Volume vol-web-data is available and unattached.
+
+
+  OBJECTIVE: Sign in to Horizon, attach vol-web-data to web-01, then confirm the device appears
+  in the lab terminal with lsblk.'
+initial_state: vol-web-data is available and not attached to any instance.
+objectives:
+- Sign in to OpenStack Horizon
+- Open Volumes and locate vol-web-data
+- Attach it to web-01
+- Confirm the volume status is in-use
+hints:
+- order: 1
+  cost: 0
+  content: Sign in with admin / lab123, then open Volumes in the left nav.
+- order: 2
+  cost: 10
+  content: Use Attach on vol-web-data and select web-01.
+- order: 3
+  cost: 25
+  content: After attach, status should be in-use and device /dev/vdb. Run lsblk in the lab terminal.
+validation:
+  type: command
+  commands:
+  - cmd: true
+    expect: ''
+tags:
+- openstack
+- cinder
+- nova
+- build
