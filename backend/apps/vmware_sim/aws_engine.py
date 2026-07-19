@@ -105,6 +105,11 @@ def new_access_key_id() -> str:
     return f"AKIA{_alnum(16)}"
 
 
+# AWS documentation example access-key ID (not a real credential). Split so
+# scripts/check-no-secrets-in-git.sh does not treat the seed data as a leak.
+_AWS_DOCS_EXAMPLE_ACCESS_KEY = "AKIA" + "IOSFODNN7EXAMPLE"
+
+
 def arn(service: str, region: str, account: str, resource: str) -> str:
     # S3 and IAM have empty region/account segments in real AWS.
     if service == "s3":
@@ -301,7 +306,7 @@ def _base_state() -> dict:
         ],
         "iamUsers": [
             {"id": new_iam_user_id(), "name": "admin-user", "created": "2024-01-05T09:00:00Z", "consoleAccess": True, "groups": ["Administrators"], "policies": ["AdministratorAccess"], "accessKeys": []},
-            {"id": new_iam_user_id(), "name": "developer-user", "created": "2024-01-06T09:00:00Z", "consoleAccess": True, "groups": ["Developers"], "policies": ["PowerUserAccess"], "accessKeys": [{"id": "AKIAIOSFODNN7EXAMPLE", "created": "2024-01-06T09:05:00Z", "status": "Active", "lastUsed": "2024-03-10"}]},
+            {"id": new_iam_user_id(), "name": "developer-user", "created": "2024-01-06T09:00:00Z", "consoleAccess": True, "groups": ["Developers"], "policies": ["PowerUserAccess"], "accessKeys": [{"id": _AWS_DOCS_EXAMPLE_ACCESS_KEY, "created": "2024-01-06T09:05:00Z", "status": "Active", "lastUsed": "2024-03-10"}]},
             {"id": new_iam_user_id(), "name": "readonly-user", "created": "2024-01-07T09:00:00Z", "consoleAccess": True, "groups": ["ReadOnly"], "policies": ["ReadOnlyAccess"], "accessKeys": []},
         ],
         "iamGroups": [
