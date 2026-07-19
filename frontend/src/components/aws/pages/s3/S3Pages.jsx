@@ -103,7 +103,7 @@ export function BucketList() {
       {deleteTarget && (
         <ConfirmDialog
           title={`Delete bucket ${deleteTarget}?`}
-          body="Deleting a bucket removes it from this local AWS simulation. AWS requires buckets to be empty before deletion; this simulator removes the seeded objects as part of the local delete."
+          body="Deleting a bucket removes it from this environment. AWS requires buckets to be empty before deletion; the console removes the seeded objects as part of the delete."
           confirmLabel="Delete bucket"
           confirmText={deleteTarget}
           onCancel={() => setDeleteTarget(null)}

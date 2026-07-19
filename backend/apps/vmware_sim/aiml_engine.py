@@ -107,7 +107,7 @@ NODE_PALETTE = [
         "type": "tool",
         "label": "Tool",
         "icon": "wrench",
-        "description": "Simulated integration: http_get, db_query, or send_notification (all canned/local).",
+        "description": "Local tool integration: http_get, db_query, or send_notification.",
         "default_config": {"kind": "http_get", "url": ""},
     },
     {
@@ -971,7 +971,7 @@ def apply_action(session_id: str, action: str, payload: dict | None = None) -> d
     payload = payload or {}
     entry = _load_session(str(session_id))
     if not entry:
-        return {"ok": False, "error": "Agent simulation session not found"}
+        return {"ok": False, "error": "Agent session not found"}
     state = entry["state"]
     graph = state.setdefault("graph", _empty_graph())
 

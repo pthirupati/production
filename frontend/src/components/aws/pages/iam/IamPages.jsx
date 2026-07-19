@@ -115,7 +115,7 @@ export function UserList() {
       {deleteTarget && (
         <ConfirmDialog
           title={`Delete ${deleteTarget.length} IAM user${deleteTarget.length === 1 ? '' : 's'}?`}
-          body="Deleting an IAM user removes its local console access, programmatic credentials, and group membership in the simulation."
+          body="Deleting an IAM user removes its local console access, programmatic credentials, and group membership."
           confirmLabel="Delete"
           confirmText={deleteTarget.length === 1 ? deleteTarget[0] : String(deleteTarget.length)}
           onCancel={() => setDeleteTarget(null)}
@@ -242,7 +242,7 @@ export function PolicyList() {
       {deleteTarget && (
         <ConfirmDialog
           title={`Delete policy ${deleteTarget}?`}
-          body="Deleting a customer managed policy removes it from the local IAM simulation. AWS does not allow deleting AWS managed policies; this table contains customer-managed policies."
+          body="Deleting a customer managed policy removes it from this environment. AWS does not allow deleting AWS managed policies; this table contains customer-managed policies."
           confirmLabel="Delete policy"
           confirmText={deleteTarget}
           onCancel={() => setDeleteTarget(null)}
