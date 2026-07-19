@@ -41,7 +41,7 @@ provider "aws" {
   region = "${linux.region || 'us-east-1'}"
 }
 
-# Example — terraform plan / apply creates resources in this simulation console
+# Example — terraform plan / apply creates resources in this console
 resource "aws_instance" "web" {
   ami           = "ami-0c55b159cbfafe1f0"
   instance_type = "t3.micro"

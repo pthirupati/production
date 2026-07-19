@@ -341,7 +341,7 @@ export function DataTable({ columns, rows, getRowKey, selectable, selected, onSe
               </label>
             ))}
           </div>
-          <div className="aws-hint" style={{ marginTop: 12 }}>At least one column must remain visible. Preferences are persisted locally for this simulation.</div>
+          <div className="aws-hint" style={{ marginTop: 12 }}>At least one column must remain visible. Preferences are persisted locally for this lab session.</div>
         </Modal>
       )}
     </div>

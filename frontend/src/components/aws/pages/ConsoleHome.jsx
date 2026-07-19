@@ -110,7 +110,7 @@ export default function ConsoleHome() {
         return (
           <WidgetShell key={key} wkey={key} title="Welcome to AWS">
             <div style={{ marginTop: 8, color: 'var(--aws-text-secondary)', fontSize: 13 }}>
-              This is a hands-on AWS console simulation. Launch resources, manage IAM, and complete guided labs.
+              This is a hands-on AWS console. Launch resources, manage IAM, and complete guided labs.
             </div>
             <a onClick={() => navigate('/technologies/aws')} style={{ display: 'inline-block', marginTop: 10 }}>Browse AWS labs</a>
           </WidgetShell>
