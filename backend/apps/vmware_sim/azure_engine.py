@@ -273,6 +273,9 @@ def check_port_reachable(session_id: str, port: str = "22") -> bool:
 def apply_action(session_id: str, action: str, payload: dict | None = None) -> dict:
     payload = payload or {}
     entry = _load(session_id)
+    # Terraform apply may create VMs before the portal was opened — seed on demand.
+    if entry is None and action == "create_vm":
+        entry = _ensure(session_id, payload.get("scenario_slug") or "")
     if not entry:
         return {"ok": False, "error": "Azure session not found"}
     state = entry["state"]
@@ -285,10 +288,51 @@ def apply_action(session_id: str, action: str, payload: dict | None = None) -> d
         _save(session_id, entry)
         return {"ok": True, "message": "Signed in"}
 
+    # Provisioning path (Terraform / API): auto-sign-in so create_vm works without a portal click.
+    if action == "create_vm" and not state.get("session", {}).get("logged_in"):
+        state["session"] = {"logged_in": True, "user": "admin@fixitlab.onmicrosoft.com"}
+
     if not state.get("session", {}).get("logged_in"):
         return {"ok": False, "error": "Sign in to the Azure portal first"}
 
-    # ── Virtual machine power lifecycle ────────────────────────────────────
+    if action == "create_vm":
+        rg = (state.get("resource_groups") or [{}])[0].get("name") or "rg-lab"
+        name = (payload.get("name") or f"vm-{_hex(4)}").strip()
+        if any(v.get("name") == name for v in state.get("vms") or []):
+            return {"ok": True, "message": "VM already exists", "vm": next(v for v in state["vms"] if v["name"] == name)}
+        size = payload.get("size") or "Standard_B2s"
+        if size not in VM_SIZES:
+            size = "Standard_B2s"
+        vnet = (state.get("vnets") or [{}])[0].get("name") or "vnet-lab"
+        subnet = ((state.get("vnets") or [{}])[0].get("subnets") or [{}])[0].get("name") or "subnet-web"
+        nsg = (state.get("nsgs") or [{}])[0].get("name") or "nsg-web"
+        os_disk = f"{name}_OsDisk"
+        vm = {
+            "id": f"vm-{_hex(8)}", "name": name, "resource_group": rg,
+            "location": payload.get("location") or "eastus",
+            "size": size, "os": payload.get("os") or "Ubuntu 22.04 LTS",
+            "power_state": "running", "provisioning_state": "Succeeded",
+            "private_ip": payload.get("private_ip") or f"10.10.1.{random.randint(10, 250)}",
+            "public_ip": payload.get("public_ip") or f"20.{random.randint(1, 200)}.{random.randint(1, 200)}.{random.randint(1, 200)}",
+            "vnet": vnet, "subnet": subnet, "nsg": nsg,
+            "os_disk": os_disk, "data_disks": [], "_transition": None,
+            "lab_managed": True,
+        }
+        state.setdefault("disks", []).append({
+            "id": f"disk-{_hex(8)}", "name": os_disk, "resource_group": rg,
+            "size_gb": int(payload.get("os_disk_gb") or 30), "sku": "Premium_SSD_LRS",
+            "state": "Attached", "attached_to": name, "os_disk": True,
+        })
+        state.setdefault("vms", []).append(vm)
+        try:
+            from apps.labs.provisioner.simulation.server_identity import new_trace_id, sync_azure_vm
+            trace_id = new_trace_id()
+            sync_azure_vm(session_id, vm, vm_sizes=VM_SIZES)
+        except Exception:
+            trace_id = None
+        _event(state, f"Created virtual machine {name}", "success", trace_id=trace_id)
+        _save(session_id, entry)
+        return {"ok": True, "message": "VM created", "vm": vm}
     if action in ("start_vm", "stop_vm", "restart_vm", "vm_action"):
         op = payload.get("op") or {"start_vm": "start", "stop_vm": "stop", "restart_vm": "restart"}.get(action, "start")
         vm = _find_vm(state, payload.get("vm_id") or payload.get("vm_name") or payload.get("name"))

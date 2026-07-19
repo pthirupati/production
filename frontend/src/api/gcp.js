@@ -48,6 +48,9 @@ export const gcpApi = {
   createDisk(sessionId, name, sizeGb, type = 'pd-balanced') {
     return gcpApi.action(sessionId, 'create_disk', { name, size_gb: sizeGb, type })
   },
+  createInstance(sessionId, payload = {}) {
+    return gcpApi.action(sessionId, 'create_instance', payload)
+  },
 }
 
 export default gcpApi

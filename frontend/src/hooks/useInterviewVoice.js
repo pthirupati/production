@@ -285,45 +285,53 @@ function stopAudio() {
 // Chrome/Safari without a primed audio graph after an await (startRound).
 let _unlockAudioCtx = null
 let _primeCooldownUntil = 0
+// True while speak() owns the synthesis queue — skip silent primes that steal
+// the queue / cancel race with the real interviewer line.
+let _speakInFlight = false
 
-// Chrome/Safari often start with speechSynthesis paused or stuck until a user
-// gesture primes it. Call this on Join / Begin AND again right before speak()
-// after any await, so the first bot line actually plays.
-export function unlockSpeech() {
+function ensureAudioGraph() {
+  try {
+    const Ctx = window.AudioContext || window.webkitAudioContext
+    if (!Ctx) return
+    if (!_unlockAudioCtx || _unlockAudioCtx.state === 'closed') {
+      _unlockAudioCtx = new Ctx()
+    }
+    if (_unlockAudioCtx.state === 'suspended') {
+      _unlockAudioCtx.resume().catch(() => {})
+    }
+    // Silent tick keeps the graph "used" under autoplay policy.
+    const osc = _unlockAudioCtx.createOscillator()
+    const gain = _unlockAudioCtx.createGain()
+    gain.gain.value = 0.0001
+    osc.connect(gain)
+    gain.connect(_unlockAudioCtx.destination)
+    osc.start()
+    osc.stop(_unlockAudioCtx.currentTime + 0.02)
+  } catch { /* non-fatal */ }
+}
+
+/**
+ * Chrome/Safari often start with speechSynthesis paused until a user gesture.
+ * Call on Join / Begin / Test (during the gesture). Prefer this over resume-only
+ * so the AudioContext unlock survives the startRound() await.
+ *
+ * Soft mode (during speak): resume + audio graph only — never enqueue a silent
+ * SpeechSynthesis utterance that would race with the real line.
+ */
+export function unlockSpeech({ soft = false } = {}) {
   if (typeof window === 'undefined') return
   try {
     if (window.speechSynthesis?.paused) window.speechSynthesis.resume()
   } catch { /* non-fatal */ }
-  try {
-    const Ctx = window.AudioContext || window.webkitAudioContext
-    if (Ctx) {
-      if (!_unlockAudioCtx || _unlockAudioCtx.state === 'closed') {
-        _unlockAudioCtx = new Ctx()
-      }
-      if (_unlockAudioCtx.state === 'suspended') {
-        _unlockAudioCtx.resume().catch(() => {})
-      }
-      // Silent tick keeps the graph "used" under autoplay policy.
-      try {
-        const osc = _unlockAudioCtx.createOscillator()
-        const gain = _unlockAudioCtx.createGain()
-        gain.gain.value = 0.0001
-        osc.connect(gain)
-        gain.connect(_unlockAudioCtx.destination)
-        osc.start()
-        osc.stop(_unlockAudioCtx.currentTime + 0.02)
-      } catch { /* non-fatal */ }
-    }
-  } catch { /* non-fatal */ }
+  ensureAudioGraph()
+  if (soft || _speakInFlight) return
   try {
     if (window.speechSynthesis) {
       // Avoid stacking silent primes — that fills Chrome's queue and starves
-      // the real interviewer utterance. Resume is enough between primes.
+      // the real interviewer utterance.
       const now = Date.now()
       if (now < _primeCooldownUntil) return
-      _primeCooldownUntil = now + 400
-      // Do NOT cancel immediately after speak — that leaves Chrome's queue stuck
-      // and the next real utterance never starts. Use a near-silent priming utterance.
+      _primeCooldownUntil = now + 800
       const u = new SpeechSynthesisUtterance(' ')
       u.volume = 0.01
       u.rate = 2
@@ -583,10 +591,14 @@ export function useInterviewVoice() {
   const speak = useCallback(async (text, voiceCode, speechOverrides = {}) => {
     if (!text) return { spoken: false }
     setIsSpeaking(true)
+    _speakInFlight = true
     let spoken = false
 
     try {
-      unlockSpeech()
+      // Soft unlock only — a silent priming utterance here races with the real
+      // line and is a common cause of "Voice unavailable" after Join.
+      unlockSpeech({ soft: true })
+      resumeSpeechSynthesis()
 
       // Optional server TTS (paid providers). Fully guarded — any failure here
       // must NEVER throw out of speak() or the hands-free loop stalls silently.
@@ -606,14 +618,21 @@ export function useInterviewVoice() {
       // Browser SpeechSynthesis fallback — segmented for a natural cadence.
       if (!window.speechSynthesis) return { spoken: false }
       const profile = resolveVoiceProfile(voiceCode)
-      await waitForBrowserVoices()
-      // Chrome: cancel() then immediate speak() often drops the utterance.
-      // Clear the queue, wait a tick, resume, then speak.
-      try { window.speechSynthesis.cancel() } catch { /* */ }
-      await new Promise((r) => setTimeout(r, 40))
-      try {
-        if (window.speechSynthesis.paused) window.speechSynthesis.resume()
-      } catch { /* */ }
+      // Voices are usually already loaded after preflight Test. Only wait briefly
+      // when empty — long awaits after Join drop Chrome's user-gesture unlock.
+      if (!window.speechSynthesis.getVoices().length) {
+        await waitForBrowserVoices(900)
+      }
+
+      // Chrome: cancel() then immediate speak() often drops the next utterance.
+      // Only clear the queue when something is already playing/pending (e.g. a
+      // leftover silent prime from unlockSpeech on the Start click).
+      const synth = window.speechSynthesis
+      if (synth.speaking || synth.pending) {
+        try { synth.cancel() } catch { /* */ }
+        await new Promise((r) => setTimeout(r, 35))
+      }
+      resumeSpeechSynthesis()
 
       const voice = pickBrowserVoice(
         profile.browser_voice_hint, profile.locale, selectedVoiceRef.current,
@@ -663,7 +682,8 @@ export function useInterviewVoice() {
         if (!spoken && speakTokenRef.current === myToken) {
           const clean = (text || '').replace(/\s+/g, ' ').trim()
           if (clean) {
-            unlockSpeech()
+            unlockSpeech({ soft: true })
+            resumeSpeechSynthesis()
             spoken = await speakBrowserUtterance(clean.slice(0, 500), utterOpts)
           }
         }
@@ -673,6 +693,7 @@ export function useInterviewVoice() {
 
       return { spoken }
     } finally {
+      _speakInFlight = false
       setIsSpeaking(false)
     }
   }, [resolveVoiceProfile])

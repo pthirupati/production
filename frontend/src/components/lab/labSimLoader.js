@@ -1,12 +1,12 @@
 /**
- * Lazy-loaded lab simulators — keeps LabRunner chunk small until a sim is needed.
+ * Lazy-loaded lab consoles — keeps LabRunner chunk small until a console is needed.
  *
  * Use lazyWithRetry (NOT plain React.lazy): a returning user with a cached
  * index.html references the PREVIOUS deploy's hashed chunks, so opening a lab
- * 404s the sim chunk. Plain lazy() throws ChunkLoadError straight into
- * SimErrorBoundary ("Something went wrong loading this simulator") — which no
- * store reset can fix. lazyWithRetry retries, then does ONE hard reload to
- * fetch the current index.html, exactly like the route chunks in AppRouter.
+ * 404s the console chunk. Plain lazy() throws ChunkLoadError straight into
+ * SimErrorBoundary ("Lab environment error") — which no store reset can fix.
+ * lazyWithRetry retries, then does ONE hard reload to fetch the current
+ * index.html, exactly like the route chunks in AppRouter.
  */
 import { lazyWithRetry } from '../../utils/lazyWithRetry'
 
