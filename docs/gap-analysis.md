@@ -18,7 +18,7 @@ See also: `docs/master-execution-todo.md` (full Phase 0–9 checklist).
 2. Scenario YAML schema + linter + richer Jira coach content.
 3. Deepen Commvault / NetApp / Dell / Datacenter / SOC beyond hero labs.
 4. Azure / GCP / OpenStack / OpenShift as **new scenario-scoped console packs** (facades first) — not one shared cloud VM.
-5. Optional free emulators behind feature flags (vcsim, LocalStack CE if license OK, kind, VirtualBMC/sushy) — still zero real-cloud cost.
+5. Optional free emulators behind feature flags (vcsim, kind, VirtualBMC/sushy) — still zero real-cloud cost. **LocalStack rejected** for commercial FixItLab (auth + non-commercial free tier as of Mar 2026).
 
 ---
 
@@ -27,7 +27,7 @@ See also: `docs/master-execution-todo.md` (full Phase 0–9 checklist).
 | Tech | Backend | Frontend | Shared identity today | Real-engine vs facade | Status |
 |---|---|---|---|---|---|
 | VMware | `vmware_sim/engine.py` | `VMwareSimulator.jsx` | Partial (`vmware_bridge`) | **Target:** `vcsim` (govmomi). Today: facade | Bridge to terminal works for NIC/disk/power |
-| AWS | `aws_engine.py` + Zustand store | `AwsLabOverlay` | Partial (`aws_bridge`) | **Target:** LocalStack CE / OSS successor (verify license). Today: facade; FE store still often SoT | Bridge attach/power → terminal |
+| AWS | `aws_engine.py` + Zustand store | `AwsLabOverlay` | Partial (`aws_bridge`) | **Stay on facade.** LocalStack CE ended March 2026 — unified image needs auth; free Hobby is non-commercial only; FixItLab is commercial training → paid LocalStack would break zero-vendor-spend. Optional paid LocalStack flag deferred indefinitely. | Bridge attach/power/SSH host registration → terminal |
 | Linux terminal | `unified_sim` / `rhel_shell` | LabTerminal WS | Hub for bridges | **Target:** real per-session container/microVM. Today: Python shell facade | High fidelity facade |
 | AWX | `awx_engine.py` | `AwxSimulator.jsx` | Partial (ansible bridge) | Facade (no Tower API) | OK as facade |
 | Grafana/Prom | `monitoring_engine.py` | `MonitoringSimulator.jsx` | Cosmetic only | **Target:** real Prometheus+Grafana containers. Today: facade | Health not graded |
@@ -93,7 +93,7 @@ See also: `docs/master-execution-todo.md` (full Phase 0–9 checklist).
 | Tech | Decision |
 |---|---|
 | VMware | Facade now → **vcsim** next sprint |
-| AWS | Facade + bridge now → **LocalStack/OSS** next (license check) |
+| AWS | Facade + bridge (**LocalStack rejected** Jul 2026 — commercial license conflict) |
 | Commvault | **Faithful facade** permanently (no public sim) |
 | Dell EMC | **High-fidelity facade** (published API shapes) |
 | NetApp | Facade default; real vsim **opt-in entitlement flag** only |

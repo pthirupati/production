@@ -4386,6 +4386,38 @@ class RHELShell:
         host_key = getattr(self, "_host_ips", {}).get(host)
         if not host_key and host in getattr(self, "_host_names", {}):
             host_key = host
+        # Fall back: resolve via /etc/hosts then ServerIdentity (cloud VMs created
+        # mid-lab may be registered after the shell maps were first wired).
+        if not host_key:
+            resolved_ip = self._resolve_dns(host)
+            if resolved_ip:
+                host_key = getattr(self, "_host_ips", {}).get(resolved_ip)
+                if not host_key and resolved_ip == host:
+                    # IP known in identity but not yet in shell maps.
+                    host_key = None
+            if not host_key:
+                sid = getattr(self.state, "session_id", None)
+                if sid:
+                    try:
+                        from .server_identity import list_servers, register_terminal_ssh_host
+                        for s in list_servers(sid):
+                            if host in (
+                                s.get("hostname"),
+                                s.get("primary_ip"),
+                                s.get("fqdn"),
+                            ) or (resolved_ip and resolved_ip == s.get("primary_ip")):
+                                if s.get("power") == "off":
+                                    return f"ssh: connect to host {host} port 22: Connection refused"
+                                hn = s.get("hostname") or host
+                                ip = s.get("primary_ip") or resolved_ip or ""
+                                if hn and ip:
+                                    register_terminal_ssh_host(
+                                        sid, hostname=hn, ip=ip, source="identity-fallback",
+                                    )
+                                host_key = hn
+                                break
+                    except Exception:
+                        pass
         if not host_key:
             return f"ssh: connect to host {host} port 22: Connection refused"
         engine = getattr(self, "_engine", None)

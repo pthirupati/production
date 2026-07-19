@@ -42,7 +42,7 @@ Legend: `[x]` done · `[~]` partial · `[ ]` open
 
 ## Phase 1.5 — Prefer real free engines (feature-flagged)
 - [ ] VMware → `vcsim` (flag)
-- [ ] AWS → LocalStack CE / OSS successor (license check + flag)
+- [x] AWS → LocalStack evaluated Jul 2026: **reject for commercial FixItLab** (CE ended; free Hobby is non-commercial-only; paid breaks zero-vendor-spend). Stay on `aws_engine` + Zustand facade; deepen grading instead.
 - [ ] K8s → kind/k3s per session (flag)
 - [ ] CI/CD → sandbox job runner executing real steps
 - [ ] GPU → virtualized PCI/`nvidia-smi` only (never real GPU) — partial seed done

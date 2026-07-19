@@ -180,3 +180,69 @@ class ServerIdentityTests(SimpleTestCase):
         self.assertEqual(hosts["node1"]["mem_mb"], 16384)
         self.assertEqual(hosts["node3"]["power"], "off")
         self.assertEqual(hosts["node1"]["tags"]["role"], "control-plane")
+
+
+class TerminalSshHostRegistrationTests(SimpleTestCase):
+    """Cloud VMs synced into ServerIdentity must be reachable via lab SSH."""
+
+    def setUp(self):
+        from apps.labs.provisioner.simulation.shell import drop_sim_session, register_sim_session
+        from apps.labs.provisioner.simulation.unified_sim import UnifiedSimulationEngine
+
+        self.sid = "si-ssh-host-session"
+        si.drop_session(self.sid)
+        drop_sim_session(self.sid)
+        self.addCleanup(si.drop_session, self.sid)
+        self.addCleanup(drop_sim_session, self.sid)
+        cache.clear()
+        self.engine = UnifiedSimulationEngine(scenario_slug="azure-resize", simulation_type="azure")
+        self.engine.shell.state.session_id = self.sid
+        register_sim_session(
+            self.sid,
+            f"sim-{self.sid}",
+            "azure",
+            {
+                "engine": self.engine,
+                "scenario_slug": "azure-resize",
+                "hosts": {"primary": {"name": "primary", "ip": "10.10.1.4", "ssh_user": "root"}},
+                "host_ips": {"10.10.1.4": "primary"},
+            },
+        )
+        self.engine.shell._host_names = {"primary": {"name": "primary", "ip": "10.10.1.4"}}
+        self.engine.shell._host_ips = {"10.10.1.4": "primary"}
+        self.engine.shell._engine = self.engine
+
+    def test_sync_azure_vm_registers_ssh_peer(self):
+        si.sync_azure_vm(
+            self.sid,
+            {
+                "name": "tf-web",
+                "private_ip": "10.10.1.88",
+                "size": "Standard_B2s",
+                "power_state": "running",
+                "lab_managed": True,
+            },
+            vm_sizes={"Standard_B2s": {"vcpus": 2, "ram_gb": 4}},
+        )
+        shell = self.engine.shell
+        self.assertEqual(shell._host_ips.get("10.10.1.88"), "tf-web")
+        self.assertIn("tf-web", shell._host_names)
+        out = shell.run("ssh azureuser@tf-web")
+        self.assertIn("Permanently added", out)
+        self.assertNotIn("Connection refused", out)
+
+    def test_sync_gcp_instance_ssh_by_ip(self):
+        si.sync_gcp_instance(
+            self.sid,
+            {
+                "name": "gcp-batch",
+                "internal_ip": "10.128.0.55",
+                "machine_type": "e2-medium",
+                "status": "RUNNING",
+                "lab_managed": True,
+            },
+            machine_types={"e2-medium": {"vcpus": 2, "ram_gb": 4}},
+        )
+        out = self.engine.shell.run("ssh ubuntu@10.128.0.55")
+        self.assertIn("Permanently added", out)
+        self.assertNotIn("Connection refused", out)
