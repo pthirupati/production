@@ -431,7 +431,7 @@ def seed_from_aws_instance(session_id: str, inst: dict, *, role: str = "primary"
     """Upsert identity from an AWS EC2-like instance dict."""
     private_ip = inst.get("privateIp") or ""
     hostname = f"ip-{private_ip.replace('.', '-')}" if private_ip else (inst.get("name") or inst.get("id") or "ec2")
-    return upsert_server(
+    server = upsert_server(
         session_id,
         {
             "id": f"aws-{inst.get('id') or hostname}",
@@ -441,10 +441,98 @@ def seed_from_aws_instance(session_id: str, inst: dict, *, role: str = "primary"
             "mem_mb": 1024,
             "power": "on" if inst.get("state") == "running" else "off",
             "os": inst.get("os") or "amazon-linux-2023",
-            "tags": {"role": role, "instance_id": inst.get("id"), "name": inst.get("name")},
+            "tags": {
+                "role": role,
+                "instance_id": inst.get("id"),
+                "name": inst.get("name"),
+                "appears_in": ["aws", "terminal"],
+            },
         },
         source="aws",
     )
+    if private_ip and (inst.get("state") or "running") == "running":
+        register_terminal_ssh_host(
+            session_id, hostname=hostname, ip=private_ip, ssh_user="ec2-user", source="aws",
+        )
+    return server
+
+
+def register_terminal_ssh_host(
+    session_id: str,
+    *,
+    hostname: str,
+    ip: str,
+    ssh_user: str = "root",
+    role: str = "cloud-vm",
+    source: str = "cloud",
+) -> None:
+    """Register a LabServer so ``ssh user@hostname`` / ``ssh user@ip`` works in
+    this session's primary shell and jump-box (ssh_client) shell.
+
+    ServerIdentity alone is not enough — the terminal resolves peers via the
+    sim session's ``hosts`` / ``host_ips`` maps (and ``/etc/hosts``). Call this
+    whenever a cloud console creates or syncs a reachable VM.
+    """
+    hostname = (hostname or "").strip()
+    ip = (ip or "").strip()
+    if not hostname or not ip:
+        return
+    try:
+        from .shell import get_sim_session
+    except Exception:
+        return
+    entry = get_sim_session(str(session_id))
+    if not entry:
+        return
+    state = entry.setdefault("state", {})
+    hosts = state.setdefault("hosts", {})
+    host_ips = state.setdefault("host_ips", {})
+    meta = {
+        "name": hostname,
+        "role": role,
+        "ip": ip,
+        "ssh_user": ssh_user,
+        "source": source,
+    }
+    hosts[hostname] = {**(hosts.get(hostname) or {}), **meta}
+    host_ips[ip] = hostname
+
+    def _wire(shell) -> None:
+        if shell is None:
+            return
+        shell._host_names = dict(hosts)
+        shell._host_ips = dict(host_ips)
+        try:
+            content = shell.state.read_file("/etc/hosts") or ""
+            line = f"{ip} {hostname}"
+            # Avoid duplicate lines for the same hostname or IP.
+            already = False
+            for raw in content.splitlines():
+                cols = raw.split("#", 1)[0].split()
+                if len(cols) >= 2 and (hostname in cols[1:] or cols[0] == ip):
+                    already = True
+                    break
+            if not already:
+                shell.state._write_file("/etc/hosts", content.rstrip("\n") + "\n" + line + "\n")
+        except Exception:
+            pass
+
+    engine = state.get("engine")
+    if engine is not None:
+        _wire(getattr(engine, "shell", None))
+        try:
+            engine.shell._engine = engine  # noqa: SLF001
+        except Exception:
+            pass
+    _wire(state.get("ssh_client_shell"))
+
+    client_meta = hosts.get("ssh_client")
+    if isinstance(client_meta, dict):
+        targets = list(client_meta.get("ssh_targets") or [])
+        if not any(t.get("name") == hostname or t.get("ip") == ip for t in targets):
+            targets.append({"name": hostname, "ip": ip, "user": ssh_user})
+            client_meta["ssh_targets"] = targets
+            hosts["ssh_client"] = client_meta
 
 
 def sync_awx_inventory(session_id: str, hosts: list[dict] | None) -> None:
@@ -705,56 +793,69 @@ def sync_soc_assets(session_id: str, assets: list[dict] | None) -> None:
 
 
 def sync_azure_vm(session_id: str, vm: dict | None, *, vm_sizes: dict | None = None) -> dict | None:
-    """Mirror the Azure console's primary VM into this session's LabServer
-    registry — same one-server-per-session model as AWS/VMware."""
+    """Mirror an Azure console VM into this session's LabServer registry and
+    make it SSH-reachable from the lab terminal."""
     if not isinstance(vm, dict):
         return None
     size_info = (vm_sizes or {}).get(vm.get("size") or "", {})
     power = vm.get("power_state") or "running"
+    hostname = vm.get("name") or "azure-vm"
+    private_ip = vm.get("private_ip") or ""
     patch: dict[str, Any] = {
-        "id": f"azure-{vm.get('name') or 'vm'}",
-        "hostname": vm.get("name") or "azure-vm",
-        "primary_ip": vm.get("private_ip") or "",
+        "id": f"azure-{hostname}",
+        "hostname": hostname,
+        "primary_ip": private_ip,
         "cpu": size_info.get("vcpus") or 2,
         "mem_mb": int(size_info.get("ram_gb") or 4) * 1024,
         "power": "on" if power in ("running", "starting") else ("reboot_pending" if power == "restarting" else "off"),
         "os": vm.get("os") or "linux",
         "tags": {
-            "role": "primary",
+            "role": "primary" if not vm.get("lab_managed") else "cloud-vm",
             "persona": "azure",
             "size": vm.get("size") or "",
             "resource_group": vm.get("resource_group") or "",
             "appears_in": ["azure", "terminal"],
         },
     }
-    return upsert_server(session_id, patch, source="azure")
+    server = upsert_server(session_id, patch, source="azure")
+    if private_ip and power in ("running", "starting"):
+        register_terminal_ssh_host(
+            session_id, hostname=hostname, ip=private_ip, ssh_user="azureuser", source="azure",
+        )
+    return server
 
 
 def sync_gcp_instance(session_id: str, instance: dict | None, *, machine_types: dict | None = None) -> dict | None:
-    """Mirror the GCP console's primary Compute Engine instance into this
-    session's LabServer registry — same one-server-per-session model as
-    AWS/Azure/VMware."""
+    """Mirror a GCP Compute Engine instance into this session's LabServer
+    registry and make it SSH-reachable from the lab terminal."""
     if not isinstance(instance, dict):
         return None
     size_info = (machine_types or {}).get(instance.get("machine_type") or "", {})
     status = instance.get("status") or "RUNNING"
+    hostname = instance.get("name") or "gcp-vm"
+    internal_ip = instance.get("internal_ip") or ""
     patch: dict[str, Any] = {
-        "id": f"gcp-{instance.get('name') or 'vm'}",
-        "hostname": instance.get("name") or "gcp-vm",
-        "primary_ip": instance.get("internal_ip") or "",
+        "id": f"gcp-{hostname}",
+        "hostname": hostname,
+        "primary_ip": internal_ip,
         "cpu": size_info.get("vcpus") or 2,
         "mem_mb": int(size_info.get("ram_gb") or 4) * 1024,
         "power": "on" if status in ("RUNNING", "PROVISIONING") else ("reboot_pending" if status == "REPAIRING" else "off"),
         "os": instance.get("os") or "linux",
         "tags": {
-            "role": "primary",
+            "role": "primary" if not instance.get("lab_managed") else "cloud-vm",
             "persona": "gcp",
             "machine_type": instance.get("machine_type") or "",
             "zone": instance.get("zone") or "",
             "appears_in": ["gcp", "terminal"],
         },
     }
-    return upsert_server(session_id, patch, source="gcp")
+    server = upsert_server(session_id, patch, source="gcp")
+    if internal_ip and status in ("RUNNING", "PROVISIONING"):
+        register_terminal_ssh_host(
+            session_id, hostname=hostname, ip=internal_ip, ssh_user="ubuntu", source="gcp",
+        )
+    return server
 
 
 def sync_k8s_nodes(session_id: str, nodes: list[dict] | None) -> None:
