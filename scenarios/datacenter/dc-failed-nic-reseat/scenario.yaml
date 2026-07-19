@@ -11,31 +11,49 @@ max_score: 100
 is_free: true
 jira_priority: Critical
 dual_terminal: false
-description: 'CONTEXT: NOC paged you as the on-site field technician: db-prod-01 in rack R02 has dropped
-  off the network. Monitoring shows the host itself is still up (ping to its out-of-band management IP
-  succeeds) but its primary data NIC link is down. Remote hands can''t fix this from a keyboard — you
-  have to walk the floor.
+description: 'CONTEXT: A team operating enterprise data center operations has raised a ticket for `Field
+  Tech: db-prod-01 Drops Off the Network - Cable or`. A customer-facing workflow is degraded and the on-call
+  engineer (you) must diagnose and resolve it. Business impact: reduced service reliability and blocked
+  users until the underlying state is repaired.
 
 
-  ENVIRONMENT: You are walking the physical data center floor through the DCIM console — pan across rack
-  row R01 through R12, click a rack to expand its servers by U position, and click a server to open its
-  component-health drawer (power, NIC, disk, motherboard, CPU, GPU). db-prod-01 lives in R02-U10. The
-  rack''s PDU (PDU-R02) and the floor''s cooling units are both healthy and not part of this incident.
+  ENVIRONMENT: You are working in FixitLab''s offline data center practice floor. The architecture is
+  a single lab-primary node exposing racks, PDUs, cooling, cabling, and physical servers; treat it as
+  the production host for this incident. All tools run locally — no paid APIs or external cloud calls
+  are required.
 
 
-  SYMPTOM / STARTING STATE: db-prod-01''s component drawer shows every other component healthy except
-  the NIC, which reads "Failed". The obvious first move for a dropped link is to check the physical cabling
-  before assuming hardware failure — but this one turns out to be the card itself, not the cable.
+  SYMPTOM / STARTING STATE: DCIM floor view with db-prod-01 (R02-U10) reporting a failed NIC while every
+  other component on the server, and every other server on the floor, reads healthy. db-prod-01''s component
+  drawer shows every other component healthy except the NIC, which reads "Failed". The obvious first move
+  for a dropped link is to check the physical cabling before assuming hardware failure — but this one
+  turns out to be the card itself, not the cable.
 
 
-  IMPACT: db-prod-01 is a production database node; with its primary NIC down it cannot serve queries
-  or replicate, and the standby failover is one more fault away from being the only copy. This is a Sev-1
-  hardware incident until the NIC is restored.
+  OBJECTIVE: Pan the datacenter floor to rack R02 and expand it to see servers by U position; Click db-prod-01
+  (R02-U10) to open its component-health drawer; Reseat the network cable as the first, lower-risk troubleshooting
+  step. Acceptance criteria: the change is minimal and reversible, and success means `check.sh` exits
+  successfully.
 
 
-  OBJECTIVE: Pan the floor to rack R02, expand it, click db-prod-01 in U10 to open its component drawer.
-  Try reseating the network cable first (the low-risk move) — if the NIC still reads "Failed" afterward,
-  the fault is the card itself, so replace the NIC and confirm every component in the drawer reads "Healthy".'
+  WORK TO DO: Required tooling is pre-installed; if a command is missing, note it and use the equivalent
+  already on the host. Make the smallest configuration change that moves the system toward the objective
+  (edit the relevant racks, PDUs, cooling, cabling, and physical servers), changing one thing at a time.
+  Check your work continuously against the objective — success means `check.sh` exits successfully.
+
+
+  VERIFY: Re-run the same check the grader uses and confirm `check.sh` exits successfully. Capture the
+  before/after output as evidence. Success criteria: the objective''s healthy state holds on a repeat
+  check, not just once.
+
+
+  ROLLBACK: If a change makes things worse, revert that single change immediately (restore the original
+  config file / undo the edit / restart the affected component) and re-observe before trying another hypothesis.
+  Never stack unverified changes.
+
+
+  WHAT TO AVOID: Do not apply broad destructive changes, skip evidence gathering, or fake completion with
+  marker files — the checker validates real system state.'
 initial_state: DCIM floor view with db-prod-01 (R02-U10) reporting a failed NIC while every other component
   on the server, and every other server on the floor, reads healthy.
 objectives:
@@ -47,33 +65,46 @@ objectives:
 hints:
 - order: 1
   cost: 0
-  content: 'ORIENT — what to observe and why: Do not replace anything yet. Pan to rack R02, expand it,
-    and open db-prod-01''s component drawer. Read every row — power, NIC, disk, motherboard, CPU, GPU
-    — and confirm the NIC is the only component flagged "Failed" before deciding what physical action
-    to take.'
+  content: 'ORIENT — what to observe and why:
+
+    Do not touch anything yet. First observe the symptom: field tech is not behaving as the scenario objectives
+    require. This lab is about field tech — how field tech behaves in a enterprise data center operations
+    environment. Read the objectives and the current state, and note precisely what looks wrong versus
+    healthy before you form any theory.'
 - order: 2
   cost: 10
-  content: 'APPROACH — the troubleshooting method: For a dropped network link, real field-tech procedure
-    is cheapest-fix-first: reseat the cable before swapping hardware, because a loose connector is far
-    more common (and free to fix) than a dead NIC card. Try that first, then re-check the component drawer
-    before escalating to a card swap.'
+  content: 'APPROACH — the troubleshooting method:
+
+    Work from evidence, not guesses. For field tech problems the reliable method is: (1) reproduce/observe
+    the failure, (2) narrow from the whole system down to the one component that owns the symptom, (3)
+    change exactly one thing, (4) re-check. Fix the underlying misconfiguration you identified (not just
+    the noisy log line), changing one thing at a time.'
 - order: 3
   cost: 25
-  content: 'WHICH TOOL — the diagnostic command(s): 1. Use "Reseat Cable" in the component drawer and
-    watch for its confirmation animation. 2. Re-read the NIC row in the drawer immediately after — if
-    it''s still "Failed", the cable was never the problem. 3. That result is your evidence the fault is
-    inside the NIC card itself, not the connection to it.'
+  content: 'WHICH TOOL — the diagnostic command(s):
+
+    Run `nvidia-smi` and `dmesg | grep -i nvidia` for driver visibility.'
 - order: 4
   cost: 40
-  content: 'NARROW DOWN — isolate the subsystem: Since the reseat didn''t clear the fault, use "Replace
-    NIC" on db-prod-01. This is the same drawer, same server — you''re just escalating from a cable-level
-    fix to a component-level replacement once the cheaper fix is ruled out.'
+  content: 'NARROW DOWN — isolate the subsystem:
+
+    1. Check if the GPU appears in `lspci | grep -i nvidia`.
+
+    2. Verify the correct driver module is loaded (`lsmod | grep nvidia`).
+
+    3. Look for Xid errors or fallen-off-bus messages in dmesg.'
 - order: 5
   cost: 60
-  content: 'NEAR-SOLUTION — the fix shape + verify (you still apply it): Click "Replace NIC" in db-prod-01''s
-    drawer and watch the brief replace animation. Confirm the NIC row now reads "Healthy" and the server''s
-    power state shows "On". WHY: the grader checks that db-prod-01''s NIC component is healthy in the
-    DCIM session state — reseating the cable alone does not clear a failed-card fault.'
+  content: 'NEAR-SOLUTION — the fix shape + verify (you still apply it):
+
+    1. Reload driver, rebind PCI, or fix persistence mode per the scenario.
+
+    2. Re-run `nvidia-smi`.
+
+    3. Confirm GPU name and memory report without errors.
+
+
+    WHY: workloads need the driver to see the device.'
 summary: Diagnose a dropped network link on db-prod-01 by trying the low-risk cable reseat first, then
   replacing the failed NIC card when that doesn't clear the fault.
 estimated_minutes: 15

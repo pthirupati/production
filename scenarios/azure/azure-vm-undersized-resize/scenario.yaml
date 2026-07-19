@@ -11,29 +11,47 @@ max_score: 100
 is_free: true
 jira_priority: High
 dual_terminal: true
-description: 'CONTEXT: The application team paged on-call because vm-web01 keeps getting OOM-killed
-  during the nightly batch job and `top` shows sustained CPU saturation. The ticket says the VM was
-  provisioned months ago on a burstable size that never got revisited as traffic grew.
+description: 'CONTEXT: A team operating Azure cloud operations has raised a ticket for `Azure VM Undersized
+  for Its Workload - Resize Before the`. A customer-facing workflow is degraded and the on-call engineer
+  (you) must diagnose and resolve it. Business impact: reduced service reliability and blocked users until
+  the underlying state is repaired.
 
 
-  ENVIRONMENT: You are working in the Azure Portal against the FixitLab Enterprise Subscription. vm-web01
-  lives in rg-fixitlab-prod / vnet-prod / snet-web. The SAME vm-web01 is also the host you SSH into over
-  the lab terminal for this session — whatever size you pick in the portal is what `nproc` and `free -h`
-  report on that terminal, exactly like a real Azure VM.
+  ENVIRONMENT: You are working in FixitLab''s offline Azure practice subscription. The architecture is
+  a single lab-primary node exposing Portal, Azure CLI, VMs, disks, NSGs, and resource groups; treat it
+  as the production host for this incident. All tools run locally — no paid APIs or external cloud calls
+  are required.
 
 
-  SYMPTOM / STARTING STATE: vm-web01 is running on Standard_B1s (1 vCPU / 1 GiB RAM) — a burstable-tier
-  size meant for light, intermittent load, not a nightly batch job. Running `nproc` and `free -h` on the
-  terminal confirms only 1 core and ~1GiB are available to the guest right now.
+  SYMPTOM / STARTING STATE: Azure Portal showing vm-web01 on Standard_B1s (1 vCPU / 1 GiB). Terminal `nproc`
+  reports 1 and `free -h` reports ~1GiB total. vm-web01 is running on Standard_B1s (1 vCPU / 1 GiB RAM)
+  — a burstable-tier size meant for light, intermittent load, not a nightly batch job. Running `nproc`
+  and `free -h` on the terminal confirms only 1 core and ~1GiB are available to the guest right now.
 
 
-  IMPACT: Every night the batch job OOM-kills and the on-call gets paged again. This will keep happening
-  until the VM is resized to a size with more vCPU and RAM headroom.
+  OBJECTIVE: Sign in to the Azure Portal; Open Virtual machines and select vm-web01; Resize vm-web01 to
+  a size with more vCPU and RAM (Standard_D2s_v5 or larger). Acceptance criteria: the change is minimal
+  and reversible, and success means `check.sh` exits successfully.
 
 
-  OBJECTIVE: In the Azure Portal, resize vm-web01 to a size with more vCPU and RAM (Standard_D2s_v5 or
-  larger), then confirm on the lab terminal that `nproc` and `free -h` now report the new, larger
-  vCPU/RAM allocation.'
+  WORK TO DO: Required tooling is pre-installed; if a command is missing, note it and use the equivalent
+  already on the host. Make the smallest configuration change that moves the system toward the objective
+  (edit the relevant Portal, Azure CLI, VMs, disks, NSGs, and resource groups), changing one thing at
+  a time. Check your work continuously against the objective — success means `check.sh` exits successfully.
+
+
+  VERIFY: Re-run the same check the grader uses and confirm `check.sh` exits successfully. Capture the
+  before/after output as evidence. Success criteria: the objective''s healthy state holds on a repeat
+  check, not just once.
+
+
+  ROLLBACK: If a change makes things worse, revert that single change immediately (restore the original
+  config file / undo the edit / restart the affected component) and re-observe before trying another hypothesis.
+  Never stack unverified changes.
+
+
+  WHAT TO AVOID: Do not apply broad destructive changes, skip evidence gathering, or fake completion with
+  marker files — the checker validates real system state.'
 initial_state: Azure Portal showing vm-web01 on Standard_B1s (1 vCPU / 1 GiB). Terminal `nproc` reports
   1 and `free -h` reports ~1GiB total.
 objectives:
@@ -44,32 +62,58 @@ objectives:
 hints:
 - order: 1
   cost: 0
-  content: 'ORIENT — what to observe and why: Before touching anything, run `nproc` and `free -h` on the
-    lab terminal and note the current vCPU/RAM. Then open the Azure Portal, go to Virtual machines ->
-    vm-web01 -> Overview, and confirm the "Size" field matches what the terminal is reporting.'
+  content: 'ORIENT — what to observe and why:
+
+    Do not touch anything yet. First observe the symptom: azure VM undersized for its workload - resize
+    before the is not behaving as the scenario objectives require. This lab is about azure VM undersized
+    for its workload - resize before the — how azure VM undersized for its workload - resize before the
+    behaves in a Azure cloud operations environment. Read the objectives and the current state, and note
+    precisely what looks wrong versus healthy before you form any theory.'
 - order: 2
   cost: 10
-  content: 'APPROACH — the troubleshooting method: An OOM-killed nightly job on sustained CPU saturation
-    is a capacity problem, not a configuration bug — the fix is resizing the VM to a size with more
-    vCPU/RAM, not tuning the application. Azure lets you resize in place from the VM''s "Size" blade.'
+  content: 'APPROACH — the troubleshooting method:
+
+    Work from evidence, not guesses. For azure VM undersized for its workload - resize before the problems
+    the reliable method is: (1) reproduce/observe the failure, (2) narrow from the whole system down to
+    the one component that owns the symptom, (3) change exactly one thing, (4) re-check. Fix the underlying
+    misconfiguration you identified (not just the noisy log line), changing one thing at a time.'
 - order: 3
   cost: 25
-  content: 'WHICH TOOL — the diagnostic command(s): In the portal, open vm-web01 -> Size (left nav under
-    Settings) -> pick a size with more vCPU/RAM (e.g. Standard_D2s_v5: 2 vCPU / 8 GiB) -> Resize. On the
-    terminal, `nproc` and `free -h` (or `cat /proc/cpuinfo` / `cat /proc/meminfo`) will show the new
-    allocation the next time you run them — the guest and the portal are the SAME server for this lab.'
+  content: 'WHICH TOOL — the diagnostic command(s):
+
+    1. Inspect the current state with Portal, Azure CLI, VMs, disks, NSGs, and resource groups.
+
+    2. Each command above tells you something specific — status/health, recent errors, and the effective
+    configuration. Read them in that order.
+
+    3. Compare what you see to the objectives; the gap points at the fault.'
 - order: 4
   cost: 40
-  content: 'NARROW DOWN — isolate the subsystem: Any size strictly larger than Standard_B1s clears the
-    "undersized" condition — Standard_D2s_v5 (2 vCPU / 8 GiB) is a safe, realistic pick for a web/batch
-    workload. Don''t resize any other VM; there is only one VM in this subscription.'
+  content: 'NARROW DOWN — isolate the subsystem:
+
+    1. From the evidence above, decide which single part of azure VM undersized for its workload - resize
+    before the is at fault.
+
+    2. Re-run the most relevant of Portal, Azure CLI, VMs, disks, NSGs, and resource groups focused on
+    just that part to confirm it.
+
+    3. State a one-line hypothesis: the smallest change that would move the state from ''azure VM undersized
+    for its workload - resize before the is not behaving as the scenario objectives require'' toward ''`check.sh`
+    exits successfully''.'
 - order: 5
   cost: 60
-  content: 'NEAR-SOLUTION — the fix shape + verify (you still apply it): Open vm-web01 -> Size -> select
-    Standard_D2s_v5 (or larger) -> click Resize -> wait for the "Resize completed" event. Then on the
-    terminal run `nproc` (expect 2 or more) and `free -h` (expect several GiB total). WHY: the grader
-    checks that the session''s Azure VM size actually changed AND that the guest hardware reflects it —
-    picking a size in the dropdown without clicking Resize does not count.'
+  content: 'NEAR-SOLUTION — the fix shape + verify (you still apply it):
+
+    1. Apply the smallest reversible change your hypothesis points to. Fix the underlying misconfiguration
+    you identified (not just the noisy log line), changing one thing at a time.
+
+    2. Re-run `bash check.sh` and confirm `check.sh` exits successfully.
+
+    3. If it still fails, the hypothesis was wrong — go back to the evidence, do not stack changes.
+
+
+    WHY: the grader validates real system state, not marker files — a fix only counts when the subsystem
+    is actually healthy.'
 summary: Resize the undersized Azure VM before the next nightly batch job OOM-kills it again, and confirm
   the new vCPU/RAM inside the guest.
 estimated_minutes: 10

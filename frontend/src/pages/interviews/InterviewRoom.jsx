@@ -2,7 +2,14 @@ import { useEffect, useRef, useState } from 'react'
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import { interviewsApi } from '../../api/interviews'
 import { adminApi } from '../../api/admin'
-import { useInterviewVoice, unlockSpeech, resumeSpeechSynthesis, detectSpeechCapabilities } from '../../hooks/useInterviewVoice'
+import {
+  useInterviewVoice,
+  unlockSpeech,
+  holdSpeechUnlock,
+  releaseSpeechHold,
+  resumeSpeechSynthesis,
+  detectSpeechCapabilities,
+} from '../../hooks/useInterviewVoice'
 import {
   getMediaErrorMessage,
   isMediaDevicesSupported,
@@ -808,7 +815,9 @@ export default function InterviewRoom() {
     const iv = setInterval(tick, 3000)
     const onVis = () => {
       if (document.visibilityState === 'visible') {
-        unlockSpeech()
+        // Soft only — a hard unlock enqueues a silent utterance that races
+        // with the interviewer line and causes post-join silence.
+        unlockSpeech({ soft: true })
         resumeSpeechSynthesis()
       }
     }
@@ -826,8 +835,9 @@ export default function InterviewRoom() {
       toast.error('Enable microphone and camera first')
       return
     }
-    // User gesture — hard-unlock TTS and hold the synth queue across startRound().
+    // User gesture — hard-unlock TTS and HOLD the synth queue across startRound().
     unlockSpeech()
+    holdSpeechUnlock()
     setPreflight(false)
     setPendingHearText(null)
     voiceUnavailableToastRef.current = false
@@ -855,10 +865,10 @@ export default function InterviewRoom() {
           startPracticalLabInline().catch(() => {})
         }
       }
-      // Re-prime softly — do NOT cancel (keeps gesture unlock from Join click).
+      // Drop the hold only now — then speak intro+first Q as one block.
+      releaseSpeechHold()
       unlockSpeech({ soft: true })
       resumeSpeechSynthesis()
-      // Speak intro+first Q as one block when possible so we only need one unlock.
       const bootstrap = [introText, firstQ?.content].filter(Boolean).join(' ')
       if (bootstrap) {
         await speakThenListen(bootstrap, {
@@ -869,6 +879,8 @@ export default function InterviewRoom() {
       }
     } catch (e) {
       toast.error(e.response?.data?.error || 'Could not start')
+    } finally {
+      releaseSpeechHold()
     }
   }
 
@@ -1139,9 +1151,11 @@ export default function InterviewRoom() {
         voiceUnavailableToastRef.current = true
         toast('Tap “Hear interviewer” if you do not hear audio.', { icon: '🔊', duration: 5000 })
       }
-    } else {
-      setPendingHearText(null)
+      // Do NOT open the mic until the candidate hears the question — otherwise
+      // the loop looks broken (silence + immediate listen) and feels like a refresh.
+      return
     }
+    setPendingHearText(null)
     if (autoListen && !observerMode && !isListeningRef.current && !bargedInRef.current) {
       voiceAnswer()
     }

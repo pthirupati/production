@@ -273,12 +273,16 @@ async function playBase64Audio(base64, mime = 'audio/mpeg') {
   })
 }
 
-function stopAudio() {
+function stopAudio({ cancelSynth = true } = {}) {
   if (_currentAudio) {
     _currentAudio.pause()
     _currentAudio = null
   }
-  if (window.speechSynthesis) window.speechSynthesis.cancel()
+  // Never cancel the synth while a Join→startRound hold is keeping Chrome's
+  // user-gesture unlock alive — that is the #1 cause of post-join silence.
+  if (cancelSynth && window.speechSynthesis && !_speechHoldActive) {
+    window.speechSynthesis.cancel()
+  }
 }
 
 // Keep one AudioContext alive — creating+closing on every unlock can leave
@@ -291,6 +295,43 @@ let _speakInFlight = false
 // Set during a real user gesture (Test / Join / Hear interviewer). Survives
 // awaits so post-startRound TTS does not call cancel() and drop the unlock.
 let _speechGestureUnlocked = false
+// Keep a near-silent utterance queued across long awaits (startRound API).
+let _speechHoldActive = false
+let _speechHoldTimer = null
+
+/**
+ * Hold Chrome's speech unlock across an await that leaves the user-gesture
+ * stack (e.g. interviewsApi.startRound). Call from Join / Begin click, then
+ * releaseSpeechHold() immediately before the real interviewer speak().
+ */
+export function holdSpeechUnlock() {
+  if (typeof window === 'undefined' || !window.speechSynthesis) return
+  _speechGestureUnlocked = true
+  _speechHoldActive = true
+  const tick = () => {
+    if (!_speechHoldActive || !window.speechSynthesis) return
+    try {
+      if (window.speechSynthesis.paused) window.speechSynthesis.resume()
+      if (!window.speechSynthesis.speaking && !window.speechSynthesis.pending) {
+        const u = new SpeechSynthesisUtterance('\u200b')
+        u.volume = 0
+        u.rate = 10
+        window.speechSynthesis.speak(u)
+      }
+    } catch { /* non-fatal */ }
+    _speechHoldTimer = setTimeout(tick, 1800)
+  }
+  if (_speechHoldTimer) clearTimeout(_speechHoldTimer)
+  tick()
+}
+
+export function releaseSpeechHold() {
+  _speechHoldActive = false
+  if (_speechHoldTimer) {
+    clearTimeout(_speechHoldTimer)
+    _speechHoldTimer = null
+  }
+}
 
 function ensureAudioGraph() {
   try {
@@ -1104,6 +1145,8 @@ export function useInterviewVoice() {
     interimTranscript,
     speak,
     unlockSpeech,
+    holdSpeechUnlock,
+    releaseSpeechHold,
     resumeSpeechSynthesis,
     cancelSpeech,
     listen,

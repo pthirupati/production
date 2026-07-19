@@ -14,6 +14,7 @@ class SupportBotConfigView(APIView):
     """GET /api/support/config/ — public bot settings (if enabled)."""
 
     permission_classes = [AllowAny]
+    throttle_classes = [StrictAnonRateThrottle]
 
     def get(self, request):
         config = support_bot_config()
@@ -30,7 +31,11 @@ class SupportBotConfigView(APIView):
 
 
 class SupportBotChatView(APIView):
-    """POST /api/support/chat/ — message in, assistant reply out."""
+    """POST /api/support/chat/ — message in, assistant reply out.
+
+    Public (AllowAny) so the marketing-site widget works for guests, but
+    strictly rate-limited. Config remains public so the widget can hide itself.
+    """
 
     permission_classes = [AllowAny]
     throttle_classes = [StrictAnonRateThrottle]

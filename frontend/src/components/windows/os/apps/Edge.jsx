@@ -76,7 +76,7 @@ export default function Edge() {
       <div style={{ padding: 32, textAlign: 'center', color: '#666' }}>
         <div style={{ fontSize: 48, marginBottom: 12 }}>🌐</div>
         <div style={{ fontWeight: 600, marginBottom: 8 }}>{url}</div>
-        <p style={{ fontSize: 13 }}>Lab page — external sites are not fetched in the lab sandbox.</p>
+        <p style={{ fontSize: 13 }}>Lab page — external sites are not fetched in this lab environment.</p>
       </div>
     ),
   }

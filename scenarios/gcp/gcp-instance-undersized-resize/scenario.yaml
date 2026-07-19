@@ -11,25 +11,48 @@ max_score: 100
 is_free: true
 jira_priority: High
 dual_terminal: true
-description: 'CONTEXT: The application team paged on-call because web01 keeps getting OOM-killed during
-  the nightly batch job and `top` shows sustained CPU saturation. The ticket says the instance was
-  provisioned months ago on a shared-core machine type that never got revisited as traffic grew.
+description: 'CONTEXT: A team operating Google Cloud operations has raised a ticket for `GCP Instance
+  Undersized for Its Workload - Change Machine`. A customer-facing workflow is degraded and the on-call
+  engineer (you) must diagnose and resolve it. Business impact: reduced service reliability and blocked
+  users until the underlying state is repaired.
 
-  ENVIRONMENT: You are working in the Google Cloud Console against the FixItLab Enterprise Project.
-  web01 lives in vpc-prod / subnet-us-central1 / us-central1-a. The SAME web01 is also the host you SSH
-  into over the lab terminal for this session — whatever machine type you pick in the console is what
-  `nproc` and `free -h` report on that terminal, exactly like a real Compute Engine instance.
 
-  SYMPTOM / STARTING STATE: web01 is running on e2-micro (2 shared vCPU / 1 GiB RAM) — a machine type
-  meant for light, intermittent load, not a nightly batch job. Running `nproc` and `free -h` on the
-  terminal confirms only a couple of shared cores and ~1GiB are available to the guest right now.
+  ENVIRONMENT: You are working in FixitLab''s offline GCP practice project. The architecture is a single
+  lab-primary node exposing Console, gcloud, Compute Engine, disks, VPC, and IAM; treat it as the production
+  host for this incident. All tools run locally — no paid APIs or external cloud calls are required.
 
-  IMPACT: Every night the batch job OOM-kills and the on-call gets paged again. This will keep happening
-  until the instance is changed to a machine type with more dedicated vCPU and RAM headroom.
 
-  OBJECTIVE: In the Google Cloud Console, stop web01, change its machine type to one with more vCPU and
-  RAM (e2-standard-2 or larger), start it back up, and confirm on the lab terminal that `nproc` and
-  `free -h` now report the new, larger vCPU/RAM allocation.'
+  SYMPTOM / STARTING STATE: Google Cloud Console showing web01 on e2-micro (2 shared vCPU / 1 GiB), RUNNING.
+  Terminal `nproc` reports 2 and `free -h` reports ~1GiB total. web01 is running on e2-micro (2 shared
+  vCPU / 1 GiB RAM) — a machine type meant for light, intermittent load, not a nightly batch job. Running
+  `nproc` and `free -h` on the terminal confirms only a couple of shared cores and ~1GiB are available
+  to the guest right now.
+
+
+  OBJECTIVE: Sign in to the Google Cloud Console; Open Compute Engine > VM instances and select web01;
+  Stop web01, change its machine type to one with more vCPU and RAM (e2-standard-2 or larger), and start
+  it again. Acceptance criteria: the change is minimal and reversible, and success means `check.sh` exits
+  successfully.
+
+
+  WORK TO DO: Required tooling is pre-installed; if a command is missing, note it and use the equivalent
+  already on the host. Make the smallest configuration change that moves the system toward the objective
+  (edit the relevant Console, gcloud, Compute Engine, disks, VPC, and IAM), changing one thing at a time.
+  Check your work continuously against the objective — success means `check.sh` exits successfully.
+
+
+  VERIFY: Re-run the same check the grader uses and confirm `check.sh` exits successfully. Capture the
+  before/after output as evidence. Success criteria: the objective''s healthy state holds on a repeat
+  check, not just once.
+
+
+  ROLLBACK: If a change makes things worse, revert that single change immediately (restore the original
+  config file / undo the edit / restart the affected component) and re-observe before trying another hypothesis.
+  Never stack unverified changes.
+
+
+  WHAT TO AVOID: Do not apply broad destructive changes, skip evidence gathering, or fake completion with
+  marker files — the checker validates real system state.'
 initial_state: Google Cloud Console showing web01 on e2-micro (2 shared vCPU / 1 GiB), RUNNING. Terminal
   `nproc` reports 2 and `free -h` reports ~1GiB total.
 objectives:
@@ -40,33 +63,58 @@ objectives:
 hints:
 - order: 1
   cost: 0
-  content: 'ORIENT — what to observe and why: Before touching anything, run `nproc` and `free -h` on the
-    lab terminal and note the current vCPU/RAM. Then open the Cloud Console, go to Compute Engine > VM
-    instances > web01, and confirm the "Machine type" field matches what the terminal is reporting.'
+  content: 'ORIENT — what to observe and why:
+
+    Do not touch anything yet. First observe the symptom: GCP instance undersized for its workload - change
+    machine is not behaving as the scenario objectives require. This lab is about GCP instance undersized
+    for its workload - change machine — how GCP instance undersized for its workload - change machine
+    behaves in a Google Cloud operations environment. Read the objectives and the current state, and note
+    precisely what looks wrong versus healthy before you form any theory.'
 - order: 2
   cost: 10
-  content: 'APPROACH — the troubleshooting method: An OOM-killed nightly job on sustained CPU saturation
-    is a capacity problem, not a configuration bug — the fix is changing the instance to a machine type
-    with more vCPU/RAM, not tuning the application. GCP requires the instance to be STOPPED before its
-    machine type can be changed.'
+  content: 'APPROACH — the troubleshooting method:
+
+    Work from evidence, not guesses. For GCP instance undersized for its workload - change machine problems
+    the reliable method is: (1) reproduce/observe the failure, (2) narrow from the whole system down to
+    the one component that owns the symptom, (3) change exactly one thing, (4) re-check. Fix the underlying
+    misconfiguration you identified (not just the noisy log line), changing one thing at a time.'
 - order: 3
   cost: 25
-  content: 'WHICH TOOL — the diagnostic command(s): In the console, select web01 -> Stop -> once
-    TERMINATED, open Edit -> Machine type -> pick a type with more vCPU/RAM (e.g. e2-standard-2: 2 vCPU
-    / 8 GiB) -> Save -> Start. On the terminal, `nproc` and `free -h` (or `cat /proc/cpuinfo` /
-    `cat /proc/meminfo`) will show the new allocation the next time you run them.'
+  content: 'WHICH TOOL — the diagnostic command(s):
+
+    1. Inspect the current state with Console, gcloud, Compute Engine, disks, VPC, and IAM.
+
+    2. Each command above tells you something specific — status/health, recent errors, and the effective
+    configuration. Read them in that order.
+
+    3. Compare what you see to the objectives; the gap points at the fault.'
 - order: 4
   cost: 40
-  content: 'NARROW DOWN — isolate the subsystem: Any machine type strictly larger than e2-micro clears
-    the "undersized" condition — e2-standard-2 (2 vCPU / 8 GiB) is a safe, realistic pick for a web/batch
-    workload. Don''t change any other instance; there is only one instance in this project.'
+  content: 'NARROW DOWN — isolate the subsystem:
+
+    1. From the evidence above, decide which single part of GCP instance undersized for its workload -
+    change machine is at fault.
+
+    2. Re-run the most relevant of Console, gcloud, Compute Engine, disks, VPC, and IAM focused on just
+    that part to confirm it.
+
+    3. State a one-line hypothesis: the smallest change that would move the state from ''GCP instance
+    undersized for its workload - change machine is not behaving as the scenario objectives require''
+    toward ''`check.sh` exits successfully''.'
 - order: 5
   cost: 60
-  content: 'NEAR-SOLUTION — the fix shape + verify (you still apply it): Stop web01, set its machine type
-    to e2-standard-2 (or larger), start it again, and wait for RUNNING. Then on the terminal run `nproc`
-    (expect 2 or more dedicated vCPU) and `free -h` (expect several GiB total). WHY: the grader checks
-    that the session''s GCP instance machine type actually changed AND that the guest hardware reflects
-    it — picking a type in the dropdown without saving and restarting does not count.'
+  content: 'NEAR-SOLUTION — the fix shape + verify (you still apply it):
+
+    1. Apply the smallest reversible change your hypothesis points to. Fix the underlying misconfiguration
+    you identified (not just the noisy log line), changing one thing at a time.
+
+    2. Re-run `bash check.sh` and confirm `check.sh` exits successfully.
+
+    3. If it still fails, the hypothesis was wrong — go back to the evidence, do not stack changes.
+
+
+    WHY: the grader validates real system state, not marker files — a fix only counts when the subsystem
+    is actually healthy.'
 summary: Change the machine type of the undersized GCP instance before the next nightly batch job
   OOM-kills it again, and confirm the new vCPU/RAM inside the guest.
 estimated_minutes: 10

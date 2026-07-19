@@ -1613,6 +1613,7 @@ export default function LabRunner() {
   const renderPrimarySim = () => {
     if (!primarySimKind) return null
     const isAws = primarySimKind === 'aws'
+    const isTerraform = primarySimKind === 'terraform'
     return (
       <SimErrorBoundary
         // Remount the boundary + sim subtree from scratch after a reset so no
@@ -1624,7 +1625,7 @@ export default function LabRunner() {
         // AWS: wipe persisted blob AND re-seed the live store, then remount.
         onResetStorage={isAws ? () => { hardResetAwsSim(); setSimResetNonce((n) => n + 1) } : undefined}
         onReset={() => setSimResetNonce((n) => n + 1)}
-        autoResetStorageOnError={isAws}
+        autoResetStorageOnError={isAws || isTerraform}
       >
         <PrimaryLabSim
           kind={primarySimKind}

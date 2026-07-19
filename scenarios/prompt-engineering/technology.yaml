@@ -6,7 +6,7 @@ description: >-
   few-shot and chain-of-thought, structured output, context and cost control,
   iterating on prompts, tools and agents, the Model Context Protocol (MCP), and
   using Claude Code in your daily workflow. Every lesson runs in a guided,
-  rule-based AI practice simulator in your browser — no API key, no cost.
+  rule-based AI prompt lab in your browser — no API key, no cost.
 icon: sparkles
 color: purple
 order: 1

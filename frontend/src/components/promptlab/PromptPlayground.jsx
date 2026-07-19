@@ -309,7 +309,7 @@ export default function PromptPlayground({ sessionId, scenario, solved: solvedPr
       <div className="shrink-0 px-4 py-2 bg-accent-purple/10 border-b border-accent-purple/20 flex items-center gap-2 text-[11px] text-surface-300">
         <Sparkles size={12} className="text-accent-purple shrink-0" />
         <span>
-          Guided <strong className="text-surface-200">AI practice simulator</strong> — replies and scoring are rule-based and 100% free (no live model). Focus on writing great prompts.
+          Guided <strong className="text-surface-200">AI prompt lab</strong> — replies and scoring are rule-based and 100% free (no live model). Focus on writing great prompts.
         </span>
       </div>
 
