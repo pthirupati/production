@@ -16,9 +16,9 @@ description: 'CONTEXT: A team operating service mesh has raised a ticket for `Wo
   it. Business impact: reduced service reliability and blocked users until the underlying state is repaired.
 
 
-  ENVIRONMENT: You are working in FixitLab''s offline FixitLab lab environment. The architecture
-  is a single lab-primary node exposing CLI and configuration files; treat it as the production host for
-  this incident. All tools run locally — no paid APIs or external cloud calls are required.
+  ENVIRONMENT: You are working in FixitLab''s offline FixitLab lab environment. The architecture is a
+  single lab-primary node exposing CLI and configuration files; treat it as the production host for this
+  incident. All tools run locally — no paid APIs or external cloud calls are required.
 
 
   SYMPTOM / STARTING STATE: The new `shipping` Deployment is not part of the mesh: its pods run a single
@@ -64,8 +64,8 @@ hints:
 
     Do not touch anything yet. First observe the symptom: workload has no sidecar injected is not behaving
     as the scenario objectives require. This lab is about workload has no sidecar injected — how workload
-    has no sidecar injected behaves in a service-mesh environment. Read the objectives and the current
-    state, and note precisely what looks wrong versus healthy before you form any theory.'
+    has no sidecar injected behaves in a service mesh operations environment. Read the objectives and
+    the current state, and note precisely what looks wrong versus healthy before you form any theory.'
 - order: 2
   cost: 10
   content: 'APPROACH — the troubleshooting method:

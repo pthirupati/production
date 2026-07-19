@@ -1,0 +1,117 @@
+title: 'Service Mesh: Authorization — Troubleshooting Drill'
+slug: academy-service-mesh-004-troubleshoot-authorization
+technology: Service Mesh
+category: Troubleshooting
+difficulty: medium
+scenario_type: fix
+lab_mode: simulation
+simulation_type: generic
+time_limit: 1200
+max_score: 100
+is_free: false
+infrastructure_type: docker
+jira_priority: Medium
+description: 'CONTEXT: A team operating service mesh operations has raised a ticket for `Service Mesh:
+  Authorization — Troubleshooting Drill`. A customer-facing workflow is degraded and the on-call engineer
+  (you) must diagnose and resolve it. Business impact: reduced service reliability and blocked users until
+  the underlying state is repaired.
+
+
+  ENVIRONMENT: You are working in FixitLab''s offline mesh practice cluster. The architecture is a single
+  lab-primary node exposing sidecars, traffic policy, mTLS, and observability; treat it as the production
+  host for this incident. All tools run locally — no paid APIs or external cloud calls are required.
+
+
+  SYMPTOM / STARTING STATE: The mesh practice cluster is degraded. Authorization is misconfigured and
+  dependent workflows are failing. Recent changes may exist around Authorization, but do not restart blindly
+  — gather evidence first. Production alert: Authorization is misconfigured and dependent workflows are
+  failing. You are on call for Service Mesh and must troubleshoot Authorization methodically — triage
+  symptoms, isolate root cause, apply the smallest safe fix, and confirm recovery.
+
+
+  OBJECTIVE: The incident symptom is clear: Authorization is misconfigured and dependent workflows are
+  failing; Root cause is isolated with evidence, not guesswork; Service behavior returns to normal after
+  the fix. Acceptance criteria: the change is minimal and reversible, and success means `check.sh` exits
+  successfully.
+
+
+  WORK TO DO: Required tooling is pre-installed; if a command is missing, note it and use the equivalent
+  already on the host. Make the smallest configuration change that moves the system toward the objective
+  (edit the relevant sidecars, traffic policy, mTLS, and observability), changing one thing at a time.
+  Check your work continuously against the objective — success means `check.sh` exits successfully.
+
+
+  VERIFY: Re-run the same check the grader uses and confirm `check.sh` exits successfully. Capture the
+  before/after output as evidence. Success criteria: the objective''s healthy state holds on a repeat
+  check, not just once.
+
+
+  ROLLBACK: If a change makes things worse, revert that single change immediately (restore the original
+  config file / undo the edit / restart the affected component) and re-observe before trying another hypothesis.
+  Never stack unverified changes.
+
+
+  WHAT TO AVOID: Do not apply broad destructive changes, skip evidence gathering, or fake completion with
+  marker files — the checker validates real system state.'
+objectives:
+- 'The incident symptom is clear: Authorization is misconfigured and dependent workflows
+  are failing'
+- Root cause is isolated with evidence, not guesswork
+- Service behavior returns to normal after the fix
+initial_state: The mesh practice cluster is degraded. Authorization is misconfigured
+  and dependent workflows are failing. Recent changes may exist around Authorization,
+  but do not restart blindly — gather evidence first.
+hints:
+- order: 1
+  cost: 0
+  content: 'ORIENT — what to observe and why:
+
+    Do not touch anything yet. First observe the symptom: Authorization is misconfigured and dependent
+    workflows are failing. This lab is about Authorization — how authorization fits into service mesh
+    operations. Read the objectives and the current state, and note precisely what looks wrong versus
+    healthy before you form any theory.'
+- order: 2
+  cost: 10
+  content: 'APPROACH — the troubleshooting method:
+
+    Work from evidence, not guesses. For Authorization problems the reliable method is: (1) reproduce/observe
+    the failure, (2) narrow from the whole system down to the one component that owns the symptom, (3)
+    change exactly one thing, (4) re-check. Fix the underlying misconfiguration you identified (not just
+    the noisy log line), changing one thing at a time.'
+- order: 3
+  cost: 25
+  content: 'WHICH TOOL — the diagnostic command(s):
+
+    1. Inspect the current state with the relevant sidecars, traffic policy, mTLS, and observability for
+    authorization.
+
+    2. Each command above tells you something specific — status/health, recent errors, and the effective
+    configuration. Read them in that order.
+
+    3. Compare what you see to the objectives; the gap points at the fault.'
+- order: 4
+  cost: 40
+  content: 'NARROW DOWN — isolate the subsystem:
+
+    1. From the evidence above, decide which single part of Authorization is at fault.
+
+    2. Re-run the most relevant of the relevant sidecars, traffic policy, mTLS, and observability for
+    authorization focused on just that part to confirm it.
+
+    3. State a one-line hypothesis: the smallest change that would move the state from ''Authorization
+    is misconfigured and dependent workflows are failing'' toward ''Authorization behaves correctly under
+    normal and failure checks''.'
+- order: 5
+  cost: 60
+  content: 'NEAR-SOLUTION — the fix shape + verify (you still apply it):
+
+    1. Apply the smallest reversible change your hypothesis points to. Fix the underlying misconfiguration
+    you identified (not just the noisy log line), changing one thing at a time.
+
+    2. Re-run `bash check.sh` and confirm Authorization behaves correctly under normal and failure checks.
+
+    3. If it still fails, the hypothesis was wrong — go back to the evidence, do not stack changes.
+
+
+    WHY: the grader validates real system state, not marker files — a fix only counts when the subsystem
+    is actually healthy.'

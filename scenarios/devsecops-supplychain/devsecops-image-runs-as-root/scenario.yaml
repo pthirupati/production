@@ -17,9 +17,9 @@ description: 'CONTEXT: A team operating devsecops supplychain has raised a ticke
   state is repaired.
 
 
-  ENVIRONMENT: You are working in FixitLab''s offline FixitLab lab environment. The architecture
-  is a single lab-primary node exposing CLI and configuration files; treat it as the production host for
-  this incident. All tools run locally — no paid APIs or external cloud calls are required.
+  ENVIRONMENT: You are working in FixitLab''s offline FixitLab lab environment. The architecture is a
+  single lab-primary node exposing CLI and configuration files; treat it as the production host for this
+  incident. All tools run locally — no paid APIs or external cloud calls are required.
 
 
   SYMPTOM / STARTING STATE: The policy gate rejects `frontend:2.0` with `container must not run as root`.
@@ -62,7 +62,7 @@ hints:
 
     Do not touch anything yet. First observe the symptom: hardening gate fails is not behaving as the
     scenario objectives require. This lab is about hardening gate fails — how hardening gate fails behaves
-    in a devsecops-supplychain environment. Read the objectives and the current state, and note precisely
+    in a DevSecOps supply chain environment. Read the objectives and the current state, and note precisely
     what looks wrong versus healthy before you form any theory.'
 - order: 2
   cost: 10

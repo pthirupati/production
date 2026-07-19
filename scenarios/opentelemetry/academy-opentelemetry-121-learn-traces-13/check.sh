@@ -1,0 +1,3 @@
+#!/usr/bin/env bash
+grep -q FIXED-OK /opt/fixitlab/academy/academy-opentelemetry-121-learn-traces-13.conf
+exit 0

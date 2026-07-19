@@ -313,9 +313,12 @@ export function holdSpeechUnlock() {
     try {
       if (window.speechSynthesis.paused) window.speechSynthesis.resume()
       if (!window.speechSynthesis.speaking && !window.speechSynthesis.pending) {
-        const u = new SpeechSynthesisUtterance('\u200b')
-        u.volume = 0
-        u.rate = 10
+        // Chrome ignores volume=0 primes for autoplay unlock — use a barely
+        // audible tick so the gesture grant survives the startRound() await.
+        const u = new SpeechSynthesisUtterance('.')
+        u.volume = 0.02
+        u.rate = 2
+        u.pitch = 1
         window.speechSynthesis.speak(u)
       }
     } catch { /* non-fatal */ }
@@ -377,8 +380,9 @@ export function unlockSpeech({ soft = false } = {}) {
       const now = Date.now()
       if (now < _primeCooldownUntil) return
       _primeCooldownUntil = now + 800
-      const u = new SpeechSynthesisUtterance('\u200b')
-      u.volume = 0
+      // Non-zero volume required — Chrome does not treat volume=0 as unlock.
+      const u = new SpeechSynthesisUtterance('.')
+      u.volume = 0.02
       u.rate = 2
       u.pitch = 1
       window.speechSynthesis.speak(u)

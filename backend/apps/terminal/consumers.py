@@ -246,12 +246,61 @@ class TerminalConsumer(AsyncWebsocketConsumer):
                     else:
                         raise exec_error
 
+            # Learner-facing environment label — never say "Simulation".
+            # Prefer the scenario's lab-server persona (EC2, Azure VM, …).
+            scenario = getattr(self.lab_session, "scenario", None)
+            sim_type = (getattr(scenario, "simulation_type", None) or "").strip().lower()
+            tech_slug = ""
+            if scenario is not None and getattr(scenario, "technology", None) is not None:
+                tech_slug = (scenario.technology.slug or "").strip().lower()
+            slug = (getattr(scenario, "slug", None) or "").strip().lower()
+
+            lab_server_labels = {
+                "aws": "AWS EC2 Lab Server",
+                "azure": "Azure Virtual Machine",
+                "gcp": "Google Compute Engine VM",
+                "openstack": "OpenStack Instance",
+                "vmware": "VMware Virtual Machine",
+                "kubernetes": "Kubernetes Node",
+                "gpu": "GPU Server",
+                "windows": "Windows Server",
+                "windows-server": "Windows Server",
+                "baremetal": "Physical Bare Metal Server",
+                "commvault": "Commvault Protected Server",
+                "netapp": "NetApp Storage Host",
+                "dellemc": "Dell EMC Storage Host",
+                "datacenter": "Physical Data Center Host",
+                "soc": "SOC Workstation",
+                "rhel": "Linux Lab Server (RHEL 9)",
+                "generic": "Linux Lab Server (RHEL 9)",
+                "terraform": "Terraform Workspace Host",
+                "ansible": "Ansible Control Host",
+                "ansible-awx": "AWX Control Host",
+                "docker": "Docker Host",
+                "networking": "Network Lab Appliance",
+                "grafana": "Observability Host",
+                "prometheus": "Observability Host",
+            }
             provider_label = {
                 "docker": "Docker Container",
-                "simulation": "FixitLab Simulation",
                 "aws_ec2": "AWS EC2 Instance",
                 "digitalocean": "DigitalOcean Droplet",
-            }.get(self.provider_type, "Lab Environment")
+            }.get(self.provider_type)
+            if not provider_label:
+                if self.provider_type == "simulation":
+                    key = sim_type if sim_type in lab_server_labels else tech_slug
+                    if key not in lab_server_labels:
+                        if slug.startswith("academy-aws") or slug.startswith("aws-") or slug.startswith("ec2-"):
+                            key = "aws"
+                        elif slug.startswith("academy-azure") or slug.startswith("azure-"):
+                            key = "azure"
+                        elif slug.startswith("academy-gcp") or slug.startswith("gcp-"):
+                            key = "gcp"
+                        elif slug.startswith("academy-openstack") or slug.startswith("openstack-"):
+                            key = "openstack"
+                    provider_label = lab_server_labels.get(key, "Linux Lab Server (RHEL 9)")
+                else:
+                    provider_label = "Lab Environment"
 
             await self.send(text_data=json.dumps({
                 "output": (

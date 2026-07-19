@@ -16,9 +16,9 @@ description: 'CONTEXT: A team operating gitops has raised a ticket for `Manual E
   it. Business impact: reduced service reliability and blocked users until the underlying state is repaired.
 
 
-  ENVIRONMENT: You are working in FixitLab''s offline FixitLab lab environment. The architecture
-  is a single lab-primary node exposing CLI and configuration files; treat it as the production host for
-  this incident. All tools run locally — no paid APIs or external cloud calls are required.
+  ENVIRONMENT: You are working in FixitLab''s offline FixitLab lab environment. The architecture is a
+  single lab-primary node exposing CLI and configuration files; treat it as the production host for this
+  incident. All tools run locally — no paid APIs or external cloud calls are required.
 
 
   SYMPTOM / STARTING STATE: Someone `kubectl edit`ed a Deployment''s image to a hotfix tag. ArgoCD shows
@@ -62,9 +62,9 @@ hints:
 
     Do not touch anything yet. First observe the symptom: manual edit survives because Self-Heal is off
     is not behaving as the scenario objectives require. This lab is about manual edit survives because
-    Self-Heal is off — how manual edit survives because Self-Heal is off behaves in a gitops environment.
-    Read the objectives and the current state, and note precisely what looks wrong versus healthy before
-    you form any theory.'
+    Self-Heal is off — how manual edit survives because Self-Heal is off behaves in a GitOps delivery
+    environment. Read the objectives and the current state, and note precisely what looks wrong versus
+    healthy before you form any theory.'
 - order: 2
   cost: 10
   content: 'APPROACH — the troubleshooting method:

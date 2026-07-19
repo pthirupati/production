@@ -17,9 +17,9 @@ description: 'CONTEXT: A team operating devsecops supplychain has raised a ticke
   state is repaired.
 
 
-  ENVIRONMENT: You are working in FixitLab''s offline FixitLab lab environment. The architecture
-  is a single lab-primary node exposing CLI and configuration files; treat it as the production host for
-  this incident. All tools run locally — no paid APIs or external cloud calls are required.
+  ENVIRONMENT: You are working in FixitLab''s offline FixitLab lab environment. The architecture is a
+  single lab-primary node exposing CLI and configuration files; treat it as the production host for this
+  incident. All tools run locally — no paid APIs or external cloud calls are required.
 
 
   SYMPTOM / STARTING STATE: The admission policy rejects `service:1.9` with `provenance builder.id not
@@ -62,9 +62,9 @@ hints:
   content: 'ORIENT — what to observe and why:
 
     Do not touch anything yet. First observe the symptom: provenance rejected is not behaving as the scenario
-    objectives require. This lab is about provenance rejected — how provenance rejected behaves in a devsecops-supplychain
-    environment. Read the objectives and the current state, and note precisely what looks wrong versus
-    healthy before you form any theory.'
+    objectives require. This lab is about provenance rejected — how provenance rejected behaves in a DevSecOps
+    supply chain environment. Read the objectives and the current state, and note precisely what looks
+    wrong versus healthy before you form any theory.'
 - order: 2
   cost: 10
   content: 'APPROACH — the troubleshooting method:
@@ -77,7 +77,7 @@ hints:
   cost: 25
   content: 'WHICH TOOL — the diagnostic command(s):
 
-    1. Inspect the current state with CLI tools for Provenance Rejected: Untrusted Builder ID.
+    1. Inspect the current state with SCA, image scanning, signing, and policy gates.
 
     2. Each command above tells you something specific — status/health, recent errors, and the effective
     configuration. Read them in that order.
@@ -89,8 +89,8 @@ hints:
 
     1. From the evidence above, decide which single part of provenance rejected is at fault.
 
-    2. Re-run the most relevant of CLI tools for Provenance Rejected: Untrusted Builder ID focused on
-    just that part to confirm it.
+    2. Re-run the most relevant of SCA, image scanning, signing, and policy gates focused on just that
+    part to confirm it.
 
     3. State a one-line hypothesis: the smallest change that would move the state from ''provenance rejected
     is not behaving as the scenario objectives require'' toward ''`check.sh` exits successfully''.'

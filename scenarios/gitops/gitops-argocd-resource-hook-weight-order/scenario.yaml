@@ -16,9 +16,9 @@ description: 'CONTEXT: A team operating gitops has raised a ticket for `Sync Hoo
   Business impact: reduced service reliability and blocked users until the underlying state is repaired.
 
 
-  ENVIRONMENT: You are working in FixitLab''s offline FixitLab lab environment. The architecture
-  is a single lab-primary node exposing CLI and configuration files; treat it as the production host for
-  this incident. All tools run locally — no paid APIs or external cloud calls are required.
+  ENVIRONMENT: You are working in FixitLab''s offline FixitLab lab environment. The architecture is a
+  single lab-primary node exposing CLI and configuration files; treat it as the production host for this
+  incident. All tools run locally — no paid APIs or external cloud calls are required.
 
 
   SYMPTOM / STARTING STATE: A database migration Job runs AFTER the app rolls out, so the new pods crash
@@ -63,8 +63,8 @@ hints:
 
     Do not touch anything yet. First observe the symptom: sync hooks run in the wrong order is not behaving
     as the scenario objectives require. This lab is about sync hooks run in the wrong order — how sync
-    hooks run in the wrong order behaves in a gitops environment. Read the objectives and the current
-    state, and note precisely what looks wrong versus healthy before you form any theory.'
+    hooks run in the wrong order behaves in a GitOps delivery environment. Read the objectives and the
+    current state, and note precisely what looks wrong versus healthy before you form any theory.'
 - order: 2
   cost: 10
   content: 'APPROACH — the troubleshooting method:
@@ -77,7 +77,7 @@ hints:
   cost: 25
   content: 'WHICH TOOL — the diagnostic command(s):
 
-    1. Inspect the current state with CLI tools for Sync Hooks Run in the Wrong Order.
+    1. Inspect the current state with Git repos, sync agents, and declarative workloads.
 
     2. Each command above tells you something specific — status/health, recent errors, and the effective
     configuration. Read them in that order.
@@ -89,7 +89,7 @@ hints:
 
     1. From the evidence above, decide which single part of sync hooks run in the wrong order is at fault.
 
-    2. Re-run the most relevant of CLI tools for Sync Hooks Run in the Wrong Order focused on just that
+    2. Re-run the most relevant of Git repos, sync agents, and declarative workloads focused on just that
     part to confirm it.
 
     3. State a one-line hypothesis: the smallest change that would move the state from ''sync hooks run

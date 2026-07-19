@@ -9,7 +9,7 @@ export default defineConfig({
   },
 
   server: {
-    host: true,        // allow external access (domain / IP)
+    host: true,
     port: 5173,
 
     allowedHosts: [
@@ -38,10 +38,32 @@ export default defineConfig({
     outDir: "dist",
     rollupOptions: {
       output: {
-        manualChunks: {
-          vendor: ['react', 'react-dom', 'react-router-dom'],
-          icons: ['lucide-react'],
-          state: ['zustand', 'axios'],
+        // Isolate AWS console + shared lab chrome so lazy AwsLabOverlay never
+        // side-imports the LabRunner page module (circular init → lab crash).
+        manualChunks(id) {
+          if (id.includes("node_modules")) {
+            if (
+              id.includes("react-dom")
+              || id.includes("/react/")
+              || id.includes("react-router")
+            ) {
+              return "vendor";
+            }
+            if (id.includes("lucide-react")) return "icons";
+            if (id.includes("zustand") || id.includes("axios")) return "state";
+            return undefined;
+          }
+          if (id.includes("/src/components/aws/")) return "aws-console";
+          if (id.includes("/src/api/labs")) return "labs-api";
+          if (
+            id.includes("/src/components/lab/")
+            || id.includes("/src/utils/simLayout")
+            || id.includes("/src/store/labStore")
+            || id.includes("/src/utils/lazyWithRetry")
+          ) {
+            return "lab-shared";
+          }
+          return undefined;
         },
       },
     },

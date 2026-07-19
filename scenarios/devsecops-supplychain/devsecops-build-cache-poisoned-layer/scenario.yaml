@@ -17,9 +17,9 @@ description: 'CONTEXT: A team operating devsecops supplychain has raised a ticke
   state is repaired.
 
 
-  ENVIRONMENT: You are working in FixitLab''s offline FixitLab lab environment. The architecture
-  is a single lab-primary node exposing CLI and configuration files; treat it as the production host for
-  this incident. All tools run locally — no paid APIs or external cloud calls are required.
+  ENVIRONMENT: You are working in FixitLab''s offline FixitLab lab environment. The architecture is a
+  single lab-primary node exposing CLI and configuration files; treat it as the production host for this
+  incident. All tools run locally — no paid APIs or external cloud calls are required.
 
 
   SYMPTOM / STARTING STATE: A rebuilt image still ships a package that was supposedly patched. A cached
@@ -63,7 +63,7 @@ hints:
 
     Do not touch anything yet. First observe the symptom: poisoned build cache reintroduces a CVE is not
     behaving as the scenario objectives require. This lab is about poisoned build cache reintroduces a
-    CVE — how poisoned build cache reintroduces a CVE behaves in a devsecops-supplychain environment.
+    CVE — how poisoned build cache reintroduces a CVE behaves in a DevSecOps supply chain environment.
     Read the objectives and the current state, and note precisely what looks wrong versus healthy before
     you form any theory.'
 - order: 2
@@ -78,7 +78,7 @@ hints:
   cost: 25
   content: 'WHICH TOOL — the diagnostic command(s):
 
-    1. Inspect the current state with CLI tools for Poisoned Build Cache Reintroduces a CVE.
+    1. Inspect the current state with SCA, image scanning, signing, and policy gates.
 
     2. Each command above tells you something specific — status/health, recent errors, and the effective
     configuration. Read them in that order.
@@ -91,8 +91,8 @@ hints:
     1. From the evidence above, decide which single part of poisoned build cache reintroduces a CVE is
     at fault.
 
-    2. Re-run the most relevant of CLI tools for Poisoned Build Cache Reintroduces a CVE focused on just
-    that part to confirm it.
+    2. Re-run the most relevant of SCA, image scanning, signing, and policy gates focused on just that
+    part to confirm it.
 
     3. State a one-line hypothesis: the smallest change that would move the state from ''poisoned build
     cache reintroduces a CVE is not behaving as the scenario objectives require'' toward ''`check.sh`

@@ -17,9 +17,9 @@ description: 'CONTEXT: A team operating gitops has raised a ticket for `Multi-So
   state is repaired.
 
 
-  ENVIRONMENT: You are working in FixitLab''s offline FixitLab lab environment. The architecture
-  is a single lab-primary node exposing CLI and configuration files; treat it as the production host for
-  this incident. All tools run locally — no paid APIs or external cloud calls are required.
+  ENVIRONMENT: You are working in FixitLab''s offline FixitLab lab environment. The architecture is a
+  single lab-primary node exposing CLI and configuration files; treat it as the production host for this
+  incident. All tools run locally — no paid APIs or external cloud calls are required.
 
 
   SYMPTOM / STARTING STATE: A multi-source Application fails with `$values/env/prod.yaml: value files
@@ -63,7 +63,7 @@ hints:
 
     Do not touch anything yet. First observe the symptom: Multi-Source app cannot resolve a $values ref
     is not behaving as the scenario objectives require. This lab is about Multi-Source app cannot resolve
-    a $values ref — how Multi-Source app cannot resolve a $values ref behaves in a gitops environment.
+    a $values ref — how Multi-Source app cannot resolve a $values ref behaves in a GitOps delivery environment.
     Read the objectives and the current state, and note precisely what looks wrong versus healthy before
     you form any theory.'
 - order: 2
@@ -78,7 +78,7 @@ hints:
   cost: 25
   content: 'WHICH TOOL — the diagnostic command(s):
 
-    1. Inspect the current state with CLI tools for Multi-Source App Cannot Resolve a $values Ref.
+    1. Inspect the current state with Git repos, sync agents, and declarative workloads.
 
     2. Each command above tells you something specific — status/health, recent errors, and the effective
     configuration. Read them in that order.
@@ -91,8 +91,8 @@ hints:
     1. From the evidence above, decide which single part of Multi-Source app cannot resolve a $values
     ref is at fault.
 
-    2. Re-run the most relevant of CLI tools for Multi-Source App Cannot Resolve a $values Ref focused
-    on just that part to confirm it.
+    2. Re-run the most relevant of Git repos, sync agents, and declarative workloads focused on just that
+    part to confirm it.
 
     3. State a one-line hypothesis: the smallest change that would move the state from ''Multi-Source
     app cannot resolve a $values ref is not behaving as the scenario objectives require'' toward ''`check.sh`

@@ -35,6 +35,7 @@ class SimulationStreamHolder:
         get_editor_state: Callable[[], object | None] | None = None,
         save_editor: Callable[[str, str], None] | None = None,
         clear_editor: Callable[[], None] | None = None,
+        banner: str = "Lab Server — RHEL 9",
     ):
         self._handler = handler
         self._prompt = prompt
@@ -49,7 +50,8 @@ class SimulationStreamHolder:
         self._timeout = 60.0
         self._lock = threading.Lock()
         self.exec_id = f"sim-exec-{uuid.uuid4().hex[:12]}"
-        self._emit("\r\n\x1b[1;36m[FixitLab Simulation — RHEL 9]\x1b[0m\r\n")
+        # Learner-facing banner — never expose the word "Simulation".
+        self._emit(f"\r\n\x1b[1;36m[{banner}]\x1b[0m\r\n")
         self._emit_prompt()
 
     @property

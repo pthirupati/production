@@ -17,9 +17,9 @@ description: 'CONTEXT: A team operating service mesh has raised a ticket for `Si
   is repaired.
 
 
-  ENVIRONMENT: You are working in FixitLab''s offline FixitLab lab environment. The architecture
-  is a single lab-primary node exposing CLI and configuration files; treat it as the production host for
-  this incident. All tools run locally — no paid APIs or external cloud calls are required.
+  ENVIRONMENT: You are working in FixitLab''s offline FixitLab lab environment. The architecture is a
+  single lab-primary node exposing CLI and configuration files; treat it as the production host for this
+  incident. All tools run locally — no paid APIs or external cloud calls are required.
 
 
   SYMPTOM / STARTING STATE: The `checkout` pod can no longer reach `inventory` after an optimization.
@@ -63,8 +63,9 @@ hints:
 
     Do not touch anything yet. First observe the symptom: sidecar resource cuts off a dependency is not
     behaving as the scenario objectives require. This lab is about sidecar resource cuts off a dependency
-    — how sidecar resource cuts off a dependency behaves in a service-mesh environment. Read the objectives
-    and the current state, and note precisely what looks wrong versus healthy before you form any theory.'
+    — how sidecar resource cuts off a dependency behaves in a service mesh operations environment. Read
+    the objectives and the current state, and note precisely what looks wrong versus healthy before you
+    form any theory.'
 - order: 2
   cost: 10
   content: 'APPROACH — the troubleshooting method:
@@ -77,7 +78,7 @@ hints:
   cost: 25
   content: 'WHICH TOOL — the diagnostic command(s):
 
-    1. Inspect the current state with CLI tools for Sidecar Resource Cuts Off a Dependency.
+    1. Inspect the current state with sidecars, traffic policy, mTLS, and observability.
 
     2. Each command above tells you something specific — status/health, recent errors, and the effective
     configuration. Read them in that order.
@@ -90,8 +91,8 @@ hints:
     1. From the evidence above, decide which single part of sidecar resource cuts off a dependency is
     at fault.
 
-    2. Re-run the most relevant of CLI tools for Sidecar Resource Cuts Off a Dependency focused on just
-    that part to confirm it.
+    2. Re-run the most relevant of sidecars, traffic policy, mTLS, and observability focused on just that
+    part to confirm it.
 
     3. State a one-line hypothesis: the smallest change that would move the state from ''sidecar resource
     cuts off a dependency is not behaving as the scenario objectives require'' toward ''`check.sh` exits

@@ -836,8 +836,14 @@ export default function InterviewRoom() {
       return
     }
     // User gesture — hard-unlock TTS and HOLD the synth queue across startRound().
+    // Also speak a short audible line HERE (still inside the click stack) so
+    // Chrome's autoplay grant is tied to a real utterance, not only a silent prime.
     unlockSpeech()
     holdSpeechUnlock()
+    const gestureWarm = speak(
+      `Hi, this is ${round?.persona_name || 'your interviewer'}. One moment while we begin.`,
+      round?.persona_voice_id,
+    ).catch(() => ({ spoken: false }))
     setPreflight(false)
     setPendingHearText(null)
     voiceUnavailableToastRef.current = false
@@ -865,7 +871,8 @@ export default function InterviewRoom() {
           startPracticalLabInline().catch(() => {})
         }
       }
-      // Drop the hold only now — then speak intro+first Q as one block.
+      // Let the gesture warm line finish (or fail) before the real bootstrap.
+      await gestureWarm
       releaseSpeechHold()
       unlockSpeech({ soft: true })
       resumeSpeechSynthesis()

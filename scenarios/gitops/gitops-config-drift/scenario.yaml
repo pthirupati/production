@@ -16,9 +16,9 @@ description: 'CONTEXT: A team operating gitops has raised a ticket for `Self-Hea
   Business impact: reduced service reliability and blocked users until the underlying state is repaired.
 
 
-  ENVIRONMENT: You are working in FixitLab''s offline FixitLab lab environment. The architecture
-  is a single lab-primary node exposing CLI and configuration files; treat it as the production host for
-  this incident. All tools run locally — no paid APIs or external cloud calls are required.
+  ENVIRONMENT: You are working in FixitLab''s offline FixitLab lab environment. The architecture is a
+  single lab-primary node exposing CLI and configuration files; treat it as the production host for this
+  incident. All tools run locally — no paid APIs or external cloud calls are required.
 
 
   SYMPTOM / STARTING STATE: An on-call engineer patched a live ConfigMap during an incident with `kubectl
@@ -64,8 +64,8 @@ hints:
 
     Do not touch anything yet. First observe the symptom: Self-Heal fights live config drift is not behaving
     as the scenario objectives require. This lab is about Self-Heal fights live config drift — how Self-Heal
-    fights live config drift behaves in a gitops environment. Read the objectives and the current state,
-    and note precisely what looks wrong versus healthy before you form any theory.'
+    fights live config drift behaves in a GitOps delivery environment. Read the objectives and the current
+    state, and note precisely what looks wrong versus healthy before you form any theory.'
 - order: 2
   cost: 10
   content: 'APPROACH — the troubleshooting method:

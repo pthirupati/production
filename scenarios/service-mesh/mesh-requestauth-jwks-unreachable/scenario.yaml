@@ -16,9 +16,9 @@ description: 'CONTEXT: A team operating service mesh has raised a ticket for `JW
   it. Business impact: reduced service reliability and blocked users until the underlying state is repaired.
 
 
-  ENVIRONMENT: You are working in FixitLab''s offline FixitLab lab environment. The architecture
-  is a single lab-primary node exposing CLI and configuration files; treat it as the production host for
-  this incident. All tools run locally — no paid APIs or external cloud calls are required.
+  ENVIRONMENT: You are working in FixitLab''s offline FixitLab lab environment. The architecture is a
+  single lab-primary node exposing CLI and configuration files; treat it as the production host for this
+  incident. All tools run locally — no paid APIs or external cloud calls are required.
 
 
   SYMPTOM / STARTING STATE: All authenticated requests to `api` return 401 with `Jwks doesn''t have key
@@ -62,8 +62,8 @@ hints:
 
     Do not touch anything yet. First observe the symptom: JWT auth fails on unreachable JWKS is not behaving
     as the scenario objectives require. This lab is about JWT auth fails on unreachable JWKS — how JWT
-    auth fails on unreachable JWKS behaves in a service-mesh environment. Read the objectives and the
-    current state, and note precisely what looks wrong versus healthy before you form any theory.'
+    auth fails on unreachable JWKS behaves in a service mesh operations environment. Read the objectives
+    and the current state, and note precisely what looks wrong versus healthy before you form any theory.'
 - order: 2
   cost: 10
   content: 'APPROACH — the troubleshooting method:
@@ -76,7 +76,7 @@ hints:
   cost: 25
   content: 'WHICH TOOL — the diagnostic command(s):
 
-    1. Inspect the current state with CLI tools for JWT Auth Fails on Unreachable JWKS.
+    1. Inspect the current state with sidecars, traffic policy, mTLS, and observability.
 
     2. Each command above tells you something specific — status/health, recent errors, and the effective
     configuration. Read them in that order.
@@ -88,7 +88,7 @@ hints:
 
     1. From the evidence above, decide which single part of JWT auth fails on unreachable JWKS is at fault.
 
-    2. Re-run the most relevant of CLI tools for JWT Auth Fails on Unreachable JWKS focused on just that
+    2. Re-run the most relevant of sidecars, traffic policy, mTLS, and observability focused on just that
     part to confirm it.
 
     3. State a one-line hypothesis: the smallest change that would move the state from ''JWT auth fails

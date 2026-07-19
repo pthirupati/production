@@ -2606,7 +2606,7 @@ class RHELShell:
 
     def _cmd_help(self, p: list[str]) -> str:
         return (
-            "FixitLab RHEL 9 Simulation — full Linux command set:\n"
+            "FixitLab RHEL 9 Lab Server — full Linux command set:\n"
             "  files: ls cd cat cp mv rm mkdir touch sed grep find tar chmod chown\n"
             "  users: useradd passwd pwck getent su sudo\n"
             "  services: systemctl service journalctl nginx curl\n"
@@ -2671,7 +2671,7 @@ class RHELShell:
             return ""
         if "makecache" in p:
             return "Metadata cache created."
-        return "dnf: command completed (simulation)"
+        return "dnf: command completed (lab)"
 
     def _dnf_info(self, names: list[str]) -> str:
         from .rhel_os import PACKAGE_CATALOG, resolve_package_name
@@ -3208,8 +3208,8 @@ class RHELShell:
         if sub == "inspect":
             return '{"State":{"Status":"running"},"Config":{"Image":"nginx:latest"}}'
         if sub == "exec":
-            return "OCI runtime exec failed: container not running (simulation — start container first)"
-        return f"docker {sub}: OK (simulation)"
+            return "OCI runtime exec failed: container not running (lab — start container first)"
+        return f"docker {sub}: OK (lab)"
 
     def _cmd_kubectl(self, p: list[str]) -> str:
         from .k8s_cluster import K8sCluster
@@ -3225,7 +3225,7 @@ class RHELShell:
             cluster.sync_from_vmware_bridge()
         line = " ".join(p)
         out = _handle_kubectl(cluster, p, line, self)
-        return out if out is not None else f"kubectl {' '.join(p[1:])}: OK (simulation)"
+        return out if out is not None else f"kubectl {' '.join(p[1:])}: OK (lab)"
 
     def _cmd_aws(self, p: list[str]) -> str:
         from .simulation_modules import _handle_aws_cli_local
@@ -3278,12 +3278,12 @@ class RHELShell:
             content = self.state.read_file(p[1])
             if content and "SyntaxError" in content:
                 return content
-            return f"python3: running {p[1]} (simulation OK)"
+            return f"python3: running {p[1]} (lab OK)"
         return "Python 3.11.6 (main, Oct 2023) [GCC 11.4.1] on linux"
 
     def _cmd_pip3(self, p: list[str]) -> str:
         if "install" in p:
-            return "Successfully installed package (simulation)"
+            return "Successfully installed package (lab)"
         return "pip 23.2.1 from /usr/lib/python3.11/site-packages/pip"
 
     def _cmd_find(self, p: list[str]) -> str:
@@ -3534,7 +3534,7 @@ class RHELShell:
             if raw is None:
                 return f"tar: {archive}: Cannot open: No such file or directory"
             if not raw.startswith("TARSIM1\n"):
-                return f"tar: {archive}: not a recognized archive (simulation)"
+                return f"tar: {archive}: not a recognized archive (lab)"
             try:
                 manifest = json.loads(raw[len("TARSIM1\n"):])
             except json.JSONDecodeError:
@@ -4317,7 +4317,7 @@ class RHELShell:
             if "-l" in p or "--list" in p:
                 return "\n".join(f"{e['path']}    {e['type']}" for e in self.state.selinux_fcontexts)
             return ""
-        return f"semanage: unsupported object '{sub}' (simulation)"
+        return f"semanage: unsupported object '{sub}' (lab)"
 
     @staticmethod
     def _opt_value(p: list[str], flag: str) -> str | None:
@@ -4375,7 +4375,7 @@ class RHELShell:
             return " Id   Name       State\n-------------------------\n 1    rhel-guest running\n 2    win-guest  shut off"
         if "console" in p:
             return "Connected to domain rhel-guest\nEscape character is ^]\nrhel-guest login:"
-        return "virsh: OK (simulation)"
+        return "virsh: OK (lab)"
 
     def _cmd_esxcli(self, p: list[str]) -> str:
         return "Host CPU: Intel Xeon Gold 6248R\n  32 logical CPUs\nMemory: 256 GB"
@@ -5076,7 +5076,7 @@ class RHELShell:
                     "notBefore=Jun 14 10:00:00 2026 GMT\n"
                     "notAfter=Jun 14 10:00:00 2027 GMT")
         if sub in ("genrsa", "genpkey"):
-            return "..+++++\nGenerating RSA private key (simulation)"
+            return "..+++++\nGenerating RSA private key (lab)"
         if sub == "s_client":
             return ("CONNECTED(00000003)\n"
                     "depth=0 CN = sim.fixitlab.local\n"
@@ -5087,7 +5087,7 @@ class RHELShell:
                 import hashlib
                 content = self.state.read_file(files[0]) or ""
                 return f"SHA256({files[0]})= {hashlib.sha256(content.encode()).hexdigest()}"
-        return f"openssl {sub}: OK (simulation)"
+        return f"openssl {sub}: OK (lab)"
 
     def _cmd_iptables(self, p: list[str]) -> str:
         # A thin veneer over the firewalld state so port-open checks stay

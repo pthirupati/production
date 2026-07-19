@@ -16,9 +16,9 @@ description: 'CONTEXT: A team operating gitops has raised a ticket for `Reconcil
   it. Business impact: reduced service reliability and blocked users until the underlying state is repaired.
 
 
-  ENVIRONMENT: You are working in FixitLab''s offline FixitLab lab environment. The architecture
-  is a single lab-primary node exposing CLI and configuration files; treat it as the production host for
-  this incident. All tools run locally — no paid APIs or external cloud calls are required.
+  ENVIRONMENT: You are working in FixitLab''s offline FixitLab lab environment. The architecture is a
+  single lab-primary node exposing CLI and configuration files; treat it as the production host for this
+  incident. All tools run locally — no paid APIs or external cloud calls are required.
 
 
   SYMPTOM / STARTING STATE: New commits to `main` never deploy. The Application''s `targetRevision` is
@@ -62,7 +62,7 @@ hints:
 
     Do not touch anything yet. First observe the symptom: reconcile pinned to a stale detached commit
     is not behaving as the scenario objectives require. This lab is about reconcile pinned to a stale
-    detached commit — how reconcile pinned to a stale detached commit behaves in a gitops environment.
+    detached commit — how reconcile pinned to a stale detached commit behaves in a GitOps delivery environment.
     Read the objectives and the current state, and note precisely what looks wrong versus healthy before
     you form any theory.'
 - order: 2
@@ -77,7 +77,7 @@ hints:
   cost: 25
   content: 'WHICH TOOL — the diagnostic command(s):
 
-    1. Inspect the current state with CLI tools for Reconcile Pinned to a Stale Detached Commit.
+    1. Inspect the current state with Git repos, sync agents, and declarative workloads.
 
     2. Each command above tells you something specific — status/health, recent errors, and the effective
     configuration. Read them in that order.
@@ -90,8 +90,8 @@ hints:
     1. From the evidence above, decide which single part of reconcile pinned to a stale detached commit
     is at fault.
 
-    2. Re-run the most relevant of CLI tools for Reconcile Pinned to a Stale Detached Commit focused on
-    just that part to confirm it.
+    2. Re-run the most relevant of Git repos, sync agents, and declarative workloads focused on just that
+    part to confirm it.
 
     3. State a one-line hypothesis: the smallest change that would move the state from ''reconcile pinned
     to a stale detached commit is not behaving as the scenario objectives require'' toward ''`check.sh`

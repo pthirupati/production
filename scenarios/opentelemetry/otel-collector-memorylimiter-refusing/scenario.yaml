@@ -16,9 +16,9 @@ description: 'CONTEXT: A team operating opentelemetry has raised a ticket for `M
   it. Business impact: reduced service reliability and blocked users until the underlying state is repaired.
 
 
-  ENVIRONMENT: You are working in FixitLab''s offline FixitLab lab environment. The architecture
-  is a single lab-primary node exposing CLI and configuration files; treat it as the production host for
-  this incident. All tools run locally — no paid APIs or external cloud calls are required.
+  ENVIRONMENT: You are working in FixitLab''s offline FixitLab lab environment. The architecture is a
+  single lab-primary node exposing CLI and configuration files; treat it as the production host for this
+  incident. All tools run locally — no paid APIs or external cloud calls are required.
 
 
   SYMPTOM / STARTING STATE: The Collector logs `data refused due to high memory usage` continuously and
@@ -62,8 +62,8 @@ hints:
 
     Do not touch anything yet. First observe the symptom: memory limiter refuses all data is not behaving
     as the scenario objectives require. This lab is about memory limiter refuses all data — how memory
-    limiter refuses all data behaves in a opentelemetry environment. Read the objectives and the current
-    state, and note precisely what looks wrong versus healthy before you form any theory.'
+    limiter refuses all data behaves in a OpenTelemetry observability environment. Read the objectives
+    and the current state, and note precisely what looks wrong versus healthy before you form any theory.'
 - order: 2
   cost: 10
   content: 'APPROACH — the troubleshooting method:
@@ -76,28 +76,37 @@ hints:
   cost: 25
   content: 'WHICH TOOL — the diagnostic command(s):
 
-    Run `docker ps -a` and `docker logs <container>` for the failing container.'
+    1. Inspect the current state with traces, metrics, logs, and collectors.
+
+    2. Each command above tells you something specific — status/health, recent errors, and the effective
+    configuration. Read them in that order.
+
+    3. Compare what you see to the objectives; the gap points at the fault.'
 - order: 4
   cost: 40
   content: 'NARROW DOWN — isolate the subsystem:
 
-    1. `docker ps -a` — note Exited status and exit code.
+    1. From the evidence above, decide which single part of memory limiter refuses all data is at fault.
 
-    2. `docker logs <name>` for the startup error.
+    2. Re-run the most relevant of traces, metrics, logs, and collectors focused on just that part to
+    confirm it.
 
-    3. Inspect the Dockerfile or `docker run` flags if the image is wrong.'
+    3. State a one-line hypothesis: the smallest change that would move the state from ''memory limiter
+    refuses all data is not behaving as the scenario objectives require'' toward ''`check.sh` exits successfully''.'
 - order: 5
   cost: 60
   content: 'NEAR-SOLUTION — the fix shape + verify (you still apply it):
 
-    1. Fix image, port mapping, volume, or env configuration.
+    1. Apply the smallest reversible change your hypothesis points to. Fix the underlying misconfiguration
+    you identified (not just the noisy log line), changing one thing at a time.
 
-    2. `docker start <name>` or re-run with corrected flags.
+    2. Re-run `bash check.sh` and confirm `check.sh` exits successfully.
 
-    3. Confirm `bash check.sh` shows the container Up.
+    3. If it still fails, the hypothesis was wrong — go back to the evidence, do not stack changes.
 
 
-    WHY: the checker validates the container is actually running.'
+    WHY: the grader validates real system state, not marker files — a fix only counts when the subsystem
+    is actually healthy.'
 summary: |-
   Diagnose and resolve memory limiter refuses all data in the opentelemetry lab and verify the healthy end state
 estimated_minutes: 30
