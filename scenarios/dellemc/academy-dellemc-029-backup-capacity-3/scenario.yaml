@@ -1,0 +1,110 @@
+title: 'Dell EMC Unisphere / PowerMax: Capacity — Backup and Recovery'
+slug: academy-dellemc-029-backup-capacity-3
+technology: Dell EMC Unisphere / PowerMax
+category: Backup & Recovery
+difficulty: medium
+scenario_type: do
+lab_mode: simulation
+simulation_type: dellemc
+time_limit: 1200
+max_score: 100
+is_free: false
+infrastructure_type: docker
+jira_priority: Medium
+description: 'CONTEXT: A team operating Dell EMC storage has raised a ticket for `Capacity — Backup`.
+  A customer-facing workflow is degraded and the on-call engineer (you) must diagnose and resolve it.
+  Business impact: reduced service reliability and blocked users until the underlying state is repaired.
+
+
+  ENVIRONMENT: You are working in FixitLab''s offline PowerStore/Unity practice array. The architecture
+  is a single lab-primary node exposing pools, volumes, snapshots, and host mapping; treat it as the production
+  host for this incident. All tools run locally — no paid APIs or external cloud calls are required.
+
+
+  SYMPTOM / STARTING STATE: Backup jobs exist but reliability is uncertain for Capacity. Leadership wants
+  proof that restore works — not just that scripts exit zero. Backup and recovery drill for Capacity.
+  Ensure backups run on schedule, retention is correct, and you can restore how capacity fits into Dell
+  EMC storage within the lab RTO.
+
+
+  OBJECTIVE: Backup coverage for Capacity is complete and restorable; Retention and encryption meet the
+  stated policy; A restore drill proves data integrity. Acceptance criteria: the change is minimal and
+  reversible, and success means `check.sh` exits successfully.
+
+
+  WORK TO DO: Required tooling is pre-installed; if a command is missing, note it and use the equivalent
+  already on the host. Make the smallest configuration change that moves the system toward the objective
+  (edit the relevant pools, volumes, snapshots, and host mapping), changing one thing at a time. Check
+  your work continuously against the objective — success means `check.sh` exits successfully.
+
+
+  VERIFY: Re-run the same check the grader uses and confirm `check.sh` exits successfully. Capture the
+  before/after output as evidence. Success criteria: the objective''s healthy state holds on a repeat
+  check, not just once.
+
+
+  ROLLBACK: If a change makes things worse, revert that single change immediately (restore the original
+  config file / undo the edit / restart the affected component) and re-observe before trying another hypothesis.
+  Never stack unverified changes.
+
+
+  WHAT TO AVOID: Do not apply broad destructive changes, skip evidence gathering, or fake completion with
+  marker files — the checker validates real system state.'
+objectives:
+- Backup coverage for Capacity is complete and restorable
+- Retention and encryption meet the stated policy
+- A restore drill proves data integrity
+initial_state: Backup jobs exist but reliability is uncertain for Capacity. Leadership
+  wants proof that restore works — not just that scripts exit zero.
+hints:
+- order: 1
+  cost: 0
+  content: 'ORIENT — what to observe and why:
+
+    Do not touch anything yet. First observe the symptom: Capacity is misconfigured and dependent workflows
+    are failing. This lab is about Capacity — how capacity fits into Dell EMC storage. Read the objectives
+    and the current state, and note precisely what looks wrong versus healthy before you form any theory.'
+- order: 2
+  cost: 10
+  content: 'APPROACH — the troubleshooting method:
+
+    Work from evidence, not guesses. For Capacity problems the reliable method is: (1) reproduce/observe
+    the failure, (2) narrow from the whole system down to the one component that owns the symptom, (3)
+    change exactly one thing, (4) re-check. Repair or run the backup job, then perform a controlled restore
+    into a scratch location to prove it works.'
+- order: 3
+  cost: 25
+  content: 'WHICH TOOL — the diagnostic command(s):
+
+    1. Inspect the current state with the relevant pools, volumes, snapshots, and host mapping for capacity.
+
+    2. Each command above tells you something specific — status/health, recent errors, and the effective
+    configuration. Read them in that order.
+
+    3. Compare what you see to the objectives; the gap points at the fault.'
+- order: 4
+  cost: 40
+  content: 'NARROW DOWN — isolate the subsystem:
+
+    1. From the evidence above, decide which single part of Capacity is at fault.
+
+    2. Re-run the most relevant of the relevant pools, volumes, snapshots, and host mapping for capacity
+    focused on just that part to confirm it.
+
+    3. State a one-line hypothesis: the smallest change that would move the state from ''Capacity is misconfigured
+    and dependent workflows are failing'' toward ''Capacity behaves correctly under normal and failure
+    checks''.'
+- order: 5
+  cost: 60
+  content: 'NEAR-SOLUTION — the fix shape + verify (you still apply it):
+
+    1. Apply the smallest reversible change your hypothesis points to. Repair or run the backup job, then
+    perform a controlled restore into a scratch location to prove it works.
+
+    2. Re-run `bash check.sh` and confirm Capacity behaves correctly under normal and failure checks.
+
+    3. If it still fails, the hypothesis was wrong — go back to the evidence, do not stack changes.
+
+
+    WHY: the grader validates real system state, not marker files — a fix only counts when the subsystem
+    is actually healthy.'

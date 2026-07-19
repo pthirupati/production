@@ -11,24 +11,45 @@ max_score: 100
 is_free: false
 jira_priority: High
 dual_terminal: false
-description: 'CONTEXT: AL-1003 (outbound connection from ws-finance-07 to a known command-and-control
-  domain) has been sitting in the alert queue for ten minutes. It is a critical-severity alert with clear
-  IOCs, but nobody has formally escalated it into a tracked incident yet — it is still just a queue entry,
-  invisible to the incident dashboard the on-call manager watches.
+description: 'CONTEXT: A team operating SOC and cybersecurity operations has raised a ticket for `Incident
+  Response: Escalate the C2 Alert Before It Falls`. A customer-facing workflow is degraded and the on-call
+  engineer (you) must diagnose and resolve it. Business impact: reduced service reliability and blocked
+  users until the underlying state is repaired.
 
-  ENVIRONMENT: You are working the SOC/SIEM console alert queue. AL-1003 is critical severity, targets
-  ws-finance-07, and has a matching C2 source IP (203.0.113.55) already visible in the alert details.
-  This is the Incident Response track: the objective here is the escalation and tracking step itself, not
-  the containment action (that is a separate lab).
 
-  SYMPTOM / STARTING STATE: AL-1003 is open in the alert queue with no linked incident — the Incidents
-  tab is empty.
+  ENVIRONMENT: You are working in FixitLab''s offline security operations lab. The architecture is a single
+  lab-primary node exposing SIEM, EDR, tickets, and investigation timelines; treat it as the production
+  host for this incident. All tools run locally — no paid APIs or external cloud calls are required.
 
-  IMPACT: An alert that never gets escalated never gets tracked, never gets a timeline, and never shows up
-  in the shift handoff report. Formal incident tracking is what turns "an alert someone saw" into "an
-  incident someone owns."
 
-  OBJECTIVE: Escalate AL-1003 into a formally tracked incident from the SOC console.'
+  SYMPTOM / STARTING STATE: SOC console with critical alert AL-1003 open against ws-finance-07 and no
+  linked incident in the Incidents tab. AL-1003 is open in the alert queue with no linked incident — the
+  Incidents tab is empty.
+
+
+  OBJECTIVE: Sign in to the SOC console; Open AL-1003 in the alert queue; Escalate AL-1003 into a formal
+  incident. Acceptance criteria: the change is minimal and reversible, and success means `check.sh` exits
+  successfully.
+
+
+  WORK TO DO: Required tooling is pre-installed; if a command is missing, note it and use the equivalent
+  already on the host. Make the smallest configuration change that moves the system toward the objective
+  (edit the relevant SIEM, EDR, tickets, and investigation timelines), changing one thing at a time. Check
+  your work continuously against the objective — success means `check.sh` exits successfully.
+
+
+  VERIFY: Re-run the same check the grader uses and confirm `check.sh` exits successfully. Capture the
+  before/after output as evidence. Success criteria: the objective''s healthy state holds on a repeat
+  check, not just once.
+
+
+  ROLLBACK: If a change makes things worse, revert that single change immediately (restore the original
+  config file / undo the edit / restart the affected component) and re-observe before trying another hypothesis.
+  Never stack unverified changes.
+
+
+  WHAT TO AVOID: Do not apply broad destructive changes, skip evidence gathering, or fake completion with
+  marker files — the checker validates real system state.'
 initial_state: SOC console with critical alert AL-1003 open against ws-finance-07 and no linked incident
   in the Incidents tab.
 objectives:
@@ -39,29 +60,55 @@ objectives:
 hints:
 - order: 1
   cost: 0
-  content: 'ORIENT — what to observe and why: Open the Incidents tab first and confirm it is empty, then
-    open AL-1003 in the Alerts queue and read its severity/asset/source details before escalating —
-    escalation should always be a deliberate decision, not a reflex click.'
+  content: 'ORIENT — what to observe and why:
+
+    Do not touch anything yet. First observe the symptom: incident response is not behaving as the scenario
+    objectives require. This lab is about incident response — how incident response behaves in a SOC and
+    cybersecurity operations environment. Read the objectives and the current state, and note precisely
+    what looks wrong versus healthy before you form any theory.'
 - order: 2
   cost: 10
-  content: 'APPROACH — the troubleshooting method: Escalation is a tracking step, not a remediation step —
-    it creates a formal incident record linked to the alert so the response has a timeline and an owner.
-    It does not quarantine anything or block anything by itself.'
+  content: 'APPROACH — the troubleshooting method:
+
+    Work from evidence, not guesses. For incident response problems the reliable method is: (1) reproduce/observe
+    the failure, (2) narrow from the whole system down to the one component that owns the symptom, (3)
+    change exactly one thing, (4) re-check. Fix the underlying misconfiguration you identified (not just
+    the noisy log line), changing one thing at a time.'
 - order: 3
   cost: 25
-  content: 'WHICH TOOL — the diagnostic command(s): Open AL-1003 and use the "Escalate" action. This
-    creates a new incident (INC-#) linked to AL-1003''s asset and severity, and flips the alert''s status
-    to "escalated".'
+  content: 'WHICH TOOL — the diagnostic command(s):
+
+    1. Inspect the current state with SIEM, EDR, tickets, and investigation timelines.
+
+    2. Each command above tells you something specific — status/health, recent errors, and the effective
+    configuration. Read them in that order.
+
+    3. Compare what you see to the objectives; the gap points at the fault.'
 - order: 4
   cost: 40
-  content: 'NARROW DOWN — isolate the subsystem: There is exactly one qualifying alert (AL-1003) — the
-    other two alerts in the queue are not part of this objective.'
+  content: 'NARROW DOWN — isolate the subsystem:
+
+    1. From the evidence above, decide which single part of incident response is at fault.
+
+    2. Re-run the most relevant of SIEM, EDR, tickets, and investigation timelines focused on just that
+    part to confirm it.
+
+    3. State a one-line hypothesis: the smallest change that would move the state from ''incident response
+    is not behaving as the scenario objectives require'' toward ''`check.sh` exits successfully''.'
 - order: 5
   cost: 60
-  content: 'NEAR-SOLUTION — the fix shape + verify (you still apply it): Click Escalate on AL-1003 and
-    confirm the new incident (INC-#) now appears in the Incidents tab, linked to ws-finance-07. WHY: the
-    grader checks that AL-1003 has been escalated in the session state — opening the alert without
-    clicking Escalate does not count.'
+  content: 'NEAR-SOLUTION — the fix shape + verify (you still apply it):
+
+    1. Apply the smallest reversible change your hypothesis points to. Fix the underlying misconfiguration
+    you identified (not just the noisy log line), changing one thing at a time.
+
+    2. Re-run `bash check.sh` and confirm `check.sh` exits successfully.
+
+    3. If it still fails, the hypothesis was wrong — go back to the evidence, do not stack changes.
+
+
+    WHY: the grader validates real system state, not marker files — a fix only counts when the subsystem
+    is actually healthy.'
 summary: Escalate the open critical C2 alert into a formally tracked incident from the SOC console.
 estimated_minutes: 6
 xp_reward: 80

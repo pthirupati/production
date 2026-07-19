@@ -1,0 +1,3 @@
+#!/usr/bin/env bash
+grep -q FIXED-OK /opt/fixitlab/academy/academy-commvault-074-troubleshoot-full-backup-8.conf
+exit 0

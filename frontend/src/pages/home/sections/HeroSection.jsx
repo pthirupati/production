@@ -68,7 +68,7 @@ export default function HeroSection({ technologies, stats = {} }) {
             </div>
             <div>
               <div className="fx-hero-stat-val">Per-user isolated</div>
-              <div className="fx-hero-stat-label">Lab sandboxes</div>
+              <div className="fx-hero-stat-label">Isolated lab environments</div>
             </div>
           </motion.div>
         </div>

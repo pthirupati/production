@@ -11,25 +11,46 @@ max_score: 100
 is_free: false
 jira_priority: Critical
 dual_terminal: false
-description: 'CONTEXT: This shift is not one alert, it is a coordinated attack: the same operator behind
-  the brute-force SSH storm against web01 (AL-1002, source 198.51.100.23) also planted the C2 beacon on
-  ws-finance-07 (AL-1003, contacting a known C2 domain). Blue team containment has to close BOTH footholds
-  — closing only one leaves the other one live and gives the attacker a way back in.
+description: 'CONTEXT: A team operating SOC and cybersecurity operations has raised a ticket for `Red
+  vs Blue: The Attacker Used Two Footholds at Once`. A customer-facing workflow is degraded and the on-call
+  engineer (you) must diagnose and resolve it. Business impact: reduced service reliability and blocked
+  users until the underlying state is repaired.
 
-  ENVIRONMENT: You are working in the SOC/SIEM console against two simultaneous alerts. AL-1002 (brute
-  force, web01, source 198.51.100.23) and AL-1003 (C2 beacon, ws-finance-07) are both open. This is the
-  Red vs Blue track: the scenario models an attacker actively probing multiple vectors, and blue team''s
-  job is complete containment, not a single quick fix.
 
-  SYMPTOM / STARTING STATE: Neither vector is contained — 198.51.100.23 is not blocked, and
-  ws-finance-07 is not quarantined. Fixing only one still leaves an active foothold.
+  ENVIRONMENT: You are working in FixitLab''s offline security operations lab. The architecture is a single
+  lab-primary node exposing SIEM, EDR, tickets, and investigation timelines; treat it as the production
+  host for this incident. All tools run locally — no paid APIs or external cloud calls are required.
 
-  IMPACT: A partial response to a multi-vector attack is a false sense of security — closing the loud
-  brute-force vector while missing the quieter C2 beacon (or vice versa) means the attacker keeps their
-  foothold and the "incident" reopens later, worse.
 
-  OBJECTIVE: Contain BOTH vectors — block 198.51.100.23 at the firewall AND quarantine ws-finance-07 from
-  the network — before considering this incident closed.'
+  SYMPTOM / STARTING STATE: SOC console with two open alerts confirmed by threat intel to be the same
+  coordinated attacker — AL-1002 (brute force, web01, unblocked) and AL-1003 (C2 beacon, ws-finance-07,
+  unquarantined). Neither vector is contained — 198.51.100.23 is not blocked, and ws-finance-07 is not
+  quarantined. Fixing only one still leaves an active foothold.
+
+
+  OBJECTIVE: Sign in to the SOC console; Recognize both alerts as part of the same coordinated attack;
+  Block 198.51.100.23 at the firewall. Acceptance criteria: the change is minimal and reversible, and
+  success means `check.sh` exits successfully.
+
+
+  WORK TO DO: Required tooling is pre-installed; if a command is missing, note it and use the equivalent
+  already on the host. Make the smallest configuration change that moves the system toward the objective
+  (edit the relevant SIEM, EDR, tickets, and investigation timelines), changing one thing at a time. Check
+  your work continuously against the objective — success means `check.sh` exits successfully.
+
+
+  VERIFY: Re-run the same check the grader uses and confirm `check.sh` exits successfully. Capture the
+  before/after output as evidence. Success criteria: the objective''s healthy state holds on a repeat
+  check, not just once.
+
+
+  ROLLBACK: If a change makes things worse, revert that single change immediately (restore the original
+  config file / undo the edit / restart the affected component) and re-observe before trying another hypothesis.
+  Never stack unverified changes.
+
+
+  WHAT TO AVOID: Do not apply broad destructive changes, skip evidence gathering, or fake completion with
+  marker files — the checker validates real system state.'
 initial_state: SOC console with two open alerts confirmed by threat intel to be the same coordinated
   attacker — AL-1002 (brute force, web01, unblocked) and AL-1003 (C2 beacon, ws-finance-07, unquarantined).
 objectives:
@@ -41,29 +62,55 @@ objectives:
 hints:
 - order: 1
   cost: 0
-  content: 'ORIENT — what to observe and why: Open both AL-1002 and AL-1003 and note that fixing only one
-    of them is a trap in this lab — threat intel has confirmed both alerts are the same actor''s work, so
-    partial containment is not real containment here.'
+  content: 'ORIENT — what to observe and why:
+
+    Do not touch anything yet. First observe the symptom: red vs blue is not behaving as the scenario
+    objectives require. This lab is about red vs blue — how red vs blue behaves in a SOC and cybersecurity
+    operations environment. Read the objectives and the current state, and note precisely what looks wrong
+    versus healthy before you form any theory.'
 - order: 2
   cost: 10
-  content: 'APPROACH — the troubleshooting method: Treat this as ONE incident with two required
-    containment actions, not two separate single-fix alerts. Plan both actions before executing either,
-    so you do not walk away after the first one feeling "done."'
+  content: 'APPROACH — the troubleshooting method:
+
+    Work from evidence, not guesses. For red vs blue problems the reliable method is: (1) reproduce/observe
+    the failure, (2) narrow from the whole system down to the one component that owns the symptom, (3)
+    change exactly one thing, (4) re-check. Fix the underlying misconfiguration you identified (not just
+    the noisy log line), changing one thing at a time.'
 - order: 3
   cost: 25
-  content: 'WHICH TOOL — the diagnostic command(s): 1. Use "Block IP" against 198.51.100.23 (the
-    brute-force source). 2. Use "Quarantine" against ws-finance-07 (the C2-beaconing host). Order does
-    not matter — both must be done.'
+  content: 'WHICH TOOL — the diagnostic command(s):
+
+    1. Inspect the current state with SIEM, EDR, tickets, and investigation timelines.
+
+    2. Each command above tells you something specific — status/health, recent errors, and the effective
+    configuration. Read them in that order.
+
+    3. Compare what you see to the objectives; the gap points at the fault.'
 - order: 4
   cost: 40
-  content: 'NARROW DOWN — isolate the subsystem: There are exactly two vectors here — the brute-force
-    source IP and the beaconing host. No other asset or IP in this session is part of this attack.'
+  content: 'NARROW DOWN — isolate the subsystem:
+
+    1. From the evidence above, decide which single part of red vs blue is at fault.
+
+    2. Re-run the most relevant of SIEM, EDR, tickets, and investigation timelines focused on just that
+    part to confirm it.
+
+    3. State a one-line hypothesis: the smallest change that would move the state from ''red vs blue is
+    not behaving as the scenario objectives require'' toward ''`check.sh` exits successfully''.'
 - order: 5
   cost: 60
-  content: 'NEAR-SOLUTION — the fix shape + verify (you still apply it): Block 198.51.100.23 AND
-    quarantine ws-finance-07 — check that BOTH now show as contained before you consider this done. WHY:
-    the grader checks that both vectors are cleared in the session state — completing only one still
-    fails validation, by design, because a multi-vector attack needs multi-vector containment.'
+  content: 'NEAR-SOLUTION — the fix shape + verify (you still apply it):
+
+    1. Apply the smallest reversible change your hypothesis points to. Fix the underlying misconfiguration
+    you identified (not just the noisy log line), changing one thing at a time.
+
+    2. Re-run `bash check.sh` and confirm `check.sh` exits successfully.
+
+    3. If it still fails, the hypothesis was wrong — go back to the evidence, do not stack changes.
+
+
+    WHY: the grader validates real system state, not marker files — a fix only counts when the subsystem
+    is actually healthy.'
 summary: Contain both vectors of a coordinated multi-vector attack — block the brute-force source IP and
   quarantine the C2-beaconing host — before considering the incident closed.
 estimated_minutes: 12

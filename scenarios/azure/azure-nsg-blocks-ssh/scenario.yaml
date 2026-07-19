@@ -11,28 +11,48 @@ max_score: 100
 is_free: true
 jira_priority: Critical
 dual_terminal: true
-description: 'CONTEXT: A deploy engineer opened a ticket saying `ssh vm-web01` has been timing out for
-  the last hour with no changes to their SSH key or client — "connection timed out", not "connection
-  refused" or "permission denied". That distinction matters: a timeout at the network layer, not the
-  application layer.
+description: 'CONTEXT: A team operating Azure cloud operations has raised a ticket for `Network Security
+  Group Silently Blocking SSH to a Production`. A customer-facing workflow is degraded and the on-call
+  engineer (you) must diagnose and resolve it. Business impact: reduced service reliability and blocked
+  users until the underlying state is repaired.
 
 
-  ENVIRONMENT: vm-web01 sits in rg-fixitlab-prod / vnet-prod / snet-web, protected by nsg-web. The
-  Network Security Groups blade in the Azure Portal evaluates inbound rules in priority order (lowest
-  number first) — the first rule that matches a port wins, exactly like production Azure.
+  ENVIRONMENT: You are working in FixitLab''s offline Azure practice subscription. The architecture is
+  a single lab-primary node exposing Portal, Azure CLI, VMs, disks, NSGs, and resource groups; treat it
+  as the production host for this incident. All tools run locally — no paid APIs or external cloud calls
+  are required.
 
 
-  SYMPTOM / STARTING STATE: vm-web01 is Running and reachable on the network, but nsg-web has no rule
-  explicitly allowing inbound TCP/22 — only AllowHTTP (TCP/80) and the built-in DenyAllInbound catch-all
-  at priority 4096. Every inbound SSH attempt falls through to that deny rule and times out.
+  SYMPTOM / STARTING STATE: nsg-web has AllowHTTP (priority 100, TCP/80) and DenyAllInbound (priority
+  4096, all ports) but no rule for TCP/22 — SSH times out. vm-web01 is Running and reachable on the network,
+  but nsg-web has no rule explicitly allowing inbound TCP/22 — only AllowHTTP (TCP/80) and the built-in
+  DenyAllInbound catch-all at priority 4096. Every inbound SSH attempt falls through to that deny rule
+  and times out.
 
 
-  IMPACT: The on-call deploy engineer cannot SSH in to roll back a bad release. Every minute this stays
-  broken is a minute the bad release keeps serving production traffic.
+  OBJECTIVE: Sign in to the Azure Portal; Open Network security groups and select nsg-web; Add an inbound
+  rule allowing TCP/22 with a priority below 4096. Acceptance criteria: the change is minimal and reversible,
+  and success means `check.sh` exits successfully.
 
 
-  OBJECTIVE: Open nsg-web in the Azure Portal, add an inbound rule allowing TCP/22 from the internet with
-  a priority lower (more urgent) than the DenyAllInbound catch-all, and confirm SSH reachability returns.'
+  WORK TO DO: Required tooling is pre-installed; if a command is missing, note it and use the equivalent
+  already on the host. Make the smallest configuration change that moves the system toward the objective
+  (edit the relevant Portal, Azure CLI, VMs, disks, NSGs, and resource groups), changing one thing at
+  a time. Check your work continuously against the objective — success means `check.sh` exits successfully.
+
+
+  VERIFY: Re-run the same check the grader uses and confirm `check.sh` exits successfully. Capture the
+  before/after output as evidence. Success criteria: the objective''s healthy state holds on a repeat
+  check, not just once.
+
+
+  ROLLBACK: If a change makes things worse, revert that single change immediately (restore the original
+  config file / undo the edit / restart the affected component) and re-observe before trying another hypothesis.
+  Never stack unverified changes.
+
+
+  WHAT TO AVOID: Do not apply broad destructive changes, skip evidence gathering, or fake completion with
+  marker files — the checker validates real system state.'
 initial_state: nsg-web has AllowHTTP (priority 100, TCP/80) and DenyAllInbound (priority 4096, all ports)
   but no rule for TCP/22 — SSH times out.
 objectives:
@@ -43,32 +63,48 @@ objectives:
 hints:
 - order: 1
   cost: 0
-  content: 'ORIENT — what to observe and why: A "connection timed out" (not "refused" or "permission
-    denied") on SSH almost always means a network ACL/firewall is silently dropping the packets before
-    they ever reach sshd — check the NSG attached to the VM''s subnet before touching anything on the
-    guest itself.'
+  content: 'ORIENT — what to observe and why:
+
+    Do not touch anything yet. First observe the symptom: network security group silently blocking SSH
+    to a production is not behaving as the scenario objectives require. This lab is about network security
+    group silently blocking SSH to a production — how network security group silently blocking SSH to
+    a production behaves in a Azure cloud operations environment. Read the objectives and the current
+    state, and note precisely what looks wrong versus healthy before you form any theory.'
 - order: 2
   cost: 10
-  content: 'APPROACH — the troubleshooting method: Open Network security groups -> nsg-web -> Inbound
-    security rules. Azure evaluates these in priority order, lowest number first, and stops at the first
-    match. List every rule and its priority/port before deciding what''s missing.'
+  content: 'APPROACH — the troubleshooting method:
+
+    Work from evidence, not guesses. For network security group silently blocking SSH to a production
+    problems the reliable method is: (1) reproduce/observe the failure, (2) narrow from the whole system
+    down to the one component that owns the symptom, (3) change exactly one thing, (4) re-check. Fix the
+    underlying misconfiguration you identified (not just the noisy log line), changing one thing at a
+    time.'
 - order: 3
   cost: 25
-  content: 'WHICH TOOL — the diagnostic command(s): You will see AllowHTTP (priority 100, TCP/80) and
-    DenyAllInbound (priority 4096, all ports, built-in — cannot be deleted). There is no rule for TCP/22
-    in between, so every SSH attempt falls through to the deny at 4096.'
+  content: 'WHICH TOOL — the diagnostic command(s):
+
+    Run `systemctl status sshd` and `ss -tlnp | grep :22` on the target host.'
 - order: 4
   cost: 40
-  content: 'NARROW DOWN — isolate the subsystem: Add a new inbound rule — name it AllowSSH, protocol TCP,
-    destination port 22, source *, action Allow — with a priority number LOWER than 4096 (e.g. 110) so it
-    is evaluated before the catch-all deny.'
+  content: 'NARROW DOWN — isolate the subsystem:
+
+    1. Confirm sshd is active and listening on port 22.
+
+    2. Check `firewall-cmd` or iptables for blocked port 22.
+
+    3. Read `/var/log/secure` for auth or config errors.'
 - order: 5
   cost: 60
-  content: 'NEAR-SOLUTION — the fix shape + verify (you still apply it): In nsg-web -> Add inbound rule,
-    set port 22, priority 110, action Allow, and save. WHY: the grader checks that nsg-web now has an
-    Allow rule for port 22 at a priority below the deny catch-all — the console''s own rule evaluation
-    (not a scripted flag) is what determines whether SSH is reachable, so the priority number matters,
-    not just adding "a" rule.'
+  content: 'NEAR-SOLUTION — the fix shape + verify (you still apply it):
+
+    1. Fix sshd_config, firewall, or socket unit as needed.
+
+    2. `systemctl restart sshd`.
+
+    3. `ssh -o BatchMode=yes user@localhost echo ok` succeeds.
+
+
+    WHY: SSH failures are usually service, firewall, or config — not credentials alone.'
 summary: Add the missing inbound NSG rule for SSH/22 before the deny-all catch-all blocks it, restoring
   SSH access to vm-web01.
 estimated_minutes: 12

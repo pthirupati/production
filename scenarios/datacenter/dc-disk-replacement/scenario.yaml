@@ -11,30 +11,48 @@ max_score: 100
 is_free: false
 jira_priority: High
 dual_terminal: false
-description: 'CONTEXT: The storage monitoring platform fired a predictive-failure SMART alert on db-prod-01
-  in rack R02. The disk hasn''t failed outright yet, but its error-correction counters have crossed the
-  replace-now threshold — waiting for a full failure would risk an unplanned outage on a production database
-  node, so hardware operations dispatched a proactive replacement ticket to the floor.
+description: 'CONTEXT: A team operating enterprise data center operations has raised a ticket for `Field
+  Tech: Predictive Failure Alert on db-prod-01''s Disk`. A customer-facing workflow is degraded and the
+  on-call engineer (you) must diagnose and resolve it. Business impact: reduced service reliability and
+  blocked users until the underlying state is repaired.
 
 
-  ENVIRONMENT: You are walking the physical data center floor through the DCIM console — pan across the
-  rack row, click rack R02 to expand its servers by U position, and click db-prod-01 (U10) to open its
-  component-health drawer showing power, NIC, disk, motherboard, CPU, and GPU status individually.
+  ENVIRONMENT: You are working in FixitLab''s offline data center practice floor. The architecture is
+  a single lab-primary node exposing racks, PDUs, cooling, cabling, and physical servers; treat it as
+  the production host for this incident. All tools run locally — no paid APIs or external cloud calls
+  are required.
 
 
-  SYMPTOM / STARTING STATE: db-prod-01''s component drawer shows the disk flagged "Failed" while every
-  other component — power, NIC, motherboard, CPU, GPU — reads "Healthy". The server itself is still powered
-  on and serving traffic; this is a live hot-swap, not a full outage.
+  SYMPTOM / STARTING STATE: DCIM floor view with db-prod-01 (R02-U10) showing a failed disk while every
+  other component on the server reads healthy and the server remains powered on. db-prod-01''s component
+  drawer shows the disk flagged "Failed" while every other component — power, NIC, motherboard, CPU, GPU
+  — reads "Healthy". The server itself is still powered on and serving traffic; this is a live hot-swap,
+  not a full outage.
 
 
-  IMPACT: Running on a degraded/failing disk risks silent data corruption or an unplanned crash mid- transaction
-  on a production database host. Hardware ops treats predictive-failure disk alerts as same-shift replacements,
-  before the drive actually dies.
+  OBJECTIVE: Pan the datacenter floor to rack R02 and expand it; Click db-prod-01 (R02-U10) to open its
+  component-health drawer; Locate the disk component flagged "Failed". Acceptance criteria: the change
+  is minimal and reversible, and success means `check.sh` exits successfully.
 
 
-  OBJECTIVE: Pan to rack R02, expand it, open db-prod-01''s component drawer, and use the disk''s "Replace
-  Disk" action to swap the failing drive. Confirm the disk reads "Healthy" afterward and the server stays
-  powered on throughout.'
+  WORK TO DO: Required tooling is pre-installed; if a command is missing, note it and use the equivalent
+  already on the host. Make the smallest configuration change that moves the system toward the objective
+  (edit the relevant racks, PDUs, cooling, cabling, and physical servers), changing one thing at a time.
+  Check your work continuously against the objective — success means `check.sh` exits successfully.
+
+
+  VERIFY: Re-run the same check the grader uses and confirm `check.sh` exits successfully. Capture the
+  before/after output as evidence. Success criteria: the objective''s healthy state holds on a repeat
+  check, not just once.
+
+
+  ROLLBACK: If a change makes things worse, revert that single change immediately (restore the original
+  config file / undo the edit / restart the affected component) and re-observe before trying another hypothesis.
+  Never stack unverified changes.
+
+
+  WHAT TO AVOID: Do not apply broad destructive changes, skip evidence gathering, or fake completion with
+  marker files — the checker validates real system state.'
 initial_state: DCIM floor view with db-prod-01 (R02-U10) showing a failed disk while every other component
   on the server reads healthy and the server remains powered on.
 objectives:
@@ -46,31 +64,46 @@ objectives:
 hints:
 - order: 1
   cost: 0
-  content: 'ORIENT — what to observe and why: Do not replace anything yet. Pan to rack R02, expand it,
-    click db-prod-01, and read every row in its component drawer. Exactly one component is flagged "Failed"
-    — confirm it''s the disk, and note that the server''s power state is still "On" (this is a hot-swap,
-    not a downed host).'
+  content: 'ORIENT — what to observe and why:
+
+    Do not touch anything yet. First observe the symptom: field tech is not behaving as the scenario objectives
+    require. This lab is about field tech — how field tech behaves in a enterprise data center operations
+    environment. Read the objectives and the current state, and note precisely what looks wrong versus
+    healthy before you form any theory.'
 - order: 2
   cost: 10
-  content: 'APPROACH — the troubleshooting method: A predictive-failure disk alert has one correct response
-    — replace the drive proactively before it fails outright. There is no diagnostic ambiguity here (unlike
-    the NIC-vs-cable case): the component drawer already tells you exactly which part is failing.'
+  content: 'APPROACH — the troubleshooting method:
+
+    Work from evidence, not guesses. For field tech problems the reliable method is: (1) reproduce/observe
+    the failure, (2) narrow from the whole system down to the one component that owns the symptom, (3)
+    change exactly one thing, (4) re-check. Fix the underlying misconfiguration you identified (not just
+    the noisy log line), changing one thing at a time.'
 - order: 3
   cost: 25
-  content: 'WHICH TOOL — the diagnostic command(s): 1. In db-prod-01''s component drawer, confirm the
-    disk row reads "Failed" and every other row reads "Healthy". 2. Use the "Replace Disk" action directly
-    on that row — no cable-reseat or power-cycle step applies to a disk swap.'
+  content: 'WHICH TOOL — the diagnostic command(s):
+
+    Run `nvidia-smi` and `dmesg | grep -i nvidia` for driver visibility.'
 - order: 4
   cost: 40
-  content: 'NARROW DOWN — isolate the subsystem: Because only the disk is flagged and the rest of the
-    server is healthy, this is a single-component fix — replace the disk, watch the brief replace animation
-    play, and re-check the drawer.'
+  content: 'NARROW DOWN — isolate the subsystem:
+
+    1. Check if the GPU appears in `lspci | grep -i nvidia`.
+
+    2. Verify the correct driver module is loaded (`lsmod | grep nvidia`).
+
+    3. Look for Xid errors or fallen-off-bus messages in dmesg.'
 - order: 5
   cost: 60
-  content: 'NEAR-SOLUTION — the fix shape + verify (you still apply it): Click "Replace Disk" on db-prod-01,
-    let the replace animation finish, and confirm the disk row now reads "Healthy" with the server''s
-    power state still "On". WHY: the grader checks that db-prod-01''s disk component is healthy in the
-    DCIM session state.'
+  content: 'NEAR-SOLUTION — the fix shape + verify (you still apply it):
+
+    1. Reload driver, rebind PCI, or fix persistence mode per the scenario.
+
+    2. Re-run `nvidia-smi`.
+
+    3. Confirm GPU name and memory report without errors.
+
+
+    WHY: workloads need the driver to see the device.'
 summary: Replace the predictively-failing disk in db-prod-01 before it fails outright, without taking
   the production database host offline.
 estimated_minutes: 8

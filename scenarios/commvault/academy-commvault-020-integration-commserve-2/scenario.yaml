@@ -1,0 +1,114 @@
+title: 'Commvault Backup & Recovery: Commserve — Integration Lab'
+slug: academy-commvault-020-integration-commserve-2
+technology: Commvault Backup & Recovery
+category: Cross-Technology
+difficulty: hard
+scenario_type: do
+lab_mode: simulation
+simulation_type: commvault
+time_limit: 1200
+max_score: 100
+is_free: false
+infrastructure_type: docker
+jira_priority: Medium
+description: 'CONTEXT: A team operating Commvault backup operations has raised a ticket for `Commvault
+  Backup & Recovery: Commserve — Integration Lab`. A customer-facing workflow is degraded and the on-call
+  engineer (you) must diagnose and resolve it. Business impact: reduced service reliability and blocked
+  users until the underlying state is repaired.
+
+
+  ENVIRONMENT: You are working in FixitLab''s offline CommCell practice lab. The architecture is a single
+  lab-primary node exposing CommServe, MediaAgent, backup plans, and restore jobs; treat it as the production
+  host for this incident. All tools run locally — no paid APIs or external cloud calls are required.
+
+
+  SYMPTOM / STARTING STATE: Two systems are deployed but not fully wired together for Commserve. Downstream
+  consumers are waiting on this integration path. Integration lab: connect Commserve with an adjacent
+  platform in the Commvault Backup & Recovery stack. Validate authentication, data handoff, and failure
+  behavior for how commserve fits into Commvault backup operations.
+
+
+  OBJECTIVE: Commserve is connected to the adjacent system successfully; Handoff points are authenticated
+  and observable; End-to-end workflow completes without manual intervention. Acceptance criteria: the
+  change is minimal and reversible, and success means `check.sh` exits successfully.
+
+
+  WORK TO DO: Required tooling is pre-installed; if a command is missing, note it and use the equivalent
+  already on the host. Make the smallest configuration change that moves the system toward the objective
+  (edit the relevant CommServe, MediaAgent, backup plans, and restore jobs), changing one thing at a time.
+  Check your work continuously against the objective — success means `check.sh` exits successfully.
+
+
+  VERIFY: Re-run the same check the grader uses and confirm `check.sh` exits successfully. Capture the
+  before/after output as evidence. Success criteria: the objective''s healthy state holds on a repeat
+  check, not just once.
+
+
+  ROLLBACK: If a change makes things worse, revert that single change immediately (restore the original
+  config file / undo the edit / restart the affected component) and re-observe before trying another hypothesis.
+  Never stack unverified changes.
+
+
+  WHAT TO AVOID: Do not apply broad destructive changes, skip evidence gathering, or fake completion with
+  marker files — the checker validates real system state.'
+objectives:
+- Commserve is connected to the adjacent system successfully
+- Handoff points are authenticated and observable
+- End-to-end workflow completes without manual intervention
+initial_state: Two systems are deployed but not fully wired together for Commserve.
+  Downstream consumers are waiting on this integration path.
+hints:
+- order: 1
+  cost: 0
+  content: 'ORIENT — what to observe and why:
+
+    Do not touch anything yet. First observe the symptom: Commserve is misconfigured and dependent workflows
+    are failing. This lab is about Commserve — how commserve fits into Commvault backup operations. Read
+    the objectives and the current state, and note precisely what looks wrong versus healthy before you
+    form any theory.'
+- order: 2
+  cost: 10
+  content: 'APPROACH — the troubleshooting method:
+
+    Work from evidence, not guesses. For Commserve problems the reliable method is: (1) reproduce/observe
+    the failure, (2) narrow from the whole system down to the one component that owns the symptom, (3)
+    change exactly one thing, (4) re-check. Configure credentials and networking, then drive one happy-path
+    transaction end to end across both systems.'
+- order: 3
+  cost: 25
+  content: 'WHICH TOOL — the diagnostic command(s):
+
+    1. Inspect the current state with the relevant CommServe, MediaAgent, backup plans, and restore jobs
+    for commserve.
+
+    2. Each command above tells you something specific — status/health, recent errors, and the effective
+    configuration. Read them in that order.
+
+    3. Compare what you see to the objectives; the gap points at the fault.'
+- order: 4
+  cost: 40
+  content: 'NARROW DOWN — isolate the subsystem:
+
+    1. From the evidence above, decide which single part of Commserve is at fault.
+
+    2. Re-run the most relevant of the relevant CommServe, MediaAgent, backup plans, and restore jobs
+    for commserve focused on just that part to confirm it.
+
+    3. State a one-line hypothesis: the smallest change that would move the state from ''Commserve is
+    misconfigured and dependent workflows are failing'' toward ''Commserve behaves correctly under normal
+    and failure checks''.'
+- order: 5
+  cost: 60
+  content: 'NEAR-SOLUTION — the fix shape + verify (you still apply it):
+
+    1. Apply the smallest reversible change your hypothesis points to. Configure credentials and networking,
+    then drive one happy-path transaction end to end across both systems.
+
+    2. Re-run `bash check.sh` and confirm Commserve behaves correctly under normal and failure checks.
+
+    3. If it still fails, the hypothesis was wrong — go back to the evidence, do not stack changes.
+
+
+    WHY: the grader validates real system state, not marker files — a fix only counts when the subsystem
+    is actually healthy.'
+cross_technology: true

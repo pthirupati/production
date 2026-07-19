@@ -34,32 +34,43 @@ TECH_TARGET = {
 SIM_BY_TECH = {
     "ansible": "ansible",
     "ai-ml": "python",
-    "aws": "generic",
+    "aws": "aws",
+    "azure": "azure",
     "baremetal": "baremetal",
+    "commvault": "commvault",
     "data-science": "python",
     "database": "database",
+    "datacenter": "datacenter",
+    "dellemc": "dellemc",
+    "devsecops-supplychain": "generic",
     "docker": "generic",
+    "gcp": "gcp",
+    "gitops": "generic",
     "gpu": "gpu",
-    "grafana": "generic",
+    "grafana": "grafana",
     "html": "generic",
     "java": "java",
     "javascript": "python",
     "kubernetes": "kubernetes",
     "linux": "generic",
     "mysql": "database",
+    "netapp": "netapp",
     "networking": "generic",
     "nmap": "nmap",
     "nodejs": "python",
+    "openstack": "openstack",
+    "opentelemetry": "generic",
     "peoplesoft": "peoplesoft",
     "postgresql": "database",
-    "prometheus": "generic",
+    "prometheus": "prometheus",
     "prompt-engineering": "python",
     "python": "python",
     "react": "python",
     "rhel-linux": "rhel",
     "security": "generic",
+    "service-mesh": "generic",
     "shell-script": "generic",
-    "simulation": "generic",
+    "soc": "soc",
     "sqlite": "database",
     "terraform": "terraform",
     "vmware": "vmware",
@@ -128,7 +139,18 @@ TECH_TOPICS = {
     "data-science": ["cleaning", "joins", "groupby", "datetime", "visualization", "statistics", "notebooks", "exports", "quality", "pipelines"],
     "prompt-engineering": ["instructions", "context", "examples", "evaluation", "tools", "structured-output", "safety", "agents", "debugging", "templates"],
     "peoplesoft": ["pia-navigation", "process-monitor", "roles", "permission-lists", "integration-broker", "app-engine", "component-security", "operator-lock", "scheduler", "reports"],
-    "simulation": ["terminal", "validation", "state", "gui", "cross-tech", "hints", "scoring", "restore", "troubleshooting", "authoring"],
+    "azure": ["virtual-machines", "managed-disks", "nsg", "vnet", "resource-groups", "identity", "storage-accounts", "load-balancer", "monitoring", "backup"],
+    "gcp": ["compute-engine", "persistent-disks", "vpc", "firewall-rules", "iam", "gke", "cloud-storage", "load-balancing", "monitoring", "snapshots"],
+    "openstack": ["nova", "neutron", "cinder", "glance", "keystone", "heat", "security-groups", "floating-ips", "flavors", "quotas"],
+    "commvault": ["vmware-discovery", "backup-plans", "incremental-backup", "full-backup", "restore", "media-agents", "storage-policies", "alerts", "reporting", "commserve"],
+    "netapp": ["svm", "volumes", "luns", "nfs", "smb", "snapshots", "snapmirror", "aggregates", "qos", "host-mapping"],
+    "dellemc": ["storage-pools", "volumes", "snapshots", "replication", "host-mapping", "iscsi", "fc", "thin-provisioning", "capacity", "alerts"],
+    "datacenter": ["racks", "pdu", "cooling", "cabling", "servers", "switches", "ups", "fiber", "inventory", "hardware-replace"],
+    "soc": ["siem", "edr", "incident-response", "threat-hunting", "forensics", "vulnerability", "firewall", "ids-ips", "iam-security", "compliance"],
+    "gitops": ["repo-structure", "sync", "drift", "rollback", "secrets", "progressive-delivery", "multi-cluster", "policy", "notifications", "bootstrapping"],
+    "devsecops-supplychain": ["sca", "image-scan", "signing", "sbom", "policy-gates", "secrets-scan", "pipeline-hardening", "provenance", "admission", "remediation"],
+    "opentelemetry": ["traces", "metrics", "logs", "collector", "sampling", "context-propagation", "exporters", "instrumentation", "dashboards", "slos"],
+    "service-mesh": ["sidecar", "traffic-split", "mtls", "authorization", "retries", "circuit-breaker", "observability", "gateway", "canary", "failover"],
 }
 
 CATEGORIES = {
@@ -299,6 +321,12 @@ def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("--force", action="store_true")
     parser.add_argument("--dry-run", action="store_true")
+    parser.add_argument(
+        "--tech",
+        action="append",
+        default=None,
+        help="Only generate for these technology slugs (repeatable).",
+    )
     args = parser.parse_args()
 
     markers: dict[str, str] = existing_academy_markers()
@@ -306,7 +334,10 @@ def main() -> None:
     skipped = 0
     plan: dict[str, int] = {}
 
+    tech_filter = set(args.tech) if args.tech else None
     for tech in sorted(DISPLAY):
+        if tech_filter is not None and tech not in tech_filter:
+            continue
         count = existing_count(tech)
         academy_count = existing_academy_count(tech)
         non_academy_count = count - academy_count
@@ -339,8 +370,9 @@ def main() -> None:
             seq += 1
 
     if not args.dry_run:
-        emit_presets(markers)
-        emit_e2e(markers)
+        # Re-scan the tree so --tech runs still emit the full academy marker map.
+        emit_presets(existing_academy_markers())
+        emit_e2e(existing_academy_markers())
 
     print(f"Complete technology scenarios planned/written: {created}; skipped: {skipped}")
     print("Per-tech additions:")

@@ -112,7 +112,7 @@ TECH_PROFILES: dict[str, dict[str, str]] = {
     "react": {"domain": "React frontends", "env": "React application", "surface": "components, hooks, router, and build output"},
     "html": {"domain": "HTML and web delivery", "env": "web server lab", "surface": "HTML pages, nginx/apache config, and browser devtools"},
     "java": {"domain": "Java applications", "env": "Java project", "surface": "Maven/Gradle, JVM logs, and Spring configuration"},
-    "shell-script": {"domain": "shell scripting", "env": "bash practice environment", "surface": "scripts, cron, logs, and shellcheck"},
+    "shell-script": {"domain": "shell scripting", "env": "bash lab host", "surface": "scripts, cron, logs, and shellcheck"},
     "database": {"domain": "database administration", "env": "database server", "surface": "SQL client, schemas, backups, and performance views"},
     "devops": {"domain": "DevOps delivery", "env": "CI/CD lab", "surface": "git repos, pipelines, artifacts, and runbooks"},
     "mysql": {"domain": "MySQL", "env": "MySQL instance", "surface": "mysql client, InnoDB, grants, and slow query log"},
@@ -129,7 +129,18 @@ TECH_PROFILES: dict[str, dict[str, str]] = {
     "data-science": {"domain": "data science", "env": "notebook lab", "surface": "pandas/notebook workflows, joins, and charts"},
     "prompt-engineering": {"domain": "prompt engineering", "env": "LLM practice workspace", "surface": "prompt templates, eval sets, and tool configs"},
     "peoplesoft": {"domain": "PeopleSoft administration", "env": "PeopleSoft app server lab", "surface": "PIA, Process Scheduler, Integration Broker, and app server logs"},
-    "simulation": {"domain": "FixitLab simulation", "env": "simulation sandbox", "surface": "terminal state, validation hooks, and lab authoring markers"},
+    "azure": {"domain": "Azure cloud operations", "env": "Azure practice subscription", "surface": "Portal, Azure CLI, VMs, disks, NSGs, and resource groups"},
+    "gcp": {"domain": "Google Cloud operations", "env": "GCP practice project", "surface": "Console, gcloud, Compute Engine, disks, VPC, and IAM"},
+    "openstack": {"domain": "OpenStack cloud operations", "env": "OpenStack practice cloud", "surface": "Horizon, Nova, Neutron, Cinder, and Glance"},
+    "commvault": {"domain": "Commvault backup operations", "env": "CommCell practice lab", "surface": "CommServe, MediaAgent, backup plans, and restore jobs"},
+    "netapp": {"domain": "NetApp ONTAP storage", "env": "ONTAP practice cluster", "surface": "System Manager, SVMs, volumes, LUNs, and SnapMirror"},
+    "dellemc": {"domain": "Dell EMC storage", "env": "PowerStore/Unity practice array", "surface": "pools, volumes, snapshots, and host mapping"},
+    "datacenter": {"domain": "enterprise data center operations", "env": "data center practice floor", "surface": "racks, PDUs, cooling, cabling, and physical servers"},
+    "soc": {"domain": "SOC and cybersecurity operations", "env": "security operations lab", "surface": "SIEM, EDR, tickets, and investigation timelines"},
+    "gitops": {"domain": "GitOps delivery", "env": "GitOps practice cluster", "surface": "Git repos, sync agents, and declarative workloads"},
+    "devsecops-supplychain": {"domain": "DevSecOps supply chain", "env": "secure pipeline lab", "surface": "SCA, image scanning, signing, and policy gates"},
+    "opentelemetry": {"domain": "OpenTelemetry observability", "env": "telemetry practice stack", "surface": "traces, metrics, logs, and collectors"},
+    "service-mesh": {"domain": "service mesh operations", "env": "mesh practice cluster", "surface": "sidecars, traffic policy, mTLS, and observability"},
 }
 
 TOPIC_SNIPPETS: dict[str, dict[str, str]] = {
@@ -519,7 +530,7 @@ def snippet_for(tech: str, topic: str) -> dict[str, str]:
     base = topic_base(topic)
     if base in TOPIC_SNIPPETS:
         return TOPIC_SNIPPETS[base]
-    profile = TECH_PROFILES.get(tech, {"domain": tech.replace("-", " "), "env": "practice environment", "surface": "CLI and configuration"})
+    profile = TECH_PROFILES.get(tech, {"domain": tech.replace("-", " "), "env": "lab environment", "surface": "CLI and configuration"})
     label = humanize_topic(topic)
     return {
         "label": label,
@@ -833,7 +844,7 @@ def build_academy_copy(
     display_name: str | None = None,
     marker: str | None = None,
 ) -> dict[str, Any]:
-    profile = TECH_PROFILES.get(tech, {"domain": tech.replace("-", " "), "env": "practice environment", "surface": "CLI and configuration"})
+    profile = TECH_PROFILES.get(tech, {"domain": tech.replace("-", " "), "env": "lab environment", "surface": "CLI and configuration"})
     snip = snippet_for(tech, topic)
     label = snip["label"]
     concept = snip["concept"]
@@ -908,7 +919,7 @@ def enrich_scenario_data(data: dict, *, folder_name: str, tech_dir: str) -> dict
     if len(desc) >= 180 and not is_generic_academy_copy(data):
         return None
 
-    profile = TECH_PROFILES.get(tech_dir, {"domain": tech_dir.replace("-", " "), "env": "practice environment"})
+    profile = TECH_PROFILES.get(tech_dir, {"domain": tech_dir.replace("-", " "), "env": "lab environment"})
     label = title
     improved_desc = (
         f"{desc} " if desc and not is_generic_academy_copy(data) else ""
@@ -921,7 +932,7 @@ def enrich_scenario_data(data: dict, *, folder_name: str, tech_dir: str) -> dict
     hints = list(data.get("hints") or [])
     while len(hints) < 3:
         hints.append({"order": len(hints) + 1, "cost": 10 + (len(hints) * 5), "content": ""})
-    env = profile.get("env", "practice environment")
+    env = profile.get("env", "lab environment")
     if not hints[0].get("content"):
         hints[0]["content"] = (
             f"Orient yourself before changing anything:\n"

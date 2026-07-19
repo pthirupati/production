@@ -11,22 +11,45 @@ max_score: 100
 is_free: true
 jira_priority: Medium
 dual_terminal: false
-description: 'CONTEXT: The data team provisioned a 100GB persistent disk last week for a one-time import
-  job that runs tonight, but nobody ever attached it to the instance that will run the job — the ticket
-  just says "disk-data-unattached is sitting there, please wire it up before the cron kicks off."
+description: 'CONTEXT: A team operating Google Cloud operations has raised a ticket for `Attach the Pending
+  Persistent Disk Before the Data Import`. A customer-facing workflow is degraded and the on-call engineer
+  (you) must diagnose and resolve it. Business impact: reduced service reliability and blocked users until
+  the underlying state is repaired.
 
-  ENVIRONMENT: You are working in the Google Cloud Console against the FixItLab Enterprise Project.
-  web01 is the target instance; disk-data-unattached is a pd-ssd persistent disk currently not attached
-  to any instance.
 
-  SYMPTOM / STARTING STATE: Compute Engine > Disks shows disk-data-unattached with no instance listed
-  under "In use by". web01''s details page shows only its boot disk under Disks.
+  ENVIRONMENT: You are working in FixitLab''s offline GCP practice project. The architecture is a single
+  lab-primary node exposing Console, gcloud, Compute Engine, disks, VPC, and IAM; treat it as the production
+  host for this incident. All tools run locally — no paid APIs or external cloud calls are required.
 
-  IMPACT: Tonight''s import job will fail immediately with "no such device" if the disk is not attached
-  and visible to the guest before the cron fires.
 
-  OBJECTIVE: In the Google Cloud Console, attach disk-data-unattached to web01 and confirm it now shows
-  as in use by web01.'
+  SYMPTOM / STARTING STATE: disk-data-unattached (100GB, pd-ssd) shows no instance under "In use by" and
+  is not listed under any instance''s disks. Compute Engine > Disks shows disk-data-unattached with no
+  instance listed under "In use by". web01''s details page shows only its boot disk under Disks.
+
+
+  OBJECTIVE: Sign in to the Google Cloud Console; Open Compute Engine > Disks and locate disk-data-unattached;
+  Attach it to web01. Acceptance criteria: the change is minimal and reversible, and success means `check.sh`
+  exits successfully.
+
+
+  WORK TO DO: Required tooling is pre-installed; if a command is missing, note it and use the equivalent
+  already on the host. Make the smallest configuration change that moves the system toward the objective
+  (edit the relevant Console, gcloud, Compute Engine, disks, VPC, and IAM), changing one thing at a time.
+  Check your work continuously against the objective — success means `check.sh` exits successfully.
+
+
+  VERIFY: Re-run the same check the grader uses and confirm `check.sh` exits successfully. Capture the
+  before/after output as evidence. Success criteria: the objective''s healthy state holds on a repeat
+  check, not just once.
+
+
+  ROLLBACK: If a change makes things worse, revert that single change immediately (restore the original
+  config file / undo the edit / restart the affected component) and re-observe before trying another hypothesis.
+  Never stack unverified changes.
+
+
+  WHAT TO AVOID: Do not apply broad destructive changes, skip evidence gathering, or fake completion with
+  marker files — the checker validates real system state.'
 initial_state: disk-data-unattached (100GB, pd-ssd) shows no instance under "In use by" and is not listed
   under any instance's disks.
 objectives:
@@ -37,30 +60,60 @@ objectives:
 hints:
 - order: 1
   cost: 0
-  content: 'ORIENT — what to observe and why: Open Disks in the left nav and look at the "In use by"
-    column for every disk. Exactly one disk has no instance attached — note its size and type before
-    deciding where it should go.'
+  content: 'ORIENT — what to observe and why:
+
+    Do not touch anything yet. First observe the symptom: attach the pending persistent disk before the
+    data import is not behaving as the scenario objectives require. This lab is about attach the pending
+    persistent disk before the data import — how attach the pending persistent disk before the data import
+    behaves in a Google Cloud operations environment. Read the objectives and the current state, and note
+    precisely what looks wrong versus healthy before you form any theory.'
 - order: 2
   cost: 10
-  content: 'APPROACH — the troubleshooting method: An unattached persistent disk with a job that needs it
-    tonight is a straightforward attach operation — you do not need to create a new disk, just wire the
-    existing one to the right instance.'
+  content: 'APPROACH — the troubleshooting method:
+
+    Work from evidence, not guesses. For attach the pending persistent disk before the data import problems
+    the reliable method is: (1) reproduce/observe the failure, (2) narrow from the whole system down to
+    the one component that owns the symptom, (3) change exactly one thing, (4) re-check. Create the smallest
+    working slice of attach the pending persistent disk before the data import first, validate it, then
+    add the remaining pieces one at a time.'
 - order: 3
   cost: 25
-  content: 'WHICH TOOL — the diagnostic command(s): From web01''s details page -> Edit -> Additional
-    disks -> Attach existing disk -> select disk-data-unattached, or from the Disks list select the disk
-    and use "Attach to instance" -> choose web01 as the target.'
+  content: 'WHICH TOOL — the diagnostic command(s):
+
+    1. Inspect the current state with Console, gcloud, Compute Engine, disks, VPC, and IAM.
+
+    2. Each command above tells you something specific — status/health, recent errors, and the effective
+    configuration. Read them in that order.
+
+    3. Compare what you see to the objectives; the gap points at the fault.'
 - order: 4
   cost: 40
-  content: 'NARROW DOWN — isolate the subsystem: There is only one instance (web01) and one unattached
-    disk (disk-data-unattached) in this project, so there is no ambiguity about which disk goes to which
-    instance.'
+  content: 'NARROW DOWN — isolate the subsystem:
+
+    1. From the evidence above, decide which single part of attach the pending persistent disk before
+    the data import is at fault.
+
+    2. Re-run the most relevant of Console, gcloud, Compute Engine, disks, VPC, and IAM focused on just
+    that part to confirm it.
+
+    3. State a one-line hypothesis: the smallest change that would move the state from ''attach the pending
+    persistent disk before the data import is not behaving as the scenario objectives require'' toward
+    ''`check.sh` exits successfully''.'
 - order: 5
   cost: 60
-  content: 'NEAR-SOLUTION — the fix shape + verify (you still apply it): Attach disk-data-unattached to
-    web01 and confirm the Disks list now shows web01 under "In use by". WHY: the grader checks the
-    session''s GCP disk state, not just that you opened the attach dialog — you must complete the attach
-    action.'
+  content: 'NEAR-SOLUTION — the fix shape + verify (you still apply it):
+
+    1. Apply the smallest reversible change your hypothesis points to. Create the smallest working slice
+    of attach the pending persistent disk before the data import first, validate it, then add the remaining
+    pieces one at a time.
+
+    2. Re-run `bash check.sh` and confirm `check.sh` exits successfully.
+
+    3. If it still fails, the hypothesis was wrong — go back to the evidence, do not stack changes.
+
+
+    WHY: the grader validates real system state, not marker files — a fix only counts when the subsystem
+    is actually healthy.'
 summary: Attach the pending persistent disk to the instance that needs it before tonight's import job
   runs.
 estimated_minutes: 8

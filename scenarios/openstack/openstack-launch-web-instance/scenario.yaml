@@ -1,0 +1,134 @@
+title: Launch the web-01 Instance Before the Change Window
+slug: openstack-launch-web-instance
+technology: openstack
+category: Build
+difficulty: easy
+lab_mode: simulation
+simulation_type: openstack
+infrastructure_type: docker
+time_limit: 900
+max_score: 100
+is_free: true
+jira_priority: Medium
+dual_terminal: false
+description: 'CONTEXT: A team operating OpenStack cloud operations has raised a ticket for `Launch the
+  web-01 Instance Before the Change Window`. A customer-facing workflow is degraded and the on-call engineer
+  (you) must diagnose and resolve it. Business impact: reduced service reliability and blocked users until
+  the underlying state is repaired.
+
+
+  ENVIRONMENT: You are working in FixitLab''s offline OpenStack practice cloud. The architecture is a
+  single lab-primary node exposing Horizon, Nova, Neutron, Cinder, and Glance; treat it as the production
+  host for this incident. All tools run locally — no paid APIs or external cloud calls are required.
+
+
+  SYMPTOM / STARTING STATE: No Nova instance named web-01 exists yet. The platform team needs web-01 online
+  before tonight''s change window. Glance already has the golden image and Neutron has the private network,
+  but nobody launched the Nova instance yet.
+
+  You are working in OpenStack Horizon against the fixitlab-prod project. The private network and default
+  security group already exist.
+
+  Launch an instance named web-01 from Horizon, wait until it is ACTIVE, then confirm the guest is reachable
+  from the lab terminal.
+
+
+  OBJECTIVE: Sign in to OpenStack Horizon; Launch instance web-01 on the private network; Confirm the
+  instance status is ACTIVE. Acceptance criteria: the change is minimal and reversible, and success means
+  `check.sh` exits successfully.
+
+
+  WORK TO DO: Required tooling is pre-installed; if a command is missing, note it and use the equivalent
+  already on the host. Make the smallest configuration change that moves the system toward the objective
+  (edit the relevant Horizon, Nova, Neutron, Cinder, and Glance), changing one thing at a time. Check
+  your work continuously against the objective — success means `check.sh` exits successfully.
+
+
+  VERIFY: Re-run the same check the grader uses and confirm `check.sh` exits successfully. Capture the
+  before/after output as evidence. Success criteria: the objective''s healthy state holds on a repeat
+  check, not just once.
+
+
+  ROLLBACK: If a change makes things worse, revert that single change immediately (restore the original
+  config file / undo the edit / restart the affected component) and re-observe before trying another hypothesis.
+  Never stack unverified changes.
+
+
+  WHAT TO AVOID: Do not apply broad destructive changes, skip evidence gathering, or fake completion with
+  marker files — the checker validates real system state.'
+initial_state: No Nova instance named web-01 exists yet.
+objectives:
+- Sign in to OpenStack Horizon
+- Launch instance web-01 on the private network
+- Confirm the instance status is ACTIVE
+- Open the lab terminal and verify the guest responds
+hints:
+- order: 1
+  cost: 0
+  content: 'ORIENT — what to observe and why:
+
+    Do not touch anything yet. First observe the symptom: launch the web-01 instance before the change
+    window is not behaving as the scenario objectives require. This lab is about launch the web-01 instance
+    before the change window — how launch the web-01 instance before the change window behaves in a OpenStack
+    cloud operations environment. Read the objectives and the current state, and note precisely what looks
+    wrong versus healthy before you form any theory.'
+- order: 2
+  cost: 10
+  content: 'APPROACH — the troubleshooting method:
+
+    Work from evidence, not guesses. For launch the web-01 instance before the change window problems
+    the reliable method is: (1) reproduce/observe the failure, (2) narrow from the whole system down to
+    the one component that owns the symptom, (3) change exactly one thing, (4) re-check. Create the smallest
+    working slice of launch the web-01 instance before the change window first, validate it, then add
+    the remaining pieces one at a time.'
+- order: 3
+  cost: 25
+  content: 'WHICH TOOL — the diagnostic command(s):
+
+    1. Inspect the current state with Horizon, Nova, Neutron, Cinder, and Glance.
+
+    2. Each command above tells you something specific — status/health, recent errors, and the effective
+    configuration. Read them in that order.
+
+    3. Compare what you see to the objectives; the gap points at the fault.'
+- order: 4
+  cost: 40
+  content: 'NARROW DOWN — isolate the subsystem:
+
+    1. From the evidence above, decide which single part of launch the web-01 instance before the change
+    window is at fault.
+
+    2. Re-run the most relevant of Horizon, Nova, Neutron, Cinder, and Glance focused on just that part
+    to confirm it.
+
+    3. State a one-line hypothesis: the smallest change that would move the state from ''launch the web-01
+    instance before the change window is not behaving as the scenario objectives require'' toward ''`check.sh`
+    exits successfully''.'
+- order: 5
+  cost: 60
+  content: 'NEAR-SOLUTION — the fix shape + verify (you still apply it):
+
+    1. Apply the smallest reversible change your hypothesis points to. Create the smallest working slice
+    of launch the web-01 instance before the change window first, validate it, then add the remaining
+    pieces one at a time.
+
+    2. Re-run `bash check.sh` and confirm `check.sh` exits successfully.
+
+    3. If it still fails, the hypothesis was wrong — go back to the evidence, do not stack changes.
+
+
+    WHY: the grader validates real system state, not marker files — a fix only counts when the subsystem
+    is actually healthy.'
+validation:
+  type: command
+  commands:
+  - cmd: true
+    expect: ''
+tags:
+- openstack
+- nova
+- build
+- create
+summary: Launch a Nova instance from Horizon and confirm it is ACTIVE.
+estimated_minutes: 10
+xp_reward: 100
