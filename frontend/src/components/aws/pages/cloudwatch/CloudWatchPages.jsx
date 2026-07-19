@@ -233,7 +233,7 @@ export function AlarmList() {
       {deleteTarget && (
         <ConfirmDialog
           title={`Delete alarm ${deleteTarget}?`}
-          body={`This removes alarm ${deleteTarget} from the local CloudWatch simulation.`}
+          body={`This removes alarm ${deleteTarget} from this CloudWatch environment.`}
           confirmLabel="Delete"
           confirmText={deleteTarget}
           onCancel={() => setDeleteTarget(null)}
@@ -294,7 +294,7 @@ export function AlarmDetail() {
       {deleteOpen && (
         <ConfirmDialog
           title={`Delete alarm ${decoded}?`}
-          body={`This removes alarm ${decoded} from the local CloudWatch simulation.`}
+          body={`This removes alarm ${decoded} from this CloudWatch environment.`}
           confirmLabel="Delete"
           confirmText={decoded}
           onCancel={() => setDeleteOpen(false)}
@@ -398,7 +398,7 @@ export function DashboardList() {
       {deleteTarget && (
         <ConfirmDialog
           title={`Delete dashboard ${deleteTarget}?`}
-          body={`This removes dashboard ${deleteTarget} from the local CloudWatch simulation.`}
+          body={`This removes dashboard ${deleteTarget} from this CloudWatch environment.`}
           confirmLabel="Delete"
           confirmText={deleteTarget}
           onCancel={() => setDeleteTarget(null)}

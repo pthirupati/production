@@ -57,7 +57,7 @@ const milestones = [
 
 const values = [
   { icon: Terminal, title: 'Learn by Doing', desc: 'We believe the best way to learn is by breaking things and fixing them — not reading docs.', color: 'text-accent-cyan', bg: 'bg-accent-cyan/10 group-hover:bg-accent-cyan/20' },
-  { icon: Shield, title: 'Safe to Fail', desc: 'Every lab is an isolated sandbox (Docker, EC2, or DO). Sessions auto-expire in 15 minutes by default.', color: 'text-accent-green', bg: 'bg-accent-green/10 group-hover:bg-accent-green/20' },
+  { icon: Shield, title: 'Safe to Fail', desc: 'Every lab is an isolated environment (Docker, EC2, or DO). Sessions auto-expire in 15 minutes by default.', color: 'text-accent-green', bg: 'bg-accent-green/10 group-hover:bg-accent-green/20' },
   { icon: Heart, title: 'Accessible', desc: 'Free tier for everyone. Promo coupons, teams for enterprise, and OAuth sign-up.', color: 'text-accent-pink', bg: 'bg-accent-pink/10 group-hover:bg-accent-pink/20' },
   { icon: Globe, title: 'Global Community', desc: 'Engineers share threads with screenshots, vote on solutions, and compete on leaderboards.', color: 'text-accent-blue', bg: 'bg-accent-blue/10 group-hover:bg-accent-blue/20' },
   { icon: Code, title: 'Real Environments', desc: 'Docker containers, AWS EC2, and DigitalOcean droplets — plus AI-powered RHEL environments.', color: 'text-accent-purple', bg: 'bg-accent-purple/10 group-hover:bg-accent-purple/20' },

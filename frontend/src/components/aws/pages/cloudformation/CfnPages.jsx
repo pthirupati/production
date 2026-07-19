@@ -86,7 +86,7 @@ export function CfnList() {
       {deleteTarget && (
         <ConfirmDialog
           title={`Delete ${deleteTarget.name}?`}
-          body={`This permanently removes stack ${deleteTarget.name} from the local CloudFormation simulation. In real AWS, deleting a stack deletes its managed resources.`}
+          body={`This permanently removes stack ${deleteTarget.name} from this CloudFormation environment. In real AWS, deleting a stack deletes its managed resources.`}
           confirmLabel="Delete"
           confirmText={deleteTarget.name}
           onCancel={() => setDeleteTarget(null)}
@@ -318,7 +318,7 @@ export function CfnDetail() {
       {deleteOpen && (
         <ConfirmDialog
           title={`Delete ${stack.name}?`}
-          body={`This permanently removes stack ${stack.name} from the local CloudFormation simulation.`}
+          body={`This permanently removes stack ${stack.name} from this CloudFormation environment.`}
           confirmLabel="Delete"
           confirmText={stack.name}
           onCancel={() => setDeleteOpen(false)}

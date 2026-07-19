@@ -19,6 +19,8 @@ import '../../styles/vscode-workbench.css'
 // Full AWS console, embedded read-only-router style so the terraform lab can show
 // exactly the resources `terraform apply` created without leaving the IDE.
 const AwsConsole = lazyWithRetry(() => import('../aws/AwsConsole'))
+const AzureConsole = lazyWithRetry(() => import('../azure/AzureConsole'))
+const GcpConsole = lazyWithRetry(() => import('../gcp/GcpConsole'))
 
 const DEFAULT_FILES = ['main.tf', 'variables.tf', 'outputs.tf']
 
@@ -238,6 +240,24 @@ export default function TerraformWorkspaceIde({
         </div>
       )
     }
+    if (bottomTab === 'azure') {
+      return (
+        <div className="h-full min-h-[220px] rounded border border-[var(--vsc-border)] overflow-hidden">
+          <Suspense fallback={<div className="p-4 text-xs text-[var(--vsc-muted)]">Loading Azure Portal…</div>}>
+            <AzureConsole embedded sessionId={sessionId} scenario={scenario} />
+          </Suspense>
+        </div>
+      )
+    }
+    if (bottomTab === 'gcp') {
+      return (
+        <div className="h-full min-h-[220px] rounded border border-[var(--vsc-border)] overflow-hidden">
+          <Suspense fallback={<div className="p-4 text-xs text-[var(--vsc-muted)]">Loading Google Cloud Console…</div>}>
+            <GcpConsole embedded sessionId={sessionId} scenario={scenario} />
+          </Suspense>
+        </div>
+      )
+    }
     return (
       <div className="space-y-2 h-full flex flex-col min-h-0">
         <div className="flex flex-wrap gap-1.5 shrink-0">
@@ -275,6 +295,8 @@ export default function TerraformWorkspaceIde({
           <VscActivityButton active title="Explorer"><Files size={22} /></VscActivityButton>
           <VscActivityButton active={bottomTab === 'aws'} onClick={() => setBottomTab('aws')} title="AWS CLI"><CloudCog size={22} /></VscActivityButton>
           <VscActivityButton active={bottomTab === 'console'} onClick={() => setBottomTab('console')} title="AWS Console"><LayoutDashboard size={22} /></VscActivityButton>
+          <VscActivityButton active={bottomTab === 'azure'} onClick={() => setBottomTab('azure')} title="Azure Portal"><CloudCog size={22} /></VscActivityButton>
+          <VscActivityButton active={bottomTab === 'gcp'} onClick={() => setBottomTab('gcp')} title="Google Cloud Console"><CloudCog size={22} /></VscActivityButton>
           {canTerminal && (
             <VscActivityButton active={bottomTab === 'terminal'} onClick={() => { setBottomTab('terminal'); setShowTerminal(true) }} title="Terminal"><Terminal size={22} /></VscActivityButton>
           )}

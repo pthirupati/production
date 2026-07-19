@@ -191,7 +191,7 @@ export function PolicyList() {
       <div className="aws-card" style={{ marginBottom: 12 }}>
         <SectionLabel>IAM policy authoring</SectionLabel>
         <div className="aws-hint" style={{ marginTop: 8 }}>
-          Create customer-managed policies, inspect ARNs, and edit JSON documents with AWS-style validation. Attach counts are simulated for users, groups, and roles.
+          Create customer-managed policies, inspect ARNs, and edit JSON documents with AWS-style validation. Attach counts reflect users, groups, and roles in this account.
         </div>
       </div>
       <DataTable

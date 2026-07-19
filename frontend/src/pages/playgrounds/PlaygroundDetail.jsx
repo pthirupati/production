@@ -117,7 +117,7 @@ export default function PlaygroundDetail() {
             </div>
           </div>
           <p className="text-xs text-surface-500">
-            Ephemeral sandbox — nothing is saved. Session resets after {Math.round((pg.idle_timeout_seconds || 900) / 60)} min idle.
+            Ephemeral workspace — nothing is saved. Session resets after {Math.round((pg.idle_timeout_seconds || 900) / 60)} min idle.
           </p>
         </header>
 

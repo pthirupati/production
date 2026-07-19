@@ -342,7 +342,7 @@ export function BucketDetail() {
       {deleteObjectsTarget && (
         <ConfirmDialog
           title={`Delete ${deleteObjectsTarget.length} object${deleteObjectsTarget.length === 1 ? '' : 's'}?`}
-          body={`This removes the selected object${deleteObjectsTarget.length === 1 ? '' : 's'} from s3://${bucket.name}/${prefix} in the local simulation.`}
+          body={`This removes the selected object${deleteObjectsTarget.length === 1 ? '' : 's'} from s3://${bucket.name}/${prefix} in this environment.`}
           confirmLabel="Delete"
           confirmText={deleteObjectsTarget.length === 1 ? deleteObjectsTarget[0] : String(deleteObjectsTarget.length)}
           onCancel={() => setDeleteObjectsTarget(null)}

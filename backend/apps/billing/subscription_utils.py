@@ -53,6 +53,53 @@ def user_has_technology_access(user, technology_id) -> bool:
     return is_tech_subscription_active(sub) or is_tech_subscription_in_grace(sub)
 
 
+def technology_access_denied_response(user, technology_slug: str):
+    """
+    Return a DRF Response when the user may not open a standalone console for
+    this technology, or None when access is allowed.
+
+    Free technologies and complimentary/staff users always pass. Used to close
+    the revenue hole where any authenticated user could open /vmware-sim (or
+    similar demo APIs) without a technology subscription.
+    """
+    from rest_framework.response import Response
+
+    from apps.question_bank.models import Technology
+
+    if not user or not user.is_authenticated:
+        return Response(
+            {"error": "Authentication required", "code": "AUTH_REQUIRED"},
+            status=401,
+        )
+    if user_has_complimentary_access(user):
+        return None
+    tech = Technology.objects.filter(slug=technology_slug).first()
+    if not tech:
+        # Unknown slug — fail closed for paid-console surfaces.
+        return Response(
+            {
+                "error": "Subscription required",
+                "code": "SUBSCRIPTION_REQUIRED",
+                "technology": technology_slug,
+            },
+            status=403,
+        )
+    if tech.is_free or tech.price == 0:
+        return None
+    if user_has_technology_access(user, tech.id):
+        return None
+    return Response(
+        {
+            "error": "Subscription required. Purchase access to this technology first.",
+            "code": "SUBSCRIPTION_REQUIRED",
+            "technology": tech.name,
+            "technology_slug": tech.slug,
+            "renew_url": f"/payment?technology={tech.slug}",
+        },
+        status=403,
+    )
+
+
 def user_has_org_technology_access(user, technology_id) -> bool:
     """True if user's organization has an active grant for this technology."""
     if not user or not user.is_authenticated:
