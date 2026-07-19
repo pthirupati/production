@@ -45,13 +45,13 @@ on:
         type: boolean
         default: false
       topology:
-        description: "Deployment topology (single = existing 1-droplet; four-droplet = D1 edge / D2 app / D3 data / D4 labs)"
+        description: "Deployment topology (ALWAYS use four-droplet for FixitLab prod: D1 edge / D2 app / D3 data / D4 labs)"
         type: choice
         required: true
-        default: single
+        default: four-droplet
         options:
-          - single
           - four-droplet
+          - single
       cloud_provider:
         description: "Cloud provider (digitalocean = default droplet/DOKS path; aws = SCAFFOLD ONLY, no-op until AWS keys exist)"
         type: choice
@@ -72,7 +72,7 @@ on:
       wire_existing:
         description: "Four-droplet only: discover existing droplets by tag (fixitlab-edge/app/db/labs) and skip creation"
         type: boolean
-        default: false
+        default: true
       credentials_email:
         description: "Four-droplet only: recipient for the deployment credentials email"
         type: string

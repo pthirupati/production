@@ -1,0 +1,24 @@
+---
+description: Always deploy FixitLab production via four-droplet topology only
+alwaysApply: true
+---
+
+# Production deploy = four-droplet only
+
+When deploying FixitLab to production (`FixitLab Production` workflow):
+
+- **ALWAYS** set `topology=four-droplet` (never leave the default / never use `single`)
+- Prefer `action=deploy`, `wire_existing=true`, `cloud_provider=digitalocean`, `hosting_target=droplets`, `create_server=false`
+- Do **not** trigger a bare `gh workflow run "FixitLab Production"` without `-f topology=four-droplet` — that historically ran the single-droplet path and skipped all `[4D]` jobs
+
+Example:
+
+```bash
+gh workflow run "FixitLab Production" --ref main \
+  -f action=deploy \
+  -f topology=four-droplet \
+  -f wire_existing=true \
+  -f cloud_provider=digitalocean \
+  -f hosting_target=droplets \
+  -f create_server=false
+```
