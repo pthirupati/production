@@ -49,7 +49,7 @@ export function VpcDashboard() {
       {primaryVpc && (
         <div className="aws-card" style={{ marginBottom: 16 }}>
           <SectionLabel>Network topology · {primaryVpc.name || primaryVpc.id}</SectionLabel>
-          <div className="aws-hint" style={{ marginTop: 6 }}>Real AWS VPC maps show how public/private subnets, route tables, internet gateways, and security groups relate. This simulation mirrors that mental model for lab troubleshooting.</div>
+          <div className="aws-hint" style={{ marginTop: 6 }}>Real AWS VPC maps show how public/private subnets, route tables, internet gateways, and security groups relate. This console mirrors that mental model for lab troubleshooting.</div>
           <div style={{ marginTop: 14, border: '1px solid var(--aws-border)', borderRadius: 8, padding: 16, background: 'var(--aws-page-bg)' }}>
             <div style={{ display: 'grid', gridTemplateColumns: '180px 1fr 180px', gap: 16, alignItems: 'stretch' }}>
               <TopologyNode title="Internet" subtitle="0.0.0.0/0" tone="edge" />

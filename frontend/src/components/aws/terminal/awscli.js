@@ -658,7 +658,7 @@ function runCommand(service, command, rest, flags, region, store) {
       // sourceDestCheck / groups etc.: accept as empty success (real CLI prints nothing).
       return ''
     }
-    return `\nAn error occurred (InvalidAction) when calling the ${command} operation: aws ec2 ${command} is not yet simulated.`
+    return `\nAn error occurred (InvalidAction) when calling the ${command} operation: aws ec2 ${command} is not supported in this lab environment.`
   }
 
   // --- S3 (high-level) ---
@@ -697,7 +697,7 @@ function runCommand(service, command, rest, flags, region, store) {
       store.putObject(bucketName, key, 2048)
       return `upload: ${src} to s3://${bucketName}/${key}`
     }
-    return `aws s3 ${command}: simulated high-level command`
+    return `aws s3 ${command}: high-level command handled in this lab`
   }
   if (service === 's3api') {
     const bucket = flags.bucket ? store.s3Buckets.find((b) => b.name === flags.bucket) : null
@@ -815,7 +815,7 @@ function runCommand(service, command, rest, flags, region, store) {
       store.updateBucket(flags.bucket, { website: true })
       return ''
     }
-    return `\nAn error occurred (InvalidAction) when calling the ${command} operation: aws s3api ${command} is not yet simulated.`
+    return `\nAn error occurred (InvalidAction) when calling the ${command} operation: aws s3api ${command} is not supported in this lab environment.`
   }
 
   // --- IAM ---
@@ -923,7 +923,7 @@ function runCommand(service, command, rest, flags, region, store) {
         AccountMFAEnabled: 0, AccessKeysPerUserQuota: 2, MFADevices: 0,
       } })
     }
-    return `\nAn error occurred (InvalidAction) when calling the ${command} operation: aws iam ${command} is not yet simulated.`
+    return `\nAn error occurred (InvalidAction) when calling the ${command} operation: aws iam ${command} is not supported in this lab environment.`
   }
 
   // --- CloudWatch / Logs ---
@@ -952,7 +952,7 @@ function runCommand(service, command, rest, flags, region, store) {
       const now = Date.now()
       return j({ Label: flags['metric-name'] || 'CPUUtilization', Datapoints: Array.from({ length: 12 }, (_, i) => ({ Timestamp: new Date(now - (11 - i) * 300000).toISOString(), Average: Math.round((10 + Math.random() * 40) * 100) / 100, Unit: flags['metric-name']?.includes('Bytes') ? 'Bytes' : 'Percent' })) })
     }
-    return `\nAn error occurred (InvalidAction) when calling the ${command} operation: aws cloudwatch ${command} is not yet simulated.`
+    return `\nAn error occurred (InvalidAction) when calling the ${command} operation: aws cloudwatch ${command} is not supported in this lab environment.`
   }
 
   // --- CloudWatch Logs ---
@@ -1009,7 +1009,7 @@ function runCommand(service, command, rest, flags, region, store) {
     if (command === 'create-log-group' || command === 'delete-log-group' || command === 'put-retention-policy') {
       return ''
     }
-    return `\nAn error occurred (InvalidAction) when calling the ${command} operation: aws logs ${command} is not yet simulated.`
+    return `\nAn error occurred (InvalidAction) when calling the ${command} operation: aws logs ${command} is not supported in this lab environment.`
   }
 
   // --- Lambda data-plane (invoke) — separate from the generic control plane. ---
@@ -1223,5 +1223,5 @@ function runCommand(service, command, rest, flags, region, store) {
     return j({ TableNames: rows.map((t) => t.name) })
   }
 
-  return `\nusage: aws [options] <command> <subcommand>\naws: error: argument command: Invalid choice or unsimulated service: '${service}'`
+  return `\nusage: aws [options] <command> <subcommand>\naws: error: argument command: Invalid choice or unsupported service: '${service}'`
 }

@@ -72,20 +72,24 @@ function useResourceIndex() {
   return useMemo(() => {
     const rows = []
     const tagText = (t) => Object.entries(t || {}).map(([k, v]) => `${k}=${v}`).join(' ')
-    ;(instances || []).forEach((i) => rows.push({ kind: 'EC2 instance', id: i.id, name: i.name || i.id, hay: `${i.id} ${i.name} ${tagText(i.tags)}`, path: `${BASE}/ec2/instances/${i.id}` }))
-    ;(buckets || []).forEach((b) => rows.push({ kind: 'S3 bucket', id: b.name, name: b.name, hay: b.name, path: `${BASE}/s3/buckets/${encodeURIComponent(b.name)}` }))
-    ;(vpcs || []).forEach((v) => rows.push({ kind: 'VPC', id: v.id, name: v.name || v.id, hay: `${v.id} ${v.name} ${v.cidr}`, path: `${BASE}/vpc/vpcs` }))
-    ;(securityGroups || []).forEach((g) => rows.push({ kind: 'Security group', id: g.id, name: g.name, hay: `${g.id} ${g.name} ${g.description}`, path: `${BASE}/ec2/security-groups` }))
-    ;(iamUsers || []).forEach((u) => rows.push({ kind: 'IAM user', id: u.name, name: u.name, hay: u.name, path: `${BASE}/iam/users` }))
-    ;(iamRoles || []).forEach((r) => rows.push({ kind: 'IAM role', id: r.name, name: r.name, hay: r.name, path: `${BASE}/iam/roles` }))
+    const objs = (list) => (list || []).filter((x) => x && typeof x === 'object')
+    objs(instances).forEach((i) => rows.push({ kind: 'EC2 instance', id: i.id, name: i.name || i.id, hay: `${i.id} ${i.name} ${tagText(i.tags)}`, path: `${BASE}/ec2/instances/${i.id}` }))
+    objs(buckets).forEach((b) => rows.push({ kind: 'S3 bucket', id: b.name, name: b.name, hay: b.name, path: `${BASE}/s3/buckets/${encodeURIComponent(b.name)}` }))
+    objs(vpcs).forEach((v) => rows.push({ kind: 'VPC', id: v.id, name: v.name || v.id, hay: `${v.id} ${v.name} ${v.cidr}`, path: `${BASE}/vpc/vpcs` }))
+    objs(securityGroups).forEach((g) => rows.push({ kind: 'Security group', id: g.id, name: g.name, hay: `${g.id} ${g.name} ${g.description}`, path: `${BASE}/ec2/security-groups` }))
+    objs(iamUsers).forEach((u) => rows.push({ kind: 'IAM user', id: u.name, name: u.name, hay: u.name, path: `${BASE}/iam/users` }))
+    objs(iamRoles).forEach((r) => rows.push({ kind: 'IAM role', id: r.name, name: r.name, hay: r.name, path: `${BASE}/iam/roles` }))
     Object.entries(genericResources || {}).forEach(([svc, resources]) => {
       Object.entries(resources || {}).forEach(([res, list]) => {
-        (list || []).forEach((row) => rows.push({
-          kind: `${SERVICE_BY_KEY[svc]?.name || svc}`,
-          id: row.id, name: row.name || row.id,
-          hay: `${row.id} ${row.name} ${tagText(row.tags)}`,
-          path: `${BASE}/${svc}/${res}/${encodeURIComponent(row.id)}`,
-        }))
+        objs(list).forEach((row) => {
+          if (!row.id) return
+          rows.push({
+            kind: `${SERVICE_BY_KEY[svc]?.name || svc}`,
+            id: row.id, name: row.name || row.id,
+            hay: `${row.id} ${row.name} ${tagText(row.tags)}`,
+            path: `${BASE}/${svc}/${res}/${encodeURIComponent(row.id)}`,
+          })
+        })
       })
     })
     return rows
