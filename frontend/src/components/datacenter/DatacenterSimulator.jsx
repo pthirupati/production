@@ -5,7 +5,7 @@ import {
   LogIn, Server, AlertTriangle, Terminal, X, Power, Network, HardDrive,
   CircuitBoard, Cpu, Zap, Wrench, RotateCcw, Snowflake, Gauge, Move,
   Building2, Router, Thermometer, Fuel, BatteryCharging, Plug, ShieldCheck,
-  RefreshCw, MonitorCog, Database, Boxes,
+  RefreshCw, MonitorCog, Database, Boxes, Ticket, Monitor,
 } from 'lucide-react'
 import { simPanelRoot } from '../../utils/simLayout'
 import { useSimSession } from '../sim/shared'
@@ -215,8 +215,8 @@ export default function DatacenterSimulator({
       </LabChromeBar>
 
       {goal.objective && (
-        <div className="px-4 py-2 text-sm bg-amber-50 border-b border-amber-200 flex items-center gap-2">
-          <AlertTriangle size={14} className="text-amber-600 shrink-0" />
+        <div className="sim-goal-banner">
+          <AlertTriangle size={14} className="shrink-0" />
           <span><strong>{goal.title}:</strong> {goal.objective}</span>
         </div>
       )}
@@ -367,14 +367,45 @@ export default function DatacenterSimulator({
             {selectedServer.hardware && (
               <div className="dc-drawer-section">
                 <div className="dc-drawer-label">Hardware inventory</div>
-                <div className="text-[11px] text-slate-300 space-y-1.5 leading-relaxed">
-                  <div><span className="text-slate-500">Motherboard</span> — {selectedServer.hardware.motherboard?.model} · BIOS {selectedServer.hardware.motherboard?.bios} · TPM {selectedServer.hardware.motherboard?.tpm}</div>
-                  <div><span className="text-slate-500">CPUs</span> — {(selectedServer.hardware.cpus || []).map((c) => `S${c.socket} ${c.cores}c/${c.threads}t`).join(' · ')}</div>
-                  <div><span className="text-slate-500">PCIe</span> — {(selectedServer.hardware.pcie || []).map((p) => `${p.slot}: ${p.model}`).join(' · ')}</div>
-                  <div><span className="text-slate-500">Storage</span> — {(selectedServer.hardware.storage || []).map((d) => `Bay${d.bay} ${d.size_gb}G ${d.bus}`).join(' · ')}</div>
-                  <div><span className="text-slate-500">Power/Cooling</span> — {(selectedServer.hardware.psus || []).map((p) => p.id).join('/')} · {(selectedServer.hardware.fans || []).length} fans</div>
-                  <div><span className="text-slate-500">Cables</span> — {(selectedServer.hardware.cables || []).map((c) => `${c.id}:${c.status}`).join(', ')}</div>
-                  <div><span className="text-slate-500">Firmware</span> — {selectedServer.firmware_version || '—'}</div>
+                <div className="dc-hw-meta">
+                  <div><span className="dc-hw-k">Vendor</span> — {selectedServer.vendor || '—'} · {selectedServer.model || '—'} · ST {selectedServer.service_tag || '—'}</div>
+                  <div><span className="dc-hw-k">Motherboard</span> — {selectedServer.hardware.motherboard?.model} · BIOS {selectedServer.hardware.motherboard?.bios} · TPM {selectedServer.hardware.motherboard?.tpm}</div>
+                  <div><span className="dc-hw-k">CPUs</span> — {(selectedServer.hardware.cpus || []).map((c) => `S${c.socket} ${c.cores}c/${c.threads}t`).join(' · ')}</div>
+                  <div><span className="dc-hw-k">PCIe</span> — {(selectedServer.hardware.pcie || []).map((p) => `${p.slot}: ${p.model}`).join(' · ')}</div>
+                  <div><span className="dc-hw-k">Storage</span> — {(selectedServer.hardware.storage || []).map((d) => `Bay${d.bay} ${d.size_gb}G ${d.bus}`).join(' · ')}</div>
+                  <div><span className="dc-hw-k">Power/Cooling</span> — {(selectedServer.hardware.psus || []).map((p) => p.id).join('/')} · {(selectedServer.hardware.fans || []).length} fans</div>
+                  <div><span className="dc-hw-k">Firmware</span> — {selectedServer.firmware_version || '—'}</div>
+                </div>
+              </div>
+            )}
+
+            {selectedServer.hardware?.cables?.length > 0 && (
+              <div className="dc-drawer-section">
+                <div className="dc-drawer-label">Cables &amp; ports</div>
+                <div className="dc-cable-list">
+                  {selectedServer.hardware.cables.map((c) => {
+                    const seated = c.status === 'seated'
+                    return (
+                      <div key={c.id} className={`dc-cable-row ${seated ? 'dc-cable-ok' : 'dc-cable-loose'}`}>
+                        <span className={`dc-port-led ${seated ? 'dc-led-green' : 'dc-led-red'}`} />
+                        <div className="dc-cable-info">
+                          <strong>{c.id}</strong>
+                          <span>{c.type} · {c.port} · {c.status}</span>
+                        </div>
+                        {seated ? (
+                          <button type="button" disabled={busy} className="dc-btn-outline dc-btn-xs"
+                            onClick={() => doAction(() => datacenterApi.unplugCable(sessionId, selectedServer.id, c.id), `Unplugged ${c.id}`, selectedServer.id)}>
+                            Unplug
+                          </button>
+                        ) : (
+                          <button type="button" disabled={busy} className="dc-btn-danger dc-btn-xs"
+                            onClick={() => doAction(() => datacenterApi.plugCable(sessionId, selectedServer.id, c.id), `Plugged ${c.id}`, selectedServer.id)}>
+                            Plug in
+                          </button>
+                        )}
+                      </div>
+                    )
+                  })}
                 </div>
               </div>
             )}
@@ -395,6 +426,61 @@ export default function DatacenterSimulator({
             </div>
 
             <div className="dc-drawer-section">
+              <div className="dc-drawer-label">Vendor support ticket</div>
+              <p className="dc-ticket-hint">
+                Raise a part-replacement / troubleshooting ticket to{' '}
+                <strong>{selectedServer.vendor || 'Dell'}</strong> for this chassis (service tag{' '}
+                {selectedServer.service_tag || '—'}).
+              </p>
+              <div className="dc-action-row">
+                <button type="button" disabled={busy} className="dc-btn-outline"
+                  onClick={() => {
+                    const failed = Object.entries(selectedServer.components).find(([, s]) => s !== 'healthy')
+                    const component = failed?.[0] || broken.component || 'hardware'
+                    doAction(
+                      () => datacenterApi.openVendorTicket(sessionId, selectedServer.id, component, selectedServer.vendor),
+                      `${selectedServer.vendor || 'Vendor'} ticket opened`,
+                      selectedServer.id,
+                    )
+                  }}>
+                  <Ticket size={13} /> Open {selectedServer.vendor || 'OEM'} ticket
+                </button>
+                {selectedServer.vendor !== 'HPE' && (
+                  <button type="button" disabled={busy} className="dc-btn-outline"
+                    onClick={() => doAction(
+                      () => datacenterApi.openVendorTicket(sessionId, selectedServer.id, broken.component || 'hardware', 'HPE'),
+                      'HPE ticket opened',
+                      selectedServer.id,
+                    )}>
+                    Ticket → HPE
+                  </button>
+                )}
+                {selectedServer.vendor !== 'Dell' && (
+                  <button type="button" disabled={busy} className="dc-btn-outline"
+                    onClick={() => doAction(
+                      () => datacenterApi.openVendorTicket(sessionId, selectedServer.id, broken.component || 'hardware', 'Dell'),
+                      'Dell ticket opened',
+                      selectedServer.id,
+                    )}>
+                    Ticket → Dell
+                  </button>
+                )}
+              </div>
+              {(st.tickets || []).filter((t) => t.asset_id === selectedServer.id).slice(0, 4).map((t) => (
+                <div key={t.id} className="dc-ticket-card">
+                  <div className="dc-ticket-id">{t.id} · {t.vendor}</div>
+                  <div className="dc-ticket-sum">{t.summary} · {t.status}</div>
+                  {t.status === 'open' && (
+                    <button type="button" disabled={busy} className="dc-btn-outline dc-btn-xs mt-1"
+                      onClick={() => doAction(() => datacenterApi.resolveVendorTicket(sessionId, t.id), `Ticket ${t.id} advanced`)}>
+                      Authorize FRU / ship parts
+                    </button>
+                  )}
+                </div>
+              ))}
+            </div>
+
+            <div className="dc-drawer-section">
               <div className="dc-drawer-label">Field actions</div>
               <div className="dc-action-row">
                 <button type="button" disabled={busy} className="dc-btn-outline"
@@ -402,8 +488,12 @@ export default function DatacenterSimulator({
                   <Power size={13} /> Power Cycle
                 </button>
                 <button type="button" disabled={busy} className="dc-btn-outline"
+                  onClick={() => doAction(() => datacenterApi.openSerialConsole(sessionId, selectedServer.id), 'Serial console open', selectedServer.id)}>
+                  <Monitor size={13} /> Attach monitor / serial
+                </button>
+                <button type="button" disabled={busy} className="dc-btn-outline"
                   onClick={() => doAction(() => datacenterApi.reseatCable(sessionId, selectedServer.id), 'Cable reseated', selectedServer.id)}>
-                  <RotateCcw size={13} /> Reseat Cable
+                  <RotateCcw size={13} /> Reseat all loose
                 </button>
                 <button type="button" disabled={busy} className="dc-btn-outline"
                   onClick={() => doAction(() => datacenterApi.updateFirmware(sessionId, selectedServer.id, '2.14.0'), 'Firmware updated', selectedServer.id)}>
@@ -416,6 +506,18 @@ export default function DatacenterSimulator({
                 </div>
               )}
             </div>
+
+            {st.console?.open && st.console?.asset_id === selectedServer.id && (
+              <div className="dc-drawer-section">
+                <div className="dc-drawer-label"><Monitor size={12} className="inline mr-1" />KVM / serial console</div>
+                <div className="dc-serial-console">
+                  {(st.console.lines || []).map((line, i) => (
+                    <div key={i} className="dc-serial-line">{line}</div>
+                  ))}
+                  <span className="dc-serial-cursor">█</span>
+                </div>
+              </div>
+            )}
 
             {selectedServer.bmc && (
               <div className="dc-drawer-section">

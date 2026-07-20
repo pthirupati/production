@@ -295,3 +295,40 @@
 .dc-bmc-sel { display: flex; flex-direction: column; gap: 0.25rem; margin-top: 0.3rem; }
 .dc-bmc-sel-row { font-size: 0.65rem; color: #64748b; }
 .dc-bmc-sel-time { font-family: 'JetBrains Mono', monospace; color: #4b5468; }
+
+/* Hardware / cables / tickets / serial */
+.dc-hw-meta { font-size: 0.7rem; color: #cbd3e3; line-height: 1.55; display: flex; flex-direction: column; gap: 0.35rem; }
+.dc-hw-k { color: #64748b; font-weight: 600; }
+.dc-cable-list { display: flex; flex-direction: column; gap: 0.45rem; }
+.dc-cable-row {
+  display: flex; align-items: center; gap: 0.5rem; padding: 0.45rem 0.55rem;
+  border-radius: 6px; border: 1px solid #262c3d; background: #171b26;
+}
+.dc-cable-loose { border-color: rgba(248, 113, 113, 0.45); background: rgba(239, 68, 68, 0.08); }
+.dc-cable-ok { border-color: rgba(52, 211, 153, 0.25); }
+.dc-port-led { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; box-shadow: 0 0 6px currentColor; }
+.dc-cable-info { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 0.1rem; }
+.dc-cable-info strong { font-size: 0.72rem; color: #f1f5f9; }
+.dc-cable-info span { font-size: 0.62rem; color: #8891a5; font-family: 'JetBrains Mono', monospace; }
+.dc-btn-xs { padding: 0.2rem 0.45rem !important; font-size: 0.65rem !important; }
+.dc-ticket-hint { font-size: 0.7rem; color: #97a2b8; margin-bottom: 0.5rem; line-height: 1.4; }
+.dc-ticket-card {
+  margin-top: 0.5rem; padding: 0.5rem 0.6rem; border-radius: 6px;
+  background: #171b26; border: 1px solid #262c3d;
+}
+.dc-ticket-id { font-size: 0.68rem; font-weight: 700; color: #f97316; font-family: 'JetBrains Mono', monospace; }
+.dc-ticket-sum { font-size: 0.65rem; color: #97a2b8; margin-top: 0.15rem; }
+.dc-serial-console {
+  background: #05070c; border: 1px solid #1c2130; border-radius: 6px; padding: 0.55rem 0.65rem;
+  font-family: 'JetBrains Mono', ui-monospace, monospace; font-size: 0.65rem; color: #34d399;
+  max-height: 160px; overflow-y: auto; line-height: 1.45;
+}
+.dc-serial-line { white-space: pre-wrap; word-break: break-word; }
+.dc-serial-cursor { animation: dc-blink 1s step-end infinite; color: #34d399; }
+
+/* Front-panel activity lights on open rack servers */
+.dc-server-card::before {
+  content: ''; width: 5px; height: 5px; border-radius: 50%; flex-shrink: 0;
+  background: #34d399; box-shadow: 0 0 5px #34d399;
+}
+.dc-server-alert::before { background: #f87171; box-shadow: 0 0 5px #f87171; animation: dc-blink 1.1s ease-in-out infinite; }

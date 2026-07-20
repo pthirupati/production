@@ -33,8 +33,25 @@ export const datacenterApi = {
     }[component] || 'replace_power'
     return datacenterApi.action(sessionId, action, { asset_id: assetId })
   },
-  reseatCable(sessionId, assetId) {
-    return datacenterApi.action(sessionId, 'reseat_cable', { asset_id: assetId })
+  reseatCable(sessionId, assetId, cableId = '') {
+    return datacenterApi.action(sessionId, 'reseat_cable', { asset_id: assetId, cable_id: cableId })
+  },
+  plugCable(sessionId, assetId, cableId) {
+    return datacenterApi.action(sessionId, 'plug_cable', { asset_id: assetId, cable_id: cableId })
+  },
+  unplugCable(sessionId, assetId, cableId) {
+    return datacenterApi.action(sessionId, 'unplug_cable', { asset_id: assetId, cable_id: cableId })
+  },
+  openVendorTicket(sessionId, assetId, component, vendor) {
+    return datacenterApi.action(sessionId, 'open_vendor_ticket', {
+      asset_id: assetId, component, vendor,
+    })
+  },
+  resolveVendorTicket(sessionId, ticketId) {
+    return datacenterApi.action(sessionId, 'resolve_vendor_ticket', { ticket_id: ticketId })
+  },
+  openSerialConsole(sessionId, assetId) {
+    return datacenterApi.action(sessionId, 'open_serial_console', { asset_id: assetId })
   },
   updateFirmware(sessionId, assetId, version) {
     return datacenterApi.action(sessionId, 'update_firmware', { asset_id: assetId, version })

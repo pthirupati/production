@@ -1,5 +1,14 @@
-/* Google Cloud Console */
-.gcp-shell { background: #f8f9fa; color: #202124; }
+/* Google Cloud Console — Material / GCP tokens */
+.gcp-shell {
+  --gcp-blue: #1a73e8;
+  --gcp-page-bg: #f8f9fa;
+  --gcp-surface: #ffffff;
+  --gcp-border: #dadce0;
+  --gcp-text: #202124;
+  --gcp-text-secondary: #5f6368;
+  background: var(--gcp-page-bg);
+  color: var(--gcp-text);
+}
 .gcp-sidebar { border-right: 1px solid #0b1b33; }
 .gcp-sidebar .sim-sidebar-item { color: #a8c7fa; }
 .gcp-sidebar .sim-sidebar-item:hover { background: rgba(255, 255, 255, 0.06); color: #fff; }

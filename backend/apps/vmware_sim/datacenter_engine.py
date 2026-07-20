@@ -145,6 +145,11 @@ def _server(asset_id: str, rack: str, u_slot: int, hostname: str, **overrides) -
     role = overrides.pop("role", None)
     bmc_override = overrides.pop("bmc", None)
     bmc = bmc_override or _bmc(hostname, power_state)
+    # Alternate Dell / HPE fleets so FRU tickets go to the right OEM
+    rack_num = int("".join(ch for ch in rack if ch.isdigit()) or "1")
+    default_vendor = "HPE" if rack_num % 2 == 0 else "Dell"
+    vendor = overrides.pop("vendor", default_vendor)
+    service_tag = overrides.pop("service_tag", f"{'MX' if vendor == 'HPE' else 'DL'}{abs(hash(asset_id)) % 10_000_000:07d}")
     server = {
         "id": asset_id,
         "rack": rack,
@@ -153,6 +158,9 @@ def _server(asset_id: str, rack: str, u_slot: int, hostname: str, **overrides) -
         "power_state": power_state,
         "components": components,
         "bmc": bmc,
+        "vendor": vendor,
+        "service_tag": service_tag,
+        "model": "ProLiant DL380 Gen10" if vendor == "HPE" else "PowerEdge R750",
         "hardware": _hardware_inventory(hostname),
         "firmware_version": overrides.pop("firmware_version", "2.12.0"),
         **({"role": role} if role else {}),
@@ -326,6 +334,8 @@ def _base_state() -> dict:
         "goal": {"title": "Datacenter break/fix", "objective": "Replace the failed power supply in web-prod-02 (R01-U14)."},
         "broken": {"server": "srv-r01-u14", "component": "power"},
         "events": [],
+        "tickets": [],
+        "console": {"open": False, "asset_id": None, "lines": []},
     }
 
 
@@ -358,15 +368,28 @@ def _apply_preset(state: dict, slug: str) -> None:
         _set_component("srv-r01-u12", "cpu", off=True)
         state["goal"] = {"title": "Replace CPU", "objective": "Replace the failed CPU in web-prod-01 (R01-U12)."}
         state["broken"] = {"server": "srv-r01-u12", "component": "cpu"}
+    elif "power" in slug or "psu" in slug:
+        _set_component("srv-r01-u14", "power", off=True)
+        state["goal"] = {"title": "Replace power supply", "objective": "Replace the failed power supply in web-prod-02 (R01-U14). Open a Dell/HPE FRU ticket if you need parts authorized."}
+        state["broken"] = {"server": "srv-r01-u14", "component": "power"}
     elif "gpu" in slug:
+        _set_component("srv-r03-u08", "gpu")
         state["goal"] = {"title": "Replace GPU", "objective": "Replace the failed GPU in gpu-node-01 (R03-U08)."}
         state["broken"] = {"server": "srv-r03-u08", "component": "gpu"}
-    elif "power" in slug or "psu" in slug:
-        state["goal"] = {"title": "Replace power supply", "objective": "Replace the failed power supply in web-prod-02 (R01-U14)."}
-        state["broken"] = {"server": "srv-r01-u14", "component": "power"}
     elif "cable" in slug or "reseat" in slug:
-        state["goal"] = {"title": "Reseat cable", "objective": "Reseat the loose network cable on db-prod-01 (R02-U10)."}
-        state["broken"] = {"server": "srv-r02-u10", "component": "cable"}
+        srv = next((s for s in servers if s["id"] == "srv-r02-u10"), None)
+        if srv:
+            srv["components"]["nic"] = "failed"
+            hw = srv.setdefault("hardware", {})
+            for c in hw.get("cables") or []:
+                if c.get("port") == "eth0":
+                    c["status"] = "unseated"
+                    break
+        state["goal"] = {
+            "title": "Reseat cable",
+            "objective": "Plug / reseat the loose NIC0-front DAC cable on db-prod-01 (R02-U10), or open a Dell support ticket for FRU replacement.",
+        }
+        state["broken"] = {"server": "srv-r02-u10", "component": "cable", "cable_id": "NIC0-front"}
     elif "firmware" in slug:
         state["goal"] = {"title": "Update firmware", "objective": "Update BIOS/firmware on gpu-node-01 (R03-U08)."}
         state["broken"] = {"server": "srv-r03-u08", "component": "firmware"}
@@ -609,18 +632,93 @@ def apply_action(session_id: str, action: str, payload: dict | None = None) -> d
             pass
         return {"ok": True, "message": f"{component} replaced"}
 
-    if action == "reseat_cable":
+    if action in ("reseat_cable", "plug_cable", "unplug_cable"):
         asset_id = payload.get("asset_id") or state.get("selected_asset") or broken.get("server") or ""
+        cable_id = payload.get("cable_id") or broken.get("cable_id") or ""
         srv = _find_server(state, asset_id)
         if not srv:
             return {"ok": False, "error": f"Asset {asset_id} not found"}
-        srv["components"]["nic"] = "healthy"
+        hw = srv.setdefault("hardware", _hardware_inventory(srv.get("hostname") or srv["id"]))
+        cables = hw.setdefault("cables", [])
+        target = None
+        if cable_id:
+            target = next((c for c in cables if c.get("id") == cable_id), None)
+        if target is None and cables:
+            target = next((c for c in cables if c.get("status") != "seated"), cables[0])
+        if action == "unplug_cable":
+            if not target:
+                return {"ok": False, "error": "No cable found"}
+            target["status"] = "unseated"
+            srv["components"]["nic"] = "failed"
+            _event(state, f"Unplugged {target['id']} on {srv['id']}", "warning")
+            _save(session_id, entry)
+            _sync_identity(session_id, state)
+            return {"ok": True, "message": f"Cable {target['id']} unplugged"}
+        # plug / reseat
+        if target:
+            target["status"] = "seated"
+        if cables and all(c.get("status") == "seated" for c in cables):
+            srv["components"]["nic"] = "healthy"
         if broken.get("server") == srv["id"] and broken.get("component") == "cable":
-            broken.clear()
-        _event(state, f"Cable reseated on {srv['id']}", "success")
+            if not cable_id or broken.get("cable_id") in (None, "", cable_id) or (target and target.get("id") == broken.get("cable_id")):
+                if all(c.get("status") == "seated" for c in cables):
+                    broken.clear()
+        label = target["id"] if target else "cable"
+        _event(state, f"Cable {label} reseated on {srv['id']}", "success")
         _save(session_id, entry)
         _sync_identity(session_id, state)
-        return {"ok": True, "message": "Cable reseated"}
+        try:
+            from apps.labs.provisioner.simulation import datacenter_bridge
+            datacenter_bridge.record_nic_reseated(str(session_id), srv["id"])
+        except Exception:
+            pass
+        return {"ok": True, "message": f"Cable {label} plugged / reseated"}
+
+    if action == "open_vendor_ticket":
+        asset_id = payload.get("asset_id") or state.get("selected_asset") or broken.get("server") or ""
+        component = payload.get("component") or broken.get("component") or "hardware"
+        srv = _find_server(state, asset_id)
+        if not srv:
+            return {"ok": False, "error": f"Asset {asset_id} not found"}
+        vendor = (payload.get("vendor") or srv.get("vendor") or "Dell").strip()
+        if vendor.lower() in ("hpe", "hp", "hewlett"):
+            vendor = "HPE"
+        elif vendor.lower() in ("dell", "dell emc", "dellemc"):
+            vendor = "Dell"
+        ticket_id = f"{vendor.upper()[:4]}-{int(time.time()) % 100000:05d}"
+        tickets = state.setdefault("tickets", [])
+        ticket = {
+            "id": ticket_id,
+            "vendor": vendor,
+            "asset_id": srv["id"],
+            "hostname": srv.get("hostname"),
+            "component": component,
+            "status": "open",
+            "priority": "high" if component in ("power", "motherboard", "cpu", "disk") else "medium",
+            "summary": f"{component} failure on {srv.get('hostname')}",
+            "created": _now_iso(),
+            "service_tag": srv.get("service_tag") or f"ST{srv['id'][-6:].upper()}",
+        }
+        tickets.insert(0, ticket)
+        # Part replacement ticket fulfills FRU scenarios when tech replaces after RMA approval simulation
+        if broken.get("server") == srv["id"] and broken.get("component") == component:
+            # Opening ticket alone does not clear broken — tech still must replace/reseat
+            pass
+        _event(state, f"Opened {vendor} ticket {ticket_id} for {srv['id']} ({component})", "info")
+        _save(session_id, entry)
+        return {"ok": True, "message": f"{vendor} ticket {ticket_id} opened", "ticket": ticket}
+
+    if action == "resolve_vendor_ticket":
+        ticket_id = payload.get("ticket_id") or ""
+        tickets = state.setdefault("tickets", [])
+        ticket = next((t for t in tickets if t.get("id") == ticket_id), None)
+        if not ticket:
+            return {"ok": False, "error": f"Ticket {ticket_id} not found"}
+        ticket["status"] = "parts_shipped"
+        ticket["resolved"] = _now_iso()
+        _event(state, f"Ticket {ticket_id}: FRU authorized / parts shipped", "success")
+        _save(session_id, entry)
+        return {"ok": True, "message": f"Ticket {ticket_id} advanced to parts_shipped"}
 
     if action == "update_firmware":
         asset_id = payload.get("asset_id") or state.get("selected_asset") or broken.get("server") or ""
@@ -694,6 +792,40 @@ def apply_action(session_id: str, action: str, payload: dict | None = None) -> d
         _event(state, f"{crac['id']} restored to normal operation", "success")
         _save(session_id, entry)
         return {"ok": True, "message": f"{crac_id} restored"}
+
+    if action == "open_serial_console":
+        asset_id = payload.get("asset_id") or state.get("selected_asset") or ""
+        srv = _find_server(state, asset_id)
+        if not srv:
+            return {"ok": False, "error": f"Asset {asset_id} not found"}
+        power = srv.get("power_state") == "on"
+        lines = [
+            f"Connected to {srv.get('hostname')} serial console (COM1 @ 115200)",
+            f"BMC: {srv.get('bmc', {}).get('endpoint')}",
+            f"Vendor: {srv.get('vendor')}  Model: {srv.get('model')}  Service Tag: {srv.get('service_tag')}",
+            "---",
+        ]
+        if power:
+            lines += [
+                f"{srv.get('hostname')} login: (session attached)",
+                f"[  OK  ] Reached target Multi-User System.",
+                f"kernel: eth0 link {'UP' if srv['components'].get('nic') == 'healthy' else 'DOWN'}",
+            ]
+        else:
+            lines += [
+                "No carrier — host powered off. Use BMC Power On or rack PDU.",
+                "POST halted. Chassis LED: amber.",
+            ]
+        state["console"] = {"open": True, "asset_id": srv["id"], "lines": lines}
+        state["selected_asset"] = srv["id"]
+        _event(state, f"Opened serial console on {srv['id']}", "info")
+        _save(session_id, entry)
+        return {"ok": True, "message": "Serial console attached", "console": state["console"]}
+
+    if action == "close_serial_console":
+        state["console"] = {"open": False, "asset_id": None, "lines": []}
+        _save(session_id, entry)
+        return {"ok": True, "message": "Serial console closed"}
 
     return {"ok": False, "error": f"Unknown action: {action}"}
 

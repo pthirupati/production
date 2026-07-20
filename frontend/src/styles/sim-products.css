@@ -5,6 +5,167 @@
   -webkit-font-smoothing: antialiased;
 }
 
+/* Product-accurate fonts */
+.az-shell.sim-product { font-family: 'Segoe UI', 'Segoe UI Web (West European)', system-ui, sans-serif; color: #323130; }
+.gcp-shell.sim-product { font-family: 'Google Sans', 'Roboto', Arial, sans-serif; color: #202124; }
+.cv-shell.sim-product { font-family: 'Segoe UI', system-ui, sans-serif; color: #1e293b; }
+.na-shell.sim-product { font-family: 'Segoe UI', system-ui, sans-serif; color: #0f2b26; }
+.de-shell.sim-product { font-family: 'Segoe UI', system-ui, sans-serif; color: #0b1d33; }
+.soc-shell.sim-product { font-family: 'Inter', system-ui, sans-serif; color: #e6edf3; }
+.dc-shell.sim-product { font-family: 'IBM Plex Sans', 'Inter', system-ui, sans-serif; color: #e6e9f0; }
+
+/* Goal / objective banners — always readable on light or dark shells */
+.sim-goal-banner {
+  display: flex; align-items: center; gap: 0.5rem;
+  padding: 0.5rem 1rem; font-size: 0.875rem; font-weight: 500;
+  background: #fff4ce; border-bottom: 1px solid #f0c33c; color: #7a4a00;
+}
+.sim-goal-banner strong { color: #5c3a00; }
+.soc-shell .sim-goal-banner,
+.dc-shell .sim-goal-banner,
+.tfc-shell .sim-goal-banner {
+  background: rgba(120, 64, 0, 0.35); border-bottom-color: rgba(240, 195, 60, 0.45); color: #fde68a;
+}
+.soc-shell .sim-goal-banner strong,
+.dc-shell .sim-goal-banner strong { color: #fef3c7; }
+
+/* ── SimDataTable: light by default (Azure/GCP/storage portals) ── */
+.sim-data-table { color: #323130; }
+.sim-data-table .sdt-search-wrap { position: relative; margin-bottom: 0.75rem; max-width: 18rem; }
+.sim-data-table .sdt-search-icon {
+  position: absolute; left: 0.65rem; top: 50%; transform: translateY(-50%); color: #605e5c; pointer-events: none;
+}
+.sim-data-table .sdt-search {
+  width: 100%; padding: 0.4rem 0.75rem 0.4rem 2rem; font-size: 0.75rem;
+  border: 1px solid #d2d0ce; border-radius: 4px; background: #fff; color: #323130; outline: none;
+}
+.sim-data-table .sdt-search:focus { border-color: #0078d4; box-shadow: 0 0 0 1px #0078d4; }
+.sim-data-table .sdt-scroll {
+  overflow-x: auto; border-radius: 4px; border: 1px solid #e1dfdd; background: #fff;
+}
+.sim-data-table .sdt-table { width: 100%; border-collapse: collapse; font-size: 0.75rem; }
+.sim-data-table thead tr { background: #f3f2f1; text-align: left; color: #605e5c; }
+.sim-data-table th { padding: 0.5rem 0.75rem; font-weight: 600; white-space: nowrap; border-bottom: 1px solid #e1dfdd; }
+.sim-data-table .sdt-th-btn {
+  display: inline-flex; align-items: center; gap: 0.25rem; color: inherit; background: none; border: none; padding: 0; cursor: default;
+}
+.sim-data-table .sdt-th-sortable { cursor: pointer; }
+.sim-data-table .sdt-th-sortable:hover { color: #201f1e; }
+.sim-data-table .sdt-sort-idle { opacity: 0.4; }
+.sim-data-table tbody td {
+  padding: 0.55rem 0.75rem; color: #323130; vertical-align: middle;
+  border-top: 1px solid #edebe9;
+}
+.sim-data-table tbody tr.sdt-row-click { cursor: pointer; }
+.sim-data-table tbody tr.sdt-row-click:hover { background: #f3f2f1; }
+.sim-data-table .sdt-empty { padding: 2rem 0.75rem; text-align: center; color: #605e5c; }
+.sim-data-table .sdt-pager {
+  display: flex; align-items: center; justify-content: space-between; margin-top: 0.5rem;
+  font-size: 0.6875rem; color: #605e5c;
+}
+.sim-data-table .sdt-pager-btns { display: flex; gap: 0.25rem; }
+.sim-data-table .sdt-pager-btns button {
+  padding: 0.25rem 0.5rem; border-radius: 4px; border: 1px solid #d2d0ce; background: #fff; color: #323130;
+}
+.sim-data-table .sdt-pager-btns button:disabled { opacity: 0.4; cursor: not-allowed; }
+.sim-data-table .sdt-pager-btns button:not(:disabled):hover { background: #f3f2f1; }
+
+/* Dark tables: SOC, datacenter, explicit variant, or dark shells */
+.soc-shell .sim-data-table,
+.dc-shell .sim-data-table,
+.tfc-shell .sim-data-table,
+.cicd-sim .sim-data-table,
+.sim-data-table-dark {
+  color: #e2e8f0;
+}
+.soc-shell .sim-data-table .sdt-search-icon,
+.dc-shell .sim-data-table .sdt-search-icon,
+.sim-data-table-dark .sdt-search-icon { color: #94a3b8; }
+.soc-shell .sim-data-table .sdt-search,
+.dc-shell .sim-data-table .sdt-search,
+.sim-data-table-dark .sdt-search {
+  border-color: #475569; background: rgba(15, 23, 42, 0.85); color: #e2e8f0;
+}
+.soc-shell .sim-data-table .sdt-search:focus,
+.dc-shell .sim-data-table .sdt-search:focus,
+.sim-data-table-dark .sdt-search:focus { border-color: #a78bfa; box-shadow: 0 0 0 1px #a78bfa; }
+.soc-shell .sim-data-table .sdt-scroll,
+.dc-shell .sim-data-table .sdt-scroll,
+.sim-data-table-dark .sdt-scroll {
+  border-color: rgba(51, 65, 85, 0.8); background: transparent;
+}
+.soc-shell .sim-data-table thead tr,
+.dc-shell .sim-data-table thead tr,
+.sim-data-table-dark thead tr { background: rgba(30, 41, 59, 0.8); color: #94a3b8; }
+.soc-shell .sim-data-table th,
+.dc-shell .sim-data-table th,
+.sim-data-table-dark th { border-bottom-color: rgba(51, 65, 85, 0.6); }
+.soc-shell .sim-data-table .sdt-th-sortable:hover,
+.dc-shell .sim-data-table .sdt-th-sortable:hover,
+.sim-data-table-dark .sdt-th-sortable:hover { color: #fff; }
+.soc-shell .sim-data-table tbody td,
+.dc-shell .sim-data-table tbody td,
+.sim-data-table-dark tbody td { color: #e2e8f0; border-top-color: rgba(51, 65, 85, 0.6); }
+.soc-shell .sim-data-table tbody tr.sdt-row-click:hover,
+.dc-shell .sim-data-table tbody tr.sdt-row-click:hover,
+.sim-data-table-dark tbody tr.sdt-row-click:hover { background: rgba(255, 255, 255, 0.05); }
+.soc-shell .sim-data-table .sdt-empty,
+.dc-shell .sim-data-table .sdt-empty,
+.sim-data-table-dark .sdt-empty,
+.soc-shell .sim-data-table .sdt-pager,
+.dc-shell .sim-data-table .sdt-pager,
+.sim-data-table-dark .sdt-pager { color: #94a3b8; }
+.soc-shell .sim-data-table .sdt-pager-btns button,
+.dc-shell .sim-data-table .sdt-pager-btns button,
+.sim-data-table-dark .sdt-pager-btns button {
+  border-color: #475569; background: #1e293b; color: #e2e8f0;
+}
+
+/* Breadcrumbs — dark chrome bars by default in product portals */
+.sim-breadcrumbs .sim-bc-sep { color: #64748b; }
+.sim-breadcrumbs .sim-bc-link { color: #94a3b8; }
+.sim-breadcrumbs .sim-bc-link:hover { color: #fff; }
+.sim-breadcrumbs .sim-bc-current { color: #e2e8f0; }
+
+/* Modal — always dark panel with readable body text */
+.sim-modal {
+  background: #1a1d2e; border: 1px solid #475569; border-radius: 8px;
+  box-shadow: 0 25px 50px rgba(0, 0, 0, 0.45); color: #e2e8f0;
+}
+.sim-modal-danger { border-color: rgba(239, 68, 68, 0.45); }
+.sim-modal-head {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 0.75rem 1rem; border-bottom: 1px solid #334155;
+}
+.sim-modal-title { font-size: 0.875rem; font-weight: 600; color: #fff; margin: 0; }
+.sim-modal-close {
+  padding: 0.25rem; border-radius: 4px; color: #94a3b8; background: transparent; border: none;
+}
+.sim-modal-close:hover { color: #fff; background: rgba(255, 255, 255, 0.1); }
+.sim-modal-body {
+  padding: 1rem; max-height: 70vh; overflow-y: auto; color: #e2e8f0; font-size: 0.875rem;
+}
+.sim-modal-body label { display: block; color: #cbd5e1; font-size: 0.875rem; }
+.sim-modal-body input,
+.sim-modal-body select,
+.sim-modal-body textarea {
+  width: 100%; margin-top: 0.25rem; padding: 0.4rem 0.5rem;
+  border: 1px solid #475569; border-radius: 4px;
+  background: #0f1219; color: #f1f5f9; font-size: 0.875rem;
+}
+.sim-modal-body input:focus,
+.sim-modal-body select:focus,
+.sim-modal-body textarea:focus { outline: none; border-color: #60a5fa; }
+.sim-modal-body p,
+.sim-modal-body .text-slate-600,
+.sim-modal-body .text-sm { color: #cbd5e1 !important; }
+.sim-modal-footer {
+  padding: 0.75rem 1rem; border-top: 1px solid #334155;
+  display: flex; justify-content: flex-end; gap: 0.5rem; align-items: center;
+}
+.sim-modal-footer button.text-sm { color: #94a3b8; }
+.sim-modal-footer button.text-sm:hover { color: #fff; }
+
 .sim-sidebar {
   width: 220px;
   background: #1a1a2e;

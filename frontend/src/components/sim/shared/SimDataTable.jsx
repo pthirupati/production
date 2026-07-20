@@ -3,11 +3,13 @@ import { ChevronDown, ChevronUp, ChevronsUpDown, Search } from 'lucide-react'
 
 /**
  * Sortable, filterable, paginated table.
+ * Theme follows parent shell via CSS (.az-shell light, .soc-shell dark, etc.).
  * columns: [{ key, label, sortable?, render?(row) }]
  */
 export default function SimDataTable({
   columns = [], rows = [], searchKeys = [], pageSize = 10,
   onRowClick, emptyMessage = 'No records found', className = '',
+  variant = 'auto',
 }) {
   const [sort, setSort] = useState({ key: null, dir: 'asc' })
   const [q, setQ] = useState('')
@@ -41,29 +43,31 @@ export default function SimDataTable({
 
   const SortIcon = ({ col }) => {
     if (!col.sortable) return null
-    if (sort.key !== col.key) return <ChevronsUpDown size={12} className="opacity-40" />
+    if (sort.key !== col.key) return <ChevronsUpDown size={12} className="sdt-sort-idle" />
     return sort.dir === 'asc' ? <ChevronUp size={12} /> : <ChevronDown size={12} />
   }
 
+  const themeClass = variant === 'dark' ? 'sim-data-table-dark' : variant === 'light' ? 'sim-data-table-light' : ''
+
   return (
-    <div className={`sim-data-table ${className}`.trim()}>
+    <div className={`sim-data-table ${themeClass} ${className}`.trim()}>
       {searchKeys.length > 0 && (
-        <div className="mb-3 relative max-w-xs">
-          <Search size={14} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-500" />
+        <div className="sdt-search-wrap">
+          <Search size={14} className="sdt-search-icon" />
           <input value={q} onChange={(e) => { setQ(e.target.value); setPage(0) }}
             placeholder="Filter…"
-            className="w-full pl-8 pr-3 py-1.5 text-xs rounded border border-slate-600 bg-slate-900/80 text-slate-200 outline-none focus:border-violet-500" />
+            className="sdt-search" />
         </div>
       )}
-      <div className="overflow-x-auto rounded border border-slate-700/80">
-        <table className="w-full text-xs">
+      <div className="sdt-scroll">
+        <table className="sdt-table">
           <thead>
-            <tr className="bg-slate-800/80 text-left text-slate-400">
+            <tr>
               {columns.map((col) => (
-                <th key={col.key} className="px-3 py-2 font-semibold whitespace-nowrap">
+                <th key={col.key}>
                   <button type="button" disabled={!col.sortable}
                     onClick={() => toggleSort(col.key, col.sortable)}
-                    className={`inline-flex items-center gap-1 ${col.sortable ? 'hover:text-white cursor-pointer' : 'cursor-default'}`}>
+                    className={`sdt-th-btn ${col.sortable ? 'sdt-th-sortable' : ''}`}>
                     {col.label} <SortIcon col={col} />
                   </button>
                 </th>
@@ -72,13 +76,13 @@ export default function SimDataTable({
           </thead>
           <tbody>
             {slice.length === 0 ? (
-              <tr><td colSpan={columns.length} className="px-3 py-8 text-center text-slate-500">{emptyMessage}</td></tr>
+              <tr><td colSpan={columns.length} className="sdt-empty">{emptyMessage}</td></tr>
             ) : slice.map((row, i) => (
               <tr key={row.id ?? i}
                 onClick={() => onRowClick?.(row)}
-                className={`border-t border-slate-700/60 ${onRowClick ? 'cursor-pointer hover:bg-white/5' : ''}`}>
+                className={onRowClick ? 'sdt-row-click' : ''}>
                 {columns.map((col) => (
-                  <td key={col.key} className="px-3 py-2.5 text-slate-200 align-middle">
+                  <td key={col.key}>
                     {col.render ? col.render(row) : row[col.key]}
                   </td>
                 ))}
@@ -88,13 +92,11 @@ export default function SimDataTable({
         </table>
       </div>
       {pages > 1 && (
-        <div className="flex items-center justify-between mt-2 text-[11px] text-slate-500">
+        <div className="sdt-pager">
           <span>{filtered.length} rows · page {page + 1} of {pages}</span>
-          <div className="flex gap-1">
-            <button type="button" disabled={page === 0} onClick={() => setPage((p) => p - 1)}
-              className="px-2 py-1 rounded border border-slate-600 disabled:opacity-40">Prev</button>
-            <button type="button" disabled={page >= pages - 1} onClick={() => setPage((p) => p + 1)}
-              className="px-2 py-1 rounded border border-slate-600 disabled:opacity-40">Next</button>
+          <div className="sdt-pager-btns">
+            <button type="button" disabled={page === 0} onClick={() => setPage((p) => p - 1)}>Prev</button>
+            <button type="button" disabled={page >= pages - 1} onClick={() => setPage((p) => p + 1)}>Next</button>
           </div>
         </div>
       )}

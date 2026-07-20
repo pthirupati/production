@@ -361,8 +361,8 @@ export default function SocSimulator({
       </LabChromeBar>
 
       {goal.objective && (
-        <div className="px-4 py-2 text-sm bg-amber-950/40 border-b border-amber-800/50 text-amber-300 flex items-center gap-2">
-          <AlertTriangle size={14} className="text-amber-400 shrink-0" />
+        <div className="sim-goal-banner">
+          <AlertTriangle size={14} className="shrink-0" />
           <span><strong>{goal.title}:</strong> {goal.objective}</span>
         </div>
       )}
