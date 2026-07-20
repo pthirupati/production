@@ -35,7 +35,7 @@ description: 'CONTEXT: A team operating network operations has raised a ticket f
   WORK TO DO: Required tooling is pre-installed; if a command is missing, note it and use the equivalent
   already on the host. Make the smallest configuration change that moves the system toward the objective
   (edit the relevant interfaces, routing tables, DNS, and firewall rules), changing one thing at a time.
-  Check your work continuously against the objective — success means `systemctl is-active nginx`` returns
+  Check your work continuously against the objective — success means `systemctl is-active nginx` returns
   active.
 
 
@@ -166,6 +166,6 @@ guided_mode:
     title: Verify with the grader
     instruction: Run the same verification the checker uses.
     command: systemctl is-active nginx
-    expected_output: '`systemctl is-active nginx`` returns active'
+    expected_output: '`systemctl is-active nginx` returns active'
     explanation: The lab passes only when real state is healthy.
     next_on: command_success

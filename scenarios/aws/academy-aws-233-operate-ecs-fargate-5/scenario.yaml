@@ -77,39 +77,27 @@ hints:
   cost: 25
   content: 'WHICH TOOL — the diagnostic command(s):
 
-    1. Inspect the current state with the relevant AWS CLI, IAM policies, EC2/S3/VPC, security groups,
-    and CloudFormation/Terraform for ecs fargate.
-
-    2. Each command above tells you something specific — status/health, recent errors, and the effective
-    configuration. Read them in that order.
-
-    3. Compare what you see to the objectives; the gap points at the fault.'
+    Inspect the planted aws Lab Server fault: `/opt/aws/lab-state.json` and the AWS CLI profile. Do not
+    chase unrelated nginx/rsyslog units.'
 - order: 4
   cost: 40
   content: 'NARROW DOWN — isolate the subsystem:
 
-    1. From the evidence above, decide which single part of Ecs Fargate is at fault.
+    1. Confirm the aws config under /opt/aws/ is broken.
 
-    2. Re-run the most relevant of the relevant AWS CLI, IAM policies, EC2/S3/VPC, security groups, and
-    CloudFormation/Terraform for ecs fargate focused on just that part to confirm it.
+    2. Repair credentials/project/region (or OpenStack clouds.yaml).
 
-    3. State a one-line hypothesis: the smallest change that would move the state from ''Ecs Fargate is
-    misconfigured and dependent workflows are failing'' toward ''Ecs Fargate behaves correctly under normal
-    and failure checks''.'
+    3. Re-check with the cloud CLI until the profile is healthy.'
 - order: 5
   cost: 60
   content: 'NEAR-SOLUTION — the fix shape + verify (you still apply it):
 
-    1. Apply the smallest reversible change your hypothesis points to. Execute the maintenance in small,
-    reversible steps, taking a snapshot or backup first if the change is risky.
+    1. Fix the broken aws configuration on this Lab Server.
 
-    2. Re-run `bash check.sh` and confirm Ecs Fargate behaves correctly under normal and failure checks.
+    2. Apply the documented remediation (config + FIXED-OK where required).
 
-    3. If it still fails, the hypothesis was wrong — go back to the evidence, do not stack changes.
-
-
-    WHY: the grader validates real system state, not marker files — a fix only counts when the subsystem
-    is actually healthy.'
+    3. Click Check Solution once cloud Lab Server health check passes (`systemctl is-failed` finds no
+    failed units / config repaired).'
 summary: Complete the ecs fargate — operate lab aws lab and verify success with the checker
 estimated_minutes: 20
 xp_reward: 100

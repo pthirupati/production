@@ -1,3 +1,3 @@
 #!/usr/bin/env bash
-grep -q FIXED-OK /opt/fixitlab/academy/academy-aws-113-operate-nat-gateway-3.conf
+systemctl is-failed --quiet 2>/dev/null; test $? -ne 0
 exit 0

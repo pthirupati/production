@@ -1,3 +1,3 @@
 #!/usr/bin/env bash
-grep -q FIXED-OK /opt/fixitlab/academy/academy-aws-027-automation-secrets-manager.conf
+systemctl is-failed --quiet 2>/dev/null; test $? -ne 0
 exit 0

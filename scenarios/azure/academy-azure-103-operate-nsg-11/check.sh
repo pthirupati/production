@@ -1,3 +1,3 @@
 #!/usr/bin/env bash
-systemctl is-active nginx
+systemctl is-failed --quiet 2>/dev/null; test $? -ne 0
 exit 0

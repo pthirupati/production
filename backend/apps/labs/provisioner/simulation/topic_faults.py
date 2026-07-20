@@ -21,8 +21,11 @@ K8S_KEYWORDS = ("kubernetes", "k8s", "pod-", "crashloop", "kubelet", "helm-")
 TF_KEYWORDS = ("terraform", "tfstate", "iac-")
 DOCKER_KEYWORDS = ("docker-compose", "compose", "containerd", "dockerfile")
 DB_KEYWORDS = ("postgres", "mysql", "mariadb", "redis", "mongodb", "pgbouncer")
-JAVA_KEYWORDS = ("spring-boot", "jvm", "tomcat", "heap-", "gc-pause")
+JAVA_KEYWORDS = ("spring-boot", "jvm", "tomcat", "heap-", "gc-pause", "springboot")
 SEC_KEYWORDS = ("secrets", "vault", "tls-", "cert-", "rbac", "owasp")
+OPENSTACK_KEYWORDS = ("openstack", "nova", "neutron", "keystone", "glance", "cinder", "horizon")
+MEMCACHE_KEYWORDS = ("memcached", "memcache")
+MQ_KEYWORDS = ("rabbitmq", "amqp")
 
 
 def apply_topic_fault(slug: str, state: Any) -> bool:
@@ -38,6 +41,19 @@ def apply_topic_fault(slug: str, state: Any) -> bool:
         from .scenario_presets import _preset_disk_full
         _preset_disk_full(state)
         return True
+
+    # Cloud academies FIRST — slug keywords like "firewall"/"dns" must not steal
+    # GCP firewall-rules / Azure NSG labs into host firewalld/named breaks.
+    if low.startswith("academy-aws") or (low.startswith("aws-") and "terraform" not in low):
+        return _fault_aws_academy(state, low)
+    if low.startswith(("academy-azure", "azure-")):
+        return _fault_cloud_cli(state, low, "azure")
+    if low.startswith(("academy-gcp", "gcp-")):
+        return _fault_cloud_cli(state, low, "gcp")
+    if low.startswith(("academy-openstack", "openstack-")) or any(
+        k in low for k in OPENSTACK_KEYWORDS
+    ):
+        return _fault_openstack(state, low)
 
     # Git / devops CI topics — plant a broken CI config + inactive runner, not nginx
     if any(k in low for k in CI_KEYWORDS):
@@ -71,23 +87,19 @@ def apply_topic_fault(slug: str, state: Any) -> bool:
     if any(k in low for k in DB_KEYWORDS):
         return _fault_database(state, low)
 
-    # Java / JVM apps
-    if any(k in low for k in JAVA_KEYWORDS):
+    # Memcached / message queues
+    if any(k in low for k in MEMCACHE_KEYWORDS):
+        return _fault_service_unit(state, low, "memcached", "Memcached")
+    if any(k in low for k in MQ_KEYWORDS):
+        return _fault_service_unit(state, low, "rabbitmq-server", "RabbitMQ broker")
+
+    # Java / JVM apps — do not match "javascript"
+    if "javascript" not in low and any(k in low for k in JAVA_KEYWORDS):
         return _fault_java(state, low)
 
     # Security / secrets / TLS
     if any(k in low for k in SEC_KEYWORDS):
         return _fault_security(state, low)
-
-    # AWS academy fail-open closure — plant broken config so is-failed check fails
-    if low.startswith("academy-aws") or (low.startswith("aws-") and "terraform" not in low):
-        return _fault_aws_academy(state, low)
-
-    # Azure / GCP academy — plant cloud CLI config fault + sentinel
-    if low.startswith(("academy-azure", "azure-")):
-        return _fault_cloud_cli(state, low, "azure")
-    if low.startswith(("academy-gcp", "gcp-")):
-        return _fault_cloud_cli(state, low, "gcp")
 
     return False
 
@@ -271,6 +283,33 @@ def _fault_security(state: Any, slug: str) -> bool:
             "/opt/app/rbac.yaml",
             "rules:\n- apiGroups: [\"*\"]\n  resources: [\"*\"]\n  verbs: [\"*\"]\n",
         )
+    from .scenario_presets import _plant_broken_config_sentinel
+    _plant_broken_config_sentinel(slug, state)
+    return True
+
+
+def _fault_service_unit(state: Any, slug: str, unit: str, desc: str) -> bool:
+    from .rhel_os import SimService
+
+    state.services[unit] = SimService(
+        unit, active="failed", enabled="enabled",
+        description=desc, loaded="loaded", sub_state="failed",
+    )
+    return True
+
+
+def _fault_openstack(state: Any, slug: str) -> bool:
+    state._mkdir("/opt/openstack")
+    state._write_file(
+        "/opt/openstack/clouds.yaml",
+        "clouds:\n  lab:\n    auth:\n      auth_url: http://127.0.0.1:5000/v3\n"
+        "      project_name: broken\n      username: broken\n      password: wrong\n"
+        "    region_name: RegionOne\n",
+    )
+    state._write_file(
+        "/opt/openstack/lab-state.json",
+        '{"nova":"down","neutron":"misconfigured","status":"broken"}\n',
+    )
     from .scenario_presets import _plant_broken_config_sentinel
     _plant_broken_config_sentinel(slug, state)
     return True

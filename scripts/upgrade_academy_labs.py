@@ -53,6 +53,7 @@ MARKER_RE = re.compile(r"grep\s+-q\s+FIXED-OK|FIXED-OK.*grep", re.I)
 # them and _emit_* would ship EMPTY preset/fix maps. Kept narrow (only the
 # generator's own service probe) so we never clobber hand-authored checks.
 ALREADY_SERVICE_RE = re.compile(r"^\s*systemctl is-active \S+\s*$", re.M)
+ALREADY_CLOUD_RE = re.compile(r"systemctl is-failed", re.M)
 
 DEDICATED_SIM = frozenset({
     "nmap", "wireshark", "vmware", "terraform", "peoplesoft",
@@ -92,6 +93,8 @@ SERVICE_DESC: dict[str, str] = {
     "gunicorn": "Gunicorn Python WSGI Server",
     "gitlab-runner": "GitLab Runner",
     "jenkins": "Jenkins Automation Server",
+    "memcached": "Memcached",
+    "rabbitmq-server": "RabbitMQ broker",
 }
 
 TECH_SERVICE_POOLS: dict[str, list[str]] = {
@@ -145,9 +148,11 @@ TOPIC_UNIT_RULES: list[tuple[tuple[str, ...], str]] = [
     (("mysql", "mariadb"), "mysqld"),
     (("redis",), "redis"),
     (("mongo",), "mongod"),
+    (("memcached", "memcache"), "memcached"),
+    (("rabbitmq", "amqp"), "rabbitmq-server"),
     (("docker", "compose", "containerd"), "docker"),
     (("haproxy", "load-balanc"), "haproxy"),
-    (("spring-boot", "jvm", "tomcat"), "spring-boot"),
+    (("spring-boot", "jvm", "tomcat", "springboot"), "spring-boot"),
     (("prometheus",), "prometheus"),
     (("grafana",), "grafana-server"),
 ]
@@ -156,10 +161,17 @@ PERM_KEYWORDS = ("permissions", "acl", "chmod", "chown", "sudoers")
 GITOPS_KEYWORDS = ("gitops", "argocd", "flux", "outofsync", "kustomize", "drift")
 MARKER_TOPIC_KEYWORDS = PERM_KEYWORDS + ("secrets", "vault", "tls-", "cert-", "rbac", "owasp",
                                            "vlan", "bonding", "mtu", "nat", "terraform", "tfstate")
+CLOUD_ACADEMY_PREFIXES = (
+    "academy-aws", "academy-azure", "academy-gcp", "academy-openstack",
+)
+CLOUD_SLUG_PREFIXES = ("aws-", "azure-", "gcp-", "openstack-")
 
 
 def assign_service_unit(tech: str, slug: str) -> str:
     low = (slug or "").lower()
+    # Avoid matching "java" inside "javascript"
+    if "javascript" in low or tech == "javascript":
+        return "node-app"
     for keys, unit in TOPIC_UNIT_RULES:
         if any(k in low for k in keys):
             return unit
@@ -172,6 +184,11 @@ def classify_mode(tech: str, sim_type: str, slug: str) -> str:
     if slug in FLAGSHIP_SLUGS:
         return "skip"
     low = (slug or "").lower()
+    # Cloud academies: grade via is-failed + planted sentinel (same contract as AWS).
+    if low.startswith(CLOUD_ACADEMY_PREFIXES) or (
+        low.startswith(CLOUD_SLUG_PREFIXES) and "terraform" not in low
+    ) or tech in ("aws", "azure", "gcp", "openstack"):
+        return "topic_cloud"
     # Permission / secrets / IaC topics are graded via FIXED-OK sentinel that
     # topic_faults plants — not a recycled nginx unit.
     if any(k in low for k in MARKER_TOPIC_KEYWORDS) or any(k in low for k in GITOPS_KEYWORDS):
@@ -202,6 +219,11 @@ def check_script_for_mode(mode: str, unit: str = "", slug: str = "") -> str:
         return "#!/usr/bin/env bash\ndocker ps | grep -q Up\n"
     if mode == "topic_marker":
         return f"#!/usr/bin/env bash\ngrep -q FIXED-OK /opt/fixitlab/academy/{slug}.conf\n"
+    if mode == "topic_cloud":
+        return (
+            "#!/usr/bin/env bash\n"
+            "systemctl is-failed --quiet 2>/dev/null; test $? -ne 0\n"
+        )
     return f"#!/usr/bin/env bash\nsystemctl is-active {unit}\n"
 
 
@@ -216,6 +238,8 @@ def verify_hint_line(mode: str, unit: str = "", slug: str = "") -> str:
         return "`docker ps` shows application containers Up"
     if mode == "topic_marker":
         return f"`grep -q FIXED-OK /opt/fixitlab/academy/{slug}.conf` succeeds after the documented fix"
+    if mode == "topic_cloud":
+        return "cloud Lab Server health check passes (`systemctl is-failed` finds no failed units / config repaired)"
     return f"`systemctl is-active {unit}` returns active"
 
 
@@ -283,6 +307,39 @@ def _topic_hint_blocks(mode: str, unit: str, slug: str) -> dict[int, str]:
                 "1. `chmod 600 /opt/app/secret.env` (and chown if needed).\n"
                 "2. Lock down `/etc/sudoers.d/app` to the minimum required.\n"
                 "3. Click Check Solution once the documented remediation is applied."
+            ),
+        }
+    if mode == "topic_cloud":
+        cloud = "aws"
+        if "azure" in low:
+            cloud = "azure"
+        elif "gcp" in low:
+            cloud = "gcp"
+        elif "openstack" in low or "nova" in low or "neutron" in low:
+            cloud = "openstack"
+        paths = {
+            "aws": "`/opt/aws/lab-state.json` and the AWS CLI profile",
+            "azure": "`/opt/azure/config` and `az account show`",
+            "gcp": "`/opt/gcp/config` and `gcloud config list`",
+            "openstack": "`/opt/openstack/clouds.yaml` and `openstack server list`",
+        }
+        return {
+            3: (
+                f"WHICH TOOL — the diagnostic command(s):\n"
+                f"Inspect the planted {cloud} Lab Server fault: {paths[cloud]}. "
+                f"Do not chase unrelated nginx/rsyslog units."
+            ),
+            4: (
+                f"NARROW DOWN — isolate the subsystem:\n"
+                f"1. Confirm the {cloud} config under /opt/{cloud}/ is broken.\n"
+                f"2. Repair credentials/project/region (or OpenStack clouds.yaml).\n"
+                f"3. Re-check with the cloud CLI until the profile is healthy."
+            ),
+            5: (
+                f"NEAR-SOLUTION — the fix shape + verify (you still apply it):\n"
+                f"1. Fix the broken {cloud} configuration on this Lab Server.\n"
+                f"2. Apply the documented remediation (config + FIXED-OK where required).\n"
+                f"3. Click Check Solution once {verify_hint_line(mode, unit, slug)}."
             ),
         }
     if mode == "service" and unit:
@@ -473,6 +530,20 @@ def patch_scenario_yaml(
             "Apply the minimal documented remediation",
             verify,
         ]
+    elif mode == "topic_cloud":
+        data["description"] = (
+            f"Cloud Lab Server operations for {topic_label}. A planted cloud CLI/API "
+            f"configuration fault keeps the environment unhealthy. Repair the cloud profile "
+            f"under `/opt`, then verify with the documented checker ({verify})."
+        )
+        data["initial_state"] = (
+            "Cloud CLI/API configuration on this Lab Server is broken; console and CLI workflows fail until repaired."
+        )
+        data["objectives"] = [
+            "Identify the planted cloud configuration fault",
+            "Repair the cloud profile with the minimal change",
+            verify,
+        ]
 
     hints = data.get("hints") or []
     blocks = _topic_hint_blocks(mode, unit, slug)
@@ -658,10 +729,12 @@ def main() -> None:
             # `systemctl is-active` line, so they re-match via classify() mode.
             is_marker = bool(MARKER_RE.search(check_body))
             is_upgraded_service = bool(ALREADY_SERVICE_RE.search(check_body))
+            is_upgraded_cloud = bool(ALREADY_CLOUD_RE.search(check_body))
             is_upgraded_nonservice = mode in {
-                "ansible", "k8s", "gpu", "docker_compose", "topic_marker", "dedicated",
+                "ansible", "k8s", "gpu", "docker_compose", "topic_marker",
+                "topic_cloud", "dedicated",
             }
-            if not (is_marker or is_upgraded_service or is_upgraded_nonservice):
+            if not (is_marker or is_upgraded_service or is_upgraded_cloud or is_upgraded_nonservice):
                 continue
 
             unit = assign_service_unit(tech, slug)

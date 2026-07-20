@@ -27,13 +27,13 @@ description: 'CONTEXT: A team operating network operations has raised a ticket f
 
   OBJECTIVE: packet capture is connected to the adjacent system successfully; Handoff points are authenticated
   and observable; End-to-end workflow completes without manual intervention. Acceptance criteria: the
-  change is minimal and reversible, and success means `systemctl is-active haproxy`` returns active.
+  change is minimal and reversible, and success means `systemctl is-active haproxy` returns active.
 
 
   WORK TO DO: Required tooling is pre-installed; if a command is missing, note it and use the equivalent
   already on the host. Make the smallest configuration change that moves the system toward the objective
   (edit the relevant interfaces, routing tables, DNS, and firewall rules), changing one thing at a time.
-  Check your work continuously against the objective — success means `systemctl is-active haproxy`` returns
+  Check your work continuously against the objective — success means `systemctl is-active haproxy` returns
   active.
 
 
@@ -164,6 +164,6 @@ guided_mode:
     title: Verify with the grader
     instruction: Run the same verification the checker uses.
     command: systemctl is-active haproxy
-    expected_output: '`systemctl is-active haproxy`` returns active'
+    expected_output: '`systemctl is-active haproxy` returns active'
     explanation: The lab passes only when real state is healthy.
     next_on: command_success

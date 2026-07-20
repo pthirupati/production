@@ -40,23 +40,25 @@ hints:
   cost: 25
   content: 'WHICH TOOL — the diagnostic command(s):
 
-    Run `systemctl status nginx` and `journalctl -u nginx -n 50`.'
+    Inspect the planted gcp Lab Server fault: `/opt/gcp/config` and `gcloud config list`. Do not chase
+    unrelated nginx/rsyslog units.'
 - order: 4
   cost: 40
   content: 'NARROW DOWN — isolate the subsystem:
 
-    1. Confirm `nginx` is failed/inactive.
+    1. Confirm the gcp config under /opt/gcp/ is broken.
 
-    2. Read the unit journal for the root cause.
+    2. Repair credentials/project/region (or OpenStack clouds.yaml).
 
-    3. Apply the smallest fix that restores the unit.'
+    3. Re-check with the cloud CLI until the profile is healthy.'
 - order: 5
   cost: 60
   content: 'NEAR-SOLUTION — the fix shape + verify (you still apply it):
 
-    1. Repair the underlying config/cause for `nginx`.
+    1. Fix the broken gcp configuration on this Lab Server.
 
-    2. `systemctl enable --now nginx`.
+    2. Apply the documented remediation (config + FIXED-OK where required).
 
-    3. Verify with `systemctl is-active nginx` (expect active).'
+    3. Click Check Solution once cloud Lab Server health check passes (`systemctl is-failed` finds no
+    failed units / config repaired).'
 cross_technology: true

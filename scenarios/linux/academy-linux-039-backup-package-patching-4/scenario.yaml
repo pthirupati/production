@@ -28,13 +28,13 @@ description: 'CONTEXT: A team operating Linux administration has raised a ticket
 
   OBJECTIVE: Backup coverage for package patching is complete and restorable; Retention and encryption
   meet the stated policy; A restore drill proves data integrity. Acceptance criteria: the change is minimal
-  and reversible, and success means `systemctl is-active rsyslog`` returns active.
+  and reversible, and success means `systemctl is-active rsyslog` returns active.
 
 
   WORK TO DO: Required tooling is pre-installed; if a command is missing, note it and use the equivalent
   already on the host. Make the smallest configuration change that moves the system toward the objective
   (edit the relevant terminal and config files under /etc and /var), changing one thing at a time. Check
-  your work continuously against the objective — success means `systemctl is-active rsyslog`` returns active.
+  your work continuously against the objective — success means `systemctl is-active rsyslog` returns active.
 
 
   VERIFY: Re-run the same check the grader uses and confirm `systemctl is-active rsyslog` returns active.
@@ -164,6 +164,6 @@ guided_mode:
     title: Verify with the grader
     instruction: Run the same verification the checker uses.
     command: systemctl is-active rsyslog
-    expected_output: '`systemctl is-active rsyslog`` returns active'
+    expected_output: '`systemctl is-active rsyslog` returns active'
     explanation: The lab passes only when real state is healthy.
     next_on: command_success

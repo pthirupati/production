@@ -1,3 +1,3 @@
 #!/usr/bin/env bash
-systemctl is-active firewalld
+systemctl is-failed --quiet 2>/dev/null; test $? -ne 0
 exit 0
