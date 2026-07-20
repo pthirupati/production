@@ -248,11 +248,16 @@ class TerminalConsumer(AsyncWebsocketConsumer):
 
             # Learner-facing environment label — never say "Simulation".
             # Prefer the scenario's lab-server persona (EC2, Azure VM, …).
+            # scenario + scenario.technology MUST be select_related in
+            # _get_session — a lazy FK fetch here is sync ORM in async connect
+            # and raises SynchronousOnlyOperation → WS close 4500 (E2E labs).
             scenario = getattr(self.lab_session, "scenario", None)
             sim_type = (getattr(scenario, "simulation_type", None) or "").strip().lower()
             tech_slug = ""
-            if scenario is not None and getattr(scenario, "technology", None) is not None:
-                tech_slug = (scenario.technology.slug or "").strip().lower()
+            if scenario is not None and getattr(scenario, "technology_id", None):
+                tech = scenario.technology  # cached via select_related
+                if tech is not None:
+                    tech_slug = (tech.slug or "").strip().lower()
             slug = (getattr(scenario, "slug", None) or "").strip().lower()
 
             lab_server_labels = {
@@ -272,6 +277,7 @@ class TerminalConsumer(AsyncWebsocketConsumer):
                 "datacenter": "Physical Data Center Host",
                 "soc": "SOC Workstation",
                 "rhel": "Linux Lab Server (RHEL 9)",
+                "linux": "Linux Lab Server (RHEL 9)",
                 "generic": "Linux Lab Server (RHEL 9)",
                 "terraform": "Terraform Workspace Host",
                 "ansible": "Ansible Control Host",
@@ -280,6 +286,8 @@ class TerminalConsumer(AsyncWebsocketConsumer):
                 "networking": "Network Lab Appliance",
                 "grafana": "Observability Host",
                 "prometheus": "Observability Host",
+                "peoplesoft": "PeopleSoft App Server",
+                "maas": "MAAS Deployed Machine",
             }
             provider_label = {
                 "docker": "Docker Container",
@@ -290,14 +298,20 @@ class TerminalConsumer(AsyncWebsocketConsumer):
                 if self.provider_type == "simulation":
                     key = sim_type if sim_type in lab_server_labels else tech_slug
                     if key not in lab_server_labels:
-                        if slug.startswith("academy-aws") or slug.startswith("aws-") or slug.startswith("ec2-"):
+                        if slug.startswith(("academy-aws", "aws-", "ec2-")):
                             key = "aws"
-                        elif slug.startswith("academy-azure") or slug.startswith("azure-"):
+                        elif slug.startswith(("academy-azure", "azure-")):
                             key = "azure"
-                        elif slug.startswith("academy-gcp") or slug.startswith("gcp-"):
+                        elif slug.startswith(("academy-gcp", "gcp-")):
                             key = "gcp"
-                        elif slug.startswith("academy-openstack") or slug.startswith("openstack-"):
+                        elif slug.startswith(("academy-openstack", "openstack-")):
                             key = "openstack"
+                        elif slug.startswith(("academy-vmware", "vmware-", "vm-")):
+                            key = "vmware"
+                        elif slug.startswith(("academy-gpu", "gpu-", "sim-gpu")):
+                            key = "gpu"
+                        elif slug.startswith(("academy-baremetal", "baremetal-")):
+                            key = "baremetal"
                     provider_label = lab_server_labels.get(key, "Linux Lab Server (RHEL 9)")
                 else:
                     provider_label = "Lab Environment"
@@ -787,9 +801,9 @@ class TerminalConsumer(AsyncWebsocketConsumer):
     @database_sync_to_async
     def _get_session(self, session_id, user):
         try:
-            session = LabSession.objects.select_related("scenario").get(
-                id=session_id, user=user
-            )
+            session = LabSession.objects.select_related(
+                "scenario", "scenario__technology",
+            ).get(id=session_id, user=user)
             return session
         except LabSession.DoesNotExist:
             return None

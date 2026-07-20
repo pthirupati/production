@@ -84,6 +84,27 @@ def _require_tech_access(request, technology_slug: str):
     return technology_access_denied_response(request.user, technology_slug)
 
 
+def _require_session_console_access(request, session, technology_slug: str):
+    """Allow session-scoped console only for that scenario's tech or a declared cross-tech link.
+
+    Prevents a Linux-only subscriber from opening an unrelated VMware/AWS console
+    by guessing another session id, while still allowing intentional cross-tech labs.
+    """
+    scenario = getattr(session, "scenario", None)
+    if scenario is None:
+        return _require_tech_access(request, technology_slug)
+
+    tech = getattr(scenario, "technology", None)
+    scen_slug = (getattr(tech, "slug", None) or "").strip().lower()
+    if scen_slug == technology_slug:
+        return None
+    if getattr(scenario, "cross_technology", False) or getattr(scenario, "vmware_link", False):
+        # Cross-tech lab: console is scoped to this session only (not a catalog bypass).
+        return None
+    # Session belongs to another technology — require a real subscription.
+    return _require_tech_access(request, technology_slug)
+
+
 def _require_any_tech_access(request, *technology_slugs: str):
     """Allow if the user has access to any of the listed technologies."""
     last = None
@@ -139,6 +160,9 @@ class VMwareSimStateView(APIView):
         ).first()
         if not session:
             return Response({"error": "Session not found"}, status=404)
+        denied = _require_session_console_access(request, session, "vmware")
+        if denied:
+            return denied
         # Prefer slug from DB; fall back to query param (e.g. when redirected from LabRunner)
         slug = session.scenario.slug if session.scenario_id else (request.query_params.get("scenario", "") or "")
         return Response(get_state(session_id, slug))
@@ -148,9 +172,14 @@ class VMwareSimActionView(APIView):
     permission_classes = [IsAuthenticated]
 
     def post(self, request, session_id):
-        session = LabSession.objects.filter(pk=session_id, user=request.user, status="RUNNING").first()
+        session = LabSession.objects.select_related("scenario", "scenario__technology").filter(
+            pk=session_id, user=request.user, status="RUNNING",
+        ).first()
         if not session:
             return Response({"error": "Lab session not running"}, status=400)
+        denied = _require_session_console_access(request, session, "vmware")
+        if denied:
+            return denied
         action = request.data.get("action", "")
         payload = request.data.get("payload") or {}
         slug = session.scenario.slug if session.scenario_id else ""

@@ -6,7 +6,8 @@ from rest_framework.test import APIClient
 
 from apps.billing.models import TechnologySubscription
 from apps.billing.subscription_utils import activate_technology_subscription
-from apps.question_bank.models import Technology
+from apps.labs.models import LabSession
+from apps.question_bank.models import Scenario, Technology
 
 User = get_user_model()
 
@@ -27,6 +28,10 @@ class StandaloneConsoleEntitlementTests(TestCase):
             self.vmware.is_free = False
             self.vmware.price = 499
             self.vmware.save(update_fields=["is_free", "price"])
+        self.linux, _ = Technology.objects.get_or_create(
+            slug="linux",
+            defaults={"name": "Linux", "price": 499, "is_free": False},
+        )
         self.client.force_authenticate(user=self.user)
 
     def test_vmware_demo_denied_without_subscription(self):
@@ -46,4 +51,72 @@ class StandaloneConsoleEntitlementTests(TestCase):
         self.user.is_staff = True
         self.user.save(update_fields=["is_staff"])
         res = self.client.get("/api/vmware/demo/")
+        self.assertEqual(res.status_code, 200)
+
+    def test_linux_session_cannot_open_vmware_console_without_cross_tech(self):
+        """Revenue loophole: Linux-only sub must not drive VMware via a plain Linux session."""
+        scen, _ = Scenario.objects.get_or_create(
+            slug="linux-plain-for-entitlement",
+            defaults={
+                "title": "Linux plain",
+                "technology": self.linux,
+                "lab_mode": "simulation",
+                "simulation_type": "generic",
+                "is_active": True,
+                "is_free": True,
+                "cross_technology": False,
+                "vmware_link": False,
+                "description": "CONTEXT: t\n\nENVIRONMENT: t\n\nOBJECTIVE: t",
+                "objectives": ["x"],
+                "time_limit": 600,
+                "max_score": 100,
+            },
+        )
+        if scen.cross_technology or scen.vmware_link:
+            scen.cross_technology = False
+            scen.vmware_link = False
+            scen.save(update_fields=["cross_technology", "vmware_link"])
+        session = LabSession.objects.create(
+            user=self.user,
+            scenario=scen,
+            status="RUNNING",
+            provider="simulation",
+            container_id="sim-entitlement-linux",
+            duration_limit=600,
+        )
+        res = self.client.get(f"/api/vmware/sessions/{session.id}/")
+        self.assertEqual(res.status_code, 403)
+        self.assertEqual(res.data.get("code"), "SUBSCRIPTION_REQUIRED")
+
+    def test_cross_tech_linux_session_can_open_vmware_console(self):
+        scen, _ = Scenario.objects.get_or_create(
+            slug="linux-cross-vmware-entitlement",
+            defaults={
+                "title": "Linux cross VMware",
+                "technology": self.linux,
+                "lab_mode": "simulation",
+                "simulation_type": "generic",
+                "is_active": True,
+                "is_free": True,
+                "cross_technology": True,
+                "vmware_link": True,
+                "description": "CONTEXT: t\n\nENVIRONMENT: t\n\nOBJECTIVE: t",
+                "objectives": ["x"],
+                "time_limit": 600,
+                "max_score": 100,
+            },
+        )
+        if not scen.cross_technology:
+            scen.cross_technology = True
+            scen.vmware_link = True
+            scen.save(update_fields=["cross_technology", "vmware_link"])
+        session = LabSession.objects.create(
+            user=self.user,
+            scenario=scen,
+            status="RUNNING",
+            provider="simulation",
+            container_id="sim-entitlement-cross",
+            duration_limit=600,
+        )
+        res = self.client.get(f"/api/vmware/sessions/{session.id}/")
         self.assertEqual(res.status_code, 200)
