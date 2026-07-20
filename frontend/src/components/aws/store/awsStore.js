@@ -62,12 +62,25 @@ export function resetAwsSimOnLogout() {
  * Hard reset used by the lab error-boundary "Reset saved state" action: wipe the
  * persisted blob for the current user AND re-seed the live in-memory store so a
  * corrupt/old payload can neither rehydrate again nor keep crashing the mount.
+ * Also sweeps legacy / other-user aws sim keys so a stale blob under a different
+ * key cannot keep poisoning the console after login switches.
  * Every step is independently guarded so the recovery path itself never throws.
  */
 export function hardResetAwsSim() {
+  try {
+    const keys = []
+    for (let i = 0; i < localStorage.length; i += 1) {
+      const k = localStorage.key(i)
+      if (k && (k === 'fixitlab-aws-sim' || k.startsWith('fixitlab-aws-sim:'))) keys.push(k)
+    }
+    keys.forEach((k) => {
+      try { localStorage.removeItem(k) } catch { /* ignore */ }
+    })
+  } catch { /* ignore */ }
   try { localStorage.removeItem(currentAwsSimStorageKey()) } catch { /* ignore */ }
   try { useAwsStore.getState().resetSimulation() } catch { /* ignore */ }
   try { useAwsStore.getState()._ensureTick() } catch { /* ignore */ }
+  try { useAwsStore.getState().disarmLabSync() } catch { /* ignore */ }
 }
 
 function newGenericId(service, resource) {

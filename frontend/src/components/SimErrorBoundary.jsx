@@ -81,6 +81,11 @@ export default class SimErrorBoundary extends Component {
             <p className="text-sm text-surface-400 max-w-md">
               {this.props.message || 'Something went wrong loading this lab console. Try resetting or reload the page.'}
             </p>
+            {(this.props.name === 'aws' || this.props.name === 'terraform') && (
+              <p className="text-xs text-surface-500 max-w-md mt-2">
+                AWS labs often fail after an update if an old console cache remains. Use <strong className="text-surface-300">Reset saved state</strong>, then reopen the lab.
+              </p>
+            )}
           </div>
           <div className="flex flex-wrap gap-2 justify-center">
             <button
