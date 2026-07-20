@@ -1,3 +1,3 @@
 #!/usr/bin/env bash
-systemctl is-active auditd
+grep -q FIXED-OK /opt/fixitlab/academy/academy-security-064-troubleshoot-secrets-7.conf
 exit 0

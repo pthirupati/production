@@ -29,17 +29,17 @@ description: 'CONTEXT: A team operating security hardening has raised a ticket f
 
   OBJECTIVE: Download the current CRL from the internal CA; Convert the CRL to PEM format if necessary;
   Update the ssl_crl directive in nginx to point to the new CRL. Acceptance criteria: the change is minimal
-  and reversible, and success means `systemctl is-active --quiet` returns active.
+  and reversible, and success means `systemctl is-active --quiet``` returns active.
 
 
   WORK TO DO: Required tooling is pre-installed; if a command is missing, note it and use the equivalent
   already on the host. Make the smallest configuration change that moves the system toward the objective
   (edit the relevant SSH, firewall, TLS, audit logs, and IAM settings), changing one thing at a time.
-  Check your work continuously against the objective — success means `systemctl is-active --quiet` returns
+  Check your work continuously against the objective — success means `systemctl is-active --quiet``` returns
   active.
 
 
-  VERIFY: Re-run the same check the grader uses and confirm `systemctl is-active --quiet` returns active.
+  VERIFY: Re-run the same check the grader uses and confirm `systemctl is-active --quiet`` returns active.
   Capture the before/after output as evidence. Success criteria: the objective''s healthy state holds
   on a repeat check, not just once.
 

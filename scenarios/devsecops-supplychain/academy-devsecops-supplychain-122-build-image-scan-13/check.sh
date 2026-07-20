@@ -1,3 +1,3 @@
 #!/usr/bin/env bash
-grep -q FIXED-OK /opt/fixitlab/academy/academy-devsecops-supplychain-122-build-image-scan-13.conf
+systemctl is-active crond
 exit 0

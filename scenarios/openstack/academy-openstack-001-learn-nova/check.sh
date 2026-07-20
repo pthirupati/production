@@ -1,3 +1,3 @@
 #!/usr/bin/env bash
-grep -q FIXED-OK /opt/fixitlab/academy/academy-openstack-001-learn-nova.conf
+systemctl is-active crond
 exit 0

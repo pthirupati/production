@@ -1,3 +1,3 @@
 #!/usr/bin/env bash
-grep -q FIXED-OK /opt/fixitlab/academy/academy-openstack-059-backup-flavors-6.conf
+systemctl is-active rsyslog
 exit 0

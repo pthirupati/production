@@ -1,3 +1,3 @@
 #!/usr/bin/env bash
-grep -q FIXED-OK /opt/fixitlab/academy/academy-datacenter-054-troubleshoot-cabling-6.conf
+systemctl is-active crond
 exit 0

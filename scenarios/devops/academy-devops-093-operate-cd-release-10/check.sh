@@ -1,3 +1,3 @@
 #!/usr/bin/env bash
-systemctl is-active crond
+systemctl is-active gitlab-runner
 exit 0

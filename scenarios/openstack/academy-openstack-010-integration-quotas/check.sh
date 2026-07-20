@@ -1,3 +1,3 @@
 #!/usr/bin/env bash
-grep -q FIXED-OK /opt/fixitlab/academy/academy-openstack-010-integration-quotas.conf
+systemctl is-active crond
 exit 0

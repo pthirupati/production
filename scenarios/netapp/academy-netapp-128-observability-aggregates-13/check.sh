@@ -1,3 +1,3 @@
 #!/usr/bin/env bash
-grep -q FIXED-OK /opt/fixitlab/academy/academy-netapp-128-observability-aggregates-13.conf
+systemctl is-active crond
 exit 0

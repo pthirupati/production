@@ -1,3 +1,3 @@
 #!/usr/bin/env bash
-grep -q FIXED-OK /opt/fixitlab/academy/academy-dellemc-004-troubleshoot-replication.conf
+systemctl is-active nginx
 exit 0

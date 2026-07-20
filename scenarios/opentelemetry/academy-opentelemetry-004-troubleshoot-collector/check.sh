@@ -1,3 +1,3 @@
 #!/usr/bin/env bash
-grep -q FIXED-OK /opt/fixitlab/academy/academy-opentelemetry-004-troubleshoot-collector.conf
+systemctl is-active crond
 exit 0

@@ -24,18 +24,17 @@ description: 'CONTEXT: A team operating database administration has raised a tic
 
 
   OBJECTIVE: Confirm mariadb is failed; Resolve the cause and start the service; Verify mariadb is active.
-  Acceptance criteria: the change is minimal and reversible, and success means `systemctl is-active mariadb`
-  returns active.
+  Acceptance criteria: the change is minimal and reversible, and success means `systemctl is-active mariadb``` returns active.
 
 
   WORK TO DO: Required tooling is pre-installed; if a command is missing, note it and use the equivalent
   already on the host. Make the smallest configuration change that moves the system toward the objective
   (edit the relevant SQL client, schemas, backups, and performance views), changing one thing at a time.
-  Check your work continuously against the objective — success means `systemctl is-active mariadb` returns
+  Check your work continuously against the objective — success means `systemctl is-active mariadb``` returns
   active.
 
 
-  VERIFY: Re-run the same check the grader uses and confirm `systemctl is-active mariadb` returns active.
+  VERIFY: Re-run the same check the grader uses and confirm `systemctl is-active mariadb`` returns active.
   Capture the before/after output as evidence. Success criteria: the objective''s healthy state holds
   on a repeat check, not just once.
 
@@ -165,6 +164,6 @@ guided_mode:
     title: Verify with the grader
     instruction: Run the same verification the checker uses.
     command: systemctl is-active mariadb
-    expected_output: '`systemctl is-active mariadb` returns active'
+    expected_output: '`systemctl is-active mariadb`` returns active'
     explanation: The lab passes only when real state is healthy.
     next_on: command_success

@@ -1,3 +1,3 @@
 #!/usr/bin/env bash
-grep -q FIXED-OK /opt/fixitlab/academy/academy-openstack-144-troubleshoot-glance-15.conf
+systemctl is-active rsyslog
 exit 0

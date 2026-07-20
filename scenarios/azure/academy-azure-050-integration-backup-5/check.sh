@@ -1,3 +1,3 @@
 #!/usr/bin/env bash
-grep -q FIXED-OK /opt/fixitlab/academy/academy-azure-050-integration-backup-5.conf
+systemctl is-active crond
 exit 0

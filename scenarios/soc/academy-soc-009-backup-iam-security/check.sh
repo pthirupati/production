@@ -1,3 +1,3 @@
 #!/usr/bin/env bash
-grep -q FIXED-OK /opt/fixitlab/academy/academy-soc-009-backup-iam-security.conf
+systemctl is-active crond
 exit 0

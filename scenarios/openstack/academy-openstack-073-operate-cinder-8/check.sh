@@ -1,3 +1,3 @@
 #!/usr/bin/env bash
-grep -q FIXED-OK /opt/fixitlab/academy/academy-openstack-073-operate-cinder-8.conf
+systemctl is-active crond
 exit 0

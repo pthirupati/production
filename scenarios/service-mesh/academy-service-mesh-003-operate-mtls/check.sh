@@ -1,3 +1,3 @@
 #!/usr/bin/env bash
-grep -q FIXED-OK /opt/fixitlab/academy/academy-service-mesh-003-operate-mtls.conf
+systemctl is-active crond
 exit 0

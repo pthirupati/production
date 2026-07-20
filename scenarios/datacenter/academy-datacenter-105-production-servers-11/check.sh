@@ -1,3 +1,3 @@
 #!/usr/bin/env bash
-grep -q FIXED-OK /opt/fixitlab/academy/academy-datacenter-105-production-servers-11.conf
+systemctl is-active rsyslog
 exit 0

@@ -11,53 +11,15 @@ max_score: 100
 is_free: false
 infrastructure_type: docker
 jira_priority: Medium
-description: 'CONTEXT: A team operating enterprise data center operations has raised a ticket for `Physical
-  Data Center (DCIM): Cooling — Daily Operations`. A customer-facing workflow is degraded and the on-call
-  engineer (you) must diagnose and resolve it. Business impact: reduced service reliability and blocked
-  users until the underlying state is repaired.
-
-
-  ENVIRONMENT: You are working in FixitLab''s offline data center practice floor. The architecture is
-  a single lab-primary node exposing racks, PDUs, cooling, cabling, and physical servers; treat it as
-  the production host for this incident. All tools run locally — no paid APIs or external cloud calls
-  are required.
-
-
-  SYMPTOM / STARTING STATE: The data center practice floor is healthy enough for scheduled work on Cooling.
-  Complete the maintenance task without unnecessary downtime. Day-2 operations: perform a routine Cooling
-  task safely in Physical Data Center (DCIM). Follow change control — inspect, change, verify — while
-  working with how cooling fits into enterprise data center operations.
-
-
-  OBJECTIVE: Day-2 Cooling work completes safely in this environment; Changes are verified with before/after
-  checks; The system remains stable for dependent teams. Acceptance criteria: the change is minimal and
-  reversible, and success means `check.sh` exits successfully.
-
-
-  WORK TO DO: Required tooling is pre-installed; if a command is missing, note it and use the equivalent
-  already on the host. Make the smallest configuration change that moves the system toward the objective
-  (edit the relevant racks, PDUs, cooling, cabling, and physical servers), changing one thing at a time.
-  Check your work continuously against the objective — success means `check.sh` exits successfully.
-
-
-  VERIFY: Re-run the same check the grader uses and confirm `check.sh` exits successfully. Capture the
-  before/after output as evidence. Success criteria: the objective''s healthy state holds on a repeat
-  check, not just once.
-
-
-  ROLLBACK: If a change makes things worse, revert that single change immediately (restore the original
-  config file / undo the edit / restart the affected component) and re-observe before trying another hypothesis.
-  Never stack unverified changes.
-
-
-  WHAT TO AVOID: Do not apply broad destructive changes, skip evidence gathering, or fake completion with
-  marker files — the checker validates real system state.'
+description: Service operations lab. The `rsyslog` systemd unit is **failed/inactive** on this host —
+  a realistic fault for Daily Operations workflows that depend on it. Diagnose with `systemctl status
+  rsyslog` and journal logs, apply the smallest reliable fix, then verify with `systemctl is-active rsyslog`.
 objectives:
-- Day-2 Cooling work completes safely in this environment
-- Changes are verified with before/after checks
-- The system remains stable for dependent teams
-initial_state: The data center practice floor is healthy enough for scheduled work
-  on Cooling. Complete the maintenance task without unnecessary downtime.
+- The `rsyslog` service is active (running)
+- '`systemctl is-active rsyslog`` returns active'
+- The fix survives a status re-check (no marker files)
+initial_state: The `rsyslog` service is not running (`systemctl is-active rsyslog` → inactive/failed).
+  Dependent Daily Operations tasks cannot succeed until the unit is healthy again.
 hints:
 - order: 1
   cost: 0
@@ -79,36 +41,22 @@ hints:
   cost: 25
   content: 'WHICH TOOL — the diagnostic command(s):
 
-    1. Inspect the current state with the relevant racks, PDUs, cooling, cabling, and physical servers
-    for cooling.
-
-    2. Each command above tells you something specific — status/health, recent errors, and the effective
-    configuration. Read them in that order.
-
-    3. Compare what you see to the objectives; the gap points at the fault.'
+    Run `systemctl status rsyslog` and `journalctl -u rsyslog -n 50`.'
 - order: 4
   cost: 40
   content: 'NARROW DOWN — isolate the subsystem:
 
-    1. From the evidence above, decide which single part of Cooling is at fault.
+    1. Confirm `rsyslog` is failed/inactive.
 
-    2. Re-run the most relevant of the relevant racks, PDUs, cooling, cabling, and physical servers for
-    cooling focused on just that part to confirm it.
+    2. Read the unit journal for the root cause.
 
-    3. State a one-line hypothesis: the smallest change that would move the state from ''Cooling is misconfigured
-    and dependent workflows are failing'' toward ''Cooling behaves correctly under normal and failure
-    checks''.'
+    3. Apply the smallest fix that restores the unit.'
 - order: 5
   cost: 60
   content: 'NEAR-SOLUTION — the fix shape + verify (you still apply it):
 
-    1. Apply the smallest reversible change your hypothesis points to. Execute the maintenance in small,
-    reversible steps, taking a snapshot or backup first if the change is risky.
+    1. Repair the underlying config/cause for `rsyslog`.
 
-    2. Re-run `bash check.sh` and confirm Cooling behaves correctly under normal and failure checks.
+    2. `systemctl enable --now rsyslog`.
 
-    3. If it still fails, the hypothesis was wrong — go back to the evidence, do not stack changes.
-
-
-    WHY: the grader validates real system state, not marker files — a fix only counts when the subsystem
-    is actually healthy.'
+    3. Verify with `systemctl is-active rsyslog` (expect active).'

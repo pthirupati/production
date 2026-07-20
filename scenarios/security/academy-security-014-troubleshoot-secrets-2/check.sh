@@ -1,3 +1,3 @@
 #!/usr/bin/env bash
-systemctl is-active sshd
+grep -q FIXED-OK /opt/fixitlab/academy/academy-security-014-troubleshoot-secrets-2.conf
 exit 0

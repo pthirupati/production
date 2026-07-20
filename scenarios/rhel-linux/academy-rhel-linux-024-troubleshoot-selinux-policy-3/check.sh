@@ -1,3 +1,3 @@
 #!/usr/bin/env bash
-systemctl is-active rsyslog
+systemctl is-active auditd
 exit 0

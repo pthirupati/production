@@ -1,3 +1,3 @@
 #!/usr/bin/env bash
-systemctl is-active named
+grep -q FIXED-OK /opt/fixitlab/academy/academy-networking-046-security-nat-5.conf
 exit 0

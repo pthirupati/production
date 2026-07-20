@@ -1,3 +1,3 @@
 #!/usr/bin/env bash
-grep -q FIXED-OK /opt/fixitlab/academy/academy-azure-107-automation-storage-accounts-11.conf
+systemctl is-active rsyslog
 exit 0

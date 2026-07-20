@@ -1,3 +1,3 @@
 #!/usr/bin/env bash
-grep -q FIXED-OK /opt/fixitlab/academy/academy-service-mesh-051-learn-sidecar-6.conf
+systemctl is-active rsyslog
 exit 0

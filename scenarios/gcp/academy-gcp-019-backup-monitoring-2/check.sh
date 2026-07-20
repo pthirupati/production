@@ -1,3 +1,3 @@
 #!/usr/bin/env bash
-grep -q FIXED-OK /opt/fixitlab/academy/academy-gcp-019-backup-monitoring-2.conf
+systemctl is-active rsyslog
 exit 0

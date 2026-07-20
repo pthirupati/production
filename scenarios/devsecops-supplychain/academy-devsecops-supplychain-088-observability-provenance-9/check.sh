@@ -1,3 +1,3 @@
 #!/usr/bin/env bash
-grep -q FIXED-OK /opt/fixitlab/academy/academy-devsecops-supplychain-088-observability-provenance-9.conf
+systemctl is-active crond
 exit 0

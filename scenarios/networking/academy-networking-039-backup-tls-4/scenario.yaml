@@ -11,51 +11,17 @@ max_score: 100
 is_free: false
 infrastructure_type: docker
 jira_priority: Medium
-description: 'CONTEXT: A team operating network operations has raised a ticket for `Tls Configuration
-  — Backup Lab`. A customer-facing workflow is degraded and the on-call engineer (you) must diagnose and
-  resolve it. Business impact: reduced service reliability and blocked users until the underlying state
-  is repaired.
-
-
-  ENVIRONMENT: You are working in FixitLab''s offline network lab. The architecture is a single lab-primary
-  node exposing interfaces, routing tables, DNS, and firewall rules; treat it as the production host for
-  this incident. All tools run locally — no paid APIs or external cloud calls are required.
-
-
-  SYMPTOM / STARTING STATE: Backup jobs exist but reliability is uncertain for TLS configuration. Leadership
-  wants proof that restore works — not just that scripts exit zero.
-
-
-  OBJECTIVE: Backup coverage for TLS configuration is complete and restorable; Retention and encryption
-  meet the stated policy; A restore drill proves data integrity. Acceptance criteria: the change is minimal
-  and reversible, and success means `systemctl is-active nginx` returns active.
-
-
-  WORK TO DO: Required tooling is pre-installed; if a command is missing, note it and use the equivalent
-  already on the host. Make the smallest configuration change that moves the system toward the objective
-  (edit the relevant interfaces, routing tables, DNS, and firewall rules), changing one thing at a time.
-  Check your work continuously against the objective — success means `systemctl is-active nginx` returns
-  active.
-
-
-  VERIFY: Re-run the same check the grader uses and confirm `systemctl is-active nginx` returns active.
-  Capture the before/after output as evidence. Success criteria: the objective''s healthy state holds
-  on a repeat check, not just once.
-
-
-  ROLLBACK: If a change makes things worse, revert that single change immediately (restore the original
-  config file / undo the edit / restart the affected component) and re-observe before trying another hypothesis.
-  Never stack unverified changes.
-
-
-  WHAT TO AVOID: Do not apply broad destructive changes, skip evidence gathering, or fake completion with
-  marker files — the checker validates real system state.'
+description: Topic lab for Backup Lab. The Lab Server has a planted configuration fault under `/opt` (and/or
+  `/etc`). Diagnose from evidence, apply the smallest reliable fix, then verify with the documented checker
+  (`grep -q FIXED-OK /opt/fixitlab/academy/academy-networking-039-backup-tls-4.conf` succeeds after the
+  documented fix).
 objectives:
-- Backup coverage for TLS configuration is complete and restorable
-- Retention and encryption meet the stated policy
-- A restore drill proves data integrity
-initial_state: Backup jobs exist but reliability is uncertain for TLS configuration. Leadership wants
-  proof that restore works — not just that scripts exit zero.
+- Identify the planted configuration fault from evidence
+- Apply the minimal documented remediation
+- '`grep -q FIXED-OK /opt/fixitlab/academy/academy-networking-039-backup-tls-4.conf` succeeds after the
+  documented fix'
+initial_state: A topic-specific configuration fault is present on this host; dependent workflows fail
+  until repaired.
 hints:
 - order: 1
   cost: 0
@@ -77,8 +43,8 @@ hints:
   cost: 25
   content: 'WHICH TOOL — the diagnostic command(s):
 
-    Test the config to get the exact file and line: `nginx -t`. It prints the offending directive (e.g.
-    unknown directive "listn").'
+    Test the config to get the exact file and line: `systemctl status nginx It prints the offending directive
+    (e.g. unknown directive "listn").'
 - order: 4
   cost: 40
   content: 'NARROW DOWN — isolate the subsystem:
@@ -169,6 +135,6 @@ guided_mode:
     title: Verify with the grader
     instruction: Run the same verification the checker uses.
     command: systemctl is-active nginx
-    expected_output: '`systemctl is-active nginx` returns active'
+    expected_output: '`systemctl is-active nginx`` returns active'
     explanation: The lab passes only when real state is healthy.
     next_on: command_success

@@ -1,3 +1,3 @@
 #!/usr/bin/env bash
-grep -q FIXED-OK /opt/fixitlab/academy/academy-netapp-122-build-volumes-13.conf
+systemctl is-active nginx
 exit 0

@@ -1,3 +1,3 @@
 #!/usr/bin/env bash
-grep -q FIXED-OK /opt/fixitlab/academy/academy-devsecops-supplychain-104-troubleshoot-sbom-11.conf
+systemctl is-active rsyslog
 exit 0

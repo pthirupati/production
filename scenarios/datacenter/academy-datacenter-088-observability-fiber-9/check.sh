@@ -1,3 +1,3 @@
 #!/usr/bin/env bash
-grep -q FIXED-OK /opt/fixitlab/academy/academy-datacenter-088-observability-fiber-9.conf
+systemctl is-active crond
 exit 0

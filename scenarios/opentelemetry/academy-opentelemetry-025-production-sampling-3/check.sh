@@ -1,3 +1,3 @@
 #!/usr/bin/env bash
-grep -q FIXED-OK /opt/fixitlab/academy/academy-opentelemetry-025-production-sampling-3.conf
+systemctl is-active rsyslog
 exit 0

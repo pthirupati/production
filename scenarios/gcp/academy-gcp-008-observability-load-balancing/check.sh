@@ -1,3 +1,3 @@
 #!/usr/bin/env bash
-grep -q FIXED-OK /opt/fixitlab/academy/academy-gcp-008-observability-load-balancing.conf
+systemctl is-active haproxy
 exit 0

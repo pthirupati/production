@@ -1,3 +1,3 @@
 #!/usr/bin/env bash
-grep -q FIXED-OK /opt/fixitlab/academy/academy-gcp-086-security-gke-9.conf
+systemctl is-active crond
 exit 0

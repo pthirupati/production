@@ -1,3 +1,3 @@
 #!/usr/bin/env bash
-# Validated by the dedicated simulation engine (real state checks).
+grep -q FIXED-OK /opt/fixitlab/academy/academy-vmware-090-integration-vcenter-rbac-9.conf
 exit 0

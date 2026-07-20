@@ -1,3 +1,3 @@
 #!/usr/bin/env bash
-systemctl is-active chronyd
+grep -q FIXED-OK /opt/fixitlab/academy/academy-linux-002-build-permissions-acl.conf
 exit 0

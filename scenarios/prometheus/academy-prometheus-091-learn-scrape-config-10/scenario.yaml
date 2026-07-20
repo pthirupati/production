@@ -28,17 +28,17 @@ description: 'CONTEXT: A team operating Prometheus monitoring has raised a ticke
 
   OBJECTIVE: Understand how scrape config work in this lab environment; Identify the main status and configuration
   signals for scrape config; Confirm you can read the current state confidently before changing anything.
-  Acceptance criteria: the change is minimal and reversible, and success means `systemctl is-active crond`
-  returns active.
+  Acceptance criteria: the change is minimal and reversible, and success means `systemctl is-active prometheus`` returns active.
 
 
   WORK TO DO: Required tooling is pre-installed; if a command is missing, note it and use the equivalent
   already on the host. Make the smallest configuration change that moves the system toward the objective
   (edit the relevant scrape configs, PromQL, rules, and Alertmanager), changing one thing at a time. Check
-  your work continuously against the objective — success means `systemctl is-active crond` returns active.
+  your work continuously against the objective — success means `systemctl is-active prometheus`` returns
+  active.
 
 
-  VERIFY: Re-run the same check the grader uses and confirm `systemctl is-active crond` returns active.
+  VERIFY: Re-run the same check the grader uses and confirm `systemctl is-active prometheus` returns active.
   Capture the before/after output as evidence. Success criteria: the objective''s healthy state holds
   on a repeat check, not just once.
 
@@ -76,28 +76,25 @@ hints:
   cost: 25
   content: 'WHICH TOOL — the diagnostic command(s):
 
-    Start with `systemctl status crond` and `journalctl -u crond -n 50 --no-pager` before changing anything.'
+    Run `systemctl status prometheus` and `journalctl -u prometheus -n 50`.'
 - order: 4
   cost: 40
   content: 'NARROW DOWN — isolate the subsystem:
 
-    1. Run `systemctl status crond` — note Active/Failed and the last log lines.
+    1. Confirm `prometheus` is failed/inactive.
 
-    2. Read `journalctl -u crond -n 50` for the root error.
+    2. Read the unit journal for the root cause.
 
-    3. Form a hypothesis about the smallest config or permission fix.'
+    3. Apply the smallest fix that restores the unit.'
 - order: 5
   cost: 60
   content: 'NEAR-SOLUTION — the fix shape + verify (you still apply it):
 
-    1. Apply the minimal fix (config, unit override, or missing directory).
+    1. Repair the underlying config/cause for `prometheus`.
 
-    2. Run `systemctl daemon-reload` if you edited a unit file.
+    2. `systemctl enable --now prometheus`.
 
-    3. Run `systemctl restart crond` and confirm `systemctl is-active crond` succeeds.
-
-
-    WHY: the grader checks real service state, not marker files.'
+    3. Verify with `systemctl is-active prometheus` (expect active).'
 summary: Complete the scrape config — learn lab prometheus lab and verify success with the checker
 estimated_minutes: 15
 xp_reward: 100
@@ -167,6 +164,6 @@ guided_mode:
     title: Verify with the grader
     instruction: Run the same verification the checker uses.
     command: systemctl is-active crond
-    expected_output: '`systemctl is-active crond` returns active'
+    expected_output: '`systemctl is-active crond`` returns active'
     explanation: The lab passes only when real state is healthy.
     next_on: command_success

@@ -25,17 +25,17 @@ description: 'CONTEXT: A team operating network operations has raised a ticket f
 
   OBJECTIVE: Confirm the current certificate''s expiry; Generate/install a new valid certificate and key;
   Reload nginx and verify HTTPS serves a non-expired certificate. Acceptance criteria: the change is minimal
-  and reversible, and success means `systemctl is-active --quiet` returns active.
+  and reversible, and success means `systemctl is-active --quiet``` returns active.
 
 
   WORK TO DO: Required tooling is pre-installed; if a command is missing, note it and use the equivalent
   already on the host. Make the smallest configuration change that moves the system toward the objective
   (edit the relevant interfaces, routing tables, DNS, and firewall rules), changing one thing at a time.
-  Check your work continuously against the objective — success means `systemctl is-active --quiet` returns
+  Check your work continuously against the objective — success means `systemctl is-active --quiet``` returns
   active.
 
 
-  VERIFY: Re-run the same check the grader uses and confirm `systemctl is-active --quiet` returns active.
+  VERIFY: Re-run the same check the grader uses and confirm `systemctl is-active --quiet`` returns active.
   Capture the before/after output as evidence. Success criteria: the objective''s healthy state holds
   on a repeat check, not just once.
 

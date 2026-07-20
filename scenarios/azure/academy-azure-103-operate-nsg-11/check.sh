@@ -1,3 +1,3 @@
 #!/usr/bin/env bash
-grep -q FIXED-OK /opt/fixitlab/academy/academy-azure-103-operate-nsg-11.conf
+systemctl is-active nginx
 exit 0

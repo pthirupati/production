@@ -1,3 +1,3 @@
 #!/usr/bin/env bash
-systemctl is-active nginx
+grep -q FIXED-OK /opt/fixitlab/academy/academy-networking-077-automation-mtu-8.conf
 exit 0

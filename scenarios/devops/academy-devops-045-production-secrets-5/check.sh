@@ -1,3 +1,3 @@
 #!/usr/bin/env bash
-systemctl is-active rsyslog
+grep -q FIXED-OK /opt/fixitlab/academy/academy-devops-045-production-secrets-5.conf
 exit 0

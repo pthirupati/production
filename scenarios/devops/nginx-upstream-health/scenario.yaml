@@ -28,16 +28,16 @@ description: 'CONTEXT: A team operating DevOps delivery has raised a ticket for 
 
   OBJECTIVE: Identify the misconfigured upstream server port in nginx.conf; Fix the upstream port from
   80 to 8080; Test the Nginx configuration syntax. Acceptance criteria: the change is minimal and reversible,
-  and success means `systemctl is-active nginx` returns active.
+  and success means `systemctl is-active nginx``` returns active.
 
 
   WORK TO DO: Required tooling is pre-installed; if a command is missing, note it and use the equivalent
   already on the host. Make the smallest configuration change that moves the system toward the objective
   (edit the relevant git repos, pipelines, artifacts, and runbooks), changing one thing at a time. Check
-  your work continuously against the objective — success means `systemctl is-active nginx` returns active.
+  your work continuously against the objective — success means `systemctl is-active nginx``` returns active.
 
 
-  VERIFY: Re-run the same check the grader uses and confirm `systemctl is-active nginx` returns active.
+  VERIFY: Re-run the same check the grader uses and confirm `systemctl is-active nginx`` returns active.
   Capture the before/after output as evidence. Success criteria: the objective''s healthy state holds
   on a repeat check, not just once.
 
@@ -101,7 +101,7 @@ hints:
 
     2. Run `nginx -t`, then `systemctl enable --now nginx`.
 
-    3. Confirm `systemctl is-active nginx` returns active.
+    3. Confirm `systemctl is-active nginx`` returns active.
 
 
     WHY: stream proxies fail when the TCP upstream or listen directive is wrong.'

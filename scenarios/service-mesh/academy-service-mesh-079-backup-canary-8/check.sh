@@ -1,3 +1,3 @@
 #!/usr/bin/env bash
-grep -q FIXED-OK /opt/fixitlab/academy/academy-service-mesh-079-backup-canary-8.conf
+systemctl is-active nginx
 exit 0

@@ -843,7 +843,13 @@ def _run_line_check(
             failures.append("Windows issue not resolved — apply the required fix first")
         return True
 
-    if "gitlab-runner" in stripped or ("pipeline" in stripped and "status" in stripped):
+    # Dedicated devops probe (`gitlab-runner status` / pipeline status). Do NOT
+    # hijack `systemctl is-active gitlab-runner` — that is a real unit grade used
+    # by topic_faults academy CI labs.
+    if "systemctl is-active" not in stripped and (
+        "gitlab-runner status" in stripped
+        or ("pipeline" in stripped and "status" in stripped)
+    ):
         devops = getattr(engine, "devops", None) if engine else None
         if not devops or not devops.is_healthy():
             failures.append("CI/CD pipeline not healthy — fix KUBECONFIG and redeploy")

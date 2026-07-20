@@ -1,3 +1,3 @@
 #!/usr/bin/env bash
-systemctl is-active firewalld
+grep -q FIXED-OK /opt/fixitlab/academy/academy-security-023-operate-tls-3.conf
 exit 0

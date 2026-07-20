@@ -9,6 +9,21 @@ from __future__ import annotations
 
 from typing import Any
 
+# Shared with scripts/upgrade_academy_labs.py — keep keyword lists in sync.
+CI_KEYWORDS = (
+    "git-flow", "git-merge", "learn-git", "ci-pipeline", "cicd", "gitlab-ci",
+    "jenkins", "artifacts", "cd-release", "change-management", "incident-response",
+)
+GITOPS_KEYWORDS = ("gitops", "argocd", "flux", "outofsync", "kustomize", "drift", "sync")
+PERM_KEYWORDS = ("permissions", "acl", "chmod", "chown", "sudoers")
+NETSEC_KEYWORDS = ("dns", "resolv", "ntp", "chrony", "firewall", "selinux", "vlan", "bonding", "mtu", "nat")
+K8S_KEYWORDS = ("kubernetes", "k8s", "pod-", "crashloop", "kubelet", "helm-")
+TF_KEYWORDS = ("terraform", "tfstate", "iac-")
+DOCKER_KEYWORDS = ("docker-compose", "compose", "containerd", "dockerfile")
+DB_KEYWORDS = ("postgres", "mysql", "mariadb", "redis", "mongodb", "pgbouncer")
+JAVA_KEYWORDS = ("spring-boot", "jvm", "tomcat", "heap-", "gc-pause")
+SEC_KEYWORDS = ("secrets", "vault", "tls-", "cert-", "rbac", "owasp")
+
 
 def apply_topic_fault(slug: str, state: Any) -> bool:
     """Apply a topic fault if the slug matches. Returns True when something changed."""
@@ -25,20 +40,44 @@ def apply_topic_fault(slug: str, state: Any) -> bool:
         return True
 
     # Git / devops CI topics — plant a broken CI config + inactive runner, not nginx
-    if any(k in low for k in ("git-flow", "git-merge", "learn-git", "ci-pipeline", "cicd", "gitlab-ci", "jenkins")):
+    if any(k in low for k in CI_KEYWORDS):
         return _fault_ci_git(state, low)
 
     # GitOps / Argo / Flux — OutOfSync app + missing FIXED path for marker labs
-    if any(k in low for k in ("gitops", "argocd", "flux", "outofsync", "kustomize")):
+    if any(k in low for k in GITOPS_KEYWORDS):
         return _fault_gitops(state, low)
 
     # Permissions / ACL
-    if any(k in low for k in ("permissions", "acl", "chmod", "chown", "sudoers")):
+    if any(k in low for k in PERM_KEYWORDS):
         return _fault_permissions(state, low)
 
-    # Networking basics
-    if any(k in low for k in ("dns", "resolv", "ntp", "chrony", "firewall", "selinux")):
+    # Networking / host security basics
+    if any(k in low for k in NETSEC_KEYWORDS):
         return _fault_network_security(state, low)
+
+    # Kubernetes / workloads
+    if any(k in low for k in K8S_KEYWORDS):
+        return _fault_kubernetes(state, low)
+
+    # Terraform / IaC
+    if any(k in low for k in TF_KEYWORDS):
+        return _fault_terraform(state, low)
+
+    # Docker / compose
+    if any(k in low for k in DOCKER_KEYWORDS):
+        return _fault_docker(state, low)
+
+    # Databases
+    if any(k in low for k in DB_KEYWORDS):
+        return _fault_database(state, low)
+
+    # Java / JVM apps
+    if any(k in low for k in JAVA_KEYWORDS):
+        return _fault_java(state, low)
+
+    # Security / secrets / TLS
+    if any(k in low for k in SEC_KEYWORDS):
+        return _fault_security(state, low)
 
     # AWS academy fail-open closure — plant broken config so is-failed check fails
     if low.startswith("academy-aws") or (low.startswith("aws-") and "terraform" not in low):
@@ -74,9 +113,7 @@ def _fault_ci_git(state: Any, slug: str) -> bool:
         "gitlab-runner", active="failed", enabled="enabled",
         description="GitLab Runner", loaded="loaded", sub_state="failed",
     )
-    # Keep a broken-config sentinel so FIXED-OK / is-failed validators stay fail-closed
-    from .scenario_presets import _plant_broken_config_sentinel
-    _plant_broken_config_sentinel(slug, state)
+    # Graded via `systemctl is-active gitlab-runner` — no FIXED-OK sentinel.
     return True
 
 
@@ -122,6 +159,9 @@ def _fault_network_security(state: Any, slug: str) -> bool:
 
     if "dns" in slug or "resolv" in slug:
         state._write_file("/etc/resolv.conf", "nameserver 127.0.0.1\n# broken — no upstream\n")
+        state.services["named"] = SimService(
+            "named", active="failed", enabled="enabled", description="DNS server",
+        )
     if "ntp" in slug or "chrony" in slug:
         state.services["chronyd"] = SimService(
             "chronyd", active="failed", enabled="enabled", description="NTP client/server",
@@ -132,6 +172,105 @@ def _fault_network_security(state: Any, slug: str) -> bool:
         )
     if "selinux" in slug:
         state.selinux_mode = "Permissive"
+    if "vlan" in slug or "bonding" in slug or "mtu" in slug or "nat" in slug:
+        state._write_file(
+            "/etc/sysconfig/network-scripts/ifcfg-eth0",
+            "DEVICE=eth0\nBOOTPROTO=none\nONBOOT=no\n# broken NIC config\n",
+        )
+        from .scenario_presets import _plant_broken_config_sentinel
+        _plant_broken_config_sentinel(slug, state)
+    elif "selinux" in slug:
+        from .scenario_presets import _plant_broken_config_sentinel
+        _plant_broken_config_sentinel(slug, state)
+    # firewall/dns/chrony are graded via systemctl is-active <unit> — no sentinel.
+    return True
+
+
+def _fault_kubernetes(state: Any, slug: str) -> bool:
+    state._mkdir("/root/.kube")
+    state._mkdir("/opt/k8s")
+    state._write_file("/root/.kube/config", "apiVersion: v1\nkind: Config\nclusters: []\n")
+    state._write_file(
+        "/opt/k8s/deployment.yaml",
+        "apiVersion: apps/v1\nkind: Deployment\nmetadata:\n  name: webapp\n"
+        "spec:\n  replicas: 1\n  template:\n    spec:\n      containers:\n"
+        "      - name: app\n        image: broken:missing\n",
+    )
+    from .scenario_presets import _plant_broken_config_sentinel
+    _plant_broken_config_sentinel(slug, state)
+    return True
+
+
+def _fault_terraform(state: Any, slug: str) -> bool:
+    state._mkdir("/opt/terraform")
+    state._write_file(
+        "/opt/terraform/main.tf",
+        'resource "null_resource" "broken" {\n  triggers = { status = "BROKEN" }\n}\n',
+    )
+    state._write_file("/opt/terraform/terraform.tfstate", '{"version":4,"resources":[]}\n')
+    from .scenario_presets import _plant_broken_config_sentinel
+    _plant_broken_config_sentinel(slug, state)
+    return True
+
+
+def _fault_docker(state: Any, slug: str) -> bool:
+    from .rhel_os import SimService
+
+    state._mkdir("/opt/app")
+    state._write_file(
+        "/opt/app/docker-compose.yml",
+        "services:\n  web:\n    image: nginx:broken\n    ports: [\"80:80\"]\n",
+    )
+    state.services["docker"] = SimService(
+        "docker", active="failed", enabled="enabled",
+        description="Docker Application Container Engine",
+        loaded="loaded", sub_state="failed",
+    )
+    return True
+
+
+def _fault_database(state: Any, slug: str) -> bool:
+    from .rhel_os import SimService
+
+    unit = "postgresql"
+    if any(k in slug for k in ("mysql", "mariadb")):
+        unit = "mysqld"
+    elif "redis" in slug:
+        unit = "redis"
+    elif "mongo" in slug:
+        unit = "mongod"
+    state.services[unit] = SimService(
+        unit, active="failed", enabled="enabled",
+        description=f"{unit} database", loaded="loaded", sub_state="failed",
+    )
+    return True
+
+
+def _fault_java(state: Any, slug: str) -> bool:
+    from .rhel_os import SimService
+
+    state._mkdir("/opt/app")
+    state._write_file("/opt/app/application.properties", "server.port=0\n# broken bind\n")
+    state.services["spring-boot"] = SimService(
+        "spring-boot", active="failed", enabled="enabled",
+        description="Spring Boot Application Service",
+        loaded="loaded", sub_state="failed",
+    )
+    return True
+
+
+def _fault_security(state: Any, slug: str) -> bool:
+    state._mkdir("/opt/app")
+    state._mkdir("/etc/pki/tls")
+    if "secret" in slug or "vault" in slug:
+        state._write_file("/opt/app/secrets.env", "API_KEY=plaintext-in-repo\n", mode="666")
+    if "tls" in slug or "cert" in slug:
+        state._write_file("/etc/pki/tls/certs/lab.crt", "# EXPIRED CERT\nBROKEN\n")
+    if "rbac" in slug or "owasp" in slug:
+        state._write_file(
+            "/opt/app/rbac.yaml",
+            "rules:\n- apiGroups: [\"*\"]\n  resources: [\"*\"]\n  verbs: [\"*\"]\n",
+        )
     from .scenario_presets import _plant_broken_config_sentinel
     _plant_broken_config_sentinel(slug, state)
     return True

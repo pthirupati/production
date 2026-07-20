@@ -1,3 +1,3 @@
 #!/usr/bin/env bash
-grep -q FIXED-OK /opt/fixitlab/academy/academy-dellemc-007-automation-fc.conf
+systemctl is-active rsyslog
 exit 0

@@ -1,3 +1,3 @@
 #!/usr/bin/env bash
-grep -q FIXED-OK /opt/fixitlab/academy/academy-netapp-015-production-smb-2.conf
+systemctl is-active crond
 exit 0

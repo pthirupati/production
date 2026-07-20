@@ -1,3 +1,3 @@
 #!/usr/bin/env bash
-grep -q FIXED-OK /opt/fixitlab/academy/academy-azure-091-learn-virtual-machines-10.conf
+systemctl is-active rsyslog
 exit 0

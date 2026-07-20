@@ -1,3 +1,3 @@
 #!/usr/bin/env bash
-grep -q FIXED-OK /opt/fixitlab/academy/academy-datacenter-004-troubleshoot-cabling.conf
+systemctl is-active rsyslog
 exit 0

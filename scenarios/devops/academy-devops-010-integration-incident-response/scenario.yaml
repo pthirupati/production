@@ -27,18 +27,19 @@ description: 'CONTEXT: A team operating DevOps delivery has raised a ticket for 
 
   OBJECTIVE: incident response is connected to the adjacent system successfully; Handoff points are authenticated
   and observable; End-to-end workflow completes without manual intervention. Acceptance criteria: the
-  change is minimal and reversible, and success means `systemctl is-active rsyslog` returns active.
+  change is minimal and reversible, and success means `systemctl is-active gitlab-runner`` returns active.
 
 
   WORK TO DO: Required tooling is pre-installed; if a command is missing, note it and use the equivalent
   already on the host. Make the smallest configuration change that moves the system toward the objective
   (edit the relevant git repos, pipelines, artifacts, and runbooks), changing one thing at a time. Check
-  your work continuously against the objective — success means `systemctl is-active rsyslog` returns active.
+  your work continuously against the objective — success means `systemctl is-active gitlab-runner`` returns
+  active.
 
 
-  VERIFY: Re-run the same check the grader uses and confirm `systemctl is-active rsyslog` returns active.
-  Capture the before/after output as evidence. Success criteria: the objective''s healthy state holds
-  on a repeat check, not just once.
+  VERIFY: Re-run the same check the grader uses and confirm `systemctl is-active gitlab-runner` returns
+  active. Capture the before/after output as evidence. Success criteria: the objective''s healthy state
+  holds on a repeat check, not just once.
 
 
   ROLLBACK: If a change makes things worse, revert that single change immediately (restore the original
@@ -74,29 +75,26 @@ hints:
   cost: 25
   content: 'WHICH TOOL — the diagnostic command(s):
 
-    Start with `systemctl status rsyslog` and `journalctl -u rsyslog -n 50 --no-pager` before changing
-    anything.'
+    Check the runner: `systemctl status gitlab-runner`. Inspect CI config under `/opt/ci/.gitlab-ci.yml`
+    and `/opt/ci/Jenkinsfile` for failing stages.'
 - order: 4
   cost: 40
   content: 'NARROW DOWN — isolate the subsystem:
 
-    1. Run `systemctl status rsyslog` — note Active/Failed and the last log lines.
+    1. Confirm `gitlab-runner` is failed/inactive.
 
-    2. Read `journalctl -u rsyslog -n 50` for the root error.
+    2. Read `/opt/ci/.gitlab-ci.yml` for BROKEN_PIPELINE / exit 1 steps.
 
-    3. Form a hypothesis about the smallest config or permission fix.'
+    3. Check `/root/app/.git/config` for a usable remote/branch setup.'
 - order: 5
   cost: 60
   content: 'NEAR-SOLUTION — the fix shape + verify (you still apply it):
 
-    1. Apply the minimal fix (config, unit override, or missing directory).
+    1. Repair the CI pipeline YAML so the build stage succeeds.
 
-    2. Run `systemctl daemon-reload` if you edited a unit file.
+    2. `systemctl enable --now gitlab-runner`.
 
-    3. Run `systemctl restart rsyslog` and confirm `systemctl is-active rsyslog` succeeds.
-
-
-    WHY: the grader checks real service state, not marker files.'
+    3. Verify with `systemctl is-active gitlab-runner` (expect active).'
 cross_technology: true
 summary: Complete the incident response — integration lab devops lab and verify success with the checker
 estimated_minutes: 20
@@ -136,15 +134,15 @@ tasks:
   background: 'This devops lab teaches systematic troubleshooting: observe, hypothesize, change, verify.'
   validation:
     type: service_active
-    command: systemctl is-active rsyslog
+    command: systemctl is-active gitlab-runner
     expected_status: active
-    error_message: The rsyslog service is not active yet. Check `systemctl status rsyslog` and `journalctl
-      -u rsyslog -n 50`.
+    error_message: The gitlab-runner service is not active yet. Check `systemctl status gitlab-runner`
+      and `journalctl -u gitlab-runner -n 50`.
 solution:
-  summary: The root cause is an unhealthy `rsyslog` service; repair it and verify active state.
+  summary: The root cause is an unhealthy `gitlab-runner` service; repair it and verify active state.
   files_changed: []
   commands_run:
-  - systemctl is-active rsyslog
+  - systemctl is-active gitlab-runner
   reference_docs: devops-fundamentals
 guided_mode:
   enabled: true
@@ -152,7 +150,7 @@ guided_mode:
   - step: 1
     title: Inspect current state
     instruction: Run a read-only diagnostic before changing anything.
-    command: systemctl is-active rsyslog
+    command: systemctl is-active gitlab-runner
     expected_output: Output shows the current failure mode
     explanation: Evidence-first troubleshooting avoids guessing.
     next_on: command_success
@@ -166,7 +164,7 @@ guided_mode:
   - step: 3
     title: Verify with the grader
     instruction: Run the same verification the checker uses.
-    command: systemctl is-active rsyslog
-    expected_output: '`systemctl is-active rsyslog` returns active'
+    command: systemctl is-active gitlab-runner
+    expected_output: '`systemctl is-active gitlab-runner`` returns active'
     explanation: The lab passes only when real state is healthy.
     next_on: command_success

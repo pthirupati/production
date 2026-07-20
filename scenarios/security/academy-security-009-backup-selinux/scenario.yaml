@@ -27,17 +27,17 @@ description: 'CONTEXT: A team operating security hardening has raised a ticket f
 
   OBJECTIVE: Backup coverage for SELinux is complete and restorable; Retention and encryption meet the
   stated policy; A restore drill proves data integrity. Acceptance criteria: the change is minimal and
-  reversible, and success means `systemctl is-active sshd` returns active.
+  reversible, and success means `systemctl is-active auditd`` returns active.
 
 
   WORK TO DO: Required tooling is pre-installed; if a command is missing, note it and use the equivalent
   already on the host. Make the smallest configuration change that moves the system toward the objective
   (edit the relevant SSH, firewall, TLS, audit logs, and IAM settings), changing one thing at a time.
-  Check your work continuously against the objective — success means `systemctl is-active sshd` returns
+  Check your work continuously against the objective — success means `systemctl is-active auditd`` returns
   active.
 
 
-  VERIFY: Re-run the same check the grader uses and confirm `systemctl is-active sshd` returns active.
+  VERIFY: Re-run the same check the grader uses and confirm `systemctl is-active auditd` returns active.
   Capture the before/after output as evidence. Success criteria: the objective''s healthy state holds
   on a repeat check, not just once.
 
@@ -76,28 +76,25 @@ hints:
   cost: 25
   content: 'WHICH TOOL — the diagnostic command(s):
 
-    Start with `systemctl status sshd` and `journalctl -u sshd -n 50 --no-pager` before changing anything.'
+    Run `systemctl status auditd` and `journalctl -u auditd -n 50`.'
 - order: 4
   cost: 40
   content: 'NARROW DOWN — isolate the subsystem:
 
-    1. Run `systemctl status sshd` — note Active/Failed and the last log lines.
+    1. Confirm `auditd` is failed/inactive.
 
-    2. Read `journalctl -u sshd -n 50` for the root error.
+    2. Read the unit journal for the root cause.
 
-    3. Form a hypothesis about the smallest config or permission fix.'
+    3. Apply the smallest fix that restores the unit.'
 - order: 5
   cost: 60
   content: 'NEAR-SOLUTION — the fix shape + verify (you still apply it):
 
-    1. Apply the minimal fix (config, unit override, or missing directory).
+    1. Repair the underlying config/cause for `auditd`.
 
-    2. Run `systemctl daemon-reload` if you edited a unit file.
+    2. `systemctl enable --now auditd`.
 
-    3. Run `systemctl restart sshd` and confirm `systemctl is-active sshd` succeeds.
-
-
-    WHY: the grader checks real service state, not marker files.'
+    3. Verify with `systemctl is-active auditd` (expect active).'
 summary: Complete the selinux — backup lab security lab and verify success with the checker
 estimated_minutes: 20
 xp_reward: 100
@@ -136,10 +133,10 @@ tasks:
   background: 'This security lab teaches systematic troubleshooting: observe, hypothesize, change, verify.'
   validation:
     type: service_active
-    command: systemctl is-active sshd
+    command: systemctl is-active auditd
     expected_status: active
-    error_message: The sshd service is not active yet. Check `systemctl status sshd` and `journalctl -u
-      sshd -n 50`.
+    error_message: The auditd service is not active yet. Check `systemctl status auditd` and `journalctl
+      -u auditd -n 50`.
 solution:
   summary: The root cause is an unhealthy `sshd` service; repair it and verify active state.
   files_changed: []
@@ -152,7 +149,7 @@ guided_mode:
   - step: 1
     title: Inspect current state
     instruction: Run a read-only diagnostic before changing anything.
-    command: systemctl is-active sshd
+    command: systemctl is-active auditd
     expected_output: Output shows the current failure mode
     explanation: Evidence-first troubleshooting avoids guessing.
     next_on: command_success
@@ -166,7 +163,7 @@ guided_mode:
   - step: 3
     title: Verify with the grader
     instruction: Run the same verification the checker uses.
-    command: systemctl is-active sshd
-    expected_output: '`systemctl is-active sshd` returns active'
+    command: systemctl is-active auditd
+    expected_output: '`systemctl is-active auditd`` returns active'
     explanation: The lab passes only when real state is healthy.
     next_on: command_success

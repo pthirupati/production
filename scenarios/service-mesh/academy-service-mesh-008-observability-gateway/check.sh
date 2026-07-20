@@ -1,3 +1,3 @@
 #!/usr/bin/env bash
-grep -q FIXED-OK /opt/fixitlab/academy/academy-service-mesh-008-observability-gateway.conf
+systemctl is-active crond
 exit 0

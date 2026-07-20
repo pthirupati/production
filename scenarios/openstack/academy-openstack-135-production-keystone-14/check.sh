@@ -1,3 +1,3 @@
 #!/usr/bin/env bash
-grep -q FIXED-OK /opt/fixitlab/academy/academy-openstack-135-production-keystone-14.conf
+systemctl is-active rsyslog
 exit 0

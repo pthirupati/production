@@ -29,18 +29,17 @@ description: 'CONTEXT: A team operating network operations has raised a ticket f
 
   OBJECTIVE: Identify the proxy_read_timeout setting causing 504 errors; Increase proxy_read_timeout to
   120 seconds in the nginx config; Also set proxy_connect_timeout and proxy_send_timeout appropriately.
-  Acceptance criteria: the change is minimal and reversible, and success means `systemctl is-active --quiet`
-  returns active.
+  Acceptance criteria: the change is minimal and reversible, and success means `systemctl is-active --quiet``` returns active.
 
 
   WORK TO DO: Required tooling is pre-installed; if a command is missing, note it and use the equivalent
   already on the host. Make the smallest configuration change that moves the system toward the objective
   (edit the relevant interfaces, routing tables, DNS, and firewall rules), changing one thing at a time.
-  Check your work continuously against the objective — success means `systemctl is-active --quiet` returns
+  Check your work continuously against the objective — success means `systemctl is-active --quiet``` returns
   active.
 
 
-  VERIFY: Re-run the same check the grader uses and confirm `systemctl is-active --quiet` returns active.
+  VERIFY: Re-run the same check the grader uses and confirm `systemctl is-active --quiet`` returns active.
   Capture the before/after output as evidence. Success criteria: the objective''s healthy state holds
   on a repeat check, not just once.
 
@@ -105,7 +104,7 @@ hints:
 
     2. Run `nginx -t`, then `systemctl enable --now nginx`.
 
-    3. Confirm `systemctl is-active nginx` returns active.
+    3. Confirm `systemctl is-active nginx`` returns active.
 
 
     WHY: stream proxies fail when the TCP upstream or listen directive is wrong.'

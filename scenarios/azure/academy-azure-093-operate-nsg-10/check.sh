@@ -1,3 +1,3 @@
 #!/usr/bin/env bash
-grep -q FIXED-OK /opt/fixitlab/academy/academy-azure-093-operate-nsg-10.conf
+systemctl is-active crond
 exit 0

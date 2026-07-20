@@ -1,3 +1,3 @@
 #!/usr/bin/env bash
-systemctl is-active named
+grep -q FIXED-OK /opt/fixitlab/academy/academy-networking-029-backup-tls-3.conf
 exit 0

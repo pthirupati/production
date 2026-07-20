@@ -1,3 +1,3 @@
 #!/usr/bin/env bash
-systemctl is-active sshd
+systemctl is-active firewalld
 exit 0

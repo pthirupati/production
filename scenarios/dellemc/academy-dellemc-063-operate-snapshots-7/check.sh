@@ -1,3 +1,3 @@
 #!/usr/bin/env bash
-grep -q FIXED-OK /opt/fixitlab/academy/academy-dellemc-063-operate-snapshots-7.conf
+systemctl is-active nginx
 exit 0

@@ -1,3 +1,3 @@
 #!/usr/bin/env bash
-systemctl is-active named
+systemctl is-active firewalld
 exit 0

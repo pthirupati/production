@@ -28,14 +28,14 @@ description: 'CONTEXT: A team operating Docker containers has raised a ticket fo
 
   OBJECTIVE: Unsafe defaults related to container healthchecks are removed or constrained; Access follows
   least privilege and is auditable; Security checks pass without breaking required functionality. Acceptance
-  criteria: the change is minimal and reversible, and success means `systemctl is-active docker` returns
+  criteria: the change is minimal and reversible, and success means `systemctl is-active docker`` returns
   active.
 
 
   WORK TO DO: Required tooling is pre-installed; if a command is missing, note it and use the equivalent
   already on the host. Make the smallest configuration change that moves the system toward the objective
   (edit the relevant docker CLI, images, containers, and compose files), changing one thing at a time.
-  Check your work continuously against the objective — success means `systemctl is-active docker` returns
+  Check your work continuously against the objective — success means `systemctl is-active docker`` returns
   active.
 
 
@@ -78,28 +78,25 @@ hints:
   cost: 25
   content: 'WHICH TOOL — the diagnostic command(s):
 
-    Run `docker ps -a` and `docker logs <container>` for the failing container.'
+    Run `systemctl status docker` and `journalctl -u docker -n 50`.'
 - order: 4
   cost: 40
   content: 'NARROW DOWN — isolate the subsystem:
 
-    1. Identify the exited/unhealthy container and read its logs.
+    1. Confirm `docker` is failed/inactive.
 
-    2. Inspect the image, env vars, and volume mounts (`docker inspect`).
+    2. Read the unit journal for the root cause.
 
-    3. Compare container state to the scenario objectives.'
+    3. Apply the smallest fix that restores the unit.'
 - order: 5
   cost: 60
   content: 'NEAR-SOLUTION — the fix shape + verify (you still apply it):
 
-    1. Fix the Dockerfile, compose file, or runtime config.
+    1. Repair the underlying config/cause for `docker`.
 
-    2. Rebuild/restart the container.
+    2. `systemctl enable --now docker`.
 
-    3. Confirm `systemctl is-active docker` succeeds.
-
-
-    WHY: Docker labs grade real container state.'
+    3. Verify with `systemctl is-active docker` (expect active).'
 summary: Complete the container healthchecks — security lab docker lab and verify success with the checker
 estimated_minutes: 20
 xp_reward: 100
@@ -168,6 +165,6 @@ guided_mode:
     title: Verify with the grader
     instruction: Run the same verification the checker uses.
     command: systemctl is-active docker
-    expected_output: '`systemctl is-active docker` returns active'
+    expected_output: '`systemctl is-active docker`` returns active'
     explanation: The lab passes only when real state is healthy.
     next_on: command_success

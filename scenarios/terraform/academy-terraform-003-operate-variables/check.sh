@@ -1,3 +1,3 @@
 #!/usr/bin/env bash
-# Validated by the dedicated simulation engine (real state checks).
+grep -q FIXED-OK /opt/fixitlab/academy/academy-terraform-003-operate-variables.conf
 exit 0

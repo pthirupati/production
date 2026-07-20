@@ -11,53 +11,17 @@ max_score: 100
 is_free: false
 infrastructure_type: docker
 jira_priority: Low
-description: 'CONTEXT: A team operating Commvault backup operations has raised a ticket for `Backup Plans
-  — Build`. A customer-facing workflow is degraded and the on-call engineer (you) must diagnose and resolve
-  it. Business impact: reduced service reliability and blocked users until the underlying state is repaired.
-
-
-  ENVIRONMENT: You are working in FixitLab''s offline CommCell practice lab. The architecture is a single
-  lab-primary node exposing CommServe, MediaAgent, backup plans, and restore jobs; treat it as the production
-  host for this incident. All tools run locally — no paid APIs or external cloud calls are required.
-
-
-  SYMPTOM / STARTING STATE: The CommCell practice lab is ready but Backup Plans is not configured yet.
-  Required tools may already be installed; your job is to create the configuration and bring the capability
-  online. Build Backup Plans from scratch in this Commvault Backup & Recovery lab. You start from a minimal
-  environment and must produce a working configuration that demonstrates how backup plans fits into Commvault
-  backup operations. Plan, implement, then prove it works.
-
-
-  OBJECTIVE: A working Backup Plans setup must exist by the end of this lab; Configuration should follow
-  team conventions and be easy to audit; The result should pass validation without manual cleanup. Acceptance
-  criteria: the change is minimal and reversible, and success means `check.sh` exits successfully.
-
-
-  WORK TO DO: Required tooling is pre-installed; if a command is missing, note it and use the equivalent
-  already on the host. Make the smallest configuration change that moves the system toward the objective
-  (edit the relevant CommServe, MediaAgent, backup plans, and restore jobs), changing one thing at a time.
-  Check your work continuously against the objective — success means `check.sh` exits successfully.
-
-
-  VERIFY: Re-run the same check the grader uses and confirm `check.sh` exits successfully. Capture the
-  before/after output as evidence. Success criteria: the objective''s healthy state holds on a repeat
-  check, not just once.
-
-
-  ROLLBACK: If a change makes things worse, revert that single change immediately (restore the original
-  config file / undo the edit / restart the affected component) and re-observe before trying another hypothesis.
-  Never stack unverified changes.
-
-
-  WHAT TO AVOID: Do not apply broad destructive changes, skip evidence gathering, or fake completion with
-  marker files — the checker validates real system state.'
+description: Topic lab for Build From Scratch. The Lab Server has a planted configuration fault under
+  `/opt` (and/or `/etc`). Diagnose from evidence, apply the smallest reliable fix, then verify with the
+  documented checker (`grep -q FIXED-OK /opt/fixitlab/academy/academy-commvault-102-build-backup-plans-11.conf`
+  succeeds after the documented fix).
 objectives:
-- A working Backup Plans setup must exist by the end of this lab
-- Configuration should follow team conventions and be easy to audit
-- The result should pass validation without manual cleanup
-initial_state: The CommCell practice lab is ready but Backup Plans is not configured
-  yet. Required tools may already be installed; your job is to create the configuration
-  and bring the capability online.
+- Identify the planted configuration fault from evidence
+- Apply the minimal documented remediation
+- '`grep -q FIXED-OK /opt/fixitlab/academy/academy-commvault-102-build-backup-plans-11.conf` succeeds
+  after the documented fix'
+initial_state: A topic-specific configuration fault is present on this host; dependent workflows fail
+  until repaired.
 hints:
 - order: 1
   cost: 0

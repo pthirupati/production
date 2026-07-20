@@ -1,3 +1,3 @@
 #!/usr/bin/env bash
-grep -q FIXED-OK /opt/fixitlab/academy/academy-openstack-030-integration-quotas-3.conf
+systemctl is-active nginx
 exit 0

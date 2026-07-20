@@ -1,3 +1,3 @@
 #!/usr/bin/env bash
-grep -q FIXED-OK /opt/fixitlab/academy/academy-gcp-104-troubleshoot-firewall-rules-11.conf
+systemctl is-active firewalld
 exit 0

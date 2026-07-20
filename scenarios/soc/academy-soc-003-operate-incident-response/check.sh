@@ -1,3 +1,3 @@
 #!/usr/bin/env bash
-grep -q FIXED-OK /opt/fixitlab/academy/academy-soc-003-operate-incident-response.conf
+systemctl is-active gitlab-runner
 exit 0

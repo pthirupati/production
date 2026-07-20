@@ -11,52 +11,15 @@ max_score: 100
 is_free: false
 infrastructure_type: docker
 jira_priority: Medium
-description: 'CONTEXT: A team operating OpenTelemetry observability has raised a ticket for `Opentelemetry:
-  Container Logs — Daily Operations`. A customer-facing workflow is degraded and the on-call engineer
-  (you) must diagnose and resolve it. Business impact: reduced service reliability and blocked users until
-  the underlying state is repaired.
-
-
-  ENVIRONMENT: You are working in FixitLab''s offline telemetry practice stack. The architecture is a
-  single lab-primary node exposing traces, metrics, logs, and collectors; treat it as the production host
-  for this incident. All tools run locally — no paid APIs or external cloud calls are required.
-
-
-  SYMPTOM / STARTING STATE: The telemetry practice stack is healthy enough for scheduled work on container
-  logs. Complete the maintenance task without unnecessary downtime. Day-2 operations: perform a routine
-  container logs task safely in Opentelemetry. Follow change control — inspect, change, verify — while
-  working with log drivers, rotation, and stdout/stderr capture.
-
-
-  OBJECTIVE: Day-2 container logs work completes safely in this environment; Changes are verified with
-  before/after checks; The system remains stable for dependent teams. Acceptance criteria: the change
-  is minimal and reversible, and success means `check.sh` exits successfully.
-
-
-  WORK TO DO: Required tooling is pre-installed; if a command is missing, note it and use the equivalent
-  already on the host. Make the smallest configuration change that moves the system toward the objective
-  (edit the relevant traces, metrics, logs, and collectors), changing one thing at a time. Check your
-  work continuously against the objective — success means `check.sh` exits successfully.
-
-
-  VERIFY: Re-run the same check the grader uses and confirm `check.sh` exits successfully. Capture the
-  before/after output as evidence. Success criteria: the objective''s healthy state holds on a repeat
-  check, not just once.
-
-
-  ROLLBACK: If a change makes things worse, revert that single change immediately (restore the original
-  config file / undo the edit / restart the affected component) and re-observe before trying another hypothesis.
-  Never stack unverified changes.
-
-
-  WHAT TO AVOID: Do not apply broad destructive changes, skip evidence gathering, or fake completion with
-  marker files — the checker validates real system state.'
+description: Service operations lab. The `rsyslog` systemd unit is **failed/inactive** on this host —
+  a realistic fault for Daily Operations workflows that depend on it. Diagnose with `systemctl status
+  rsyslog` and journal logs, apply the smallest reliable fix, then verify with `systemctl is-active rsyslog`.
 objectives:
-- Day-2 container logs work completes safely in this environment
-- Changes are verified with before/after checks
-- The system remains stable for dependent teams
-initial_state: The telemetry practice stack is healthy enough for scheduled work on
-  container logs. Complete the maintenance task without unnecessary downtime.
+- The `rsyslog` service is active (running)
+- '`systemctl is-active rsyslog`` returns active'
+- The fix survives a status re-check (no marker files)
+initial_state: The `rsyslog` service is not running (`systemctl is-active rsyslog` → inactive/failed).
+  Dependent Daily Operations tasks cannot succeed until the unit is healthy again.
 hints:
 - order: 1
   cost: 0
@@ -77,25 +40,22 @@ hints:
   cost: 25
   content: 'WHICH TOOL — the diagnostic command(s):
 
-    Run `docker ps -a` and `docker logs <container>` for the failing container.'
+    Run `systemctl status rsyslog` and `journalctl -u rsyslog -n 50`.'
 - order: 4
   cost: 40
   content: 'NARROW DOWN — isolate the subsystem:
 
-    1. `docker ps -a` — note Exited status and exit code.
+    1. Confirm `rsyslog` is failed/inactive.
 
-    2. `docker logs <name>` for the startup error.
+    2. Read the unit journal for the root cause.
 
-    3. Inspect the Dockerfile or `docker run` flags if the image is wrong.'
+    3. Apply the smallest fix that restores the unit.'
 - order: 5
   cost: 60
   content: 'NEAR-SOLUTION — the fix shape + verify (you still apply it):
 
-    1. Fix image, port mapping, volume, or env configuration.
+    1. Repair the underlying config/cause for `rsyslog`.
 
-    2. `docker start <name>` or re-run with corrected flags.
+    2. `systemctl enable --now rsyslog`.
 
-    3. Confirm `bash check.sh` shows the container Up.
-
-
-    WHY: the checker validates the container is actually running.'
+    3. Verify with `systemctl is-active rsyslog` (expect active).'

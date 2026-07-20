@@ -27,13 +27,13 @@ description: 'CONTEXT: A team operating PostgreSQL has raised a ticket for `Quer
 
   OBJECTIVE: query plans is connected to the adjacent system successfully; Handoff points are authenticated
   and observable; End-to-end workflow completes without manual intervention. Acceptance criteria: the
-  change is minimal and reversible, and success means `systemctl is-active postgresql` returns active.
+  change is minimal and reversible, and success means `systemctl is-active postgresql`` returns active.
 
 
   WORK TO DO: Required tooling is pre-installed; if a command is missing, note it and use the equivalent
   already on the host. Make the smallest configuration change that moves the system toward the objective
   (edit the relevant psql, pg_hba.conf, roles, and WAL), changing one thing at a time. Check your work
-  continuously against the objective — success means `systemctl is-active postgresql` returns active.
+  continuously against the objective — success means `systemctl is-active postgresql`` returns active.
 
 
   VERIFY: Re-run the same check the grader uses and confirm `systemctl is-active postgresql` returns active.
@@ -74,29 +74,25 @@ hints:
   cost: 25
   content: 'WHICH TOOL — the diagnostic command(s):
 
-    Start with `systemctl status postgresql` and `journalctl -u postgresql -n 50 --no-pager` before changing
-    anything.'
+    Run `systemctl status postgresql` and `journalctl -u postgresql -n 50`.'
 - order: 4
   cost: 40
   content: 'NARROW DOWN — isolate the subsystem:
 
-    1. Run `systemctl status postgresql` — note Active/Failed and the last log lines.
+    1. Confirm `postgresql` is failed/inactive.
 
-    2. Read `journalctl -u postgresql -n 50` for the root error.
+    2. Read the unit journal for the root cause.
 
-    3. Form a hypothesis about the smallest config or permission fix.'
+    3. Apply the smallest fix that restores the unit.'
 - order: 5
   cost: 60
   content: 'NEAR-SOLUTION — the fix shape + verify (you still apply it):
 
-    1. Apply the minimal fix (config, unit override, or missing directory).
+    1. Repair the underlying config/cause for `postgresql`.
 
-    2. Run `systemctl daemon-reload` if you edited a unit file.
+    2. `systemctl enable --now postgresql`.
 
-    3. Run `systemctl restart postgresql` and confirm `systemctl is-active postgresql` succeeds.
-
-
-    WHY: the grader checks real service state, not marker files.'
+    3. Verify with `systemctl is-active postgresql` (expect active).'
 cross_technology: true
 summary: Complete the query plans — integration lab postgresql lab and verify success with the checker
 estimated_minutes: 20
@@ -167,6 +163,6 @@ guided_mode:
     title: Verify with the grader
     instruction: Run the same verification the checker uses.
     command: systemctl is-active postgresql
-    expected_output: '`systemctl is-active postgresql` returns active'
+    expected_output: '`systemctl is-active postgresql`` returns active'
     explanation: The lab passes only when real state is healthy.
     next_on: command_success

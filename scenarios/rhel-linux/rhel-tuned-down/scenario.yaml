@@ -31,11 +31,11 @@ description: 'CONTEXT: A team operating Red Hat Enterprise Linux has raised a ti
   WORK TO DO: Required tooling is pre-installed; if a command is missing, note it and use the equivalent
   already on the host. Make the smallest configuration change that moves the system toward the objective
   (edit the relevant dnf, subscription-manager, firewalld, and SELinux), changing one thing at a time.
-  Check your work continuously against the objective — success means `systemctl is-active tuned` returns
+  Check your work continuously against the objective — success means `systemctl is-active tuned``` returns
   active.
 
 
-  VERIFY: Re-run the same check the grader uses and confirm `systemctl is-active tuned` returns active.
+  VERIFY: Re-run the same check the grader uses and confirm `systemctl is-active tuned`` returns active.
   Capture the before/after output as evidence. Success criteria: the objective''s healthy state holds
   on a repeat check, not just once.
 
@@ -164,6 +164,6 @@ guided_mode:
     title: Verify with the grader
     instruction: Run the same verification the checker uses.
     command: systemctl is-active tuned
-    expected_output: '`systemctl is-active tuned` returns active'
+    expected_output: '`systemctl is-active tuned`` returns active'
     explanation: The lab passes only when real state is healthy.
     next_on: command_success

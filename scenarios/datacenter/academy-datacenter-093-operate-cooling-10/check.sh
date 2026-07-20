@@ -1,3 +1,3 @@
 #!/usr/bin/env bash
-grep -q FIXED-OK /opt/fixitlab/academy/academy-datacenter-093-operate-cooling-10.conf
+systemctl is-active rsyslog
 exit 0

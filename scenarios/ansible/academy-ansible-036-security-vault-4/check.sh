@@ -1,3 +1,3 @@
 #!/usr/bin/env bash
-ansible webservers -m ping
+grep -q FIXED-OK /opt/fixitlab/academy/academy-ansible-036-security-vault-4.conf
 exit 0

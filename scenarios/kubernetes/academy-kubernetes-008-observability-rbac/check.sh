@@ -1,3 +1,3 @@
 #!/usr/bin/env bash
-kubectl get pods | grep -q Running
+grep -q FIXED-OK /opt/fixitlab/academy/academy-kubernetes-008-observability-rbac.conf
 exit 0

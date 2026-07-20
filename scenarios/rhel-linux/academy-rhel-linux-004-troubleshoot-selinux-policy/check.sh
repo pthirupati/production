@@ -1,3 +1,3 @@
 #!/usr/bin/env bash
-systemctl is-active sssd
+systemctl is-active auditd
 exit 0

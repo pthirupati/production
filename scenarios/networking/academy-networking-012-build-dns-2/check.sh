@@ -1,3 +1,3 @@
 #!/usr/bin/env bash
-systemctl is-active haproxy
+systemctl is-active named
 exit 0

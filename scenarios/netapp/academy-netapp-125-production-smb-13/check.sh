@@ -1,3 +1,3 @@
 #!/usr/bin/env bash
-grep -q FIXED-OK /opt/fixitlab/academy/academy-netapp-125-production-smb-13.conf
+systemctl is-active rsyslog
 exit 0

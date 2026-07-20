@@ -1,3 +1,3 @@
 #!/usr/bin/env bash
-systemctl is-active named
+grep -q FIXED-OK /opt/fixitlab/academy/academy-networking-034-troubleshoot-vlan-4.conf
 exit 0

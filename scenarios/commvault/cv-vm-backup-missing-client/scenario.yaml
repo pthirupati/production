@@ -37,17 +37,17 @@ description: 'CONTEXT: A team operating Commvault backup operations has raised a
   OBJECTIVE: Open the VMware console (companion "Open VMware" link) and power on the migrated VM so it
   is discovered as a CommCell client; Sign in to the Commvault Command Center; Open Client Computers and
   locate db01, flagged "Overdue". Acceptance criteria: the change is minimal and reversible, and success
-  means `systemctl is-active mysqld` returns active.
+  means `systemctl is-active mysqld`` returns active.
 
 
   WORK TO DO: Required tooling is pre-installed; if a command is missing, note it and use the equivalent
   already on the host. Make the smallest configuration change that moves the system toward the objective
   (edit the relevant CommServe, MediaAgent, backup plans, and restore jobs), changing one thing at a time.
-  Check your work continuously against the objective — success means `systemctl is-active mysqld` returns
+  Check your work continuously against the objective — success means `systemctl is-active mysqld``` returns
   active.
 
 
-  VERIFY: Re-run the same check the grader uses and confirm `systemctl is-active mysqld` returns active.
+  VERIFY: Re-run the same check the grader uses and confirm `systemctl is-active mysqld`` returns active.
   Capture the before/after output as evidence. Success criteria: the objective''s healthy state holds
   on a repeat check, not just once.
 
@@ -108,7 +108,7 @@ hints:
 
     2. `systemctl restart mysqld`.
 
-    3. Confirm `systemctl is-active mysqld` returns active.
+    3. Confirm `systemctl is-active mysqld`` returns active.
 
 
     WHY: MySQL often fails silently until you read the error log.'

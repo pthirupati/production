@@ -28,18 +28,18 @@ description: 'CONTEXT: A team operating DevOps delivery has raised a ticket for 
 
   OBJECTIVE: Identify the misconfigured Prometheus datasource in Grafana; Update the datasource URL to
   the correct Prometheus endpoint; Verify dashboards display data after the fix. Acceptance criteria:
-  the change is minimal and reversible, and success means `systemctl is-active grafana-server` returns
+  the change is minimal and reversible, and success means `systemctl is-active grafana-server``` returns
   active.
 
 
   WORK TO DO: Required tooling is pre-installed; if a command is missing, note it and use the equivalent
   already on the host. Make the smallest configuration change that moves the system toward the objective
   (edit the relevant git repos, pipelines, artifacts, and runbooks), changing one thing at a time. Check
-  your work continuously against the objective — success means `systemctl is-active grafana-server` returns
+  your work continuously against the objective — success means `systemctl is-active grafana-server``` returns
   active.
 
 
-  VERIFY: Re-run the same check the grader uses and confirm `systemctl is-active grafana-server` returns
+  VERIFY: Re-run the same check the grader uses and confirm `systemctl is-active grafana-server`` returns
   active. Capture the before/after output as evidence. Success criteria: the objective''s healthy state
   holds on a repeat check, not just once.
 

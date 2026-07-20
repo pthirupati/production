@@ -21,11 +21,12 @@ description: 'CONTEXT: A team operating prompt engineering has raised a ticket f
   host for this incident. All tools run locally — no paid APIs or external cloud calls are required.
 
 
-  SYMPTOM / STARTING STATE: A guided AI practice console opens in your browser. It is a rule-based tool responder
-  (no real model, no API cost) that scores your prompt live. Two systems are deployed but not fully wired
-  together for Jinja2 templates. Downstream consumers are waiting on this integration path. Integration
-  lab: connect Jinja2 templates with an adjacent platform in the prompt-engineering stack. Validate authentication,
-  data handoff, and failure behavior for variables, filters, and conditionals in templates.
+  SYMPTOM / STARTING STATE: A guided AI practice console opens in your browser. It is a rule-based tool
+  responder (no real model, no API cost) that scores your prompt live. Two systems are deployed but not
+  fully wired together for Jinja2 templates. Downstream consumers are waiting on this integration path.
+  Integration lab: connect Jinja2 templates with an adjacent platform in the prompt-engineering stack.
+  Validate authentication, data handoff, and failure behavior for variables, filters, and conditionals
+  in templates.
 
 
   OBJECTIVE: Jinja2 templates is connected to the adjacent system successfully; Handoff points are authenticated
@@ -55,7 +56,8 @@ objectives:
 - Jinja2 templates is connected to the adjacent system successfully
 - Handoff points are authenticated and observable
 - End-to-end workflow completes without manual intervention
-initial_state: A guided AI practice console opens in your browser. It is a rule-based tool responder (no real model, no API cost) that scores your prompt live.
+initial_state: A guided AI practice console opens in your browser. It is a rule-based tool responder (no
+  real model, no API cost) that scores your prompt live.
 hints:
 - order: 1
   cost: 0
@@ -76,34 +78,28 @@ hints:
   cost: 25
   content: 'WHICH TOOL — the diagnostic command(s):
 
-    Open `the solution file`, read the instructions, and run the visible tests to see which assertion
-    fails first.'
+    Run `systemctl status model-server` and `journalctl -u model-server -n 50`.'
 - order: 4
   cost: 40
   content: 'NARROW DOWN — isolate the subsystem:
 
-    1. From the evidence above, decide which single part of Jinja2 templates is at fault.
+    1. Confirm `model-server` is failed/inactive.
 
-    2. Re-run the most relevant of template files, `--check --diff`, and rendered output focused on just
-    that part to confirm it.
+    2. Read the unit journal for the root cause.
 
-    3. State a one-line hypothesis: the smallest change that would move the state from ''rendered config
-    is wrong or missing values'' toward ''the rendered file matches the intended config''.'
+    3. Apply the smallest fix that restores the unit.'
 - order: 5
   cost: 60
   content: 'NEAR-SOLUTION — the fix shape + verify (you still apply it):
 
-    1. Edit `the solution file` with the smallest correct change.
+    1. Repair the underlying config/cause for `model-server`.
 
-    2. Re-run visible tests, then Check Solution (includes hidden tests).
+    2. `systemctl enable --now model-server`.
 
-    3. Confirm every test passes.
-
-
-    WHY: coding labs grade against hidden test cases, not marker files.'
+    3. Verify with `systemctl is-active model-server` (expect active).'
 cross_technology: true
-summary: Complete the jinja2 templates — integration lab prompt engineering lab and
-  verify success with the checker
+summary: Complete the jinja2 templates — integration lab prompt engineering lab and verify success with
+  the checker
 estimated_minutes: 20
 xp_reward: 100
 prerequisites:
@@ -142,8 +138,7 @@ tasks:
     script: hidden_tests
     error_message: Prompt did not meet the rubric. Revise and submit again.
 solution:
-  summary: Write a specific prompt covering role, task, constraints, and format for
-    templates.
+  summary: Write a specific prompt covering role, task, constraints, and format for templates.
   files_changed: []
   commands_run: []
 guided_mode:
@@ -178,12 +173,11 @@ coding_spec:
     persona: A helpful AI assistant for learning prompt engineering.
     lesson:
     - heading: About Templates
-      body: This lab teaches templates — one of the core skills for reliable LLM workflows.
-        Use the practice console to draft and score your prompt against the rubric.
+      body: This lab teaches templates — one of the core skills for reliable LLM workflows. Use the practice
+        console to draft and score your prompt against the rubric.
     - heading: What good looks like
-      body: Strong prompts assign a role, state the task clearly, set constraints
-        (length, tone, format), and specify the output shape. Vague prompts score
-        low; specific prompts score 80+.
+      body: Strong prompts assign a role, state the task clearly, set constraints (length, tone, format),
+        and specify the output shape. Vague prompts score low; specific prompts score 80+.
     rubric:
     - role
     - context
@@ -199,5 +193,5 @@ coding_spec:
         has_delimiter: true
         min_words: 20
       starter: Write your prompt here…
-  instructions: Complete the Jinja2 Templates — Integration Lab exercise in the Prompt
-    Playground. Score 80+ on the rubric, then submit.
+  instructions: Complete the Jinja2 Templates — Integration Lab exercise in the Prompt Playground. Score
+    80+ on the rubric, then submit.

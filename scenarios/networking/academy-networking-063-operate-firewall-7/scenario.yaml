@@ -27,17 +27,17 @@ description: 'CONTEXT: A team operating network operations has raised a ticket f
 
   OBJECTIVE: Day-2 host firewall work completes safely in this environment; Changes are verified with
   before/after checks; The system remains stable for dependent teams. Acceptance criteria: the change
-  is minimal and reversible, and success means `systemctl is-active named` returns active.
+  is minimal and reversible, and success means `systemctl is-active firewalld`` returns active.
 
 
   WORK TO DO: Required tooling is pre-installed; if a command is missing, note it and use the equivalent
   already on the host. Make the smallest configuration change that moves the system toward the objective
   (edit the relevant interfaces, routing tables, DNS, and firewall rules), changing one thing at a time.
-  Check your work continuously against the objective — success means `systemctl is-active named` returns
+  Check your work continuously against the objective — success means `systemctl is-active firewalld`` returns
   active.
 
 
-  VERIFY: Re-run the same check the grader uses and confirm `systemctl is-active named` returns active.
+  VERIFY: Re-run the same check the grader uses and confirm `systemctl is-active firewalld` returns active.
   Capture the before/after output as evidence. Success criteria: the objective''s healthy state holds
   on a repeat check, not just once.
 
@@ -76,28 +76,25 @@ hints:
   cost: 25
   content: 'WHICH TOOL — the diagnostic command(s):
 
-    Start with `systemctl status named` and `journalctl -u named -n 50 --no-pager` before changing anything.'
+    Run `systemctl status firewalld` and `journalctl -u firewalld -n 50`.'
 - order: 4
   cost: 40
   content: 'NARROW DOWN — isolate the subsystem:
 
-    1. Run `systemctl status named` — note Active/Failed and the last log lines.
+    1. Confirm `firewalld` is failed/inactive.
 
-    2. Read `journalctl -u named -n 50` for the root error.
+    2. Read the unit journal for the root cause.
 
-    3. Form a hypothesis about the smallest config or permission fix.'
+    3. Apply the smallest fix that restores the unit.'
 - order: 5
   cost: 60
   content: 'NEAR-SOLUTION — the fix shape + verify (you still apply it):
 
-    1. Apply the minimal fix (config, unit override, or missing directory).
+    1. Repair the underlying config/cause for `firewalld`.
 
-    2. Run `systemctl daemon-reload` if you edited a unit file.
+    2. `systemctl enable --now firewalld`.
 
-    3. Run `systemctl restart named` and confirm `systemctl is-active named` succeeds.
-
-
-    WHY: the grader checks real service state, not marker files.'
+    3. Verify with `systemctl is-active firewalld` (expect active).'
 summary: Complete the host firewall — operate lab networking lab and verify success with the checker
 estimated_minutes: 20
 xp_reward: 100
@@ -136,10 +133,10 @@ tasks:
   background: 'This networking lab teaches systematic troubleshooting: observe, hypothesize, change, verify.'
   validation:
     type: service_active
-    command: systemctl is-active named
+    command: systemctl is-active firewalld
     expected_status: active
-    error_message: The named service is not active yet. Check `systemctl status named` and `journalctl
-      -u named -n 50`.
+    error_message: The firewalld service is not active yet. Check `systemctl status firewalld` and `journalctl
+      -u firewalld -n 50`.
 solution:
   summary: The root cause is an unhealthy `named` service; repair it and verify active state.
   files_changed: []
@@ -152,7 +149,7 @@ guided_mode:
   - step: 1
     title: Inspect current state
     instruction: Run a read-only diagnostic before changing anything.
-    command: systemctl is-active named
+    command: systemctl is-active firewalld
     expected_output: Output shows the current failure mode
     explanation: Evidence-first troubleshooting avoids guessing.
     next_on: command_success
@@ -166,7 +163,7 @@ guided_mode:
   - step: 3
     title: Verify with the grader
     instruction: Run the same verification the checker uses.
-    command: systemctl is-active named
-    expected_output: '`systemctl is-active named` returns active'
+    command: systemctl is-active firewalld
+    expected_output: '`systemctl is-active firewalld`` returns active'
     explanation: The lab passes only when real state is healthy.
     next_on: command_success

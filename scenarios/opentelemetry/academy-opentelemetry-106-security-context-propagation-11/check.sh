@@ -1,3 +1,3 @@
 #!/usr/bin/env bash
-grep -q FIXED-OK /opt/fixitlab/academy/academy-opentelemetry-106-security-context-propagation-11.conf
+systemctl is-active rsyslog
 exit 0

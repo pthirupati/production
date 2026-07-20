@@ -1,3 +1,3 @@
 #!/usr/bin/env bash
-grep -q FIXED-OK /opt/fixitlab/academy/academy-devsecops-supplychain-003-operate-signing.conf
+systemctl is-active crond
 exit 0

@@ -1,3 +1,3 @@
 #!/usr/bin/env bash
-grep -q FIXED-OK /opt/fixitlab/academy/academy-openstack-009-backup-flavors.conf
+systemctl is-active nginx
 exit 0

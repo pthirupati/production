@@ -90,6 +90,8 @@ SERVICE_DESC: dict[str, str] = {
     "grafana-server": "Grafana Dashboard Server",
     "prometheus": "Prometheus Monitoring Server",
     "gunicorn": "Gunicorn Python WSGI Server",
+    "gitlab-runner": "GitLab Runner",
+    "jenkins": "Jenkins Automation Server",
 }
 
 TECH_SERVICE_POOLS: dict[str, list[str]] = {
@@ -128,8 +130,39 @@ TECH_SERVICE_POOLS: dict[str, list[str]] = {
     "peoplesoft": ["nginx"],
 }
 
+# Keyword → graded systemd unit (must match topic_faults planting).
+# First match wins. Keep in sync with topic_faults.py keyword lists.
+TOPIC_UNIT_RULES: list[tuple[tuple[str, ...], str]] = [
+    (("git-flow", "git-merge", "learn-git", "ci-pipeline", "cicd", "gitlab-ci",
+      "jenkins", "artifacts", "cd-release", "change-management", "incident-response"),
+     "gitlab-runner"),
+    (("firewall",), "firewalld"),
+    (("dns", "resolv"), "named"),
+    (("ntp", "chrony"), "chronyd"),
+    (("selinux", "audit"), "auditd"),
+    (("ssh",), "sshd"),
+    (("postgres", "postgresql"), "postgresql"),
+    (("mysql", "mariadb"), "mysqld"),
+    (("redis",), "redis"),
+    (("mongo",), "mongod"),
+    (("docker", "compose", "containerd"), "docker"),
+    (("haproxy", "load-balanc"), "haproxy"),
+    (("spring-boot", "jvm", "tomcat"), "spring-boot"),
+    (("prometheus",), "prometheus"),
+    (("grafana",), "grafana-server"),
+]
+
+PERM_KEYWORDS = ("permissions", "acl", "chmod", "chown", "sudoers")
+GITOPS_KEYWORDS = ("gitops", "argocd", "flux", "outofsync", "kustomize", "drift")
+MARKER_TOPIC_KEYWORDS = PERM_KEYWORDS + ("secrets", "vault", "tls-", "cert-", "rbac", "owasp",
+                                           "vlan", "bonding", "mtu", "nat", "terraform", "tfstate")
+
 
 def assign_service_unit(tech: str, slug: str) -> str:
+    low = (slug or "").lower()
+    for keys, unit in TOPIC_UNIT_RULES:
+        if any(k in low for k in keys):
+            return unit
     pool = TECH_SERVICE_POOLS.get(tech) or ["nginx", "crond", "rsyslog"]
     idx = sum(ord(c) for c in slug) % len(pool)
     return pool[idx]
@@ -138,6 +171,11 @@ def assign_service_unit(tech: str, slug: str) -> str:
 def classify_mode(tech: str, sim_type: str, slug: str) -> str:
     if slug in FLAGSHIP_SLUGS:
         return "skip"
+    low = (slug or "").lower()
+    # Permission / secrets / IaC topics are graded via FIXED-OK sentinel that
+    # topic_faults plants — not a recycled nginx unit.
+    if any(k in low for k in MARKER_TOPIC_KEYWORDS) or any(k in low for k in GITOPS_KEYWORDS):
+        return "topic_marker"
     if sim_type in DEDICATED_SIM:
         return "dedicated"
     if sim_type == "ansible" or tech == "ansible":
@@ -151,7 +189,7 @@ def classify_mode(tech: str, sim_type: str, slug: str) -> str:
     return "service"
 
 
-def check_script_for_mode(mode: str, unit: str = "") -> str:
+def check_script_for_mode(mode: str, unit: str = "", slug: str = "") -> str:
     if mode == "dedicated":
         return "#!/usr/bin/env bash\n# Validated by the dedicated simulation engine (real state checks).\n"
     if mode == "ansible":
@@ -162,10 +200,12 @@ def check_script_for_mode(mode: str, unit: str = "") -> str:
         return "#!/usr/bin/env bash\nnvidia-smi\n"
     if mode == "docker_compose":
         return "#!/usr/bin/env bash\ndocker ps | grep -q Up\n"
+    if mode == "topic_marker":
+        return f"#!/usr/bin/env bash\ngrep -q FIXED-OK /opt/fixitlab/academy/{slug}.conf\n"
     return f"#!/usr/bin/env bash\nsystemctl is-active {unit}\n"
 
 
-def verify_hint_line(mode: str, unit: str = "") -> str:
+def verify_hint_line(mode: str, unit: str = "", slug: str = "") -> str:
     if mode == "ansible":
         return "`ansible webservers -m ping` returns SUCCESS for every host"
     if mode == "k8s":
@@ -174,12 +214,193 @@ def verify_hint_line(mode: str, unit: str = "") -> str:
         return "`nvidia-smi` reports a healthy GPU"
     if mode == "docker_compose":
         return "`docker ps` shows application containers Up"
+    if mode == "topic_marker":
+        return f"`grep -q FIXED-OK /opt/fixitlab/academy/{slug}.conf` succeeds after the documented fix"
     return f"`systemctl is-active {unit}` returns active"
 
 
-def patch_scenario_yaml(path: Path, mode: str, unit: str, topic_label: str) -> None:
+def _topic_hint_blocks(mode: str, unit: str, slug: str) -> dict[int, str]:
+    """Replace diagnostic/fix hint tiers so they match planted topic faults."""
+    low = (slug or "").lower()
+    if mode == "topic_marker" and any(k in low for k in GITOPS_KEYWORDS):
+        return {
+            3: (
+                "WHICH TOOL — the diagnostic command(s):\n"
+                "Inspect GitOps state: `cat /opt/gitops/application.yaml` and "
+                "`cat /opt/gitops/flux-kustomization.yaml`. Look for OutOfSync / Ready=False."
+            ),
+            4: (
+                "NARROW DOWN — isolate the subsystem:\n"
+                "1. Confirm sync/health status in the Application manifest.\n"
+                "2. Check `syncPolicy` and source path/repoURL.\n"
+                "3. Compare with the Flux Kustomization Ready condition."
+            ),
+            5: (
+                "NEAR-SOLUTION — the fix shape + verify (you still apply it):\n"
+                "1. Repair `/opt/gitops/application.yaml` so sync is healthy (Synced/Healthy).\n"
+                "2. Fix Flux reconciliation errors in `/opt/gitops/flux-kustomization.yaml`.\n"
+                "3. Click Check Solution once the documented remediation is applied "
+                f"(grader: {verify_hint_line(mode, unit, slug)})."
+            ),
+        }
+    if unit == "gitlab-runner" or any(
+        k in low for k in ("git-flow", "ci-pipeline", "cicd", "jenkins", "artifacts", "cd-release")
+    ):
+        return {
+            3: (
+                "WHICH TOOL — the diagnostic command(s):\n"
+                "Check the runner: `systemctl status gitlab-runner`. Inspect CI config under "
+                "`/opt/ci/.gitlab-ci.yml` and `/opt/ci/Jenkinsfile` for failing stages."
+            ),
+            4: (
+                "NARROW DOWN — isolate the subsystem:\n"
+                "1. Confirm `gitlab-runner` is failed/inactive.\n"
+                "2. Read `/opt/ci/.gitlab-ci.yml` for BROKEN_PIPELINE / exit 1 steps.\n"
+                "3. Check `/root/app/.git/config` for a usable remote/branch setup."
+            ),
+            5: (
+                "NEAR-SOLUTION — the fix shape + verify (you still apply it):\n"
+                "1. Repair the CI pipeline YAML so the build stage succeeds.\n"
+                "2. `systemctl enable --now gitlab-runner`.\n"
+                "3. Verify with `systemctl is-active gitlab-runner` (expect active)."
+            ),
+        }
+    if mode == "topic_marker" and any(k in low for k in PERM_KEYWORDS):
+        return {
+            3: (
+                "WHICH TOOL — the diagnostic command(s):\n"
+                "Inspect permissions: `ls -la /opt/app/secret.env` and "
+                "`cat /etc/sudoers.d/app`. World-writable secrets and NOPASSWD ALL are the faults."
+            ),
+            4: (
+                "NARROW DOWN — isolate the subsystem:\n"
+                "1. Confirm secret.env mode is 777 (too open).\n"
+                "2. Review sudoers.d for overly broad privileges.\n"
+                "3. Decide least-privilege mode/owner for the app secret."
+            ),
+            5: (
+                "NEAR-SOLUTION — the fix shape + verify (you still apply it):\n"
+                "1. `chmod 600 /opt/app/secret.env` (and chown if needed).\n"
+                "2. Lock down `/etc/sudoers.d/app` to the minimum required.\n"
+                "3. Click Check Solution once the documented remediation is applied."
+            ),
+        }
+    if mode == "service" and unit:
+        return {
+            3: (
+                f"WHICH TOOL — the diagnostic command(s):\n"
+                f"Run `systemctl status {unit}` and `journalctl -u {unit} -n 50`."
+            ),
+            4: (
+                f"NARROW DOWN — isolate the subsystem:\n"
+                f"1. Confirm `{unit}` is failed/inactive.\n"
+                f"2. Read the unit journal for the root cause.\n"
+                f"3. Apply the smallest fix that restores the unit."
+            ),
+            5: (
+                f"NEAR-SOLUTION — the fix shape + verify (you still apply it):\n"
+                f"1. Repair the underlying config/cause for `{unit}`.\n"
+                f"2. `systemctl enable --now {unit}`.\n"
+                f"3. Verify with `systemctl is-active {unit}` (expect active)."
+            ),
+        }
+    return {}
+
+
+def retarget_verify_and_hints(
+    path: Path, mode: str, unit: str, slug: str, *, full_rewrite: bool = False
+) -> None:
+    """Update verify language + diagnostic hints without wiping ticket CONTEXT."""
     data = yaml.safe_load(path.read_text(encoding="utf-8")) or {}
-    verify = verify_hint_line(mode, unit)
+    verify = verify_hint_line(mode, unit, slug)
+    desc = data.get("description") or ""
+    if isinstance(desc, str) and mode == "service" and unit:
+        # Preserve backticks around the verify phrase.
+        desc = re.sub(
+            r"`systemctl is-active \S+` returns active",
+            f"`systemctl is-active {unit}` returns active",
+            desc,
+        )
+        desc = re.sub(
+            r"(?<!`)systemctl is-active \S+(?!`)",
+            f"systemctl is-active {unit}",
+            desc,
+        )
+        data["description"] = desc
+
+    if full_rewrite:
+        patch_scenario_yaml(path, mode, unit, topic_label=slug, slug=slug)
+        return
+
+    blocks = _topic_hint_blocks(mode, unit, slug)
+    hints = data.get("hints") or []
+    for h in hints:
+        order = h.get("order")
+        if order in blocks:
+            h["content"] = blocks[order]
+        elif order == 3 and unit:
+            content = (h.get("content") or "")
+            content = content.replace("nginx -t", f"systemctl status {unit}")
+            content = re.sub(r"systemctl status \S+", f"systemctl status {unit}", content)
+            h["content"] = content
+    data["hints"] = hints
+
+    # Retarget tasks / solution / guided_mode that still name a stale unit (nginx).
+    if mode == "service" and unit:
+        text = yaml.dump(data, sort_keys=False, allow_unicode=True, width=100)
+        # Only swap common academy recycled units when the graded unit differs.
+        for stale in ("nginx", "crond", "rsyslog"):
+            if stale == unit:
+                continue
+            text = text.replace(f"systemctl is-active {stale}", f"systemctl is-active {unit}")
+            text = text.replace(f"systemctl status {stale}", f"systemctl status {unit}")
+            text = text.replace(f"`{stale}` service", f"`{unit}` service")
+            text = text.replace(f"-u {stale}", f"-u {unit}")
+        data = yaml.safe_load(text) or data
+        sol = data.get("solution") or {}
+        if isinstance(sol, dict) and unit:
+            summary = sol.get("summary") or ""
+            if "nginx" in summary and unit != "nginx":
+                sol["summary"] = (
+                    f"The root cause is an unhealthy `{unit}` service; repair it and verify active state."
+                )
+            cmds = sol.get("commands_run") or []
+            sol["commands_run"] = [
+                c.replace("nginx", unit) if isinstance(c, str) else c for c in cmds
+            ]
+            data["solution"] = sol
+        for task in data.get("tasks") or []:
+            val = (task or {}).get("validation") or {}
+            if isinstance(val, dict) and "command" in val and unit:
+                cmd = val.get("command") or ""
+                if "systemctl is-active" in cmd:
+                    val["command"] = f"systemctl is-active {unit}"
+                    val["error_message"] = (
+                        f"The {unit} service is not active yet. "
+                        f"Check `systemctl status {unit}` and `journalctl -u {unit} -n 50`."
+                    )
+                    task["validation"] = val
+        guided = data.get("guided_mode") or {}
+        for step in guided.get("steps") or []:
+            cmd = step.get("command") or ""
+            if "systemctl is-active" in cmd and unit:
+                step["command"] = f"systemctl is-active {unit}"
+            exp = step.get("expected_output") or ""
+            if "systemctl is-active" in exp and unit:
+                step["expected_output"] = f"`systemctl is-active {unit}` returns active"
+
+    path.write_text(
+        yaml.dump(data, sort_keys=False, allow_unicode=True, width=100),
+        encoding="utf-8",
+    )
+
+
+def patch_scenario_yaml(
+    path: Path, mode: str, unit: str, topic_label: str, slug: str = ""
+) -> None:
+    data = yaml.safe_load(path.read_text(encoding="utf-8")) or {}
+    slug = slug or path.parent.name
+    verify = verify_hint_line(mode, unit, slug)
     if mode == "service":
         desc = (
             f"Service operations lab. The `{unit}` systemd unit is **failed/inactive** on "
@@ -238,10 +459,29 @@ def patch_scenario_yaml(path: Path, mode: str, unit: str, topic_label: str) -> N
         )
         data["initial_state"] = "`docker ps` shows no application containers in Up state."
         data["objectives"] = ["Compose stack containers are Up", verify]
+    elif mode == "topic_marker":
+        data["description"] = (
+            f"Topic lab for {topic_label}. The Lab Server has a planted configuration fault "
+            f"under `/opt` (and/or `/etc`). Diagnose from evidence, apply the smallest reliable "
+            f"fix, then verify with the documented checker ({verify})."
+        )
+        data["initial_state"] = (
+            "A topic-specific configuration fault is present on this host; dependent workflows fail until repaired."
+        )
+        data["objectives"] = [
+            "Identify the planted configuration fault from evidence",
+            "Apply the minimal documented remediation",
+            verify,
+        ]
 
     hints = data.get("hints") or []
+    blocks = _topic_hint_blocks(mode, unit, slug)
     for h in hints:
-        if h.get("order") == 3:
+        order = h.get("order")
+        if order in blocks:
+            h["content"] = blocks[order]
+            continue
+        if order == 3:
             content = (h.get("content") or "")
             content = re.sub(
                 r"\n4\. Record completion:.*",
@@ -350,6 +590,11 @@ def main() -> None:
     parser = argparse.ArgumentParser(description="Upgrade academy labs to real validation")
     parser.add_argument("--technology", default="", help="Only one tech folder slug")
     parser.add_argument("--dry-run", action="store_true")
+    parser.add_argument(
+        "--force-hints",
+        action="store_true",
+        help="Retarget verify language + diagnostic hints even for already-upgraded labs",
+    )
     args = parser.parse_args()
     tech_filter = args.technology.strip()
 
@@ -358,6 +603,30 @@ def main() -> None:
     docker_slugs: set[str] = set()
     ansible_slugs: set[str] = set()
     counts: dict[str, int] = {}
+
+    # When filtering to one technology, preserve maps for other techs so we
+    # don't wipe the generated preset/e2e files.
+    if tech_filter and PRESET_OUT.is_file() and E2E_OUT.is_file():
+        try:
+            from apps.labs.provisioner.simulation.academy_service_e2e_fixes import (
+                ACADEMY_ANSIBLE_SLUGS as _EXISTING_ANSIBLE,
+                ACADEMY_DOCKER_COMPOSE_SLUGS as _EXISTING_DOCKER,
+                ACADEMY_SERVICE_FIX as _EXISTING_FIX,
+            )
+            service_fix.update(_EXISTING_FIX)
+            docker_slugs.update(_EXISTING_DOCKER)
+            ansible_slugs.update(_EXISTING_ANSIBLE)
+            for slug, unit in _EXISTING_FIX.items():
+                if not slug.startswith(f"academy-{tech_filter}"):
+                    preset_entries[slug] = ("service", unit)
+            for slug in _EXISTING_DOCKER:
+                if not slug.startswith(f"academy-{tech_filter}"):
+                    preset_entries[slug] = ("docker_compose", "")
+            for slug in _EXISTING_ANSIBLE:
+                if not slug.startswith(f"academy-{tech_filter}"):
+                    preset_entries[slug] = ("ansible", "")
+        except Exception:
+            pass
 
     for tech_dir in sorted(SCEN.iterdir()):
         if not tech_dir.is_dir() or tech_dir.name == "shared":
@@ -371,6 +640,12 @@ def main() -> None:
             if not yaml_path.is_file():
                 continue
             slug = folder.name
+            # Drop prior entries for this tech when re-emitting under --technology
+            if tech_filter:
+                preset_entries.pop(slug, None)
+                service_fix.pop(slug, None)
+                docker_slugs.discard(slug)
+                ansible_slugs.discard(slug)
             data = yaml.safe_load(yaml_path.read_text(encoding="utf-8")) or {}
             sim_type = (data.get("simulation_type") or "generic").strip()
             mode = classify_mode(tech, sim_type, slug)
@@ -379,17 +654,18 @@ def main() -> None:
             check_body = check_path.read_text(encoding="utf-8") if check_path.is_file() else ""
             # Match still-marker labs (first upgrade) AND already-upgraded service
             # labs (re-run: retarget the graded unit). Non-service already-upgraded
-            # modes (ansible/k8s/gpu/docker/dedicated) carry no `systemctl is-active`
-            # line, so they only re-match when the classify() mode below matches —
-            # their check.sh is regenerated deterministically regardless.
+            # modes (ansible/k8s/gpu/docker/dedicated/topic_marker) carry no
+            # `systemctl is-active` line, so they re-match via classify() mode.
             is_marker = bool(MARKER_RE.search(check_body))
             is_upgraded_service = bool(ALREADY_SERVICE_RE.search(check_body))
-            is_upgraded_nonservice = mode in {"ansible", "k8s", "gpu", "docker_compose"}
+            is_upgraded_nonservice = mode in {
+                "ansible", "k8s", "gpu", "docker_compose", "topic_marker", "dedicated",
+            }
             if not (is_marker or is_upgraded_service or is_upgraded_nonservice):
                 continue
 
             unit = assign_service_unit(tech, slug)
-            script = check_script_for_mode(mode, unit)
+            script = check_script_for_mode(mode, unit, slug)
             title = (data.get("title") or slug).split("—")[-1].strip()
             topic_label = title or tech.replace("-", " ")
 
@@ -401,7 +677,9 @@ def main() -> None:
                 # here only RETARGETS the graded unit (check.sh + maps) and must NOT
                 # clobber that enrichment — per TASK #8 "keep the enriched description".
                 if is_marker:
-                    patch_scenario_yaml(yaml_path, mode, unit, topic_label)
+                    patch_scenario_yaml(yaml_path, mode, unit, topic_label, slug=slug)
+                elif args.force_hints:
+                    retarget_verify_and_hints(yaml_path, mode, unit, slug)
 
             if mode == "service":
                 preset_entries[slug] = ("service", unit)
@@ -414,7 +692,7 @@ def main() -> None:
             elif mode == "ansible":
                 preset_entries[slug] = ("ansible", "")
                 ansible_slugs.add(slug)
-            # k8s + dedicated: check.sh only (+ k8s engine hook)
+            # k8s + dedicated + topic_marker: check.sh only (topic_faults plants state)
 
             counts[mode] = counts.get(mode, 0) + 1
 

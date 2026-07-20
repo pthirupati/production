@@ -1,3 +1,3 @@
 #!/usr/bin/env bash
-grep -q FIXED-OK /opt/fixitlab/academy/academy-dellemc-016-security-iscsi-2.conf
+systemctl is-active nginx
 exit 0

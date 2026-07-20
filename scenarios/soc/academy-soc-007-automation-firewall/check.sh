@@ -1,3 +1,3 @@
 #!/usr/bin/env bash
-grep -q FIXED-OK /opt/fixitlab/academy/academy-soc-007-automation-firewall.conf
+systemctl is-active firewalld
 exit 0

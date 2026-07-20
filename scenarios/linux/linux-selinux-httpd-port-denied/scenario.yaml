@@ -26,16 +26,16 @@ description: 'CONTEXT: A team operating Linux administration has raised a ticket
   OBJECTIVE: Confirm SELinux is in Enforcing mode with getenforce / sestatus; Identify port 8080 is not
   labelled http_port_t (semanage port -l | grep http_port_t); Add the port label with semanage port -a
   -t http_port_t -p tcp 8080. Acceptance criteria: the change is minimal and reversible, and success means
-  `systemctl is-active nginx` returns active.
+  `systemctl is-active nginx`` returns active.
 
 
   WORK TO DO: Required tooling is pre-installed; if a command is missing, note it and use the equivalent
   already on the host. Make the smallest configuration change that moves the system toward the objective
   (edit the relevant terminal and config files under /etc and /var), changing one thing at a time. Check
-  your work continuously against the objective — success means `systemctl is-active nginx` returns active.
+  your work continuously against the objective — success means `systemctl is-active nginx``` returns active.
 
 
-  VERIFY: Re-run the same check the grader uses and confirm `systemctl is-active nginx` returns active.
+  VERIFY: Re-run the same check the grader uses and confirm `systemctl is-active nginx`` returns active.
   Capture the before/after output as evidence. Success criteria: the objective''s healthy state holds
   on a repeat check, not just once.
 

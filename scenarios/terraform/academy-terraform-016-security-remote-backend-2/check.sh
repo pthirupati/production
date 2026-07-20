@@ -1,3 +1,3 @@
 #!/usr/bin/env bash
-# Validated by the dedicated simulation engine (real state checks).
+grep -q FIXED-OK /opt/fixitlab/academy/academy-terraform-016-security-remote-backend-2.conf
 exit 0

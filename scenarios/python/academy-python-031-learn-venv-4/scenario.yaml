@@ -30,16 +30,16 @@ description: 'CONTEXT: A team operating Python development has raised a ticket f
   OBJECTIVE: Understand how Python virtual environments work in this lab environment; Identify the main
   status and configuration signals for Python virtual environments; Confirm you can read the current state
   confidently before changing anything. Acceptance criteria: the change is minimal and reversible, and
-  success means `systemctl is-active nginx` returns active.
+  success means `systemctl is-active gunicorn`` returns active.
 
 
   WORK TO DO: Required tooling is pre-installed; if a command is missing, note it and use the equivalent
   already on the host. Make the smallest configuration change that moves the system toward the objective
   (edit the relevant source files, venv, tests, and CLI entrypoints), changing one thing at a time. Check
-  your work continuously against the objective — success means `systemctl is-active nginx` returns active.
+  your work continuously against the objective — success means `systemctl is-active gunicorn`` returns active.
 
 
-  VERIFY: Re-run the same check the grader uses and confirm `systemctl is-active nginx` returns active.
+  VERIFY: Re-run the same check the grader uses and confirm `systemctl is-active gunicorn` returns active.
   Capture the before/after output as evidence. Success criteria: the objective''s healthy state holds
   on a repeat check, not just once.
 
@@ -79,29 +79,25 @@ hints:
   cost: 25
   content: 'WHICH TOOL — the diagnostic command(s):
 
-    Test the config to get the exact file and line: `nginx -t`. It prints the offending directive (e.g.
-    unknown directive "listn").'
+    Run `systemctl status gunicorn` and `journalctl -u gunicorn -n 50`.'
 - order: 4
   cost: 40
   content: 'NARROW DOWN — isolate the subsystem:
 
-    1. Run `nginx -t` and `systemctl status nginx` for config vs service errors.
+    1. Confirm `gunicorn` is failed/inactive.
 
-    2. Open the cited file under `/etc/nginx/`.
+    2. Read the unit journal for the root cause.
 
-    3. Compare listen/upstream/proxy directives to the scenario objectives.'
+    3. Apply the smallest fix that restores the unit.'
 - order: 5
   cost: 60
   content: 'NEAR-SOLUTION — the fix shape + verify (you still apply it):
 
-    1. Correct the typo on the reported line and save the file.
+    1. Repair the underlying config/cause for `gunicorn`.
 
-    2. Re-run `nginx -t` until it reports syntax is ok.
+    2. `systemctl enable --now gunicorn`.
 
-    3. Run `systemctl enable --now nginx`, then `curl -I http://localhost` (expect HTTP 200).
-
-
-    WHY: systemd will not start nginx until `nginx -t` passes.'
+    3. Verify with `systemctl is-active gunicorn` (expect active).'
 summary: Complete the python virtual environments — learn lab python lab and verify success with the checker
 estimated_minutes: 15
 xp_reward: 100
@@ -171,6 +167,6 @@ guided_mode:
     title: Verify with the grader
     instruction: Run the same verification the checker uses.
     command: systemctl is-active nginx
-    expected_output: '`systemctl is-active nginx` returns active'
+    expected_output: '`systemctl is-active nginx`` returns active'
     explanation: The lab passes only when real state is healthy.
     next_on: command_success

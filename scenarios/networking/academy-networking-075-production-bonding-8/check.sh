@@ -1,3 +1,3 @@
 #!/usr/bin/env bash
-systemctl is-active nginx
+grep -q FIXED-OK /opt/fixitlab/academy/academy-networking-075-production-bonding-8.conf
 exit 0

@@ -22,17 +22,17 @@ description: 'CONTEXT: A team operating Docker containers has raised a ticket fo
   OBJECTIVE: Confirm the appstack service is failed/disabled and the stack is not supervised; Correct
   the unit so it manages `docker compose up -d` correctly (ordering after docker, Type/RemainAfterExit);
   Enable and start appstack; verify the service is active. Acceptance criteria: the change is minimal
-  and reversible, and success means `systemctl is-active appstack` returns active.
+  and reversible, and success means `systemctl is-active appstack``` returns active.
 
 
   WORK TO DO: Required tooling is pre-installed; if a command is missing, note it and use the equivalent
   already on the host. Make the smallest configuration change that moves the system toward the objective
   (edit the relevant docker CLI, images, containers, and compose files), changing one thing at a time.
-  Check your work continuously against the objective — success means `systemctl is-active appstack` returns
+  Check your work continuously against the objective — success means `systemctl is-active appstack``` returns
   active.
 
 
-  VERIFY: Re-run the same check the grader uses and confirm `systemctl is-active appstack` returns active.
+  VERIFY: Re-run the same check the grader uses and confirm `systemctl is-active appstack`` returns active.
   Capture the before/after output as evidence. Success criteria: the objective''s healthy state holds
   on a repeat check, not just once.
 
@@ -173,6 +173,6 @@ guided_mode:
     title: Verify with the grader
     instruction: Run the same verification the checker uses.
     command: systemctl is-active appstack
-    expected_output: '`systemctl is-active appstack` returns active'
+    expected_output: '`systemctl is-active appstack`` returns active'
     explanation: The lab passes only when real state is healthy.
     next_on: command_success

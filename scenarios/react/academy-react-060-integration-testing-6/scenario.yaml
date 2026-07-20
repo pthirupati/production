@@ -27,16 +27,16 @@ description: 'CONTEXT: A team operating React frontends has raised a ticket for 
 
   OBJECTIVE: testing is connected to the adjacent system successfully; Handoff points are authenticated
   and observable; End-to-end workflow completes without manual intervention. Acceptance criteria: the
-  change is minimal and reversible, and success means `systemctl is-active nginx` returns active.
+  change is minimal and reversible, and success means `systemctl is-active node-app`` returns active.
 
 
   WORK TO DO: Required tooling is pre-installed; if a command is missing, note it and use the equivalent
   already on the host. Make the smallest configuration change that moves the system toward the objective
   (edit the relevant components, hooks, router, and build output), changing one thing at a time. Check
-  your work continuously against the objective — success means `systemctl is-active nginx` returns active.
+  your work continuously against the objective — success means `systemctl is-active node-app`` returns active.
 
 
-  VERIFY: Re-run the same check the grader uses and confirm `systemctl is-active nginx` returns active.
+  VERIFY: Re-run the same check the grader uses and confirm `systemctl is-active node-app` returns active.
   Capture the before/after output as evidence. Success criteria: the objective''s healthy state holds
   on a repeat check, not just once.
 
@@ -74,29 +74,25 @@ hints:
   cost: 25
   content: 'WHICH TOOL — the diagnostic command(s):
 
-    Test the config to get the exact file and line: `nginx -t`. It prints the offending directive (e.g.
-    unknown directive "listn").'
+    Run `systemctl status node-app` and `journalctl -u node-app -n 50`.'
 - order: 4
   cost: 40
   content: 'NARROW DOWN — isolate the subsystem:
 
-    1. Run `nginx -t` and `systemctl status nginx` for config vs service errors.
+    1. Confirm `node-app` is failed/inactive.
 
-    2. Open the cited file under `/etc/nginx/`.
+    2. Read the unit journal for the root cause.
 
-    3. Compare listen/upstream/proxy directives to the scenario objectives.'
+    3. Apply the smallest fix that restores the unit.'
 - order: 5
   cost: 60
   content: 'NEAR-SOLUTION — the fix shape + verify (you still apply it):
 
-    1. Fix the stream block in nginx config (upstream, listen, proxy_pass).
+    1. Repair the underlying config/cause for `node-app`.
 
-    2. Run `nginx -t`, then `systemctl enable --now nginx`.
+    2. `systemctl enable --now node-app`.
 
-    3. Confirm `systemctl is-active nginx` returns active.
-
-
-    WHY: stream proxies fail when the TCP upstream or listen directive is wrong.'
+    3. Verify with `systemctl is-active node-app` (expect active).'
 cross_technology: true
 summary: Complete the testing — integration lab react lab and verify success with the checker
 estimated_minutes: 20
@@ -167,6 +163,6 @@ guided_mode:
     title: Verify with the grader
     instruction: Run the same verification the checker uses.
     command: systemctl is-active nginx
-    expected_output: '`systemctl is-active nginx` returns active'
+    expected_output: '`systemctl is-active nginx`` returns active'
     explanation: The lab passes only when real state is healthy.
     next_on: command_success

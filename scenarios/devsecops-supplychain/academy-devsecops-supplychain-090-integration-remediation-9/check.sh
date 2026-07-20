@@ -1,3 +1,3 @@
 #!/usr/bin/env bash
-grep -q FIXED-OK /opt/fixitlab/academy/academy-devsecops-supplychain-090-integration-remediation-9.conf
+systemctl is-active nginx
 exit 0

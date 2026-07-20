@@ -1,3 +1,3 @@
 #!/usr/bin/env bash
-systemctl is-active auditd
+grep -q FIXED-OK /opt/fixitlab/academy/academy-security-093-operate-tls-10.conf
 exit 0

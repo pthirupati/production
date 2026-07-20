@@ -1,3 +1,3 @@
 #!/usr/bin/env bash
-grep -q FIXED-OK /opt/fixitlab/academy/academy-service-mesh-002-build-traffic-split.conf
+systemctl is-active crond
 exit 0

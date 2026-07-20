@@ -1,3 +1,3 @@
 #!/usr/bin/env bash
-systemctl is-active sshd
+grep -q FIXED-OK /opt/fixitlab/academy/academy-security-073-operate-tls-8.conf
 exit 0

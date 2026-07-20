@@ -1,3 +1,3 @@
 #!/usr/bin/env bash
-systemctl is-active crond
+grep -q FIXED-OK /opt/fixitlab/academy/academy-devops-085-production-secrets-9.conf
 exit 0

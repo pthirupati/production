@@ -1,3 +1,3 @@
 #!/usr/bin/env bash
-grep -q FIXED-OK /opt/fixitlab/academy/academy-netapp-117-automation-snapmirror-12.conf
+systemctl is-active crond
 exit 0

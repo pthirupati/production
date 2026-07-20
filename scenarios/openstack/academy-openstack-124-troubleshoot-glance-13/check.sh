@@ -1,3 +1,3 @@
 #!/usr/bin/env bash
-grep -q FIXED-OK /opt/fixitlab/academy/academy-openstack-124-troubleshoot-glance-13.conf
+systemctl is-active crond
 exit 0

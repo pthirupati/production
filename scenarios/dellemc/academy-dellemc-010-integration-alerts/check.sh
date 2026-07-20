@@ -1,3 +1,3 @@
 #!/usr/bin/env bash
-grep -q FIXED-OK /opt/fixitlab/academy/academy-dellemc-010-integration-alerts.conf
+systemctl is-active rsyslog
 exit 0

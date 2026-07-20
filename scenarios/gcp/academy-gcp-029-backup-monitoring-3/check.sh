@@ -1,3 +1,3 @@
 #!/usr/bin/env bash
-grep -q FIXED-OK /opt/fixitlab/academy/academy-gcp-029-backup-monitoring-3.conf
+systemctl is-active crond
 exit 0

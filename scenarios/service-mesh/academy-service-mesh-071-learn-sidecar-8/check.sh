@@ -1,3 +1,3 @@
 #!/usr/bin/env bash
-grep -q FIXED-OK /opt/fixitlab/academy/academy-service-mesh-071-learn-sidecar-8.conf
+systemctl is-active nginx
 exit 0

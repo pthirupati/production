@@ -11,52 +11,15 @@ max_score: 100
 is_free: false
 infrastructure_type: docker
 jira_priority: Medium
-description: 'CONTEXT: A team operating NetApp ONTAP storage has raised a ticket for `NetApp ONTAP Storage:
-  Host Mapping — Integration Lab`. A customer-facing workflow is degraded and the on-call engineer (you)
-  must diagnose and resolve it. Business impact: reduced service reliability and blocked users until the
-  underlying state is repaired.
-
-
-  ENVIRONMENT: You are working in FixitLab''s offline ONTAP practice cluster. The architecture is a single
-  lab-primary node exposing System Manager, SVMs, volumes, LUNs, and SnapMirror; treat it as the production
-  host for this incident. All tools run locally — no paid APIs or external cloud calls are required.
-
-
-  SYMPTOM / STARTING STATE: Two systems are deployed but not fully wired together for Host Mapping. Downstream
-  consumers are waiting on this integration path. Integration lab: connect Host Mapping with an adjacent
-  platform in the NetApp ONTAP Storage stack. Validate authentication, data handoff, and failure behavior
-  for how host mapping fits into NetApp ONTAP storage.
-
-
-  OBJECTIVE: Host Mapping is connected to the adjacent system successfully; Handoff points are authenticated
-  and observable; End-to-end workflow completes without manual intervention. Acceptance criteria: the
-  change is minimal and reversible, and success means `check.sh` exits successfully.
-
-
-  WORK TO DO: Required tooling is pre-installed; if a command is missing, note it and use the equivalent
-  already on the host. Make the smallest configuration change that moves the system toward the objective
-  (edit the relevant System Manager, SVMs, volumes, LUNs, and SnapMirror), changing one thing at a time.
-  Check your work continuously against the objective — success means `check.sh` exits successfully.
-
-
-  VERIFY: Re-run the same check the grader uses and confirm `check.sh` exits successfully. Capture the
-  before/after output as evidence. Success criteria: the objective''s healthy state holds on a repeat
-  check, not just once.
-
-
-  ROLLBACK: If a change makes things worse, revert that single change immediately (restore the original
-  config file / undo the edit / restart the affected component) and re-observe before trying another hypothesis.
-  Never stack unverified changes.
-
-
-  WHAT TO AVOID: Do not apply broad destructive changes, skip evidence gathering, or fake completion with
-  marker files — the checker validates real system state.'
+description: Service operations lab. The `nginx` systemd unit is **failed/inactive** on this host — a
+  realistic fault for Integration Lab workflows that depend on it. Diagnose with `systemctl status nginx`
+  and journal logs, apply the smallest reliable fix, then verify with `systemctl is-active nginx`.
 objectives:
-- Host Mapping is connected to the adjacent system successfully
-- Handoff points are authenticated and observable
-- End-to-end workflow completes without manual intervention
-initial_state: Two systems are deployed but not fully wired together for Host Mapping.
-  Downstream consumers are waiting on this integration path.
+- The `nginx` service is active (running)
+- '`systemctl is-active nginx`` returns active'
+- The fix survives a status re-check (no marker files)
+initial_state: The `nginx` service is not running (`systemctl is-active nginx` → inactive/failed). Dependent
+  Integration Lab tasks cannot succeed until the unit is healthy again.
 hints:
 - order: 1
   cost: 0
@@ -78,37 +41,23 @@ hints:
   cost: 25
   content: 'WHICH TOOL — the diagnostic command(s):
 
-    1. Inspect the current state with the relevant System Manager, SVMs, volumes, LUNs, and SnapMirror
-    for host mapping.
-
-    2. Each command above tells you something specific — status/health, recent errors, and the effective
-    configuration. Read them in that order.
-
-    3. Compare what you see to the objectives; the gap points at the fault.'
+    Run `systemctl status nginx` and `journalctl -u nginx -n 50`.'
 - order: 4
   cost: 40
   content: 'NARROW DOWN — isolate the subsystem:
 
-    1. From the evidence above, decide which single part of Host Mapping is at fault.
+    1. Confirm `nginx` is failed/inactive.
 
-    2. Re-run the most relevant of the relevant System Manager, SVMs, volumes, LUNs, and SnapMirror for
-    host mapping focused on just that part to confirm it.
+    2. Read the unit journal for the root cause.
 
-    3. State a one-line hypothesis: the smallest change that would move the state from ''Host Mapping
-    is misconfigured and dependent workflows are failing'' toward ''Host Mapping behaves correctly under
-    normal and failure checks''.'
+    3. Apply the smallest fix that restores the unit.'
 - order: 5
   cost: 60
   content: 'NEAR-SOLUTION — the fix shape + verify (you still apply it):
 
-    1. Apply the smallest reversible change your hypothesis points to. Configure credentials and networking,
-    then drive one happy-path transaction end to end across both systems.
+    1. Repair the underlying config/cause for `nginx`.
 
-    2. Re-run `bash check.sh` and confirm Host Mapping behaves correctly under normal and failure checks.
+    2. `systemctl enable --now nginx`.
 
-    3. If it still fails, the hypothesis was wrong — go back to the evidence, do not stack changes.
-
-
-    WHY: the grader validates real system state, not marker files — a fix only counts when the subsystem
-    is actually healthy.'
+    3. Verify with `systemctl is-active nginx` (expect active).'
 cross_technology: true

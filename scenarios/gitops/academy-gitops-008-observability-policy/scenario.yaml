@@ -11,52 +11,17 @@ max_score: 100
 is_free: false
 infrastructure_type: docker
 jira_priority: Medium
-description: 'CONTEXT: A team operating GitOps delivery has raised a ticket for `Gitops: Policy As Code
-  — Observability Practice`. A customer-facing workflow is degraded and the on-call engineer (you) must
-  diagnose and resolve it. Business impact: reduced service reliability and blocked users until the underlying
-  state is repaired.
-
-
-  ENVIRONMENT: You are working in FixitLab''s offline GitOps practice cluster. The architecture is a single
-  lab-primary node exposing Git repos, sync agents, and declarative workloads; treat it as the production
-  host for this incident. All tools run locally — no paid APIs or external cloud calls are required.
-
-
-  SYMPTOM / STARTING STATE: The system runs, but policy as code lacks useful telemetry. Dashboards/alerts
-  are blank or noisy — improve signal quality. Observability task: make policy as code visible in logs,
-  metrics, or traces. On-call should answer ''what is broken?'' quickly using signals from guardrails,
-  validation, and sentinel/OPA checks.
-
-
-  OBJECTIVE: Day-2 policy as code work completes safely in this environment; Changes are verified with
-  before/after checks; The system remains stable for dependent teams. Acceptance criteria: the change
-  is minimal and reversible, and success means `check.sh` exits successfully.
-
-
-  WORK TO DO: Required tooling is pre-installed; if a command is missing, note it and use the equivalent
-  already on the host. Make the smallest configuration change that moves the system toward the objective
-  (edit the relevant Git repos, sync agents, and declarative workloads), changing one thing at a time.
-  Check your work continuously against the objective — success means `check.sh` exits successfully.
-
-
-  VERIFY: Re-run the same check the grader uses and confirm `check.sh` exits successfully. Capture the
-  before/after output as evidence. Success criteria: the objective''s healthy state holds on a repeat
-  check, not just once.
-
-
-  ROLLBACK: If a change makes things worse, revert that single change immediately (restore the original
-  config file / undo the edit / restart the affected component) and re-observe before trying another hypothesis.
-  Never stack unverified changes.
-
-
-  WHAT TO AVOID: Do not apply broad destructive changes, skip evidence gathering, or fake completion with
-  marker files — the checker validates real system state.'
+description: Topic lab for Observability Practice. The Lab Server has a planted configuration fault under
+  `/opt` (and/or `/etc`). Diagnose from evidence, apply the smallest reliable fix, then verify with the
+  documented checker (`grep -q FIXED-OK /opt/fixitlab/academy/academy-gitops-008-observability-policy.conf`
+  succeeds after the documented fix).
 objectives:
-- Day-2 policy as code work completes safely in this environment
-- Changes are verified with before/after checks
-- The system remains stable for dependent teams
-initial_state: The system runs, but policy as code lacks useful telemetry. Dashboards/alerts
-  are blank or noisy — improve signal quality.
+- Identify the planted configuration fault from evidence
+- Apply the minimal documented remediation
+- '`grep -q FIXED-OK /opt/fixitlab/academy/academy-gitops-008-observability-policy.conf` succeeds after
+  the documented fix'
+initial_state: A topic-specific configuration fault is present on this host; dependent workflows fail
+  until repaired.
 hints:
 - order: 1
   cost: 0
@@ -77,33 +42,24 @@ hints:
   cost: 25
   content: 'WHICH TOOL — the diagnostic command(s):
 
-    1. Inspect the current state with policy files and plan output.
-
-    2. Each command above tells you something specific — status/health, recent errors, and the effective
-    configuration. Read them in that order.
-
-    3. Compare what you see to the objectives; the gap points at the fault.'
+    Inspect GitOps state: `cat /opt/gitops/application.yaml` and `cat /opt/gitops/flux-kustomization.yaml`.
+    Look for OutOfSync / Ready=False.'
 - order: 4
   cost: 40
   content: 'NARROW DOWN — isolate the subsystem:
 
-    1. From the evidence above, decide which single part of policy as code is at fault.
+    1. Confirm sync/health status in the Application manifest.
 
-    2. Re-run the most relevant of policy files and plan output focused on just that part to confirm it.
+    2. Check `syncPolicy` and source path/repoURL.
 
-    3. State a one-line hypothesis: the smallest change that would move the state from ''non-compliant
-    changes can be applied'' toward ''violating plans are blocked and compliant ones pass''.'
+    3. Compare with the Flux Kustomization Ready condition.'
 - order: 5
   cost: 60
   content: 'NEAR-SOLUTION — the fix shape + verify (you still apply it):
 
-    1. Apply the smallest reversible change your hypothesis points to. Add or fix the exporter / dashboard
-    / alert with clear names, labels, and a sensible threshold.
+    1. Repair `/opt/gitops/application.yaml` so sync is healthy (Synced/Healthy).
 
-    2. Re-run `bash check.sh` and confirm violating plans are blocked and compliant ones pass.
+    2. Fix Flux reconciliation errors in `/opt/gitops/flux-kustomization.yaml`.
 
-    3. If it still fails, the hypothesis was wrong — go back to the evidence, do not stack changes.
-
-
-    WHY: the grader validates real system state, not marker files — a fix only counts when the subsystem
-    is actually healthy.'
+    3. Click Check Solution once the documented remediation is applied (grader: `grep -q FIXED-OK /opt/fixitlab/academy/academy-gitops-008-observability-policy.conf`
+    succeeds after the documented fix).'

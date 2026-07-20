@@ -54,8 +54,8 @@ objectives:
 - Day-2 Nat Gateway work completes safely in this environment
 - Changes are verified with before/after checks
 - The system remains stable for dependent teams
-initial_state: A feature fix works in dev, but Nat Gateway is not production ready
-  — missing guardrails, runbooks, or capacity checks.
+initial_state: A feature fix works in dev, but Nat Gateway is not production ready — missing guardrails,
+  runbooks, or capacity checks.
 hints:
 - order: 1
   cost: 0
@@ -110,8 +110,7 @@ hints:
 
     WHY: the grader validates real system state, not marker files — a fix only counts when the subsystem
     is actually healthy.'
-summary: Complete the nat gateway — production lab aws lab and verify success with
-  the checker
+summary: Complete the nat gateway — production lab aws lab and verify success with the checker
 estimated_minutes: 20
 xp_reward: 100
 prerequisites:
@@ -145,18 +144,15 @@ environment:
 tasks:
 - id: task_1
   title: Nat Gateway — Production Lab
-  description: Restore healthy behavior for Nat Gateway — Production Lab by investigating
-    the failure, applying the smallest safe fix, and validating the outcome.
-  background: 'This aws lab teaches systematic troubleshooting: observe, hypothesize,
-    change, verify.'
+  description: Restore healthy behavior for Nat Gateway — Production Lab by investigating the failure,
+    applying the smallest safe fix, and validating the outcome.
+  background: 'This aws lab teaches systematic troubleshooting: observe, hypothesize, change, verify.'
   validation:
     type: custom_script
     script: check.sh
-    error_message: Validation did not pass. Re-read the objectives and Hint 2 diagnostic
-      steps.
+    error_message: Validation did not pass. Re-read the objectives and Hint 2 diagnostic steps.
 solution:
-  summary: Identify the misconfiguration affecting this aws lab and apply the minimal
-    fix.
+  summary: Identify the misconfiguration affecting this aws lab and apply the minimal fix.
   files_changed: []
   commands_run:
   - bash check.sh

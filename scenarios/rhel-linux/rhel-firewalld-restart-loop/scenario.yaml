@@ -26,17 +26,17 @@ description: 'CONTEXT: A team operating Red Hat Enterprise Linux has raised a ti
 
   OBJECTIVE: Confirm firewalld is down (firewalld restarts repeatedly); Resolve the cause and start firewalld;
   Verify firewalld is active. Acceptance criteria: the change is minimal and reversible, and success means
-  `systemctl is-active firewalld` returns active.
+  `systemctl is-active firewalld`` returns active.
 
 
   WORK TO DO: Required tooling is pre-installed; if a command is missing, note it and use the equivalent
   already on the host. Make the smallest configuration change that moves the system toward the objective
   (edit the relevant dnf, subscription-manager, firewalld, and SELinux), changing one thing at a time.
-  Check your work continuously against the objective — success means `systemctl is-active firewalld` returns
+  Check your work continuously against the objective — success means `systemctl is-active firewalld``` returns
   active.
 
 
-  VERIFY: Re-run the same check the grader uses and confirm `systemctl is-active firewalld` returns active.
+  VERIFY: Re-run the same check the grader uses and confirm `systemctl is-active firewalld`` returns active.
   Capture the before/after output as evidence. Success criteria: the objective''s healthy state holds
   on a repeat check, not just once.
 

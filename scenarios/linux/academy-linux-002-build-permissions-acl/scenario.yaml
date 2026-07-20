@@ -11,53 +11,17 @@ max_score: 100
 is_free: true
 infrastructure_type: docker
 jira_priority: Low
-description: 'CONTEXT: A team operating Linux administration has raised a ticket for `File Permissions
-  And Acls — Build Lab`. A customer-facing workflow is degraded and the on-call engineer (you) must diagnose
-  and resolve it. Business impact: reduced service reliability and blocked users until the underlying
-  state is repaired.
-
-
-  ENVIRONMENT: You are working in FixitLab''s offline Linux practice server. The architecture is a single
-  lab-primary node exposing terminal and config files under /etc and /var; treat it as the production
-  host for this incident. All tools run locally — no paid APIs or external cloud calls are required.
-
-
-  SYMPTOM / STARTING STATE: The Linux practice server is ready but file permissions and ACLs is not configured
-  yet. Required tools may already be installed; your job is to create the configuration and bring the
-  capability online.
-
-
-  OBJECTIVE: A working file permissions and ACLs setup must exist by the end of this lab; Configuration
-  should follow team conventions and be easy to audit; The result should pass validation without manual
-  cleanup. Acceptance criteria: the change is minimal and reversible, and success means `systemctl is-active
-  chronyd` returns active.
-
-
-  WORK TO DO: Required tooling is pre-installed; if a command is missing, note it and use the equivalent
-  already on the host. Make the smallest configuration change that moves the system toward the objective
-  (edit the relevant terminal and config files under /etc and /var), changing one thing at a time. Check
-  your work continuously against the objective — success means `systemctl is-active chronyd` returns active.
-
-
-  VERIFY: Re-run the same check the grader uses and confirm `systemctl is-active chronyd` returns active.
-  Capture the before/after output as evidence. Success criteria: the objective''s healthy state holds
-  on a repeat check, not just once.
-
-
-  ROLLBACK: If a change makes things worse, revert that single change immediately (restore the original
-  config file / undo the edit / restart the affected component) and re-observe before trying another hypothesis.
-  Never stack unverified changes.
-
-
-  WHAT TO AVOID: Do not apply broad destructive changes, skip evidence gathering, or fake completion with
-  marker files — the checker validates real system state.'
+description: Topic lab for Build Lab. The Lab Server has a planted configuration fault under `/opt` (and/or
+  `/etc`). Diagnose from evidence, apply the smallest reliable fix, then verify with the documented checker
+  (`grep -q FIXED-OK /opt/fixitlab/academy/academy-linux-002-build-permissions-acl.conf` succeeds after
+  the documented fix).
 objectives:
-- A working file permissions and ACLs setup must exist by the end of this lab
-- Configuration should follow team conventions and be easy to audit
-- The result should pass validation without manual cleanup
-initial_state: The Linux practice server is ready but file permissions and ACLs is not configured yet.
-  Required tools may already be installed; your job is to create the configuration and bring the capability
-  online.
+- Identify the planted configuration fault from evidence
+- Apply the minimal documented remediation
+- '`grep -q FIXED-OK /opt/fixitlab/academy/academy-linux-002-build-permissions-acl.conf` succeeds after
+  the documented fix'
+initial_state: A topic-specific configuration fault is present on this host; dependent workflows fail
+  until repaired.
 hints:
 - order: 1
   cost: 0
@@ -79,29 +43,26 @@ hints:
   cost: 25
   content: 'WHICH TOOL — the diagnostic command(s):
 
-    Start with `systemctl status chronyd` and `journalctl -u chronyd -n 50 --no-pager` before changing
-    anything.'
+    Inspect permissions: `ls -la /opt/app/secret.env` and `cat /etc/sudoers.d/app`. World-writable secrets
+    and NOPASSWD ALL are the faults.'
 - order: 4
   cost: 40
   content: 'NARROW DOWN — isolate the subsystem:
 
-    1. Run `systemctl status chronyd` — note Active/Failed and the last log lines.
+    1. Confirm secret.env mode is 777 (too open).
 
-    2. Read `journalctl -u chronyd -n 50` for the root error.
+    2. Review sudoers.d for overly broad privileges.
 
-    3. Form a hypothesis about the smallest config or permission fix.'
+    3. Decide least-privilege mode/owner for the app secret.'
 - order: 5
   cost: 60
   content: 'NEAR-SOLUTION — the fix shape + verify (you still apply it):
 
-    1. Apply the minimal fix (config, unit override, or missing directory).
+    1. `chmod 600 /opt/app/secret.env` (and chown if needed).
 
-    2. Run `systemctl daemon-reload` if you edited a unit file.
+    2. Lock down `/etc/sudoers.d/app` to the minimum required.
 
-    3. Run `systemctl restart chronyd` and confirm `systemctl is-active chronyd` succeeds.
-
-
-    WHY: the grader checks real service state, not marker files.'
+    3. Click Check Solution once the documented remediation is applied.'
 summary: Complete the file permissions and acls — build lab linux lab and verify success with the checker
 estimated_minutes: 15
 xp_reward: 100
@@ -171,6 +132,6 @@ guided_mode:
     title: Verify with the grader
     instruction: Run the same verification the checker uses.
     command: systemctl is-active chronyd
-    expected_output: '`systemctl is-active chronyd` returns active'
+    expected_output: '`systemctl is-active chronyd`` returns active'
     explanation: The lab passes only when real state is healthy.
     next_on: command_success
