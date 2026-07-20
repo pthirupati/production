@@ -512,7 +512,7 @@ export default function TechnologyDetail() {
                 to={nextScenario ? `/scenarios/${nextScenario.slug}` : hasScenarios ? `/scenarios?technology=${tech.slug}` : '/pricing'}
                 className="inline-flex items-center justify-center gap-2 px-[18px] py-3 rounded-[11px] text-[13.5px] font-bold text-white bg-gradient-to-br from-accent-cyan to-accent-purple shadow-[0_8px_22px_-8px_rgb(var(--a-cyan))] hover:opacity-95 transition-opacity"
               >
-                <PlayCircle size={14} /> Continue learning
+                <PlayCircle size={14} /> {nextScenario ? 'Start Lab' : 'Browse labs'}
               </Link>
               <Link
                 to={`/interviews/setup?tech=${tech.slug}`}

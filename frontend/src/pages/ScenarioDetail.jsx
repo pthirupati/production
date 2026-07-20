@@ -261,7 +261,7 @@ export default function ScenarioDetail() {
       ) : (
         <>
           <Play size={18} />
-          {userCompleted ? 'Launch Again' : 'Start Challenge'}
+          {userCompleted ? 'Launch Again' : 'Start Lab'}
         </>
       )}
     </button>

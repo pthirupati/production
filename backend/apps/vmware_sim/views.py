@@ -98,11 +98,33 @@ def _require_session_console_access(request, session, technology_slug: str):
     scen_slug = (getattr(tech, "slug", None) or "").strip().lower()
     if scen_slug == technology_slug:
         return None
+    sim_type = (getattr(scenario, "simulation_type", None) or "").strip().lower()
+    if sim_type == technology_slug:
+        return None
     if getattr(scenario, "cross_technology", False) or getattr(scenario, "vmware_link", False):
         # Cross-tech lab: console is scoped to this session only (not a catalog bypass).
         return None
     # Session belongs to another technology — require a real subscription.
     return _require_tech_access(request, technology_slug)
+
+
+def _session_console_or_deny(request, session_id, technology_slug: str, *, running_only: bool = False):
+    """Load a lab session and enforce per-technology console entitlement."""
+    qs = LabSession.objects.select_related("scenario", "scenario__technology").filter(
+        pk=session_id, user=request.user,
+    )
+    if running_only:
+        qs = qs.filter(status="RUNNING")
+    session = qs.first()
+    if not session:
+        return None, Response(
+            {"error": "Lab session not running" if running_only else "Session not found"},
+            status=400 if running_only else 404,
+        )
+    denied = _require_session_console_access(request, session, technology_slug)
+    if denied:
+        return None, denied
+    return session, None
 
 
 def _require_any_tech_access(request, *technology_slugs: str):
@@ -760,9 +782,9 @@ class AwsSimStateView(APIView):
     permission_classes = [IsAuthenticated]
 
     def get(self, request, session_id):
-        session = LabSession.objects.select_related("scenario").filter(pk=session_id, user=request.user).first()
-        if not session:
-            return Response({"error": "Session not found"}, status=404)
+        session, err = _session_console_or_deny(request, session_id, "aws")
+        if err:
+            return err
         slug = session.scenario.slug if session.scenario_id else (request.query_params.get("scenario", "") or "")
         return Response(aws_get_state(session_id, slug))
 
@@ -771,9 +793,9 @@ class AwsSimActionView(APIView):
     permission_classes = [IsAuthenticated]
 
     def post(self, request, session_id):
-        session = LabSession.objects.filter(pk=session_id, user=request.user, status="RUNNING").first()
-        if not session:
-            return Response({"error": "Lab session not running"}, status=400)
+        session, err = _session_console_or_deny(request, session_id, "aws", running_only=True)
+        if err:
+            return err
         action = request.data.get("action", "")
         payload = request.data.get("payload") or {}
         slug = session.scenario.slug if session.scenario_id else ""
@@ -858,9 +880,9 @@ class AzureSimStateView(APIView):
     permission_classes = [IsAuthenticated]
 
     def get(self, request, session_id):
-        session = LabSession.objects.select_related("scenario").filter(pk=session_id, user=request.user).first()
-        if not session:
-            return Response({"error": "Session not found"}, status=404)
+        session, err = _session_console_or_deny(request, session_id, "azure")
+        if err:
+            return err
         slug = session.scenario.slug if session.scenario_id else (request.query_params.get("scenario", "") or "")
         return Response(azure_get_state(session_id, slug))
 
@@ -869,9 +891,9 @@ class AzureSimActionView(APIView):
     permission_classes = [IsAuthenticated]
 
     def post(self, request, session_id):
-        session = LabSession.objects.filter(pk=session_id, user=request.user, status="RUNNING").first()
-        if not session:
-            return Response({"error": "Lab session not running"}, status=400)
+        session, err = _session_console_or_deny(request, session_id, "azure", running_only=True)
+        if err:
+            return err
         action = request.data.get("action", "")
         payload = request.data.get("payload") or {}
         slug = session.scenario.slug if session.scenario_id else ""
@@ -896,9 +918,9 @@ class CommvaultSimStateView(APIView):
     permission_classes = [IsAuthenticated]
 
     def get(self, request, session_id):
-        session = LabSession.objects.select_related("scenario").filter(pk=session_id, user=request.user).first()
-        if not session:
-            return Response({"error": "Session not found"}, status=404)
+        session, err = _session_console_or_deny(request, session_id, "commvault")
+        if err:
+            return err
         slug = session.scenario.slug if session.scenario_id else (request.query_params.get("scenario", "") or "")
         return Response(commvault_get_state(session_id, slug))
 
@@ -907,9 +929,9 @@ class CommvaultSimActionView(APIView):
     permission_classes = [IsAuthenticated]
 
     def post(self, request, session_id):
-        session = LabSession.objects.filter(pk=session_id, user=request.user, status="RUNNING").first()
-        if not session:
-            return Response({"error": "Lab session not running"}, status=400)
+        session, err = _session_console_or_deny(request, session_id, "commvault", running_only=True)
+        if err:
+            return err
         action = request.data.get("action", "")
         payload = request.data.get("payload") or {}
         slug = session.scenario.slug if session.scenario_id else ""
@@ -935,9 +957,9 @@ class NetappSimStateView(APIView):
     permission_classes = [IsAuthenticated]
 
     def get(self, request, session_id):
-        session = LabSession.objects.select_related("scenario").filter(pk=session_id, user=request.user).first()
-        if not session:
-            return Response({"error": "Session not found"}, status=404)
+        session, err = _session_console_or_deny(request, session_id, "netapp")
+        if err:
+            return err
         slug = session.scenario.slug if session.scenario_id else (request.query_params.get("scenario", "") or "")
         return Response(netapp_get_state(session_id, slug))
 
@@ -946,9 +968,9 @@ class NetappSimActionView(APIView):
     permission_classes = [IsAuthenticated]
 
     def post(self, request, session_id):
-        session = LabSession.objects.filter(pk=session_id, user=request.user, status="RUNNING").first()
-        if not session:
-            return Response({"error": "Lab session not running"}, status=400)
+        session, err = _session_console_or_deny(request, session_id, "netapp", running_only=True)
+        if err:
+            return err
         action = request.data.get("action", "")
         payload = request.data.get("payload") or {}
         slug = session.scenario.slug if session.scenario_id else ""
@@ -974,9 +996,9 @@ class DellemcSimStateView(APIView):
     permission_classes = [IsAuthenticated]
 
     def get(self, request, session_id):
-        session = LabSession.objects.select_related("scenario").filter(pk=session_id, user=request.user).first()
-        if not session:
-            return Response({"error": "Session not found"}, status=404)
+        session, err = _session_console_or_deny(request, session_id, "dellemc")
+        if err:
+            return err
         slug = session.scenario.slug if session.scenario_id else (request.query_params.get("scenario", "") or "")
         return Response(dellemc_get_state(session_id, slug))
 
@@ -985,9 +1007,9 @@ class DellemcSimActionView(APIView):
     permission_classes = [IsAuthenticated]
 
     def post(self, request, session_id):
-        session = LabSession.objects.filter(pk=session_id, user=request.user, status="RUNNING").first()
-        if not session:
-            return Response({"error": "Lab session not running"}, status=400)
+        session, err = _session_console_or_deny(request, session_id, "dellemc", running_only=True)
+        if err:
+            return err
         action = request.data.get("action", "")
         payload = request.data.get("payload") or {}
         slug = session.scenario.slug if session.scenario_id else ""
@@ -1031,9 +1053,9 @@ class GcpSimStateView(APIView):
     permission_classes = [IsAuthenticated]
 
     def get(self, request, session_id):
-        session = LabSession.objects.select_related("scenario").filter(pk=session_id, user=request.user).first()
-        if not session:
-            return Response({"error": "Session not found"}, status=404)
+        session, err = _session_console_or_deny(request, session_id, "gcp")
+        if err:
+            return err
         slug = session.scenario.slug if session.scenario_id else (request.query_params.get("scenario", "") or "")
         return Response(gcp_get_state(session_id, slug))
 
@@ -1042,9 +1064,9 @@ class GcpSimActionView(APIView):
     permission_classes = [IsAuthenticated]
 
     def post(self, request, session_id):
-        session = LabSession.objects.filter(pk=session_id, user=request.user, status="RUNNING").first()
-        if not session:
-            return Response({"error": "Lab session not running"}, status=400)
+        session, err = _session_console_or_deny(request, session_id, "gcp", running_only=True)
+        if err:
+            return err
         action = request.data.get("action", "")
         payload = request.data.get("payload") or {}
         slug = session.scenario.slug if session.scenario_id else ""
@@ -1069,9 +1091,9 @@ class OpenStackSimStateView(APIView):
     permission_classes = [IsAuthenticated]
 
     def get(self, request, session_id):
-        session = LabSession.objects.select_related("scenario").filter(pk=session_id, user=request.user).first()
-        if not session:
-            return Response({"error": "Session not found"}, status=404)
+        session, err = _session_console_or_deny(request, session_id, "openstack")
+        if err:
+            return err
         slug = session.scenario.slug if session.scenario_id else (request.query_params.get("scenario", "") or "")
         return Response(openstack_get_state(session_id, slug))
 
@@ -1080,9 +1102,9 @@ class OpenStackSimActionView(APIView):
     permission_classes = [IsAuthenticated]
 
     def post(self, request, session_id):
-        session = LabSession.objects.filter(pk=session_id, user=request.user, status="RUNNING").first()
-        if not session:
-            return Response({"error": "Lab session not running"}, status=400)
+        session, err = _session_console_or_deny(request, session_id, "openstack", running_only=True)
+        if err:
+            return err
         action = request.data.get("action", "")
         payload = request.data.get("payload") or {}
         slug = session.scenario.slug if session.scenario_id else ""
@@ -1106,9 +1128,9 @@ class DatacenterSimStateView(APIView):
     permission_classes = [IsAuthenticated]
 
     def get(self, request, session_id):
-        session = LabSession.objects.select_related("scenario").filter(pk=session_id, user=request.user).first()
-        if not session:
-            return Response({"error": "Session not found"}, status=404)
+        session, err = _session_console_or_deny(request, session_id, "datacenter")
+        if err:
+            return err
         slug = session.scenario.slug if session.scenario_id else (request.query_params.get("scenario", "") or "")
         return Response(datacenter_get_state(session_id, slug))
 
@@ -1117,9 +1139,9 @@ class DatacenterSimActionView(APIView):
     permission_classes = [IsAuthenticated]
 
     def post(self, request, session_id):
-        session = LabSession.objects.filter(pk=session_id, user=request.user, status="RUNNING").first()
-        if not session:
-            return Response({"error": "Lab session not running"}, status=400)
+        session, err = _session_console_or_deny(request, session_id, "datacenter", running_only=True)
+        if err:
+            return err
         action = request.data.get("action", "")
         payload = request.data.get("payload") or {}
         slug = session.scenario.slug if session.scenario_id else ""
@@ -1145,9 +1167,9 @@ class SocSimStateView(APIView):
     permission_classes = [IsAuthenticated]
 
     def get(self, request, session_id):
-        session = LabSession.objects.select_related("scenario").filter(pk=session_id, user=request.user).first()
-        if not session:
-            return Response({"error": "Session not found"}, status=404)
+        session, err = _session_console_or_deny(request, session_id, "soc")
+        if err:
+            return err
         slug = session.scenario.slug if session.scenario_id else (request.query_params.get("scenario", "") or "")
         return Response(soc_get_state(session_id, slug))
 
@@ -1156,9 +1178,9 @@ class SocSimActionView(APIView):
     permission_classes = [IsAuthenticated]
 
     def post(self, request, session_id):
-        session = LabSession.objects.filter(pk=session_id, user=request.user, status="RUNNING").first()
-        if not session:
-            return Response({"error": "Lab session not running"}, status=400)
+        session, err = _session_console_or_deny(request, session_id, "soc", running_only=True)
+        if err:
+            return err
         action = request.data.get("action", "")
         payload = request.data.get("payload") or {}
         slug = session.scenario.slug if session.scenario_id else ""

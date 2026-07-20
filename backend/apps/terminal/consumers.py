@@ -36,6 +36,78 @@ MAX_WS_PER_USER = int(os.environ.get("TERMINAL_MAX_WS_PER_USER", "20"))
 _WS_CONN_KEY = "ws_conn:{user_id}"
 _WS_CONN_TTL = 3700  # slightly over 1 hour; auto-expires stale counts if process crashes
 
+# Learner-facing environment labels — never expose "Simulation".
+_LAB_SERVER_LABELS = {
+    "aws": "AWS EC2 Lab Server",
+    "azure": "Azure Virtual Machine",
+    "gcp": "Google Compute Engine VM",
+    "openstack": "OpenStack Instance",
+    "vmware": "VMware Virtual Machine",
+    "kubernetes": "Kubernetes Node",
+    "gpu": "GPU Server",
+    "windows": "Windows Server",
+    "windows-server": "Windows Server",
+    "baremetal": "Physical Bare Metal Server",
+    "commvault": "Commvault Protected Server",
+    "netapp": "NetApp Storage Host",
+    "dellemc": "Dell EMC Storage Host",
+    "datacenter": "Physical Data Center Host",
+    "soc": "SOC Workstation",
+    "rhel": "Linux Lab Server (RHEL 9)",
+    "linux": "Linux Lab Server (RHEL 9)",
+    "generic": "Linux Lab Server (RHEL 9)",
+    "terraform": "Terraform Workspace Host",
+    "ansible": "Ansible Control Host",
+    "ansible-awx": "AWX Control Host",
+    "docker": "Docker Host",
+    "networking": "Network Lab Appliance",
+    "grafana": "Observability Host",
+    "prometheus": "Observability Host",
+    "peoplesoft": "PeopleSoft App Server",
+    "maas": "MAAS Deployed Machine",
+}
+
+
+def _resolve_lab_provider_label(provider_type: str, sim_type: str, tech_slug: str, slug: str) -> str:
+    """Pure-string label for the welcome banner (safe to call from sync or async)."""
+    cloud = {
+        "docker": "Docker Container",
+        "aws_ec2": "AWS EC2 Instance",
+        "digitalocean": "DigitalOcean Droplet",
+    }.get(provider_type)
+    if cloud:
+        return cloud
+    if provider_type != "simulation":
+        return "Lab Environment"
+    key = sim_type if sim_type in _LAB_SERVER_LABELS else tech_slug
+    if key not in _LAB_SERVER_LABELS:
+        low = (slug or "").lower()
+        if low.startswith(("academy-aws", "aws-", "ec2-")):
+            key = "aws"
+        elif low.startswith(("academy-azure", "azure-")):
+            key = "azure"
+        elif low.startswith(("academy-gcp", "gcp-")):
+            key = "gcp"
+        elif low.startswith(("academy-openstack", "openstack-")):
+            key = "openstack"
+        elif low.startswith(("academy-vmware", "vmware-", "vm-")):
+            key = "vmware"
+        elif low.startswith(("academy-gpu", "gpu-", "sim-gpu")):
+            key = "gpu"
+        elif low.startswith(("academy-baremetal", "baremetal-")):
+            key = "baremetal"
+        elif low.startswith(("academy-datacenter", "datacenter-", "dc-")):
+            key = "datacenter"
+        elif low.startswith(("academy-soc", "soc-")):
+            key = "soc"
+        elif low.startswith(("academy-commvault", "commvault-", "cv-")):
+            key = "commvault"
+        elif low.startswith(("academy-netapp", "netapp-", "ontap-")):
+            key = "netapp"
+        elif low.startswith(("academy-dellemc", "dellemc-", "powermax-")):
+            key = "dellemc"
+    return _LAB_SERVER_LABELS.get(key, "Linux Lab Server (RHEL 9)")
+
 
 def reset_user_ws_connections(user_id=None):
     """Clear per-user WS counters (test helper)."""
@@ -194,7 +266,6 @@ class TerminalConsumer(AsyncWebsocketConsumer):
 
         # For cloud labs, show a connecting message since SSH may take a moment
         is_cloud = self.provider_type not in ("docker", "simulation")
-        is_simulation = self.provider_type == "simulation"
         if is_cloud:
             await self.send(text_data=json.dumps({
                 "output": (
@@ -203,38 +274,18 @@ class TerminalConsumer(AsyncWebsocketConsumer):
                 )
             }))
 
-        # Create interactive shell (Docker exec or SSH channel) — retry for slow containers
+        # Create interactive shell (Docker exec or SSH channel) — retry for slow containers.
+        # All ORM / provisioner work MUST run via database_sync_to_async (not
+        # asyncio.to_thread alone): create_exec_stream → ensure_sim_session does
+        # LabSession.objects / .save(), and any sync ORM from the async event-loop
+        # thread raises SynchronousOnlyOperation → WS 4500.
         try:
-            self.provisioner = await asyncio.to_thread(
-                get_provisioner, self.provider_type
-            )
-
             exec_error = None
             for attempt in range(5):
                 try:
-                    if is_cloud:
-                        ssh_user = self.lab_session.ssh_user or "ec2-user"
-                        self.exec_id, self.raw_socket = await asyncio.to_thread(
-                            self.provisioner.create_exec_stream,
-                            resource_id,
-                            ssh_user,
-                        )
-                    elif is_simulation:
-                        host_key = getattr(self, "_terminal_host", "primary")
-                        self.exec_id, self.raw_socket = await asyncio.to_thread(
-                            self.provisioner.create_exec_stream,
-                            resource_id,
-                            str(self.lab_session.id),
-                            host_key,
-                        )
-                    else:
-                        self.exec_id, self.raw_socket = await asyncio.to_thread(
-                            self.provisioner.create_exec_stream,
-                            resource_id,
-                            str(self.lab_session.id),
-                        )
+                    self.exec_id, self.raw_socket = await self._create_exec_stream(resource_id)
                     if isinstance(self.raw_socket, (ExecStreamHolder, SimulationStreamHolder)):
-                        await asyncio.to_thread(self.raw_socket.set_timeout, 60.0)
+                        await database_sync_to_async(self.raw_socket.set_timeout)(60.0)
                     if isinstance(self.raw_socket, SimulationStreamHolder):
                         self._sim_stream_key = getattr(self.raw_socket, "_stream_key", None)
                     exec_error = None
@@ -246,84 +297,22 @@ class TerminalConsumer(AsyncWebsocketConsumer):
                     else:
                         raise exec_error
 
-            # Learner-facing environment label — never say "Simulation".
-            # Prefer the scenario's lab-server persona (EC2, Azure VM, …).
-            # scenario + scenario.technology MUST be select_related in
-            # _get_session — a lazy FK fetch here is sync ORM in async connect
-            # and raises SynchronousOnlyOperation → WS close 4500 (E2E labs).
-            scenario = getattr(self.lab_session, "scenario", None)
-            sim_type = (getattr(scenario, "simulation_type", None) or "").strip().lower()
-            tech_slug = ""
-            if scenario is not None and getattr(scenario, "technology_id", None):
-                tech = scenario.technology  # cached via select_related
-                if tech is not None:
-                    tech_slug = (tech.slug or "").strip().lower()
-            slug = (getattr(scenario, "slug", None) or "").strip().lower()
-
-            lab_server_labels = {
-                "aws": "AWS EC2 Lab Server",
-                "azure": "Azure Virtual Machine",
-                "gcp": "Google Compute Engine VM",
-                "openstack": "OpenStack Instance",
-                "vmware": "VMware Virtual Machine",
-                "kubernetes": "Kubernetes Node",
-                "gpu": "GPU Server",
-                "windows": "Windows Server",
-                "windows-server": "Windows Server",
-                "baremetal": "Physical Bare Metal Server",
-                "commvault": "Commvault Protected Server",
-                "netapp": "NetApp Storage Host",
-                "dellemc": "Dell EMC Storage Host",
-                "datacenter": "Physical Data Center Host",
-                "soc": "SOC Workstation",
-                "rhel": "Linux Lab Server (RHEL 9)",
-                "linux": "Linux Lab Server (RHEL 9)",
-                "generic": "Linux Lab Server (RHEL 9)",
-                "terraform": "Terraform Workspace Host",
-                "ansible": "Ansible Control Host",
-                "ansible-awx": "AWX Control Host",
-                "docker": "Docker Host",
-                "networking": "Network Lab Appliance",
-                "grafana": "Observability Host",
-                "prometheus": "Observability Host",
-                "peoplesoft": "PeopleSoft App Server",
-                "maas": "MAAS Deployed Machine",
-            }
-            provider_label = {
-                "docker": "Docker Container",
-                "aws_ec2": "AWS EC2 Instance",
-                "digitalocean": "DigitalOcean Droplet",
-            }.get(self.provider_type)
-            if not provider_label:
-                if self.provider_type == "simulation":
-                    key = sim_type if sim_type in lab_server_labels else tech_slug
-                    if key not in lab_server_labels:
-                        if slug.startswith(("academy-aws", "aws-", "ec2-")):
-                            key = "aws"
-                        elif slug.startswith(("academy-azure", "azure-")):
-                            key = "azure"
-                        elif slug.startswith(("academy-gcp", "gcp-")):
-                            key = "gcp"
-                        elif slug.startswith(("academy-openstack", "openstack-")):
-                            key = "openstack"
-                        elif slug.startswith(("academy-vmware", "vmware-", "vm-")):
-                            key = "vmware"
-                        elif slug.startswith(("academy-gpu", "gpu-", "sim-gpu")):
-                            key = "gpu"
-                        elif slug.startswith(("academy-baremetal", "baremetal-")):
-                            key = "baremetal"
-                    provider_label = lab_server_labels.get(key, "Linux Lab Server (RHEL 9)")
-                else:
-                    provider_label = "Lab Environment"
+            # Welcome banner uses ONLY plain strings prepared in _get_session —
+            # never touch scenario/technology FKs from this async method.
+            scenario_title = getattr(self, "_welcome_scenario_title", "") or "Lab"
+            provider_label = getattr(self, "_welcome_provider_label", None) or "Lab Environment"
+            duration_limit = getattr(self, "_welcome_duration_limit", None)
+            if duration_limit is None:
+                duration_limit = getattr(self.lab_session, "duration_limit", 0) or 0
 
             await self.send(text_data=json.dumps({
                 "output": (
                     "\r\n\x1b[1;36m╔══════════════════════════════════════╗\x1b[0m\r\n"
                     "\x1b[1;36m║       FixitLab Terminal Ready         ║\x1b[0m\r\n"
                     "\x1b[1;36m╚══════════════════════════════════════╝\x1b[0m\r\n"
-                    f"\r\n Scenario: \x1b[1;33m{self.lab_session.scenario.title}\x1b[0m\r\n"
+                    f"\r\n Scenario: \x1b[1;33m{scenario_title}\x1b[0m\r\n"
                     f" Environment: \x1b[1;37m{provider_label}\x1b[0m\r\n"
-                    f" Time limit: \x1b[1;37m{self.lab_session.duration_limit // 60} minutes\x1b[0m\r\n"
+                    f" Time limit: \x1b[1;37m{duration_limit // 60} minutes\x1b[0m\r\n"
                     " Type your commands below. Good luck!\r\n\r\n"
                 )
             }))
@@ -463,30 +452,61 @@ class TerminalConsumer(AsyncWebsocketConsumer):
 
     async def _open_shell(self, resource_id: str) -> bool:
         """Attach to container/VM shell."""
-        if self.provider_type == "docker":
-            self.exec_id, self.raw_socket = await asyncio.to_thread(
-                self.provisioner.create_exec_stream,
-                resource_id,
-                str(self.lab_session.id),
-            )
-        elif self.provider_type == "simulation":
+        self.exec_id, self.raw_socket = await self._create_exec_stream(resource_id)
+        if isinstance(self.raw_socket, SimulationStreamHolder):
+            self._sim_stream_key = getattr(self.raw_socket, "_stream_key", None)
+        return True
+
+    @database_sync_to_async
+    def _create_exec_stream(self, resource_id: str):
+        """Run provisioner.create_exec_stream off the event loop (ORM-safe)."""
+        provisioner = get_provisioner(self.provider_type)
+        self.provisioner = provisioner
+        if self.provider_type == "simulation":
             host_key = getattr(self, "_terminal_host", "primary")
-            self.exec_id, self.raw_socket = await asyncio.to_thread(
-                self.provisioner.create_exec_stream,
+            return provisioner.create_exec_stream(
                 resource_id,
                 str(self.lab_session.id),
                 host_key,
             )
-            if isinstance(self.raw_socket, SimulationStreamHolder):
-                self._sim_stream_key = getattr(self.raw_socket, "_stream_key", None)
-        else:
-            ssh_user = self.lab_session.ssh_user or "ec2-user"
-            self.exec_id, self.raw_socket = await asyncio.to_thread(
-                self.provisioner.create_exec_stream,
+        if self.provider_type in ("docker",):
+            return provisioner.create_exec_stream(
                 resource_id,
-                ssh_user,
+                str(self.lab_session.id),
             )
-        return True
+        ssh_user = self.lab_session.ssh_user or "ec2-user"
+        return provisioner.create_exec_stream(resource_id, ssh_user)
+
+    @database_sync_to_async
+    def _get_session(self, session_id, user):
+        try:
+            session = LabSession.objects.select_related(
+                "scenario", "scenario__technology",
+            ).get(id=session_id, user=user)
+            # Pre-resolve welcome banner strings here so connect() never touches FKs.
+            scenario = session.scenario
+            sim_type = ""
+            tech_slug = ""
+            slug = ""
+            title = "Lab"
+            if scenario is not None:
+                title = scenario.title or title
+                sim_type = (getattr(scenario, "simulation_type", None) or "").strip().lower()
+                slug = (getattr(scenario, "slug", None) or "").strip().lower()
+                # Access technology only inside this sync method (select_related).
+                tech = None
+                if getattr(scenario, "technology_id", None):
+                    tech = scenario.technology
+                if tech is not None:
+                    tech_slug = (tech.slug or "").strip().lower()
+            self._welcome_scenario_title = title
+            self._welcome_provider_label = _resolve_lab_provider_label(
+                session.provider or "docker", sim_type, tech_slug, slug,
+            )
+            self._welcome_duration_limit = session.duration_limit or 0
+            return session
+        except LabSession.DoesNotExist:
+            return None
 
     async def _respawn_shell(self, reason: str = "") -> bool:
         """Re-attach to shell without closing the WebSocket (avoids client reconnect loops)."""
@@ -512,8 +532,7 @@ class TerminalConsumer(AsyncWebsocketConsumer):
             if self.provider_type == "simulation":
                 from apps.labs.provisioner.simulation_provisioner import evict_sim_stream
                 host_key = getattr(self, "_terminal_host", "primary")
-                await asyncio.to_thread(
-                    evict_sim_stream,
+                await database_sync_to_async(evict_sim_stream)(
                     str(self.lab_session.id),
                     host_key,
                     self._sim_stream_key,
@@ -530,7 +549,7 @@ class TerminalConsumer(AsyncWebsocketConsumer):
             if isinstance(self.raw_socket, SimulationStreamHolder):
                 self._sim_stream_key = getattr(self.raw_socket, "_stream_key", None)
             if isinstance(self.raw_socket, (ExecStreamHolder, SimulationStreamHolder)):
-                await asyncio.to_thread(self.raw_socket.set_timeout, 60.0)
+                await database_sync_to_async(self.raw_socket.set_timeout)(60.0)
             self._shell_ready = True
             await self._safe_send(json.dumps({"type": "shell_ready"}))
             return True
@@ -797,14 +816,4 @@ class TerminalConsumer(AsyncWebsocketConsumer):
             )
         except Exception as e:
             logger.debug(f"Failed to save recording: {e}")
-
-    @database_sync_to_async
-    def _get_session(self, session_id, user):
-        try:
-            session = LabSession.objects.select_related(
-                "scenario", "scenario__technology",
-            ).get(id=session_id, user=user)
-            return session
-        except LabSession.DoesNotExist:
-            return None
 

@@ -120,3 +120,40 @@ class StandaloneConsoleEntitlementTests(TestCase):
         )
         res = self.client.get(f"/api/vmware/sessions/{session.id}/")
         self.assertEqual(res.status_code, 200)
+
+    def test_linux_session_cannot_open_datacenter_or_azure_console(self):
+        """Same loophole pattern for other session consoles."""
+        scen, _ = Scenario.objects.get_or_create(
+            slug="linux-plain-for-dc-entitlement",
+            defaults={
+                "title": "Linux plain DC",
+                "technology": self.linux,
+                "lab_mode": "simulation",
+                "simulation_type": "generic",
+                "is_active": True,
+                "is_free": True,
+                "cross_technology": False,
+                "vmware_link": False,
+                "description": "CONTEXT: t\n\nENVIRONMENT: t\n\nOBJECTIVE: t",
+                "objectives": ["x"],
+                "time_limit": 600,
+                "max_score": 100,
+            },
+        )
+        session = LabSession.objects.create(
+            user=self.user,
+            scenario=scen,
+            status="RUNNING",
+            provider="simulation",
+            container_id="sim-entitlement-linux-dc",
+            duration_limit=600,
+        )
+        for path in (
+            f"/api/vmware/datacenter/sessions/{session.id}/",
+            f"/api/vmware/azure/sessions/{session.id}/",
+            f"/api/vmware/gcp/sessions/{session.id}/",
+            f"/api/vmware/openstack/sessions/{session.id}/",
+        ):
+            res = self.client.get(path)
+            self.assertEqual(res.status_code, 403, path)
+            self.assertEqual(res.data.get("code"), "SUBSCRIPTION_REQUIRED", path)

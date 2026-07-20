@@ -1443,29 +1443,34 @@ export default function LabRunner() {
     || scenario?.technology?.slug === 'commvault'
     || (scenario?.slug || '').startsWith('cv-')
     || (scenario?.slug || '').startsWith('commvault-')
+    || (scenario?.slug || '').startsWith('academy-commvault-')
   )
   const isNetappLab = !isCrossTech && (
     scenario?.simulation_type === 'netapp'
     || scenario?.technology?.slug === 'netapp'
     || (scenario?.slug || '').startsWith('netapp-')
     || (scenario?.slug || '').startsWith('ontap-')
+    || (scenario?.slug || '').startsWith('academy-netapp-')
   )
   const isDellemcLab = !isCrossTech && (
     scenario?.simulation_type === 'dellemc'
     || scenario?.technology?.slug === 'dellemc'
     || (scenario?.slug || '').startsWith('dellemc-')
     || (scenario?.slug || '').startsWith('powermax-')
+    || (scenario?.slug || '').startsWith('academy-dellemc-')
   )
   const isDatacenterLab = !isCrossTech && (
     scenario?.simulation_type === 'datacenter'
     || scenario?.technology?.slug === 'datacenter'
     || (scenario?.slug || '').startsWith('datacenter-')
     || (scenario?.slug || '').startsWith('dc-')
+    || (scenario?.slug || '').startsWith('academy-datacenter-')
   )
   const isSocLab = !isCrossTech && (
     scenario?.simulation_type === 'soc'
     || scenario?.technology?.slug === 'soc'
     || (scenario?.slug || '').startsWith('soc-')
+    || (scenario?.slug || '').startsWith('academy-soc-')
   )
   const isAzureLab = !isCrossTech && (
     scenario?.simulation_type === 'azure'
@@ -1483,6 +1488,7 @@ export default function LabRunner() {
     scenario?.simulation_type === 'openstack'
     || scenario?.technology?.slug === 'openstack'
     || (scenario?.slug || '').startsWith('openstack-')
+    || (scenario?.slug || '').startsWith('academy-openstack-')
   )
   const isSimPrimaryLab = !isCrossTech && (
     isAwsLab || isDevOpsPipelineLab || isTerraformSimLab || isAwxLab || isMonitoringLab || isWindowsGuiLab
@@ -1580,6 +1586,26 @@ export default function LabRunner() {
     || isNetappLab
     || isDellemcLab
   )
+  // When a dedicated console is primary, keep a visible "Lab console" chip so
+  // learners never wonder where the GUI went (VMware-parity affordance).
+  const primaryConsoleLabel = {
+    aws: 'AWS Console',
+    azure: 'Azure Portal',
+    gcp: 'GCP Console',
+    openstack: 'OpenStack Horizon',
+    datacenter: 'Data Center Floor',
+    soc: 'SOC Console',
+    commvault: 'CommCell Console',
+    netapp: 'ONTAP System Manager',
+    dellemc: 'Dell EMC Unisphere',
+    cicd: 'CI/CD Pipeline',
+    terraform: 'Terraform Workspace',
+    awx: 'AWX',
+    monitoring: 'Monitoring',
+    windows: 'Windows Server',
+    peoplesoft: 'PeopleSoft',
+    baremetal: 'Bare Metal',
+  }[primarySimKind] || null
   const showTerminalVmwareLink = isVmBackedTerminalLab || (!isCrossTech && !isVmwareLab && explicitVmwareScenario)
   const showCrossTechVmwareLink = isCrossTech
   // Ansible terminal labs run playbooks from the shell, so the terminal stays
@@ -2389,6 +2415,14 @@ export default function LabRunner() {
                 AWS / VMware / Terminal controls that live on the non-primary
                 terminal action bar. Keep a compact always-visible strip. */}
             <div className="shrink-0 flex flex-wrap items-center gap-1.5 px-2 py-1.5 bg-surface-900 border-b border-surface-800 text-[10px]">
+              {primaryConsoleLabel && (
+                <span
+                  className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-md border border-accent-cyan/40 text-accent-cyan bg-accent-cyan/10 font-semibold"
+                  title="Primary lab console for this scenario"
+                >
+                  Lab: {primaryConsoleLabel}
+                </span>
+              )}
               <button
                 type="button"
                 onClick={() => setSimTerminalOpen((v) => !v)}
