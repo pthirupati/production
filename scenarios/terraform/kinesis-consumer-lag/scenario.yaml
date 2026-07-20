@@ -50,7 +50,7 @@ objectives:
 - Increase the shard count on the Kinesis stream to meet throughput requirements
 - Optionally increase Lambda concurrency or batch size to improve consumer throughput
 lab_mode: simulation
-simulation_type: aws
+simulation_type: terraform
 time_limit: 2400
 max_score: 100
 is_free: false

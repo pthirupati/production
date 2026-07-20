@@ -49,7 +49,7 @@ objectives:
 - Identify the missing/broken subscriber or wrong threshold type
 - Add a valid email subscriber so an alert fires when spend exceeds the threshold
 lab_mode: simulation
-simulation_type: aws
+simulation_type: terraform
 time_limit: 1200
 max_score: 100
 is_free: true

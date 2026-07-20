@@ -60,7 +60,7 @@ objectives:
   cluster can satisfy, resource requests)
 - Confirm the manifest is corrected so `kubectl apply -f deployment.yaml` would be accepted
 lab_mode: simulation
-simulation_type: generic
+simulation_type: docker
 cross_technology: true
 time_limit: 1500
 max_score: 100

@@ -4,7 +4,7 @@ technology: windows
 category: Fix
 difficulty: easy
 lab_mode: simulation
-simulation_type: windows-server
+simulation_type: windows
 infrastructure_type: docker
 time_limit: 600
 max_score: 100

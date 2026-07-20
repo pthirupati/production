@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
   Play, RotateCcw, GitBranch, GitPullRequest, Hand, CalendarClock, Workflow, FileCode,
   Server, History, CheckCircle2, XCircle, AlertTriangle, ThumbsUp, ThumbsDown,
-  Download, Ban, ArrowUpCircle, Rocket, Zap,
+  Download, Ban, ArrowUpCircle, Rocket, Zap, KeyRound, Variable, Settings2,
 } from 'lucide-react'
 import LabChromeBar from '../lab/LabChromeBar'
 import { simPanelRoot } from '../../utils/simLayout'
@@ -29,10 +29,12 @@ const TRIGGERS = [
 ]
 
 const TABS = [
-  { id: 'pipeline', label: 'Pipeline', icon: Workflow },
-  { id: 'editor', label: 'Editor', icon: FileCode },
+  { id: 'pipeline', label: 'Workflow', icon: Workflow },
+  { id: 'editor', label: 'YAML', icon: FileCode },
+  { id: 'secrets', label: 'Secrets', icon: KeyRound },
+  { id: 'variables', label: 'Variables', icon: Variable },
   { id: 'environments', label: 'Environments', icon: Server },
-  { id: 'history', label: 'History', icon: History },
+  { id: 'history', label: 'Runs', icon: History },
 ]
 
 let _sha = 0xa1b2c3
@@ -107,6 +109,16 @@ export default function CicdPipelineSim({
   const [nowTick, setNowTick] = useState(0)
   const [runHistory, setRunHistory] = useState([])
   const [environments, setEnvironments] = useState({}) // env -> {sha, at, status, runId}
+  const [secrets, setSecrets] = useState(() => ([
+    { name: 'GITHUB_TOKEN', scope: 'repository', updated: '2d ago' },
+    { name: 'REGISTRY_TOKEN', scope: 'repository', updated: '5d ago', empty: true },
+    { name: 'KUBE_TOKEN', scope: 'environment:production', updated: '1w ago' },
+  ]))
+  const [variables, setVariables] = useState(() => ([
+    { name: 'NODE_VERSION', value: '18', scope: 'repository' },
+    { name: 'DEPLOY_REGION', value: 'us-east-1', scope: 'repository' },
+    { name: 'IMAGE_TAG', value: 'main', scope: 'environment:staging' },
+  ]))
   const [artifacts, setArtifacts] = useState({}) // jobId -> [names]
 
   const runnerRef = useRef(null)
@@ -432,7 +444,7 @@ export default function CicdPipelineSim({
             disabled={hasBlockingErrors || !pipeline.jobs.length}
             title={hasBlockingErrors ? 'Fix definition errors first' : 'Run pipeline'}
           >
-            <Play size={13} /> Run pipeline
+            <Play size={13} /> {isGitOpsLab || provider === PROVIDERS.GITHUB ? 'Run workflow' : 'Run pipeline'}
           </button>
         )}
       </div>
@@ -562,6 +574,134 @@ export default function CicdPipelineSim({
           </div>
         )}
 
+        {tab === 'secrets' && (
+          <div className="max-w-4xl mx-auto space-y-3">
+            <div className="flex items-center justify-between gap-2">
+              <div>
+                <div className="text-[14px] font-semibold flex items-center gap-2">
+                  <KeyRound size={15} style={{ color: 'var(--cicd-accent)' }} /> Actions secrets
+                </div>
+                <p className="text-[12px] mt-1" style={{ color: 'var(--cicd-muted)' }}>
+                  Repository and environment secrets available to workflow jobs (GitHub Actions style).
+                </p>
+              </div>
+              <button
+                type="button"
+                className="cicd-btn cicd-btn-primary"
+                onClick={() => setSecrets((s) => [
+                  ...s,
+                  { name: `NEW_SECRET_${s.length + 1}`, scope: 'repository', updated: 'just now', empty: false },
+                ])}
+              >
+                <Settings2 size={12} /> New secret
+              </button>
+            </div>
+            <div className="cicd-card overflow-hidden">
+              <table className="w-full text-[12px]">
+                <thead>
+                  <tr style={{ color: 'var(--cicd-muted)' }} className="text-left">
+                    <th className="p-2.5 font-medium">Name</th>
+                    <th className="p-2.5 font-medium">Scope</th>
+                    <th className="p-2.5 font-medium">Last updated</th>
+                    <th className="p-2.5 font-medium text-right">Actions</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {secrets.map((sec) => (
+                    <tr key={sec.name} className="cicd-row">
+                      <td className="p-2.5 font-mono">
+                        {sec.name}
+                        {sec.empty && (
+                          <span className="ml-2 text-[10px] uppercase" style={{ color: 'var(--cicd-amber)' }}>unset</span>
+                        )}
+                      </td>
+                      <td className="p-2.5" style={{ color: 'var(--cicd-muted)' }}>{sec.scope}</td>
+                      <td className="p-2.5" style={{ color: 'var(--cicd-muted)' }}>{sec.updated}</td>
+                      <td className="p-2.5 text-right">
+                        <button
+                          type="button"
+                          className="cicd-btn"
+                          onClick={() => setSecrets((rows) => rows.map((r) => (
+                            r.name === sec.name ? { ...r, empty: false, updated: 'just now' } : r
+                          )))}
+                        >
+                          Update
+                        </button>
+                        <button
+                          type="button"
+                          className="cicd-btn cicd-btn-danger ml-1"
+                          onClick={() => setSecrets((rows) => rows.filter((r) => r.name !== sec.name))}
+                        >
+                          Delete
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        )}
+
+        {tab === 'variables' && (
+          <div className="max-w-4xl mx-auto space-y-3">
+            <div className="text-[14px] font-semibold flex items-center gap-2">
+              <Variable size={15} style={{ color: 'var(--cicd-accent)' }} /> Variables
+            </div>
+            <p className="text-[12px]" style={{ color: 'var(--cicd-muted)' }}>
+              Configuration variables injected into workflow steps (visible in job logs as env).
+            </p>
+            <div className="cicd-card overflow-hidden">
+              <table className="w-full text-[12px]">
+                <thead>
+                  <tr style={{ color: 'var(--cicd-muted)' }} className="text-left">
+                    <th className="p-2.5 font-medium">Name</th>
+                    <th className="p-2.5 font-medium">Value</th>
+                    <th className="p-2.5 font-medium">Scope</th>
+                    <th className="p-2.5 font-medium text-right">Actions</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {variables.map((v) => (
+                    <tr key={v.name} className="cicd-row">
+                      <td className="p-2.5 font-mono">{v.name}</td>
+                      <td className="p-2.5">
+                        <input
+                          className="cicd-select w-full max-w-[220px]"
+                          value={v.value}
+                          onChange={(e) => setVariables((rows) => rows.map((r) => (
+                            r.name === v.name ? { ...r, value: e.target.value } : r
+                          )))}
+                        />
+                      </td>
+                      <td className="p-2.5" style={{ color: 'var(--cicd-muted)' }}>{v.scope}</td>
+                      <td className="p-2.5 text-right">
+                        <button
+                          type="button"
+                          className="cicd-btn cicd-btn-danger"
+                          onClick={() => setVariables((rows) => rows.filter((r) => r.name !== v.name))}
+                        >
+                          Remove
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+            <button
+              type="button"
+              className="cicd-btn"
+              onClick={() => setVariables((rows) => [
+                ...rows,
+                { name: `VAR_${rows.length + 1}`, value: '', scope: 'repository' },
+              ])}
+            >
+              Add variable
+            </button>
+          </div>
+        )}
+
         {tab === 'environments' && (
           <div className="max-w-4xl mx-auto grid sm:grid-cols-2 gap-3">
             {['staging', 'production'].map((env) => {
@@ -602,7 +742,7 @@ export default function CicdPipelineSim({
           <div className="max-w-5xl mx-auto">
             {runHistory.length === 0 ? (
               <div className="cicd-card p-6 text-center text-[13px]" style={{ color: 'var(--cicd-muted)' }}>
-                No runs yet — click <strong>Run pipeline</strong>.
+                No runs yet — click <strong>Run workflow</strong>.
               </div>
             ) : (
               <div className="cicd-card overflow-hidden">

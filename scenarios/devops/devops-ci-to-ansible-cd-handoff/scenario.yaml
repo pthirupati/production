@@ -58,7 +58,7 @@ objectives:
   group
 - Confirm the play is corrected so the CI -> Ansible CD handoff completes
 lab_mode: simulation
-simulation_type: ansible
+simulation_type: devops
 cross_technology: true
 time_limit: 1200
 max_score: 100

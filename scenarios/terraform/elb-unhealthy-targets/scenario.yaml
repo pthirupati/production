@@ -50,7 +50,7 @@ objectives:
 - Fix the health check path to match the application endpoint
 - Update the EC2 instance security group to allow inbound traffic from the ALB on the correct port
 lab_mode: simulation
-simulation_type: aws
+simulation_type: terraform
 time_limit: 1800
 max_score: 100
 is_free: false

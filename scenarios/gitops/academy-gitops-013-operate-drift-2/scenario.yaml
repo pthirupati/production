@@ -1,11 +1,11 @@
 title: 'Gitops: Configuration Drift — Daily Operations'
 slug: academy-gitops-013-operate-drift-2
-technology: Gitops
+technology: gitops
 category: Operations
 difficulty: medium
 scenario_type: do
 lab_mode: simulation
-simulation_type: generic
+simulation_type: devops
 time_limit: 1200
 max_score: 100
 is_free: false

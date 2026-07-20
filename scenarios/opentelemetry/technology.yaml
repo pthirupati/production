@@ -1,0 +1,8 @@
+name: OpenTelemetry
+slug: opentelemetry
+icon: activity
+color: indigo
+order: 37
+is_active: true
+price: 499
+description: "Distributed tracing, metrics, and logs — Collector pipelines, context propagation, sampling, and cardinality control."

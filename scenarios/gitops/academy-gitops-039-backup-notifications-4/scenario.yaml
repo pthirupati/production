@@ -1,11 +1,11 @@
 title: 'Gitops: Notifications — Backup and Recovery'
 slug: academy-gitops-039-backup-notifications-4
-technology: Gitops
+technology: gitops
 category: Backup & Recovery
 difficulty: medium
 scenario_type: do
 lab_mode: simulation
-simulation_type: generic
+simulation_type: devops
 time_limit: 1200
 max_score: 100
 is_free: false

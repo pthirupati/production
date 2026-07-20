@@ -4,7 +4,7 @@ technology: docker
 category: Build
 difficulty: medium
 lab_mode: simulation
-simulation_type: generic
+simulation_type: docker
 time_limit: 1200
 max_score: 100
 is_free: true

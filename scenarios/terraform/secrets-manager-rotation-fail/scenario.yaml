@@ -50,7 +50,7 @@ objectives:
 - Add the missing secretsmanager permissions to the Lambda execution role
 - Trigger a manual rotation and confirm it completes successfully
 lab_mode: simulation
-simulation_type: aws
+simulation_type: terraform
 time_limit: 1800
 max_score: 100
 is_free: false

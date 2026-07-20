@@ -1,11 +1,11 @@
 title: 'Gitops: Secrets — Production Readiness'
 slug: academy-gitops-015-production-secrets-2
-technology: Gitops
+technology: gitops
 category: Production
 difficulty: hard
 scenario_type: fix
 lab_mode: simulation
-simulation_type: generic
+simulation_type: devops
 time_limit: 1200
 max_score: 100
 is_free: false

@@ -1,0 +1,8 @@
+name: Service Mesh
+slug: service-mesh
+icon: network
+color: purple
+order: 38
+is_active: true
+price: 499
+description: "mTLS, traffic routing, and resilience with Istio and Linkerd — sidecar injection, VirtualServices, outlier detection, and authorization policies."

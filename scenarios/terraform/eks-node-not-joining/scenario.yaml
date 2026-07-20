@@ -50,7 +50,7 @@ objectives:
 - Attach the required policies to the node group IAM role
 - Verify the aws-auth ConfigMap includes the node role ARN and nodes join the cluster
 lab_mode: simulation
-simulation_type: aws
+simulation_type: terraform
 time_limit: 2400
 max_score: 100
 is_free: false

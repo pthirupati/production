@@ -92,7 +92,7 @@ objectives:
 - Read the container logs to learn why it stopped
 - Fix the cause and restart the container so it stays running
 requires_companion_hosts: false
-simulation_type: generic
+simulation_type: docker
 slug: sim-docker-container-exited
 time_limit: 900
 title: Docker Container Exited

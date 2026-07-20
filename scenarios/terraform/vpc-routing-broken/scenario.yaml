@@ -51,7 +51,7 @@ objectives:
 - Add the missing route: destination 0.0.0.0/0, target the NAT Gateway ID
 - Confirm the EC2 instance can reach the internet (e.g., curl an external URL)
 lab_mode: simulation
-simulation_type: aws
+simulation_type: terraform
 time_limit: 2400
 max_score: 100
 is_free: false

@@ -1,0 +1,8 @@
+name: Security
+slug: security
+icon: shield
+color: red
+order: 21
+is_active: true
+price: 499
+description: "Linux and application security hardening, firewall, SELinux, and vulnerability response labs."

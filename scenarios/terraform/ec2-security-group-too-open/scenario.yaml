@@ -48,7 +48,7 @@ objectives:
 - Revoke the world-open SSH ingress rule
 - Re-authorize SSH from a specific trusted CIDR and verify the rule is scoped
 lab_mode: simulation
-simulation_type: aws
+simulation_type: terraform
 time_limit: 1200
 max_score: 100
 is_free: true

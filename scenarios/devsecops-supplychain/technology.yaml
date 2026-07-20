@@ -1,0 +1,8 @@
+name: DevSecOps Supply Chain
+slug: devsecops-supplychain
+icon: shield
+color: red
+order: 36
+is_active: true
+price: 499
+description: "Software supply-chain security — image CVE scanning, SBOMs, cosign signing, SLSA provenance, and Falco runtime detection."

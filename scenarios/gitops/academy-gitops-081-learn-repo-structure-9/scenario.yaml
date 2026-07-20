@@ -1,11 +1,11 @@
 title: 'Gitops: Repo Structure — Fundamentals Lab'
 slug: academy-gitops-081-learn-repo-structure-9
-technology: Gitops
+technology: gitops
 category: Core Skills
 difficulty: easy
 scenario_type: do
 lab_mode: simulation
-simulation_type: generic
+simulation_type: devops
 time_limit: 900
 max_score: 100
 is_free: false

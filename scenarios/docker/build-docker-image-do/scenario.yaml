@@ -8,6 +8,7 @@ time_limit: 900
 max_score: 100
 infrastructure_type: docker
 lab_mode: docker
+simulation_type: docker
 jira_priority: Low
 is_free: false
 description: 'CONTEXT: A team operating Docker containers has raised a ticket for `Build and Run Docker

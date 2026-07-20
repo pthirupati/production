@@ -4,7 +4,7 @@ technology: devops
 category: Fix
 difficulty: hard
 lab_mode: simulation
-simulation_type: generic
+simulation_type: devops
 time_limit: 1500
 max_score: 100
 is_free: true

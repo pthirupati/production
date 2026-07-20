@@ -8,6 +8,7 @@ time_limit: 900
 max_score: 100
 infrastructure_type: docker
 lab_mode: docker
+simulation_type: windows
 jira_priority: Low
 is_free: false
 description: 'CONTEXT: A team operating Windows Server has raised a ticket for `Create IIS Website`. A

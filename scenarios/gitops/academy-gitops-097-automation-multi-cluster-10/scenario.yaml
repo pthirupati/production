@@ -1,11 +1,11 @@
 title: 'Gitops: Multi Cluster — Automation Practice'
 slug: academy-gitops-097-automation-multi-cluster-10
-technology: Gitops
+technology: gitops
 category: Automation
 difficulty: medium
 scenario_type: do
 lab_mode: simulation
-simulation_type: generic
+simulation_type: devops
 time_limit: 1200
 max_score: 100
 is_free: false

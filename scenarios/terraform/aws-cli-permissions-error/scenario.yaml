@@ -49,7 +49,7 @@ objectives:
 - Attach or create an IAM policy granting the minimum required permissions
 - Confirm the CLI commands succeed after the policy change
 lab_mode: simulation
-simulation_type: aws
+simulation_type: terraform
 time_limit: 1200
 max_score: 100
 is_free: true

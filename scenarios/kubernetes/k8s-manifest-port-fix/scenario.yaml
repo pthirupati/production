@@ -8,6 +8,7 @@ time_limit: 1200
 max_score: 100
 infrastructure_type: docker
 lab_mode: docker
+simulation_type: kubernetes
 jira_priority: High
 is_free: false
 description: 'CONTEXT: A team operating Kubernetes has raised a ticket for `Fix Kubernetes Service Port

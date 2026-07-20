@@ -1,11 +1,11 @@
 title: 'Gitops: Progressive Delivery — Security Practice'
 slug: academy-gitops-106-security-progressive-delivery-11
-technology: Gitops
+technology: gitops
 category: Security
 difficulty: medium
 scenario_type: fix
 lab_mode: simulation
-simulation_type: generic
+simulation_type: devops
 time_limit: 1200
 max_score: 100
 is_free: false

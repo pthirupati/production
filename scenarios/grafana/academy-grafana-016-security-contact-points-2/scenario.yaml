@@ -5,7 +5,7 @@ category: Harden
 difficulty: medium
 scenario_type: fix
 lab_mode: simulation
-simulation_type: generic
+simulation_type: grafana
 time_limit: 1200
 max_score: 100
 is_free: false

@@ -245,8 +245,12 @@ class Command(BaseCommand):
                     infra = "docker"  # valid choice; runtime uses lab_mode
 
                 sim_type = data.get("simulation_type", "generic")
-                from apps.labs.provisioner.simulation.sim_types import normalize_sim_type
-                sim_type = normalize_sim_type(sim_type)
+                from apps.labs.provisioner.simulation.sim_types import infer_sim_type
+                sim_type = infer_sim_type(
+                    sim_type,
+                    slug=data.get("slug", scenario_dir),
+                    technology=getattr(technology, "slug", "") or tech_dir,
+                )
 
                 slug = data.get("slug", scenario_dir)
                 if merge_only and Scenario.objects.filter(slug=slug).exists():

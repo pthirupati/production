@@ -49,7 +49,7 @@ objectives:
 - Enable all four Block Public Access settings on the bucket
 - Remove any bucket policy or ACL entries that grant public read access
 lab_mode: simulation
-simulation_type: aws
+simulation_type: terraform
 time_limit: 1200
 max_score: 100
 is_free: true

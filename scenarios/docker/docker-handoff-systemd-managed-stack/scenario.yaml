@@ -54,7 +54,7 @@ objectives:
 - Correct the unit so it manages `docker compose up -d` correctly (ordering after docker, Type/RemainAfterExit)
 - Enable and start appstack; verify the service is active
 lab_mode: simulation
-simulation_type: generic
+simulation_type: docker
 cross_technology: true
 time_limit: 1200
 max_score: 100

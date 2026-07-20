@@ -1,0 +1,8 @@
+name: DevOps
+slug: devops
+icon: layers
+color: purple
+order: 20
+is_active: true
+price: 499
+description: "CI/CD pipelines, Git workflows, Helm releases, and GitLab/Jenkins/GitHub Actions labs. Primary console: CI/CD Pipeline / GitHub Actions."

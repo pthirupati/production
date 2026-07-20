@@ -49,7 +49,7 @@ objectives:
 - Identify the wrong metric name, threshold, period, or evaluation settings
 - Fix the alarm so it transitions to ALARM when the metric breaches the threshold
 lab_mode: simulation
-simulation_type: aws
+simulation_type: terraform
 time_limit: 1200
 max_score: 100
 is_free: true

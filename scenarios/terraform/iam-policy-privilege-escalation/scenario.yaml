@@ -50,7 +50,7 @@ objectives:
 - Remove or scope down the iam:PassRole permission to restrict it to specific safe roles only
 - Confirm the user can no longer pass arbitrary roles to EC2 instances
 lab_mode: simulation
-simulation_type: aws
+simulation_type: terraform
 time_limit: 2400
 max_score: 100
 is_free: false

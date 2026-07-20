@@ -50,7 +50,7 @@ objectives:
 - Fix the alarm metric namespace, dimension, or threshold so it correctly monitors ASG CPU utilization
 - Verify the Auto Scaling policy is linked to the corrected alarm
 lab_mode: simulation
-simulation_type: aws
+simulation_type: terraform
 time_limit: 1800
 max_score: 100
 is_free: false

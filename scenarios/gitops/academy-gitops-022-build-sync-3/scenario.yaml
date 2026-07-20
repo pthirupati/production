@@ -1,11 +1,11 @@
 title: 'Gitops: Sync — Build From Scratch'
 slug: academy-gitops-022-build-sync-3
-technology: Gitops
+technology: gitops
 category: Build Lab
 difficulty: easy
 scenario_type: do
 lab_mode: simulation
-simulation_type: generic
+simulation_type: devops
 time_limit: 900
 max_score: 100
 is_free: false

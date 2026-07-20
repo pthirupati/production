@@ -1,0 +1,8 @@
+name: GitOps
+slug: gitops
+icon: git-branch
+color: orange
+order: 35
+is_active: true
+price: 499
+description: "Declarative continuous delivery with Argo CD, Flux, and GitHub Actions — sync failures, drift, App-of-Apps, secrets, and reconciliation incidents. Primary console: GitHub Actions workflow UI."

@@ -12,7 +12,10 @@ def apply_scenario_preset(slug: str, state: RHELOSState) -> None:
         preset(state)
         return
     low = (slug or "").lower()
-    if "disk-full" in low or "disk_full" in low or low.endswith("diskfull"):
+    if (
+        low in ("disk-full", "sim-disk-full", "sim-rhel-disk-full")
+        or (low.endswith("-disk-full") and "inode" not in low and "deleted" not in low)
+    ):
         _preset_disk_full(state)
         return
     if "nginx" in slug:
@@ -268,34 +271,31 @@ def _preset_patching(state: RHELOSState) -> None:
 def _preset_disk_full(state: RHELOSState) -> None:
     """Filesystem ~98% full: large logs, hidden cache, log_generator process.
 
-    Matches disk-full / Disk Space Crisis labs — ``df`` must show pressure and
-    ``du`` must surface the oversized paths so the learner has something to clean.
+    Paths and process name match scenarios/linux/disk-full/check.sh so the
+    learner's df/du/rm/kill workflow and Check Solution stay aligned.
     """
     from .rhel_os import SimProcess
 
     state.lvm.set_root_used_pct(98.0)
     state._mkdir("/var/log")
-    state._mkdir("/var/log/app")
+    state._mkdir("/var/log/webapp")
+    state._mkdir("/tmp/.hidden_cache")
     state._mkdir("/var/cache")
-    state._mkdir("/tmp")
-    # Oversized logs (reported size, not stored payload)
     if hasattr(state, "_write_large_file"):
-        state._write_large_file("/var/log/app/access.log", 12 * 1024 * 1024 * 1024)  # 12G
-        state._write_large_file("/var/log/app/error.log", 8 * 1024 * 1024 * 1024)  # 8G
-        state._write_large_file("/var/log/messages", 3 * 1024 * 1024 * 1024)  # 3G
-        state._write_large_file("/var/cache/.hidden_cache_dump", 6 * 1024 * 1024 * 1024)  # 6G
-        state._write_large_file("/tmp/core.legacy.dump", 2 * 1024 * 1024 * 1024)  # 2G
+        state._write_large_file("/var/log/webapp/application.log", 100 * 1024 * 1024)  # 100MB
+        state._write_large_file("/tmp/.hidden_cache/cache.dat", 50 * 1024 * 1024)  # 50MB
+        state._write_large_file("/var/log/messages", 3 * 1024 * 1024 * 1024)
     else:
-        state._write_file("/var/log/app/access.log", "# oversized\n" * 2000)
-        state._write_file("/var/cache/.hidden_cache_dump", "# cache\n" * 2000)
-    # Process that keeps growing logs until killed
+        state._write_file("/var/log/webapp/application.log", "# oversized\n" * 2000)
+        state._write_file("/tmp/.hidden_cache/cache.dat", "# cache\n" * 2000)
     state.processes = list(getattr(state, "processes", []) or [])
     state.processes.append(
-        SimProcess(2241, "root", 12.0, 4.5, "/usr/local/bin/log_generator --out /var/log/app"),
+        SimProcess(2241, "root", 12.0, 4.5, "/usr/local/bin/log_generator.sh --out /var/log/webapp"),
     )
     state._write_file(
         "/opt/fixitlab/disk-pressure.note",
-        "root filesystem at ~98%; kill log_generator and remove oversized logs under /var/log and /var/cache\n",
+        "root filesystem at ~98%; kill log_generator.sh and remove /var/log/webapp/application.log "
+        "and /tmp/.hidden_cache/cache.dat\n",
     )
 
 

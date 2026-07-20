@@ -49,7 +49,7 @@ objectives:
 - Enable automated backups with a retention period of at least 7 days
 - Set an appropriate backup window and confirm backups are enabled
 lab_mode: simulation
-simulation_type: aws
+simulation_type: terraform
 time_limit: 1200
 max_score: 100
 is_free: true

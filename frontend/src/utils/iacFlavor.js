@@ -15,11 +15,13 @@ export function isTerraformLab(scenario) {
   const slug = (scenario?.slug || '').toLowerCase()
   const tech = (scenario?.technology?.slug || '').toLowerCase()
   const sim = (scenario?.simulation_type || '').toLowerCase()
+  // Do NOT treat every aws-* slug as Terraform — that stole the AWS console
+  // from AWS-technology labs and terraform folder aws-* that are really EC2.
   return (
     sim === 'terraform'
     || tech === 'terraform'
     || slug.includes('terraform')
-    || slug.startsWith('aws-')
     || slug.startsWith('iac-')
+    || (slug.startsWith('aws-') && tech === 'terraform')
   )
 }

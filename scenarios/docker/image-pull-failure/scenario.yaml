@@ -92,7 +92,7 @@ objectives:
 - Identify the wrong image name/tag or missing registry auth
 - Pull the corrected image and run the container successfully
 requires_companion_hosts: false
-simulation_type: generic
+simulation_type: docker
 slug: docker-image-pull-failure-lab
 time_limit: 900
 title: Docker Image Pull Failure

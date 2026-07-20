@@ -8,6 +8,7 @@ time_limit: 900
 max_score: 100
 infrastructure_type: docker
 lab_mode: docker
+simulation_type: docker
 docker_privileged: true
 jira_priority: Medium
 is_free: false

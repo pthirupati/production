@@ -1343,8 +1343,8 @@ export default function LabRunner() {
   // Monitoring labs (Grafana + Prometheus) open the in-app observability
   // simulator inline (login gate → dashboards/panels/alerts + PromQL), the same
   // way prompt/coding labs open their own surface. No dedicated route needed.
-  const monitoringSimType = ['grafana', 'prometheus', 'monitoring'].includes(scenario?.simulation_type)
-  const monitoringTech = ['grafana', 'prometheus'].includes(scenario?.technology?.slug)
+  const monitoringSimType = ['grafana', 'prometheus', 'monitoring', 'opentelemetry'].includes(scenario?.simulation_type)
+  const monitoringTech = ['grafana', 'prometheus', 'opentelemetry'].includes(scenario?.technology?.slug)
   const isMonitoringLab = !isCrossTech && (monitoringSimType || monitoringTech)
   const monitoringFlavor = (scenario?.simulation_type === 'prometheus' || scenario?.technology?.slug === 'prometheus')
     ? 'prometheus' : 'grafana'
@@ -1415,16 +1415,13 @@ export default function LabRunner() {
     || (scenario?.slug || '').startsWith('aws-')
     || (scenario?.slug || '').startsWith('academy-aws-')
   )
-  const isDevOpsPipelineLab = !isCrossTech && (
-    ['devops', 'gitops', 'github', 'cicd'].includes((scenario?.technology?.slug || '').toLowerCase())
-    || scenario?.simulation_type === 'devops'
-    || /jenkins|gitlab|pipeline|argocd|flux|helm|sonar|ci-pipeline|cicd|gitops|github|gh-actions|academy-gitops/.test(
-      (scenario?.slug || '').toLowerCase(),
-    )
-  )
+  const techSlugLc = (scenario?.technology?.slug || '').toLowerCase()
   const isBaremetalGuiLab = !isCrossTech && (
     scenario?.simulation_type === 'baremetal'
-    && /maas|lxd|lxc|kvm|virsh|ipmi|pxe/.test((scenario?.slug || '').toLowerCase())
+    || techSlugLc === 'baremetal'
+    || (scenario?.slug || '').startsWith('academy-baremetal-')
+    || (scenario?.slug || '').startsWith('baremetal-')
+    || /maas|lxd|lxc|kvm|virsh|ipmi|pxe/.test((scenario?.slug || '').toLowerCase())
   )
   // Enterprise storage / DC / SOC simulators — each is a dedicated technology
   // (see scenarios/<tech>/technology.yaml) with a matching backend engine under
@@ -1488,12 +1485,26 @@ export default function LabRunner() {
     || scenario?.technology?.slug === 'kubernetes'
     || scenario?.technology?.slug === 'k8s'
     || scenario?.technology?.slug === 'openshift'
+    || scenario?.technology?.slug === 'service-mesh'
     || (scenario?.slug || '').startsWith('kubernetes-')
     || (scenario?.slug || '').startsWith('k8s-')
     || (scenario?.slug || '').startsWith('openshift-')
     || (scenario?.slug || '').startsWith('academy-kubernetes-')
     || (scenario?.slug || '').startsWith('academy-k8s-')
     || (scenario?.slug || '').startsWith('academy-openshift-')
+    || (scenario?.slug || '').startsWith('service-mesh-')
+    || (scenario?.slug || '').startsWith('academy-service-mesh-')
+    || (scenario?.slug || '').startsWith('istio-')
+    || (scenario?.slug || '').startsWith('linkerd-')
+  )
+  // CI/CD / GitOps / GitHub Actions — after k8s so kubernetes-* slugs under devops
+  // folder do not open the wrong console.
+  const isDevOpsPipelineLab = !isCrossTech && !isK8sLab && (
+    ['devops', 'gitops', 'github', 'cicd', 'devsecops-supplychain'].includes(techSlugLc)
+    || scenario?.simulation_type === 'devops'
+    || /jenkins|gitlab|pipeline|argocd|flux|helm|sonar|ci-pipeline|cicd|gitops|github|gh-actions|academy-gitops|academy-devops|devsecops|supplychain|cosign|sbom/.test(
+      (scenario?.slug || '').toLowerCase(),
+    )
   )
   const isDockerLab = !isCrossTech && !isK8sLab && (
     scenario?.simulation_type === 'docker'
@@ -1515,6 +1526,8 @@ export default function LabRunner() {
     || showDatacenterSim
   )
   const primarySimKind = isAwsLab ? 'aws'
+    : isK8sLab ? 'k8s'
+    : isDockerLab ? 'docker'
     : isDevOpsPipelineLab ? 'cicd'
     : isTerraformSimLab ? 'terraform'
     : isAwxLab ? 'awx'
@@ -1534,8 +1547,6 @@ export default function LabRunner() {
     : isAzureLab ? 'azure'
     : isGcpLab ? 'gcp'
     : isOpenStackLab ? 'openstack'
-    : isK8sLab ? 'k8s'
-    : isDockerLab ? 'docker'
     : null
   const solved = validationResult?.passed
   const expired = validationResult?.expired
@@ -1595,7 +1606,10 @@ export default function LabRunner() {
     commvault: 'CommCell Console',
     netapp: 'ONTAP System Manager',
     dellemc: 'Dell EMC Unisphere',
-    cicd: 'CI/CD Pipeline',
+    cicd: (scenario?.technology?.slug || '').toLowerCase() === 'gitops'
+      || /gitops|github|academy-gitops/.test((scenario?.slug || '').toLowerCase())
+      ? 'GitHub Actions'
+      : 'CI/CD Pipeline',
     terraform: 'Terraform Workspace',
     awx: 'AWX',
     monitoring: 'Monitoring',
