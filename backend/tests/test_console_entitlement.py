@@ -121,6 +121,43 @@ class StandaloneConsoleEntitlementTests(TestCase):
         res = self.client.get(f"/api/vmware/sessions/{session.id}/")
         self.assertEqual(res.status_code, 200)
 
+    def test_cross_tech_vmware_link_does_not_unlock_azure(self):
+        """vmware_link must not blanket-allow every other console."""
+        scen, _ = Scenario.objects.get_or_create(
+            slug="linux-cross-vmware-not-azure",
+            defaults={
+                "title": "Linux cross VMware only",
+                "technology": self.linux,
+                "lab_mode": "simulation",
+                "simulation_type": "generic",
+                "is_active": True,
+                "is_free": True,
+                "cross_technology": True,
+                "vmware_link": True,
+                "description": "CONTEXT: t\n\nENVIRONMENT: t\n\nOBJECTIVE: t",
+                "objectives": ["x"],
+                "time_limit": 600,
+                "max_score": 100,
+            },
+        )
+        if not scen.cross_technology:
+            scen.cross_technology = True
+            scen.vmware_link = True
+            scen.save(update_fields=["cross_technology", "vmware_link"])
+        session = LabSession.objects.create(
+            user=self.user,
+            scenario=scen,
+            status="RUNNING",
+            provider="simulation",
+            container_id="sim-entitlement-cross-azure-block",
+            duration_limit=600,
+        )
+        ok = self.client.get(f"/api/vmware/sessions/{session.id}/")
+        self.assertEqual(ok.status_code, 200)
+        blocked = self.client.get(f"/api/vmware/azure/sessions/{session.id}/")
+        self.assertEqual(blocked.status_code, 403)
+        self.assertEqual(blocked.data.get("code"), "SUBSCRIPTION_REQUIRED")
+
     def test_linux_session_cannot_open_datacenter_or_azure_console(self):
         """Same loophole pattern for other session consoles."""
         scen, _ = Scenario.objects.get_or_create(

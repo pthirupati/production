@@ -1175,16 +1175,6 @@ export default function LabRunner() {
   scenarioSlugRef.current = scenario?.slug || scenarioSlugRef.current
   const labHosts = session?.lab_hosts || []
 
-  // Default to SSH jump box for simulation labs — learners connect with ssh user@ip.
-  useEffect(() => {
-    if (!session || session.status !== 'RUNNING') return
-    if (session.provider !== 'simulation') return
-    const slug = (scenario?.slug || '').toLowerCase()
-    if (['boot', 'grub', 'initramfs', 'kernel-panic'].some((k) => slug.includes(k))) return
-    const hasClient = (session.lab_hosts || []).some((h) => h.name === 'ssh_client')
-    if (hasClient) setTerminalHost('ssh_client')
-  }, [session?.id, session?.status, session?.provider, session?.lab_hosts, scenario?.slug])
-
   const blockedCmds = useMemo(
     () => (Array.isArray(scenario.blocked_commands) ? scenario.blocked_commands : []),
     [scenario.blocked_commands],
@@ -1552,40 +1542,20 @@ export default function LabRunner() {
   const isPromptLab = Boolean(scenario?.coding_mode) && promptKind
   const isCodingLab = Boolean(scenario?.coding_mode) && !isPromptLab
 
-  // Linux server and other VM-backed terminal labs reach the terminal action bar.
-  const VM_BACKED_TERMINAL_TECHS = new Set([
-    'linux', 'kubernetes', 'docker', 'database', 'networking', 'ansible', 'devops',
-    'security', 'shell-script', 'bash', 'rhel', 'ubuntu',
-  ])
-  const isVmBackedTerminalLab = !isCrossTech && !isVmwareLab
-    && VM_BACKED_TERMINAL_TECHS.has(scenario?.technology?.slug)
-  // VM-backed labs (Linux shells, Windows Server, AWX, Grafana/Prometheus) also
-  // live on a VMware-managed server, so we surface a vCenter link that lets the
-  // learner perform hypervisor-side steps (add a disk, snapshot, reboot) and
-  // then return here to rescan. The backend field currently defaults to false,
-  // so infer known VM-backed families here instead of requiring every scenario
-  // YAML to opt in one-by-one.
+  // Cross-console links are OPT-IN per scenario only (vmware_link / cross_technology /
+  // datacenter_link / slug markers). Do NOT show VMware/Datacenter on every Linux lab —
+  // that both confuses learners and looks like a free path into other tech consoles.
   const scenarioSlug = scenario?.slug || ''
-  const explicitVmwareScenario = scenario?.vmware_link === true || /vmware|vcenter|vsphere/i.test(scenarioSlug)
+  const explicitVmwareScenario = scenario?.vmware_link === true
+    || scenario?.cross_technology === true
+    || /(?:^|-)(vmware|vcenter|vsphere)(?:-|$)/i.test(scenarioSlug)
   const vmwareServerHref = `/vmware/${sessionId}?scenario=${scenario?.slug || ''}`
-  const showSimVmwareLink = isAwxLab || isMonitoringLab || isWindowsGuiLab || isCommvaultLab || (isTerraformSimLab && explicitVmwareScenario)
-  // Physical / rack work: open the datacenter floor for the same server when the
-  // scenario is physical-backed or the technology routinely needs rack ops.
-  const DC_CROSS_TECHS = new Set([
-    'baremetal', 'gpu', 'windows', 'vmware', 'commvault', 'netapp', 'dellemc',
-    'datacenter', 'linux', 'rhel', 'kubernetes',
-  ])
-  const explicitDatacenterScenario = scenario?.datacenter_link === true
-    || /datacenter|rack|physical|dc-|bmc|ipmi|pdu/.test(scenarioSlug)
-  const showDatacenterLink = !isDatacenterLab && (
-    explicitDatacenterScenario
-    || DC_CROSS_TECHS.has(scenario?.technology?.slug)
-    || isBaremetalGuiLab
-    || isWindowsGuiLab
-    || isCommvaultLab
-    || isNetappLab
-    || isDellemcLab
+  const showSimVmwareLink = explicitVmwareScenario && (
+    isAwxLab || isMonitoringLab || isWindowsGuiLab || isCommvaultLab || isTerraformSimLab
   )
+  const explicitDatacenterScenario = scenario?.datacenter_link === true
+    || /(?:^|-)(datacenter|rack|physical|dc|bmc|ipmi|pdu|remote-hands)(?:-|$)/i.test(scenarioSlug)
+  const showDatacenterLink = !isDatacenterLab && explicitDatacenterScenario
   // When a dedicated console is primary, keep a visible "Lab console" chip so
   // learners never wonder where the GUI went (VMware-parity affordance).
   const primaryConsoleLabel = {
@@ -1606,15 +1576,19 @@ export default function LabRunner() {
     peoplesoft: 'PeopleSoft',
     baremetal: 'Bare Metal',
   }[primarySimKind] || null
-  const showTerminalVmwareLink = isVmBackedTerminalLab || (!isCrossTech && !isVmwareLab && explicitVmwareScenario)
+  const showTerminalVmwareLink = !isCrossTech && !isVmwareLab && (
+    scenario?.vmware_link === true || /(?:^|-)(vmware|vcenter|vsphere)(?:-|$)/i.test(scenarioSlug)
+  )
   const showCrossTechVmwareLink = isCrossTech
   // Ansible terminal labs run playbooks from the shell, so the terminal stays
-  // primary (we do NOT make them AWX-primary). But every Ansible lab should be
-  // able to jump into AWX/Tower to run the same job from a controller, so add
-  // an "Open AWX" link alongside the terminal when the lab isn't already an
-  // AWX-primary scenario.
+  // primary (we do NOT make them AWX-primary). Surface Open AWX only when the
+  // scenario opts in (awx_link) or is clearly an AWX/controller lab.
   const showAwxLink = !isCrossTech && !isAwxLab
-    && (scenario?.technology?.slug === 'ansible' || scenario?.simulation_type === 'ansible')
+    && (
+      scenario?.awx_link === true
+      || scenario?.simulation_type === 'ansible-awx'
+      || /(?:^|-)(awx|tower)(?:-|$)/i.test(scenarioSlug)
+    )
   const vmwareWorkflowHint = showTerminalVmwareLink || showCrossTechVmwareLink
     ? 'Use vCenter for hypervisor steps, then return here and rescan/reboot.'
     : ''
@@ -1688,14 +1662,19 @@ export default function LabRunner() {
 
   const remoteSshTargets = labHosts.filter(h => h.ip && h.name !== 'primary' && h.name !== 'ssh_client')
   const hasSshClient = labHosts.some(h => h.name === 'ssh_client')
-  const openSshClient = (host) => {
+  // SSH Client = empty jump-box shell (labuser@ssh-client). Never attach to a
+  // lab server automatically — learner must ssh/telnet to targets by IP.
+  const openSshClient = () => {
     if (!hasSshClient) {
       toast.error('SSH client not available for this lab', TOAST)
       return
     }
-    setSshClientTarget(host)
+    setSshClientTarget(null)
     setTerminalHost('ssh_client')
-    toast(`SSH client terminal — connect with: ssh ${host.ssh_user || 'root'}@${host.ip}`, { ...TOAST, duration: 8000 })
+    const hint = remoteSshTargets[0]
+      ? `Jump box ready — try: ssh ${remoteSshTargets[0].ssh_user || 'root'}@${remoteSshTargets[0].ip}`
+      : 'Jump box ready — use ssh/telnet to reach lab servers by IP.'
+    toast(hint, { ...TOAST, duration: 8000 })
   }
 
   // The CodingIDE grades on the backend through the SAME completion path as
@@ -2777,25 +2756,30 @@ export default function LabRunner() {
               onClick={() => {
                 if (h.name !== terminalHost) {
                   setTerminalHost(h.name)
-                  if (h.name !== 'ssh_client') setSshClientTarget(null)
+                  setSshClientTarget(null)
                 }
               }}
               className={`px-2.5 py-1.5 rounded-md border font-medium ${terminalHost === h.name ? 'border-accent-cyan text-accent-cyan bg-accent-cyan/10' : 'border-surface-700 text-surface-400 hover:border-surface-600'}`}
+              title={h.name === 'ssh_client' ? 'Empty jump-box shell — ssh/telnet to lab servers by IP' : undefined}
             >
               {h.role === 'SSH Client' || h.name === 'ssh_client' ? 'SSH Client' : (h.role || h.name)}
             </button>
           ))}
-          {remoteSshTargets.map(h => (
+          {useDualPane && hasSshClient && (
             <button
-              key={`ssh-${h.name}`}
               type="button"
-              onClick={() => openSshClient(h)}
+              onClick={() => openSshClient()}
               className="flex items-center gap-1 px-2.5 py-1.5 rounded-md border border-surface-700 text-surface-300 hover:border-accent-cyan hover:text-accent-cyan bg-surface-800/50"
-              title={`Open SSH client → ssh ${h.ssh_user || 'root'}@${h.ip}`}
+              title="Open empty SSH jump-box terminal — then ssh/telnet to lab servers"
             >
-              <Terminal size={12} /> SSH {h.role || h.name}
+              <Terminal size={12} /> SSH Client
             </button>
-          ))}
+          )}
+          {terminalHost === 'ssh_client' && remoteSshTargets.length > 0 && (
+            <span className="text-[10px] text-surface-500 hidden sm:inline">
+              jump box — try: {remoteSshTargets.map((h) => `ssh ${h.ssh_user || 'root'}@${h.ip}`).join(' · ')}
+            </span>
+          )}
           <div className="w-px h-6 bg-surface-700 mx-0.5 hidden sm:block" />
           <button
             onClick={() => setTerminalFullscreen(p => {
@@ -2889,8 +2873,10 @@ export default function LabRunner() {
               blockedCommands={blockedCmds}
               className="flex-1 min-h-0"
               layoutKey={`${session?.status}-${session?.container_id || ''}-${showTerraformSim}`}
-              welcomeHint={terminalHost === 'ssh_client' && sshClientTarget
-                ? `Type: ssh -o StrictHostKeyChecking=no ${sshClientTarget.ssh_user || 'root'}@${sshClientTarget.ip}`
+              welcomeHint={terminalHost === 'ssh_client'
+                ? (remoteSshTargets[0]
+                  ? `Jump box — try: ssh -o StrictHostKeyChecking=no ${remoteSshTargets[0].ssh_user || 'root'}@${remoteSshTargets[0].ip}`
+                  : 'Jump box — use ssh/telnet to reach lab servers by IP')
                 : ''}
               onReady={() => handleTerminalReady(terminalHost)}
             />
@@ -2970,12 +2956,12 @@ export default function LabRunner() {
           className="p-2 text-surface-400 hover:text-accent-amber" aria-label="Hints">
           <Lightbulb size={20} />
         </button>
-        {remoteSshTargets.length > 0 && (
+        {hasSshClient && (
           <button
-            onClick={() => openSshClient(remoteSshTargets[0])}
+            onClick={() => openSshClient()}
             className="p-2 text-surface-400 hover:text-accent-cyan"
-            aria-label="SSH client terminal"
-            title={`SSH client → ${remoteSshTargets[0].ssh_user || 'root'}@${remoteSshTargets[0].ip}`}
+            aria-label="SSH client jump box"
+            title="Empty SSH jump box — then ssh/telnet to lab servers"
           >
             <Terminal size={20} />
           </button>

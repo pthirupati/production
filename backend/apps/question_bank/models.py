@@ -214,6 +214,10 @@ class Scenario(models.Model):
         default=False,
         help_text="Surface an 'Open VMware' link in the lab so the user can perform the hypervisor-side action",
     )
+    datacenter_link = models.BooleanField(
+        default=False,
+        help_text="Surface an 'Open Datacenter' link for physical rack / BMC / PDU steps on the same server",
+    )
     certification_only = models.BooleanField(
         default=False,
         help_text="Show only under certification tracks — excluded from normal technology scenario lists",

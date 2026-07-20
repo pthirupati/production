@@ -109,6 +109,58 @@ def _resolve_lab_provider_label(provider_type: str, sim_type: str, tech_slug: st
     return _LAB_SERVER_LABELS.get(key, "Linux Lab Server (RHEL 9)")
 
 
+def _resolve_hosting_context(
+    *,
+    provider_label: str,
+    sim_type: str,
+    tech_slug: str,
+    slug: str,
+    cross_technology: bool = False,
+    vmware_link: bool = False,
+    datacenter_link: bool = False,
+) -> str:
+    """Where this Lab Server appears in the platform (for the terminal banner)."""
+    low = (slug or "").lower()
+    st = (sim_type or "").strip().lower()
+    tech = (tech_slug or "").strip().lower()
+
+    if st == "aws" or tech == "aws" or low.startswith(("academy-aws", "aws-", "ec2-")):
+        return "Hosted as: AWS EC2 Instance (same guest as AWS Console)"
+    if st == "azure" or tech == "azure" or low.startswith(("academy-azure", "azure-")):
+        return "Hosted as: Azure Virtual Machine (same guest as Azure Portal)"
+    if st == "gcp" or tech == "gcp" or low.startswith(("academy-gcp", "gcp-")):
+        return "Hosted as: Google Compute Engine VM (same guest as GCP Console)"
+    if st == "openstack" or tech == "openstack" or low.startswith(("academy-openstack", "openstack-")):
+        return "Hosted as: OpenStack Instance (same guest as Horizon)"
+    if st == "vmware" or tech == "vmware" or low.startswith(("academy-vmware", "vmware-")):
+        return "Hosted as: VMware Virtual Machine (same guest as vCenter)"
+    if st == "datacenter" or tech == "datacenter" or low.startswith(("academy-datacenter", "datacenter-", "dc-")):
+        return "Hosted as: Physical rack server (same host as Data Center Floor)"
+    if st == "baremetal" or tech == "baremetal":
+        return "Hosted as: Physical Bare Metal Server"
+    if st == "gpu" or tech == "gpu":
+        return "Hosted as: GPU Server"
+    if st == "windows" or tech in ("windows", "windows-server"):
+        return "Hosted as: Windows Server"
+    if st == "kubernetes" or tech == "kubernetes":
+        return "Hosted as: Kubernetes Node"
+    if st == "commvault" or tech == "commvault":
+        return "Hosted as: Commvault Protected Server"
+    if st == "netapp" or tech == "netapp":
+        return "Hosted as: NetApp Storage Host"
+    if st == "dellemc" or tech == "dellemc":
+        return "Hosted as: Dell EMC Storage Host"
+    if st == "soc" or tech == "soc":
+        return "Hosted as: SOC Workstation"
+    if cross_technology or vmware_link:
+        return "Hosted as: VMware Virtual Machine (session-linked guest — same OS as this terminal)"
+    if datacenter_link:
+        return "Hosted as: Physical rack server (session-linked — same host as Data Center Floor)"
+    if provider_label and provider_label != "Lab Environment":
+        return f"Hosted as: {provider_label}"
+    return "Hosted as: Linux Lab Server (scenario-scoped)"
+
+
 def reset_user_ws_connections(user_id=None):
     """Clear per-user WS counters (test helper)."""
     from django.core.cache import cache
@@ -301,6 +353,7 @@ class TerminalConsumer(AsyncWebsocketConsumer):
             # never touch scenario/technology FKs from this async method.
             scenario_title = getattr(self, "_welcome_scenario_title", "") or "Lab"
             provider_label = getattr(self, "_welcome_provider_label", None) or "Lab Environment"
+            hosting_line = getattr(self, "_welcome_hosting_line", None) or f"Hosted as: {provider_label}"
             duration_limit = getattr(self, "_welcome_duration_limit", None)
             if duration_limit is None:
                 duration_limit = getattr(self.lab_session, "duration_limit", 0) or 0
@@ -312,6 +365,7 @@ class TerminalConsumer(AsyncWebsocketConsumer):
                     "\x1b[1;36m╚══════════════════════════════════════╝\x1b[0m\r\n"
                     f"\r\n Scenario: \x1b[1;33m{scenario_title}\x1b[0m\r\n"
                     f" Environment: \x1b[1;37m{provider_label}\x1b[0m\r\n"
+                    f" {hosting_line}\r\n"
                     f" Time limit: \x1b[1;37m{duration_limit // 60} minutes\x1b[0m\r\n"
                     " Type your commands below. Good luck!\r\n\r\n"
                 )
@@ -489,19 +543,35 @@ class TerminalConsumer(AsyncWebsocketConsumer):
             tech_slug = ""
             slug = ""
             title = "Lab"
+            cross_technology = False
+            vmware_link = False
+            datacenter_link = False
             if scenario is not None:
                 title = scenario.title or title
                 sim_type = (getattr(scenario, "simulation_type", None) or "").strip().lower()
                 slug = (getattr(scenario, "slug", None) or "").strip().lower()
+                cross_technology = bool(getattr(scenario, "cross_technology", False))
+                vmware_link = bool(getattr(scenario, "vmware_link", False))
+                datacenter_link = bool(getattr(scenario, "datacenter_link", False))
                 # Access technology only inside this sync method (select_related).
                 tech = None
                 if getattr(scenario, "technology_id", None):
                     tech = scenario.technology
                 if tech is not None:
                     tech_slug = (tech.slug or "").strip().lower()
-            self._welcome_scenario_title = title
-            self._welcome_provider_label = _resolve_lab_provider_label(
+            provider_label = _resolve_lab_provider_label(
                 session.provider or "docker", sim_type, tech_slug, slug,
+            )
+            self._welcome_scenario_title = title
+            self._welcome_provider_label = provider_label
+            self._welcome_hosting_line = _resolve_hosting_context(
+                provider_label=provider_label,
+                sim_type=sim_type,
+                tech_slug=tech_slug,
+                slug=slug,
+                cross_technology=cross_technology,
+                vmware_link=vmware_link,
+                datacenter_link=datacenter_link,
             )
             self._welcome_duration_limit = session.duration_limit or 0
             return session
