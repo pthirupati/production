@@ -65,7 +65,7 @@ export default function InterviewSection({ isAuthenticated }) {
               Start an AI interview <ArrowRight size={16} />
             </Link>
             <Link to="/mock-interviews" className="fx-btn-secondary">
-              <Play size={14} fill="currentColor" stroke="none" /> Watch Demo
+              <Play size={14} fill="currentColor" stroke="none" /> Watch preview
             </Link>
           </div>
         </motion.div>

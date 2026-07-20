@@ -176,7 +176,7 @@ const platformFeatures = [
     desc: 'Production-ready auth and isolation so you can practice safely on shared infrastructure.',
     bullets: [
       'Email OTP registration, GitHub/Google OAuth, and password reset flows',
-      'Isolated lab sandboxes with automatic session expiry and idle timeout',
+      'Isolated lab environments with automatic session expiry and idle timeout',
       'Admin audit logs, rate limiting, and security dashboards for operators',
     ],
   },

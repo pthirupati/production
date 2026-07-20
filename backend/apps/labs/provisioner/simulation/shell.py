@@ -165,7 +165,7 @@ class SimulationStreamHolder:
                     try:
                         out = self._handler(line) or ""
                     except Exception as exc:
-                        out = f"\x1b[1;31mSimulation error: {exc}\x1b[0m"
+                        out = f"\x1b[1;31mLab shell error: {exc}\x1b[0m"
                     if out == "__REBOOT__":
                         self._editor.reset()
                         self._emit_prompt()

@@ -134,7 +134,7 @@ export default function CertificationDetail() {
       setExam(data)
       setResult(null)
       if (data.resumed) toast('Resumed your in-progress exam.')
-      else toast.success('Timed mock exam started — complete the labs before time runs out.')
+      else toast.success('Timed exam started — complete the labs before time runs out.')
     } catch (err) {
       const data = err?.response?.data
       if (data?.code === 'CERT_SUBSCRIPTION_REQUIRED') {
@@ -188,7 +188,7 @@ export default function CertificationDetail() {
                 <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-accent-amber opacity-75" />
                 <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-accent-amber" />
               </span>
-              <span className="text-sm font-semibold text-white">Mock exam in progress</span>
+              <span className="text-sm font-semibold text-white">Timed exam in progress</span>
               <span className="text-xs text-surface-300 hidden sm:inline">
                 Complete the labs below before the timer reaches zero.
               </span>
@@ -253,7 +253,7 @@ export default function CertificationDetail() {
         {exam ? (
           <FixitPanel className="mb-8 border-accent-amber/30" padding="p-6">
             <div className="flex items-center justify-between gap-4 mb-4">
-              <h3 className="font-display font-semibold text-white">Mock exam in progress</h3>
+              <h3 className="font-display font-semibold text-white">Timed exam in progress</h3>
               <button onClick={() => submitExam(false)} disabled={busy} className="btn-primary text-sm disabled:opacity-60">
                 {busy ? 'Submitting…' : 'Submit exam'}
               </button>

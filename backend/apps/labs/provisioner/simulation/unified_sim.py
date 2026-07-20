@@ -13,7 +13,7 @@ from .k8s_cluster import K8sCluster
 from .networking_state import NetworkingState
 from .rhel_shell import RHELShell
 from .shell import SimulationStreamHolder
-from .sim_types import boot_console_for, hostname_for_type, normalize_sim_type
+from .sim_types import boot_console_for, hostname_for_type, lab_server_banner, normalize_sim_type
 from .simulation_modules import apply_simulation_context, register_modules
 
 
@@ -100,6 +100,7 @@ class UnifiedSimulationEngine(BaseRHELSimulator):
             get_editor_state=get_ed,
             save_editor=save_ed,
             clear_editor=clear_ed,
+            banner=lab_server_banner(engine.simulation_type, engine.scenario_slug),
         )
         engine._stream_holder = holder
         if engine.boot and engine.boot.start_at_shell and not getattr(engine, "_patch_hint_shown", False):
@@ -131,7 +132,7 @@ class UnifiedSimulationEngine(BaseRHELSimulator):
             if engine.boot and engine.boot.phase == "grub":
                 return "grub> "
             if engine.boot and engine.boot.phase == "login":
-                return "rhel-sim login: "
+                return "rhel-lab login: "
             if engine.boot and engine.boot.phase == "password_wait":
                 return ""
             return engine.shell.prompt
@@ -219,7 +220,7 @@ class UnifiedSimulationEngine(BaseRHELSimulator):
         if self._stream_holder:
             self._start_grub_countdown(self._stream_holder)
         self._persist_lab_snapshot()
-        return f"\r\n\x1b[1;33mConnection to simulation host closed by remote host.\x1b[0m\r\n{out}"
+        return f"\r\n\x1b[1;33mConnection to lab host closed by remote host.\x1b[0m\r\n{out}"
 
     def _persist_lab_snapshot(self) -> None:
         """Flush engine state after reboot so uptime survives worker/server restarts."""

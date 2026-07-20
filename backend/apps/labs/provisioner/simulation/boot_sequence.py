@@ -33,7 +33,7 @@ KERNEL_BOOT_OK = """\
 [    4.102331] systemd[1]: Mounted /sysroot.
 [    4.881102] systemd[1]: Started NetworkManager.service
 [    5.441002] systemd[1]: Reached target Network.
-[    6.001882] systemd[1]: Started FixitLab simulated RHEL 9.3.
+[    6.001882] systemd[1]: Started FixitLab RHEL 9.3 lab host.
 [    6.441002] systemd[1]: Reached target Multi-User System.
 """
 
@@ -232,7 +232,7 @@ class BootState:
         if not self.password_hint_shown:
             self.password_hint_shown = True
             hint = "\r\n\x1b[1;33mHint: login as root, password redhat\x1b[0m\r\n"
-        out += f"\r\n\r\nRHEL 9.3 FixitLab Simulated Server\r\n{hint}rhel-sim login: "
+        out += f"\r\n\r\nRHEL 9.3 FixitLab Lab Server\r\n{hint}rhel-lab login: "
         return out
 
     def handle_grub(self, line: str) -> str:
@@ -326,7 +326,7 @@ class BootState:
         self.logged_in = True
         self.phase = "shell"
         return (
-            "\r\nWelcome to FixitLab RHEL 9.3 Simulation\r\n"
+            "\r\nWelcome to FixitLab RHEL 9.3 Lab Server\r\n"
             "Last login: Fri Jun 14 10:00:00 UTC 2026 on tty1"
         )
 

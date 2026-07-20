@@ -29,7 +29,7 @@ export default function CertDashboardPanel() {
     setBusyId(slug)
     try {
       await certApi.startExam(slug)
-      toast.success('Mock exam started — open labs from the track page.')
+      toast.success('Exam started — open labs from the track page.')
       load()
     } catch (err) {
       const data = err?.response?.data
@@ -125,7 +125,7 @@ export default function CertDashboardPanel() {
                   onClick={() => startExam(t.slug)}
                   className="btn-primary text-xs inline-flex items-center gap-1 disabled:opacity-60"
                 >
-                  <Play size={12} /> {busyId === t.slug ? 'Starting…' : 'Start mock exam'}
+                  <Play size={12} /> {busyId === t.slug ? 'Starting…' : 'Start timed exam'}
                 </button>
               ) : null}
             </div>

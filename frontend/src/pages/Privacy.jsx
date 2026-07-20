@@ -40,7 +40,7 @@ export default function Privacy() {
       icon: Lock,
       title: 'Data Security',
       color: 'from-amber-500 to-orange-600',
-      text: 'We implement industry-standard security measures including encrypted data transmission (TLS), hashed passwords, secure authentication tokens, and regular security audits to protect your data. Lab sessions are isolated in sandboxed containers that are destroyed after use.',
+      text: 'We implement industry-standard security measures including encrypted data transmission (TLS), hashed passwords, secure authentication tokens, and regular security audits to protect your data. Lab sessions are isolated in containers that are destroyed after use.',
     },
     {
       icon: UserCheck,

@@ -312,15 +312,19 @@ export function holdSpeechUnlock() {
     if (!_speechHoldActive || !window.speechSynthesis) return
     try {
       if (window.speechSynthesis.paused) window.speechSynthesis.resume()
-      if (!window.speechSynthesis.speaking && !window.speechSynthesis.pending) {
-        // Chrome ignores volume=0 primes for autoplay unlock — use a barely
-        // audible tick so the gesture grant survives the startRound() await.
-        const u = new SpeechSynthesisUtterance('.')
-        u.volume = 0.02
-        u.rate = 2
-        u.pitch = 1
-        window.speechSynthesis.speak(u)
+      // Never inject a prime while speak() owns the queue — that races the
+      // gesture warm-up / interviewer line and is a common silence cause.
+      if (_speakInFlight || window.speechSynthesis.speaking || window.speechSynthesis.pending) {
+        _speechHoldTimer = setTimeout(tick, 1800)
+        return
       }
+      // Chrome ignores volume=0 primes for autoplay unlock — use a barely
+      // audible tick so the gesture grant survives the startRound() await.
+      const u = new SpeechSynthesisUtterance('.')
+      u.volume = 0.02
+      u.rate = 2
+      u.pitch = 1
+      window.speechSynthesis.speak(u)
     } catch { /* non-fatal */ }
     _speechHoldTimer = setTimeout(tick, 1800)
   }

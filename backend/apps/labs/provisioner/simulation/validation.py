@@ -254,7 +254,7 @@ def validate_simulation_state(
         if _marker_path:
             _content = state.read_file(_marker_path) or ""
             if "FIXED-OK" in _content:
-                return True, "Simulation validation passed (documented fix applied)"
+                return True, "Lab validation passed (documented fix applied)"
             return False, (
                 f"{_marker_path} not corrected — apply the documented remediation "
                 "and append the FIXED-OK marker, then re-run Check Solution"
@@ -330,7 +330,7 @@ def validate_simulation_state(
                     f"{path} still contains the broken configuration — edit the file "
                     "and apply the documented fix, then re-run Check Solution"
                 )
-    return True, "Simulation validation passed"
+    return True, "Lab validation passed"
 
 
 def _run_line_check(

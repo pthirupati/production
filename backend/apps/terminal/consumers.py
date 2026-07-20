@@ -568,12 +568,12 @@ class TerminalConsumer(AsyncWebsocketConsumer):
                     if self.provider_type == "simulation":
                         if empty_reads > 80:
                             logger.info(
-                                "Simulation stream EOF for session %s — respawning shell",
+                                "Lab stream EOF for session %s — respawning shell",
                                 self.lab_session.id,
                             )
                             if not await self._respawn_shell("sim_eof"):
                                 await self._safe_send(json.dumps({
-                                    "output": "\r\n\x1b[1;31mSimulation shell unavailable.\x1b[0m\r\n",
+                                    "output": "\r\n\x1b[1;31mLab shell unavailable.\x1b[0m\r\n",
                                 }))
                                 if self._ws_connected:
                                     await self.close(code=4500)

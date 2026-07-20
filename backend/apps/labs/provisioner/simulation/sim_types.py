@@ -56,10 +56,52 @@ def normalize_sim_type(raw: str | None) -> str:
     return _LEGACY_MAP.get(key, "generic")
 
 
+def lab_server_banner(sim_type: str, slug: str = "") -> str:
+    """Learner-facing terminal banner for the scenario's Lab Server persona."""
+    st = normalize_sim_type(sim_type)
+    by_type = {
+        "aws": "AWS EC2 Lab Server — Amazon Linux",
+        "azure": "Azure Virtual Machine — RHEL 9",
+        "gcp": "Google Compute Engine VM — RHEL 9",
+        "openstack": "OpenStack Instance — RHEL 9",
+        "vmware": "VMware Guest — RHEL 9",
+        "kubernetes": "Kubernetes Node — RHEL 9",
+        "gpu": "GPU Server — RHEL 9",
+        "windows": "Windows Server Lab",
+        "windows-server": "Windows Server Lab",
+        "baremetal": "Physical Bare Metal Server — RHEL 9",
+        "commvault": "Commvault Protected Server — RHEL 9",
+        "netapp": "NetApp Storage Host",
+        "dellemc": "Dell EMC Storage Host",
+        "datacenter": "Physical Data Center Host — RHEL 9",
+        "soc": "SOC Workstation — RHEL 9",
+        "terraform": "Terraform Workspace Host — RHEL 9",
+        "ansible": "Ansible Control Host — RHEL 9",
+        "ansible-awx": "AWX Control Host — RHEL 9",
+        "docker": "Docker Host — RHEL 9",
+        "networking": "Network Lab Appliance — RHEL 9",
+        "grafana": "Observability Host — RHEL 9",
+        "prometheus": "Observability Host — RHEL 9",
+        "rhel": "Linux Lab Server — RHEL 9",
+        "generic": "Linux Lab Server — RHEL 9",
+    }
+    s = (slug or "").lower()
+    if st == "generic":
+        if s.startswith(("academy-aws", "aws-", "ec2-")):
+            return by_type["aws"]
+        if s.startswith(("academy-azure", "azure-")):
+            return by_type["azure"]
+        if s.startswith(("academy-gcp", "gcp-")):
+            return by_type["gcp"]
+        if s.startswith(("academy-openstack", "openstack-")):
+            return by_type["openstack"]
+    return by_type.get(st, "Linux Lab Server — RHEL 9")
+
+
 def hostname_for_type(sim_type: str, slug: str = "") -> str:
     defaults = {
-        "generic": "rhel-sim",
-        "rhel": "rhel-sim",
+        "generic": "rhel-lab",
+        "rhel": "rhel-lab",
         "kubernetes": "k8s-master",
         "gpu": "gpu-node",
         "baremetal": "bmc-host",
@@ -67,13 +109,13 @@ def hostname_for_type(sim_type: str, slug: str = "") -> str:
         "ansible": "ansible-control",
         "python": "dev-server",
         "java": "dev-server",
-        "vmware": "vcenter-sim",
+        "vmware": "vcenter-lab",
         "terraform": "terraform-ws",
-        "windows": "WIN-SRV-SIM",
+        "windows": "WIN-SRV-01",
         "devops": "gitlab-runner",
         "networking": "core-router",
-        "grafana": "grafana-sim",
-        "prometheus": "prometheus-sim",
+        "grafana": "grafana-lab",
+        "prometheus": "prometheus-lab",
         "commvault": "commvault-commcell",
         "netapp": "netapp-ontap",
         "dellemc": "dellemc-unisphere",
@@ -81,6 +123,8 @@ def hostname_for_type(sim_type: str, slug: str = "") -> str:
         "soc": "soc-siem",
         "azure": "vm-web01",
         "gcp": "web01",
+        "openstack": "web-01",
+        "aws": "ip-10-0-1-25",
     }
     if "ansible" in slug:
         return "ansible-control"
@@ -88,7 +132,7 @@ def hostname_for_type(sim_type: str, slug: str = "") -> str:
         return "gpu-node"
     if "k8s" in slug or "kubernetes" in slug:
         return "k8s-master"
-    return defaults.get(sim_type, "rhel-sim")
+    return defaults.get(sim_type, "rhel-lab")
 
 
 def boot_console_for(scenario_slug: str, sim_type: str) -> bool:

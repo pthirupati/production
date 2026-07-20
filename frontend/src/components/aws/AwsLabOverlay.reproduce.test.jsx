@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 /**
  * REPRODUCTION harness for BUG A: AWS labs show "Lab environment error /
- * Something went wrong loading this simulator" on load.
+ * Something went wrong loading this lab console" on load.
  *
  * This renders the REAL mount path a returning learner hits:
  *   AwsLabOverlay -> MemoryRouter -> AwsConsole -> TopNav + ConsoleHome
@@ -12,7 +12,7 @@
  *
  * We wrap the overlay in the SAME SimErrorBoundary LabRunner uses, and assert
  * the boundary's fallback text never appears. If the console throws on mount,
- * the boundary renders "Something went wrong loading this simulator" — which is
+ * the boundary renders "Something went wrong loading this lab console" — which is
  * exactly the reported symptom — and we capture the thrown error + stack.
  */
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'

@@ -780,7 +780,7 @@ EXTENDED_COURSES: list[dict] = [
     },
     {
         "course_slug": "fixitlab-simulation-zero-hero",
-        "course_title": "FixitLab Simulation Platform",
+        "course_title": "FixitLab Lab Platform",
         "topic": "Simulation",
         "playground_slug": "simulation",
         "modules": [
