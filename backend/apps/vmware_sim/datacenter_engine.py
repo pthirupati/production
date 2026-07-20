@@ -30,7 +30,52 @@ _MDF_RACKS = ["R09", "R10"]
 _RACKS = _DATA_HALL_RACKS + _MDF_RACKS
 
 # Component keys tracked per server; each has a status of "healthy" or "failed".
-_COMPONENT_KEYS = ("power", "nic", "disk", "motherboard", "cpu", "gpu")
+_COMPONENT_KEYS = (
+    "power", "nic", "disk", "motherboard", "cpu", "gpu",
+    "fan", "dimm", "pcie", "raid", "hba",
+)
+
+
+def _hardware_inventory(hostname: str) -> dict:
+    """Detailed server bill-of-materials for the Hardware drawer."""
+    return {
+        "motherboard": {
+            "model": "ServerBoard X11DPi-N", "bios": "3.4", "uefi": True, "tpm": "2.0",
+            "bmc": "iDRAC9 / Redfish", "secure_boot": True,
+        },
+        "cpus": [
+            {"socket": 0, "model": "Intel Xeon Gold 6338", "cores": 32, "threads": 64, "numa_node": 0},
+            {"socket": 1, "model": "Intel Xeon Gold 6338", "cores": 32, "threads": 64, "numa_node": 1},
+        ],
+        "dimms": [
+            {"slot": f"A{i}", "size_gb": 32, "type": "DDR4-3200 ECC", "status": "healthy"}
+            for i in range(1, 9)
+        ],
+        "pcie": [
+            {"slot": "PCIe-1", "device": "NIC", "model": "Mellanox ConnectX-6 25GbE", "lanes": "x8"},
+            {"slot": "PCIe-2", "device": "RAID", "model": "PERC H755", "lanes": "x8"},
+            {"slot": "PCIe-3", "device": "HBA", "model": "Emulex LPe32002 FC32", "lanes": "x8"},
+            {"slot": "PCIe-4", "device": "GPU", "model": "NVIDIA A40", "lanes": "x16"},
+        ],
+        "storage": [
+            {"bay": 0, "model": "Samsung PM9A3", "size_gb": 1920, "bus": "NVMe", "status": "healthy"},
+            {"bay": 1, "model": "Samsung PM9A3", "size_gb": 1920, "bus": "NVMe", "status": "healthy"},
+            {"bay": 2, "model": "Seagate Exos", "size_gb": 4000, "bus": "SAS", "status": "healthy"},
+        ],
+        "psus": [
+            {"id": "PSU1", "watts": 1400, "redundant": True, "status": "healthy"},
+            {"id": "PSU2", "watts": 1400, "redundant": True, "status": "healthy"},
+        ],
+        "fans": [
+            {"id": f"FAN{i}", "rpm": 7200 + i * 50, "status": "healthy"} for i in range(1, 7)
+        ],
+        "cables": [
+            {"id": "NIC0-front", "type": "DAC", "port": "eth0", "status": "seated"},
+            {"id": "NIC1-rear", "type": "fiber", "port": "eth1", "status": "seated"},
+            {"id": "FC0", "type": "fiber", "port": "fc0", "status": "seated"},
+        ],
+        "hostname": hostname,
+    }
 
 
 def _session_key(session_id: str) -> str:
@@ -108,6 +153,8 @@ def _server(asset_id: str, rack: str, u_slot: int, hostname: str, **overrides) -
         "power_state": power_state,
         "components": components,
         "bmc": bmc,
+        "hardware": _hardware_inventory(hostname),
+        "firmware_version": overrides.pop("firmware_version", "2.12.0"),
         **({"role": role} if role else {}),
         **{k: v for k, v in overrides.items() if k != "power_state"},
     }
@@ -439,6 +486,11 @@ _REPLACE_ACTIONS = {
     "replace_gpu": "gpu",
     "replace_power": "power",
     "replace_psu": "power",
+    "replace_fan": "fan",
+    "replace_dimm": "dimm",
+    "replace_pcie": "pcie",
+    "replace_raid": "raid",
+    "replace_hba": "hba",
 }
 
 
@@ -530,9 +582,31 @@ def apply_action(session_id: str, action: str, payload: dict | None = None) -> d
             srv["bmc"]["power"] = "on"
         if broken.get("server") == srv["id"] and broken.get("component") == component:
             broken.clear()
+        # Keep detailed hardware inventory in sync with component health.
+        hw = srv.setdefault("hardware", _hardware_inventory(srv.get("hostname") or srv["id"]))
+        if component == "disk":
+            for d in hw.get("storage") or []:
+                d["status"] = "healthy"
+        if component == "dimm":
+            for d in hw.get("dimms") or []:
+                d["status"] = "healthy"
+        if component == "power":
+            for p in hw.get("psus") or []:
+                p["status"] = "healthy"
+        if component == "fan":
+            for f in hw.get("fans") or []:
+                f["status"] = "healthy"
         _event(state, f"Replaced {component} in {srv['id']}", "success")
         _save(session_id, entry)
         _sync_identity(session_id, state)
+        try:
+            from apps.labs.provisioner.simulation import datacenter_bridge
+            if component == "disk":
+                datacenter_bridge.record_disk_replaced(str(session_id), srv["id"])
+            elif component == "nic":
+                datacenter_bridge.record_nic_reseated(str(session_id), srv["id"])
+        except Exception:
+            pass
         return {"ok": True, "message": f"{component} replaced"}
 
     if action == "reseat_cable":

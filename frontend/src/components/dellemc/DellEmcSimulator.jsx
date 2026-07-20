@@ -18,9 +18,12 @@ const SIDEBAR = [
   { key: 'arrays', label: 'Arrays', icon: Server },
   { key: 'storage-groups', label: 'Storage Groups', icon: Layers },
   { key: 'volumes', label: 'Volumes', icon: HardDrive },
+  { key: 'snapshots', label: 'Snapshots', icon: HardDrive },
   { key: 'hosts', label: 'Hosts', icon: Users },
   { key: 'masking-views', label: 'Masking Views', icon: Eye },
+  { key: 'srdf', label: 'SRDF', icon: Network },
   { key: 'ports', label: 'Ports', icon: Network },
+  { key: 'activity', label: 'Activity', icon: Server },
 ]
 
 export default function DellEmcSimulator({
@@ -142,7 +145,15 @@ export default function DellEmcSimulator({
           <SimDataTable columns={[
             { key: 'name', label: 'Storage Group', sortable: true },
             { key: 'volumes', label: 'Volumes', render: (r) => (r.volumes || []).length },
+            { key: 'slo', label: 'SLO', sortable: true, render: (r) => r.slo || '—' },
+            { key: 'host_io_limit', label: 'IOPS limit', render: (r) => r.host_io_limit || 'Unlimited' },
             { key: 'array', label: 'Array', sortable: true },
+            { key: 'actions', label: 'Actions', render: (r) => (
+              <button type="button" className="de-btn-sm" onClick={(e) => {
+                e.stopPropagation()
+                run(() => dellemcApi.setHostIoLimit(sessionId, r.name, 10000), 'Host I/O limit set')
+              }}>Set 10k IOPS</button>
+            ) },
           ]} rows={st.storage_groups || []} searchKeys={['name']} />
         </div>
       )
@@ -166,12 +177,37 @@ export default function DellEmcSimulator({
             { key: 'size_gb', label: 'Size', render: (r) => `${r.size_gb} GB` },
             { key: 'storage_group', label: 'Storage Group', sortable: true, render: (r) => r.storage_group || '—' },
             { key: 'status', label: 'Status', render: (r) => <SimStatusBadge status={r.status === 'Ready' ? 'success' : 'warning'} label={r.status} /> },
-            { key: 'actions', label: 'Actions', render: (r) => r.status !== 'Ready' && (
-              <button type="button" className="de-btn-sm" onClick={(e) => { e.stopPropagation(); setMapTarget(r.id); setMapSg((st.storage_groups || [])[0]?.name || '') }}>
-                <Link2 size={11} /> Map
-              </button>
+            { key: 'actions', label: 'Actions', render: (r) => (
+              <div className="flex gap-1">
+                {r.status !== 'Ready' && (
+                  <button type="button" className="de-btn-sm" onClick={(e) => { e.stopPropagation(); setMapTarget(r.id); setMapSg((st.storage_groups || [])[0]?.name || '') }}>
+                    <Link2 size={11} /> Map
+                  </button>
+                )}
+                <button type="button" className="de-btn-sm" onClick={(e) => {
+                  e.stopPropagation()
+                  run(() => dellemcApi.createSnapshot(sessionId, r.id), 'Snapshot created')
+                }}>Snap</button>
+                <button type="button" className="de-btn-sm" onClick={(e) => {
+                  e.stopPropagation()
+                  run(() => dellemcApi.expandVolume(sessionId, r.id, (r.size_gb || 100) + 100), 'Volume expanded')
+                }}>Expand</button>
+              </div>
             ) },
           ]} rows={st.volumes || []} searchKeys={['id']} />
+        </div>
+      )
+    }
+    if (nav === 'snapshots') {
+      return (
+        <div className="space-y-3">
+          <h2 className="text-lg font-semibold">Snapshots</h2>
+          <SimDataTable columns={[
+            { key: 'name', label: 'Snapshot', sortable: true },
+            { key: 'volume_id', label: 'Volume', sortable: true },
+            { key: 'size_gb', label: 'Size', render: (r) => `${r.size_gb} GB` },
+            { key: 'created', label: 'Created', sortable: true },
+          ]} rows={st.snapshots || []} searchKeys={['name', 'volume_id']} />
         </div>
       )
     }
@@ -206,7 +242,33 @@ export default function DellEmcSimulator({
             { key: 'storage_group', label: 'Storage Group', sortable: true },
             { key: 'host', label: 'Host', sortable: true },
             { key: 'port_group', label: 'Port Group', sortable: true },
+            { key: 'actions', label: 'Actions', render: (r) => (
+              <button type="button" className="de-btn-sm de-btn-outline" onClick={(e) => {
+                e.stopPropagation()
+                run(() => dellemcApi.deleteMaskingView(sessionId, r.name), 'Masking view deleted')
+              }}>Delete</button>
+            ) },
           ]} rows={st.masking_views || []} searchKeys={['name', 'host']} />
+        </div>
+      )
+    }
+    if (nav === 'srdf') {
+      return (
+        <div className="space-y-3">
+          <h2 className="text-lg font-semibold">SRDF Groups</h2>
+          <SimDataTable columns={[
+            { key: 'name', label: 'RDF Group', sortable: true },
+            { key: 'local_volume', label: 'Local', sortable: true },
+            { key: 'remote_volume', label: 'Remote', sortable: true },
+            { key: 'mode', label: 'Mode', sortable: true },
+            { key: 'state', label: 'State', render: (r) => <SimStatusBadge status={r.state === 'Consistent' ? 'success' : 'warning'} label={r.state} /> },
+            { key: 'actions', label: 'Actions', render: (r) => r.state !== 'FailedOver' && (
+              <button type="button" className="de-btn-sm" onClick={(e) => {
+                e.stopPropagation()
+                run(() => dellemcApi.failoverSrdf(sessionId, r.name), 'SRDF failover complete')
+              }}>Failover</button>
+            ) },
+          ]} rows={st.srdf || []} searchKeys={['name']} />
         </div>
       )
     }
@@ -217,6 +279,18 @@ export default function DellEmcSimulator({
         { key: 'status', label: 'Status', render: (r) => <SimStatusBadge status={r.status === 'online' ? 'success' : 'error'} label={r.status} /> },
         { key: 'speed', label: 'Speed', sortable: true },
       ]} rows={st.ports || []} searchKeys={['id', 'director']} />
+    }
+    if (nav === 'activity') {
+      return (
+        <div className="space-y-3">
+          <h2 className="text-lg font-semibold">Activity</h2>
+          <SimDataTable columns={[
+            { key: 'time', label: 'Time', sortable: true },
+            { key: 'severity', label: 'Severity', sortable: true },
+            { key: 'message', label: 'Message', sortable: true },
+          ]} rows={st.activity_log || st.events || []} searchKeys={['message']} emptyMessage="No activity yet." />
+        </div>
+      )
     }
     return null
   }

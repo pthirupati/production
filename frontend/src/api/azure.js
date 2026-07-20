@@ -51,6 +51,38 @@ export const azureApi = {
   createVm(sessionId, payload = {}) {
     return azureApi.action(sessionId, 'create_vm', payload)
   },
+  createResourceGroup(sessionId, name, location = 'eastus') {
+    return azureApi.action(sessionId, 'create_resource_group', { name, location })
+  },
+  createStorageAccount(sessionId, name, opts = {}) {
+    return azureApi.action(sessionId, 'create_storage_account', { name, ...opts })
+  },
+  createBlobContainer(sessionId, account, name) {
+    return azureApi.action(sessionId, 'create_blob_container', { account, name })
+  },
+  setSecret(sessionId, vault, name, contentType = 'text') {
+    return azureApi.action(sessionId, 'set_secret', { vault, name, content_type: contentType })
+  },
+  assignRole(sessionId, principal, role, scope) {
+    return azureApi.action(sessionId, 'assign_role', { principal, role, scope })
+  },
+  removeRoleAssignment(sessionId, id) {
+    return azureApi.action(sessionId, 'remove_role_assignment', { id })
+  },
+  createLbRule(sessionId, lb, rule) {
+    return azureApi.action(sessionId, 'create_load_balancer_rule', { lb, ...rule })
+  },
+  createSubnet(sessionId, vnet, name, addressPrefix) {
+    return azureApi.action(sessionId, 'create_subnet', {
+      vnet, name, address_prefix: addressPrefix,
+    })
+  },
+  createNsg(sessionId, name) {
+    return azureApi.action(sessionId, 'create_nsg', { name })
+  },
+  snapshotDisk(sessionId, diskName, name) {
+    return azureApi.action(sessionId, 'snapshot_disk', { disk_name: diskName, name })
+  },
 }
 
 export default azureApi

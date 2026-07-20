@@ -28,6 +28,8 @@ export const datacenterApi = {
     const action = {
       nic: 'replace_nic', disk: 'replace_disk', motherboard: 'replace_motherboard',
       cpu: 'replace_cpu', gpu: 'replace_gpu', power: 'replace_power',
+      fan: 'replace_fan', dimm: 'replace_dimm', pcie: 'replace_pcie',
+      raid: 'replace_raid', hba: 'replace_hba',
     }[component] || 'replace_power'
     return datacenterApi.action(sessionId, action, { asset_id: assetId })
   },

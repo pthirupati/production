@@ -33,6 +33,27 @@ export const commvaultApi = {
   enablePolicy(sessionId, name) {
     return commvaultApi.action(sessionId, 'enable_policy', { name })
   },
+  setRetention(sessionId, name, retentionDays) {
+    return commvaultApi.action(sessionId, 'set_retention', { name, retention_days: retentionDays })
+  },
+  killJob(sessionId, jobId) {
+    return commvaultApi.action(sessionId, 'kill_job', { job_id: jobId })
+  },
+  enableSchedule(sessionId, name) {
+    return commvaultApi.action(sessionId, 'enable_schedule', { name })
+  },
+  createSchedule(sessionId, payload) {
+    return commvaultApi.action(sessionId, 'create_schedule', payload)
+  },
+  runAuxCopy(sessionId, name) {
+    return commvaultApi.action(sessionId, 'run_aux_copy', { name })
+  },
+  addMediaAgent(sessionId, name, os = 'Linux') {
+    return commvaultApi.action(sessionId, 'add_media_agent', { name, os })
+  },
+  createLibrary(sessionId, name, type = 'Disk', capacityGb = 1000) {
+    return commvaultApi.action(sessionId, 'create_library', { name, type, capacity_gb: capacityGb })
+  },
 }
 
 export default commvaultApi

@@ -51,6 +51,27 @@ export const gcpApi = {
   createInstance(sessionId, payload = {}) {
     return gcpApi.action(sessionId, 'create_instance', payload)
   },
+  addIamBinding(sessionId, member, role) {
+    return gcpApi.action(sessionId, 'add_iam_binding', { member, role })
+  },
+  removeIamBinding(sessionId, member, role) {
+    return gcpApi.action(sessionId, 'remove_iam_binding', { member, role })
+  },
+  createBucket(sessionId, name, opts = {}) {
+    return gcpApi.action(sessionId, 'create_bucket', { name, ...opts })
+  },
+  deleteBucket(sessionId, name) {
+    return gcpApi.action(sessionId, 'delete_bucket', { name })
+  },
+  createSubnet(sessionId, network, name, range) {
+    return gcpApi.action(sessionId, 'create_subnet', { network, name, range })
+  },
+  createForwardingRule(sessionId, payload = {}) {
+    return gcpApi.action(sessionId, 'create_forwarding_rule', payload)
+  },
+  createSnapshot(sessionId, diskName, name) {
+    return gcpApi.action(sessionId, 'create_snapshot', { disk_name: diskName, name })
+  },
 }
 
 export default gcpApi

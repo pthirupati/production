@@ -38,7 +38,10 @@ def _now_iso() -> str:
 
 
 def _event(state: dict, message: str, severity: str = "info") -> None:
-    state.setdefault("events", []).insert(0, {"time": _now_iso(), "message": message, "severity": severity})
+    entry = {"time": _now_iso(), "message": message, "severity": severity}
+    state.setdefault("events", []).insert(0, entry)
+    state.setdefault("activity_log", []).insert(0, entry)
+    state["activity_log"] = state["activity_log"][:200]
 
 
 def _base_state() -> dict:
@@ -49,8 +52,8 @@ def _base_state() -> dict:
             {"id": "000297900123", "model": "PowerMax 2500", "capacity_tb": 500, "used_tb": 180, "health": "normal"},
         ],
         "storage_groups": [
-            {"name": "SG_web_prod", "array": "000297900123", "volumes": ["0001", "0002"], "host_io_limit": None},
-            {"name": "SG_db_prod", "array": "000297900123", "volumes": ["0003"], "host_io_limit": None},
+            {"name": "SG_web_prod", "array": "000297900123", "volumes": ["0001", "0002"], "host_io_limit": None, "slo": "Diamond"},
+            {"name": "SG_db_prod", "array": "000297900123", "volumes": ["0003"], "host_io_limit": None, "slo": "Platinum"},
         ],
         "volumes": [
             {"id": "0001", "size_gb": 100, "storage_group": "SG_web_prod", "status": "Ready", "emulation": "FBA"},
@@ -73,6 +76,13 @@ def _base_state() -> dict:
             {"name": "PG_web", "ports": ["FA-1D:4"]},
             {"name": "PG_db", "ports": ["FA-2D:4"]},
         ],
+        "snapshots": [
+            {"name": "snap-0003-daily", "volume_id": "0003", "size_gb": 12, "created": _now_iso()},
+        ],
+        "srdf": [
+            {"name": "RDFG-1", "local_volume": "0003", "remote_volume": "9003", "mode": "Async", "state": "Consistent"},
+        ],
+        "activity_log": [],
         "goal": {"title": "Dell EMC provisioning lab", "objective": "Provision the unmapped volume 0004 to db01."},
         "broken": {"unmapped_volume": "0004"},
         "events": [],
@@ -229,6 +239,73 @@ def apply_action(session_id: str, action: str, payload: dict | None = None) -> d
         _event(state, f"Masking view {name} created for {host}", "success")
         _save(session_id, entry)
         return {"ok": True, "message": "Masking view created"}
+
+    if action == "expand_volume":
+        vol_id = payload.get("volume_id") or ""
+        vol = _find_volume(state, vol_id)
+        if not vol:
+            return {"ok": False, "error": f"Volume {vol_id} not found"}
+        new_size = int(payload.get("size_gb") or (vol.get("size_gb", 100) + 100))
+        if new_size <= vol.get("size_gb", 0):
+            return {"ok": False, "error": "New size must be larger"}
+        vol["size_gb"] = new_size
+        _event(state, f"Volume {vol_id} expanded to {new_size}GB", "success")
+        _save(session_id, entry)
+        return {"ok": True, "message": "Volume expanded"}
+
+    if action == "create_snapshot":
+        vol_id = payload.get("volume_id") or "0003"
+        vol = _find_volume(state, vol_id)
+        if not vol:
+            return {"ok": False, "error": f"Volume {vol_id} not found"}
+        name = payload.get("name") or f"snap-{vol_id}-{int(time.time()) % 10000}"
+        state.setdefault("snapshots", []).insert(0, {
+            "name": name, "volume_id": vol_id, "size_gb": round(float(vol.get("size_gb", 10)) * 0.05, 1),
+            "created": _now_iso(),
+        })
+        _event(state, f"Snapshot {name} created for volume {vol_id}", "success")
+        _save(session_id, entry)
+        return {"ok": True, "message": "Snapshot created"}
+
+    if action == "set_host_io_limit":
+        sg_name = payload.get("storage_group") or "SG_web_prod"
+        sg = next((s for s in state.get("storage_groups", []) if s.get("name") == sg_name), None)
+        if not sg:
+            return {"ok": False, "error": f"Storage group {sg_name} not found"}
+        iops = int(payload.get("iops") or 10000)
+        sg["host_io_limit"] = iops
+        _event(state, f"Host I/O limit for {sg_name} set to {iops} IOPS", "success")
+        _save(session_id, entry)
+        return {"ok": True, "message": "Host I/O limit set"}
+
+    if action == "create_port_group":
+        name = (payload.get("name") or "PG_new").strip()
+        ports = payload.get("ports") or ["FA-1D:4"]
+        state.setdefault("port_groups", []).append({"name": name, "ports": ports})
+        _event(state, f"Port group {name} created", "success")
+        _save(session_id, entry)
+        return {"ok": True, "message": "Port group created"}
+
+    if action == "failover_srdf":
+        name = payload.get("name") or "RDFG-1"
+        pair = next((s for s in state.get("srdf", []) if s.get("name") == name), None)
+        if not pair:
+            return {"ok": False, "error": f"SRDF group {name} not found"}
+        pair["state"] = "FailedOver"
+        pair["mode"] = "Async"
+        _event(state, f"SRDF {name} failed over to remote", "warning")
+        _save(session_id, entry)
+        return {"ok": True, "message": "SRDF failover complete"}
+
+    if action == "delete_masking_view":
+        name = payload.get("name") or ""
+        before = len(state.get("masking_views", []))
+        state["masking_views"] = [m for m in state.get("masking_views", []) if m.get("name") != name]
+        if len(state["masking_views"]) == before:
+            return {"ok": False, "error": f"Masking view {name} not found"}
+        _event(state, f"Masking view {name} deleted", "warning")
+        _save(session_id, entry)
+        return {"ok": True, "message": "Masking view deleted"}
 
     return {"ok": False, "error": f"Unknown action: {action}"}
 

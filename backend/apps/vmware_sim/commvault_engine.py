@@ -50,7 +50,10 @@ def _now() -> float:
 
 
 def _event(state: dict, message: str, severity: str = "info") -> None:
-    state.setdefault("events", []).insert(0, {"time": _now_iso(), "message": message, "severity": severity})
+    entry = {"time": _now_iso(), "message": message, "severity": severity}
+    state.setdefault("events", []).insert(0, entry)
+    state.setdefault("activity_log", []).insert(0, entry)
+    state["activity_log"] = state["activity_log"][:200]
 
 
 # ---------------------------------------------------------------------------
@@ -166,11 +169,24 @@ def _base_state() -> dict:
              "finish_status": "completed", "size_gb": 4.2, "progress": 100},
         ],
         "media_agents": [
-            {"name": "MA-01", "status": "online", "os": "Linux"},
+            {"name": "MA-01", "status": "online", "os": "Linux", "streams": 10, "free_space_gb": 1200},
+            {"name": "MA-02", "status": "online", "os": "Linux", "streams": 8, "free_space_gb": 800},
         ],
         "libraries": [
-            {"name": "DiskLib-01", "type": "Disk", "capacity_gb": 2000, "used_gb": 640},
+            {"name": "DiskLib-01", "type": "Disk", "capacity_gb": 2000, "used_gb": 640, "media_agent": "MA-01"},
+            {"name": "CloudLib-S3", "type": "Cloud", "capacity_gb": 10000, "used_gb": 2100, "media_agent": "MA-02"},
         ],
+        "schedules": [
+            {"id": "sch1", "name": "Daily-Full-web01", "client": "web01", "policy": "Gold-Retention-30d",
+             "type": "Full", "cron": "0 2 * * *", "enabled": True},
+            {"id": "sch2", "name": "Incremental-db01", "client": "db01", "policy": "Gold-Retention-30d",
+             "type": "Incremental", "cron": "0 */6 * * *", "enabled": False},
+        ],
+        "aux_copies": [
+            {"id": "ac1", "name": "Gold-to-Cloud", "source_policy": "Gold-Retention-30d",
+             "dest_library": "CloudLib-S3", "status": "idle"},
+        ],
+        "activity_log": [],
         "goal": {"title": "Commvault backup lab", "objective": "Run a backup job for the client with overdue protection."},
         "broken": {"overdue_client": "db01"},
         "events": [],
@@ -191,6 +207,12 @@ def _apply_preset(state: dict, slug: str) -> None:
     elif "client" in slug and ("add" in slug or "register" in slug or "discover" in slug):
         state["goal"] = {"title": "Register client", "objective": "Add a new client to the CommCell and verify it comes online."}
         state["broken"] = {"missing_client": True}
+    elif "schedule" in slug:
+        state["goal"] = {"title": "Enable schedule", "objective": "Enable the disabled Incremental-db01 schedule."}
+        state["broken"] = {"schedule_disabled": "Incremental-db01"}
+    elif "aux" in slug or "copy" in slug:
+        state["goal"] = {"title": "Run aux copy", "objective": "Start the Gold-to-Cloud auxiliary copy job."}
+        state["broken"] = {"needs_aux_copy": "Gold-to-Cloud"}
     elif "backup" in slug or "job" in slug or "overdue" in slug:
         state["goal"] = {"title": "Fix overdue backup", "objective": "Run a backup job for db01 to clear its overdue protection status."}
         state["broken"] = {"overdue_client": "db01"}
@@ -322,6 +344,93 @@ def apply_action(session_id: str, action: str, payload: dict | None = None) -> d
         _event(state, f"Storage policy {policy['name']} enabled", "success")
         _save(session_id, entry)
         return {"ok": True, "message": "Storage policy enabled"}
+
+    if action == "set_retention":
+        name = payload.get("name") or ""
+        policy = next((p for p in state.get("storage_policies", []) if p.get("name") == name or p.get("id") == name), None)
+        if not policy:
+            return {"ok": False, "error": f"Storage policy '{name}' not found"}
+        days = int(payload.get("retention_days") or policy.get("retention_days") or 30)
+        policy["retention_days"] = days
+        _event(state, f"Retention for {policy['name']} set to {days} days", "success")
+        _save(session_id, entry)
+        return {"ok": True, "message": "Retention updated"}
+
+    if action == "kill_job":
+        job_id = int(payload.get("job_id") or 0)
+        job = next((j for j in state.get("jobs", []) if int(j.get("id", 0)) == job_id), None)
+        if not job:
+            return {"ok": False, "error": f"Job {job_id} not found"}
+        if job.get("status") in ("completed", "failed", "killed"):
+            return {"ok": False, "error": "Job already finished"}
+        job["status"] = "killed"
+        job["progress"] = job.get("progress") or 0
+        _event(state, f"Job {job_id} killed by operator", "warning")
+        _save(session_id, entry)
+        return {"ok": True, "message": "Job killed"}
+
+    if action == "enable_schedule":
+        name = payload.get("name") or broken.get("schedule_disabled") or ""
+        sch = next((s for s in state.get("schedules", []) if s.get("name") == name or s.get("id") == name), None)
+        if not sch:
+            return {"ok": False, "error": f"Schedule '{name}' not found"}
+        sch["enabled"] = True
+        if broken.get("schedule_disabled") == sch["name"]:
+            broken.pop("schedule_disabled", None)
+        _event(state, f"Schedule {sch['name']} enabled", "success")
+        _save(session_id, entry)
+        return {"ok": True, "message": "Schedule enabled"}
+
+    if action == "create_schedule":
+        name = (payload.get("name") or "New-Schedule").strip()
+        sch_id = f"sch{len(state.get('schedules', [])) + 1}"
+        state.setdefault("schedules", []).append({
+            "id": sch_id, "name": name,
+            "client": payload.get("client") or "web01",
+            "policy": payload.get("policy") or "Gold-Retention-30d",
+            "type": payload.get("type") or "Incremental",
+            "cron": payload.get("cron") or "0 1 * * *",
+            "enabled": True,
+        })
+        _event(state, f"Schedule {name} created", "success")
+        _save(session_id, entry)
+        return {"ok": True, "message": "Schedule created", "id": sch_id}
+
+    if action == "run_aux_copy":
+        name = payload.get("name") or broken.get("needs_aux_copy") or "Gold-to-Cloud"
+        aux = next((a for a in state.get("aux_copies", []) if a.get("name") == name or a.get("id") == name), None)
+        if not aux:
+            return {"ok": False, "error": f"Aux copy '{name}' not found"}
+        aux["status"] = "running"
+        job = _make_job(state, kind="aux_copy", subclient=aux["name"], policy=aux.get("source_policy") or "",
+                         job_type="AuxCopy", will_fail=False)
+        state.setdefault("jobs", []).insert(0, job)
+        if broken.get("needs_aux_copy") == aux["name"]:
+            broken.pop("needs_aux_copy", None)
+        _event(state, f"Auxiliary copy {aux['name']} started (job {job['id']})", "success")
+        _save(session_id, entry)
+        return {"ok": True, "message": "Aux copy started", "job_id": job["id"]}
+
+    if action == "add_media_agent":
+        name = (payload.get("name") or "MA-new").strip()
+        state.setdefault("media_agents", []).append({
+            "name": name, "status": "online", "os": payload.get("os") or "Linux",
+            "streams": int(payload.get("streams") or 8), "free_space_gb": int(payload.get("free_space_gb") or 500),
+        })
+        _event(state, f"Media agent {name} registered", "success")
+        _save(session_id, entry)
+        return {"ok": True, "message": "Media agent added"}
+
+    if action == "create_library":
+        name = (payload.get("name") or "DiskLib-new").strip()
+        state.setdefault("libraries", []).append({
+            "name": name, "type": payload.get("type") or "Disk",
+            "capacity_gb": int(payload.get("capacity_gb") or 1000), "used_gb": 0,
+            "media_agent": payload.get("media_agent") or "MA-01",
+        })
+        _event(state, f"Library {name} created", "success")
+        _save(session_id, entry)
+        return {"ok": True, "message": "Library created"}
 
     return {"ok": False, "error": f"Unknown action: {action}"}
 

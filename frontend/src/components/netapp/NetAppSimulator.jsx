@@ -17,10 +17,13 @@ const ACCENT = '#0f6d5c'
 const SIDEBAR = [
   { key: 'clusters', label: 'Clusters', icon: Server },
   { key: 'svms', label: 'SVMs', icon: Layers },
+  { key: 'aggregates', label: 'Aggregates', icon: Layers },
   { key: 'volumes', label: 'Volumes', icon: HardDrive },
+  { key: 'snapshots', label: 'Snapshots', icon: Shield },
   { key: 'luns', label: 'LUNs', icon: HardDrive },
   { key: 'protection', label: 'Protection', icon: Shield },
   { key: 'network', label: 'Network', icon: Network },
+  { key: 'activity', label: 'Activity', icon: Server },
 ]
 
 export default function NetAppSimulator({
@@ -134,6 +137,14 @@ export default function NetAppSimulator({
         { key: 'protocols', label: 'Protocols', render: (r) => (r.protocols || []).join(', ').toUpperCase() },
       ]} rows={st.svms || []} searchKeys={['name']} />
     }
+    if (nav === 'aggregates') {
+      return <SimDataTable columns={[
+        { key: 'name', label: 'Aggregate', sortable: true },
+        { key: 'raid', label: 'RAID', sortable: true },
+        { key: 'used', label: 'Used', render: (r) => `${r.used_gb} / ${r.size_gb} GB` },
+        { key: 'state', label: 'State', render: (r) => <SimStatusBadge status={r.state === 'online' ? 'success' : 'error'} label={r.state} /> },
+      ]} rows={st.aggregates || []} searchKeys={['name']} />
+    }
     if (nav === 'volumes') {
       return (
         <div className="space-y-3">
@@ -165,11 +176,40 @@ export default function NetAppSimulator({
             } },
             { key: 'state', label: 'State', render: (r) => <SimStatusBadge status={r.state === 'online' ? 'success' : 'error'} label={r.state} /> },
             { key: 'actions', label: 'Actions', render: (r) => (
-              <button type="button" className="na-btn-sm" onClick={(e) => { e.stopPropagation(); setResizeTarget(r.name); setResizeSize(r.size_gb * 2) }}>
-                <Maximize2 size={11} /> Resize
-              </button>
+              <div className="flex gap-1">
+                <button type="button" className="na-btn-sm" onClick={(e) => { e.stopPropagation(); setResizeTarget(r.name); setResizeSize(r.size_gb * 2) }}>
+                  <Maximize2 size={11} /> Resize
+                </button>
+                <button type="button" className="na-btn-sm" onClick={(e) => {
+                  e.stopPropagation()
+                  run(() => netappApi.takeSnapshot(sessionId, r.name), 'Snapshot created')
+                }}>Snap</button>
+              </div>
             ) },
           ]} rows={st.volumes || []} searchKeys={['name', 'svm']} />
+        </div>
+      )
+    }
+    if (nav === 'snapshots') {
+      return (
+        <div className="space-y-3">
+          <h2 className="text-lg font-semibold">Snapshots</h2>
+          <SimDataTable columns={[
+            { key: 'name', label: 'Snapshot', sortable: true },
+            { key: 'volume', label: 'Volume', sortable: true },
+            { key: 'size_gb', label: 'Size', render: (r) => `${r.size_gb} GB` },
+            { key: 'created', label: 'Created', sortable: true },
+          ]} rows={st.snapshots || []} searchKeys={['name', 'volume']} />
+          {(st.qtrees || []).length > 0 && (
+            <>
+              <h2 className="text-lg font-semibold pt-2">Qtrees</h2>
+              <SimDataTable columns={[
+                { key: 'name', label: 'Qtree', sortable: true },
+                { key: 'volume', label: 'Volume', sortable: true },
+                { key: 'security_style', label: 'Security', sortable: true },
+              ]} rows={st.qtrees || []} searchKeys={['name']} />
+            </>
+          )}
         </div>
       )
     }
@@ -206,10 +246,19 @@ export default function NetAppSimulator({
             { key: 'destination', label: 'Destination', sortable: true },
             { key: 'state', label: 'State', render: (r) => <SimStatusBadge status={r.state === 'snapmirrored' ? 'success' : 'warning'} label={r.state} /> },
             { key: 'lag', label: 'Lag', sortable: true },
-            { key: 'actions', label: 'Actions', render: (r) => r.state === 'snapmirrored' && (
-              <button type="button" className="na-btn-sm na-btn-outline" onClick={(e) => { e.stopPropagation(); run(() => netappApi.breakMirror(sessionId, r.id), 'SnapMirror broken') }}>
-                Break
-              </button>
+            { key: 'actions', label: 'Actions', render: (r) => (
+              <div className="flex gap-1">
+                {r.state === 'snapmirrored' && (
+                  <button type="button" className="na-btn-sm na-btn-outline" onClick={(e) => { e.stopPropagation(); run(() => netappApi.breakMirror(sessionId, r.id), 'SnapMirror broken') }}>
+                    Break
+                  </button>
+                )}
+                {r.state === 'broken-off' && (
+                  <button type="button" className="na-btn-sm" onClick={(e) => { e.stopPropagation(); run(() => netappApi.resyncMirror(sessionId, r.id), 'SnapMirror resynced') }}>
+                    Resync
+                  </button>
+                )}
+              </div>
             ) },
           ]} rows={st.snapmirrors || []} searchKeys={['source', 'destination']} />
         </div>
@@ -218,13 +267,33 @@ export default function NetAppSimulator({
     if (nav === 'network') {
       return (
         <div className="space-y-3">
-          <h2 className="text-lg font-semibold">NFS / CIFS Exports</h2>
+          <h2 className="text-lg font-semibold">Network Interfaces</h2>
+          <SimDataTable columns={[
+            { key: 'name', label: 'LIF', sortable: true },
+            { key: 'svm', label: 'SVM', sortable: true },
+            { key: 'address', label: 'Address', sortable: true },
+            { key: 'home_port', label: 'Port', sortable: true },
+            { key: 'status', label: 'Status', render: (r) => <SimStatusBadge status={r.status === 'up' ? 'success' : 'error'} label={r.status} /> },
+          ]} rows={st.network_interfaces || []} searchKeys={['name', 'address']} />
+          <h2 className="text-lg font-semibold pt-2">NFS / CIFS Exports</h2>
           <SimDataTable columns={[
             { key: 'volume', label: 'Volume', sortable: true },
             { key: 'policy', label: 'Export Policy', sortable: true },
             { key: 'clients', label: 'Allowed Clients', render: (r) => (r.clients || []).join(', ') },
             { key: 'rules', label: 'Rules', sortable: true },
           ]} rows={st.exports || []} searchKeys={['volume']} />
+        </div>
+      )
+    }
+    if (nav === 'activity') {
+      return (
+        <div className="space-y-3">
+          <h2 className="text-lg font-semibold">Activity</h2>
+          <SimDataTable columns={[
+            { key: 'time', label: 'Time', sortable: true },
+            { key: 'severity', label: 'Severity', sortable: true },
+            { key: 'message', label: 'Message', sortable: true },
+          ]} rows={st.activity_log || st.events || []} searchKeys={['message']} emptyMessage="No activity yet." />
         </div>
       )
     }

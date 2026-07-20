@@ -33,6 +33,24 @@ export const dellemcApi = {
   createMaskingView(sessionId, name, storageGroup, host, portGroup) {
     return dellemcApi.action(sessionId, 'create_masking_view', { name, storage_group: storageGroup, host, port_group: portGroup })
   },
+  expandVolume(sessionId, volumeId, sizeGb) {
+    return dellemcApi.action(sessionId, 'expand_volume', { volume_id: volumeId, size_gb: sizeGb })
+  },
+  createSnapshot(sessionId, volumeId, name) {
+    return dellemcApi.action(sessionId, 'create_snapshot', { volume_id: volumeId, name })
+  },
+  setHostIoLimit(sessionId, storageGroup, iops) {
+    return dellemcApi.action(sessionId, 'set_host_io_limit', { storage_group: storageGroup, iops })
+  },
+  createPortGroup(sessionId, name, ports) {
+    return dellemcApi.action(sessionId, 'create_port_group', { name, ports })
+  },
+  failoverSrdf(sessionId, name) {
+    return dellemcApi.action(sessionId, 'failover_srdf', { name })
+  },
+  deleteMaskingView(sessionId, name) {
+    return dellemcApi.action(sessionId, 'delete_masking_view', { name })
+  },
 }
 
 export default dellemcApi

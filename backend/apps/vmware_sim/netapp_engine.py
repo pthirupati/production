@@ -36,7 +36,10 @@ def _now_iso() -> str:
 
 
 def _event(state: dict, message: str, severity: str = "info") -> None:
-    state.setdefault("events", []).insert(0, {"time": _now_iso(), "message": message, "severity": severity})
+    entry = {"time": _now_iso(), "message": message, "severity": severity}
+    state.setdefault("events", []).insert(0, entry)
+    state.setdefault("activity_log", []).insert(0, entry)
+    state["activity_log"] = state["activity_log"][:200]
 
 
 def _base_state() -> dict:
@@ -44,15 +47,19 @@ def _base_state() -> dict:
         "session": {"logged_in": False, "user": ""},
         "summary": {"version": "ONTAP 9.14.1", "cluster": "fixitlab-cluster"},
         "clusters": [
-            {"name": "fixitlab-cluster", "nodes": 2, "health": "ok"},
+            {"name": "fixitlab-cluster", "nodes": 2, "health": "ok", "ha_partner": "node-02"},
+        ],
+        "nodes": [
+            {"name": "node-01", "model": "AFF-A400", "uptime": "42d", "state": "up"},
+            {"name": "node-02", "model": "AFF-A400", "uptime": "42d", "state": "up"},
         ],
         "svms": [
             {"name": "svm-prod", "state": "running", "protocols": ["nfs", "cifs", "iscsi"]},
             {"name": "svm-dr", "state": "running", "protocols": ["nfs"]},
         ],
         "aggregates": [
-            {"name": "aggr1", "size_gb": 5000, "used_gb": 1800, "state": "online", "svm": "svm-prod"},
-            {"name": "aggr2", "size_gb": 5000, "used_gb": 500, "state": "online", "svm": "svm-dr"},
+            {"name": "aggr1", "size_gb": 5000, "used_gb": 1800, "state": "online", "svm": "svm-prod", "raid": "raid_dp"},
+            {"name": "aggr2", "size_gb": 5000, "used_gb": 500, "state": "online", "svm": "svm-dr", "raid": "raid_dp"},
         ],
         "volumes": [
             {"name": "vol_web_data", "svm": "svm-prod", "aggregate": "aggr1", "size_gb": 100, "used_gb": 95, "state": "online", "type": "rw"},
@@ -62,12 +69,23 @@ def _base_state() -> dict:
         "luns": [
             {"path": "/vol/vol_db_data/lun0", "size_gb": 150, "svm": "svm-prod", "mapped": False, "os_type": "linux"},
         ],
+        "snapshots": [
+            {"name": "vol_web_data.daily.20260719", "volume": "vol_web_data", "size_gb": 2.1, "created": _now_iso()},
+        ],
+        "qtrees": [
+            {"name": "qt_users", "volume": "vol_web_data", "security_style": "unix", "oplocks": True},
+        ],
+        "network_interfaces": [
+            {"name": "svm-prod-data", "svm": "svm-prod", "address": "10.0.10.50", "home_port": "e0a", "status": "up"},
+            {"name": "svm-dr-data", "svm": "svm-dr", "address": "10.0.20.50", "home_port": "e0a", "status": "up"},
+        ],
         "snapmirrors": [
             {"id": "sm1", "source": "svm-prod:vol_web_data", "destination": "svm-dr:vol_dr_copy", "state": "snapmirrored", "lag": "00:05:00"},
         ],
         "exports": [
             {"volume": "vol_web_data", "policy": "default", "clients": ["10.0.0.0/24"], "rules": "rw"},
         ],
+        "activity_log": [],
         "goal": {"title": "NetApp storage lab", "objective": "Grow vol_web_data before it runs out of space."},
         "broken": {"volume_near_full": "vol_web_data"},
         "events": [],
@@ -246,6 +264,76 @@ def apply_action(session_id: str, action: str, payload: dict | None = None) -> d
         _event(state, f"LUN {path} mapped to {lun['initiator']}", "success")
         _save(session_id, entry)
         return {"ok": True, "message": "LUN mapped"}
+
+    if action == "take_snapshot":
+        volume = payload.get("volume") or "vol_web_data"
+        vol = _find_volume(state, volume)
+        if not vol:
+            return {"ok": False, "error": f"Volume {volume} not found"}
+        name = payload.get("name") or f"{volume}.manual.{int(time.time()) % 100000}"
+        state.setdefault("snapshots", []).insert(0, {
+            "name": name, "volume": volume, "size_gb": round(float(vol.get("used_gb", 1)) * 0.02, 2),
+            "created": _now_iso(),
+        })
+        _event(state, f"Snapshot {name} created on {volume}", "success")
+        _save(session_id, entry)
+        return {"ok": True, "message": "Snapshot created", "name": name}
+
+    if action == "create_qtree":
+        volume = payload.get("volume") or "vol_web_data"
+        name = (payload.get("name") or "qt_new").strip()
+        if not _find_volume(state, volume):
+            return {"ok": False, "error": f"Volume {volume} not found"}
+        state.setdefault("qtrees", []).append({
+            "name": name, "volume": volume,
+            "security_style": payload.get("security_style") or "unix", "oplocks": True,
+        })
+        _event(state, f"Qtree {name} created on {volume}", "success")
+        _save(session_id, entry)
+        return {"ok": True, "message": "Qtree created"}
+
+    if action == "offline_volume":
+        name = payload.get("name") or ""
+        vol = _find_volume(state, name)
+        if not vol:
+            return {"ok": False, "error": f"Volume {name} not found"}
+        vol["state"] = "offline"
+        _event(state, f"Volume {name} taken offline", "warning")
+        _save(session_id, entry)
+        return {"ok": True, "message": "Volume offline"}
+
+    if action == "online_volume":
+        name = payload.get("name") or ""
+        vol = _find_volume(state, name)
+        if not vol:
+            return {"ok": False, "error": f"Volume {name} not found"}
+        vol["state"] = "online"
+        _event(state, f"Volume {name} brought online", "success")
+        _save(session_id, entry)
+        return {"ok": True, "message": "Volume online"}
+
+    if action == "create_lun":
+        volume = payload.get("volume") or "vol_db_data"
+        size_gb = int(payload.get("size_gb") or 50)
+        path = payload.get("path") or f"/vol/{volume}/lun{len(state.get('luns', []))}"
+        state.setdefault("luns", []).append({
+            "path": path, "size_gb": size_gb, "svm": payload.get("svm") or "svm-prod",
+            "mapped": False, "os_type": payload.get("os_type") or "linux",
+        })
+        _event(state, f"LUN {path} created ({size_gb}GB)", "success")
+        _save(session_id, entry)
+        return {"ok": True, "message": "LUN created"}
+
+    if action == "resync_mirror":
+        sm_id = payload.get("id") or ""
+        sm = next((s for s in state.get("snapmirrors", []) if s.get("id") == sm_id), None)
+        if not sm:
+            return {"ok": False, "error": f"SnapMirror {sm_id} not found"}
+        sm["state"] = "snapmirrored"
+        sm["lag"] = "00:00:00"
+        _event(state, f"SnapMirror {sm_id} resynchronized", "success")
+        _save(session_id, entry)
+        return {"ok": True, "message": "SnapMirror resynced"}
 
     return {"ok": False, "error": f"Unknown action: {action}"}
 

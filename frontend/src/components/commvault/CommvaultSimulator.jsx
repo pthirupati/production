@@ -16,9 +16,12 @@ const CV_LAB_PASS = 'lab_commvault@123'
 const SIDEBAR = [
   { key: 'clients', label: 'Client Computers', icon: Server },
   { key: 'storage-policies', label: 'Storage Policies', icon: Shield },
+  { key: 'schedules', label: 'Schedules', icon: Clock },
   { key: 'job-controller', label: 'Job Controller', icon: Briefcase },
+  { key: 'aux-copies', label: 'Aux Copies', icon: Database },
   { key: 'media-agents', label: 'Media Agents', icon: Database },
   { key: 'libraries', label: 'Libraries', icon: HardDrive },
+  { key: 'activity', label: 'Activity Log', icon: Users },
 ]
 
 const JOB_ICON = {
@@ -215,7 +218,52 @@ export default function CommvaultSimulator({
             { key: 'type', label: 'Job Type', sortable: true },
             { key: 'size_gb', label: 'Size', render: (r) => `${r.size_gb} GB` },
             { key: 'status', label: 'Status', render: (r) => <div className="flex items-center gap-1.5">{JOB_ICON[r.status]}<JobProgress job={r} /></div> },
+            { key: 'actions', label: 'Actions', render: (r) => !['completed', 'failed', 'killed'].includes(r.status) && (
+              <button type="button" className="cv-btn-sm cv-btn-outline" onClick={(e) => {
+                e.stopPropagation()
+                run(() => commvaultApi.killJob(sessionId, r.id), 'Job killed')
+              }}>Kill</button>
+            ) },
           ]} rows={jobs} searchKeys={['subclient', 'kind']} emptyMessage="No jobs run yet — start a backup or restore from Client Computers." />
+        </div>
+      )
+    }
+    if (nav === 'schedules') {
+      return (
+        <div className="space-y-3">
+          <h2 className="text-lg font-semibold">Schedules</h2>
+          <SimDataTable columns={[
+            { key: 'name', label: 'Schedule', sortable: true },
+            { key: 'client', label: 'Client', sortable: true },
+            { key: 'type', label: 'Type', sortable: true },
+            { key: 'cron', label: 'Cron', sortable: true },
+            { key: 'enabled', label: 'State', render: (r) => <SimStatusBadge status={r.enabled ? 'success' : 'disabled'} label={r.enabled ? 'Enabled' : 'Disabled'} /> },
+            { key: 'actions', label: 'Actions', render: (r) => !r.enabled && (
+              <button type="button" className="cv-btn-sm" onClick={(e) => {
+                e.stopPropagation()
+                run(() => commvaultApi.enableSchedule(sessionId, r.name), 'Schedule enabled')
+              }}>Enable</button>
+            ) },
+          ]} rows={st.schedules || []} searchKeys={['name', 'client']} />
+        </div>
+      )
+    }
+    if (nav === 'aux-copies') {
+      return (
+        <div className="space-y-3">
+          <h2 className="text-lg font-semibold">Auxiliary Copies</h2>
+          <SimDataTable columns={[
+            { key: 'name', label: 'Copy', sortable: true },
+            { key: 'source_policy', label: 'Source policy', sortable: true },
+            { key: 'dest_library', label: 'Destination', sortable: true },
+            { key: 'status', label: 'Status', render: (r) => <SimStatusBadge status={r.status === 'running' ? 'info' : 'success'} label={r.status} /> },
+            { key: 'actions', label: 'Actions', render: (r) => (
+              <button type="button" className="cv-btn-sm" onClick={(e) => {
+                e.stopPropagation()
+                run(() => commvaultApi.runAuxCopy(sessionId, r.name), 'Aux copy started')
+              }}><Play size={11} /> Run</button>
+            ) },
+          ]} rows={st.aux_copies || []} searchKeys={['name']} />
         </div>
       )
     }
@@ -224,6 +272,8 @@ export default function CommvaultSimulator({
         <SimDataTable columns={[
           { key: 'name', label: 'Media Agent', sortable: true },
           { key: 'os', label: 'OS', sortable: true },
+          { key: 'streams', label: 'Streams', sortable: true },
+          { key: 'free_space_gb', label: 'Free (GB)', sortable: true },
           { key: 'status', label: 'Status', render: (r) => <SimStatusBadge status={r.status === 'online' ? 'success' : 'error'} label={r.status} /> },
         ]} rows={st.media_agents || []} searchKeys={['name']} />
       )
@@ -238,7 +288,7 @@ export default function CommvaultSimulator({
               <div key={l.name} className="cv-panel p-4">
                 <div className="flex justify-between items-center mb-2">
                   <div className="font-medium flex items-center gap-2"><HardDrive size={15} className="text-[#0b3d78]" /> {l.name}</div>
-                  <span className="text-xs text-slate-500">{l.type} · {l.used_gb} / {l.capacity_gb} GB</span>
+                  <span className="text-xs text-slate-500">{l.type} · {l.media_agent || '—'} · {l.used_gb} / {l.capacity_gb} GB</span>
                 </div>
                 <div className="h-2 rounded bg-slate-200 overflow-hidden">
                   <div className="h-full rounded" style={{ width: `${pct}%`, background: pct > 85 ? '#ef4444' : '#0b3d78' }} />
@@ -246,6 +296,18 @@ export default function CommvaultSimulator({
               </div>
             )
           })}
+        </div>
+      )
+    }
+    if (nav === 'activity') {
+      return (
+        <div className="space-y-3">
+          <h2 className="text-lg font-semibold">Activity Log</h2>
+          <SimDataTable columns={[
+            { key: 'time', label: 'Time', sortable: true },
+            { key: 'severity', label: 'Severity', sortable: true },
+            { key: 'message', label: 'Message', sortable: true },
+          ]} rows={st.activity_log || st.events || []} searchKeys={['message']} emptyMessage="No activity yet." />
         </div>
       )
     }

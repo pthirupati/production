@@ -81,6 +81,17 @@ def _event(state: dict, message: str, severity: str = "info", *, trace_id: str |
     if trace_id:
         entry["trace_id"] = trace_id
     state.setdefault("events", []).insert(0, entry)
+    # Activity Log mirrors portal operations (same stream, richer fields).
+    state.setdefault("activity_log", []).insert(0, {
+        "time": entry["time"],
+        "operation": message,
+        "status": "Succeeded" if severity in ("info", "success") else "Failed",
+        "caller": (state.get("session") or {}).get("user") or "system",
+        "severity": severity,
+        "trace_id": trace_id,
+    })
+    state["activity_log"] = state["activity_log"][:200]
+    state["events"] = state["events"][:200]
 
 
 def _find_vm(state: dict, ident: str) -> dict | None:
@@ -149,6 +160,66 @@ def _base_state() -> dict:
                 "_transition": None,
             },
         ],
+        "storage_accounts": [
+            {
+                "id": f"sa-{_hex(8)}", "name": "stfixitlabprod", "resource_group": rg,
+                "location": "eastus", "sku": "Standard_LRS", "kind": "StorageV2",
+                "access_tier": "Hot", "https_only": True, "blob_containers": [
+                    {"name": "app-data", "public_access": "None", "blobs": 3},
+                    {"name": "backups", "public_access": "None", "blobs": 12},
+                ],
+            },
+        ],
+        "key_vaults": [
+            {
+                "id": f"kv-{_hex(8)}", "name": "kv-fixitlab-prod", "resource_group": rg,
+                "location": "eastus", "sku": "standard",
+                "secrets": [
+                    {"name": "app-connection-string", "enabled": True, "content_type": "text"},
+                    {"name": "ssh-admin-password", "enabled": True, "content_type": "password"},
+                ],
+                "certificates": [
+                    {"name": "wildcard-fixitlab", "enabled": True, "expires": "2027-06-01"},
+                ],
+            },
+        ],
+        "role_assignments": [
+            {
+                "id": f"ra-{_hex(8)}", "principal": "admin@fixitlab.onmicrosoft.com",
+                "role": "Owner", "scope": f"/subscriptions/{SUBSCRIPTION_ID}",
+            },
+            {
+                "id": f"ra-{_hex(8)}", "principal": "ops@fixitlab.onmicrosoft.com",
+                "role": "Contributor", "scope": f"/subscriptions/{SUBSCRIPTION_ID}/resourceGroups/{rg}",
+            },
+            {
+                "id": f"ra-{_hex(8)}", "principal": "reader@fixitlab.onmicrosoft.com",
+                "role": "Reader", "scope": f"/subscriptions/{SUBSCRIPTION_ID}/resourceGroups/{rg}",
+            },
+        ],
+        "load_balancers": [
+            {
+                "id": f"lb-{_hex(8)}", "name": "lb-web", "resource_group": rg, "location": "eastus",
+                "sku": "Standard", "frontend_ip": "20.1.2.10", "backend_pool": [vm_name],
+                "rules": [
+                    {"name": "http", "frontend_port": 80, "backend_port": 80, "protocol": "Tcp"},
+                ],
+                "probes": [
+                    {"name": "http-probe", "protocol": "Http", "port": 80, "path": "/health"},
+                ],
+            },
+        ],
+        "public_ips": [
+            {
+                "id": f"pip-{_hex(8)}", "name": "pip-web01", "resource_group": rg,
+                "ip": "20.1.2.3", "sku": "Standard", "allocation": "Static", "attached_to": vm_name,
+            },
+            {
+                "id": f"pip-{_hex(8)}", "name": "pip-lb", "resource_group": rg,
+                "ip": "20.1.2.10", "sku": "Standard", "allocation": "Static", "attached_to": "lb-web",
+            },
+        ],
+        "activity_log": [],
         "goal": {"title": "Azure lab", "objective": "Resolve the flagged Azure issue."},
         "broken": {},
         "events": [],
@@ -479,6 +550,187 @@ def apply_action(session_id: str, action: str, payload: dict | None = None) -> d
         _event(state, f"Created disk {disk['name']}", "success")
         _save(session_id, entry)
         return {"ok": True, "message": "Disk created", "disk": disk}
+
+    if action == "create_resource_group":
+        name = (payload.get("name") or "").strip()
+        location = (payload.get("location") or "eastus").strip()
+        if not name:
+            return {"ok": False, "error": "Resource group name is required"}
+        if any(r.get("name") == name for r in state.get("resource_groups") or []):
+            return {"ok": False, "error": f"Resource group '{name}' already exists"}
+        rg = {"name": name, "location": location, "resources": 0}
+        state.setdefault("resource_groups", []).append(rg)
+        _event(state, f"Created resource group {name}", "success")
+        _save(session_id, entry)
+        return {"ok": True, "message": "Resource group created", "resource_group": rg}
+
+    if action == "create_storage_account":
+        rg = (payload.get("resource_group")
+              or (state.get("resource_groups") or [{}])[0].get("name")
+              or "rg-fixitlab-prod")
+        name = (payload.get("name") or f"st{_hex(6)}").strip().lower()
+        if any(s.get("name") == name for s in state.get("storage_accounts") or []):
+            return {"ok": False, "error": f"Storage account '{name}' already exists"}
+        sa = {
+            "id": f"sa-{_hex(8)}", "name": name, "resource_group": rg,
+            "location": payload.get("location") or "eastus",
+            "sku": payload.get("sku") or "Standard_LRS", "kind": "StorageV2",
+            "access_tier": payload.get("access_tier") or "Hot", "https_only": True,
+            "blob_containers": [],
+        }
+        state.setdefault("storage_accounts", []).append(sa)
+        _event(state, f"Created storage account {name}", "success")
+        _save(session_id, entry)
+        return {"ok": True, "message": "Storage account created", "storage_account": sa}
+
+    if action == "create_blob_container":
+        sa = next(
+            (s for s in state.get("storage_accounts") or []
+             if s.get("name") == (payload.get("account") or payload.get("storage_account"))),
+            None,
+        )
+        if not sa:
+            return {"ok": False, "error": "Storage account not found"}
+        cname = (payload.get("name") or "data").strip()
+        if any(c.get("name") == cname for c in sa.get("blob_containers") or []):
+            return {"ok": False, "error": f"Container '{cname}' already exists"}
+        sa.setdefault("blob_containers", []).append({
+            "name": cname, "public_access": payload.get("public_access") or "None", "blobs": 0,
+        })
+        _event(state, f"Created container {cname} on {sa['name']}", "success")
+        _save(session_id, entry)
+        return {"ok": True, "message": "Container created"}
+
+    if action == "set_secret":
+        kv = next(
+            (k for k in state.get("key_vaults") or []
+             if k.get("name") == (payload.get("vault") or payload.get("key_vault"))),
+            None,
+        )
+        if not kv:
+            return {"ok": False, "error": "Key vault not found"}
+        sname = (payload.get("name") or "").strip()
+        if not sname:
+            return {"ok": False, "error": "Secret name is required"}
+        existing = next((s for s in kv.get("secrets") or [] if s.get("name") == sname), None)
+        if existing:
+            existing["enabled"] = True
+            existing["updated"] = _now_iso()
+        else:
+            kv.setdefault("secrets", []).append({
+                "name": sname, "enabled": True,
+                "content_type": payload.get("content_type") or "text",
+                "updated": _now_iso(),
+            })
+        if (state.get("broken") or {}).get("missing_secret") == sname:
+            state["broken"].pop("missing_secret", None)
+        _event(state, f"Set secret {sname} in {kv['name']}", "success")
+        _save(session_id, entry)
+        return {"ok": True, "message": "Secret set"}
+
+    if action == "assign_role":
+        principal = (payload.get("principal") or "").strip()
+        role = (payload.get("role") or "Reader").strip()
+        scope = (payload.get("scope")
+                 or f"/subscriptions/{SUBSCRIPTION_ID}")
+        if not principal:
+            return {"ok": False, "error": "Principal is required"}
+        ra = {
+            "id": f"ra-{_hex(8)}", "principal": principal, "role": role, "scope": scope,
+        }
+        state.setdefault("role_assignments", []).append(ra)
+        _event(state, f"Assigned {role} to {principal}", "success")
+        _save(session_id, entry)
+        return {"ok": True, "message": "Role assigned", "role_assignment": ra}
+
+    if action == "remove_role_assignment":
+        rid = payload.get("id") or ""
+        before = len(state.get("role_assignments") or [])
+        state["role_assignments"] = [
+            r for r in (state.get("role_assignments") or []) if r.get("id") != rid
+        ]
+        if len(state["role_assignments"]) == before:
+            return {"ok": False, "error": "Role assignment not found"}
+        _event(state, f"Removed role assignment {rid}", "info")
+        _save(session_id, entry)
+        return {"ok": True, "message": "Role assignment removed"}
+
+    if action == "create_load_balancer_rule":
+        lb = next(
+            (x for x in state.get("load_balancers") or []
+             if x.get("name") == (payload.get("lb") or payload.get("name") or "lb-web")),
+            None,
+        )
+        if not lb:
+            return {"ok": False, "error": "Load balancer not found"}
+        rule = {
+            "name": (payload.get("rule_name") or "rule").strip(),
+            "frontend_port": int(payload.get("frontend_port") or 443),
+            "backend_port": int(payload.get("backend_port") or 443),
+            "protocol": payload.get("protocol") or "Tcp",
+        }
+        lb.setdefault("rules", []).append(rule)
+        _event(state, f"Added LB rule {rule['name']} on {lb['name']}", "success")
+        _save(session_id, entry)
+        return {"ok": True, "message": "Load balancer rule added", "rule": rule}
+
+    if action == "create_subnet":
+        vnet = next(
+            (v for v in state.get("vnets") or []
+             if v.get("name") == (payload.get("vnet") or payload.get("vnet_name"))),
+            None,
+        )
+        if not vnet:
+            return {"ok": False, "error": "Virtual network not found"}
+        sname = (payload.get("name") or "snet-new").strip()
+        if any(s.get("name") == sname for s in vnet.get("subnets") or []):
+            return {"ok": False, "error": f"Subnet '{sname}' already exists"}
+        subnet = {
+            "name": sname,
+            "address_prefix": payload.get("address_prefix") or "10.10.2.0/24",
+            "nsg": payload.get("nsg") or "",
+        }
+        vnet.setdefault("subnets", []).append(subnet)
+        _event(state, f"Created subnet {sname} on {vnet['name']}", "success")
+        _save(session_id, entry)
+        return {"ok": True, "message": "Subnet created", "subnet": subnet}
+
+    if action == "create_nsg":
+        rg = (payload.get("resource_group")
+              or (state.get("resource_groups") or [{}])[0].get("name"))
+        name = (payload.get("name") or f"nsg-{_hex(4)}").strip()
+        if any(n.get("name") == name for n in state.get("nsgs") or []):
+            return {"ok": False, "error": f"NSG '{name}' already exists"}
+        nsg = {
+            "id": f"nsg-{_hex(8)}", "name": name, "resource_group": rg,
+            "location": payload.get("location") or "eastus", "attached_to": [],
+            "rules": [
+                {"name": "DenyAllInbound", "priority": 4096, "direction": "Inbound",
+                 "access": "Deny", "protocol": "*", "source": "*",
+                 "destination_port": "*", "system": True},
+            ],
+        }
+        state.setdefault("nsgs", []).append(nsg)
+        _event(state, f"Created network security group {name}", "success")
+        _save(session_id, entry)
+        return {"ok": True, "message": "NSG created", "nsg": nsg}
+
+    if action == "snapshot_disk":
+        disk = _find_disk(state, payload.get("disk_id") or payload.get("disk_name"))
+        if not disk:
+            return {"ok": False, "error": "Disk not found"}
+        snap = {
+            "id": f"snap-{_hex(8)}",
+            "name": (payload.get("name") or f"{disk['name']}-snap").strip(),
+            "source_disk": disk["name"],
+            "size_gb": disk.get("size_gb"),
+            "created": _now_iso(),
+            "resource_group": disk.get("resource_group"),
+        }
+        state.setdefault("snapshots", []).append(snap)
+        _event(state, f"Created snapshot {snap['name']} from {disk['name']}", "success")
+        _save(session_id, entry)
+        return {"ok": True, "message": "Snapshot created", "snapshot": snap}
 
     return {"ok": False, "error": f"Unknown action: {action}"}
 

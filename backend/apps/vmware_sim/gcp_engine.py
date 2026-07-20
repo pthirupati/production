@@ -74,6 +74,16 @@ def _event(state: dict, message: str, severity: str = "info", *, trace_id: str |
     if trace_id:
         entry["trace_id"] = trace_id
     state.setdefault("events", []).insert(0, entry)
+    state.setdefault("operations", []).insert(0, {
+        "name": f"operation-{_hex(6)}",
+        "time": entry["time"],
+        "description": message,
+        "status": "DONE" if severity != "error" else "ERROR",
+        "target": "project",
+        "trace_id": trace_id,
+    })
+    state["events"] = state["events"][:200]
+    state["operations"] = state["operations"][:200]
 
 
 def _find_instance(state: dict, ident: str) -> dict | None:
@@ -133,6 +143,33 @@ def _base_state() -> dict:
                 "_transition": None,
             },
         ],
+        "buckets": [
+            {
+                "name": "fixitlab-prod-assets", "location": "US", "storage_class": "STANDARD",
+                "objects": [
+                    {"name": "app/config.json", "size_kb": 4},
+                    {"name": "backups/daily.tgz", "size_kb": 102400},
+                ],
+            },
+        ],
+        "iam_bindings": [
+            {"member": "user:admin@fixitlab.io", "role": "roles/owner"},
+            {"member": "user:ops@fixitlab.io", "role": "roles/editor"},
+            {"member": "user:viewer@fixitlab.io", "role": "roles/viewer"},
+            {"member": "serviceAccount:compute@fixitlab-prod-247319.iam.gserviceaccount.com", "role": "roles/compute.instanceAdmin.v1"},
+        ],
+        "routes": [
+            {"name": "default-route-internet", "network": network_name, "dest": "0.0.0.0/0", "next_hop": "default-internet-gateway", "priority": 1000},
+            {"name": "route-to-onprem", "network": network_name, "dest": "10.0.0.0/8", "next_hop": "vpn-tunnel-1", "priority": 900},
+        ],
+        "forwarding_rules": [
+            {
+                "name": "fr-http", "region": "us-central1", "ip": "34.72.1.100",
+                "port": 80, "target": "target-pool-web", "backend": [vm_name],
+            },
+        ],
+        "snapshots": [],
+        "operations": [],
         "goal": {"title": "GCP lab", "objective": "Resolve the flagged GCP issue."},
         "broken": {},
         "events": [],
@@ -456,6 +493,108 @@ def apply_action(session_id: str, action: str, payload: dict | None = None) -> d
         _event(state, f"Created disk {disk['name']}", "success")
         _save(session_id, entry)
         return {"ok": True, "message": "Disk created", "disk": disk}
+
+    if action == "add_iam_binding":
+        member = (payload.get("member") or "").strip()
+        role = (payload.get("role") or "roles/viewer").strip()
+        if not member:
+            return {"ok": False, "error": "Member is required"}
+        if not member.startswith(("user:", "serviceAccount:", "group:")):
+            member = f"user:{member}"
+        state.setdefault("iam_bindings", []).append({"member": member, "role": role})
+        _event(state, f"Granted {role} to {member}", "success")
+        _save(session_id, entry)
+        return {"ok": True, "message": "IAM binding added"}
+
+    if action == "remove_iam_binding":
+        member = payload.get("member") or ""
+        role = payload.get("role") or ""
+        before = len(state.get("iam_bindings") or [])
+        state["iam_bindings"] = [
+            b for b in (state.get("iam_bindings") or [])
+            if not (b.get("member") == member and b.get("role") == role)
+        ]
+        if len(state["iam_bindings"]) == before:
+            return {"ok": False, "error": "IAM binding not found"}
+        _event(state, f"Removed {role} from {member}", "info")
+        _save(session_id, entry)
+        return {"ok": True, "message": "IAM binding removed"}
+
+    if action == "create_bucket":
+        name = (payload.get("name") or f"fixitlab-{_hex(4)}").strip()
+        if any(b.get("name") == name for b in state.get("buckets") or []):
+            return {"ok": False, "error": f"Bucket '{name}' already exists"}
+        bucket = {
+            "name": name,
+            "location": payload.get("location") or "US",
+            "storage_class": payload.get("storage_class") or "STANDARD",
+            "objects": [],
+        }
+        state.setdefault("buckets", []).append(bucket)
+        _event(state, f"Created bucket gs://{name}", "success")
+        _save(session_id, entry)
+        return {"ok": True, "message": "Bucket created", "bucket": bucket}
+
+    if action == "delete_bucket":
+        name = payload.get("name") or ""
+        before = len(state.get("buckets") or [])
+        state["buckets"] = [b for b in (state.get("buckets") or []) if b.get("name") != name]
+        if len(state["buckets"]) == before:
+            return {"ok": False, "error": "Bucket not found"}
+        _event(state, f"Deleted bucket gs://{name}", "info")
+        _save(session_id, entry)
+        return {"ok": True, "message": "Bucket deleted"}
+
+    if action == "create_subnet":
+        net = next(
+            (n for n in state.get("networks") or []
+             if n.get("name") == (payload.get("network") or "vpc-prod")),
+            None,
+        )
+        if not net:
+            return {"ok": False, "error": "VPC network not found"}
+        sname = (payload.get("name") or "subnet-new").strip()
+        if any(s.get("name") == sname for s in net.get("subnets") or []):
+            return {"ok": False, "error": f"Subnet '{sname}' already exists"}
+        subnet = {
+            "name": sname,
+            "region": payload.get("region") or "us-central1",
+            "range": payload.get("range") or "10.128.16.0/20",
+        }
+        net.setdefault("subnets", []).append(subnet)
+        _event(state, f"Created subnet {sname}", "success")
+        _save(session_id, entry)
+        return {"ok": True, "message": "Subnet created", "subnet": subnet}
+
+    if action == "create_forwarding_rule":
+        fr = {
+            "name": (payload.get("name") or f"fr-{_hex(4)}").strip(),
+            "region": payload.get("region") or "us-central1",
+            "ip": payload.get("ip") or f"34.72.{random.randint(1, 200)}.{random.randint(1, 200)}",
+            "port": int(payload.get("port") or 443),
+            "target": payload.get("target") or "target-pool-web",
+            "backend": payload.get("backend") or [],
+        }
+        state.setdefault("forwarding_rules", []).append(fr)
+        _event(state, f"Created forwarding rule {fr['name']}", "success")
+        _save(session_id, entry)
+        return {"ok": True, "message": "Forwarding rule created", "forwarding_rule": fr}
+
+    if action == "create_snapshot":
+        disk = _find_disk(state, payload.get("disk_id") or payload.get("disk_name"))
+        if not disk:
+            return {"ok": False, "error": "Disk not found"}
+        snap = {
+            "name": (payload.get("name") or f"{disk['name']}-snap").strip(),
+            "source_disk": disk["name"],
+            "size_gb": disk.get("size_gb"),
+            "status": "READY",
+            "created": _now_iso(),
+        }
+        state.setdefault("snapshots", []).append(snap)
+        _event(state, f"Created snapshot {snap['name']}", "success")
+        _save(session_id, entry)
+        return {"ok": True, "message": "Snapshot created", "snapshot": snap}
 
     return {"ok": False, "error": f"Unknown action: {action}"}
 

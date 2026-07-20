@@ -19,7 +19,10 @@ const SIDEBAR = [
   { key: 'incidents', label: 'Incidents', icon: ShieldAlert },
   { key: 'log-search', label: 'Log Search', icon: Search },
   { key: 'playbooks', label: 'Playbooks', icon: ListChecks },
+  { key: 'threat-intel', label: 'Threat Intel', icon: Radio },
+  { key: 'rules', label: 'Detection Rules', icon: ListChecks },
   { key: 'assets', label: 'Assets', icon: Server },
+  { key: 'activity', label: 'Activity', icon: Server },
 ]
 
 const SEVERITY_ORDER = { critical: 0, high: 1, medium: 2, low: 3 }
@@ -160,6 +163,10 @@ export default function SocSimulator({
                   </button>
                 )}
                 <button type="button" disabled={busy} className="soc-btn-outline"
+                  onClick={() => run(() => socApi.enrichAlert(sessionId, selectedAlert.id), 'Alert enriched')}>
+                  <Search size={13} /> Enrich IOCs
+                </button>
+                <button type="button" disabled={busy} className="soc-btn-outline"
                   onClick={() => run(() => socApi.quarantineHost(sessionId, selectedAlert.asset), 'Host quarantined')}>
                   <Lock size={13} /> Quarantine {selectedAlert.asset}
                 </button>
@@ -174,6 +181,9 @@ export default function SocSimulator({
                   </button>
                 )}
               </div>
+              {selectedAlert.enriched && (selectedAlert.ioc_matches || []).length > 0 && (
+                <div className="soc-incident-note">IOC matches: {(selectedAlert.ioc_matches || []).map((i) => i.value).join(', ')}</div>
+              )}
               {relatedIncident && (
                 <div className="soc-incident-note">Linked incident <strong>{relatedIncident.id}</strong> · {relatedIncident.status}</div>
               )}
@@ -193,6 +203,17 @@ export default function SocSimulator({
             { key: 'severity', label: 'Severity', render: (r) => <SeverityBadge severity={r.severity} /> },
             { key: 'status', label: 'Status', render: (r) => <SimStatusBadge status={r.status === 'closed' ? 'success' : 'warning'} label={r.status} /> },
           ]} rows={st.incidents || []} searchKeys={['title', 'asset']} emptyMessage="No incidents opened yet — escalate an alert." />
+          {(st.cases || []).length > 0 && (
+            <>
+              <h2 className="soc-h pt-2">Cases</h2>
+              <SimDataTable columns={[
+                { key: 'id', label: 'Case', sortable: true },
+                { key: 'title', label: 'Title', sortable: true },
+                { key: 'status', label: 'Status', sortable: true },
+                { key: 'created', label: 'Opened', sortable: true },
+              ]} rows={st.cases || []} searchKeys={['title']} />
+            </>
+          )}
         </div>
       )
     }
@@ -254,15 +275,74 @@ export default function SocSimulator({
             { key: 'ip', label: 'IP', sortable: true },
             { key: 'risk', label: 'Risk', render: (r) => <SeverityBadge severity={r.risk} /> },
             { key: 'quarantined', label: 'Network', render: (r) => <SimStatusBadge status={r.quarantined ? 'error' : 'success'} label={r.quarantined ? 'Quarantined' : 'Connected'} /> },
+            { key: 'actions', label: 'Actions', render: (r) => r.quarantined && (
+              <button type="button" className="soc-btn-outline" onClick={(e) => {
+                e.stopPropagation()
+                run(() => socApi.unquarantineHost(sessionId, r.name), 'Host unquarantined')
+              }}>Release</button>
+            ) },
           ]} rows={st.assets || []} searchKeys={['name', 'ip']} />
           {(st.blocked_ips || []).length > 0 && (
             <div className="soc-panel p-3">
               <div className="font-semibold text-xs uppercase tracking-wide text-slate-400 mb-2 flex items-center gap-1"><Radio size={12} /> Blocked at firewall</div>
               <div className="flex flex-wrap gap-1.5">
-                {(st.blocked_ips || []).map((ip) => <span key={ip} className="soc-ip-chip font-mono">{ip}</span>)}
+                {(st.blocked_ips || []).map((ip) => (
+                  <button key={ip} type="button" className="soc-ip-chip font-mono" onClick={() => run(() => socApi.unblockIp(sessionId, ip), `IP ${ip} unblocked`)}>
+                    {ip} ×
+                  </button>
+                ))}
               </div>
             </div>
           )}
+        </div>
+      )
+    }
+    if (nav === 'threat-intel') {
+      return (
+        <div className="space-y-3">
+          <div className="flex justify-between items-center">
+            <h2 className="soc-h">Indicators of Compromise</h2>
+            <button type="button" className="soc-btn-outline" disabled={busy}
+              onClick={() => run(() => socApi.addIoc(sessionId, 'ip', '203.0.113.99', 'scanner'), 'IOC added')}>
+              Add sample IOC
+            </button>
+          </div>
+          <SimDataTable columns={[
+            { key: 'type', label: 'Type', sortable: true },
+            { key: 'value', label: 'Value', sortable: true },
+            { key: 'threat', label: 'Threat', sortable: true },
+            { key: 'confidence', label: 'Confidence', sortable: true },
+          ]} rows={st.iocs || []} searchKeys={['value', 'threat']} />
+        </div>
+      )
+    }
+    if (nav === 'rules') {
+      return (
+        <div className="space-y-3">
+          <h2 className="soc-h">Detection Rules</h2>
+          <SimDataTable columns={[
+            { key: 'name', label: 'Rule', sortable: true },
+            { key: 'severity', label: 'Severity', render: (r) => <SeverityBadge severity={r.severity} /> },
+            { key: 'enabled', label: 'State', render: (r) => <SimStatusBadge status={r.enabled ? 'success' : 'disabled'} label={r.enabled ? 'Enabled' : 'Disabled'} /> },
+            { key: 'actions', label: 'Actions', render: (r) => (
+              <button type="button" className="soc-btn-outline" onClick={(e) => {
+                e.stopPropagation()
+                run(() => (r.enabled ? socApi.disableRule(sessionId, r.id) : socApi.enableRule(sessionId, r.id)), r.enabled ? 'Rule disabled' : 'Rule enabled')
+              }}>{r.enabled ? 'Disable' : 'Enable'}</button>
+            ) },
+          ]} rows={st.detection_rules || []} searchKeys={['name']} />
+        </div>
+      )
+    }
+    if (nav === 'activity') {
+      return (
+        <div className="space-y-3">
+          <h2 className="soc-h">Analyst Activity</h2>
+          <SimDataTable columns={[
+            { key: 'time', label: 'Time', sortable: true },
+            { key: 'severity', label: 'Severity', sortable: true },
+            { key: 'message', label: 'Message', sortable: true },
+          ]} rows={st.activity_log || st.events || []} searchKeys={['message']} emptyMessage="No activity yet." />
         </div>
       )
     }

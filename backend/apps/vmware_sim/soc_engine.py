@@ -38,7 +38,10 @@ def _now_iso() -> str:
 
 
 def _event(state: dict, message: str, severity: str = "info") -> None:
-    state.setdefault("events", []).insert(0, {"time": _now_iso(), "message": message, "severity": severity})
+    entry = {"time": _now_iso(), "message": message, "severity": severity}
+    state.setdefault("events", []).insert(0, entry)
+    state.setdefault("activity_log", []).insert(0, entry)
+    state["activity_log"] = state["activity_log"][:200]
 
 
 def _base_state() -> dict:
@@ -62,8 +65,20 @@ def _base_state() -> dict:
         "playbooks": [
             {"id": "pb-malware-contain", "name": "Malware Containment", "steps": ["Isolate host", "Collect forensics", "Remove artifact"]},
             {"id": "pb-brute-force", "name": "Brute Force Response", "steps": ["Block source IP", "Force password reset", "Review auth logs"]},
+            {"id": "pb-phishing", "name": "Phishing Response", "steps": ["Disable mailbox", "Purge messages", "Reset credentials"]},
         ],
         "blocked_ips": [],
+        "iocs": [
+            {"type": "ip", "value": "203.0.113.55", "threat": "C2", "confidence": "high"},
+            {"type": "domain", "value": "evil-c2.example", "threat": "C2", "confidence": "high"},
+            {"type": "hash", "value": "a1b2c3d4e5f67890", "threat": "malware", "confidence": "medium"},
+        ],
+        "detection_rules": [
+            {"id": "rule-ps1", "name": "Encoded PowerShell", "enabled": True, "severity": "high"},
+            {"id": "rule-ssh-bf", "name": "SSH Brute Force", "enabled": True, "severity": "medium"},
+            {"id": "rule-dns-tunnel", "name": "DNS Tunneling", "enabled": False, "severity": "high"},
+        ],
+        "cases": [],
         "log_index": [
             {"time": "2026-07-16T10:02:11Z", "host": "ws-finance-07", "message": "powershell.exe -enc <base64> spawned by winword.exe", "source": "EDR"},
             {"time": "2026-07-16T10:02:15Z", "host": "ws-finance-07", "message": "Outbound TCP 443 to 203.0.113.55 (known C2)", "source": "Firewall"},
@@ -71,6 +86,7 @@ def _base_state() -> dict:
             {"time": "2026-07-16T09:58:03Z", "host": "web01", "message": "Failed password for root from 198.51.100.23", "source": "sshd"},
             {"time": "2026-07-16T09:58:04Z", "host": "web01", "message": "Failed password for admin from 198.51.100.23", "source": "sshd"},
         ],
+        "activity_log": [],
         "goal": {"title": "SOC triage lab", "objective": "Triage the critical C2 alert: acknowledge it, escalate to an incident, quarantine the host, and close it."},
         "broken": {"open_critical_alert": "AL-1003"},
         "events": [],
@@ -265,6 +281,86 @@ def apply_action(session_id: str, action: str, payload: dict | None = None) -> d
         _event(state, f"Incident/alert {inc_id or alert_id} closed", "success")
         _save(session_id, entry)
         return {"ok": True, "message": "Closed"}
+
+    if action == "add_ioc":
+        ioc_type = payload.get("type") or "ip"
+        value = (payload.get("value") or "").strip()
+        if not value:
+            return {"ok": False, "error": "IOC value required"}
+        state.setdefault("iocs", []).insert(0, {
+            "type": ioc_type, "value": value,
+            "threat": payload.get("threat") or "custom", "confidence": payload.get("confidence") or "medium",
+        })
+        _event(state, f"IOC added: {ioc_type}={value}", "success")
+        _save(session_id, entry)
+        return {"ok": True, "message": "IOC added"}
+
+    if action == "enable_rule":
+        rule_id = payload.get("rule_id") or "rule-dns-tunnel"
+        rule = next((r for r in state.get("detection_rules", []) if r.get("id") == rule_id), None)
+        if not rule:
+            return {"ok": False, "error": f"Rule {rule_id} not found"}
+        rule["enabled"] = True
+        _event(state, f"Detection rule {rule['name']} enabled", "success")
+        _save(session_id, entry)
+        return {"ok": True, "message": "Rule enabled"}
+
+    if action == "disable_rule":
+        rule_id = payload.get("rule_id") or ""
+        rule = next((r for r in state.get("detection_rules", []) if r.get("id") == rule_id), None)
+        if not rule:
+            return {"ok": False, "error": f"Rule {rule_id} not found"}
+        rule["enabled"] = False
+        _event(state, f"Detection rule {rule['name']} disabled", "warning")
+        _save(session_id, entry)
+        return {"ok": True, "message": "Rule disabled"}
+
+    if action == "enrich_alert":
+        alert_id = payload.get("alert_id") or ""
+        alert = _find_alert(state, alert_id)
+        if not alert:
+            return {"ok": False, "error": f"Alert {alert_id} not found"}
+        matched = [i for i in state.get("iocs", []) if i.get("value") == alert.get("source_ip")]
+        alert["enriched"] = True
+        alert["ioc_matches"] = matched
+        _event(state, f"Alert {alert_id} enriched ({len(matched)} IOC matches)", "info")
+        _save(session_id, entry)
+        return {"ok": True, "message": "Alert enriched", "matches": matched}
+
+    if action == "unquarantine_host":
+        name = payload.get("asset") or ""
+        asset = _find_asset(state, name)
+        if not asset:
+            return {"ok": False, "error": f"Asset {name} not found"}
+        asset["quarantined"] = False
+        _event(state, f"Host {name} released from quarantine", "info")
+        _save(session_id, entry)
+        try:
+            from apps.labs.provisioner.simulation.chaos_engine import clear_faults as _chaos_clear
+            _chaos_clear(session_id, fault_type="drop_nic", target=name)
+        except Exception:  # pragma: no cover
+            pass
+        return {"ok": True, "message": "Host unquarantined"}
+
+    if action == "create_case":
+        title = payload.get("title") or "Investigation case"
+        case_id = f"CASE-{len(state.get('cases', [])) + 1001}"
+        state.setdefault("cases", []).append({
+            "id": case_id, "title": title, "status": "open",
+            "alert_id": payload.get("alert_id") or "", "created": _now_iso(),
+        })
+        _event(state, f"Case {case_id} opened", "info")
+        _save(session_id, entry)
+        return {"ok": True, "message": "Case created", "case_id": case_id}
+
+    if action == "unblock_ip":
+        ip = payload.get("ip") or ""
+        if ip in state.get("blocked_ips", []):
+            state["blocked_ips"] = [x for x in state["blocked_ips"] if x != ip]
+            _event(state, f"IP {ip} unblocked", "info")
+            _save(session_id, entry)
+            return {"ok": True, "message": f"IP {ip} unblocked"}
+        return {"ok": False, "error": f"IP {ip} is not blocked"}
 
     return {"ok": False, "error": f"Unknown action: {action}"}
 

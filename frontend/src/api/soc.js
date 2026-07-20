@@ -39,6 +39,27 @@ export const socApi = {
   closeIncident(sessionId, incidentId, alertId) {
     return socApi.action(sessionId, 'close_incident', { incident_id: incidentId, alert_id: alertId })
   },
+  addIoc(sessionId, type, value, threat = 'custom') {
+    return socApi.action(sessionId, 'add_ioc', { type, value, threat })
+  },
+  enableRule(sessionId, ruleId) {
+    return socApi.action(sessionId, 'enable_rule', { rule_id: ruleId })
+  },
+  disableRule(sessionId, ruleId) {
+    return socApi.action(sessionId, 'disable_rule', { rule_id: ruleId })
+  },
+  enrichAlert(sessionId, alertId) {
+    return socApi.action(sessionId, 'enrich_alert', { alert_id: alertId })
+  },
+  unquarantineHost(sessionId, asset) {
+    return socApi.action(sessionId, 'unquarantine_host', { asset })
+  },
+  createCase(sessionId, title, alertId) {
+    return socApi.action(sessionId, 'create_case', { title, alert_id: alertId })
+  },
+  unblockIp(sessionId, ip) {
+    return socApi.action(sessionId, 'unblock_ip', { ip })
+  },
 }
 
 export default socApi

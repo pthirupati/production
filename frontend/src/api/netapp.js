@@ -36,6 +36,24 @@ export const netappApi = {
   mountLun(sessionId, path, initiator) {
     return netappApi.action(sessionId, 'mount_lun', { path, initiator })
   },
+  takeSnapshot(sessionId, volume, name) {
+    return netappApi.action(sessionId, 'take_snapshot', { volume, name })
+  },
+  createQtree(sessionId, volume, name) {
+    return netappApi.action(sessionId, 'create_qtree', { volume, name })
+  },
+  offlineVolume(sessionId, name) {
+    return netappApi.action(sessionId, 'offline_volume', { name })
+  },
+  onlineVolume(sessionId, name) {
+    return netappApi.action(sessionId, 'online_volume', { name })
+  },
+  createLun(sessionId, volume, sizeGb, path) {
+    return netappApi.action(sessionId, 'create_lun', { volume, size_gb: sizeGb, path })
+  },
+  resyncMirror(sessionId, id) {
+    return netappApi.action(sessionId, 'resync_mirror', { id })
+  },
 }
 
 export default netappApi

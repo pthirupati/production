@@ -3,7 +3,8 @@ import { azureApi } from '../../api/azure'
 import LabChromeBar from '../lab/LabChromeBar'
 import {
   LogIn, Cloud, Server, Network, Shield, HardDrive, Plus, AlertTriangle,
-  Terminal, Play, Square, RotateCw, Maximize2, Link2, Unlink,
+  Terminal, Play, Square, RotateCw, Maximize2, Link2, Unlink, KeyRound,
+  Database, Users, Activity, Layers, Box,
 } from 'lucide-react'
 import { simPanelRoot } from '../../utils/simLayout'
 import { SimSidebar, SimBreadcrumbs, SimDataTable, SimStatusBadge, SimModal, useSimSession } from '../sim/shared'
@@ -18,7 +19,12 @@ const SIDEBAR = [
   { key: 'overview', label: 'Overview', icon: Cloud },
   { key: 'vms', label: 'Virtual machines', icon: Server },
   { key: 'networking', label: 'Networking', icon: Network },
+  { key: 'loadbalancers', label: 'Load balancers', icon: Layers },
   { key: 'disks', label: 'Disks', icon: HardDrive },
+  { key: 'storage', label: 'Storage accounts', icon: Database },
+  { key: 'keyvault', label: 'Key vaults', icon: KeyRound },
+  { key: 'iam', label: 'Access control (IAM)', icon: Users },
+  { key: 'activity', label: 'Activity log', icon: Activity },
 ]
 
 const VM_SIZE_OPTIONS = [
@@ -60,6 +66,27 @@ export default function AzureConsole({
   const [createDiskModal, setCreateDiskModal] = useState(false)
   const [newDiskName, setNewDiskName] = useState('disk-new')
   const [newDiskSize, setNewDiskSize] = useState(128)
+  const [createRgOpen, setCreateRgOpen] = useState(false)
+  const [rgName, setRgName] = useState('rg-workloads')
+  const [createSaOpen, setCreateSaOpen] = useState(false)
+  const [saName, setSaName] = useState('stworkloads')
+  const [createVmOpen, setCreateVmOpen] = useState(false)
+  const [newVmName, setNewVmName] = useState('vm-app01')
+  const [newVmSize, setNewVmSize] = useState('Standard_B2s')
+  const [subnetModal, setSubnetModal] = useState(null)
+  const [subnetName, setSubnetName] = useState('snet-app')
+  const [subnetCidr, setSubnetCidr] = useState('10.10.2.0/24')
+  const [secretModal, setSecretModal] = useState(null)
+  const [secretName, setSecretName] = useState('')
+  const [roleModal, setRoleModal] = useState(false)
+  const [rolePrincipal, setRolePrincipal] = useState('')
+  const [roleName, setRoleName] = useState('Reader')
+  const [lbRuleModal, setLbRuleModal] = useState(null)
+  const [lbRuleName, setLbRuleName] = useState('https')
+  const [lbFront, setLbFront] = useState(443)
+  const [lbBack, setLbBack] = useState(443)
+  const [containerModal, setContainerModal] = useState(null)
+  const [containerName, setContainerName] = useState('logs')
 
   const st = state?.state || {}
   const loggedIn = st?.session?.logged_in
@@ -70,6 +97,13 @@ export default function AzureConsole({
   const disks = st.disks || []
   const vnets = st.vnets || []
   const resourceGroups = st.resource_groups || []
+  const storageAccounts = st.storage_accounts || []
+  const keyVaults = st.key_vaults || []
+  const roleAssignments = st.role_assignments || []
+  const loadBalancers = st.load_balancers || []
+  const publicIps = st.public_ips || []
+  const activityLog = st.activity_log || st.events || []
+  const snapshots = st.snapshots || []
 
   const chromeProps = {
     onHints, onCheck, onExtend, onStop,
@@ -127,9 +161,6 @@ export default function AzureConsole({
                 className="w-full py-1.5 text-xs text-slate-600 border border-slate-300 rounded hover:bg-slate-50">
                 Use lab credentials (autofill)
               </button>
-              <p className="text-[10px] text-slate-500 text-center pt-2 border-t border-slate-100">
-                Training credentials: <span className="font-mono text-slate-700">{AZ_LAB_USER}</span> / <span className="font-mono text-slate-700">{AZ_LAB_PASS}</span>
-              </p>
             </form>
           </div>
         </div>
@@ -152,25 +183,44 @@ export default function AzureConsole({
 
   const renderOverview = () => (
     <div className="space-y-4">
-      <h2 className="text-lg font-semibold">Resource groups</h2>
+      <div className="flex justify-between items-center flex-wrap gap-2">
+        <h2 className="text-lg font-semibold">Resource groups</h2>
+        <button type="button" className="az-btn-primary flex items-center gap-1" onClick={() => setCreateRgOpen(true)}>
+          <Plus size={14} /> Create resource group
+        </button>
+      </div>
       <SimDataTable columns={[
         { key: 'name', label: 'Name', sortable: true },
         { key: 'location', label: 'Region', sortable: true },
-        { key: 'resources', label: 'Resources', render: () => vms.length + vnets.length + nsgs.length + disks.length },
+        { key: 'resources', label: 'Resources', render: () => vms.length + vnets.length + nsgs.length + disks.length + storageAccounts.length },
       ]} rows={resourceGroups} searchKeys={['name']} />
-      <h2 className="text-lg font-semibold pt-2">Quick glance</h2>
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-        <div className="az-tile"><Server size={16} /> <div><div className="az-tile-num">{vms.length}</div><div className="az-tile-label">Virtual machines</div></div></div>
-        <div className="az-tile"><Network size={16} /> <div><div className="az-tile-num">{vnets.length}</div><div className="az-tile-label">Virtual networks</div></div></div>
-        <div className="az-tile"><Shield size={16} /> <div><div className="az-tile-num">{nsgs.length}</div><div className="az-tile-label">Network security groups</div></div></div>
-        <div className="az-tile"><HardDrive size={16} /> <div><div className="az-tile-num">{disks.length}</div><div className="az-tile-label">Disks</div></div></div>
+      <h2 className="text-lg font-semibold pt-2">Subscription glance</h2>
+      <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-5 gap-3">
+        <div className="az-tile"><Server size={16} /> <div><div className="az-tile-num">{vms.length}</div><div className="az-tile-label">VMs</div></div></div>
+        <div className="az-tile"><Network size={16} /> <div><div className="az-tile-num">{vnets.length}</div><div className="az-tile-label">VNets</div></div></div>
+        <div className="az-tile"><Database size={16} /> <div><div className="az-tile-num">{storageAccounts.length}</div><div className="az-tile-label">Storage</div></div></div>
+        <div className="az-tile"><KeyRound size={16} /> <div><div className="az-tile-num">{keyVaults.length}</div><div className="az-tile-label">Key vaults</div></div></div>
+        <div className="az-tile"><Layers size={16} /> <div><div className="az-tile-num">{loadBalancers.length}</div><div className="az-tile-label">Load balancers</div></div></div>
       </div>
+      <h2 className="text-lg font-semibold pt-2">Public IP addresses</h2>
+      <SimDataTable columns={[
+        { key: 'name', label: 'Name', sortable: true },
+        { key: 'ip', label: 'IP address', sortable: true },
+        { key: 'sku', label: 'SKU' },
+        { key: 'allocation', label: 'Allocation' },
+        { key: 'attached_to', label: 'Associated to', render: (r) => r.attached_to || '—' },
+      ]} rows={publicIps} searchKeys={['name', 'ip']} />
     </div>
   )
 
   const renderVms = () => (
     <div className="space-y-3">
-      <h2 className="text-lg font-semibold">Virtual machines</h2>
+      <div className="flex justify-between items-center flex-wrap gap-2">
+        <h2 className="text-lg font-semibold">Virtual machines</h2>
+        <button type="button" className="az-btn-primary flex items-center gap-1" onClick={() => setCreateVmOpen(true)}>
+          <Plus size={14} /> Create VM
+        </button>
+      </div>
       {broken.vm_undersized && (
         <div className="az-banner">
           <AlertTriangle size={14} /> <strong>{broken.vm_undersized}</strong> looks undersized for its current workload — consider resizing it.
@@ -186,9 +236,10 @@ export default function AzureConsole({
         { key: 'power_state', label: 'Status', render: (r) => <SimStatusBadge status={powerStatus(r.power_state)} label={r.power_state} /> },
         { key: 'size', label: 'Size', sortable: true },
         { key: 'private_ip', label: 'Private IP', sortable: true },
+        { key: 'public_ip', label: 'Public IP', sortable: true },
         { key: 'resource_group', label: 'Resource group', sortable: true },
         { key: 'actions', label: 'Actions', render: (r) => (
-          <div className="flex items-center gap-1">
+          <div className="flex items-center gap-1 flex-wrap">
             {r.power_state !== 'running' && (
               <button type="button" className="az-btn-sm" onClick={(e) => { e.stopPropagation(); vmPower(r, 'start') }}>
                 <Play size={11} /> Start
@@ -214,11 +265,21 @@ export default function AzureConsole({
   const renderNetworking = () => (
     <div className="space-y-5">
       <div>
-        <h2 className="text-lg font-semibold mb-2">Virtual networks</h2>
+        <div className="flex justify-between items-center mb-2 flex-wrap gap-2">
+          <h2 className="text-lg font-semibold">Virtual networks</h2>
+          <button type="button" className="az-btn-sm" onClick={() => run(() => azureApi.createNsg(sessionId, `nsg-${Date.now().toString(36).slice(-4)}`), 'NSG created')}>
+            <Plus size={11} /> Create NSG
+          </button>
+        </div>
         <SimDataTable columns={[
           { key: 'name', label: 'Name', sortable: true },
           { key: 'address_space', label: 'Address space', sortable: true },
           { key: 'subnets', label: 'Subnets', render: (r) => (r.subnets || []).map((s) => s.name).join(', ') },
+          { key: 'actions', label: '', render: (r) => (
+            <button type="button" className="az-btn-sm" onClick={(e) => { e.stopPropagation(); setSubnetModal(r.name); setSubnetName('snet-app'); setSubnetCidr('10.10.2.0/24') }}>
+              <Plus size={11} /> Add subnet
+            </button>
+          ) },
         ]} rows={vnets} searchKeys={['name']} />
       </div>
       <div>
@@ -251,6 +312,39 @@ export default function AzureConsole({
     </div>
   )
 
+  const renderLoadBalancers = () => (
+    <div className="space-y-4">
+      <h2 className="text-lg font-semibold">Load balancers</h2>
+      {loadBalancers.map((lb) => (
+        <div key={lb.name} className="az-panel">
+          <div className="flex items-center justify-between mb-2 flex-wrap gap-2">
+            <div>
+              <div className="font-semibold text-sm flex items-center gap-1.5"><Layers size={14} /> {lb.name}</div>
+              <div className="text-xs text-slate-500">Frontend {lb.frontend_ip} · SKU {lb.sku} · Backend {(lb.backend_pool || []).join(', ')}</div>
+            </div>
+            <button type="button" className="az-btn-sm" onClick={() => { setLbRuleModal(lb.name); setLbRuleName('https'); setLbFront(443); setLbBack(443) }}>
+              <Plus size={11} /> Add rule
+            </button>
+          </div>
+          <SimDataTable columns={[
+            { key: 'name', label: 'Rule' },
+            { key: 'frontend_port', label: 'Frontend port' },
+            { key: 'backend_port', label: 'Backend port' },
+            { key: 'protocol', label: 'Protocol' },
+          ]} rows={lb.rules || []} pageSize={10} />
+          <h3 className="text-sm font-semibold mt-3 mb-1">Health probes</h3>
+          <SimDataTable columns={[
+            { key: 'name', label: 'Name' },
+            { key: 'protocol', label: 'Protocol' },
+            { key: 'port', label: 'Port' },
+            { key: 'path', label: 'Path', render: (r) => r.path || '—' },
+          ]} rows={lb.probes || []} pageSize={10} />
+        </div>
+      ))}
+      {!loadBalancers.length && <p className="text-sm text-slate-500">No load balancers in this subscription lab.</p>}
+    </div>
+  )
+
   const renderDisks = () => (
     <div className="space-y-3">
       <div className="flex justify-between items-center flex-wrap gap-2">
@@ -271,24 +365,140 @@ export default function AzureConsole({
         { key: 'state', label: 'State', render: (r) => <SimStatusBadge status={r.state === 'Attached' ? 'success' : 'warning'} label={r.state} /> },
         { key: 'attached_to', label: 'Attached to', render: (r) => r.attached_to || '—' },
         { key: 'actions', label: 'Actions', render: (r) => (
-          r.state === 'Attached' && !r.os_disk ? (
-            <button type="button" className="az-btn-sm" onClick={(e) => { e.stopPropagation(); run(() => azureApi.detachDisk(sessionId, r.name), 'Disk detached') }}>
-              <Unlink size={11} /> Detach
+          <div className="flex gap-1">
+            {r.state === 'Attached' && !r.os_disk ? (
+              <button type="button" className="az-btn-sm" onClick={(e) => { e.stopPropagation(); run(() => azureApi.detachDisk(sessionId, r.name), 'Disk detached') }}>
+                <Unlink size={11} /> Detach
+              </button>
+            ) : null}
+            {r.state === 'Unattached' ? (
+              <button type="button" className="az-btn-sm" onClick={(e) => { e.stopPropagation(); setAttachTarget(r.name) }}>
+                <Link2 size={11} /> Attach
+              </button>
+            ) : null}
+            <button type="button" className="az-btn-sm" onClick={(e) => {
+              e.stopPropagation()
+              run(() => azureApi.snapshotDisk(sessionId, r.name, `${r.name}-snap`), 'Snapshot created')
+            }}>
+              <Box size={11} /> Snapshot
             </button>
-          ) : r.state === 'Unattached' ? (
-            <button type="button" className="az-btn-sm" onClick={(e) => { e.stopPropagation(); setAttachTarget(r.name) }}>
-              <Link2 size={11} /> Attach
-            </button>
-          ) : null
+          </div>
         ) },
       ]} rows={disks} searchKeys={['name']} />
+      {snapshots.length > 0 && (
+        <>
+          <h2 className="text-lg font-semibold pt-2">Snapshots</h2>
+          <SimDataTable columns={[
+            { key: 'name', label: 'Name' },
+            { key: 'source_disk', label: 'Source disk' },
+            { key: 'size_gb', label: 'Size', render: (r) => `${r.size_gb} GiB` },
+            { key: 'created', label: 'Created' },
+          ]} rows={snapshots} searchKeys={['name']} />
+        </>
+      )}
+    </div>
+  )
+
+  const renderStorage = () => (
+    <div className="space-y-3">
+      <div className="flex justify-between items-center flex-wrap gap-2">
+        <h2 className="text-lg font-semibold">Storage accounts</h2>
+        <button type="button" className="az-btn-primary flex items-center gap-1" onClick={() => setCreateSaOpen(true)}>
+          <Plus size={14} /> Create storage account
+        </button>
+      </div>
+      {storageAccounts.map((sa) => (
+        <div key={sa.name} className="az-panel mb-3">
+          <div className="flex items-center justify-between mb-2 flex-wrap gap-2">
+            <div>
+              <div className="font-semibold text-sm flex items-center gap-1.5"><Database size={14} /> {sa.name}</div>
+              <div className="text-xs text-slate-500">{sa.sku} · {sa.kind} · {sa.access_tier} · HTTPS only: {sa.https_only ? 'Yes' : 'No'}</div>
+            </div>
+            <button type="button" className="az-btn-sm" onClick={() => { setContainerModal(sa.name); setContainerName('logs') }}>
+              <Plus size={11} /> Container
+            </button>
+          </div>
+          <SimDataTable columns={[
+            { key: 'name', label: 'Container' },
+            { key: 'public_access', label: 'Public access' },
+            { key: 'blobs', label: 'Blobs' },
+          ]} rows={sa.blob_containers || []} pageSize={10} />
+        </div>
+      ))}
+    </div>
+  )
+
+  const renderKeyVault = () => (
+    <div className="space-y-4">
+      <h2 className="text-lg font-semibold">Key vaults</h2>
+      {keyVaults.map((kv) => (
+        <div key={kv.name} className="az-panel">
+          <div className="flex items-center justify-between mb-2 flex-wrap gap-2">
+            <div className="font-semibold text-sm flex items-center gap-1.5"><KeyRound size={14} /> {kv.name}</div>
+            <button type="button" className="az-btn-sm" onClick={() => { setSecretModal(kv.name); setSecretName('new-secret') }}>
+              <Plus size={11} /> Set secret
+            </button>
+          </div>
+          <h3 className="text-xs font-semibold uppercase text-slate-500 mb-1">Secrets</h3>
+          <SimDataTable columns={[
+            { key: 'name', label: 'Name' },
+            { key: 'enabled', label: 'Enabled', render: (r) => <SimStatusBadge status={r.enabled ? 'success' : 'error'} label={r.enabled ? 'Yes' : 'No'} /> },
+            { key: 'content_type', label: 'Content type' },
+          ]} rows={kv.secrets || []} pageSize={10} />
+          <h3 className="text-xs font-semibold uppercase text-slate-500 mt-3 mb-1">Certificates</h3>
+          <SimDataTable columns={[
+            { key: 'name', label: 'Name' },
+            { key: 'enabled', label: 'Enabled', render: (r) => r.enabled ? 'Yes' : 'No' },
+            { key: 'expires', label: 'Expires' },
+          ]} rows={kv.certificates || []} pageSize={10} />
+        </div>
+      ))}
+    </div>
+  )
+
+  const renderIam = () => (
+    <div className="space-y-3">
+      <div className="flex justify-between items-center flex-wrap gap-2">
+        <h2 className="text-lg font-semibold">Role assignments</h2>
+        <button type="button" className="az-btn-primary flex items-center gap-1" onClick={() => setRoleModal(true)}>
+          <Plus size={14} /> Add role assignment
+        </button>
+      </div>
+      <SimDataTable columns={[
+        { key: 'principal', label: 'Principal', sortable: true },
+        { key: 'role', label: 'Role', sortable: true },
+        { key: 'scope', label: 'Scope', render: (r) => <span className="font-mono text-[11px]">{r.scope}</span> },
+        { key: 'actions', label: '', render: (r) => (
+          <button type="button" className="az-btn-sm az-btn-outline"
+            onClick={() => run(() => azureApi.removeRoleAssignment(sessionId, r.id), 'Role assignment removed')}>
+            Remove
+          </button>
+        ) },
+      ]} rows={roleAssignments} searchKeys={['principal', 'role']} />
+    </div>
+  )
+
+  const renderActivity = () => (
+    <div className="space-y-3">
+      <h2 className="text-lg font-semibold">Activity log</h2>
+      <SimDataTable columns={[
+        { key: 'time', label: 'Time', sortable: true },
+        { key: 'operation', label: 'Operation', render: (r) => r.operation || r.message },
+        { key: 'status', label: 'Status', render: (r) => <SimStatusBadge status={(r.status || '').includes('Fail') || r.severity === 'error' ? 'error' : 'success'} label={r.status || r.severity || 'Succeeded'} /> },
+        { key: 'caller', label: 'Caller', render: (r) => r.caller || '—' },
+      ]} rows={activityLog} searchKeys={['operation', 'message', 'caller']} pageSize={25} />
     </div>
   )
 
   const renderContent = () => {
     if (nav === 'vms') return renderVms()
     if (nav === 'networking') return renderNetworking()
+    if (nav === 'loadbalancers') return renderLoadBalancers()
     if (nav === 'disks') return renderDisks()
+    if (nav === 'storage') return renderStorage()
+    if (nav === 'keyvault') return renderKeyVault()
+    if (nav === 'iam') return renderIam()
+    if (nav === 'activity') return renderActivity()
     return renderOverview()
   }
 
@@ -367,7 +577,7 @@ export default function AzureConsole({
             setAttachTarget(null)
           }}>Attach to {vms[0]?.name || 'VM'}</button>
         </>}>
-        <p className="text-sm text-slate-300">Attach this managed disk to the virtual machine <span className="font-mono">{vms[0]?.name}</span>.</p>
+        <p className="text-sm text-slate-300">Attach this managed disk to <span className="font-mono">{vms[0]?.name}</span>.</p>
       </SimModal>
 
       <SimModal open={createDiskModal} onClose={() => setCreateDiskModal(false)} title="Create managed disk"
@@ -383,6 +593,135 @@ export default function AzureConsole({
         </label>
         <label className="block text-sm mt-3">Size (GiB)
           <input type="number" className="w-full mt-1 border rounded px-2 py-1.5" value={newDiskSize} onChange={(e) => setNewDiskSize(e.target.value)} />
+        </label>
+      </SimModal>
+
+      <SimModal open={createRgOpen} onClose={() => setCreateRgOpen(false)} title="Create resource group"
+        footer={<>
+          <button type="button" className="text-sm px-3" onClick={() => setCreateRgOpen(false)}>Cancel</button>
+          <button type="button" className="az-btn-primary" disabled={busy} onClick={() => {
+            run(() => azureApi.createResourceGroup(sessionId, rgName), 'Resource group created')
+            setCreateRgOpen(false)
+          }}>Create</button>
+        </>}>
+        <label className="block text-sm">Name
+          <input className="w-full mt-1 border rounded px-2 py-1.5" value={rgName} onChange={(e) => setRgName(e.target.value)} />
+        </label>
+      </SimModal>
+
+      <SimModal open={createSaOpen} onClose={() => setCreateSaOpen(false)} title="Create storage account"
+        footer={<>
+          <button type="button" className="text-sm px-3" onClick={() => setCreateSaOpen(false)}>Cancel</button>
+          <button type="button" className="az-btn-primary" disabled={busy} onClick={() => {
+            run(() => azureApi.createStorageAccount(sessionId, saName), 'Storage account created')
+            setCreateSaOpen(false)
+          }}>Create</button>
+        </>}>
+        <label className="block text-sm">Name (lowercase)
+          <input className="w-full mt-1 border rounded px-2 py-1.5" value={saName} onChange={(e) => setSaName(e.target.value)} />
+        </label>
+      </SimModal>
+
+      <SimModal open={createVmOpen} onClose={() => setCreateVmOpen(false)} title="Create a virtual machine"
+        footer={<>
+          <button type="button" className="text-sm px-3" onClick={() => setCreateVmOpen(false)}>Cancel</button>
+          <button type="button" className="az-btn-primary" disabled={busy} onClick={() => {
+            run(() => azureApi.createVm(sessionId, { name: newVmName, size: newVmSize }), 'VM created')
+            setCreateVmOpen(false)
+          }}>Create</button>
+        </>}>
+        <label className="block text-sm">Name
+          <input className="w-full mt-1 border rounded px-2 py-1.5" value={newVmName} onChange={(e) => setNewVmName(e.target.value)} />
+        </label>
+        <label className="block text-sm mt-3">Size
+          <select className="w-full mt-1 border rounded px-2 py-1.5" value={newVmSize} onChange={(e) => setNewVmSize(e.target.value)}>
+            {VM_SIZE_OPTIONS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
+          </select>
+        </label>
+      </SimModal>
+
+      <SimModal open={!!subnetModal} onClose={() => setSubnetModal(null)} title={`Add subnet — ${subnetModal || ''}`}
+        footer={<>
+          <button type="button" className="text-sm px-3" onClick={() => setSubnetModal(null)}>Cancel</button>
+          <button type="button" className="az-btn-primary" disabled={busy} onClick={() => {
+            run(() => azureApi.createSubnet(sessionId, subnetModal, subnetName, subnetCidr), 'Subnet created')
+            setSubnetModal(null)
+          }}>Add</button>
+        </>}>
+        <label className="block text-sm">Subnet name
+          <input className="w-full mt-1 border rounded px-2 py-1.5" value={subnetName} onChange={(e) => setSubnetName(e.target.value)} />
+        </label>
+        <label className="block text-sm mt-3">Address prefix
+          <input className="w-full mt-1 border rounded px-2 py-1.5" value={subnetCidr} onChange={(e) => setSubnetCidr(e.target.value)} />
+        </label>
+      </SimModal>
+
+      <SimModal open={!!secretModal} onClose={() => setSecretModal(null)} title={`Set secret — ${secretModal || ''}`}
+        footer={<>
+          <button type="button" className="text-sm px-3" onClick={() => setSecretModal(null)}>Cancel</button>
+          <button type="button" className="az-btn-primary" disabled={busy} onClick={() => {
+            run(() => azureApi.setSecret(sessionId, secretModal, secretName), 'Secret set')
+            setSecretModal(null)
+          }}>Set</button>
+        </>}>
+        <label className="block text-sm">Secret name
+          <input className="w-full mt-1 border rounded px-2 py-1.5" value={secretName} onChange={(e) => setSecretName(e.target.value)} />
+        </label>
+      </SimModal>
+
+      <SimModal open={roleModal} onClose={() => setRoleModal(false)} title="Add role assignment"
+        footer={<>
+          <button type="button" className="text-sm px-3" onClick={() => setRoleModal(false)}>Cancel</button>
+          <button type="button" className="az-btn-primary" disabled={busy} onClick={() => {
+            run(() => azureApi.assignRole(sessionId, rolePrincipal, roleName), 'Role assigned')
+            setRoleModal(false)
+          }}>Assign</button>
+        </>}>
+        <label className="block text-sm">Principal
+          <input className="w-full mt-1 border rounded px-2 py-1.5" value={rolePrincipal} onChange={(e) => setRolePrincipal(e.target.value)} placeholder="user@fixitlab.onmicrosoft.com" />
+        </label>
+        <label className="block text-sm mt-3">Role
+          <select className="w-full mt-1 border rounded px-2 py-1.5" value={roleName} onChange={(e) => setRoleName(e.target.value)}>
+            <option>Owner</option>
+            <option>Contributor</option>
+            <option>Reader</option>
+            <option>Virtual Machine Contributor</option>
+            <option>Storage Blob Data Contributor</option>
+          </select>
+        </label>
+      </SimModal>
+
+      <SimModal open={!!lbRuleModal} onClose={() => setLbRuleModal(null)} title={`Add LB rule — ${lbRuleModal || ''}`}
+        footer={<>
+          <button type="button" className="text-sm px-3" onClick={() => setLbRuleModal(null)}>Cancel</button>
+          <button type="button" className="az-btn-primary" disabled={busy} onClick={() => {
+            run(() => azureApi.createLbRule(sessionId, lbRuleModal, {
+              rule_name: lbRuleName, frontend_port: Number(lbFront), backend_port: Number(lbBack),
+            }), 'LB rule added')
+            setLbRuleModal(null)
+          }}>Add</button>
+        </>}>
+        <label className="block text-sm">Rule name
+          <input className="w-full mt-1 border rounded px-2 py-1.5" value={lbRuleName} onChange={(e) => setLbRuleName(e.target.value)} />
+        </label>
+        <label className="block text-sm mt-3">Frontend port
+          <input type="number" className="w-full mt-1 border rounded px-2 py-1.5" value={lbFront} onChange={(e) => setLbFront(e.target.value)} />
+        </label>
+        <label className="block text-sm mt-3">Backend port
+          <input type="number" className="w-full mt-1 border rounded px-2 py-1.5" value={lbBack} onChange={(e) => setLbBack(e.target.value)} />
+        </label>
+      </SimModal>
+
+      <SimModal open={!!containerModal} onClose={() => setContainerModal(null)} title={`New container — ${containerModal || ''}`}
+        footer={<>
+          <button type="button" className="text-sm px-3" onClick={() => setContainerModal(null)}>Cancel</button>
+          <button type="button" className="az-btn-primary" disabled={busy} onClick={() => {
+            run(() => azureApi.createBlobContainer(sessionId, containerModal, containerName), 'Container created')
+            setContainerModal(null)
+          }}>Create</button>
+        </>}>
+        <label className="block text-sm">Container name
+          <input className="w-full mt-1 border rounded px-2 py-1.5" value={containerName} onChange={(e) => setContainerName(e.target.value)} />
         </label>
       </SimModal>
     </div>

@@ -23,6 +23,11 @@ const COMPONENT_META = {
   motherboard: { label: 'Motherboard', icon: CircuitBoard },
   cpu: { label: 'CPU', icon: Cpu },
   gpu: { label: 'GPU', icon: Zap },
+  fan: { label: 'Fan', icon: Snowflake },
+  dimm: { label: 'DIMM', icon: CircuitBoard },
+  pcie: { label: 'PCIe', icon: Boxes },
+  raid: { label: 'RAID', icon: HardDrive },
+  hba: { label: 'HBA', icon: Network },
 }
 
 const ROOM_ICONS = { data_hall: Building2, network: Router, mechanical: Thermometer, electrical: Plug }
@@ -358,6 +363,21 @@ export default function DatacenterSimulator({
                 ))}
               </div>
             </div>
+
+            {selectedServer.hardware && (
+              <div className="dc-drawer-section">
+                <div className="dc-drawer-label">Hardware inventory</div>
+                <div className="text-[11px] text-slate-300 space-y-1.5 leading-relaxed">
+                  <div><span className="text-slate-500">Motherboard</span> — {selectedServer.hardware.motherboard?.model} · BIOS {selectedServer.hardware.motherboard?.bios} · TPM {selectedServer.hardware.motherboard?.tpm}</div>
+                  <div><span className="text-slate-500">CPUs</span> — {(selectedServer.hardware.cpus || []).map((c) => `S${c.socket} ${c.cores}c/${c.threads}t`).join(' · ')}</div>
+                  <div><span className="text-slate-500">PCIe</span> — {(selectedServer.hardware.pcie || []).map((p) => `${p.slot}: ${p.model}`).join(' · ')}</div>
+                  <div><span className="text-slate-500">Storage</span> — {(selectedServer.hardware.storage || []).map((d) => `Bay${d.bay} ${d.size_gb}G ${d.bus}`).join(' · ')}</div>
+                  <div><span className="text-slate-500">Power/Cooling</span> — {(selectedServer.hardware.psus || []).map((p) => p.id).join('/')} · {(selectedServer.hardware.fans || []).length} fans</div>
+                  <div><span className="text-slate-500">Cables</span> — {(selectedServer.hardware.cables || []).map((c) => `${c.id}:${c.status}`).join(', ')}</div>
+                  <div><span className="text-slate-500">Firmware</span> — {selectedServer.firmware_version || '—'}</div>
+                </div>
+              </div>
+            )}
 
             <div className="dc-drawer-section">
               <div className="dc-drawer-label">Replace failed component</div>
