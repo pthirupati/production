@@ -327,6 +327,10 @@ class RHELShell:
             "docker": self._cmd_docker,
             "kubectl": self._cmd_kubectl,
             "aws": self._cmd_aws,
+            "argocd": self._cmd_argocd,
+            "flux": self._cmd_flux,
+            "az": self._cmd_az,
+            "gcloud": self._cmd_gcloud,
             "mysql": self._cmd_mysql,
             "psql": self._cmd_psql,
             "python3": self._cmd_python3,
@@ -3245,6 +3249,74 @@ class RHELShell:
             except Exception:  # noqa: BLE001
                 pass
         return _handle_aws_cli_local(line.strip())
+
+    def _cmd_argocd(self, p: list[str]) -> str:
+        """GitOps Argo CD CLI — reads /opt/gitops application state."""
+        args = [a for a in p[1:] if not a.startswith("-")]
+        app = self.state.read_file("/opt/gitops/application.yaml") or ""
+        if not args or args[0] in ("version", "--help", "help"):
+            return "argocd: v2.10.0+lab\n"
+        if args[0] == "app" and len(args) >= 2:
+            sub = args[1]
+            name = args[2] if len(args) > 2 else "webapp"
+            if sub == "list":
+                status = "OutOfSync" if "OutOfSync" in app else "Synced"
+                health = "Degraded" if "Degraded" in app else "Healthy"
+                return f"NAME     CLUSTER  STATUS     HEALTH\n{name:<8} in-cluster  {status:<10} {health}"
+            if sub in ("get", "diff"):
+                if "OutOfSync" in app:
+                    return f"===== {name} =====\nSTATUS: OutOfSync\nHEALTH: Degraded\n*** live ≠ desired (edit /opt/gitops/application.yaml or sync)"
+                return f"===== {name} =====\nSTATUS: Synced\nHEALTH: Healthy"
+            if sub == "sync":
+                if app and "OutOfSync" in app:
+                    fixed = app.replace("OutOfSync", "Synced").replace("Degraded", "Healthy")
+                    self.state.write_file("/opt/gitops/application.yaml", fixed)
+                return f"Application '{name}' synced"
+        return f"argocd {' '.join(args)}: OK (lab)"
+
+    def _cmd_flux(self, p: list[str]) -> str:
+        args = [a for a in p[1:] if not a.startswith("-")]
+        ks = self.state.read_file("/opt/gitops/flux-kustomization.yaml") or ""
+        if not args or args[0] in ("version", "--help", "help"):
+            return "flux: v2.2.0+lab\n"
+        if args[0] == "get" and len(args) >= 2:
+            kind = args[1]
+            ready = "False" if 'status: "False"' in ks or "reconciliation failed" in ks else "True"
+            return f"NAME  READY  MESSAGE\napps  {ready}   {'reconciliation failed' if ready == 'False' else 'Applied revision'}"
+        if args[0] == "reconcile":
+            if ks and "reconciliation failed" in ks:
+                fixed = ks.replace('status: "False"', 'status: "True"').replace(
+                    "reconciliation failed", "Applied revision main@sha1"
+                )
+                self.state.write_file("/opt/gitops/flux-kustomization.yaml", fixed)
+            return "◎ annotating GitRepository\n✔ reconciliation triggered"
+        return f"flux {' '.join(args)}: OK (lab)"
+
+    def _cmd_az(self, p: list[str]) -> str:
+        args = [a for a in p[1:] if not a.startswith("-")]
+        if not args or args[0] in ("--version", "version"):
+            return "azure-cli 2.58.0\n"
+        if args[0] == "account":
+            cfg = self.state.read_file("/opt/azure/config") or ""
+            if "broken" in cfg.lower() and "FIXED-OK" not in cfg:
+                return "ERROR: Please run 'az login' to setup account."
+            return "[\n  {\n    \"name\": \"FixitLab Subscription\",\n    \"id\": \"00000000-lab\",\n    \"isDefault\": true\n  }\n]"
+        if args[0] == "vm" and "list" in args:
+            return "Name    ResourceGroup    PowerState\nvm-web01  rg-lab          VM running"
+        return f"az {' '.join(args)}: OK (lab)"
+
+    def _cmd_gcloud(self, p: list[str]) -> str:
+        args = [a for a in p[1:] if not a.startswith("-")]
+        if not args or args[0] in ("version", "--version"):
+            return "Google Cloud SDK 460.0.0\n"
+        if args[0] == "config":
+            cfg = self.state.read_file("/opt/gcp/config") or ""
+            if "broken" in cfg.lower() and "FIXED-OK" not in cfg:
+                return "ERROR: You do not currently have an active account selected."
+            return "project = fixitlab-lab\naccount = learner@fixitlab.local"
+        if args[0] == "compute" and "instances" in args:
+            return "NAME   ZONE           STATUS\nweb01  us-central1-a  RUNNING"
+        return f"gcloud {' '.join(args)}: OK (lab)"
 
     def _cmd_mysql(self, p: list[str]) -> str:
         if "-e" in p:

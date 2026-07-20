@@ -7,11 +7,22 @@ from .rhel_os import RHELOSState, SimBlockDevice, SimUser
 
 def apply_scenario_preset(slug: str, state: RHELOSState) -> None:
     """Configure simulated OS to match scenario slug."""
+    low = (slug or "").lower()
+
+    # Topic-aware faults FIRST so narrative (git/CI/gitops/aws/ACL) wins over
+    # recycled academy nginx/rsyslog breaks and COMPLETE_TECH markers alone.
+    try:
+        from .topic_faults import apply_topic_fault
+        if apply_topic_fault(slug, state):
+            return
+    except Exception:
+        pass
+
     preset = _PRESETS.get(slug)
     if preset:
         preset(state)
         return
-    low = (slug or "").lower()
+
     if (
         low in ("disk-full", "sim-disk-full", "sim-rhel-disk-full")
         or (low.endswith("-disk-full") and "inode" not in low and "deleted" not in low)

@@ -157,6 +157,134 @@ def _apply_initial_host_state(engine, slug: str) -> None:
         _preset_firewalld_blocked(engine.shell.state)
 
 
+def _annotate_lab_hosts_hosting(lab_hosts: list[dict], platform: str) -> list[dict]:
+    """Stamp Hosted-as onto lab_hosts so the LabRunner UI can show it."""
+    from .simulation.hosting_persona import hosted_as_line
+
+    hosts = [dict(h) for h in (lab_hosts or [])]
+    line = hosted_as_line(platform)
+    for h in hosts:
+        h["host_platform"] = platform
+        h["hosted_as"] = line
+    if not hosts:
+        hosts = [{"name": "primary", "host_platform": platform, "hosted_as": line}]
+    return hosts
+
+
+def _seed_linux_guest_into_hosting_console(engine, session_id: str, slug: str, platform: str) -> None:
+    """Mirror this Lab Server into the Hosted-as product console (VMware/AWS/…)."""
+    st = engine.shell.state
+    hostname = getattr(st, "hostname", None) or "lab-server"
+    ip = "10.20.30.41"
+    try:
+        addrs = (st.network_ifs or {}).get("eth0", {}).get("addrs") or []
+        if addrs:
+            ip = str(addrs[0]).split("/")[0]
+    except Exception:
+        pass
+    cpu = int(getattr(st, "cpu_count", 2) or 2)
+    mem_mb = int(getattr(st, "mem_mb", 4096) or 4096)
+
+    if platform == "vmware":
+        try:
+            from apps.vmware_sim.engine import _ensure_session, _save_session
+            from .simulation.server_identity import seed_from_vmware_vm
+
+            sid = str(session_id)
+            entry = _ensure_session(sid, slug)
+            state = entry["state"]
+            vms = state.setdefault("vms", [])
+            guest = {
+                "id": "vm-lab-primary",
+                "name": hostname,
+                "host_id": "host-01",
+                "datastore_id": "ds-01",
+                "network_id": "net-02",
+                "resource_pool_id": "rp-prod",
+                "power": "poweredOn",
+                "cpu": cpu,
+                "memory_mb": mem_mb,
+                "disk_gb": 40,
+                "guest_os": "Red Hat Enterprise Linux 9 (64-bit)",
+                "guest_os_version": "RHEL 9.3",
+                "ip": ip,
+                "hostname": hostname,
+                "tools": "ok",
+                "tools_version": "12325",
+                "hardware_version": "vmx-19",
+                "annotation": f"Lab Server for {slug}",
+                "snapshots": [],
+                "cpu_pct": 12,
+                "mem_pct": 40,
+                "disk_io_mbps": 5,
+                "net_mbps": 2,
+                "lab_primary": True,
+            }
+            existing = next(
+                (v for v in vms if v.get("lab_primary") or v.get("id") == "vm-lab-primary"),
+                None,
+            )
+            if existing:
+                existing.update(guest)
+            else:
+                vms.insert(0, guest)
+            _save_session(sid, entry)
+            seed_from_vmware_vm(sid, guest, role="primary")
+        except Exception:
+            logger.exception("VMware guest seed skipped for session %s", session_id)
+        return
+
+    if platform == "aws":
+        try:
+            from apps.vmware_sim.aws_engine import get_state, _ensure
+            from .simulation.server_identity import seed_from_aws_instance
+
+            sid = str(session_id)
+            _ensure(sid, slug)
+            inv = (get_state(sid, slug) or {}).get("state") or {}
+            instances = inv.get("instances") or []
+            if instances:
+                inst = instances[0]
+                inst["privateIp"] = ip
+                inst["name"] = hostname
+                inst["state"] = "running"
+                seed_from_aws_instance(sid, inst, role="primary")
+        except Exception:
+            logger.exception("AWS guest seed skipped for session %s", session_id)
+        return
+
+    if platform == "azure":
+        try:
+            from apps.vmware_sim.azure_engine import get_state, _ensure
+
+            sid = str(session_id)
+            _ensure(sid, slug)
+            inv = (get_state(sid, slug) or {}).get("state") or {}
+            vms = inv.get("vms") or []
+            if vms:
+                vms[0]["name"] = hostname
+                vms[0]["privateIp"] = ip
+                vms[0]["powerState"] = "VM running"
+        except Exception:
+            logger.exception("Azure guest seed skipped for session %s", session_id)
+        return
+
+    if platform == "gcp":
+        try:
+            from apps.vmware_sim.gcp_engine import get_state, _ensure
+
+            sid = str(session_id)
+            _ensure(sid, slug)
+            inv = (get_state(sid, slug) or {}).get("state") or {}
+            instances = inv.get("instances") or inv.get("vms") or []
+            if instances:
+                instances[0]["name"] = hostname
+                instances[0]["internal_ip"] = ip
+                instances[0]["status"] = "RUNNING"
+        except Exception:
+            logger.exception("GCP guest seed skipped for session %s", session_id)
+
+
 def _is_vmware_lab(slug: str, raw_type: str) -> bool:
     return raw_type == "vmware" or "vmware" in (slug or "").lower()
 
@@ -454,6 +582,7 @@ def ensure_sim_session(lab_session) -> dict | None:
     if fresh:
         # Re-assert hosting persona after cloud seed (keeps Amazon Linux / DMI
         # even when EC2 seed rewrote hostname/IP/hardware).
+        platform = "linux"
         try:
             from .simulation.hosting_persona import apply_hosting_persona, resolve_host_platform
             platform = resolve_host_platform(sim_type, slug, tech_slug=tech_slug)
@@ -461,17 +590,32 @@ def ensure_sim_session(lab_session) -> dict | None:
             engine.host_platform = platform
         except Exception:
             logger.exception("Hosting persona re-apply skipped for session %s", session_id)
+        # Linux labs Hosted as VMware/AWS/… must appear in that console too.
+        if platform in ("vmware", "aws", "azure", "gcp") and not (
+            _is_vmware_lab(slug, raw_type) or _is_aws_lab(slug, raw_type)
+            or _is_azure_lab(slug, raw_type) or _is_gcp_lab(slug, raw_type)
+        ):
+            _seed_linux_guest_into_hosting_console(engine, session_id, slug, platform)
         _seed_gpu_identity_if_needed(engine, session_id, slug, sim_type)
         try:
             from .simulation.server_identity import seed_scenario_lab_servers
             seed_scenario_lab_servers(session_id, sim_type=sim_type, slug=slug, engine=engine)
         except Exception:
             logger.exception("LabServer seed skipped for session %s", session_id)
+    else:
+        platform = getattr(engine, "host_platform", None) or "linux"
+
     lab_hosts = lab_session.lab_hosts or _build_lab_hosts(scenario, resource_id, sim_type)
     if _should_use_ssh_client_default(scenario, sim_type):
         lab_hosts = _attach_ssh_client_host(lab_hosts, resource_id)
     elif len(lab_hosts) >= 2 and not any(h.get("name") == "ssh_client" for h in lab_hosts):
         lab_hosts = _attach_ssh_client_host(lab_hosts, resource_id)
+
+    try:
+        platform = getattr(engine, "host_platform", None) or platform
+        lab_hosts = _annotate_lab_hosts_hosting(lab_hosts, platform)
+    except Exception:
+        pass
 
     if lab_hosts != (lab_session.lab_hosts or []):
         lab_session.lab_hosts = lab_hosts
@@ -546,25 +690,6 @@ class SimulationProvisioner:
             lab_hosts = _attach_ssh_client_host(lab_hosts, resource_id)
         elif len(lab_hosts) >= 2:
             lab_hosts = _attach_ssh_client_host(lab_hosts, resource_id)
-        lab_session.lab_hosts = lab_hosts
-        lab_session.save(update_fields=["lab_hosts"])
-
-        register_sim_session(
-            str(lab_session.id),
-            resource_id,
-            sim_type,
-            {
-                "engine": engine,
-                "scenario_slug": slug,
-                "simulation_type": sim_type,
-                "hosts": {h["name"]: h for h in lab_hosts},
-                "host_ips": {h.get("ip", ""): h["name"] for h in lab_hosts if h.get("ip")},
-                "validation_marker": f"/opt/fixitlab/sim-valid-{slug}",
-            },
-        )
-        entry = get_sim_session(str(lab_session.id))
-        if entry:
-            _wire_engine_hosts(engine, entry)
 
         if "vmware" in slug.lower() or raw_type == "vmware":
             from apps.vmware_sim.engine import _ensure_session
@@ -585,6 +710,46 @@ class SimulationProvisioner:
         else:
             _seed_hostname_for_persona(engine, slug, raw_type)
             _seed_gpu_identity_if_needed(engine, lab_session.id, slug, sim_type)
+
+        # Hosting persona + console mirror (Linux on VMware/AWS/Azure/GCP)
+        platform = "linux"
+        try:
+            from .simulation.hosting_persona import apply_hosting_persona, resolve_host_platform
+            platform = resolve_host_platform(sim_type, slug, tech_slug=tech_slug)
+            apply_hosting_persona(engine.shell.state, platform, slug=slug)
+            engine.host_platform = platform
+        except Exception:
+            logger.exception("Hosting persona skipped for session %s", lab_session.id)
+        if platform in ("vmware", "aws", "azure", "gcp") and not (
+            _is_vmware_lab(slug, raw_type) or _is_aws_lab(slug, raw_type)
+            or _is_azure_lab(slug, raw_type) or _is_gcp_lab(slug, raw_type)
+        ):
+            _seed_linux_guest_into_hosting_console(engine, str(lab_session.id), slug, platform)
+
+        try:
+            lab_hosts = _annotate_lab_hosts_hosting(lab_hosts, platform)
+        except Exception:
+            pass
+        lab_session.lab_hosts = lab_hosts
+        lab_session.save(update_fields=["lab_hosts"])
+
+        register_sim_session(
+            str(lab_session.id),
+            resource_id,
+            sim_type,
+            {
+                "engine": engine,
+                "scenario_slug": slug,
+                "simulation_type": sim_type,
+                "hosts": {h["name"]: h for h in lab_hosts},
+                "host_ips": {h.get("ip", ""): h["name"] for h in lab_hosts if h.get("ip")},
+                "validation_marker": f"/opt/fixitlab/sim-valid-{slug}",
+                "host_platform": platform,
+            },
+        )
+        entry = get_sim_session(str(lab_session.id))
+        if entry:
+            _wire_engine_hosts(engine, entry)
 
         # Scenario-scoped LabServer: terminal OS identity for this session only.
         try:

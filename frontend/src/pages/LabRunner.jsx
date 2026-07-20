@@ -43,6 +43,8 @@ import {
   LazyDellEmcSimulator,
   LazyDatacenterSimulator,
   LazySocSimulator,
+  LazyAzureConsole,
+  LazyGcpConsole,
   LazyCodingIDE,
   LazyPromptPlayground,
 } from '../components/lab/labSimLoader'
@@ -399,6 +401,8 @@ export default function LabRunner() {
   const [showTerraformSim, setShowTerraformSim] = useState(false)
   const [showAwsSim, setShowAwsSim] = useState(false)
   const [showCicdSim, setShowCicdSim] = useState(false)
+  const [showAzureSim, setShowAzureSim] = useState(false)
+  const [showGcpSim, setShowGcpSim] = useState(false)
   const [simTerminalOpen, setSimTerminalOpen] = useState(false)
   const [showBaremetalSim, setShowBaremetalSim] = useState(false)
   const [showDatacenterSim, setShowDatacenterSim] = useState(false)
@@ -684,6 +688,8 @@ export default function LabRunner() {
             jira_issue_key: lab.jira_issue_key || '',
             jira_issue_url: lab.jira_issue_url || '',
             lab_hosts: lab.lab_hosts || [],
+            host_platform: lab.host_platform || lab.lab_hosts?.[0]?.host_platform || '',
+            hosted_as: lab.hosted_as || lab.lab_hosts?.[0]?.hosted_as || '',
           }
           setSession(sessionData)
 
@@ -1576,20 +1582,32 @@ export default function LabRunner() {
   const isPromptLab = Boolean(scenario?.coding_mode) && promptKind
   const isCodingLab = Boolean(scenario?.coding_mode) && !isPromptLab
 
-  // Cross-console links are OPT-IN per scenario only (vmware_link / cross_technology /
-  // datacenter_link / slug markers). Do NOT show VMware/Datacenter on every Linux lab —
-  // that both confuses learners and looks like a free path into other tech consoles.
+  // Hosted-as comes from the Lab Server persona (terminal banner + lab_hosts).
+  // When Linux is hosted on VMware/AWS/Azure/GCP, surface Open <Console> so the
+  // learner can see the SAME guest in that product UI.
+  const hostPlatform = (
+    session?.host_platform
+    || session?.lab_hosts?.[0]?.host_platform
+    || ''
+  ).toLowerCase()
+  const hostedAsLabel = session?.hosted_as || session?.lab_hosts?.[0]?.hosted_as || ''
   const scenarioSlug = scenario?.slug || ''
   const explicitVmwareScenario = scenario?.vmware_link === true
     || scenario?.cross_technology === true
+    || hostPlatform === 'vmware'
     || /(?:^|-)(vmware|vcenter|vsphere)(?:-|$)/i.test(scenarioSlug)
   const vmwareServerHref = `/vmware/${sessionId}?scenario=${scenario?.slug || ''}`
   const showSimVmwareLink = explicitVmwareScenario && (
     isAwxLab || isMonitoringLab || isWindowsGuiLab || isCommvaultLab || isTerraformSimLab
+    || hostPlatform === 'vmware'
   )
   const explicitDatacenterScenario = scenario?.datacenter_link === true
+    || hostPlatform === 'datacenter'
     || /(?:^|-)(datacenter|rack|physical|dc|bmc|ipmi|pdu|remote-hands)(?:-|$)/i.test(scenarioSlug)
   const showDatacenterLink = !isDatacenterLab && explicitDatacenterScenario
+  const showHostedAwsLink = !isAwsLab && hostPlatform === 'aws'
+  const showHostedAzureLink = !isAzureLab && hostPlatform === 'azure'
+  const showHostedGcpLink = !isGcpLab && hostPlatform === 'gcp'
   // When a dedicated console is primary, keep a visible "Lab console" chip so
   // learners never wonder where the GUI went (VMware-parity affordance).
   const primaryConsoleLabel = {
@@ -1618,7 +1636,9 @@ export default function LabRunner() {
     baremetal: 'Bare Metal',
   }[primarySimKind] || null
   const showTerminalVmwareLink = !isCrossTech && !isVmwareLab && (
-    scenario?.vmware_link === true || /(?:^|-)(vmware|vcenter|vsphere)(?:-|$)/i.test(scenarioSlug)
+    scenario?.vmware_link === true
+    || hostPlatform === 'vmware'
+    || /(?:^|-)(vmware|vcenter|vsphere)(?:-|$)/i.test(scenarioSlug)
   )
   const showCrossTechVmwareLink = isCrossTech
   // Ansible terminal labs run playbooks from the shell, so the terminal stays
@@ -2443,6 +2463,14 @@ export default function LabRunner() {
                   Lab: {primaryConsoleLabel}
                 </span>
               )}
+              {hostedAsLabel && (
+                <span
+                  className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-md border border-surface-600 text-surface-200 font-medium max-w-[min(100%,28rem)] truncate"
+                  title={hostedAsLabel}
+                >
+                  {hostedAsLabel}
+                </span>
+              )}
               <button
                 type="button"
                 onClick={() => setSimTerminalOpen((v) => !v)}
@@ -2461,6 +2489,39 @@ export default function LabRunner() {
                 >
                   <ExternalLink size={12} /> Open VMware
                 </a>
+              )}
+              {showHostedAwsLink && (
+                <button
+                  type="button"
+                  onClick={() => setShowAwsSim(true)}
+                  className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-md border font-semibold"
+                  style={{ borderColor: 'rgba(255,153,0,.5)', color: '#ff9900', background: 'rgba(255,153,0,.12)' }}
+                  title="Same guest in AWS Console"
+                >
+                  <ExternalLink size={12} /> Open AWS
+                </button>
+              )}
+              {showHostedAzureLink && (
+                <button
+                  type="button"
+                  onClick={() => setShowAzureSim(true)}
+                  className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-md border font-semibold"
+                  style={{ borderColor: 'rgba(0,120,212,.5)', color: '#50e6ff', background: 'rgba(0,120,212,.12)' }}
+                  title="Same guest in Azure Portal"
+                >
+                  <ExternalLink size={12} /> Open Azure
+                </button>
+              )}
+              {showHostedGcpLink && (
+                <button
+                  type="button"
+                  onClick={() => setShowGcpSim(true)}
+                  className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-md border font-semibold"
+                  style={{ borderColor: 'rgba(66,133,244,.5)', color: '#8ab4f8', background: 'rgba(66,133,244,.12)' }}
+                  title="Same guest in GCP Console"
+                >
+                  <ExternalLink size={12} /> Open GCP
+                </button>
               )}
               {showDatacenterLink && (
                 <button
@@ -2546,6 +2607,14 @@ export default function LabRunner() {
         )}
         {/* Terminal action bar — above xterm */}
         <div className="shrink-0 flex flex-wrap items-center gap-1.5 sm:gap-2 px-2 py-2 bg-surface-900 border-b border-surface-800 text-[10px] sm:text-xs">
+          {hostedAsLabel && (
+            <span
+              className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-md border border-surface-600 text-surface-200 font-medium max-w-[min(100%,28rem)] truncate"
+              title={hostedAsLabel}
+            >
+              {hostedAsLabel}
+            </span>
+          )}
           {/* Wayfinding only — the actual tool buttons render as the inline
               controls below. The journey strip used to ALSO render clickable
               vCenter/Monitoring/AWX chips, which duplicated those buttons (a
@@ -2573,6 +2642,36 @@ export default function LabRunner() {
             >
               <ExternalLink size={12} /> Open vCenter
             </Link>
+          )}
+          {showHostedAwsLink && (
+            <button
+              type="button"
+              onClick={() => setShowAwsSim(true)}
+              className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-md border font-semibold text-[10px]"
+              style={{ borderColor: 'rgba(255,153,0,.5)', color: '#ff9900', background: 'rgba(255,153,0,.12)' }}
+            >
+              <ExternalLink size={12} /> Open AWS
+            </button>
+          )}
+          {showHostedAzureLink && (
+            <button
+              type="button"
+              onClick={() => setShowAzureSim(true)}
+              className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-md border font-semibold text-[10px]"
+              style={{ borderColor: 'rgba(0,120,212,.5)', color: '#50e6ff', background: 'rgba(0,120,212,.12)' }}
+            >
+              <ExternalLink size={12} /> Open Azure
+            </button>
+          )}
+          {showHostedGcpLink && (
+            <button
+              type="button"
+              onClick={() => setShowGcpSim(true)}
+              className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-md border font-semibold text-[10px]"
+              style={{ borderColor: 'rgba(66,133,244,.5)', color: '#8ab4f8', background: 'rgba(66,133,244,.12)' }}
+            >
+              <ExternalLink size={12} /> Open GCP
+            </button>
           )}
           {showCrossTechVmwareLink && (
             <Link
@@ -3177,6 +3276,39 @@ export default function LabRunner() {
           scenario={scenario}
           onToggleTerminal={() => setShowAwsSim(false)}
           vmwareHref={showSimVmwareLink ? vmwareServerHref : null}
+          {...simChromeProps}
+        />
+      )}
+
+      {showHostedAwsLink && showAwsSim && (
+        <LazySimPanel
+          Sim={LazyAwsLabOverlay}
+          label="AWS Console"
+          sessionId={sessionId}
+          scenario={scenario}
+          onToggleTerminal={() => setShowAwsSim(false)}
+          {...simChromeProps}
+        />
+      )}
+
+      {showHostedAzureLink && showAzureSim && (
+        <LazySimPanel
+          Sim={LazyAzureConsole}
+          label="Azure Portal"
+          sessionId={sessionId}
+          scenario={scenario}
+          onExit={() => setShowAzureSim(false)}
+          {...simChromeProps}
+        />
+      )}
+
+      {showHostedGcpLink && showGcpSim && (
+        <LazySimPanel
+          Sim={LazyGcpConsole}
+          label="GCP Console"
+          sessionId={sessionId}
+          scenario={scenario}
+          onExit={() => setShowGcpSim(false)}
           {...simChromeProps}
         />
       )}

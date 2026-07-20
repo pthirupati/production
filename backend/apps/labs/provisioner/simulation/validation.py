@@ -1042,6 +1042,7 @@ def _run_line_check(
     # when no units are failed AND no broken-configuration sentinel remains.
     if "systemctl is-failed" in stripped:
         slug = (getattr(state, "scenario_slug", "") or "").strip()
+        found_break = False
         if slug:
             sentinel = f"# broken configuration for {slug}"
             for path, node in state.vfs.items():
@@ -1053,12 +1054,40 @@ def _run_line_check(
                         f"{path} still contains the broken configuration — edit the file "
                         "and apply the documented fix, then re-run Check Solution"
                     )
+                    found_break = True
                     break
             marker_path = _marker_paths_by_slug().get(slug)
             if marker_path:
                 marker_content = state.read_file(marker_path) or ""
                 if "FIXED-OK" not in marker_content:
                     failures.append(f"{marker_path} not corrected — apply the documented fix")
+                    found_break = True
+        # Fail-closed: if check.sh only asks is-failed but the lab never planted
+        # a break (common academy-aws gap), treat as still broken until FIXED-OK
+        # exists on a topic file under /opt/fixitlab or /opt/aws.
+        if not found_break and not failures:
+            failed_units = [
+                n for n, svc in (state.services or {}).items()
+                if getattr(svc, "active", "") == "failed"
+            ]
+            if failed_units:
+                failures.append(
+                    f"failed units still present: {', '.join(failed_units[:5])} — repair and re-check"
+                )
+            else:
+                # No failed units and no sentinel → previously auto-passed. Require
+                # at least one FIXED-OK marker under /opt for academy packs.
+                has_fixed = any(
+                    isinstance(node, dict) and node.get("type") == "file"
+                    and "FIXED-OK" in (node.get("content") or "")
+                    for path, node in state.vfs.items()
+                    if path.startswith("/opt/")
+                )
+                if not has_fixed and slug.startswith(("academy-", "aws-", "azure-", "gcp-")):
+                    failures.append(
+                        "lab issue not resolved yet — apply the documented fix "
+                        "(append FIXED-OK to the broken config under /opt) then re-check"
+                    )
         return True
 
     # ── Postgres readiness (pg_isready) ──
