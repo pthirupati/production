@@ -56,9 +56,48 @@ def normalize_sim_type(raw: str | None) -> str:
     return _LEGACY_MAP.get(key, "generic")
 
 
+def infer_sim_type(
+    raw: str | None,
+    slug: str = "",
+    technology: str = "",
+) -> str:
+    """Normalize simulation_type, promoting cloud/gitops slugs out of generic.
+
+    Many academy YAML files still ship ``simulation_type: generic`` even when
+    ``technology: aws`` / slug is ``academy-aws-*``. Without promotion the Lab
+    Terminal boots a plain RHEL bare-metal persona while the banner says AWS.
+    """
+    st = normalize_sim_type(raw)
+    low = (slug or "").lower()
+    tech = (technology or "").strip().lower()
+    if st != "generic":
+        # Still map gitops → devops for CI GUI modules
+        if tech in ("gitops", "github") or low.startswith(("academy-gitops", "gitops-")):
+            if st in ("generic", "rhel"):
+                return "devops"
+        return st
+    if tech == "aws" or low.startswith(("academy-aws", "aws-", "ec2-")):
+        return "aws"
+    if tech == "azure" or low.startswith(("academy-azure", "azure-")):
+        return "azure"
+    if tech == "gcp" or low.startswith(("academy-gcp", "gcp-")):
+        return "gcp"
+    if tech == "openstack" or low.startswith(("academy-openstack", "openstack-")):
+        return "openstack"
+    if tech == "vmware" or low.startswith(("academy-vmware", "vmware-")):
+        return "vmware"
+    if tech in ("gitops", "github", "devops") or low.startswith(
+        ("academy-gitops", "gitops-", "academy-devops", "devops-")
+    ):
+        return "devops"
+    if tech == "baremetal" or low.startswith(("academy-baremetal", "baremetal-")):
+        return "baremetal"
+    return st
+
+
 def lab_server_banner(sim_type: str, slug: str = "") -> str:
     """Learner-facing terminal banner for the scenario's Lab Server persona."""
-    st = normalize_sim_type(sim_type)
+    st = infer_sim_type(sim_type, slug)
     by_type = {
         "aws": "AWS EC2 Lab Server — Amazon Linux",
         "azure": "Azure Virtual Machine — RHEL 9",
@@ -82,19 +121,29 @@ def lab_server_banner(sim_type: str, slug: str = "") -> str:
         "networking": "Network Lab Appliance — RHEL 9",
         "grafana": "Observability Host — RHEL 9",
         "prometheus": "Observability Host — RHEL 9",
+        "devops": "GitOps / CI Lab Server — RHEL 9",
         "rhel": "Linux Lab Server — RHEL 9",
         "generic": "Linux Lab Server — RHEL 9",
     }
-    s = (slug or "").lower()
-    if st == "generic":
-        if s.startswith(("academy-aws", "aws-", "ec2-")):
+    try:
+        from .hosting_persona import resolve_host_platform
+
+        platform = resolve_host_platform(st, slug)
+        platform_banners = {
+            "aws": by_type["aws"],
+            "azure": by_type["azure"],
+            "gcp": by_type["gcp"],
+            "openstack": by_type["openstack"],
+            "vmware": by_type["vmware"],
+            "baremetal": by_type["baremetal"],
+            "datacenter": by_type["datacenter"],
+        }
+        if st in ("generic", "rhel", "linux") and platform in platform_banners:
+            return platform_banners[platform]
+        if platform == "aws" and st == "aws":
             return by_type["aws"]
-        if s.startswith(("academy-azure", "azure-")):
-            return by_type["azure"]
-        if s.startswith(("academy-gcp", "gcp-")):
-            return by_type["gcp"]
-        if s.startswith(("academy-openstack", "openstack-")):
-            return by_type["openstack"]
+    except Exception:
+        pass
     return by_type.get(st, "Linux Lab Server — RHEL 9")
 
 
@@ -126,13 +175,19 @@ def hostname_for_type(sim_type: str, slug: str = "") -> str:
         "openstack": "web-01",
         "aws": "ip-10-0-1-25",
     }
-    if "ansible" in slug:
+    low = (slug or "").lower()
+    if "ansible" in low:
         return "ansible-control"
-    if "gpu" in slug or "nvidia" in slug:
+    if "gpu" in low or "nvidia" in low:
         return "gpu-node"
-    if "k8s" in slug or "kubernetes" in slug:
+    if "k8s" in low or "kubernetes" in low:
         return "k8s-master"
-    return defaults.get(sim_type, "rhel-lab")
+    st = infer_sim_type(sim_type, slug)
+    if st == "aws" or low.startswith(("academy-aws", "aws-", "ec2-")):
+        return "ip-172-31-14-52"
+    if st == "devops" or low.startswith(("academy-gitops", "gitops-")):
+        return "gitops-runner"
+    return defaults.get(st, defaults.get(sim_type, "rhel-lab"))
 
 
 def boot_console_for(scenario_slug: str, sim_type: str) -> bool:

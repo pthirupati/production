@@ -14,7 +14,7 @@ from .simulation.shell import (
     get_sim_session_by_resource,
     register_sim_session,
 )
-from .simulation.sim_types import normalize_sim_type
+from .simulation.sim_types import infer_sim_type, normalize_sim_type
 from .simulation.simulation_modules import register_modules
 from .simulation.unified_sim import UnifiedSimulationEngine
 from .simulation.validation import (
@@ -419,7 +419,14 @@ def ensure_sim_session(lab_session) -> dict | None:
         return None
 
     raw_type = getattr(scenario, "simulation_type", "generic") or "generic"
-    sim_type = normalize_sim_type(raw_type)
+    tech_slug = ""
+    try:
+        tech = getattr(scenario, "technology", None)
+        tech_slug = getattr(tech, "slug", "") or ""
+    except Exception:
+        tech_slug = ""
+    from .simulation.sim_types import infer_sim_type
+    sim_type = infer_sim_type(raw_type, slug=scenario.slug, technology=tech_slug)
     slug = scenario.slug
     snapshot = getattr(lab_session, "simulation_snapshot", None) or {}
     fresh = True
@@ -445,6 +452,15 @@ def ensure_sim_session(lab_session) -> dict | None:
     elif fresh and _is_gcp_lab(slug, raw_type):
         _seed_state_from_gcp_instance(engine, session_id, slug)
     if fresh:
+        # Re-assert hosting persona after cloud seed (keeps Amazon Linux / DMI
+        # even when EC2 seed rewrote hostname/IP/hardware).
+        try:
+            from .simulation.hosting_persona import apply_hosting_persona, resolve_host_platform
+            platform = resolve_host_platform(sim_type, slug, tech_slug=tech_slug)
+            apply_hosting_persona(engine.shell.state, platform, slug=slug)
+            engine.host_platform = platform
+        except Exception:
+            logger.exception("Hosting persona re-apply skipped for session %s", session_id)
         _seed_gpu_identity_if_needed(engine, session_id, slug, sim_type)
         try:
             from .simulation.server_identity import seed_scenario_lab_servers
@@ -511,7 +527,13 @@ class SimulationProvisioner:
     def provision(self, lab_session):
         scenario = lab_session.scenario
         raw_type = getattr(scenario, "simulation_type", "generic") or "generic"
-        sim_type = normalize_sim_type(raw_type)
+        tech_slug = ""
+        try:
+            tech = getattr(scenario, "technology", None)
+            tech_slug = getattr(tech, "slug", "") or ""
+        except Exception:
+            tech_slug = ""
+        sim_type = infer_sim_type(raw_type, slug=scenario.slug, technology=tech_slug)
         slug = scenario.slug
 
         engine = UnifiedSimulationEngine(scenario_slug=slug, simulation_type=sim_type)

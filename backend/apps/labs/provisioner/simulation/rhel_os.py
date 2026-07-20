@@ -513,6 +513,11 @@ class RHELOSState:
         from .firewall_state import FirewallState
         self.lvm = LVMState()
         self.firewall = FirewallState()
+        # Hosting persona (AWS / Azure / GCE / VMware / bare metal) — set by
+        # apply_hosting_persona; dmidecode and Hosted-as banner read these.
+        self.host_platform: str = "linux"
+        self.dmi_manufacturer: str = "Red Hat"
+        self.dmi_product: str = "KVM"
         # Stateful rpm DB: name -> "name-version-release.arch". `dnf/yum install`
         # adds, remove deletes, and `rpm -q`/`rpm -qa` read from it so an install
         # is reflected in subsequent queries.
@@ -992,6 +997,18 @@ class RHELOSState:
 
     def _write_file(self, path: str, content: str, mode: str = "644") -> None:
         self.vfs[path] = {"type": "file", "content": content, "mode": mode, "owner": "root", "group": "root"}
+
+    def _write_large_file(self, path: str, size_bytes: int, mode: str = "644") -> None:
+        """Plant a file that ``du``/`ls -l` treat as large without storing the payload."""
+        marker = f"# large file placeholder ({size_bytes} bytes)\n"
+        self.vfs[path] = {
+            "type": "file",
+            "content": marker,
+            "mode": mode,
+            "owner": "root",
+            "group": "root",
+            "reported_bytes": max(len(marker), int(size_bytes)),
+        }
 
     def resolve_path(self, path: str) -> str:
         if not path:

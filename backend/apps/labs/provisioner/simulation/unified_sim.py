@@ -13,7 +13,7 @@ from .k8s_cluster import K8sCluster
 from .networking_state import NetworkingState
 from .rhel_shell import RHELShell
 from .shell import SimulationStreamHolder
-from .sim_types import boot_console_for, hostname_for_type, lab_server_banner, normalize_sim_type
+from .sim_types import boot_console_for, hostname_for_type, infer_sim_type, lab_server_banner
 from .simulation_modules import apply_simulation_context, register_modules
 
 
@@ -26,7 +26,7 @@ class UnifiedSimulationEngine(BaseRHELSimulator):
 
     def __init__(self, scenario_slug: str = "", simulation_type: str = "generic"):
         self.scenario_slug = scenario_slug
-        self.simulation_type = normalize_sim_type(simulation_type)
+        self.simulation_type = infer_sim_type(simulation_type, scenario_slug)
         hostname = hostname_for_type(self.simulation_type, scenario_slug)
         self.scenario_slug = scenario_slug
         self.hostname = hostname

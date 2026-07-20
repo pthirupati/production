@@ -43,6 +43,11 @@ class LVMState:
             "rhel/root": SimLV("root", "rhel", "40.00g", "/", "/dev/mapper/rhel-root"),
             "rhel/swap": SimLV("swap", "rhel", "8.00g", "[SWAP]", "/dev/mapper/rhel-swap"),
         }
+        # Override root filesystem Use% for disk-pressure scenarios (default healthy).
+        self.root_used_pct: float = 17.0
+
+    def set_root_used_pct(self, pct: float) -> None:
+        self.root_used_pct = max(0.0, min(99.0, float(pct)))
 
     def provision_disk(self, device: str) -> None:
         """Attach a disk that was provisioned via Jira @storage team."""
@@ -143,19 +148,26 @@ class LVMState:
     def format_df(self) -> str:
         lines = ["Filesystem                        1K-blocks    Used Available Use% Mounted on"]
         seen = set()
+        pct = getattr(self, "root_used_pct", 17.0) or 17.0
         for lv in self.lvs.values():
             if not lv.mount or lv.mount == "[SWAP]":
                 continue
             path = lv.lv_path or f"/dev/mapper/{lv.vg}-{lv.name}"
             size_k = self._size_to_kb(lv.size)
-            used = int(size_k * 0.17)
-            avail = size_k - used
+            use_pct = pct if lv.mount == "/" else 17.0
+            used = int(size_k * (use_pct / 100.0))
+            avail = max(0, size_k - used)
             lines.append(
-                f"{path:<32} {size_k:>10} {used:>8} {avail:>10}  17% {lv.mount}"
+                f"{path:<32} {size_k:>10} {used:>8} {avail:>10}  {int(use_pct)}% {lv.mount}"
             )
             seen.add(lv.mount)
         if "/" not in seen:
-            lines.append("/dev/mapper/rhel-root              52428800 8388608  44040192  17% /")
+            size_k = 52428800
+            used = int(size_k * (pct / 100.0))
+            avail = max(0, size_k - used)
+            lines.append(
+                f"/dev/mapper/rhel-root              {size_k:>10} {used:>8} {avail:>10}  {int(pct)}% /"
+            )
         lines.append("tmpfs                              4026532       0   4026532   0% /dev/shm")
         return "\n".join(lines)
 

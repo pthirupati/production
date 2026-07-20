@@ -62,6 +62,9 @@ export default function CicdPipelineSim({
   vmwareHref = null,
 }) {
   const slug = scenario?.slug || ''
+  const techSlug = (scenario?.technology?.slug || '').toLowerCase()
+  const isGitOpsLab = techSlug === 'gitops'
+    || /gitops|argocd|flux|academy-gitops|github|gh-actions/.test(slug.toLowerCase())
 
   // Fault set derived from the lab scenario slug (gates the old cheat button).
   const scenarioFault = useMemo(() => faultsForScenario(slug), [slug])
@@ -74,9 +77,15 @@ export default function CicdPipelineSim({
 
   // Provider + seed selection, seeded from the scenario on mount.
   const initialSeed = useMemo(() => pipelineForScenario(slug), [slug])
-  const [provider, setProvider] = useState(initialSeed.provider)
-  const [seedSlug, setSeedSlug] = useState(initialSeed.slug)
-  const [source, setSource] = useState(initialSeed.source)
+  const [provider, setProvider] = useState(() => (
+    isGitOpsLab ? PROVIDERS.GITHUB : initialSeed.provider
+  ))
+  const [seedSlug, setSeedSlug] = useState(() => (
+    isGitOpsLab ? CICD_SEED_PIPELINES[PROVIDERS.GITHUB][0].slug : initialSeed.slug
+  ))
+  const [source, setSource] = useState(() => (
+    isGitOpsLab ? CICD_SEED_PIPELINES[PROVIDERS.GITHUB][0].source : initialSeed.source
+  ))
 
   const [tab, setTab] = useState('pipeline')
   const [trigger, setTrigger] = useState('push')
@@ -338,12 +347,15 @@ export default function CicdPipelineSim({
         : runHistory[0]?.status || null
 
   return (
-    <div className={simPanelRoot(embedded, 'cicd-sim text-sm')} style={{ background: 'var(--cicd-bg)', color: 'var(--cicd-text)' }}>
+    <div
+      className={simPanelRoot(embedded, `cicd-sim text-sm${isGitOpsLab || provider === PROVIDERS.GITHUB ? ' cicd-github' : ''}`)}
+      style={{ background: 'var(--cicd-bg)', color: 'var(--cicd-text)' }}
+    >
       <LabChromeBar
         icon={GitBranch}
-        title="CI/CD Pipeline"
-        subtitle={scenario?.title || 'DevOps lab'}
-        accent="#388bfd"
+        title={isGitOpsLab || provider === PROVIDERS.GITHUB ? 'GitHub Actions' : 'CI/CD Pipeline'}
+        subtitle={scenario?.title || (isGitOpsLab ? 'GitOps lab' : 'DevOps lab')}
+        accent="#238636"
         className="lab-chrome-bar"
         onExit={onExit}
         onHints={onHints}
@@ -368,8 +380,15 @@ export default function CicdPipelineSim({
       <div className="cicd-toolbar flex flex-wrap items-center gap-2 px-4 py-2 shrink-0">
         <label className="flex items-center gap-1.5 text-[11px]" style={{ color: 'var(--cicd-muted)' }}>
           Provider
-          <select className="cicd-select" value={provider} onChange={(e) => selectProvider(e.target.value)}>
-            {PROVIDER_ORDER.map((p) => <option key={p} value={p}>{PROVIDER_LABELS[p]}</option>)}
+          <select
+            className="cicd-select"
+            value={provider}
+            disabled={isGitOpsLab}
+            onChange={(e) => selectProvider(e.target.value)}
+          >
+            {(isGitOpsLab ? [PROVIDERS.GITHUB] : PROVIDER_ORDER).map((p) => (
+              <option key={p} value={p}>{PROVIDER_LABELS[p]}</option>
+            ))}
           </select>
         </label>
         <label className="flex items-center gap-1.5 text-[11px]" style={{ color: 'var(--cicd-muted)' }}>

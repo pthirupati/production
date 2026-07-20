@@ -4755,8 +4755,13 @@ class RHELShell:
                 for path, node in self.state.vfs.items():
                     if (path == ap or path.startswith(prefix)) and isinstance(node, dict) \
                             and node.get("type") == "file":
-                        total += len(node.get("content", ""))
+                        total += int(node.get("reported_bytes") or len(node.get("content", "")))
                 return total or 4096
+            node = self.state.vfs.get(ap)
+            if isinstance(node, dict) and node.get("type") == "file":
+                if node.get("reported_bytes"):
+                    return int(node["reported_bytes"])
+                return len(node.get("content", ""))
             content = self.state.read_file(ap)
             return len(content) if content is not None else 0
 

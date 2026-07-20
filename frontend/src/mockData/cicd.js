@@ -388,9 +388,12 @@ export function faultsForScenario(slug) {
   if (/image|tag|manifest/.test(s)) return CICD_FAULTS_CATALOG['bad-image-tag']
   if (/oom|memory|killed/.test(s)) return CICD_FAULTS_CATALOG['oom-test']
   if (/flaky|intermittent|retry/.test(s)) return CICD_FAULTS_CATALOG['flaky-test']
-  if (/secret|token|credential|vault/.test(s)) return CICD_FAULTS_CATALOG['missing-secret']
-  if (/kubeconfig|rbac|unauthorized|forbidden|argocd|flux|helm|kubectl/.test(s)) return CICD_FAULTS_CATALOG['kubeconfig-unauthorized']
+  if (/secret|token|credential|vault|sops/.test(s)) return CICD_FAULTS_CATALOG['missing-secret']
+  if (/kubeconfig|rbac|unauthorized|forbidden|argocd|flux|helm|kubectl|sync|drift|prune/.test(s)) {
+    return CICD_FAULTS_CATALOG['kubeconfig-unauthorized']
+  }
   if (/approval|gate|manual|timeout/.test(s)) return CICD_FAULTS_CATALOG['approval-timeout']
+  if (/gitops|rollback/.test(s)) return CICD_FAULTS_CATALOG['kubeconfig-unauthorized']
   return null
 }
 
@@ -401,7 +404,10 @@ export function faultsForScenario(slug) {
 export function pipelineForScenario(slug) {
   const s = String(slug || '').toLowerCase()
   if (/jenkins/.test(s)) return CICD_SEED_PIPELINES[PROVIDERS.JENKINS][0]
-  if (/github|gh-actions|actions/.test(s)) return CICD_SEED_PIPELINES[PROVIDERS.GITHUB][0]
+  // GitOps + GitHub Actions labs → full GitHub workflow UI (Actions dark theme)
+  if (/github|gh-actions|actions|gitops|argocd|flux|academy-gitops/.test(s)) {
+    return CICD_SEED_PIPELINES[PROVIDERS.GITHUB][0]
+  }
   if (/gitlab/.test(s)) return CICD_SEED_PIPELINES[PROVIDERS.GITLAB][0]
   return CICD_SEED_PIPELINES[PROVIDERS.GITLAB][0]
 }

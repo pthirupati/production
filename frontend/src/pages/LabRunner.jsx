@@ -1416,9 +1416,11 @@ export default function LabRunner() {
     || (scenario?.slug || '').startsWith('academy-aws-')
   )
   const isDevOpsPipelineLab = !isCrossTech && (
-    scenario?.technology?.slug === 'devops'
+    ['devops', 'gitops', 'github', 'cicd'].includes((scenario?.technology?.slug || '').toLowerCase())
     || scenario?.simulation_type === 'devops'
-    || /jenkins|gitlab|pipeline|argocd|flux|helm|sonar|ci-pipeline|cicd/.test((scenario?.slug || '').toLowerCase())
+    || /jenkins|gitlab|pipeline|argocd|flux|helm|sonar|ci-pipeline|cicd|gitops|github|gh-actions|academy-gitops/.test(
+      (scenario?.slug || '').toLowerCase(),
+    )
   )
   const isBaremetalGuiLab = !isCrossTech && (
     scenario?.simulation_type === 'baremetal'

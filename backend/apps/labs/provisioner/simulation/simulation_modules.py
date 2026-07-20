@@ -53,6 +53,17 @@ def apply_simulation_context(engine: "UnifiedSimulationEngine") -> None:
     state = engine.shell.state
     slug = engine.scenario_slug
 
+    # Hosting persona first so /etc/os-release + dmidecode match Hosted-as banner
+    # (AWS → Amazon Linux, VMware → VMware DMI, bare metal → HPE, …).
+    try:
+        from .hosting_persona import apply_hosting_persona, resolve_host_platform
+
+        platform = resolve_host_platform(sim_type, slug)
+        apply_hosting_persona(state, platform, slug=slug)
+        engine.host_platform = platform
+    except Exception:
+        engine.host_platform = "linux"
+
     if sim_type == "ansible" or "ansible" in slug:
         state.set_prompt_user("ansible")
         state.hostname = "ansible-control"
@@ -82,8 +93,15 @@ def apply_simulation_context(engine: "UnifiedSimulationEngine") -> None:
             state._write_file("/opt/app/main.py", 'import requests\nprint("starting"\n')
         else:
             state._write_file("/opt/app/main.py", 'print("hello"\n')
-    elif sim_type == "devops" or "devops" in slug or "ci-pipeline" in slug or "helm" in slug:
-        state.hostname = "gitlab-runner"
+    elif (
+        sim_type == "devops"
+        or "devops" in slug
+        or "ci-pipeline" in slug
+        or "helm" in slug
+        or "gitops" in slug
+        or slug.startswith("academy-gitops")
+    ):
+        state.hostname = "gitops-runner" if "gitops" in slug else "gitlab-runner"
     elif sim_type == "networking" or "bgp" in slug or "ntp-drift" in slug:
         state.hostname = "core-router"
     elif sim_type == "terraform" or slug.startswith("terraform-"):
@@ -100,7 +118,13 @@ def apply_simulation_context(engine: "UnifiedSimulationEngine") -> None:
 
     # DevOps / git labs get a real repository with history and a feature branch
     # so git status/log/branch/merge/push all work against meaningful state.
-    if sim_type == "devops" or "git" in slug or "ci-pipeline" in slug or "devops" in slug:
+    if (
+        sim_type == "devops"
+        or "git" in slug
+        or "ci-pipeline" in slug
+        or "devops" in slug
+        or "gitops" in slug
+    ):
         _seed_devops_git_repo(state)
 
     # `sim-rhel-ssh-stop` is graded by `systemctl is-active sshd`; sshd must start
@@ -195,6 +219,12 @@ def _modules_for_type(sim_type: str) -> set[str]:
         return {"networking"}
     if sim_type == "terraform":
         return {"terraform", "docker"}
+    # Cloud / hypervisor guests still need dmidecode (and occasional ipmi) so the
+    # Lab Terminal hardware identity matches Hosted-as — reuse the baremetal module.
+    if sim_type in ("aws", "azure", "gcp", "openstack", "vmware"):
+        return {sim_type, "baremetal", "docker"}
+    if sim_type in ("baremetal", "datacenter"):
+        return {"baremetal"}
     return {sim_type, "docker"} if sim_type == "rhel" else {sim_type}
 
 
@@ -1304,7 +1334,17 @@ def _register_baremetal(engine: "UnifiedSimulationEngine", shell: RHELShell) -> 
         if "fru" in low:
             return " Board Product         : ProLiant DL380 Gen10"
         if "dmidecode" in low:
-            return "Manufacturer: HPE\nProduct Name: ProLiant DL380 Gen10"
+            # Persona-aware DMI: AWS Nitro / Azure / GCE / VMware / HPE bare metal.
+            # Generic labs used to always answer HPE even on EC2 guests.
+            mfr = getattr(shell.state, "dmi_manufacturer", None) or "HPE"
+            prod = getattr(shell.state, "dmi_product", None) or "ProLiant DL380 Gen10"
+            platform = getattr(shell.state, "host_platform", "") or ""
+            # Only claim HPE ProLiant when this Lab Server is actually bare metal /
+            # datacenter — otherwise prefer the hosting persona already applied.
+            if platform and platform not in ("baremetal", "datacenter", "linux"):
+                mfr = getattr(shell.state, "dmi_manufacturer", mfr) or mfr
+                prod = getattr(shell.state, "dmi_product", prod) or prod
+            return f"Manufacturer: {mfr}\nProduct Name: {prod}"
         if "esxcli" in low:
             return "Host CPU: Intel Xeon Gold 6248R\nMemory: 256 GB"
         if low.startswith("maas"):

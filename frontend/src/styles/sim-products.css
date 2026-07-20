@@ -160,6 +160,23 @@
   --cicd-violet: #a371f7;
 }
 
+/* GitHub Actions / GitOps — match github.com Actions chrome */
+.cicd-sim.cicd-github {
+  --cicd-accent: #238636;
+  --cicd-accent-soft: rgba(35, 134, 54, 0.18);
+  --cicd-violet: #a371f7;
+}
+.cicd-sim.cicd-github .cicd-btn-primary {
+  background: #238636;
+  border-color: #2ea043;
+  color: #fff;
+}
+.cicd-sim.cicd-github .cicd-tab-active {
+  color: #58a6ff;
+  background: rgba(56, 139, 253, 0.12);
+  border-color: rgba(56, 139, 253, 0.35);
+}
+
 /* Provider / trigger toolbar */
 .cicd-toolbar { background: var(--cicd-panel); border-bottom: 1px solid var(--cicd-border-soft); }
 .cicd-select {

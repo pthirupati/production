@@ -120,6 +120,26 @@ def _resolve_hosting_context(
     datacenter_link: bool = False,
 ) -> str:
     """Where this Lab Server appears in the platform (for the terminal banner)."""
+    try:
+        from apps.labs.provisioner.simulation.hosting_persona import (
+            hosted_as_line,
+            resolve_host_platform,
+        )
+        from apps.labs.provisioner.simulation.sim_types import infer_sim_type
+
+        st = infer_sim_type(sim_type, slug, tech_slug)
+        platform = resolve_host_platform(st, slug, tech_slug=tech_slug)
+        # Prefer platform-specific Hosted-as (covers Linux labs hosted on VMware/AWS/…)
+        line = hosted_as_line(platform)
+        if cross_technology or vmware_link:
+            if platform == "vmware" or st == "vmware":
+                return "Hosted as: VMware Virtual Machine (session-linked guest — same OS as this terminal)"
+        if datacenter_link and platform in ("datacenter", "baremetal"):
+            return "Hosted as: Physical rack server (session-linked — same host as Data Center Floor)"
+        return line
+    except Exception:
+        pass
+
     low = (slug or "").lower()
     st = (sim_type or "").strip().lower()
     tech = (tech_slug or "").strip().lower()
