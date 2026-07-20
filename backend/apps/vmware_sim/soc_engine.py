@@ -239,6 +239,11 @@ def apply_action(session_id: str, action: str, payload: dict | None = None) -> d
             _chaos_inject(session_id, "drop_nic", name, detail={"console": "soc", "reason": "quarantined"})
         except Exception:  # pragma: no cover
             pass
+        try:
+            from apps.labs.provisioner.simulation import soc_bridge
+            soc_bridge.record_quarantine(str(session_id), name)
+        except Exception:
+            pass
         return {"ok": True, "message": "Host quarantined"}
 
     if action == "block_ip":
@@ -250,6 +255,11 @@ def apply_action(session_id: str, action: str, payload: dict | None = None) -> d
         broken.pop("needs_block_ip", None)
         _event(state, f"IP {ip} blocked at the firewall", "success")
         _save(session_id, entry)
+        try:
+            from apps.labs.provisioner.simulation import soc_bridge
+            soc_bridge.record_block_ip(str(session_id), ip)
+        except Exception:
+            pass
         return {"ok": True, "message": f"IP {ip} blocked"}
 
     if action == "search_logs":

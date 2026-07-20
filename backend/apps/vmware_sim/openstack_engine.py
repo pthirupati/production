@@ -108,6 +108,25 @@ def _base_state() -> dict:
                 "attached_to": None, "device": None, "bootable": False,
             },
         ],
+        "security_groups": [
+            {
+                "id": _uuid(), "name": "default",
+                "rules": [
+                    {"direction": "ingress", "protocol": "tcp", "port_min": 22, "port_max": 22, "remote": "0.0.0.0/0"},
+                    {"direction": "egress", "protocol": "any", "port_min": None, "port_max": None, "remote": "0.0.0.0/0"},
+                ],
+            },
+            {
+                "id": _uuid(), "name": "web",
+                "rules": [
+                    {"direction": "ingress", "protocol": "tcp", "port_min": 80, "port_max": 80, "remote": "0.0.0.0/0"},
+                    {"direction": "ingress", "protocol": "tcp", "port_min": 443, "port_max": 443, "remote": "0.0.0.0/0"},
+                ],
+            },
+        ],
+        "floating_ips": [
+            {"id": _uuid(), "address": "172.24.4.100", "pool": "public", "status": "DOWN", "instance": None},
+        ],
         "instances": [
             {
                 "id": inst_id, "name": "web-01", "status": "ACTIVE",
@@ -366,5 +385,59 @@ def apply_action(session_id: str, action: str, payload: dict | None = None) -> d
         except Exception:
             pass
         return {"ok": True, "message": "Resize complete"}
+
+    if action == "create_security_group":
+        name = (payload.get("name") or "sg-new").strip()
+        if any(sg.get("name") == name for sg in state.get("security_groups", [])):
+            return {"ok": False, "error": f"Security group {name} already exists"}
+        sg = {"id": _uuid(), "name": name, "rules": payload.get("rules") or []}
+        state.setdefault("security_groups", []).append(sg)
+        _event(state, f"Created security group {name}", "success")
+        _save(session_id, entry)
+        return {"ok": True, "message": "Security group created", "id": sg["id"]}
+
+    if action == "add_security_group_rule":
+        sg = next((s for s in state.get("security_groups", []) if s.get("name") == payload.get("name") or s.get("id") == payload.get("sg_id")), None)
+        if not sg:
+            return {"ok": False, "error": "Security group not found"}
+        rule = {
+            "direction": payload.get("direction") or "ingress",
+            "protocol": payload.get("protocol") or "tcp",
+            "port_min": int(payload.get("port_min") or payload.get("port") or 0) or None,
+            "port_max": int(payload.get("port_max") or payload.get("port") or 0) or None,
+            "remote": payload.get("remote") or "0.0.0.0/0",
+        }
+        sg.setdefault("rules", []).append(rule)
+        _event(state, f"Added rule to {sg['name']}", "success")
+        _save(session_id, entry)
+        return {"ok": True, "message": "Rule added"}
+
+    if action == "allocate_floating_ip":
+        fip = {
+            "id": _uuid(),
+            "address": payload.get("address") or f"172.24.4.{random.randint(50, 200)}",
+            "pool": payload.get("pool") or "public",
+            "status": "DOWN",
+            "instance": None,
+        }
+        state.setdefault("floating_ips", []).append(fip)
+        _event(state, f"Allocated floating IP {fip['address']}", "success")
+        _save(session_id, entry)
+        return {"ok": True, "message": "Floating IP allocated", "floating_ip": fip}
+
+    if action == "associate_floating_ip":
+        addr = payload.get("address") or payload.get("floating_ip") or ""
+        fip = next((f for f in state.get("floating_ips", []) if f.get("address") == addr or f.get("id") == addr), None)
+        inst = _find_instance(state, payload.get("instance_id") or payload.get("instance") or "")
+        if not fip:
+            return {"ok": False, "error": "Floating IP not found"}
+        if not inst:
+            return {"ok": False, "error": "Instance not found"}
+        fip["status"] = "ACTIVE"
+        fip["instance"] = inst["id"]
+        inst["floating_ip"] = fip["address"]
+        _event(state, f"Associated {fip['address']} with {inst['name']}", "success")
+        _save(session_id, entry)
+        return {"ok": True, "message": "Floating IP associated"}
 
     return {"ok": False, "error": f"Unknown action '{action}'"}

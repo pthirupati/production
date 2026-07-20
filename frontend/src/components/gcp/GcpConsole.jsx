@@ -7,6 +7,7 @@ import {
 } from 'lucide-react'
 import { simPanelRoot } from '../../utils/simLayout'
 import { SimSidebar, SimBreadcrumbs, SimDataTable, SimStatusBadge, SimModal, useSimSession } from '../sim/shared'
+import CloudShellPanel from '../lab/CloudShellPanel'
 import '../../styles/sim-products.css'
 import './gcp.css'
 
@@ -69,6 +70,7 @@ export default function GcpConsole({
   const [iamRole, setIamRole] = useState('roles/viewer')
   const [createBucketOpen, setCreateBucketOpen] = useState(false)
   const [iamOpen, setIamOpen] = useState(false)
+  const [cloudShellOpen, setCloudShellOpen] = useState(false)
 
   const st = state?.state || {}
   const loggedIn = st?.session?.logged_in
@@ -417,6 +419,9 @@ export default function GcpConsole({
     <div className={simPanelRoot(embedded, 'gcp-shell sim-product')}>
       <LabChromeBar title="Google Cloud" subtitle={scenario?.title || slug} accent={ACCENT}
         className="lab-chrome-bar !bg-[#1a73e8]" {...chromeProps}>
+        <button type="button" className="lab-chrome-btn flex items-center gap-1" onClick={() => setCloudShellOpen((o) => !o)}>
+          <Terminal size={13} /> {cloudShellOpen ? 'Hide Cloud Shell' : 'Cloud Shell'}
+        </button>
         {onToggleTerminal && (
           <button type="button" className="lab-chrome-btn flex items-center gap-1" onClick={onToggleTerminal}>
             <Terminal size={13} /> {simTerminalOpen ? 'Hide terminal' : 'Terminal'}
@@ -441,6 +446,19 @@ export default function GcpConsole({
           className="!w-[220px] !bg-[#0b1b33] gcp-sidebar" />
         <main className="flex-1 overflow-auto p-5 bg-[#f8f9fa]">{renderContent()}</main>
       </div>
+
+      {cloudShellOpen && (
+        <CloudShellPanel
+          provider="gcp"
+          accent={ACCENT}
+          onClose={() => setCloudShellOpen(false)}
+          onCommand={async (action, payload) => {
+            const res = await gcpApi.action(sessionId, action, payload)
+            await run(() => Promise.resolve(res), res?.message || 'Cloud Shell command')
+            return res
+          }}
+        />
+      )}
 
       <SimModal open={!!instanceDetail} onClose={() => setInstanceDetail(null)} title={`${instanceDetail?.name || ''} — Machine type`}
         footer={<>

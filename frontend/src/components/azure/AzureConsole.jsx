@@ -8,6 +8,7 @@ import {
 } from 'lucide-react'
 import { simPanelRoot } from '../../utils/simLayout'
 import { SimSidebar, SimBreadcrumbs, SimDataTable, SimStatusBadge, SimModal, useSimSession } from '../sim/shared'
+import CloudShellPanel from '../lab/CloudShellPanel'
 import '../../styles/sim-products.css'
 import './azure.css'
 
@@ -87,6 +88,7 @@ export default function AzureConsole({
   const [lbBack, setLbBack] = useState(443)
   const [containerModal, setContainerModal] = useState(null)
   const [containerName, setContainerName] = useState('logs')
+  const [cloudShellOpen, setCloudShellOpen] = useState(false)
 
   const st = state?.state || {}
   const loggedIn = st?.session?.logged_in
@@ -506,6 +508,9 @@ export default function AzureConsole({
     <div className={simPanelRoot(embedded, 'az-shell sim-product')}>
       <LabChromeBar title="Microsoft Azure" subtitle={scenario?.title || slug} accent={ACCENT}
         className="lab-chrome-bar !bg-[#0078d4]" {...chromeProps}>
+        <button type="button" className="lab-chrome-btn flex items-center gap-1" onClick={() => setCloudShellOpen((o) => !o)}>
+          <Terminal size={13} /> {cloudShellOpen ? 'Hide Cloud Shell' : 'Cloud Shell'}
+        </button>
         {onToggleTerminal && (
           <button type="button" className="lab-chrome-btn flex items-center gap-1" onClick={onToggleTerminal}>
             <Terminal size={13} /> {simTerminalOpen ? 'Hide terminal' : 'Terminal'}
@@ -528,8 +533,21 @@ export default function AzureConsole({
       <div className="flex flex-1 min-h-0">
         <SimSidebar sections={SIDEBAR} activeKey={nav} onSelect={setNav} accent={ACCENT}
           className="!w-[220px] !bg-[#04223f] az-sidebar" />
-        <main className="flex-1 overflow-auto p-5 bg-[#f5f7fa]">{renderContent()}</main>
+        <main className="flex-1 overflow-auto p-5 bg-[#f5f7fa]" style={{ paddingBottom: cloudShellOpen ? 12 : undefined }}>{renderContent()}</main>
       </div>
+
+      {cloudShellOpen && (
+        <CloudShellPanel
+          provider="azure"
+          accent={ACCENT}
+          onClose={() => setCloudShellOpen(false)}
+          onCommand={async (action, payload) => {
+            const res = await azureApi.action(sessionId, action, payload)
+            await run(() => Promise.resolve(res), res?.message || 'Cloud Shell command')
+            return res
+          }}
+        />
+      )}
 
       <SimModal open={!!vmDetail} onClose={() => setVmDetail(null)} title={`${vmDetail?.name || ''} — Size`}
         footer={<>

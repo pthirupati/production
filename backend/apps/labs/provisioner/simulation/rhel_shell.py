@@ -5104,9 +5104,14 @@ class RHELShell:
             rules = "\n".join(
                 f"ACCEPT     tcp  --  anywhere    anywhere    tcp dpt:{pt}"
                 for pt in sorted(set(open_ports), key=lambda x: int(x) if x.isdigit() else 0))
+            drops = "\n".join(
+                f"DROP       all  --  {ip}       anywhere"
+                for ip in sorted(getattr(self.state, "blocked_ips", set()) or [])
+            )
+            body = "\n".join(x for x in (rules, drops) if x)
             return ("Chain INPUT (policy ACCEPT)\n"
                     "target     prot opt source      destination\n"
-                    f"{rules}" if rules else
+                    f"{body}" if body else
                     "Chain INPUT (policy ACCEPT)\ntarget     prot opt source      destination")
         if "-S" in p:
             return "-P INPUT ACCEPT\n-P FORWARD ACCEPT\n-P OUTPUT ACCEPT"

@@ -359,6 +359,7 @@ def _base_daemon() -> dict:
         "os": "linux",
         "arch": "x86_64",
         "kernel": "6.1.0-21-amd64",
+        "session": {"logged_in": False, "user": ""},
         "containers": containers,
         "images": images,
         "networks": networks,
@@ -549,6 +550,12 @@ def apply_action(session_id: str, action: str, payload: dict | None = None) -> d
     def _docker_event(event_type: str, event_action: str, actor: str, message: str = "") -> dict:
         return {"time": _now_iso(), "type": event_type, "action": event_action,
                 "actor": actor, "message": message}
+
+    if action == "login":
+        state["session"] = {"logged_in": True, "user": payload.get("user") or "admin"}
+        events.append(_docker_event("login", "login", "console", "Signed in to Docker Host Console"))
+        _save_session(str(session_id), entry)
+        return {"ok": True, "message": "Logged in"}
 
     # --- Container lifecycle ---
 

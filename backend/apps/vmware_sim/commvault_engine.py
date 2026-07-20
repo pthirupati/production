@@ -303,6 +303,13 @@ def apply_action(session_id: str, action: str, payload: dict | None = None) -> d
         broken.pop("needs_restore", None)
         _event(state, f"Restore job {job['id']} started for {client_name}", "success")
         _save(session_id, entry)
+        try:
+            from apps.labs.provisioner.simulation import commvault_bridge
+            commvault_bridge.record_restore_files(
+                str(session_id), ["/restore/latest"], client=client_name,
+            )
+        except Exception:
+            pass
         return {"ok": True, "message": "Restore job started", "job_id": job["id"]}
 
     if action == "create_subclient":

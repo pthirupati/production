@@ -577,6 +577,7 @@ def _base_cluster() -> dict:
         "cluster_version": "v1.28.5",
         "cluster_name": "fixitlab-prod",
         "api_server": "https://k8s.fixitlab.local:6443",
+        "session": {"logged_in": False, "user": ""},
         "nodes": nodes,
         "namespaces": namespaces,
         "deployments": deployments,
@@ -829,6 +830,12 @@ def apply_action(session_id: str, action: str, payload: dict | None = None) -> d
     # decision is made against the up-to-date cluster state.
     _tick(state)
     events = state.setdefault("events", [])
+
+    if action == "login":
+        state["session"] = {"logged_in": True, "user": payload.get("user") or "admin"}
+        events.append(_event("Signed in to Kubernetes console", involved_object="console"))
+        _save_session(str(session_id), entry)
+        return {"ok": True, "message": "Logged in"}
 
     # --- Node actions ---
 

@@ -263,6 +263,16 @@ def apply_action(session_id: str, action: str, payload: dict | None = None) -> d
             broken.pop("lun_unmapped", None)
         _event(state, f"LUN {path} mapped to {lun['initiator']}", "success")
         _save(session_id, entry)
+        try:
+            from apps.labs.provisioner.simulation import netapp_bridge
+            netapp_bridge.record_lun_mapped(
+                str(session_id),
+                path,
+                lun.get("size_gb") or 50,
+                device="/dev/mapper/netapp0",
+            )
+        except Exception:
+            pass
         return {"ok": True, "message": "LUN mapped"}
 
     if action == "take_snapshot":

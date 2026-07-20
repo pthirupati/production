@@ -18,6 +18,9 @@ const SIDEBAR = [
   { key: 'instances', label: 'Instances', icon: Server },
   { key: 'networks', label: 'Networks', icon: Network },
   { key: 'volumes', label: 'Volumes', icon: HardDrive },
+  { key: 'security', label: 'Security Groups', icon: Network },
+  { key: 'floating', label: 'Floating IPs', icon: Cloud },
+  { key: 'images', label: 'Images', icon: HardDrive },
 ]
 
 const FLAVOR_OPTIONS = [
@@ -56,6 +59,9 @@ export default function OpenStackConsole({
   const instances = st.instances || []
   const networks = st.networks || []
   const volumes = st.volumes || []
+  const securityGroups = st.security_groups || []
+  const floatingIps = st.floating_ips || []
+  const images = st.images || []
   const project = st.project || {}
 
   const chromeProps = {
@@ -196,6 +202,83 @@ export default function OpenStackConsole({
             { key: 'subnets', label: 'Subnets', render: (r) => (r.subnets || []).map((s) => s.cidr).join(', ') },
           ]}
           rows={networks}
+        />
+      )
+    }
+    if (nav === 'security') {
+      return (
+        <div className="space-y-3">
+          <div className="flex justify-end">
+            <button type="button" className="os-btn-primary inline-flex items-center gap-1.5 px-3 py-1.5 text-sm"
+              onClick={() => run(() => openstackApi.action(sessionId, 'create_security_group', { name: `sg-${Date.now().toString(36).slice(-4)}` }), 'Security group created')}
+              disabled={busy}>
+              <Plus size={14} /> Create Security Group
+            </button>
+          </div>
+          <SimDataTable
+            searchKeys={['name']}
+            columns={[
+              { key: 'name', label: 'Name', sortable: true },
+              { key: 'rules', label: 'Rules', render: (r) => (r.rules || []).length },
+              {
+                key: 'actions', label: 'Actions',
+                render: (r) => (
+                  <button type="button" className="text-xs text-red-700 underline"
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      run(() => openstackApi.action(sessionId, 'add_security_group_rule', { name: r.name, port: 8080 }), 'Rule added')
+                    }} disabled={busy}>Add :8080</button>
+                ),
+              },
+            ]}
+            rows={securityGroups}
+          />
+        </div>
+      )
+    }
+    if (nav === 'floating') {
+      return (
+        <div className="space-y-3">
+          <div className="flex justify-end gap-2">
+            <button type="button" className="os-btn-primary inline-flex items-center gap-1.5 px-3 py-1.5 text-sm"
+              onClick={() => run(() => openstackApi.action(sessionId, 'allocate_floating_ip', {}), 'Floating IP allocated')}
+              disabled={busy}>
+              <Plus size={14} /> Allocate IP
+            </button>
+          </div>
+          <SimDataTable
+            searchKeys={['address']}
+            columns={[
+              { key: 'address', label: 'IP Address', sortable: true },
+              { key: 'pool', label: 'Pool' },
+              { key: 'status', label: 'Status' },
+              { key: 'instance', label: 'Instance', render: (r) => r.instance || '—' },
+              {
+                key: 'actions', label: 'Actions',
+                render: (r) => !r.instance && instances[0] ? (
+                  <button type="button" className="text-xs text-red-700 underline"
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      run(() => openstackApi.action(sessionId, 'associate_floating_ip', { address: r.address, instance: instances[0].name }), 'Associated')
+                    }} disabled={busy}>Associate</button>
+                ) : null,
+              },
+            ]}
+            rows={floatingIps}
+          />
+        </div>
+      )
+    }
+    if (nav === 'images') {
+      return (
+        <SimDataTable
+          searchKeys={['name']}
+          columns={[
+            { key: 'name', label: 'Image', sortable: true },
+            { key: 'status', label: 'Status' },
+            { key: 'size_gb', label: 'Size (GiB)' },
+          ]}
+          rows={images}
         />
       )
     }

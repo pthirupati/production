@@ -498,6 +498,9 @@ class RHELOSState:
         # shared cache; server_hung models a guest hung until reset from VMware.
         self.session_id: str = ""
         self.server_hung: bool = False
+        # SOC console → terminal: IPs blocked in the SOC UI surface here so
+        # firewall-cmd/iptables can consult them (additive set; fail-closed).
+        self.blocked_ips: set[str] = set()
         self.editor = None  # EditorSession when nano/vi active
         self.network_ifs: dict[str, dict] = {
             "lo": {"up": True, "addrs": ["127.0.0.1/8"]},
@@ -757,6 +760,7 @@ class RHELOSState:
             self.hidden_block_devices.pop(dev, None)
             revealed.append(dev)
         revealed.extend(self._reveal_aws_bridge_volumes())
+        revealed.extend(self._reveal_vendor_bridges())
         return revealed
 
     def _reveal_aws_bridge_volumes(self) -> list[str]:
@@ -779,6 +783,86 @@ class RHELOSState:
         for dev in consume_removed_volume_events(self.session_id):
             self.block_devices.pop(dev, None)
             self.hidden_block_devices.pop(dev, None)
+        return revealed
+
+    def _reveal_vendor_bridges(self) -> list[str]:
+        """Drain datacenter / NetApp / Dell EMC / Commvault / SOC pending
+        events into this guest. Additive + fail-closed — each bridge is
+        independent so a missing module never blocks the others."""
+        if not self.session_id:
+            return []
+        revealed: list[str] = []
+
+        # Data Center Floor → replacement disk / reseated NIC
+        try:
+            from .datacenter_bridge import consume_pending_disk, consume_pending_nic
+            disk = consume_pending_disk(self.session_id)
+            if disk:
+                used = set(self.block_devices) | set(self.hidden_block_devices)
+                dev = "/dev/sdg"
+                for letter in "ghijklmnop":
+                    candidate = f"/dev/sd{letter}"
+                    if candidate not in used:
+                        dev = candidate
+                        break
+                size = f"{int(disk.get('size_gb', 1920))}G"
+                self.block_devices[dev] = SimBlockDevice(dev, size, "disk", present=True)
+                self.hidden_block_devices.pop(dev, None)
+                revealed.append(dev)
+            nic = consume_pending_nic(self.session_id)
+            if nic:
+                name = f"eth{len(self.network_ifs)}"
+                self.network_ifs[name] = {"up": True, "addrs": ["10.0.0.40/24"]}
+        except Exception:
+            pass
+
+        # NetApp LUN map → multipath device
+        try:
+            from .netapp_bridge import consume_lun_mapped
+            for event in consume_lun_mapped(self.session_id):
+                dev = event.get("device") or "/dev/mapper/netapp0"
+                size = f"{int(event.get('size_gb', 50))}G"
+                self.block_devices[dev] = SimBlockDevice(dev, size, "disk", present=True)
+                self.hidden_block_devices.pop(dev, None)
+                revealed.append(dev)
+        except Exception:
+            pass
+
+        # Dell EMC volume map → /dev/sdx (etc.)
+        try:
+            from .dellemc_bridge import consume_volume_mapped
+            for event in consume_volume_mapped(self.session_id):
+                dev = event.get("device") or "/dev/sdx"
+                size = f"{int(event.get('size_gb', 100))}G"
+                self.block_devices[dev] = SimBlockDevice(dev, size, "disk", present=True)
+                self.hidden_block_devices.pop(dev, None)
+                revealed.append(dev)
+        except Exception:
+            pass
+
+        # Commvault restore → empty placeholder files on the sim FS
+        try:
+            from .commvault_bridge import consume_restore_files
+            for event in consume_restore_files(self.session_id):
+                paths = event.get("paths") or ([event["path"]] if event.get("path") else [])
+                for path in paths:
+                    if path:
+                        try:
+                            self.write_file(path, "")
+                        except Exception:
+                            pass
+        except Exception:
+            pass
+
+        # SOC blocked IPs → attribute consulted by firewall-cmd/iptables
+        try:
+            from .soc_bridge import consume_blocked_ips
+            for ip in consume_blocked_ips(self.session_id):
+                if ip:
+                    self.blocked_ips.add(ip)
+        except Exception:
+            pass
+
         return revealed
 
     def reveal_bridge_nic(self) -> bool:
@@ -1145,6 +1229,7 @@ class RHELOSState:
         other.hidden_block_devices = copy.deepcopy(self.hidden_block_devices)
         other.swaps = copy.deepcopy(self.swaps)
         other.mounts = copy.deepcopy(self.mounts)
+        other.blocked_ips = set(self.blocked_ips)
         other.selinux_mode = self.selinux_mode
         other.selinux_ports = copy.deepcopy(self.selinux_ports)
         other.selinux_fcontexts = copy.deepcopy(self.selinux_fcontexts)

@@ -1,0 +1,20 @@
+/* Kubernetes Dashboard–inspired chrome (scoped). */
+.k8s-btn-primary {
+  background: #326ce5;
+  color: #fff;
+  border-radius: 3px;
+  font-weight: 600;
+}
+.k8s-btn-primary:hover { background: #2a5cc4; }
+.k8s-btn-primary:disabled { opacity: 0.55; cursor: not-allowed; }
+
+.k8s-btn-ghost {
+  background: transparent;
+  border: 1px solid #cbd5e1;
+  border-radius: 3px;
+  font-size: 12px;
+  padding: 2px 8px;
+  color: #334155;
+}
+.k8s-btn-ghost:hover { background: #f1f5f9; }
+.k8s-btn-ghost:disabled { opacity: 0.55; cursor: not-allowed; }

@@ -410,6 +410,18 @@ def get_state(session_id: str, scenario_slug: str = "") -> dict:
         _save(session_id, entry)
     slug = entry.get("scenario_slug") or scenario_slug
     state = copy.deepcopy(entry["state"])
+    # Scenario-owned Lab Server: mirror primary EC2 into server_identity so the
+    # terminal Hosted as: AWS EC2 Instance matches the console instance.
+    try:
+        from apps.labs.provisioner.simulation.server_identity import sync_aws_instance
+        primary = next(
+            (i for i in (state.get("instances") or []) if (i.get("state") or "") != "terminated"),
+            None,
+        )
+        if primary:
+            sync_aws_instance(str(session_id), primary, instance_types=INSTANCE_TYPES)
+    except Exception:
+        pass
     return {
         "session_id": str(session_id),
         "scenario_slug": slug,
@@ -491,6 +503,14 @@ def apply_action(session_id: str, action: str, payload: dict | None = None) -> d
             created.append(iid)
         _event(state, f"Launched {len(created)} instance(s): {', '.join(created)}", "success")
         _save(session_id, entry)
+        try:
+            from apps.labs.provisioner.simulation.server_identity import sync_aws_instance
+            for iid in created:
+                inst = _find_instance(state, iid)
+                if inst:
+                    sync_aws_instance(str(session_id), inst, instance_types=INSTANCE_TYPES)
+        except Exception:
+            pass
         return {"ok": True, "message": "RunInstances succeeded", "instance_ids": created}
 
     # ── EC2 lifecycle: start / stop / reboot / terminate ───────────────────────
@@ -525,6 +545,14 @@ def apply_action(session_id: str, action: str, payload: dict | None = None) -> d
             touched.append(inst.get("id"))
         _event(state, f"{op} requested for {', '.join(touched)}", "info")
         _save(session_id, entry)
+        try:
+            from apps.labs.provisioner.simulation.server_identity import sync_aws_instance
+            for ident in touched:
+                inst = _find_instance(state, ident)
+                if inst:
+                    sync_aws_instance(str(session_id), inst, instance_types=INSTANCE_TYPES)
+        except Exception:
+            pass
         return {"ok": True, "message": f"{op} initiated", "instance_ids": touched}
 
     # ── EC2 tags ───────────────────────────────────────────────────────────────

@@ -1480,12 +1480,31 @@ export default function LabRunner() {
     || (scenario?.slug || '').startsWith('openstack-')
     || (scenario?.slug || '').startsWith('academy-openstack-')
   )
+  const isK8sLab = !isCrossTech && (
+    scenario?.simulation_type === 'kubernetes'
+    || scenario?.simulation_type === 'k8s'
+    || scenario?.technology?.slug === 'kubernetes'
+    || scenario?.technology?.slug === 'k8s'
+    || scenario?.technology?.slug === 'openshift'
+    || (scenario?.slug || '').startsWith('kubernetes-')
+    || (scenario?.slug || '').startsWith('k8s-')
+    || (scenario?.slug || '').startsWith('openshift-')
+    || (scenario?.slug || '').startsWith('academy-kubernetes-')
+    || (scenario?.slug || '').startsWith('academy-k8s-')
+    || (scenario?.slug || '').startsWith('academy-openshift-')
+  )
+  const isDockerLab = !isCrossTech && !isK8sLab && (
+    scenario?.simulation_type === 'docker'
+    || scenario?.technology?.slug === 'docker'
+    || (scenario?.slug || '').startsWith('docker-')
+    || (scenario?.slug || '').startsWith('academy-docker-')
+  )
   const isSimPrimaryLab = !isCrossTech && (
     isAwsLab || isDevOpsPipelineLab || isTerraformSimLab || isAwxLab || isMonitoringLab || isWindowsGuiLab
     || isPeopleSoftLab || isBaremetalGuiLab || isDataDashboardLab || isAgentLab
     || isNmapLab || isWiresharkLab
     || isCommvaultLab || isNetappLab || isDellemcLab || isDatacenterLab || isSocLab || isAzureLab || isGcpLab
-    || isOpenStackLab
+    || isOpenStackLab || isK8sLab || isDockerLab
   )
   const simOverlayOpen = !isSimPrimaryLab && (
     showMonitoringSim || showNmapSim || showWiresharkSim
@@ -1513,6 +1532,8 @@ export default function LabRunner() {
     : isAzureLab ? 'azure'
     : isGcpLab ? 'gcp'
     : isOpenStackLab ? 'openstack'
+    : isK8sLab ? 'k8s'
+    : isDockerLab ? 'docker'
     : null
   const solved = validationResult?.passed
   const expired = validationResult?.expired
@@ -1563,6 +1584,10 @@ export default function LabRunner() {
     azure: 'Azure Portal',
     gcp: 'GCP Console',
     openstack: 'OpenStack Horizon',
+    kubernetes: 'Kubernetes Console',
+    k8s: 'Kubernetes Console',
+    openshift: 'Kubernetes Console',
+    docker: 'Docker Host Console',
     datacenter: 'Data Center Floor',
     soc: 'SOC Console',
     commvault: 'CommCell Console',

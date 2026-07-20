@@ -205,6 +205,16 @@ def apply_action(session_id: str, action: str, payload: dict | None = None) -> d
             broken.pop("unmapped_volume", None)
         _event(state, f"Volume {vol_id} mapped into {sg_name}", "success")
         _save(session_id, entry)
+        try:
+            from apps.labs.provisioner.simulation import dellemc_bridge
+            dellemc_bridge.record_volume_mapped(
+                str(session_id),
+                vol_id,
+                vol.get("size_gb") or 100,
+                device="/dev/sdx",
+            )
+        except Exception:
+            pass
         return {"ok": True, "message": "Volume mapped to storage group"}
 
     if action == "add_host":
@@ -295,6 +305,11 @@ def apply_action(session_id: str, action: str, payload: dict | None = None) -> d
         pair["mode"] = "Async"
         _event(state, f"SRDF {name} failed over to remote", "warning")
         _save(session_id, entry)
+        try:
+            from apps.labs.provisioner.simulation import dellemc_bridge
+            dellemc_bridge.record_srdf_failover(str(session_id), name)
+        except Exception:
+            pass
         return {"ok": True, "message": "SRDF failover complete"}
 
     if action == "delete_masking_view":

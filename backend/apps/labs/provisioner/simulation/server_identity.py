@@ -891,6 +891,49 @@ def sync_openstack_instance(session_id: str, instance: dict | None, *, flavors: 
     return server
 
 
+def sync_aws_instance(session_id: str, instance: dict | None, *, instance_types: dict | None = None) -> dict | None:
+    """Mirror an AWS EC2 instance into this session's LabServer registry.
+
+    Terminal Hosted as: AWS EC2 Instance. Power/state follows EC2 lifecycle.
+    """
+    if not isinstance(instance, dict):
+        return None
+    itype = instance.get("type") or instance.get("instance_type") or "t2.micro"
+    size_info = (instance_types or {}).get(itype, {})
+    state = (instance.get("state") or "running").lower()
+    hostname = instance.get("name") or instance.get("id") or "ec2-instance"
+    private_ip = instance.get("privateIp") or instance.get("private_ip") or ""
+    public_ip = instance.get("publicIp") or instance.get("public_ip") or ""
+    power_on = state in ("running", "pending", "rebooting")
+    patch: dict[str, Any] = {
+        "id": f"aws-{instance.get('id') or hostname}",
+        "hostname": str(hostname).replace(" ", "-")[:48] or "ec2-instance",
+        "primary_ip": private_ip or public_ip,
+        "cpu": size_info.get("vcpus") or size_info.get("vcpu") or 2,
+        "mem_mb": int(size_info.get("ram_gb") or size_info.get("memory_gb") or 1) * 1024,
+        "power": "on" if power_on else ("reboot_pending" if state == "rebooting" else "off"),
+        "os": instance.get("os") or "linux",
+        "tags": {
+            "role": "primary",
+            "persona": "aws",
+            "instance_id": instance.get("id") or "",
+            "instance_type": itype,
+            "az": instance.get("az") or "",
+            "appears_in": ["aws", "terminal"],
+        },
+    }
+    server = upsert_server(session_id, patch, source="aws")
+    if (private_ip or public_ip) and power_on:
+        register_terminal_ssh_host(
+            session_id,
+            hostname=patch["hostname"],
+            ip=private_ip or public_ip,
+            ssh_user="ec2-user",
+            source="aws",
+        )
+    return server
+
+
 def sync_k8s_nodes(session_id: str, nodes: list[dict] | None) -> None:
     """Mirror Kubernetes cluster nodes into this session's LabServer registry."""
     for node in nodes or []:

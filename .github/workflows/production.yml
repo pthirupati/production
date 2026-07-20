@@ -1623,11 +1623,20 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
+      # Never fail the whole pipeline on a missing artifact (e.g. concurrent
+      # queued deploy, expired artifact, or create-cluster skipped). Deploy may
+      # already have succeeded — summary is informational only.
       - uses: actions/download-artifact@v4
+        continue-on-error: true
         with: { name: cluster-edge-host, path: _cluster }
       - name: Load edge host
         run: |
-          echo "EDGE_PUBLIC_IP=$(cat _cluster/edge_host.txt)" >> "$GITHUB_ENV"
+          if [ -f _cluster/edge_host.txt ]; then
+            echo "EDGE_PUBLIC_IP=$(cat _cluster/edge_host.txt)" >> "$GITHUB_ENV"
+          else
+            echo "EDGE_PUBLIC_IP=(unavailable)" >> "$GITHUB_ENV"
+            echo "::notice::cluster-edge-host artifact missing — summary will omit public edge IP"
+          fi
           [ -f _cluster/cluster_ips.env ] && cat _cluster/cluster_ips.env >> "$GITHUB_ENV" || true
       - name: Write cluster summary
         run: |
@@ -1637,12 +1646,14 @@ jobs:
             echo "| | |"
             echo "|---|---|"
             echo "| Topology | \`four-droplet\` |"
-            echo "| Edge (D1) | \`${EDGE_PUBLIC_IP}\` (public) |"
+            echo "| Edge (D1) | \`${EDGE_PUBLIC_IP:-(unavailable)}\` (public) |"
             echo "| App (D2) | \`${{ needs.create-cluster.outputs.app_private_ip }}\` (private) |"
             echo "| Data (D3) | \`${{ needs.create-cluster.outputs.db_private_ip }}\` (private) |"
             echo "| Labs (D4) | \`${{ needs.create-cluster.outputs.labs_private_ip }}\` (private) |"
             echo "| Wire existing | \`${{ inputs.wire_existing }}\` |"
             echo "| Rotate secrets | \`${{ inputs.rotate_secrets }}\` |"
+            echo "| Create cluster | \`${{ needs.create-cluster.result }}\` |"
+            echo "| Deploy cluster | \`${{ needs.deploy-cluster.result }}\` |"
             echo "| Site | https://fixitlab.in |"
             echo ""
             echo "## Job results"
@@ -1661,6 +1672,8 @@ jobs:
             echo "| e2e-labs-cluster | \`${{ needs.e2e-labs-cluster.result }}\` |"
             echo "| cleanup-cluster | \`${{ needs.cleanup-cluster.result }}\` |"
           } >> "$GITHUB_STEP_SUMMARY"
+        # Summary must never red-X a green deploy.
+        continue-on-error: true
 
   # ════════════════════════════════════════════════════════════════════════
   # MANAGED-KUBERNETES + AWS SCAFFOLD — STANDALONE, GATED, NO-OP WITHOUT KEYS
