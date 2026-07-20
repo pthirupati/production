@@ -125,8 +125,9 @@ def lab_server_banner(sim_type: str, slug: str = "") -> str:
         "rhel": "Linux Lab Server — RHEL 9",
         "generic": "Linux Lab Server — RHEL 9",
     }
+    title = by_type.get(st, "Linux Lab Server — RHEL 9")
     try:
-        from .hosting_persona import resolve_host_platform
+        from .hosting_persona import hosted_as_line, resolve_host_platform
 
         platform = resolve_host_platform(st, slug)
         platform_banners = {
@@ -138,13 +139,18 @@ def lab_server_banner(sim_type: str, slug: str = "") -> str:
             "baremetal": by_type["baremetal"],
             "datacenter": by_type["datacenter"],
         }
-        if st in ("generic", "rhel", "linux") and platform in platform_banners:
-            return platform_banners[platform]
-        if platform == "aws" and st == "aws":
-            return by_type["aws"]
+        if st in ("generic", "rhel", "linux", "devops", "docker", "networking") and platform in platform_banners:
+            title = platform_banners[platform]
+        elif platform == "aws" and st == "aws":
+            title = by_type["aws"]
+        # Always append Hosted-as so every tech terminal shows where the guest lives.
+        hosted = hosted_as_line(platform)
+        if hosted and "Hosted as:" in hosted:
+            return f"{title}\r\n {hosted}"
+        return title
     except Exception:
         pass
-    return by_type.get(st, "Linux Lab Server — RHEL 9")
+    return title
 
 
 def hostname_for_type(sim_type: str, slug: str = "") -> str:

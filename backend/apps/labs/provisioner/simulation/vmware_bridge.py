@@ -140,6 +140,10 @@ def record_guest_power(session_id: str, action: str) -> None:
         return
     data = _load(session_id)
     data["guest_power"] = action
+    if action == "reboot":
+        data["terminal_link"] = "rebooting"
+    elif action == "poweroff":
+        data["terminal_link"] = "disconnected"
     _save(session_id, data)
 
 
@@ -152,6 +156,39 @@ def consume_guest_power(session_id: str) -> str | None:
     data.pop("guest_power", None)
     _save(session_id, data)
     return action
+
+
+def record_hypervisor_reboot(session_id: str) -> None:
+    """VMware → Terminal: guest reboot/power-on from vCenter must disconnect the
+    Lab Server terminal until boot completes (keeps console + terminal in sync)."""
+    data = _load(session_id)
+    data["hypervisor_reboot"] = True
+    data["terminal_link"] = "rebooting"
+    _save(session_id, data)
+
+
+def consume_hypervisor_reboot(session_id: str) -> bool:
+    """Drain a pending hypervisor-side reboot (True when terminal must re-boot)."""
+    data = _load(session_id)
+    if not data.get("hypervisor_reboot"):
+        return False
+    data.pop("hypervisor_reboot", None)
+    data["terminal_link"] = "connected"
+    _save(session_id, data)
+    return True
+
+
+def get_terminal_link_state(session_id: str) -> str:
+    """Return connected | rebooting | disconnected for LabRunner status UI."""
+    return (_load(session_id).get("terminal_link") or "connected")
+
+
+def set_terminal_link_state(session_id: str, state: str) -> None:
+    if state not in ("connected", "rebooting", "disconnected"):
+        return
+    data = _load(session_id)
+    data["terminal_link"] = state
+    _save(session_id, data)
 
 
 def record_pending_nic(session_id: str, ip: str = "10.0.0.30/24") -> None:

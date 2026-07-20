@@ -870,7 +870,9 @@ class StartLabView(APIView):
                 scenario=scenario,
                 status="PROVISIONING",
                 provider=infra_type,
-                duration_limit=scenario.time_limit,
+                # Never allow a 0/None limit — that expires the lab in ~1s and
+                # redirects learners back to a previous scenario after stop/start.
+                duration_limit=max(int(scenario.time_limit or 900), 60),
             )
 
         try:

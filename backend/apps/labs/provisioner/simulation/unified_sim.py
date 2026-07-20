@@ -198,7 +198,20 @@ class UnifiedSimulationEngine(BaseRHELSimulator):
             if revealed:
                 extra = f"\r\n\x1b[2m[ OK ] Detected new block device(s): {', '.join(revealed)}\x1b[0m\r\n"
             self._persist_lab_snapshot()
-            return f"\r\n\x1b[1;33mSystem rebooting...\x1b[0m{extra}\r\n"
+            try:
+                from .vmware_bridge import set_terminal_link_state
+                sid = getattr(st, "session_id", "") or ""
+                if sid:
+                    set_terminal_link_state(sid, "rebooting")
+                    set_terminal_link_state(sid, "connected")
+            except Exception:
+                pass
+            return (
+                "\r\n\x1b[1;31mConnection closed — Lab Server is rebooting…\x1b[0m\r\n"
+                "\x1b[1;33mReconnecting after reboot…\x1b[0m"
+                f"{extra}\r\n"
+                "\x1b[1;32mConnected — Lab Server is up.\x1b[0m\r\n"
+            )
         self._sync_boot_to_state()
         if self.boot.issue == "patching" and not self.shell.state.patching_done:
             return (
@@ -234,6 +247,17 @@ class UnifiedSimulationEngine(BaseRHELSimulator):
             pass
 
     def _handle_shell(self, line: str) -> str:
+        # VMware console reboot/power-on must disconnect this Lab Server terminal
+        # and run the same boot path so console + terminal stay in sync.
+        try:
+            from .vmware_bridge import consume_hypervisor_reboot, set_terminal_link_state
+            sid = getattr(self.shell.state, "session_id", "") or ""
+            if sid and consume_hypervisor_reboot(sid):
+                out = self._reboot_from_shell()
+                set_terminal_link_state(sid, "connected")
+                return out
+        except Exception:
+            pass
         if self.boot and not self.boot.logged_in and self.boot.phase in (
             "grub", "grub_edit", "grub_rescue", "login", "password_wait", "emergency",
             "mbr", "booting", "initramfs", "panic",

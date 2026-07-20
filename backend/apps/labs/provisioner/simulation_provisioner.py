@@ -771,21 +771,42 @@ class SimulationProvisioner:
         return resource_id, f"sim-{slug}"
 
     def _setup_ssh_client_shell(self, engine, entry, hostname: str = "ssh-client") -> RHELShell:
+        """Empty jump-box shell — NOT a clone of the Lab Server.
+
+        Learners must ssh/telnet/ping to lab hosts by IP from here. Cloning the
+        primary VFS made the jump box look like the Lab Server (same faults,
+        same root shell tools), which defeated the SSH Client button.
+        """
         cached = entry.get("state", {}).get("ssh_client_shell")
         if isinstance(cached, RHELShell):
             return cached
-        client_state = engine.state.clone_for_host(hostname)
-        if "labuser" not in client_state.users:
-            client_state.users["labuser"] = SimUser(
-                "labuser", 1002, 1002, "/home/labuser", "/bin/bash", "Lab SSH User",
-            )
+        from .simulation.rhel_os import RHELOSState
+
+        client_state = RHELOSState(hostname=hostname, scenario_slug=entry["state"].get("scenario_slug", ""))
+        client_state.users["labuser"] = SimUser(
+            "labuser", 1002, 1002, "/home/labuser", "/bin/bash", "Lab SSH User",
+        )
+        if "root" not in client_state.users:
+            client_state.users["root"] = SimUser("root", 0, 0, "/root", "/bin/bash", "root")
         client_state._mkdir("/home/labuser")
         client_state._mkdir("/home/labuser/.ssh")
         client_state._write_file(
             "/home/labuser/.ssh/id_rsa",
             "-----BEGIN OPENSSH PRIVATE KEY-----\n(lab-training-key)\n-----END OPENSSH PRIVATE KEY-----\n",
+            mode="600",
+        )
+        client_state._write_file(
+            "/home/labuser/.ssh/config",
+            "Host *\n  StrictHostKeyChecking no\n  UserKnownHostsFile /dev/null\n",
+            mode="600",
+        )
+        # Jump box only — minimal packages, no planted Lab Server faults.
+        client_state._write_file(
+            "/etc/motd",
+            "FixitLab SSH Jump Box — use ssh/telnet/ping to reach lab servers by IP.\n",
         )
         client_state.set_prompt_user("labuser")
+        client_state.set_host_ip("10.0.0.5")
         shell = RHELShell(
             state=client_state,
             scenario_slug=entry["state"].get("scenario_slug", ""),
@@ -822,6 +843,11 @@ class SimulationProvisioner:
                 shell.run,
                 prompt=shell.prompt,
                 dynamic_prompt=lambda: shell.prompt,
+                banner=(
+                    "FixitLab SSH Jump Box\r\n"
+                    " Empty shell — use ssh / telnet / ping to reach lab servers by IP.\r\n"
+                    " Example: ssh -o StrictHostKeyChecking=no root@10.0.0.10"
+                ),
             )
             entry.setdefault("streams", {})[stream_key] = holder
             holder._stream_key = stream_key

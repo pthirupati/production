@@ -542,8 +542,10 @@ def grade_submission(
             logger.error("code_exec: grading deferred to review (fail-closed): %s", exc)
             return GradeResult(
                 ran=False, all_passed=False, needs_review=True,
-                error="Code grading is temporarily unavailable. Your submission was "
-                      "saved for review — it was not auto-graded.",
+                error="Code grading is temporarily unavailable (container sandbox "
+                      "unreachable on the labs engine). Your submission was saved "
+                      "for review — it was not auto-graded. Ops: ensure SANDBOX_DOCKER "
+                      "can reach DOCKER_SOCKET and images python:3.12-alpine / node:20-alpine.",
             )
 
         if timed_out:

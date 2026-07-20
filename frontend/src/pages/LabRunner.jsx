@@ -729,11 +729,16 @@ export default function LabRunner() {
           }
 
           if (lab.time_remaining > 0) {
+            const expireForSession = sessionId
             startTimer(lab.time_remaining, async () => {
+              // Guard: never stop/redirect if the user already moved to another lab.
+              const liveId = useLabStore.getState().timerSessionId
+              if (liveId && liveId !== expireForSession) return
+
               toast('Lab time completed! The environment is being terminated.', { icon: '⏰', duration: 6000, ...TOAST })
 
               try {
-                await labApi.stopLab(sessionId)
+                await labApi.stopLab(expireForSession)
               } catch (e) {
                 console.warn('Failed to stop expired lab:', e)
               }
@@ -742,10 +747,10 @@ export default function LabRunner() {
               stopTimer()
 
               // Broadcast to other tabs that this lab expired
-              broadcastLabStopped(sessionId, 'expired')
-              closeLabChildTabs(sessionId)
+              broadcastLabStopped(expireForSession, 'expired')
+              closeLabChildTabs(expireForSession)
               if (labChannelRef.current) {
-                labChannelRef.current.postMessage({ type: 'lab_stopped', sessionId, reason: 'expired' })
+                labChannelRef.current.postMessage({ type: 'lab_stopped', sessionId: expireForSession, reason: 'expired' })
               }
 
               // Redirect to scenarios page after brief delay
@@ -754,7 +759,7 @@ export default function LabRunner() {
                   state: { labExpired: true, scenarioTitle: lab.scenario?.title }
                 })
               }, 2000)
-            })
+            }, expireForSession)
           }
           setLoading(false)
         } else if (lab.status === 'FAILED') {
@@ -1335,8 +1340,10 @@ export default function LabRunner() {
     </div>
   )}
 
-  const useDualPane = Boolean(scenario.dual_terminal && labHosts.length >= 2)
-  const dualHosts = useDualPane ? labHosts.slice(0, 2) : []
+  const useDualPane = Boolean(scenario.dual_terminal && labHosts.filter(h => h.name !== 'ssh_client').length >= 2)
+  const dualHosts = useDualPane
+    ? labHosts.filter(h => h.name !== 'ssh_client').slice(0, 2)
+    : []
   const isSimulationLab = session?.provider === 'simulation' || scenario.lab_mode === 'simulation'
   // Cross-technology labs (shared server in both VMware + terminal) open the Linux
   // terminal but expose an "Open VMware" link so the hypervisor-side step can be
@@ -1417,7 +1424,8 @@ export default function LabRunner() {
   // technology slug or aws-* scenario slugs, but never Terraform labs (which
   // merely target AWS providers and have their own simulator).
   const isAwsLab = !isCrossTech && !isTerraformSimLab && (
-    scenario?.technology?.slug === 'aws'
+    scenario?.simulation_type === 'aws'
+    || scenario?.technology?.slug === 'aws'
     || (scenario?.slug || '').startsWith('aws-')
     || (scenario?.slug || '').startsWith('academy-aws-')
   )
@@ -1730,11 +1738,13 @@ export default function LabRunner() {
       toast.error('SSH client not available for this lab', TOAST)
       return
     }
-    setSshClientTarget(null)
+    // Use a sentinel so dual-pane labs switch to the jump box instead of
+    // staying on primary (setTerminalHost alone is ignored while dual pane is up).
+    setSshClientTarget({ jumpBox: true, name: 'ssh_client', role: 'SSH Client' })
     setTerminalHost('ssh_client')
     const hint = remoteSshTargets[0]
       ? `Jump box ready — try: ssh ${remoteSshTargets[0].ssh_user || 'root'}@${remoteSshTargets[0].ip}`
-      : 'Jump box ready — use ssh/telnet to reach lab servers by IP.'
+      : 'Jump box ready — use ssh/telnet/ping to reach lab servers by IP.'
     toast(hint, { ...TOAST, duration: 8000 })
   }
 
@@ -3016,20 +3026,23 @@ export default function LabRunner() {
               welcomeHint={terminalHost === 'ssh_client'
                 ? (remoteSshTargets[0]
                   ? `Jump box — try: ssh -o StrictHostKeyChecking=no ${remoteSshTargets[0].ssh_user || 'root'}@${remoteSshTargets[0].ip}`
-                  : 'Jump box — use ssh/telnet to reach lab servers by IP')
+                  : 'Jump box — use ssh/telnet/ping to reach lab servers by IP')
                 : ''}
               onReady={() => handleTerminalReady(terminalHost)}
             />
           )}
           {sshClientTarget && (
-            <div className={`${useDualPane ? 'h-[45%]' : 'flex-1'} min-h-0 border-t border-accent-cyan/30`}>
+            <div className={`${useDualPane ? 'flex-1' : 'flex-1'} min-h-0 ${useDualPane ? 'border-t border-accent-cyan/30' : ''}`}>
               <div className="flex items-center justify-between px-2 py-1 bg-surface-900 border-b border-surface-800">
                 <span className="text-[10px] text-accent-cyan font-medium">
-                  SSH Client (labuser) → {sshClientTarget.role || sshClientTarget.name}
+                  {sshClientTarget.jumpBox
+                    ? 'SSH Jump Box (labuser@ssh-client) — empty shell; ssh/telnet/ping manually'
+                    : `SSH Client (labuser) → ${sshClientTarget.role || sshClientTarget.name}`}
                 </span>
                 <button type="button" onClick={() => setSshClientTarget(null)} className="text-[10px] text-surface-400 hover:text-white">Close</button>
               </div>
               <LabTerminal
+                key={`${sessionId}:ssh_client-jump`}
                 ref={(el) => { terminalRefs.current.ssh_client = el }}
                 sessionId={sessionId}
                 session={terminalSession}
@@ -3037,7 +3050,13 @@ export default function LabRunner() {
                 isMobile={isMobile}
                 blockedCommands={blockedCmds}
                 className="h-[calc(100%-1.75rem)]"
-                welcomeHint={`Type: ssh -o StrictHostKeyChecking=no ${sshClientTarget.ssh_user || 'root'}@${sshClientTarget.ip}`}
+                welcomeHint={
+                  sshClientTarget.jumpBox
+                    ? (remoteSshTargets[0]
+                      ? `Empty jump box — try: ssh -o StrictHostKeyChecking=no ${remoteSshTargets[0].ssh_user || 'root'}@${remoteSshTargets[0].ip}`
+                      : 'Empty jump box — use ssh/telnet/ping to reach lab servers by IP')
+                    : `Type: ssh -o StrictHostKeyChecking=no ${sshClientTarget.ssh_user || 'root'}@${sshClientTarget.ip}`
+                }
                 onReady={() => handleTerminalReady('ssh_client')}
               />
             </div>

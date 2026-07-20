@@ -164,7 +164,9 @@ export default function ScenarioDetail() {
       } else {
         const msg = data?.error || 'Failed to start lab'
         toast.error(msg)
-        if (data?.session_id) navigate(`/lab/${data.session_id}`)
+        // Only reconnect to an existing session when the API explicitly says to
+        // resume — never bounce the learner back to a different lab they stopped.
+        if (data?.resumed && data?.session_id) navigate(`/lab/${data.session_id}`)
       }
     } finally {
       setStarting(false)

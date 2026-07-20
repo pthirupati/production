@@ -159,10 +159,17 @@ def resolve_host_platform(
     if low.startswith(("academy-datacenter", "datacenter-", "dc-")) or tech == "datacenter":
         return "datacenter"
 
-    # Pure Linux / RHEL / generic practice labs: rotate hosting so learners see
-    # real Hosted-as + matching DMI (and Amazon Linux when hosted on AWS).
-    if st in ("generic", "rhel", "linux", "") or tech in ("linux", "rhel", ""):
-        return _slug_hash_pick(low or "linux", _LINUX_HOST_ROTATION)
+    # Pure Linux / RHEL / generic practice labs AND other terminal-first techs:
+    # rotate hosting so learners see real Hosted-as + matching DMI (and Amazon
+    # Linux when hosted on AWS). Cloud-native sim types keep their own platform.
+    _ROTATE_TYPES = (
+        "generic", "rhel", "linux", "", "devops", "docker", "networking",
+        "grafana", "prometheus", "ansible", "database", "python", "java",
+        "security", "gitops", "shell-script", "html", "javascript", "nodejs",
+        "react", "ai-ml", "data-science", "simulation",
+    )
+    if st in _ROTATE_TYPES or tech in _ROTATE_TYPES or tech in ("linux", "rhel", ""):
+        return _slug_hash_pick(low or tech or "linux", _LINUX_HOST_ROTATION)
 
     return "linux"
 

@@ -1073,6 +1073,11 @@ def apply_action(session_id: str, action: str, payload: dict | None = None) -> d
         tasks.insert(0, _task("Power On Virtual Machine", vm["name"]))
         # Cross-tech k8s: powering on a worker-node VM makes its k8s node join Ready.
         _bridge_k8s_node(entry, vm, "online")
+        try:
+            from apps.labs.provisioner.simulation.vmware_bridge import record_hypervisor_reboot
+            record_hypervisor_reboot(str(session_id))
+        except Exception:
+            pass
         _save_session(str(session_id), entry)
         return {"ok": True, "message": f"{vm['name']} powered on successfully"}
 
@@ -1152,10 +1157,17 @@ def apply_action(session_id: str, action: str, payload: dict | None = None) -> d
             return {"ok": False, "error": "VM is not running"}
         if vm["tools"] != "ok":
             return {"ok": False, "error": "VMware Tools not running"}
+        vm["boot_pending"] = True
+        vm["tools"] = "ok"
         events.append(_event(f"Restart guest OS on {vm['name']}", "info", vm["name"]))
         tasks.insert(0, _task("Restart Guest", vm["name"]))
+        try:
+            from apps.labs.provisioner.simulation.vmware_bridge import record_hypervisor_reboot
+            record_hypervisor_reboot(str(session_id))
+        except Exception:
+            pass
         _save_session(str(session_id), entry)
-        return {"ok": True, "message": f"{vm['name']} guest OS restarted"}
+        return {"ok": True, "message": f"{vm['name']} guest OS restarted — terminal reconnecting"}
 
     if action == "suspend":
         vm = _find_vm(state, payload.get("vm_id"), payload.get("vm_name"))
