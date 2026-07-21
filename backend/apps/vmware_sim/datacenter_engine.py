@@ -498,6 +498,8 @@ def _base_state() -> dict:
         "campus": _campus(),
         "inventory": [],
         "digital_twin": {"version": 2, "persisted_changes": []},
+        "liquid_cooling": None,  # built lazily in get_state
+        "pxe_maas": None,
     }
 
 
@@ -676,6 +678,12 @@ def get_state(session_id: str, scenario_slug: str = "") -> dict:
         state["hypervisors"] = build_hypervisor_platform(state.get("servers") or [])
     if not state.get("ai_platform"):
         state["ai_platform"] = build_ai_platform(state.get("servers") or [])
+    # Phase 9: liquid cooling + MAAS/PXE
+    from apps.vmware_sim.datacenter_plant_provision import build_liquid_cooling, build_pxe_maas
+    if not state.get("liquid_cooling"):
+        state["liquid_cooling"] = build_liquid_cooling(state.get("servers") or [])
+    if not state.get("pxe_maas"):
+        state["pxe_maas"] = build_pxe_maas(state.get("servers") or [])
     # CMDB rollup + hardware catalog for UI
     state["inventory"] = [
         {**(s.get("inventory") or {}), "server_id": s["id"], "hostname": s.get("hostname")}
@@ -1438,8 +1446,12 @@ def apply_action(session_id: str, action: str, payload: dict | None = None) -> d
                 _event(state, f"Injected cable/fiber fault on {srv['id']}", "danger")
             elif comp == "pxe":
                 bios = srv.setdefault("bios", {})
-                bios["settings"]["PXEBoot"] = "Disabled"
+                bios.setdefault("settings", {})["PXEBoot"] = "Disabled"
                 state["broken"] = {"server": srv["id"], "component": "pxe"}
+                from apps.vmware_sim.datacenter_plant_provision import build_pxe_maas, pxe_maas_op
+                platform = state.get("pxe_maas") or build_pxe_maas(state.get("servers") or [])
+                _, _, platform = pxe_maas_op(platform, "break_dhcp")
+                state["pxe_maas"] = platform
                 _event(state, f"Injected PXE failure on {srv['id']}", "danger")
             elif comp in srv.get("components", {}):
                 srv["components"][comp] = "failed"
@@ -1505,6 +1517,13 @@ def apply_action(session_id: str, action: str, payload: dict | None = None) -> d
                 fac = state.setdefault("facility", {})
                 fac["alarm"] = preset["component"]
                 state["broken"] = {"server": None, "component": preset["component"], "target": "facility"}
+                if preset["component"] == "leak":
+                    from apps.vmware_sim.datacenter_plant_provision import build_liquid_cooling, liquid_cooling_op
+                    loop = state.get("liquid_cooling") or build_liquid_cooling(state.get("servers") or [])
+                    _, _, loop = liquid_cooling_op(loop, "inject_leak")
+                    state["liquid_cooling"] = loop
+                    state["broken"]["detail"] = "water_leak"
+                    state["broken"]["target"] = "liquid-leak"
             state["goal"] = {"title": preset["label"], "objective": f"Respond to {preset['label']}."}
             _event(state, f"Injected facility fault: {preset['label']}", "danger")
             _twin_journal(state, "inject_failure", {"preset": preset_id})
@@ -2109,6 +2128,78 @@ def apply_action(session_id: str, action: str, payload: dict | None = None) -> d
         _event(state, f"PDU outlet {outlet_id} breaker {out['breaker']}", "info")
         _save(session_id, entry)
         return {"ok": True, "message": f"Outlet {outlet_id}", "outlet": out}
+
+    if action == "liquid_cooling_ops":
+        from apps.vmware_sim.datacenter_plant_provision import build_liquid_cooling, liquid_cooling_op
+        loop = state.get("liquid_cooling") or build_liquid_cooling(state.get("servers") or [])
+        op = payload.get("op") or ""
+        ok, msg, loop = liquid_cooling_op(loop, op, **{k: v for k, v in payload.items() if k != "op"})
+        state["liquid_cooling"] = loop
+        if not ok:
+            return {"ok": False, "error": msg}
+        if op == "inject_leak":
+            state["broken"] = {"server": None, "component": "cooling", "target": "liquid-leak", "detail": "water_leak"}
+        if op == "clear_leak" and broken.get("detail") == "water_leak":
+            broken.clear()
+        _twin_journal(state, "liquid_cooling_ops", {"op": op})
+        _event(state, f"Liquid cooling: {msg}", "warning" if "leak" in op else "info")
+        _save(session_id, entry)
+        return {"ok": True, "message": msg, "liquid_cooling": loop}
+
+    if action == "pxe_maas_ops":
+        from apps.vmware_sim.datacenter_plant_provision import build_pxe_maas, pxe_maas_op
+        platform = state.get("pxe_maas") or build_pxe_maas(state.get("servers") or [])
+        op = payload.get("op") or ""
+        ok, msg, platform = pxe_maas_op(platform, op, **{k: v for k, v in payload.items() if k != "op"})
+        state["pxe_maas"] = platform
+        if not ok:
+            return {"ok": False, "error": msg}
+        # Sync BIOS PXE + clear pxe failure on successful pxe_boot / fix_dhcp
+        asset_id = payload.get("machine_id") or payload.get("asset_id") or state.get("selected_asset")
+        srv = _find_server(state, asset_id) if asset_id else None
+        if op == "pxe_boot" and srv:
+            bios = srv.setdefault("bios", {})
+            bios.setdefault("settings", {})["PXEBoot"] = "Enabled"
+            if (platform.get("region") or {}).get("dhcp"):
+                if broken.get("server") == srv["id"] and broken.get("component") == "pxe":
+                    broken.clear()
+                console_lines = [
+                    f"=== PXE → MAAS ({(platform.get('region') or {}).get('url')}) ===",
+                    f"DHCP offer · TFTP · loading {srv.get('hostname')}",
+                    "iPXE> chain pxelinux.0",
+                ]
+                state["console"] = {"open": True, "asset_id": srv["id"], "lines": console_lines}
+            else:
+                return {"ok": False, "error": "PXE failed — DHCP down. Run fix_dhcp."}
+        if op == "deploy" and srv:
+            srv["power_state"] = "on"
+            if srv.get("bmc"):
+                srv["bmc"]["power"] = "on"
+        if op == "fix_dhcp" and broken.get("component") == "pxe":
+            broken.clear()
+        if op == "break_dhcp":
+            state["broken"] = {"server": None, "component": "pxe", "target": "maas-dhcp"}
+        _twin_journal(state, "pxe_maas_ops", {"op": op, "machine_id": asset_id})
+        _event(state, f"MAAS/PXE: {msg}", "info")
+        _save(session_id, entry)
+        return {"ok": True, "message": msg, "pxe_maas": platform, "console": state.get("console")}
+
+    if action == "rack_fru_ops":
+        from apps.vmware_sim.datacenter_plant_provision import rack_fru_op, densify_rack_fru
+        rack_id = payload.get("rack_id") or ""
+        rack = next((r for r in state.get("racks") or [] if r.get("id") == rack_id), None)
+        if not rack:
+            return {"ok": False, "error": f"Rack {rack_id} not found"}
+        fru = densify_rack_fru(rack.setdefault("fru", {}), rack_id)
+        op = payload.get("op") or ""
+        ok, msg, fru = rack_fru_op(fru, op, **{k: v for k, v in payload.items() if k not in ("op", "rack_id")})
+        rack["fru"] = fru
+        if not ok:
+            return {"ok": False, "error": msg}
+        _twin_journal(state, "rack_fru_ops", {"rack_id": rack_id, "op": op})
+        _event(state, f"Rack FRU {rack_id}: {msg}", "info")
+        _save(session_id, entry)
+        return {"ok": True, "message": msg, "fru": fru}
 
     if action == "ops_ticket":
         from apps.vmware_sim.datacenter_physics_ops import build_ops_ticket, advance_ticket, SUPPORT_VENDORS

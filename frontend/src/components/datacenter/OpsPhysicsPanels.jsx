@@ -29,7 +29,7 @@ export function BusAnimPanel({ buses }) {
 }
 
 /** Rack physics + FRU detail when rack expanded */
-export function RackPhysicsFruPanel({ rack, busy, onToggleCasters, onBlanking, onOutlet }) {
+export function RackPhysicsFruPanel({ rack, busy, onToggleCasters, onBlanking, onOutlet, onFruOp }) {
   if (!rack) return null
   const phy = rack.physics || {}
   const fru = rack.fru || {}
@@ -59,11 +59,39 @@ export function RackPhysicsFruPanel({ rack, busy, onToggleCasters, onBlanking, o
           <div className="dc-drawer-label mt-2">Rack FRU · {fru.manufacturer} {fru.model}</div>
           <div className="dc-hw-meta">
             <div><span className="dc-hw-k">Serial</span> {fru.serial} · {fru.asset_tag}</div>
-            <div><span className="dc-hw-k">QR</span> {fru.qr_code}</div>
-            <div><span className="dc-hw-k">Warranty</span> {fru.warranty_sticker?.vendor} exp {fru.warranty_sticker?.expires}</div>
-            <div><span className="dc-hw-k">Rails</span> {fru.rails?.front?.type} · {fru.rails?.screws} screws · {fru.cage_nuts_installed} cage nuts · {fru.washers} washers</div>
-            <div><span className="dc-hw-k">Ground</span> {fru.grounding_strap?.status} @ {fru.grounding_strap?.torque_nm} N·m</div>
+            <div><span className="dc-hw-k">QR</span> {fru.qr_code}
+              <button type="button" disabled={busy} className="dc-btn-outline dc-btn-xs" style={{ marginLeft: 6 }}
+                onClick={() => onFruOp?.(rack.id, 'scan_qr')}>Scan</button>
+            </div>
+            <div><span className="dc-hw-k">Warranty</span> {(fru.warranty_stickers || [fru.warranty_sticker]).filter(Boolean).map((w) => `${w.vendor} exp ${w.expires}`).join(' · ')}</div>
+            <div><span className="dc-hw-k">Rails</span> {fru.rails?.front?.type} · kit M6×{fru.screw_kit?.m6_screws ?? fru.rails?.screws} · {fru.cage_nuts_installed} cage nuts · washers {fru.screw_kit?.washers ?? fru.washers}</div>
+            <div><span className="dc-hw-k">Ground</span> {fru.grounding_strap?.status} @ {fru.grounding_strap?.torque_nm} N·m
+              <button type="button" disabled={busy} className="dc-btn-outline dc-btn-xs" style={{ marginLeft: 6 }}
+                onClick={() => onFruOp?.(rack.id, 'torque_ground', { torque_nm: 5 })}>Re-torque</button>
+            </div>
             <div><span className="dc-hw-k">Blanking</span> {(fru.blanking_panels || []).filter((p) => p.installed).length} panels · ties {fru.cable_ties} · velcro {fru.velcro_straps}</div>
+            <div><span className="dc-hw-k">Baffles</span> {(fru.airflow_baffles || []).map((b) => `${b.id}:${b.status}`).join(' · ')}
+              <button type="button" disabled={busy} className="dc-btn-outline dc-btn-xs" style={{ marginLeft: 6 }}
+                onClick={() => onFruOp?.(rack.id, 'toggle_baffle', { baffle_id: 'BAF-TOP' })}>Toggle top</button>
+            </div>
+          </div>
+          {fru.last_qr_scan && (
+            <div className="dc-muted mt-1">Last QR scan: {fru.last_qr_scan.code} @ {fru.last_qr_scan.time}</div>
+          )}
+          <div className="dc-drawer-label mt-2">U labels / QR (sample)</div>
+          <div className="dc-action-row" style={{ flexWrap: 'wrap' }}>
+            {(fru.labels || []).slice(0, 8).map((l) => (
+              <span key={l.u} className="dc-topology-chip" title={l.qr}>{l.text}</span>
+            ))}
+          </div>
+          <div className="dc-drawer-label mt-2">Cage nuts (interactive)</div>
+          <div className="dc-action-row" style={{ flexWrap: 'wrap' }}>
+            {(fru.cage_nuts || []).slice(0, 8).map((cn) => (
+              <button key={cn.u} type="button" disabled={busy} className="dc-btn-outline dc-btn-xs"
+                onClick={() => onFruOp?.(rack.id, cn.front_left ? 'remove_cage_nut' : 'install_cage_nut', { u: cn.u, side: 'front_left' })}>
+                U{cn.u} FL {cn.front_left ? '●' : '○'}
+              </button>
+            ))}
           </div>
           <div className="dc-action-row mt-1">
             <button type="button" disabled={busy} className="dc-btn-outline dc-btn-xs"
@@ -83,6 +111,136 @@ export function RackPhysicsFruPanel({ rack, busy, onToggleCasters, onBlanking, o
           </div>
         </>
       )}
+    </div>
+  )
+}
+
+/** CDU / DLC liquid cooling plant */
+export function LiquidCoolingPanel({ liquid, busy, onOp }) {
+  const loop = liquid || {}
+  if (!loop.cdus) return <p className="dc-muted">No liquid cooling loop.</p>
+  return (
+    <div className="dc-twin-panel">
+      <div className="dc-twin-toolbar">
+        <span className="dc-twin-title"><Gauge size={13} /> Liquid loop · {loop.fluid}</span>
+        <span className={loop.leak_detected ? 'dc-text-bad' : 'dc-text-ok'}>
+          {loop.loop_status}{loop.leak_detected ? ' · LEAK' : ''}
+        </span>
+      </div>
+      <div className="dc-crac-grid">
+        {(loop.cdus || []).map((c) => (
+          <div key={c.id} className={`dc-crac-card ${c.status !== 'running' ? 'dc-crac-alert' : ''}`}>
+            <div className="dc-crac-id">{c.id} · {c.model}</div>
+            <div className="dc-crac-zone">{c.status} · {c.load_kw}/{c.capacity_kw} kW · pump {c.pump_rpm} RPM</div>
+            <div className="dc-crac-metrics">
+              <div><span className="dc-crac-metric-label">Supply</span><span className="dc-crac-metric-val">{c.supply_temp_c}°C</span></div>
+              <div><span className="dc-crac-metric-label">Return</span><span className="dc-crac-metric-val">{c.return_temp_c}°C</span></div>
+              <div><span className="dc-crac-metric-label">Flow</span><span className="dc-crac-metric-val">{c.flow_lpm} L/min</span></div>
+            </div>
+            <div className="dc-action-row mt-1">
+              {c.status === 'running' ? (
+                <button type="button" disabled={busy} className="dc-btn-danger dc-btn-xs" onClick={() => onOp?.('stop_cdu', { cdu_id: c.id })}>Stop</button>
+              ) : (
+                <button type="button" disabled={busy} className="dc-btn-primary dc-btn-xs" onClick={() => onOp?.('start_cdu', { cdu_id: c.id })}>Start</button>
+              )}
+              <button type="button" disabled={busy} className="dc-btn-outline dc-btn-xs"
+                onClick={() => onOp?.('set_setpoint', { cdu_id: c.id, temp_c: 18 })}>Set 18°C</button>
+            </div>
+          </div>
+        ))}
+      </div>
+      <div className="dc-drawer-label mt-2">Rack manifolds / QD couplings</div>
+      {(loop.manifolds || []).map((m) => (
+        <div key={m.id} className="dc-vd-card">
+          <div className="dc-vd-head">
+            <strong>{m.id}</strong>
+            <span>{m.rack} · {m.status} · {m.flow_lpm} L/min · {m.supply_temp_c}→{m.return_temp_c}°C</span>
+          </div>
+          <div className="dc-action-row">
+            {(m.qd_couplings || []).map((qd) => (
+              <button key={qd.id} type="button" disabled={busy}
+                className={`dc-btn-xs ${qd.connected ? 'dc-btn-primary' : 'dc-btn-outline'}`}
+                onClick={() => onOp?.('toggle_qd', { qd_id: qd.id })}>
+                {qd.id} {qd.connected ? '●' : '○'} ({qd.side})
+              </button>
+            ))}
+          </div>
+        </div>
+      ))}
+      <div className="dc-action-row mt-2">
+        <button type="button" disabled={busy} className="dc-btn-danger dc-btn-xs" onClick={() => onOp?.('inject_leak')}>Inject leak</button>
+        <button type="button" disabled={busy} className="dc-btn-outline dc-btn-xs" onClick={() => onOp?.('clear_leak')}>Clear leak</button>
+      </div>
+      <div className="dc-drawer-label mt-2">Events</div>
+      {(loop.events || []).slice(0, 4).map((e, i) => (
+        <div key={i} className="dc-muted">{e.time} · {e.message}</div>
+      ))}
+    </div>
+  )
+}
+
+/** MAAS / PXE bare-metal provisioning */
+export function PxeMaasPanel({ pxeMaas, busy, selectedServerId, onOp }) {
+  const p = pxeMaas || {}
+  const region = p.region || {}
+  if (!region.id) return <p className="dc-muted">No MAAS region.</p>
+  return (
+    <div className="dc-twin-panel">
+      <div className="dc-twin-toolbar">
+        <span className="dc-twin-title"><Boxes size={13} /> MAAS {region.version}</span>
+        <span className={region.status === 'healthy' ? 'dc-text-ok' : 'dc-text-bad'}>{region.status}</span>
+      </div>
+      <div className="dc-muted">{region.url}</div>
+      <div className="dc-hw-meta">
+        <div><span className="dc-hw-k">DHCP</span> {region.dhcp ? 'on' : 'OFF'} · TFTP {region.tftp ? 'on' : 'off'} · HTTP boot {region.http_boot ? 'on' : 'off'}</div>
+        <div><span className="dc-hw-k">Leases</span> {p.dhcp_leases} · rack controllers {(p.rack_controllers || []).length}</div>
+      </div>
+      <div className="dc-action-row mt-1">
+        <button type="button" disabled={busy} className="dc-btn-outline dc-btn-xs" onClick={() => onOp?.('fix_dhcp')}>Fix DHCP/TFTP</button>
+        <button type="button" disabled={busy} className="dc-btn-danger dc-btn-xs" onClick={() => onOp?.('break_dhcp')}>Break DHCP</button>
+        <button type="button" disabled={busy} className="dc-btn-outline dc-btn-xs" onClick={() => onOp?.('sync_image', { image: 'centos/stream9' })}>Sync Stream9</button>
+      </div>
+      <div className="dc-drawer-label mt-2">Images</div>
+      <div className="dc-action-row" style={{ flexWrap: 'wrap' }}>
+        {(p.images || []).map((img) => (
+          <span key={img.name} className={`dc-topology-chip ${img.synced ? '' : 'dc-text-bad'}`}>
+            {img.name}{img.synced ? '' : ' ✗'}
+          </span>
+        ))}
+      </div>
+      <div className="dc-drawer-label mt-2">PXE menu</div>
+      <div className="dc-muted">{(p.pxe_menu || []).join(' · ')}</div>
+      <div className="dc-drawer-label mt-2">Machines</div>
+      <table className="dc-port-table">
+        <thead><tr><th>Host</th><th>Status</th><th>OS</th><th /></tr></thead>
+        <tbody>
+          {(p.machines || []).map((m) => (
+            <tr key={m.id} className={m.id === selectedServerId ? 'dc-row-sel' : ''}>
+              <td>{m.hostname}</td>
+              <td>{m.status}</td>
+              <td>{m.os || '—'}</td>
+              <td>
+                <div className="dc-action-row">
+                  <button type="button" disabled={busy} className="dc-btn-outline dc-btn-xs"
+                    onClick={() => onOp?.('enlist', { machine_id: m.id })}>Enlist</button>
+                  <button type="button" disabled={busy} className="dc-btn-outline dc-btn-xs"
+                    onClick={() => onOp?.('commission', { machine_id: m.id })}>Commission</button>
+                  <button type="button" disabled={busy} className="dc-btn-primary dc-btn-xs"
+                    onClick={() => onOp?.('deploy', { machine_id: m.id, image: m.os || 'ubuntu/22.04' })}>Deploy</button>
+                  <button type="button" disabled={busy} className="dc-btn-outline dc-btn-xs"
+                    onClick={() => onOp?.('pxe_boot', { machine_id: m.id })}>PXE</button>
+                  <button type="button" disabled={busy} className="dc-btn-danger dc-btn-xs"
+                    onClick={() => onOp?.('release', { machine_id: m.id })}>Release</button>
+                </div>
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+      <div className="dc-drawer-label mt-2">Events</div>
+      {(p.events || []).slice(0, 4).map((e, i) => (
+        <div key={i} className="dc-muted">{e.time} · {e.message}</div>
+      ))}
     </div>
   )
 }

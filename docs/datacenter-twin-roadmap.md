@@ -30,14 +30,14 @@ facades inside FixitLab**, not a separate `:3080` Three.js monorepo. See
 |---|-------------|-------|--------|
 | 1 | Real physics (Rapier/Cannon) | P4 lite → P7 Rapier | [x] |
 | 2 | Entire campus building | P1 | [x] campus rooms + plant assets |
-| 3 | Complete rack FRU | P4 | [~] racks/PDUs/blanking; not every screw |
+| 3 | Complete rack FRU | P4 → P9 | [x] dense labels/QR/cage nuts (not every screw mesh) |
 | 4 | Every server OEM | P2 | [x] multi-OEM live fleet + vendor BOM |
 | 5 | Every CPU generation | P2 | [~] catalog + live die from motherboard map |
 | 6 | GPU systems (DGX/HGX/…) | P2 catalog → P6 AI | [~] catalog + gpu_node / H100 BOM |
 | 7 | Complete motherboard + bus anim | P1–P8 | [x] interactive FRU + bus pulse |
 | 8 | Every cable type + ops | P1 plug → P3 catalog | [~] |
 | 9 | Real switches + CLI | P3 | [x] multi-vendor CLI + MPLS/EVPN |
-| 10 | Console / BIOS / BMC / PXE | P1–P8 | [x] gen switch + KVM/media/flash |
+| 10 | Console / BIOS / BMC / PXE | P1–P9 | [x] BMC gens + MAAS/PXE |
 | 11 | Real storage stack | P3 | [x] facade stack (NVMe/Ceph/ZFS/SAN/NAS) |
 | 12 | Networking simulation | P3 | [x] counters + tools + protocol writers |
 | 13 | Hypervisors | P6 | [x] ESXi/KVM create/migrate/snapshot |
@@ -51,7 +51,7 @@ facades inside FixitLab**, not a separate `:3080` Three.js monorepo. See
 | 21 | Interactive training roles | P5 | [x] guided scenarios + feedback |
 | 22 | Digital twin persistence / replay | P5 | [x] journal + DB snapshot mirror |
 
-Still intentionally shallow vs Omniverse: screw-level FRU, real VirtualBMC/MAAS, liquid cooling loops.
+Still intentionally shallow vs Omniverse: screw-level photoreal meshes, real VirtualBMC agents, full CFD liquid loops.
 
 ---
 
@@ -117,6 +117,13 @@ Still intentionally shallow vs Omniverse: screw-level FRU, real VirtualBMC/MAAS,
 - [x] Motherboard: CPU remove/install, DIMM reseat, PCIe FRU, richer bus anim
 - [x] RAID: hot-spare assign, expand VD, initialize, full level picker
 - [x] BMC: generation switch (iDRAC/iLO/XCC/IPMI), KVM/virtual media/flash paths
+
+## Phase 9 — Plant liquid cooling · dense FRU · MAAS/PXE
+
+- [x] CDU / DLC manifolds / QD couplings + leak inject (Mechanical room)
+- [x] Dense rack FRU: U labels, QR scan, cage nuts, baffle, ground torque
+- [x] Server chassis label plates on CMDB
+- [x] MAAS region + enlist/commission/deploy/PXE (Staging/Burn-in + server drawer)
 
 ---
 

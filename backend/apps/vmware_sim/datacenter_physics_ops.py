@@ -182,6 +182,8 @@ def enrich_rack(rack: dict, servers: list[dict], cooling: list[dict], pdus: list
     pdu = next((p for p in (pdus or []) if p.get("rack") == rack.get("id") or p.get("id") == rack.get("pdu")), None)
     if not rack.get("fru"):
         rack["fru"] = build_rack_fru(rack["id"])
+    from apps.vmware_sim.datacenter_plant_provision import densify_rack_fru
+    rack["fru"] = densify_rack_fru(rack["fru"], rack["id"])
     rack["physics"] = compute_rack_physics(rack, servers, cooling, pdu)
     return rack
 

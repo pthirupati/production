@@ -19,6 +19,7 @@ import {
 } from './NetworkStoragePanels'
 import {
   RackPhysicsFruPanel, MonitoringPanel, OpsTicketsPanel, TrainingPanel, ComputeAiPanel,
+  LiquidCoolingPanel, PxeMaasPanel,
 } from './OpsPhysicsPanels'
 import '../../styles/sim-products.css'
 import './DatacenterSimulator.css'
@@ -109,6 +110,8 @@ export default function DatacenterSimulator({
   const servers = st.servers || []
   const pdus = st.pdus || []
   const cooling = st.cooling || []
+  const liquidCooling = st.liquid_cooling || null
+  const pxeMaas = st.pxe_maas || null
   const rooms = st.rooms || []
   const network = st.network || { switches: [], topology: [] }
   const powerChain = st.power_chain || {}
@@ -384,6 +387,10 @@ export default function DatacenterSimulator({
                           onToggleCasters={(id) => doAction(() => datacenterApi.toggleRackCasters(sessionId, id), 'Casters toggled')}
                           onBlanking={(id, u) => doAction(() => datacenterApi.installBlanking(sessionId, id, u), `Blanking U${u}`)}
                           onOutlet={(id, oid) => doAction(() => datacenterApi.pduOutletToggle(sessionId, id, oid), 'Outlet toggled')}
+                          onFruOp={(id, op, extra) => doAction(
+                            () => datacenterApi.rackFruOps(sessionId, id, op, extra),
+                            `FRU ${op}`,
+                          )}
                         />
                       </div>
                     )}
@@ -418,6 +425,16 @@ export default function DatacenterSimulator({
         <div className="dc-room-body">
           <MechanicalRoomView cooling={cooling} busy={busy}
             onRestore={(cracId) => doAction(() => datacenterApi.restoreCrac(sessionId, cracId), 'CRAC restored')} />
+          <div style={{ marginTop: '1rem' }}>
+            <LiquidCoolingPanel
+              liquid={liquidCooling}
+              busy={busy}
+              onOp={(op, extra) => doAction(
+                () => datacenterApi.liquidCoolingOps(sessionId, op, extra),
+                `Liquid ${op}`,
+              )}
+            />
+          </div>
         </div>
       )}
 
@@ -471,6 +488,18 @@ export default function DatacenterSimulator({
             onHv={(op, extra) => doAction(() => datacenterApi.hypervisorOps(sessionId, op, extra), `HV ${op}`)}
             onAi={(op, extra) => doAction(() => datacenterApi.aiOps(sessionId, op, extra), `AI ${op}`)}
           />
+          <div style={{ marginTop: '1rem' }}>
+            <PxeMaasPanel
+              pxeMaas={pxeMaas}
+              busy={busy}
+              selectedServerId={selectedServerId}
+              onOp={(op, extra) => doAction(
+                () => datacenterApi.pxeMaasOps(sessionId, op, extra),
+                `MAAS ${op}`,
+                extra?.machine_id,
+              )}
+            />
+          </div>
         </div>
       )}
 
@@ -509,6 +538,7 @@ export default function DatacenterSimulator({
                 ['service', 'Service'],
                 ['inventory', 'CMDB'],
                 ['storage', 'Storage'],
+                ['pxe', 'PXE/MAAS'],
               ].map(([key, label]) => (
                 <button key={key} type="button"
                   className={`dc-drawer-tab ${drawerTab === key ? 'dc-drawer-tab-active' : ''}`}
@@ -630,6 +660,21 @@ export default function DatacenterSimulator({
                   onOp={(op, extra) => doAction(
                     () => datacenterApi.storageOps(sessionId, selectedServer.id, op, extra),
                     `Storage ${op}`,
+                    selectedServer.id,
+                  )}
+                />
+              </div>
+            )}
+
+            {drawerTab === 'pxe' && (
+              <div className="dc-drawer-section">
+                <PxeMaasPanel
+                  pxeMaas={pxeMaas}
+                  busy={busy}
+                  selectedServerId={selectedServer.id}
+                  onOp={(op, extra) => doAction(
+                    () => datacenterApi.pxeMaasOps(sessionId, op, { machine_id: selectedServer.id, ...extra }),
+                    `MAAS ${op}`,
                     selectedServer.id,
                   )}
                 />

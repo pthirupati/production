@@ -221,6 +221,15 @@ export const datacenterApi = {
   replayTwinJournal(sessionId, extra = {}) {
     return datacenterApi.action(sessionId, 'replay_twin_journal', extra)
   },
+  liquidCoolingOps(sessionId, op, extra = {}) {
+    return datacenterApi.action(sessionId, 'liquid_cooling_ops', { op, ...extra })
+  },
+  pxeMaasOps(sessionId, op, extra = {}) {
+    return datacenterApi.action(sessionId, 'pxe_maas_ops', { op, ...extra })
+  },
+  rackFruOps(sessionId, rackId, op, extra = {}) {
+    return datacenterApi.action(sessionId, 'rack_fru_ops', { rack_id: rackId, op, ...extra })
+  },
 }
 
 export default datacenterApi

@@ -473,6 +473,19 @@ export function InventoryPanel({ inventory }) {
           ))}
         </>
       )}
+      {inventory.fru_labels && (
+        <>
+          <div className="dc-drawer-label mt-2">Chassis labels / QR</div>
+          <div className="dc-hw-meta">
+            <div><span className="dc-hw-k">QR</span> {inventory.fru_labels.chassis_qr}</div>
+            <div><span className="dc-hw-k">Serial plate</span> {inventory.fru_labels.serial_plate}</div>
+            <div><span className="dc-hw-k">Warranty sticker</span> {inventory.fru_labels.warranty_sticker}</div>
+            <div><span className="dc-hw-k">Ports</span> {(inventory.fru_labels.port_labels || []).join(', ')}</div>
+            <div><span className="dc-hw-k">PSU</span> {(inventory.fru_labels.psu_labels || []).join(', ')}</div>
+            <div><span className="dc-hw-k">Bays</span> {(inventory.fru_labels.drive_bay_labels || []).join(', ')}</div>
+          </div>
+        </>
+      )}
     </div>
   )
 }

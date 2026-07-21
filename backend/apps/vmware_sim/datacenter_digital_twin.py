@@ -450,6 +450,8 @@ def enrich_server(server: dict) -> dict:
         hw["cables"] = enrich_cables(hw["cables"])
     if not server.get("storage_stack"):
         server["storage_stack"] = build_storage_stack(server.get("role"))
+    from apps.vmware_sim.datacenter_plant_provision import densify_server_labels
+    densify_server_labels(server)
     return server
 
 
