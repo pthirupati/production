@@ -15,18 +15,55 @@ def _now() -> str:
 
 def enrich_network(network: dict) -> dict:
     """Attach vendor, CLI, protocols, and live counters to switches."""
-    defaults = [
+    by_vendor = {
+        "Arista": {"os": "EOS", "cli_style": "arista"},
+        "Cisco": {"os": "NX-OS", "cli_style": "cisco"},
+        "Juniper": {"os": "Junos", "cli_style": "juniper"},
+        "NVIDIA": {"os": "Cumulus/Spectrum", "cli_style": "nvidia"},
+        "Mellanox": {"os": "MLNX-OS", "cli_style": "nvidia"},
+        "Dell": {"os": "OS10", "cli_style": "cisco"},
+        "Extreme": {"os": "EXOS", "cli_style": "extreme"},
+    }
+    fallback = [
         {"vendor": "Arista", "os": "EOS", "cli_style": "arista", "mgmt_ip": "10.0.0.11"},
         {"vendor": "Cisco", "os": "NX-OS", "cli_style": "cisco", "mgmt_ip": "10.0.0.12"},
         {"vendor": "Juniper", "os": "Junos", "cli_style": "juniper", "mgmt_ip": "10.0.0.13"},
         {"vendor": "NVIDIA", "os": "Cumulus/Spectrum", "cli_style": "nvidia", "mgmt_ip": "10.0.0.14"},
     ]
+
+    def _infer_vendor(model: str) -> str | None:
+        m = (model or "").lower()
+        if "arista" in m or "7050" in m or "7280" in m:
+            return "Arista"
+        if "cisco" in m or "nexus" in m or "catalyst" in m:
+            return "Cisco"
+        if "juniper" in m or "qfx" in m or "mx" in m:
+            return "Juniper"
+        if "spectrum" in m or "sn3700" in m or "sn5600" in m or "nvidia" in m:
+            return "NVIDIA"
+        if "mellanox" in m:
+            return "Mellanox"
+        if "dell" in m or "s5248" in m:
+            return "Dell"
+        if "extreme" in m:
+            return "Extreme"
+        return None
+
     for i, sw in enumerate(network.get("switches") or []):
-        meta = defaults[i % len(defaults)]
-        sw.setdefault("vendor", meta["vendor"])
-        sw.setdefault("os", meta["os"])
-        sw.setdefault("cli_style", meta["cli_style"])
-        sw.setdefault("mgmt_ip", meta["mgmt_ip"])
+        inferred = _infer_vendor(sw.get("model") or "")
+        meta = by_vendor.get(inferred) if inferred else None
+        fb = fallback[i % len(fallback)]
+        vendor = inferred or sw.get("vendor") or fb["vendor"]
+        info = meta or by_vendor.get(vendor) or fb
+        sw.setdefault("vendor", vendor)
+        sw.setdefault("os", info.get("os") or fb["os"])
+        sw.setdefault("cli_style", info.get("cli_style") or fb["cli_style"])
+        sw.setdefault("mgmt_ip", fb["mgmt_ip"])
+        # Prefer inferred vendor over stale default when model is known
+        if inferred:
+            sw["vendor"] = inferred
+            sw["os"] = info["os"]
+            sw["cli_style"] = info["cli_style"]
         sw.setdefault("protocols", {
             "bgp": {"asn": 65001 + i, "peers": 2, "established": 2 if i == 0 else 1, "status": "up"},
             "ospf": {"area": "0.0.0.0", "neighbors": 1, "status": "full"},
@@ -77,22 +114,32 @@ def run_switch_cli(sw: dict, command: str) -> list[str]:
             "  switchport access vlan <id> | exit | end | clear counters",
         ]
 
-    if lower.startswith("show version") or lower == "show ver":
+    if lower.startswith("show version") or lower == "show ver" or lower == "show system information":
         lines = [
             f"{sw.get('vendor')} {sw.get('os')} — {sw.get('hostname')}",
             f"Hardware: {sw.get('model')}",
             f"Management IP: {sw.get('mgmt_ip')}",
             f"Uptime: 142 days, 3:11:08",
         ]
-    elif "interface" in lower and lower.startswith("show"):
-        lines = ["Port  Status  Speed  VLAN  RX(pps)  TX(pps)  Err  Drop  Lat(us)  Util%"]
+    elif ("interface" in lower and lower.startswith("show")) or lower in ("show interfaces terse", "show interface terse"):
+        hdr = "Interface  Admin  Link  Proto  Speed  VLAN  RX  TX  Err" if style == "juniper" else (
+            "Port  Status  Speed  VLAN  RX(pps)  TX(pps)  Err  Drop  Lat(us)  Util%"
+        )
+        lines = [hdr]
         for p in ports:
-            lines.append(
-                f"{p.get('port'):<5} {p.get('status'):<7} {str(p.get('speed') or '-'):<6} "
-                f"{str(p.get('vlan') or '-'):<5} {p.get('rx_pps') or 0:<8} {p.get('tx_pps') or 0:<8} "
-                f"{p.get('errors') or 0:<4} {p.get('drops') or 0:<5} {str(p.get('latency_us') or '-'):<8} "
-                f"{p.get('util_pct') or 0}"
-            )
+            if style == "juniper":
+                lines.append(
+                    f"et-{p.get('port')}/0/0  {'up' if p.get('status')=='up' else 'down':<5} "
+                    f"{p.get('status'):<4} inet  {str(p.get('speed') or '-'):<6} "
+                    f"{str(p.get('vlan') or '-'):<5} {p.get('rx_pps') or 0} {p.get('tx_pps') or 0} {p.get('errors') or 0}"
+                )
+            else:
+                lines.append(
+                    f"{p.get('port'):<5} {p.get('status'):<7} {str(p.get('speed') or '-'):<6} "
+                    f"{str(p.get('vlan') or '-'):<5} {p.get('rx_pps') or 0:<8} {p.get('tx_pps') or 0:<8} "
+                    f"{p.get('errors') or 0:<4} {p.get('drops') or 0:<5} {str(p.get('latency_us') or '-'):<8} "
+                    f"{p.get('util_pct') or 0}"
+                )
     elif "vlan" in lower and lower.startswith("show"):
         vlans = proto.get("vlan", {}).get("ids") or []
         lines = [f"VLAN  Name"] + [f"{v:<5} vlan{v}" for v in vlans] or ["No VLANs configured"]

@@ -295,11 +295,20 @@ def _network() -> dict:
                 {"port": 3, "status": "down", "speed": "100G", "vlan": None, "connected_to": None},
             ],
         },
+        {
+            "id": "sw-edge-01", "rack": "R09", "u_slot": 38, "hostname": "edge-sw-01",
+            "model": "Juniper QFX5120-48Y", "ports": [
+                {"port": 1, "status": "up", "speed": "25G", "vlan": 10, "connected_to": "sw-core-01"},
+                {"port": 2, "status": "up", "speed": "10G", "vlan": 1, "connected_to": "internet-edge"},
+                {"port": 3, "status": "down", "speed": "10G", "vlan": None, "connected_to": None},
+            ],
+        },
     ]
     topology = [
         {"from": "core-sw-01", "to": "agg-sw-01", "type": "uplink", "speed": "40G", "latency_us": 12, "util_pct": 34},
         {"from": "agg-sw-01", "to": "internet-edge", "type": "uplink", "speed": "10G", "latency_us": 80, "util_pct": 22},
         {"from": "ib-sw-01", "to": "agg-sw-01", "type": "uplink", "speed": "100G", "latency_us": 5, "util_pct": 41},
+        {"from": "edge-sw-01", "to": "core-sw-01", "type": "uplink", "speed": "25G", "latency_us": 15, "util_pct": 18},
     ]
     return enrich_network({"switches": switches, "topology": topology})
 
