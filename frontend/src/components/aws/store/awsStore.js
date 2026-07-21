@@ -1713,6 +1713,8 @@ export const useAwsStore = create(
         else if (service === 'sns' && resource === 'topics') syncAction = 'create_sns_topic'
         else if (service === 'sqs' && resource === 'queues') syncAction = 'create_sqs_queue'
         else if (service === 'secretsmanager' && resource === 'secrets') syncAction = 'create_secret'
+        else if (service === 'acm' && resource === 'certificates') syncAction = 'request_certificate'
+        else if (service === 'cloudfront' && resource === 'distributions') syncAction = 'create_cloudfront_distribution'
         get()._syncAction(syncAction, syncPayload)
         if (created.pendingTransition) get()._ensureTick()
         return created

@@ -19,6 +19,9 @@ export const cicdApi = {
   approveJob(sessionId, job) {
     return cicdApi.action(sessionId, 'approve_job', { job })
   },
+  rejectJob(sessionId, job) {
+    return cicdApi.action(sessionId, 'reject_job', { job })
+  },
   fixJob(sessionId, job, script) {
     return cicdApi.action(sessionId, 'fix_job', { job, script })
   },

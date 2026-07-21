@@ -74,6 +74,8 @@ def seed_v2() -> dict[str, Any]:
         "registry_keys": [],
         "cleared_event_logs": [],
         "ended_processes": [],
+        "process_priorities": [],
+        "startup_items": [],
     }
 
 
@@ -87,7 +89,7 @@ def ensure_v2(world: dict) -> None:
     world["vswitches"] = v2.get("vswitches") or []
     world["vhdx_disks"] = v2.get("vhdx_disks") or []
     world["console_sessions"] = v2.get("console_sessions") or []
-    for key in ("iis_sites", "iis_bindings", "iis_app_pools", "dns_records", "dhcp_reservations", "firewall_rules", "scheduled_tasks", "perf_counters", "registry_values", "registry_keys", "cleared_event_logs", "ended_processes"):
+    for key in ("iis_sites", "iis_bindings", "iis_app_pools", "dns_records", "dhcp_reservations", "firewall_rules", "scheduled_tasks", "perf_counters", "registry_values", "registry_keys", "cleared_event_logs", "ended_processes", "process_priorities", "startup_items"):
         world[key] = v2.get(key) or []
 
 
@@ -432,5 +434,37 @@ def apply_v2_action(world: dict, action: str, payload: dict | None = None) -> di
             ended.append(row)
         world["v2"]["ended_processes"] = world["ended_processes"]
         return {"ok": True, "message": f"Ended process {pid or name}", "process": row}
+
+    if action == "set_process_priority":
+        pid = payload.get("pid")
+        priority = (payload.get("priority") or "Normal").strip()
+        name = payload.get("name") or payload.get("process") or ""
+        rows = world.setdefault("process_priorities", [])
+        existing = next((p for p in rows if p.get("pid") == pid), None)
+        row = {"pid": pid, "name": name, "priority": priority, "updated_at": _now()}
+        if existing:
+            existing.update(row)
+        else:
+            rows.append(row)
+        world["v2"]["process_priorities"] = world["process_priorities"]
+        return {"ok": True, "message": f"Set priority {priority} for {pid or name}", "process": row}
+
+    if action == "toggle_startup_item":
+        name = (payload.get("name") or "").strip()
+        if not name:
+            return {"ok": False, "error": "Startup item name required"}
+        enabled = payload.get("enabled")
+        rows = world.setdefault("startup_items", [])
+        existing = next((s for s in rows if s.get("name") == name), None)
+        if existing is None:
+            existing = {"name": name, "enabled": True}
+            rows.append(existing)
+        if enabled is None:
+            existing["enabled"] = not bool(existing.get("enabled", True))
+        else:
+            existing["enabled"] = bool(enabled)
+        existing["updated_at"] = _now()
+        world["v2"]["startup_items"] = world["startup_items"]
+        return {"ok": True, "message": f"{'Enabled' if existing['enabled'] else 'Disabled'} startup {name}", "item": existing}
 
     return None

@@ -465,6 +465,18 @@ def apply_action(session_id: str, action: str, payload: dict | None = None) -> d
         _save(session_id, entry)
         return {"ok": True, "message": f"Approved {job_id}"}
 
+    if action == "reject_job" or action == "reject":
+        job_id = (payload.get("job") or payload.get("job_id") or "").strip()
+        job = _job(state, job_id)
+        if not job:
+            return {"ok": False, "error": f"job '{job_id}' not found"}
+        if not job.get("manual"):
+            return {"ok": False, "error": f"job '{job_id}' is not a manual gate"}
+        job["approved"] = False
+        state["events"].insert(0, {"time": _now_iso(), "message": f"Rejected manual gate {job_id}", "severity": "warning"})
+        _save(session_id, entry)
+        return {"ok": True, "message": f"Rejected {job_id}"}
+
     if action == "fix_job":
         # Repair a failing job's script so it passes.
         job_id = (payload.get("job") or payload.get("job_id") or "").strip()

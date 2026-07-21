@@ -546,6 +546,33 @@ def apply_v2_action(state: dict, action: str, payload: dict) -> dict | None:
         secrets.append(row)
         return {"ok": True, "message": f"Created secret {name}", "secret": row}
 
+    if action == "request_certificate":
+        name = (payload.get("name") or payload.get("domain") or f"*.lab-{_hex(4)}.example.com").strip()
+        certs = gr.setdefault("acm", {}).setdefault("certificates", [])
+        if any(c.get("name") == name for c in certs):
+            return {"ok": False, "error": f"Certificate '{name}' already exists"}
+        row = _row(payload.get("id") or f"cert-{_hex()}", name, {
+            "type": payload.get("type") or "Amazon issued",
+            "status": payload.get("status") or "Issued",
+            "expires": payload.get("expires") or "2027-12-31",
+        })
+        certs.append(row)
+        return {"ok": True, "message": f"Requested certificate {name}", "certificate": row}
+
+    if action == "create_cloudfront_distribution":
+        name = (payload.get("name") or f"dist-{_hex(4)}").strip()
+        dists = gr.setdefault("cloudfront", {}).setdefault("distributions", [])
+        if any(d.get("name") == name for d in dists):
+            return {"ok": False, "error": f"Distribution '{name}' already exists"}
+        dist_id = payload.get("id") or f"E{_hex(13).upper()}"
+        row = _row(dist_id, name, {
+            "domainName": payload.get("domainName") or f"d{_hex(14)}.cloudfront.net",
+            "status": payload.get("status") or "Deployed",
+            "priceClass": payload.get("priceClass") or "Use all edge locations",
+        })
+        dists.append(row)
+        return {"ok": True, "message": f"Created CloudFront distribution {name}", "distribution": row}
+
     if action == "send_sqs":
         qname = payload.get("name") or "lab-queue"
         queues = gr.setdefault("sqs", {}).setdefault("queues", [])

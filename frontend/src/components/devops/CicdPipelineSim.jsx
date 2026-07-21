@@ -313,7 +313,10 @@ export default function CicdPipelineSim({
     finalizeRun(result, meta)
     runnerRef.current = null
     setRunning(false)
-  }, [running, hasBlockingErrors, pipeline, resetRunState, artifactsForJob, activeFault, runHistory.length, trigger, branch, provider, seedSlug, source, handleEvent, finalizeRun])
+    if (sessionId) {
+      cicdApi.runPipeline(sessionId).catch(() => {})
+    }
+  }, [running, hasBlockingErrors, pipeline, resetRunState, artifactsForJob, activeFault, runHistory.length, trigger, branch, provider, seedSlug, source, handleEvent, finalizeRun, sessionId])
 
   const cancelRun = useCallback(() => {
     runnerRef.current?.cancel()
@@ -325,7 +328,12 @@ export default function CicdPipelineSim({
       cicdApi.approveJob(sessionId, jobId).catch(() => {})
     }
   }, [sessionId])
-  const reject = useCallback((jobId) => { runnerRef.current?.reject(jobId) }, [])
+  const reject = useCallback((jobId) => {
+    runnerRef.current?.reject(jobId)
+    if (sessionId) {
+      cicdApi.rejectJob(sessionId, jobId).catch(() => {})
+    }
+  }, [sessionId])
 
   const [serverState, setServerState] = useState(null)
   const [gitopsBusy, setGitopsBusy] = useState(false)

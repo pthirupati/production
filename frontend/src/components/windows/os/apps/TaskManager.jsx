@@ -43,7 +43,13 @@ export default function TaskManager({ win }) {
         os.endProcess(p.pid)
         if (os.labAction) os.labAction('end_process', { pid: p.pid, name: p.desc || p.name })
       } },
-      { label: 'Set priority', sub: ['Realtime', 'High', 'Above normal', 'Normal', 'Below normal', 'Low'].map((pr) => ({ label: (p.priority === pr ? '● ' : '') + pr, onClick: () => os.setProcessPriority(p.pid, pr) })) },
+      { label: 'Set priority', sub: ['Realtime', 'High', 'Above normal', 'Normal', 'Below normal', 'Low'].map((pr) => ({
+        label: (p.priority === pr ? '● ' : '') + pr,
+        onClick: () => {
+          os.setProcessPriority(p.pid, pr)
+          if (os.labAction) os.labAction('set_process_priority', { pid: p.pid, priority: pr, name: p.desc || p.name })
+        },
+      })) },
       { label: 'Set affinity' }, { sep: true },
       { label: 'Open file location' }, { label: 'Search online' }, { label: 'Properties' }, { label: 'Go to details' },
     ])
@@ -115,7 +121,10 @@ export default function TaskManager({ win }) {
         <table className="winos-table"><thead><tr><th>Name</th><th>Publisher</th><th>Status</th><th>Startup impact</th></tr></thead>
           <tbody>{os.startupItems.map((i) => (
             <tr key={i.name}><td>{i.name}</td><td>{i.publisher}</td><td><span className={`winos-badge ${i.enabled ? 'ok' : 'err'}`}>{i.enabled ? 'Enabled' : 'Disabled'}</span></td>
-              <td><button className="winos-btn" onClick={() => os.toggleStartup(i.name)}>{i.enabled ? 'Disable' : 'Enable'}</button> {i.impact}</td></tr>
+              <td><button className="winos-btn" onClick={() => {
+                os.toggleStartup(i.name)
+                if (os.labAction) os.labAction('toggle_startup_item', { name: i.name, enabled: !i.enabled })
+              }}>{i.enabled ? 'Disable' : 'Enable'}</button> {i.impact}</td></tr>
           ))}</tbody></table>
       )}
 

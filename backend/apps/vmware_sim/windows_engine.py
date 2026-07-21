@@ -811,6 +811,8 @@ def get_state(session_id: str, scenario_slug: str = "") -> dict:
         "registry_keys": world.get("registry_keys") or (world.get("v2") or {}).get("registry_keys") or [],
         "cleared_event_logs": world.get("cleared_event_logs") or (world.get("v2") or {}).get("cleared_event_logs") or [],
         "ended_processes": world.get("ended_processes") or (world.get("v2") or {}).get("ended_processes") or [],
+        "process_priorities": world.get("process_priorities") or (world.get("v2") or {}).get("process_priorities") or [],
+        "startup_items": world.get("startup_items") or (world.get("v2") or {}).get("startup_items") or [],
         # Human-readable goal (objective/title) — never leaks the answer beyond
         # what the objective already tells the learner.
         "goal": {
