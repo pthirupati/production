@@ -327,6 +327,8 @@ def build_service_mode(vendor: str = "Dell") -> dict:
 
 def enrich_server(server: dict) -> dict:
     """Attach motherboard / RAID / BIOS / rich BMC if missing (idempotent)."""
+    from apps.vmware_sim.datacenter_network_storage import enrich_cables, build_storage_stack
+
     vendor = server.get("vendor") or "Dell"
     hostname = server.get("hostname") or server.get("id") or "host"
     power = server.get("power_state") or "on"
@@ -361,6 +363,12 @@ def enrich_server(server: dict) -> dict:
         mb["cover_open"] = True
         mb["maintenance_mode"] = True
         server["motherboard"] = mb
+    # Cables: enrich with catalog metadata
+    hw = server.setdefault("hardware", {})
+    if hw.get("cables"):
+        hw["cables"] = enrich_cables(hw["cables"])
+    if not server.get("storage_stack"):
+        server["storage_stack"] = build_storage_stack(server.get("role"))
     return server
 
 

@@ -13,6 +13,9 @@ import {
   MotherboardPanel, RaidPanel, BiosPanel, BmcPanel, CampusRoomView,
   ServiceModePanel, InventoryPanel, FailureInjectBar,
 } from './ServerTwinPanels'
+import {
+  NetworkRoomPhase3, CableOpsPanel, StorageStackPanel,
+} from './NetworkStoragePanels'
 import '../../styles/sim-products.css'
 import './DatacenterSimulator.css'
 
@@ -334,7 +337,20 @@ export default function DatacenterSimulator({
 
       {currentRoom.type === 'network' && currentRoom.id === 'mdf' && (
         <div className="dc-room-body">
-          <NetworkRoomView network={network} servers={servers} onSelectServer={(id) => { setSelectedServerId(id); setDrawerTab('overview') }} />
+          <NetworkRoomPhase3
+            network={network}
+            servers={servers}
+            busy={busy}
+            onSelectServer={(id) => { setSelectedServerId(id); setDrawerTab('overview') }}
+            onCli={async (switchId, command) => {
+              const res = await run(() => datacenterApi.switchCli(sessionId, switchId, command), `CLI ${command}`)
+              return res
+            }}
+            onPing={async (host) => run(() => datacenterApi.netPing(sessionId, host), `ping ${host}`)}
+            onTrace={async (dest) => run(() => datacenterApi.netTraceroute(sessionId, dest), `traceroute ${dest}`)}
+            onIperf={async (src, dst) => run(() => datacenterApi.netIperf(sessionId, src, dst), 'iperf')}
+            onFixProtocol={(protocol) => doAction(() => datacenterApi.netFixProtocol(sessionId, protocol), `Restored ${protocol}`)}
+          />
         </div>
       )}
 
@@ -384,6 +400,7 @@ export default function DatacenterSimulator({
                 ['bmc', selectedServer.bmc?.product || 'iDRAC/iLO'],
                 ['service', 'Service'],
                 ['inventory', 'CMDB'],
+                ['storage', 'Storage'],
               ].map(([key, label]) => (
                 <button key={key} type="button"
                   className={`dc-drawer-tab ${drawerTab === key ? 'dc-drawer-tab-active' : ''}`}
@@ -488,6 +505,20 @@ export default function DatacenterSimulator({
               </div>
             )}
 
+            {drawerTab === 'storage' && (
+              <div className="dc-drawer-section">
+                <StorageStackPanel
+                  storage={selectedServer.storage_stack}
+                  busy={busy}
+                  onOp={(op, extra) => doAction(
+                    () => datacenterApi.storageOps(sessionId, selectedServer.id, op, extra),
+                    `Storage ${op}`,
+                    selectedServer.id,
+                  )}
+                />
+              </div>
+            )}
+
             {drawerTab === 'overview' && (
               <>
             <div className="dc-drawer-section">
@@ -517,28 +548,29 @@ export default function DatacenterSimulator({
             {selectedServer.hardware?.cables?.length > 0 && (
               <div className="dc-drawer-section">
                 <div className="dc-drawer-label">Cables &amp; ports</div>
-                <div className="dc-cable-list">
+                <CableOpsPanel
+                  cables={selectedServer.hardware.cables}
+                  busy={busy}
+                  catalog={hardwareCatalog.cable_catalog}
+                  onOp={(op, cableId, extra) => doAction(
+                    () => datacenterApi.cableOps(sessionId, selectedServer.id, op, { cable_id: cableId, ...extra }),
+                    `Cable ${op}`,
+                    selectedServer.id,
+                  )}
+                />
+                <div className="dc-action-row mt-2">
                   {selectedServer.hardware.cables.map((c) => {
                     const seated = c.status === 'seated'
-                    return (
-                      <div key={c.id} className={`dc-cable-row ${seated ? 'dc-cable-ok' : 'dc-cable-loose'}`}>
-                        <span className={`dc-port-led ${seated ? 'dc-led-green' : 'dc-led-red'}`} />
-                        <div className="dc-cable-info">
-                          <strong>{c.id}</strong>
-                          <span>{c.type} · {c.port} · {c.status}</span>
-                        </div>
-                        {seated ? (
-                          <button type="button" disabled={busy} className="dc-btn-outline dc-btn-xs"
-                            onClick={() => doAction(() => datacenterApi.unplugCable(sessionId, selectedServer.id, c.id), `Unplugged ${c.id}`, selectedServer.id)}>
-                            Unplug
-                          </button>
-                        ) : (
-                          <button type="button" disabled={busy} className="dc-btn-danger dc-btn-xs"
-                            onClick={() => doAction(() => datacenterApi.plugCable(sessionId, selectedServer.id, c.id), `Plugged ${c.id}`, selectedServer.id)}>
-                            Plug in
-                          </button>
-                        )}
-                      </div>
+                    return seated ? (
+                      <button key={`u-${c.id}`} type="button" disabled={busy} className="dc-btn-outline dc-btn-xs"
+                        onClick={() => doAction(() => datacenterApi.unplugCable(sessionId, selectedServer.id, c.id), `Unplugged ${c.id}`, selectedServer.id)}>
+                        Unplug {c.id}
+                      </button>
+                    ) : (
+                      <button key={`p-${c.id}`} type="button" disabled={busy} className="dc-btn-danger dc-btn-xs"
+                        onClick={() => doAction(() => datacenterApi.plugCable(sessionId, selectedServer.id, c.id), `Plugged ${c.id}`, selectedServer.id)}>
+                        Plug {c.id}
+                      </button>
                     )
                   })}
                 </div>
@@ -704,60 +736,6 @@ export default function DatacenterSimulator({
             </>
             )}
           </div>
-        </div>
-      )}
-    </div>
-  )
-}
-
-function NetworkRoomView({ network, servers, onSelectServer }) {
-  const hostnameById = useMemo(() => {
-    const m = {}
-    for (const s of servers) m[s.id] = s.hostname
-    return m
-  }, [servers])
-
-  return (
-    <div className="dc-network-room">
-      {(network.switches || []).map((sw) => (
-        <div key={sw.id} className="dc-switch-card">
-          <div className="dc-switch-head">
-            <Router size={14} />
-            <span className="dc-switch-name">{sw.hostname}</span>
-            <span className="dc-switch-loc">{sw.rack} · U{sw.u_slot}</span>
-            <span className="dc-switch-model">{sw.model}</span>
-          </div>
-          <table className="dc-port-table">
-            <thead>
-              <tr><th>Port</th><th>Status</th><th>Speed</th><th>VLAN</th><th>Connected to</th></tr>
-            </thead>
-            <tbody>
-              {(sw.ports || []).map((p) => (
-                <tr key={p.port}>
-                  <td>{p.port}</td>
-                  <td><span className={`dc-port-badge ${p.status === 'up' ? 'dc-port-up' : 'dc-port-down'}`}>{p.status}</span></td>
-                  <td>{p.speed}</td>
-                  <td>{p.vlan ?? '—'}</td>
-                  <td>
-                    {p.connected_to ? (
-                      <button type="button" className="dc-port-link"
-                        onClick={() => hostnameById[p.connected_to] && onSelectServer(p.connected_to)}>
-                        {hostnameById[p.connected_to] || p.connected_to}
-                      </button>
-                    ) : '—'}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      ))}
-      {(network.topology || []).length > 0 && (
-        <div className="dc-topology-strip">
-          <span className="dc-topology-label">Uplinks:</span>
-          {network.topology.map((link, i) => (
-            <span key={i} className="dc-topology-chip">{link.from} → {link.to} ({link.speed})</span>
-          ))}
         </div>
       )}
     </div>

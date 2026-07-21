@@ -264,10 +264,11 @@ def _cooling_units() -> list[dict]:
 # ── Network ────────────────────────────────────────────────────────────────
 
 def _network() -> dict:
+    from apps.vmware_sim.datacenter_network_storage import enrich_network
     switches = [
         {
             "id": "sw-core-01", "rack": "R09", "u_slot": 40, "hostname": "core-sw-01",
-            "model": "48-port 10G ToR", "ports": [
+            "model": "Arista 7050CX3-32S", "ports": [
                 {"port": 1, "status": "up", "speed": "10G", "vlan": 10, "connected_to": "srv-r01-u12"},
                 {"port": 2, "status": "up", "speed": "10G", "vlan": 10, "connected_to": "srv-r01-u14"},
                 {"port": 3, "status": "up", "speed": "10G", "vlan": 20, "connected_to": "srv-r02-u10"},
@@ -280,18 +281,27 @@ def _network() -> dict:
         },
         {
             "id": "sw-agg-01", "rack": "R10", "u_slot": 38, "hostname": "agg-sw-01",
-            "model": "24-port 40G aggregation", "ports": [
+            "model": "Cisco Nexus 93180YC-FX", "ports": [
                 {"port": 1, "status": "up", "speed": "40G", "vlan": 1, "connected_to": "sw-core-01"},
                 {"port": 2, "status": "up", "speed": "10G", "vlan": 1, "connected_to": "internet-edge"},
                 {"port": 3, "status": "down", "speed": "10G", "vlan": None, "connected_to": None},
             ],
         },
+        {
+            "id": "sw-ib-01", "rack": "R10", "u_slot": 36, "hostname": "ib-sw-01",
+            "model": "NVIDIA Spectrum SN3700", "ports": [
+                {"port": 1, "status": "up", "speed": "100G", "vlan": 30, "connected_to": "srv-r03-u08"},
+                {"port": 2, "status": "up", "speed": "100G", "vlan": 1, "connected_to": "sw-agg-01"},
+                {"port": 3, "status": "down", "speed": "100G", "vlan": None, "connected_to": None},
+            ],
+        },
     ]
     topology = [
-        {"from": "core-sw-01", "to": "agg-sw-01", "type": "uplink", "speed": "40G"},
-        {"from": "agg-sw-01", "to": "internet-edge", "type": "uplink", "speed": "10G"},
+        {"from": "core-sw-01", "to": "agg-sw-01", "type": "uplink", "speed": "40G", "latency_us": 12, "util_pct": 34},
+        {"from": "agg-sw-01", "to": "internet-edge", "type": "uplink", "speed": "10G", "latency_us": 80, "util_pct": 22},
+        {"from": "ib-sw-01", "to": "agg-sw-01", "type": "uplink", "speed": "100G", "latency_us": 5, "util_pct": 41},
     ]
-    return {"switches": switches, "topology": topology}
+    return enrich_network({"switches": switches, "topology": topology})
 
 
 # ── Base state ─────────────────────────────────────────────────────────────
@@ -500,6 +510,11 @@ def get_state(session_id: str, scenario_slug: str = "") -> dict:
         state["campus"] = campus_assets()
     for srv in state.get("servers", []):
         enrich_server(srv)
+    # Enrich network (CLI/counters) for older sessions
+    from apps.vmware_sim.datacenter_network_storage import enrich_network, tick_port_counters, CABLE_CATALOG
+    if state.get("network"):
+        enrich_network(state["network"])
+        tick_port_counters(state["network"])
     # CMDB rollup + hardware catalog for UI
     state["inventory"] = [
         {**(s.get("inventory") or {}), "server_id": s["id"], "hostname": s.get("hostname")}
@@ -508,6 +523,7 @@ def get_state(session_id: str, scenario_slug: str = "") -> dict:
     if not state.get("hardware_catalog"):
         from apps.vmware_sim.datacenter_hardware_catalog import full_catalog
         state["hardware_catalog"] = full_catalog()
+    state["hardware_catalog"]["cable_catalog"] = CABLE_CATALOG
     _save(session_id, entry)
     _sync_identity(session_id, state)
     state_copy = copy.deepcopy(state)
@@ -1482,6 +1498,144 @@ def apply_action(session_id: str, action: str, payload: dict | None = None) -> d
         _event(state, f"HTML5 KVM opened on {srv['id']}", "info")
         _save(session_id, entry)
         return {"ok": True, "message": "KVM open", "console": state["console"], "bmc": bmc}
+
+    # ── Phase 3: switch CLI, net tools, cables, storage ─────────────────────
+
+    if action == "switch_cli":
+        from apps.vmware_sim.datacenter_network_storage import run_switch_cli, enrich_network
+        switch_id = payload.get("switch_id") or ""
+        command = payload.get("command") or ""
+        net = state.setdefault("network", {})
+        enrich_network(net)
+        sw = next((s for s in net.get("switches") or [] if s.get("id") == switch_id or s.get("hostname") == switch_id), None)
+        if not sw and net.get("switches"):
+            sw = net["switches"][0]
+        if not sw:
+            return {"ok": False, "error": "No switch found"}
+        lines = run_switch_cli(sw, command)
+        # Clear switch failure if admin no shutdown restored ports
+        if broken.get("component") == "switch" and broken.get("target") == sw.get("id"):
+            if any(p.get("status") == "up" for p in sw.get("ports") or []):
+                broken.clear()
+        _event(state, f"CLI on {sw.get('hostname')}: {command}", "info")
+        _save(session_id, entry)
+        return {"ok": True, "message": "CLI ok", "switch_id": sw["id"], "output": lines, "switch": sw}
+
+    if action == "net_ping":
+        from apps.vmware_sim.datacenter_network_storage import run_switch_cli
+        host = payload.get("host") or "10.0.0.1"
+        # Reuse ping formatter
+        lines = run_switch_cli({"ports": [], "cli_style": "cisco", "hostname": "tools"}, f"ping {host}")
+        tools = state.setdefault("network", {}).setdefault("tools", {})
+        tools["last_ping"] = {"host": host, "lines": lines, "time": _now_iso()}
+        if broken.get("component") in ("dns", "dhcp") and "0%" in "\n".join(lines):
+            pass  # ping alone doesn't clear DNS
+        _event(state, f"ping {host}", "info")
+        _save(session_id, entry)
+        return {"ok": True, "message": f"ping {host}", "output": lines, "tools": tools}
+
+    if action == "net_traceroute":
+        from apps.vmware_sim.datacenter_network_storage import run_traceroute
+        dest = payload.get("dest") or payload.get("host") or "10.99.0.10"
+        result = run_traceroute(dest)
+        tools = state.setdefault("network", {}).setdefault("tools", {})
+        tools["last_traceroute"] = result
+        lines = [f"{h['hop']}  {h['host']} ({h['ip']})  {h['rtt_ms']} ms" for h in result["hops"]]
+        _event(state, f"traceroute {dest}", "info")
+        _save(session_id, entry)
+        return {"ok": True, "message": f"traceroute {dest}", "output": lines, "result": result}
+
+    if action == "net_iperf":
+        from apps.vmware_sim.datacenter_network_storage import run_iperf
+        src = payload.get("src") or "srv-r01-u12"
+        dst = payload.get("dst") or "srv-r04-u06"
+        result = run_iperf(src, dst, int(payload.get("seconds") or 5))
+        tools = state.setdefault("network", {}).setdefault("tools", {})
+        tools["last_iperf"] = result
+        lines = [
+            f"iperf3: {src} → {dst}",
+            f"Interval 0.0-{result['seconds']}.0 sec  Transfer  Bandwidth {result['throughput_gbps']} Gbits/sec",
+            f"Retransmits: {result['retransmits']}",
+        ]
+        _event(state, f"iperf {src}→{dst} {result['throughput_gbps']}Gbps", "info")
+        _save(session_id, entry)
+        return {"ok": True, "message": "iperf complete", "output": lines, "result": result}
+
+    if action == "net_fix_protocol":
+        from apps.vmware_sim.datacenter_network_storage import enrich_network
+        proto = payload.get("protocol") or "bgp"
+        net = state.setdefault("network", {})
+        enrich_network(net)
+        for sw in net.get("switches") or []:
+            p = sw.setdefault("protocols", {})
+            if proto == "bgp":
+                p.setdefault("bgp", {})["status"] = "up"
+                p["bgp"]["established"] = p["bgp"].get("peers", 2)
+            elif proto == "vlan":
+                # restore VLANs on downed access ports
+                for port in sw.get("ports") or []:
+                    if port.get("connected_to") and not port.get("vlan"):
+                        port["vlan"] = 10
+                        port["status"] = "up"
+            elif proto == "ospf":
+                p.setdefault("ospf", {})["status"] = "full"
+        if broken.get("component") in ("bgp", "vlan", "ospf", proto):
+            broken.clear()
+        _event(state, f"Restored network protocol {proto}", "success")
+        _save(session_id, entry)
+        return {"ok": True, "message": f"{proto} restored", "network": net}
+
+    if action == "cable_ops":
+        from apps.vmware_sim.datacenter_network_storage import cable_action, enrich_cables
+        asset_id = payload.get("asset_id") or state.get("selected_asset") or ""
+        srv = _find_server(state, asset_id)
+        if not srv:
+            return {"ok": False, "error": f"Asset {asset_id} not found"}
+        hw = srv.setdefault("hardware", _hardware_inventory(srv.get("hostname") or srv["id"]))
+        hw["cables"] = enrich_cables(hw.get("cables") or [])
+        ok, msg, cable = cable_action(
+            hw["cables"],
+            payload.get("cable_id") or "",
+            payload.get("op") or "label",
+            label=payload.get("label"),
+            route=payload.get("route"),
+            cable_type=payload.get("cable_type"),
+            bend_radius_mm=payload.get("bend_radius_mm"),
+            tension_n=payload.get("tension_n"),
+        )
+        if not ok:
+            return {"ok": False, "error": msg}
+        if cable and cable.get("status") == "seated" and broken.get("server") == srv["id"] and broken.get("component") == "cable":
+            if all(c.get("status") == "seated" for c in hw["cables"]):
+                broken.clear()
+        _event(state, f"Cable {msg} on {srv['id']}", "info")
+        _save(session_id, entry)
+        return {"ok": True, "message": msg, "cables": hw["cables"], "cable": cable}
+
+    if action == "storage_ops":
+        from apps.vmware_sim.datacenter_network_storage import storage_action, build_storage_stack
+        asset_id = payload.get("asset_id") or state.get("selected_asset") or ""
+        srv = _find_server(state, asset_id)
+        if not srv:
+            return {"ok": False, "error": f"Asset {asset_id} not found"}
+        stack = srv.setdefault("storage_stack", build_storage_stack(srv.get("role")))
+        ok, msg = storage_action(
+            stack,
+            payload.get("op") or "ceph_status",
+            bay_id=payload.get("bay_id"),
+            lun_id=payload.get("lun_id"),
+            path=payload.get("path"),
+            clients=payload.get("clients"),
+            mode=payload.get("mode"),
+        )
+        if not ok:
+            return {"ok": False, "error": msg}
+        if payload.get("op") == "replace_bay" and broken.get("server") == srv["id"] and broken.get("component") == "disk":
+            srv["components"]["disk"] = "healthy"
+            broken.clear()
+        _event(state, f"Storage {msg} on {srv['id']}", "info")
+        _save(session_id, entry)
+        return {"ok": True, "message": msg, "storage_stack": stack}
 
     return {"ok": False, "error": f"Unknown action: {action}"}
 

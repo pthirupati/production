@@ -152,6 +152,27 @@ export const datacenterApi = {
   bmcOpenKvm(sessionId, assetId) {
     return datacenterApi.action(sessionId, 'bmc_open_kvm', { asset_id: assetId })
   },
+  switchCli(sessionId, switchId, command) {
+    return datacenterApi.action(sessionId, 'switch_cli', { switch_id: switchId, command })
+  },
+  netPing(sessionId, host) {
+    return datacenterApi.action(sessionId, 'net_ping', { host })
+  },
+  netTraceroute(sessionId, dest) {
+    return datacenterApi.action(sessionId, 'net_traceroute', { dest })
+  },
+  netIperf(sessionId, src, dst) {
+    return datacenterApi.action(sessionId, 'net_iperf', { src, dst })
+  },
+  netFixProtocol(sessionId, protocol) {
+    return datacenterApi.action(sessionId, 'net_fix_protocol', { protocol })
+  },
+  cableOps(sessionId, assetId, op, extra = {}) {
+    return datacenterApi.action(sessionId, 'cable_ops', { asset_id: assetId, op, ...extra })
+  },
+  storageOps(sessionId, assetId, op, extra = {}) {
+    return datacenterApi.action(sessionId, 'storage_ops', { asset_id: assetId, op, ...extra })
+  },
 }
 
 export default datacenterApi

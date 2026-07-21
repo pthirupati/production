@@ -68,10 +68,11 @@ instancing / streaming.
 
 ## Phase 3 — Network & storage
 
-- [ ] Switch CLI (Cisco / Arista / Juniper / Spectrum)
-- [ ] Packets, latency, BGP/OSPF/VLAN/LACP, ping/traceroute/iperf
-- [ ] Full cable catalog + damage/label/route
-- [ ] NVMe/SATA/SAS/U.2/E3.S + Ceph/ZFS/SAN/NAS facades
+- [x] Switch CLI (Cisco / Arista / Juniper / Spectrum facades)
+- [x] Packets counters, latency, BGP/OSPF/VLAN/LACP, ping/traceroute/iperf
+- [x] Full cable catalog + damage/label/route/bend/replace
+- [x] NVMe/SATA/SAS/U.2/E3.S + Ceph/ZFS/SAN/NAS facades
+- [ ] Deeper MPLS/EVPN config writers (show-level done)
 
 ## Phase 4 — Physics-lite & rack FRU
 

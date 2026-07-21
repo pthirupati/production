@@ -425,3 +425,22 @@
   margin-top: 0.85rem; padding-top: 0.75rem; border-top: 1px solid #1c2130;
   display: flex; flex-direction: column; gap: 0.45rem;
 }
+
+/* Phase 3: switch CLI, net tools, cables, storage */
+.dc-net-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 0.75rem; margin-bottom: 0.75rem; }
+@media (max-width: 900px) { .dc-net-grid { grid-template-columns: 1fr; } }
+.dc-net-phase3 { background: #12151e; border: 1px solid #232838; border-radius: 8px; padding: 0.75rem; }
+.dc-cli-row { display: flex; gap: 0.35rem; margin: 0.45rem 0; align-items: center; }
+.dc-cli-input { flex: 1; font-family: 'JetBrains Mono', monospace; }
+.dc-cli-screen {
+  background: #05070c; border: 1px solid #1c2130; border-radius: 6px; padding: 0.5rem 0.65rem;
+  font-family: 'JetBrains Mono', monospace; font-size: 0.62rem; color: #7dd3fc;
+  max-height: 180px; overflow-y: auto; line-height: 1.4;
+}
+.dc-cli-line { white-space: pre-wrap; word-break: break-word; }
+.dc-led-blink { animation: dc-blink 0.9s ease-in-out infinite; }
+.dc-proto-chips { display: flex; flex-wrap: wrap; gap: 0.35rem; margin-top: 0.45rem; }
+.dc-cable-route { display: block; color: #64748b; font-size: 0.58rem; }
+.dc-cable-ops { display: flex; flex-wrap: wrap; gap: 0.25rem; max-width: 220px; justify-content: flex-end; }
+.dc-storage-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 0.5rem; margin-top: 0.55rem; }
+.dc-port-led.inline { display: inline-block; vertical-align: middle; }
