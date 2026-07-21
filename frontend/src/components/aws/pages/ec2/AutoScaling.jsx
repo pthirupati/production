@@ -90,7 +90,11 @@ export function AutoScalingGroupDetail() {
   const navigate = useNavigate()
   const asg = useAwsStore((s) => (s.autoScalingGroups || []).find((x) => x.id === id))
   const instances = useAwsStore((s) => s.instances) || []
+  const scaleAutoScalingGroup = useAwsStore((s) => s.scaleAutoScalingGroup)
+  const pushFlash = useAwsStore((s) => s.pushFlash)
   const [tab, setTab] = useState('instances')
+  const [editOpen, setEditOpen] = useState(false)
+  const [capacity, setCapacity] = useState({ desired: 1, min: 1, max: 4 })
 
   if (!asg) {
     return <div className="aws-page"><EmptyState title="Auto Scaling group not found" action={<Button onClick={() => navigate(`${BASE}/ec2/auto-scaling-groups`)}>Back to Auto Scaling groups</Button>} /></div>
@@ -108,11 +112,19 @@ export function AutoScalingGroupDetail() {
     { at: asg.created, description: `Auto Scaling group ${asg.name} created`, status: 'Successful', cause: `Group created with desired capacity ${asg.desired}.` },
   ].sort((a, b) => new Date(b.at) - new Date(a.at))
 
+  const openEdit = () => {
+    setCapacity({ desired: asg.desired, min: asg.min, max: asg.max })
+    setEditOpen(true)
+  }
+
   return (
     <div>
       <Breadcrumb items={[{ label: 'EC2', onClick: () => navigate(`${BASE}/ec2/home`) }, { label: 'Auto Scaling Groups', onClick: () => navigate(`${BASE}/ec2/auto-scaling-groups`) }, { label: asg.name }]} />
       <div className="aws-page" style={{ paddingTop: 0 }}>
-        <h1 style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 16 }}>{asg.name} <Badge state={asg.status === 'active' ? 'available' : asg.status}>{asg.status}</Badge></h1>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, marginBottom: 16, flexWrap: 'wrap' }}>
+          <h1 style={{ display: 'flex', alignItems: 'center', gap: 12, margin: 0 }}>{asg.name} <Badge state={asg.status === 'active' ? 'available' : asg.status}>{asg.status}</Badge></h1>
+          <Button onClick={openEdit}>Edit capacity</Button>
+        </div>
         <div className="aws-card" style={{ marginBottom: 16 }}>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 16 }}>
             <div className="aws-kv"><span className="v" style={{ fontSize: 24, fontWeight: 700 }}>{asg.desired}</span><span className="k">Desired capacity</span></div>
@@ -173,6 +185,29 @@ export function AutoScalingGroupDetail() {
           )}
         </div>
       </div>
+      {editOpen && (
+        <Modal onClose={() => setEditOpen(false)} title="Edit capacity"
+          footer={(
+            <>
+              <Button onClick={() => setEditOpen(false)}>Cancel</Button>
+              <Button variant="primary" onClick={() => {
+                const res = scaleAutoScalingGroup(asg.id, capacity)
+                if (res?.ok === false) pushFlash('error', res.error)
+                else pushFlash('success', `Scaled ${asg.name} desired=${capacity.desired}`)
+                setEditOpen(false)
+              }}>Update</Button>
+            </>
+          )}>
+          <div style={{ display: 'grid', gap: 12 }}>
+            <label className="aws-label">Desired<input className="aws-input" type="number" min={0} value={capacity.desired}
+              onChange={(e) => setCapacity({ ...capacity, desired: Number(e.target.value) })} /></label>
+            <label className="aws-label">Minimum<input className="aws-input" type="number" min={0} value={capacity.min}
+              onChange={(e) => setCapacity({ ...capacity, min: Number(e.target.value) })} /></label>
+            <label className="aws-label">Maximum<input className="aws-input" type="number" min={0} value={capacity.max}
+              onChange={(e) => setCapacity({ ...capacity, max: Number(e.target.value) })} /></label>
+          </div>
+        </Modal>
+      )}
     </div>
   )
 }

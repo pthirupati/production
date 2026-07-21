@@ -125,7 +125,7 @@ export function buildHostMenu(host, onAction, acting) {
     {
       label: 'Host Profiles', icon: 'FileText', children: [
         { label: 'Extract Host Profile…', icon: 'FileText', onClick: () => onAction('extract_host_profile', { host_id: id }), disabled: acting },
-        { label: 'Attach Host Profile…', icon: 'FileText', onClick: () => onAction('__attach_host_profile__', host), disabled: acting },
+        { label: 'Attach Host Profile…', icon: 'FileText', onClick: () => onAction('attach_host_profile', { host: host.name || id, name: `Profile-${host.name || id}` }), disabled: acting },
       ],
     },
     { label: 'Export System Logs…', icon: 'FileText', onClick: () => onAction('export_system_logs', { host_id: id }), disabled: acting },

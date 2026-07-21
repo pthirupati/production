@@ -884,7 +884,14 @@ function GrafanaView({ state, sessionId, scenario, onReload, activeNav, grafanaC
           <GrafanaExplorePanel sessionId={sessionId} scenarioSlug={scenario} datasources={graf.datasources || []} />
         )}
 
-        {sub === 'alerting' && <GrafanaAlertingPanel graf={graf} />}
+        {sub === 'alerting' && (
+          <GrafanaAlertingPanel
+            graf={graf}
+            sessionId={sessionId}
+            silences={(state.prometheus?.alertmanager?.silences) || []}
+            onReload={onReload}
+          />
+        )}
 
         {sub === 'connections' && <GrafanaConnectionsPanel datasources={graf.datasources || []} sessionId={sessionId} onReload={onReload} />}
 

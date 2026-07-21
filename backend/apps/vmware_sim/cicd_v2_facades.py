@@ -219,11 +219,33 @@ def apply_v2_action(state: dict, action: str, payload: dict | None = None) -> di
     if action == "flux_suspend":
         name = (payload.get("name") or "").strip()
         flux = state.setdefault("flux", {})
+        kind = (payload.get("kind") or "kustomization").lower()
+        if kind in ("helmrelease", "helm_release", "helm"):
+            hr = next((h for h in flux.get("helm_releases") or [] if h.get("name") == name), None)
+            if not hr and flux.get("helm_releases"):
+                hr = flux["helm_releases"][0]
+            if not hr:
+                return {"ok": False, "error": "HelmRelease not found"}
+            hr["suspended"] = bool(payload.get("suspended", True))
+            return {"ok": True, "message": f"{'Suspended' if hr['suspended'] else 'Resumed'} HelmRelease {hr['name']}", "helm_release": hr}
         ks = next((k for k in flux.get("kustomizations") or [] if k.get("name") == name), None)
         if not ks:
             return {"ok": False, "error": "Kustomization not found"}
         ks["suspended"] = bool(payload.get("suspended", True))
         return {"ok": True, "message": f"{'Suspended' if ks['suspended'] else 'Resumed'} {name}", "kustomization": ks}
+
+    if action == "flux_helm_reconcile":
+        name = (payload.get("name") or "").strip()
+        flux = state.setdefault("flux", {})
+        hr = next((h for h in flux.get("helm_releases") or [] if h.get("name") == name), None)
+        if not hr and flux.get("helm_releases"):
+            hr = flux["helm_releases"][0]
+        if not hr:
+            return {"ok": False, "error": "HelmRelease not found"}
+        hr["ready"] = True
+        hr["suspended"] = False
+        hr["last_applied"] = _now()
+        return {"ok": True, "message": f"Reconciled HelmRelease {hr['name']}", "helm_release": hr}
 
     if action == "github_rerun_workflow":
         runs = (state.get("github") or {}).setdefault("actions_runs", [])

@@ -3,6 +3,7 @@ import {
   Bell, BellOff, Radio, GitBranch, Layers, ListChecks,
   AlertTriangle, CheckCircle2, Clock, ChevronRight, Mail, MessageSquare,
 } from 'lucide-react'
+import { monitoringApi } from '../../api/monitoring'
 
 /* ── helpers ───────────────────────────────────────────────────────────── */
 
@@ -53,8 +54,9 @@ const SUB_TABS = [
  *   graf.contact_points:[{name,type,address,configured}]
  *   graf.notification_policies:{ root:{ receiver, ... } }
  */
-export default function GrafanaAlertingPanel({ graf = {} }) {
+export default function GrafanaAlertingPanel({ graf = {}, sessionId, silences: liveSilences, onReload }) {
   const [sub, setSub] = useState('rules')
+  const [busy, setBusy] = useState(false)
 
   const rules = Array.isArray(graf.alert_rules) ? graf.alert_rules : []
   const contacts = Array.isArray(graf.contact_points) ? graf.contact_points : []
@@ -71,8 +73,21 @@ export default function GrafanaAlertingPanel({ graf = {} }) {
     [rules],
   )
 
-  // ── synthesized Silences (original sample data) ──
+  // Prefer lab-server silences; fall back to synthesized samples for empty labs.
   const silences = useMemo(() => {
+    if (Array.isArray(liveSilences) && liveSilences.length) {
+      return liveSilences.map((s) => ({
+        id: s.id,
+        matchers: (s.matchers || []).map((m) => (
+          typeof m === 'string' ? m : `${m.name}${m.isRegex ? '=~' : '='}"${m.value}"`
+        )),
+        comment: s.comment || '',
+        createdBy: s.created_by || s.createdBy || 'labuser',
+        starts: s.starts_at || s.starts || 'now',
+        ends: s.ends_at || s.ends || '',
+        state: s.state || 'active',
+      }))
+    }
     const out = []
     const muted = firing[0] || pending[0] || rules[0]
     if (muted) {
@@ -105,7 +120,7 @@ export default function GrafanaAlertingPanel({ graf = {} }) {
       state: 'expired',
     })
     return out
-  }, [firing, pending, rules])
+  }, [liveSilences, firing, pending, rules])
 
   // ── synthesized Alert groups, grouped by severity (original sample data) ──
   const alertGroups = useMemo(() => {
@@ -294,20 +309,33 @@ export default function GrafanaAlertingPanel({ graf = {} }) {
         </div>
       )}
 
-      {/* ── Silences (synthesized original sample data) ── */}
+      {/* ── Silences ── */}
       {sub === 'silences' && (
         <div className="space-y-3">
           <div className="mon-banner">
             <BellOff size={15} className="shrink-0 mt-0.5" style={{ color: ACCENT }} />
             <span>
               Silences mute notifications for alerts matching a set of label matchers.
-              These samples are derived from the current rules to illustrate the workflow.
+              Create or expire silences against the lab Alertmanager state.
             </span>
+          </div>
+          <div className="flex justify-end">
+            <button type="button" className="mon-btn-primary !text-xs" disabled={busy || !sessionId}
+              onClick={async () => {
+                setBusy(true)
+                try {
+                  const alertname = firing[0]?.title || pending[0]?.title || rules[0]?.title || 'NodeDown'
+                  await monitoringApi.createSilence(sessionId, { alertname, comment: `Lab silence for ${alertname}` })
+                  await onReload?.()
+                } finally { setBusy(false) }
+              }}>
+              Create silence
+            </button>
           </div>
           <div className="mon-card !p-0 overflow-hidden">
             <table className="mon-table">
               <thead>
-                <tr><th>Matchers</th><th>Comment</th><th>Created by</th><th>Schedule</th><th>State</th></tr>
+                <tr><th>Matchers</th><th>Comment</th><th>Created by</th><th>Schedule</th><th>State</th><th /></tr>
               </thead>
               <tbody>
                 {silences.map(s => (
@@ -331,6 +359,20 @@ export default function GrafanaAlertingPanel({ graf = {} }) {
                             : 'mon-badge-down'}`}>
                         {s.state}
                       </span>
+                    </td>
+                    <td>
+                      {s.state === 'active' && sessionId && (
+                        <button type="button" className="text-xs text-[#f7913b]" disabled={busy}
+                          onClick={async () => {
+                            setBusy(true)
+                            try {
+                              await monitoringApi.expireSilence(sessionId, s.id)
+                              await onReload?.()
+                            } finally { setBusy(false) }
+                          }}>
+                          Expire
+                        </button>
+                      )}
                     </td>
                   </tr>
                 ))}

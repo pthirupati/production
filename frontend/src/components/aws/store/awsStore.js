@@ -1246,6 +1246,46 @@ export const useAwsStore = create(
         set((s) => ({ autoScalingGroups: (s.autoScalingGroups || []).filter((a) => a.id !== id) }))
         return ok()
       },
+      scaleAutoScalingGroup: (id, { desired, min, max } = {}) => {
+        const asg = (get().autoScalingGroups || []).find((a) => a.id === id)
+        if (!asg) return fail(resourceNotFound('UpdateAutoScalingGroup', 'Auto Scaling group not found.'))
+        const nextMin = min != null ? Number(min) : asg.min
+        const nextMax = max != null ? Number(max) : asg.max
+        let nextDesired = desired != null ? Number(desired) : asg.desired
+        nextDesired = Math.max(nextMin, Math.min(nextMax, nextDesired))
+        const current = (asg.instanceIds || []).length
+        if (nextDesired > current) {
+          for (let i = current; i < nextDesired; i += 1) {
+            const created = get().launchInstances({
+              name: `${asg.name}-instance`, amiId: 'ami-0c02fb55956c7d316', type: 't3.micro', count: 1,
+              keyName: '', subnetId: '', securityGroups: [], monitoring: false,
+              tags: { 'aws:autoscaling:groupName': asg.name },
+            })
+            if (created?.[0]) {
+              set((s) => ({
+                autoScalingGroups: (s.autoScalingGroups || []).map((a) => (
+                  a.id === id ? { ...a, instanceIds: [...(a.instanceIds || []), created[0].id] } : a
+                )),
+              }))
+            }
+          }
+        } else if (nextDesired < current) {
+          const toTerminate = (asg.instanceIds || []).slice(nextDesired)
+          if (toTerminate.length) get().instanceAction(toTerminate, 'terminate')
+          set((s) => ({
+            autoScalingGroups: (s.autoScalingGroups || []).map((a) => (
+              a.id === id ? { ...a, instanceIds: (a.instanceIds || []).slice(0, nextDesired) } : a
+            )),
+          }))
+        }
+        set((s) => ({
+          autoScalingGroups: (s.autoScalingGroups || []).map((a) => (
+            a.id === id ? { ...a, desired: nextDesired, min: nextMin, max: nextMax } : a
+          )),
+        }))
+        get()._syncAction('scale_asg', { id: asg.id, name: asg.name, desired: nextDesired, min: nextMin, max: nextMax })
+        return ok({ desired: nextDesired, min: nextMin, max: nextMax })
+      },
 
       // ---------- S3 ----------
       createBucket: ({ name, region, versioning, encryption, blockPublic }) => {
@@ -1440,7 +1480,13 @@ export const useAwsStore = create(
       },
 
       // ---------- RDS bespoke ----------
-      rebootDb: (id) => get().transitionGenericResource('rds', 'databases', id, 'reboot'),
+      rebootDb: (id) => {
+        const dbs = get().genericResources?.rds?.databases || []
+        const db = dbs.find((d) => d.id === id) || dbs[0]
+        const res = get().transitionGenericResource('rds', 'databases', id, 'reboot')
+        if (db) get()._syncAction('reboot_rds', { id: db.id, name: db.name })
+        return res
+      },
       modifyDb: (id, patch) => get().transitionGenericResource('rds', 'databases', id, 'modify', patch),
 
       // ---------- Lambda bespoke ----------
@@ -1449,10 +1495,14 @@ export const useAwsStore = create(
         const billedMs = Math.ceil(durationMs / 100) * 100
         const memoryUsed = 60 + Math.floor(Math.random() * 40)
         const entry = { at: new Date().toISOString(), statusCode: 200, durationMs, billedMs, memoryUsed, payload: payload ?? null }
-        set((s) => mapGeneric(s, 'lambda', 'functions', id, (fn) => ({
-          ...fn,
-          invocationHistory: [entry, ...((fn.invocationHistory) || [])].slice(0, 50),
+        const funcs = get().genericResources?.lambda?.functions || []
+        const fn = funcs.find((f) => f.id === id) || funcs[0]
+        set((s) => mapGeneric(s, 'lambda', 'functions', id, (f) => ({
+          ...f,
+          invocationHistory: [entry, ...((f.invocationHistory) || [])].slice(0, 50),
+          invocations_24h: (f.invocations_24h || 0) + 1,
         })))
+        if (fn) get()._syncAction('invoke_lambda', { id: fn.id, name: fn.name })
         return { statusCode: 200, body: payload ?? { message: 'Hello from Lambda!' }, durationMs, billedMs, memoryUsed }
       },
       setLambdaCode: (id, code) => set((s) => mapGeneric(s, 'lambda', 'functions', id, (fn) => ({ ...fn, code }))),

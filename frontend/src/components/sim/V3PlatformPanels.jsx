@@ -95,6 +95,30 @@ export function renderCicdGitOpsPage({ nav, st, sessionId, busy, run }) {
             { key: 'chart', label: 'Chart' },
             { key: 'version', label: 'Version' },
             { key: 'ready', label: 'Ready', render: (r) => <SimStatusBadge status={r.ready ? 'success' : 'warning'} label={r.ready ? 'True' : 'False'} /> },
+            { key: 'suspended', label: 'Suspended', render: (r) => (r.suspended ? 'Yes' : 'No') },
+            {
+              key: 'actions', label: '',
+              render: (r) => (
+                <div className="flex gap-1 flex-wrap">
+                  {!r.ready && !r.suspended && (
+                    <button type="button" className="cicd-btn cicd-btn-approve text-xs" disabled={busy}
+                      onClick={(e) => { e.stopPropagation(); run(() => cicdApi.fluxHelmReconcile(sessionId, r.name), 'Reconciled') }}>
+                      Reconcile
+                    </button>
+                  )}
+                  <button type="button" className="cicd-btn cicd-btn-approve text-xs" disabled={busy}
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      run(
+                        () => cicdApi.fluxSuspend(sessionId, r.name, !r.suspended, 'helmrelease'),
+                        r.suspended ? 'Resumed' : 'Suspended',
+                      )
+                    }}>
+                    {r.suspended ? 'Resume' : 'Suspend'}
+                  </button>
+                </div>
+              ),
+            },
           ]} rows={flux.helm_releases || []} />
         </div>
       </div>

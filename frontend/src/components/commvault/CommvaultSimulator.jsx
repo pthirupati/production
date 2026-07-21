@@ -278,19 +278,34 @@ export default function CommvaultSimulator({
     }
     if (nav === 'media-agents') {
       return (
-        <SimDataTable columns={[
-          { key: 'name', label: 'Media Agent', sortable: true },
-          { key: 'os', label: 'OS', sortable: true },
-          { key: 'streams', label: 'Streams', sortable: true },
-          { key: 'free_space_gb', label: 'Free (GB)', sortable: true },
-          { key: 'status', label: 'Status', render: (r) => <SimStatusBadge status={r.status === 'online' ? 'success' : 'error'} label={r.status} /> },
-        ]} rows={st.media_agents || []} searchKeys={['name']} />
+        <div className="space-y-3">
+          <div className="flex justify-between items-center flex-wrap gap-2">
+            <h2 className="text-lg font-semibold">Media Agents</h2>
+            <button type="button" className="cv-btn-primary flex items-center gap-1" disabled={busy}
+              onClick={() => run(() => commvaultApi.addMediaAgent(sessionId, `MA-${Date.now().toString(36).slice(-4)}`), 'Media Agent added')}>
+              <Plus size={14} /> Add Media Agent
+            </button>
+          </div>
+          <SimDataTable columns={[
+            { key: 'name', label: 'Media Agent', sortable: true },
+            { key: 'os', label: 'OS', sortable: true },
+            { key: 'streams', label: 'Streams', sortable: true },
+            { key: 'free_space_gb', label: 'Free (GB)', sortable: true },
+            { key: 'status', label: 'Status', render: (r) => <SimStatusBadge status={r.status === 'online' ? 'success' : 'error'} label={r.status} /> },
+          ]} rows={st.media_agents || []} searchKeys={['name']} />
+        </div>
       )
     }
     if (nav === 'libraries') {
       return (
         <div className="space-y-3">
-          <h2 className="text-lg font-semibold">Disk Libraries</h2>
+          <div className="flex justify-between items-center flex-wrap gap-2">
+            <h2 className="text-lg font-semibold">Disk Libraries</h2>
+            <button type="button" className="cv-btn-primary flex items-center gap-1" disabled={busy}
+              onClick={() => run(() => commvaultApi.createLibrary(sessionId, `Lib-${Date.now().toString(36).slice(-4)}`), 'Library created')}>
+              <Plus size={14} /> Create Library
+            </button>
+          </div>
           {(st.libraries || []).map((l) => {
             const pct = Math.round(((l.used_gb || 0) / (l.capacity_gb || 1)) * 100)
             return (

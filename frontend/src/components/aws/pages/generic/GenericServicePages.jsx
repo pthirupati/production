@@ -451,6 +451,7 @@ export function GenericResourceDetail() {
     // row walks rebooting -> available via the durable tick.
     if (service === 'rds' && cfg.lifecycle?.actions?.reboot) {
       transitionGenericResource(service, resource, row.id, 'reboot')
+      useAwsStore.getState()._syncAction('reboot_rds', { id: row.id, name: row.name })
       pushFlash('info', `Rebooting ${row.name}`)
       return
     }

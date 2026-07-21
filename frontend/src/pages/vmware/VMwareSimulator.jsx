@@ -1133,7 +1133,7 @@ export default function VMwareSimulator() {
       case '__host_power_on__': setVmToast({ message: `${payload.name} is already powered on`, kind: 'info' }); break
       case '__host_shutdown__': runAction('enter_maintenance', { host_id: payload.id }); break
       case '__host_reboot__': setVmToast({ message: `Reboot of ${payload.name} — host will reconnect`, kind: 'success' }); break
-      case '__attach_host_profile__': runAction('extract_host_profile', { host_id: payload.id }); break
+      case '__attach_host_profile__': runAction('attach_host_profile', { host: payload.name || payload.id, name: `Profile-${payload.name || payload.id}` }); break
       case '__host_settings__': setSelectedNode({ type: 'host', id: payload.id }); setActiveTab('configure'); break
       // ── datacenter sentinels ──
       case '__add_host__': setShowAddHostModal(true); break

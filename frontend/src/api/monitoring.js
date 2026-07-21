@@ -49,6 +49,8 @@ export const monitoringApi = {
   createLibraryPanel: (sessionId, payload = {}) => actionWithFallback(sessionId, 'create_library_panel', payload),
   createFolder: (sessionId, payload = {}) => actionWithFallback(sessionId, 'create_folder', payload),
   pushgatewayPush: (sessionId, payload = {}) => actionWithFallback(sessionId, 'pushgateway_push', payload),
+  createSilence: (sessionId, payload = {}) => actionWithFallback(sessionId, 'create_silence', payload),
+  expireSilence: (sessionId, id) => actionWithFallback(sessionId, 'expire_silence', { id }),
   release: (sessionId) => {
     if (!sessionId) return Promise.resolve({ released: true })
     return api.post(`/vmware/monitoring/sessions/${sessionId}/release/`, {}, { silentError: true })

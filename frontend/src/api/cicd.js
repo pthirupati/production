@@ -34,8 +34,11 @@ export const cicdApi = {
   fluxReconcile(sessionId, name) {
     return cicdApi.action(sessionId, 'flux_reconcile', { name })
   },
-  fluxSuspend(sessionId, name, suspended = true) {
-    return cicdApi.action(sessionId, 'flux_suspend', { name, suspended })
+  fluxSuspend(sessionId, name, suspended = true, kind = 'kustomization') {
+    return cicdApi.action(sessionId, 'flux_suspend', { name, suspended, kind })
+  },
+  fluxHelmReconcile(sessionId, name) {
+    return cicdApi.action(sessionId, 'flux_helm_reconcile', { name })
   },
   githubCreateIssue(sessionId, payload = {}) {
     return cicdApi.action(sessionId, 'github_create_issue', payload)
