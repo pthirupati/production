@@ -117,6 +117,21 @@ export const gcpApi = {
   createSpannerInstance(sessionId, payload = {}) {
     return gcpApi.action(sessionId, 'create_spanner_instance', payload)
   },
+  createBigQueryDataset(sessionId, datasetId) {
+    return gcpApi.action(sessionId, 'create_bigquery_dataset', { dataset_id: datasetId })
+  },
+  createBigQueryTable(sessionId, datasetId, name) {
+    return gcpApi.action(sessionId, 'create_bigquery_table', { dataset_id: datasetId, name })
+  },
+  runBigQuery(sessionId, sql) {
+    return gcpApi.action(sessionId, 'run_bigquery_query', { sql })
+  },
+  createHttpLoadBalancer(sessionId, payload = {}) {
+    return gcpApi.action(sessionId, 'create_http_load_balancer', payload)
+  },
+  uploadGcsObject(sessionId, bucket, payload = {}) {
+    return gcpApi.action(sessionId, 'upload_gcs_object', { bucket, ...payload })
+  },
 }
 
 export default gcpApi

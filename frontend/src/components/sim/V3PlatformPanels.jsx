@@ -78,6 +78,112 @@ export function renderCicdGitOpsPage({ nav, st, sessionId, busy, run }) {
       </div>
     )
   }
+  if (nav === 'github') {
+    const gh = st.github || {}
+    const issues = gh.issues || []
+    const prs = gh.pull_requests || []
+    const runs = gh.actions_runs || []
+    return (
+      <div className="space-y-5 p-3">
+        <div className="flex justify-between items-center flex-wrap gap-2">
+          <div>
+            <h2 className="text-lg font-semibold text-[#e6edf3]">{gh.repo || 'fixitlab/app'}</h2>
+            <p className="text-xs text-slate-400">{gh.open_issues ?? issues.filter((i) => i.state === 'open').length} open issues · {gh.open_prs ?? prs.filter((p) => p.state === 'open').length} open PRs · default {gh.default_branch || 'main'}</p>
+          </div>
+          <div className="flex gap-2">
+            <button type="button" className="cicd-btn cicd-btn-approve text-xs" disabled={busy}
+              onClick={() => run(() => cicdApi.githubCreateIssue(sessionId, { title: `Lab issue ${Date.now() % 1000}` }), 'Issue opened')}>
+              <Plus size={12} /> New issue
+            </button>
+            <button type="button" className="cicd-btn cicd-btn-approve text-xs" disabled={busy}
+              onClick={() => run(() => cicdApi.githubCreatePr(sessionId, { title: `lab: change ${Date.now() % 1000}` }), 'PR opened')}>
+              <Plus size={12} /> New PR
+            </button>
+          </div>
+        </div>
+        <div>
+          <h3 className="text-sm font-semibold text-[#e6edf3] mb-2">Issues</h3>
+          <SimDataTable
+            variant="dark"
+            columns={[
+              { key: 'number', label: '#', sortable: true },
+              { key: 'title', label: 'Title' },
+              { key: 'state', label: 'State', render: (r) => <SimStatusBadge status={r.state === 'open' ? 'warning' : 'success'} label={r.state} /> },
+              { key: 'labels', label: 'Labels', render: (r) => (r.labels || []).join(', ') },
+              { key: 'author', label: 'Author' },
+              {
+                key: 'actions', label: '',
+                render: (r) => r.state === 'open' ? (
+                  <button type="button" className="cicd-btn text-xs" disabled={busy}
+                    onClick={(e) => { e.stopPropagation(); run(() => cicdApi.githubCloseIssue(sessionId, r.number), 'Closed') }}>
+                    Close
+                  </button>
+                ) : null,
+              },
+            ]}
+            rows={issues}
+            searchKeys={['title', 'author']}
+          />
+        </div>
+        <div>
+          <h3 className="text-sm font-semibold text-[#e6edf3] mb-2">Pull requests</h3>
+          <SimDataTable
+            variant="dark"
+            columns={[
+              { key: 'number', label: '#', sortable: true },
+              { key: 'title', label: 'Title' },
+              { key: 'state', label: 'State', render: (r) => <SimStatusBadge status={r.state === 'merged' ? 'success' : r.state === 'open' ? 'warning' : 'pending'} label={r.state} /> },
+              { key: 'head', label: 'Branch', render: (r) => `${r.head} → ${r.base}` },
+              { key: 'checks', label: 'Checks', render: (r) => <SimStatusBadge status={r.checks === 'success' ? 'success' : r.checks === 'failure' ? 'error' : 'pending'} label={r.checks} /> },
+              { key: 'review', label: 'Review' },
+              {
+                key: 'actions', label: '',
+                render: (r) => r.state === 'open' ? (
+                  <div className="flex gap-1">
+                    {r.review !== 'approved' && (
+                      <button type="button" className="cicd-btn text-xs" disabled={busy}
+                        onClick={(e) => { e.stopPropagation(); run(() => cicdApi.githubApprovePr(sessionId, r.number), 'Approved') }}>
+                        Approve
+                      </button>
+                    )}
+                    <button type="button" className="cicd-btn cicd-btn-approve text-xs" disabled={busy}
+                      onClick={(e) => { e.stopPropagation(); run(() => cicdApi.githubMergePr(sessionId, r.number), 'Merged') }}>
+                      Merge
+                    </button>
+                  </div>
+                ) : null,
+              },
+            ]}
+            rows={prs}
+            searchKeys={['title', 'head']}
+          />
+        </div>
+        <div>
+          <h3 className="text-sm font-semibold text-[#e6edf3] mb-2">Actions runs</h3>
+          <SimDataTable
+            variant="dark"
+            columns={[
+              { key: 'id', label: 'Run' },
+              { key: 'workflow', label: 'Workflow' },
+              { key: 'branch', label: 'Branch' },
+              { key: 'status', label: 'Status', render: (r) => <SimStatusBadge status={r.status === 'success' ? 'success' : 'error'} label={r.status} /> },
+              { key: 'duration_s', label: 'Duration (s)' },
+              {
+                key: 'actions', label: '',
+                render: (r) => r.status !== 'success' ? (
+                  <button type="button" className="cicd-btn text-xs" disabled={busy}
+                    onClick={(e) => { e.stopPropagation(); run(() => cicdApi.githubRerunWorkflow(sessionId, r.id), 'Re-ran') }}>
+                    Re-run
+                  </button>
+                ) : null,
+              },
+            ]}
+            rows={runs}
+          />
+        </div>
+      </div>
+    )
+  }
   return null
 }
 

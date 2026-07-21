@@ -103,6 +103,40 @@ def seed_v2() -> dict[str, Any]:
                 {"id": 247, "workflow": "ci.yml", "status": "success", "branch": "main", "sha": "abc1234", "duration_s": 272},
                 {"id": 246, "workflow": "security-scan.yml", "status": "failure", "branch": "main", "sha": "bcd5678", "duration_s": 43},
             ],
+            "issues": [
+                {
+                    "number": 42, "title": "Flaky deploy job on staging",
+                    "state": "open", "author": "ops-bot", "labels": ["bug", "ci"],
+                    "created": "2024-06-10T12:00:00Z", "assignees": ["alice"],
+                },
+                {
+                    "number": 41, "title": "Document Flux image automation",
+                    "state": "open", "author": "docs", "labels": ["docs"],
+                    "created": "2024-06-08T09:30:00Z", "assignees": [],
+                },
+                {
+                    "number": 38, "title": "Bump kube-prometheus-stack",
+                    "state": "closed", "author": "alice", "labels": ["deps"],
+                    "created": "2024-05-20T16:00:00Z", "assignees": ["bob"],
+                },
+            ],
+            "pull_requests": [
+                {
+                    "number": 88, "title": "feat: add canary rollout for api-server",
+                    "state": "open", "author": "alice", "base": "main", "head": "feat/canary",
+                    "checks": "pending", "review": "approved", "created": "2024-06-18T10:00:00Z",
+                },
+                {
+                    "number": 87, "title": "fix: harden security-scan workflow",
+                    "state": "open", "author": "bob", "base": "main", "head": "fix/gha-scan",
+                    "checks": "failure", "review": "changes_requested", "created": "2024-06-17T14:22:00Z",
+                },
+                {
+                    "number": 80, "title": "chore: bump actions/checkout to v4",
+                    "state": "merged", "author": "ops-bot", "base": "main", "head": "chore/checkout-v4",
+                    "checks": "success", "review": "approved", "created": "2024-06-01T08:00:00Z",
+                },
+            ],
         },
     }
 
@@ -188,5 +222,76 @@ def apply_v2_action(state: dict, action: str, payload: dict | None = None) -> di
         run["status"] = "success"
         run["duration_s"] = int(payload.get("duration_s") or 180)
         return {"ok": True, "message": f"Re-ran workflow #{run['id']}", "run": run}
+
+    if action == "github_create_issue":
+        gh = state.setdefault("github", {})
+        issues = gh.setdefault("issues", [])
+        number = max((i.get("number") or 0 for i in issues), default=40) + 1
+        row = {
+            "number": number,
+            "title": (payload.get("title") or f"Issue {number}").strip(),
+            "state": "open",
+            "author": payload.get("author") or "lab-user",
+            "labels": payload.get("labels") or ["triage"],
+            "created": _now(),
+            "assignees": payload.get("assignees") or [],
+        }
+        issues.insert(0, row)
+        gh["open_issues"] = sum(1 for i in issues if i.get("state") == "open")
+        return {"ok": True, "message": f"Opened issue #{number}", "issue": row}
+
+    if action == "github_close_issue":
+        gh = state.setdefault("github", {})
+        number = int(payload.get("number") or 0)
+        issue = next((i for i in gh.get("issues") or [] if i.get("number") == number), None)
+        if not issue:
+            return {"ok": False, "error": "Issue not found"}
+        issue["state"] = "closed"
+        gh["open_issues"] = sum(1 for i in (gh.get("issues") or []) if i.get("state") == "open")
+        return {"ok": True, "message": f"Closed issue #{number}", "issue": issue}
+
+    if action == "github_create_pr":
+        gh = state.setdefault("github", {})
+        prs = gh.setdefault("pull_requests", [])
+        number = max((p.get("number") or 0 for p in prs), default=80) + 1
+        row = {
+            "number": number,
+            "title": (payload.get("title") or f"PR {number}").strip(),
+            "state": "open",
+            "author": payload.get("author") or "lab-user",
+            "base": payload.get("base") or gh.get("default_branch") or "main",
+            "head": payload.get("head") or f"feature/{number}",
+            "checks": "pending",
+            "review": "pending",
+            "created": _now(),
+        }
+        prs.insert(0, row)
+        gh["open_prs"] = sum(1 for p in prs if p.get("state") == "open")
+        return {"ok": True, "message": f"Opened PR #{number}", "pull_request": row}
+
+    if action == "github_merge_pr":
+        gh = state.setdefault("github", {})
+        number = int(payload.get("number") or 0)
+        pr = next((p for p in gh.get("pull_requests") or [] if p.get("number") == number), None)
+        if not pr:
+            return {"ok": False, "error": "Pull request not found"}
+        if pr.get("state") == "merged":
+            return {"ok": False, "error": "PR already merged"}
+        pr["state"] = "merged"
+        pr["checks"] = "success"
+        pr["review"] = "approved"
+        gh["open_prs"] = sum(1 for p in (gh.get("pull_requests") or []) if p.get("state") == "open")
+        return {"ok": True, "message": f"Merged PR #{number}", "pull_request": pr}
+
+    if action == "github_approve_pr":
+        gh = state.setdefault("github", {})
+        number = int(payload.get("number") or 0)
+        pr = next((p for p in gh.get("pull_requests") or [] if p.get("number") == number), None)
+        if not pr:
+            return {"ok": False, "error": "Pull request not found"}
+        pr["review"] = "approved"
+        if pr.get("checks") == "failure":
+            pr["checks"] = "success"
+        return {"ok": True, "message": f"Approved PR #{number}", "pull_request": pr}
 
     return None

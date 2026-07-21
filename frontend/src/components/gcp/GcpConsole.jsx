@@ -4,7 +4,7 @@ import LabChromeBar from '../lab/LabChromeBar'
 import {
   LogIn, Cloud, Server, Network, Shield, HardDrive, Plus, AlertTriangle,
   Terminal, Play, Square, RotateCw, Settings2, Link2, Unlink,
-  Container, Radio, Boxes, Zap, Database, KeyRound, ShieldAlert, Globe2,
+  Container, Radio, Boxes, Zap, Database, KeyRound, ShieldAlert, Globe2, Table2, Scale,
 } from 'lucide-react'
 import { simPanelRoot } from '../../utils/simLayout'
 import { SimSidebar, SimBreadcrumbs, SimDataTable, SimStatusBadge, SimModal, useSimSession } from '../sim/shared'
@@ -24,10 +24,12 @@ const SIDEBAR = [
   { key: 'run', label: 'Cloud Run', icon: Container },
   { key: 'functions', label: 'Cloud Functions', icon: Zap },
   { key: 'networking', label: 'VPC network', icon: Network },
+  { key: 'lb', label: 'Load balancing', icon: Scale },
   { key: 'armor', label: 'Cloud Armor', icon: ShieldAlert },
   { key: 'disks', label: 'Disks', icon: HardDrive },
   { key: 'storage', label: 'Cloud Storage', icon: HardDrive },
   { key: 'sql', label: 'Cloud SQL', icon: Database },
+  { key: 'bigquery', label: 'BigQuery', icon: Table2 },
   { key: 'spanner', label: 'Spanner', icon: Globe2 },
   { key: 'pubsub', label: 'Pub/Sub', icon: Radio },
   { key: 'secrets', label: 'Secret Manager', icon: KeyRound },
@@ -350,9 +352,17 @@ export default function GcpConsole({
               <div className="font-semibold text-sm">gs://{b.name}</div>
               <div className="text-xs text-slate-500">{b.location} · {b.storage_class}</div>
             </div>
-            <button type="button" className="gcp-btn-sm" onClick={() => run(() => gcpApi.deleteBucket(sessionId, b.name), 'Bucket deleted')}>
-              Delete
-            </button>
+            <div className="flex gap-1">
+              <button type="button" className="gcp-btn-sm" disabled={busy}
+                onClick={() => run(() => gcpApi.uploadGcsObject(sessionId, b.name, {
+                  name: `uploads/file-${Date.now().toString(36).slice(-4)}.bin`, size_kb: 128,
+                }), 'Object uploaded')}>
+                Upload
+              </button>
+              <button type="button" className="gcp-btn-sm" onClick={() => run(() => gcpApi.deleteBucket(sessionId, b.name), 'Bucket deleted')}>
+                Delete
+              </button>
+            </div>
           </div>
           <SimDataTable columns={[
             { key: 'name', label: 'Object' },

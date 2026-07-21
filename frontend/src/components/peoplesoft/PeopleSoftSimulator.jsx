@@ -3,6 +3,7 @@ import { peoplesoftApi } from '../../api/peoplesoft'
 import toast from 'react-hot-toast'
 import {
   LogIn, Server, Users, Workflow, Network, RefreshCw, Menu, Bell, Search, HelpCircle, User, Settings2,
+  SearchCode, Code2, BookOpen, Receipt, FileSpreadsheet, Wallet,
 } from 'lucide-react'
 import LabChromeBar from '../lab/LabChromeBar'
 import { PS_NAV_MENU } from '../../mockData/peoplesoft'
@@ -11,6 +12,7 @@ import {
   ProcessMonitorTable, PeopleSoftNavMenu, FluidStubPage,
   SecurityUsers, PermissionLists, ComponentConfig,
 } from './PeopleSoftFluidViews'
+import { renderPeopleSoftV2Page } from './PeopleSoftV2Panels'
 import '../../styles/sim-products.css'
 
 const PS_BLUE = '#1b3a5c'
@@ -22,7 +24,15 @@ const NAV = [
   { key: 'security', label: 'Security', icon: Users },
   { key: 'config', label: 'Component Config', icon: Settings2 },
   { key: 'integration', label: 'Integration Broker', icon: Network },
+  { key: 'query', label: 'Query Manager', icon: SearchCode },
+  { key: 'peoplecode', label: 'PeopleCode', icon: Code2 },
+  { key: 'gl', label: 'General Ledger', icon: BookOpen },
+  { key: 'ap', label: 'Accounts Payable', icon: Receipt },
+  { key: 'ar', label: 'Accounts Receivable', icon: FileSpreadsheet },
+  { key: 'payroll_admin', label: 'Payroll Admin', icon: Wallet },
 ]
+
+const V2_SECTIONS = new Set(['query', 'peoplecode', 'gl', 'ap', 'ar', 'payroll_admin'])
 
 export default function PeopleSoftSimulator({
   sessionId, scenario, onExit, onStop, onHints, onCheck, onExtend,
@@ -69,6 +79,7 @@ export default function PeopleSoftSimulator({
   }, [busy, refresh])
 
   const w = state?.inventory || {}
+  const v2 = state?.v2 || w?.v2 || {}
   const summary = state?.summary || {}
   const goal = state?.goal || {}
   const loggedIn = w?.session?.logged_in
@@ -89,6 +100,12 @@ export default function PeopleSoftSimulator({
 
   const handleNavMenu = (item) => {
     const t = (item || '').toLowerCase()
+    if (t.includes('query')) { setSection('query'); setFluidView(null); return }
+    if (t.includes('peoplecode') || t.includes('application designer')) { setSection('peoplecode'); setFluidView(null); return }
+    if (t.includes('journal') || t.includes('trial balance') || t.includes('general ledger')) { setSection('gl'); setFluidView(null); return }
+    if (t.includes('voucher') || t.includes('accounts payable')) { setSection('ap'); setFluidView(null); return }
+    if (t.includes('billing') || t.includes('customer invoice') || t.includes('accounts receivable')) { setSection('ar'); setFluidView(null); return }
+    if (t.includes('payroll processing') || t.includes('pay period')) { setSection('payroll_admin'); setFluidView(null); return }
     if (t.includes('benefit') || t.includes('enrollment')) { handleFluidNav('benefits'); return }
     if (t.includes('pay') || t.includes('payroll')) { handleFluidNav('pay'); return }
     if (t.includes('job') || t.includes('personal') || t.includes('organizational')) { handleFluidNav('jobdata'); return }
@@ -258,6 +275,10 @@ export default function PeopleSoftSimulator({
               </Table>
             </Panel>
           )}
+
+          {!loading && !fluidView && V2_SECTIONS.has(section) && renderPeopleSoftV2Page({
+            section, v2, sessionId, busy, run,
+          })}
         </main>
       </div>
     </div>

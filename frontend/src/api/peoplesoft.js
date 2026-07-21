@@ -49,6 +49,13 @@ export const peoplesoftApi = {
   restartIbNode: (sessionId, node) => action(sessionId, 'restart_ib_node', { node }),
   activateService: (sessionId, service) => action(sessionId, 'activate_service', { service }),
   setComponentConfig: (sessionId, component, config) => action(sessionId, 'set_component_config', { component, config }),
+  createQuery: (sessionId, payload = {}) => action(sessionId, 'create_query', payload),
+  runQuery: (sessionId, queryId) => action(sessionId, 'run_query', { query_id: queryId }),
+  savePeopleCode: (sessionId, payload = {}) => action(sessionId, 'save_peoplecode', payload),
+  createJournal: (sessionId, payload = {}) => action(sessionId, 'create_journal', payload),
+  createVoucher: (sessionId, payload = {}) => action(sessionId, 'create_voucher', payload),
+  createArInvoice: (sessionId, payload = {}) => action(sessionId, 'create_ar_invoice', payload),
+  runPayroll: (sessionId, payload = {}) => action(sessionId, 'run_payroll', payload),
   reset: (sessionId) => action(sessionId, 'reset', {}),
 
   release: (sessionId) => {

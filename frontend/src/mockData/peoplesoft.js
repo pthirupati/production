@@ -19,6 +19,11 @@ export const PS_NAV_MENU = [
   { label: 'Benefits', items: ['Administer Base Benefits', 'eBenefits', 'Open Enrollment'] },
   { label: 'Time and Labor', items: ['Report Time', 'View Time', 'Process Time'] },
   { label: 'Recruiting', items: ['Find Job Openings', 'Create Job Opening', 'Search Applicants'] },
+  { label: 'Reporting Tools', items: ['Query Manager', 'Query Viewer'] },
+  { label: 'General Ledger', items: ['Create Journal Entries', 'Review Journals', 'Trial Balance'] },
+  { label: 'Accounts Payable', items: ['Voucher Entry', 'Voucher Inquiry'] },
+  { label: 'Accounts Receivable', items: ['Billing', 'Customer Invoices'] },
+  { label: 'PeopleTools', items: ['Application Designer', 'PeopleCode'] },
 ]
 
 export const PS_JOB_DATA = {

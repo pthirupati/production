@@ -31,6 +31,24 @@ export const cicdApi = {
   fluxReconcile(sessionId, name) {
     return cicdApi.action(sessionId, 'flux_reconcile', { name })
   },
+  githubCreateIssue(sessionId, payload = {}) {
+    return cicdApi.action(sessionId, 'github_create_issue', payload)
+  },
+  githubCloseIssue(sessionId, number) {
+    return cicdApi.action(sessionId, 'github_close_issue', { number })
+  },
+  githubCreatePr(sessionId, payload = {}) {
+    return cicdApi.action(sessionId, 'github_create_pr', payload)
+  },
+  githubMergePr(sessionId, number) {
+    return cicdApi.action(sessionId, 'github_merge_pr', { number })
+  },
+  githubApprovePr(sessionId, number) {
+    return cicdApi.action(sessionId, 'github_approve_pr', { number })
+  },
+  githubRerunWorkflow(sessionId, runId) {
+    return cicdApi.action(sessionId, 'github_rerun_workflow', { run_id: runId })
+  },
 }
 
 export default cicdApi

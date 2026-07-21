@@ -34,6 +34,7 @@ const TABS = [
   { id: 'pipeline', label: 'Workflow', icon: Workflow },
   { id: 'argocd', label: 'Argo CD', icon: Rocket },
   { id: 'flux', label: 'Flux', icon: Zap },
+  { id: 'github', label: 'GitHub', icon: GitPullRequest },
   { id: 'editor', label: 'YAML', icon: FileCode },
   { id: 'secrets', label: 'Secrets', icon: KeyRound },
   { id: 'variables', label: 'Variables', icon: Variable },
@@ -503,7 +504,7 @@ export default function CicdPipelineSim({
       </div>
 
       <div className="flex-1 min-h-0 overflow-auto p-4">
-        {(tab === 'argocd' || tab === 'flux') && renderCicdGitOpsPage({
+        {(tab === 'argocd' || tab === 'flux' || tab === 'github') && renderCicdGitOpsPage({
           nav: tab, st: serverState || {}, sessionId, busy: gitopsBusy, run: runGitops,
         })}
         {tab === 'pipeline' && (

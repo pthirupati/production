@@ -43,6 +43,8 @@ from typing import Any
 
 from django.core.cache import cache
 
+from .peoplesoft_v2_facades import apply_v2_action, ensure_v2
+
 SESSION_TTL = 7200  # 2-hour TTL matching the other simulator engines
 
 
@@ -733,10 +735,11 @@ def _ensure_session(session_id: str, scenario_slug: str = "") -> dict:
 
 def get_state(session_id: str, scenario_slug: str = "") -> dict:
     entry = _ensure_session(session_id, scenario_slug)
+    ensure_v2(entry["state"]["world"])
     # Advance any queued/running self-service jobs on wall-clock, then persist
     # so the Process Monitor reflects the progression across polls/workers.
-    if _advance_lifecycle(entry["state"]["world"]):
-        _save_session(str(session_id), entry)
+    _advance_lifecycle(entry["state"]["world"])
+    _save_session(str(session_id), entry)
     state = copy.deepcopy(entry["state"])
     world = state["world"]
     goal = state.get("goal", {})
@@ -763,6 +766,7 @@ def get_state(session_id: str, scenario_slug: str = "") -> dict:
         "session_id": str(session_id),
         "scenario_slug": entry.get("scenario_slug") or scenario_slug,
         "inventory": world,
+        "v2": world.get("v2", {}),
         "goal": goal,
         "events": world.get("events", []),
         "access": accessible,
@@ -790,6 +794,8 @@ def get_state(session_id: str, scenario_slug: str = "") -> dict:
             "ib_services_inactive": sum(1 for sv in integ["services"] if not sv.get("active")),
             "goal_title": goal.get("title", ""),
             "objective": goal.get("objective", ""),
+            "queries": len((world.get("v2") or {}).get("queries") or []),
+            "journals": len((world.get("v2") or {}).get("journals") or []),
         },
     }
 
@@ -1107,6 +1113,12 @@ def _dispatch(world: dict, state: dict, action: str, payload: dict) -> dict:
         state["goal"] = new.get("goal", state.get("goal"))
         _event(state, "Lab reset to initial state")
         return {"ok": True, "message": "Lab reset"}
+
+    v2 = apply_v2_action(world, act, payload)
+    if v2 is not None:
+        if v2.get("ok"):
+            _event(state, v2.get("message") or act)
+        return v2
 
     return {"ok": False, "error": f"unknown action: {action}"}
 

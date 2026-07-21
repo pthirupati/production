@@ -104,6 +104,24 @@ def seed_v2(project: str = "fixitlab-prod-247319") -> dict[str, Any]:
                 ],
             },
         ],
+        "bigquery_datasets": [
+            {
+                "id": f"bq-{_hex()}", "dataset_id": "analytics", "project": project,
+                "location": "US", "tables": [
+                    {"name": "events", "rows": 1250000, "size_gb": 4.2, "type": "TABLE"},
+                    {"name": "daily_agg", "rows": 3650, "size_gb": 0.1, "type": "TABLE"},
+                ],
+            },
+        ],
+        "http_load_balancers": [
+            {
+                "id": f"lb-{_hex()}", "name": "web-https-lb", "protocol": "HTTPS",
+                "ip": "34.111.20.5", "port": 443, "backend_service": "web-backend",
+                "backends": [{"instance_group": "web-ig", "zone": "us-central1-a", "capacity": 100}],
+                "health_check": "hc-web-https", "ssl_cert": "fixitlab-io",
+                "status": "ACTIVE",
+            },
+        ],
     }
 
 
@@ -324,5 +342,77 @@ def apply_v2_action(state: dict, action: str, payload: dict) -> dict | None:
         }
         state.setdefault("spanner_instances", []).append(item)
         return {"ok": True, "message": f"Created Spanner instance {name}", "instance": item}
+
+    if action == "create_bigquery_dataset":
+        dataset_id = (payload.get("dataset_id") or payload.get("name") or f"ds_{_hex(4)}").strip()
+        if any(d.get("dataset_id") == dataset_id for d in state.get("bigquery_datasets") or []):
+            return {"ok": False, "error": f"Dataset '{dataset_id}' already exists"}
+        item = {
+            "id": f"bq-{_hex()}", "dataset_id": dataset_id, "project": project,
+            "location": payload.get("location") or "US", "tables": [],
+        }
+        state.setdefault("bigquery_datasets", []).append(item)
+        return {"ok": True, "message": f"Created dataset {dataset_id}", "dataset": item}
+
+    if action == "create_bigquery_table":
+        dataset_id = payload.get("dataset_id") or payload.get("dataset") or ""
+        ds = next((d for d in state.get("bigquery_datasets") or [] if d.get("dataset_id") == dataset_id), None)
+        if not ds:
+            return {"ok": False, "error": "Dataset not found"}
+        table_name = (payload.get("name") or f"table_{_hex(4)}").strip()
+        if any(t.get("name") == table_name for t in ds.get("tables") or []):
+            return {"ok": False, "error": f"Table '{table_name}' already exists"}
+        table = {
+            "name": table_name,
+            "rows": int(payload.get("rows") or 0),
+            "size_gb": float(payload.get("size_gb") or 0),
+            "type": payload.get("type") or "TABLE",
+        }
+        ds.setdefault("tables", []).append(table)
+        return {"ok": True, "message": f"Created table {table_name}", "dataset": ds}
+
+    if action == "run_bigquery_query":
+        sql = (payload.get("sql") or "SELECT 1").strip()
+        rows = [
+            {"col1": "alpha", "col2": 42, "col3": _now()[:10]},
+            {"col1": "beta", "col2": 17, "col3": _now()[:10]},
+            {"col1": "gamma", "col2": 99, "col3": _now()[:10]},
+        ]
+        job = {
+            "id": f"job_{_hex()}", "sql": sql[:200], "state": "DONE",
+            "bytes_processed": 1048576, "rows_returned": len(rows), "created": _now(),
+        }
+        state.setdefault("bigquery_jobs", []).insert(0, job)
+        state["bigquery_jobs"] = state["bigquery_jobs"][:20]
+        return {"ok": True, "message": f"Query job {job['id']} completed", "job": job, "rows": rows}
+
+    if action == "create_http_load_balancer":
+        name = (payload.get("name") or f"lb-{_hex(4)}").strip()
+        if any(lb.get("name") == name for lb in state.get("http_load_balancers") or []):
+            return {"ok": False, "error": f"Load balancer '{name}' already exists"}
+        item = {
+            "id": f"lb-{_hex()}", "name": name,
+            "protocol": payload.get("protocol") or "HTTPS",
+            "ip": f"34.{random.randint(1, 250)}.{random.randint(1, 250)}.{random.randint(1, 250)}",
+            "port": int(payload.get("port") or 443),
+            "backend_service": payload.get("backend_service") or f"{name}-backend",
+            "backends": [{"instance_group": payload.get("instance_group") or "web-ig",
+                          "zone": "us-central1-a", "capacity": 100}],
+            "health_check": payload.get("health_check") or f"hc-{name}",
+            "ssl_cert": payload.get("ssl_cert") or "fixitlab-io",
+            "status": "ACTIVE",
+        }
+        state.setdefault("http_load_balancers", []).append(item)
+        return {"ok": True, "message": f"Created load balancer {name}", "load_balancer": item}
+
+    if action == "upload_gcs_object":
+        bucket_name = payload.get("bucket") or ""
+        bucket = next((b for b in state.get("buckets") or [] if b.get("name") == bucket_name), None)
+        if not bucket:
+            return {"ok": False, "error": "Bucket not found"}
+        obj_name = (payload.get("name") or f"uploads/object-{_hex(4)}.bin").strip()
+        obj = {"name": obj_name, "size_kb": int(payload.get("size_kb") or 64)}
+        bucket.setdefault("objects", []).append(obj)
+        return {"ok": True, "message": f"Uploaded gs://{bucket_name}/{obj_name}", "bucket": bucket, "object": obj}
 
     return None

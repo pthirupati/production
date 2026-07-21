@@ -391,5 +391,101 @@ export function renderGcpV2Page({
     )
   }
 
+  if (nav === 'bigquery') {
+    const datasets = st.bigquery_datasets || []
+    const jobs = st.bigquery_jobs || []
+    return (
+      <div className="space-y-4">
+        <div className="flex justify-between items-center flex-wrap gap-2">
+          <h2 className="text-lg font-semibold">BigQuery</h2>
+          <div className="flex gap-2">
+            <button type="button" className="gcp-btn-sm" disabled={busy}
+              onClick={() => run(() => gcpApi.runBigQuery(sessionId, 'SELECT COUNT(*) FROM analytics.events'), 'Query finished')}>
+              Run sample query
+            </button>
+            <button type="button" className="gcp-btn-primary flex items-center gap-1" disabled={busy}
+              onClick={() => run(() => gcpApi.createBigQueryDataset(sessionId, `dataset_${Date.now().toString(36).slice(-4)}`), 'Dataset created')}>
+              <Plus size={14} /> Create dataset
+            </button>
+          </div>
+        </div>
+        <SimDataTable
+          columns={[
+            { key: 'dataset_id', label: 'Dataset', sortable: true },
+            { key: 'location', label: 'Location' },
+            { key: 'tables', label: 'Tables', render: (r) => (r.tables || []).length },
+          ]}
+          rows={datasets}
+          searchKeys={['dataset_id']}
+          expandRow={(r) => (
+            <div className="gcp-detail-panel text-sm p-3 space-y-2">
+              <button type="button" className="gcp-btn-sm" disabled={busy}
+                onClick={() => run(() => gcpApi.createBigQueryTable(sessionId, r.dataset_id, `tbl_${Date.now().toString(36).slice(-3)}`), 'Table created')}>
+                <Plus size={11} /> Create table
+              </button>
+              <SimDataTable columns={[
+                { key: 'name', label: 'Table' },
+                { key: 'type', label: 'Type' },
+                { key: 'rows', label: 'Rows' },
+                { key: 'size_gb', label: 'Size (GB)' },
+              ]} rows={r.tables || []} />
+            </div>
+          )}
+        />
+        {jobs.length > 0 && (
+          <>
+            <h3 className="text-sm font-semibold text-slate-600">Query jobs</h3>
+            <SimDataTable columns={[
+              { key: 'id', label: 'Job' },
+              { key: 'state', label: 'State', render: (r) => <SimStatusBadge status="success" label={r.state} /> },
+              { key: 'rows_returned', label: 'Rows' },
+              { key: 'bytes_processed', label: 'Bytes' },
+              { key: 'sql', label: 'SQL' },
+            ]} rows={jobs} />
+          </>
+        )}
+      </div>
+    )
+  }
+
+  if (nav === 'lb') {
+    const lbs = st.http_load_balancers || []
+    return (
+      <div className="space-y-3">
+        <div className="flex justify-between items-center flex-wrap gap-2">
+          <h2 className="text-lg font-semibold">Load balancing</h2>
+          <button type="button" className="gcp-btn-primary flex items-center gap-1" disabled={busy}
+            onClick={() => run(() => gcpApi.createHttpLoadBalancer(sessionId, {
+              name: `https-lb-${Date.now().toString(36).slice(-4)}`,
+            }), 'Load balancer created')}>
+            <Plus size={14} /> Create HTTP(S) LB
+          </button>
+        </div>
+        <SimDataTable
+          columns={[
+            { key: 'name', label: 'Name', sortable: true },
+            { key: 'protocol', label: 'Protocol' },
+            { key: 'ip', label: 'Frontend IP' },
+            { key: 'port', label: 'Port' },
+            { key: 'backend_service', label: 'Backend service' },
+            { key: 'status', label: 'Status', render: (r) => <SimStatusBadge status="success" label={r.status} /> },
+          ]}
+          rows={lbs}
+          searchKeys={['name']}
+          expandRow={(r) => (
+            <div className="gcp-detail-panel text-sm p-3 space-y-1">
+              <div>Health check: <code>{r.health_check}</code> · SSL: <code>{r.ssl_cert}</code></div>
+              <SimDataTable columns={[
+                { key: 'instance_group', label: 'Backend' },
+                { key: 'zone', label: 'Zone' },
+                { key: 'capacity', label: 'Capacity %' },
+              ]} rows={r.backends || []} />
+            </div>
+          )}
+        />
+      </div>
+    )
+  }
+
   return null
 }
