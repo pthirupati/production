@@ -138,6 +138,17 @@ Still intentionally shallow vs Omniverse: screw-level photoreal meshes, real Vir
 - [x] Security gate badge/biometrics/cameras/tailgate (gate + SOC)
 - [x] Automation runbook catalog (incl. DR tabletop) + ops report generator
 
+## Phase 12 — Gap closure (CAB, sustainability, plant depth)
+
+- [x] Change CAB workflow + freeze gate on FRU/power/firmware actions
+- [x] Sustainability: PUE + WUE + carbon (header + NOC panel)
+- [x] Containment doors/curtains coupled to rack blanking → inlet/ΔP
+- [x] Cable tray plant (fill %, ladder/basket/underfloor) in Cable/MMR rooms
+- [x] Burn-in load bank + guest OS stages + release gate
+- [x] SNMP walk / Redfish GET exporter depth + SOP/evidence pack
+
+Intentionally still deferred: photoreal meshes, real VirtualBMC, Django Channels WS push, full CFD.
+
 ---
 
 ## Spec document index (expand later)

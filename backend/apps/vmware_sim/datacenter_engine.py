@@ -716,6 +716,27 @@ def get_state(session_id: str, scenario_slug: str = "") -> dict:
         "biometrics": (ac.get("biometrics") or {}).get("status", "online"),
         "cameras": (ac.get("cameras") or {}).get("online", 24),
     }
+    # Phase 12: CAB, sustainability, containment, cable plant, burn-in, exporters
+    from apps.vmware_sim.datacenter_phase12 import (
+        build_change_calendar, build_sustainability, build_containment,
+        build_cable_plant, build_burnin, build_doc_library, build_exporters,
+        apply_blanking_to_physics,
+    )
+    if not state.get("change_calendar"):
+        state["change_calendar"] = build_change_calendar()
+    if not state.get("containment"):
+        state["containment"] = build_containment()
+    if not state.get("cable_plant"):
+        state["cable_plant"] = build_cable_plant()
+    if not state.get("burnin"):
+        state["burnin"] = build_burnin(state.get("servers") or [])
+    if not state.get("doc_library"):
+        state["doc_library"] = build_doc_library()
+    if not state.get("exporters"):
+        state["exporters"] = build_exporters(state)
+    state["sustainability"] = build_sustainability(state)
+    for rack in state.get("racks") or []:
+        apply_blanking_to_physics(rack, state.get("containment"))
     # CMDB rollup + hardware catalog for UI
     state["inventory"] = [
         {**(s.get("inventory") or {}), "server_id": s["id"], "hostname": s.get("hostname")}
@@ -779,6 +800,12 @@ def apply_action(session_id: str, action: str, payload: dict | None = None) -> d
         return {"ok": False, "error": "Datacenter session not found"}
     state = entry["state"]
     broken = state.get("broken") or {}
+
+    # Phase 12: change freeze gate
+    from apps.vmware_sim.datacenter_phase12 import change_freeze_blocks
+    freeze_err = change_freeze_blocks(state, action)
+    if freeze_err:
+        return {"ok": False, "error": freeze_err}
 
     if action == "login":
         state["session"] = {"logged_in": True, "user": payload.get("user") or "tech"}
@@ -2148,6 +2175,15 @@ def apply_action(session_id: str, action: str, payload: dict | None = None) -> d
             existing["installed"] = True
         else:
             panels.append({"u": u, "size_u": 1, "installed": True})
+        from apps.vmware_sim.datacenter_phase12 import apply_blanking_to_physics
+        apply_blanking_to_physics(rack, state.get("containment"))
+        ct = state.get("containment")
+        if ct is not None:
+            total_panels = sum(
+                len([p for p in ((r.get("fru") or {}).get("blanking_panels") or []) if p.get("installed")])
+                for r in (state.get("racks") or [])
+            )
+            ct["blanking_compliance_pct"] = min(100, 40 + total_panels * 3)
         _event(state, f"Blanking panel installed at {rack_id} U{u}", "success")
         _save(session_id, entry)
         return {"ok": True, "message": f"Blanking U{u}", "fru": fru}
@@ -2375,10 +2411,18 @@ def apply_action(session_id: str, action: str, payload: dict | None = None) -> d
             state["dr"] = dr
             state["power_chain"] = pc
             _recompute_facility(state)
+        if op == "run" and payload.get("runbook_id") == "rb-compliance-export":
+            from apps.vmware_sim.datacenter_phase12 import build_evidence_pack, build_sustainability
+            from apps.vmware_sim.datacenter_facility_ops import build_capacity_snapshot, build_predictive_maintenance
+            state["capacity"] = build_capacity_snapshot(state)
+            state["predictive"] = build_predictive_maintenance(state)
+            state["sustainability"] = build_sustainability(state)
+            state["evidence_pack"] = build_evidence_pack(state)
+            msg = f"{msg} · evidence {state['evidence_pack']['id']}"
         _twin_journal(state, "automation_ops", {"op": op, "runbook_id": payload.get("runbook_id")})
         _event(state, f"Automation: {msg}", "info")
         _save(session_id, entry)
-        return {"ok": True, "message": msg, "automation": auto, "dr": state.get("dr")}
+        return {"ok": True, "message": msg, "automation": auto, "dr": state.get("dr"), "evidence_pack": state.get("evidence_pack")}
 
     if action == "generate_ops_report":
         from apps.vmware_sim.datacenter_ops_platform import build_ops_report
@@ -2390,6 +2434,95 @@ def apply_action(session_id: str, action: str, payload: dict | None = None) -> d
         _event(state, "Ops report generated", "info")
         _save(session_id, entry)
         return {"ok": True, "message": "Report generated", "ops_report": report}
+
+    if action == "change_ops":
+        from apps.vmware_sim.datacenter_phase12 import build_change_calendar, change_op
+        cal = state.get("change_calendar") or build_change_calendar()
+        op = payload.get("op") or ""
+        ok, msg, cal = change_op(cal, op, **{k: v for k, v in payload.items() if k != "op"})
+        state["change_calendar"] = cal
+        if not ok:
+            return {"ok": False, "error": msg}
+        _twin_journal(state, "change_ops", {"op": op, "change_id": payload.get("change_id")})
+        _event(state, f"Change: {msg}", "warning" if "freeze" in op else "info")
+        _save(session_id, entry)
+        return {"ok": True, "message": msg, "change_calendar": cal}
+
+    if action == "containment_ops":
+        from apps.vmware_sim.datacenter_phase12 import build_containment, containment_op, apply_blanking_to_physics
+        ct = state.get("containment") or build_containment()
+        op = payload.get("op") or ""
+        ok, msg, ct = containment_op(ct, op, **{k: v for k, v in payload.items() if k != "op"})
+        state["containment"] = ct
+        if not ok:
+            return {"ok": False, "error": msg}
+        for rack in state.get("racks") or []:
+            apply_blanking_to_physics(rack, ct)
+        _event(state, f"Containment: {msg}", "info")
+        _save(session_id, entry)
+        return {"ok": True, "message": msg, "containment": ct}
+
+    if action == "cable_plant_ops":
+        from apps.vmware_sim.datacenter_phase12 import build_cable_plant, cable_plant_op
+        plant = state.get("cable_plant") or build_cable_plant()
+        op = payload.get("op") or ""
+        ok, msg, plant = cable_plant_op(plant, op, **{k: v for k, v in payload.items() if k != "op"})
+        state["cable_plant"] = plant
+        if not ok:
+            return {"ok": False, "error": msg}
+        _event(state, f"Cable plant: {msg}", "info")
+        _save(session_id, entry)
+        return {"ok": True, "message": msg, "cable_plant": plant}
+
+    if action == "burnin_ops":
+        from apps.vmware_sim.datacenter_phase12 import build_burnin, burnin_op
+        bi = state.get("burnin") or build_burnin(state.get("servers") or [])
+        op = payload.get("op") or ""
+        ok, msg, bi = burnin_op(bi, op, **{k: v for k, v in payload.items() if k != "op"})
+        state["burnin"] = bi
+        if not ok:
+            return {"ok": False, "error": msg}
+        mid = payload.get("machine_id")
+        if op == "guest_advance" and mid:
+            srv = _find_server(state, mid)
+            if srv:
+                stage = next((m.get("guest_install") for m in bi.get("machines") or [] if m.get("id") == mid), "")
+                state["console"] = {
+                    "open": True, "asset_id": mid,
+                    "lines": [f"=== Guest install stage: {stage} ===", f"Host {srv.get('hostname')}", "cloud-init / first-boot progressing..."],
+                }
+        _twin_journal(state, "burnin_ops", {"op": op, "machine_id": mid})
+        _event(state, f"Burn-in: {msg}", "info")
+        _save(session_id, entry)
+        return {"ok": True, "message": msg, "burnin": bi, "console": state.get("console")}
+
+    if action == "exporter_ops":
+        from apps.vmware_sim.datacenter_phase12 import build_exporters, exporter_op
+        ex = state.get("exporters") or build_exporters(state)
+        op = payload.get("op") or ""
+        ok, msg, ex = exporter_op(ex, op, **{k: v for k, v in payload.items() if k != "op"})
+        state["exporters"] = ex
+        if not ok:
+            return {"ok": False, "error": msg}
+        _event(state, f"Exporter: {msg}", "info")
+        _save(session_id, entry)
+        return {"ok": True, "message": msg, "exporters": ex}
+
+    if action == "generate_evidence":
+        from apps.vmware_sim.datacenter_phase12 import build_evidence_pack, build_sustainability
+        from apps.vmware_sim.datacenter_facility_ops import build_capacity_snapshot, build_predictive_maintenance
+        state["capacity"] = build_capacity_snapshot(state)
+        state["predictive"] = build_predictive_maintenance(state)
+        state["sustainability"] = build_sustainability(state)
+        pack = build_evidence_pack(state)
+        state["evidence_pack"] = pack
+        # Mark compliance runbook as having artifact
+        auto = state.get("automation") or {}
+        auto.setdefault("events", []).insert(0, {"time": _now_iso(), "message": f"Evidence pack {pack['id']} generated"})
+        state["automation"] = auto
+        _event(state, f"Evidence {pack['id']}", "success")
+        _save(session_id, entry)
+        return {"ok": True, "message": f"Evidence {pack['id']}", "evidence_pack": pack}
 
     if action == "ops_ticket":
         from apps.vmware_sim.datacenter_physics_ops import build_ops_ticket, advance_ticket, SUPPORT_VENDORS

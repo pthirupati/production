@@ -804,3 +804,213 @@ export function AutomationReportPanel({ automation, opsReport, busy, onRun, onRe
     </div>
   )
 }
+
+/** Change CAB / freeze */
+export function ChangeCabPanel({ calendar, busy, onOp }) {
+  const cal = calendar || {}
+  return (
+    <div className="dc-twin-panel">
+      <div className="dc-twin-toolbar">
+        <span className="dc-twin-title"><ClipboardList size={13} /> Change / CAB</span>
+        <span className={cal.freeze_active ? 'dc-text-bad' : 'dc-text-ok'}>
+          {cal.freeze_active ? `FREEZE: ${cal.freeze_reason}` : 'No freeze'}
+        </span>
+      </div>
+      <div className="dc-action-row" style={{ flexWrap: 'wrap' }}>
+        <button type="button" disabled={busy} className="dc-btn-primary dc-btn-xs"
+          onClick={() => onOp?.('create', { title: 'Rack FRU window' })}>New change</button>
+        <button type="button" disabled={busy} className="dc-btn-danger dc-btn-xs"
+          onClick={() => onOp?.('enable_freeze', { reason: 'Critical event freeze' })}>Enable freeze</button>
+        <button type="button" disabled={busy} className="dc-btn-outline dc-btn-xs"
+          onClick={() => onOp?.('disable_freeze')}>Lift freeze</button>
+      </div>
+      <div className="dc-drawer-label mt-2">Windows</div>
+      <div className="dc-action-row" style={{ flexWrap: 'wrap' }}>
+        {(cal.windows || []).map((w) => (
+          <span key={w.id} className="dc-topology-chip">{w.id}: {w.label}</span>
+        ))}
+      </div>
+      <div className="dc-drawer-label mt-2">Changes</div>
+      {(cal.changes || []).slice(0, 6).map((c) => (
+        <div key={c.id} className="dc-vd-card">
+          <div className="dc-vd-head"><strong>{c.id}</strong><span>{c.status} · {c.risk}</span></div>
+          <div className="dc-muted">{c.title} · {c.impact}</div>
+          <div className="dc-action-row mt-1" style={{ flexWrap: 'wrap' }}>
+            {c.status === 'draft' && <button type="button" disabled={busy} className="dc-btn-outline dc-btn-xs" onClick={() => onOp?.('submit_cab', { change_id: c.id })}>Submit CAB</button>}
+            {c.status === 'cab' && (
+              <>
+                <button type="button" disabled={busy} className="dc-btn-primary dc-btn-xs" onClick={() => onOp?.('cab_approve', { change_id: c.id })}>Approve</button>
+                <button type="button" disabled={busy} className="dc-btn-danger dc-btn-xs" onClick={() => onOp?.('cab_reject', { change_id: c.id })}>Reject</button>
+              </>
+            )}
+            {c.status === 'approved' && <button type="button" disabled={busy} className="dc-btn-outline dc-btn-xs" onClick={() => onOp?.('implement', { change_id: c.id })}>Implement</button>}
+            {c.status === 'implementing' && <button type="button" disabled={busy} className="dc-btn-outline dc-btn-xs" onClick={() => onOp?.('verify', { change_id: c.id })}>Verify</button>}
+            {c.status === 'verified' && <button type="button" disabled={busy} className="dc-btn-primary dc-btn-xs" onClick={() => onOp?.('close', { change_id: c.id })}>Close</button>}
+          </div>
+        </div>
+      ))}
+    </div>
+  )
+}
+
+/** Sustainability PUE/WUE/carbon */
+export function SustainabilityPanel({ sustainability }) {
+  const s = sustainability || {}
+  if (!s.computed_at) return <p className="dc-muted">No sustainability snapshot.</p>
+  return (
+    <div className="dc-twin-panel">
+      <div className="dc-twin-title"><Activity size={13} /> Sustainability</div>
+      <div className="dc-facility-metrics">
+        <div className="dc-facility-metric dc-facility-pue"><span>PUE</span><strong>{s.pue}</strong><div className="dc-muted">target {s.targets?.pue}</div></div>
+        <div className="dc-facility-metric"><span>WUE</span><strong>{s.wue_l_per_kwh}</strong><div className="dc-muted">L/kWh · {s.water_l_day} L/day</div></div>
+        <div className="dc-facility-metric"><span>Carbon</span><strong>{s.carbon_kg_hr}</strong><div className="dc-muted">kg/hr · intensity {s.carbon_intensity_kg_per_kwh}</div></div>
+        <div className="dc-facility-metric"><span>DLC</span><strong>{s.dlc_active ? 'ON' : 'off'}</strong></div>
+      </div>
+      <div className="dc-muted mt-1">{s.notes}</div>
+    </div>
+  )
+}
+
+/** Hot/cold aisle containment */
+export function ContainmentPanel({ containment, busy, onOp }) {
+  const ct = containment || {}
+  return (
+    <div className="dc-twin-panel">
+      <div className="dc-twin-toolbar">
+        <span className="dc-twin-title"><Gauge size={13} /> Containment</span>
+        <span className="dc-muted">Blanking {ct.blanking_compliance_pct ?? '—'}%</span>
+      </div>
+      {(ct.aisles || []).map((a) => (
+        <div key={a.id} className="dc-vd-card">
+          <div className="dc-vd-head"><strong>{a.id}</strong><span>{a.name} · ΔP {a.dp_pa} Pa</span></div>
+          <div className="dc-action-row">
+            <button type="button" disabled={busy} className="dc-btn-outline dc-btn-xs"
+              onClick={() => onOp?.('toggle_door', { aisle_id: a.id })}>
+              Doors {a.doors_closed ? 'CLOSED' : 'OPEN'}
+            </button>
+            <button type="button" disabled={busy} className="dc-btn-outline dc-btn-xs"
+              onClick={() => onOp?.('toggle_curtain', { aisle_id: a.id })}>
+              Curtains {a.curtains_ok ? 'OK' : 'GAP'}
+            </button>
+          </div>
+        </div>
+      ))}
+    </div>
+  )
+}
+
+/** Cable tray plant */
+export function CablePlantPanel({ plant, busy, onOp }) {
+  const p = plant || {}
+  if (!(p.trays || []).length) return <p className="dc-muted">No cable trays.</p>
+  return (
+    <div className="dc-twin-panel">
+      <div className="dc-twin-title"><Network size={13} /> Cable trays</div>
+      {(p.trays || []).map((t) => (
+        <div key={t.id} className={`dc-vd-card ${t.status !== 'ok' ? 'dc-crac-alert' : ''}`}>
+          <div className="dc-vd-head">
+            <strong>{t.id}</strong>
+            <span>{t.type} · fill {t.fill_pct}% · {t.status}</span>
+          </div>
+          <div className="dc-muted">{t.path}</div>
+          <div className="dc-action-row mt-1">
+            <button type="button" disabled={busy} className="dc-btn-outline dc-btn-xs" onClick={() => onOp?.('add_fill', { tray_id: t.id, delta: 5 })}>+5% fill</button>
+            <button type="button" disabled={busy} className="dc-btn-outline dc-btn-xs" onClick={() => onOp?.('reduce_fill', { tray_id: t.id, delta: 5 })}>−5%</button>
+          </div>
+        </div>
+      ))}
+    </div>
+  )
+}
+
+/** Burn-in / load bank / guest OS */
+export function BurninPanel({ burnin, busy, onOp }) {
+  const bi = burnin || {}
+  return (
+    <div className="dc-twin-panel">
+      <div className="dc-twin-title"><Cpu size={13} /> Burn-in / load bank</div>
+      <div className="dc-action-row" style={{ flexWrap: 'wrap' }}>
+        {(bi.load_banks || []).map((lb) => (
+          <span key={lb.id} className="dc-topology-chip">{lb.id} {lb.kw}kW · {lb.status}{lb.attached_to ? ` → ${lb.attached_to}` : ''}</span>
+        ))}
+      </div>
+      {(bi.machines || []).map((m) => (
+        <div key={m.id} className="dc-vd-card">
+          <div className="dc-vd-head">
+            <strong>{m.hostname}</strong>
+            <span>soak {m.soak_pct}% · guest {m.guest_install} · {m.result || '—'}{m.released ? ' · RELEASED' : ''}</span>
+          </div>
+          <div className="dc-action-row" style={{ flexWrap: 'wrap' }}>
+            <button type="button" disabled={busy} className="dc-btn-outline dc-btn-xs" onClick={() => onOp?.('attach_load_bank', { machine_id: m.id, load_bank_id: 'LB-1' })}>Attach LB-1</button>
+            <button type="button" disabled={busy} className="dc-btn-primary dc-btn-xs" onClick={() => onOp?.('soak', { machine_id: m.id })}>Soak +</button>
+            <button type="button" disabled={busy} className="dc-btn-outline dc-btn-xs" onClick={() => onOp?.('guest_advance', { machine_id: m.id })}>Guest stage</button>
+            <button type="button" disabled={busy} className="dc-btn-primary dc-btn-xs" onClick={() => onOp?.('release', { machine_id: m.id })}>Release</button>
+            <button type="button" disabled={busy} className="dc-btn-danger dc-btn-xs" onClick={() => onOp?.('fail_soak', { machine_id: m.id })}>Fail</button>
+          </div>
+        </div>
+      ))}
+    </div>
+  )
+}
+
+/** SNMP / Redfish exporters */
+export function ExportersPanel({ exporters, busy, onOp }) {
+  const ex = exporters || {}
+  return (
+    <div className="dc-twin-panel">
+      <div className="dc-twin-toolbar">
+        <span className="dc-twin-title"><Activity size={13} /> SNMP / Redfish exporters</span>
+        <button type="button" disabled={busy} className="dc-btn-outline dc-btn-xs" onClick={() => onOp?.('snmp_walk')}>SNMP walk</button>
+        <button type="button" disabled={busy} className="dc-btn-outline dc-btn-xs" onClick={() => onOp?.('redfish_get', { path: '/redfish/v1/Systems/1' })}>Redfish GET</button>
+      </div>
+      <div className="dc-action-row" style={{ flexWrap: 'wrap' }}>
+        {(ex.targets || []).slice(0, 10).map((t) => (
+          <button key={t.id} type="button" disabled={busy}
+            className={`dc-btn-xs ${t.up ? 'dc-btn-primary' : 'dc-btn-danger'}`}
+            onClick={() => onOp?.('toggle_target', { target_id: t.id })}>
+            {t.type}:{t.id.split('-').slice(-1)[0]} {t.up ? '↑' : '↓'}
+          </button>
+        ))}
+      </div>
+      {ex.last_walk && (
+        <>
+          <div className="dc-drawer-label mt-2">Last SNMP walk · {ex.last_walk.target}</div>
+          {(ex.last_walk.rows || []).map((r, i) => (
+            <div key={i} className="dc-muted">{r.oid} = {r.value}</div>
+          ))}
+        </>
+      )}
+      {ex.last_redfish && (
+        <>
+          <div className="dc-drawer-label mt-2">Last Redfish · {ex.last_redfish.path}</div>
+          <pre className="dc-mb-json">{JSON.stringify(ex.last_redfish.body, null, 2)}</pre>
+        </>
+      )}
+    </div>
+  )
+}
+
+/** Doc library + evidence */
+export function DocsEvidencePanel({ docs, evidence, busy, onEvidence }) {
+  const lib = docs || {}
+  const ev = evidence || {}
+  return (
+    <div className="dc-twin-panel">
+      <div className="dc-twin-toolbar">
+        <span className="dc-twin-title"><ClipboardList size={13} /> SOP library / evidence</span>
+        <button type="button" disabled={busy} className="dc-btn-primary dc-btn-xs" onClick={onEvidence}>Generate evidence pack</button>
+      </div>
+      {(lib.sops || []).map((s) => (
+        <div key={s.id} className="dc-muted">{s.id} · {s.title} · role {s.role}</div>
+      ))}
+      {ev.id && (
+        <div className="dc-vd-card mt-2">
+          <div className="dc-vd-head"><strong>{ev.id}</strong><span>sha {ev.sha256_16}</span></div>
+          <div className="dc-muted">
+            inv {ev.sections?.inventory_rows} · tickets {ev.sections?.tickets} · journal {ev.sections?.journal_entries} · {ev.generated_at}
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}

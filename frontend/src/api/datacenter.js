@@ -254,6 +254,25 @@ export const datacenterApi = {
   generateOpsReport(sessionId) {
     return datacenterApi.action(sessionId, 'generate_ops_report', {})
   },
+  changeOps(sessionId, op, extra = {}) {
+    return datacenterApi.action(sessionId, 'change_ops', { op, ...extra })
+  },
+  containmentOps(sessionId, op, extra = {}) {
+    return datacenterApi.action(sessionId, 'containment_ops', { op, ...extra })
+  },
+  cablePlantOps(sessionId, op, extra = {}) {
+    return datacenterApi.action(sessionId, 'cable_plant_ops', { op, ...extra })
+  },
+  burninOps(sessionId, op, extra = {}) {
+    return datacenterApi.action(sessionId, 'burnin_ops', { op, ...extra })
+  },
+  exporterOps(sessionId, op, extra = {}) {
+    return datacenterApi.action(sessionId, 'exporter_ops', { op, ...extra })
+  },
+  generateEvidence(sessionId) {
+    return datacenterApi.action(sessionId, 'generate_evidence', {})
+  },
 }
+
 
 export default datacenterApi

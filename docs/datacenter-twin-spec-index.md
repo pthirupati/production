@@ -61,4 +61,10 @@ unless product approves a pivot.
 1 Executive Vision · 2 PRD · 3 Functional · 4 NFR · 5 Architecture · …
 17 Motherboards · 22 RAID · 23 BIOS · 24 BMC · 42 Digital Twin · 58 Roadmap · 60 Appendices
 
+## Phase 12 gap closure
+
+CAB/change freeze, WUE/carbon sustainability, containment↔blanking, cable trays, burn-in/load-bank/guest OS stages, SNMP/Redfish exporter depth, SOP + evidence packs.
+
+Still deferred (by design): photoreal Omniverse meshes, real VirtualBMC agents, Django Channels live WS, full CFD.
+
 Authoritative phased backlog: `docs/datacenter-twin-roadmap.md`.

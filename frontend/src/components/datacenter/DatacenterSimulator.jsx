@@ -21,6 +21,8 @@ import {
   RackPhysicsFruPanel, MonitoringPanel, OpsTicketsPanel, TrainingPanel, ComputeAiPanel,
   LiquidCoolingPanel, PxeMaasPanel, FireSafetyPanel, EnvironmentalPanel, OpticalPanel, CapacityPdmPanel,
   DrFailoverPanel, AccessControlPanel, AutomationReportPanel,
+  ChangeCabPanel, SustainabilityPanel, ContainmentPanel, CablePlantPanel,
+  BurninPanel, ExportersPanel, DocsEvidencePanel,
 } from './OpsPhysicsPanels'
 import '../../styles/sim-products.css'
 import './DatacenterSimulator.css'
@@ -122,6 +124,14 @@ export default function DatacenterSimulator({
   const accessControl = st.access_control || null
   const automation = st.automation || null
   const opsReport = st.ops_report || null
+  const changeCalendar = st.change_calendar || null
+  const sustainability = st.sustainability || null
+  const containment = st.containment || null
+  const cablePlant = st.cable_plant || null
+  const burnin = st.burnin || null
+  const exporters = st.exporters || null
+  const docLibrary = st.doc_library || null
+  const evidencePack = st.evidence_pack || null
   const rooms = st.rooms || []
   const network = st.network || { switches: [], topology: [] }
   const powerChain = st.power_chain || {}
@@ -275,7 +285,7 @@ export default function DatacenterSimulator({
           )
         })}
         <span className="dc-pue-pill">
-          <Gauge size={12} /> PUE {facility.pue ?? '—'}
+          <Gauge size={12} /> PUE {facility.pue ?? sustainability?.pue ?? '—'} · WUE {sustainability?.wue_l_per_kwh ?? '—'} · CO₂ {sustainability?.carbon_kg_hr ?? '—'} kg/h
           <span className={`dc-ashrae-dot ${facility.ashrae_ok === false ? 'dc-ashrae-bad' : 'dc-ashrae-ok'}`} />
         </span>
       </div>
@@ -444,6 +454,13 @@ export default function DatacenterSimulator({
                 `Liquid ${op}`,
               )}
             />
+            <div style={{ marginTop: '1rem' }}>
+              <ContainmentPanel
+                containment={containment}
+                busy={busy}
+                onOp={(op, extra) => doAction(() => datacenterApi.containmentOps(sessionId, op, extra), `Containment ${op}`)}
+              />
+            </div>
           </div>
         </div>
       )}
@@ -545,6 +562,31 @@ export default function DatacenterSimulator({
                 )}
                 onReport={() => doAction(() => datacenterApi.generateOpsReport(sessionId), 'Ops report')}
               />
+              <div style={{ marginTop: '1rem' }}>
+                <ChangeCabPanel
+                  calendar={changeCalendar}
+                  busy={busy}
+                  onOp={(op, extra) => doAction(() => datacenterApi.changeOps(sessionId, op, extra), `Change ${op}`)}
+                />
+              </div>
+              <div style={{ marginTop: '1rem' }}>
+                <SustainabilityPanel sustainability={sustainability} />
+              </div>
+              <div style={{ marginTop: '1rem' }}>
+                <ExportersPanel
+                  exporters={exporters}
+                  busy={busy}
+                  onOp={(op, extra) => doAction(() => datacenterApi.exporterOps(sessionId, op, extra), `Exporter ${op}`)}
+                />
+              </div>
+              <div style={{ marginTop: '1rem' }}>
+                <DocsEvidencePanel
+                  docs={docLibrary}
+                  evidence={evidencePack}
+                  busy={busy}
+                  onEvidence={() => doAction(() => datacenterApi.generateEvidence(sessionId), 'Evidence pack')}
+                />
+              </div>
             </div>
           )}
           {currentRoom.id === 'soc' && (
@@ -576,6 +618,15 @@ export default function DatacenterSimulator({
             busy={busy}
             onOp={(op, extra) => doAction(() => datacenterApi.opticalOps(sessionId, op, extra), `Optical ${op}`)}
           />
+          {(currentRoom.id === 'cable-room' || currentRoom.id === 'mmr') && (
+            <div style={{ marginTop: '1rem' }}>
+              <CablePlantPanel
+                plant={cablePlant}
+                busy={busy}
+                onOp={(op, extra) => doAction(() => datacenterApi.cablePlantOps(sessionId, op, extra), `Tray ${op}`)}
+              />
+            </div>
+          )}
         </div>
       )}
 
@@ -600,6 +651,19 @@ export default function DatacenterSimulator({
               )}
             />
           </div>
+          {currentRoom.id === 'burn-in' && (
+            <div style={{ marginTop: '1rem' }}>
+              <BurninPanel
+                burnin={burnin}
+                busy={busy}
+                onOp={(op, extra) => doAction(
+                  () => datacenterApi.burninOps(sessionId, op, extra),
+                  `Burnin ${op}`,
+                  extra?.machine_id,
+                )}
+              />
+            </div>
+          )}
         </div>
       )}
 
