@@ -185,9 +185,9 @@ export default function BaremetalSimulator({
               machine={detailMachine}
               busy={busy}
               onBack={() => setDetailId(null)}
-              onCommission={() => run(() => baremetalApi.action(sessionId, 'maas_commission', { machine_id: detailMachine.id }), 'Commissioning started')}
-              onDeploy={() => run(() => baremetalApi.action(sessionId, 'maas_deploy', { machine_id: detailMachine.id }), 'Deploy started')}
-              onPower={(power) => run(() => baremetalApi.action(sessionId, 'maas_power', { machine_id: detailMachine.id, power }), 'Power toggled')}
+              onCommission={() => run(() => baremetalApi.commission(sessionId, detailMachine.id), 'Commissioning started')}
+              onDeploy={() => run(() => baremetalApi.deploy(sessionId, detailMachine.id), 'Deploy started')}
+              onPower={(power) => run(() => baremetalApi.power(sessionId, detailMachine.id, power), 'Power toggled')}
             />
           )}
 

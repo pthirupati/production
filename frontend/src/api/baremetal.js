@@ -19,6 +19,9 @@ export const baremetalApi = {
   deploy(sessionId, machineId) {
     return baremetalApi.action(sessionId, 'maas_deploy', { machine_id: machineId })
   },
+  power(sessionId, machineId, power) {
+    return baremetalApi.action(sessionId, 'maas_power', { machine_id: machineId, power })
+  },
   startLxd(sessionId, name) {
     return baremetalApi.action(sessionId, 'lxd_start', { name })
   },

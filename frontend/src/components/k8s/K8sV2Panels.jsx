@@ -40,6 +40,19 @@ export function renderK8sV2Page({ nav, cluster, sessionId, busy, run, isOpenShif
           { key: 'name', label: 'Name', sortable: true },
           { key: 'namespace', label: 'Namespace' },
           { key: 'data', label: 'Keys', render: (r) => Object.keys(r.data || {}).join(', ') },
+          {
+            key: 'actions', label: 'Actions', render: (r) => (
+              <button type="button" className="k8s-btn-ghost" disabled={busy}
+                onClick={(e) => {
+                  e.stopPropagation()
+                  run(() => k8sApi.patchResource(sessionId, 'configmap', r.name, {
+                    data: { ...(r.data || {}), 'lab.patched': 'true' },
+                  }, r.namespace), 'ConfigMap patched')
+                }}>
+                Patch
+              </button>
+            ),
+          },
         ]} rows={cluster.configmaps || []} searchKeys={['name']}
           expandRow={(r) => (
             <pre className="text-xs p-2 bg-slate-50 overflow-auto">{JSON.stringify(r.data || {}, null, 2)}</pre>

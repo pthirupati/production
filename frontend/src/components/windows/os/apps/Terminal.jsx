@@ -49,9 +49,28 @@ function runCommand(raw, shell, os, cwdRef) {
         { h: 'Status', v: (r) => r.status }, { h: 'Name', v: (r) => r.name }, { h: 'DisplayName', v: (r) => r.display },
       ])
     }
-    if (lower.startsWith('start-service')) { const m = line.match(/-name\s+(\S+)|start-service\s+(\S+)/i); const n = (m?.[1] || m?.[2] || '').replace(/['"]/g, ''); os.startService(n); return [''] }
-    if (lower.startsWith('stop-service')) { const m = line.match(/-name\s+(\S+)|stop-service\s+(\S+)/i); const n = (m?.[1] || m?.[2] || '').replace(/['"]/g, ''); os.stopService(n); return [''] }
-    if (lower.startsWith('restart-service')) { const m = line.match(/-name\s+(\S+)|restart-service\s+(\S+)/i); const n = (m?.[1] || m?.[2] || '').replace(/['"]/g, ''); os.stopService(n); os.startService(n); return [''] }
+    if (lower.startsWith('start-service')) {
+      const m = line.match(/-name\s+(\S+)|start-service\s+(\S+)/i)
+      const n = (m?.[1] || m?.[2] || '').replace(/['"]/g, '')
+      os.startService(n)
+      if (os.labAction) os.labAction('start_service', { service: n })
+      return ['']
+    }
+    if (lower.startsWith('stop-service')) {
+      const m = line.match(/-name\s+(\S+)|stop-service\s+(\S+)/i)
+      const n = (m?.[1] || m?.[2] || '').replace(/['"]/g, '')
+      os.stopService(n)
+      if (os.labAction) os.labAction('stop_service', { service: n })
+      return ['']
+    }
+    if (lower.startsWith('restart-service')) {
+      const m = line.match(/-name\s+(\S+)|restart-service\s+(\S+)/i)
+      const n = (m?.[1] || m?.[2] || '').replace(/['"]/g, '')
+      os.stopService(n)
+      os.startService(n)
+      if (os.labAction) os.labAction('restart_service', { service: n })
+      return ['']
+    }
 
     // Reboot / shutdown — drive the GUI boot sequence so a terminal restart
     // shows firmware POST → Windows logo → "Getting Windows ready" → desktop.

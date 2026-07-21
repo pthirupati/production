@@ -241,6 +241,7 @@ export const useOS = create((set, get) => ({
   dnsRecords: [],
   dhcpReservations: [],
   firewallRules: [],
+  groupPolicyGpos: [],
   labSessionId: '',
   labAction: null,
   setLabAction: (fn) => set({ labAction: fn }),
@@ -258,6 +259,7 @@ export const useOS = create((set, get) => ({
       iis_sites: snapshot.iis_sites,
       dns_records: snapshot.dns_records,
       firewall_rules: snapshot.firewall_rules,
+      group_policy: snapshot.group_policy,
     })
     // Short-circuit WITHOUT calling set() — calling set (even returning {})
     // produces a fresh state object every time, which would re-fire any effect
@@ -415,6 +417,9 @@ export const useOS = create((set, get) => ({
       dnsRecords: Array.isArray(snapshot.dns_records) ? snapshot.dns_records : s.dnsRecords,
       dhcpReservations: Array.isArray(snapshot.dhcp_reservations) ? snapshot.dhcp_reservations : s.dhcpReservations,
       firewallRules: Array.isArray(snapshot.firewall_rules) ? snapshot.firewall_rules : s.firewallRules,
+      groupPolicyGpos: Array.isArray(snapshot.group_policy?.gpos)
+        ? snapshot.group_policy.gpos.map((g) => g.name).filter(Boolean)
+        : s.groupPolicyGpos,
       labSessionId: snapshot.session_id || s.labSessionId,
     }
     })

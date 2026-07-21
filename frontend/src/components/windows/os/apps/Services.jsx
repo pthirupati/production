@@ -117,8 +117,14 @@ function ServiceProps({ svc, onClose }) {
             </select>
             <span style={{ color: '#666' }}>Service status:</span><span>{live.status === 'Running' ? 'Running' : 'Stopped'}</span>
             <span /><div style={{ display: 'flex', gap: 6 }}>
-              <button className="winos-btn" disabled={live.status === 'Running'} onClick={() => os.startService(live.name)}>Start</button>
-              <button className="winos-btn" disabled={live.status !== 'Running'} onClick={() => os.stopService(live.name)}>Stop</button>
+              <button className="winos-btn" disabled={live.status === 'Running'} onClick={() => {
+                os.startService(live.name)
+                if (os.labAction) os.labAction('start_service', { service: live.name })
+              }}>Start</button>
+              <button className="winos-btn" disabled={live.status !== 'Running'} onClick={() => {
+                os.stopService(live.name)
+                if (os.labAction) os.labAction('stop_service', { service: live.name })
+              }}>Stop</button>
               <button className="winos-btn" disabled>Pause</button><button className="winos-btn" disabled>Resume</button>
             </div>
           </div>

@@ -157,12 +157,22 @@ function AddRolesWizard({ onClose }) {
   const toggle = (r) => setChecked((s) => { const n = new Set(s); n.has(r) ? n.delete(r) : n.add(r); return n })
   const newRoles = [...checked].filter((r) => !os.roles.find((x) => x.name === r && x.installed))
 
-  const install = () => {
+  const install = async () => {
     setInstalling(true)
-    setTimeout(() => {
-      newRoles.forEach((rn) => { const role = os.roles.find((r) => r.name === rn); if (role) os.setRoleInstalled(role.id, true) })
-      setInstalling(false); setDone(true); setPage(7)
-    }, 1600)
+    try {
+      for (const rn of newRoles) {
+        const role = os.roles.find((r) => r.name === rn)
+        if (!role) continue
+        if (os.labAction) {
+          await os.labAction('install_role', { role: role.id })
+        }
+        os.setRoleInstalled(role.id, true)
+      }
+      setDone(true)
+      setPage(7)
+    } finally {
+      setInstalling(false)
+    }
   }
 
   return (

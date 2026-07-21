@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { ChevronRight, Plus, Shield, Globe, Gauge, Calculator as CalcIcon, Palette, FileText } from 'lucide-react'
 import { useOS } from '../store'
 import { Dialog, Tabs } from '../ui'
@@ -27,19 +27,32 @@ const policySettings = [
 export function GPMC() {
   const os = useOS()
   const labAction = useOS((s) => s.labAction)
+  const backendGpos = useOS((s) => s.groupPolicyGpos)
   const [selected, setSelected] = useState('Default Domain Policy')
   const [tab, setTab] = useState('Scope')
   const [editor, setEditor] = useState(null)
   const [localGpos, setLocalGpos] = useState(gpos)
   const [busy, setBusy] = useState(false)
 
+  useEffect(() => {
+    if (!backendGpos?.length) return
+    setLocalGpos((prev) => {
+      const names = new Set(prev)
+      backendGpos.forEach((n) => names.add(n))
+      return [...names]
+    })
+  }, [backendGpos])
+
   const createGpo = async () => {
+    if (!labAction || busy) return
     const name = `Lab-GPO-${Date.now().toString(36).slice(-4)}`
-    setLocalGpos((list) => [...list, name])
-    setSelected(name)
-    if (labAction) {
-      setBusy(true)
-      try { await labAction('create_gpo', { name }) } finally { setBusy(false) }
+    setBusy(true)
+    try {
+      await labAction('create_gpo', { name })
+      setLocalGpos((list) => [...list, name])
+      setSelected(name)
+    } finally {
+      setBusy(false)
     }
   }
 
@@ -48,7 +61,7 @@ export function GPMC() {
       <div className="winos-toolbar">
         <span style={{ fontSize: 12 }}>File &nbsp; Action &nbsp; View &nbsp; Window &nbsp; Help</span>
         <span style={{ flex: 1 }} />
-        <button type="button" className="winos-btn primary" disabled={busy} onClick={createGpo}><Plus size={13} /> New GPO</button>
+        <button type="button" className="winos-btn primary" disabled={busy || !labAction} onClick={createGpo}><Plus size={13} /> New GPO</button>
       </div>
       <div className="winos-split">
         <div className="winos-tree" style={{ width: 310 }}>
@@ -418,13 +431,12 @@ export function FirewallAdvanced() {
     : firewallRules)
 
   const finishWizard = async () => {
-    if (labAction) {
-      setBusy(true)
-      try {
-        await labAction('firewall_add_rule', { name: newName, port: '8080', protocol: 'TCP' })
-      } finally { setBusy(false) }
-    }
-    setWizard(false)
+    if (!labAction || busy) return
+    setBusy(true)
+    try {
+      await labAction('firewall_add_rule', { name: newName, port: '8080', protocol: 'TCP' })
+      setWizard(false)
+    } finally { setBusy(false) }
   }
 
   return (
@@ -463,7 +475,7 @@ export function FirewallAdvanced() {
       </div>
       {rule && <FirewallRuleDialog rule={rule} onClose={() => setRule(null)} />}
       {wizard && <Dialog title="New Inbound Rule Wizard" onClose={() => setWizard(false)} width={520}
-        footer={<><button type="button" className="winos-btn primary" disabled={busy} onClick={finishWizard}>Finish</button><button type="button" className="winos-btn" onClick={() => setWizard(false)}>Cancel</button></>}>
+        footer={<><button type="button" className="winos-btn primary" disabled={busy || !labAction} onClick={finishWizard}>Finish</button><button type="button" className="winos-btn" onClick={() => setWizard(false)}>Cancel</button></>}>
         <div style={{ fontSize: 12.5 }}>
           <b>Rule Type</b><br />
           <label><input type="radio" defaultChecked /> Port</label>
