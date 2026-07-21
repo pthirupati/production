@@ -4,9 +4,11 @@ import LabChromeBar from '../lab/LabChromeBar'
 import {
   LogIn, ShieldAlert, Siren, Search, ListChecks, Server, AlertTriangle,
   Terminal, CheckCircle2, ArrowUpCircle, Ban, Lock, PlayCircle, Radio,
+  KeyRound, Bug, BrickWall, Activity, Scale,
 } from 'lucide-react'
 import { simPanelRoot } from '../../utils/simLayout'
 import { SimSidebar, SimBreadcrumbs, SimDataTable, SimStatusBadge, useSimSession } from '../sim/shared'
+import { renderSocV2Page } from './SocV2Panels'
 import '../../styles/sim-products.css'
 import './soc.css'
 
@@ -22,6 +24,11 @@ const SIDEBAR = [
   { key: 'threat-intel', label: 'Threat Intel', icon: Radio },
   { key: 'rules', label: 'Detection Rules', icon: ListChecks },
   { key: 'assets', label: 'Assets', icon: Server },
+  { key: 'pam', label: 'PAM Sessions', icon: KeyRound },
+  { key: 'vulns', label: 'Vulnerabilities', icon: Bug },
+  { key: 'firewall', label: 'Firewall', icon: BrickWall },
+  { key: 'pcap', label: 'Packet Capture', icon: Activity },
+  { key: 'compliance', label: 'Compliance', icon: Scale },
   { key: 'activity', label: 'Activity', icon: Server },
 ]
 
@@ -125,6 +132,8 @@ export default function SocSimulator({
   }
 
   const renderContent = () => {
+    const v2 = renderSocV2Page({ nav, st, sessionId, busy, run })
+    if (v2) return v2
     if (nav === 'alerts') {
       return (
         <div className="soc-split">

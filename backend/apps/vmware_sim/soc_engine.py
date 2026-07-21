@@ -15,6 +15,8 @@ import time
 
 from django.core.cache import cache
 
+from .soc_v2_facades import apply_v2_action, ensure_v2, seed_v2
+
 SESSION_TTL = 7200
 
 
@@ -90,6 +92,7 @@ def _base_state() -> dict:
         "goal": {"title": "SOC triage lab", "objective": "Triage the critical C2 alert: acknowledge it, escalate to an incident, quarantine the host, and close it."},
         "broken": {"open_critical_alert": "AL-1003"},
         "events": [],
+        **seed_v2(),
     }
 
 
@@ -140,6 +143,10 @@ _ensure_session = _ensure
 
 def get_state(session_id: str, scenario_slug: str = "") -> dict:
     entry = _ensure(session_id, scenario_slug)
+    keys_before = set(entry["state"].keys())
+    ensure_v2(entry["state"])
+    if set(entry["state"].keys()) != keys_before:
+        _save(session_id, entry)
     state = copy.deepcopy(entry["state"])
     try:
         from apps.labs.provisioner.simulation.server_identity import sync_soc_assets
@@ -371,6 +378,14 @@ def apply_action(session_id: str, action: str, payload: dict | None = None) -> d
             _save(session_id, entry)
             return {"ok": True, "message": f"IP {ip} unblocked"}
         return {"ok": False, "error": f"IP {ip} is not blocked"}
+
+    ensure_v2(state)
+    v2 = apply_v2_action(state, action, payload)
+    if v2 is not None:
+        if v2.get("ok"):
+            _event(state, v2.get("message") or action, "success")
+            _save(session_id, entry)
+        return v2
 
     return {"ok": False, "error": f"Unknown action: {action}"}
 
