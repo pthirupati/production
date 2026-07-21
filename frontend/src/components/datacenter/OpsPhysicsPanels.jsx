@@ -246,13 +246,16 @@ export function PxeMaasPanel({ pxeMaas, busy, selectedServerId, onOp }) {
 }
 
 /** Monitoring / Alertmanager style dashboard */
-export function MonitoringPanel({ monitoring, busy, onRefresh, onReplay, twinJournal }) {
+export function MonitoringPanel({ monitoring, busy, onRefresh, onLiveTick, onReplay, twinJournal }) {
   const m = monitoring || {}
   const [tick, setTick] = useState(0)
   useEffect(() => {
-    const id = setInterval(() => setTick((t) => t + 1), 4000)
+    const id = setInterval(() => {
+      setTick((t) => t + 1)
+      onLiveTick?.()
+    }, 5000)
     return () => clearInterval(id)
-  }, [])
+  }, [onLiveTick])
   const journalLen = (twinJournal?.persisted_changes || []).length
   const lastReplay = twinJournal?.last_replay
   return (

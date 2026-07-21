@@ -6,11 +6,45 @@ and NOC planning surfaces.
 
 from __future__ import annotations
 
+import math
 import time
 
 
 def _now() -> str:
     return time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
+
+
+def tick_live(state: dict) -> dict:
+    """Drift environmental + BMC sensors for live NOC scrape feel (no WS required)."""
+    env = state.setdefault("environmental", build_environmental(state.get("servers") or []))
+    t = time.time()
+    phase = (t % 120) / 120.0 * 2 * math.pi
+    for s in env.get("sensors") or []:
+        if s.get("type") == "temp_humidity":
+            base = 33.5 if "Hot" in (s.get("location") or "") else 21.2
+            if s.get("status") == "alarm":
+                continue
+            s["temp_c"] = round(base + 0.6 * math.sin(phase + hash(s.get("id") or "") % 7), 1)
+            s["humidity_pct"] = round(max(20, min(60, (s.get("humidity_pct") or 45) + 0.3 * math.cos(phase))), 1)
+        elif s.get("type") == "differential_pressure" and s.get("status") == "ok":
+            s["pa"] = round(12.0 + 1.5 * math.sin(phase * 1.7), 1)
+    env["last_scan"] = _now()
+    env["tick"] = env.get("tick", 0) + 1
+
+    for srv in state.get("servers") or []:
+        if srv.get("power_state") != "on":
+            continue
+        bmc = srv.setdefault("bmc", {})
+        sensors = bmc.setdefault("sensors", {})
+        inlet = float(sensors.get("inlet_c") or 22.0)
+        sensors["inlet_c"] = round(inlet + 0.15 * math.sin(phase + hash(srv.get("id") or "") % 5), 1)
+        sensors["exhaust_c"] = round(sensors["inlet_c"] + 11.5 + 0.4 * math.cos(phase), 1)
+        sensors["fans_rpm"] = int(7200 + 80 * math.sin(phase * 2))
+        if sensors.get("cpu1_c"):
+            sensors["cpu1_c"] = round(sensors["inlet_c"] + 26 + 0.5 * math.sin(phase), 1)
+        if sensors.get("cpu2_c"):
+            sensors["cpu2_c"] = round(sensors["inlet_c"] + 28 + 0.5 * math.cos(phase), 1)
+    return env
 
 
 # ── Fire & safety ──────────────────────────────────────────────────────────

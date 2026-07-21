@@ -2614,6 +2614,24 @@ def apply_action(session_id: str, action: str, payload: dict | None = None) -> d
         _save(session_id, entry)
         return {"ok": True, "message": "Metrics refreshed", "monitoring": state["monitoring"]}
 
+    if action == "live_tick":
+        # Live scrape without flooding the twin journal (not replayed).
+        from apps.vmware_sim.datacenter_facility_ops import tick_live
+        from apps.vmware_sim.datacenter_physics_ops import build_monitoring_snapshot
+        env = tick_live(state)
+        state["environmental"] = env
+        state["monitoring"] = build_monitoring_snapshot(state)
+        from apps.vmware_sim.datacenter_facility_ops import build_capacity_snapshot
+        state["capacity"] = build_capacity_snapshot(state)
+        _save(session_id, entry)
+        return {
+            "ok": True,
+            "message": f"Live tick #{env.get('tick', 0)}",
+            "environmental": env,
+            "monitoring": state["monitoring"],
+            "capacity": state["capacity"],
+        }
+
     if action == "hypervisor_ops":
         from apps.vmware_sim.datacenter_compute_ai import build_hypervisor_platform, hv_action
         plat = state.setdefault("hypervisors", build_hypervisor_platform(state.get("servers") or []))
@@ -2689,7 +2707,7 @@ def apply_action(session_id: str, action: str, payload: dict | None = None) -> d
         skipped = 0
         for item in journal:
             act = item.get("action")
-            if not act or act == "replay_twin_journal":
+            if not act or act in ("replay_twin_journal", "live_tick", "refresh_monitoring"):
                 skipped += 1
                 continue
             pl = dict(item.get("payload") or {})

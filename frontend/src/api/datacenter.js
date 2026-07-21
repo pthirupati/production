@@ -212,6 +212,9 @@ export const datacenterApi = {
   refreshMonitoring(sessionId) {
     return datacenterApi.action(sessionId, 'refresh_monitoring', {})
   },
+  liveTick(sessionId) {
+    return datacenterApi.action(sessionId, 'live_tick', {})
+  },
   hypervisorOps(sessionId, op, extra = {}) {
     return datacenterApi.action(sessionId, 'hypervisor_ops', { op, ...extra })
   },

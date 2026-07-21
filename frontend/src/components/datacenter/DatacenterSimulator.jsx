@@ -92,7 +92,7 @@ export default function DatacenterSimulator({
   onToggleTerminal, simTerminalOpen = false, vmwareHref = null,
 }) {
   const slug = scenario?.slug || ''
-  const { state, loading, busy, run } = useSimSession(sessionId, slug, datacenterApi)
+  const { state, setState, loading, busy, run } = useSimSession(sessionId, slug, datacenterApi)
   const [loginUser, setLoginUser] = useState('')
   const [loginPass, setLoginPass] = useState('')
   const [loginError, setLoginError] = useState('')
@@ -104,6 +104,18 @@ export default function DatacenterSimulator({
   const [floorView, setFloorView] = useState('2d') // '2d' | '3d'
   const dragRef = useRef(null)
   const movedRef = useRef(false)
+  const liveTickInFlight = useRef(false)
+  const busyRef = useRef(busy)
+  busyRef.current = busy
+
+  const onLiveTick = useCallback(() => {
+    if (!sessionId || busyRef.current || liveTickInFlight.current) return
+    liveTickInFlight.current = true
+    datacenterApi.liveTick(sessionId)
+      .then((res) => { if (res?.state) setState(res.state) })
+      .catch(() => {})
+      .finally(() => { liveTickInFlight.current = false })
+  }, [sessionId, setState])
 
   const st = state?.state || {}
   const loggedIn = st?.session?.logged_in
@@ -512,6 +524,7 @@ export default function DatacenterSimulator({
             twinJournal={st.digital_twin}
             busy={busy}
             onRefresh={() => doAction(() => datacenterApi.refreshMonitoring(sessionId), 'Metrics refreshed')}
+            onLiveTick={onLiveTick}
             onReplay={() => doAction(() => datacenterApi.replayTwinJournal(sessionId), 'Twin journal replayed')}
           />
           <OpsTicketsPanel

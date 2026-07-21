@@ -146,6 +146,8 @@ Still intentionally shallow vs Omniverse: screw-level photoreal meshes, real Vir
 - [x] Cable tray plant (fill %, ladder/basket/underfloor) in Cable/MMR rooms
 - [x] Burn-in load bank + guest OS stages + release gate
 - [x] SNMP walk / Redfish GET exporter depth + SOP/evidence pack
+- [x] Live sensor tick (`live_tick`) + NOC auto-scrape (no Channels WS)
+- [x] E2E lifecycle test: `backend/tests/test_datacenter_e2e_lifecycle.py`
 
 Intentionally still deferred: photoreal meshes, real VirtualBMC, Django Channels WS push, full CFD.
 
