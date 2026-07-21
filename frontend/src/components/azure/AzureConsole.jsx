@@ -25,6 +25,7 @@ const SIDEBAR = [
   { key: 'appservice', label: 'App Services', icon: AppWindow },
   { key: 'functions', label: 'Function apps', icon: Zap },
   { key: 'containerapps', label: 'Container apps', icon: Container },
+  { key: 'aks', label: 'Kubernetes services', icon: Boxes },
   { key: 'networking', label: 'Networking', icon: Network },
   { key: 'loadbalancers', label: 'Load balancers', icon: Layers },
   { key: 'firewall', label: 'Firewalls & VPN', icon: Flame },
@@ -108,6 +109,8 @@ export default function AzureConsole({
   const [funcName, setFuncName] = useState('func-events')
   const [createCaOpen, setCreateCaOpen] = useState(false)
   const [caName, setCaName] = useState('ca-worker')
+  const [createAksOpen, setCreateAksOpen] = useState(false)
+  const [aksName, setAksName] = useState('aks-workloads')
   const [inviteOpen, setInviteOpen] = useState(false)
   const [inviteUpn, setInviteUpn] = useState('partner@fabrikam.com')
 
@@ -521,6 +524,7 @@ export default function AzureConsole({
       createAppOpen, setCreateAppOpen, appName, setAppName,
       createFuncOpen, setCreateFuncOpen, funcName, setFuncName,
       createCaOpen, setCreateCaOpen, caName, setCaName,
+      createAksOpen, setCreateAksOpen, aksName, setAksName,
       inviteOpen, setInviteOpen, inviteUpn, setInviteUpn,
     })
     if (v2) return v2

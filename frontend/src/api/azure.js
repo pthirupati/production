@@ -104,6 +104,12 @@ export const azureApi = {
   createContainerApp(sessionId, payload = {}) {
     return azureApi.action(sessionId, 'create_container_app', payload)
   },
+  createAksCluster(sessionId, payload = {}) {
+    return azureApi.action(sessionId, 'create_aks_cluster', payload)
+  },
+  scaleAksNodePool(sessionId, cluster, nodePool, count) {
+    return azureApi.action(sessionId, 'scale_aks_node_pool', { cluster, node_pool: nodePool, count })
+  },
   createFirewallRule(sessionId, firewall, rule = {}) {
     return azureApi.action(sessionId, 'create_firewall_rule', { firewall, ...rule })
   },

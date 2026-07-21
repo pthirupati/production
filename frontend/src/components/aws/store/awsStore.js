@@ -1193,6 +1193,7 @@ export const useAwsStore = create(
         const { region } = get()
         const lb = { id: `elb-0${Math.random().toString(16).slice(2, 18).padEnd(16, '0')}`, region, name: name || 'my-lb', type: type || 'application', scheme: scheme || 'internet-facing', state: 'active', dnsName: `${name || 'my-lb'}-${Math.floor(Math.random() * 1e9)}.${region}.elb.amazonaws.com`, vpcId: vpcId || get().vpcs[0]?.id, targetGroups: [], created: new Date().toISOString() }
         set((s) => ({ loadBalancers: [...(s.loadBalancers || []), lb] }))
+        get()._syncAction('create_load_balancer', { name: lb.name, type: lb.type, scheme: lb.scheme, vpcId: lb.vpcId })
         return lb
       },
       deleteLoadBalancer: (id) => { set((s) => ({ loadBalancers: (s.loadBalancers || []).filter((x) => x.id !== id) })); return ok() },
@@ -1223,6 +1224,10 @@ export const useAwsStore = create(
         }
         const asg = { id: `asg-0${Math.random().toString(16).slice(2, 18).padEnd(16, '0')}`, region, name: name || 'my-asg', min: min ?? 1, max: max ?? 4, desired: n, instanceIds, launchTemplate: launchTemplate || 'default-lt', vpcId: subnet?.vpcId, status: 'active', created: new Date().toISOString() }
         set((s) => ({ autoScalingGroups: [...(s.autoScalingGroups || []), asg] }))
+        get()._syncAction('create_asg', {
+          name: asg.name, min: asg.min, max: asg.max, desired: asg.desired,
+          launchTemplate: asg.launchTemplate, vpcId: asg.vpcId,
+        })
         return asg
       },
       deleteAutoScalingGroup: (id) => {
@@ -1379,6 +1384,16 @@ export const useAwsStore = create(
             },
           },
         }))
+        // Mirror to lab server so scenario grading can observe creates.
+        get()._syncAction('create_generic_resource', {
+          service,
+          resource,
+          name: created.name,
+          status: created.status,
+          ...Object.fromEntries(
+            Object.entries(created).filter(([k]) => !['id', 'region', 'created', 'tags', 'pendingTransition', 'stateTransitionAt', 'name', 'status'].includes(k)),
+          ),
+        })
         if (created.pendingTransition) get()._ensureTick()
         return created
       },

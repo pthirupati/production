@@ -23,6 +23,8 @@ from typing import Any
 
 from django.core.cache import cache
 
+from .aws_v2_facades import apply_v2_action, ensure_v2, seed_v2
+
 SESSION_TTL = 7200
 ACCOUNT_ID = "123456789012"
 
@@ -328,6 +330,7 @@ def _base_state() -> dict:
         "goal": {"title": "AWS console lab", "objective": "Use the AWS console to fix the misconfigured resource."},
         "broken": {},
         "events": [],
+        **seed_v2(),
     }
 
 
@@ -406,6 +409,10 @@ _ensure_session = _ensure
 
 def get_state(session_id: str, scenario_slug: str = "") -> dict:
     entry = _ensure(session_id, scenario_slug)
+    keys_before = set(entry["state"].keys())
+    ensure_v2(entry["state"])
+    if set(entry["state"].keys()) != keys_before:
+        _save(session_id, entry)
     if _advance_lifecycle(entry["state"]):
         _save(session_id, entry)
     slug = entry.get("scenario_slug") or scenario_slug
@@ -873,6 +880,14 @@ def apply_action(session_id: str, action: str, payload: dict | None = None) -> d
         state["region"] = payload.get("region") or region
         _save(session_id, entry)
         return {"ok": True, "message": f"Region set to {state['region']}"}
+
+    ensure_v2(state)
+    v2 = apply_v2_action(state, action, payload)
+    if v2 is not None:
+        if v2.get("ok"):
+            _event(state, v2.get("message") or action, "success")
+            _save(session_id, entry)
+        return v2
 
     return {"ok": False, "error": f"Unknown action: {action}"}
 

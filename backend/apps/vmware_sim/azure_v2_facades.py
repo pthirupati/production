@@ -158,6 +158,25 @@ def seed_v2(rg: str = "rg-fixitlab-prod") -> dict[str, Any]:
                 {"name": "Require MFA for admins", "state": "enabled", "users": "All admins", "grant": "MFA"},
             ],
         },
+        "aks_clusters": [
+            {
+                "id": f"aks-{_hex()}", "name": "aks-prod", "resource_group": rg,
+                "location": "eastus", "kubernetes_version": "1.29.7",
+                "sku": "Standard", "network_plugin": "azure",
+                "node_pools": [
+                    {
+                        "name": "system", "mode": "System", "count": 3,
+                        "vm_size": "Standard_D4s_v5", "autoscaling": True, "min": 3, "max": 6,
+                    },
+                    {
+                        "name": "userpool", "mode": "User", "count": 2,
+                        "vm_size": "Standard_D8s_v5", "autoscaling": True, "min": 1, "max": 10,
+                    },
+                ],
+                "provisioning_state": "Succeeded",
+                "fqdn": "aks-prod-dns-abc123.hcp.eastus.azmk8s.io",
+            },
+        ],
     }
 
 
@@ -306,6 +325,43 @@ def apply_v2_action(state: dict, action: str, payload: dict) -> dict | None:
         }
         state.setdefault("container_apps", []).append(item)
         return {"ok": True, "message": f"Created container app {name}", "container_app": item}
+
+    if action == "create_aks_cluster":
+        name = (payload.get("name") or f"aks-{_hex(4)}").strip()
+        if any(c.get("name") == name for c in state.get("aks_clusters") or []):
+            return {"ok": False, "error": f"AKS cluster '{name}' already exists"}
+        count = int(payload.get("node_count") or 3)
+        item = {
+            "id": f"aks-{_hex()}", "name": name, "resource_group": rg,
+            "location": payload.get("location") or "eastus",
+            "kubernetes_version": payload.get("kubernetes_version") or "1.29.7",
+            "sku": payload.get("sku") or "Standard",
+            "network_plugin": payload.get("network_plugin") or "azure",
+            "node_pools": [
+                {
+                    "name": "system", "mode": "System", "count": count,
+                    "vm_size": payload.get("vm_size") or "Standard_D4s_v5",
+                    "autoscaling": True, "min": max(1, count - 1), "max": max(count + 3, 6),
+                },
+            ],
+            "provisioning_state": "Succeeded",
+            "fqdn": f"{name}-dns-{_hex(6)}.hcp.eastus.azmk8s.io",
+        }
+        state.setdefault("aks_clusters", []).append(item)
+        return {"ok": True, "message": f"Created AKS cluster {name}", "aks_cluster": item}
+
+    if action == "scale_aks_node_pool":
+        cluster_name = payload.get("cluster") or payload.get("name") or ""
+        pool_name = payload.get("node_pool") or "system"
+        cluster = next((c for c in state.get("aks_clusters") or [] if c.get("name") == cluster_name), None)
+        if not cluster:
+            return {"ok": False, "error": "AKS cluster not found"}
+        pool = next((p for p in cluster.get("node_pools") or [] if p.get("name") == pool_name), None)
+        if not pool:
+            return {"ok": False, "error": "Node pool not found"}
+        count = max(0, int(payload.get("count") or pool.get("count") or 1))
+        pool["count"] = count
+        return {"ok": True, "message": f"Scaled {cluster_name}/{pool_name} to {count}", "aks_cluster": cluster}
 
     if action == "create_firewall_rule":
         fw_name = payload.get("firewall") or ""

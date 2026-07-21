@@ -1,9 +1,11 @@
 import { useState } from 'react'
+import { renderVsphereV2Page, VSPHERE_V2_NAV } from './VsphereV2Panels'
 
 /* vSphere "Administration" area — reachable from Menu ▸ Administration.
    Left rail with Access Control ▸ (Users and Groups / Roles / Global
    Permissions). Styled like vSphere SSO. Builds on the existing
-   create_vcenter_user / assign_user_role / create_role / assign_role actions. */
+   create_vcenter_user / assign_user_role / create_role / assign_role actions.
+   V2 blades: Host Profiles, SPBM, Tags, DRS/HA, Guest Customization, LCM. */
 
 // Privilege groups shown for each role (read-only catalogue, like vSphere).
 const ROLE_PRIVILEGES = {
@@ -254,9 +256,12 @@ function GlobalPermissions({ permissions, roles, onAction, acting }) {
   )
 }
 
-export default function VmwareAdministration({ users = [], rolesCatalog = [], permissions = [], onAction, acting }) {
+export default function VmwareAdministration({
+  users = [], rolesCatalog = [], permissions = [], inventory = {}, onAction, acting,
+}) {
   const roles = rolesCatalog.length ? rolesCatalog : ['Administrator', 'Read Only', 'No Access']
   const [view, setView] = useState('users')
+  const v2 = renderVsphereV2Page({ view, inv: inventory, onAction, acting })
 
   return (
     <div className="flex gap-3 min-h-0">
@@ -265,13 +270,18 @@ export default function VmwareAdministration({ users = [], rolesCatalog = [], pe
         <NavItem active={view === 'users'} label="Users and Groups" onClick={() => setView('users')} />
         <NavItem active={view === 'roles'} label="Roles" onClick={() => setView('roles')} />
         <NavItem active={view === 'permissions'} label="Global Permissions" onClick={() => setView('permissions')} />
+        <p className="px-3 py-1 mt-2 text-[10px] font-bold text-[#6880a0] uppercase tracking-wider m-0">Policies and Profiles</p>
+        {VSPHERE_V2_NAV.map((item) => (
+          <NavItem key={item.key} active={view === item.key} label={item.label} onClick={() => setView(item.key)} />
+        ))}
         <p className="px-3 py-1 mt-2 text-[10px] font-bold text-[#6880a0] uppercase tracking-wider m-0">Single Sign On</p>
         <NavItem active={view === 'users'} label="Configuration" indent={1} onClick={() => setView('users')} />
       </div>
       <div className="flex-1 min-w-0">
-        {view === 'users' && <UsersAndGroups users={users} roles={roles} onAction={onAction} acting={acting} />}
-        {view === 'roles' && <Roles roles={roles} onAction={onAction} acting={acting} />}
-        {view === 'permissions' && <GlobalPermissions permissions={permissions} roles={roles} onAction={onAction} acting={acting} />}
+        {v2}
+        {!v2 && view === 'users' && <UsersAndGroups users={users} roles={roles} onAction={onAction} acting={acting} />}
+        {!v2 && view === 'roles' && <Roles roles={roles} onAction={onAction} acting={acting} />}
+        {!v2 && view === 'permissions' && <GlobalPermissions permissions={permissions} roles={roles} onAction={onAction} acting={acting} />}
       </div>
     </div>
   )

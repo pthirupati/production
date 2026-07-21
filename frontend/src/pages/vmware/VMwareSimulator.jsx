@@ -1760,7 +1760,7 @@ export default function VMwareSimulator() {
 
               {/* ── ADMINISTRATION (Menu ▸ Administration) ───────── */}
               {((selectedNode.type === 'vcenter' && activeTab === 'administration') || selectedNode.type === 'admin') && (
-                <VmwareAdministration users={vcenterUsers} rolesCatalog={rolesCatalog} permissions={permissions} onAction={runAction} acting={acting} />
+                <VmwareAdministration users={vcenterUsers} rolesCatalog={rolesCatalog} permissions={permissions} inventory={inv} onAction={runAction} acting={acting} />
               )}
 
               {selectedNode.type === 'nsx' && activeTab === 'summary' && (

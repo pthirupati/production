@@ -9,6 +9,7 @@ export function AzureV2NavExtras() {
     { key: 'appservice', label: 'App Services' },
     { key: 'functions', label: 'Function apps' },
     { key: 'containerapps', label: 'Container apps' },
+    { key: 'aks', label: 'Kubernetes services' },
     { key: 'firewall', label: 'Firewalls & VPN' },
     { key: 'cosmos', label: 'Azure Cosmos DB' },
     { key: 'sentinel', label: 'Microsoft Sentinel' },
@@ -22,12 +23,14 @@ export function renderAzureV2Page({
   createAppOpen, setCreateAppOpen, appName, setAppName,
   createFuncOpen, setCreateFuncOpen, funcName, setFuncName,
   createCaOpen, setCreateCaOpen, caName, setCaName,
+  createAksOpen, setCreateAksOpen, aksName, setAksName,
   inviteOpen, setInviteOpen, inviteUpn, setInviteUpn,
 }) {
   const vmss = st.vmss || []
   const webApps = st.web_apps || []
   const plans = st.app_service_plans || []
   const funcs = st.function_apps || []
+  const aksClusters = st.aks_clusters || []
   const cas = st.container_apps || []
   const envs = st.container_apps_envs || []
   const firewalls = st.firewalls || []
@@ -278,6 +281,85 @@ export function renderAzureV2Page({
           </>}>
           <label className="block text-sm">Name
             <input className="w-full mt-1 border rounded px-2 py-1.5" value={caName} onChange={(e) => setCaName(e.target.value)} />
+          </label>
+        </SimModal>
+      </div>
+    )
+  }
+
+  if (nav === 'aks') {
+    return (
+      <div className="space-y-3">
+        <div className="flex justify-between items-center flex-wrap gap-2">
+          <h2 className="text-lg font-semibold">Kubernetes services</h2>
+          <button type="button" className="az-btn-primary flex items-center gap-1" onClick={() => setCreateAksOpen(true)}>
+            <Plus size={14} /> Create
+          </button>
+        </div>
+        <SimDataTable
+          columns={[
+            { key: 'name', label: 'Name', sortable: true },
+            { key: 'kubernetes_version', label: 'Version' },
+            { key: 'sku', label: 'SKU' },
+            { key: 'network_plugin', label: 'Network' },
+            {
+              key: 'nodes', label: 'Nodes',
+              render: (r) => (r.node_pools || []).reduce((n, p) => n + (p.count || 0), 0),
+            },
+            {
+              key: 'provisioning_state', label: 'Status',
+              render: (r) => <SimStatusBadge status="success" label={r.provisioning_state || 'Succeeded'} />,
+            },
+            {
+              key: 'actions', label: '',
+              render: (r) => (
+                <button
+                  type="button"
+                  className="az-btn-outline text-xs"
+                  disabled={busy}
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    const pool = (r.node_pools || [])[0]
+                    if (!pool) return
+                    run(
+                      () => azureApi.scaleAksNodePool(sessionId, r.name, pool.name, (pool.count || 1) + 1),
+                      'Node pool scaled',
+                    )
+                  }}
+                >
+                  Scale +1
+                </button>
+              ),
+            },
+          ]}
+          rows={aksClusters}
+          searchKeys={['name']}
+          expandRow={(r) => (
+            <div className="az-detail-panel text-sm p-3 space-y-2">
+              <div>FQDN: <code>{r.fqdn}</code></div>
+              <SimDataTable
+                columns={[
+                  { key: 'name', label: 'Node pool' },
+                  { key: 'mode', label: 'Mode' },
+                  { key: 'count', label: 'Count' },
+                  { key: 'vm_size', label: 'Size' },
+                  { key: 'autoscaling', label: 'Autoscale', render: (p) => (p.autoscaling ? 'On' : 'Off') },
+                ]}
+                rows={r.node_pools || []}
+              />
+            </div>
+          )}
+        />
+        <SimModal open={createAksOpen} onClose={() => setCreateAksOpen(false)} title="Create AKS cluster"
+          footer={<>
+            <button type="button" className="text-sm px-3" onClick={() => setCreateAksOpen(false)}>Cancel</button>
+            <button type="button" className="az-btn-primary" disabled={busy} onClick={() => {
+              run(() => azureApi.createAksCluster(sessionId, { name: aksName }), 'AKS cluster created')
+              setCreateAksOpen(false)
+            }}>Create</button>
+          </>}>
+          <label className="block text-sm">Cluster name
+            <input className="w-full mt-1 border rounded px-2 py-1.5" value={aksName} onChange={(e) => setAksName(e.target.value)} />
           </label>
         </SimModal>
       </div>
