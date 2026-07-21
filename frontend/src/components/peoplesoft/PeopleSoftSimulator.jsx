@@ -275,22 +275,43 @@ export default function PeopleSoftSimulator({
           )}
 
           {!loading && !fluidView && section === 'integration' && (
-            <Panel title="Integration Broker — Nodes">
-              <Table head={['Node', 'Status', '']}>
-                {(w?.integration?.nodes || []).map((n) => (
-                  <tr key={n.name} className="border-t border-slate-100">
-                    <td className="px-3 py-2 font-mono">{n.name}</td>
-                    <td className="px-3 py-2">{n.status}</td>
-                    <td className="px-3 py-2 text-right">
-                      {n.status === 'down' && (
-                        <button type="button" onClick={() => run(() => peoplesoftApi.restartIbNode(sessionId, n.name), `Restarted ${n.name}`)}
-                          className="text-xs px-2 py-1 rounded text-white" style={{ background: PS_BLUE }}>Restart</button>
-                      )}
-                    </td>
-                  </tr>
-                ))}
-              </Table>
-            </Panel>
+            <div className="space-y-6">
+              <Panel title="Integration Broker — Nodes">
+                <Table head={['Node', 'Status', '']}>
+                  {(w?.integration?.nodes || []).map((n) => (
+                    <tr key={n.name} className="border-t border-slate-100">
+                      <td className="px-3 py-2 font-mono">{n.name}</td>
+                      <td className="px-3 py-2">{n.status}</td>
+                      <td className="px-3 py-2 text-right">
+                        {n.status === 'down' && (
+                          <button type="button" onClick={() => run(() => peoplesoftApi.restartIbNode(sessionId, n.name), `Restarted ${n.name}`)}
+                            className="text-xs px-2 py-1 rounded text-white" style={{ background: PS_BLUE }}>Restart</button>
+                        )}
+                      </td>
+                    </tr>
+                  ))}
+                </Table>
+              </Panel>
+              <Panel title="Integration Broker — Services">
+                <Table head={['Service', 'Active', '']}>
+                  {(w?.integration?.services || []).map((svc) => (
+                    <tr key={svc.name} className="border-t border-slate-100">
+                      <td className="px-3 py-2 font-mono">{svc.name}</td>
+                      <td className="px-3 py-2">{svc.active ? 'Yes' : 'No'}</td>
+                      <td className="px-3 py-2 text-right">
+                        {!svc.active && (
+                          <button type="button" disabled={busy}
+                            onClick={() => run(() => peoplesoftApi.activateService(sessionId, svc.name), `Activated ${svc.name}`)}
+                            className="text-xs px-2 py-1 rounded text-white disabled:opacity-50" style={{ background: PS_BLUE }}>
+                            Activate
+                          </button>
+                        )}
+                      </td>
+                    </tr>
+                  ))}
+                </Table>
+              </Panel>
+            </div>
           )}
 
           {!loading && !fluidView && V2_SECTIONS.has(section) && renderPeopleSoftV2Page({

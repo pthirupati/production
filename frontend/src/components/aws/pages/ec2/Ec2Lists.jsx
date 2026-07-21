@@ -276,6 +276,10 @@ export function ElasticIpList() {
 export function AmiList() {
   const region = useAwsStore((s) => s.region)
   const amis = scoped(useAwsStore((s) => s.amis), region)
+  const instances = scoped(useAwsStore((s) => s.instances), region)
+  const createImage = useAwsStore((s) => s.createImage)
+  const deregisterImage = useAwsStore((s) => s.deregisterImage)
+  const pushFlash = useAwsStore((s) => s.pushFlash)
   const columns = [
     { key: 'name', label: 'Name' },
     { key: 'id', label: 'AMI ID', render: (r) => <IDCopy value={r.id} /> },
@@ -284,5 +288,27 @@ export function AmiList() {
     { key: 'arch', label: 'Architecture' },
     { key: 'created', label: 'Creation date', render: (r) => new Date(r.created).toLocaleDateString() },
   ]
-  return <Page title={`AMIs (${amis.length})`}><DataTable columns={columns} rows={amis} getRowKey={(r) => r.id} selectable selected={[]} onSelect={() => {}} /></Page>
+  const source = instances.find((i) => i.state === 'running' || i.state === 'stopped') || instances[0]
+  return (
+    <Page
+      title={`AMIs (${amis.length})`}
+      action={<Button variant="primary" disabled={!source} onClick={() => {
+        const ami = createImage({ instanceId: source.id, name: `${source.name || source.id}-ami` })
+        if (ami?.ok === false) return
+        pushFlash('success', `Created image ${ami.id} from ${source.id}`)
+      }}>Create image</Button>}
+    >
+      <DataTable
+        columns={columns}
+        rows={amis}
+        getRowKey={(r) => r.id}
+        selectable
+        selected={[]}
+        onSelect={() => {}}
+        rowActions={(r) => (r.visibility === 'private' ? [
+          { label: 'Deregister', danger: true, onClick: () => { deregisterImage(r.id); pushFlash('success', `Deregistered ${r.id}`) } },
+        ] : [])}
+      />
+    </Page>
+  )
 }

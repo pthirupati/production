@@ -460,7 +460,15 @@ export function renderAzureV2Page({
   if (nav === 'cosmos') {
     return (
       <div className="space-y-3">
-        <h2 className="text-lg font-semibold">Azure Cosmos DB</h2>
+        <div className="flex justify-between items-center flex-wrap gap-2">
+          <h2 className="text-lg font-semibold">Azure Cosmos DB</h2>
+          <button type="button" className="az-btn-sm" disabled={busy}
+            onClick={() => run(() => azureApi.createCosmosAccount(sessionId, {
+              name: `cosmos-${Date.now().toString(36).slice(-4)}`,
+            }), 'Cosmos account created')}>
+            <Plus size={11} /> Create account
+          </button>
+        </div>
         <SimDataTable
           columns={[
             { key: 'name', label: 'Account', sortable: true },
@@ -539,6 +547,18 @@ export function renderAzureV2Page({
             { key: 'kind', label: 'Kind' },
             { key: 'enabled', label: 'Enabled', render: (r) => (r.enabled ? 'Yes' : 'No') },
             { key: 'firings_30d', label: 'Firings (30d)' },
+            {
+              key: 'actions', label: '',
+              render: (r) => (
+                <button type="button" className="az-btn-sm" disabled={busy}
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    run(() => azureApi.toggleSentinelAnalyticsRule(sessionId, r.name), r.enabled ? 'Rule disabled' : 'Rule enabled')
+                  }}>
+                  {r.enabled ? 'Disable' : 'Enable'}
+                </button>
+              ),
+            },
           ]} rows={sentinel.analytics_rules || []} />
         </div>
         <div>

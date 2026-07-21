@@ -3,7 +3,7 @@ import { persist, createJSONStorage } from 'zustand/middleware'
 import { useAuthStore } from '../../../store/authStore'
 import {
   newInstanceId, newVolumeId, newSnapshotId, newSgId, newKeyPairId, newAmiId, newEipAllocId,
-  newEipAssocId, newIgwId, newSubnetId, newVpcId, newSgRuleId,
+  newEipAssocId, newIgwId, newSubnetId, newVpcId, newSgRuleId, newRtbId,
   newIamUserId, newIamRoleId, newIamGroupId, newAccessKeyId,
   newSecretAccessKey, newPrivateIp, newPublicIp, publicDns, privateDns, hostnameFromIp,
 } from '../lib/ids'
@@ -760,9 +760,13 @@ export const useAwsStore = create(
       },
 
       // Toggle EC2 termination protection.
-      setDisableApiTermination: (id, value) => set((s) => ({
-        instances: s.instances.map((x) => (x.id === id ? { ...x, disableApiTermination: !!value } : x)),
-      })),
+      setDisableApiTermination: (id, value) => {
+        set((s) => ({
+          instances: s.instances.map((x) => (x.id === id ? { ...x, disableApiTermination: !!value } : x)),
+        }))
+        get()._syncAction('set_termination_protection', { instance_id: id, value: !!value })
+        return ok()
+      },
 
       // ---------- Durable lifecycle engine ----------
       // Resolve every past-due transition (EC2 + generic + LB/TG health) and
@@ -1104,6 +1108,77 @@ export const useAwsStore = create(
         return ok()
       },
 
+      // ---------- Route tables ----------
+      createRouteTable: ({ vpcId } = {}) => {
+        const { region, vpcs } = get()
+        const vpc = vpcs.find((v) => v.id === vpcId) || vpcs[0]
+        if (!vpc) return fail(invalidParameterValue('CreateRouteTable', 'VPC not found'))
+        const rtb = {
+          id: newRtbId(), region, vpcId: vpc.id, main: false,
+          routes: [{ dest: vpc.cidr, target: 'local' }],
+        }
+        set((s) => ({ routeTables: [...(s.routeTables || []), rtb] }))
+        get()._syncAction('create_route_table', { rtb_id: rtb.id, vpc_id: vpc.id })
+        return rtb
+      },
+      createRoute: (rtbId, { dest, target } = {}) => {
+        const { routeTables } = get()
+        const rtb = routeTables.find((r) => r.id === rtbId)
+        if (!rtb) return fail(invalidParameterValue('CreateRoute', `The routeTable ID '${rtbId}' does not exist`))
+        const route = { dest: dest || '0.0.0.0/0', target: target || 'igw-local' }
+        set((s) => ({
+          routeTables: s.routeTables.map((r) => (
+            r.id === rtbId
+              ? { ...r, routes: [...(r.routes || []).filter((x) => x.dest !== route.dest), route] }
+              : r
+          )),
+        }))
+        get()._syncAction('create_route', { rtb_id: rtbId, dest: route.dest, target: route.target })
+        return ok()
+      },
+      deleteRouteTable: (id) => {
+        const { routeTables } = get()
+        const rtb = routeTables.find((r) => r.id === id)
+        if (rtb?.main) {
+          const err = dependencyViolation('DeleteRouteTable', `The main route table '${id}' cannot be deleted.`)
+          get().pushFlash('error', err.str)
+          return fail(err)
+        }
+        set((s) => ({ routeTables: (s.routeTables || []).filter((r) => r.id !== id) }))
+        get()._syncAction('delete_route_table', { rtb_id: id })
+        return ok()
+      },
+
+      // ---------- AMIs ----------
+      createImage: ({ instanceId, name, description } = {}) => {
+        const { region, instances } = get()
+        const inst = instances.find((i) => i.id === instanceId)
+        if (!inst) return fail(invalidParameterValue('CreateImage', `The instance ID '${instanceId}' does not exist`))
+        const ami = {
+          id: newAmiId(),
+          region,
+          name: name || `${inst.name || inst.id}-ami`,
+          os: inst.os || 'amazon-linux-2023',
+          platform: inst.platform || 'Linux/UNIX',
+          arch: 'x86_64',
+          user: 'ec2-user',
+          desc: description || `Created from ${inst.id}`,
+          owner: ACCOUNT_ID,
+          created: new Date().toISOString(),
+          visibility: 'private',
+        }
+        set((s) => ({ amis: [...(s.amis || []), ami] }))
+        get()._syncAction('create_image', {
+          instance_id: instanceId, ami_id: ami.id, name: ami.name, description: ami.desc,
+        })
+        return ami
+      },
+      deregisterImage: (id) => {
+        set((s) => ({ amis: (s.amis || []).filter((a) => a.id !== id) }))
+        get()._syncAction('deregister_image', { ami_id: id })
+        return ok()
+      },
+
       // ---------- EBS volumes / snapshots ----------
       attachVolume: (volId, instanceId, device) => {
         const { volumes, instances } = get()
@@ -1438,10 +1513,18 @@ export const useAwsStore = create(
         get()._syncAction('create_iam_policy', { name, description, document: doc })
         return policy
       },
-      updateIamPolicy: (name, patch) => set((s) => ({
-        iamPolicies: s.iamPolicies.map((p) => (p.name === name ? { ...p, ...patch } : p)),
-      })),
-      deleteIamPolicy: (name) => set((s) => ({ iamPolicies: s.iamPolicies.filter((p) => p.name !== name) })),
+      updateIamPolicy: (name, patch) => {
+        set((s) => ({
+          iamPolicies: s.iamPolicies.map((p) => (p.name === name ? { ...p, ...patch } : p)),
+        }))
+        get()._syncAction('update_iam_policy', { name, patch: patch || {} })
+        return ok()
+      },
+      deleteIamPolicy: (name) => {
+        set((s) => ({ iamPolicies: s.iamPolicies.filter((p) => p.name !== name) }))
+        get()._syncAction('delete_iam_policy', { name })
+        return ok()
+      },
 
       // ---------- Generic services ----------
       createGenericResource: (service, resource, payload) => {
@@ -1510,12 +1593,18 @@ export const useAwsStore = create(
             pendingTransition: { op: 'delete' },
           })))
           get()._ensureTick()
+          get()._syncAction('delete_generic_resource', { service, resource, id })
           return ok()
         }
         set((s) => removeGeneric(s, service, resource, id))
+        get()._syncAction('delete_generic_resource', { service, resource, id })
         return ok()
       },
-      updateGenericResource: (service, resource, id, patch) => set((s) => mapGeneric(s, service, resource, id, (x) => ({ ...x, ...patch }))),
+      updateGenericResource: (service, resource, id, patch) => {
+        set((s) => mapGeneric(s, service, resource, id, (x) => ({ ...x, ...patch })))
+        get()._syncAction('update_generic_resource', { service, resource, id, patch: patch || {} })
+        return ok()
+      },
 
       // Generic action (reboot/modify/...) driven by cfg.lifecycle.actions.
       transitionGenericResource: (service, resource, id, action, extraPatch) => {

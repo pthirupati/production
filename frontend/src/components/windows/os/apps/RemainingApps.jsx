@@ -26,12 +26,30 @@ const policySettings = [
 
 export function GPMC() {
   const os = useOS()
+  const labAction = useOS((s) => s.labAction)
   const [selected, setSelected] = useState('Default Domain Policy')
   const [tab, setTab] = useState('Scope')
   const [editor, setEditor] = useState(null)
+  const [localGpos, setLocalGpos] = useState(gpos)
+  const [busy, setBusy] = useState(false)
+
+  const createGpo = async () => {
+    const name = `Lab-GPO-${Date.now().toString(36).slice(-4)}`
+    setLocalGpos((list) => [...list, name])
+    setSelected(name)
+    if (labAction) {
+      setBusy(true)
+      try { await labAction('create_gpo', { name }) } finally { setBusy(false) }
+    }
+  }
+
   return (
     <div className="winos-app">
-      <div className="winos-toolbar"><span style={{ fontSize: 12 }}>File &nbsp; Action &nbsp; View &nbsp; Window &nbsp; Help</span></div>
+      <div className="winos-toolbar">
+        <span style={{ fontSize: 12 }}>File &nbsp; Action &nbsp; View &nbsp; Window &nbsp; Help</span>
+        <span style={{ flex: 1 }} />
+        <button type="button" className="winos-btn primary" disabled={busy} onClick={createGpo}><Plus size={13} /> New GPO</button>
+      </div>
       <div className="winos-split">
         <div className="winos-tree" style={{ width: 310 }}>
           <div className="winos-tree-row" style={{ fontWeight: 600 }}>Group Policy Management</div>
@@ -42,7 +60,7 @@ export function GPMC() {
             <div key={n} className={`winos-tree-row ${selected === n ? 'sel' : ''}`} style={{ paddingLeft: 50 }} onClick={() => setSelected(n)}>{n}</div>
           ))}
           <TreeLine d={4} label="Group Policy Objects" open />
-          {gpos.map((g) => (
+          {localGpos.map((g) => (
             <div key={g} className={`winos-tree-row ${selected === g ? 'sel' : ''}`} style={{ paddingLeft: 66 }} onClick={() => setSelected(g)} onDoubleClick={() => setEditor(g)}>📜 {g}</div>
           ))}
           <TreeLine d={2} label="Sites" />
@@ -54,7 +72,7 @@ export function GPMC() {
             <div style={{ display: 'flex', alignItems: 'center', marginBottom: 10 }}>
               <h2 style={{ fontSize: 16, margin: 0, fontWeight: 600 }}>{selected}</h2>
               <span style={{ flex: 1 }} />
-              {gpos.includes(selected) && <button className="winos-btn primary" onClick={() => setEditor(selected)}>Edit…</button>}
+              {localGpos.includes(selected) && <button className="winos-btn primary" onClick={() => setEditor(selected)}>Edit…</button>}
             </div>
             {tab === 'Scope' && (
               <>
@@ -121,7 +139,26 @@ function GPOEditor({ name, os, onClose }) {
         </div>
       </div>
       {edit && <Dialog title={edit[0]} onClose={() => setEdit(null)} width={460}
-        footer={<><button className="winos-btn primary" onClick={() => setEdit(null)}>OK</button><button className="winos-btn" onClick={() => setEdit(null)}>Cancel</button><button className="winos-btn">Apply</button></>}>
+        footer={<><button className="winos-btn primary" onClick={() => {
+          if (os.labAction) {
+            os.labAction('update_gpo_setting', {
+              gpo: name,
+              setting: edit[0],
+              value: 'Enabled',
+              detail: edit[2],
+            })
+          }
+          setEdit(null)
+        }}>OK</button><button className="winos-btn" onClick={() => setEdit(null)}>Cancel</button><button className="winos-btn" onClick={() => {
+          if (os.labAction) {
+            os.labAction('update_gpo_setting', {
+              gpo: name,
+              setting: edit[0],
+              value: 'Enabled',
+              detail: edit[2],
+            })
+          }
+        }}>Apply</button></>}>
         <div style={{ fontSize: 12.5 }}>
           <label style={{ display: 'block' }}><input type="radio" name="pol" /> Not Configured</label>
           <label style={{ display: 'block' }}><input type="radio" name="pol" defaultChecked /> Enabled</label>

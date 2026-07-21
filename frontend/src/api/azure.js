@@ -125,8 +125,17 @@ export const azureApi = {
   createCosmosItem(sessionId, account, database, container) {
     return azureApi.action(sessionId, 'create_cosmos_item', { account, database, container })
   },
+  createCosmosAccount(sessionId, payload = {}) {
+    return azureApi.action(sessionId, 'create_cosmos_account', payload)
+  },
   sentinelUpdateIncident(sessionId, incidentId, status) {
     return azureApi.action(sessionId, 'sentinel_update_incident', { incident_id: incidentId, status })
+  },
+  toggleSentinelAnalyticsRule(sessionId, name, enabled) {
+    return azureApi.action(sessionId, 'toggle_sentinel_analytics_rule', {
+      name,
+      ...(enabled === undefined ? {} : { enabled }),
+    })
   },
   entraInviteUser(sessionId, upn, opts = {}) {
     return azureApi.action(sessionId, 'entra_invite_user', { upn, ...opts })

@@ -113,6 +113,8 @@ function SubnetColumn({ title, subnets, route }) {
 export function VpcList() {
   const region = useAwsStore((s) => s.region)
   const vpcs = scoped(useAwsStore((s) => s.vpcs), region)
+  const createVpc = useAwsStore((s) => s.createVpc)
+  const pushFlash = useAwsStore((s) => s.pushFlash)
   const columns = [
     { key: 'id', label: 'VPC ID', render: (r) => <IDCopy value={r.id} /> },
     { key: 'name', label: 'Name', render: (r) => r.name || '—' },
@@ -121,12 +123,27 @@ export function VpcList() {
     { key: 'isDefault', label: 'Default VPC', render: (r) => (r.isDefault ? 'Yes' : 'No') },
     { key: 'tenancy', label: 'Tenancy' },
   ]
-  return <Page title={`Your VPCs (${vpcs.length})`}><DataTable columns={columns} rows={vpcs} getRowKey={(r) => r.id} selectable selected={[]} onSelect={() => {}} /></Page>
+  return (
+    <Page
+      title={`Your VPCs (${vpcs.length})`}
+      action={<Button variant="primary" onClick={() => {
+        const n = (vpcs.length || 0) + 1
+        const res = createVpc({ name: `lab-vpc-${n}`, cidr: `10.${10 + n}.0.0/16` })
+        if (res?.ok === false) return
+        pushFlash('success', `Created VPC ${res.id}`)
+      }}>Create VPC</Button>}
+    >
+      <DataTable columns={columns} rows={vpcs} getRowKey={(r) => r.id} selectable selected={[]} onSelect={() => {}} />
+    </Page>
+  )
 }
 
 export function SubnetList() {
   const region = useAwsStore((s) => s.region)
   const subnets = scoped(useAwsStore((s) => s.subnets), region)
+  const vpcs = scoped(useAwsStore((s) => s.vpcs), region)
+  const createSubnet = useAwsStore((s) => s.createSubnet)
+  const pushFlash = useAwsStore((s) => s.pushFlash)
   const columns = [
     { key: 'id', label: 'Subnet ID', render: (r) => <IDCopy value={r.id} /> },
     { key: 'state', label: 'State', render: () => <Badge state="available">available</Badge> },
@@ -136,19 +153,71 @@ export function SubnetList() {
     { key: 'az', label: 'Availability Zone' },
     { key: 'mapPublicIp', label: 'Auto-assign public IP', render: (r) => (r.mapPublicIp ? 'Yes' : 'No') },
   ]
-  return <Page title={`Subnets (${subnets.length})`}><DataTable columns={columns} rows={subnets} getRowKey={(r) => r.id} selectable selected={[]} onSelect={() => {}} /></Page>
+  return (
+    <Page
+      title={`Subnets (${subnets.length})`}
+      action={<Button variant="primary" onClick={() => {
+        const vpc = vpcs[0]
+        if (!vpc) { pushFlash('error', 'Create a VPC first'); return }
+        const n = (subnets.filter((s) => s.vpcId === vpc.id).length || 0) + 1
+        const res = createSubnet({ vpcId: vpc.id, cidr: `172.31.${n * 16}.0/20`, az: `${region}a`, mapPublicIp: true })
+        if (res?.ok === false) return
+        pushFlash('success', `Created subnet ${res.id}`)
+      }}>Create subnet</Button>}
+    >
+      <DataTable columns={columns} rows={subnets} getRowKey={(r) => r.id} selectable selected={[]} onSelect={() => {}} />
+    </Page>
+  )
 }
 
 export function RouteTableList() {
   const region = useAwsStore((s) => s.region)
   const rts = scoped(useAwsStore((s) => s.routeTables), region)
+  const vpcs = scoped(useAwsStore((s) => s.vpcs), region)
+  const igws = scoped(useAwsStore((s) => s.internetGateways), region)
+  const createRtb = useAwsStore((s) => s.createRouteTable)
+  const createRoute = useAwsStore((s) => s.createRoute)
+  const deleteRtb = useAwsStore((s) => s.deleteRouteTable)
+  const pushFlash = useAwsStore((s) => s.pushFlash)
   const columns = [
     { key: 'id', label: 'Route table ID', render: (r) => <IDCopy value={r.id} /> },
     { key: 'main', label: 'Main', render: (r) => (r.main ? 'Yes' : 'No') },
     { key: 'vpcId', label: 'VPC', render: (r) => <span className="aws-mono">{r.vpcId}</span> },
     { key: 'routes', label: 'Routes', render: (r) => r.routes.map((rt) => `${rt.dest} → ${rt.target}`).join(', ') },
+    {
+      key: 'actions', label: '', sortable: false,
+      render: (r) => (
+        <Button variant="link" onClick={() => {
+          const igw = igws.find((g) => g.vpcId === r.vpcId && g.state === 'attached') || igws[0]
+          const res = createRoute(r.id, { dest: '0.0.0.0/0', target: igw?.id || 'igw-local' })
+          if (res?.ok === false) return
+          pushFlash('success', `Added default route on ${r.id}`)
+        }}>Add 0.0.0.0/0</Button>
+      ),
+    },
   ]
-  return <Page title={`Route tables (${rts.length})`}><DataTable columns={columns} rows={rts} getRowKey={(r) => r.id} selectable selected={[]} onSelect={() => {}} /></Page>
+  return (
+    <Page
+      title={`Route tables (${rts.length})`}
+      action={<Button variant="primary" onClick={() => {
+        const res = createRtb({ vpcId: vpcs[0]?.id })
+        if (res?.ok === false) return
+        pushFlash('success', `Created ${res.id}`)
+      }}>Create route table</Button>}
+    >
+      <DataTable
+        columns={columns}
+        rows={rts}
+        getRowKey={(r) => r.id}
+        selectable
+        selected={[]}
+        onSelect={() => {}}
+        rowActions={(r) => (r.main ? [] : [
+          { label: 'Delete', danger: true, onClick: () => { const res = deleteRtb(r.id); if (res?.ok === false) return; pushFlash('success', `Deleted ${r.id}`) } },
+        ])}
+      />
+    </Page>
+  )
 }
 
 export function InternetGatewayList() {

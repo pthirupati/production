@@ -513,4 +513,42 @@ def apply_v2_action(state: dict, action: str, payload: dict) -> dict | None:
         state.setdefault("vnets", []).append(item)
         return {"ok": True, "message": f"Created virtual network {name}", "vnet": item}
 
+    if action == "create_cosmos_account":
+        name = (payload.get("name") or f"cosmos-{_hex(4)}").strip()
+        if any(c.get("name") == name for c in state.get("cosmos_accounts") or []):
+            return {"ok": False, "error": f"Cosmos account '{name}' already exists"}
+        item = {
+            "id": f"cosmos-{_hex()}", "name": name, "resource_group": rg,
+            "location": payload.get("location") or "eastus",
+            "api": payload.get("api") or "NoSQL",
+            "consistency": payload.get("consistency") or "Session",
+            "multi_region_writes": bool(payload.get("multi_region_writes")),
+            "databases": [{
+                "name": payload.get("database") or "appdb",
+                "containers": [{
+                    "name": payload.get("container") or "items",
+                    "partition_key": payload.get("partition_key") or "/id",
+                    "throughput": int(payload.get("throughput") or 400),
+                    "items": 0,
+                }],
+            }],
+        }
+        state.setdefault("cosmos_accounts", []).append(item)
+        return {"ok": True, "message": f"Created Cosmos account {name}", "cosmos": item}
+
+    if action == "toggle_sentinel_analytics_rule":
+        name = payload.get("name") or ""
+        sentinel = state.setdefault("sentinel", {})
+        rules = sentinel.setdefault("analytics_rules", [])
+        rule = next((r for r in rules if r.get("name") == name), None)
+        if not rule and rules:
+            rule = rules[0]
+        if not rule:
+            return {"ok": False, "error": "Analytics rule not found"}
+        if "enabled" in payload:
+            rule["enabled"] = bool(payload["enabled"])
+        else:
+            rule["enabled"] = not bool(rule.get("enabled"))
+        return {"ok": True, "message": f"Rule {rule['name']} → {'enabled' if rule['enabled'] else 'disabled'}", "rule": rule}
+
     return None

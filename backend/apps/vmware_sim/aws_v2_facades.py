@@ -419,6 +419,31 @@ def apply_v2_action(state: dict, action: str, payload: dict) -> dict | None:
         gr.setdefault(service, {}).setdefault(resource, []).append(row)
         return {"ok": True, "message": f"Created {service}/{resource} {name}", "resource": row}
 
+    if action == "delete_generic_resource":
+        service = payload.get("service") or ""
+        resource = payload.get("resource") or ""
+        ident = payload.get("id") or payload.get("name") or ""
+        rows = gr.setdefault(service, {}).setdefault(resource, [])
+        before = len(rows)
+        gr[service][resource] = [r for r in rows if r.get("id") != ident and r.get("name") != ident]
+        if len(gr[service][resource]) == before:
+            return {"ok": False, "error": f"{service}/{resource} '{ident}' not found"}
+        return {"ok": True, "message": f"Deleted {service}/{resource} {ident}"}
+
+    if action == "update_generic_resource":
+        service = payload.get("service") or ""
+        resource = payload.get("resource") or ""
+        ident = payload.get("id") or payload.get("name") or ""
+        rows = gr.setdefault(service, {}).setdefault(resource, [])
+        row = next((r for r in rows if r.get("id") == ident or r.get("name") == ident), None)
+        if not row:
+            return {"ok": False, "error": f"{service}/{resource} '{ident}' not found"}
+        patch = payload.get("patch") or {}
+        for k, v in patch.items():
+            if k not in ("id",):
+                row[k] = v
+        return {"ok": True, "message": f"Updated {service}/{resource} {ident}", "resource": row}
+
     if action == "publish_sns":
         topic = payload.get("name") or payload.get("topic") or "lab-topic"
         topics = gr.setdefault("sns", {}).setdefault("topics", [])

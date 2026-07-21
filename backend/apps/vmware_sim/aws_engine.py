@@ -959,6 +959,90 @@ def apply_action(session_id: str, action: str, payload: dict | None = None) -> d
         _save(session_id, entry)
         return {"ok": True, "message": "DeleteKeyPair succeeded"}
 
+    if action == "create_route_table":
+        vpc_id = payload.get("vpc_id") or (state.get("vpcs") or [{}])[0].get("id")
+        vpc = next((v for v in state.get("vpcs", []) if v.get("id") == vpc_id), None)
+        rtb = {
+            "id": payload.get("rtb_id") or new_rtb_id(),
+            "region": region,
+            "vpcId": vpc_id,
+            "main": False,
+            "routes": [{"dest": (vpc or {}).get("cidr") or "10.0.0.0/16", "target": "local"}],
+        }
+        state.setdefault("routeTables", []).append(rtb)
+        _event(state, f"Route table {rtb['id']} created", "success")
+        _save(session_id, entry)
+        return {"ok": True, "message": "CreateRouteTable succeeded", "rtb_id": rtb["id"]}
+
+    if action == "create_route":
+        rtb_id = payload.get("rtb_id") or ""
+        rtb = next((r for r in state.get("routeTables", []) if r.get("id") == rtb_id), None)
+        if not rtb:
+            return {"ok": False, "error": f"The routeTable ID '{rtb_id}' does not exist"}
+        dest = payload.get("dest") or "0.0.0.0/0"
+        target = payload.get("target") or "igw-local"
+        routes = [x for x in (rtb.get("routes") or []) if x.get("dest") != dest]
+        routes.append({"dest": dest, "target": target})
+        rtb["routes"] = routes
+        _event(state, f"Route {dest} → {target} added to {rtb_id}", "success")
+        _save(session_id, entry)
+        return {"ok": True, "message": "CreateRoute succeeded"}
+
+    if action == "delete_route_table":
+        rtb_id = payload.get("rtb_id") or payload.get("id")
+        rtb = next((r for r in state.get("routeTables", []) if r.get("id") == rtb_id), None)
+        if not rtb:
+            return {"ok": False, "error": f"The routeTable ID '{rtb_id}' does not exist"}
+        if rtb.get("main"):
+            return {"ok": False, "error": f"The main route table '{rtb_id}' cannot be deleted."}
+        state["routeTables"] = [r for r in state["routeTables"] if r.get("id") != rtb_id]
+        _event(state, f"Route table {rtb_id} deleted", "info")
+        _save(session_id, entry)
+        return {"ok": True, "message": "DeleteRouteTable succeeded"}
+
+    if action == "create_image":
+        inst_id = payload.get("instance_id") or ""
+        inst = _find_instance(state, inst_id) if inst_id else None
+        if not inst:
+            return {"ok": False, "error": f"The instance ID '{inst_id}' does not exist"}
+        ami = {
+            "id": payload.get("ami_id") or new_ami_id(),
+            "region": region,
+            "name": payload.get("name") or f"{inst.get('name') or inst_id}-ami",
+            "os": inst.get("os") or "amazon-linux-2023",
+            "platform": "Linux/UNIX",
+            "arch": "x86_64",
+            "user": "ec2-user",
+            "desc": payload.get("description") or f"Created from {inst_id}",
+            "owner": ACCOUNT_ID,
+            "created": _now_iso(),
+            "visibility": "private",
+        }
+        state.setdefault("amis", []).append(ami)
+        _event(state, f"AMI {ami['id']} created from {inst_id}", "success")
+        _save(session_id, entry)
+        return {"ok": True, "message": "CreateImage succeeded", "ami_id": ami["id"]}
+
+    if action == "deregister_image":
+        ami_id = payload.get("ami_id") or payload.get("id")
+        before = len(state.get("amis") or [])
+        state["amis"] = [a for a in (state.get("amis") or []) if a.get("id") != ami_id]
+        if len(state.get("amis") or []) == before:
+            return {"ok": False, "error": f"The AMI ID '{ami_id}' does not exist"}
+        _event(state, f"AMI {ami_id} deregistered", "info")
+        _save(session_id, entry)
+        return {"ok": True, "message": "DeregisterImage succeeded"}
+
+    if action == "set_termination_protection":
+        inst_id = payload.get("instance_id") or payload.get("id")
+        inst = _find_instance(state, inst_id)
+        if not inst:
+            return {"ok": False, "error": f"The instance ID '{inst_id}' does not exist"}
+        inst["disableApiTermination"] = bool(payload.get("value"))
+        _event(state, f"Termination protection for {inst_id} → {inst['disableApiTermination']}", "info")
+        _save(session_id, entry)
+        return {"ok": True, "message": "ModifyInstanceAttribute succeeded"}
+
     if action == "delete_iam_user":
         uname = payload.get("name") or ""
         before = len(state.get("iamUsers") or [])
@@ -1101,6 +1185,29 @@ def apply_action(session_id: str, action: str, payload: dict | None = None) -> d
         _event(state, f"IAM policy {pname} created", "success")
         _save(session_id, entry)
         return {"ok": True, "message": "CreatePolicy succeeded"}
+
+    if action == "update_iam_policy":
+        pname = payload.get("name") or ""
+        pol = next((p for p in state.get("iamPolicies", []) if p.get("name") == pname), None)
+        if not pol:
+            return {"ok": False, "error": f"NoSuchEntity: The policy with name {pname} cannot be found"}
+        patch = payload.get("patch") or {}
+        for k, v in patch.items():
+            if k in ("description", "document", "attached"):
+                pol[k] = v
+        _event(state, f"IAM policy {pname} updated", "info")
+        _save(session_id, entry)
+        return {"ok": True, "message": "CreatePolicyVersion succeeded"}
+
+    if action == "delete_iam_policy":
+        pname = payload.get("name") or ""
+        before = len(state.get("iamPolicies") or [])
+        state["iamPolicies"] = [p for p in (state.get("iamPolicies") or []) if p.get("name") != pname]
+        if len(state.get("iamPolicies") or []) == before:
+            return {"ok": False, "error": f"NoSuchEntity: The policy with name {pname} cannot be found"}
+        _event(state, f"IAM policy {pname} deleted", "info")
+        _save(session_id, entry)
+        return {"ok": True, "message": "DeletePolicy succeeded"}
 
     if action == "attach_instance_role":
         ident = payload.get("instance_id") or payload.get("id")
