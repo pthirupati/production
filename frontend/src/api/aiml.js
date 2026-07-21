@@ -50,6 +50,14 @@ export const aimlApi = {
   runWorkflow: (sessionId) => actionReq(sessionId, 'run_workflow', {}),
   reset: (sessionId) => actionReq(sessionId, 'reset', {}),
 
+  createExperiment: (sessionId, payload = {}) => actionReq(sessionId, 'create_experiment', payload),
+  logRun: (sessionId, payload = {}) => actionReq(sessionId, 'log_run', payload),
+  registerModel: (sessionId, payload = {}) => actionReq(sessionId, 'register_model', payload),
+  transitionModelStage: (sessionId, name, stage) =>
+    actionReq(sessionId, 'transition_model_stage', { name, stage }),
+  createKnowledgeBase: (sessionId, payload = {}) => actionReq(sessionId, 'create_knowledge_base', payload),
+  ragRetrieve: (sessionId, query) => actionReq(sessionId, 'rag_retrieve', { query }),
+
   release: (sessionId) => {
     if (!sessionId) return Promise.resolve({ released: true })
     return api.post(`/vmware/aiml/sessions/${sessionId}/release/`, {}, { silentError: true })

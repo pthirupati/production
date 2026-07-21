@@ -258,6 +258,20 @@ def apply_v2_action(state: dict, action: str, payload: dict) -> dict | None:
                 p["apps"] = int(p.get("apps") or 0) + 1
         return {"ok": True, "message": f"Created web app {name}", "web_app": item}
 
+    if action == "create_app_service_plan":
+        name = (payload.get("name") or f"asp-{_hex(4)}").strip()
+        if any(p.get("name") == name for p in state.get("app_service_plans") or []):
+            return {"ok": False, "error": f"App Service plan '{name}' already exists"}
+        item = {
+            "id": f"asp-{_hex()}", "name": name, "resource_group": rg,
+            "sku": payload.get("sku") or "P1v3",
+            "os": payload.get("os") or "Linux",
+            "apps": 0,
+            "location": payload.get("location") or "eastus",
+        }
+        state.setdefault("app_service_plans", []).append(item)
+        return {"ok": True, "message": f"Created App Service plan {name}", "plan": item}
+
     if action == "swap_web_slots":
         name = payload.get("name") or ""
         app = next((a for a in state.get("web_apps") or [] if a.get("name") == name), None)
@@ -325,6 +339,19 @@ def apply_v2_action(state: dict, action: str, payload: dict) -> dict | None:
         }
         state.setdefault("container_apps", []).append(item)
         return {"ok": True, "message": f"Created container app {name}", "container_app": item}
+
+    if action == "create_container_apps_env":
+        name = (payload.get("name") or f"cae-{_hex(4)}").strip()
+        if any(e.get("name") == name for e in state.get("container_apps_envs") or []):
+            return {"ok": False, "error": f"Container Apps environment '{name}' already exists"}
+        item = {
+            "id": f"cae-{_hex()}", "name": name, "resource_group": rg,
+            "plan": payload.get("plan") or "Consumption",
+            "log_analytics": payload.get("log_analytics") or "law-prod",
+            "location": payload.get("location") or "eastus",
+        }
+        state.setdefault("container_apps_envs", []).append(item)
+        return {"ok": True, "message": f"Created Container Apps environment {name}", "environment": item}
 
     if action == "create_aks_cluster":
         name = (payload.get("name") or f"aks-{_hex(4)}").strip()

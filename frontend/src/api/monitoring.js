@@ -48,6 +48,7 @@ export const monitoringApi = {
   createSnapshot: (sessionId, payload = {}) => actionWithFallback(sessionId, 'create_snapshot', payload),
   createLibraryPanel: (sessionId, payload = {}) => actionWithFallback(sessionId, 'create_library_panel', payload),
   createFolder: (sessionId, payload = {}) => actionWithFallback(sessionId, 'create_folder', payload),
+  pushgatewayPush: (sessionId, payload = {}) => actionWithFallback(sessionId, 'pushgateway_push', payload),
   release: (sessionId) => {
     if (!sessionId) return Promise.resolve({ released: true })
     return api.post(`/vmware/monitoring/sessions/${sessionId}/release/`, {}, { silentError: true })

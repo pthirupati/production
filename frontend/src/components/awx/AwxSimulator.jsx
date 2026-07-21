@@ -496,11 +496,25 @@ export default function AwxSimulator({
       }))} searchKeys={['name']} />
     }
     if (nav === 'execution-envs') {
-      return <SimDataTable columns={[
-        { key: 'name', label: 'Environment', sortable: true },
-        { key: 'image', label: 'Image', sortable: true },
-        { key: 'status', label: 'Status', render: (r) => <SimStatusBadge status={r.status} /> },
-      ]} rows={inv.execution_environments || AWX_EXEC_ENVS} searchKeys={['name']} />
+      return (
+        <div className="space-y-3">
+          <div className="flex justify-between items-center flex-wrap gap-2">
+            <h2 className="text-lg font-semibold">Execution Environments</h2>
+            <button type="button" className="awx-btn-launch flex items-center gap-1" disabled={busy}
+              onClick={() => run(() => awxApi.createExecutionEnvironment(sessionId, {
+                name: `EE-${Date.now().toString(36).slice(-4)}`,
+                image: 'quay.io/ansible/awx-ee:latest',
+              }), 'Execution environment created')}>
+              <Plus size={14} /> Add
+            </button>
+          </div>
+          <SimDataTable columns={[
+            { key: 'name', label: 'Environment', sortable: true },
+            { key: 'image', label: 'Image', sortable: true },
+            { key: 'status', label: 'Status', render: (r) => <SimStatusBadge status={r.status} /> },
+          ]} rows={inv.execution_environments || AWX_EXEC_ENVS} searchKeys={['name']} />
+        </div>
+      )
     }
     if (nav === 'applications') {
       return (

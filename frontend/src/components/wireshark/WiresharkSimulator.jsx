@@ -419,6 +419,17 @@ export default function WiresharkSimulator({
     finally { setBusy(false) }
   }, [sessionId, load])
 
+  const refreshAnalysis = useCallback(async () => {
+    setBusy(true); setError('')
+    try {
+      const res = await wiresharkApi.refreshAnalysis(sessionId)
+      if (res?.ok === false) setError(res.error || res.message || 'Analysis refresh failed')
+      await load()
+    } catch { setError('Could not refresh analysis') }
+    finally { setBusy(false) }
+  }, [sessionId, load])
+  }, [sessionId, load])
+
   const selectPacket = useCallback(async (no) => {
     try { await wiresharkApi.selectPacket(sessionId, no); await load() } catch { /* ignore */ }
   }, [sessionId, load])
@@ -973,11 +984,16 @@ export default function WiresharkSimulator({
 
       {modal === 'expert' && (
         <ModalShell title="Expert Information" onClose={() => setModal(null)}>
+          <div className="flex justify-end mb-2">
+            <button type="button" className="ws-btn ws-btn-primary" disabled={busy} onClick={refreshAnalysis}>
+              {busy ? <RefreshCw size={13} className="animate-spin" /> : <RefreshCw size={13} />} Refresh analysis
+            </button>
+          </div>
           <table className="ws-light-table">
             <thead><tr><th>Severity</th><th>Group</th><th>Protocol</th><th>Summary</th><th>Packet</th></tr></thead>
             <tbody>
               {(state?.expert_info || []).length === 0 ? (
-                <tr><td colSpan={5} className="text-slate-500">No expert events — refresh analysis after capturing.</td></tr>
+                <tr><td colSpan={5} className="text-slate-500">No expert events — click Refresh analysis after capturing.</td></tr>
               ) : (state.expert_info || []).map((e, i) => (
                 <tr key={i}><td>{e.severity}</td><td>{e.group}</td><td>{e.protocol}</td><td>{e.summary}</td><td>{e.packet ?? '—'}</td></tr>
               ))}
@@ -988,10 +1004,17 @@ export default function WiresharkSimulator({
 
       {modal === 'endpoints' && (
         <ModalShell title="Endpoints" onClose={() => setModal(null)}>
+          <div className="flex justify-end mb-2">
+            <button type="button" className="ws-btn ws-btn-primary" disabled={busy} onClick={refreshAnalysis}>
+              {busy ? <RefreshCw size={13} className="animate-spin" /> : <RefreshCw size={13} />} Refresh analysis
+            </button>
+          </div>
           <table className="ws-light-table">
             <thead><tr><th>Address</th><th>Packets</th><th>Bytes</th><th>Tx</th><th>Rx</th></tr></thead>
             <tbody>
-              {(state?.endpoints || []).map((e) => (
+              {(state?.endpoints || []).length === 0 ? (
+                <tr><td colSpan={5} className="text-slate-500">No endpoints — click Refresh analysis.</td></tr>
+              ) : (state.endpoints || []).map((e) => (
                 <tr key={e.address}><td className="font-mono">{e.address}</td><td>{e.packets}</td><td>{e.bytes}</td><td>{e.tx_packets}</td><td>{e.rx_packets}</td></tr>
               ))}
             </tbody>
@@ -1001,9 +1024,14 @@ export default function WiresharkSimulator({
 
       {modal === 'flow-graph' && (
         <ModalShell title="Flow Graph" onClose={() => setModal(null)}>
+          <div className="flex justify-end mb-2">
+            <button type="button" className="ws-btn ws-btn-primary" disabled={busy} onClick={refreshAnalysis}>
+              {busy ? <RefreshCw size={13} className="animate-spin" /> : <RefreshCw size={13} />} Refresh analysis
+            </button>
+          </div>
           <div className="font-mono text-xs space-y-1 max-h-[55vh] overflow-auto">
             {(state?.flow_graph || []).length === 0 ? (
-              <div className="text-slate-500">No flows in the current view.</div>
+              <div className="text-slate-500">No flows — click Refresh analysis.</div>
             ) : (state.flow_graph || []).map((f, i) => (
               <div key={i} className="flex gap-2 border-b border-slate-100 py-1">
                 <span className="text-slate-400 w-10">{f.no}</span>

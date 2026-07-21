@@ -28,8 +28,14 @@ export const cicdApi = {
   argoSync(sessionId, name) {
     return cicdApi.action(sessionId, 'argo_sync', { name })
   },
+  argoCreateApp(sessionId, payload = {}) {
+    return cicdApi.action(sessionId, 'argo_create_app', payload)
+  },
   fluxReconcile(sessionId, name) {
     return cicdApi.action(sessionId, 'flux_reconcile', { name })
+  },
+  fluxSuspend(sessionId, name, suspended = true) {
+    return cicdApi.action(sessionId, 'flux_suspend', { name, suspended })
   },
   githubCreateIssue(sessionId, payload = {}) {
     return cicdApi.action(sessionId, 'github_create_issue', payload)

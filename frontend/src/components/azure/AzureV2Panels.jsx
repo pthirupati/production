@@ -106,7 +106,16 @@ export function renderAzureV2Page({
     return (
       <div className="space-y-5">
         <div>
-          <h2 className="text-lg font-semibold mb-2">App Service plans</h2>
+          <div className="flex justify-between items-center mb-2 flex-wrap gap-2">
+            <h2 className="text-lg font-semibold">App Service plans</h2>
+            <button type="button" className="az-btn-primary flex items-center gap-1" disabled={busy}
+              onClick={() => run(() => azureApi.createAppServicePlan(sessionId, {
+                name: `asp-${Date.now().toString(36).slice(-4)}`,
+                sku: 'P1v3',
+              }), 'App Service plan created')}>
+              <Plus size={14} /> Create plan
+            </button>
+          </div>
           <SimDataTable columns={[
             { key: 'name', label: 'Name', sortable: true },
             { key: 'sku', label: 'SKU', sortable: true },
@@ -232,7 +241,15 @@ export function renderAzureV2Page({
     return (
       <div className="space-y-5">
         <div>
-          <h2 className="text-lg font-semibold mb-2">Environments</h2>
+          <div className="flex justify-between items-center mb-2 flex-wrap gap-2">
+            <h2 className="text-lg font-semibold">Environments</h2>
+            <button type="button" className="az-btn-primary flex items-center gap-1" disabled={busy}
+              onClick={() => run(() => azureApi.createContainerAppsEnv(sessionId, {
+                name: `cae-${Date.now().toString(36).slice(-4)}`,
+              }), 'Environment created')}>
+              <Plus size={14} /> Create environment
+            </button>
+          </div>
           <SimDataTable columns={[
             { key: 'name', label: 'Name' },
             { key: 'plan', label: 'Plan' },

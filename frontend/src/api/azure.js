@@ -92,6 +92,9 @@ export const azureApi = {
   createWebApp(sessionId, payload = {}) {
     return azureApi.action(sessionId, 'create_web_app', payload)
   },
+  createAppServicePlan(sessionId, payload = {}) {
+    return azureApi.action(sessionId, 'create_app_service_plan', payload)
+  },
   swapWebSlots(sessionId, name) {
     return azureApi.action(sessionId, 'swap_web_slots', { name })
   },
@@ -103,6 +106,9 @@ export const azureApi = {
   },
   createContainerApp(sessionId, payload = {}) {
     return azureApi.action(sessionId, 'create_container_app', payload)
+  },
+  createContainerAppsEnv(sessionId, payload = {}) {
+    return azureApi.action(sessionId, 'create_container_apps_env', payload)
   },
   createAksCluster(sessionId, payload = {}) {
     return azureApi.action(sessionId, 'create_aks_cluster', payload)

@@ -51,6 +51,7 @@ export const wiresharkApi = {
   selectPacket: (sessionId, packetNo) => actionWithFallback(sessionId, 'select_packet', { packet_no: packetNo }),
   markPacket: (sessionId, packetNo) => actionWithFallback(sessionId, 'mark_packet', { packet_no: packetNo }),
   clearFilters: (sessionId) => actionWithFallback(sessionId, 'clear_filters', {}),
+  refreshAnalysis: (sessionId) => actionWithFallback(sessionId, 'refresh_analysis', {}),
   release: (sessionId) => {
     if (!sessionId) return Promise.resolve({ released: true })
     return api.post(`/vmware/wireshark/sessions/${sessionId}/release/`, {}, { silentError: true })

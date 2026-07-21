@@ -13,6 +13,13 @@ export function renderCicdGitOpsPage({ nav, st, sessionId, busy, run }) {
       <div className="space-y-3 p-3">
         <div className="flex justify-between items-center flex-wrap gap-2">
           <h2 className="text-lg font-semibold text-[#e6edf3]">Argo CD Applications</h2>
+          <button type="button" className="cicd-btn cicd-btn-approve text-xs flex items-center gap-1" disabled={busy}
+            onClick={() => run(() => cicdApi.argoCreateApp(sessionId, {
+              name: `app-${Date.now().toString(36).slice(-4)}`,
+              namespace: 'default',
+            }), 'Application created')}>
+            <Plus size={14} /> New application
+          </button>
         </div>
         <SimDataTable
           variant="dark"
@@ -55,12 +62,26 @@ export function renderCicdGitOpsPage({ nav, st, sessionId, busy, run }) {
               { key: 'suspended', label: 'Suspended', render: (r) => (r.suspended ? 'Yes' : 'No') },
               {
                 key: 'actions', label: '',
-                render: (r) => !r.ready ? (
-                  <button type="button" className="cicd-btn cicd-btn-approve text-xs" disabled={busy}
-                    onClick={(e) => { e.stopPropagation(); run(() => cicdApi.fluxReconcile(sessionId, r.name), 'Reconciled') }}>
-                    Reconcile
-                  </button>
-                ) : null,
+                render: (r) => (
+                  <div className="flex gap-1 flex-wrap">
+                    {!r.ready && !r.suspended && (
+                      <button type="button" className="cicd-btn cicd-btn-approve text-xs" disabled={busy}
+                        onClick={(e) => { e.stopPropagation(); run(() => cicdApi.fluxReconcile(sessionId, r.name), 'Reconciled') }}>
+                        Reconcile
+                      </button>
+                    )}
+                    <button type="button" className="cicd-btn cicd-btn-approve text-xs" disabled={busy}
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        run(
+                          () => cicdApi.fluxSuspend(sessionId, r.name, !r.suspended),
+                          r.suspended ? 'Resumed' : 'Suspended',
+                        )
+                      }}>
+                      {r.suspended ? 'Resume' : 'Suspend'}
+                    </button>
+                  </div>
+                ),
               },
             ]}
             rows={flux.kustomizations || []}
@@ -376,12 +397,20 @@ export function renderAimlV2Page({ nav, st, sessionId, busy, run, ragQuery, setR
   if (nav === 'experiments') {
     return (
       <div className="space-y-5 p-3">
-        <div className="flex justify-between items-center">
+        <div className="flex justify-between items-center flex-wrap gap-2">
           <h2 className="text-lg font-semibold text-[#E2E2F0]">Experiments</h2>
-          <button type="button" className="px-3 py-1.5 rounded bg-[#7C3AED] text-white text-sm" disabled={busy}
-            onClick={() => run(() => aimlApi.action(sessionId, 'create_experiment', { name: `exp-${Date.now() % 1000}` }), 'Experiment created')}>
-            New experiment
-          </button>
+          <div className="flex gap-2">
+            <button type="button" className="px-3 py-1.5 rounded bg-[#7C3AED] text-white text-sm" disabled={busy}
+              onClick={() => run(() => aimlApi.createExperiment(sessionId, { name: `exp-${Date.now() % 1000}` }), 'Experiment created')}>
+              New experiment
+            </button>
+            <button type="button" className="px-3 py-1.5 rounded border border-[#7C3AED] text-[#A78BFA] text-sm" disabled={busy}
+              onClick={() => run(() => aimlApi.logRun(sessionId, {
+                name: `run-${Date.now().toString(36).slice(-4)}`,
+              }), 'Run logged')}>
+              Log run
+            </button>
+          </div>
         </div>
         <SimDataTable variant="dark" columns={[
           { key: 'name', label: 'Name', sortable: true },
@@ -402,7 +431,16 @@ export function renderAimlV2Page({ nav, st, sessionId, busy, run, ragQuery, setR
   if (nav === 'registry') {
     return (
       <div className="space-y-3 p-3">
-        <h2 className="text-lg font-semibold text-[#E2E2F0]">Model Registry</h2>
+        <div className="flex justify-between items-center flex-wrap gap-2">
+          <h2 className="text-lg font-semibold text-[#E2E2F0]">Model Registry</h2>
+          <button type="button" className="px-3 py-1.5 rounded bg-[#7C3AED] text-white text-sm" disabled={busy}
+            onClick={() => run(() => aimlApi.registerModel(sessionId, {
+              name: `model-${Date.now().toString(36).slice(-4)}`,
+              stage: 'Staging',
+            }), 'Model registered')}>
+            Register model
+          </button>
+        </div>
         <SimDataTable variant="dark" columns={[
           { key: 'name', label: 'Model' },
           { key: 'latest_version', label: 'Version' },
@@ -411,7 +449,7 @@ export function renderAimlV2Page({ nav, st, sessionId, busy, run, ragQuery, setR
             key: 'actions', label: '',
             render: (r) => r.stage !== 'Production' ? (
               <button type="button" className="text-xs text-[#A78BFA]" disabled={busy}
-                onClick={(e) => { e.stopPropagation(); run(() => aimlApi.action(sessionId, 'transition_model_stage', { name: r.name, stage: 'Production' }), 'Promoted') }}>
+                onClick={(e) => { e.stopPropagation(); run(() => aimlApi.transitionModelStage(sessionId, r.name, 'Production'), 'Promoted') }}>
                 Promote
               </button>
             ) : null,
@@ -429,7 +467,7 @@ export function renderAimlV2Page({ nav, st, sessionId, busy, run, ragQuery, setR
             value={ragQuery || ''} onChange={(e) => setRagQuery(e.target.value)}
             placeholder="What is the refund policy for digital products?" />
           <button type="button" className="px-3 py-1.5 rounded bg-[#7C3AED] text-white text-sm" disabled={busy}
-            onClick={() => run(() => aimlApi.action(sessionId, 'rag_retrieve', { query: ragQuery }), 'Retrieved')}>
+            onClick={() => run(() => aimlApi.ragRetrieve(sessionId, ragQuery), 'Retrieved')}>
             Retrieve
           </button>
         </div>
@@ -438,7 +476,17 @@ export function renderAimlV2Page({ nav, st, sessionId, busy, run, ragQuery, setR
           { key: 'source', label: 'Source' },
           { key: 'text', label: 'Text' },
         ]} rows={st.rag_results || []} />
-        <h2 className="text-lg font-semibold text-[#E2E2F0] pt-2">Knowledge Bases</h2>
+        <div className="flex justify-between items-center flex-wrap gap-2 pt-2">
+          <h2 className="text-lg font-semibold text-[#E2E2F0]">Knowledge Bases</h2>
+          <button type="button" className="px-3 py-1.5 rounded bg-[#7C3AED] text-white text-sm" disabled={busy}
+            onClick={() => run(() => aimlApi.createKnowledgeBase(sessionId, {
+              name: `kb-${Date.now().toString(36).slice(-4)}`,
+              documents: 12,
+              chunks: 180,
+            }), 'Knowledge base created')}>
+            Create knowledge base
+          </button>
+        </div>
         <SimDataTable variant="dark" columns={[
           { key: 'name', label: 'Name' },
           { key: 'vector_store', label: 'Store' },
@@ -530,6 +578,7 @@ export function renderMonitoringV2Extras({ nav, st, sessionId, busy, run }) {
   if (nav === 'exporters') {
     const ex = st.exporters || {}
     const probes = ex.blackbox?.probes || []
+    const groups = ex.pushgateway?.groups || []
     return (
       <div className="space-y-5 p-3">
         <div className="flex justify-between items-center">
@@ -545,6 +594,23 @@ export function renderMonitoringV2Extras({ nav, st, sessionId, busy, run }) {
           { key: 'success', label: 'Success', render: (r) => <SimStatusBadge status={r.success ? 'success' : 'error'} label={r.success ? 'OK' : 'FAIL'} /> },
           { key: 'duration_s', label: 'Duration (s)' },
         ]} rows={probes} />
+        <div className="flex justify-between items-center flex-wrap gap-2">
+          <h2 className="text-lg font-semibold">Pushgateway</h2>
+          <button type="button" className="px-3 py-1.5 rounded bg-[#E6522C] text-white text-sm" disabled={busy}
+            onClick={() => run(() => monitoringApi.pushgatewayPush(sessionId, {
+              job: 'batch-export',
+              instance: `cron-${Date.now().toString(36).slice(-3)}`,
+              metrics: 3,
+            }), 'Metrics pushed')}>
+            Push metrics
+          </button>
+        </div>
+        <SimDataTable columns={[
+          { key: 'job', label: 'Job' },
+          { key: 'instance', label: 'Instance' },
+          { key: 'metrics', label: 'Metrics' },
+          { key: 'last_push', label: 'Last push' },
+        ]} rows={groups} />
       </div>
     )
   }
