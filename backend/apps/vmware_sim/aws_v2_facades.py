@@ -167,6 +167,32 @@ def apply_v2_action(state: dict, action: str, payload: dict) -> dict | None:
         fn["last_invoke"] = _now()
         return {"ok": True, "message": f"Invoked {fn['name']}", "result": {"statusCode": 200, "body": "ok"}}
 
+    if action == "update_lambda_code":
+        name = payload.get("name") or payload.get("id") or ""
+        funcs = (gr.get("lambda") or {}).get("functions") or []
+        fn = next((f for f in funcs if f.get("name") == name or f.get("id") == name), None)
+        if not fn and funcs:
+            fn = funcs[0]
+        if not fn:
+            return {"ok": False, "error": "Function not found"}
+        if "code" in payload:
+            fn["code"] = payload["code"]
+        fn["last_modified"] = _now()
+        fn["code_size"] = len(str(payload.get("code") or fn.get("code") or ""))
+        return {"ok": True, "message": f"Updated code for {fn['name']}", "function": fn}
+
+    if action == "update_lambda_env":
+        name = payload.get("name") or payload.get("id") or ""
+        funcs = (gr.get("lambda") or {}).get("functions") or []
+        fn = next((f for f in funcs if f.get("name") == name or f.get("id") == name), None)
+        if not fn and funcs:
+            fn = funcs[0]
+        if not fn:
+            return {"ok": False, "error": "Function not found"}
+        fn["env"] = payload.get("env") if isinstance(payload.get("env"), dict) else (fn.get("env") or {})
+        fn["last_modified"] = _now()
+        return {"ok": True, "message": f"Updated env for {fn['name']}", "function": fn}
+
     if action == "create_rds":
         name = (payload.get("name") or f"db-{_hex(4)}").strip()
         db = _row(f"db-{_hex()}", name, {

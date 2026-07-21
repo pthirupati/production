@@ -384,13 +384,36 @@ export function TaskScheduler() {
   const os = useOS()
   const [sel, setSel] = useState(null)
   const [wizard, setWizard] = useState(false)
+  const [form, setForm] = useState({ name: 'New Task', description: '', trigger: 'Daily', action: 'Start a program', program: 'powershell.exe' })
   const cur = os.scheduledTasks.find((t) => t.name === sel)
+  const finish = () => {
+    const name = (form.name || 'New Task').trim()
+    const task = {
+      name,
+      status: 'Ready',
+      triggers: `At 12:00 AM — ${form.trigger}`,
+      nextRun: 'Soon',
+      lastRun: 'Never',
+      result: '0x0',
+      author: 'lab\\Administrator',
+      program: form.program,
+    }
+    os.addScheduledTask(task)
+    if (os.labAction) {
+      os.labAction('create_scheduled_task', {
+        name, description: form.description, trigger: form.trigger,
+        task_action: form.action, program: form.program,
+      })
+    }
+    setWizard(false)
+    setSel(name)
+  }
   return (
     <div className="winos-app">
       <div className="winos-toolbar">
         <span style={{ fontSize: 12 }}>File &nbsp; Action &nbsp; View &nbsp; Help</span>
         <span style={{ flex: 1 }} />
-        <button className="winos-btn" onClick={() => setWizard(true)}>Create Basic Task…</button>
+        <button className="winos-btn" onClick={() => { setForm({ name: 'New Task', description: '', trigger: 'Daily', action: 'Start a program', program: 'powershell.exe' }); setWizard(true) }}>Create Basic Task…</button>
       </div>
       <div className="winos-split">
         <div className="winos-tree" style={{ width: 220 }}>
@@ -413,13 +436,17 @@ export function TaskScheduler() {
       </div>
       <div className="winos-status"><span>{os.scheduledTasks.length} task(s)</span><span>{cur ? cur.name : ''}</span></div>
       {wizard && <Dialog title="Create Basic Task Wizard" onClose={() => setWizard(false)}
-        footer={<><button className="winos-btn primary" onClick={() => setWizard(false)}>Finish</button><button className="winos-btn" onClick={() => setWizard(false)}>Cancel</button></>}>
+        footer={<><button className="winos-btn primary" onClick={finish}>Finish</button><button className="winos-btn" onClick={() => setWizard(false)}>Cancel</button></>}>
         <div className="winos-grid2" style={{ fontSize: 12.5 }}>
-          <span>Name:</span><input className="winos-input" defaultValue="New Task" />
-          <span>Description:</span><textarea className="winos-input" rows={2} />
-          <span>Trigger:</span><select className="winos-input"><option>Daily</option><option>Weekly</option><option>Monthly</option><option>One time</option><option>When the computer starts</option><option>When I log on</option></select>
-          <span>Action:</span><select className="winos-input"><option>Start a program</option><option>Send an e-mail</option><option>Display a message</option></select>
-          <span>Program/script:</span><input className="winos-input" defaultValue="powershell.exe" />
+          <span>Name:</span><input className="winos-input" value={form.name} onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))} />
+          <span>Description:</span><textarea className="winos-input" rows={2} value={form.description} onChange={(e) => setForm((f) => ({ ...f, description: e.target.value }))} />
+          <span>Trigger:</span><select className="winos-input" value={form.trigger} onChange={(e) => setForm((f) => ({ ...f, trigger: e.target.value }))}>
+            {['Daily', 'Weekly', 'Monthly', 'One time', 'When the computer starts', 'When I log on'].map((o) => <option key={o}>{o}</option>)}
+          </select>
+          <span>Action:</span><select className="winos-input" value={form.action} onChange={(e) => setForm((f) => ({ ...f, action: e.target.value }))}>
+            {['Start a program', 'Send an e-mail', 'Display a message'].map((o) => <option key={o}>{o}</option>)}
+          </select>
+          <span>Program/script:</span><input className="winos-input" value={form.program} onChange={(e) => setForm((f) => ({ ...f, program: e.target.value }))} />
         </div>
       </Dialog>}
     </div>
@@ -430,7 +457,14 @@ export function TaskScheduler() {
 export function SettingsApp() {
   const os = useOS()
   const [page, setPage] = useState('System')
+  const [deviceName, setDeviceName] = useState(os.computer.name)
   const pages = ['System', 'Network & Internet', 'Personalization', 'Apps', 'Accounts', 'Update & Security']
+  const applyRename = () => {
+    const name = (deviceName || '').trim()
+    if (!name || name === os.computer.name) return
+    os.setComputerName(name)
+    if (os.labAction) os.labAction('rename_computer', { name })
+  }
   return (
     <div className="winos-app">
       <div className="winos-split">
@@ -441,7 +475,11 @@ export function SettingsApp() {
         <div className="winos-main" style={{ padding: 20 }}>
           <h2 style={{ fontWeight: 600, fontSize: 18 }}>{page}</h2>
           {page === 'System' && <div className="winos-grid2" style={{ marginTop: 12 }}>
-            <span>Device name</span><span>{os.computer.name}</span>
+            <span>Device name</span>
+            <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+              <input className="winos-input" value={deviceName} onChange={(e) => setDeviceName(e.target.value)} style={{ width: 180 }} />
+              <button type="button" className="winos-btn" onClick={applyRename} disabled={!deviceName.trim() || deviceName.trim() === os.computer.name}>Rename</button>
+            </div>
             <span>Edition</span><span>{os.computer.edition}</span>
             <span>Version</span><span>21H2 (Build {os.computer.build})</span>
             <span>Processor</span><span>{os.computer.cpu}</span>

@@ -225,6 +225,12 @@ export const useOS = create((set, get) => ({
   programs: clone(SEED_PROGRAMS),
   updates: clone(SEED_UPDATES),
   scheduledTasks: clone(SEED_TASKS),
+  addScheduledTask: (task) => set((s) => ({
+    scheduledTasks: [...s.scheduledTasks, task],
+  })),
+  setComputerName: (name) => set((s) => ({
+    computer: { ...s.computer, name, fqdn: s.computer.domain ? `${name}.${s.computer.domain}` : name },
+  })),
   startupItems: clone(SEED_STARTUP),
   roles: clone(SEED_ROLES),
   hypervVms: [],

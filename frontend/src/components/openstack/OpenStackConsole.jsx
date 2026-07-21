@@ -292,15 +292,27 @@ export default function OpenStackConsole({
     }
     if (nav === 'images') {
       return (
-        <SimDataTable
-          searchKeys={['name']}
-          columns={[
-            { key: 'name', label: 'Image', sortable: true },
-            { key: 'status', label: 'Status' },
-            { key: 'size_gb', label: 'Size (GiB)' },
-          ]}
-          rows={images}
-        />
+        <div>
+          <div className="flex justify-end mb-3">
+            <button type="button" className="os-btn-primary inline-flex items-center gap-1.5 px-3 py-1.5 text-sm"
+              onClick={() => run(() => openstackApi.action(sessionId, 'create_image', {
+                name: `img-${Date.now().toString(36).slice(-4)}`,
+                size_gb: 8,
+                status: 'active',
+              }), 'Image created')} disabled={busy}>
+              <Plus size={14} /> Create Image
+            </button>
+          </div>
+          <SimDataTable
+            searchKeys={['name']}
+            columns={[
+              { key: 'name', label: 'Image', sortable: true },
+              { key: 'status', label: 'Status' },
+              { key: 'size_gb', label: 'Size (GiB)' },
+            ]}
+            rows={images}
+          />
+        </div>
       )
     }
     return (

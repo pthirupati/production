@@ -410,6 +410,24 @@ def apply_v2_action(state: dict, action: str, payload: dict) -> dict | None:
             fw.setdefault("network_rules", []).append(rule)
         return {"ok": True, "message": f"Added {kind} rule on {fw_name}", "firewall": fw}
 
+    if action == "create_firewall":
+        name = (payload.get("name") or f"afw-{_hex(4)}").strip()
+        if any(f.get("name") == name for f in state.get("firewalls") or []):
+            return {"ok": False, "error": f"Firewall '{name}' already exists"}
+        item = {
+            "id": f"afw-{_hex()}",
+            "name": name,
+            "resource_group": rg,
+            "location": payload.get("location") or "eastus",
+            "sku": payload.get("sku") or "Standard",
+            "threat_intel": payload.get("threat_intel") or "Alert",
+            "public_ip": payload.get("public_ip") or f"20.50.1.{10 + len(state.get('firewalls') or [])}",
+            "network_rules": list(payload.get("network_rules") or []),
+            "app_rules": list(payload.get("app_rules") or []),
+        }
+        state.setdefault("firewalls", []).append(item)
+        return {"ok": True, "message": f"Created Azure Firewall {name}", "firewall": item}
+
     if action == "create_cosmos_item":
         account = payload.get("account") or ""
         acct = next((c for c in state.get("cosmos_accounts") or [] if c.get("name") == account), None)

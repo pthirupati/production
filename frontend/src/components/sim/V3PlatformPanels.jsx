@@ -51,7 +51,15 @@ export function renderCicdGitOpsPage({ nav, st, sessionId, busy, run }) {
     return (
       <div className="space-y-5 p-3">
         <div>
-          <h2 className="text-lg font-semibold text-[#e6edf3] mb-2">Kustomizations</h2>
+          <div className="flex justify-between items-center mb-2 flex-wrap gap-2">
+            <h2 className="text-lg font-semibold text-[#e6edf3]">Kustomizations</h2>
+            <button type="button" className="cicd-btn cicd-btn-approve text-xs flex items-center gap-1" disabled={busy}
+              onClick={() => run(() => cicdApi.fluxCreateKustomization(sessionId, {
+                name: `ks-${Date.now().toString(36).slice(-4)}`,
+              }), 'Kustomization created')}>
+              <Plus size={14} /> New kustomization
+            </button>
+          </div>
           <SimDataTable
             variant="dark"
             columns={[
@@ -88,7 +96,16 @@ export function renderCicdGitOpsPage({ nav, st, sessionId, busy, run }) {
           />
         </div>
         <div>
-          <h2 className="text-lg font-semibold text-[#e6edf3] mb-2">HelmReleases</h2>
+          <div className="flex justify-between items-center mb-2 flex-wrap gap-2">
+            <h2 className="text-lg font-semibold text-[#e6edf3]">HelmReleases</h2>
+            <button type="button" className="cicd-btn cicd-btn-approve text-xs flex items-center gap-1" disabled={busy}
+              onClick={() => run(() => cicdApi.fluxCreateHelmRelease(sessionId, {
+                name: `hr-${Date.now().toString(36).slice(-4)}`,
+                chart: 'bitnami/nginx',
+              }), 'HelmRelease created')}>
+              <Plus size={14} /> New HelmRelease
+            </button>
+          </div>
           <SimDataTable variant="dark" columns={[
             { key: 'name', label: 'Name' },
             { key: 'namespace', label: 'Namespace' },

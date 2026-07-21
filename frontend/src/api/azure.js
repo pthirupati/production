@@ -122,6 +122,9 @@ export const azureApi = {
   createFirewallRule(sessionId, firewall, rule = {}) {
     return azureApi.action(sessionId, 'create_firewall_rule', { firewall, ...rule })
   },
+  createFirewall(sessionId, payload = {}) {
+    return azureApi.action(sessionId, 'create_firewall', payload)
+  },
   createCosmosItem(sessionId, account, database, container) {
     return azureApi.action(sessionId, 'create_cosmos_item', { account, database, container })
   },

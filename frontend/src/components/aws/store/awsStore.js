@@ -1695,7 +1695,7 @@ export const useAwsStore = create(
           },
         }))
         // Mirror to lab server so scenario grading can observe creates.
-        get()._syncAction('create_generic_resource', {
+        const syncPayload = {
           service,
           resource,
           name: created.name,
@@ -1703,7 +1703,14 @@ export const useAwsStore = create(
           ...Object.fromEntries(
             Object.entries(created).filter(([k]) => !['id', 'region', 'created', 'tags', 'pendingTransition', 'stateTransitionAt', 'name', 'status'].includes(k)),
           ),
-        })
+        }
+        let syncAction = 'create_generic_resource'
+        if (service === 'rds' && resource === 'databases') syncAction = 'create_rds'
+        else if (service === 'dynamodb' && resource === 'tables') syncAction = 'create_dynamodb_table'
+        else if (service === 'eks' && resource === 'clusters') syncAction = 'create_eks_cluster'
+        else if (service === 'ecs' && resource === 'services') syncAction = 'create_ecs_service'
+        else if (service === 'lambda' && resource === 'functions') syncAction = 'create_lambda'
+        get()._syncAction(syncAction, syncPayload)
         if (created.pendingTransition) get()._ensureTick()
         return created
       },
@@ -1772,8 +1779,18 @@ export const useAwsStore = create(
         if (fn) get()._syncAction('invoke_lambda', { id: fn.id, name: fn.name })
         return { statusCode: 200, body: payload ?? { message: 'Hello from Lambda!' }, durationMs, billedMs, memoryUsed }
       },
-      setLambdaCode: (id, code) => set((s) => mapGeneric(s, 'lambda', 'functions', id, (fn) => ({ ...fn, code }))),
-      setLambdaEnv: (id, env) => set((s) => mapGeneric(s, 'lambda', 'functions', id, (fn) => ({ ...fn, env: env || {} }))),
+      setLambdaCode: (id, code) => {
+        const funcs = get().genericResources?.lambda?.functions || []
+        const fn = funcs.find((f) => f.id === id) || funcs[0]
+        set((s) => mapGeneric(s, 'lambda', 'functions', id, (x) => ({ ...x, code })))
+        if (fn) get()._syncAction('update_lambda_code', { id: fn.id, name: fn.name, code })
+      },
+      setLambdaEnv: (id, env) => {
+        const funcs = get().genericResources?.lambda?.functions || []
+        const fn = funcs.find((f) => f.id === id) || funcs[0]
+        set((s) => mapGeneric(s, 'lambda', 'functions', id, (x) => ({ ...x, env: env || {} })))
+        if (fn) get()._syncAction('update_lambda_env', { id: fn.id, name: fn.name, env: env || {} })
+      },
 
       // ---------- SNS / SQS / Secrets / Route53 ----------
       publishSnsTopic: (id, message) => {

@@ -247,6 +247,41 @@ def apply_v2_action(state: dict, action: str, payload: dict | None = None) -> di
         hr["last_applied"] = _now()
         return {"ok": True, "message": f"Reconciled HelmRelease {hr['name']}", "helm_release": hr}
 
+    if action == "flux_create_kustomization":
+        name = (payload.get("name") or f"ks-{len(state.get('flux', {}).get('kustomizations') or []) + 1}").strip()
+        flux = state.setdefault("flux", {})
+        if any(k.get("name") == name for k in flux.get("kustomizations") or []):
+            return {"ok": False, "error": f"Kustomization '{name}' already exists"}
+        row = {
+            "name": name,
+            "namespace": payload.get("namespace") or "flux-system",
+            "ready": bool(payload.get("ready", True)),
+            "revision": payload.get("revision") or f"main@sha1:{_now()[-6:]}",
+            "path": payload.get("path") or f"./clusters/{name}",
+            "interval": payload.get("interval") or "5m",
+            "suspended": False,
+            "last_applied": _now(),
+        }
+        flux.setdefault("kustomizations", []).append(row)
+        return {"ok": True, "message": f"Created Flux kustomization {name}", "kustomization": row}
+
+    if action == "flux_create_helmrelease":
+        name = (payload.get("name") or f"hr-{len(state.get('flux', {}).get('helm_releases') or []) + 1}").strip()
+        flux = state.setdefault("flux", {})
+        if any(h.get("name") == name for h in flux.get("helm_releases") or []):
+            return {"ok": False, "error": f"HelmRelease '{name}' already exists"}
+        row = {
+            "name": name,
+            "namespace": payload.get("namespace") or "default",
+            "ready": bool(payload.get("ready", True)),
+            "chart": payload.get("chart") or f"{name}/chart",
+            "version": payload.get("version") or "1.0.0",
+            "suspended": False,
+            "last_applied": _now(),
+        }
+        flux.setdefault("helm_releases", []).append(row)
+        return {"ok": True, "message": f"Created HelmRelease {name}", "helm_release": row}
+
     if action == "github_rerun_workflow":
         runs = (state.get("github") or {}).setdefault("actions_runs", [])
         run_id = payload.get("run_id")

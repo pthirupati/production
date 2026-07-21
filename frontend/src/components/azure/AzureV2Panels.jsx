@@ -387,7 +387,15 @@ export function renderAzureV2Page({
     return (
       <div className="space-y-5">
         <div>
-          <h2 className="text-lg font-semibold mb-2">Azure Firewall</h2>
+          <div className="flex justify-between items-center mb-2 flex-wrap gap-2">
+            <h2 className="text-lg font-semibold">Azure Firewall</h2>
+            <button type="button" className="az-btn-primary flex items-center gap-1" disabled={busy}
+              onClick={() => run(() => azureApi.createFirewall(sessionId, {
+                name: `afw-${Date.now().toString(36).slice(-4)}`,
+              }), 'Firewall created')}>
+              <Plus size={14} /> Create firewall
+            </button>
+          </div>
           <SimDataTable
             columns={[
               { key: 'name', label: 'Name' },

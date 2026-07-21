@@ -40,6 +40,12 @@ export const cicdApi = {
   fluxHelmReconcile(sessionId, name) {
     return cicdApi.action(sessionId, 'flux_helm_reconcile', { name })
   },
+  fluxCreateKustomization(sessionId, payload = {}) {
+    return cicdApi.action(sessionId, 'flux_create_kustomization', payload)
+  },
+  fluxCreateHelmRelease(sessionId, payload = {}) {
+    return cicdApi.action(sessionId, 'flux_create_helmrelease', payload)
+  },
   githubCreateIssue(sessionId, payload = {}) {
     return cicdApi.action(sessionId, 'github_create_issue', payload)
   },

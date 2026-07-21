@@ -170,6 +170,22 @@ def apply_v2_action(state: dict, action: str, payload: dict | None = None) -> di
         state.setdefault("volumes", []).append(row)
         return {"ok": True, "message": f"Created volume {name}", "volume": row}
 
+    if action == "create_image":
+        name = (payload.get("name") or f"img-{_hex(4)}").strip()
+        if any(i.get("name") == name for i in state.get("images") or []):
+            return {"ok": False, "error": f"Image '{name}' already exists"}
+        row = {
+            "id": _uuid(), "name": name,
+            "status": payload.get("status") or "active",
+            "size_gb": int(payload.get("size_gb") or 8),
+            "visibility": payload.get("visibility") or "private",
+            "disk_format": payload.get("disk_format") or "qcow2",
+            "min_disk": int(payload.get("min_disk") or payload.get("size_gb") or 8),
+            "min_ram": int(payload.get("min_ram") or 512),
+        }
+        state.setdefault("images", []).append(row)
+        return {"ok": True, "message": f"Created image {name}", "image": row}
+
     if action == "create_heat_stack":
         name = (payload.get("name") or f"stack-{_hex(4)}").strip()
         if any(s.get("name") == name for s in state.get("heat_stacks") or []):

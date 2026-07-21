@@ -71,6 +71,7 @@ export const windowsApi = {
   initializeDisk: (sessionId, diskId, style = 'GPT') => action(sessionId, 'initialize_disk', { disk_id: diskId, style }),
   createVolume: (sessionId, payload = {}) => action(sessionId, 'create_volume', payload),
   setAdapterIp: (sessionId, payload = {}) => action(sessionId, 'set_adapter_ip', payload),
+  createScheduledTask: (sessionId, payload = {}) => action(sessionId, 'create_scheduled_task', payload),
 
   joinDomain: (sessionId, domain) => action(sessionId, 'join_domain', domain ? { domain } : {}),
   leaveDomain: (sessionId) => action(sessionId, 'leave_domain', {}),

@@ -63,6 +63,10 @@ def seed_v2() -> dict[str, Any]:
             {"name": "Allow HTTPS Inbound", "group": "Custom", "profile": "Domain", "enabled": True, "action": "Allow", "protocol": "TCP", "port": "443"},
             {"name": "Allow RDP", "group": "Remote Desktop", "profile": "Domain", "enabled": True, "action": "Allow", "protocol": "TCP", "port": "3389"},
         ],
+        "scheduled_tasks": [
+            {"name": "Daily Backup", "status": "Ready", "triggers": "At 2:00 AM every day", "nextRun": "2024-01-18 2:00:00 AM", "lastRun": "2024-01-17 2:00:00 AM", "result": "0x0", "author": "lab\\Administrator", "program": "powershell.exe"},
+            {"name": "Windows Update Check", "status": "Ready", "triggers": "At 6:00 AM every day", "nextRun": "2024-01-18 6:00:00 AM", "lastRun": "2024-01-17 6:00:00 AM", "result": "0x0", "author": "SYSTEM", "program": "wuauclt.exe"},
+        ],
     }
 
 
@@ -76,7 +80,7 @@ def ensure_v2(world: dict) -> None:
     world["vswitches"] = v2.get("vswitches") or []
     world["vhdx_disks"] = v2.get("vhdx_disks") or []
     world["console_sessions"] = v2.get("console_sessions") or []
-    for key in ("iis_sites", "iis_bindings", "iis_app_pools", "dns_records", "dhcp_reservations", "firewall_rules"):
+    for key in ("iis_sites", "iis_bindings", "iis_app_pools", "dns_records", "dhcp_reservations", "firewall_rules", "scheduled_tasks"):
         world[key] = v2.get(key) or []
 
 
@@ -320,5 +324,26 @@ def apply_v2_action(world: dict, action: str, payload: dict | None = None) -> di
         else:
             rule["enabled"] = not bool(rule.get("enabled"))
         return {"ok": True, "message": f"{'Enabled' if rule['enabled'] else 'Disabled'} {rule['name']}", "rule": rule}
+
+    if action == "create_scheduled_task":
+        name = (payload.get("name") or f"New Task {len(world.get('scheduled_tasks') or []) + 1}").strip()
+        if any(t.get("name") == name for t in world.get("scheduled_tasks") or []):
+            return {"ok": False, "error": f"Task '{name}' already exists"}
+        trigger = payload.get("trigger") or payload.get("triggers") or "Daily"
+        row = {
+            "name": name,
+            "status": "Ready",
+            "triggers": trigger if "At " in str(trigger) or "every" in str(trigger).lower() else f"At 12:00 AM — {trigger}",
+            "nextRun": payload.get("next_run") or "Soon",
+            "lastRun": payload.get("last_run") or "Never",
+            "result": "0x0",
+            "author": payload.get("author") or "lab\\Administrator",
+            "program": payload.get("program") or "powershell.exe",
+            "action": payload.get("action_type") or payload.get("task_action") or "Start a program",
+            "description": payload.get("description") or "",
+        }
+        world.setdefault("scheduled_tasks", []).append(row)
+        world["v2"]["scheduled_tasks"] = world["scheduled_tasks"]
+        return {"ok": True, "message": f"Created scheduled task {name}", "task": row}
 
     return None
