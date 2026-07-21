@@ -37,6 +37,32 @@ def seed_v2() -> dict[str, Any]:
             {"path": "C:\\Hyper-V\\WEB01.vhdx", "size_gb": 60, "type": "Dynamic", "attached_to": "WEB01"},
         ],
         "console_sessions": [],
+        "iis_sites": [
+            {"name": "Default Web Site", "state": "Started", "path": "C:\\inetpub\\wwwroot"},
+            {"name": "api.lab.local", "state": "Started", "path": "C:\\inetpub\\api"},
+            {"name": "intranet", "state": "Stopped", "path": "C:\\inetpub\\intranet"},
+        ],
+        "iis_bindings": [
+            {"site": "Default Web Site", "type": "http", "host": "", "port": 80, "ip": "*"},
+            {"site": "api.lab.local", "type": "https", "host": "api.lab.local", "port": 443, "ip": "*"},
+        ],
+        "iis_app_pools": [
+            {"name": "DefaultAppPool", "state": "Started", "pipeline": "Integrated", "clr": "v4.0"},
+            {"name": "api-pool", "state": "Started", "pipeline": "Integrated", "clr": "v4.0"},
+            {"name": "legacy-pool", "state": "Stopped", "pipeline": "Classic", "clr": "v2.0"},
+        ],
+        "dns_records": [
+            {"name": "server01", "type": "A", "data": "192.168.10.50", "zone": "lab.local"},
+            {"name": "web01", "type": "A", "data": "192.168.10.60", "zone": "lab.local"},
+            {"name": "api", "type": "CNAME", "data": "web01.lab.local.", "zone": "lab.local"},
+        ],
+        "dhcp_reservations": [
+            {"ip": "192.168.10.60", "mac": "00:50:56:ab:10:01", "name": "web01.lab.local"},
+        ],
+        "firewall_rules": [
+            {"name": "Allow HTTPS Inbound", "group": "Custom", "profile": "Domain", "enabled": True, "action": "Allow", "protocol": "TCP", "port": "443"},
+            {"name": "Allow RDP", "group": "Remote Desktop", "profile": "Domain", "enabled": True, "action": "Allow", "protocol": "TCP", "port": "3389"},
+        ],
     }
 
 
@@ -50,6 +76,8 @@ def ensure_v2(world: dict) -> None:
     world["vswitches"] = v2.get("vswitches") or []
     world["vhdx_disks"] = v2.get("vhdx_disks") or []
     world["console_sessions"] = v2.get("console_sessions") or []
+    for key in ("iis_sites", "iis_bindings", "iis_app_pools", "dns_records", "dhcp_reservations", "firewall_rules"):
+        world[key] = v2.get(key) or []
 
 
 def _find_vm(world: dict, name: str) -> dict | None:
@@ -193,5 +221,104 @@ def apply_v2_action(world: dict, action: str, payload: dict | None = None) -> di
             if vm:
                 vm["vhd_path"] = path
         return {"ok": True, "message": f"Created VHDX {path}", "disk": row}
+
+    if action == "iis_add_binding":
+        site = payload.get("site") or "Default Web Site"
+        binding = {
+            "site": site,
+            "type": payload.get("type") or "http",
+            "host": payload.get("host") or "",
+            "port": int(payload.get("port") or 80),
+            "ip": payload.get("ip") or "*",
+        }
+        world.setdefault("iis_bindings", []).append(binding)
+        world["v2"]["iis_bindings"] = world["iis_bindings"]
+        return {"ok": True, "message": f"Added binding on {site}", "binding": binding}
+
+    if action == "iis_start_site":
+        site = next((s for s in world.get("iis_sites") or [] if s.get("name") == payload.get("name")), None)
+        if not site and world.get("iis_sites"):
+            site = world["iis_sites"][0]
+        if not site:
+            return {"ok": False, "error": "IIS site not found"}
+        site["state"] = "Started"
+        return {"ok": True, "message": f"Started {site['name']}", "site": site}
+
+    if action == "iis_stop_site":
+        site = next((s for s in world.get("iis_sites") or [] if s.get("name") == payload.get("name")), None)
+        if not site and world.get("iis_sites"):
+            site = world["iis_sites"][0]
+        if not site:
+            return {"ok": False, "error": "IIS site not found"}
+        site["state"] = "Stopped"
+        return {"ok": True, "message": f"Stopped {site['name']}", "site": site}
+
+    if action == "iis_recycle_pool":
+        pool = next((p for p in world.get("iis_app_pools") or [] if p.get("name") == payload.get("name")), None)
+        if not pool and world.get("iis_app_pools"):
+            pool = world["iis_app_pools"][0]
+        if not pool:
+            return {"ok": False, "error": "App pool not found"}
+        pool["state"] = "Started"
+        pool["last_recycle"] = _now()
+        return {"ok": True, "message": f"Recycled {pool['name']}", "pool": pool}
+
+    if action == "dns_add_record":
+        row = {
+            "name": (payload.get("name") or "host").strip(),
+            "type": payload.get("type") or "A",
+            "data": payload.get("data") or "192.168.10.100",
+            "zone": payload.get("zone") or "lab.local",
+        }
+        world.setdefault("dns_records", []).append(row)
+        world["v2"]["dns_records"] = world["dns_records"]
+        return {"ok": True, "message": f"Added DNS {row['type']} {row['name']}", "record": row}
+
+    if action == "dns_delete_record":
+        name = payload.get("name") or ""
+        records = world.setdefault("dns_records", [])
+        before = len(records)
+        world["dns_records"] = [r for r in records if r.get("name") != name]
+        world["v2"]["dns_records"] = world["dns_records"]
+        if len(world["dns_records"]) == before:
+            return {"ok": False, "error": "DNS record not found"}
+        return {"ok": True, "message": f"Deleted DNS record {name}"}
+
+    if action == "dhcp_create_reservation":
+        row = {
+            "ip": payload.get("ip") or f"192.168.10.{100 + len(world.get('dhcp_reservations') or [])}",
+            "mac": payload.get("mac") or "00:50:56:ab:99:99",
+            "name": payload.get("name") or "reserved-host.lab.local",
+        }
+        world.setdefault("dhcp_reservations", []).append(row)
+        world["v2"]["dhcp_reservations"] = world["dhcp_reservations"]
+        return {"ok": True, "message": f"Reserved {row['ip']}", "reservation": row}
+
+    if action == "firewall_add_rule":
+        row = {
+            "name": (payload.get("name") or f"Custom Rule {len(world.get('firewall_rules') or []) + 1}").strip(),
+            "group": payload.get("group") or "Custom",
+            "profile": payload.get("profile") or "Domain",
+            "enabled": bool(payload.get("enabled", True)),
+            "action": payload.get("action") or "Allow",
+            "protocol": payload.get("protocol") or "TCP",
+            "port": str(payload.get("port") or "8080"),
+        }
+        world.setdefault("firewall_rules", []).insert(0, row)
+        world["v2"]["firewall_rules"] = world["firewall_rules"]
+        return {"ok": True, "message": f"Added firewall rule {row['name']}", "rule": row}
+
+    if action == "firewall_toggle_rule":
+        name = payload.get("name") or ""
+        rule = next((r for r in world.get("firewall_rules") or [] if r.get("name") == name), None)
+        if not rule and world.get("firewall_rules"):
+            rule = world["firewall_rules"][0]
+        if not rule:
+            return {"ok": False, "error": "Firewall rule not found"}
+        if "enabled" in payload:
+            rule["enabled"] = bool(payload["enabled"])
+        else:
+            rule["enabled"] = not bool(rule.get("enabled"))
+        return {"ok": True, "message": f"{'Enabled' if rule['enabled'] else 'Disabled'} {rule['name']}", "rule": rule}
 
     return None

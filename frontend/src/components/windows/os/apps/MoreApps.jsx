@@ -24,11 +24,36 @@ const DNS_RECORDS = [
 ]
 
 export function DNSManager() {
+  const labAction = useOS((s) => s.labAction)
+  const dnsRecords = useOS((s) => s.dnsRecords)
   const [sel, setSel] = useState('lab.local')
   const [expand, setExpand] = useState({ SERVER01: true, fwd: true })
+  const [busy, setBusy] = useState(false)
+  const live = (dnsRecords || []).filter((r) => (r.zone || 'lab.local') === sel)
+  const rows = live.length
+    ? live.map((r) => [r.name, r.type === 'A' ? 'Host (A)' : r.type === 'CNAME' ? 'Alias (CNAME)' : r.type, r.data])
+    : (sel === 'lab.local' ? DNS_RECORDS : [['(same as parent folder)', 'Start of Authority (SOA)', `[1], server01.lab.local.`], ['(same as parent folder)', 'Name Server (NS)', 'server01.lab.local.']])
+
+  const addRecord = async () => {
+    if (!labAction || busy) return
+    setBusy(true)
+    try {
+      await labAction('dns_add_record', {
+        zone: sel,
+        name: `host-${Date.now().toString(36).slice(-3)}`,
+        type: 'A',
+        data: '192.168.10.120',
+      })
+    } finally { setBusy(false) }
+  }
+
   return (
     <div className="winos-app">
-      <div className="winos-toolbar"><span style={{ fontSize: 12 }}>File &nbsp; Action &nbsp; View &nbsp; Help</span></div>
+      <div className="winos-toolbar">
+        <span style={{ fontSize: 12 }}>File &nbsp; Action &nbsp; View &nbsp; Help</span>
+        <span style={{ flex: 1 }} />
+        <button type="button" className="winos-btn primary" disabled={busy || !labAction} onClick={addRecord}>New Host (A)…</button>
+      </div>
       <div className="winos-split">
         <div className="winos-tree" style={{ width: 250 }}>
           <div className="winos-tree-row" style={{ fontWeight: 600 }}><Globe size={13} /> DNS</div>
@@ -45,13 +70,13 @@ export function DNSManager() {
         <div className="winos-main">
           <table className="winos-table">
             <thead><tr><th>Name</th><th>Type</th><th>Data</th></tr></thead>
-            <tbody>{(sel === 'lab.local' ? DNS_RECORDS : [['(same as parent folder)', 'Start of Authority (SOA)', `[1], server01.lab.local.`], ['(same as parent folder)', 'Name Server (NS)', 'server01.lab.local.']]).map((r, i) => (
+            <tbody>{rows.map((r, i) => (
               <tr key={i}><td>{r[0]}</td><td>{r[1]}</td><td>{r[2]}</td></tr>
             ))}</tbody>
           </table>
         </div>
       </div>
-      <div className="winos-status"><span>{sel}</span><span>{sel === 'lab.local' ? DNS_RECORDS.length : 2} record(s)</span></div>
+      <div className="winos-status"><span>{sel}</span><span>{rows.length} record(s)</span></div>
     </div>
   )
 }

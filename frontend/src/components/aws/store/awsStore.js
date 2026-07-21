@@ -1604,21 +1604,33 @@ export const useAwsStore = create(
       },
 
       // ---------- DynamoDB bespoke ----------
-      putDynamoItem: (id, item) => set((s) => mapGeneric(s, 'dynamodb', 'tables', id, (t) => {
-        const records = [...((t.records) || [])]
-        const pkField = (t.partitionKey || 'pk').split(' ')[0]
-        const skField = (t.sortKey || '').split(' ')[0]
-        const idx = records.findIndex((r) => r[pkField] === item[pkField] && (!skField || r[skField] === item[skField]))
-        if (idx >= 0) records[idx] = { ...records[idx], ...item }
-        else records.push(item)
-        return { ...t, records, items: records.length }
-      })),
-      deleteDynamoItem: (id, key) => set((s) => mapGeneric(s, 'dynamodb', 'tables', id, (t) => {
-        const pkField = (t.partitionKey || 'pk').split(' ')[0]
-        const skField = (t.sortKey || '').split(' ')[0]
-        const records = ((t.records) || []).filter((r) => !(r[pkField] === key[pkField] && (!skField || r[skField] === key[skField])))
-        return { ...t, records, items: records.length }
-      })),
+      putDynamoItem: (id, item) => {
+        const tables = get().genericResources?.dynamodb?.tables || []
+        const table = tables.find((t) => t.id === id) || tables[0]
+        set((s) => mapGeneric(s, 'dynamodb', 'tables', id, (t) => {
+          const records = [...((t.records) || [])]
+          const pkField = (t.partitionKey || 'pk').split(' ')[0]
+          const skField = (t.sortKey || '').split(' ')[0]
+          const idx = records.findIndex((r) => r[pkField] === item[pkField] && (!skField || r[skField] === item[skField]))
+          if (idx >= 0) records[idx] = { ...records[idx], ...item }
+          else records.push(item)
+          return { ...t, records, items: records.length }
+        }))
+        if (table) get()._syncAction('put_dynamodb_item', { id: table.id, name: table.name, item })
+        return ok()
+      },
+      deleteDynamoItem: (id, key) => {
+        const tables = get().genericResources?.dynamodb?.tables || []
+        const table = tables.find((t) => t.id === id) || tables[0]
+        set((s) => mapGeneric(s, 'dynamodb', 'tables', id, (t) => {
+          const pkField = (t.partitionKey || 'pk').split(' ')[0]
+          const skField = (t.sortKey || '').split(' ')[0]
+          const records = ((t.records) || []).filter((r) => !(r[pkField] === key[pkField] && (!skField || r[skField] === key[skField])))
+          return { ...t, records, items: records.length }
+        }))
+        if (table) get()._syncAction('delete_dynamodb_item', { id: table.id, name: table.name, key })
+        return ok()
+      },
       queryDynamo: (id, key) => {
         const t = (get().genericResources?.dynamodb?.tables || []).find((x) => x.id === id)
         if (!t) return []
@@ -1628,6 +1640,31 @@ export const useAwsStore = create(
       scanDynamo: (id) => {
         const t = (get().genericResources?.dynamodb?.tables || []).find((x) => x.id === id)
         return t ? ((t.records) || []) : []
+      },
+
+      scaleEksResource: (id, patch = {}) => {
+        const clusters = get().genericResources?.eks?.clusters || []
+        const ngs = get().genericResources?.eks?.['node-groups'] || []
+        const cluster = clusters.find((c) => c.id === id)
+        const ng = ngs.find((n) => n.id === id)
+        const target = cluster || ng
+        if (!target) return fail(resourceNotFound('UpdateClusterConfig', 'EKS resource not found.'))
+        const resource = cluster ? 'clusters' : 'node-groups'
+        const next = { ...patch }
+        if (next.nodes != null) next.nodes = Math.max(0, Number(next.nodes))
+        if (next.desired != null) next.desired = Math.max(0, Number(next.desired))
+        set((s) => mapGeneric(s, 'eks', resource, id, (x) => ({ ...x, ...next })))
+        get()._syncAction('scale_eks', { id: target.id, name: target.name, ...next })
+        return ok(next)
+      },
+      scaleEcsService: (id, desired) => {
+        const services = get().genericResources?.ecs?.services || []
+        const svc = services.find((s) => s.id === id) || services[0]
+        if (!svc) return fail(resourceNotFound('UpdateService', 'ECS service not found.'))
+        const n = Math.max(0, Number(desired))
+        set((s) => mapGeneric(s, 'ecs', 'services', svc.id, (x) => ({ ...x, desired: n, running: n })))
+        get()._syncAction('scale_ecs', { id: svc.id, name: svc.name, desired: n })
+        return ok({ desired: n })
       },
 
       // ---------- CloudFormation bespoke ----------
@@ -1661,6 +1698,9 @@ export const useAwsStore = create(
             },
           },
         }))
+        get()._syncAction('create_cfn_stack', {
+          id: stack.id, name: stack.name, resources: stack.resources, template: stack.template, status: stack.status,
+        })
         get()._ensureTick()
         return stack
       },

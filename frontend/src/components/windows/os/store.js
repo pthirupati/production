@@ -228,6 +228,12 @@ export const useOS = create((set, get) => ({
   startupItems: clone(SEED_STARTUP),
   roles: clone(SEED_ROLES),
   hypervVms: [],
+  iisSites: [],
+  iisBindings: [],
+  iisAppPools: [],
+  dnsRecords: [],
+  dhcpReservations: [],
+  firewallRules: [],
   labSessionId: '',
   labAction: null,
   setLabAction: (fn) => set({ labAction: fn }),
@@ -242,6 +248,9 @@ export const useOS = create((set, get) => ({
       storage: snapshot.storage,
       ad: snapshot.ad,
       hyperv_vms: snapshot.hyperv_vms,
+      iis_sites: snapshot.iis_sites,
+      dns_records: snapshot.dns_records,
+      firewall_rules: snapshot.firewall_rules,
     })
     // Short-circuit WITHOUT calling set() — calling set (even returning {})
     // produces a fresh state object every time, which would re-fire any effect
@@ -393,6 +402,12 @@ export const useOS = create((set, get) => ({
       vfs,
       adUsers,
       hypervVms: Array.isArray(snapshot.hyperv_vms) ? snapshot.hyperv_vms : s.hypervVms,
+      iisSites: Array.isArray(snapshot.iis_sites) ? snapshot.iis_sites : s.iisSites,
+      iisBindings: Array.isArray(snapshot.iis_bindings) ? snapshot.iis_bindings : s.iisBindings,
+      iisAppPools: Array.isArray(snapshot.iis_app_pools) ? snapshot.iis_app_pools : s.iisAppPools,
+      dnsRecords: Array.isArray(snapshot.dns_records) ? snapshot.dns_records : s.dnsRecords,
+      dhcpReservations: Array.isArray(snapshot.dhcp_reservations) ? snapshot.dhcp_reservations : s.dhcpReservations,
+      firewallRules: Array.isArray(snapshot.firewall_rules) ? snapshot.firewall_rules : s.firewallRules,
       labSessionId: snapshot.session_id || s.labSessionId,
     }
     })

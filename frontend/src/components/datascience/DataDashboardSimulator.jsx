@@ -690,6 +690,12 @@ export default function DataDashboardSimulator({
                 onClick={() => fire(() => datascienceApi.action(sessionId, 'add_clean_step', { op: 'fill_nulls', column: cleanCol, value: '0' }))}>
                 Fill nulls
               </button>
+              <button type="button" className="ds-btn" disabled={busy || !cleanCol}
+                onClick={() => fire(() => datascienceApi.action(sessionId, 'add_clean_step', {
+                  op: 'rename_column', column: cleanCol, to: `${cleanCol}_clean`,
+                }))}>
+                Rename column
+              </button>
             </div>
             <div className="space-y-1">
               {(state?.cleaning_steps || []).length === 0 ? (

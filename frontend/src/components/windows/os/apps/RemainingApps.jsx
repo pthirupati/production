@@ -136,18 +136,44 @@ function GPOEditor({ name, os, onClose }) {
   )
 }
 
-const appPools = ['DefaultAppPool', '.NET v4.5', '.NET v4.5 Classic', 'Classic .NET AppPool', 'api-pool', 'legacy-pool']
-const sites = [
-  ['Default Web Site', 'Started', 'http', '*:80:'],
-  ['API-Site', 'Started', 'https', '*:443:api.lab.local'],
-  ['Intranet', 'Started', 'http', '*:8081:'],
-  ['Legacy-App', 'Stopped', 'http', '*:8082:'],
+const FALLBACK_POOLS = [
+  { name: 'DefaultAppPool', state: 'Started', pipeline: 'Integrated', clr: 'v4.0' },
+  { name: 'api-pool', state: 'Started', pipeline: 'Integrated', clr: 'v4.0' },
+  { name: 'legacy-pool', state: 'Stopped', pipeline: 'Classic', clr: 'v2.0' },
+]
+const FALLBACK_SITES = [
+  { name: 'Default Web Site', state: 'Started', path: 'C:\\inetpub\\wwwroot' },
+  { name: 'api.lab.local', state: 'Started', path: 'C:\\inetpub\\api' },
+  { name: 'intranet', state: 'Stopped', path: 'C:\\inetpub\\intranet' },
+]
+const FALLBACK_BINDINGS = [
+  { site: 'Default Web Site', type: 'http', host: '', port: 80, ip: '*' },
+  { site: 'api.lab.local', type: 'https', host: 'api.lab.local', port: 443, ip: '*' },
 ]
 const iisFeatures = ['Authentication', 'Authorization Rules', 'Compression', 'Default Document', 'Directory Browsing', 'Error Pages', 'Handler Mappings', 'HTTP Response Headers', 'Logging', 'MIME Types', 'Modules', 'Request Filtering', 'SSL Settings']
 
 export function IISManager() {
+  const labAction = useOS((s) => s.labAction)
+  const iisSites = useOS((s) => s.iisSites)
+  const iisBindings = useOS((s) => s.iisBindings)
+  const iisAppPools = useOS((s) => s.iisAppPools)
+  const sites = (iisSites?.length ? iisSites : FALLBACK_SITES)
+  const pools = (iisAppPools?.length ? iisAppPools : FALLBACK_POOLS)
+  const bindings = (iisBindings?.length ? iisBindings : FALLBACK_BINDINGS)
   const [sel, setSel] = useState('SERVER01')
   const [dialog, setDialog] = useState(null)
+  const [busy, setBusy] = useState(false)
+  const siteNames = sites.map((s) => s.name)
+  const poolNames = pools.map((p) => p.name)
+  const curSite = sites.find((s) => s.name === sel)
+  const curPool = pools.find((p) => p.name === sel)
+
+  const act = async (action, extra = {}) => {
+    if (!labAction || busy) return
+    setBusy(true)
+    try { await labAction(action, extra) } finally { setBusy(false) }
+  }
+
   return (
     <div className="winos-app">
       <div className="winos-toolbar"><span style={{ fontSize: 12 }}>File &nbsp; View &nbsp; Help</span></div>
@@ -156,23 +182,42 @@ export function IISManager() {
           <div className="winos-tree-row">Start Page</div>
           <TreeLine d={0} label="SERVER01 (local computer)" open />
           <TreeLine d={1} label="Application Pools" open />
-          {appPools.map((p) => <div key={p} className={`winos-tree-row ${sel === p ? 'sel' : ''}`} style={{ paddingLeft: 36 }} onClick={() => setSel(p)}>⚙️ {p}</div>)}
+          {pools.map((p) => <div key={p.name} className={`winos-tree-row ${sel === p.name ? 'sel' : ''}`} style={{ paddingLeft: 36 }} onClick={() => setSel(p.name)}>⚙️ {p.name}</div>)}
           <TreeLine d={1} label="Sites" open />
-          {sites.map((s) => <div key={s[0]} className={`winos-tree-row ${sel === s[0] ? 'sel' : ''}`} style={{ paddingLeft: 36 }} onClick={() => setSel(s[0])}>🌐 {s[0]}</div>)}
+          {sites.map((s) => <div key={s.name} className={`winos-tree-row ${sel === s.name ? 'sel' : ''}`} style={{ paddingLeft: 36 }} onClick={() => setSel(s.name)}>🌐 {s.name}</div>)}
         </div>
         <div className="winos-main" style={{ padding: 14 }}>
-          {appPools.includes(sel) ? <AppPoolView name={sel} onOpen={() => setDialog('pool')} />
-            : sites.some((s) => s[0] === sel) ? <SiteView site={sites.find((s) => s[0] === sel)} onBindings={() => setDialog('bindings')} />
+          {curPool ? <AppPoolView pool={curPool} onOpen={() => setDialog('pool')} />
+            : curSite ? <SiteView site={curSite} bindings={bindings.filter((b) => b.site === curSite.name)} onBindings={() => setDialog('bindings')} />
               : <FeatureGrid title="SERVER01 Home" />}
         </div>
         <div style={{ width: 190, borderLeft: '1px solid #ddd', padding: 10, fontSize: 12 }}>
           <b>Actions</b>
-          {sites.some((s) => s[0] === sel) && <><Action onClick={() => setDialog('bindings')}>Edit Bindings…</Action><Action>Basic Settings…</Action><Action>Browse Website</Action><Action>Restart</Action><Action>Stop</Action></>}
-          {appPools.includes(sel) && <><Action onClick={() => setDialog('pool')}>Advanced Settings…</Action><Action>Start</Action><Action>Stop</Action><Action>Recycle…</Action></>}
-          {!appPools.includes(sel) && !sites.some((s) => s[0] === sel) && <><Action>Restart</Action><Action>Start</Action><Action>Stop</Action></>}
+          {curSite && (
+            <>
+              <Action onClick={() => setDialog('bindings')}>Edit Bindings…</Action>
+              <Action onClick={() => act('iis_start_site', { name: curSite.name })} disabled={busy}>Start</Action>
+              <Action onClick={() => act('iis_stop_site', { name: curSite.name })} disabled={busy}>Stop</Action>
+              <Action onClick={() => act('iis_start_site', { name: curSite.name })} disabled={busy}>Restart</Action>
+            </>
+          )}
+          {curPool && (
+            <>
+              <Action onClick={() => setDialog('pool')}>Advanced Settings…</Action>
+              <Action onClick={() => act('iis_recycle_pool', { name: curPool.name })} disabled={busy}>Recycle…</Action>
+            </>
+          )}
         </div>
       </div>
-      {dialog === 'bindings' && <BindingsDialog onClose={() => setDialog(null)} />}
+      {dialog === 'bindings' && (
+        <BindingsDialog
+          site={curSite?.name || siteNames[0]}
+          bindings={bindings.filter((b) => b.site === (curSite?.name || siteNames[0]))}
+          busy={busy}
+          onAdd={() => act('iis_add_binding', { site: curSite?.name || siteNames[0], type: 'http', port: 8080 + bindings.length })}
+          onClose={() => setDialog(null)}
+        />
+      )}
       {dialog === 'pool' && <PoolDialog pool={sel} onClose={() => setDialog(null)} />}
     </div>
   )
@@ -190,39 +235,51 @@ function FeatureGrid({ title }) {
   )
 }
 
-function SiteView({ site }) {
+function SiteView({ site, bindings = [] }) {
   return (
     <div>
-      <h2 style={{ fontSize: 16, fontWeight: 600 }}>{site[0]} Home</h2>
+      <h2 style={{ fontSize: 16, fontWeight: 600 }}>{site.name} Home</h2>
       <div className="winos-grid2" style={{ marginBottom: 14 }}>
-        <span>Status</span><span>{site[1]}</span><span>Binding</span><span>{site[2]} {site[3]}</span><span>Physical Path</span><span>C:\inetpub\wwwroot</span>
+        <span>Status</span><span>{site.state}</span>
+        <span>Bindings</span><span>{bindings.map((b) => `${b.type} *:${b.port}:${b.host || ''}`).join(', ') || '—'}</span>
+        <span>Physical Path</span><span>{site.path || 'C:\\inetpub\\wwwroot'}</span>
       </div>
       <FeatureGrid title="Features View" />
     </div>
   )
 }
 
-function AppPoolView({ name, onOpen }) {
+function AppPoolView({ pool, onOpen }) {
   return (
     <div>
-      <h2 style={{ fontSize: 16, fontWeight: 600 }}>{name}</h2>
+      <h2 style={{ fontSize: 16, fontWeight: 600 }}>{pool.name}</h2>
       <div className="winos-grid2">
-        <span>.NET CLR version</span><span>{name.includes('Classic') ? 'v2.0' : 'v4.0'}</span>
-        <span>Managed pipeline mode</span><span>{name.includes('Classic') ? 'Classic' : 'Integrated'}</span>
-        <span>Status</span><span>{name === 'legacy-pool' ? 'Stopped' : 'Started'}</span>
+        <span>.NET CLR version</span><span>{pool.clr || 'v4.0'}</span>
+        <span>Managed pipeline mode</span><span>{pool.pipeline || 'Integrated'}</span>
+        <span>Status</span><span>{pool.state || 'Started'}</span>
       </div>
       <button className="winos-btn primary" style={{ marginTop: 12 }} onClick={onOpen}>Advanced Settings…</button>
     </div>
   )
 }
 
-function BindingsDialog({ onClose }) {
+function BindingsDialog({ site, bindings = [], busy, onAdd, onClose }) {
   return (
     <Dialog title="Site Bindings" onClose={onClose} width={540}
       footer={<><button className="winos-btn primary" onClick={onClose}>Close</button></>}>
       <table className="winos-table"><thead><tr><th>Type</th><th>Host Name</th><th>Port</th><th>IP Address</th><th>Binding Information</th></tr></thead>
-        <tbody><tr><td>http</td><td></td><td>80</td><td>*</td><td>*:80:</td></tr><tr><td>https</td><td>api.lab.local</td><td>443</td><td>*</td><td>*:443:api.lab.local</td></tr></tbody></table>
-      <div style={{ marginTop: 10, display: 'flex', gap: 6 }}><button className="winos-btn">Add…</button><button className="winos-btn">Edit…</button><button className="winos-btn">Remove</button><button className="winos-btn">Browse</button></div>
+        <tbody>
+          {bindings.map((b, i) => (
+            <tr key={i}><td>{b.type}</td><td>{b.host}</td><td>{b.port}</td><td>{b.ip}</td><td>{`${b.ip}:${b.port}:${b.host}`}</td></tr>
+          ))}
+        </tbody>
+      </table>
+      <div style={{ marginTop: 10, display: 'flex', gap: 6 }}>
+        <button type="button" className="winos-btn" disabled={busy} onClick={onAdd}>Add…</button>
+        <button type="button" className="winos-btn" disabled>Edit…</button>
+        <button type="button" className="winos-btn" disabled>Remove</button>
+      </div>
+      <div style={{ marginTop: 8, fontSize: 11, color: '#666' }}>Site: {site}</div>
     </Dialog>
   )
 }
@@ -240,8 +297,28 @@ function PoolDialog({ pool, onClose }) {
 const leases = Array.from({ length: 80 }, (_, i) => [`192.168.10.${101 + i}`, `00:50:56:ab:${(20 + i).toString(16).padStart(2, '0')}:${(40 + i).toString(16).padStart(2, '0')}`, `ws-${i < 25 ? 'eng' : 'mkt'}-${String((i % 25) + 1).padStart(2, '0')}.lab.local`, `1/18/2024 ${8 + (i % 10)}:45 AM`, 'DHCP'])
 
 export function DHCPManager() {
+  const labAction = useOS((s) => s.labAction)
+  const dhcpReservations = useOS((s) => s.dhcpReservations)
   const [node, setNode] = useState('Address Leases')
   const [props, setProps] = useState(false)
+  const [busy, setBusy] = useState(false)
+  const reservations = dhcpReservations?.length
+    ? dhcpReservations
+    : ['server01', 'server02', 'print01', 'nas01', 'backup01'].map((n, i) => ({
+      ip: `192.168.10.${50 + i}`, mac: `00:50:56:ab:cd:${(239 + i).toString(16)}`, name: n,
+    }))
+
+  const addReservation = async () => {
+    if (!labAction || busy) return
+    setBusy(true)
+    try {
+      await labAction('dhcp_create_reservation', {
+        name: `host-${Date.now().toString(36).slice(-3)}.lab.local`,
+        ip: `192.168.10.${60 + reservations.length}`,
+      })
+    } finally { setBusy(false) }
+  }
+
   return (
     <div className="winos-app">
       <div className="winos-toolbar"><span style={{ fontSize: 12 }}>File &nbsp; Action &nbsp; View &nbsp; Help</span></div>
@@ -256,10 +333,19 @@ export function DHCPManager() {
           <TreeLine d={2} label="IPv6" />
         </div>
         <div className="winos-main">
-          <div className="winos-toolbar"><b>{node}</b><span style={{ flex: 1 }} /><button className="winos-btn" onClick={() => setProps(true)}>Properties…</button></div>
+          <div className="winos-toolbar">
+            <b>{node}</b><span style={{ flex: 1 }} />
+            {node === 'Reservations' && <button type="button" className="winos-btn primary" disabled={busy || !labAction} onClick={addReservation}>New Reservation…</button>}
+            <button className="winos-btn" onClick={() => setProps(true)}>Properties…</button>
+          </div>
           {node === 'Address Leases' && <table className="winos-table"><thead><tr><th>IP Address</th><th>Client Unique ID</th><th>Name</th><th>Lease Expiration</th><th>Type</th></tr></thead><tbody>{leases.map((r) => <tr key={r[0]}>{r.map((c) => <td key={c}>{c}</td>)}</tr>)}</tbody></table>}
           {node === 'Address Pool' && <table className="winos-table"><tbody><tr><td>192.168.10.100 - 192.168.10.200</td><td>Distribution range</td></tr><tr><td>192.168.10.1 - 192.168.10.99</td><td>Exclusion range</td></tr></tbody></table>}
-          {node === 'Reservations' && <table className="winos-table"><tbody>{['server01', 'server02', 'print01', 'nas01', 'backup01'].map((n, i) => <tr key={n}><td>192.168.10.{50 + i}</td><td>00:50:56:ab:cd:{(239 + i).toString(16)}</td><td>{n}</td><td>Reservation (both)</td></tr>)}</tbody></table>}
+          {node === 'Reservations' && (
+            <table className="winos-table">
+              <thead><tr><th>IP</th><th>MAC</th><th>Name</th></tr></thead>
+              <tbody>{reservations.map((r) => <tr key={r.ip}><td>{r.ip}</td><td>{r.mac}</td><td>{r.name}</td></tr>)}</tbody>
+            </table>
+          )}
           {node === 'Scope Options' && <table className="winos-table"><tbody><tr><td>003 Router</td><td>192.168.10.1</td></tr><tr><td>006 DNS Servers</td><td>192.168.10.10, 192.168.10.11</td></tr><tr><td>015 DNS Domain Name</td><td>lab.local</td></tr></tbody></table>}
         </div>
       </div>
@@ -283,9 +369,27 @@ const firewallRules = [
 ]
 
 export function FirewallAdvanced() {
+  const labAction = useOS((s) => s.labAction)
+  const liveRules = useOS((s) => s.firewallRules)
   const [node, setNode] = useState('Inbound Rules')
   const [rule, setRule] = useState(null)
   const [wizard, setWizard] = useState(false)
+  const [busy, setBusy] = useState(false)
+  const [newName, setNewName] = useState('Allow Custom App')
+  const rows = (liveRules?.length
+    ? liveRules.map((r) => [r.name, r.group, r.profile, r.enabled ? 'Yes' : 'No', r.action, r.protocol, r.port])
+    : firewallRules)
+
+  const finishWizard = async () => {
+    if (labAction) {
+      setBusy(true)
+      try {
+        await labAction('firewall_add_rule', { name: newName, port: '8080', protocol: 'TCP' })
+      } finally { setBusy(false) }
+    }
+    setWizard(false)
+  }
+
   return (
     <div className="winos-app">
       <div className="winos-split">
@@ -294,15 +398,43 @@ export function FirewallAdvanced() {
           {['Inbound Rules', 'Outbound Rules', 'Connection Security Rules', 'Monitoring'].map((n) => <div key={n} className={`winos-tree-row ${node === n ? 'sel' : ''}`} style={{ paddingLeft: 28 }} onClick={() => setNode(n)}>{n}</div>)}
         </div>
         <div className="winos-main">
-          <div className="winos-toolbar"><b>{node}</b><span style={{ flex: 1 }} /><button className="winos-btn primary" onClick={() => setWizard(true)}><Plus size={13} /> New Rule…</button></div>
-          {node === 'Inbound Rules' ? <table className="winos-table"><thead><tr><th>Name</th><th>Group</th><th>Profile</th><th>Enabled</th><th>Action</th><th>Protocol</th><th>Local Port</th></tr></thead><tbody>{firewallRules.map((r) => <tr key={r[0]} onDoubleClick={() => setRule(r)}>{r.map((c) => <td key={c}>{c}</td>)}</tr>)}</tbody></table>
-            : <div style={{ padding: 16, color: '#555' }}>{node} status and policy details are available from the Actions pane.</div>}
+          <div className="winos-toolbar"><b>{node}</b><span style={{ flex: 1 }} /><button type="button" className="winos-btn primary" onClick={() => setWizard(true)}><Plus size={13} /> New Rule…</button></div>
+          {node === 'Inbound Rules' ? (
+            <table className="winos-table">
+              <thead><tr><th>Name</th><th>Group</th><th>Profile</th><th>Enabled</th><th>Action</th><th>Protocol</th><th>Local Port</th><th /></tr></thead>
+              <tbody>
+                {rows.map((r) => (
+                  <tr key={r[0]} onDoubleClick={() => setRule(r)}>
+                    {r.map((c) => <td key={`${r[0]}-${c}`}>{c}</td>)}
+                    <td>
+                      <button type="button" className="winos-btn" disabled={busy || !labAction}
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          if (!labAction) return
+                          setBusy(true)
+                          labAction('firewall_toggle_rule', { name: r[0] }).finally(() => setBusy(false))
+                        }}>
+                        Toggle
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          ) : <div style={{ padding: 16, color: '#555' }}>{node} status and policy details are available from the Actions pane.</div>}
         </div>
       </div>
       {rule && <FirewallRuleDialog rule={rule} onClose={() => setRule(null)} />}
       {wizard && <Dialog title="New Inbound Rule Wizard" onClose={() => setWizard(false)} width={520}
-        footer={<><button className="winos-btn primary" onClick={() => setWizard(false)}>Finish</button><button className="winos-btn" onClick={() => setWizard(false)}>Cancel</button></>}>
-        <div style={{ fontSize: 12.5 }}><b>Rule Type</b><br /><label><input type="radio" defaultChecked /> Program</label><br /><label><input type="radio" /> Port</label><br /><label><input type="radio" /> Predefined</label><br /><label><input type="radio" /> Custom</label><div className="winos-grid2" style={{ marginTop: 12 }}><span>Name</span><input className="winos-input" defaultValue="Allow Custom App" /><span>Action</span><select className="winos-input"><option>Allow the connection</option><option>Block the connection</option></select></div></div>
+        footer={<><button type="button" className="winos-btn primary" disabled={busy} onClick={finishWizard}>Finish</button><button type="button" className="winos-btn" onClick={() => setWizard(false)}>Cancel</button></>}>
+        <div style={{ fontSize: 12.5 }}>
+          <b>Rule Type</b><br />
+          <label><input type="radio" defaultChecked /> Port</label>
+          <div className="winos-grid2" style={{ marginTop: 12 }}>
+            <span>Name</span><input className="winos-input" value={newName} onChange={(e) => setNewName(e.target.value)} />
+            <span>Action</span><select className="winos-input"><option>Allow the connection</option><option>Block the connection</option></select>
+          </div>
+        </div>
       </Dialog>}
     </div>
   )
@@ -377,6 +509,13 @@ function Panel({ title, children }) {
   return <div className="winos-card" style={{ marginBottom: 12 }}><div className="winos-card-h">{title}</div><div style={{ padding: 10 }}>{children}</div></div>
 }
 
-function Action({ children, onClick }) {
-  return <div style={{ color: '#06c', padding: '4px 0', cursor: 'default' }} onClick={onClick}>{children}</div>
+function Action({ children, onClick, disabled }) {
+  return (
+    <div
+      style={{ color: disabled ? '#999' : '#06c', padding: '4px 0', cursor: disabled ? 'not-allowed' : 'pointer', opacity: disabled ? 0.6 : 1 }}
+      onClick={disabled ? undefined : onClick}
+    >
+      {children}
+    </div>
+  )
 }

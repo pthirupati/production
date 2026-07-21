@@ -167,10 +167,49 @@ def apply_v2_action(state: dict, action: str, payload: dict) -> dict | None:
             "partitionKey": payload.get("partitionKey") or "pk (String)",
             "sortKey": payload.get("sortKey") or "",
             "billingMode": payload.get("billingMode") or "On-demand",
-            "status": "Active", "items": 0,
+            "status": "Active", "items": 0, "records": [],
         })
         gr.setdefault("dynamodb", {}).setdefault("tables", []).append(table)
         return {"ok": True, "message": f"Created table {name}", "table": table}
+
+    if action == "put_dynamodb_item":
+        tables = gr.setdefault("dynamodb", {}).setdefault("tables", [])
+        table = next((t for t in tables if t.get("id") == payload.get("id") or t.get("name") == payload.get("name")), None)
+        if not table and tables:
+            table = tables[0]
+        if not table:
+            table = _row(payload.get("id") or f"table-{_hex()}", payload.get("name") or "Orders", {
+                "partitionKey": "pk (String)", "status": "Active", "records": [], "items": 0,
+            })
+            tables.append(table)
+        item = payload.get("item") or {}
+        records = table.setdefault("records", [])
+        pk = (table.get("partitionKey") or "pk").split()[0]
+        sk = (table.get("sortKey") or "").split()[0] if table.get("sortKey") else ""
+        idx = next((i for i, r in enumerate(records)
+                    if r.get(pk) == item.get(pk) and (not sk or r.get(sk) == item.get(sk))), None)
+        if idx is not None:
+            records[idx] = {**records[idx], **item}
+        else:
+            records.append(item)
+        table["items"] = len(records)
+        return {"ok": True, "message": f"Put item in {table.get('name')}", "table": table}
+
+    if action == "delete_dynamodb_item":
+        tables = gr.setdefault("dynamodb", {}).setdefault("tables", [])
+        table = next((t for t in tables if t.get("id") == payload.get("id") or t.get("name") == payload.get("name")), None)
+        if not table and tables:
+            table = tables[0]
+        if not table:
+            return {"ok": False, "error": "Table not found"}
+        key = payload.get("key") or {}
+        pk = (table.get("partitionKey") or "pk").split()[0]
+        sk = (table.get("sortKey") or "").split()[0] if table.get("sortKey") else ""
+        records = table.get("records") or []
+        table["records"] = [r for r in records
+                            if not (r.get(pk) == key.get(pk) and (not sk or r.get(sk) == key.get(sk)))]
+        table["items"] = len(table["records"])
+        return {"ok": True, "message": f"Deleted item from {table.get('name')}", "table": table}
 
     if action == "create_eks_cluster":
         name = (payload.get("name") or f"eks-{_hex(4)}").strip()
@@ -182,15 +221,69 @@ def apply_v2_action(state: dict, action: str, payload: dict) -> dict | None:
         gr.setdefault("eks", {}).setdefault("clusters", []).append(cluster)
         return {"ok": True, "message": f"Created EKS cluster {name}", "cluster": cluster}
 
+    if action == "scale_eks":
+        clusters = gr.setdefault("eks", {}).setdefault("clusters", [])
+        node_groups = gr.setdefault("eks", {}).setdefault("node-groups", [])
+        target = next((c for c in clusters if c.get("id") == payload.get("id") or c.get("name") == payload.get("name")), None)
+        if not target:
+            target = next((n for n in node_groups if n.get("id") == payload.get("id") or n.get("name") == payload.get("name")), None)
+        if not target and clusters:
+            target = clusters[0]
+        if not target:
+            name = payload.get("name") or "lab-eks-cluster"
+            target = _row(payload.get("id") or f"cluster-{_hex()}", name, {
+                "version": "1.30", "nodes": int(payload.get("nodes") or payload.get("desired") or 3), "status": "Active",
+            })
+            clusters.append(target)
+        if "nodes" in payload:
+            target["nodes"] = max(0, int(payload["nodes"]))
+        if "desired" in payload:
+            target["desired"] = max(0, int(payload["desired"]))
+            if "nodes" not in target or payload.get("nodes") is None:
+                target["nodes"] = target["desired"]
+        return {"ok": True, "message": f"Scaled {target.get('name')}", "resource": target}
+
     if action == "create_ecs_service":
         name = (payload.get("name") or f"svc-{_hex(4)}").strip()
+        desired = int(payload.get("desired") or 1)
         svc = _row(f"ecsservice-{_hex()}", name, {
-            "desired": int(payload.get("desired") or 1),
-            "running": int(payload.get("desired") or 1),
+            "desired": desired,
+            "running": desired,
             "status": "Active",
         })
         gr.setdefault("ecs", {}).setdefault("services", []).append(svc)
         return {"ok": True, "message": f"Created ECS service {name}", "service": svc}
+
+    if action == "scale_ecs":
+        services = gr.setdefault("ecs", {}).setdefault("services", [])
+        svc = next((s for s in services if s.get("id") == payload.get("id") or s.get("name") == payload.get("name")), None)
+        if not svc and services:
+            svc = services[0]
+        if not svc:
+            name = payload.get("name") or "web-service"
+            desired = max(0, int(payload.get("desired") if payload.get("desired") is not None else 1))
+            svc = _row(payload.get("id") or f"ecsservice-{_hex()}", name, {
+                "desired": desired, "running": desired, "status": "Active",
+            })
+            services.append(svc)
+            return {"ok": True, "message": f"Scaled {svc.get('name')} desired={desired}", "service": svc}
+        desired = max(0, int(payload.get("desired") if payload.get("desired") is not None else svc.get("desired") or 1))
+        svc["desired"] = desired
+        svc["running"] = desired
+        return {"ok": True, "message": f"Scaled {svc.get('name')} desired={desired}", "service": svc}
+
+    if action == "create_cfn_stack":
+        name = (payload.get("name") or f"stack-{_hex(4)}").strip()
+        stacks = gr.setdefault("cloudformation", {}).setdefault("stacks", [])
+        if any(s.get("name") == name for s in stacks):
+            return {"ok": False, "error": f"Stack '{name}' already exists"}
+        stack = _row(payload.get("id") or f"stack-{_hex()}", name, {
+            "status": payload.get("status") or "CREATE_COMPLETE",
+            "resources": int(payload.get("resources") or 0),
+            "template": payload.get("template") or "",
+        })
+        stacks.append(stack)
+        return {"ok": True, "message": f"Created stack {name}", "stack": stack}
 
     if action == "create_load_balancer":
         name = (payload.get("name") or f"alb-{_hex(4)}").strip()

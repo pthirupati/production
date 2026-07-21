@@ -421,6 +421,8 @@ export function GenericResourceDetail() {
   const getSecretValue = useAwsStore((s) => s.getSecretValue)
   const rotateSecret = useAwsStore((s) => s.rotateSecret)
   const upsertRoute53Record = useAwsStore((s) => s.upsertRoute53Record)
+  const scaleEksResource = useAwsStore((s) => s.scaleEksResource)
+  const scaleEcsService = useAwsStore((s) => s.scaleEcsService)
   const pushFlash = useAwsStore((s) => s.pushFlash)
   const serviceCfg = SERVICE_CONFIGS[service]
   const cfg = getResourceConfig(service, resource)
@@ -523,6 +525,40 @@ export function GenericResourceDetail() {
           action={(
             <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
               <Button disabled={transient} onClick={simulateRun}>{primaryActionLabel()}</Button>
+              {service === 'eks' && (resource === 'clusters' || resource === 'node-groups') && (
+                <>
+                  <Button disabled={transient} onClick={() => {
+                    const cur = resource === 'clusters' ? (row.nodes || 0) : (row.desired || 0)
+                    const patch = resource === 'clusters' ? { nodes: cur + 1 } : { desired: cur + 1 }
+                    const res = scaleEksResource(row.id, patch)
+                    if (res?.ok === false) pushFlash('error', res.error)
+                    else pushFlash('success', `Scaled ${row.name} up`)
+                  }}>+ Scale</Button>
+                  <Button disabled={transient} onClick={() => {
+                    const cur = resource === 'clusters' ? (row.nodes || 0) : (row.desired || 0)
+                    const next = Math.max(0, cur - 1)
+                    const patch = resource === 'clusters' ? { nodes: next } : { desired: next }
+                    const res = scaleEksResource(row.id, patch)
+                    if (res?.ok === false) pushFlash('error', res.error)
+                    else pushFlash('success', `Scaled ${row.name} down`)
+                  }}>− Scale</Button>
+                </>
+              )}
+              {service === 'ecs' && resource === 'services' && (
+                <>
+                  <Button disabled={transient} onClick={() => {
+                    const res = scaleEcsService(row.id, (row.desired || 0) + 1)
+                    if (res?.ok === false) pushFlash('error', res.error)
+                    else pushFlash('success', `Desired → ${(row.desired || 0) + 1}`)
+                  }}>+ Desired</Button>
+                  <Button disabled={transient} onClick={() => {
+                    const next = Math.max(0, (row.desired || 0) - 1)
+                    const res = scaleEcsService(row.id, next)
+                    if (res?.ok === false) pushFlash('error', res.error)
+                    else pushFlash('success', `Desired → ${next}`)
+                  }}>− Desired</Button>
+                </>
+              )}
               {service === 'sqs' && resource === 'queues' && (
                 <>
                   <Button disabled={transient} onClick={() => {

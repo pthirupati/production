@@ -117,6 +117,9 @@ export const gcpApi = {
   createSpannerInstance(sessionId, payload = {}) {
     return gcpApi.action(sessionId, 'create_spanner_instance', payload)
   },
+  createSpannerDatabase(sessionId, instance, name) {
+    return gcpApi.action(sessionId, 'create_spanner_database', { instance, name })
+  },
   createBigQueryDataset(sessionId, datasetId) {
     return gcpApi.action(sessionId, 'create_bigquery_dataset', { dataset_id: datasetId })
   },

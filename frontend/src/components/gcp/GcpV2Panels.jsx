@@ -380,11 +380,19 @@ export function renderGcpV2Page({
           ]}
           rows={instances}
           expandRow={(r) => (
-            <SimDataTable columns={[
-              { key: 'name', label: 'Database' },
-              { key: 'tables', label: 'Tables' },
-              { key: 'size_gb', label: 'Size (GB)' },
-            ]} rows={r.databases || []} />
+            <div className="space-y-2 p-2">
+              <div className="flex justify-end">
+                <button type="button" className="gcp-btn-sm" disabled={busy}
+                  onClick={() => run(() => gcpApi.createSpannerDatabase(sessionId, r.name, `db_${Date.now().toString(36).slice(-4)}`), 'Database created')}>
+                  Create database
+                </button>
+              </div>
+              <SimDataTable columns={[
+                { key: 'name', label: 'Database' },
+                { key: 'tables', label: 'Tables' },
+                { key: 'size_gb', label: 'Size (GB)' },
+              ]} rows={r.databases || []} />
+            </div>
           )}
         />
       </div>

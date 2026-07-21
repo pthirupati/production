@@ -343,6 +343,26 @@ def apply_v2_action(state: dict, action: str, payload: dict) -> dict | None:
         state.setdefault("spanner_instances", []).append(item)
         return {"ok": True, "message": f"Created Spanner instance {name}", "instance": item}
 
+    if action == "create_spanner_database":
+        inst_name = payload.get("instance") or payload.get("instance_name") or ""
+        inst = next((s for s in state.get("spanner_instances") or [] if s.get("name") == inst_name or s.get("id") == inst_name), None)
+        if not inst and state.get("spanner_instances"):
+            inst = state["spanner_instances"][0]
+        if not inst:
+            return {"ok": False, "error": "Spanner instance not found"}
+        db_name = (payload.get("name") or f"db_{_hex(4)}").strip()
+        dbs = inst.setdefault("databases", [])
+        if any(d.get("name") == db_name for d in dbs):
+            return {"ok": False, "error": f"Database '{db_name}' already exists"}
+        row = {
+            "name": db_name,
+            "tables": int(payload.get("tables") or 0),
+            "size_gb": float(payload.get("size_gb") or 0),
+            "state": "READY",
+        }
+        dbs.append(row)
+        return {"ok": True, "message": f"Created database {db_name}", "database": row, "instance": inst}
+
     if action == "create_bigquery_dataset":
         dataset_id = (payload.get("dataset_id") or payload.get("name") or f"ds_{_hex(4)}").strip()
         if any(d.get("dataset_id") == dataset_id for d in state.get("bigquery_datasets") or []):

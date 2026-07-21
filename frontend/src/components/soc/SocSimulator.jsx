@@ -204,7 +204,13 @@ export default function SocSimulator({
     if (nav === 'incidents') {
       return (
         <div className="space-y-3">
-          <h2 className="soc-h">Incidents</h2>
+          <div className="flex justify-between items-center flex-wrap gap-2">
+            <h2 className="soc-h">Incidents</h2>
+            <button type="button" className="soc-btn-primary" disabled={busy}
+              onClick={() => run(() => socApi.createCase(sessionId, `Case-${Date.now().toString(36).slice(-4)}`, (st.alerts || [])[0]?.id), 'Case created')}>
+              Create case
+            </button>
+          </div>
           <SimDataTable columns={[
             { key: 'id', label: 'Incident', sortable: true },
             { key: 'title', label: 'Title', sortable: true },
