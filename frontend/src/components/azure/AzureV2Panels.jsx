@@ -410,7 +410,13 @@ export function renderAzureV2Page({
           />
         </div>
         <div>
-          <h2 className="text-lg font-semibold mb-2">VPN gateways</h2>
+          <div className="flex justify-between items-center mb-2 flex-wrap gap-2">
+            <h2 className="text-lg font-semibold">VPN gateways</h2>
+            <button type="button" className="az-btn-primary flex items-center gap-1" disabled={busy}
+              onClick={() => run(() => azureApi.createVpnGateway(sessionId, `vpngw-${Date.now().toString(36).slice(-4)}`), 'VPN gateway created')}>
+              <Plus size={14} /> Create VPN gateway
+            </button>
+          </div>
           <SimDataTable
             columns={[
               { key: 'name', label: 'Name' },
@@ -560,7 +566,13 @@ export function renderAzureV2Page({
           ]} rows={entra.groups || []} />
         </div>
         <div>
-          <h2 className="text-lg font-semibold mb-2">App registrations</h2>
+          <div className="flex justify-between items-center mb-2 flex-wrap gap-2">
+            <h2 className="text-lg font-semibold">App registrations</h2>
+            <button type="button" className="az-btn-primary flex items-center gap-1" disabled={busy}
+              onClick={() => run(() => azureApi.createAppRegistration(sessionId, `app-${Date.now().toString(36).slice(-4)}`), 'App registration created')}>
+              <Plus size={14} /> New registration
+            </button>
+          </div>
           <SimDataTable columns={[
             { key: 'name', label: 'Name' },
             { key: 'app_id', label: 'Application (client) ID' },
@@ -568,12 +580,23 @@ export function renderAzureV2Page({
           ]} rows={entra.app_registrations || []} />
         </div>
         <div>
-          <h2 className="text-lg font-semibold mb-2">Conditional Access</h2>
+          <div className="flex justify-between items-center mb-2 flex-wrap gap-2">
+            <h2 className="text-lg font-semibold">Conditional Access</h2>
+          </div>
           <SimDataTable columns={[
             { key: 'name', label: 'Policy' },
             { key: 'state', label: 'State' },
             { key: 'users', label: 'Users' },
             { key: 'grant', label: 'Grant' },
+            {
+              key: 'actions', label: '',
+              render: (r) => (
+                <button type="button" className="az-btn-sm" disabled={busy}
+                  onClick={(e) => { e.stopPropagation(); run(() => azureApi.toggleConditionalAccess(sessionId, r.name), 'Policy updated') }}>
+                  Toggle
+                </button>
+              ),
+            },
           ]} rows={entra.conditional_access || []} />
         </div>
         <SimModal open={inviteOpen} onClose={() => setInviteOpen(false)} title="Invite external user"

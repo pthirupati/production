@@ -378,6 +378,9 @@ def get_state(session_id: str, scenario_slug: str = "") -> dict:
         "argo_apps": state.get("argo_apps", []),
         "flux": state.get("flux", {}),
         "github": state.get("github", {}),
+        "pipeline_secrets": state.get("pipeline_secrets", []),
+        "pipeline_variables": state.get("pipeline_variables", []),
+        "pipeline_environments": state.get("pipeline_environments", []),
         "summary": summary,
     }
 

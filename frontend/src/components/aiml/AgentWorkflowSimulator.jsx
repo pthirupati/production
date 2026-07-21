@@ -492,6 +492,7 @@ export default function AgentWorkflowSimulator({
           ['experiments', 'Experiments'],
           ['registry', 'Registry'],
           ['rag', 'RAG'],
+          ['playground', 'Playground'],
         ].map(([k, label]) => (
           <button
             key={k}

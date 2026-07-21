@@ -122,6 +122,15 @@ export const azureApi = {
   entraInviteUser(sessionId, upn, opts = {}) {
     return azureApi.action(sessionId, 'entra_invite_user', { upn, ...opts })
   },
+  createAppRegistration(sessionId, name) {
+    return azureApi.action(sessionId, 'create_app_registration', { name })
+  },
+  toggleConditionalAccess(sessionId, name, state) {
+    return azureApi.action(sessionId, 'toggle_conditional_access', { name, state })
+  },
+  createVpnGateway(sessionId, name, opts = {}) {
+    return azureApi.action(sessionId, 'create_vpn_gateway', { name, ...opts })
+  },
 }
 
 export default azureApi

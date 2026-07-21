@@ -424,4 +424,47 @@ def apply_v2_action(state: dict, action: str, payload: dict) -> dict | None:
         entra.setdefault("users", []).append(user)
         return {"ok": True, "message": f"Invited {upn}", "user": user}
 
+    if action == "create_app_registration":
+        name = (payload.get("name") or f"app-{_hex(4)}").strip()
+        entra = state.setdefault("entra", seed_v2(rg)["entra"])
+        if any(a.get("name") == name for a in entra.get("app_registrations") or []):
+            return {"ok": False, "error": f"App '{name}' already exists"}
+        item = {
+            "name": name,
+            "app_id": f"{_hex(8)}-{_hex(4)}-{_hex(4)}-{_hex(4)}-{_hex(12)}",
+            "secrets": int(payload.get("secrets") or 1),
+        }
+        entra.setdefault("app_registrations", []).append(item)
+        return {"ok": True, "message": f"Created app registration {name}", "app": item}
+
+    if action == "toggle_conditional_access":
+        name = payload.get("name") or ""
+        entra = state.setdefault("entra", seed_v2(rg)["entra"])
+        policy = next((p for p in entra.get("conditional_access") or [] if p.get("name") == name), None)
+        if not policy and (entra.get("conditional_access") or []):
+            policy = entra["conditional_access"][0]
+        if not policy:
+            return {"ok": False, "error": "Policy not found"}
+        if payload.get("state"):
+            policy["state"] = payload["state"]
+        else:
+            policy["state"] = "disabled" if policy.get("state") == "enabled" else "enabled"
+        return {"ok": True, "message": f"Policy {policy['name']} → {policy['state']}", "policy": policy}
+
+    if action == "create_vpn_gateway":
+        name = (payload.get("name") or f"vpngw-{_hex(4)}").strip()
+        if any(g.get("name") == name for g in state.get("vpn_gateways") or []):
+            return {"ok": False, "error": f"VPN gateway '{name}' already exists"}
+        item = {
+            "id": f"vpngw-{_hex()}",
+            "name": name,
+            "resource_group": rg,
+            "sku": payload.get("sku") or "VpnGw1",
+            "generation": payload.get("generation") or "Generation1",
+            "bgp_asn": int(payload.get("bgp_asn") or 65515),
+            "connections": [],
+        }
+        state.setdefault("vpn_gateways", []).append(item)
+        return {"ok": True, "message": f"Created VPN gateway {name}", "vpn_gateway": item}
+
     return None

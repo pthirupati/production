@@ -261,9 +261,16 @@ export default function CicdPipelineSim({
           envUpdates[job.environment] = { sha: meta.sha, at: entry.at, status: 'success', runId: meta.runId, jobId: job.id }
         }
       }
-      if (Object.keys(envUpdates).length) setEnvironments((e) => ({ ...e, ...envUpdates }))
+      if (Object.keys(envUpdates).length) {
+        setEnvironments((e) => ({ ...e, ...envUpdates }))
+        if (sessionId) {
+          for (const [name, dep] of Object.entries(envUpdates)) {
+            cicdApi.upsertEnvironment(sessionId, { name, deployment: dep }).catch(() => {})
+          }
+        }
+      }
     }
-  }, [pipeline])
+  }, [pipeline, sessionId])
 
   // Keep a ref of stepState for the finalize snapshot (avoids stale closure).
   const stepStateRef = useRef(stepState)
@@ -327,6 +334,26 @@ export default function CicdPipelineSim({
     try {
       const data = await cicdApi.getState(sessionId, slug)
       setServerState(data)
+      if (Array.isArray(data?.pipeline_secrets) && data.pipeline_secrets.length) {
+        setSecrets(data.pipeline_secrets)
+      }
+      if (Array.isArray(data?.pipeline_variables) && data.pipeline_variables.length) {
+        setVariables(data.pipeline_variables)
+      }
+      if (Array.isArray(data?.pipeline_environments) && data.pipeline_environments.length) {
+        const mapped = {}
+        for (const env of data.pipeline_environments) {
+          if (env.deployment) {
+            mapped[env.name] = {
+              sha: env.deployment.sha,
+              at: env.deployment.at,
+              status: env.deployment.status || 'success',
+              runId: env.deployment.runId,
+            }
+          }
+        }
+        if (Object.keys(mapped).length) setEnvironments((prev) => ({ ...prev, ...mapped }))
+      }
     } catch { /* grading sync is best-effort */ }
   }, [sessionId, slug])
   useEffect(() => { reloadServer() }, [reloadServer])
@@ -622,10 +649,15 @@ export default function CicdPipelineSim({
               <button
                 type="button"
                 className="cicd-btn cicd-btn-primary"
-                onClick={() => setSecrets((s) => [
-                  ...s,
-                  { name: `NEW_SECRET_${s.length + 1}`, scope: 'repository', updated: 'just now', empty: false },
-                ])}
+                disabled={gitopsBusy}
+                onClick={() => {
+                  const name = `NEW_SECRET_${secrets.length + 1}`
+                  if (sessionId) {
+                    runGitops(() => cicdApi.upsertSecret(sessionId, { name, scope: 'repository' }), 'Secret created')
+                  } else {
+                    setSecrets((s) => [...s, { name, scope: 'repository', updated: 'just now', empty: false }])
+                  }
+                }}
               >
                 <Settings2 size={12} /> New secret
               </button>
@@ -655,16 +687,30 @@ export default function CicdPipelineSim({
                         <button
                           type="button"
                           className="cicd-btn"
-                          onClick={() => setSecrets((rows) => rows.map((r) => (
-                            r.name === sec.name ? { ...r, empty: false, updated: 'just now' } : r
-                          )))}
+                          disabled={gitopsBusy}
+                          onClick={() => {
+                            if (sessionId) {
+                              runGitops(() => cicdApi.upsertSecret(sessionId, { name: sec.name, scope: sec.scope, empty: false }), 'Secret updated')
+                            } else {
+                              setSecrets((rows) => rows.map((r) => (
+                                r.name === sec.name ? { ...r, empty: false, updated: 'just now' } : r
+                              )))
+                            }
+                          }}
                         >
                           Update
                         </button>
                         <button
                           type="button"
                           className="cicd-btn cicd-btn-danger ml-1"
-                          onClick={() => setSecrets((rows) => rows.filter((r) => r.name !== sec.name))}
+                          disabled={gitopsBusy}
+                          onClick={() => {
+                            if (sessionId) {
+                              runGitops(() => cicdApi.deleteSecret(sessionId, sec.name), 'Secret deleted')
+                            } else {
+                              setSecrets((rows) => rows.filter((r) => r.name !== sec.name))
+                            }
+                          }}
                         >
                           Delete
                         </button>
@@ -706,6 +752,11 @@ export default function CicdPipelineSim({
                           onChange={(e) => setVariables((rows) => rows.map((r) => (
                             r.name === v.name ? { ...r, value: e.target.value } : r
                           )))}
+                          onBlur={(e) => {
+                            if (sessionId) {
+                              cicdApi.upsertVariable(sessionId, { name: v.name, value: e.target.value, scope: v.scope }).then(reloadServer).catch(() => {})
+                            }
+                          }}
                         />
                       </td>
                       <td className="p-2.5" style={{ color: 'var(--cicd-muted)' }}>{v.scope}</td>
@@ -713,7 +764,14 @@ export default function CicdPipelineSim({
                         <button
                           type="button"
                           className="cicd-btn cicd-btn-danger"
-                          onClick={() => setVariables((rows) => rows.filter((r) => r.name !== v.name))}
+                          disabled={gitopsBusy}
+                          onClick={() => {
+                            if (sessionId) {
+                              runGitops(() => cicdApi.deleteVariable(sessionId, v.name), 'Variable removed')
+                            } else {
+                              setVariables((rows) => rows.filter((r) => r.name !== v.name))
+                            }
+                          }}
                         >
                           Remove
                         </button>
@@ -726,10 +784,15 @@ export default function CicdPipelineSim({
             <button
               type="button"
               className="cicd-btn"
-              onClick={() => setVariables((rows) => [
-                ...rows,
-                { name: `VAR_${rows.length + 1}`, value: '', scope: 'repository' },
-              ])}
+              disabled={gitopsBusy}
+              onClick={() => {
+                const name = `VAR_${variables.length + 1}`
+                if (sessionId) {
+                  runGitops(() => cicdApi.upsertVariable(sessionId, { name, value: '', scope: 'repository' }), 'Variable added')
+                } else {
+                  setVariables((rows) => [...rows, { name, value: '', scope: 'repository' }])
+                }
+              }}
             >
               Add variable
             </button>
@@ -755,9 +818,14 @@ export default function CicdPipelineSim({
                       <button
                         type="button"
                         className="cicd-btn mt-2"
-                        onClick={() => setEnvironments((e) => {
-                          const n = { ...e }; delete n[env]; return n
-                        })}
+                        onClick={() => {
+                          if (sessionId) {
+                            runGitops(() => cicdApi.clearEnvironmentDeployment(sessionId, env), 'Rolled back')
+                          }
+                          setEnvironments((e) => {
+                            const n = { ...e }; delete n[env]; return n
+                          })
+                        }}
                         title="Simulate a rollback (removes the deployed revision)"
                       >
                         <ArrowUpCircle size={12} /> Rollback

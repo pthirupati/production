@@ -1,3 +1,4 @@
+import { useState } from 'react'
 import { Plus } from 'lucide-react'
 import { SimDataTable, SimStatusBadge } from '../sim/shared'
 import { cicdApi } from '../../api/cicd'
@@ -204,6 +205,15 @@ export function renderOpenStackV2Page({ nav, st, sessionId, busy, run }) {
           { key: 'external_network', label: 'External Network' },
           { key: 'ha', label: 'HA', render: (r) => (r.ha ? 'Yes' : 'No') },
           { key: 'interfaces', label: 'Interfaces', render: (r) => (r.interfaces || []).length },
+          {
+            key: 'actions', label: '',
+            render: (r) => (
+              <button type="button" className="text-xs text-[#cf2a27] underline" disabled={busy}
+                onClick={(e) => { e.stopPropagation(); run(() => openstackApi.action(sessionId, 'add_router_interface', { name: r.name }), 'Interface added') }}>
+                Add interface
+              </button>
+            ),
+          },
         ]} rows={st.routers || []} />
       </div>
     )
@@ -243,6 +253,15 @@ export function renderOpenStackV2Page({ nav, st, sessionId, busy, run }) {
           { key: 'status', label: 'Status', render: (r) => <SimStatusBadge status="success" label={r.status} /> },
           { key: 'resources', label: 'Resources', render: (r) => (r.resources || []).length },
           { key: 'created', label: 'Created' },
+          {
+            key: 'actions', label: '',
+            render: (r) => (
+              <button type="button" className="text-xs text-red-600 underline" disabled={busy}
+                onClick={(e) => { e.stopPropagation(); run(() => openstackApi.action(sessionId, 'delete_heat_stack', { name: r.name }), 'Stack deleted') }}>
+                Delete
+              </button>
+            ),
+          },
         ]} rows={st.heat_stacks || []}
           expandRow={(r) => (
             <div className="text-sm p-2 space-y-1">
@@ -270,6 +289,83 @@ export function renderOpenStackV2Page({ nav, st, sessionId, busy, run }) {
           { key: 'fingerprint', label: 'Fingerprint' },
           { key: 'type', label: 'Type' },
         ]} rows={st.keypairs || []} />
+      </div>
+    )
+  }
+  if (nav === 'object-storage') {
+    return (
+      <div className="space-y-3">
+        <div className="flex justify-between items-center">
+          <h2 className="text-lg font-semibold">Object Storage (Swift)</h2>
+          <button type="button" className="os-btn-primary flex items-center gap-1" disabled={busy}
+            onClick={() => run(() => openstackApi.action(sessionId, 'create_object_container', { name: `container-${Date.now() % 1000}` }), 'Container created')}>
+            <Plus size={14} /> Create Container
+          </button>
+        </div>
+        <SimDataTable columns={[
+          { key: 'name', label: 'Container' },
+          { key: 'objects', label: 'Objects' },
+          { key: 'bytes', label: 'Bytes', render: (r) => `${Math.round((r.bytes || 0) / 1024)} KiB` },
+          { key: 'public', label: 'Public', render: (r) => (r.public ? 'Yes' : 'No') },
+        ]} rows={st.object_containers || []} />
+      </div>
+    )
+  }
+  if (nav === 'hypervisors') {
+    return (
+      <div className="space-y-3">
+        <h2 className="text-lg font-semibold">Hypervisors</h2>
+        <SimDataTable columns={[
+          { key: 'hostname', label: 'Hostname' },
+          { key: 'type', label: 'Type' },
+          { key: 'vcpus', label: 'vCPUs', render: (r) => `${r.vcpus_used}/${r.vcpus}` },
+          { key: 'ram', label: 'RAM (GiB)', render: (r) => `${r.ram_used_gb}/${r.ram_gb}` },
+          { key: 'vms', label: 'VMs' },
+          { key: 'status', label: 'Status', render: (r) => <SimStatusBadge status={r.status === 'up' ? 'success' : 'error'} label={r.status} /> },
+        ]} rows={st.hypervisors || []} />
+      </div>
+    )
+  }
+  if (nav === 'snapshots') {
+    return (
+      <div className="space-y-3">
+        <div className="flex justify-between items-center">
+          <h2 className="text-lg font-semibold">Volume Snapshots</h2>
+          <button type="button" className="os-btn-primary flex items-center gap-1" disabled={busy}
+            onClick={() => run(() => openstackApi.action(sessionId, 'create_volume_snapshot', {
+              volume: (st.volumes || [])[0]?.name || 'vol-db',
+              snapshot_name: `snap-${Date.now() % 1000}`,
+            }), 'Snapshot created')}>
+            <Plus size={14} /> Create Snapshot
+          </button>
+        </div>
+        <SimDataTable columns={[
+          { key: 'name', label: 'Name' },
+          { key: 'volume', label: 'Volume' },
+          { key: 'size_gb', label: 'Size (GiB)' },
+          { key: 'status', label: 'Status' },
+          { key: 'created', label: 'Created' },
+        ]} rows={st.volume_snapshots || []} />
+      </div>
+    )
+  }
+  if (nav === 'server-groups') {
+    return (
+      <div className="space-y-3">
+        <div className="flex justify-between items-center">
+          <h2 className="text-lg font-semibold">Server Groups</h2>
+          <button type="button" className="os-btn-primary flex items-center gap-1" disabled={busy}
+            onClick={() => run(() => openstackApi.action(sessionId, 'create_server_group', {
+              name: `sg-${Date.now() % 1000}`, policy: 'anti-affinity',
+            }), 'Server group created')}>
+            <Plus size={14} /> Create Server Group
+          </button>
+        </div>
+        <SimDataTable columns={[
+          { key: 'name', label: 'Name' },
+          { key: 'policy', label: 'Policy' },
+          { key: 'members', label: 'Members' },
+        ]} rows={st.server_groups || []} />
       </div>
     )
   }
@@ -354,7 +450,50 @@ export function renderAimlV2Page({ nav, st, sessionId, busy, run, ragQuery, setR
       </div>
     )
   }
+  if (nav === 'playground') {
+    return <AimlPlaygroundPanel st={st} sessionId={sessionId} busy={busy} run={run} />
+  }
   return null
+}
+
+function AimlPlaygroundPanel({ st, sessionId, busy, run }) {
+  const playground = st.llm_playground || {}
+  const models = playground.models || ['GPT-4o']
+  const [model, setModel] = useState(playground.last_model || models[0])
+  const [prompt, setPrompt] = useState(playground.last_prompt || '')
+  const usage = playground.token_usage || {}
+  return (
+    <div className="space-y-3 p-3 max-w-3xl">
+      <h2 className="text-lg font-semibold text-[#E2E2F0]">LLM Playground</h2>
+      <p className="text-xs text-[#9CA3AF]">Lab Environment chat — grounded responses for training (not a live model API).</p>
+      <label className="block text-xs text-[#9CA3AF]">
+        Model
+        <select className="mt-1 w-full bg-[#1A1B26] border border-[#2A2B3D] rounded px-3 py-2 text-sm text-[#E2E2F0]"
+          value={model} onChange={(e) => setModel(e.target.value)}>
+          {models.map((m) => <option key={m} value={m}>{m}</option>)}
+        </select>
+      </label>
+      <textarea
+        className="w-full h-28 bg-[#1A1B26] border border-[#2A2B3D] rounded px-3 py-2 text-sm text-[#E2E2F0]"
+        placeholder="Ask a question…"
+        value={prompt}
+        onChange={(e) => setPrompt(e.target.value)}
+      />
+      <button type="button" className="px-3 py-1.5 rounded bg-[#7C3AED] text-white text-sm" disabled={busy || !prompt.trim()}
+        onClick={() => run(() => aimlApi.action(sessionId, 'llm_chat', { prompt, model }), 'Response generated')}>
+        Generate
+      </button>
+      {playground.last_response && (
+        <div className="rounded border border-[#2A2B3D] bg-[#12131C] p-3 text-sm text-[#E2E2F0] whitespace-pre-wrap">
+          {playground.last_response}
+          <div className="text-[10px] text-[#9CA3AF] mt-2">
+            Tokens · in {usage.input || 0} · out {usage.output || 0}
+            {playground.last_model ? ` · ${playground.last_model}` : ''}
+          </div>
+        </div>
+      )}
+    </div>
+  )
 }
 
 export function renderMonitoringV2Extras({ nav, st, sessionId, busy, run }) {

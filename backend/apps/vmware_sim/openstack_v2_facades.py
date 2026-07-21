@@ -176,4 +176,17 @@ def apply_v2_action(state: dict, action: str, payload: dict | None = None) -> di
         state.setdefault("object_containers", []).append(row)
         return {"ok": True, "message": f"Created container {name}", "container": row}
 
+    if action == "create_server_group":
+        name = (payload.get("name") or f"sg-{_hex(4)}").strip()
+        if any(g.get("name") == name for g in state.get("server_groups") or []):
+            return {"ok": False, "error": f"Server group '{name}' already exists"}
+        row = {
+            "id": _uuid(),
+            "name": name,
+            "policy": payload.get("policy") or "anti-affinity",
+            "members": int(payload.get("members") or 0),
+        }
+        state.setdefault("server_groups", []).append(row)
+        return {"ok": True, "message": f"Created server group {name}", "server_group": row}
+
     return None

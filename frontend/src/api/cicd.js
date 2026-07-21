@@ -49,6 +49,24 @@ export const cicdApi = {
   githubRerunWorkflow(sessionId, runId) {
     return cicdApi.action(sessionId, 'github_rerun_workflow', { run_id: runId })
   },
+  upsertSecret(sessionId, payload = {}) {
+    return cicdApi.action(sessionId, 'upsert_secret', payload)
+  },
+  deleteSecret(sessionId, name) {
+    return cicdApi.action(sessionId, 'delete_secret', { name })
+  },
+  upsertVariable(sessionId, payload = {}) {
+    return cicdApi.action(sessionId, 'upsert_variable', payload)
+  },
+  deleteVariable(sessionId, name) {
+    return cicdApi.action(sessionId, 'delete_variable', { name })
+  },
+  upsertEnvironment(sessionId, payload = {}) {
+    return cicdApi.action(sessionId, 'upsert_environment', payload)
+  },
+  clearEnvironmentDeployment(sessionId, name) {
+    return cicdApi.action(sessionId, 'clear_environment_deployment', { name })
+  },
 }
 
 export default cicdApi

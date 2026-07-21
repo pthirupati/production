@@ -138,6 +138,20 @@ def seed_v2() -> dict[str, Any]:
                 },
             ],
         },
+        "pipeline_secrets": [
+            {"name": "GITHUB_TOKEN", "scope": "repository", "updated": "2d ago", "empty": False},
+            {"name": "REGISTRY_TOKEN", "scope": "repository", "updated": "5d ago", "empty": True},
+            {"name": "KUBE_TOKEN", "scope": "environment:production", "updated": "1w ago", "empty": False},
+        ],
+        "pipeline_variables": [
+            {"name": "NODE_VERSION", "value": "18", "scope": "repository"},
+            {"name": "DEPLOY_REGION", "value": "us-east-1", "scope": "repository"},
+            {"name": "IMAGE_TAG", "value": "main", "scope": "environment:staging"},
+        ],
+        "pipeline_environments": [
+            {"name": "staging", "protection": False, "url": "https://staging.fixitlab.local", "deployment": None},
+            {"name": "production", "protection": True, "url": "https://app.fixitlab.local", "deployment": None},
+        ],
     }
 
 
@@ -293,5 +307,91 @@ def apply_v2_action(state: dict, action: str, payload: dict | None = None) -> di
         if pr.get("checks") == "failure":
             pr["checks"] = "success"
         return {"ok": True, "message": f"Approved PR #{number}", "pull_request": pr}
+
+    if action == "upsert_secret":
+        name = (payload.get("name") or "").strip()
+        if not name:
+            return {"ok": False, "error": "Secret name required"}
+        secrets = state.setdefault("pipeline_secrets", [])
+        row = next((s for s in secrets if s.get("name") == name), None)
+        if row:
+            row["empty"] = bool(payload.get("empty", False))
+            row["updated"] = "just now"
+            row["scope"] = payload.get("scope") or row.get("scope") or "repository"
+        else:
+            row = {
+                "name": name,
+                "scope": payload.get("scope") or "repository",
+                "updated": "just now",
+                "empty": bool(payload.get("empty", False)),
+            }
+            secrets.append(row)
+        return {"ok": True, "message": f"Secret {name} saved", "secret": row}
+
+    if action == "delete_secret":
+        name = (payload.get("name") or "").strip()
+        before = len(state.get("pipeline_secrets") or [])
+        state["pipeline_secrets"] = [s for s in (state.get("pipeline_secrets") or []) if s.get("name") != name]
+        if len(state["pipeline_secrets"]) == before:
+            return {"ok": False, "error": "Secret not found"}
+        return {"ok": True, "message": f"Deleted secret {name}"}
+
+    if action == "upsert_variable":
+        name = (payload.get("name") or "").strip()
+        if not name:
+            return {"ok": False, "error": "Variable name required"}
+        variables = state.setdefault("pipeline_variables", [])
+        row = next((v for v in variables if v.get("name") == name), None)
+        if row:
+            if "value" in payload:
+                row["value"] = payload.get("value")
+            row["scope"] = payload.get("scope") or row.get("scope") or "repository"
+        else:
+            row = {
+                "name": name,
+                "value": payload.get("value") or "",
+                "scope": payload.get("scope") or "repository",
+            }
+            variables.append(row)
+        return {"ok": True, "message": f"Variable {name} saved", "variable": row}
+
+    if action == "delete_variable":
+        name = (payload.get("name") or "").strip()
+        before = len(state.get("pipeline_variables") or [])
+        state["pipeline_variables"] = [v for v in (state.get("pipeline_variables") or []) if v.get("name") != name]
+        if len(state["pipeline_variables"]) == before:
+            return {"ok": False, "error": "Variable not found"}
+        return {"ok": True, "message": f"Deleted variable {name}"}
+
+    if action == "upsert_environment":
+        name = (payload.get("name") or "").strip()
+        if not name:
+            return {"ok": False, "error": "Environment name required"}
+        envs = state.setdefault("pipeline_environments", [])
+        row = next((e for e in envs if e.get("name") == name), None)
+        if row:
+            if "deployment" in payload:
+                row["deployment"] = payload.get("deployment")
+            if "url" in payload:
+                row["url"] = payload.get("url")
+            if "protection" in payload:
+                row["protection"] = bool(payload.get("protection"))
+        else:
+            row = {
+                "name": name,
+                "protection": bool(payload.get("protection")),
+                "url": payload.get("url") or "",
+                "deployment": payload.get("deployment"),
+            }
+            envs.append(row)
+        return {"ok": True, "message": f"Environment {name} saved", "environment": row}
+
+    if action == "clear_environment_deployment":
+        name = (payload.get("name") or "").strip()
+        env = next((e for e in state.get("pipeline_environments") or [] if e.get("name") == name), None)
+        if not env:
+            return {"ok": False, "error": "Environment not found"}
+        env["deployment"] = None
+        return {"ok": True, "message": f"Rolled back {name}", "environment": env}
 
     return None
