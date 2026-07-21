@@ -75,27 +75,37 @@ def build_motherboard(vendor: str = "Dell") -> dict:
                 "channel": ch,
                 "cpu": 1 if ch in "ABCD" else 2,
                 "populated": True,
-                "module": "32GB DDR4-3200 ECC RDIMM",
+                "module": "32GB DDR5-4800 ECC RDIMM",
                 "status": "healthy",
                 "ecc_corrections_24h": 0,
+                "clips_locked": True,
             }
             for ch in "ABCDEFGH"
             for n in (1, 2)
         ][:16],
         "pcie_slots": [
-            {"id": "PCIE1", "gen": 4, "lanes": 16, "device": "NVIDIA A40", "status": "healthy", "bw_gbs": 12.4},
+            {"id": "PCIE1", "gen": 5, "lanes": 16, "device": "NVIDIA A40", "status": "healthy", "bw_gbs": 12.4},
             {"id": "PCIE2", "gen": 4, "lanes": 8, "device": raid_dev, "status": "healthy", "bw_gbs": 3.1},
             {"id": "PCIE3", "gen": 4, "lanes": 8, "device": "ConnectX-6 25GbE", "status": "healthy", "bw_gbs": 5.2},
             {"id": "PCIE4", "gen": 3, "lanes": 8, "device": "Emulex LPe32002", "status": "healthy", "bw_gbs": 1.8},
-            {"id": "PCIE5", "gen": 3, "lanes": 4, "device": None, "status": "empty", "bw_gbs": 0},
+            {"id": "PCIE5", "gen": 4, "lanes": 4, "device": None, "status": "empty", "bw_gbs": 0},
         ],
         "storage_connectors": [
             {"id": "U2-0", "type": "U.2", "gen": 4, "status": "linked"},
             {"id": "U2-1", "type": "U.2", "gen": 4, "status": "linked"},
+            {"id": "U3-0", "type": "U.3", "gen": 4, "status": "linked"},
             {"id": "SAS0", "type": "MiniSAS-HD SFF-8643", "status": "linked"},
+            {"id": "SLIM0", "type": "SlimSAS SFF-8654", "status": "linked"},
             {"id": "M2-1", "type": "M.2 2280", "status": "empty"},
+            {"id": "E1S-0", "type": "E1.S", "status": "empty"},
             {"id": "OCP30", "type": "OCP 3.0", "status": "linked"},
         ],
+        "vrm": {
+            "phases_per_socket": 16,
+            "controller": "Monolithic Power",
+            "mosfets_per_phase": 2,
+            "heatsink": "aluminum bar",
+        },
         "chips": [
             {"id": "BMC", "model": "ASPEED AST2600A3", "role": "BMC", "status": "healthy"},
             {"id": "BIOS1", "model": "SPI-NOR 256Mbit", "role": "BIOS primary", "status": "healthy"},
@@ -103,13 +113,22 @@ def build_motherboard(vendor: str = "Dell") -> dict:
             {"id": "TPM", "model": "TCG 2.0", "role": "TPM", "status": "healthy"},
             {"id": "CLK", "model": "PCIe refclk", "role": "Clock generator", "status": "healthy"},
             {"id": "CMOS", "model": "CR2032", "role": "CMOS battery", "status": "healthy", "voltage_v": 3.05},
+            {"id": "CHIPSET", "model": "C741 / IOD", "role": "Chipset / I/O die", "status": "healthy"},
         ],
         "buses": [
-            {"id": "PCIe_Gen4", "util_pct": 42, "errors": 0, "color": "#00CC66"},
-            {"id": "DDR4", "util_pct": 28, "errors": 0, "color": "#0088FF"},
-            {"id": "UPI_3_0", "util_pct": 15, "errors": 0, "color": "#FF8800"},
-            {"id": "SMBus", "util_pct": 4, "errors": 0, "color": "#888888"},
-            {"id": "SATA_III", "util_pct": 11, "errors": 0, "color": "#FF4444"},
+            {"id": "PCIe_Gen5", "util_pct": 38, "errors": 0, "color": "#00FF88", "latency_ns": 120},
+            {"id": "DDR5", "util_pct": 31, "errors": 0, "color": "#0088FF", "latency_ns": 75},
+            {"id": "UPI_3_0", "util_pct": 15, "errors": 0, "color": "#FF8800", "latency_ns": 40},
+            {"id": "Infinity_Fabric", "util_pct": 12, "errors": 0, "color": "#FFAA00", "latency_ns": 35},
+            {"id": "NVLink", "util_pct": 0, "errors": 0, "color": "#76B900", "latency_ns": 0},
+            {"id": "SMBus", "util_pct": 4, "errors": 0, "color": "#888888", "latency_ns": 5000},
+            {"id": "I2C", "util_pct": 3, "errors": 0, "color": "#666666", "latency_ns": 8000},
+            {"id": "SPI", "util_pct": 1, "errors": 0, "color": "#AAAAAA", "latency_ns": 200},
+            {"id": "LPC", "util_pct": 1, "errors": 0, "color": "#777777", "latency_ns": 1000},
+            {"id": "USB3", "util_pct": 6, "errors": 0, "color": "#FF00FF", "latency_ns": 250},
+            {"id": "SATA_III", "util_pct": 11, "errors": 0, "color": "#FF4444", "latency_ns": 400},
+            {"id": "SAS_24G", "util_pct": 8, "errors": 0, "color": "#FF6600", "latency_ns": 180},
+            {"id": "NVMe", "util_pct": 22, "errors": 0, "color": "#00CCFF", "latency_ns": 20},
         ],
         "cover_open": False,
         "maintenance_mode": False,
@@ -172,6 +191,8 @@ def build_raid(vendor: str = "Dell") -> dict:
         "patrol_read": {"enabled": True, "last_run": None, "status": "idle"},
         "consistency_check": {"enabled": True, "last_run": None, "status": "idle"},
         "foreign_config": False,
+        "supported_levels": ["RAID0", "RAID1", "RAID5", "RAID6", "RAID10", "RAID50", "RAID60"],
+        "hot_spares": ["PD3"],
     }
 
 
@@ -219,7 +240,7 @@ def build_bmc(hostname: str, vendor: str, power_state: str = "on", *, generation
     if generation:
         product = generation
     elif is_hpe:
-        product = "iLO 5"
+        product = "iLO5"
     elif is_lenovo:
         product = "XClarity Controller"
     elif is_sm:
@@ -228,6 +249,9 @@ def build_bmc(hostname: str, vendor: str, power_state: str = "on", *, generation
         product = "Cisco IMC"
     else:
         product = "iDRAC9"
+    # Normalize display aliases (iLO 5 → iLO5)
+    if is_hpe and product.replace(" ", "") in ("iLO4", "iLO5", "iLO6"):
+        product = product.replace(" ", "")
     chip = (
         "iLO ASIC" if is_hpe
         else "XCC ASIC" if is_lenovo
@@ -240,6 +264,11 @@ def build_bmc(hostname: str, vendor: str, power_state: str = "on", *, generation
         else "4.3.2" if is_cisco
         else "6.10.30.00"
     )
+    # Firmware bumps slightly per generation
+    if product in ("iLO6", "iDRAC10"):
+        fw = "3.00.00" if is_hpe else "7.00.00.00"
+    elif product in ("iLO4", "iDRAC8"):
+        fw = "2.60.00" if is_hpe else "5.10.00.00"
     on = power_state == "on"
     gens = (
         ["iLO4", "iLO5", "iLO6"] if is_hpe

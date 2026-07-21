@@ -524,6 +524,11 @@ export default function DatacenterSimulator({
                   onToggleCover={() => doAction(() => datacenterApi.toggleChassisCover(sessionId, selectedServer.id), 'Chassis cover toggled', selectedServer.id)}
                   onReplaceDimm={(slotId) => doAction(() => datacenterApi.replaceDimmSlot(sessionId, selectedServer.id, slotId), `DIMM ${slotId} replaced`, selectedServer.id)}
                   onApplyPaste={(socketId) => doAction(() => datacenterApi.applyThermalPaste(sessionId, selectedServer.id, socketId), `Paste on ${socketId}`, selectedServer.id)}
+                  onMbOp={(op, extra = {}) => doAction(
+                    () => datacenterApi.motherboardOps(sessionId, selectedServer.id, op, extra),
+                    `MB ${op}`,
+                    selectedServer.id,
+                  )}
                 />
               </div>
             )}
@@ -541,6 +546,9 @@ export default function DatacenterSimulator({
                   onPatrol={() => doAction(() => datacenterApi.raidPatrolRead(sessionId, selectedServer.id), 'Patrol read', selectedServer.id)}
                   onConsistency={() => doAction(() => datacenterApi.raidConsistencyCheck(sessionId, selectedServer.id), 'Consistency check', selectedServer.id)}
                   onImportForeign={() => doAction(() => datacenterApi.raidImportForeign(sessionId, selectedServer.id), 'Foreign import', selectedServer.id)}
+                  onAssignHotspare={(diskId) => doAction(() => datacenterApi.raidAssignHotspare(sessionId, selectedServer.id, diskId), `${diskId} hot spare`, selectedServer.id)}
+                  onExpandVd={(vdId, addGb) => doAction(() => datacenterApi.raidExpandVd(sessionId, selectedServer.id, vdId, addGb), `${vdId} expanded`, selectedServer.id)}
+                  onInitializeVd={(vdId, mode) => doAction(() => datacenterApi.raidInitializeVd(sessionId, selectedServer.id, vdId, mode), `${vdId} init`, selectedServer.id)}
                 />
               </div>
             )}
@@ -574,6 +582,7 @@ export default function DatacenterSimulator({
                   onNmi={() => doAction(() => datacenterApi.bmcNmi(sessionId, selectedServer.id), 'NMI', selectedServer.id)}
                   onFlash={(t, v) => doAction(() => datacenterApi.bmcFlashTarget(sessionId, selectedServer.id, t, v), `Flash ${t}`, selectedServer.id)}
                   onKvm={() => doAction(() => datacenterApi.bmcOpenKvm(sessionId, selectedServer.id), 'KVM open', selectedServer.id)}
+                  onSetGeneration={(g) => doAction(() => datacenterApi.bmcSetGeneration(sessionId, selectedServer.id, g), `BMC ${g}`, selectedServer.id)}
                 />
               </div>
             )}

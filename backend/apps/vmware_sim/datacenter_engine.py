@@ -1110,6 +1110,101 @@ def apply_action(session_id: str, action: str, payload: dict | None = None) -> d
         _save(session_id, entry)
         return {"ok": True, "message": f"Thermal paste applied to {socket_id}"}
 
+    if action == "motherboard_ops":
+        asset_id = payload.get("asset_id") or state.get("selected_asset") or ""
+        op = payload.get("op") or ""
+        srv = _find_server(state, asset_id)
+        if not srv:
+            return {"ok": False, "error": f"Asset {asset_id} not found"}
+        mb = srv.setdefault("motherboard", {})
+        sm = srv.setdefault("service_mode", {})
+        inv = srv.setdefault("inventory", {})
+        hist = inv.setdefault("replacement_history", [])
+        if not mb.get("cover_open") and op not in ("pulse_buses",):
+            return {"ok": False, "error": "Open chassis cover before motherboard FRU ops"}
+
+        if op == "remove_cpu":
+            sock = payload.get("socket_id") or "CPU1"
+            for c in mb.get("cpu_sockets") or []:
+                if c.get("id") == sock:
+                    c["populated"] = False
+                    c["status"] = "empty"
+                    c["paste_applied"] = False
+            if sock not in sm.setdefault("cpu_removed", []):
+                sm["cpu_removed"].append(sock)
+            hist.insert(0, {"time": _now_iso(), "part": sock, "action": "cpu_remove"})
+        elif op == "install_cpu":
+            sock = payload.get("socket_id") or "CPU1"
+            for c in mb.get("cpu_sockets") or []:
+                if c.get("id") == sock:
+                    c["populated"] = True
+                    c["status"] = "healthy"
+                    c["paste_applied"] = False
+            sm["cpu_removed"] = [x for x in sm.get("cpu_removed", []) if x != sock]
+            hist.insert(0, {"time": _now_iso(), "part": sock, "action": "cpu_install"})
+            if broken.get("server") == srv["id"] and broken.get("component") == "cpu":
+                srv["components"]["cpu"] = "healthy"
+                broken.clear()
+        elif op == "remove_heatsink":
+            sock = payload.get("socket_id") or "CPU1"
+            if sock not in sm.setdefault("heatsink_removed", []):
+                sm["heatsink_removed"].append(sock)
+            for c in mb.get("cpu_sockets") or []:
+                if c.get("id") == sock:
+                    c["heatsink"] = None
+        elif op == "install_heatsink":
+            sock = payload.get("socket_id") or "CPU1"
+            sm["heatsink_removed"] = [x for x in sm.get("heatsink_removed", []) if x != sock]
+            for c in mb.get("cpu_sockets") or []:
+                if c.get("id") == sock:
+                    c["heatsink"] = "aluminum finstack + heatpipes"
+        elif op == "reseat_dimm":
+            slot_id = payload.get("slot_id") or ""
+            slot = next((d for d in mb.get("dimm_slots", []) if d.get("id") == slot_id), None)
+            if not slot:
+                return {"ok": False, "error": f"DIMM slot {slot_id} not found"}
+            slot["clips_locked"] = not slot.get("clips_locked", True)
+            if slot.get("clips_locked"):
+                slot["populated"] = True
+                slot["status"] = "healthy"
+                slot["ecc_corrections_24h"] = 0
+            else:
+                slot["status"] = "unseated"
+            hist.insert(0, {"time": _now_iso(), "part": slot_id, "action": "dimm_reseat"})
+        elif op == "remove_pcie":
+            slot_id = payload.get("slot_id") or ""
+            slot = next((p for p in mb.get("pcie_slots", []) if p.get("id") == slot_id), None)
+            if not slot:
+                return {"ok": False, "error": f"PCIe slot {slot_id} not found"}
+            removed = slot.get("device")
+            slot["device"] = None
+            slot["status"] = "empty"
+            slot["bw_gbs"] = 0
+            hist.insert(0, {"time": _now_iso(), "part": slot_id, "action": f"pcie_remove:{removed}"})
+        elif op == "install_pcie":
+            slot_id = payload.get("slot_id") or ""
+            device = payload.get("device") or "ConnectX-7 100GbE"
+            slot = next((p for p in mb.get("pcie_slots", []) if p.get("id") == slot_id), None)
+            if not slot:
+                return {"ok": False, "error": f"PCIe slot {slot_id} not found"}
+            slot["device"] = device
+            slot["status"] = "healthy"
+            slot["bw_gbs"] = 4.0
+            hist.insert(0, {"time": _now_iso(), "part": slot_id, "action": f"pcie_install:{device}"})
+            if broken.get("server") == srv["id"] and broken.get("component") in ("nic", "pcie", "gpu"):
+                srv["components"][broken.get("component")] = "healthy"
+                broken.clear()
+        elif op == "pulse_buses":
+            for bus in mb.get("buses") or []:
+                util = int(bus.get("util_pct") or 0)
+                bus["util_pct"] = min(95, max(1, util + (7 if util < 50 else -5)))
+        else:
+            return {"ok": False, "error": f"Unknown motherboard op: {op}"}
+        _twin_journal(state, "motherboard_ops", {"asset_id": srv["id"], "op": op})
+        _event(state, f"Motherboard {op} on {srv['id']}", "info")
+        _save(session_id, entry)
+        return {"ok": True, "message": f"Motherboard: {op}", "motherboard": mb, "service_mode": sm}
+
     if action == "raid_create_vd":
         asset_id = payload.get("asset_id") or state.get("selected_asset") or ""
         srv = _find_server(state, asset_id)
@@ -1587,6 +1682,68 @@ def apply_action(session_id: str, action: str, payload: dict | None = None) -> d
         _save(session_id, entry)
         return {"ok": True, "message": "Foreign config imported", "raid": raid}
 
+    if action == "raid_assign_hotspare":
+        asset_id = payload.get("asset_id") or state.get("selected_asset") or ""
+        disk_id = payload.get("disk_id") or ""
+        srv = _find_server(state, asset_id)
+        if not srv:
+            return {"ok": False, "error": f"Asset {asset_id} not found"}
+        raid = srv.setdefault("raid", {})
+        disk = next((d for d in raid.get("physical_disks", []) if d.get("id") == disk_id), None)
+        if not disk:
+            return {"ok": False, "error": f"Disk {disk_id} not found"}
+        # Only unassigned online disks (not VD members) become hot spares
+        members = {m for vd in raid.get("virtual_disks") or [] for m in (vd.get("members") or [])}
+        if disk_id in members:
+            return {"ok": False, "error": f"{disk_id} is a VD member"}
+        disk["status"] = "hotspare"
+        spares = raid.setdefault("hot_spares", [])
+        if disk_id not in spares:
+            spares.append(disk_id)
+        raid.setdefault("operations", []).insert(0, {"time": _now_iso(), "op": "assign_hotspare", "detail": disk_id})
+        _event(state, f"Assigned hot spare {disk_id} on {srv['id']}", "info")
+        _save(session_id, entry)
+        return {"ok": True, "message": f"{disk_id} → hot spare", "raid": raid}
+
+    if action == "raid_expand_vd":
+        asset_id = payload.get("asset_id") or state.get("selected_asset") or ""
+        vd_id = payload.get("vd_id") or ""
+        add_gb = int(payload.get("add_gb") or 500)
+        srv = _find_server(state, asset_id)
+        if not srv:
+            return {"ok": False, "error": f"Asset {asset_id} not found"}
+        raid = srv.setdefault("raid", {})
+        vd = next((v for v in raid.get("virtual_disks", []) if v.get("id") == vd_id), None)
+        if not vd:
+            return {"ok": False, "error": f"VD {vd_id} not found"}
+        if vd.get("status") not in ("optimal", "degraded"):
+            return {"ok": False, "error": f"{vd_id} cannot expand in state {vd.get('status')}"}
+        vd["size_gb"] = int(vd.get("size_gb") or 0) + add_gb
+        vd["status"] = "optimal"
+        raid.setdefault("operations", []).insert(0, {"time": _now_iso(), "op": "expand_vd", "detail": f"{vd_id}+{add_gb}G"})
+        _event(state, f"Expanded {vd_id} by {add_gb}G on {srv['id']}", "success")
+        _save(session_id, entry)
+        return {"ok": True, "message": f"{vd_id} expanded +{add_gb}G", "raid": raid}
+
+    if action == "raid_initialize_vd":
+        asset_id = payload.get("asset_id") or state.get("selected_asset") or ""
+        vd_id = payload.get("vd_id") or ""
+        mode = payload.get("mode") or "fast"
+        srv = _find_server(state, asset_id)
+        if not srv:
+            return {"ok": False, "error": f"Asset {asset_id} not found"}
+        raid = srv.setdefault("raid", {})
+        vd = next((v for v in raid.get("virtual_disks", []) if v.get("id") == vd_id), None)
+        if not vd:
+            return {"ok": False, "error": f"VD {vd_id} not found"}
+        vd["init_mode"] = mode
+        vd["init_pct"] = 100
+        vd["status"] = "optimal"
+        raid.setdefault("operations", []).insert(0, {"time": _now_iso(), "op": "initialize", "detail": f"{vd_id}:{mode}"})
+        _event(state, f"Initialized {vd_id} ({mode}) on {srv['id']}", "info")
+        _save(session_id, entry)
+        return {"ok": True, "message": f"{vd_id} initialized ({mode})", "raid": raid}
+
     if action == "bios_run_post":
         asset_id = payload.get("asset_id") or state.get("selected_asset") or ""
         srv = _find_server(state, asset_id)
@@ -1687,6 +1844,38 @@ def apply_action(session_id: str, action: str, payload: dict | None = None) -> d
         _event(state, f"HTML5 KVM opened on {srv['id']}", "info")
         _save(session_id, entry)
         return {"ok": True, "message": "KVM open", "console": state["console"], "bmc": bmc}
+
+    if action == "bmc_set_generation":
+        asset_id = payload.get("asset_id") or state.get("selected_asset") or ""
+        generation = payload.get("generation") or ""
+        srv = _find_server(state, asset_id)
+        if not srv:
+            return {"ok": False, "error": f"Asset {asset_id} not found"}
+        from apps.vmware_sim.datacenter_digital_twin import build_bmc
+        vendor = srv.get("vendor") or "Dell"
+        hostname = srv.get("hostname") or srv["id"]
+        power = srv.get("power_state") or "on"
+        prev = srv.get("bmc") or {}
+        gens = prev.get("generations_available") or []
+        if generation and gens and generation not in gens:
+            return {"ok": False, "error": f"{generation} not available for {vendor}"}
+        rich = build_bmc(hostname, vendor, power, generation=generation or None)
+        rich["endpoint"] = prev.get("endpoint") or rich["endpoint"]
+        rich["network"] = prev.get("network") or rich["network"]
+        rich["users"] = prev.get("users") or rich["users"]
+        if prev.get("sel"):
+            rich["sel"] = prev["sel"]
+        rich.setdefault("sel", []).insert(0, {
+            "time": _now_iso(), "severity": "info",
+            "message": f"BMC product switched to {rich.get('product')}",
+        })
+        srv["bmc"] = rich
+        if srv.get("inventory"):
+            srv["inventory"].setdefault("firmware", {})["bmc"] = rich.get("firmware")
+        _twin_journal(state, "bmc_set_generation", {"asset_id": srv["id"], "generation": rich.get("product")})
+        _event(state, f"BMC generation → {rich.get('product')} on {srv['id']}", "info")
+        _save(session_id, entry)
+        return {"ok": True, "message": f"BMC → {rich.get('product')}", "bmc": rich}
 
     # ── Phase 3: switch CLI, net tools, cables, storage ─────────────────────
 

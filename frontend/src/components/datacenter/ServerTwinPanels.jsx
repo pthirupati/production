@@ -5,26 +5,35 @@ import {
 import { BusAnimPanel } from './OpsPhysicsPanels'
 
 /** Interactive motherboard map — component pickers + bus util bars */
-export function MotherboardPanel({ motherboard, busy, onToggleCover, onReplaceDimm, onApplyPaste }) {
+export function MotherboardPanel({
+  motherboard, busy, onToggleCover, onReplaceDimm, onApplyPaste, onMbOp,
+}) {
   const [selected, setSelected] = useState(null)
   if (!motherboard) return <p className="dc-muted">No motherboard data.</p>
   const sel = selected && (
     motherboard.cpu_sockets?.find((c) => c.id === selected)
     || motherboard.dimm_slots?.find((d) => d.id === selected)
     || motherboard.pcie_slots?.find((p) => p.id === selected)
+    || motherboard.storage_connectors?.find((s) => s.id === selected)
     || motherboard.chips?.find((c) => c.id === selected)
   )
+  const coverOpen = !!motherboard.cover_open
 
   return (
     <div className="dc-twin-panel">
       <div className="dc-twin-toolbar">
         <span className="dc-twin-title"><CircuitBoard size={13} /> {motherboard.model}</span>
         <button type="button" disabled={busy} className="dc-btn-outline dc-btn-xs" onClick={onToggleCover}>
-          {motherboard.cover_open ? 'Close cover' : 'Open cover / service mode'}
+          {coverOpen ? 'Close cover' : 'Open cover / service mode'}
         </button>
+        <button type="button" disabled={busy} className="dc-btn-outline dc-btn-xs"
+          onClick={() => onMbOp?.('pulse_buses')}>Pulse buses</button>
       </div>
       {motherboard.maintenance_mode && (
-        <div className="dc-objective-note">Maintenance mode — cover open. Replace FRUs, reapply paste, then close cover.</div>
+        <div className="dc-objective-note">Maintenance mode — cover open. Remove/install CPU, reseat DIMMs, PCIe FRUs, reapply paste, then close cover.</div>
+      )}
+      {motherboard.vrm && (
+        <div className="dc-muted">VRM: {motherboard.vrm.phases_per_socket}-phase · {motherboard.vrm.controller} · {motherboard.vrm.mosfets_per_phase} MOSFET/phase</div>
       )}
       <div className="dc-mb-canvas">
         <div className="dc-mb-zone">
@@ -33,7 +42,7 @@ export function MotherboardPanel({ motherboard, busy, onToggleCover, onReplaceDi
             <button key={c.id} type="button"
               className={`dc-mb-chip ${selected === c.id ? 'dc-mb-chip-sel' : ''} ${c.status !== 'healthy' ? 'dc-mb-chip-bad' : ''}`}
               onClick={() => setSelected(c.id)}>
-              <Cpu size={12} /> {c.id}<br /><span>{c.die}</span>
+              <Cpu size={12} /> {c.id}<br /><span>{c.populated ? c.die : 'empty'}</span>
             </button>
           ))}
         </div>
@@ -55,7 +64,17 @@ export function MotherboardPanel({ motherboard, busy, onToggleCover, onReplaceDi
             <button key={p.id} type="button"
               className={`dc-mb-chip ${selected === p.id ? 'dc-mb-chip-sel' : ''}`}
               onClick={() => setSelected(p.id)}>
-              {p.id} x{p.lanes} · {p.device || 'empty'}
+              {p.id} Gen{p.gen} x{p.lanes} · {p.device || 'empty'}
+            </button>
+          ))}
+        </div>
+        <div className="dc-mb-zone">
+          <div className="dc-mb-zone-label">Storage connectors</div>
+          {(motherboard.storage_connectors || []).map((s) => (
+            <button key={s.id} type="button"
+              className={`dc-mb-chip ${selected === s.id ? 'dc-mb-chip-sel' : ''}`}
+              onClick={() => setSelected(s.id)}>
+              {s.id}: {s.type} · {s.status}
             </button>
           ))}
         </div>
@@ -77,13 +96,48 @@ export function MotherboardPanel({ motherboard, busy, onToggleCover, onReplaceDi
         <div className="dc-mb-detail">
           <strong>{sel.id || sel.model}</strong>
           <pre className="dc-mb-json">{JSON.stringify(sel, null, 2)}</pre>
-          {sel.module && (
-            <button type="button" disabled={busy} className="dc-btn-danger dc-btn-xs"
-              onClick={() => onReplaceDimm?.(sel.id)}>Replace DIMM</button>
-          )}
-          {sel.die && (
-            <button type="button" disabled={busy} className="dc-btn-outline dc-btn-xs"
-              onClick={() => onApplyPaste?.(sel.id)}>Reapply thermal paste</button>
+          <div className="dc-action-row" style={{ flexWrap: 'wrap' }}>
+            {sel.module && (
+              <>
+                <button type="button" disabled={busy} className="dc-btn-danger dc-btn-xs"
+                  onClick={() => onReplaceDimm?.(sel.id)}>Replace DIMM</button>
+                <button type="button" disabled={busy || !coverOpen} className="dc-btn-outline dc-btn-xs"
+                  onClick={() => onMbOp?.('reseat_dimm', { slot_id: sel.id })}>
+                  {sel.clips_locked === false ? 'Seat / lock clips' : 'Unseat clips'}
+                </button>
+              </>
+            )}
+            {sel.die !== undefined && (
+              <>
+                <button type="button" disabled={busy} className="dc-btn-outline dc-btn-xs"
+                  onClick={() => onApplyPaste?.(sel.id)}>Reapply thermal paste</button>
+                {sel.populated ? (
+                  <button type="button" disabled={busy || !coverOpen} className="dc-btn-danger dc-btn-xs"
+                    onClick={() => onMbOp?.('remove_cpu', { socket_id: sel.id })}>Remove CPU</button>
+                ) : (
+                  <button type="button" disabled={busy || !coverOpen} className="dc-btn-primary dc-btn-xs"
+                    onClick={() => onMbOp?.('install_cpu', { socket_id: sel.id })}>Install CPU</button>
+                )}
+                <button type="button" disabled={busy || !coverOpen} className="dc-btn-outline dc-btn-xs"
+                  onClick={() => onMbOp?.(sel.heatsink ? 'remove_heatsink' : 'install_heatsink', { socket_id: sel.id })}>
+                  {sel.heatsink ? 'Remove heatsink' : 'Install heatsink'}
+                </button>
+              </>
+            )}
+            {sel.lanes !== undefined && (
+              sel.device ? (
+                <button type="button" disabled={busy || !coverOpen} className="dc-btn-danger dc-btn-xs"
+                  onClick={() => onMbOp?.('remove_pcie', { slot_id: sel.id })}>Remove PCIe card</button>
+              ) : (
+                <button type="button" disabled={busy || !coverOpen} className="dc-btn-primary dc-btn-xs"
+                  onClick={() => onMbOp?.('install_pcie', { slot_id: sel.id, device: 'ConnectX-7 100GbE' })}>
+                  Install NIC
+                </button>
+              )
+            )}
+          </div>
+          {!coverOpen && (sel.die !== undefined || sel.lanes !== undefined || sel.module) && (
+            <p className="dc-muted mt-1">Open cover to enable FRU remove/install.</p>
           )}
         </div>
       )}
@@ -92,10 +146,15 @@ export function MotherboardPanel({ motherboard, busy, onToggleCover, onReplaceDi
 }
 
 /** PERC / Smart Array style RAID manager */
-export function RaidPanel({ raid, busy, onFailDisk, onRebuild, onSetCache, onCreateVd, onDeleteVd, onPatrol, onConsistency, onImportForeign }) {
+export function RaidPanel({
+  raid, busy, onFailDisk, onRebuild, onSetCache, onCreateVd, onDeleteVd,
+  onPatrol, onConsistency, onImportForeign, onAssignHotspare, onExpandVd, onInitializeVd,
+}) {
   const [level, setLevel] = useState('RAID1')
   const [name, setName] = useState('NEWVD')
   if (!raid) return <p className="dc-muted">No RAID controller.</p>
+  const levels = raid.supported_levels || ['RAID0', 'RAID1', 'RAID5', 'RAID6', 'RAID10', 'RAID50', 'RAID60']
+  const vdMembers = new Set((raid.virtual_disks || []).flatMap((vd) => vd.members || []))
   return (
     <div className="dc-twin-panel">
       <div className="dc-twin-toolbar">
@@ -122,10 +181,16 @@ export function RaidPanel({ raid, busy, onFailDisk, onRebuild, onSetCache, onCre
               <td><span className={`dc-port-badge ${d.status === 'online' || d.status === 'hotspare' ? 'dc-port-up' : 'dc-port-down'}`}>{d.status}</span></td>
               <td>{d.smart} · {d.temp_c}°C · wear {d.wear_pct}%</td>
               <td>
-                {d.status !== 'failed' && (
-                  <button type="button" disabled={busy} className="dc-btn-danger dc-btn-xs"
-                    onClick={() => onFailDisk?.(d.id)}>Fail</button>
-                )}
+                <div className="dc-action-row">
+                  {d.status !== 'failed' && (
+                    <button type="button" disabled={busy} className="dc-btn-danger dc-btn-xs"
+                      onClick={() => onFailDisk?.(d.id)}>Fail</button>
+                  )}
+                  {d.status === 'online' && !vdMembers.has(d.id) && (
+                    <button type="button" disabled={busy} className="dc-btn-outline dc-btn-xs"
+                      onClick={() => onAssignHotspare?.(d.id)}>Hot spare</button>
+                  )}
+                </div>
               </td>
             </tr>
           ))}
@@ -138,13 +203,23 @@ export function RaidPanel({ raid, busy, onFailDisk, onRebuild, onSetCache, onCre
             <strong>{vd.id} · {vd.name}</strong>
             <span>{vd.raid_level} · {vd.size_gb} GB · {vd.status}</span>
           </div>
-          <div className="dc-muted">Members: {(vd.members || []).join(', ')} · {vd.write_policy}</div>
-          {vd.status === 'degraded' && (
-            <button type="button" disabled={busy} className="dc-btn-primary dc-btn-xs mt-1"
-              onClick={() => onRebuild?.(vd.id)}><RefreshCw size={11} /> Rebuild / promote hotspare</button>
-          )}
-          <button type="button" disabled={busy} className="dc-btn-danger dc-btn-xs mt-1"
-            onClick={() => onDeleteVd?.(vd.id)}>Delete VD</button>
+          <div className="dc-muted">Members: {(vd.members || []).join(', ')} · {vd.write_policy}
+            {vd.init_pct != null ? ` · init ${vd.init_pct}% (${vd.init_mode || 'fast'})` : ''}
+          </div>
+          <div className="dc-action-row mt-1" style={{ flexWrap: 'wrap' }}>
+            {vd.status === 'degraded' && (
+              <button type="button" disabled={busy} className="dc-btn-primary dc-btn-xs"
+                onClick={() => onRebuild?.(vd.id)}><RefreshCw size={11} /> Rebuild / promote hotspare</button>
+            )}
+            <button type="button" disabled={busy} className="dc-btn-outline dc-btn-xs"
+              onClick={() => onExpandVd?.(vd.id, 500)}>Expand +500G</button>
+            <button type="button" disabled={busy} className="dc-btn-outline dc-btn-xs"
+              onClick={() => onInitializeVd?.(vd.id, 'fast')}>Initialize (fast)</button>
+            <button type="button" disabled={busy} className="dc-btn-outline dc-btn-xs"
+              onClick={() => onInitializeVd?.(vd.id, 'full')}>Initialize (full)</button>
+            <button type="button" disabled={busy} className="dc-btn-danger dc-btn-xs"
+              onClick={() => onDeleteVd?.(vd.id)}>Delete VD</button>
+          </div>
         </div>
       ))}
       <div className="dc-drawer-label mt-2">Controller ops</div>
@@ -163,7 +238,7 @@ export function RaidPanel({ raid, busy, onFailDisk, onRebuild, onSetCache, onCre
       <div className="dc-action-row">
         <input className="dc-input" value={name} onChange={(e) => setName(e.target.value)} placeholder="Name" />
         <select className="dc-input" value={level} onChange={(e) => setLevel(e.target.value)}>
-          {['RAID0', 'RAID1', 'RAID5', 'RAID6', 'RAID10', 'RAID50', 'RAID60'].map((l) => (
+          {levels.map((l) => (
             <option key={l} value={l}>{l}</option>
           ))}
         </select>
@@ -235,18 +310,28 @@ export function BiosPanel({ bios, busy, onEnter, onExit, onSet, onCmosReset, onP
 }
 
 /** iDRAC9 / iLO 5 management console */
-export function BmcPanel({ bmc, vendor, busy, onPower, onMountIso, onDiag, onUpdateNet, onNmi, onFlash, onKvm }) {
+export function BmcPanel({
+  bmc, vendor, busy, onPower, onMountIso, onDiag, onUpdateNet, onNmi, onFlash, onKvm, onSetGeneration,
+}) {
   const [iso, setIso] = useState('rhel-9.4-x86_64-dvd.iso')
   if (!bmc) return <p className="dc-muted">No BMC.</p>
   const s = bmc.sensors || {}
+  const gens = bmc.generations_available || []
   return (
     <div className="dc-twin-panel">
       <div className="dc-twin-toolbar">
         <span className="dc-twin-title"><Shield size={13} /> {bmc.product} · {bmc.chip}</span>
         <span className="dc-muted">FW {bmc.firmware}</span>
       </div>
-      {(bmc.generations_available || []).length > 0 && (
-        <div className="dc-muted">Family: {(bmc.generations_available || []).join(' · ')}</div>
+      {gens.length > 0 && (
+        <div className="dc-action-row" style={{ flexWrap: 'wrap' }}>
+          <span className="dc-muted">Generation:</span>
+          {gens.map((g) => (
+            <button key={g} type="button" disabled={busy}
+              className={`dc-btn-xs ${bmc.product === g ? 'dc-btn-primary' : 'dc-btn-outline'}`}
+              onClick={() => onSetGeneration?.(g)}>{g}</button>
+          ))}
+        </div>
       )}
       <div className="dc-bmc-row"><span className="dc-bmc-key">URL</span><span className="dc-bmc-mono">{bmc.endpoint}</span></div>
       <div className="dc-bmc-row"><span className="dc-bmc-key">IP</span>

@@ -83,6 +83,9 @@ export const datacenterApi = {
   applyThermalPaste(sessionId, assetId, socketId) {
     return datacenterApi.action(sessionId, 'apply_thermal_paste', { asset_id: assetId, socket_id: socketId })
   },
+  motherboardOps(sessionId, assetId, op, extra = {}) {
+    return datacenterApi.action(sessionId, 'motherboard_ops', { asset_id: assetId, op, ...extra })
+  },
   raidFailDisk(sessionId, assetId, diskId) {
     return datacenterApi.action(sessionId, 'raid_fail_disk', { asset_id: assetId, disk_id: diskId })
   },
@@ -94,6 +97,15 @@ export const datacenterApi = {
   },
   raidCreateVd(sessionId, assetId, payload) {
     return datacenterApi.action(sessionId, 'raid_create_vd', { asset_id: assetId, ...payload })
+  },
+  raidAssignHotspare(sessionId, assetId, diskId) {
+    return datacenterApi.action(sessionId, 'raid_assign_hotspare', { asset_id: assetId, disk_id: diskId })
+  },
+  raidExpandVd(sessionId, assetId, vdId, addGb = 500) {
+    return datacenterApi.action(sessionId, 'raid_expand_vd', { asset_id: assetId, vd_id: vdId, add_gb: addGb })
+  },
+  raidInitializeVd(sessionId, assetId, vdId, mode = 'fast') {
+    return datacenterApi.action(sessionId, 'raid_initialize_vd', { asset_id: assetId, vd_id: vdId, mode })
   },
   biosEnterSetup(sessionId, assetId) {
     return datacenterApi.action(sessionId, 'bios_enter_setup', { asset_id: assetId })
@@ -151,6 +163,9 @@ export const datacenterApi = {
   },
   bmcOpenKvm(sessionId, assetId) {
     return datacenterApi.action(sessionId, 'bmc_open_kvm', { asset_id: assetId })
+  },
+  bmcSetGeneration(sessionId, assetId, generation) {
+    return datacenterApi.action(sessionId, 'bmc_set_generation', { asset_id: assetId, generation })
   },
   switchCli(sessionId, switchId, command) {
     return datacenterApi.action(sessionId, 'switch_cli', { switch_id: switchId, command })

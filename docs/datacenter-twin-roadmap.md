@@ -17,6 +17,11 @@ replaceable, monitorable. Full lifecycle: plan → install → deploy → monito
 maintain → RMA → incident. Performance target for any future 3D surface: 60+ FPS via LOD /
 instancing / streaming.
 
+**Absorbs** the V2 exhaustive Omniverse-class prompt (requirements 1–22, motherboard/firmware
+depth, campus plant list, every OEM/GPU/cable catalog). Delivery is **phased Lab Environment
+facades inside FixitLab**, not a separate `:3080` Three.js monorepo. See
+`docs/datacenter-twin-spec-index.md`.
+
 ---
 
 ## Requirement → phase map
@@ -29,10 +34,10 @@ instancing / streaming.
 | 4 | Every server OEM | P2 | [x] multi-OEM live fleet + vendor BOM |
 | 5 | Every CPU generation | P2 | [~] catalog + live die from motherboard map |
 | 6 | GPU systems (DGX/HGX/…) | P2 catalog → P6 AI | [~] catalog + gpu_node / H100 BOM |
-| 7 | Complete motherboard + bus anim | P1 panels → P4 anim | [~] |
+| 7 | Complete motherboard + bus anim | P1–P8 | [x] interactive FRU + bus pulse |
 | 8 | Every cable type + ops | P1 plug → P3 catalog | [~] |
 | 9 | Real switches + CLI | P3 | [x] multi-vendor CLI + MPLS/EVPN |
-| 10 | Console / BIOS / BMC / PXE | P1–P2 | [~] |
+| 10 | Console / BIOS / BMC / PXE | P1–P8 | [x] gen switch + KVM/media/flash |
 | 11 | Real storage stack | P3 | [x] facade stack (NVMe/Ceph/ZFS/SAN/NAS) |
 | 12 | Networking simulation | P3 | [x] counters + tools + protocol writers |
 | 13 | Hypervisors | P6 | [x] ESXi/KVM create/migrate/snapshot |
@@ -105,6 +110,13 @@ Still intentionally shallow vs Omniverse: screw-level FRU, real VirtualBMC/MAAS,
   CSS pseudo-isometric floor remains the default fallback.
   Motions: camera intro, staggered rack rise, door open, LED/fan pulse, cable packets, airflow particles.
   Plant-linked: CRAC + PDU strips, thermal stress → airflow color, InstancedMesh U-slots + BVH picking.
+
+## Phase 8 — Motherboard / RAID / BMC depth (Lab Environment)
+
+- [x] Spec index absorbs V2 mega-prompt without greenfield monorepo
+- [x] Motherboard: CPU remove/install, DIMM reseat, PCIe FRU, richer bus anim
+- [x] RAID: hot-spare assign, expand VD, initialize, full level picker
+- [x] BMC: generation switch (iDRAC/iLO/XCC/IPMI), KVM/virtual media/flash paths
 
 ---
 
