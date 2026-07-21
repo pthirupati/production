@@ -132,6 +132,12 @@ Still intentionally shallow vs Omniverse: screw-level photoreal meshes, real Vir
 - [x] Optical FEF/MMR/MPO trunks (fiber cut/repair, carriers, XC)
 - [x] Capacity planning + predictive maintenance on NOC
 
+## Phase 11 — DR / access / automation / reports
+
+- [x] Utility→ATS→generator failover + site failover/failback + DR runbook
+- [x] Security gate badge/biometrics/cameras/tailgate (gate + SOC)
+- [x] Automation runbook catalog (incl. DR tabletop) + ops report generator
+
 ---
 
 ## Spec document index (expand later)

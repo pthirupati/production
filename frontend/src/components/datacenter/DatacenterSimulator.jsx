@@ -20,6 +20,7 @@ import {
 import {
   RackPhysicsFruPanel, MonitoringPanel, OpsTicketsPanel, TrainingPanel, ComputeAiPanel,
   LiquidCoolingPanel, PxeMaasPanel, FireSafetyPanel, EnvironmentalPanel, OpticalPanel, CapacityPdmPanel,
+  DrFailoverPanel, AccessControlPanel, AutomationReportPanel,
 } from './OpsPhysicsPanels'
 import '../../styles/sim-products.css'
 import './DatacenterSimulator.css'
@@ -117,6 +118,10 @@ export default function DatacenterSimulator({
   const optical = st.optical || null
   const capacity = st.capacity || null
   const predictive = st.predictive || null
+  const dr = st.dr || null
+  const accessControl = st.access_control || null
+  const automation = st.automation || null
+  const opsReport = st.ops_report || null
   const rooms = st.rooms || []
   const network = st.network || { switches: [], topology: [] }
   const powerChain = st.power_chain || {}
@@ -448,6 +453,38 @@ export default function DatacenterSimulator({
           <ElectricalRoomView powerChain={powerChain} facility={facility} busy={busy}
             onTrip={(pduId) => doAction(() => datacenterApi.tripPduBreaker(sessionId, pduId), 'Breaker tripped')}
             onRestore={(pduId) => doAction(() => datacenterApi.restorePdu(sessionId, pduId), 'Breaker restored')} />
+          <div style={{ marginTop: '1rem' }}>
+            <DrFailoverPanel
+              dr={dr}
+              powerChain={powerChain}
+              busy={busy}
+              onOp={(op, extra) => doAction(() => datacenterApi.drOps(sessionId, op, extra), `DR ${op}`)}
+            />
+          </div>
+        </div>
+      )}
+
+      {currentRoom.id === 'generator-yard' && (
+        <div className="dc-room-body">
+          <CampusRoomView room={currentRoom} campus={campus} />
+          <div style={{ marginTop: '1rem' }}>
+            <DrFailoverPanel
+              dr={dr}
+              powerChain={powerChain}
+              busy={busy}
+              onOp={(op, extra) => doAction(() => datacenterApi.drOps(sessionId, op, extra), `DR ${op}`)}
+            />
+          </div>
+        </div>
+      )}
+
+      {currentRoom.id === 'security-gate' && (
+        <div className="dc-room-body">
+          <AccessControlPanel
+            access={accessControl}
+            busy={busy}
+            onOp={(op, extra) => doAction(() => datacenterApi.accessOps(sessionId, op, extra), `Access ${op}`)}
+          />
         </div>
       )}
 
@@ -496,6 +533,29 @@ export default function DatacenterSimulator({
               onOp={(op, extra) => doAction(() => datacenterApi.environmentalOps(sessionId, op, extra), `Env ${op}`)}
             />
           </div>
+          {currentRoom.id === 'noc' && (
+            <div style={{ marginTop: '1rem' }}>
+              <AutomationReportPanel
+                automation={automation}
+                opsReport={opsReport}
+                busy={busy}
+                onRun={(runbookId) => doAction(
+                  () => datacenterApi.automationOps(sessionId, 'run', { runbook_id: runbookId }),
+                  `Runbook ${runbookId}`,
+                )}
+                onReport={() => doAction(() => datacenterApi.generateOpsReport(sessionId), 'Ops report')}
+              />
+            </div>
+          )}
+          {currentRoom.id === 'soc' && (
+            <div style={{ marginTop: '1rem' }}>
+              <AccessControlPanel
+                access={accessControl}
+                busy={busy}
+                onOp={(op, extra) => doAction(() => datacenterApi.accessOps(sessionId, op, extra), `Access ${op}`)}
+              />
+            </div>
+          )}
         </div>
       )}
 
@@ -553,7 +613,9 @@ export default function DatacenterSimulator({
         && currentRoom.id !== 'fire-suppression'
         && currentRoom.id !== 'fef'
         && currentRoom.id !== 'mmr'
-        && currentRoom.id !== 'cable-room' && (
+        && currentRoom.id !== 'cable-room'
+        && currentRoom.id !== 'generator-yard'
+        && currentRoom.id !== 'security-gate' && (
         <div className="dc-room-body">
           <CampusRoomView room={currentRoom} campus={campus} />
         </div>

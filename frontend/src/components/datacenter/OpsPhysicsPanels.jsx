@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { Activity, AlertTriangle, Boxes, ClipboardList, Cpu, Gauge, Network, Ticket } from 'lucide-react'
+import { Activity, AlertTriangle, Boxes, ClipboardList, Cpu, Gauge, Network, ShieldCheck, Ticket } from 'lucide-react'
 
 /** Animated motherboard bus packets */
 export function BusAnimPanel({ buses }) {
@@ -653,6 +653,154 @@ export function CapacityPdmPanel({ capacity, predictive, busy, onRefresh }) {
           [{it.risk}] {it.asset} · {it.part} · {it.metric}={it.value} — {it.recommendation}
         </div>
       ))}
+    </div>
+  )
+}
+
+
+/** Disaster recovery / ATS / generator */
+export function DrFailoverPanel({ dr, powerChain, busy, onOp }) {
+  const d = dr || {}
+  const pc = powerChain || {}
+  const gen = pc.generator || {}
+  const ats = pc.ats || {}
+  const util = pc.utility || {}
+  return (
+    <div className="dc-twin-panel">
+      <div className="dc-twin-toolbar">
+        <span className="dc-twin-title"><AlertTriangle size={13} /> DR / Failover · {d.mode || '—'}</span>
+        <span className="dc-muted">RTO {d.rto_min}m · RPO {d.rpo_min}m</span>
+      </div>
+      <div className="dc-hw-meta">
+        <div><span className="dc-hw-k">Utility</span> {util.status} · {util.voltage_v || '—'}V</div>
+        <div><span className="dc-hw-k">ATS</span> {ats.status} · transfer {ats.transfer_time_ms}ms</div>
+        <div><span className="dc-hw-k">Generator</span> {gen.status} · fuel {gen.fuel_pct}% · {gen.runtime_hours}h</div>
+      </div>
+      <div className="dc-action-row mt-1" style={{ flexWrap: 'wrap' }}>
+        <button type="button" disabled={busy} className="dc-btn-danger dc-btn-xs" onClick={() => onOp?.('utility_fail')}>Utility fail</button>
+        <button type="button" disabled={busy} className="dc-btn-primary dc-btn-xs" onClick={() => onOp?.('start_generator')}>Start generator</button>
+        <button type="button" disabled={busy} className="dc-btn-outline dc-btn-xs" onClick={() => onOp?.('stop_generator')}>Stop gen</button>
+        <button type="button" disabled={busy} className="dc-btn-outline dc-btn-xs" onClick={() => onOp?.('restore_utility')}>Restore utility</button>
+        <button type="button" disabled={busy} className="dc-btn-danger dc-btn-xs" onClick={() => onOp?.('site_failover')}>Site failover</button>
+        <button type="button" disabled={busy} className="dc-btn-primary dc-btn-xs" onClick={() => onOp?.('site_failback')}>Failback</button>
+        <button type="button" disabled={busy} className="dc-btn-outline dc-btn-xs" onClick={() => onOp?.('run_drill')}>DR drill</button>
+      </div>
+      <div className="dc-drawer-label mt-2">Sites</div>
+      <div className="dc-action-row" style={{ flexWrap: 'wrap' }}>
+        {(d.sites || []).map((s) => (
+          <span key={s.id} className="dc-topology-chip">{s.id}: {s.role}/{s.status}</span>
+        ))}
+      </div>
+      <div className="dc-drawer-label mt-2">Runbook</div>
+      {(d.runbook_steps || []).map((step) => {
+        const done = (d.completed_steps || []).includes(step)
+        return (
+          <button key={step} type="button" disabled={busy}
+            className={`dc-btn-xs ${done ? 'dc-btn-primary' : 'dc-btn-outline'}`}
+            style={{ display: 'block', marginBottom: 4, textAlign: 'left', width: '100%' }}
+            onClick={() => onOp?.('complete_step', { step })}>
+            {done ? '✓ ' : ''}{step}
+          </button>
+        )
+      })}
+      {(d.events || []).slice(0, 3).map((e, i) => (
+        <div key={i} className="dc-muted">{e.time} · {e.message}</div>
+      ))}
+    </div>
+  )
+}
+
+/** Security gate / badges / SOC */
+export function AccessControlPanel({ access, busy, onOp }) {
+  const a = access || {}
+  if (!a.gate) return <p className="dc-muted">No access control.</p>
+  return (
+    <div className="dc-twin-panel">
+      <div className="dc-twin-toolbar">
+        <span className="dc-twin-title"><ShieldCheck size={13} /> Access / Security</span>
+        <span className={a.gate?.status === 'secured' ? 'dc-text-ok' : 'dc-text-bad'}>{a.gate?.status}</span>
+      </div>
+      <div className="dc-hw-meta">
+        <div><span className="dc-hw-k">Gate</span> barrier {a.gate?.vehicle_barrier}{a.gate?.tailgate_alarm ? ' · TAILGATE' : ''}</div>
+        <div><span className="dc-hw-k">Biometrics</span> {a.biometrics?.status} · {a.biometrics?.readers} readers · fails {a.biometrics?.failed_scans_24h}</div>
+        <div><span className="dc-hw-k">Cameras</span> {a.cameras?.online}/{a.cameras?.total} · recording {a.cameras?.recording ? 'yes' : 'no'}</div>
+        <div><span className="dc-hw-k">Mantrap</span> {a.mantrap?.status}{a.mantrap?.occupied ? ' · occupied' : ''}</div>
+      </div>
+      <div className="dc-action-row mt-1" style={{ flexWrap: 'wrap' }}>
+        <button type="button" disabled={busy} className="dc-btn-outline dc-btn-xs" onClick={() => onOp?.('open_gate')}>Open gate</button>
+        <button type="button" disabled={busy} className="dc-btn-primary dc-btn-xs" onClick={() => onOp?.('secure_gate')}>Secure gate</button>
+        <button type="button" disabled={busy} className="dc-btn-danger dc-btn-xs" onClick={() => onOp?.('tailgate_alarm')}>Tailgate</button>
+        <button type="button" disabled={busy} className="dc-btn-outline dc-btn-xs" onClick={() => onOp?.('clear_alarms')}>Clear alarms</button>
+        <button type="button" disabled={busy} className="dc-btn-danger dc-btn-xs" onClick={() => onOp?.('biometric_fail')}>Bio fail</button>
+        <button type="button" disabled={busy} className="dc-btn-outline dc-btn-xs" onClick={() => onOp?.('biometric_ok')}>Bio OK</button>
+        <button type="button" disabled={busy} className="dc-btn-outline dc-btn-xs" onClick={() => onOp?.('camera_offline')}>Cam offline</button>
+      </div>
+      <div className="dc-drawer-label mt-2">Badge-in</div>
+      <div className="dc-action-row" style={{ flexWrap: 'wrap' }}>
+        {(a.badges || []).map((b) => (
+          <button key={b.id} type="button" disabled={busy} className="dc-btn-outline dc-btn-xs"
+            onClick={() => onOp?.('badge_in', { badge_id: b.id, zone: 'data-hall-a' })}
+            title={(b.zones || []).join(', ')}>
+            {b.holder} → hall
+          </button>
+        ))}
+        <button type="button" disabled={busy} className="dc-btn-outline dc-btn-xs"
+          onClick={() => onOp?.('badge_in', { badge_id: 'BADGE-3003', zone: 'data-hall-a' })}>
+            Visitor → hall (expect deny)
+        </button>
+      </div>
+      {(a.active_alarms || []).slice(0, 4).map((al, i) => (
+        <div key={i} className="dc-alert-row">[{al.severity}] {al.message}</div>
+      ))}
+      <div className="dc-drawer-label mt-2">Events</div>
+      {(a.events || []).slice(0, 5).map((e, i) => (
+        <div key={i} className="dc-muted">{e.time} · {e.type} · {e.message}</div>
+      ))}
+    </div>
+  )
+}
+
+/** Automation runbooks + ops report */
+export function AutomationReportPanel({ automation, opsReport, busy, onRun, onReport }) {
+  const auto = automation || {}
+  const report = opsReport || {}
+  const sum = report.summary || {}
+  return (
+    <div className="dc-twin-panel">
+      <div className="dc-twin-toolbar">
+        <span className="dc-twin-title"><Boxes size={13} /> Automation · {auto.engine || 'Runbooks'}</span>
+        <button type="button" disabled={busy} className="dc-btn-outline dc-btn-xs" onClick={onReport}>Generate report</button>
+      </div>
+      <div className="dc-drawer-label">Catalog</div>
+      {(auto.catalog || []).map((rb) => (
+        <div key={rb.id} className="dc-vd-card">
+          <div className="dc-vd-head">
+            <strong>{rb.name}</strong>
+            <button type="button" disabled={busy} className="dc-btn-primary dc-btn-xs"
+              onClick={() => onRun?.(rb.id)}>Run</button>
+          </div>
+          <div className="dc-muted">{(rb.steps || []).join(' → ')}</div>
+        </div>
+      ))}
+      <div className="dc-drawer-label mt-2">Recent jobs</div>
+      {(auto.jobs || []).slice(0, 4).map((j) => (
+        <div key={j.id} className="dc-muted">{j.id} · {j.name} · {j.status} · {j.finished}</div>
+      ))}
+      {report.generated_at && (
+        <>
+          <div className="dc-drawer-label mt-2">Ops report · {report.generated_at}</div>
+          <div className="dc-facility-metrics">
+            <div className="dc-facility-metric"><span>Servers</span><strong>{sum.healthy_servers}/{sum.servers}</strong></div>
+            <div className="dc-facility-metric"><span>Tickets</span><strong>{sum.open_tickets}</strong></div>
+            <div className="dc-facility-metric"><span>PUE</span><strong>{sum.pue ?? '—'}</strong></div>
+            <div className="dc-facility-metric"><span>IT kW</span><strong>{sum.it_kw ?? '—'}</strong></div>
+          </div>
+          <div className="dc-drawer-label mt-1">Recommendations</div>
+          {(report.recommendations || []).map((r, i) => (
+            <div key={i} className="dc-muted">• {r}</div>
+          ))}
+        </>
+      )}
     </div>
   )
 }

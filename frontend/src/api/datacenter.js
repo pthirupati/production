@@ -242,6 +242,18 @@ export const datacenterApi = {
   refreshCapacity(sessionId) {
     return datacenterApi.action(sessionId, 'refresh_capacity', {})
   },
+  drOps(sessionId, op, extra = {}) {
+    return datacenterApi.action(sessionId, 'dr_ops', { op, ...extra })
+  },
+  accessOps(sessionId, op, extra = {}) {
+    return datacenterApi.action(sessionId, 'access_ops', { op, ...extra })
+  },
+  automationOps(sessionId, op, extra = {}) {
+    return datacenterApi.action(sessionId, 'automation_ops', { op, ...extra })
+  },
+  generateOpsReport(sessionId) {
+    return datacenterApi.action(sessionId, 'generate_ops_report', {})
+  },
 }
 
 export default datacenterApi

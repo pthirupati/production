@@ -697,6 +697,25 @@ def get_state(session_id: str, scenario_slug: str = "") -> dict:
         state["optical"] = build_optical()
     state["capacity"] = build_capacity_snapshot(state)
     state["predictive"] = build_predictive_maintenance(state)
+    # Phase 11: DR, access, automation, reports
+    from apps.vmware_sim.datacenter_ops_platform import (
+        build_dr_platform, build_access_control, build_automation, build_ops_report,
+    )
+    if not state.get("dr"):
+        state["dr"] = build_dr_platform()
+    if not state.get("access_control"):
+        state["access_control"] = build_access_control()
+    if not state.get("automation"):
+        state["automation"] = build_automation()
+    state["ops_report"] = build_ops_report(state)
+    # Sync campus access from access_control
+    campus = state.setdefault("campus", {})
+    ac = state["access_control"]
+    campus["access"] = {
+        "gate": (ac.get("gate") or {}).get("status", "secured"),
+        "biometrics": (ac.get("biometrics") or {}).get("status", "online"),
+        "cameras": (ac.get("cameras") or {}).get("online", 24),
+    }
     # CMDB rollup + hardware catalog for UI
     state["inventory"] = [
         {**(s.get("inventory") or {}), "server_id": s["id"], "hostname": s.get("hostname")}
@@ -2291,6 +2310,86 @@ def apply_action(session_id: str, action: str, payload: dict | None = None) -> d
         _event(state, "Capacity / PdM refreshed", "info")
         _save(session_id, entry)
         return {"ok": True, "message": "Capacity refreshed", "capacity": state["capacity"], "predictive": state["predictive"]}
+
+    if action == "dr_ops":
+        from apps.vmware_sim.datacenter_ops_platform import build_dr_platform, dr_op
+        dr = state.get("dr") or build_dr_platform()
+        pc = state.setdefault("power_chain", {})
+        campus = state.setdefault("campus", {})
+        op = payload.get("op") or ""
+        ok, msg, dr, pc = dr_op(dr, pc, campus, op, **{k: v for k, v in payload.items() if k != "op"})
+        state["dr"] = dr
+        state["power_chain"] = pc
+        if not ok:
+            return {"ok": False, "error": msg}
+        if op == "utility_fail":
+            state["broken"] = {"server": None, "component": "ups", "target": "utility", "detail": "utility_loss"}
+        if op in ("restore_utility", "site_failback") and broken.get("detail") == "utility_loss":
+            broken.clear()
+        if op == "site_failover":
+            state["broken"] = {"server": None, "component": "dr", "target": "dc1-primary"}
+        _recompute_facility(state)
+        _twin_journal(state, "dr_ops", {"op": op})
+        _event(state, f"DR: {msg}", "danger" if op in ("utility_fail", "site_failover") else "info")
+        _save(session_id, entry)
+        return {"ok": True, "message": msg, "dr": dr, "power_chain": pc}
+
+    if action == "access_ops":
+        from apps.vmware_sim.datacenter_ops_platform import build_access_control, access_op
+        ac = state.get("access_control") or build_access_control()
+        op = payload.get("op") or ""
+        ok, msg, ac = access_op(ac, op, **{k: v for k, v in payload.items() if k != "op"})
+        state["access_control"] = ac
+        if not ok:
+            return {"ok": False, "error": msg}
+        campus = state.setdefault("campus", {})
+        campus["access"] = {
+            "gate": (ac.get("gate") or {}).get("status", "secured"),
+            "biometrics": (ac.get("biometrics") or {}).get("status", "online"),
+            "cameras": (ac.get("cameras") or {}).get("online", 24),
+        }
+        if op == "tailgate_alarm":
+            state["broken"] = {"server": None, "component": "security", "target": "gate"}
+        if op == "clear_alarms" and broken.get("component") == "security":
+            broken.clear()
+        _twin_journal(state, "access_ops", {"op": op})
+        _event(state, f"Access: {msg}", "warning" if "alarm" in op or "deny" in msg.lower() or "Denied" in msg else "info")
+        _save(session_id, entry)
+        return {"ok": True, "message": msg, "access_control": ac}
+
+    if action == "automation_ops":
+        from apps.vmware_sim.datacenter_ops_platform import build_automation, automation_op, build_dr_platform, dr_op
+        auto = state.get("automation") or build_automation()
+        op = payload.get("op") or "run"
+        ok, msg, auto = automation_op(auto, op, **{k: v for k, v in payload.items() if k != "op"})
+        state["automation"] = auto
+        if not ok:
+            return {"ok": False, "error": msg}
+        # DR tabletop runbook also drives power chain when selected
+        if op == "run" and payload.get("runbook_id") == "rb-dr-tabletop":
+            dr = state.get("dr") or build_dr_platform()
+            pc = state.setdefault("power_chain", {})
+            campus = state.setdefault("campus", {})
+            for step_op in ("utility_fail", "start_generator", "restore_utility"):
+                _, _, dr, pc = dr_op(dr, pc, campus, step_op)
+            state["dr"] = dr
+            state["power_chain"] = pc
+            _recompute_facility(state)
+        _twin_journal(state, "automation_ops", {"op": op, "runbook_id": payload.get("runbook_id")})
+        _event(state, f"Automation: {msg}", "info")
+        _save(session_id, entry)
+        return {"ok": True, "message": msg, "automation": auto, "dr": state.get("dr")}
+
+    if action == "generate_ops_report":
+        from apps.vmware_sim.datacenter_ops_platform import build_ops_report
+        from apps.vmware_sim.datacenter_facility_ops import build_capacity_snapshot, build_predictive_maintenance
+        state["capacity"] = build_capacity_snapshot(state)
+        state["predictive"] = build_predictive_maintenance(state)
+        report = build_ops_report(state)
+        state["ops_report"] = report
+        _event(state, "Ops report generated", "info")
+        _save(session_id, entry)
+        return {"ok": True, "message": "Report generated", "ops_report": report}
 
     if action == "ops_ticket":
         from apps.vmware_sim.datacenter_physics_ops import build_ops_ticket, advance_ticket, SUPPORT_VENDORS
