@@ -484,9 +484,14 @@ export default function AzureConsole({
         <div key={kv.name} className="az-panel">
           <div className="flex items-center justify-between mb-2 flex-wrap gap-2">
             <div className="font-semibold text-sm flex items-center gap-1.5"><KeyRound size={14} /> {kv.name}</div>
-            <button type="button" className="az-btn-sm" onClick={() => { setSecretModal(kv.name); setSecretName('new-secret') }}>
-              <Plus size={11} /> Set secret
-            </button>
+            <div className="flex gap-2 flex-wrap">
+              <button type="button" className="az-btn-sm" onClick={() => { setSecretModal(kv.name); setSecretName('new-secret') }}>
+                <Plus size={11} /> Set secret
+              </button>
+              <button type="button" className="az-btn-sm" onClick={() => run(() => azureApi.importCertificate(sessionId, kv.name, `cert-${Date.now().toString(36).slice(-4)}`), 'Certificate imported')}>
+                <Plus size={11} /> Import certificate
+              </button>
+            </div>
           </div>
           <h3 className="text-xs font-semibold uppercase text-slate-500 mb-1">Secrets</h3>
           <SimDataTable columns={[

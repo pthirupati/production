@@ -59,6 +59,8 @@ export const windowsApi = {
   resetPassword: (sessionId, user) => action(sessionId, 'reset_password', { user }),
   addToGroup: (sessionId, user, group) => action(sessionId, 'add_user_to_group', { user, group }),
   removeFromGroup: (sessionId, user, group) => action(sessionId, 'remove_user_from_group', { user, group }),
+  createAdGroup: (sessionId, payload = {}) => action(sessionId, 'create_ad_group', payload),
+  addPerfCounter: (sessionId, payload = {}) => action(sessionId, 'add_perf_counter', payload),
 
   installUpdate: (sessionId, kb) => action(sessionId, 'install_update', kb ? { kb } : {}),
   retryUpdate: (sessionId, kb) => action(sessionId, 'retry_update', { kb }),

@@ -1710,6 +1710,9 @@ export const useAwsStore = create(
         else if (service === 'eks' && resource === 'clusters') syncAction = 'create_eks_cluster'
         else if (service === 'ecs' && resource === 'services') syncAction = 'create_ecs_service'
         else if (service === 'lambda' && resource === 'functions') syncAction = 'create_lambda'
+        else if (service === 'sns' && resource === 'topics') syncAction = 'create_sns_topic'
+        else if (service === 'sqs' && resource === 'queues') syncAction = 'create_sqs_queue'
+        else if (service === 'secretsmanager' && resource === 'secrets') syncAction = 'create_secret'
         get()._syncAction(syncAction, syncPayload)
         if (created.pendingTransition) get()._ensureTick()
         return created

@@ -506,6 +506,46 @@ def apply_v2_action(state: dict, action: str, payload: dict) -> dict | None:
         row["lastPublish"] = _now()
         return {"ok": True, "message": f"Published to {row.get('name')}", "topic": row}
 
+    if action == "create_sns_topic":
+        name = (payload.get("name") or f"topic-{_hex(4)}").strip()
+        topics = gr.setdefault("sns", {}).setdefault("topics", [])
+        if any(t.get("name") == name for t in topics):
+            return {"ok": False, "error": f"Topic '{name}' already exists"}
+        row = _row(payload.get("id") or f"topic-{_hex()}", name, {
+            "type": payload.get("type") or "Standard",
+            "subscriptions": int(payload.get("subscriptions") or 0),
+            "status": payload.get("status") or "Active",
+            "published": 0,
+        })
+        topics.append(row)
+        return {"ok": True, "message": f"Created SNS topic {name}", "topic": row}
+
+    if action == "create_sqs_queue":
+        name = (payload.get("name") or f"queue-{_hex(4)}").strip()
+        queues = gr.setdefault("sqs", {}).setdefault("queues", [])
+        if any(q.get("name") == name for q in queues):
+            return {"ok": False, "error": f"Queue '{name}' already exists"}
+        row = _row(payload.get("id") or f"queue-{_hex()}", name, {
+            "type": payload.get("type") or "Standard",
+            "messages": int(payload.get("messages") or 0),
+            "status": payload.get("status") or "Active",
+        })
+        queues.append(row)
+        return {"ok": True, "message": f"Created SQS queue {name}", "queue": row}
+
+    if action == "create_secret":
+        name = (payload.get("name") or f"secret-{_hex(4)}").strip()
+        secrets = gr.setdefault("secretsmanager", {}).setdefault("secrets", [])
+        if any(s.get("name") == name for s in secrets):
+            return {"ok": False, "error": f"Secret '{name}' already exists"}
+        row = _row(payload.get("id") or f"secret-{_hex()}", name, {
+            "description": payload.get("description") or "",
+            "status": payload.get("status") or "Active",
+            "rotation": bool(payload.get("rotation")),
+        })
+        secrets.append(row)
+        return {"ok": True, "message": f"Created secret {name}", "secret": row}
+
     if action == "send_sqs":
         qname = payload.get("name") or "lab-queue"
         queues = gr.setdefault("sqs", {}).setdefault("queues", [])

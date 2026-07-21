@@ -215,6 +215,7 @@ export const useOS = create((set, get) => ({
   adGroups: clone(SEED_AD_GROUPS),
   ouTree: clone(SEED_OU_TREE),
   createADUser: (user) => set((s) => ({ adUsers: [...s.adUsers, user] })),
+  createADGroup: (group) => set((s) => ({ adGroups: [...s.adGroups, group] })),
   modifyADUser: (sam, changes) => set((s) => ({ adUsers: s.adUsers.map((u) => u.sam === sam ? { ...u, ...changes } : u) })),
   deleteADUser: (sam) => set((s) => ({ adUsers: s.adUsers.filter((u) => u.sam !== sam) })),
   addGroupMember: (sam, group) => set((s) => ({ adUsers: s.adUsers.map((u) => u.sam === sam && !u.groups.includes(group) ? { ...u, groups: [...u.groups, group] } : u) })),

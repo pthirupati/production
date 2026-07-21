@@ -634,6 +634,31 @@ def apply_action(session_id: str, action: str, payload: dict | None = None) -> d
         _save(session_id, entry)
         return {"ok": True, "message": "Secret set"}
 
+    if action == "import_certificate":
+        kv = next(
+            (k for k in state.get("key_vaults") or []
+             if k.get("name") == (payload.get("vault") or payload.get("key_vault"))),
+            None,
+        )
+        if not kv:
+            return {"ok": False, "error": "Key vault not found"}
+        cname = (payload.get("name") or "").strip()
+        if not cname:
+            return {"ok": False, "error": "Certificate name is required"}
+        existing = next((c for c in kv.get("certificates") or [] if c.get("name") == cname), None)
+        if existing:
+            existing["enabled"] = True
+            existing["expires"] = payload.get("expires") or existing.get("expires") or "2028-01-01"
+        else:
+            kv.setdefault("certificates", []).append({
+                "name": cname,
+                "enabled": True,
+                "expires": payload.get("expires") or "2028-01-01",
+            })
+        _event(state, f"Imported certificate {cname} in {kv['name']}", "success")
+        _save(session_id, entry)
+        return {"ok": True, "message": "Certificate imported"}
+
     if action == "assign_role":
         principal = (payload.get("principal") or "").strip()
         role = (payload.get("role") or "Reader").strip()

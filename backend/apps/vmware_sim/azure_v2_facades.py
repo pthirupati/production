@@ -482,6 +482,19 @@ def apply_v2_action(state: dict, action: str, payload: dict) -> dict | None:
         entra.setdefault("app_registrations", []).append(item)
         return {"ok": True, "message": f"Created app registration {name}", "app": item}
 
+    if action == "create_entra_group":
+        name = (payload.get("name") or f"group-{_hex(4)}").strip()
+        entra = state.setdefault("entra", seed_v2(rg)["entra"])
+        if any(g.get("name") == name for g in entra.get("groups") or []):
+            return {"ok": False, "error": f"Group '{name}' already exists"}
+        item = {
+            "name": name,
+            "type": payload.get("type") or "Security",
+            "members": int(payload.get("members") or 0),
+        }
+        entra.setdefault("groups", []).append(item)
+        return {"ok": True, "message": f"Created Entra group {name}", "group": item}
+
     if action == "toggle_conditional_access":
         name = payload.get("name") or ""
         entra = state.setdefault("entra", seed_v2(rg)["entra"])

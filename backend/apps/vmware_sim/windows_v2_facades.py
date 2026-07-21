@@ -67,6 +67,9 @@ def seed_v2() -> dict[str, Any]:
             {"name": "Daily Backup", "status": "Ready", "triggers": "At 2:00 AM every day", "nextRun": "2024-01-18 2:00:00 AM", "lastRun": "2024-01-17 2:00:00 AM", "result": "0x0", "author": "lab\\Administrator", "program": "powershell.exe"},
             {"name": "Windows Update Check", "status": "Ready", "triggers": "At 6:00 AM every day", "nextRun": "2024-01-18 6:00:00 AM", "lastRun": "2024-01-17 6:00:00 AM", "result": "0x0", "author": "SYSTEM", "program": "wuauclt.exe"},
         ],
+        "perf_counters": [
+            {"counter": "% Processor Time", "instance": "_Total", "object": "Processor", "computer": "\\\\SERVER01", "color": "Green", "scale": 1.0},
+        ],
     }
 
 
@@ -80,7 +83,7 @@ def ensure_v2(world: dict) -> None:
     world["vswitches"] = v2.get("vswitches") or []
     world["vhdx_disks"] = v2.get("vhdx_disks") or []
     world["console_sessions"] = v2.get("console_sessions") or []
-    for key in ("iis_sites", "iis_bindings", "iis_app_pools", "dns_records", "dhcp_reservations", "firewall_rules", "scheduled_tasks"):
+    for key in ("iis_sites", "iis_bindings", "iis_app_pools", "dns_records", "dhcp_reservations", "firewall_rules", "scheduled_tasks", "perf_counters"):
         world[key] = v2.get(key) or []
 
 
@@ -345,5 +348,21 @@ def apply_v2_action(world: dict, action: str, payload: dict | None = None) -> di
         world.setdefault("scheduled_tasks", []).append(row)
         world["v2"]["scheduled_tasks"] = world["scheduled_tasks"]
         return {"ok": True, "message": f"Created scheduled task {name}", "task": row}
+
+    if action == "add_perf_counter":
+        counter = (payload.get("counter") or "% Processor Time").strip()
+        row = {
+            "counter": counter,
+            "instance": payload.get("instance") or "_Total",
+            "object": payload.get("object") or "Processor",
+            "computer": payload.get("computer") or "\\\\SERVER01",
+            "color": payload.get("color") or "Green",
+            "scale": float(payload.get("scale") or 1.0),
+        }
+        counters = world.setdefault("perf_counters", [])
+        if not any(c.get("counter") == counter and c.get("instance") == row["instance"] for c in counters):
+            counters.append(row)
+        world["v2"]["perf_counters"] = world["perf_counters"]
+        return {"ok": True, "message": f"Added counter {counter}", "counter": row}
 
     return None

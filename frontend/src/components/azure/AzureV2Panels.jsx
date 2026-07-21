@@ -603,7 +603,16 @@ export function renderAzureV2Page({
           ]} rows={entra.users || []} searchKeys={['upn', 'display']} />
         </div>
         <div>
-          <h2 className="text-lg font-semibold mb-2">Groups</h2>
+          <div className="flex justify-between items-center mb-2 flex-wrap gap-2">
+            <h2 className="text-lg font-semibold">Groups</h2>
+            <button type="button" className="az-btn-primary flex items-center gap-1" disabled={busy}
+              onClick={() => run(() => azureApi.createEntraGroup(sessionId, {
+                name: `grp-${Date.now().toString(36).slice(-4)}`,
+                type: 'Security',
+              }), 'Group created')}>
+              <Plus size={14} /> New group
+            </button>
+          </div>
           <SimDataTable columns={[
             { key: 'name', label: 'Name' },
             { key: 'type', label: 'Type' },

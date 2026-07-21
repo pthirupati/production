@@ -115,14 +115,57 @@ function runCommand(raw, shell, os, cwdRef) {
         `Name              : ${u.display}`, `SamAccountName    : ${u.sam}`, `Surname           : ${u.last}`,
         `UserPrincipalName : ${u.upn}`, '']
     }
-    if (lower.startsWith('new-aduser')) { const m = line.match(/-samaccountname\s+(\S+)/i); const n = line.match(/-name\s+["']([^"']+)/i); if (m) os.createADUser({ sam: m[1], display: n?.[1] || m[1], first: n?.[1]?.split(' ')[0] || '', last: n?.[1]?.split(' ')[1] || '', upn: `${m[1]}@lab.local`, email: `${m[1]}@lab.local`, dept: '', title: '', ou: 'CN=Users,DC=lab,DC=local', enabled: true, locked: false, groups: ['Domain Users'], phone: '', office: '', company: '', manager: '', employeeId: '', pwLastSet: '2024-01-17', lastLogon: 'Never' }); return [''] }
-    if (lower.startsWith('enable-adaccount')) { const m = line.match(/(\S+)$/); os.modifyADUser(m[1].replace(/['"]/g, ''), { enabled: true }); return ['The command completed successfully.'] }
-    if (lower.startsWith('disable-adaccount')) { const m = line.match(/(\S+)$/); os.modifyADUser(m[1].replace(/['"]/g, ''), { enabled: false }); return ['The command completed successfully.'] }
-    if (lower.startsWith('unlock-adaccount')) { const m = line.match(/(\S+)$/); os.modifyADUser(m[1].replace(/['"]/g, ''), { locked: false }); return ['The command completed successfully.'] }
+    if (lower.startsWith('new-aduser')) {
+      const m = line.match(/-samaccountname\s+(\S+)/i)
+      const n = line.match(/-name\s+["']([^"']+)/i)
+      if (m) {
+        const sam = m[1].replace(/['"]/g, '')
+        const display = n?.[1] || sam
+        os.createADUser({
+          sam, display, first: display.split(' ')[0] || '', last: display.split(' ')[1] || '',
+          upn: `${sam}@lab.local`, email: `${sam}@lab.local`, dept: '', title: '',
+          ou: 'CN=Users,DC=lab,DC=local', enabled: true, locked: false, groups: ['Domain Users'],
+          phone: '', office: '', company: '', manager: '', employeeId: '', pwLastSet: '2024-01-17', lastLogon: 'Never',
+        })
+        if (os.labAction) os.labAction('create_ad_user', { name: sam, display, enabled: true, groups: ['Domain Users'] })
+      }
+      return ['']
+    }
+    if (lower.startsWith('enable-adaccount')) {
+      const m = line.match(/(\S+)$/)
+      const sam = m[1].replace(/['"]/g, '')
+      os.modifyADUser(sam, { enabled: true })
+      if (os.labAction) os.labAction('enable_ad_user', { user: sam })
+      return ['The command completed successfully.']
+    }
+    if (lower.startsWith('disable-adaccount')) {
+      const m = line.match(/(\S+)$/)
+      const sam = m[1].replace(/['"]/g, '')
+      os.modifyADUser(sam, { enabled: false })
+      if (os.labAction) os.labAction('disable_ad_user', { user: sam })
+      return ['The command completed successfully.']
+    }
+    if (lower.startsWith('unlock-adaccount')) {
+      const m = line.match(/(\S+)$/)
+      const sam = m[1].replace(/['"]/g, '')
+      os.modifyADUser(sam, { locked: false })
+      if (os.labAction) os.labAction('unlock_ad_user', { user: sam })
+      return ['The command completed successfully.']
+    }
     if (lower.startsWith('get-adgroup')) {
       return tableFromObjects(os.adGroups, [{ h: 'Name', v: (r) => r.name }, { h: 'GroupScope', v: (r) => r.scope }, { h: 'GroupCategory', v: (r) => r.category }])
     }
-    if (lower.startsWith('add-adgroupmember')) { const g = line.match(/-identity\s+["']?([^"']+?)["']?\s/i); const u = line.match(/-members\s+(\S+)/i); if (g && u) os.addGroupMember(u[1].replace(/['"]/g, ''), g[1]); return [''] }
+    if (lower.startsWith('add-adgroupmember')) {
+      const g = line.match(/-identity\s+["']?([^"']+?)["']?\s/i)
+      const u = line.match(/-members\s+(\S+)/i)
+      if (g && u) {
+        const sam = u[1].replace(/['"]/g, '')
+        const group = g[1]
+        os.addGroupMember(sam, group)
+        if (os.labAction) os.labAction('add_user_to_group', { user: sam, group })
+      }
+      return ['']
+    }
 
     if (lower === 'get-netadapter' || lower.startsWith('get-netadapter')) {
       return tableFromObjects(os.adapters, [{ h: 'Name', v: (r) => r.name }, { h: 'InterfaceDescription', v: (r) => r.desc }, { h: 'Status', v: (r) => r.status === 'Connected' ? 'Up' : 'Disconnected' }, { h: 'LinkSpeed', v: (r) => r.speed }])

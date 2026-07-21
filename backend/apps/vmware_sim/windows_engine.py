@@ -1016,6 +1016,23 @@ def _dispatch(world: dict, state: dict, action: str, payload: dict) -> dict:
         _event(state, f"Created AD user: {name}")
         return {"ok": True, "message": f"Created user {name}"}
 
+    if act in ("create_ad_group", "new_ad_group"):
+        name = (payload.get("name") or payload.get("group") or "").strip()
+        if not name:
+            return {"ok": False, "error": "A group name is required"}
+        if _group_exists(world, name):
+            return {"ok": False, "error": f"Group '{name}' already exists"}
+        row = {
+            "name": name,
+            "scope": payload.get("scope") or "Global",
+            "category": payload.get("category") or "Security",
+            "description": payload.get("description") or payload.get("desc") or "",
+            "ou": payload.get("ou") or "Users",
+        }
+        world.setdefault("ad", {}).setdefault("groups", []).append(row)
+        _event(state, f"Created AD group: {name}")
+        return {"ok": True, "message": f"Created group {name}", "group": row}
+
     if act in ("enable_ad_user", "enable_user"):
         user = _find_user(world, payload.get("user") or payload.get("name"))
         if not user:

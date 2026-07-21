@@ -63,6 +63,9 @@ export const azureApi = {
   setSecret(sessionId, vault, name, contentType = 'text') {
     return azureApi.action(sessionId, 'set_secret', { vault, name, content_type: contentType })
   },
+  importCertificate(sessionId, vault, name, expires = '2028-01-01') {
+    return azureApi.action(sessionId, 'import_certificate', { vault, name, expires })
+  },
   assignRole(sessionId, principal, role, scope) {
     return azureApi.action(sessionId, 'assign_role', { principal, role, scope })
   },
@@ -145,6 +148,9 @@ export const azureApi = {
   },
   createAppRegistration(sessionId, name) {
     return azureApi.action(sessionId, 'create_app_registration', { name })
+  },
+  createEntraGroup(sessionId, payload = {}) {
+    return azureApi.action(sessionId, 'create_entra_group', payload)
   },
   toggleConditionalAccess(sessionId, name, state) {
     return azureApi.action(sessionId, 'toggle_conditional_access', { name, state })

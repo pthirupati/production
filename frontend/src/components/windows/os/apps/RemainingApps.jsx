@@ -489,10 +489,17 @@ function FirewallRuleDialog({ rule, onClose }) {
 }
 
 export function PerformanceMonitor() {
+  const os = useOS()
   const [counter, setCounter] = useState('% Processor Time')
   const [add, setAdd] = useState(false)
   const points = useMemo(() => Array.from({ length: 60 }, (_, i) => 20 + Math.sin(i / 4) * 12 + (i % 7)), [counter])
   const path = points.map((p, i) => `${i * 10},${150 - p}`).join(' ')
+  const addCounter = () => {
+    if (os.labAction) {
+      os.labAction('add_perf_counter', { counter, instance: '_Total', object: 'Processor', computer: '\\\\SERVER01' })
+    }
+    setAdd(false)
+  }
   return (
     <div className="winos-app">
       <div className="winos-toolbar"><Gauge size={14} /><button className="winos-btn" onClick={() => setAdd(true)}><Plus size={13} /> Add Counters</button><button className="winos-btn">Freeze Display</button><span>{counter}</span></div>
@@ -508,7 +515,7 @@ export function PerformanceMonitor() {
         </div>
       </div>
       {add && <Dialog title="Add Counters" onClose={() => setAdd(false)} width={560}
-        footer={<><button className="winos-btn primary" onClick={() => setAdd(false)}>Add</button><button className="winos-btn" onClick={() => setAdd(false)}>Close</button></>}>
+        footer={<><button className="winos-btn primary" onClick={addCounter}>Add</button><button className="winos-btn" onClick={() => setAdd(false)}>Close</button></>}>
         <div style={{ fontSize: 12.5 }}>Select counters from computer: <input className="winos-input" defaultValue="\\SERVER01" /></div>
         <div style={{ display: 'flex', gap: 10, marginTop: 10 }}>
           <select className="winos-input" size={12} style={{ flex: 1 }} value={counter} onChange={(e) => setCounter(e.target.value)}>

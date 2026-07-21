@@ -10,6 +10,8 @@ export default function ADUC() {
   const [expanded, setExpanded] = useState({ 'lab.local': true, Corp: true })
   const [selUser, setSelUser] = useState(null)
   const [wizard, setWizard] = useState(false)
+  const [groupWizard, setGroupWizard] = useState(false)
+  const [addToGroup, setAddToGroup] = useState(null)
   const [props, setProps] = useState(null)
   const [reset, setReset] = useState(null)
   const [find, setFind] = useState(false)
@@ -43,7 +45,9 @@ export default function ADUC() {
     e.preventDefault(); setSelUser(u.sam)
     const lab = os.labAction
     ctx.open(e.clientX, e.clientY, [
-      { label: 'Copy…' }, { label: 'Add to a group…' }, { label: 'Name Mappings…' },
+      { label: 'Copy…' },
+      { label: 'Add to a group…', onClick: () => setAddToGroup(u) },
+      { label: 'Name Mappings…' },
       {
         label: u.enabled ? 'Disable Account' : 'Enable Account',
         onClick: () => {
@@ -71,6 +75,7 @@ export default function ADUC() {
         <span style={{ fontSize: 12 }}>File &nbsp; Action &nbsp; View &nbsp; Help</span>
         <span style={{ width: 1, height: 20, background: '#ddd' }} />
         <button className="winos-btn" onClick={() => setWizard(true)}><UserPlus size={13} /> New User</button>
+        <button className="winos-btn" onClick={() => setGroupWizard(true)}><Users size={13} /> New Group</button>
         <button className="winos-btn" onClick={() => setFind(true)}><Search size={13} /> Find</button>
         <span style={{ flex: 1 }} />
         <span style={{ fontSize: 11, color: '#888' }}>{os.adUsers.length} users in directory</span>
@@ -102,6 +107,8 @@ export default function ADUC() {
       <div className="winos-status"><span>{objects.length + groupsForOU.length} object(s)</span><span>lab.local/Corp/{selOU}</span></div>
 
       {wizard && <NewUserWizard ou={selOU} onClose={() => setWizard(false)} onDone={(n) => showToast(`User "${n}" created.`)} />}
+      {groupWizard && <NewGroupWizard ou={selOU} onClose={() => setGroupWizard(false)} onDone={(n) => showToast(`Group "${n}" created.`)} />}
+      {addToGroup && <AddToGroupDialog user={addToGroup} onClose={() => setAddToGroup(null)} onDone={(g) => showToast(`Added ${addToGroup.sam} to ${g}.`)} />}
       {props && <UserProps user={props} onClose={() => setProps(null)} />}
       {reset && <ResetDialog user={reset} onClose={() => setReset(null)} onDone={() => showToast(`The password for ${reset.sam} has been changed.`)} />}
       {find && <FindDialog onClose={() => setFind(false)} onOpen={(u) => { setProps(u); setFind(false) }} />}
@@ -187,6 +194,66 @@ function NewUserWizard({ ou, onClose, onDone }) {
   )
 }
 
+function NewGroupWizard({ ou, onClose, onDone }) {
+  const os = useOS()
+  const [name, setName] = useState('')
+  const [scope, setScope] = useState('Global')
+  const [category, setCategory] = useState('Security')
+  const [desc, setDesc] = useState('')
+  const finish = () => {
+    const gname = name.trim()
+    if (!gname) return
+    const group = { name: gname, scope, category, desc }
+    os.createADGroup(group)
+    if (os.labAction) {
+      os.labAction('create_ad_group', { name: gname, scope, category, description: desc, ou })
+    }
+    onDone(gname)
+    onClose()
+  }
+  return (
+    <Dialog title="New Object - Group" onClose={onClose} width={440}
+      footer={<><button className="winos-btn primary" disabled={!name.trim()} onClick={finish}>OK</button><button className="winos-btn" onClick={onClose}>Cancel</button></>}>
+      <div style={{ fontSize: 12, color: '#666', marginBottom: 10 }}>Create in: lab.local/Corp/{ou}</div>
+      <div className="winos-grid2" style={{ fontSize: 12.5 }}>
+        <span>Group name:</span><input className="winos-input" value={name} onChange={(e) => setName(e.target.value)} />
+        <span>Description:</span><input className="winos-input" value={desc} onChange={(e) => setDesc(e.target.value)} />
+        <span>Group scope:</span>
+        <select className="winos-input" value={scope} onChange={(e) => setScope(e.target.value)}>
+          {['DomainLocal', 'Global', 'Universal'].map((o) => <option key={o}>{o}</option>)}
+        </select>
+        <span>Group type:</span>
+        <select className="winos-input" value={category} onChange={(e) => setCategory(e.target.value)}>
+          {['Security', 'Distribution'].map((o) => <option key={o}>{o}</option>)}
+        </select>
+      </div>
+    </Dialog>
+  )
+}
+
+function AddToGroupDialog({ user, onClose, onDone }) {
+  const os = useOS()
+  const candidates = os.adGroups.map((g) => g.name).filter((g) => !(user.groups || []).includes(g))
+  const [group, setGroup] = useState(candidates[0] || '')
+  const finish = () => {
+    if (!group) return
+    os.addGroupMember(user.sam, group)
+    if (os.labAction) os.labAction('add_user_to_group', { user: user.sam, group })
+    onDone(group)
+    onClose()
+  }
+  return (
+    <Dialog title="Select Groups" onClose={onClose} width={420}
+      footer={<><button className="winos-btn primary" disabled={!group} onClick={finish}>OK</button><button className="winos-btn" onClick={onClose}>Cancel</button></>}>
+      <div style={{ fontSize: 12.5, marginBottom: 8 }}>Add {user.display || user.sam} to:</div>
+      <select className="winos-input" value={group} onChange={(e) => setGroup(e.target.value)} style={{ width: '100%' }}>
+        {candidates.map((g) => <option key={g}>{g}</option>)}
+      </select>
+      {!candidates.length && <div style={{ color: '#888', marginTop: 8, fontSize: 12 }}>This user is already a member of all groups.</div>}
+    </Dialog>
+  )
+}
+
 function ResetDialog({ user, onClose, onDone }) {
   const [pw, setPw] = useState(''); const [pw2, setPw2] = useState('')
   const os = useOS()
@@ -236,10 +303,41 @@ function UserProps({ user, onClose }) {
   const [form, setForm] = useState(live)
   const set = (k, v) => setForm((f) => ({ ...f, [k]: v }))
   const allGroups = os.adGroups.map((g) => g.name)
+  const initialGroups = live.groups || []
+
+  const apply = () => {
+    os.modifyADUser(user.sam, form)
+    const lab = os.labAction
+    if (!lab) return
+    if (form.enabled !== live.enabled) {
+      lab(form.enabled ? 'enable_ad_user' : 'disable_ad_user', { user: user.sam })
+    }
+    if (live.locked && !form.locked) {
+      lab('unlock_ad_user', { user: user.sam })
+    }
+    const next = form.groups || []
+    next.filter((g) => !initialGroups.includes(g)).forEach((g) => lab('add_user_to_group', { user: user.sam, group: g }))
+    initialGroups.filter((g) => !next.includes(g)).forEach((g) => lab('remove_user_from_group', { user: user.sam, group: g }))
+  }
+
+  const addGroup = () => {
+    const v = document.getElementById('grpadd')?.value
+    if (!v || form.groups.includes(v)) return
+    set('groups', [...form.groups, v])
+    os.addGroupMember(user.sam, v)
+    if (os.labAction) os.labAction('add_user_to_group', { user: user.sam, group: v })
+  }
+  const removeGroup = () => {
+    if (!form.groups.length) return
+    const g = form.groups[form.groups.length - 1]
+    set('groups', form.groups.slice(0, -1))
+    os.removeGroupMember(user.sam, g)
+    if (os.labAction) os.labAction('remove_user_from_group', { user: user.sam, group: g })
+  }
 
   return (
     <Dialog title={`${live.display} Properties`} onClose={onClose} width={520}
-      footer={<><button className="winos-btn primary" onClick={() => { os.modifyADUser(user.sam, form); onClose() }}>OK</button><button className="winos-btn" onClick={onClose}>Cancel</button><button className="winos-btn" onClick={() => os.modifyADUser(user.sam, form)}>Apply</button></>}>
+      footer={<><button className="winos-btn primary" onClick={() => { apply(); onClose() }}>OK</button><button className="winos-btn" onClick={onClose}>Cancel</button><button className="winos-btn" onClick={apply}>Apply</button></>}>
       <Tabs tabs={TABS} active={tab} onChange={setTab} />
       <div style={{ paddingTop: 12, fontSize: 12.5, minHeight: 240 }}>
         {tab === 'General' && (
@@ -311,8 +409,8 @@ function UserProps({ user, onClose }) {
             </div>
             <div style={{ display: 'flex', gap: 6 }}>
               <select className="winos-input" id="grpadd" style={{ flex: 1 }}>{allGroups.filter((g) => !form.groups.includes(g)).map((g) => <option key={g}>{g}</option>)}</select>
-              <button className="winos-btn" onClick={() => { const v = document.getElementById('grpadd').value; if (v && !form.groups.includes(v)) set('groups', [...form.groups, v]) }}>Add…</button>
-              <button className="winos-btn" onClick={() => set('groups', form.groups.slice(0, -1))}>Remove</button>
+              <button className="winos-btn" onClick={addGroup}>Add…</button>
+              <button className="winos-btn" onClick={removeGroup}>Remove</button>
             </div>
           </div>
         )}
