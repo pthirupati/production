@@ -4,7 +4,7 @@ import toast from 'react-hot-toast'
 import {
   LogIn, Play, Square, Server, Box, Cpu,
   AlertTriangle, Network, RefreshCw, Power, ChevronLeft,
-  HardDrive, Cable, Terminal, Rocket,
+  HardDrive, Cable, Terminal, Rocket, Plus,
 } from 'lucide-react'
 import LabChromeBar from '../lab/LabChromeBar'
 import { simPanelRoot } from '../../utils/simLayout'
@@ -13,6 +13,7 @@ const ACCENT = '#0d9488'
 
 const TABS = [
   { key: 'maas', label: 'MAAS', icon: Server },
+  { key: 'spaces', label: 'Spaces & Tags', icon: Cable },
   { key: 'lxd', label: 'LXD', icon: Box },
   { key: 'kvm', label: 'KVM', icon: Cpu },
   { key: 'ipmi', label: 'IPMI', icon: Network },
@@ -207,7 +208,7 @@ export default function BaremetalSimulator({
                       <div className="font-medium flex items-center gap-2">
                         {m.hostname} <StatusBadge status={m.status} />
                       </div>
-                      <div className="text-xs text-slate-500">{m.ip || 'no IP'} · power {m.power} · {m.arch || 'amd64'}</div>
+                      <div className="text-xs text-slate-500">{m.ip || 'no IP'} · power {m.power} · {m.arch || 'amd64'}{(m.tags || []).length ? ` · ${(m.tags || []).join(', ')}` : ''}</div>
                     </button>
                     <div className="flex gap-2 items-center">
                       {(m.status === 'Failed' || m.status === 'New') && (
@@ -218,6 +219,8 @@ export default function BaremetalSimulator({
                         <button disabled={busy} onClick={() => run(() => baremetalApi.action(sessionId, 'maas_deploy', { machine_id: m.id }), 'Deploy started')}
                           className="px-3 py-1.5 rounded border text-sm flex items-center gap-1"><Rocket size={13} /> Deploy</button>
                       )}
+                      <button disabled={busy} onClick={() => run(() => baremetalApi.tagMachine(sessionId, m.hostname, 'lab'), 'Tagged')}
+                        className="text-xs border px-2 py-1.5 rounded bg-white">+ Tag</button>
                       <button onClick={() => setDetailId(m.id)} className="text-xs border px-2 py-1.5 rounded bg-white">Details</button>
                     </div>
                   </div>
@@ -226,6 +229,50 @@ export default function BaremetalSimulator({
                   )}
                 </div>
               ))}
+            </div>
+          )}
+
+          {tab === 'spaces' && (
+            <div className="space-y-5">
+              <div className="space-y-3">
+                <div className="flex justify-between items-center">
+                  <h2 className="text-lg font-semibold">Spaces</h2>
+                  <button disabled={busy} onClick={() => run(() => baremetalApi.createSpace(sessionId, `space-${Date.now().toString(36).slice(-3)}`), 'Space created')}
+                    className="text-xs flex items-center gap-1 border px-2 py-1 rounded bg-white"><Plus size={12} /> Create space</button>
+                </div>
+                {(st.maas?.spaces || []).map((s) => (
+                  <div key={s.id || s.name} className="bm-card p-3 flex justify-between items-center gap-3">
+                    <div>
+                      <div className="font-medium">{s.name}</div>
+                      <div className="text-xs text-slate-500">{(s.subnets || []).join(', ')}</div>
+                    </div>
+                    <button disabled={busy} onClick={() => run(() => baremetalApi.addSubnet(sessionId, s.name, `10.${40 + (s.subnets || []).length}.0.0/24`), 'Subnet added')}
+                      className="text-xs border px-2 py-1 rounded bg-white">+ Subnet</button>
+                  </div>
+                ))}
+              </div>
+              <div className="space-y-3">
+                <h2 className="text-lg font-semibold">Tags</h2>
+                {(st.maas?.tags || []).map((t) => (
+                  <div key={t.name} className="bm-card p-3">
+                    <div className="font-medium">{t.name}</div>
+                    <div className="text-xs text-slate-500">{(t.machines || []).join(', ') || 'No machines'}</div>
+                  </div>
+                ))}
+              </div>
+              <div className="space-y-3">
+                <div className="flex justify-between items-center">
+                  <h2 className="text-lg font-semibold">Commissioning scripts</h2>
+                  <button disabled={busy} onClick={() => run(() => baremetalApi.attachScript(sessionId, `fixitlab-check-${Date.now().toString(36).slice(-3)}`, ['*']), 'Script attached')}
+                    className="text-xs flex items-center gap-1 border px-2 py-1 rounded bg-white"><Plus size={12} /> Attach script</button>
+                </div>
+                {(st.maas?.commissioning_scripts || []).map((s) => (
+                  <div key={s.name} className="bm-card p-3">
+                    <div className="font-medium font-mono text-sm">{s.name}</div>
+                    <div className="text-xs text-slate-500">{s.type} · applied to {(s.applied_to || []).join(', ')}</div>
+                  </div>
+                ))}
+              </div>
             </div>
           )}
 

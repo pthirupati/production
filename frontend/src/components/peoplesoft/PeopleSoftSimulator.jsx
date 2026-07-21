@@ -9,10 +9,10 @@ import LabChromeBar from '../lab/LabChromeBar'
 import { PS_NAV_MENU } from '../../mockData/peoplesoft'
 import {
   FluidHome, JobDataComponent, BenefitsEnrollment, PaycheckReview,
-  ProcessMonitorTable, PeopleSoftNavMenu, FluidStubPage,
+  ProcessMonitorTable, PeopleSoftNavMenu,
   SecurityUsers, PermissionLists, ComponentConfig,
 } from './PeopleSoftFluidViews'
-import { renderPeopleSoftV2Page } from './PeopleSoftV2Panels'
+import { renderPeopleSoftV2Page, renderPeopleSoftEssPage } from './PeopleSoftV2Panels'
 import '../../styles/sim-products.css'
 
 const PS_BLUE = '#1b3a5c'
@@ -208,11 +208,11 @@ export default function PeopleSoftSimulator({
             <PaycheckReview profile={essProfile} busy={busy}
               onReprint={() => run(() => peoplesoftApi.action(sessionId, 'request_paycheck', { oprid }), 'Pay advice reprint queued')} />
           )}
-          {!loading && fluidView === 'time' && <FluidStubPage title="My Time" description="Report hours, view time sheets, and manager approvals." />}
-          {!loading && fluidView === 'directory' && <FluidStubPage title="Company Directory" description="Search colleagues by name, department, or location." />}
-          {!loading && fluidView === 'training' && <FluidStubPage title="Training" description="Browse learning catalog and assigned courses." />}
-          {!loading && fluidView === 'expenses' && <FluidStubPage title="Expenses" description="Submit travel and expense reports for approval." />}
-          {!loading && fluidView === 'jobs' && <FluidStubPage title="Job Openings" description="Internal recruiting — view and apply for open positions." />}
+          {!loading && fluidView === 'time' && renderPeopleSoftEssPage({ fluidView: 'time', v2, sessionId, busy, run })}
+          {!loading && fluidView === 'directory' && renderPeopleSoftEssPage({ fluidView: 'directory', v2, sessionId, busy, run })}
+          {!loading && fluidView === 'training' && renderPeopleSoftEssPage({ fluidView: 'training', v2, sessionId, busy, run })}
+          {!loading && fluidView === 'expenses' && renderPeopleSoftEssPage({ fluidView: 'expenses', v2, sessionId, busy, run })}
+          {!loading && fluidView === 'jobs' && renderPeopleSoftEssPage({ fluidView: 'jobs', v2, sessionId, busy, run })}
 
           {!loading && !fluidView && section === 'home' && (
             <FluidHome onNavigate={handleFluidNav} />

@@ -15,6 +15,7 @@ import {
   TFC_AUDIT_LOG, TFC_USAGE,
 } from '../../mockData/terraformCloud'
 import TerraformWorkspaceIde from './TerraformWorkspaceIde'
+import { terraformApi } from '../../api/terraform'
 import { getIacProfile } from '../../utils/iacFlavor'
 import '../../styles/sim-products.css'
 
@@ -43,14 +44,26 @@ export default function TerraformCloudShell({
   const [showNewWs, setShowNewWs] = useState(false)
   const [newWsName, setNewWsName] = useState('lab-workspace')
   const [extraWorkspaces, setExtraWorkspaces] = useState([])
-  const allWorkspaces = useMemo(() => [...TFC_WORKSPACES, ...extraWorkspaces], [extraWorkspaces])
+  const tfc = state?.state?.tfc || {}
+  const serverWorkspaces = tfc.workspaces || []
+  const serverRuns = tfc.runs || []
+  const serverModules = tfc.modules || []
+  const serverTeams = tfc.teams || []
+  const allWorkspaces = useMemo(() => {
+    if (serverWorkspaces.length) return [...serverWorkspaces, ...extraWorkspaces]
+    return [...TFC_WORKSPACES, ...extraWorkspaces]
+  }, [serverWorkspaces, extraWorkspaces])
+  const runRows = serverRuns.length ? serverRuns : TFC_RUNS
+  const moduleRows = serverModules.length ? serverModules : TFC_MODULES
+  const teamRows = serverTeams.length ? serverTeams : TFC_TEAMS
   const [showApply, setShowApply] = useState(false)
   const [showVarModal, setShowVarModal] = useState(false)
   const slug = scenario?.slug || ''
   const iac = getIacProfile()
+  const orgName = tfc.org?.name || TFC_ORG.name
 
   const breadcrumbs = useMemo(() => {
-    const items = [{ label: TFC_ORG.name, onClick: () => { setNav('workspaces'); setSelectedWs(null) } }]
+    const items = [{ label: orgName, onClick: () => { setNav('workspaces'); setSelectedWs(null) } }]
     if (nav === 'workspaces' && !selectedWs) items.push({ label: 'Workspaces' })
     if (selectedWs) {
       items.push({ label: 'Workspaces', onClick: () => setSelectedWs(null) })
@@ -80,8 +93,13 @@ export default function TerraformCloudShell({
             <p className="text-xs text-slate-500">Project: {ws.project} · ID {ws.id}</p>
           </div>
           <div className="flex gap-2">
-            <button type="button" className="tfc-btn-primary" onClick={() => run('terraform_plan', {}, 'Plan queued')}>Queue plan</button>
-            <button type="button" className="tfc-btn-primary" onClick={() => setShowApply(true)}>Apply run</button>
+            <button type="button" className="tfc-btn-primary" disabled={busy}
+              onClick={() => run(() => terraformApi.queueRun(sessionId, ws.name), 'Plan queued')}>Queue plan</button>
+            <button type="button" className="tfc-btn-primary" disabled={busy || ws.locked} onClick={() => setShowApply(true)}>Apply run</button>
+            <button type="button" className="tfc-btn-primary" disabled={busy}
+              onClick={() => run(() => terraformApi.lockWorkspace(sessionId, ws.name, !ws.locked), ws.locked ? 'Unlocked' : 'Locked')}>
+              {ws.locked ? 'Unlock' : 'Lock'}
+            </button>
           </div>
         </div>
         <div className="flex border-b border-[#2d2d44] px-5 gap-1 shrink-0">
@@ -99,7 +117,7 @@ export default function TerraformCloudShell({
                 { key: 'triggeredBy', label: 'Triggered By', sortable: true },
                 { key: 'planCost', label: 'Plan Cost', sortable: true },
                 { key: 'time', label: 'Duration', sortable: true },
-              ]} rows={TFC_RUNS} searchKeys={['id', 'status']} onRowClick={(r) => setSelectedRun(r)} />
+              ]} rows={runRows.filter((r) => !ws?.name || r.workspace === ws.name || !r.workspace)} searchKeys={['id', 'status']} onRowClick={(r) => setSelectedRun(r)} />
               {selectedRun && (
                 <div className="tfc-card p-4 space-y-3">
                   <div className="flex items-center justify-between">
@@ -239,7 +257,7 @@ export default function TerraformCloudShell({
             { key: 'provider', label: 'Provider', sortable: true },
             { key: 'version', label: 'Latest Version', sortable: true },
             { key: 'published', label: 'Published', sortable: true },
-          ]} rows={TFC_MODULES} searchKeys={['name']} />
+          ]} rows={moduleRows} searchKeys={['name']} />
         </div>
       )
     }
@@ -251,7 +269,7 @@ export default function TerraformCloudShell({
             { key: 'name', label: 'Team', sortable: true },
             { key: 'access', label: 'Organization Access', sortable: true },
             { key: 'members', label: 'Members', sortable: true },
-          ]} rows={TFC_TEAMS} searchKeys={['name']} />
+          ]} rows={teamRows} searchKeys={['name']} />
         </div>
       )
     }
@@ -442,7 +460,7 @@ export default function TerraformCloudShell({
 
       <div className="tfc-topbar flex items-center justify-between px-4 py-2 shrink-0">
         <SimBreadcrumbs items={breadcrumbs} />
-        <span className="tfc-org-switcher">{TFC_ORG.name}</span>
+        <span className="tfc-org-switcher">{orgName}</span>
       </div>
 
       <div className="flex flex-1 min-h-0">
@@ -453,13 +471,11 @@ export default function TerraformCloudShell({
       </div>
 
       <SimModal open={showNewWs} onClose={() => setShowNewWs(false)} title="Create Workspace"
-        footer={<><button type="button" className="text-sm text-slate-400 px-3 py-1.5" onClick={() => setShowNewWs(false)}>Cancel</button><button type="button" className="tfc-btn-primary" onClick={() => {
+        footer={<><button type="button" className="text-sm text-slate-400 px-3 py-1.5" onClick={() => setShowNewWs(false)}>Cancel</button><button type="button" className="tfc-btn-primary" disabled={busy} onClick={() => {
           const name = (newWsName || 'lab-workspace').trim()
-          const ws = { id: `ws-${Date.now()}`, name, project: 'Training', status: 'ready', terraform: '1.7.5', updated: 'Just now' }
-          setExtraWorkspaces((prev) => [...prev, ws])
+          run(() => terraformApi.createWorkspace(sessionId, name), 'Workspace created')
           setShowNewWs(false)
-          setSelectedWs(ws)
-          setWsTab('ide')
+          setWsTab('runs')
         }}>Create</button></>}>
         <div className="space-y-3 text-sm">
           <label className="block"><span className="text-slate-400 text-xs">Name</span><input className="w-full mt-1 px-3 py-2 rounded bg-slate-900 border border-slate-600" value={newWsName} onChange={(e) => setNewWsName(e.target.value)} /></label>
@@ -468,7 +484,10 @@ export default function TerraformCloudShell({
       </SimModal>
 
       <SimModal open={showApply} onClose={() => setShowApply(false)} title="Confirm Apply"
-        footer={<><button type="button" className="text-sm px-3 py-1.5" onClick={() => setShowApply(false)}>Cancel</button><button type="button" className="tfc-btn-primary" disabled={busy} onClick={() => { run('terraform_apply', {}, 'Apply complete'); setShowApply(false) }}>Confirm & Apply</button></>}>
+        footer={<><button type="button" className="text-sm px-3 py-1.5" onClick={() => setShowApply(false)}>Cancel</button><button type="button" className="tfc-btn-primary" disabled={busy} onClick={() => {
+          run(() => terraformApi.queueRun(sessionId, selectedWs?.name || 'lab-workspace', true), 'Apply complete')
+          setShowApply(false)
+        }}>Confirm & Apply</button></>}>
         <p className="text-sm text-slate-300">Apply the latest successful plan to infrastructure?</p>
       </SimModal>
 

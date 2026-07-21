@@ -22,6 +22,8 @@ from typing import Any
 
 from django.core.cache import cache
 
+from .baremetal_v2_facades import apply_v2_action, ensure_v2
+
 SESSION_TTL = 7200
 
 # Wall-clock durations (seconds) for each async phase.  Kept short so a learner
@@ -252,10 +254,11 @@ def _ensure(session_id: str, slug: str = "") -> dict:
 
 def get_state(session_id: str, scenario_slug: str = "") -> dict:
     entry = _ensure(session_id, scenario_slug)
+    ensure_v2(entry["state"])
     # Advance the lifecycle on read so status/progress reflect wall-clock time
     # even when no action has been taken since the phase started.
-    if _tick(entry["state"]):
-        _save(session_id, entry)
+    _tick(entry["state"])
+    _save(session_id, entry)
     return {
         "session_id": str(session_id),
         "scenario_slug": entry.get("scenario_slug") or scenario_slug,
@@ -481,6 +484,16 @@ def apply_action(session_id: str, action: str, payload: dict | None = None) -> d
         )
         _save(session_id, entry)
         return {"ok": True, "message": f"VM {name} created"}
+
+    ensure_v2(state)
+    v2 = apply_v2_action(state, action, payload)
+    if v2 is not None:
+        if v2.get("ok"):
+            state.setdefault("events", []).insert(0, {
+                "time": _now_iso(), "message": v2.get("message") or action, "severity": "success",
+            })
+            _save(session_id, entry)
+        return v2
 
     # An action may have advanced the lifecycle even if it hit no explicit branch;
     # persist so the tick is not lost.

@@ -10,4 +10,19 @@ export const terraformApi = {
   action(sessionId, action, payload = {}) {
     return api.post(`${base(sessionId)}/action/`, { action, payload }).then((r) => r.data)
   },
+  createWorkspace(sessionId, name, project = 'Training') {
+    return terraformApi.action(sessionId, 'tfc_create_workspace', { name, project })
+  },
+  queueRun(sessionId, workspace, apply = false) {
+    return terraformApi.action(sessionId, 'tfc_queue_run', { workspace, apply })
+  },
+  applyRun(sessionId, runId) {
+    return terraformApi.action(sessionId, 'tfc_apply_run', { run_id: runId })
+  },
+  lockWorkspace(sessionId, workspace, locked = true) {
+    return terraformApi.action(sessionId, 'tfc_lock_workspace', { workspace, locked })
+  },
+  setVariable(sessionId, payload = {}) {
+    return terraformApi.action(sessionId, 'tfc_set_variable', payload)
+  },
 }

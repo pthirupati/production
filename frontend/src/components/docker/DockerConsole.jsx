@@ -3,10 +3,11 @@ import { dockerApi } from '../../api/docker'
 import LabChromeBar from '../lab/LabChromeBar'
 import {
   LogIn, Container, Image, Network, HardDrive, Layers,
-  Play, Square, Trash2, RotateCw, Plus, Download,
+  Play, Square, Trash2, RotateCw, Plus, Download, Hexagon, KeyRound, Archive,
 } from 'lucide-react'
 import { simPanelRoot } from '../../utils/simLayout'
 import { SimSidebar, SimBreadcrumbs, SimDataTable, SimStatusBadge, SimModal, useSimSession } from '../sim/shared'
+import { renderDockerV2Page } from './DockerV2Panels'
 import '../../styles/sim-products.css'
 import './docker.css'
 
@@ -20,6 +21,9 @@ const SIDEBAR = [
   { key: 'networks', label: 'Networks', icon: Network },
   { key: 'volumes', label: 'Volumes', icon: HardDrive },
   { key: 'compose', label: 'Compose', icon: Layers },
+  { key: 'swarm', label: 'Swarm', icon: Hexagon },
+  { key: 'secrets', label: 'Secrets & Configs', icon: KeyRound },
+  { key: 'registry', label: 'Registry', icon: Archive },
 ]
 
 function containerTone(state) {
@@ -130,6 +134,8 @@ export default function DockerConsole({
   )
 
   const renderContent = () => {
+    const v2 = renderDockerV2Page({ nav, daemon, sessionId, busy, run })
+    if (v2) return v2
     if (nav === 'containers') {
       return (
         <div>

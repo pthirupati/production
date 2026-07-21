@@ -75,4 +75,25 @@ export const dockerApi = {
   systemPrune(sessionId, { all = false, volumes = false } = {}) {
     return dockerApi.action(sessionId, 'system_prune', { all, volumes })
   },
+  swarmInit(sessionId, payload = {}) {
+    return dockerApi.action(sessionId, 'swarm_init', payload)
+  },
+  createSwarmService(sessionId, payload = {}) {
+    return dockerApi.action(sessionId, 'create_swarm_service', payload)
+  },
+  scaleSwarmService(sessionId, name, replicas) {
+    return dockerApi.action(sessionId, 'scale_swarm_service', { name, replicas })
+  },
+  createSecret(sessionId, name) {
+    return dockerApi.action(sessionId, 'create_secret', { name })
+  },
+  createConfig(sessionId, name) {
+    return dockerApi.action(sessionId, 'create_config', { name })
+  },
+  registryPush(sessionId, payload = {}) {
+    return dockerApi.action(sessionId, 'registry_push', payload)
+  },
+  registryPull(sessionId, name, tag = 'latest') {
+    return dockerApi.action(sessionId, 'registry_pull', { name, tag })
+  },
 }

@@ -9,6 +9,8 @@ from typing import Any
 
 from django.core.cache import cache
 
+from .terraform_v2_facades import apply_v2_action, ensure_v2
+
 SESSION_TTL = 7200
 
 DEFAULT_FILES = {
@@ -284,6 +286,8 @@ def _ensure(session_id: str, slug: str = "") -> dict:
 
 def get_state(session_id: str, scenario_slug: str = "") -> dict:
     entry = _ensure(session_id, scenario_slug)
+    ensure_v2(entry["state"])
+    _save(session_id, entry)
     slug = entry.get("scenario_slug") or scenario_slug
     return {
         "session_id": str(session_id),
@@ -428,6 +432,13 @@ def apply_action(session_id: str, action: str, payload: dict | None = None) -> d
         )):
             return {"ok": True, "output": _handle_aws_cli_local(cmd)}
         return {"ok": True, "output": _handle_aws_cli_local(cmd)}
+
+    ensure_v2(state)
+    v2 = apply_v2_action(state, action, payload)
+    if v2 is not None:
+        if v2.get("ok"):
+            _save(session_id, entry)
+        return v2
 
     return {"ok": False, "error": f"Unknown action: {action}"}
 

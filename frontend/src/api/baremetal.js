@@ -37,4 +37,16 @@ export const baremetalApi = {
   resetCommission(sessionId, machineId) {
     return baremetalApi.action(sessionId, 'reset_commission', { machine_id: machineId })
   },
+  createSpace(sessionId, name, subnet) {
+    return baremetalApi.action(sessionId, 'maas_create_space', { name, subnet })
+  },
+  addSubnet(sessionId, space, subnet) {
+    return baremetalApi.action(sessionId, 'maas_add_subnet', { space, subnet })
+  },
+  tagMachine(sessionId, hostname, tag) {
+    return baremetalApi.action(sessionId, 'maas_tag_machine', { hostname, tag })
+  },
+  attachScript(sessionId, name, appliedTo = ['*']) {
+    return baremetalApi.action(sessionId, 'maas_attach_script', { name, applied_to: appliedTo })
+  },
 }

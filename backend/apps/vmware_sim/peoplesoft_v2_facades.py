@@ -92,6 +92,38 @@ def seed_v2() -> dict[str, Any]:
             {"account": "4000", "descr": "Revenue", "debit": 0, "credit": 520000},
             {"account": "6100", "descr": "Professional services", "debit": 85000, "credit": 0},
         ],
+        "timesheets": [
+            {
+                "id": "TS-1001",
+                "emplid": "1001",
+                "week_ending": "2024-06-21",
+                "status": "Submitted",
+                "hours": 40,
+                "lines": [
+                    {"day": "Mon", "hours": 8, "trcode": "REG"},
+                    {"day": "Tue", "hours": 8, "trcode": "REG"},
+                    {"day": "Wed", "hours": 8, "trcode": "REG"},
+                    {"day": "Thu", "hours": 8, "trcode": "REG"},
+                    {"day": "Fri", "hours": 8, "trcode": "REG"},
+                ],
+            },
+        ],
+        "directory": [
+            {"emplid": "1001", "name": "Ada Lovelace", "title": "Principal Engineer", "dept": "IT", "email": "ada@fixitlab.io", "phone": "x4101"},
+            {"emplid": "1002", "name": "Grace Hopper", "title": "Architect", "dept": "IT", "email": "grace@fixitlab.io", "phone": "x4102"},
+            {"emplid": "1003", "name": "Alan Turing", "title": "Research Scientist", "dept": "R&D", "email": "alan@fixitlab.io", "phone": "x4201"},
+        ],
+        "training": [
+            {"id": "CRS-101", "title": "PeopleSoft Security Fundamentals", "status": "Assigned", "due": "2024-07-15"},
+            {"id": "CRS-205", "title": "GL Journal Entry", "status": "Completed", "due": "2024-05-01"},
+        ],
+        "expenses": [
+            {"id": "EXP-901", "descr": "Client travel — Hyderabad", "amount": 420.50, "status": "Pending", "submitted": "2024-06-18"},
+        ],
+        "job_openings": [
+            {"id": "JOB-501", "title": "Senior PeopleSoft Developer", "dept": "IT", "location": "Hyderabad", "status": "Open"},
+            {"id": "JOB-502", "title": "Payroll Analyst", "dept": "HR", "location": "Remote", "status": "Open"},
+        ],
     }
 
 
@@ -225,5 +257,59 @@ def apply_v2_action(world: dict, action: str, payload: dict | None = None) -> di
             row["status"] = "Confirmed"
         v2.setdefault("pay_runs", []).insert(0, row)
         return {"ok": True, "message": f"Pay run {row['id']} {row['status'].lower()}", "pay_run": row}
+
+    if action == "submit_timesheet":
+        hours = float(payload.get("hours") or 40)
+        row = {
+            "id": f"TS-{1000 + len(v2.get('timesheets') or []) + 1}",
+            "emplid": payload.get("emplid") or world.get("session", {}).get("oprid") or "PS",
+            "week_ending": payload.get("week_ending") or _now()[:10],
+            "status": "Submitted",
+            "hours": hours,
+            "lines": payload.get("lines") or [
+                {"day": d, "hours": 8, "trcode": "REG"} for d in ("Mon", "Tue", "Wed", "Thu", "Fri")
+            ],
+        }
+        v2.setdefault("timesheets", []).insert(0, row)
+        return {"ok": True, "message": f"Timesheet {row['id']} submitted", "timesheet": row}
+
+    if action == "submit_expense":
+        row = {
+            "id": f"EXP-{900 + len(v2.get('expenses') or []) + 1}",
+            "descr": payload.get("descr") or "Business expense",
+            "amount": float(payload.get("amount") or 100),
+            "status": "Pending",
+            "submitted": _now()[:10],
+        }
+        v2.setdefault("expenses", []).insert(0, row)
+        return {"ok": True, "message": f"Expense {row['id']} submitted", "expense": row}
+
+    if action == "apply_job":
+        job_id = payload.get("job_id") or ""
+        job = next((j for j in v2.get("job_openings") or [] if j.get("id") == job_id), None)
+        if not job and (v2.get("job_openings") or []):
+            job = v2["job_openings"][0]
+        if not job:
+            return {"ok": False, "error": "Job opening not found"}
+        apps = v2.setdefault("job_applications", [])
+        row = {
+            "id": f"APP-{len(apps) + 1}",
+            "job_id": job["id"],
+            "title": job["title"],
+            "status": "Submitted",
+            "applied": _now()[:10],
+        }
+        apps.insert(0, row)
+        return {"ok": True, "message": f"Applied to {job['title']}", "application": row}
+
+    if action == "enroll_training":
+        course_id = payload.get("course_id") or ""
+        course = next((c for c in v2.get("training") or [] if c.get("id") == course_id), None)
+        if not course and (v2.get("training") or []):
+            course = next((c for c in v2["training"] if c.get("status") != "Completed"), v2["training"][0])
+        if not course:
+            return {"ok": False, "error": "Course not found"}
+        course["status"] = "In Progress"
+        return {"ok": True, "message": f"Enrolled in {course['title']}", "course": course}
 
     return None

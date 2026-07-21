@@ -56,6 +56,10 @@ export const peoplesoftApi = {
   createVoucher: (sessionId, payload = {}) => action(sessionId, 'create_voucher', payload),
   createArInvoice: (sessionId, payload = {}) => action(sessionId, 'create_ar_invoice', payload),
   runPayroll: (sessionId, payload = {}) => action(sessionId, 'run_payroll', payload),
+  submitTimesheet: (sessionId, payload = {}) => action(sessionId, 'submit_timesheet', payload),
+  submitExpense: (sessionId, payload = {}) => action(sessionId, 'submit_expense', payload),
+  applyJob: (sessionId, jobId) => action(sessionId, 'apply_job', { job_id: jobId }),
+  enrollTraining: (sessionId, courseId) => action(sessionId, 'enroll_training', { course_id: courseId }),
   reset: (sessionId) => action(sessionId, 'reset', {}),
 
   release: (sessionId) => {
