@@ -54,7 +54,7 @@ drf-spectacular>=0.29.0
 
 # Server
 gunicorn>=22.0
-uvicorn[standard]>=0.29.0
+uvicorn[standard]>=0.51.0
 uvloop>=0.19.0
 whitenoise>=6.12.0
 
