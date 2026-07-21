@@ -519,11 +519,24 @@ def get_state(session_id: str, scenario_slug: str = "") -> dict:
         state["campus"] = campus_assets()
     for srv in state.get("servers", []):
         enrich_server(srv)
+        mb = srv.get("motherboard")
+        if mb:
+            from apps.vmware_sim.datacenter_physics_ops import ensure_extended_buses, tick_bus_packets
+            ensure_extended_buses(mb)
+            tick_bus_packets(mb)
     # Enrich network (CLI/counters) for older sessions
     from apps.vmware_sim.datacenter_network_storage import enrich_network, tick_port_counters, CABLE_CATALOG
     if state.get("network"):
         enrich_network(state["network"])
         tick_port_counters(state["network"])
+    # Phase 4: rack FRU + physics
+    from apps.vmware_sim.datacenter_physics_ops import enrich_rack, build_monitoring_snapshot, build_training_scenarios
+    pdus = state.get("pdus") or state.get("power_chain", {}).get("rack_pdus") or []
+    for rack in state.get("racks") or []:
+        enrich_rack(rack, state.get("servers") or [], state.get("cooling") or [], pdus)
+    state["monitoring"] = build_monitoring_snapshot(state)
+    if not state.get("training"):
+        state["training"] = {"scenarios": build_training_scenarios(), "active": None, "progress": []}
     # CMDB rollup + hardware catalog for UI
     state["inventory"] = [
         {**(s.get("inventory") or {}), "server_id": s["id"], "hostname": s.get("hostname")}
@@ -1645,6 +1658,151 @@ def apply_action(session_id: str, action: str, payload: dict | None = None) -> d
         _event(state, f"Storage {msg} on {srv['id']}", "info")
         _save(session_id, entry)
         return {"ok": True, "message": msg, "storage_stack": stack}
+
+    # ── Phase 4–5: physics, rack FRU, ops tickets, monitoring, training ─────
+
+    if action == "toggle_rack_casters":
+        rack_id = payload.get("rack_id") or ""
+        rack = next((r for r in state.get("racks") or [] if r.get("id") == rack_id), None)
+        if not rack:
+            return {"ok": False, "error": f"Rack {rack_id} not found"}
+        phy = rack.setdefault("physics", {})
+        phy["casters_locked"] = not phy.get("casters_locked", True)
+        fru = rack.setdefault("fru", {})
+        fru.setdefault("casters", {})["locked"] = phy["casters_locked"]
+        # Unlocking casters raises tip risk
+        if not phy["casters_locked"]:
+            phy["tip_score"] = min(100, int(phy.get("tip_score") or 40) + 25)
+            phy["tip_risk"] = "high" if phy["tip_score"] >= 65 else phy.get("tip_risk")
+        _event(state, f"Rack {rack_id} casters {'locked' if phy['casters_locked'] else 'unlocked'}", "warning")
+        _save(session_id, entry)
+        return {"ok": True, "message": "Casters toggled", "rack": rack}
+
+    if action == "install_blanking":
+        rack_id = payload.get("rack_id") or ""
+        u = int(payload.get("u") or 1)
+        rack = next((r for r in state.get("racks") or [] if r.get("id") == rack_id), None)
+        if not rack:
+            return {"ok": False, "error": f"Rack {rack_id} not found"}
+        fru = rack.setdefault("fru", {})
+        panels = fru.setdefault("blanking_panels", [])
+        existing = next((p for p in panels if p.get("u") == u), None)
+        if existing:
+            existing["installed"] = True
+        else:
+            panels.append({"u": u, "size_u": 1, "installed": True})
+        _event(state, f"Blanking panel installed at {rack_id} U{u}", "success")
+        _save(session_id, entry)
+        return {"ok": True, "message": f"Blanking U{u}", "fru": fru}
+
+    if action == "pdu_outlet_toggle":
+        rack_id = payload.get("rack_id") or ""
+        outlet_id = payload.get("outlet_id") or ""
+        rack = next((r for r in state.get("racks") or [] if r.get("id") == rack_id), None)
+        if not rack:
+            return {"ok": False, "error": f"Rack {rack_id} not found"}
+        outlets = (rack.get("fru") or {}).get("pdu_outlets") or []
+        out = next((o for o in outlets if o.get("id") == outlet_id), None)
+        if not out:
+            return {"ok": False, "error": f"Outlet {outlet_id} not found"}
+        if out.get("breaker") == "closed":
+            out["breaker"] = "open"
+            out["energized"] = False
+            out["led"] = "off"
+            out["load_w"] = 0
+        else:
+            out["breaker"] = "closed"
+            out["energized"] = True
+            out["led"] = "green"
+            out["load_w"] = 120
+        _event(state, f"PDU outlet {outlet_id} breaker {out['breaker']}", "info")
+        _save(session_id, entry)
+        return {"ok": True, "message": f"Outlet {outlet_id}", "outlet": out}
+
+    if action == "ops_ticket":
+        from apps.vmware_sim.datacenter_physics_ops import build_ops_ticket, advance_ticket, SUPPORT_VENDORS
+        op = payload.get("op") or "create"
+        tickets = state.setdefault("tickets", [])
+        if op == "create":
+            asset_id = payload.get("asset_id") or state.get("selected_asset")
+            srv = _find_server(state, asset_id) if asset_id else None
+            vendor = payload.get("vendor") or (srv.get("vendor") if srv else "Dell")
+            if vendor not in SUPPORT_VENDORS and vendor not in ("HP",):
+                # allow Cisco/NVIDIA even without matching server OEM
+                pass
+            ticket = build_ops_ticket(
+                vendor=vendor if vendor != "HP" else "HPE",
+                ticket_type=payload.get("ticket_type") or "incident",
+                asset_id=srv["id"] if srv else asset_id,
+                hostname=srv.get("hostname") if srv else None,
+                component=payload.get("component") or (broken.get("component") if broken else "hardware") or "hardware",
+                summary=payload.get("summary") or f"Ops ticket for {asset_id or 'facility'}",
+                service_tag=srv.get("service_tag") if srv else payload.get("service_tag"),
+                priority=payload.get("priority") or "medium",
+            )
+            tickets.insert(0, ticket)
+            state.setdefault("digital_twin", {}).setdefault("persisted_changes", []).insert(
+                0, {"time": _now_iso(), "type": "ticket", "id": ticket["id"]},
+            )
+            _event(state, f"Opened {ticket['type']} {ticket['id']} ({ticket['vendor']})", "info")
+            _save(session_id, entry)
+            return {"ok": True, "message": f"Ticket {ticket['id']}", "ticket": ticket}
+        ticket_id = payload.get("ticket_id") or ""
+        ticket = next((t for t in tickets if t.get("id") == ticket_id), None)
+        if not ticket:
+            return {"ok": False, "error": f"Ticket {ticket_id} not found"}
+        try:
+            advance_ticket(
+                ticket,
+                payload.get("advance") or "assign",
+                engineer=payload.get("engineer"),
+                part=payload.get("part"),
+                root_cause=payload.get("root_cause"),
+                corrective=payload.get("corrective"),
+                duration_min=payload.get("duration_min"),
+            )
+        except ValueError as exc:
+            return {"ok": False, "error": str(exc)}
+        _event(state, f"Ticket {ticket_id} → {ticket.get('status')}", "info")
+        _save(session_id, entry)
+        return {"ok": True, "message": f"Ticket {ticket_id} updated", "ticket": ticket}
+
+    if action == "training_start":
+        from apps.vmware_sim.datacenter_physics_ops import build_training_scenarios
+        training = state.setdefault("training", {"scenarios": build_training_scenarios(), "active": None, "progress": []})
+        if not training.get("scenarios"):
+            training["scenarios"] = build_training_scenarios()
+        sid = payload.get("scenario_id") or "dc-tech"
+        scen = next((s for s in training["scenarios"] if s["id"] == sid), training["scenarios"][0])
+        training["active"] = scen["id"]
+        training["progress"] = []
+        training["feedback"] = f"Started: {scen['role']}. Complete steps in order."
+        _event(state, f"Training started: {scen['role']}", "info")
+        _save(session_id, entry)
+        return {"ok": True, "message": f"Training {scen['id']}", "training": training}
+
+    if action == "training_complete_step":
+        training = state.setdefault("training", {})
+        step = payload.get("step") or ""
+        if not training.get("active"):
+            return {"ok": False, "error": "No active training"}
+        prog = training.setdefault("progress", [])
+        if step and step not in prog:
+            prog.append(step)
+        scen = next((s for s in training.get("scenarios") or [] if s["id"] == training["active"]), None)
+        done = len(prog)
+        total = len((scen or {}).get("steps") or [])
+        training["feedback"] = f"Progress {done}/{total}. " + (
+            "Scenario complete — great work." if done >= total else f"Next: {(scen or {}).get('steps', [''])[min(done, total-1)]}"
+        )
+        _save(session_id, entry)
+        return {"ok": True, "message": training["feedback"], "training": training}
+
+    if action == "refresh_monitoring":
+        from apps.vmware_sim.datacenter_physics_ops import build_monitoring_snapshot
+        state["monitoring"] = build_monitoring_snapshot(state)
+        _save(session_id, entry)
+        return {"ok": True, "message": "Metrics refreshed", "monitoring": state["monitoring"]}
 
     return {"ok": False, "error": f"Unknown action: {action}"}
 

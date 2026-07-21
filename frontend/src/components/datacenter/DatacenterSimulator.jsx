@@ -16,6 +16,9 @@ import {
 import {
   NetworkRoomPhase3, CableOpsPanel, StorageStackPanel,
 } from './NetworkStoragePanels'
+import {
+  RackPhysicsFruPanel, MonitoringPanel, OpsTicketsPanel, TrainingPanel,
+} from './OpsPhysicsPanels'
 import '../../styles/sim-products.css'
 import './DatacenterSimulator.css'
 
@@ -106,6 +109,8 @@ export default function DatacenterSimulator({
   const facility = st.facility || {}
   const campus = st.campus || {}
   const hardwareCatalog = st.hardware_catalog || {}
+  const monitoring = st.monitoring || {}
+  const training = st.training || {}
   const currentRoomId = st.current_room || 'data-hall-a'
   const currentRoom = rooms.find((r) => r.id === currentRoomId) || rooms[0] || { type: 'data_hall', racks: [] }
 
@@ -297,8 +302,10 @@ export default function DatacenterSimulator({
                     <div className="dc-rack-head">
                       <span className="dc-rack-id">{rack.id}</span>
                       <span className={`dc-rack-led ${anyFailed ? 'dc-led-red' : 'dc-led-green'}`} />
+                      {rack.physics?.tip_risk === 'high' && <span className="dc-tip-badge">TIP</span>}
+                      {rack.physics?.mass_kg && <span className="dc-mass-badge">{rack.physics.mass_kg}kg</span>}
                     </div>
-                    <div className="dc-rack-pdu">{rack.pdu}</div>
+                    <div className="dc-rack-pdu">{rack.pdu} · {rack.physics?.outlet_c ?? '—'}°C out · {rack.physics?.airflow_cfm ?? '—'} CFM</div>
                     {!isOpen && (
                       <div className="dc-rack-mini">
                         {rackServers.length === 0 && <span className="dc-rack-empty">empty</span>}
@@ -325,6 +332,13 @@ export default function DatacenterSimulator({
                             </button>
                           )
                         })}
+                        <RackPhysicsFruPanel
+                          rack={rack}
+                          busy={busy}
+                          onToggleCasters={(id) => doAction(() => datacenterApi.toggleRackCasters(sessionId, id), 'Casters toggled')}
+                          onBlanking={(id, u) => doAction(() => datacenterApi.installBlanking(sessionId, id, u), `Blanking U${u}`)}
+                          onOutlet={(id, oid) => doAction(() => datacenterApi.pduOutletToggle(sessionId, id, oid), 'Outlet toggled')}
+                        />
                       </div>
                     )}
                   </div>
@@ -369,10 +383,42 @@ export default function DatacenterSimulator({
         </div>
       )}
 
+      {currentRoom.type === 'ops' && (currentRoom.id === 'noc' || currentRoom.id === 'soc') && (
+        <div className="dc-room-body dc-ops-room">
+          <MonitoringPanel
+            monitoring={monitoring}
+            busy={busy}
+            onRefresh={() => doAction(() => datacenterApi.refreshMonitoring(sessionId), 'Metrics refreshed')}
+          />
+          <OpsTicketsPanel
+            tickets={st.tickets}
+            busy={busy}
+            onCreate={(vendor, ticketType) => doAction(
+              () => datacenterApi.opsTicketCreate(sessionId, vendor, ticketType, {
+                asset_id: selectedServerId || broken.server,
+                component: broken.component || 'hardware',
+              }),
+              `${vendor} ${ticketType} opened`,
+            )}
+            onAdvance={(ticketId, advance) => doAction(
+              () => datacenterApi.opsTicketAdvance(sessionId, ticketId, advance),
+              `Ticket ${advance}`,
+            )}
+          />
+          <TrainingPanel
+            training={training}
+            busy={busy}
+            onStart={(id) => doAction(() => datacenterApi.trainingStart(sessionId, id), `Training ${id}`)}
+            onStep={(step) => doAction(() => datacenterApi.trainingStep(sessionId, step), `Step: ${step}`)}
+          />
+        </div>
+      )}
+
       {currentRoom.type !== 'data_hall'
         && !(currentRoom.type === 'network' && currentRoom.id === 'mdf')
         && !(currentRoom.type === 'mechanical' && currentRoom.id === 'mechanical')
-        && !(currentRoom.type === 'electrical' && currentRoom.id === 'electrical') && (
+        && !(currentRoom.type === 'electrical' && currentRoom.id === 'electrical')
+        && !(currentRoom.type === 'ops' && (currentRoom.id === 'noc' || currentRoom.id === 'soc')) && (
         <div className="dc-room-body">
           <CampusRoomView room={currentRoom} campus={campus} />
         </div>

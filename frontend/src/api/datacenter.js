@@ -173,6 +173,30 @@ export const datacenterApi = {
   storageOps(sessionId, assetId, op, extra = {}) {
     return datacenterApi.action(sessionId, 'storage_ops', { asset_id: assetId, op, ...extra })
   },
+  toggleRackCasters(sessionId, rackId) {
+    return datacenterApi.action(sessionId, 'toggle_rack_casters', { rack_id: rackId })
+  },
+  installBlanking(sessionId, rackId, u) {
+    return datacenterApi.action(sessionId, 'install_blanking', { rack_id: rackId, u })
+  },
+  pduOutletToggle(sessionId, rackId, outletId) {
+    return datacenterApi.action(sessionId, 'pdu_outlet_toggle', { rack_id: rackId, outlet_id: outletId })
+  },
+  opsTicketCreate(sessionId, vendor, ticketType, extra = {}) {
+    return datacenterApi.action(sessionId, 'ops_ticket', { op: 'create', vendor, ticket_type: ticketType, ...extra })
+  },
+  opsTicketAdvance(sessionId, ticketId, advance, extra = {}) {
+    return datacenterApi.action(sessionId, 'ops_ticket', { op: 'advance', ticket_id: ticketId, advance, ...extra })
+  },
+  trainingStart(sessionId, scenarioId) {
+    return datacenterApi.action(sessionId, 'training_start', { scenario_id: scenarioId })
+  },
+  trainingStep(sessionId, step) {
+    return datacenterApi.action(sessionId, 'training_complete_step', { step })
+  },
+  refreshMonitoring(sessionId) {
+    return datacenterApi.action(sessionId, 'refresh_monitoring', {})
+  },
 }
 
 export default datacenterApi

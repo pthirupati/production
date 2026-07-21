@@ -2,6 +2,7 @@ import { useState } from 'react'
 import {
   CircuitBoard, Cpu, HardDrive, MonitorCog, Shield, Zap, RefreshCw, Disc,
 } from 'lucide-react'
+import { BusAnimPanel } from './OpsPhysicsPanels'
 
 /** Interactive motherboard map — component pickers + bus util bars */
 export function MotherboardPanel({ motherboard, busy, onToggleCover, onReplaceDimm, onApplyPaste }) {
@@ -70,15 +71,7 @@ export function MotherboardPanel({ motherboard, busy, onToggleCover, onReplaceDi
         </div>
       </div>
       <div className="dc-bus-bars">
-        {(motherboard.buses || []).map((b) => (
-          <div key={b.id} className="dc-bus-row">
-            <span className="dc-bus-name" style={{ color: b.color }}>{b.id}</span>
-            <div className="dc-bus-track">
-              <div className="dc-bus-fill" style={{ width: `${b.util_pct}%`, background: b.color }} />
-            </div>
-            <span className="dc-bus-pct">{b.util_pct}% · err {b.errors}</span>
-          </div>
-        ))}
+        <BusAnimPanel buses={motherboard.buses} />
       </div>
       {sel && (
         <div className="dc-mb-detail">

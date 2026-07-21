@@ -77,8 +77,8 @@ instancing / streaming.
 ## Phase 4 — Physics-lite & rack FRU
 
 - [ ] Mass, tipping risk, heat propagation, fan pressure (formulas)
-- [ ] Cage nuts, rails, blanking, PDU outlets, QR/warranty labels
-- [ ] Bus packet animation (PCIe/DDR/UPI/IF/NVLink)
+- [x] Cage nuts, rails, blanking, PDU outlets, QR/warranty labels
+- [x] Bus packet animation (PCIe/DDR/UPI/IF/NVLink)
 
 ## Phase 5 — Ops platform
 
