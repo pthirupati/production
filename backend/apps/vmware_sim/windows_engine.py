@@ -41,6 +41,8 @@ from typing import Any
 
 from django.core.cache import cache
 
+from .windows_v2_facades import apply_v2_action, ensure_v2
+
 SESSION_TTL = 7200  # 2-hour TTL matching the other simulator engines
 
 # Interactive-session idle timeout (seconds). A signed-in console/RDP session
@@ -755,10 +757,11 @@ def _overlay_vmware_bridge(world: dict, session_id: str) -> None:
 
 def get_state(session_id: str, scenario_slug: str = "") -> dict:
     entry = _ensure_session(session_id, scenario_slug)
+    ensure_v2(entry["state"]["world"])
     # Advance the interactive-session lifecycle (idle-lock / RDP logoff) on read
     # so the lock screen reflects wall-clock time even with no action taken.
-    if _advance_session(entry["state"]["world"]):
-        _save_session(str(session_id), entry)
+    _advance_session(entry["state"]["world"])
+    _save_session(str(session_id), entry)
     state = copy.deepcopy(entry["state"])
     world = state["world"]
     _overlay_vmware_bridge(world, session_id)
@@ -792,6 +795,7 @@ def get_state(session_id: str, scenario_slug: str = "") -> dict:
         "explorer": world.get("explorer", {}),
         "settings": world.get("settings", {}),
         "sccm": world.get("sccm", {}),
+        "hyperv_vms": world.get("hyperv_vms") or (world.get("v2") or {}).get("hyperv_vms") or [],
         # Human-readable goal (objective/title) — never leaks the answer beyond
         # what the objective already tells the learner.
         "goal": {
@@ -810,6 +814,7 @@ def get_state(session_id: str, scenario_slug: str = "") -> dict:
             "ad_groups": len(world["ad"]["groups"]),
             "updates_pending": pending_updates,
             "services_stopped": stopped_services,
+            "hyperv_vms": len(world.get("hyperv_vms") or []),
             "title": goal.get("title", ""),
             "objective": goal.get("objective", ""),
         },
@@ -1424,7 +1429,14 @@ def _dispatch(world: dict, state: dict, action: str, payload: dict) -> dict:
         # Replace the live reference so the caller persists the reset world.
         world.clear()
         world.update(new_world)
+        ensure_v2(world)
         return {"ok": True, "message": "Lab reset"}
+
+    v2 = apply_v2_action(world, act, payload)
+    if v2 is not None:
+        if v2.get("ok"):
+            _event(state, v2.get("message") or act)
+        return v2
 
     return {"ok": False, "error": f"unknown action: {action}"}
 

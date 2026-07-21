@@ -14,6 +14,8 @@ from typing import Any
 
 from django.core.cache import cache
 
+from .k8s_v2_facades import apply_v2_action, ensure_v2
+
 SESSION_TTL = 7200  # 2-hour TTL matching VMware sessions
 
 # Sessions stored in Django cache (Redis in production) for multi-worker safety
@@ -656,10 +658,11 @@ def _ensure_session(session_id: str, scenario_slug: str = "") -> dict:
 
 def get_state(session_id: str, scenario_slug: str = "") -> dict:
     entry = _ensure_session(session_id, scenario_slug)
+    ensure_v2(entry["state"])
     # Advance graceful termination / node drain on read so the cluster reflects
     # wall-clock time even when no action has been taken since a drain started.
-    if _tick(entry["state"]):
-        _save_session(str(session_id), entry)
+    _tick(entry["state"])
+    _save_session(str(session_id), entry)
     state = copy.deepcopy(entry["state"])
 
     nodes_ready = sum(1 for n in state["nodes"] if n["status"] == "Ready")
@@ -1120,6 +1123,13 @@ def apply_action(session_id: str, action: str, payload: dict | None = None) -> d
         events.append(_event(f"Patched {kind}/{name}", involved_object=name, namespace=namespace))
         _save_session(str(session_id), entry)
         return {"ok": True, "message": f"{kind}/{name} patched"}
+
+    ensure_v2(state)
+    v2 = apply_v2_action(state, action, payload)
+    if v2 is not None:
+        if v2.get("ok"):
+            _save_session(str(session_id), entry)
+        return v2
 
     return {"ok": False, "error": f"Unknown action: {action}"}
 

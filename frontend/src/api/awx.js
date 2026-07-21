@@ -55,4 +55,19 @@ export const awxApi = {
   installAwx(sessionId) {
     return awxApi.action(sessionId, 'install_awx', {})
   },
+  createWorkflowTemplate(sessionId, name) {
+    return awxApi.action(sessionId, 'create_workflow_template', { name })
+  },
+  launchWorkflow(sessionId, workflowId) {
+    return awxApi.action(sessionId, 'launch_workflow', { workflow_id: workflowId })
+  },
+  approveWorkflow(sessionId, id, approve = true) {
+    return awxApi.action(sessionId, 'approve_workflow', { id, approve })
+  },
+  createNotification(sessionId, payload = {}) {
+    return awxApi.action(sessionId, 'create_notification', payload)
+  },
+  createExecutionEnvironment(sessionId, payload = {}) {
+    return awxApi.action(sessionId, 'create_execution_environment', payload)
+  },
 }

@@ -363,14 +363,42 @@ export default function AwxSimulator({
       )
     }
     if (nav === 'workflow-templates') {
+      const workflows = inv.workflow_templates || []
       return (
-        <div className="awx-widget p-6 min-h-[320px] relative bg-slate-50">
-          <p className="text-sm text-slate-600 mb-4">Workflow Visualizer — drag nodes, connect success/failure paths</p>
-          <div className="flex items-center gap-8">
-            <div className="px-4 py-2 rounded border-2 border-green-500 bg-white font-medium text-sm">Start</div>
-            <div className="px-4 py-2 rounded border bg-white shadow text-sm">Deploy Web → <SimStatusBadge status="success" label="OK" /></div>
-            <div className="px-4 py-2 rounded border bg-white shadow text-sm">Run Tests → <SimStatusBadge status="pending" /></div>
+        <div className="space-y-3">
+          <div className="flex justify-between items-center flex-wrap gap-2">
+            <h2 className="text-lg font-semibold">Workflow Templates</h2>
+            <button type="button" className="awx-btn-launch flex items-center gap-1" disabled={busy}
+              onClick={() => run(() => awxApi.createWorkflowTemplate(sessionId, `WF-${Date.now().toString(36).slice(-4)}`), 'Workflow created')}>
+              <Plus size={14} /> Add
+            </button>
           </div>
+          <SimDataTable columns={[
+            { key: 'name', label: 'Name', sortable: true },
+            { key: 'organization', label: 'Organization' },
+            { key: 'inventory', label: 'Inventory' },
+            { key: 'nodes', label: 'Nodes', render: (r) => (r.nodes || []).length },
+            {
+              key: 'actions', label: '',
+              render: (r) => (
+                <button type="button" className="awx-btn-launch text-xs" disabled={busy}
+                  onClick={(e) => { e.stopPropagation(); run(() => awxApi.launchWorkflow(sessionId, r.id), 'Workflow launched') }}>
+                  Launch
+                </button>
+              ),
+            },
+          ]} rows={workflows} searchKeys={['name']}
+            expandRow={(r) => (
+              <div className="p-3 text-sm flex flex-wrap items-center gap-3">
+                {(r.nodes || []).map((n, i) => (
+                  <span key={n.id || i} className="px-3 py-1.5 rounded border bg-white shadow-sm">
+                    {n.name} <span className="text-slate-400">({n.type})</span>
+                    {i < (r.nodes || []).length - 1 ? ' →' : ''}
+                  </span>
+                ))}
+              </div>
+            )}
+          />
         </div>
       )
     }
@@ -394,10 +422,21 @@ export default function AwxSimulator({
           <SimDataTable columns={[
             { key: 'workflow', label: 'Workflow', sortable: true },
             { key: 'step', label: 'Step', sortable: true },
-            { key: 'status', label: 'Status', render: (r) => <SimStatusBadge status={r.status} /> },
+            { key: 'status', label: 'Status', render: (r) => <SimStatusBadge status={r.status === 'approved' ? 'success' : r.status === 'denied' ? 'error' : 'pending'} label={r.status} /> },
             { key: 'requestedBy', label: 'Requested By', sortable: true },
             { key: 'age', label: 'Age', sortable: true },
-          ]} rows={AWX_APPROVALS} searchKeys={['workflow']} />
+            {
+              key: 'actions', label: '',
+              render: (r) => r.status === 'pending' ? (
+                <div className="flex gap-1">
+                  <button type="button" className="awx-btn-launch text-xs" disabled={busy}
+                    onClick={(e) => { e.stopPropagation(); run(() => awxApi.approveWorkflow(sessionId, r.id, true), 'Approved') }}>Approve</button>
+                  <button type="button" className="text-xs px-2 py-1 border rounded" disabled={busy}
+                    onClick={(e) => { e.stopPropagation(); run(() => awxApi.approveWorkflow(sessionId, r.id, false), 'Denied') }}>Deny</button>
+                </div>
+              ) : null,
+            },
+          ]} rows={inv.approvals || AWX_APPROVALS} searchKeys={['workflow']} />
         </div>
       )
     }
@@ -443,14 +482,17 @@ export default function AwxSimulator({
         { key: 'instances', label: 'Instances', sortable: true },
         { key: 'capacity', label: 'Capacity', sortable: true },
         { key: 'jobsRunning', label: 'Running Jobs', sortable: true },
-      ]} rows={AWX_INSTANCE_GROUPS} searchKeys={['name']} />
+      ]} rows={(inv.instance_groups || AWX_INSTANCE_GROUPS).map((g) => ({
+        ...g,
+        jobsRunning: g.jobsRunning ?? g.jobs_running,
+      }))} searchKeys={['name']} />
     }
     if (nav === 'execution-envs') {
       return <SimDataTable columns={[
         { key: 'name', label: 'Environment', sortable: true },
         { key: 'image', label: 'Image', sortable: true },
         { key: 'status', label: 'Status', render: (r) => <SimStatusBadge status={r.status} /> },
-      ]} rows={AWX_EXEC_ENVS} searchKeys={['name']} />
+      ]} rows={inv.execution_environments || AWX_EXEC_ENVS} searchKeys={['name']} />
     }
     if (nav === 'applications') {
       return <SimDataTable columns={[
@@ -460,12 +502,25 @@ export default function AwxSimulator({
       ]} rows={AWX_APPLICATIONS} searchKeys={['name']} />
     }
     if (nav === 'notifications') {
-      return <SimDataTable columns={[
-        { key: 'name', label: 'Template', sortable: true },
-        { key: 'type', label: 'Type', sortable: true },
-        { key: 'destinations', label: 'Destination', sortable: true },
-        { key: 'status', label: 'Status', render: (r) => <SimStatusBadge status={r.status === 'ok' ? 'success' : 'disabled'} label={r.status} /> },
-      ]} rows={AWX_NOTIFICATIONS} searchKeys={['name']} />
+      return (
+        <div className="space-y-3">
+          <div className="flex justify-between items-center flex-wrap gap-2">
+            <h2 className="text-lg font-semibold">Notification Templates</h2>
+            <button type="button" className="awx-btn-launch flex items-center gap-1" disabled={busy}
+              onClick={() => run(() => awxApi.createNotification(sessionId, {
+                name: `Notify-${Date.now().toString(36).slice(-4)}`, type: 'Slack', destinations: '#ops',
+              }), 'Notification created')}>
+              <Plus size={14} /> Add
+            </button>
+          </div>
+          <SimDataTable columns={[
+            { key: 'name', label: 'Template', sortable: true },
+            { key: 'type', label: 'Type', sortable: true },
+            { key: 'destinations', label: 'Destination', sortable: true },
+            { key: 'status', label: 'Status', render: (r) => <SimStatusBadge status={r.status === 'ok' ? 'success' : 'disabled'} label={r.status} /> },
+          ]} rows={inv.notifications || AWX_NOTIFICATIONS} searchKeys={['name']} />
+        </div>
+      )
     }
     if (nav === 'mgmt-jobs') {
       return <SimDataTable columns={[

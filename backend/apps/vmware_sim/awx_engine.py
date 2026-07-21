@@ -9,6 +9,8 @@ from typing import Any
 
 from django.core.cache import cache
 
+from .awx_v2_facades import apply_v2_action, ensure_v2
+
 SESSION_TTL = 7200
 
 
@@ -426,10 +428,11 @@ def _merge_vmware_hosts(state: dict, session_id: str) -> None:
 
 def get_state(session_id: str, scenario_slug: str = "") -> dict:
     entry = _ensure(session_id, scenario_slug)
+    ensure_v2(entry["state"])
     # Advance live jobs on wall-clock BEFORE snapshotting so transitions persist
     # (a terminal status sticks across polls, and grading sees the final state).
-    if _advance_jobs(entry["state"]):
-        _save(session_id, entry)
+    _advance_jobs(entry["state"])
+    _save(session_id, entry)
     state = copy.deepcopy(entry["state"])
     _merge_vmware_hosts(state, session_id)
     try:
@@ -694,6 +697,17 @@ def apply_action(session_id: str, action: str, payload: dict | None = None) -> d
         _activity(state, "Created user", username)
         _save(session_id, entry)
         return {"ok": True, "message": "User created"}
+
+    ensure_v2(state)
+    v2 = apply_v2_action(state, action, payload)
+    if v2 is not None:
+        if v2.get("ok"):
+            state.setdefault("events", []).insert(0, {
+                "time": _now_iso(), "message": v2.get("message") or action, "severity": "success",
+            })
+            _activity(state, v2.get("message") or action, action)
+            _save(session_id, entry)
+        return v2
 
     return {"ok": False, "error": f"Unknown action: {action}"}
 

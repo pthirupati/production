@@ -1,0 +1,162 @@
+"""AWX / Ansible Tower V2 facades — workflows, approvals, notifications, EEs.
+
+Learner language: Lab Environment / Lab Server — never Simulation/Sandbox/Mock.
+"""
+
+from __future__ import annotations
+
+from datetime import datetime, timezone
+from typing import Any
+
+
+def _now() -> str:
+    return datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+
+
+def seed_v2() -> dict[str, Any]:
+    return {
+        "workflow_templates": [
+            {
+                "id": 201,
+                "name": "Deploy Web Stack",
+                "organization": "Default",
+                "inventory": "Production",
+                "nodes": [
+                    {"id": "n1", "type": "job", "name": "Deploy Web", "unified_job_template": 11},
+                    {"id": "n2", "type": "approval", "name": "Change CAB"},
+                    {"id": "n3", "type": "job", "name": "Smoke Tests", "unified_job_template": 12},
+                ],
+                "edges": [
+                    {"from": "n1", "to": "n2", "on": "success"},
+                    {"from": "n2", "to": "n3", "on": "success"},
+                ],
+            },
+        ],
+        "approvals": [
+            {
+                "id": "appr-1",
+                "workflow": "Deploy Web Stack",
+                "step": "Change CAB",
+                "status": "pending",
+                "requestedBy": "alice",
+                "age": "12m",
+                "created": _now(),
+            },
+        ],
+        "notifications": [
+            {
+                "id": "nt-1",
+                "name": "Slack Ops",
+                "type": "Slack",
+                "destinations": "#ops-alerts",
+                "status": "ok",
+            },
+            {
+                "id": "nt-2",
+                "name": "Email On-Call",
+                "type": "Email",
+                "destinations": "oncall@fixitlab.io",
+                "status": "ok",
+            },
+        ],
+        "instance_groups": [
+            {"id": "ig-1", "name": "default", "capacity": 100, "jobs_running": 1, "instances": 2},
+            {"id": "ig-2", "name": "controlplane", "capacity": 50, "jobs_running": 0, "instances": 1},
+        ],
+        "execution_environments": [
+            {
+                "id": "ee-1",
+                "name": "Default execution environment",
+                "image": "quay.io/ansible/awx-ee:latest",
+                "status": "ok",
+            },
+            {
+                "id": "ee-2",
+                "name": "Network EE",
+                "image": "quay.io/ansible/network-ee:latest",
+                "status": "ok",
+            },
+        ],
+    }
+
+
+def ensure_v2(state: dict) -> None:
+    for key, value in seed_v2().items():
+        if key not in state or state.get(key) is None:
+            state[key] = value
+
+
+def apply_v2_action(state: dict, action: str, payload: dict | None = None) -> dict | None:
+    payload = payload or {}
+    ensure_v2(state)
+
+    if action == "create_workflow_template":
+        name = (payload.get("name") or f"Workflow {len(state.get('workflow_templates') or []) + 1}").strip()
+        wid = max((int(w.get("id") or 0) for w in state.get("workflow_templates") or []), default=200) + 1
+        row = {
+            "id": wid,
+            "name": name,
+            "organization": payload.get("organization") or "Default",
+            "inventory": payload.get("inventory") or "Production",
+            "nodes": payload.get("nodes") or [
+                {"id": "n1", "type": "job", "name": "Start Job", "unified_job_template": 11},
+                {"id": "n2", "type": "approval", "name": "Approve"},
+            ],
+            "edges": payload.get("edges") or [{"from": "n1", "to": "n2", "on": "success"}],
+        }
+        state.setdefault("workflow_templates", []).append(row)
+        return {"ok": True, "message": f"Workflow template {name} created", "workflow": row}
+
+    if action == "launch_workflow":
+        wid = int(payload.get("workflow_id") or payload.get("id") or 0)
+        wf = next((w for w in state.get("workflow_templates") or [] if w.get("id") == wid), None)
+        if not wf and (state.get("workflow_templates") or []):
+            wf = state["workflow_templates"][0]
+        if not wf:
+            return {"ok": False, "error": "Workflow template not found"}
+        approval = {
+            "id": f"appr-{len(state.get('approvals') or []) + 1}",
+            "workflow": wf["name"],
+            "step": next((n["name"] for n in (wf.get("nodes") or []) if n.get("type") == "approval"), "Approval"),
+            "status": "pending",
+            "requestedBy": (state.get("session") or {}).get("user") or "admin",
+            "age": "0m",
+            "created": _now(),
+        }
+        state.setdefault("approvals", []).insert(0, approval)
+        return {"ok": True, "message": f"Launched workflow {wf['name']}", "approval": approval}
+
+    if action == "approve_workflow":
+        aid = payload.get("id") or payload.get("approval_id")
+        appr = next((a for a in state.get("approvals") or [] if a.get("id") == aid), None)
+        if not appr and (state.get("approvals") or []):
+            appr = next((a for a in state["approvals"] if a.get("status") == "pending"), None)
+        if not appr:
+            return {"ok": False, "error": "Approval not found"}
+        appr["status"] = "approved" if payload.get("approve", True) else "denied"
+        return {"ok": True, "message": f"Approval {appr['status']}", "approval": appr}
+
+    if action == "create_notification":
+        name = (payload.get("name") or f"Notify {len(state.get('notifications') or []) + 1}").strip()
+        row = {
+            "id": f"nt-{len(state.get('notifications') or []) + 1}",
+            "name": name,
+            "type": payload.get("type") or "Slack",
+            "destinations": payload.get("destinations") or "#alerts",
+            "status": "ok",
+        }
+        state.setdefault("notifications", []).append(row)
+        return {"ok": True, "message": f"Notification {name} created", "notification": row}
+
+    if action == "create_execution_environment":
+        name = (payload.get("name") or f"EE {len(state.get('execution_environments') or []) + 1}").strip()
+        row = {
+            "id": f"ee-{len(state.get('execution_environments') or []) + 1}",
+            "name": name,
+            "image": payload.get("image") or "quay.io/ansible/awx-ee:latest",
+            "status": "ok",
+        }
+        state.setdefault("execution_environments", []).append(row)
+        return {"ok": True, "message": f"Execution environment {name} created", "execution_environment": row}
+
+    return None

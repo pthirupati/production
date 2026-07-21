@@ -3,26 +3,42 @@ import { k8sApi } from '../../api/k8s'
 import LabChromeBar from '../lab/LabChromeBar'
 import {
   LogIn, Layers, Server, Box, Network, FolderTree, HardDrive, Activity,
-  Plus, RotateCw, Trash2, Ban, ArrowDownToLine, Unlock,
+  Plus, RotateCw, Trash2, Ban, ArrowDownToLine, Unlock, KeyRound, FileCode,
+  Shield, Gauge, Package, Route, Hammer, FolderKanban,
 } from 'lucide-react'
 import { simPanelRoot } from '../../utils/simLayout'
 import { SimSidebar, SimBreadcrumbs, SimDataTable, SimStatusBadge, SimModal, useSimSession } from '../sim/shared'
+import { renderK8sV2Page } from './K8sV2Panels'
 import '../../styles/sim-products.css'
 import './k8s.css'
 
 const K8S_LAB_USER = 'admin'
 const K8S_LAB_PASS = 'lab123'
 const ACCENT = '#326ce5'
+const OCP_ACCENT = '#ee0000'
 
-const SIDEBAR = [
+const SIDEBAR_BASE = [
   { key: 'overview', label: 'Overview', icon: Layers },
   { key: 'nodes', label: 'Nodes', icon: Server },
   { key: 'workloads', label: 'Workloads', icon: Box },
   { key: 'pods', label: 'Pods', icon: Box },
   { key: 'services', label: 'Services', icon: Network },
+  { key: 'ingress', label: 'Ingresses', icon: Route },
+  { key: 'netpol', label: 'NetworkPolicies', icon: Shield },
+  { key: 'configmaps', label: 'ConfigMaps', icon: FileCode },
+  { key: 'secrets', label: 'Secrets', icon: KeyRound },
+  { key: 'hpa', label: 'HPA', icon: Gauge },
+  { key: 'helm', label: 'Helm', icon: Package },
+  { key: 'rbac', label: 'RBAC', icon: Unlock },
   { key: 'namespaces', label: 'Namespaces', icon: FolderTree },
   { key: 'storage', label: 'Storage', icon: HardDrive },
   { key: 'events', label: 'Events', icon: Activity },
+]
+
+const SIDEBAR_OCP = [
+  { key: 'projects', label: 'Projects', icon: FolderKanban },
+  { key: 'routes', label: 'Routes', icon: Route },
+  { key: 'builds', label: 'Builds', icon: Hammer },
 ]
 
 function nodeTone(status) {
@@ -56,6 +72,11 @@ export default function K8sConsole({
   onToggleTerminal, simTerminalOpen = false,
 }) {
   const slug = scenario?.slug || ''
+  const isOpenShift = /openshift|ocp|okd/.test(`${slug} ${scenario?.technology?.slug || ''}`.toLowerCase())
+  const accent = isOpenShift ? OCP_ACCENT : ACCENT
+  const SIDEBAR = isOpenShift
+    ? [...SIDEBAR_BASE.slice(0, 5), ...SIDEBAR_OCP, ...SIDEBAR_BASE.slice(5)]
+    : SIDEBAR_BASE
   const { state, loading, busy, run } = useSimSession(sessionId, slug, k8sApi)
   const [nav, setNav] = useState('overview')
   const [loggedIn, setLoggedIn] = useState(false)
@@ -143,6 +164,8 @@ export default function K8sConsole({
   }
 
   const renderContent = () => {
+    const v2 = renderK8sV2Page({ nav, cluster, sessionId, busy, run, isOpenShift })
+    if (v2) return v2
     if (nav === 'overview') {
       return (
         <div className="space-y-4">
@@ -394,9 +417,9 @@ export default function K8sConsole({
 
   return (
     <div className={simPanelRoot(embedded, 'bg-[#f5f7fb] text-slate-900')}>
-      <LabChromeBar title="Kubernetes Console" subtitle={scenario?.title || slug} accent={ACCENT} {...chromeProps} />
+      <LabChromeBar title={isOpenShift ? 'OpenShift Console' : 'Kubernetes Console'} subtitle={scenario?.title || slug} accent={accent} {...chromeProps} />
       <div className="flex flex-1 min-h-0">
-        <SimSidebar sections={SIDEBAR} activeKey={nav} onSelect={setNav} accent={ACCENT}
+        <SimSidebar sections={SIDEBAR} activeKey={nav} onSelect={setNav} accent={accent}
           className="!w-[220px] !bg-[#1e2430] text-white" />
         <main className="flex-1 overflow-auto p-5 bg-[#f5f7fb]">
           <SimBreadcrumbs items={breadcrumbs} />

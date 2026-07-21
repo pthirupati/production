@@ -1268,7 +1268,7 @@ export default function WindowsServerSimulator({
       {/* Full pixel-perfect Windows Server 2022 desktop (client-side OS) */}
       {desktopMode && signedIn && !locked && (
         <div className="flex-1 relative min-h-0 overflow-hidden">
-          <WindowsServer2022 backendState={state} />
+          <WindowsServer2022 backendState={state} onLabAction={runAction} />
         </div>
       )}
 

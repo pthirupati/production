@@ -58,4 +58,28 @@ export const k8sApi = {
   patchResource(sessionId, kind, name, patch = {}, namespace = '') {
     return k8sApi.action(sessionId, 'patch_resource', { kind, name, patch, namespace })
   },
+  createIngress(sessionId, payload = {}) {
+    return k8sApi.action(sessionId, 'create_ingress', payload)
+  },
+  createNetworkPolicy(sessionId, payload = {}) {
+    return k8sApi.action(sessionId, 'create_network_policy', payload)
+  },
+  helmInstall(sessionId, payload = {}) {
+    return k8sApi.action(sessionId, 'helm_install', payload)
+  },
+  createHpa(sessionId, payload = {}) {
+    return k8sApi.action(sessionId, 'create_hpa', payload)
+  },
+  createRoleBinding(sessionId, payload = {}) {
+    return k8sApi.action(sessionId, 'create_role_binding', payload)
+  },
+  createOpenShiftProject(sessionId, payload = {}) {
+    return k8sApi.action(sessionId, 'create_openshift_project', payload)
+  },
+  createOpenShiftRoute(sessionId, payload = {}) {
+    return k8sApi.action(sessionId, 'create_openshift_route', payload)
+  },
+  startOpenShiftBuild(sessionId, payload = {}) {
+    return k8sApi.action(sessionId, 'start_openshift_build', payload)
+  },
 }

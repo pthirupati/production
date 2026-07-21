@@ -9,12 +9,13 @@ import WindowFrame from './WindowFrame'
 import BootSequence from './BootSequence'
 import { APPS, AppIcon } from './apps/registry'
 
-export default function WindowsServer2022({ autoOpen = 'ServerManager', backendState = null }) {
+export default function WindowsServer2022({ autoOpen = 'ServerManager', backendState = null, onLabAction = null }) {
   const os = useOS()
   // Select actions individually — these references are stable across store
   // updates, so effects that depend on them won't re-fire on every render
   // (depending on the whole `os` object caused a React #185 infinite loop).
   const hydrateFromBackend = useOS((s) => s.hydrateFromBackend)
+  const setLabAction = useOS((s) => s.setLabAction)
   const taskViewOpen = useOS((s) => s.taskViewOpen)
   const setTaskViewOpen = useOS((s) => s.setTaskViewOpen)
   const powerState = useOS((s) => s.powerState)
@@ -25,6 +26,11 @@ export default function WindowsServer2022({ autoOpen = 'ServerManager', backendS
   useEffect(() => {
     if (backendState) hydrateFromBackend(backendState)
   }, [backendState, hydrateFromBackend])
+
+  useEffect(() => {
+    setLabAction(onLabAction || null)
+    return () => setLabAction(null)
+  }, [onLabAction, setLabAction])
 
   // Auto-open Server Manager on first login (like real Windows Server)
   useEffect(() => {

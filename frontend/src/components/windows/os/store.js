@@ -227,6 +227,10 @@ export const useOS = create((set, get) => ({
   scheduledTasks: clone(SEED_TASKS),
   startupItems: clone(SEED_STARTUP),
   roles: clone(SEED_ROLES),
+  hypervVms: [],
+  labSessionId: '',
+  labAction: null,
+  setLabAction: (fn) => set({ labAction: fn }),
   hydrateFromBackend: (snapshot) => {
     if (!snapshot) return
     const snapshotKey = JSON.stringify({
@@ -237,6 +241,7 @@ export const useOS = create((set, get) => ({
       updates: snapshot.updates,
       storage: snapshot.storage,
       ad: snapshot.ad,
+      hyperv_vms: snapshot.hyperv_vms,
     })
     // Short-circuit WITHOUT calling set() — calling set (even returning {})
     // produces a fresh state object every time, which would re-fire any effect
@@ -387,6 +392,8 @@ export const useOS = create((set, get) => ({
       disks,
       vfs,
       adUsers,
+      hypervVms: Array.isArray(snapshot.hyperv_vms) ? snapshot.hyperv_vms : s.hypervVms,
+      labSessionId: snapshot.session_id || s.labSessionId,
     }
     })
   },

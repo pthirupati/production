@@ -57,25 +57,37 @@ export function DNSManager() {
 }
 
 // ── Hyper-V Manager ──────────────────────────────────────────────────────────
-const VMS = [
+const FALLBACK_VMS = [
   { name: 'DC01', state: 'Running', cpu: 12, mem: 4096, uptime: '2.14:23:11', status: 'Operating normally' },
   { name: 'WEB01', state: 'Running', cpu: 8, mem: 2048, uptime: '2.14:23:11', status: 'Operating normally' },
-  { name: 'WEB02', state: 'Running', cpu: 6, mem: 2048, uptime: '2.14:23:11', status: 'Operating normally' },
-  { name: 'DB01', state: 'Running', cpu: 24, mem: 8192, uptime: '2.14:23:11', status: 'Operating normally' },
-  { name: 'APP01', state: 'Running', cpu: 15, mem: 4096, uptime: '2.14:23:11', status: 'Operating normally' },
-  { name: 'BACKUP01', state: 'Saved', cpu: 0, mem: 0, uptime: '', status: 'Saved state' },
   { name: 'DEV-WIN', state: 'Off', cpu: 0, mem: 0, uptime: '', status: 'Off' },
-  { name: 'TEST-VM', state: 'Running', cpu: 3, mem: 1024, uptime: '0.00:45:22', status: 'Operating normally' },
-  { name: 'LEGACY-APP', state: 'Paused', cpu: 0, mem: 2048, uptime: '', status: 'Paused' },
 ]
 
 export function HyperV() {
-  const [sel, setSel] = useState('DC01')
+  const hypervVms = useOS((s) => s.hypervVms)
+  const labAction = useOS((s) => s.labAction)
+  const [sel, setSel] = useState('')
   const [settings, setSettings] = useState(null)
-  const cur = VMS.find((v) => v.name === sel)
+  const [busy, setBusy] = useState(false)
+  const VMS = (hypervVms && hypervVms.length) ? hypervVms : FALLBACK_VMS
+  const cur = VMS.find((v) => v.name === (sel || VMS[0]?.name)) || VMS[0]
+
+  const act = async (action, name) => {
+    if (!labAction || busy) return
+    setBusy(true)
+    try { await labAction(action, { name }) }
+    finally { setBusy(false) }
+  }
+
   return (
     <div className="winos-app">
-      <div className="winos-toolbar"><span style={{ fontSize: 12 }}>File &nbsp; Action &nbsp; View &nbsp; Help</span></div>
+      <div className="winos-toolbar">
+        <span style={{ fontSize: 12 }}>File &nbsp; Action &nbsp; View &nbsp; Help</span>
+        <button type="button" className="winos-btn" style={{ marginLeft: 'auto' }} disabled={busy || !labAction}
+          onClick={() => act('hyperv_create', `NEW-VM-${Date.now().toString(36).slice(-3).toUpperCase()}`)}>
+          New…
+        </button>
+      </div>
       <div className="winos-split">
         <div className="winos-tree" style={{ width: 150 }}>
           <div className="winos-tree-row sel"><Box size={13} /> SERVER01</div>
@@ -85,7 +97,7 @@ export function HyperV() {
             <table className="winos-table">
               <thead><tr><th>Name</th><th>State</th><th>CPU Usage</th><th>Assigned Memory</th><th>Uptime</th><th>Status</th></tr></thead>
               <tbody>{VMS.map((v) => (
-                <tr key={v.name} className={sel === v.name ? 'sel' : ''} onClick={() => setSel(v.name)} onDoubleClick={() => setSettings(v)}>
+                <tr key={v.name} className={(sel || VMS[0]?.name) === v.name ? 'sel' : ''} onClick={() => setSel(v.name)} onDoubleClick={() => setSettings(v)}>
                   <td>{v.name}</td>
                   <td><span className={`winos-badge ${v.state === 'Running' ? 'ok' : v.state === 'Off' ? 'err' : 'warn'}`}>{v.state}</span></td>
                   <td>{v.state === 'Running' ? `${v.cpu}%` : ''}</td><td>{v.mem ? `${v.mem} MB` : ''}</td><td>{v.uptime}</td><td>{v.status}</td>
@@ -97,11 +109,14 @@ export function HyperV() {
             <div style={{ borderTop: '2px solid #ccc', padding: 12, fontSize: 12 }}>
               <div style={{ fontWeight: 600, marginBottom: 6 }}>{cur.name}</div>
               <div style={{ display: 'flex', gap: 6 }}>
-                <button className="winos-btn">Connect</button>
-                <button className="winos-btn" onClick={() => setSettings(cur)}>Settings…</button>
-                <button className="winos-btn" disabled={cur.state === 'Running'}>Start</button>
-                <button className="winos-btn" disabled={cur.state !== 'Running'}>Turn Off…</button>
-                <button className="winos-btn">Checkpoint</button>
+                <button type="button" className="winos-btn">Connect</button>
+                <button type="button" className="winos-btn" onClick={() => setSettings(cur)}>Settings…</button>
+                <button type="button" className="winos-btn" disabled={busy || cur.state === 'Running'}
+                  onClick={() => act('hyperv_start', cur.name)}>Start</button>
+                <button type="button" className="winos-btn" disabled={busy || cur.state !== 'Running'}
+                  onClick={() => act('hyperv_stop', cur.name)}>Turn Off…</button>
+                <button type="button" className="winos-btn" disabled={busy}
+                  onClick={() => act('hyperv_checkpoint', cur.name)}>Checkpoint</button>
               </div>
             </div>
           )}
