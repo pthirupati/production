@@ -69,11 +69,44 @@ def enrich_network(network: dict) -> dict:
             "ospf": {"area": "0.0.0.0", "neighbors": 1, "status": "full"},
             "stp": {"mode": "RSTP", "root": i == 0, "status": "forwarding"},
             "lacp": {"bundles": [{"id": "Po1", "members": [7, 8], "status": "up"}] if i == 0 else []},
-            "vxlan": {"enabled": i == 0, "vnis": [10010, 10020] if i == 0 else []},
-            "evpn": {"enabled": i == 0, "status": "established" if i == 0 else "disabled"},
-            "mpls": {"enabled": False},
+            "vxlan": {
+                "enabled": i == 0,
+                "vnis": [10010, 10020] if i == 0 else [],
+                "source_interface": "Loopback0",
+            },
+            "evpn": {
+                "enabled": i == 0,
+                "status": "established" if i == 0 else "disabled",
+                "rd": f"65001:{100 + i}",
+                "rt_import": ["65001:10010"] if i == 0 else [],
+                "rt_export": ["65001:10010"] if i == 0 else [],
+                "vteps": ["10.0.0.11", "10.0.0.12"] if i == 0 else [],
+                "neighbors": ["10.0.0.1"] if i == 0 else [],
+            },
+            "mpls": {
+                "enabled": False,
+                "ldp_router_id": sw.get("mgmt_ip") or f"10.0.0.{11 + i}",
+                "ldp_neighbors": [],
+                "labels": [],
+                "status": "disabled",
+            },
             "vlan": {"ids": sorted({p.get("vlan") for p in sw.get("ports") or [] if p.get("vlan")})},
         })
+        # Backfill richer keys on already-seeded protocol dicts
+        mpls = sw["protocols"].setdefault("mpls", {"enabled": False})
+        mpls.setdefault("ldp_router_id", sw.get("mgmt_ip") or "10.0.0.11")
+        mpls.setdefault("ldp_neighbors", [])
+        mpls.setdefault("labels", [])
+        mpls.setdefault("status", "established" if mpls.get("enabled") else "disabled")
+        evpn = sw["protocols"].setdefault("evpn", {})
+        evpn.setdefault("rd", f"65001:{100 + i}")
+        evpn.setdefault("rt_import", [])
+        evpn.setdefault("rt_export", [])
+        evpn.setdefault("vteps", [])
+        evpn.setdefault("neighbors", [])
+        vx = sw["protocols"].setdefault("vxlan", {})
+        vx.setdefault("source_interface", "Loopback0")
+        vx.setdefault("vnis", [])
         sw.setdefault("cli_history", [])
         sw.setdefault("cli_output", [])
         for p in sw.get("ports") or []:
@@ -109,9 +142,12 @@ def run_switch_cli(sw: dict, command: str) -> list[str]:
     if lower in ("?", "help"):
         return [
             "Available: show version | show interfaces | show vlan | show ip bgp summary",
-            "  show lacp | show spanning-tree | show vxlan | ping <host>",
+            "  show lacp | show spanning-tree | show vxlan | show mpls | show evpn",
+            "  show bgp l2vpn evpn summary | show mpls ldp neighbor | show mpls forwarding",
             "  conf t / configure | interface EthernetN | no shutdown | shutdown",
-            "  switchport access vlan <id> | exit | end | clear counters",
+            "  switchport access vlan <id> | mpls ip | no mpls ip | mpls ldp router-id <ip>",
+            "  nv overlay evpn | address-family l2vpn evpn | neighbor <ip> activate",
+            "  vni <id> | route-target import/export <rt> | exit | end | clear counters",
         ]
 
     if lower.startswith("show version") or lower == "show ver" or lower == "show system information":
@@ -143,6 +179,58 @@ def run_switch_cli(sw: dict, command: str) -> list[str]:
     elif "vlan" in lower and lower.startswith("show"):
         vlans = proto.get("vlan", {}).get("ids") or []
         lines = [f"VLAN  Name"] + [f"{v:<5} vlan{v}" for v in vlans] or ["No VLANs configured"]
+    elif "mpls" in lower and lower.startswith("show"):
+        m = proto.get("mpls") or {}
+        if "ldp" in lower:
+            neighbors = m.get("ldp_neighbors") or []
+            lines = [
+                f"LDP router-id {m.get('ldp_router_id')} status={m.get('status')}",
+                "Peer            State",
+            ] + ([f"{n:<15} Operational" for n in neighbors] or ["(no LDP neighbors)"])
+        elif "forward" in lower:
+            labels = m.get("labels") or []
+            lines = ["In Label  Out Label  Prefix / FEC", "--------  ---------  -----------"]
+            if labels:
+                for lab in labels:
+                    lines.append(
+                        f"{lab.get('in', '-'):<9} {lab.get('out', '-'):<10} {lab.get('fec', '-')}"
+                    )
+            else:
+                lines.append("(empty FIB — enable MPLS first)")
+        else:
+            lines = [
+                f"MPLS enabled={m.get('enabled')} status={m.get('status')}",
+                f"LDP router-id {m.get('ldp_router_id')}",
+                f"LDP neighbors: {len(m.get('ldp_neighbors') or [])}",
+                f"Labels in FIB: {len(m.get('labels') or [])}",
+            ]
+    elif "l2vpn evpn" in lower or "evpn" in lower and lower.startswith("show") or lower.startswith("show evpn"):
+        ev = proto.get("evpn") or {}
+        vx = proto.get("vxlan") or {}
+        if "summary" in lower or "l2vpn" in lower:
+            lines = [
+                f"BGP L2VPN EVPN — enabled={ev.get('enabled')} status={ev.get('status')}",
+                f"RD {ev.get('rd')}  RT import {ev.get('rt_import')}  RT export {ev.get('rt_export')}",
+                "Neighbor        State",
+            ]
+            for n in (ev.get("neighbors") or []):
+                lines.append(f"{n:<15} {'Established' if ev.get('enabled') else 'Idle'}")
+            if not ev.get("neighbors"):
+                lines.append("(no EVPN neighbors — activate under address-family)")
+        else:
+            lines = [
+                f"EVPN enabled={ev.get('enabled')} status={ev.get('status')}",
+                f"RD={ev.get('rd')} VTEPs={ev.get('vteps')}",
+                f"VNIs={vx.get('vnis')} source={vx.get('source_interface')}",
+            ]
+    elif "vxlan" in lower and lower.startswith("show"):
+        vx = proto.get("vxlan") or {}
+        ev = proto.get("evpn") or {}
+        lines = [
+            f"VXLAN enabled={vx.get('enabled')} VNIs={vx.get('vnis')}",
+            f"Source interface {vx.get('source_interface')}",
+            f"EVPN enabled={ev.get('enabled')} status={ev.get('status')}",
+        ]
     elif "bgp" in lower:
         bgp = proto.get("bgp") or {}
         lines = [
@@ -165,13 +253,6 @@ def run_switch_cli(sw: dict, command: str) -> list[str]:
     elif "spanning" in lower or "stp" in lower or "rstp" in lower:
         s = proto.get("stp") or {}
         lines = [f"Mode {s.get('mode')} root={'yes' if s.get('root') else 'no'} status {s.get('status')}"]
-    elif "vxlan" in lower or "evpn" in lower:
-        vx = proto.get("vxlan") or {}
-        ev = proto.get("evpn") or {}
-        lines = [
-            f"VXLAN enabled={vx.get('enabled')} VNIs={vx.get('vnis')}",
-            f"EVPN enabled={ev.get('enabled')} status={ev.get('status')}",
-        ]
     elif lower.startswith("clear counter"):
         for p in ports:
             p["errors"] = 0
@@ -226,6 +307,80 @@ def run_switch_cli(sw: dict, command: str) -> list[str]:
                 lines = ["% No interface"]
         except (ValueError, IndexError):
             lines = ["% Incomplete command"]
+    elif lower in ("mpls ip", "no mpls ip") or lower.startswith("mpls ldp router-id"):
+        m = proto.setdefault("mpls", {})
+        if lower == "no mpls ip":
+            m["enabled"] = False
+            m["status"] = "disabled"
+            m["ldp_neighbors"] = []
+            m["labels"] = []
+            lines = ["MPLS disabled"]
+        elif lower.startswith("mpls ldp router-id"):
+            rid = cmd.split()[-1] if len(cmd.split()) >= 4 else (sw.get("mgmt_ip") or "10.0.0.11")
+            m["ldp_router_id"] = rid
+            lines = [f"LDP router-id set to {rid}"]
+        else:
+            m["enabled"] = True
+            m["status"] = "established"
+            m["ldp_neighbors"] = list({*(m.get("ldp_neighbors") or []), "10.0.0.1", "10.0.0.2"})
+            m["labels"] = m.get("labels") or [
+                {"in": 16001, "out": 3, "fec": "10.10.0.0/16"},
+                {"in": 16002, "out": 3, "fec": "10.20.0.0/16"},
+            ]
+            lines = ["MPLS enabled; LDP neighbors discovered"]
+    elif lower in ("nv overlay evpn", "no nv overlay evpn") or lower == "address-family l2vpn evpn":
+        ev = proto.setdefault("evpn", {})
+        vx = proto.setdefault("vxlan", {})
+        if lower.startswith("no "):
+            ev["enabled"] = False
+            ev["status"] = "disabled"
+            vx["enabled"] = False
+            lines = ["EVPN overlay disabled"]
+        else:
+            ev["enabled"] = True
+            ev["status"] = "established"
+            vx["enabled"] = True
+            if not vx.get("vnis"):
+                vx["vnis"] = [10010, 10020]
+            lines = ["EVPN overlay enabled (address-family l2vpn evpn)"]
+    elif lower.startswith("neighbor ") and "activate" in lower:
+        ev = proto.setdefault("evpn", {})
+        parts = cmd.split()
+        peer = parts[1] if len(parts) > 1 else "10.0.0.1"
+        neighbors = ev.setdefault("neighbors", [])
+        if peer not in neighbors:
+            neighbors.append(peer)
+        ev["enabled"] = True
+        ev["status"] = "established"
+        lines = [f"EVPN neighbor {peer} activated"]
+    elif lower.startswith("vni ") or lower.startswith("member vni"):
+        vx = proto.setdefault("vxlan", {})
+        ev = proto.setdefault("evpn", {})
+        tokens = [t for t in cmd.replace("/", " ").split() if t.isdigit()]
+        vni = int(tokens[0]) if tokens else 10010
+        vnis = vx.setdefault("vnis", [])
+        if vni not in vnis:
+            vnis.append(vni)
+        vx["enabled"] = True
+        ev["enabled"] = True
+        ev["status"] = "established"
+        lines = [f"VNI {vni} member added to NVE/VXLAN"]
+    elif "route-target" in lower:
+        ev = proto.setdefault("evpn", {})
+        parts = cmd.split()
+        rt = parts[-1] if parts else "65001:10010"
+        if "import" in lower:
+            rts = ev.setdefault("rt_import", [])
+            if rt not in rts:
+                rts.append(rt)
+            lines = [f"route-target import {rt}"]
+        else:
+            rts = ev.setdefault("rt_export", [])
+            if rt not in rts:
+                rts.append(rt)
+            lines = [f"route-target export {rt}"]
+        ev["enabled"] = True
+        ev["status"] = "established"
     elif lower.startswith("ping"):
         host = cmd.split(maxsplit=1)[1] if " " in cmd else "10.0.0.1"
         lines = _ping_lines(host)

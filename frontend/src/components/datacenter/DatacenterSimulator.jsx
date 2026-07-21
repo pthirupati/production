@@ -51,6 +51,8 @@ const ROLE_META = {
   gpu_node: { label: 'GPU Node', icon: Zap },
   storage: { label: 'Storage', icon: HardDrive },
   db: { label: 'Database', icon: Database },
+  app: { label: 'App', icon: Boxes },
+  cache: { label: 'Cache', icon: Database },
 }
 
 function ComponentPill({ name, status }) {
@@ -389,8 +391,10 @@ export default function DatacenterSimulator({
         <div className="dc-room-body dc-ops-room">
           <MonitoringPanel
             monitoring={monitoring}
+            twinJournal={st.digital_twin}
             busy={busy}
             onRefresh={() => doAction(() => datacenterApi.refreshMonitoring(sessionId), 'Metrics refreshed')}
+            onReplay={() => doAction(() => datacenterApi.replayTwinJournal(sessionId), 'Twin journal replayed')}
           />
           <OpsTicketsPanel
             tickets={st.tickets}

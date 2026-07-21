@@ -84,13 +84,62 @@ def _session_key(session_id: str) -> str:
 
 def _load(session_id: str) -> dict | None:
     data = cache.get(_session_key(str(session_id)))
-    if data is None:
-        return None
-    return json.loads(data) if isinstance(data, str) else data
+    if data is not None:
+        return json.loads(data) if isinstance(data, str) else data
+    # Cache-cold fallback: recover from LabSession.simulation_snapshot["datacenter"]
+    return _load_from_snapshot(session_id)
 
 
 def _save(session_id: str, entry: dict) -> None:
     cache.set(_session_key(str(session_id)), json.dumps(entry, default=str), SESSION_TTL)
+    _mirror_to_snapshot(session_id, entry)
+
+
+def _load_from_snapshot(session_id: str) -> dict | None:
+    try:
+        from apps.labs.models import LabSession
+
+        snap = (
+            LabSession.objects.filter(pk=session_id)
+            .values_list("simulation_snapshot", flat=True)
+            .first()
+        )
+        if isinstance(snap, dict):
+            entry = snap.get("datacenter")
+            if isinstance(entry, dict) and entry.get("state"):
+                return copy.deepcopy(entry)
+    except Exception:  # pragma: no cover - defensive (no DB row / migration)
+        return None
+    return None
+
+
+def _mirror_to_snapshot(session_id: str, entry: dict) -> None:
+    """Persist datacenter twin state into LabSession.simulation_snapshot["datacenter"]."""
+    try:
+        from apps.labs.models import LabSession
+
+        row = LabSession.objects.filter(pk=session_id).only("id", "simulation_snapshot").first()
+        if not row:
+            return
+        snap = row.simulation_snapshot if isinstance(row.simulation_snapshot, dict) else {}
+        snap = dict(snap)
+        snap["datacenter"] = json.loads(json.dumps(entry, default=str))
+        LabSession.objects.filter(pk=session_id).update(simulation_snapshot=snap)
+    except Exception:  # pragma: no cover - defensive (unsaved session in tests)
+        pass
+
+
+JOURNAL_MAX = 200
+
+
+def _twin_journal(state: dict, action: str, payload: dict | None = None) -> None:
+    """Append a replayable action envelope to the digital-twin journal."""
+    if (payload or {}).get("_replay"):
+        return
+    clean = {k: v for k, v in (payload or {}).items() if not str(k).startswith("_")}
+    journal = state.setdefault("digital_twin", {}).setdefault("persisted_changes", [])
+    journal.insert(0, {"time": _now_iso(), "action": action, "payload": clean})
+    del journal[JOURNAL_MAX:]
 
 
 def _now_iso() -> str:
@@ -146,16 +195,19 @@ def _bmc(hostname: str, power_state: str, *, inlet_c: float = 22.1, exhaust_c: f
 
 def _server(asset_id: str, rack: str, u_slot: int, hostname: str, **overrides) -> dict:
     from apps.vmware_sim.datacenter_digital_twin import enrich_server
+    from apps.vmware_sim.datacenter_hardware_catalog import fleet_profile_for
     components = {k: "healthy" for k in _COMPONENT_KEYS}
     components.update(overrides.pop("components", {}))
     power_state = overrides.get("power_state", "on")
     role = overrides.pop("role", None)
     bmc_override = overrides.pop("bmc", None)
-    # Alternate Dell / HPE fleets so FRU tickets go to the right OEM
     rack_num = int("".join(ch for ch in rack if ch.isdigit()) or "1")
-    default_vendor = "HPE" if rack_num % 2 == 0 else "Dell"
-    vendor = overrides.pop("vendor", default_vendor)
-    service_tag = overrides.pop("service_tag", f"{'MX' if vendor == 'HPE' else 'DL'}{abs(hash(asset_id)) % 10_000_000:07d}")
+    vendor_override = overrides.pop("vendor", None)
+    profile = fleet_profile_for(vendor=vendor_override, rack_num=rack_num)
+    vendor = profile["vendor"]
+    model = overrides.pop("model", None) or profile["model"]
+    prefix = profile["tag_prefix"]
+    service_tag = overrides.pop("service_tag", f"{prefix}{abs(hash(asset_id)) % 10_000_000:07d}")
     bmc = bmc_override or _bmc(hostname, power_state, vendor=vendor)
     server = {
         "id": asset_id,
@@ -167,7 +219,7 @@ def _server(asset_id: str, rack: str, u_slot: int, hostname: str, **overrides) -
         "bmc": bmc,
         "vendor": vendor,
         "service_tag": service_tag,
-        "model": "ProLiant DL380 Gen10" if vendor == "HPE" else "PowerEdge R750",
+        "model": model,
         "hardware": _hardware_inventory(hostname),
         "firmware_version": overrides.pop("firmware_version", "2.12.0"),
         **({"role": role} if role else {}),
@@ -303,12 +355,30 @@ def _network() -> dict:
                 {"port": 3, "status": "down", "speed": "10G", "vlan": None, "connected_to": None},
             ],
         },
+        {
+            "id": "sw-tor-01", "rack": "R09", "u_slot": 34, "hostname": "tor-sw-01",
+            "model": "Dell S5248F-ON", "ports": [
+                {"port": 1, "status": "up", "speed": "25G", "vlan": 10, "connected_to": "sw-core-01"},
+                {"port": 2, "status": "up", "speed": "25G", "vlan": 20, "connected_to": "srv-r02-u10"},
+                {"port": 3, "status": "down", "speed": "25G", "vlan": None, "connected_to": None},
+            ],
+        },
+        {
+            "id": "sw-spine-01", "rack": "R10", "u_slot": 34, "hostname": "spine-sw-01",
+            "model": "Extreme 9920", "ports": [
+                {"port": 1, "status": "up", "speed": "100G", "vlan": 1, "connected_to": "sw-agg-01"},
+                {"port": 2, "status": "up", "speed": "100G", "vlan": 1, "connected_to": "sw-core-01"},
+                {"port": 3, "status": "down", "speed": "100G", "vlan": None, "connected_to": None},
+            ],
+        },
     ]
     topology = [
         {"from": "core-sw-01", "to": "agg-sw-01", "type": "uplink", "speed": "40G", "latency_us": 12, "util_pct": 34},
         {"from": "agg-sw-01", "to": "internet-edge", "type": "uplink", "speed": "10G", "latency_us": 80, "util_pct": 22},
         {"from": "ib-sw-01", "to": "agg-sw-01", "type": "uplink", "speed": "100G", "latency_us": 5, "util_pct": 41},
         {"from": "edge-sw-01", "to": "core-sw-01", "type": "uplink", "speed": "25G", "latency_us": 15, "util_pct": 18},
+        {"from": "tor-sw-01", "to": "core-sw-01", "type": "uplink", "speed": "25G", "latency_us": 10, "util_pct": 27},
+        {"from": "spine-sw-01", "to": "agg-sw-01", "type": "uplink", "speed": "100G", "latency_us": 6, "util_pct": 33},
     ]
     return enrich_network({"switches": switches, "topology": topology})
 
@@ -317,15 +387,18 @@ def _network() -> dict:
 
 def _base_state() -> dict:
     servers = [
-        _server("srv-r01-u12", "R01", 12, "web-prod-01", role="esxi_host"),
-        _server("srv-r01-u14", "R01", 14, "web-prod-02", role="esxi_host", power_state="off",
+        # R01 stays Dell so power-failure / broken-asset scenarios stay stable
+        _server("srv-r01-u12", "R01", 12, "web-prod-01", role="esxi_host", vendor="Dell"),
+        _server("srv-r01-u14", "R01", 14, "web-prod-02", role="esxi_host", vendor="Dell", power_state="off",
                 components={"power": "failed", "nic": "healthy", "disk": "healthy",
                             "motherboard": "healthy", "cpu": "healthy", "gpu": "healthy"}),
-        _server("srv-r02-u10", "R02", 10, "db-prod-01", role="db"),
-        _server("srv-r03-u08", "R03", 8, "gpu-node-01", role="gpu_node",
+        _server("srv-r02-u10", "R02", 10, "db-prod-01", role="db", vendor="HPE"),
+        _server("srv-r03-u08", "R03", 8, "gpu-node-01", role="gpu_node", vendor="Supermicro",
                 components={"power": "healthy", "nic": "healthy", "disk": "healthy",
                             "motherboard": "healthy", "cpu": "healthy", "gpu": "failed"}),
-        _server("srv-r04-u06", "R04", 6, "storage-01", role="storage"),
+        _server("srv-r04-u06", "R04", 6, "storage-01", role="storage", vendor="Lenovo"),
+        _server("srv-r05-u10", "R05", 10, "app-prod-01", role="app", vendor="Cisco"),
+        _server("srv-r06-u08", "R06", 8, "edge-cache-01", role="cache", vendor="Gigabyte"),
     ]
     rooms = _rooms()
     rack_pdus = _rack_pdus()
@@ -1233,9 +1306,7 @@ def apply_action(session_id: str, action: str, payload: dict | None = None) -> d
                 state["broken"] = {"server": srv["id"], "component": comp}
                 _event(state, f"Injected {preset['label']} on {srv['id']}", "danger")
             # twin journal
-            state.setdefault("digital_twin", {}).setdefault("persisted_changes", []).insert(
-                0, {"time": _now_iso(), "type": "failure_inject", "preset": preset_id, "asset": srv["id"]},
-            )
+            _twin_journal(state, "inject_failure", {"preset": preset_id, "asset_id": srv["id"]})
         elif target_type == "facility":
             if preset["component"] == "cooling":
                 cooling = state.get("cooling") or []
@@ -1363,9 +1434,9 @@ def apply_action(session_id: str, action: str, payload: dict | None = None) -> d
                 broken.clear()
         else:
             return {"ok": False, "error": f"Unknown service op: {op}"}
-        state.setdefault("digital_twin", {}).setdefault("persisted_changes", []).insert(
-            0, {"time": _now_iso(), "type": "service", "op": op, "asset": srv["id"]},
-        )
+        _twin_journal(state, "service_mode_action", {
+            "asset_id": srv["id"], "op": op, "slot": payload.get("slot"),
+        })
         _event(state, f"Service mode {op} on {srv['id']}", "info")
         _save(session_id, entry)
         return {"ok": True, "message": f"Service: {op}", "service_mode": sm, "motherboard": mb, "inventory": inv}
@@ -1545,6 +1616,17 @@ def apply_action(session_id: str, action: str, payload: dict | None = None) -> d
         if broken.get("component") == "switch" and broken.get("target") == sw.get("id"):
             if any(p.get("status") == "up" for p in sw.get("ports") or []):
                 broken.clear()
+        # Journal config-mutating CLI (skip pure show/help/ping)
+        cl = (command or "").strip().lower()
+        if cl and not cl.startswith("show") and cl not in ("?", "help") and not cl.startswith("ping"):
+            _twin_journal(state, "switch_cli", {"switch_id": sw["id"], "command": command})
+            # Clear MPLS/EVPN faults when CLI re-enables them
+            if broken.get("component") in ("mpls", "evpn", "vxlan"):
+                proto = sw.get("protocols") or {}
+                if broken["component"] == "mpls" and (proto.get("mpls") or {}).get("enabled"):
+                    broken.clear()
+                if broken["component"] in ("evpn", "vxlan") and (proto.get("evpn") or {}).get("enabled"):
+                    broken.clear()
         _event(state, f"CLI on {sw.get('hostname')}: {command}", "info")
         _save(session_id, entry)
         return {"ok": True, "message": "CLI ok", "switch_id": sw["id"], "output": lines, "switch": sw}
@@ -1607,8 +1689,27 @@ def apply_action(session_id: str, action: str, payload: dict | None = None) -> d
                         port["status"] = "up"
             elif proto == "ospf":
                 p.setdefault("ospf", {})["status"] = "full"
-        if broken.get("component") in ("bgp", "vlan", "ospf", proto):
+            elif proto == "mpls":
+                m = p.setdefault("mpls", {})
+                m["enabled"] = True
+                m["status"] = "established"
+                m.setdefault("ldp_neighbors", ["10.0.0.1", "10.0.0.2"])
+                m.setdefault("labels", [
+                    {"in": 16001, "out": 3, "fec": "10.10.0.0/16"},
+                ])
+            elif proto in ("evpn", "vxlan"):
+                ev = p.setdefault("evpn", {})
+                vx = p.setdefault("vxlan", {})
+                ev["enabled"] = True
+                ev["status"] = "established"
+                vx["enabled"] = True
+                if not vx.get("vnis"):
+                    vx["vnis"] = [10010, 10020]
+                if not ev.get("neighbors"):
+                    ev["neighbors"] = ["10.0.0.1"]
+        if broken.get("component") in ("bgp", "vlan", "ospf", "mpls", "evpn", "vxlan", proto):
             broken.clear()
+        _twin_journal(state, "net_fix_protocol", {"protocol": proto})
         _event(state, f"Restored network protocol {proto}", "success")
         _save(session_id, entry)
         return {"ok": True, "message": f"{proto} restored", "network": net}
@@ -1747,9 +1848,14 @@ def apply_action(session_id: str, action: str, payload: dict | None = None) -> d
                 priority=payload.get("priority") or "medium",
             )
             tickets.insert(0, ticket)
-            state.setdefault("digital_twin", {}).setdefault("persisted_changes", []).insert(
-                0, {"time": _now_iso(), "type": "ticket", "id": ticket["id"]},
-            )
+            _twin_journal(state, "ops_ticket", {
+                "op": "create",
+                "vendor": ticket["vendor"],
+                "ticket_type": ticket["type"],
+                "asset_id": asset_id,
+                "component": ticket["component"],
+                "summary": ticket["summary"],
+            })
             _event(state, f"Opened {ticket['type']} {ticket['id']} ({ticket['vendor']})", "info")
             _save(session_id, entry)
             return {"ok": True, "message": f"Ticket {ticket['id']}", "ticket": ticket}
@@ -1827,9 +1933,17 @@ def apply_action(session_id: str, action: str, payload: dict | None = None) -> d
         )
         if not ok:
             return {"ok": False, "error": msg}
-        state.setdefault("digital_twin", {}).setdefault("persisted_changes", []).insert(
-            0, {"time": _now_iso(), "type": "hypervisor", "op": payload.get("op"), "detail": msg},
-        )
+        _twin_journal(state, "hypervisor_ops", {
+            "op": payload.get("op"),
+            "host_id": payload.get("host_id"),
+            "vm_id": payload.get("vm_id"),
+            "dest_host": payload.get("dest_host"),
+            "name": payload.get("name"),
+            "cpus": payload.get("cpus"),
+            "mem_gb": payload.get("mem_gb"),
+            "disk_gb": payload.get("disk_gb"),
+            "mode": payload.get("mode"),
+        })
         _event(state, msg, "success")
         _save(session_id, entry)
         return {"ok": True, "message": msg, "hypervisors": plat}
@@ -1850,12 +1964,58 @@ def apply_action(session_id: str, action: str, payload: dict | None = None) -> d
         )
         if not ok:
             return {"ok": False, "error": msg}
-        state.setdefault("digital_twin", {}).setdefault("persisted_changes", []).insert(
-            0, {"time": _now_iso(), "type": "ai", "op": payload.get("op"), "detail": msg},
-        )
+        _twin_journal(state, "ai_ops", {
+            "op": payload.get("op"),
+            "name": payload.get("name"),
+            "ns": payload.get("ns"),
+            "node": payload.get("node"),
+            "gpus": payload.get("gpus"),
+            "chart": payload.get("chart"),
+            "profile": payload.get("profile"),
+            "replicas": payload.get("replicas"),
+        })
         _event(state, msg, "success")
         _save(session_id, entry)
         return {"ok": True, "message": msg, "ai_platform": ai}
+
+    if action == "replay_twin_journal":
+        twin = state.get("digital_twin") or {}
+        journal = list(reversed(twin.get("persisted_changes") or []))
+        scenario = entry.get("scenario_slug") or payload.get("scenario_slug") or ""
+        entry["state"] = _base_state()
+        _apply_preset(entry["state"], scenario)
+        entry["state"]["digital_twin"] = {"version": 2, "persisted_changes": []}
+        entry["scenario_slug"] = scenario
+        _save(session_id, entry)
+        replayed = 0
+        skipped = 0
+        for item in journal:
+            act = item.get("action")
+            if not act or act == "replay_twin_journal":
+                skipped += 1
+                continue
+            pl = dict(item.get("payload") or {})
+            pl["_replay"] = True
+            res = apply_action(session_id, act, pl)
+            if res.get("ok"):
+                replayed += 1
+            else:
+                skipped += 1
+        entry = _load(session_id) or entry
+        state = entry["state"]
+        state.setdefault("digital_twin", {})["persisted_changes"] = list(reversed(journal))
+        state["digital_twin"]["last_replay"] = {
+            "time": _now_iso(), "replayed": replayed, "skipped": skipped,
+        }
+        _event(state, f"Replayed twin journal ({replayed} actions, {skipped} skipped)", "success")
+        _save(session_id, entry)
+        return {
+            "ok": True,
+            "message": f"Replayed {replayed} journal actions",
+            "replayed": replayed,
+            "skipped": skipped,
+            "digital_twin": state.get("digital_twin"),
+        }
 
     return {"ok": False, "error": f"Unknown action: {action}"}
 

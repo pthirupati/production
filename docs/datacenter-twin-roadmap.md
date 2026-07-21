@@ -64,7 +64,8 @@ instancing / streaming.
 - [x] RAID depth: delete VD, patrol, CC, foreign import
 - [x] BMC depth: generations, NMI, firmware targets, users, HTML5 KVM
 - [x] BIOS: POST, password, flash, boot settings
-- [ ] Wire every catalog OEM into live fleet population (still Dell/HPE primary)
+- [x] Wire every catalog OEM into live fleet population (still Dell/HPE primary)
+  Live fleet: Dell, HPE, Lenovo, Supermicro, Cisco, Gigabyte (+ Dell/Extreme switches)
 
 ## Phase 3 — Network & storage
 
@@ -72,7 +73,7 @@ instancing / streaming.
 - [x] Packets counters, latency, BGP/OSPF/VLAN/LACP, ping/traceroute/iperf
 - [x] Full cable catalog + damage/label/route/bend/replace
 - [x] NVMe/SATA/SAS/U.2/E3.S + Ceph/ZFS/SAN/NAS facades
-- [ ] Deeper MPLS/EVPN config writers (show-level done)
+- [x] Deeper MPLS/EVPN config writers (show-level done)
 
 ## Phase 4 — Physics-lite & rack FRU
 
@@ -85,7 +86,7 @@ instancing / streaming.
 - [x] Full ticketing: change/incident/problem/RCA + Cisco/NVIDIA
 - [x] Grafana-style metrics panels (Prom/SNMP/Redfish/DCGM facades)
 - [x] Guided training by role with feedback
-- [x] Replayable event journal (session twin journal; DB-backed full replay later)
+- [x] Replayable event journal (session twin journal + LabSession.simulation_snapshot DB mirror + replay_twin_journal)
 
 ## Phase 6 — Compute platforms
 

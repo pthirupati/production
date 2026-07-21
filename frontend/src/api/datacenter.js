@@ -203,6 +203,9 @@ export const datacenterApi = {
   aiOps(sessionId, op, extra = {}) {
     return datacenterApi.action(sessionId, 'ai_ops', { op, ...extra })
   },
+  replayTwinJournal(sessionId, extra = {}) {
+    return datacenterApi.action(sessionId, 'replay_twin_journal', extra)
+  },
 }
 
 export default datacenterApi

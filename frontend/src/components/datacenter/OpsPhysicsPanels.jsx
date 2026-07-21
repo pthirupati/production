@@ -88,20 +88,31 @@ export function RackPhysicsFruPanel({ rack, busy, onToggleCasters, onBlanking, o
 }
 
 /** Monitoring / Alertmanager style dashboard */
-export function MonitoringPanel({ monitoring, busy, onRefresh }) {
+export function MonitoringPanel({ monitoring, busy, onRefresh, onReplay, twinJournal }) {
   const m = monitoring || {}
   const [tick, setTick] = useState(0)
   useEffect(() => {
     const id = setInterval(() => setTick((t) => t + 1), 4000)
     return () => clearInterval(id)
   }, [])
+  const journalLen = (twinJournal?.persisted_changes || []).length
+  const lastReplay = twinJournal?.last_replay
   return (
     <div className="dc-ops-panel">
       <div className="dc-twin-toolbar">
         <span className="dc-twin-title"><Activity size={13} /> Monitoring · scrape #{tick}</span>
         <button type="button" disabled={busy} className="dc-btn-outline dc-btn-xs" onClick={onRefresh}>Refresh</button>
+        {onReplay && (
+          <button type="button" disabled={busy || journalLen === 0} className="dc-btn-outline dc-btn-xs"
+            onClick={onReplay} title="Reset twin and replay journaled actions">
+            Replay journal ({journalLen})
+          </button>
+        )}
       </div>
       <div className="dc-muted">Exporters: {(m.exporters || []).join(', ')} · targets {m.targets_up}/{m.targets_total} · PUE {m.pue}</div>
+      {lastReplay && (
+        <div className="dc-muted">Last replay {lastReplay.time}: {lastReplay.replayed} ok / {lastReplay.skipped} skipped</div>
+      )}
       <div className="dc-drawer-label mt-2">Alerts</div>
       {(m.alerts || []).length === 0 && <div className="dc-text-ok">No firing alerts</div>}
       {(m.alerts || []).slice(0, 8).map((a, i) => (
@@ -130,7 +141,7 @@ export function OpsTicketsPanel({ tickets, busy, onCreate, onAdvance }) {
         <span className="dc-twin-title"><Ticket size={13} /> Ops tickets / RMA</span>
       </div>
       <div className="dc-action-row" style={{ flexWrap: 'wrap' }}>
-        {['Dell', 'HPE', 'Cisco', 'NVIDIA'].map((v) => (
+        {['Dell', 'HPE', 'Lenovo', 'Supermicro', 'Cisco', 'NVIDIA'].map((v) => (
           <button key={v} type="button" disabled={busy} className="dc-btn-outline dc-btn-xs"
             onClick={() => onCreate?.(v, 'incident')}>{v} Incident</button>
         ))}

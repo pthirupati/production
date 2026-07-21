@@ -35,6 +35,18 @@ export function SwitchCliPanel({ network, busy, onCli, onFixProtocol }) {
           placeholder="show interfaces | help" />
         <button type="button" disabled={busy} className="dc-btn-primary dc-btn-xs" onClick={run}>Run</button>
       </div>
+      <div className="dc-action-row" style={{ flexWrap: 'wrap', marginBottom: '0.4rem' }}>
+        {[
+          'show mpls',
+          'show bgp l2vpn evpn summary',
+          'mpls ip',
+          'nv overlay evpn',
+          'show evpn vni',
+        ].map((c) => (
+          <button key={c} type="button" disabled={busy} className="dc-btn-outline dc-btn-xs"
+            onClick={() => setCmd(c)}>{c}</button>
+        ))}
+      </div>
       <div className="dc-cli-screen">
         {(output.length ? output : (sw?.cli_output || ['Type a command and press Run. Try: help'])).map((line, i) => (
           <div key={i} className="dc-cli-line">{line}</div>
@@ -63,8 +75,8 @@ export function SwitchCliPanel({ network, busy, onCli, onFixProtocol }) {
         </table>
       )}
       <div className="dc-drawer-label mt-2">Protocols</div>
-      <div className="dc-action-row">
-        {['bgp', 'ospf', 'vlan', 'lacp'].map((p) => (
+      <div className="dc-action-row" style={{ flexWrap: 'wrap' }}>
+        {['bgp', 'ospf', 'vlan', 'lacp', 'mpls', 'evpn'].map((p) => (
           <button key={p} type="button" disabled={busy} className="dc-btn-outline dc-btn-xs"
             onClick={() => onFixProtocol?.(p)}>Restore {p.toUpperCase()}</button>
         ))}
@@ -76,6 +88,7 @@ export function SwitchCliPanel({ network, busy, onCli, onFixProtocol }) {
           <span className="dc-topology-chip">STP {sw.protocols.stp?.mode}</span>
           <span className="dc-topology-chip">VXLAN {sw.protocols.vxlan?.enabled ? 'on' : 'off'}</span>
           <span className="dc-topology-chip">EVPN {sw.protocols.evpn?.status}</span>
+          <span className="dc-topology-chip">MPLS {sw.protocols.mpls?.enabled ? 'on' : 'off'}</span>
         </div>
       )}
     </div>

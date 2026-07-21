@@ -12,6 +12,33 @@ SERVER_OEMS = [
     "Gigabyte", "ASUS", "Inspur", "Quanta", "Wiwynn", "Open Compute",
 ]
 
+# Profiles used to seed the live floor fleet (subset of SERVER_OEMS with models).
+FLEET_SERVER_PROFILES = [
+    {"vendor": "Dell", "model": "PowerEdge R750", "tag_prefix": "DL"},
+    {"vendor": "HPE", "model": "ProLiant DL380 Gen10", "tag_prefix": "MX"},
+    {"vendor": "Lenovo", "model": "ThinkSystem SR650 V3", "tag_prefix": "LN"},
+    {"vendor": "Supermicro", "model": "SYS-221H-TNR", "tag_prefix": "SM"},
+    {"vendor": "Cisco", "model": "UCS C240 M6", "tag_prefix": "UC"},
+    {"vendor": "Gigabyte", "model": "G292-Z43", "tag_prefix": "GB"},
+    {"vendor": "ASUS", "model": "ESC8000A-E12", "tag_prefix": "AS"},
+    {"vendor": "Inspur", "model": "NF5280M6", "tag_prefix": "IN"},
+    {"vendor": "Quanta", "model": "Grid D52BQ-2U", "tag_prefix": "QT"},
+    {"vendor": "Wiwynn", "model": "SV7220G3", "tag_prefix": "WW"},
+    {"vendor": "Open Compute", "model": "OCP Tioga Pass", "tag_prefix": "OC"},
+]
+
+
+def fleet_profile_for(*, vendor: str | None = None, rack_num: int = 1) -> dict:
+    """Pick a live-fleet OEM profile by vendor override or rack rotation."""
+    if vendor:
+        v = vendor.upper()
+        for p in FLEET_SERVER_PROFILES:
+            if p["vendor"].upper() == v or (v == "HP" and p["vendor"] == "HPE"):
+                return p
+        # Alias HP → HPE already handled; unknown vendors fall through to Dell
+        return FLEET_SERVER_PROFILES[0]
+    return FLEET_SERVER_PROFILES[(max(1, rack_num) - 1) % len(FLEET_SERVER_PROFILES)]
+
 CPU_CATALOG = [
     {"vendor": "Intel", "family": "Xeon Scalable", "gen": "Ice Lake", "socket": "LGA4189", "example": "Gold 6338"},
     {"vendor": "Intel", "family": "Xeon Scalable", "gen": "Emerald Rapids", "socket": "LGA4677", "example": "Gold 6548Y+"},
@@ -115,6 +142,7 @@ FAILURE_PRESETS = [
 def full_catalog() -> dict:
     return {
         "server_oems": SERVER_OEMS,
+        "fleet_profiles": FLEET_SERVER_PROFILES,
         "cpus": CPU_CATALOG,
         "gpus": GPU_CATALOG,
         "cables": CABLE_TYPES,

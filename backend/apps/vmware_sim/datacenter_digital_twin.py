@@ -18,9 +18,23 @@ def _now() -> str:
 
 def build_motherboard(vendor: str = "Dell") -> dict:
     """Selectable motherboard components with live bus telemetry stubs."""
-    is_hpe = vendor.upper() in ("HPE", "HP")
+    v = vendor.upper()
+    is_hpe = v in ("HPE", "HP")
+    is_lenovo = v == "LENOVO"
+    is_sm = v == "SUPERMICRO"
+    is_cisco = v == "CISCO"
+    if is_hpe:
+        model, socket, die, raid_dev = "ProLiant Gen10 System Board", "SP5", "EPYC 7543", "Smart Array P408i"
+    elif is_lenovo:
+        model, socket, die, raid_dev = "ThinkSystem SR650 System Board", "LGA4677", "Xeon Gold 6338", "ThinkSystem RAID 940-8i"
+    elif is_sm:
+        model, socket, die, raid_dev = "X13DEG-QT Dual Socket", "LGA4677", "Xeon Gold 6430", "Broadcom 9500-8i"
+    elif is_cisco:
+        model, socket, die, raid_dev = "UCS C240 M6 System Board", "LGA4189", "Xeon Gold 6338", "Cisco 12G SAS RAID"
+    else:
+        model, socket, die, raid_dev = "PowerEdge R750 System Board", "LGA4677", "Xeon Gold 6338", "PERC H755"
     return {
-        "model": "ProLiant Gen10 System Board" if is_hpe else "PowerEdge R750 System Board",
+        "model": model,
         "form_factor": "OCP 3.0 dual-socket",
         "pcb": {
             "width_mm": 305,
@@ -32,10 +46,10 @@ def build_motherboard(vendor: str = "Dell") -> dict:
         "cpu_sockets": [
             {
                 "id": "CPU1",
-                "type": "LGA4677" if not is_hpe else "SP5",
+                "type": socket,
                 "populated": True,
                 "status": "healthy",
-                "die": "Xeon Gold 6338" if not is_hpe else "EPYC 7543",
+                "die": die,
                 "tdp_w": 205,
                 "temp_c": 48.2,
                 "paste_applied": True,
@@ -44,10 +58,10 @@ def build_motherboard(vendor: str = "Dell") -> dict:
             },
             {
                 "id": "CPU2",
-                "type": "LGA4677" if not is_hpe else "SP5",
+                "type": socket,
                 "populated": True,
                 "status": "healthy",
-                "die": "Xeon Gold 6338" if not is_hpe else "EPYC 7543",
+                "die": die,
                 "tdp_w": 205,
                 "temp_c": 51.0,
                 "paste_applied": True,
@@ -70,7 +84,7 @@ def build_motherboard(vendor: str = "Dell") -> dict:
         ][:16],
         "pcie_slots": [
             {"id": "PCIE1", "gen": 4, "lanes": 16, "device": "NVIDIA A40", "status": "healthy", "bw_gbs": 12.4},
-            {"id": "PCIE2", "gen": 4, "lanes": 8, "device": "PERC H755" if not is_hpe else "Smart Array P408i", "status": "healthy", "bw_gbs": 3.1},
+            {"id": "PCIE2", "gen": 4, "lanes": 8, "device": raid_dev, "status": "healthy", "bw_gbs": 3.1},
             {"id": "PCIE3", "gen": 4, "lanes": 8, "device": "ConnectX-6 25GbE", "status": "healthy", "bw_gbs": 5.2},
             {"id": "PCIE4", "gen": 3, "lanes": 8, "device": "Emulex LPe32002", "status": "healthy", "bw_gbs": 1.8},
             {"id": "PCIE5", "gen": 3, "lanes": 4, "device": None, "status": "empty", "bw_gbs": 0},
@@ -105,8 +119,17 @@ def build_motherboard(vendor: str = "Dell") -> dict:
 # ── RAID ───────────────────────────────────────────────────────────────────
 
 def build_raid(vendor: str = "Dell") -> dict:
-    is_hpe = vendor.upper() in ("HPE", "HP")
-    controller = "HPE Smart Array P408i-a" if is_hpe else "Dell PERC H755"
+    v = vendor.upper()
+    if v in ("HPE", "HP"):
+        controller = "HPE Smart Array P408i-a"
+    elif v == "LENOVO":
+        controller = "ThinkSystem RAID 940-8i"
+    elif v == "SUPERMICRO":
+        controller = "Broadcom 9500-8i"
+    elif v == "CISCO":
+        controller = "Cisco 12G Modular RAID"
+    else:
+        controller = "Dell PERC H755"
     disks = [
         {"id": "PD0", "bay": 0, "model": "Samsung PM9A3", "size_gb": 1920, "bus": "NVMe", "status": "online", "smart": "OK", "temp_c": 38, "wear_pct": 4},
         {"id": "PD1", "bay": 1, "model": "Samsung PM9A3", "size_gb": 1920, "bus": "NVMe", "status": "online", "smart": "OK", "temp_c": 39, "wear_pct": 4},
@@ -192,6 +215,7 @@ def build_bmc(hostname: str, vendor: str, power_state: str = "on", *, generation
     is_hpe = vendor.upper() in ("HPE", "HP")
     is_lenovo = vendor.upper() == "LENOVO"
     is_sm = vendor.upper() == "SUPERMICRO"
+    is_cisco = vendor.upper() == "CISCO"
     if generation:
         product = generation
     elif is_hpe:
@@ -200,18 +224,31 @@ def build_bmc(hostname: str, vendor: str, power_state: str = "on", *, generation
         product = "XClarity Controller"
     elif is_sm:
         product = "Supermicro IPMI"
+    elif is_cisco:
+        product = "Cisco IMC"
     else:
         product = "iDRAC9"
-    chip = "iLO ASIC" if is_hpe else ("ASPEED AST2600" if not is_lenovo else "XCC ASIC")
-    fw = "2.86.00" if is_hpe else ("9.1.0" if is_lenovo else "6.10.30.00")
+    chip = (
+        "iLO ASIC" if is_hpe
+        else "XCC ASIC" if is_lenovo
+        else "Cisco IMC SoC" if is_cisco
+        else "ASPEED AST2600"
+    )
+    fw = (
+        "2.86.00" if is_hpe
+        else "9.1.0" if is_lenovo
+        else "4.3.2" if is_cisco
+        else "6.10.30.00"
+    )
     on = power_state == "on"
+    gens = (
+        ["iLO4", "iLO5", "iLO6"] if is_hpe
+        else [product] if (is_lenovo or is_sm or is_cisco)
+        else ["iDRAC8", "iDRAC9", "iDRAC10"]
+    )
     return {
         "product": product,
-        "generations_available": (
-            ["iLO4", "iLO5", "iLO6"] if is_hpe
-            else ["iDRAC8", "iDRAC9", "iDRAC10"] if not (is_lenovo or is_sm)
-            else [product]
-        ),
+        "generations_available": gens,
         "chip": chip,
         "firmware": fw,
         "endpoint": f"https://bmc-{hostname}.mgmt.corp.local",
@@ -279,6 +316,21 @@ def build_inventory_record(server: dict) -> dict:
     sid = server.get("id") or "srv"
     tag = server.get("service_tag") or f"AT-{abs(hash(sid)) % 10_000_000:07d}"
     purchase = "2023-06-15"
+    warranty_by_vendor = {
+        "Dell": "ProSupport Plus",
+        "HPE": "HPE Foundation Care",
+        "HP": "HPE Foundation Care",
+        "Lenovo": "Lenovo Premier Support",
+        "Supermicro": "Supermicro Standard Warranty",
+        "Cisco": "Cisco Smart Net Total Care",
+        "Gigabyte": "Gigabyte Server Warranty",
+        "ASUS": "ASUS Server Warranty",
+        "Inspur": "Inspur Care",
+        "Quanta": "QuantaCare",
+        "Wiwynn": "Wiwynn Support",
+        "Open Compute": "OCP Community Support",
+        "NVIDIA": "NVIDIA Enterprise Support",
+    }
     return {
         "asset_tag": f"FIX-{abs(hash(sid)) % 100_000:05d}",
         "serial": tag,
@@ -286,7 +338,7 @@ def build_inventory_record(server: dict) -> dict:
         "model": server.get("model") or "PowerEdge R750",
         "purchase_date": purchase,
         "warranty": {
-            "type": "ProSupport Plus" if vendor == "Dell" else "HPE Foundation Care",
+            "type": warranty_by_vendor.get(vendor, f"{vendor} Support"),
             "expires": "2027-06-15",
             "status": "active",
         },

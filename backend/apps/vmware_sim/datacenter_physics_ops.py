@@ -188,7 +188,10 @@ def enrich_rack(rack: dict, servers: list[dict], cooling: list[dict], pdus: list
 
 # ── Ops: tickets + monitoring (Phase 5 start) ──────────────────────────────
 
-SUPPORT_VENDORS = ("Dell", "HPE", "Cisco", "NVIDIA")
+SUPPORT_VENDORS = (
+    "Dell", "HPE", "Lenovo", "Supermicro", "Cisco", "NVIDIA",
+    "Gigabyte", "ASUS", "Inspur", "Quanta", "Wiwynn", "Open Compute",
+)
 
 TICKET_TYPES = (
     "incident", "problem", "change", "rma", "field_visit",
