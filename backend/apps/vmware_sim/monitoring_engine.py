@@ -953,6 +953,7 @@ def get_state(session_id: str, scenario_slug: str = "") -> dict:
         "prom_runtime": state.get("prom_runtime", {}),
         "prom_flags": state.get("prom_flags", []),
         "service_discovery": state.get("service_discovery", []),
+        "grafana_browse": state.get("grafana_browse", {}),
         "summary": summary,
     }
 

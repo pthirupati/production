@@ -25,4 +25,10 @@ export const terraformApi = {
   setVariable(sessionId, payload = {}) {
     return terraformApi.action(sessionId, 'tfc_set_variable', payload)
   },
+  createAgentPool(sessionId, name, agents = 1) {
+    return terraformApi.action(sessionId, 'tfc_create_agent_pool', { name, agents })
+  },
+  updateOrgSetting(sessionId, section, key, value) {
+    return terraformApi.action(sessionId, 'tfc_update_org_setting', { section, key, value })
+  },
 }

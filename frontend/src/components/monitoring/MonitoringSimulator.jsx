@@ -464,6 +464,11 @@ const GRAFANA_NAV_MAP = {
 /* ── Grafana view ── */
 function GrafanaView({ state, sessionId, scenario, onReload, activeNav, grafanaChildNav, setGrafanaChildNav }) {
   const graf = state.grafana || {}
+  const browse = state.grafana_browse || {}
+  const folders = browse.folders?.length ? browse.folders : GRAFANA_FOLDERS
+  const playlists = browse.playlists?.length ? browse.playlists : GRAFANA_PLAYLISTS
+  const snapshots = browse.snapshots?.length ? browse.snapshots : GRAFANA_SNAPSHOTS
+  const libraryPanels = browse.library_panels?.length ? browse.library_panels : GRAFANA_LIBRARY_PANELS
   const [activeDash, setActiveDash] = useState(graf.dashboards?.[0]?.uid || '')
   const [sub, setSub] = useState(GRAFANA_NAV_MAP[activeNav] || 'dashboards')
   const [editLayout, setEditLayout] = useState(false)
@@ -489,9 +494,10 @@ function GrafanaView({ state, sessionId, scenario, onReload, activeNav, grafanaC
       updated: 'Just now',
     }))
     const stateUids = new Set(fromState.map((d) => d.uid))
-    const extras = GRAFANA_DASHBOARD_BROWSE.filter((d) => !stateUids.has(d.uid))
+    const extrasSrc = browse.browse_dashboards?.length ? browse.browse_dashboards : GRAFANA_DASHBOARD_BROWSE
+    const extras = extrasSrc.filter((d) => !stateUids.has(d.uid))
     return [...fromState, ...extras]
-  }, [graf.dashboards])
+  }, [graf.dashboards, browse.browse_dashboards])
 
   useEffect(() => {
     if (activeNav) setSub(GRAFANA_NAV_MAP[activeNav] || 'dashboards')
@@ -639,8 +645,14 @@ function GrafanaView({ state, sessionId, scenario, onReload, activeNav, grafanaC
         {sub === 'dashboards' && grafanaChildNav === 'Browse' && (
           <div className="grid grid-cols-1 lg:grid-cols-[200px_1fr] gap-4">
             <div className="mon-card !p-2">
-              <div className="mon-panel-sub px-2 py-1 mb-1">Folders</div>
-              {GRAFANA_FOLDERS.map((f) => (
+              <div className="flex items-center justify-between px-2 py-1 mb-1">
+                <div className="mon-panel-sub">Folders</div>
+                <button type="button" className="text-[10px] text-[#f7913b]" onClick={async () => {
+                  await monitoringApi.createFolder(sessionId, { name: `Folder ${folders.length + 1}` })
+                  onReload?.()
+                }}>+ New</button>
+              </div>
+              {folders.map((f) => (
                 <button key={f.id} type="button" className="w-full text-left px-2 py-1.5 text-xs rounded hover:bg-white/5 text-[#d8def0]">
                   📁 {f.name} <span className="text-[#8a93b2]">({f.dashboards})</span>
                 </button>
@@ -681,8 +693,14 @@ function GrafanaView({ state, sessionId, scenario, onReload, activeNav, grafanaC
 
         {sub === 'dashboards' && grafanaChildNav === 'Playlists' && (
           <div className="mon-card">
-            <div className="mon-panel-title mb-3">Playlists</div>
-            {GRAFANA_PLAYLISTS.map((p) => (
+            <div className="flex items-center justify-between mb-3">
+              <div className="mon-panel-title">Playlists</div>
+              <button type="button" className="mon-btn-primary !text-xs" onClick={async () => {
+                await monitoringApi.createPlaylist(sessionId, { name: `Playlist ${playlists.length + 1}`, dashboards: 2 })
+                onReload?.()
+              }}>+ New playlist</button>
+            </div>
+            {playlists.map((p) => (
               <div key={p.id} className="flex justify-between py-2 border-b border-[#262a45]/50 text-sm">
                 <span>{p.name}</span><span className="text-[#8a93b2]">{p.dashboards} dashboards · {p.interval}</span>
               </div>
@@ -692,7 +710,14 @@ function GrafanaView({ state, sessionId, scenario, onReload, activeNav, grafanaC
 
         {sub === 'dashboards' && grafanaChildNav === 'Snapshots' && (
           <div className="mon-card">
-            {GRAFANA_SNAPSHOTS.map((s) => (
+            <div className="flex items-center justify-between mb-3">
+              <div className="mon-panel-title">Snapshots</div>
+              <button type="button" className="mon-btn-primary !text-xs" onClick={async () => {
+                await monitoringApi.createSnapshot(sessionId, { name: `Snapshot ${new Date().toISOString().slice(0, 10)}` })
+                onReload?.()
+              }}>+ New snapshot</button>
+            </div>
+            {snapshots.map((s) => (
               <div key={s.id} className="py-2 border-b border-[#262a45]/50 text-sm flex justify-between">
                 <span>{s.name}</span><span className="text-[#8a93b2]">expires {s.expires}</span>
               </div>
@@ -701,13 +726,21 @@ function GrafanaView({ state, sessionId, scenario, onReload, activeNav, grafanaC
         )}
 
         {sub === 'dashboards' && grafanaChildNav === 'Library panels' && (
-          <div className="grid sm:grid-cols-2 gap-3">
-            {GRAFANA_LIBRARY_PANELS.map((p) => (
-              <div key={p.id} className="mon-card !p-3">
-                <div className="font-medium text-sm">{p.name}</div>
-                <div className="text-[10px] text-[#8a93b2] mt-1">{p.type} · {p.datasource}</div>
-              </div>
-            ))}
+          <div>
+            <div className="flex justify-end mb-3">
+              <button type="button" className="mon-btn-primary !text-xs" onClick={async () => {
+                await monitoringApi.createLibraryPanel(sessionId, { name: `Panel ${libraryPanels.length + 1}` })
+                onReload?.()
+              }}>+ New panel</button>
+            </div>
+            <div className="grid sm:grid-cols-2 gap-3">
+              {libraryPanels.map((p) => (
+                <div key={p.id} className="mon-card !p-3">
+                  <div className="font-medium text-sm">{p.name}</div>
+                  <div className="text-[10px] text-[#8a93b2] mt-1">{p.type} · {p.datasource}</div>
+                </div>
+              ))}
+            </div>
           </div>
         )}
 

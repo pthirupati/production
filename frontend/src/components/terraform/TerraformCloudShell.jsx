@@ -58,9 +58,24 @@ export default function TerraformCloudShell({
   const teamRows = serverTeams.length ? serverTeams : TFC_TEAMS
   const [showApply, setShowApply] = useState(false)
   const [showVarModal, setShowVarModal] = useState(false)
+  const [varKey, setVarKey] = useState('')
+  const [varValue, setVarValue] = useState('')
+  const [varSensitive, setVarSensitive] = useState(false)
+  const [varHcl, setVarHcl] = useState(false)
   const slug = scenario?.slug || ''
   const iac = getIacProfile()
   const orgName = tfc.org?.name || TFC_ORG.name
+  const varRows = (tfc.variables || []).length
+    ? (tfc.variables || []).filter((v) => !selectedWs?.name || v.workspace === selectedWs.name || !v.workspace)
+    : TFC_VARIABLES
+  const stateRows = (tfc.states || []).length
+    ? (tfc.states || []).filter((s) => !selectedWs?.name || s.workspace === selectedWs.name || !s.workspace)
+    : TFC_STATES
+  const lockRows = (tfc.locks || []).length
+    ? (tfc.locks || []).filter((l) => !selectedWs?.name || l.workspace === selectedWs.name || !l.workspace)
+    : (selectedWs?.locked ? TFC_LOCKS : [])
+  const agentRows = (tfc.agent_pools || []).length ? tfc.agent_pools : TFC_AGENT_POOLS
+  const orgSettings = tfc.org_settings || {}
 
   const breadcrumbs = useMemo(() => {
     const items = [{ label: orgName, onClick: () => { setNav('workspaces'); setSelectedWs(null) } }]
@@ -146,7 +161,7 @@ export default function TerraformCloudShell({
                 { key: 'category', label: 'Category', sortable: true },
                 { key: 'sensitive', label: 'Sensitive', render: (r) => r.sensitive ? 'Yes' : 'No' },
                 { key: 'hcl', label: 'HCL', render: (r) => r.hcl ? 'Yes' : 'No' },
-              ]} rows={TFC_VARIABLES} searchKeys={['key']} />
+              ]} rows={varRows} searchKeys={['key']} />
             </div>
           )}
           {wsTab === 'settings' && (
@@ -170,13 +185,13 @@ export default function TerraformCloudShell({
                 { key: 'createdAt', label: 'Created', sortable: true, render: (r) => new Date(r.createdAt).toLocaleString() },
                 { key: 'createdBy', label: 'Created By', sortable: true },
                 { key: 'resources', label: 'Resources', sortable: true },
-              ]} rows={TFC_STATES} searchKeys={['createdBy']} />
+              ]} rows={stateRows} searchKeys={['createdBy']} />
             </div>
           )}
           {wsTab === 'locks' && (
             <div className="p-5">
               <h3 className="font-semibold mb-3">State locks</h3>
-              {TFC_LOCKS.length === 0 ? (
+              {lockRows.length === 0 ? (
                 <p className="text-sm text-slate-500">No active locks.</p>
               ) : (
                 <SimDataTable columns={[
@@ -184,7 +199,7 @@ export default function TerraformCloudShell({
                   { key: 'lockedBy', label: 'Locked By', sortable: true },
                   { key: 'lockedAt', label: 'Locked At', sortable: true, render: (r) => new Date(r.lockedAt).toLocaleString() },
                   { key: 'age', label: 'Age', sortable: true },
-                ]} rows={TFC_LOCKS} searchKeys={['lockedBy']} />
+                ]} rows={lockRows} searchKeys={['lockedBy']} />
               )}
             </div>
           )}
@@ -194,7 +209,7 @@ export default function TerraformCloudShell({
                 { key: 'name', label: 'Destination', sortable: true },
                 { key: 'triggers', label: 'Triggers', sortable: true },
                 { key: 'status', label: 'Status', render: (r) => <SimStatusBadge status={r.status === 'enabled' ? 'success' : 'disabled'} label={r.status} /> },
-              ]} rows={TFC_WS_NOTIFICATIONS} searchKeys={['name']} />
+              ]} rows={(tfc.ws_notifications || TFC_WS_NOTIFICATIONS).filter((n) => !ws?.name || n.workspace === ws.name || !n.workspace)} searchKeys={['name']} />
             </div>
           )}
           {wsTab === 'team access' && (
@@ -203,18 +218,18 @@ export default function TerraformCloudShell({
                 { key: 'team', label: 'Team', sortable: true },
                 { key: 'permission', label: 'Permission', sortable: true },
                 { key: 'inherited', label: 'Inherited', render: (r) => r.inherited ? 'Yes' : 'No' },
-              ]} rows={TFC_TEAM_ACCESS} searchKeys={['team']} />
+              ]} rows={(tfc.team_access || TFC_TEAM_ACCESS).filter((t) => !ws?.name || t.workspace === ws.name || !t.workspace)} searchKeys={['team']} />
             </div>
           )}
           {wsTab === 'health' && (
             <div className="p-5 grid gap-3 md:grid-cols-2">
-              {TFC_HEALTH.map((h) => (
+              {(tfc.health || TFC_HEALTH).map((h) => (
                 <div key={h.check} className="tfc-card p-4 flex items-start justify-between gap-3">
                   <div>
                     <div className="font-medium">{h.check}</div>
                     <div className="text-xs text-slate-500 mt-1">{h.detail}</div>
                   </div>
-                  <SimStatusBadge status={h.status === 'passing' ? 'success' : h.status === 'warning' ? 'pending' : 'error'} label={h.status} />
+                  <SimStatusBadge status={h.status === 'passing' || h.status === 'healthy' ? 'success' : h.status === 'warning' ? 'pending' : 'error'} label={h.status} />
                 </div>
               ))}
             </div>
@@ -275,13 +290,19 @@ export default function TerraformCloudShell({
     }
     if (nav === 'settings-agents') {
       return (
-        <div className="p-5">
-          <h1 className="text-xl font-semibold text-white mb-4">Agent Pools</h1>
+        <div className="p-5 space-y-3">
+          <div className="flex justify-between items-center">
+            <h1 className="text-xl font-semibold text-white">Agent Pools</h1>
+            <button type="button" className="tfc-btn-primary" disabled={busy}
+              onClick={() => run(() => terraformApi.createAgentPool(sessionId, `pool-${Date.now().toString(36).slice(-4)}`, 2), 'Agent pool created')}>
+              + New pool
+            </button>
+          </div>
           <SimDataTable columns={[
             { key: 'name', label: 'Pool', sortable: true },
             { key: 'agents', label: 'Agents', sortable: true },
             { key: 'status', label: 'Status', render: (r) => <SimStatusBadge status={r.status} /> },
-          ]} rows={TFC_AGENT_POOLS} searchKeys={['name']} />
+          ]} rows={agentRows} searchKeys={['name']} />
         </div>
       )
     }
@@ -300,8 +321,13 @@ export default function TerraformCloudShell({
     if (nav === 'settings-general') {
       return (
         <div className="p-5 grid gap-4 md:grid-cols-2">
-          {TFC_SETTINGS_GENERAL.map(([k, v]) => (
-            <div key={k} className="tfc-card p-3"><div className="text-[10px] uppercase text-slate-500 mb-1">{k}</div><div className="text-sm">{v}</div></div>
+          {(orgSettings.general || TFC_SETTINGS_GENERAL).map(([k, v]) => (
+            <div key={k} className="tfc-card p-3">
+              <div className="text-[10px] uppercase text-slate-500 mb-1">{k}</div>
+              <input className="w-full text-sm bg-transparent border-b border-transparent hover:border-slate-600 focus:border-violet-400 outline-none"
+                defaultValue={v} disabled={busy}
+                onBlur={(e) => { if (e.target.value !== v) run(() => terraformApi.updateOrgSetting(sessionId, 'general', k, e.target.value), 'Saved') }} />
+            </div>
           ))}
         </div>
       )
@@ -309,8 +335,13 @@ export default function TerraformCloudShell({
     if (nav === 'settings-sso') {
       return (
         <div className="p-5 grid gap-4 md:grid-cols-2">
-          {TFC_SETTINGS_SSO.map(([k, v]) => (
-            <div key={k} className="tfc-card p-3"><div className="text-[10px] uppercase text-slate-500 mb-1">{k}</div><div className="text-sm">{v}</div></div>
+          {(orgSettings.sso || TFC_SETTINGS_SSO).map(([k, v]) => (
+            <div key={k} className="tfc-card p-3">
+              <div className="text-[10px] uppercase text-slate-500 mb-1">{k}</div>
+              <input className="w-full text-sm bg-transparent border-b border-transparent hover:border-slate-600 focus:border-violet-400 outline-none"
+                defaultValue={v} disabled={busy}
+                onBlur={(e) => { if (e.target.value !== v) run(() => terraformApi.updateOrgSetting(sessionId, 'sso', k, e.target.value), 'Saved') }} />
+            </div>
           ))}
         </div>
       )
@@ -323,7 +354,7 @@ export default function TerraformCloudShell({
             { key: 'org', label: 'Organization', sortable: true },
             { key: 'status', label: 'Status', render: (r) => <SimStatusBadge status={r.status === 'connected' ? 'success' : 'disabled'} label={r.status} /> },
             { key: 'repos', label: 'Repos', sortable: true },
-          ]} rows={TFC_SETTINGS_VCS} searchKeys={['provider']} />
+          ]} rows={orgSettings.vcs || TFC_SETTINGS_VCS} searchKeys={['provider']} />
         </div>
       )
     }
@@ -335,7 +366,7 @@ export default function TerraformCloudShell({
             { key: 'created', label: 'Created', sortable: true },
             { key: 'lastUsed', label: 'Last Used', sortable: true },
             { key: 'scopes', label: 'Scopes', sortable: true },
-          ]} rows={TFC_SETTINGS_TOKENS} searchKeys={['name']} />
+          ]} rows={orgSettings.tokens || TFC_SETTINGS_TOKENS} searchKeys={['name']} />
         </div>
       )
     }
@@ -347,14 +378,14 @@ export default function TerraformCloudShell({
             { key: 'user', label: 'User', sortable: true },
             { key: 'action', label: 'Action', sortable: true },
             { key: 'target', label: 'Target', sortable: true },
-          ]} rows={TFC_AUDIT_LOG} searchKeys={['user', 'action']} />
+          ]} rows={orgSettings.audit || TFC_AUDIT_LOG} searchKeys={['user', 'action']} />
         </div>
       )
     }
     if (nav === 'settings-usage') {
       return (
         <div className="p-5 grid gap-4 md:grid-cols-3">
-          {TFC_USAGE.map((u) => (
+          {(orgSettings.usage || TFC_USAGE).map((u) => (
             <div key={u.metric} className="tfc-card p-4">
               <div className="text-[10px] uppercase text-slate-500">{u.metric}</div>
               <div className="text-2xl font-bold text-violet-300 mt-1">{u.value}</div>
@@ -491,13 +522,26 @@ export default function TerraformCloudShell({
         <p className="text-sm text-slate-300">Apply the latest successful plan to infrastructure?</p>
       </SimModal>
 
-      <SimModal open={showVarModal} onClose={() => setShowVarModal(false)} title="Add Variable"
-        footer={<button type="button" className="tfc-btn-primary" onClick={() => setShowVarModal(false)}>Save variable</button>}>
+      <SimModal open={showVarModal} onClose={() => { setShowVarModal(false); setVarKey(''); setVarValue(''); setVarSensitive(false); setVarHcl(false) }} title="Add Variable"
+        footer={<button type="button" className="tfc-btn-primary" disabled={busy || !varKey.trim()} onClick={() => {
+          run(() => terraformApi.setVariable(sessionId, {
+            workspace: selectedWs?.name || 'lab-workspace',
+            key: varKey.trim(),
+            value: varValue,
+            sensitive: varSensitive,
+            hcl: varHcl,
+          }), 'Variable saved')
+          setShowVarModal(false)
+          setVarKey('')
+          setVarValue('')
+          setVarSensitive(false)
+          setVarHcl(false)
+        }}>Save variable</button>}>
         <div className="space-y-3 text-sm">
-          <input placeholder="Key" className="w-full px-3 py-2 rounded bg-slate-900 border border-slate-600" />
-          <input placeholder="Value" className="w-full px-3 py-2 rounded bg-slate-900 border border-slate-600" />
-          <label className="flex items-center gap-2 text-xs"><input type="checkbox" /> Sensitive</label>
-          <label className="flex items-center gap-2 text-xs"><input type="checkbox" /> HCL</label>
+          <input placeholder="Key" className="w-full px-3 py-2 rounded bg-slate-900 border border-slate-600" value={varKey} onChange={(e) => setVarKey(e.target.value)} />
+          <input placeholder="Value" className="w-full px-3 py-2 rounded bg-slate-900 border border-slate-600" value={varValue} onChange={(e) => setVarValue(e.target.value)} />
+          <label className="flex items-center gap-2 text-xs"><input type="checkbox" checked={varSensitive} onChange={(e) => setVarSensitive(e.target.checked)} /> Sensitive</label>
+          <label className="flex items-center gap-2 text-xs"><input type="checkbox" checked={varHcl} onChange={(e) => setVarHcl(e.target.checked)} /> HCL</label>
         </div>
       </SimModal>
     </div>

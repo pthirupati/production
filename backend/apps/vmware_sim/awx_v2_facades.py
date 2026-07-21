@@ -77,6 +77,45 @@ def seed_v2() -> dict[str, Any]:
                 "status": "ok",
             },
         ],
+        "applications": [
+            {
+                "id": "app1",
+                "name": "GitHub OAuth",
+                "clientType": "Confidential",
+                "redirect": "https://awx.fixitlab.local/sso/callback",
+            },
+        ],
+        "management_jobs": [
+            {"id": "mj1", "name": "Cleanup expired sessions", "schedule": "Daily 03:00", "lastRun": "Success", "enabled": True},
+            {"id": "mj2", "name": "Remove old job artifacts", "schedule": "Weekly Sun", "lastRun": "Success", "enabled": True},
+            {"id": "mj3", "name": "Cleanup orphaned partitions", "schedule": "Monthly 1st", "lastRun": "Success", "enabled": False},
+        ],
+        "settings": {
+            "settings-auth": [
+                {"key": "LDAP Server URI", "value": "ldap://dc.corp.fixitlab.local"},
+                {"key": "Bind DN", "value": "CN=awx-bind,OU=Service,DC=corp,DC=fixitlab,DC=local"},
+                {"key": "User Search", "value": "(&(objectClass=user)(sAMAccountName=%(user)s))"},
+            ],
+            "settings-jobs": [
+                {"key": "Job timeout (seconds)", "value": "3600"},
+                {"key": "Concurrent jobs", "value": "10"},
+                {"key": "AWX task isolation", "value": "Enabled"},
+            ],
+            "settings-system": [
+                {"key": "Base URL", "value": "https://awx.fixitlab.local"},
+                {"key": "Timezone", "value": "UTC"},
+                {"key": "Session timeout", "value": "1800"},
+            ],
+            "settings-ui": [
+                {"key": "Custom login info", "value": "FixitLab AWX Training"},
+                {"key": "Logo", "value": "Default"},
+            ],
+            "settings-subscription": [
+                {"key": "Subscription type", "value": "Enterprise trial"},
+                {"key": "Seats", "value": "50"},
+                {"key": "Expires", "value": "2026-12-31"},
+            ],
+        },
     }
 
 
@@ -84,6 +123,9 @@ def ensure_v2(state: dict) -> None:
     for key, value in seed_v2().items():
         if key not in state or state.get(key) is None:
             state[key] = value
+        elif key == "settings" and isinstance(value, dict) and isinstance(state.get(key), dict):
+            for section, rows in value.items():
+                state["settings"].setdefault(section, rows)
 
 
 def apply_v2_action(state: dict, action: str, payload: dict | None = None) -> dict | None:
@@ -158,5 +200,52 @@ def apply_v2_action(state: dict, action: str, payload: dict | None = None) -> di
         }
         state.setdefault("execution_environments", []).append(row)
         return {"ok": True, "message": f"Execution environment {name} created", "execution_environment": row}
+
+    if action == "create_application":
+        name = (payload.get("name") or f"App {len(state.get('applications') or []) + 1}").strip()
+        row = {
+            "id": f"app-{len(state.get('applications') or []) + 1}",
+            "name": name,
+            "clientType": payload.get("clientType") or payload.get("client_type") or "Confidential",
+            "redirect": payload.get("redirect") or "https://awx.fixitlab.local/api/o/authorize/",
+        }
+        state.setdefault("applications", []).append(row)
+        return {"ok": True, "message": f"Application {name} created", "application": row}
+
+    if action == "launch_mgmt_job":
+        mid = payload.get("id") or payload.get("job_id")
+        jobs = state.get("management_jobs") or []
+        job = next((j for j in jobs if j.get("id") == mid), None)
+        if not job and jobs:
+            job = jobs[0]
+        if not job:
+            return {"ok": False, "error": "Management job not found"}
+        job["lastRun"] = "Success"
+        job["last_run_at"] = _now()
+        return {"ok": True, "message": f"Launched management job {job['name']}", "job": job}
+
+    if action == "toggle_mgmt_job":
+        mid = payload.get("id") or payload.get("job_id")
+        job = next((j for j in state.get("management_jobs") or [] if j.get("id") == mid), None)
+        if not job:
+            return {"ok": False, "error": "Management job not found"}
+        job["enabled"] = not bool(job.get("enabled", True))
+        return {"ok": True, "message": f"{'Enabled' if job['enabled'] else 'Disabled'} {job['name']}", "job": job}
+
+    if action == "update_setting":
+        section = payload.get("section") or "settings-system"
+        key = payload.get("key") or ""
+        value = payload.get("value")
+        settings = state.setdefault("settings", {})
+        rows = settings.setdefault(section, [])
+        row = next((r for r in rows if r.get("key") == key), None)
+        if row:
+            row["value"] = value if value is not None else row.get("value")
+        else:
+            if not key:
+                return {"ok": False, "error": "Setting key required"}
+            row = {"key": key, "value": value or ""}
+            rows.append(row)
+        return {"ok": True, "message": f"Updated {key}", "setting": row, "section": section}
 
     return None

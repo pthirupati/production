@@ -70,4 +70,16 @@ export const awxApi = {
   createExecutionEnvironment(sessionId, payload = {}) {
     return awxApi.action(sessionId, 'create_execution_environment', payload)
   },
+  createApplication(sessionId, payload = {}) {
+    return awxApi.action(sessionId, 'create_application', payload)
+  },
+  launchMgmtJob(sessionId, id) {
+    return awxApi.action(sessionId, 'launch_mgmt_job', { id })
+  },
+  toggleMgmtJob(sessionId, id) {
+    return awxApi.action(sessionId, 'toggle_mgmt_job', { id })
+  },
+  updateSetting(sessionId, section, key, value) {
+    return awxApi.action(sessionId, 'update_setting', { section, key, value })
+  },
 }

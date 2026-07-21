@@ -38,6 +38,59 @@ def seed_v2() -> dict[str, Any]:
                 {"id": "t1", "name": "platform-admins", "access": "admin", "members": 4},
                 {"id": "t2", "name": "developers", "access": "write", "members": 18},
             ],
+            "agent_pools": [
+                {"id": "ap1", "name": "default-pool", "agents": 3, "status": "healthy"},
+                {"id": "ap2", "name": "prod-agents", "agents": 5, "status": "healthy"},
+            ],
+            "states": [
+                {"id": "st-1", "workspace": "lab-workspace", "serial": 42, "createdAt": _now(), "createdBy": "lab-user", "resources": 18},
+                {"id": "st-2", "workspace": "lab-workspace", "serial": 41, "createdAt": _now(), "createdBy": "ci-bot", "resources": 17},
+            ],
+            "locks": [],
+            "ws_notifications": [
+                {"id": "wn1", "workspace": "lab-workspace", "name": "Slack #infra", "triggers": "Errored runs", "status": "enabled"},
+                {"id": "wn2", "workspace": "lab-workspace", "name": "Email platform", "triggers": "Needs attention", "status": "enabled"},
+            ],
+            "team_access": [
+                {"team": "platform-admins", "permission": "Admin", "inherited": False, "workspace": "lab-workspace"},
+                {"team": "developers", "permission": "Write", "inherited": True, "workspace": "lab-workspace"},
+            ],
+            "health": [
+                {"check": "VCS connection", "status": "passing", "detail": "GitHub connected"},
+                {"check": "Remote state", "status": "passing", "detail": "S3 backend reachable"},
+                {"check": "Variables", "status": "warning", "detail": "1 sensitive var unused"},
+                {"check": "Run queue", "status": "passing", "detail": "0 queued runs"},
+            ],
+            "org_settings": {
+                "general": [
+                    ["Organization name", "fixitlab-training"],
+                    ["Default execution mode", "Remote"],
+                    ["Terraform version", "1.7.5"],
+                    ["Cost estimation", "Enabled"],
+                ],
+                "sso": [
+                    ["SAML enabled", "Yes"],
+                    ["IdP", "Okta"],
+                    ["Enforce SSO", "Optional"],
+                ],
+                "vcs": [
+                    {"provider": "GitHub", "org": "fixitlab", "status": "connected", "repos": 12},
+                    {"provider": "GitLab", "org": "—", "status": "not connected", "repos": 0},
+                ],
+                "tokens": [
+                    {"name": "ci-bot", "created": "2026-01-15", "lastUsed": "2026-06-24", "scopes": "plan, apply"},
+                    {"name": "local-dev", "created": "2026-03-01", "lastUsed": "2026-06-20", "scopes": "read"},
+                ],
+                "audit": [
+                    {"time": _now(), "user": "lab-user", "action": "run:plan", "target": "lab-workspace"},
+                    {"time": _now(), "user": "ci-bot", "action": "run:apply", "target": "web-tier-asg"},
+                ],
+                "usage": [
+                    {"metric": "Managed resources", "value": "186", "limit": "500"},
+                    {"metric": "Runs this month", "value": "42", "limit": "Unlimited"},
+                    {"metric": "Policy checks", "value": "12", "limit": "Unlimited"},
+                ],
+            },
         },
     }
 
@@ -51,6 +104,9 @@ def ensure_v2(state: dict) -> None:
     for key, value in seed["tfc"].items():
         if key not in tfc or tfc.get(key) is None:
             tfc[key] = value
+        elif key == "org_settings" and isinstance(value, dict) and isinstance(tfc.get(key), dict):
+            for section, rows in value.items():
+                tfc["org_settings"].setdefault(section, rows)
 
 
 def apply_v2_action(state: dict, action: str, payload: dict | None = None) -> dict | None:
@@ -123,6 +179,19 @@ def apply_v2_action(state: dict, action: str, payload: dict | None = None) -> di
         if not ws:
             return {"ok": False, "error": "Workspace not found"}
         ws["locked"] = bool(payload.get("locked", True))
+        locks = tfc.setdefault("locks", [])
+        if ws["locked"]:
+            locks[:] = [lk for lk in locks if lk.get("workspace") != ws["name"]]
+            locks.insert(0, {
+                "id": f"lk-{len(locks) + 1}",
+                "workspace": ws["name"],
+                "operation": payload.get("operation") or "plan",
+                "lockedBy": payload.get("lockedBy") or "lab-user",
+                "lockedAt": _now(),
+                "age": "0m",
+            })
+        else:
+            locks[:] = [lk for lk in locks if lk.get("workspace") != ws["name"]]
         return {"ok": True, "message": f"{'Locked' if ws['locked'] else 'Unlocked'} {ws['name']}", "workspace": ws}
 
     if action == "tfc_set_variable":
@@ -135,6 +204,7 @@ def apply_v2_action(state: dict, action: str, payload: dict | None = None) -> di
         if existing:
             existing["value"] = payload.get("value") or existing.get("value")
             existing["sensitive"] = bool(payload.get("sensitive", existing.get("sensitive")))
+            existing["hcl"] = bool(payload.get("hcl", existing.get("hcl")))
             row = existing
         else:
             row = {
@@ -144,8 +214,39 @@ def apply_v2_action(state: dict, action: str, payload: dict | None = None) -> di
                 "value": payload.get("value") or "",
                 "category": payload.get("category") or "terraform",
                 "sensitive": bool(payload.get("sensitive")),
+                "hcl": bool(payload.get("hcl")),
             }
             vars_.append(row)
         return {"ok": True, "message": f"Set variable {key}", "variable": row}
+
+    if action == "tfc_create_agent_pool":
+        name = (payload.get("name") or f"pool-{len(tfc.get('agent_pools') or []) + 1}").strip()
+        row = {
+            "id": f"ap-{len(tfc.get('agent_pools') or []) + 1}",
+            "name": name,
+            "agents": int(payload.get("agents") or 1),
+            "status": "healthy",
+        }
+        tfc.setdefault("agent_pools", []).append(row)
+        return {"ok": True, "message": f"Agent pool {name} created", "pool": row}
+
+    if action == "tfc_update_org_setting":
+        section = payload.get("section") or "general"
+        key = payload.get("key") or ""
+        value = payload.get("value")
+        org = tfc.setdefault("org_settings", {})
+        rows = org.setdefault(section, [])
+        if section in ("vcs", "tokens", "audit", "usage"):
+            return {"ok": False, "error": f"Section {section} is not key/value editable"}
+        # general/sso are list of [k,v]
+        found = False
+        for pair in rows:
+            if isinstance(pair, (list, tuple)) and pair and pair[0] == key:
+                pair[1] = value if value is not None else pair[1]
+                found = True
+                break
+        if not found and key:
+            rows.append([key, value or ""])
+        return {"ok": True, "message": f"Updated {key}", "section": section}
 
     return None

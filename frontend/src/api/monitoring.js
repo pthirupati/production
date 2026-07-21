@@ -44,6 +44,10 @@ export const monitoringApi = {
   getState: (sessionId, scenario = '') => getStateWithFallback(sessionId, scenario),
   action: (sessionId, action, payload = {}) => actionWithFallback(sessionId, action, payload),
   query: (sessionId, expr) => actionWithFallback(sessionId, 'query', { expr }),
+  createPlaylist: (sessionId, payload = {}) => actionWithFallback(sessionId, 'create_playlist', payload),
+  createSnapshot: (sessionId, payload = {}) => actionWithFallback(sessionId, 'create_snapshot', payload),
+  createLibraryPanel: (sessionId, payload = {}) => actionWithFallback(sessionId, 'create_library_panel', payload),
+  createFolder: (sessionId, payload = {}) => actionWithFallback(sessionId, 'create_folder', payload),
   release: (sessionId) => {
     if (!sessionId) return Promise.resolve({ released: true })
     return api.post(`/vmware/monitoring/sessions/${sessionId}/release/`, {}, { silentError: true })

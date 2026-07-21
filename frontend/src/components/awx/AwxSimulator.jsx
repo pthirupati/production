@@ -167,7 +167,15 @@ export default function AwxSimulator({
         <div className="space-y-4">
           {nav === 'dashboard' && (
             <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-3">
-              {AWX_DASHBOARD_STATS.map((s) => (
+              {[
+                { label: 'Hosts', value: (inv.hosts || []).length, color: '#EE0000' },
+                { label: 'Failed Hosts', value: (inv.hosts || []).filter((h) => h.status === 'failed').length, color: '#c0392b' },
+                { label: 'Inventories', value: (inv.inventories || []).length, color: '#2980b9' },
+                { label: 'Projects', value: (inv.projects || []).length, color: '#27ae60' },
+                { label: 'Job Templates', value: (inv.job_templates || []).length, color: '#8e44ad' },
+                { label: 'Jobs Running', value: (inv.jobs || []).filter((j) => ['running', 'pending', 'waiting'].includes(j.status)).length, color: '#f39c12' },
+                { label: 'Jobs Failed', value: (inv.jobs || []).filter((j) => j.status === 'failed').length, color: '#e74c3c' },
+              ].map((s) => (
                 <div key={s.label} className="awx-widget text-center">
                   <div className="text-2xl font-bold" style={{ color: s.color }}>{s.value}</div>
                   <div className="text-[10px] text-slate-500 uppercase mt-1">{s.label}</div>
@@ -495,11 +503,26 @@ export default function AwxSimulator({
       ]} rows={inv.execution_environments || AWX_EXEC_ENVS} searchKeys={['name']} />
     }
     if (nav === 'applications') {
-      return <SimDataTable columns={[
-        { key: 'name', label: 'Application', sortable: true },
-        { key: 'clientType', label: 'Client Type', sortable: true },
-        { key: 'redirect', label: 'Redirect URI', sortable: true },
-      ]} rows={AWX_APPLICATIONS} searchKeys={['name']} />
+      return (
+        <div className="space-y-3">
+          <div className="flex justify-between items-center flex-wrap gap-2">
+            <h2 className="text-lg font-semibold">Applications</h2>
+            <button type="button" className="awx-btn-launch flex items-center gap-1" disabled={busy}
+              onClick={() => run(() => awxApi.createApplication(sessionId, {
+                name: `App-${Date.now().toString(36).slice(-4)}`,
+                clientType: 'Confidential',
+                redirect: 'https://awx.fixitlab.local/api/o/authorize/',
+              }), 'Application created')}>
+              <Plus size={14} /> Add
+            </button>
+          </div>
+          <SimDataTable columns={[
+            { key: 'name', label: 'Application', sortable: true },
+            { key: 'clientType', label: 'Client Type', sortable: true },
+            { key: 'redirect', label: 'Redirect URI', sortable: true },
+          ]} rows={inv.applications || AWX_APPLICATIONS} searchKeys={['name']} />
+        </div>
+      )
     }
     if (nav === 'notifications') {
       return (
@@ -523,22 +546,50 @@ export default function AwxSimulator({
       )
     }
     if (nav === 'mgmt-jobs') {
-      return <SimDataTable columns={[
-        { key: 'name', label: 'Job', sortable: true },
-        { key: 'schedule', label: 'Schedule', sortable: true },
-        { key: 'lastRun', label: 'Last Run', render: (r) => <SimStatusBadge status="success" label={r.lastRun} /> },
-      ]} rows={AWX_MGMT_JOBS} searchKeys={['name']} />
+      return (
+        <div className="space-y-3">
+          <h2 className="text-lg font-semibold">Management Jobs</h2>
+          <SimDataTable columns={[
+            { key: 'name', label: 'Job', sortable: true },
+            { key: 'schedule', label: 'Schedule', sortable: true },
+            { key: 'enabled', label: 'Enabled', render: (r) => (r.enabled === false ? 'No' : 'Yes') },
+            { key: 'lastRun', label: 'Last Run', render: (r) => <SimStatusBadge status="success" label={r.lastRun || '—'} /> },
+            {
+              key: 'actions', label: '',
+              render: (r) => (
+                <div className="flex gap-1">
+                  <button type="button" className="awx-btn-launch !text-[11px] !py-0.5 !px-2" disabled={busy}
+                    onClick={(e) => { e.stopPropagation(); run(() => awxApi.launchMgmtJob(sessionId, r.id), 'Launched') }}>Launch</button>
+                  <button type="button" className="text-xs text-slate-500 underline" disabled={busy}
+                    onClick={(e) => { e.stopPropagation(); run(() => awxApi.toggleMgmtJob(sessionId, r.id), 'Updated') }}>
+                    {r.enabled === false ? 'Enable' : 'Disable'}
+                  </button>
+                </div>
+              ),
+            },
+          ]} rows={inv.management_jobs || AWX_MGMT_JOBS} searchKeys={['name']} />
+        </div>
+      )
     }
     if (nav.startsWith('settings-')) {
-      const rows = AWX_SETTINGS_SECTIONS[nav] || []
+      const rows = (inv.settings && inv.settings[nav]) || AWX_SETTINGS_SECTIONS[nav] || []
       return (
         <div className="space-y-3">
           <h2 className="text-lg font-semibold capitalize">{nav.replace('settings-', '').replace(/-/g, ' ')} Settings</h2>
           <div className="awx-widget divide-y">
             {rows.map((r) => (
-              <div key={r.key} className="flex justify-between py-3 text-sm">
-                <span className="text-slate-600">{r.key}</span>
-                <span className="font-mono text-slate-800">{r.value}</span>
+              <div key={r.key} className="flex justify-between items-center gap-3 py-3 text-sm">
+                <span className="text-slate-600 shrink-0">{r.key}</span>
+                <input
+                  className="font-mono text-slate-800 text-right bg-transparent border-b border-transparent hover:border-slate-300 focus:border-red-400 outline-none min-w-0 flex-1 max-w-md"
+                  defaultValue={r.value}
+                  disabled={busy}
+                  onBlur={(e) => {
+                    if (e.target.value !== r.value) {
+                      run(() => awxApi.updateSetting(sessionId, nav, r.key, e.target.value), 'Setting saved')
+                    }
+                  }}
+                />
               </div>
             ))}
           </div>

@@ -68,6 +68,31 @@ def seed_v2() -> dict[str, Any]:
             {"type": "kubernetes_sd", "role": "node", "discovered": 5, "active": 5},
             {"type": "file_sd", "path": "/etc/prometheus/targets/prod-nodes.json", "discovered": 8, "active": 8},
         ],
+        "grafana_browse": {
+            "folders": [
+                {"id": "general", "name": "General", "dashboards": 3},
+                {"id": "infra", "name": "Infrastructure", "dashboards": 5},
+                {"id": "apps", "name": "Applications", "dashboards": 4},
+                {"id": "slo", "name": "SLO / SLI", "dashboards": 2},
+            ],
+            "playlists": [
+                {"id": "pl1", "name": "NOC Rotation", "dashboards": 4, "interval": "30s"},
+                {"id": "pl2", "name": "Executive Summary", "dashboards": 2, "interval": "60s"},
+            ],
+            "snapshots": [
+                {"id": "sn1", "name": "Incident 2026-06-20", "created": "2026-06-20T14:00:00Z", "expires": "2026-07-20"},
+            ],
+            "library_panels": [
+                {"id": "lp1", "name": "CPU Usage Stat", "type": "stat", "datasource": "Prometheus"},
+                {"id": "lp2", "name": "Request Rate Graph", "type": "timeseries", "datasource": "Prometheus"},
+            ],
+            "browse_dashboards": [
+                {"uid": "infra-nodes", "title": "Node Exporter Full", "folder": "Infrastructure", "tags": ["linux", "prometheus"], "updated": "2026-06-24"},
+                {"uid": "k8s-cluster", "title": "Kubernetes Cluster", "folder": "Infrastructure", "tags": ["k8s"], "updated": "2026-06-23"},
+                {"uid": "api-latency", "title": "API Latency SLO", "folder": "SLO / SLI", "tags": ["http", "slo"], "updated": "2026-06-22"},
+                {"uid": "home-overview", "title": "Home Overview", "folder": "General", "tags": ["home"], "updated": "2026-06-20"},
+            ],
+        },
     }
 
 
@@ -75,6 +100,9 @@ def ensure_v2(state: dict) -> None:
     for key, value in seed_v2().items():
         if key not in state or state.get(key) is None:
             state[key] = value if not isinstance(value, dict) else dict(value)
+        elif key == "grafana_browse" and isinstance(value, dict) and isinstance(state.get(key), dict):
+            for nested, nested_val in value.items():
+                state[key].setdefault(nested, nested_val)
 
     prom = state.setdefault("prometheus", {})
     am = prom.setdefault("alertmanager", {})
@@ -198,5 +226,51 @@ def apply_v2_action(state: dict, action: str, payload: dict | None = None) -> di
         g["last_push"] = _now()
         g["metrics"] = int(g.get("metrics") or 0) + int(payload.get("metrics") or 1)
         return {"ok": True, "message": f"Pushed metrics for {job}/{instance}", "group": g}
+
+    if action == "create_playlist":
+        browse = state.setdefault("grafana_browse", {})
+        name = (payload.get("name") or f"Playlist {len(browse.get('playlists') or []) + 1}").strip()
+        row = {
+            "id": f"pl-{len(browse.get('playlists') or []) + 1}",
+            "name": name,
+            "dashboards": int(payload.get("dashboards") or 1),
+            "interval": payload.get("interval") or "30s",
+        }
+        browse.setdefault("playlists", []).append(row)
+        return {"ok": True, "message": f"Playlist {name} created", "playlist": row}
+
+    if action == "create_snapshot":
+        browse = state.setdefault("grafana_browse", {})
+        name = (payload.get("name") or f"Snapshot {len(browse.get('snapshots') or []) + 1}").strip()
+        row = {
+            "id": f"sn-{len(browse.get('snapshots') or []) + 1}",
+            "name": name,
+            "created": _now(),
+            "expires": payload.get("expires") or "2026-12-31",
+        }
+        browse.setdefault("snapshots", []).append(row)
+        return {"ok": True, "message": f"Snapshot {name} created", "snapshot": row}
+
+    if action == "create_library_panel":
+        browse = state.setdefault("grafana_browse", {})
+        name = (payload.get("name") or f"Panel {len(browse.get('library_panels') or []) + 1}").strip()
+        row = {
+            "id": f"lp-{len(browse.get('library_panels') or []) + 1}",
+            "name": name,
+            "type": payload.get("type") or "timeseries",
+            "datasource": payload.get("datasource") or "Prometheus",
+        }
+        browse.setdefault("library_panels", []).append(row)
+        return {"ok": True, "message": f"Library panel {name} created", "panel": row}
+
+    if action == "create_folder":
+        browse = state.setdefault("grafana_browse", {})
+        name = (payload.get("name") or f"Folder {len(browse.get('folders') or []) + 1}").strip()
+        fid = (payload.get("id") or name.lower().replace(" ", "-"))[:32]
+        if any(f.get("id") == fid or f.get("name") == name for f in browse.get("folders") or []):
+            return {"ok": False, "error": "Folder already exists"}
+        row = {"id": fid, "name": name, "dashboards": 0}
+        browse.setdefault("folders", []).append(row)
+        return {"ok": True, "message": f"Folder {name} created", "folder": row}
 
     return None
