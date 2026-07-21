@@ -11,6 +11,7 @@ import { simPanelRoot } from '../../utils/simLayout'
 import { useSimSession } from '../sim/shared'
 import {
   MotherboardPanel, RaidPanel, BiosPanel, BmcPanel, CampusRoomView,
+  ServiceModePanel, InventoryPanel, FailureInjectBar,
 } from './ServerTwinPanels'
 import '../../styles/sim-products.css'
 import './DatacenterSimulator.css'
@@ -101,6 +102,7 @@ export default function DatacenterSimulator({
   const powerChain = st.power_chain || {}
   const facility = st.facility || {}
   const campus = st.campus || {}
+  const hardwareCatalog = st.hardware_catalog || {}
   const currentRoomId = st.current_room || 'data-hall-a'
   const currentRoom = rooms.find((r) => r.id === currentRoomId) || rooms[0] || { type: 'data_hall', racks: [] }
 
@@ -380,6 +382,8 @@ export default function DatacenterSimulator({
                 ['raid', 'RAID'],
                 ['bios', 'BIOS/UEFI'],
                 ['bmc', selectedServer.bmc?.product || 'iDRAC/iLO'],
+                ['service', 'Service'],
+                ['inventory', 'CMDB'],
               ].map(([key, label]) => (
                 <button key={key} type="button"
                   className={`dc-drawer-tab ${drawerTab === key ? 'dc-drawer-tab-active' : ''}`}
@@ -408,6 +412,10 @@ export default function DatacenterSimulator({
                   onRebuild={(vdId) => doAction(() => datacenterApi.raidRebuild(sessionId, selectedServer.id, vdId), `${vdId} rebuilt`, selectedServer.id)}
                   onSetCache={(mode) => doAction(() => datacenterApi.raidSetCache(sessionId, selectedServer.id, mode), `Cache ${mode}`, selectedServer.id)}
                   onCreateVd={(payload) => doAction(() => datacenterApi.raidCreateVd(sessionId, selectedServer.id, payload), 'VD created', selectedServer.id)}
+                  onDeleteVd={(vdId) => doAction(() => datacenterApi.raidDeleteVd(sessionId, selectedServer.id, vdId), `${vdId} deleted`, selectedServer.id)}
+                  onPatrol={() => doAction(() => datacenterApi.raidPatrolRead(sessionId, selectedServer.id), 'Patrol read', selectedServer.id)}
+                  onConsistency={() => doAction(() => datacenterApi.raidConsistencyCheck(sessionId, selectedServer.id), 'Consistency check', selectedServer.id)}
+                  onImportForeign={() => doAction(() => datacenterApi.raidImportForeign(sessionId, selectedServer.id), 'Foreign import', selectedServer.id)}
                 />
               </div>
             )}
@@ -421,6 +429,9 @@ export default function DatacenterSimulator({
                   onExit={() => doAction(() => datacenterApi.biosExitSetup(sessionId, selectedServer.id), 'BIOS exit', selectedServer.id)}
                   onSet={(key, value) => doAction(() => datacenterApi.biosSet(sessionId, selectedServer.id, key, value), `BIOS ${key}`, selectedServer.id)}
                   onCmosReset={() => doAction(() => datacenterApi.biosCmosReset(sessionId, selectedServer.id), 'CMOS reset', selectedServer.id)}
+                  onPost={() => doAction(() => datacenterApi.biosRunPost(sessionId, selectedServer.id), 'POST', selectedServer.id)}
+                  onFlash={(v) => doAction(() => datacenterApi.biosFlash(sessionId, selectedServer.id, v), `BIOS ${v}`, selectedServer.id)}
+                  onSetPassword={(p) => doAction(() => datacenterApi.biosSetPassword(sessionId, selectedServer.id, p), 'BIOS password', selectedServer.id)}
                 />
               </div>
             )}
@@ -435,7 +446,45 @@ export default function DatacenterSimulator({
                   onMountIso={(image) => doAction(() => datacenterApi.bmcMountIso(sessionId, selectedServer.id, image), 'ISO mounted', selectedServer.id)}
                   onDiag={(suite) => doAction(() => datacenterApi.bmcRunDiagnostics(sessionId, selectedServer.id, suite), `${suite} diagnostics`, selectedServer.id)}
                   onUpdateNet={(payload) => doAction(() => datacenterApi.bmcUpdateNetwork(sessionId, selectedServer.id, payload), 'BMC network', selectedServer.id)}
+                  onNmi={() => doAction(() => datacenterApi.bmcNmi(sessionId, selectedServer.id), 'NMI', selectedServer.id)}
+                  onFlash={(t, v) => doAction(() => datacenterApi.bmcFlashTarget(sessionId, selectedServer.id, t, v), `Flash ${t}`, selectedServer.id)}
+                  onKvm={() => doAction(() => datacenterApi.bmcOpenKvm(sessionId, selectedServer.id), 'KVM open', selectedServer.id)}
                 />
+              </div>
+            )}
+
+            {drawerTab === 'service' && (
+              <div className="dc-drawer-section">
+                <ServiceModePanel
+                  serviceMode={selectedServer.service_mode}
+                  busy={busy}
+                  onOp={(op, extra) => doAction(
+                    () => datacenterApi.serviceMode(sessionId, selectedServer.id, op, extra),
+                    `Service ${op}`,
+                    selectedServer.id,
+                  )}
+                />
+              </div>
+            )}
+
+            {drawerTab === 'inventory' && (
+              <div className="dc-drawer-section">
+                <InventoryPanel inventory={selectedServer.inventory} />
+                <FailureInjectBar
+                  presets={hardwareCatalog.failure_presets}
+                  busy={busy}
+                  assetId={selectedServer.id}
+                  onInject={(preset, assetId) => doAction(
+                    () => datacenterApi.injectFailure(sessionId, preset, assetId),
+                    `Injected ${preset}`,
+                    assetId,
+                  )}
+                />
+                {(hardwareCatalog.server_oems || []).length > 0 && (
+                  <div className="dc-muted mt-2">
+                    Catalog OEMs: {(hardwareCatalog.server_oems || []).join(', ')}
+                  </div>
+                )}
               </div>
             )}
 

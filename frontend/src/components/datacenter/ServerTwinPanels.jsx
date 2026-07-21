@@ -99,7 +99,7 @@ export function MotherboardPanel({ motherboard, busy, onToggleCover, onReplaceDi
 }
 
 /** PERC / Smart Array style RAID manager */
-export function RaidPanel({ raid, busy, onFailDisk, onRebuild, onSetCache, onCreateVd }) {
+export function RaidPanel({ raid, busy, onFailDisk, onRebuild, onSetCache, onCreateVd, onDeleteVd, onPatrol, onConsistency, onImportForeign }) {
   const [level, setLevel] = useState('RAID1')
   const [name, setName] = useState('NEWVD')
   if (!raid) return <p className="dc-muted">No RAID controller.</p>
@@ -150,8 +150,22 @@ export function RaidPanel({ raid, busy, onFailDisk, onRebuild, onSetCache, onCre
             <button type="button" disabled={busy} className="dc-btn-primary dc-btn-xs mt-1"
               onClick={() => onRebuild?.(vd.id)}><RefreshCw size={11} /> Rebuild / promote hotspare</button>
           )}
+          <button type="button" disabled={busy} className="dc-btn-danger dc-btn-xs mt-1"
+            onClick={() => onDeleteVd?.(vd.id)}>Delete VD</button>
         </div>
       ))}
+      <div className="dc-drawer-label mt-2">Controller ops</div>
+      <div className="dc-action-row">
+        <button type="button" disabled={busy} className="dc-btn-outline dc-btn-xs" onClick={() => onPatrol?.()}>
+          Patrol Read {raid.patrol_read?.status === 'completed' ? '✓' : ''}
+        </button>
+        <button type="button" disabled={busy} className="dc-btn-outline dc-btn-xs" onClick={() => onConsistency?.()}>
+          Consistency Check {raid.consistency_check?.status === 'completed' ? '✓' : ''}
+        </button>
+        <button type="button" disabled={busy} className="dc-btn-outline dc-btn-xs" onClick={() => onImportForeign?.()}>
+          Import Foreign Config
+        </button>
+      </div>
       <div className="dc-drawer-label mt-2">Create virtual disk</div>
       <div className="dc-action-row">
         <input className="dc-input" value={name} onChange={(e) => setName(e.target.value)} placeholder="Name" />
@@ -170,19 +184,26 @@ export function RaidPanel({ raid, busy, onFailDisk, onRebuild, onSetCache, onCre
 }
 
 /** BIOS / UEFI setup screen */
-export function BiosPanel({ bios, busy, onEnter, onExit, onSet, onCmosReset }) {
+export function BiosPanel({ bios, busy, onEnter, onExit, onSet, onCmosReset, onPost, onFlash, onSetPassword }) {
   if (!bios) return <p className="dc-muted">No BIOS data.</p>
   if (!bios.setup_open) {
     return (
       <div className="dc-twin-panel">
         <div className="dc-twin-title"><MonitorCog size={13} /> UEFI {bios.version} · {bios.mode}</div>
-        <p className="dc-muted">Secure Boot {bios.secure_boot ? 'On' : 'Off'} · TPM {bios.tpm}</p>
-        <button type="button" disabled={busy} className="dc-btn-primary" onClick={onEnter}>
-          Enter Setup (F2)
-        </button>
-        <button type="button" disabled={busy} className="dc-btn-outline ml-2" onClick={onCmosReset}>
-          CMOS Reset
-        </button>
+        <p className="dc-muted">Secure Boot {bios.secure_boot ? 'On' : 'Off'} · TPM {bios.tpm} · Password {bios.password_set ? 'Set' : 'None'}</p>
+        <p className="dc-muted">POST: {bios.post_state}</p>
+        {(bios.post_log || []).length > 0 && (
+          <div className="dc-bios-screen" style={{ marginBottom: '0.5rem' }}>
+            {bios.post_log.map((l, i) => <div key={i}>{l}</div>)}
+          </div>
+        )}
+        <div className="dc-action-row">
+          <button type="button" disabled={busy} className="dc-btn-primary" onClick={onEnter}>Enter Setup (F2)</button>
+          <button type="button" disabled={busy} className="dc-btn-outline" onClick={onPost}>Run POST</button>
+          <button type="button" disabled={busy} className="dc-btn-outline" onClick={() => onFlash?.('2.14.0')}>Flash BIOS 2.14.0</button>
+          <button type="button" disabled={busy} className="dc-btn-outline" onClick={onCmosReset}>CMOS Reset</button>
+          <button type="button" disabled={busy} className="dc-btn-outline" onClick={() => onSetPassword?.('lab')}>Set password</button>
+        </div>
       </div>
     )
   }
@@ -209,7 +230,7 @@ export function BiosPanel({ bios, busy, onEnter, onExit, onSet, onCmosReset }) {
             <div key={k} className="dc-bios-row">
               <span>{k}</span>
               <button type="button" disabled={busy} className="dc-btn-outline dc-btn-xs"
-                onClick={() => onSet?.(k, v === 'Enabled' ? 'Disabled' : 'Enabled')}>
+                onClick={() => onSet?.(k, v === 'Enabled' ? 'Disabled' : (v === 'Disabled' ? 'Enabled' : v))}>
                 {String(v)}
               </button>
             </div>
@@ -221,7 +242,7 @@ export function BiosPanel({ bios, busy, onEnter, onExit, onSet, onCmosReset }) {
 }
 
 /** iDRAC9 / iLO 5 management console */
-export function BmcPanel({ bmc, vendor, busy, onPower, onMountIso, onDiag, onUpdateNet }) {
+export function BmcPanel({ bmc, vendor, busy, onPower, onMountIso, onDiag, onUpdateNet, onNmi, onFlash, onKvm }) {
   const [iso, setIso] = useState('rhel-9.4-x86_64-dvd.iso')
   if (!bmc) return <p className="dc-muted">No BMC.</p>
   const s = bmc.sensors || {}
@@ -231,6 +252,9 @@ export function BmcPanel({ bmc, vendor, busy, onPower, onMountIso, onDiag, onUpd
         <span className="dc-twin-title"><Shield size={13} /> {bmc.product} · {bmc.chip}</span>
         <span className="dc-muted">FW {bmc.firmware}</span>
       </div>
+      {(bmc.generations_available || []).length > 0 && (
+        <div className="dc-muted">Family: {(bmc.generations_available || []).join(' · ')}</div>
+      )}
       <div className="dc-bmc-row"><span className="dc-bmc-key">URL</span><span className="dc-bmc-mono">{bmc.endpoint}</span></div>
       <div className="dc-bmc-row"><span className="dc-bmc-key">IP</span>
         <span className="dc-bmc-val">{bmc.network?.ipv4} · VLAN {bmc.network?.vlan} · {bmc.network?.mode}</span>
@@ -248,6 +272,8 @@ export function BmcPanel({ bmc, vendor, busy, onPower, onMountIso, onDiag, onUpd
           <button key={m} type="button" disabled={busy} className="dc-btn-outline dc-btn-xs"
             onClick={() => onPower?.(m)}>{m}</button>
         ))}
+        <button type="button" disabled={busy} className="dc-btn-outline dc-btn-xs" onClick={() => onNmi?.()}>NMI</button>
+        <button type="button" disabled={busy} className="dc-btn-primary dc-btn-xs" onClick={() => onKvm?.()}>HTML5 KVM</button>
       </div>
       <div className="dc-drawer-label mt-2">Virtual media</div>
       <div className="dc-action-row">
@@ -257,6 +283,13 @@ export function BmcPanel({ bmc, vendor, busy, onPower, onMountIso, onDiag, onUpd
           <Disc size={11} /> Mount ISO
         </button>
         {bmc.virtual_media?.mounted && <span className="dc-text-ok">Mounted: {bmc.virtual_media.image}</span>}
+      </div>
+      <div className="dc-drawer-label mt-2">Firmware targets</div>
+      <div className="dc-action-row">
+        {(bmc.firmware_targets || ['BIOS', 'BMC', 'RAID']).map((t) => (
+          <button key={t} type="button" disabled={busy} className="dc-btn-outline dc-btn-xs"
+            onClick={() => onFlash?.(t, 'next')}>{t}</button>
+        ))}
       </div>
       <div className="dc-drawer-label mt-2">{vendor === 'HPE' ? 'Insight Diagnostics' : 'ePSA Diagnostics'}</div>
       <div className="dc-action-row">
@@ -268,6 +301,12 @@ export function BmcPanel({ bmc, vendor, busy, onPower, onMountIso, onDiag, onUpd
       {bmc.diagnostics?.last_run && (
         <div className="dc-muted mt-1">Last: {bmc.diagnostics.suite} → {bmc.diagnostics.result} @ {bmc.diagnostics.last_run}</div>
       )}
+      <div className="dc-drawer-label mt-2">RBAC users</div>
+      <div className="dc-action-row">
+        {(bmc.users || []).map((u) => (
+          <span key={u.name} className="dc-topology-chip">{u.name}:{u.role}{u.mfa ? '+MFA' : ''}</span>
+        ))}
+      </div>
       <div className="dc-drawer-label mt-2">SEL</div>
       <div className="dc-bmc-sel">
         {(bmc.sel || []).slice(0, 5).map((e, i) => (
@@ -282,6 +321,90 @@ export function BmcPanel({ bmc, vendor, busy, onPower, onMountIso, onDiag, onUpd
         onClick={() => onUpdateNet?.({ vlan: 90 })}>
         <Zap size={11} /> Refresh BMC network
       </button>
+    </div>
+  )
+}
+
+/** Field service checklist */
+export function ServiceModePanel({ serviceMode, busy, onOp }) {
+  const sm = serviceMode || {}
+  const steps = [
+    ['extend_rails', 'Extend rails', sm.rails_extended],
+    ['open_cover', 'Open cover', sm.cover_open],
+    ['remove_air_shroud', 'Remove air shroud', sm.air_shroud_removed],
+    ['disconnect_power', 'Disconnect power', sm.power_cables_disconnected],
+    ['disconnect_network', 'Disconnect network', sm.network_cables_disconnected],
+    ['remove_cpu', 'Remove CPU1', (sm.cpu_removed || []).includes('CPU1')],
+    ['install_cpu', 'Install CPU1', !(sm.cpu_removed || []).includes('CPU1') && sm.rails_extended],
+    ['replace_cmos', 'Replace CMOS', sm.cmos_battery_ok],
+    ['replace_tpm', 'Replace TPM', sm.tpm_present],
+    ['hotswap_psu', 'Hot-swap PSU1', true],
+    ['install_air_shroud', 'Install shroud', !sm.air_shroud_removed],
+    ['close_cover', 'Close cover', !sm.cover_open],
+    ['reconnect_power', 'Reconnect power', !sm.power_cables_disconnected],
+    ['reconnect_network', 'Reconnect network', !sm.network_cables_disconnected],
+    ['retract_rails', 'Retract rails', !sm.rails_extended],
+  ]
+  return (
+    <div className="dc-twin-panel">
+      <div className="dc-twin-title">Service & maintenance mode</div>
+      <p className="dc-muted">{sm.notes || 'Follow field procedure in order.'}</p>
+      <div className="dc-service-grid">
+        {steps.map(([op, label, done]) => (
+          <button key={op} type="button" disabled={busy}
+            className={`dc-btn-outline dc-btn-xs ${done ? 'dc-service-done' : ''}`}
+            onClick={() => onOp?.(op, op.includes('cpu') ? { socket_id: 'CPU1' } : op === 'hotswap_psu' ? { psu_id: 'PSU1' } : {})}>
+            {done ? '✓ ' : ''}{label}
+          </button>
+        ))}
+      </div>
+    </div>
+  )
+}
+
+/** CMDB inventory card */
+export function InventoryPanel({ inventory }) {
+  if (!inventory) return <p className="dc-muted">No inventory record.</p>
+  const w = inventory.warranty || {}
+  const fw = inventory.firmware || {}
+  const life = inventory.lifecycle || {}
+  return (
+    <div className="dc-twin-panel">
+      <div className="dc-twin-title">CMDB / Asset</div>
+      <div className="dc-hw-meta">
+        <div><span className="dc-hw-k">Asset tag</span> {inventory.asset_tag}</div>
+        <div><span className="dc-hw-k">Serial</span> {inventory.serial}</div>
+        <div><span className="dc-hw-k">Model</span> {inventory.vendor} {inventory.model}</div>
+        <div><span className="dc-hw-k">Purchase</span> {inventory.purchase_date}</div>
+        <div><span className="dc-hw-k">Warranty</span> {w.type} · {w.status} · exp {w.expires}</div>
+        <div><span className="dc-hw-k">Firmware</span> BIOS {fw.bios} · BMC {fw.bmc} · RAID {fw.raid}</div>
+        <div><span className="dc-hw-k">Lifecycle</span> {life.stage} · EOS {life.eos} · EOL {life.eol}</div>
+      </div>
+      {(inventory.replacement_history || []).length > 0 && (
+        <>
+          <div className="dc-drawer-label mt-2">Replacement history</div>
+          {(inventory.replacement_history || []).slice(0, 5).map((h, i) => (
+            <div key={i} className="dc-muted">{h.time} · {h.part} · {h.action}</div>
+          ))}
+        </>
+      )}
+    </div>
+  )
+}
+
+/** Failure injection toolbar */
+export function FailureInjectBar({ presets, busy, onInject, assetId }) {
+  const list = presets || []
+  if (!list.length) return null
+  return (
+    <div className="dc-failure-bar">
+      <span className="dc-drawer-label" style={{ margin: 0 }}>Inject failure</span>
+      <div className="dc-action-row" style={{ flexWrap: 'wrap' }}>
+        {list.slice(0, 14).map((p) => (
+          <button key={p.id} type="button" disabled={busy} className="dc-btn-danger dc-btn-xs"
+            onClick={() => onInject?.(p.id, assetId)}>{p.label}</button>
+        ))}
+      </div>
     </div>
   )
 }

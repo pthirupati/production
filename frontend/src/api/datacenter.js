@@ -116,6 +116,42 @@ export const datacenterApi = {
   bmcUpdateNetwork(sessionId, assetId, payload) {
     return datacenterApi.action(sessionId, 'bmc_update_network', { asset_id: assetId, ...payload })
   },
+  injectFailure(sessionId, preset, assetId = '') {
+    return datacenterApi.action(sessionId, 'inject_failure', { preset, asset_id: assetId })
+  },
+  serviceMode(sessionId, assetId, op, extra = {}) {
+    return datacenterApi.action(sessionId, 'service_mode_action', { asset_id: assetId, op, ...extra })
+  },
+  raidDeleteVd(sessionId, assetId, vdId) {
+    return datacenterApi.action(sessionId, 'raid_delete_vd', { asset_id: assetId, vd_id: vdId })
+  },
+  raidPatrolRead(sessionId, assetId) {
+    return datacenterApi.action(sessionId, 'raid_patrol_read', { asset_id: assetId })
+  },
+  raidConsistencyCheck(sessionId, assetId) {
+    return datacenterApi.action(sessionId, 'raid_consistency_check', { asset_id: assetId })
+  },
+  raidImportForeign(sessionId, assetId) {
+    return datacenterApi.action(sessionId, 'raid_import_foreign', { asset_id: assetId })
+  },
+  biosRunPost(sessionId, assetId) {
+    return datacenterApi.action(sessionId, 'bios_run_post', { asset_id: assetId })
+  },
+  biosSetPassword(sessionId, assetId, password) {
+    return datacenterApi.action(sessionId, 'bios_set_password', { asset_id: assetId, password })
+  },
+  biosFlash(sessionId, assetId, version) {
+    return datacenterApi.action(sessionId, 'bios_flash', { asset_id: assetId, version })
+  },
+  bmcNmi(sessionId, assetId) {
+    return datacenterApi.action(sessionId, 'bmc_nmi', { asset_id: assetId })
+  },
+  bmcFlashTarget(sessionId, assetId, target, version) {
+    return datacenterApi.action(sessionId, 'bmc_flash_target', { asset_id: assetId, target, version })
+  },
+  bmcOpenKvm(sessionId, assetId) {
+    return datacenterApi.action(sessionId, 'bmc_open_kvm', { asset_id: assetId })
+  },
 }
 
 export default datacenterApi

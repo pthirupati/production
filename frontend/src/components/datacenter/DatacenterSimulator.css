@@ -418,3 +418,10 @@
   .dc-mb-canvas, .dc-bios-grid { grid-template-columns: 1fr; }
   .dc-drawer-wide { width: 100vw; }
 }
+
+.dc-service-grid { display: flex; flex-wrap: wrap; gap: 0.35rem; }
+.dc-service-done { border-color: rgba(52, 211, 153, 0.45) !important; color: #34d399 !important; }
+.dc-failure-bar {
+  margin-top: 0.85rem; padding-top: 0.75rem; border-top: 1px solid #1c2130;
+  display: flex; flex-direction: column; gap: 0.45rem;
+}

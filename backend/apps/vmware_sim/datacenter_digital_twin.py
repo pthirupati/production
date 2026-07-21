@@ -117,7 +117,6 @@ def build_raid(vendor: str = "Dell") -> dict:
         "controller": controller,
         "firmware": "51.16.0-4076",
         "cache": {"mode": "WriteBack", "bbu": "present", "bbu_charge_pct": 100, "size_mb": 8192},
-        "foreign_config": False,
         "physical_disks": disks,
         "virtual_disks": [
             {
@@ -147,6 +146,9 @@ def build_raid(vendor: str = "Dell") -> dict:
             },
         ],
         "operations": [],
+        "patrol_read": {"enabled": True, "last_run": None, "status": "idle"},
+        "consistency_check": {"enabled": True, "last_run": None, "status": "idle"},
+        "foreign_config": False,
     }
 
 
@@ -160,6 +162,7 @@ def build_bios(vendor: str = "Dell") -> dict:
         "secure_boot": True,
         "tpm": "2.0 Enabled",
         "password_set": False,
+        "password": None,
         "boot_order": ["Hard Disk", "PXE Network", "USB", "CD/DVD", "Virtual Media"],
         "settings": {
             "VirtualizationTechnology": "Enabled",
@@ -172,24 +175,45 @@ def build_bios(vendor: str = "Dell") -> dict:
             "WakeOnLAN": "Enabled",
             "PXEBoot": "Enabled",
             "FanCurve": "Optimal",
+            "MemoryTiming": "Auto",
+            "PCIeGeneration": "Auto",
         },
         "post_state": "idle",  # idle | posting | setup | os
+        "post_log": [],
         "setup_open": False,
         "cmos_cleared": False,
+        "flash_in_progress": False,
     }
 
 
 # ── BMC / iDRAC / iLO ──────────────────────────────────────────────────────
 
-def build_bmc(hostname: str, vendor: str, power_state: str = "on") -> dict:
+def build_bmc(hostname: str, vendor: str, power_state: str = "on", *, generation: str | None = None) -> dict:
     is_hpe = vendor.upper() in ("HPE", "HP")
-    product = "iLO 5" if is_hpe else "iDRAC9"
-    chip = "iLO ASIC" if is_hpe else "ASPEED AST2600"
+    is_lenovo = vendor.upper() == "LENOVO"
+    is_sm = vendor.upper() == "SUPERMICRO"
+    if generation:
+        product = generation
+    elif is_hpe:
+        product = "iLO 5"
+    elif is_lenovo:
+        product = "XClarity Controller"
+    elif is_sm:
+        product = "Supermicro IPMI"
+    else:
+        product = "iDRAC9"
+    chip = "iLO ASIC" if is_hpe else ("ASPEED AST2600" if not is_lenovo else "XCC ASIC")
+    fw = "2.86.00" if is_hpe else ("9.1.0" if is_lenovo else "6.10.30.00")
     on = power_state == "on"
     return {
         "product": product,
+        "generations_available": (
+            ["iLO4", "iLO5", "iLO6"] if is_hpe
+            else ["iDRAC8", "iDRAC9", "iDRAC10"] if not (is_lenovo or is_sm)
+            else [product]
+        ),
         "chip": chip,
-        "firmware": "2.86.00" if is_hpe else "6.10.30.00",
+        "firmware": fw,
         "endpoint": f"https://bmc-{hostname}.mgmt.corp.local",
         "protocol": "redfish",
         "protocols_enabled": ["IPMI", "Redfish", "SNMP", "SSH", "HTTPS", "Syslog"],
@@ -202,10 +226,13 @@ def build_bmc(hostname: str, vendor: str, power_state: str = "on") -> dict:
             "vlan": 90,
             "dns": ["10.90.0.10", "10.90.0.11"],
             "ntp": "ntp.corp.local",
+            "ldap": False,
+            "active_directory": False,
         },
         "users": [
-            {"name": "root", "role": "Administrator", "enabled": True},
-            {"name": "readonly", "role": "ReadOnly", "enabled": True},
+            {"name": "root", "role": "Administrator", "enabled": True, "mfa": False},
+            {"name": "readonly", "role": "ReadOnly", "enabled": True, "mfa": False},
+            {"name": "operator", "role": "Operator", "enabled": True, "mfa": True},
         ],
         "sensors": {
             "inlet_c": 22.1,
@@ -225,10 +252,11 @@ def build_bmc(hostname: str, vendor: str, power_state: str = "on") -> dict:
             {"time": _now(), "severity": "info", "message": f"{product} self-test passed, sensors nominal"},
         ],
         "lifecycle_log": [
-            {"time": _now(), "message": f"{product} firmware {('2.86.00' if is_hpe else '6.10.30.00')} active"},
+            {"time": _now(), "message": f"{product} firmware {fw} active"},
         ],
         "virtual_media": {"mounted": False, "image": None},
         "console": {"html5": True, "java_legacy": False, "kvm_active": False},
+        "firmware_targets": ["BIOS", "BMC", "CPLD", "RAID", "NIC", "PSU", "Backplane"],
         "inventory": {
             "cpus": 2,
             "dimms_populated": 16,
@@ -240,8 +268,60 @@ def build_bmc(hostname: str, vendor: str, power_state: str = "on") -> dict:
         "diagnostics": {
             "last_run": None,
             "result": None,
-            "suites": ["Memory", "CPU", "Storage", "PCIe", "Network", "Thermal", "Power"],
+            "suites": ["Memory", "CPU", "Storage", "PCIe", "Network", "Thermal", "Power", "Burn-In"],
         },
+    }
+
+
+def build_inventory_record(server: dict) -> dict:
+    """CMDB-style asset record for a server chassis and key FRUs."""
+    vendor = server.get("vendor") or "Dell"
+    sid = server.get("id") or "srv"
+    tag = server.get("service_tag") or f"AT-{abs(hash(sid)) % 10_000_000:07d}"
+    purchase = "2023-06-15"
+    return {
+        "asset_tag": f"FIX-{abs(hash(sid)) % 100_000:05d}",
+        "serial": tag,
+        "vendor": vendor,
+        "model": server.get("model") or "PowerEdge R750",
+        "purchase_date": purchase,
+        "warranty": {
+            "type": "ProSupport Plus" if vendor == "Dell" else "HPE Foundation Care",
+            "expires": "2027-06-15",
+            "status": "active",
+        },
+        "firmware": {
+            "bios": (server.get("bios") or {}).get("version") or server.get("firmware_version") or "2.12.0",
+            "bmc": (server.get("bmc") or {}).get("firmware") or "6.10.30.00",
+            "raid": (server.get("raid") or {}).get("firmware") or "51.16.0",
+        },
+        "lifecycle": {
+            "eos": "2029-12-31",
+            "eol": "2031-12-31",
+            "stage": "production",
+        },
+        "replacement_history": server.get("inventory", {}).get("replacement_history") or [],
+        "location": {
+            "rack": server.get("rack"),
+            "u_slot": server.get("u_slot"),
+            "room": "data-hall-a",
+        },
+    }
+
+
+def build_service_mode(vendor: str = "Dell") -> dict:
+    return {
+        "rails_extended": False,
+        "cover_open": False,
+        "air_shroud_removed": False,
+        "power_cables_disconnected": False,
+        "network_cables_disconnected": False,
+        "cpu_removed": [],
+        "heatsink_removed": [],
+        "cmos_battery_ok": True,
+        "tpm_present": True,
+        "psu_hotswap_allowed": True,
+        "notes": f"{vendor} field service checklist",
     }
 
 
@@ -267,6 +347,20 @@ def enrich_server(server: dict) -> dict:
         if bmc.get("sensors"):
             rich["sensors"].update({k: v for k, v in bmc["sensors"].items() if v is not None})
         server["bmc"] = rich
+    if not server.get("inventory") or not server["inventory"].get("asset_tag"):
+        prev_hist = (server.get("inventory") or {}).get("replacement_history") or []
+        inv = build_inventory_record(server)
+        inv["replacement_history"] = prev_hist
+        server["inventory"] = inv
+    if not server.get("service_mode"):
+        server["service_mode"] = build_service_mode(vendor)
+    # Keep motherboard cover in sync with service mode
+    sm = server.get("service_mode") or {}
+    mb = server.get("motherboard") or {}
+    if sm.get("cover_open") and not mb.get("cover_open"):
+        mb["cover_open"] = True
+        mb["maintenance_mode"] = True
+        server["motherboard"] = mb
     return server
 
 
