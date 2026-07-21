@@ -896,9 +896,14 @@ export const useAwsStore = create(
         const { region } = get()
         const kp = { id: newKeyPairId(), region, name, type: type || 'rsa', fingerprint: Array.from({ length: 16 }, () => Math.floor(Math.random() * 256).toString(16).padStart(2, '0')).join(':'), created: new Date().toISOString() }
         set((s) => ({ keyPairs: [...s.keyPairs, kp] }))
+        get()._syncAction('create_key_pair', { name: kp.name, type: kp.type, key_pair_id: kp.id })
         return kp
       },
-      deleteKeyPair: (name) => set((s) => ({ keyPairs: s.keyPairs.filter((k) => k.name !== name) })),
+      deleteKeyPair: (name) => {
+        set((s) => ({ keyPairs: s.keyPairs.filter((k) => k.name !== name) }))
+        get()._syncAction('delete_key_pair', { name })
+        return ok()
+      },
 
       // ---------- Security groups ----------
       createSecurityGroup: ({ name, description, vpcId, inbound }) => {
@@ -1067,6 +1072,7 @@ export const useAwsStore = create(
         const { region } = get()
         const igw = { id: newIgwId(), region, vpcId: null, state: 'detached', name: name || '' }
         set((s) => ({ internetGateways: [...s.internetGateways, igw] }))
+        get()._syncAction('create_internet_gateway', { igw_id: igw.id, name: igw.name })
         return igw
       },
       attachInternetGateway: (id, vpcId) => {
@@ -1077,10 +1083,12 @@ export const useAwsStore = create(
           return fail(err)
         }
         set((s) => ({ internetGateways: s.internetGateways.map((g) => (g.id === id ? { ...g, vpcId, state: 'attached' } : g)) }))
+        get()._syncAction('attach_internet_gateway', { igw_id: id, vpc_id: vpcId })
         return ok()
       },
       detachInternetGateway: (id) => {
         set((s) => ({ internetGateways: s.internetGateways.map((g) => (g.id === id ? { ...g, vpcId: null, state: 'detached' } : g)) }))
+        get()._syncAction('detach_internet_gateway', { igw_id: id })
         return ok()
       },
       deleteInternetGateway: (id) => {
@@ -1092,6 +1100,7 @@ export const useAwsStore = create(
           return fail(err)
         }
         set((s) => ({ internetGateways: s.internetGateways.filter((x) => x.id !== id) }))
+        get()._syncAction('delete_internet_gateway', { igw_id: id })
         return ok()
       },
 
@@ -1188,10 +1197,12 @@ export const useAwsStore = create(
         const inst = instances.find((i) => i.id === instanceId)
         if (!eip) return fail(invalidParameterValue('AssociateAddress', `The allocation ID '${allocationId}' does not exist`))
         if (!inst) return fail(invalidParameterValue('AssociateAddress', `The instance ID '${instanceId}' does not exist`))
+        const associationId = newEipAssocId()
         set((s) => ({
-          elasticIps: s.elasticIps.map((e) => (e.allocationId === allocationId ? { ...e, associationId: newEipAssocId(), instanceId } : e)),
+          elasticIps: s.elasticIps.map((e) => (e.allocationId === allocationId ? { ...e, associationId, instanceId } : e)),
           instances: s.instances.map((i) => (i.id === instanceId ? { ...i, publicIp: eip.publicIp } : i)),
         }))
+        get()._syncAction('associate_eip', { allocation_id: allocationId, instance_id: instanceId, association_id: associationId })
         return ok()
       },
       disassociateEip: (allocationId) => {
@@ -1201,6 +1212,7 @@ export const useAwsStore = create(
           elasticIps: s.elasticIps.map((e) => (e.allocationId === allocationId ? { ...e, associationId: null, instanceId: null } : e)),
           instances: eip?.instanceId ? s.instances.map((i) => (i.id === eip.instanceId ? { ...i, publicIp: '' } : i)) : s.instances,
         }))
+        get()._syncAction('disassociate_eip', { allocation_id: allocationId, instance_id: eip?.instanceId })
         return ok()
       },
       releaseEip: (allocationId) => {
@@ -1212,6 +1224,7 @@ export const useAwsStore = create(
           return fail(err)
         }
         set((s) => ({ elasticIps: s.elasticIps.filter((e) => e.allocationId !== allocationId) }))
+        get()._syncAction('release_eip', { allocation_id: allocationId })
         return ok()
       },
 
@@ -1223,21 +1236,34 @@ export const useAwsStore = create(
         get()._syncAction('create_load_balancer', { name: lb.name, type: lb.type, scheme: lb.scheme, vpcId: lb.vpcId })
         return lb
       },
-      deleteLoadBalancer: (id) => { set((s) => ({ loadBalancers: (s.loadBalancers || []).filter((x) => x.id !== id) })); return ok() },
+      deleteLoadBalancer: (id) => {
+        set((s) => ({ loadBalancers: (s.loadBalancers || []).filter((x) => x.id !== id) }))
+        get()._syncAction('delete_load_balancer', { id })
+        return ok()
+      },
       createTargetGroup: ({ name, protocol, port, vpcId, targetType } = {}) => {
         const { region } = get()
         const tg = { id: `tg-0${Math.random().toString(16).slice(2, 18).padEnd(16, '0')}`, region, name: name || 'my-targets', protocol: protocol || 'HTTP', port: port || 80, vpcId: vpcId || get().vpcs[0]?.id, targetType: targetType || 'instance', targets: [], created: new Date().toISOString() }
         set((s) => ({ targetGroups: [...(s.targetGroups || []), tg] }))
+        get()._syncAction('create_target_group', {
+          id: tg.id, name: tg.name, protocol: tg.protocol, port: tg.port, vpcId: tg.vpcId, targetType: tg.targetType,
+        })
         return tg
       },
-      deleteTargetGroup: (id) => { set((s) => ({ targetGroups: (s.targetGroups || []).filter((x) => x.id !== id) })); return ok() },
+      deleteTargetGroup: (id) => {
+        set((s) => ({ targetGroups: (s.targetGroups || []).filter((x) => x.id !== id) }))
+        get()._syncAction('delete_target_group', { id })
+        return ok()
+      },
       registerTarget: (tgId, instanceId, port) => {
         set((s) => ({ targetGroups: (s.targetGroups || []).map((tg) => (tg.id === tgId ? { ...tg, targets: [...(tg.targets || []).filter((t) => t.id !== instanceId), { id: instanceId, port: port || tg.port, health: 'initial' }] } : tg)) }))
         get()._ensureTick()
+        get()._syncAction('register_target', { target_group_id: tgId, instance_id: instanceId, port: port || 80 })
         return ok()
       },
       deregisterTarget: (tgId, instanceId) => {
         set((s) => ({ targetGroups: (s.targetGroups || []).map((tg) => (tg.id === tgId ? { ...tg, targets: (tg.targets || []).filter((t) => t.id !== instanceId) } : tg)) }))
+        get()._syncAction('deregister_target', { target_group_id: tgId, instance_id: instanceId })
         return ok()
       },
       createAutoScalingGroup: ({ name, min, max, desired, launchTemplate, subnetId } = {}) => {
@@ -1262,6 +1288,7 @@ export const useAwsStore = create(
         const asg = autoScalingGroups.find((a) => a.id === id)
         if (asg && asg.instanceIds?.length) get().instanceAction(asg.instanceIds, 'terminate')
         set((s) => ({ autoScalingGroups: (s.autoScalingGroups || []).filter((a) => a.id !== id) }))
+        get()._syncAction('delete_asg', { id, name: asg?.name })
         return ok()
       },
       scaleAutoScalingGroup: (id, { desired, min, max } = {}) => {

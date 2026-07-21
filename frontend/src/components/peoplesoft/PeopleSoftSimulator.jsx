@@ -233,6 +233,7 @@ export default function PeopleSoftSimulator({
 
           {!loading && !fluidView && section === 'process' && (
             <ProcessMonitorTable runs={w?.process?.runs} busy={busy}
+              onRunProcess={(name) => run(() => peoplesoftApi.runProcess(sessionId, name), `Submitted ${name}`)}
               onRerun={(instance) => run(() => peoplesoftApi.rerunProcess(sessionId, instance), `Re-queued ${instance}`)} />
           )}
 
@@ -246,7 +247,10 @@ export default function PeopleSoftSimulator({
                   busy={busy}
                   onAssignRole={(oprid, role) => run(() => peoplesoftApi.assignRole(sessionId, oprid, role), `Assigned role to ${oprid}`)}
                   onRemoveRole={(oprid, role) => run(() => peoplesoftApi.removeRole(sessionId, oprid, role), `Removed role from ${oprid}`)}
-                  onUnlock={(oprid) => run(() => peoplesoftApi.unlockUser(sessionId, oprid), `Unlocked ${oprid}`)} />
+                  onUnlock={(oprid) => run(() => peoplesoftApi.unlockUser(sessionId, oprid), `Unlocked ${oprid}`)}
+                  onEnable={(oprid) => run(() => peoplesoftApi.enableUser(sessionId, oprid), `Enabled ${oprid}`)}
+                  onDisable={(oprid) => run(() => peoplesoftApi.disableUser(sessionId, oprid), `Disabled ${oprid}`)}
+                  onResetPassword={(oprid) => run(() => peoplesoftApi.resetPassword(sessionId, oprid), `Password reset for ${oprid}`)} />
               </div>
               <div>
                 <div className="text-sm font-semibold text-slate-700 mb-2">Permission Lists</div>

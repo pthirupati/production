@@ -41,12 +41,26 @@ export default function ADUC() {
 
   const userCtx = (u) => (e) => {
     e.preventDefault(); setSelUser(u.sam)
+    const lab = os.labAction
     ctx.open(e.clientX, e.clientY, [
       { label: 'Copy…' }, { label: 'Add to a group…' }, { label: 'Name Mappings…' },
-      { label: u.enabled ? 'Disable Account' : 'Enable Account', onClick: () => os.modifyADUser(u.sam, { enabled: !u.enabled }) },
+      {
+        label: u.enabled ? 'Disable Account' : 'Enable Account',
+        onClick: () => {
+          os.modifyADUser(u.sam, { enabled: !u.enabled })
+          if (lab) lab(u.enabled ? 'disable_ad_user' : 'enable_ad_user', { user: u.sam })
+        },
+      },
       { label: 'Reset Password…', onClick: () => setReset(u) },
       { label: 'Move…' }, { label: 'Open Home Page' }, { label: 'Send Mail' }, { sep: true },
-      { label: 'Delete', onClick: () => os.deleteADUser(u.sam) }, { label: 'Rename' }, { sep: true },
+      {
+        label: 'Delete',
+        onClick: () => {
+          os.deleteADUser(u.sam)
+          if (lab) lab('disable_ad_user', { user: u.sam })
+        },
+      },
+      { label: 'Rename' }, { sep: true },
       { label: 'Properties', onClick: () => setProps(u) },
     ])
   }
@@ -108,12 +122,24 @@ function NewUserWizard({ ou, onClose, onDone }) {
   const display = `${first} ${last}`.trim()
 
   const finish = () => {
-    os.createADUser({
-      sam: sam || (first[0] + last).toLowerCase(), first, last, display, upn: `${sam || (first[0] + last).toLowerCase()}@lab.local`,
+    const account = sam || (`${first[0] || ''}${last}`).toLowerCase()
+    const user = {
+      sam: account, first, last, display, upn: `${account}@lab.local`,
       email: '', dept: ou, title: '', ou: `OU=${ou},OU=Corp,DC=lab,DC=local`, enabled: !opts.disabled, locked: false,
       phone: '', office: '', company: 'Lab Industries', manager: '', employeeId: '',
       groups: ['Domain Users'], pwLastSet: '2024-01-17', lastLogon: 'Never',
-    })
+    }
+    os.createADUser(user)
+    if (os.labAction) {
+      os.labAction('create_ad_user', {
+        name: account,
+        display,
+        enabled: !opts.disabled,
+        ou: user.ou,
+        groups: ['Domain Users'],
+        must_change_pw: opts.mustChange,
+      })
+    }
     onDone(display); onClose()
   }
 
@@ -166,7 +192,11 @@ function ResetDialog({ user, onClose, onDone }) {
   const os = useOS()
   return (
     <Dialog title="Reset Password" onClose={onClose} width={420}
-      footer={<><button className="winos-btn primary" disabled={!pw || pw !== pw2} onClick={() => { os.modifyADUser(user.sam, { locked: false, pwLastSet: '2024-01-17' }); onDone(); onClose() }}>OK</button><button className="winos-btn" onClick={onClose}>Cancel</button></>}>
+      footer={<><button className="winos-btn primary" disabled={!pw || pw !== pw2} onClick={() => {
+        os.modifyADUser(user.sam, { locked: false, pwLastSet: '2024-01-17' })
+        if (os.labAction) os.labAction('reset_password', { user: user.sam })
+        onDone(); onClose()
+      }}>OK</button><button className="winos-btn" onClick={onClose}>Cancel</button></>}>
       <div className="winos-grid2" style={{ fontSize: 12.5 }}>
         <span>New password:</span><input className="winos-input" type="password" value={pw} onChange={(e) => setPw(e.target.value)} />
         <span>Confirm password:</span><input className="winos-input" type="password" value={pw2} onChange={(e) => setPw2(e.target.value)} />

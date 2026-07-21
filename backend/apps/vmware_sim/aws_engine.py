@@ -836,6 +836,129 @@ def apply_action(session_id: str, action: str, payload: dict | None = None) -> d
         _save(session_id, entry)
         return {"ok": True, "message": "AllocateAddress succeeded", "allocation_id": eip["allocationId"]}
 
+    if action == "associate_eip":
+        alloc = payload.get("allocation_id") or ""
+        eip = next((e for e in state.get("elasticIps", []) if e.get("allocationId") == alloc), None)
+        if not eip:
+            return {"ok": False, "error": f"The allocation ID '{alloc}' does not exist"}
+        inst_id = payload.get("instance_id") or ""
+        inst = _find_instance(state, inst_id) if inst_id else None
+        if not inst:
+            return {"ok": False, "error": f"The instance ID '{inst_id}' does not exist"}
+        eip["associationId"] = payload.get("association_id") or f"eipassoc-0{_hex(16)}"
+        eip["instanceId"] = inst_id
+        inst["publicIp"] = eip.get("publicIp") or ""
+        _event(state, f"Associated {eip['publicIp']} with {inst_id}", "success")
+        _save(session_id, entry)
+        return {"ok": True, "message": "AssociateAddress succeeded"}
+
+    if action == "disassociate_eip":
+        alloc = payload.get("allocation_id") or ""
+        eip = next((e for e in state.get("elasticIps", []) if e.get("allocationId") == alloc), None)
+        if not eip:
+            return {"ok": False, "error": f"The allocation ID '{alloc}' does not exist"}
+        inst_id = eip.get("instanceId")
+        if inst_id:
+            inst = _find_instance(state, inst_id)
+            if inst:
+                inst["publicIp"] = ""
+        eip["associationId"] = None
+        eip["instanceId"] = None
+        _event(state, f"Disassociated Elastic IP {eip.get('publicIp')}", "info")
+        _save(session_id, entry)
+        return {"ok": True, "message": "DisassociateAddress succeeded"}
+
+    if action == "release_eip":
+        alloc = payload.get("allocation_id") or ""
+        eip = next((e for e in state.get("elasticIps", []) if e.get("allocationId") == alloc), None)
+        if not eip:
+            return {"ok": False, "error": f"The allocation ID '{alloc}' does not exist"}
+        if eip.get("associationId"):
+            return {"ok": False, "error": f"The address with allocation id '{alloc}' is currently associated and cannot be released. Disassociate it first."}
+        state["elasticIps"] = [e for e in state["elasticIps"] if e.get("allocationId") != alloc]
+        _event(state, f"Released Elastic IP {eip.get('publicIp')}", "info")
+        _save(session_id, entry)
+        return {"ok": True, "message": "ReleaseAddress succeeded"}
+
+    if action == "create_internet_gateway":
+        igw = {
+            "id": payload.get("igw_id") or new_igw_id(),
+            "region": region,
+            "vpcId": None,
+            "state": "detached",
+            "name": payload.get("name") or "",
+        }
+        state.setdefault("internetGateways", []).append(igw)
+        _event(state, f"Internet gateway {igw['id']} created", "success")
+        _save(session_id, entry)
+        return {"ok": True, "message": "CreateInternetGateway succeeded", "igw_id": igw["id"]}
+
+    if action == "attach_internet_gateway":
+        igw_id = payload.get("igw_id") or payload.get("id")
+        vpc_id = payload.get("vpc_id") or ""
+        igw = next((g for g in state.get("internetGateways", []) if g.get("id") == igw_id), None)
+        if not igw:
+            return {"ok": False, "error": f"The internetGateway '{igw_id}' does not exist"}
+        if any(g.get("vpcId") == vpc_id and g.get("id") != igw_id for g in state.get("internetGateways", [])):
+            return {"ok": False, "error": f"resource {vpc_id} already has an internet gateway attached"}
+        igw["vpcId"] = vpc_id
+        igw["state"] = "attached"
+        _event(state, f"Attached {igw_id} to {vpc_id}", "success")
+        _save(session_id, entry)
+        return {"ok": True, "message": "AttachInternetGateway succeeded"}
+
+    if action == "detach_internet_gateway":
+        igw_id = payload.get("igw_id") or payload.get("id")
+        igw = next((g for g in state.get("internetGateways", []) if g.get("id") == igw_id), None)
+        if not igw:
+            return {"ok": False, "error": f"The internetGateway '{igw_id}' does not exist"}
+        igw["vpcId"] = None
+        igw["state"] = "detached"
+        _event(state, f"Detached internet gateway {igw_id}", "info")
+        _save(session_id, entry)
+        return {"ok": True, "message": "DetachInternetGateway succeeded"}
+
+    if action == "delete_internet_gateway":
+        igw_id = payload.get("igw_id") or payload.get("id")
+        igw = next((g for g in state.get("internetGateways", []) if g.get("id") == igw_id), None)
+        if not igw:
+            return {"ok": False, "error": f"The internetGateway '{igw_id}' does not exist"}
+        if igw.get("state") == "attached":
+            return {"ok": False, "error": f"The internetGateway '{igw_id}' has dependencies and cannot be deleted. Detach it first."}
+        state["internetGateways"] = [g for g in state["internetGateways"] if g.get("id") != igw_id]
+        _event(state, f"Deleted internet gateway {igw_id}", "info")
+        _save(session_id, entry)
+        return {"ok": True, "message": "DeleteInternetGateway succeeded"}
+
+    if action == "create_key_pair":
+        name = (payload.get("name") or "").strip()
+        if not name:
+            return {"ok": False, "error": "Key pair name is required"}
+        if any(k.get("name") == name for k in state.get("keyPairs", [])):
+            return {"ok": False, "error": f"InvalidKeyPair.Duplicate: The keypair '{name}' already exists."}
+        kp = {
+            "id": payload.get("key_pair_id") or new_key_pair_id(),
+            "region": region,
+            "name": name,
+            "type": payload.get("type") or "rsa",
+            "fingerprint": ":".join(f"{random.randint(0, 255):02x}" for _ in range(16)),
+            "created": _now_iso(),
+        }
+        state.setdefault("keyPairs", []).append(kp)
+        _event(state, f"Key pair {name} created", "success")
+        _save(session_id, entry)
+        return {"ok": True, "message": "CreateKeyPair succeeded", "key_pair_id": kp["id"]}
+
+    if action == "delete_key_pair":
+        name = payload.get("name") or ""
+        before = len(state.get("keyPairs") or [])
+        state["keyPairs"] = [k for k in (state.get("keyPairs") or []) if k.get("name") != name]
+        if len(state.get("keyPairs") or []) == before:
+            return {"ok": False, "error": f"InvalidKeyPair.NotFound: The key pair '{name}' does not exist"}
+        _event(state, f"Key pair {name} deleted", "info")
+        _save(session_id, entry)
+        return {"ok": True, "message": "DeleteKeyPair succeeded"}
+
     if action == "delete_iam_user":
         uname = payload.get("name") or ""
         before = len(state.get("iamUsers") or [])

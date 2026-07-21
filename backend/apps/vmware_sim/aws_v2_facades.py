@@ -334,6 +334,78 @@ def apply_v2_action(state: dict, action: str, payload: dict) -> dict | None:
         state.setdefault("autoScalingGroups", []).append(asg)
         return {"ok": True, "message": f"Created ASG {name}", "asg": asg}
 
+    if action == "delete_asg":
+        ident = payload.get("id") or payload.get("name") or ""
+        before = len(state.get("autoScalingGroups") or [])
+        state["autoScalingGroups"] = [
+            a for a in (state.get("autoScalingGroups") or [])
+            if a.get("id") != ident and a.get("name") != ident
+        ]
+        if len(state.get("autoScalingGroups") or []) == before:
+            return {"ok": False, "error": "Auto Scaling group not found"}
+        return {"ok": True, "message": f"Deleted ASG {ident}"}
+
+    if action == "delete_load_balancer":
+        ident = payload.get("id") or payload.get("name") or ""
+        before = len(state.get("loadBalancers") or [])
+        state["loadBalancers"] = [
+            lb for lb in (state.get("loadBalancers") or [])
+            if lb.get("id") != ident and lb.get("name") != ident
+        ]
+        if len(state.get("loadBalancers") or []) == before:
+            return {"ok": False, "error": "Load balancer not found"}
+        return {"ok": True, "message": f"Deleted load balancer {ident}"}
+
+    if action == "create_target_group":
+        name = (payload.get("name") or f"tg-{_hex(4)}").strip()
+        tg = {
+            "id": payload.get("id") or f"tg-0{_hex(16)}",
+            "region": "us-east-1",
+            "name": name,
+            "protocol": payload.get("protocol") or "HTTP",
+            "port": int(payload.get("port") or 80),
+            "vpcId": payload.get("vpcId") or "vpc-0a1b2c3d4e5f67890",
+            "targetType": payload.get("targetType") or "instance",
+            "targets": [],
+            "created": _now(),
+        }
+        state.setdefault("targetGroups", []).append(tg)
+        return {"ok": True, "message": f"Created target group {name}", "targetGroup": tg}
+
+    if action == "delete_target_group":
+        ident = payload.get("id") or payload.get("name") or ""
+        before = len(state.get("targetGroups") or [])
+        state["targetGroups"] = [
+            tg for tg in (state.get("targetGroups") or [])
+            if tg.get("id") != ident and tg.get("name") != ident
+        ]
+        if len(state.get("targetGroups") or []) == before:
+            return {"ok": False, "error": "Target group not found"}
+        return {"ok": True, "message": f"Deleted target group {ident}"}
+
+    if action == "register_target":
+        tg_id = payload.get("target_group_id") or payload.get("id") or ""
+        tg = next((t for t in state.get("targetGroups") or [] if t.get("id") == tg_id or t.get("name") == tg_id), None)
+        if not tg and state.get("targetGroups"):
+            tg = state["targetGroups"][0]
+        if not tg:
+            return {"ok": False, "error": "Target group not found"}
+        inst_id = payload.get("instance_id") or ""
+        port = int(payload.get("port") or tg.get("port") or 80)
+        targets = [t for t in (tg.get("targets") or []) if t.get("id") != inst_id]
+        targets.append({"id": inst_id, "port": port, "health": "initial"})
+        tg["targets"] = targets
+        return {"ok": True, "message": f"Registered {inst_id} on {tg['name']}", "targetGroup": tg}
+
+    if action == "deregister_target":
+        tg_id = payload.get("target_group_id") or payload.get("id") or ""
+        tg = next((t for t in state.get("targetGroups") or [] if t.get("id") == tg_id or t.get("name") == tg_id), None)
+        if not tg:
+            return {"ok": False, "error": "Target group not found"}
+        inst_id = payload.get("instance_id") or ""
+        tg["targets"] = [t for t in (tg.get("targets") or []) if t.get("id") != inst_id]
+        return {"ok": True, "message": f"Deregistered {inst_id} from {tg['name']}", "targetGroup": tg}
+
     # Generic create from frontend sync
     if action == "create_generic_resource":
         service = payload.get("service") or ""

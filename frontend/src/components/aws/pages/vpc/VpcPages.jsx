@@ -1,12 +1,16 @@
+import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useAwsStore, scoped } from '../../store/awsStore'
-import { Badge, DataTable, IDCopy, SectionLabel } from '../../ui/primitives'
+import { Badge, Button, DataTable, IDCopy, Modal, SectionLabel } from '../../ui/primitives'
 import { BASE } from '../../layout/serviceNav'
 
-function Page({ title, children }) {
+function Page({ title, action, children }) {
   return (
     <div className="aws-page">
-      <h1 style={{ marginBottom: 16 }}>{title}</h1>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
+        <h1>{title}</h1>
+        {action}
+      </div>
       {children}
     </div>
   )
@@ -150,10 +154,65 @@ export function RouteTableList() {
 export function InternetGatewayList() {
   const region = useAwsStore((s) => s.region)
   const igws = scoped(useAwsStore((s) => s.internetGateways), region)
+  const vpcs = scoped(useAwsStore((s) => s.vpcs), region)
+  const createIgw = useAwsStore((s) => s.createInternetGateway)
+  const attachIgw = useAwsStore((s) => s.attachInternetGateway)
+  const detachIgw = useAwsStore((s) => s.detachInternetGateway)
+  const deleteIgw = useAwsStore((s) => s.deleteInternetGateway)
+  const pushFlash = useAwsStore((s) => s.pushFlash)
+  const [attachTarget, setAttachTarget] = useState(null)
+  const [attachVpc, setAttachVpc] = useState('')
+
   const columns = [
     { key: 'id', label: 'Internet gateway ID', render: (r) => <IDCopy value={r.id} /> },
     { key: 'state', label: 'State', render: (r) => <Badge state="available">{r.state}</Badge> },
-    { key: 'vpcId', label: 'VPC ID', render: (r) => <span className="aws-mono">{r.vpcId}</span> },
+    { key: 'vpcId', label: 'VPC ID', render: (r) => <span className="aws-mono">{r.vpcId || '—'}</span> },
+    {
+      key: 'actions', label: '', sortable: false,
+      render: (r) => (r.state === 'attached'
+        ? <Button variant="link" onClick={() => { const res = detachIgw(r.id); if (res?.ok === false) return; pushFlash('success', `Detached ${r.id}`) }}>Detach</Button>
+        : <Button variant="link" onClick={() => { setAttachVpc(vpcs[0]?.id || ''); setAttachTarget(r) }}>Attach to VPC</Button>),
+    },
   ]
-  return <Page title={`Internet gateways (${igws.length})`}><DataTable columns={columns} rows={igws} getRowKey={(r) => r.id} selectable selected={[]} onSelect={() => {}} /></Page>
+  return (
+    <Page
+      title={`Internet gateways (${igws.length})`}
+      action={<Button variant="primary" onClick={() => { const g = createIgw({ name: `igw-${Date.now().toString(36).slice(-4)}` }); pushFlash('success', `Created ${g.id}`) }}>Create internet gateway</Button>}
+    >
+      <DataTable
+        columns={columns}
+        rows={igws}
+        getRowKey={(r) => r.id}
+        selectable
+        selected={[]}
+        onSelect={() => {}}
+        rowActions={(r) => [
+          ...(r.state === 'attached'
+            ? [{ label: 'Detach from VPC', onClick: () => { detachIgw(r.id); pushFlash('success', `Detached ${r.id}`) } }]
+            : [{ label: 'Attach to VPC', onClick: () => { setAttachVpc(vpcs[0]?.id || ''); setAttachTarget(r) } }]),
+          { label: 'Delete', danger: true, onClick: () => { const res = deleteIgw(r.id); if (res?.ok === false) return; pushFlash('success', `Deleted ${r.id}`) } },
+        ]}
+      />
+      {attachTarget && (
+        <Modal title={`Attach ${attachTarget.id}`} onClose={() => setAttachTarget(null)}
+          footer={(
+            <>
+              <Button onClick={() => setAttachTarget(null)}>Cancel</Button>
+              <Button variant="primary" disabled={!attachVpc} onClick={() => {
+                const res = attachIgw(attachTarget.id, attachVpc)
+                if (res?.ok === false) return
+                pushFlash('success', `Attached ${attachTarget.id} to ${attachVpc}`)
+                setAttachTarget(null)
+              }}>Attach</Button>
+            </>
+          )}>
+          <label className="aws-label">VPC</label>
+          <select className="aws-select" value={attachVpc} onChange={(e) => setAttachVpc(e.target.value)}>
+            <option value="">Select a VPC</option>
+            {vpcs.map((v) => <option key={v.id} value={v.id}>{v.id}{v.name ? ` (${v.name})` : ''} · {v.cidr}</option>)}
+          </select>
+        </Modal>
+      )}
+    </Page>
+  )
 }

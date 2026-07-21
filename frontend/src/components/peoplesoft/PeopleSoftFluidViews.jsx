@@ -241,32 +241,42 @@ export function PaycheckReview({ profile, onReprint, busy }) {
   )
 }
 
-export function ProcessMonitorTable({ runs = [], onRerun, busy }) {
+export function ProcessMonitorTable({ runs = [], onRerun, onRunProcess, busy }) {
   const rows = runs.length ? runs : PS_PROCESS_INSTANCES
   return (
-    <table className="w-full text-sm bg-white rounded border border-slate-200 overflow-hidden">
-      <thead><tr className="bg-slate-50 text-slate-500 text-xs">
-        {['Instance', 'Process', 'Description', 'Server', 'Status', 'Run Date/Time', ''].map((h) => <th key={h} className="px-3 py-2 text-left font-medium">{h}</th>)}
-      </tr></thead>
-      <tbody>
-        {rows.map((r) => (
-          <tr key={r.instance} className="border-t border-slate-100 hover:bg-slate-50">
-            <td className="px-3 py-2 font-mono">{r.instance}</td>
-            <td className="px-3 py-2 font-mono text-xs">{r.name || r.process}</td>
-            <td className="px-3 py-2 text-slate-600">{r.description || r.run_control || '—'}</td>
-            <td className="px-3 py-2">{r.server}</td>
-            <td className="px-3 py-2"><SimStatusBadge status={(r.status || '').toLowerCase()} label={r.status} /></td>
-            <td className="px-3 py-2 text-slate-500 text-xs">{r.runDt || r.run_datetime || '—'}</td>
-            <td className="px-3 py-2 text-right">
-              {['error', 'cancelled'].includes((r.status || '').toLowerCase()) && onRerun && (
-                <button type="button" disabled={busy} onClick={() => onRerun(r.instance)}
-                  className="text-xs px-2 py-1 rounded text-white" style={{ background: PS_BLUE }}>Rerun</button>
-              )}
-            </td>
-          </tr>
-        ))}
-      </tbody>
-    </table>
+    <div className="space-y-3">
+      {onRunProcess && (
+        <div className="flex justify-end">
+          <button type="button" disabled={busy} onClick={() => onRunProcess('PAY001')}
+            className="text-xs px-3 py-1.5 rounded text-white disabled:opacity-50 flex items-center gap-1" style={{ background: PS_BLUE }}>
+            Run Process
+          </button>
+        </div>
+      )}
+      <table className="w-full text-sm bg-white rounded border border-slate-200 overflow-hidden">
+        <thead><tr className="bg-slate-50 text-slate-500 text-xs">
+          {['Instance', 'Process', 'Description', 'Server', 'Status', 'Run Date/Time', ''].map((h) => <th key={h} className="px-3 py-2 text-left font-medium">{h}</th>)}
+        </tr></thead>
+        <tbody>
+          {rows.map((r) => (
+            <tr key={r.instance} className="border-t border-slate-100 hover:bg-slate-50">
+              <td className="px-3 py-2 font-mono">{r.instance}</td>
+              <td className="px-3 py-2 font-mono text-xs">{r.name || r.process}</td>
+              <td className="px-3 py-2 text-slate-600">{r.description || r.run_control || '—'}</td>
+              <td className="px-3 py-2">{r.server}</td>
+              <td className="px-3 py-2"><SimStatusBadge status={(r.status || '').toLowerCase()} label={r.status} /></td>
+              <td className="px-3 py-2 text-slate-500 text-xs">{r.runDt || r.run_datetime || '—'}</td>
+              <td className="px-3 py-2 text-right">
+                {['error', 'cancelled'].includes((r.status || '').toLowerCase()) && onRerun && (
+                  <button type="button" disabled={busy} onClick={() => onRerun(r.instance)}
+                    className="text-xs px-2 py-1 rounded text-white" style={{ background: PS_BLUE }}>Rerun</button>
+                )}
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
   )
 }
 
@@ -275,7 +285,7 @@ export function ProcessMonitorTable({ runs = [], onRerun, busy }) {
 // where an administrator grants/revokes roles and a "General" tab with the
 // Account Locked Out flag. This renders both so the grant-role and
 // locked-account scenarios are fixable through the GUI.
-export function SecurityUsers({ users = [], roles = [], busy, onAssignRole, onRemoveRole, onUnlock }) {
+export function SecurityUsers({ users = [], roles = [], busy, onAssignRole, onRemoveRole, onUnlock, onEnable, onDisable, onResetPassword }) {
   const [selected, setSelected] = useState(users[0]?.oprid || '')
   const active = users.find((u) => u.oprid === selected) || users[0] || null
   const heldIds = new Set((active?.roles || []).map((r) => String(r)))
@@ -295,7 +305,9 @@ export function SecurityUsers({ users = [], roles = [], busy, onAssignRole, onRe
               <span className="font-mono">{u.oprid}</span>
               {u.locked
                 ? <span className="text-[11px] text-red-600">Locked</span>
-                : <span className="text-[11px] text-green-600">Active</span>}
+                : u.enabled === false
+                  ? <span className="text-[11px] text-amber-600">Disabled</span>
+                  : <span className="text-[11px] text-green-600">Active</span>}
             </button>
           ))}
         </div>
@@ -325,6 +337,20 @@ export function SecurityUsers({ users = [], roles = [], busy, onAssignRole, onRe
                 </button>
               </div>
             )}
+
+            <div className="flex flex-wrap gap-2">
+              {active.enabled === false
+                ? (
+                  <button type="button" disabled={busy} onClick={() => onEnable?.(active.oprid)}
+                    className="text-xs px-2.5 py-1 rounded bg-slate-700 text-white disabled:opacity-50">Enable</button>
+                )
+                : (
+                  <button type="button" disabled={busy} onClick={() => onDisable?.(active.oprid)}
+                    className="text-xs px-2.5 py-1 rounded border border-slate-300 text-slate-700 disabled:opacity-50">Disable</button>
+                )}
+              <button type="button" disabled={busy} onClick={() => onResetPassword?.(active.oprid)}
+                className="text-xs px-2.5 py-1 rounded border border-slate-300 text-slate-700 disabled:opacity-50">Reset password</button>
+            </div>
 
             <div>
               <div className="text-[11px] uppercase tracking-wide text-slate-500 mb-1.5">Roles</div>

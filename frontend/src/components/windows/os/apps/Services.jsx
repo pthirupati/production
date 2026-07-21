@@ -13,13 +13,29 @@ export default function Services() {
   const svcs = [...os.services].sort((a, b) => String(a[sort]).localeCompare(String(b[sort])))
   const selected = os.services.find((s) => s.name === sel)
 
+  const start = (name) => {
+    os.startService(name)
+    if (os.labAction) os.labAction('start_service', { service: name })
+  }
+  const stop = (name) => {
+    os.stopService(name)
+    if (os.labAction) os.labAction('stop_service', { service: name })
+  }
+  const restart = (name) => {
+    os.stopService(name)
+    setTimeout(() => {
+      os.startService(name)
+      if (os.labAction) os.labAction('restart_service', { service: name })
+    }, 50)
+  }
+
   const rowCtx = (s) => (e) => {
     e.preventDefault(); setSel(s.name)
     ctx.open(e.clientX, e.clientY, [
-      { label: 'Start', disabled: s.status === 'Running' || s.startup === 'Disabled', onClick: () => os.startService(s.name) },
-      { label: 'Stop', disabled: s.status !== 'Running', onClick: () => os.stopService(s.name) },
+      { label: 'Start', disabled: s.status === 'Running' || s.startup === 'Disabled', onClick: () => start(s.name) },
+      { label: 'Stop', disabled: s.status !== 'Running', onClick: () => stop(s.name) },
       { label: 'Pause', disabled: true }, { label: 'Resume', disabled: true },
-      { label: 'Restart', disabled: s.status !== 'Running', onClick: () => { os.stopService(s.name); setTimeout(() => os.startService(s.name), 50) } },
+      { label: 'Restart', disabled: s.status !== 'Running', onClick: () => restart(s.name) },
       { sep: true }, { label: 'Refresh' }, { label: 'Properties', onClick: () => setProps(s) },
     ])
   }
@@ -29,9 +45,9 @@ export default function Services() {
       <div className="winos-toolbar">
         <strong style={{ fontSize: 13 }}>Services</strong>
         <span style={{ flex: 1 }} />
-        <button className="winos-btn" disabled={!selected || selected.status === 'Running' || selected.startup === 'Disabled'} onClick={() => os.startService(sel)}><Play size={13} /> Start</button>
-        <button className="winos-btn" disabled={!selected || selected.status !== 'Running'} onClick={() => os.stopService(sel)}><Square size={13} /> Stop</button>
-        <button className="winos-btn" disabled={!selected || selected.status !== 'Running'} onClick={() => { os.stopService(sel); setTimeout(() => os.startService(sel), 50) }}><RotateCw size={13} /> Restart</button>
+        <button className="winos-btn" disabled={!selected || selected.status === 'Running' || selected.startup === 'Disabled'} onClick={() => start(sel)}><Play size={13} /> Start</button>
+        <button className="winos-btn" disabled={!selected || selected.status !== 'Running'} onClick={() => stop(sel)}><Square size={13} /> Stop</button>
+        <button className="winos-btn" disabled={!selected || selected.status !== 'Running'} onClick={() => restart(sel)}><RotateCw size={13} /> Restart</button>
       </div>
       <div className="winos-split">
         {selected && (
@@ -39,8 +55,8 @@ export default function Services() {
             <div style={{ fontWeight: 600, marginBottom: 6 }}>{selected.display}</div>
             <div style={{ color: '#555', marginBottom: 10, lineHeight: 1.4 }}>{selected.desc}</div>
             {selected.status === 'Running'
-              ? <><a style={{ color: '#06c', cursor: 'default' }} onClick={() => os.stopService(sel)}>Stop the service</a><br /><a style={{ color: '#06c', cursor: 'default' }} onClick={() => { os.stopService(sel); setTimeout(() => os.startService(sel), 50) }}>Restart the service</a></>
-              : <a style={{ color: '#06c', cursor: 'default' }} onClick={() => selected.startup !== 'Disabled' && os.startService(sel)}>Start the service</a>}
+              ? <><a style={{ color: '#06c', cursor: 'default' }} onClick={() => stop(sel)}>Stop the service</a><br /><a style={{ color: '#06c', cursor: 'default' }} onClick={() => restart(sel)}>Restart the service</a></>
+              : <a style={{ color: '#06c', cursor: 'default' }} onClick={() => selected.startup !== 'Disabled' && start(sel)}>Start the service</a>}
           </div>
         )}
         <div className="winos-main">
